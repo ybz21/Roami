@@ -11,6 +11,7 @@ import { P2PTransferStatus, type TransferView } from '../../p2p/P2PTransferStatu
 import { recentDirs } from '../sessions/DirPicker'
 import { usePreferences } from '../../preferences'
 import { dirname, fileNameOf, fmtSize, joinPath, normalizePath } from './file-utils'
+import { loadExpandedDirs, saveExpandedDirs } from './tree-expansion-memory'
 import { copyText } from '../chat/blocks'
 import {
   BackIcon, Chevron, ClosePanelButton, CloseIcon, DownloadIcon, EyeIcon, EyeOffIcon, FileTypeIcon, FolderIcon,
@@ -251,7 +252,8 @@ function FileTree({
   onOpenFile: (full: string) => void
   actions: FileMenuActions
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // 展开到哪几层记在本机（按根目录），刷新和换任务再回来都还在（tree-expansion-memory）
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(loadExpandedDirs(root)))
   const [childMap, setChildMap] = useState<Record<string, Entry[]>>({})
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const { t } = useI18n()
@@ -271,25 +273,29 @@ function FileTree({
   }
 
   const prevRoot = useRef(root)
-  // 换根目录 → 清空展开态与缓存（旧展开对新目录无意义）。
+  // 换根目录 → 子项缓存作废，展开态换成**新根记着的那份**（旧根的展开对新目录无意义，
+  // 但新根自己上次展开到哪儿是该留着的）。
   // 刷新(tick 变、root 不变) → 保留展开层级，静默重拉各已展开目录的子项，
   // 让新增/删除的文件显示出来而不折叠（顶层 rootEntries 由父组件随 tick 重拉）。
+  // 挂载那一跑走的也是下面这支：把记着的那几层的子项拉回来，树才展得开。
   useEffect(() => {
     if (prevRoot.current !== root) {
       prevRoot.current = root
-      setExpanded(new Set()); setChildMap({}); setLoading({})
+      const remembered = loadExpandedDirs(root)
+      setExpanded(new Set(remembered)); setChildMap({}); setLoading({})
+      remembered.forEach((dirPath) => loadDir(dirPath))
       return
     }
     expanded.forEach((dirPath) => reloadDir(dirPath))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root, tick])
   const toggleDir = (dirPath: string) => {
-    setExpanded((s) => {
-      const n = new Set(s)
-      if (n.has(dirPath)) n.delete(dirPath)
-      else { n.add(dirPath); if (!(dirPath in childMap)) loadDir(dirPath) }
-      return n
-    })
+    // 在更新函数外面算好再 setState：里面顺手存盘的话，StrictMode 会把这段跑两遍
+    const next = new Set(expanded)
+    if (next.has(dirPath)) next.delete(dirPath)
+    else { next.add(dirPath); if (!(dirPath in childMap)) loadDir(dirPath) }
+    setExpanded(next)
+    saveExpandedDirs(root, [...next])
   }
   const visible = (entries: Entry[]) => sortEntries((entries || []).filter((e) => showHidden || !e.name.startsWith('.')), sortKey)
 
