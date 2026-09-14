@@ -1965,6 +1965,25 @@ html[data-pointer="coarse"] .cc-git-section-act .cc-dl { opacity: 1; }
   }
 }
 
+/* ── 图片预览：适应窗口起步，放大后自己滚 ──
+   画布必须是 overflow:auto 的普通块，图的显示尺寸由 JS 写在 style 上（见 ImageView）。
+   不要回到 place-items:center：居中的栅格/弹性行不会低于 min-content，长截图会把行撑成
+   原始高度，maxHeight:100% 于是永远不生效，图被外层裁掉又滚不动。 */
+.tt-imgview { height: 100%; min-height: 0; display: flex; flex-direction: column;
+  background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); overflow: hidden; }
+.tt-imgview-canvas { flex: 1; min-height: 0; overflow: auto; display: flex;
+  /* 捏合自己处理（要锚在两指中点上），平移交给原生滚动 */
+  touch-action: pan-x pan-y; outline: none; }
+/* margin:auto 而不是居中对齐：子项比容器大时，居中会把起始那一边挪到滚动区外，再也滚不回去 */
+.tt-imgview-canvas > img { margin: auto; display: block; }
+.tt-imgview-canvas:focus-visible { outline: 1px solid var(--accent-border); outline-offset: -1px; }
+.tt-imgview-canvas.pan { cursor: grab; }
+.tt-imgview-canvas.pan:active { cursor: grabbing; }
+.tt-imgview-bar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2); border-top: 1px solid var(--border-subtle); }
+.tt-imgview-bar .dim { margin-left: auto; color: var(--text-dimmer);
+  font: var(--fs-micro)/1 ui-monospace, monospace; }
+
 /* ── Swarm topology: draggable rich graph cards ── */
 .swarm-topology-node {
   transition: opacity .16s ease, filter .16s ease;

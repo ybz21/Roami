@@ -193,7 +193,7 @@ export function FileView({
   const bodyNode = (
     <>
       {isImg ? (
-        <ImageView rawUrl={rawUrl} name={name} />
+        <ImageView rawUrl={rawUrl} name={name} height={previewHeight} />
       ) : isMedia ? (
         <MediaView path={path} rawUrl={rawUrl} name={name} audio={isAudio} inline={inline} />
       ) : isPdf ? (

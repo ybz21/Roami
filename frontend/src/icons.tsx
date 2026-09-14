@@ -138,6 +138,15 @@ export const ReadIcon = ({ size = 13 }: P) => line(
 export const PencilIcon = ({ size = 13 }: P) => line(<><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5Z" /><path d="m14.5 5.5 3 3" /></>, size)
 export const NotebookIcon = ({ size = 13 }: P) => line(<><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M9 3v18" /><path d="M13 8h3" /><path d="M13 12h3" /></>, size)
 export const SearchIcon = ({ size = 13 }: P) => line(<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /></>, size)
+// 放大 / 缩小：跟 SearchIcon 同一枚镜片，只是镜片里多一横（一竖）——工具条上三枚钮挨着，
+// 形状不同源会立刻看出来是拼的。
+export const ZoomInIcon = ({ size = 13 }: P) => line(
+  <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /><path d="M11 8.2v5.6" /><path d="M8.2 11h5.6" /></>, size)
+export const ZoomOutIcon = ({ size = 13 }: P) => line(
+  <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /><path d="M8.2 11h5.6" /></>, size)
+/** 适应窗口：四角向内收 */
+export const FitIcon = ({ size = 13 }: P) => line(
+  <><path d="M9 4.5H4.5V9" /><path d="M15 4.5h4.5V9" /><path d="M9 19.5H4.5V15" /><path d="M15 19.5h4.5V15" /></>, size)
 // 搜索结果里区分「这是个文件夹/项目」还是「这是个文件」。按类型细分的文件图标在
 // file-icons.tsx，那是文件列表的活；这里只要一个中性的通用件。
 export const PlugIcon = ({ size = 13 }: P) => line(
