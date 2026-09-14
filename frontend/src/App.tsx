@@ -467,7 +467,7 @@ export default function App() {
       if (mod && e.key.toLowerCase() === 'j') {
         e.preventDefault()
         // 任务视图：⌘J 开合右栏（Dock 没了，这个键让给它）；⌘⇧J 仍是 Focus
-        if (taskView && !e.shiftKey) { space.toggleInspectorCollapsed(); return }
+        if (taskView && !e.shiftKey) { toggleInspector(); return }
         if (e.shiftKey) { if (taskView) space.setNavCollapsed(!space.navCollapsed); else space.toggleFocus() }
         else { space.setFocus('none'); space.toggleDock() }
         return
@@ -514,7 +514,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hasSider, space, taskView, curFile, active])
+  }, [hasSider, space, taskView, curFile, active, panel, sessIds])  // panel/sessIds：⌘J 那一支要靠它们算出「记到哪个标签、记成哪个面板」
 
   // 启动：先确认登录态，**再**做多机引导，最后才放行渲染。
   //
