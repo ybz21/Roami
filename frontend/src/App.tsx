@@ -45,6 +45,7 @@ import { useWorkspaceLayout, NAV_WIDTH, NAV_RAIL } from './components/shell/useW
 import { Workspace, SessionCapsule } from './components/shell/Workspace'
 import { Navigation } from './components/shell/Navigation'
 import { reorderTabs } from './components/shell/tabs'
+import { nextInspector, pruneTabInspector, recallTabInspector, rememberTabInspector, tabKey } from './components/shell/tab-inspector-memory'
 import { requestIntent, OPEN_FILE_INTENT } from './intents'
 import { SessionDock } from './components/shell/SessionDock'
 import { WorkspaceStatusBar } from './components/shell/WorkspaceStatusBar'
@@ -176,6 +177,10 @@ export default function App() {
   // 组件内部一律用会话名——后端 API / WebSocket 收发的都是名字。
   const [terms, setTerms] = useState<string[]>([])
   const [active, setActive] = useState<string | null>(null)
+  // ── 会话身份映射（id ↔ 名字）──（拉取在下面那条 /sessions 轮询里）
+  // 会话名可以随时改，用它当 URL 里的 handle 会让分享/收藏的链接一改名就指空。id 由后端按
+  // tmux session_id 派生、改名不变，所以 URL 只写 id。名字仍是 API/WS 的 handle，只在这里换算。
+  const [sessIds, setSessIds] = useState<{ byId: Record<string, string>; byName: Record<string, string> } | null>(null)
   // 标签条**不按任务隔离**（用户拍板，推翻 22 设计 §3.3 的分片）：所有会话标签都在条上。
   // 「当前任务」不是独立状态，而是从当前标签推出来的：会话标签看它的 worktree（taskKeyOf），
   // 文件标签看它是从哪个任务开的。左树高亮、右栏的根、新建会话落进哪个目录，都跟着它走。
@@ -265,6 +270,47 @@ export default function App() {
   const taskView = hasSider && tab === TASK_ROUTE
   // 空间状态（Page / Split / Focus）与 Dock 宽度：唯一的尺寸契约来源
   const space = useWorkspaceLayout(terms.length > 0 || taskView, taskView)
+
+  // 右栏状态跟着标签走：切回一个标签，它上次开着就还开着、停在哪个面板也照旧。
+  // 只在 large 档做——窄档右栏是覆盖式面板，切个标签就弹一层盖住正文，那不是记忆是打扰。
+  // 会话那一半用**写进 URL 的那个 token**（会话 id），不是显示名：还原时 id→名字的映射
+  // 晚一步才到，中间那一帧 active 还是 id。拿 active 直接当键，刷新前后就是两个键——
+  // 记的那笔查不到，还会被下面的 prune 当成关掉的标签清掉（第一版就是这么丢的）。
+  const insTab = tabKey({ active: (active && sessIds?.byName[active]) || active || '', activeFile })
+  const rememberIns = (rec: { collapsed: boolean; panel: InspectorPanelKind }) => {
+    // 只在任务视图里记：项目页/会话页也开得出右栏，但那里开的不属于任何一个标签，
+    // 记到当前标签名下就成了「在别处开的，回到这个标签也跟着开」。
+    if (taskView && space.large) rememberTabInspector(insTab, rec)
+  }
+  const toggleInspector = () => {
+    const collapsed = !space.inspectorCollapsed
+    space.setInspectorCollapsed(collapsed)
+    rememberIns({ collapsed, panel })
+  }
+  /** 展开右栏（可顺带切面板）：⌘⇧E/G/F、对话工具行的 Git 都走这里 */
+  const showInspector = (p?: InspectorPanelKind) => {
+    if (p) setPanel(p)
+    space.setInspectorCollapsed(false)
+    rememberIns({ collapsed: false, panel: p || panel })
+  }
+  const pickPanel = (p: InspectorPanelKind) => {
+    setPanel(p)
+    rememberIns({ collapsed: space.inspectorCollapsed, panel: p })
+  }
+  // 换标签时：先把离开那个标签此刻的样子记下，再按新标签记着的摆好。
+  // 依赖里只有标签键——collapsed/panel 是**读**的，写进依赖会让「用户刚收起右栏」也触发一次
+  // 换标签逻辑，把他刚收起的状态当成新标签的状态存错地方。
+  const insTabRef = useRef('')
+  useEffect(() => {
+    if (!taskView || !space.large) return
+    const prev = insTabRef.current
+    if (prev === insTab) return
+    insTabRef.current = insTab
+    if (prev) rememberTabInspector(prev, { collapsed: space.inspectorCollapsed, panel })
+    const next = nextInspector(recallTabInspector(insTab), { collapsed: space.inspectorCollapsed, panel })
+    if (next.collapsed !== space.inspectorCollapsed) space.setInspectorCollapsed(next.collapsed)
+    if (next.panel !== panel) setPanel(next.panel)
+  }, [insTab, taskView, space.large])
   const { message: antMessage, modal: antModal } = AntApp.useApp()
   const modKeyLabel = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl+'
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
@@ -445,16 +491,14 @@ export default function App() {
       // ⌘⇧F：右栏切到「内容」搜索并聚焦（22 设计 §9）
       if (mod && e.shiftKey && taskView && e.key.toLowerCase() === 'f') {
         e.preventDefault()
-        setPanel('files')
-        space.setInspectorCollapsed(false)
+        showInspector('files')
         setSearchNonce((n) => n + 1)
         return
       }
       // 右栏切面板：⌘⇧E 文件、⌘⇧G Git（22 设计 §9）
       if (mod && e.shiftKey && taskView && (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'g')) {
         e.preventDefault()
-        setPanel(e.key.toLowerCase() === 'e' ? 'files' : 'git')
-        space.setInspectorCollapsed(false)
+        showInspector(e.key.toLowerCase() === 'e' ? 'files' : 'git')
         return
       }
       // Esc 收一层：覆盖态先收面板，聚焦态退回分栏。两者都不关终端、不离开页面。
@@ -496,10 +540,6 @@ export default function App() {
     return () => { alive = false }
   }, [])
 
-  // ── 会话身份映射（id ↔ 名字）──
-  // 会话名可以随时改，用它当 URL 里的 handle 会让分享/收藏的链接一改名就指空。id 由后端按
-  // tmux session_id 派生、改名不变，所以 URL 只写 id。名字仍是 API/WS 的 handle，只在这里换算。
-  const [sessIds, setSessIds] = useState<{ byId: Record<string, string>; byName: Record<string, string> } | null>(null)
   useEffect(() => {
     if (!authed) return
     let stop = false
@@ -572,6 +612,8 @@ export default function App() {
     })
     // 同一份东西再按机器存一份：切走了还能切回来（见 term-tabs-store）
     saveTabs(curNodeId, toks, activeTok, fileTabs, activeFile)
+    // 关掉的标签不留记录：文件标签的键是路径，翻过的文件多了这张表比标签本身还大
+    pruneTabInspector([...toks.map((t) => `s:${t}`), ...fileTabs.map((f) => `f:${f.path}`)])
   }, [terms, active, fileTabs, activeFile, sessIds, curNodeId])
 
   // 左栏树：三份原料 memo 一次；已打开会话探测到的 agent 比 /projects 的名单准
@@ -797,8 +839,8 @@ export default function App() {
       onNew={taskView ? { terminal: () => { void newTerminalInTask('shell') }, claude: () => { void newTerminalInTask('claude') }, codex: () => { void newTerminalInTask('codex') }, taskLabel: activeTaskLabel } : undefined}
       // 任务视图里对话点路径 / Git 都落到右栏三面板；手机与 Page 态退回 TerminalPane 自己的二级页
       onOpenFile={taskView ? (path, line) => openFileTab(path, line) : undefined}
-      onOpenGit={taskView ? () => { setPanel('git'); space.setInspectorCollapsed(false) } : undefined}
-      inspector={taskView ? { open: !space.inspectorCollapsed, toggle: () => space.toggleInspectorCollapsed() } : undefined}
+      onOpenGit={taskView ? () => showInspector('git') : undefined}
+      inspector={taskView ? { open: !space.inspectorCollapsed, toggle: toggleInspector } : undefined}
       fileTabs={taskView ? fileTabs : undefined} activeFile={taskView ? curFile : undefined}
       taskDir={activeTask && !isLooseTask(activeTask) ? activeTask : (activeProject?.dir || '')}
       onFileTab={setActiveFile} onCloseFile={closeFileTab} onPinFile={pinFileTab} onFileMode={setFileMode} reveal={reveal}
@@ -1065,7 +1107,7 @@ export default function App() {
             mode={space.mode} canvas={canvasNode} dock={dockNode}
             onDismiss={() => space.setDockOpen(false)}
             inspectorCollapsed={space.inspectorCollapsed}
-            onToggleInspector={space.toggleInspectorCollapsed}
+            onToggleInspector={toggleInspector}
             inspectorWidth={space.inspectorWidth} inspectorBounds={space.inspectorBounds}
             inspectorOverlay={!space.large} canvasFitsInspector={space.canvasFitsInspector}
             onInspectorResize={space.setInspectorWidth} onInspectorReset={space.resetInspectorWidth}
@@ -1090,7 +1132,7 @@ export default function App() {
               <InspectorColumn width={space.inspectorWidth} bounds={space.inspectorBounds}
                 overlay={!space.large} onResize={space.setInspectorWidth}
                 onReset={space.resetInspectorWidth}
-                collapsed={space.inspectorCollapsed} onToggleCollapsed={space.toggleInspectorCollapsed} />
+                collapsed={space.inspectorCollapsed} onToggleCollapsed={toggleInspector} />
             )}
           </div>
         )}
@@ -1104,11 +1146,11 @@ export default function App() {
         const dir = activeTask && !loose ? activeTask : (activeProject?.dir || '')
         const scope = owner && task ? `${owner.name} · ${task.name}` : (active ? sessionLabel(active) || active : '')
         return (
-          <InspectorPanels open={taskView} panel={panel} onPanel={setPanel} dir={dir} scope={scope}
+          <InspectorPanels open={taskView} panel={panel} onPanel={pickPanel} dir={dir} scope={scope}
             openTerm={openTerm}
             onOpenFile={(p) => openFileTab(p)} selectedPath={curFile}
             searchNonce={searchNonce} onOpenLine={(p, line) => openFileTab(p, line)}
-            onClose={() => { if (!space.inspectorCollapsed) space.toggleInspectorCollapsed() }} />
+            onClose={() => { if (!space.inspectorCollapsed) toggleInspector() }} />
         )
       })()}
 
