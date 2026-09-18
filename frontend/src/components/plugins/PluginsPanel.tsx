@@ -11,12 +11,14 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import HostMonitorPanel from './HostMonitorPanel'
 import CronPanel from './CronPanel'
+import KeepalivePanel from './KeepalivePanel'
 import MobileSubPage from '../MobileSubPage'
 import { useLayout } from '../../layout'
 
 // 有宿主侧内置面板的插件(v1 插件无自定义前端,面板由宿主按 id 挂载)
 const HOST_MONITOR_ID = 'roam.host-monitor'
 const CRON_ID = 'roam.cron'
+const KEEPALIVE_ID = 'roam.keepalive'
 
 type LocaleText = Record<string, string> | undefined
 
@@ -333,6 +335,12 @@ function PluginDetail({ plugin, locale, t, onChanged }: {
           ...(m.id === CRON_ID ? [{
             key: 'jobs', label: t('cron.tab'),
             children: <CronPanel pluginId={m.id} enabled={plugin.enabled} t={t} />,
+          }] : []),
+          // 守护 tab 排在「配置」前面:对这个插件来说「谁被守着」才是主任务,
+          // 全局默认已经被提到面板顶上那句白话里了
+          ...(m.id === KEEPALIVE_ID ? [{
+            key: 'guards', label: t('ka.tab'),
+            children: <KeepalivePanel pluginId={m.id} enabled={plugin.enabled} t={t} />,
           }] : []),
           {
             key: 'config', label: t('plugins.tabConfig'),

@@ -284,3 +284,62 @@ func lastLine(s string) string {
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	return lines[len(lines)-1]
 }
+
+// SessionState 一条会话的「此刻」：身份 + 有没有人看着 + 最后一次有动静是啥时候。
+//
+// 和 SessionRows 分开一个格式串，是因为两者问的问题不同：那个问身份（谁是谁），
+// 这个问状态（还动不动）。合并的代价是所有拿身份的调用方都多付两次字段解析，
+// 而分开的代价只是多一行常量——label 必须留在最后（唯一可能带空白的字段）。
+type SessionState struct {
+	SessionRow
+	Attached bool  // 有客户端 attach 着
+	Activity int64 // 最后一次有动静（unix 秒）
+}
+
+// sessionStateFormat：label 仍放最后，理由同 sessionRowFormat。
+const sessionStateFormat = "#{session_id}\t#{session_created}\t#{session_activity}\t" +
+	"#{window_activity}\t#{session_attached}\t#{session_name}\t#{" + LabelOption + "}"
+
+// SessionStates 返回全部活会话的状态。tmux 盲态返回 nil——同 SessionRows，
+// 「看不见的时候不下判断」。
+//
+// activity 取 session_activity 与 window_activity 的较大者：tmux 只在
+// attach/输入/焦点变化时刷新 session_activity，后台没人看的会话即便一直在输出
+// （agent 正干活）也不动，光看前者会把干得最欢的会话判成「安静了一天」。
+func (r Runtime) SessionStates() []SessionState {
+	out, err := r.TmuxOutput("list-sessions", "-F", sessionStateFormat)
+	if err != nil {
+		return nil
+	}
+	var states []SessionState
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 7)
+		if len(parts) < 6 {
+			continue
+		}
+		created, _ := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+		sa, _ := strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64)
+		wa, _ := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64)
+		attached, _ := strconv.Atoi(strings.TrimSpace(parts[4]))
+		st := SessionState{
+			SessionRow: SessionRow{TmuxID: strings.TrimSpace(parts[0]), Created: created, Name: parts[5]},
+			Attached:   attached > 0,
+			Activity:   max64(sa, wa),
+		}
+		if len(parts) > 6 {
+			st.Label = strings.TrimSpace(parts[6])
+		}
+		states = append(states, st)
+	}
+	return states
+}
+
+func max64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}

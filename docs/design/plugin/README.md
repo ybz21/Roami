@@ -27,6 +27,8 @@
 
 相关文档:
 
+- [keepalive.html](keepalive.html) — 会话守护插件（roam.keepalive）设计稿：形态选型、判「它停住了」的判据、守护语规则表、设置页交互。
+- [keepalive-panel.html](keepalive-panel.html) — 上面那份的界面落地稿：按 1440 真尺寸定死列宽、行高、六种行状态、抽屉与手机档。
 - [智能评审插件设计.md](智能评审插件设计.md) — 插件机制的第一个消费者;其 manifest 与 finding 模型以本目录 [05-manifest.md](05-manifest.md) / [06-platform-api.md](06-platform-api.md) 为准对齐。
 
 ## 一页纸架构

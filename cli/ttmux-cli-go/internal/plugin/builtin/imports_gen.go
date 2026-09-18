@@ -6,5 +6,6 @@ import (
 	_ "roam-plugins/cron"
 	_ "roam-plugins/hostmonitor"
 	_ "roam-plugins/im"
+	_ "roam-plugins/keepalive"
 	_ "roam-plugins/reviewmesh"
 )

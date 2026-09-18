@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roami · 会话守护面板 · 界面稿</title>
+<style>
+/* 令牌直接取 frontend/src/theme.tsx 的真值——界面稿不许出现生色值 */
+:root {
+  --bg-base:#0d1117; --bg-container:#161b22; --bg-elevated:#1b222b; --bg-term:#06090d;
+  --border:#30363d; --border-subtle:#21262d;
+  --text-bright:#e6edf3; --text-dim:#8b949e; --text-dimmer:#6e7681;
+  --accent:#58a6ff; --accent-solid:#1f6feb; --accent-soft:rgba(31,111,235,.14); --accent-border:rgba(88,166,255,.45);
+  --ok:#3fb950; --ok-solid:#238636; --ok-soft:rgba(63,185,80,.14); --ok-border:rgba(63,185,80,.42);
+  --danger:#f85149; --danger-soft:rgba(248,81,73,.12); --danger-border:rgba(248,81,73,.40);
+  --warn:#d29922; --warn-soft:rgba(210,153,34,.12); --warn-border:rgba(210,153,34,.40);
+  --sel-bg:rgba(88,166,255,.10); --list-hover:rgba(255,255,255,.025);
+  --brand-claude:#d97757; --brand-codex:#10a37f;
+  --fs-micro:11px; --fs-meta:12px; --fs-sm:13px; --fs-body:14px; --fs-lg:16px; --fs-title:22px;
+  --r-xs:6px; --r-sm:10px; --r-card:14px; --r-pill:999px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+html[data-theme="light"] {
+  --bg-base:#f6f8fa; --bg-container:#ffffff; --bg-elevated:#ffffff; --bg-term:#ffffff;
+  --border:#d0d7de; --border-subtle:#e6e9ec;
+  --text-bright:#1f2328; --text-dim:#57606a; --text-dimmer:#8c959f;
+  --accent:#0969da; --accent-soft:rgba(31,111,235,.10); --accent-border:rgba(31,111,235,.40);
+  --ok:#1a7f37; --ok-soft:rgba(31,136,61,.10); --ok-border:rgba(31,136,61,.40);
+  --danger:#cf222e; --danger-soft:rgba(207,34,46,.09); --danger-border:rgba(207,34,46,.35);
+  --warn:#9a6700; --warn-soft:rgba(154,103,0,.10); --warn-border:rgba(154,103,0,.35);
+  --sel-bg:rgba(9,105,218,.08); --list-hover:rgba(27,31,36,.04);
+}
+* { box-sizing:border-box; }
+html { background:#07090d; }
+html[data-theme="light"] { background:#eef1f5; }
+body { margin:0; color:var(--text-bright);
+  font:var(--fs-body)/1.65 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased; }
+button,input { font:inherit; } button { cursor:pointer; }
+
+.top { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:var(--sp-3);
+  padding:10px clamp(16px,3vw,40px); background:color-mix(in srgb, var(--bg-base) 84%, transparent);
+  border-bottom:1px solid var(--border-subtle); backdrop-filter:blur(18px); }
+.top .kicker { font-size:var(--fs-micro); letter-spacing:.14em; text-transform:uppercase; color:var(--text-dimmer); }
+.top h1 { margin:0; font-size:var(--fs-sm); font-weight:600; }
+.top .sp { flex:1; }
+.tbtn { border:1px solid var(--border); background:var(--bg-container); color:var(--text-dim);
+  border-radius:var(--r-pill); padding:5px 14px; font-size:var(--fs-meta); }
+
+.wrap { max-width:1180px; margin:0 auto; padding:30px clamp(16px,3vw,40px) 110px; }
+.lede { color:var(--text-dim); font-size:var(--fs-lg); line-height:1.7; margin:0 0 var(--sp-5); }
+.lede b { color:var(--text-bright); }
+h2 { margin:52px 0 6px; padding-top:24px; font-size:var(--fs-lg); font-weight:600; border-top:1px solid var(--border-subtle); }
+h2:first-of-type { margin-top:4px; border-top:0; padding-top:0; }
+h2 .n { color:var(--text-dimmer); font-family:var(--mono); font-size:var(--fs-meta); margin-right:var(--sp-2); }
+h3 { margin:28px 0 8px; font-size:var(--fs-body); font-weight:600; }
+p { margin:10px 0; }
+code { font-family:var(--mono); font-size:.92em; background:var(--bg-elevated);
+  border:1px solid var(--border-subtle); border-radius:var(--r-xs); padding:1px 5px; }
+ul { margin:10px 0; padding-left:22px; } li { margin:5px 0; }
+a { color:var(--accent); }
+table { width:100%; border-collapse:collapse; margin:var(--sp-3) 0; font-size:var(--fs-sm); }
+th,td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--border-subtle); vertical-align:top; }
+th { color:var(--text-dim); font-weight:600; font-size:var(--fs-meta); letter-spacing:.04em; text-transform:uppercase; }
+td.mono { font-family:var(--mono); font-size:var(--fs-meta); white-space:nowrap; }
+.card { background:var(--bg-container); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:var(--sp-4) var(--sp-5); margin:var(--sp-4) 0; }
+.card.warn { border-color:var(--warn-border); background:var(--warn-soft); }
+.card.bad  { border-color:var(--danger-border); background:var(--danger-soft); }
+.card.good { border-color:var(--ok-border); background:var(--ok-soft); }
+.card > :first-child { margin-top:0; } .card > :last-child { margin-bottom:0; }
+.card h4 { margin:0 0 var(--sp-2); font-size:var(--fs-sm); font-weight:600; }
+.cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:var(--sp-3); margin:var(--sp-4) 0; }
+.cap { display:flex; align-items:baseline; gap:var(--sp-2); margin:var(--sp-4) 0 var(--sp-2); }
+.cap b { font-size:var(--fs-sm); }
+.cap span { color:var(--text-dimmer); font-size:var(--fs-micro); font-family:var(--mono); }
+
+/* ══ 真尺寸舞台：里面按 1440 宽画，靠 zoom 缩到版心 ══ */
+.stage.fit { display:inline-block; }
+.stage { border:1px solid var(--border); border-radius:var(--r-card); overflow:hidden; background:var(--bg-base);
+  margin:var(--sp-3) 0 var(--sp-4); }
+.dk { zoom:.76; width:1440px; height:760px; display:flex; }
+.dk.tall { height:880px; }
+.dk.z1 { zoom:1; width:auto; height:auto; }
+
+/* 站点外壳（只画个意思，重点在右边） */
+.nav { flex:0 0 200px; background:var(--bg-container); border-right:1px solid var(--border-subtle); padding:14px 10px; }
+.nav .lg { font-size:17px; font-weight:800; padding:0 8px 10px; }
+.nav i { display:block; font-style:normal; font-size:var(--fs-body); color:var(--text-dim);
+  padding:8px 10px; border-radius:var(--r-sm); margin-top:3px; }
+.nav i.on { color:var(--accent); background:var(--sel-bg); box-shadow:inset 2px 0 0 var(--accent); }
+.body { flex:1; min-width:0; display:flex; }
+
+/* 插件页左栏 */
+.plist { flex:0 0 280px; background:var(--bg-container); border-right:1px solid var(--border-subtle); }
+.plist .ph { padding:10px 12px; border-bottom:1px solid var(--border-subtle); font-size:var(--fs-sm); font-weight:600; }
+.plist .it { padding:8px 10px; display:flex; gap:8px; align-items:center; }
+.plist .it.on { background:var(--sel-bg); box-shadow:inset 2px 0 0 var(--accent); }
+.plist .it b { font-size:var(--fs-sm); font-weight:600; flex:1; }
+.plist .it small { display:block; color:var(--text-dimmer); font-size:var(--fs-micro); font-weight:400; }
+
+/* 插件详情 */
+.detail { flex:1; min-width:0; display:flex; flex-direction:column; padding:12px 16px; gap:10px; }
+.dhd { display:flex; align-items:center; gap:var(--sp-2); }
+.dhd b { font-size:var(--fs-lg); }
+.tabs { display:flex; gap:18px; border-bottom:1px solid var(--border-subtle); }
+.tabs span { padding:7px 0; font-size:var(--fs-body); color:var(--text-dim); }
+.tabs span.on { color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
+
+/* ── 守护面板本体 ── */
+.banner { display:flex; align-items:center; gap:var(--sp-3); padding:9px var(--sp-3);
+  border:1px solid var(--ok-border); background:var(--ok-soft); border-radius:var(--r-sm); font-size:var(--fs-sm); }
+.banner.idle { border-color:var(--border); background:var(--bg-container); color:var(--text-dim); }
+.banner.warn { border-color:var(--warn-border); background:var(--warn-soft); }
+.banner.info { border-color:var(--accent-border); background:var(--accent-soft); }
+.banner .dot { width:8px; height:8px; border-radius:50%; background:var(--ok); flex:none; }
+.banner.idle .dot { background:var(--text-dimmer); }
+.banner.warn .dot { background:var(--warn); }
+.banner.info .dot { background:var(--accent); }
+.banner .sp { flex:1; }
+.banner .txt b { font-weight:600; }
+.banner .sub { color:var(--text-dim); }
+
+.sentence { padding:10px var(--sp-4); border:1px dashed var(--border); border-radius:var(--r-sm);
+  background:var(--bg-container); font-size:var(--fs-sm); line-height:1.9; }
+.sentence u { text-decoration:none; color:var(--accent); border-bottom:1px dashed var(--accent-border);
+  padding:0 2px; font-weight:600; }
+.sentence .edit { display:inline-block; min-width:56px; padding:1px 6px; border-radius:var(--r-xs);
+  border:1px solid var(--accent); background:var(--bg-base); color:var(--text-bright); font-weight:600; }
+.sentence .promptline { display:flex; align-items:center; gap:var(--sp-2); margin-top:8px;
+  padding-top:8px; border-top:1px dashed var(--border-subtle); }
+.sentence .lb2 { color:var(--text-dim); font-size:var(--fs-meta); flex:none; }
+.sentence .pv { flex:1; min-width:0; border:1px solid var(--border); background:var(--bg-base);
+  border-radius:var(--r-xs); padding:5px 10px; font-size:var(--fs-sm); color:var(--text-bright);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sentence .pv.fx { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); white-space:normal; }
+.sentence .count { color:var(--text-dimmer); font-size:var(--fs-micro); font-family:var(--mono); flex:none; }
+.sentence .cursor { border-left:1.5px solid var(--accent); margin-left:1px; animation:bl 1s steps(1) infinite; }
+@keyframes bl { 50% { opacity:0 } }
+
+.filters { display:flex; align-items:center; gap:var(--sp-2); }
+.seg { display:flex; gap:2px; background:var(--bg-elevated); border-radius:var(--r-xs); padding:2px; }
+.seg span { padding:3px 12px; font-size:var(--fs-meta); color:var(--text-dim); border-radius:var(--r-xs); }
+.seg span.on { background:var(--accent-solid); color:#fff; }
+.search { flex:0 0 220px; border:1px solid var(--border); background:var(--bg-base); border-radius:var(--r-xs);
+  padding:4px 10px; font-size:var(--fs-meta); color:var(--text-dimmer); }
+
+/* 主列表：栅格一处定义，下面所有行都用它 */
+.kh, .kr { display:grid; grid-template-columns:28px minmax(260px,1fr) 96px 200px 176px; gap:var(--sp-3);
+  align-items:center; padding:0 var(--sp-3); }
+.kh { height:30px; color:var(--text-dim); font-size:var(--fs-micro); letter-spacing:.06em; text-transform:uppercase;
+  border-bottom:1px solid var(--border-subtle); }
+.kr { height:52px; border-bottom:1px solid var(--border-subtle); }
+.kr.hover { background:var(--list-hover); }
+.kr .name { min-width:0; }
+.kr .name a { font-size:var(--fs-body); font-weight:600; color:var(--text-bright); text-decoration:none;
+  border-bottom:1px solid transparent; }
+.kr.hover .name a { color:var(--accent); border-bottom-color:var(--accent-border); }
+.kr .name small { display:block; font-family:var(--mono); font-size:var(--fs-micro); color:var(--text-dimmer);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kr .quiet { font-family:var(--mono); font-size:var(--fs-meta); color:var(--text-dim); text-align:right; }
+.kr .quiet.long { color:var(--warn); }
+.kr .guard { display:flex; align-items:center; gap:var(--sp-2); min-width:0; }
+.kr .guard .st { font-size:var(--fs-micro); color:var(--text-dim); line-height:1.35; }
+.kr .guard .st.bad { color:var(--danger); }
+.kr .guard .st.ok { color:var(--ok); }
+.kr .ops { display:flex; gap:6px; justify-content:flex-end; }
+
+.mk { width:22px; height:22px; border-radius:var(--r-xs); display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:700; letter-spacing:-.03em; }
+.mk.cc { color:var(--brand-claude); border:1px solid color-mix(in srgb, var(--brand-claude) 45%, transparent); }
+.mk.cx { color:var(--brand-codex);  border:1px solid color-mix(in srgb, var(--brand-codex) 45%, transparent); }
+.mk.sh { color:var(--text-dimmer); border:1px solid var(--border); }
+
+.sw { width:30px; height:17px; border-radius:var(--r-pill); background:var(--border); position:relative;
+  display:inline-block; flex:none; }
+.sw::after { content:''; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%;
+  background:var(--text-dim); }
+.sw.on { background:var(--ok-solid); } .sw.on::after { left:15px; background:#fff; }
+.sw.fx { box-shadow:0 0 0 3px var(--accent-soft); }
+
+.b { border:1px solid var(--border); background:transparent; color:var(--text-dim);
+  border-radius:var(--r-xs); padding:3px 10px; font-size:var(--fs-micro); white-space:nowrap; }
+.b.pri { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
+.b.dg { border-color:var(--danger-border); color:var(--danger); }
+.b.hover { color:var(--text-bright); border-color:var(--accent-border); }
+.b.fx { box-shadow:0 0 0 3px var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+
+.menu { position:relative; }
+.pop { position:absolute; right:0; top:26px; width:268px; background:var(--bg-elevated); border:1px solid var(--border);
+  border-radius:var(--r-sm); box-shadow:0 12px 34px rgba(0,0,0,.5); padding:5px; z-index:9; }
+.pop i { display:block; font-style:normal; padding:7px 10px; border-radius:var(--r-xs); font-size:var(--fs-meta);
+  color:var(--text-bright); }
+.pop i.on { background:var(--list-hover); }
+.pop i small { display:block; color:var(--text-dimmer); font-size:var(--fs-micro); margin-top:1px; }
+.pop hr { border:0; border-top:1px solid var(--border-subtle); margin:4px 2px; }
+
+/* 抽屉 */
+.drawer { width:520px; background:var(--bg-container); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; }
+.drawer .dh { padding:12px var(--sp-4); border-bottom:1px solid var(--border-subtle);
+  display:flex; align-items:center; gap:var(--sp-2); }
+.drawer .dh b { flex:1; font-size:var(--fs-body); }
+.drawer .db { padding:var(--sp-4); display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+
+.rrow { display:grid; grid-template-columns:16px 1fr 26px; gap:10px; align-items:start;
+  padding:10px 0; border-bottom:1px solid var(--border-subtle); }
+.rrow .gr { color:var(--text-dimmer); font-size:14px; line-height:1; margin-top:3px; }
+.rrow .mt { display:block; font-family:var(--mono); font-size:var(--fs-micro); color:var(--warn); word-break:break-all; }
+.rrow .pt { display:block; font-size:var(--fs-sm); margin-top:3px; }
+.rrow.fb .mt { color:var(--text-dimmer); font-family:inherit; font-style:italic; }
+.try { border:1px solid var(--ok-border); background:var(--ok-soft); border-radius:var(--r-sm);
+  padding:9px var(--sp-3); font-size:var(--fs-meta); color:var(--text-dim); }
+.try b { color:var(--ok); }
+
+.frow { display:grid; grid-template-columns:104px 1fr; gap:var(--sp-3); align-items:start;
+  padding:10px 0; border-bottom:1px solid var(--border-subtle); font-size:var(--fs-sm); }
+.frow .lb { color:var(--text-dim); font-size:var(--fs-meta); padding-top:3px; }
+.frow .ph2 { color:var(--text-dimmer); }
+.inp { border:1px solid var(--border); background:var(--bg-base); border-radius:var(--r-xs);
+  padding:5px 9px; font-size:var(--fs-sm); color:var(--text-dimmer); }
+.chips { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+.chip { border:1px solid var(--border); border-radius:var(--r-pill); padding:2px 9px; font-size:var(--fs-micro);
+  color:var(--text-dim); }
+.chip.on { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
+
+.hrow { display:grid; grid-template-columns:14px 1fr; gap:var(--sp-3); padding:9px 0;
+  border-bottom:1px solid var(--border-subtle); }
+.hrow .d { width:8px; height:8px; border-radius:50%; background:var(--ok); margin-top:6px; }
+.hrow.bad .d { background:var(--danger); }
+.hrow .h2r { display:flex; gap:var(--sp-2); align-items:baseline; flex-wrap:wrap; }
+.hrow .h2r b { font-size:var(--fs-sm); }
+.hrow .h2r span { color:var(--text-dimmer); font-size:var(--fs-micro); }
+.hrow .msg { color:var(--text-dim); font-size:var(--fs-meta); margin-top:2px; }
+.tg { display:inline-block; font-size:var(--fs-micro); padding:1px 8px; border-radius:var(--r-pill);
+  border:1px solid var(--border); color:var(--text-dim); }
+.tg.bad { border-color:var(--danger-border); color:var(--danger); background:var(--danger-soft); }
+.tg.ok { border-color:var(--ok-border); color:var(--ok); background:var(--ok-soft); }
+.tg.mid { border-color:var(--warn-border); color:var(--warn); background:var(--warn-soft); }
+.tg.info { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
+
+/* 手机 */
+.dev { width:390px; height:730px; background:var(--bg-base); border:1px solid var(--border);
+  border-radius:20px; overflow:hidden; display:flex; flex-direction:column; }
+.dev .pt2 { padding:10px 14px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; gap:8px; }
+.dev .pt2 b { font-size:var(--fs-body); flex:1; }
+.dev .pb { padding:12px; display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+.pcard { border:1px solid var(--border-subtle); border-radius:var(--r-sm); background:var(--bg-container); padding:11px 12px; }
+.pcard .h { display:flex; align-items:center; gap:8px; }
+.pcard .h b { flex:1; font-size:var(--fs-body); }
+.pcard .m { color:var(--text-dim); font-size:var(--fs-meta); margin-top:5px; }
+.pcard .o { display:flex; gap:8px; margin-top:10px; }
+.pcard .o .b { padding:8px 14px; font-size:var(--fs-meta); }
+
+.ruler { position:relative; height:20px; margin:6px 0 2px; }
+.ruler i { position:absolute; top:8px; height:1px; background:var(--accent-border); }
+.ruler i::before, .ruler i::after { content:''; position:absolute; top:-3px; width:1px; height:7px; background:var(--accent-border); }
+.ruler i::before { left:0; } .ruler i::after { right:0; }
+.ruler b { position:absolute; top:-2px; font:var(--fs-micro)/1 var(--mono); color:var(--accent);
+  background:var(--bg-base); padding:0 4px; transform:translateX(-50%); }
+
+.foot { margin-top:64px; padding-top:var(--sp-4); border-top:1px solid var(--border-subtle);
+  color:var(--text-dimmer); font-size:var(--fs-meta); }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div><div class="kicker">Roami · Plugin · Keepalive</div><h1>会话守护面板 · 界面稿</h1></div>
+  <div class="sp"></div>
+  <button class="tbtn" id="themeBtn" type="button">浅色</button>
+</div>
+
+<div class="wrap">
+
+<p class="lede">
+这是 <a href="keepalive.html">设计稿 §07</a> 里那张主视图的<b>落地版</b>：按 1440 宽真尺寸画，
+列宽、行高、字号全部定死，每一种行状态都单独摆出来。
+判断标准只有一条——<b>扫一眼就知道谁被守着、谁最久没动、下一个该管谁</b>。
+</p>
+
+<h2><span class="n">01</span>它落在哪儿</h2>
+
+<p>插件页第三级：<code>#/plugins/roam.keepalive</code> → 详情卡 →「守护」tab。
+这个 tab <b>排在「配置」前面</b>，因为对这个插件来说，「谁被守着」才是主任务，
+而全局默认已经被提到面板顶上那句白话里了（<a href="keepalive.html">设计稿 §01.3</a>）。</p>
+
+<div class="stage">
+  <div class="dk">
+    <div class="nav">
+      <div class="lg">Roami</div>
+      <i>概览</i><i>会话</i><i>项目</i><i>文件</i><i class="on">插件</i><i>设置</i>
+    </div>
+    <div class="body">
+      <div class="plist">
+        <div class="ph">插件</div>
+        <div class="it"><b>主机监控<small>CPU / 内存 / 磁盘</small></b><i class="sw on"></i></div>
+        <div class="it"><b>定时任务<small>到点拉 Agent 干活</small></b><i class="sw on"></i></div>
+        <div class="it on"><b>会话守护<small>没动静就替你催一句</small></b><i class="sw on"></i></div>
+        <div class="it"><b>智能互审<small>空闲自动互审</small></b><i class="sw on"></i></div>
+        <div class="it"><b>IM 机器人<small>飞书桥 + 管家</small></b><i class="sw"></i></div>
+      </div>
+
+      <div class="detail">
+        <div class="dhd"><b>会话守护</b><span class="tg ok">已启用</span><span class="tg">builtin</span>
+          <span style="flex:1"></span><button class="b dg">卸载</button></div>
+        <div style="color:var(--text-dim);font-size:var(--fs-sm)">
+          替你看着会话：谁安静太久就自动发一句话把它推回去干活；连催几次没反应就停手并通知你
+        </div>
+        <div class="tabs"><span class="on">守护</span><span>配置</span><span>命令</span><span>权限</span><span>审计</span></div>
+
+        <div class="banner">
+          <i class="dot"></i>
+          <span class="txt">守护中 <b>3</b> 个会话 <span class="sub">· 12 秒前巡检过一轮 · 每 30 秒看一眼</span></span>
+          <span class="sp"></span>
+          <button class="b">发送记录</button>
+          <button class="b">守护语规则</button>
+          <button class="b">全部守护 ▾</button>
+        </div>
+
+        <div class="sentence">
+          <div>现在的规矩是：一个会话的屏幕 <u>10 分钟</u> 没动静，就替你催它一句；
+            同一个会话最快 <u>30 分钟</u> 催一次；连催 <u>3 次</u> 都没换来动静，就停手并通知你。</div>
+          <div class="promptline">
+            <span class="lb2">催它这句话</span>
+            <span class="pv">你是不是已经完成了你的任务？没有完成，那么继续。</span>
+            <button class="b">预设 ▾</button>
+          </div>
+        </div>
+
+        <div class="filters">
+          <div class="seg"><span class="on">全部 9</span><span>守护中 3</span><span>Agent 6</span></div>
+          <span style="flex:1"></span>
+          <div class="search">搜会话名或目录…</div>
+        </div>
+
+        <div>
+          <div class="kh"><span></span><span>会话</span><span style="text-align:right">安静了 ↓</span><span>守护</span><span style="text-align:right">操作</span></div>
+
+          <div class="kr">
+            <span class="mk cx">CX</span>
+            <span class="name"><a href="#">小慧优化</a><small>~/codes/ybz/xh/XiaoHui</small></span>
+            <span class="quiet long">41m</span>
+            <span class="guard"><i class="sw on"></i><span class="st">守护中<br>3 分钟前催过 · 共 2 次</span></span>
+            <span class="ops"><button class="b">催一下</button><button class="b">单独设置</button></span>
+          </div>
+
+          <div class="kr hover">
+            <span class="mk cc">CC</span>
+            <span class="name"><a href="#">ttmux 优化</a><small>~/codes/ttmux</small></span>
+            <span class="quiet">2m</span>
+            <span class="guard"><i class="sw on"></i><span class="st">守护中<br>还没催过</span></span>
+            <span class="ops"><button class="b hover">催一下</button><button class="b">单独设置</button></span>
+          </div>
+
+          <div class="kr">
+            <span class="mk cc">CC</span>
+            <span class="name"><a href="#">周报整理</a><small>~/codes/notes</small></span>
+            <span class="quiet">18m</span>
+            <span class="guard"><i class="sw on"></i><span class="st ok">守护中<br>刚刚催过</span></span>
+            <span class="ops"><button class="b">催一下</button><button class="b">单独设置</button></span>
+          </div>
+
+          <div class="kr">
+            <span class="mk cc">CC</span>
+            <span class="name"><a href="#">p2p 直连</a><small>~/codes/ttmux-p2p</small></span>
+            <span class="quiet long">6h</span>
+            <span class="guard"><i class="sw"></i><span class="st bad">已停手<br>连催 3 次没反应</span></span>
+            <span class="ops"><button class="b pri">再试试</button><button class="b">单独设置</button></span>
+          </div>
+
+          <div class="kr">
+            <span class="mk cx">CX</span>
+            <span class="name"><a href="#">镜像页重构</a><small>~/codes/ttmux</small></span>
+            <span class="quiet">4m</span>
+            <span class="guard"><i class="sw"></i><span class="st">未守护</span></span>
+            <span class="ops"><button class="b">催一下</button></span>
+          </div>
+
+          <div class="kr">
+            <span class="mk sh">sh</span>
+            <span class="name"><a href="#">随手开的终端</a><small>~</small></span>
+            <span class="quiet long">3d</span>
+            <span class="guard"><i class="sw"></i><span class="st">未守护 · 不是 Agent 会话</span></span>
+            <span class="ops"><button class="b">催一下</button></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">02</span>栅格：五列，为什么是这五列</h2>
+
+<div class="ruler" style="max-width:800px">
+  <i style="left:0;width:3.5%"></i><b style="left:1.7%">28</b>
+  <i style="left:5%;width:32%"></i><b style="left:21%">1fr ≥260</b>
+  <i style="left:38.5%;width:12%"></i><b style="left:44.5%">96</b>
+  <i style="left:52%;width:25%"></i><b style="left:64.5%">200</b>
+  <i style="left:78.5%;width:21.5%"></i><b style="left:89%">176</b>
+</div>
+
+<table>
+  <thead><tr><th>列</th><th>宽</th><th>装什么</th><th>为什么</th></tr></thead>
+  <tbody>
+    <tr><td>①&nbsp;身份标</td><td class="mono">28</td>
+        <td>Claude / Codex 品牌标，认不出的给中性灰框</td>
+        <td>「这是不是个 Agent 会话」决定了守护该不该开——它必须是<b>最左边、不读字就看得见</b>的东西</td></tr>
+    <tr><td>②&nbsp;会话</td><td class="mono">1fr ≥260</td>
+        <td>展示名（可点，真链接跳工作区）+ 第二行归属目录</td>
+        <td>名字重名是常态（三个「优化」），<b>目录才是认人的那一行</b>；给 1fr 是因为目录长度不可控</td></tr>
+    <tr><td>③&nbsp;安静了</td><td class="mono">96</td>
+        <td>右对齐等宽数字 <code>2m / 41m / 6h / 3d</code>，超阈值转暖色</td>
+        <td>这是<b>唯一可排序、需要纵向扫的数字</b>。等宽 + 右对齐才能让一列数字排成一条线</td></tr>
+    <tr><td>④&nbsp;守护</td><td class="mono">200</td>
+        <td>开关 + 两行状态：第一行是态（守护中 / 未守护 / 已停手），第二行是最近发生了什么</td>
+        <td>开关和它的后果必须挨着。把「催过 2 次」拆去别的列，人就得左右对</td></tr>
+    <tr><td>⑤&nbsp;操作</td><td class="mono">176</td>
+        <td>最多两个幽灵钮 <code>.tt-act</code>，右对齐</td>
+        <td>176 = 两个按钮的上限。放不下第三个正好——<b>第三个动作就该进抽屉</b></td></tr>
+  </tbody>
+</table>
+
+<p>固定列合计 <code>28+96+200+176 + 4×12(gap) = 548</code>，加上 ②&nbsp;的下限 260 →
+<b>这张表的最小可用宽度是 808px</b>。插件详情区在 1440 下约有 1100px，宽裕；
+窄于 1100 时把③并进④（「安静 41 分钟 · 3 分钟前催过」），窄于 900 直接换手机卡片（§07）。</p>
+
+<div class="card">
+  <h4>行高 52px，两行文本</h4>
+  <p>一行 32px 只塞得下名字，目录就得丢——而目录是认人的那一行。
+  52px = 名字（<code>--fs-body</code>/20）+ 目录（<code>--fs-micro</code>/16）+ 上下各 8。
+  一屏（760px 的详情区、去掉横幅句子和过滤条约 450px）能看见 <b>8 行</b>，
+  正好是本机会话数的中位数——<b>常见情况下不用滚</b>。</p>
+</div>
+
+<h2><span class="n">03</span>一行的六种状态</h2>
+
+<p>这六种是这张表的全部语义。做到这一步的标准是：<b>不读第二行小字，光看颜色和开关就能分出三档</b>
+（守护中 / 没守 / 出事了）。</p>
+
+<div class="stage"><div class="dk z1" style="padding:6px 0">
+  <div style="width:100%">
+    <div class="kh"><span></span><span>会话</span><span style="text-align:right">安静了</span><span>守护</span><span style="text-align:right">操作</span></div>
+
+    <div class="kr">
+      <span class="mk cc">CC</span>
+      <span class="name"><a href="#">A · 守护中，还在干活</a><small>安静时长没到阈值，这一轮不会发</small></span>
+      <span class="quiet">2m</span>
+      <span class="guard"><i class="sw on"></i><span class="st">守护中<br>还没催过</span></span>
+      <span class="ops"><button class="b">催一下</button><button class="b">单独设置</button></span>
+    </div>
+
+    <div class="kr">
+      <span class="mk cx">CX</span>
+      <span class="name"><a href="#">B · 守护中，刚被催过</a><small>绿色只亮 5 分钟，之后退回灰色</small></span>
+      <span class="quiet">18m</span>
+      <span class="guard"><i class="sw on"></i><span class="st ok">守护中<br>刚刚催过</span></span>
+      <span class="ops"><button class="b">催一下</button><button class="b">单独设置</button></span>
+    </div>
+
+    <div class="kr">
+      <span class="mk cx">CX</span>
+      <span class="name"><a href="#">C · 守护中，安静太久了</a><small>数字转暖色 = 它已经超过阈值，下一轮就会被催</small></span>
+      <span class="quiet long">41m</span>
+      <span class="guard"><i class="sw on"></i><span class="st">守护中<br>3 分钟前催过 · 共 2 次</span></span>
+      <span class="ops"><button class="b">催一下</button><button class="b">单独设置</button></span>
+    </div>
+
+    <div class="kr">
+      <span class="mk cc">CC</span>
+      <span class="name"><a href="#">D · 已自动停手</a><small>这一行是全表唯一的红；首要动作换成「再试试」</small></span>
+      <span class="quiet long">6h</span>
+      <span class="guard"><i class="sw"></i><span class="st bad">已停手<br>连催 3 次没反应</span></span>
+      <span class="ops"><button class="b pri">再试试</button><button class="b">单独设置</button></span>
+    </div>
+
+    <div class="kr">
+      <span class="mk cc">CC</span>
+      <span class="name"><a href="#">E · 未守护的 Agent 会话</a><small>「全部守护」会捞走这一类</small></span>
+      <span class="quiet">4m</span>
+      <span class="guard"><i class="sw"></i><span class="st">未守护</span></span>
+      <span class="ops"><button class="b">催一下</button></span>
+    </div>
+
+    <div class="kr">
+      <span class="mk sh">sh</span>
+      <span class="name"><a href="#">F · 认不出是 Agent</a><small>「全部守护」默认跳过；开关照样能单独打开</small></span>
+      <span class="quiet long">3d</span>
+      <span class="guard"><i class="sw"></i><span class="st">未守护 · 不是 Agent 会话</span></span>
+      <span class="ops"><button class="b">催一下</button></span>
+    </div>
+  </div>
+</div></div>
+
+<div class="cols">
+  <div class="card good">
+    <h4>颜色只用三次</h4>
+    <p><b>绿</b>=刚刚催过（且只亮 5 分钟）、<b>暖</b>=安静超阈值、<b>红</b>=已停手。
+    其余一律是中性灰。守护中的行<b>不</b>整行染绿——十行全绿等于没有重点，
+    而这张表真正要你看见的是那一两行出事的。</p>
+  </div>
+  <div class="card">
+    <h4>未守护的行不做灰化处理</h4>
+    <p>它们是<b>候选</b>，不是禁用项。压暗会让人以为「这些不能开」，
+    而这一页一半的价值恰恰是让你从这些行里挑一个打开。</p>
+  </div>
+  <div class="card">
+    <h4>开关就是全部操作</h4>
+    <p>点开关即刻生效，没有保存按钮，没有确认框。回执是那一行右边的状态字当场改写——
+    <b>眼睛在那一行上，反馈就该出现在那一行上</b>，不在屏幕角落弹 toast。</p>
+  </div>
+</div>
+
+<h3>3.1 默认全关，而且只能手动开</h3>
+
+<div class="cols">
+  <div class="card good">
+    <h4>装上插件 ≠ 开始守护</h4>
+    <p>builtin 插件默认启用，但<b>守护表是空的</b>：一行开关都不会自己打开。
+    插件启用只意味着「这一页能用了」，不意味着有任何会话正在被催。
+    第一次进来看到的是一整列灰开关（§07.4 空态）。</p>
+  </div>
+  <div class="card good">
+    <h4>新会话也不会自动进来</h4>
+    <p>点过一次「全部守护」之后再新建的会话，<b>仍然是关的</b>。
+    没有「以后新建的自动守护」这个选项，下拉里那一条是灰的、写着「不提供」。
+    <b>每一条守护都必须有人亲手打开过</b>——因为每一条都会替你花钱、
+    往你的会话里写东西。</p>
+  </div>
+  <div class="card">
+    <h4>所以「全部守护」不是主按钮</h4>
+    <p>它在横幅右端，是个普通幽灵钮，排在「发送记录」「守护语规则」后面。
+    主路径是<b>在列表里挑一个、打开它右边的开关</b>——一次开一个，
+    你清楚地知道自己开了谁。批量只是给「我就是要全守上」的人一个不用点十下的出口，
+    而且带确认。</p>
+  </div>
+</div>
+
+<h2><span class="n">04</span>排序与过滤</h2>
+
+<p><b>默认排序不是按名字，是按「该管谁」</b>：守护中的在前，同组内按安静时长倒序。
+最该被你看一眼的那行永远在第一行。</p>
+
+<table>
+  <thead><tr><th>组</th><th>顺序</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>1 · 已停手</td><td>置顶</td><td>出事了。它是唯一需要你做决定的一类</td></tr>
+    <tr><td>2 · 守护中</td><td>按安静时长倒序</td><td>越久没动静越靠前</td></tr>
+    <tr><td>3 · 未守护</td><td>Agent 在前，再按安静时长倒序</td><td>下一个可能要开的就在这一档的顶上</td></tr>
+  </tbody>
+</table>
+
+<p>「安静了」那一列的列头可点，切换成纯按时长排序（跨组）。<b>只有这一列可排序</b>——
+再多就变成一张需要学习的表。</p>
+
+<div class="card warn">
+  <h4>过滤条：会话 &gt; 8 个才出现</h4>
+  <p>本机常年 5~8 个会话，给一条常驻的搜索 + 分段筛选纯属占地方。
+  超过 8 个才渲染，且分段的三档<b>各自带计数</b>（<code>全部 9 / 守护中 3 / Agent 6</code>）——
+  没有计数的筛选器，用户点进去才知道是空的。</p>
+</div>
+
+<h2><span class="n">05</span>全局默认：一句白话 + 一块守护语</h2>
+
+<p>全局默认拆成两半，因为这两半的体量根本不是一个量级：<b>三个数字</b>短到能嵌进句子里，
+<b>守护语</b>则是一整句甚至几句话——「你是不是已经完成了你的任务？没有完成，那么继续。」
+硬塞进句子里只会把它挤成一坨。</p>
+
+<div class="cap"><b>静止</b><span>数字带虚线下划线（可点）；守护语单独一行，一眼看得全</span></div>
+<div class="stage"><div class="dk z1" style="padding:12px 14px">
+  <div class="sentence" style="width:100%">
+    <div>现在的规矩是：一个会话的屏幕 <u>10 分钟</u> 没动静，就替你催它一句；
+      同一个会话最快 <u>30 分钟</u> 催一次；连催 <u>3 次</u> 都没换来动静，就停手并通知你。</div>
+    <div class="promptline">
+      <span class="lb2">催它这句话</span>
+      <span class="pv">你是不是已经完成了你的任务？没有完成，那么继续。</span>
+      <button class="b">预设 ▾</button>
+    </div>
+  </div>
+</div></div>
+
+<div class="cap"><b>改数字</b><span>就地变输入框，句子其余部分一个字不动</span></div>
+<div class="stage"><div class="dk z1" style="padding:12px 14px">
+  <div class="sentence" style="width:100%">
+    <div>现在的规矩是：一个会话的屏幕 <span class="edit">15<span class="cursor">&nbsp;</span></span> 分钟 没动静，就替你催它一句；
+      同一个会话最快 <u>30 分钟</u> 催一次；连催 <u>3 次</u> 都没换来动静，就停手并通知你。</div>
+    <div class="promptline">
+      <span class="lb2">催它这句话</span>
+      <span class="pv">你是不是已经完成了你的任务？没有完成，那么继续。</span>
+      <button class="b">预设 ▾</button>
+    </div>
+  </div>
+</div></div>
+
+<div class="cap"><b>改守护语</b><span>聚焦后展开成多行，字数就在右边；预设胶囊点一下就填进去</span></div>
+<div class="stage"><div class="dk z1" style="padding:12px 14px">
+  <div class="sentence" style="width:100%">
+    <div>现在的规矩是：一个会话的屏幕 <u>10 分钟</u> 没动静，就替你催它一句；
+      同一个会话最快 <u>30 分钟</u> 催一次；连催 <u>3 次</u> 都没换来动静，就停手并通知你。</div>
+    <div class="promptline" style="align-items:flex-start">
+      <span class="lb2" style="padding-top:6px">催它这句话</span>
+      <span style="flex:1;min-width:0">
+        <span class="pv fx" style="display:block">你是不是已经完成了你的任务？没有完成，那么继续。<span class="cursor">&nbsp;</span></span>
+        <span class="chips">
+          <i class="chip on">确认是否完成</i><i class="chip">继续</i><i class="chip">断线重连</i>
+          <i class="chip">回头自查</i><i class="chip">清空自己写</i>
+        </span>
+      </span>
+      <span class="count" style="padding-top:6px">24 / 500</span>
+    </div>
+  </div>
+</div></div>
+
+<h3>5.1 为什么默认不是「继续」</h3>
+
+<div class="cols">
+  <div class="card bad">
+    <h4>✗ 「继续」</h4>
+    <p>它<b>不给 Agent 留台阶</b>。一个真的已经干完的 Agent 收到「继续」，
+    最常见的反应是去找点事做——翻出一个无关的改进、再重构一遍刚写好的东西。
+    你本来只想确认它还活着，结果换来一次计划外的改动。</p>
+  </div>
+  <div class="card good">
+    <h4>✓ 「你是不是已经完成了你的任务？没有完成，那么继续。」</h4>
+    <p>它<b>先问后推</b>：干完了就回一句「干完了」，没干完才接着干。
+    对停在等待态的会话，效果和「继续」一样；对已经收尾的会话，
+    它换来的是一句交代而不是一堆新改动。<b>所以它是默认兜底语。</b></p>
+  </div>
+</div>
+
+<h3>5.2 预设</h3>
+
+<table>
+  <thead><tr><th>预设</th><th>发出去的话</th><th>什么时候用</th></tr></thead>
+  <tbody>
+    <tr><td><b>确认是否完成</b><br><span style="color:var(--text-dimmer);font-size:var(--fs-micro)">默认</span></td>
+        <td>你是不是已经完成了你的任务？没有完成，那么继续。</td>
+        <td>兜底。不知道它是停住了还是干完了的时候——大多数时候</td></tr>
+    <tr><td>继续</td><td>继续</td>
+        <td>你很确定它就是停在半路等你点头</td></tr>
+    <tr><td>断线重连</td><td>刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍</td>
+        <td>规则表里绑在 <code>Connection lost mid-response</code> 那条上（<a href="keepalive.html">设计稿 §04</a>）</td></tr>
+    <tr><td>回头自查</td><td>先别往下写了，回头自查一遍：跑一遍构建和测试，把结果贴出来</td>
+        <td>绑在「催到第 2 次」上：第一次推它走，第二次让它回头看</td></tr>
+    <tr><td>清空自己写</td><td>—</td><td>把输入框清空，自己写</td></tr>
+  </tbody>
+</table>
+
+<h3>5.3 三个约束</h3>
+
+<div class="cols">
+  <div class="card warn">
+    <h4>换行会被折成一行</h4>
+    <p>守护语经 <code>paste-buffer</code> 打进 TUI，而<b>在 Claude/Codex 的输入框里换行即提交</b>
+    ——多行文本会被拆成好几次输入。所以宿主侧的 <code>session.send</code> 统一把
+    <code>\n</code> 折成空格。输入框里可以敲回车（那是保存），
+    但<b>别指望守护语能分段</b>；真要发长文，那是定时任务插件拉 Agent 的活。</p>
+  </div>
+  <div class="card">
+    <h4>上限 500 字</h4>
+    <p>它是「一句话」，不是一篇 prompt。超了就在计数器上标红并拦住保存，
+    <b>不截断</b>——悄悄截掉一半的句子发出去，比不让保存糟得多。</p>
+  </div>
+  <div class="card">
+    <h4>改完下一轮生效</h4>
+    <p>守护语落插件私有 storage，常驻循环<b>每轮重读</b>（<a href="keepalive.html">设计稿 §10</a>）。
+    失焦即存，≤30 秒后下一次巡检用的就是新的，不用重启任何东西。
+    句子本身就是回执，不另弹提示。</p>
+  </div>
+</div>
+
+<h3>5.4 越界当场拦住</h3>
+
+<p>三个数字输入 <code>0</code> 或 <code>9999</code> 时，输入框转红并在下方一行小字说清区间
+（1–1440 分钟），<b>不静默夹值</b>——静默夹值会让人以为自己设成了 0 而实际跑的是 10。
+Esc 撤销回原值。</p>
+
+<h2><span class="n">06</span>三个抽屉</h2>
+
+<p>统一 520px 宽、从右侧推入，主列表不被遮死（1440 下仍剩 900+）。
+抽屉打开时列表<b>暂停 5 秒轮询</b>，免得数据在手底下跳。</p>
+
+<div class="cap"><b>A · 守护语规则</b><span>drawer 520 · 见设计稿 §04</span></div>
+<div class="stage fit"><div class="dk z1">
+  <div class="drawer" style="width:520px;border-left:0">
+    <div class="dh"><b>守护语规则</b><button class="b">＋ 加一条</button><button class="b">关闭</button></div>
+    <div class="db">
+      <div style="color:var(--text-dim);font-size:var(--fs-meta);line-height:1.8">
+        从上往下匹配会话屏幕的<b style="color:var(--text-bright)">末尾 40 行</b>，
+        命中第一条就用它；都不命中就用最下面那条兜底。
+      </div>
+      <div>
+        <div class="rrow">
+          <span class="gr">⠿</span>
+          <span><span class="mt">Connection lost mid-response|API Error|Request timed out</span>
+            <span class="pt">刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍</span></span>
+          <span><i class="sw on"></i></span>
+        </div>
+        <div class="rrow">
+          <span class="gr">⠿</span>
+          <span><span class="mt" style="color:var(--text-dimmer);font-family:inherit;font-style:italic">不看屏幕，按「催到第 2 次」触发</span>
+            <span class="pt">先别往下写了，回头自查一遍：跑一遍构建和测试，把结果贴出来</span></span>
+          <span><i class="sw"></i></span>
+        </div>
+        <div class="rrow fb">
+          <span class="gr" style="color:var(--text-dimmer)">底</span>
+          <span><span class="mt">其它一切情况（兜底，删不掉，只能改它说什么）</span>
+            <span class="pt">继续</span></span>
+          <span><i class="sw on"></i></span>
+        </div>
+      </div>
+      <div class="try">
+        拿 <b>小慧优化</b> 当前的屏幕试了一下：命中 <b>第 1 条</b>，会发出
+        「刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍」
+      </div>
+      <div style="display:flex;gap:8px"><button class="b">换个会话试 ▾</button></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="cap"><b>B · 单独设置</b><span>逐会话覆盖，留空即跟随全局</span></div>
+<div class="stage fit"><div class="dk z1">
+  <div class="drawer" style="width:520px;border-left:0">
+    <div class="dh"><b>小慧优化 · 单独设置</b><button class="b">关闭</button></div>
+    <div class="db">
+      <div style="color:var(--text-dim);font-size:var(--fs-meta);line-height:1.8">
+        三项都可以留空——<b style="color:var(--text-bright)">留空就跟着全局走</b>。
+      </div>
+      <div>
+        <div class="frow"><span class="lb">守护语</span>
+          <span><span class="inp" style="display:block">跟着全局：继续</span>
+            <span class="chips"><i class="chip on">继续</i><i class="chip">断线重连</i><i class="chip">回头自查</i><i class="chip">自定义…</i></span></span></div>
+        <div class="frow"><span class="lb">安静多久算停住</span>
+          <span class="inp" style="display:block">跟着全局：10 分钟</span></div>
+        <div class="frow"><span class="lb">最快多久催一次</span>
+          <span class="inp" style="display:block">跟着全局：30 分钟</span></div>
+        <div class="frow" style="border-bottom:0"><span class="lb">这个会话</span>
+          <span style="font-size:var(--fs-sm)">共催过 2 次 · 3 分钟前一次 · <b style="color:var(--warn)">连败 1 次</b>
+            <span style="display:block;color:var(--text-dimmer);font-size:var(--fs-micro);margin-top:3px">
+              再连败 2 次就会自动停手</span></span></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div class="cap"><b>C · 发送记录</b><span>新的在前，最多 200 条</span></div>
+<div class="stage fit"><div class="dk z1">
+  <div class="drawer" style="width:520px;border-left:0">
+    <div class="dh"><b>发送记录</b><span class="tg">共 24 次</span><span class="tg bad">1 次停手</span>
+      <span style="flex:1"></span><button class="b">关闭</button></div>
+    <div class="db">
+      <div>
+        <div class="hrow"><i class="d"></i><div>
+          <div class="h2r"><b>3 分钟前</b><span>小慧优化</span><span>自动 · 当时已安静 41 分钟</span>
+            <span class="tg bad">断线规则命中</span></div>
+          <div class="msg">刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍</div></div></div>
+        <div class="hrow"><i class="d"></i><div>
+          <div class="h2r"><b>22 分钟前</b><span>周报整理</span><span>手动 · 你点的「催一下」</span></div>
+          <div class="msg">继续</div></div></div>
+        <div class="hrow"><i class="d"></i><div>
+          <div class="h2r"><b>1 小时前</b><span>ttmux 优化</span><span>自动 · 当时已安静 12 分钟</span></div>
+          <div class="msg">继续</div></div></div>
+        <div class="hrow bad"><i class="d"></i><div>
+          <div class="h2r"><b>2 小时前</b><span>p2p 直连</span><span>自动 · 第 3 次</span>
+            <span class="tg bad">已停手</span></div>
+          <div class="msg">继续 —— 连催 3 次屏幕都没动，已停止守护并发出通知</div></div></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<h2><span class="n">07</span>「全部守护」展开的样子</h2>
+
+<p>它是个下拉而不是直给的按钮：<b>直接一键把所有会话都守起来，是个会花钱的动作</b>，
+必须先让人看见「守哪些、跳过哪些」。</p>
+
+<div class="stage"><div class="dk z1" style="padding:12px;justify-content:flex-end">
+  <div class="menu" style="width:100%;display:flex;justify-content:flex-end">
+    <button class="b fx">全部守护 ▾</button>
+    <div class="pop" style="position:static;margin-left:10px">
+      <i class="on">守护全部 Agent 会话<small>6 个里有 4 个还没守 · 跳过 3 个认不出是 Agent 的</small></i>
+      <i>连非 Agent 会话也守<small>9 个全守上 · 往裸 shell 打字会得到 command not found</small></i>
+      <hr>
+      <i style="color:var(--text-dimmer)">以后新建的会话自动守护<small>不提供 —— 每一条守护都得你亲手打开</small></i>
+      <hr>
+      <i>全部取消守护<small>3 条守护停用 · 配置留着，随时可以再打开</small></i>
+    </div>
+  </div>
+</div></div>
+
+<p>选完弹确认，确认文案说的是<b>结果</b>而不是问句：
+「将开始守护 4 个会话，跳过 3 个（认不出是 Agent）。它们安静 10 分钟就会各收到一句『继续』。」
+——用户要确认的是这句话，不是「你确定吗」。</p>
+
+<h2><span class="n">08</span>手机档：390 × 844</h2>
+
+<p>五列合计 ≥808px，360 的屏必然横滚，而横滚表格在手机上等于每列都要滑到才看得见。
+<code>data-size=compact</code> 下换卡片，结构沿用定时任务插件验证过的
+<code>.tt-cron-card</code>：<b>标题行 → 一行状态 → 一排按钮</b>。</p>
+
+<div class="stage" style="display:inline-block"><div class="dk z1">
+  <div class="dev">
+    <div class="pt2"><b>会话守护</b><span class="tg ok">已启用</span></div>
+    <div class="pb">
+      <div class="banner"><i class="dot"></i><span class="txt">守护 <b>3</b> 个 <span class="sub">· 12 秒前巡检</span></span></div>
+      <div class="sentence" style="font-size:var(--fs-meta);line-height:1.9">
+        <div>安静 <u>10 分钟</u> 催一句，最快 <u>30 分钟</u> 一次，连催 <u>3 次</u> 停手</div>
+        <div class="promptline"><span class="pv">你是不是已经完成了你的任务？没有完成，那么继续。</span></div>
+      </div>
+
+      <div class="pcard" style="border-color:var(--danger-border)">
+        <div class="h"><span class="mk cc">CC</span><b>p2p 直连</b><span class="tg bad">已停手</span></div>
+        <div class="m">连催 3 次没反应 · 安静 6 小时</div>
+        <div class="o"><button class="b pri">再试试</button><button class="b">单独设置</button></div>
+      </div>
+
+      <div class="pcard">
+        <div class="h"><span class="mk cx">CX</span><b>小慧优化</b><i class="sw on"></i></div>
+        <div class="m">安静 41 分钟 · 3 分钟前催过 · 共 2 次</div>
+        <div class="o"><button class="b">催一下</button><button class="b">单独设置</button></div>
+      </div>
+
+      <div class="pcard">
+        <div class="h"><span class="mk cc">CC</span><b>ttmux 优化</b><i class="sw on"></i></div>
+        <div class="m">安静 2 分钟 · 还没催过</div>
+        <div class="o"><button class="b">催一下</button><button class="b">单独设置</button></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div class="cols">
+  <div class="card">
+    <h4>卡片顺序＝桌面排序</h4>
+    <p>已停手的那张置顶并描红边——手机上人只看得见前两屏，
+    <b>要紧的必须在第一屏</b>。</p>
+  </div>
+  <div class="card warn">
+    <h4>命中区 ≥44px</h4>
+    <p>按钮视觉高度仍是 28，靠伪元素把命中区撑到 44；相邻图标按钮之间的空隙<b>比设计值多留 4px</b>
+    （3px 在 dpr 2.75 上仍会点错）。开关本身用 antd 默认尺寸，不缩小。</p>
+  </div>
+  <div class="card bad">
+    <h4>不给 Tooltip</h4>
+    <p>粗指针下 <code>.ant-tooltip</code> 站点级隐藏（长按开出来的 tooltip 没有 mouseleave，
+    它的遮罩会吃掉下一次点击）。所以图标按钮的名字写在 <code>aria-label</code> 里，
+    而这一页干脆<b>全部用带文字的按钮</b>。</p>
+  </div>
+</div>
+
+<h2><span class="n">09</span>用到的令牌（不许出现生值）</h2>
+
+<table>
+  <thead><tr><th>角色</th><th>令牌</th><th>用在哪</th></tr></thead>
+  <tbody>
+    <tr><td>会话名</td><td class="mono">--fs-body / 600</td><td>第二列第一行</td></tr>
+    <tr><td>目录、状态小字</td><td class="mono">--fs-micro + --text-dimmer</td><td>第二列第二行、第四列第二行</td></tr>
+    <tr><td>安静时长</td><td class="mono">--fs-meta + --mono</td><td>第三列；超阈值换 <code>--warn</code></td></tr>
+    <tr><td>刚刚催过</td><td class="mono">--ok</td><td>第四列状态字，只亮 5 分钟</td></tr>
+    <tr><td>已停手</td><td class="mono">--danger / --danger-border</td><td>第四列状态字、手机卡片边框</td></tr>
+    <tr><td>主行动按钮</td><td class="mono">--accent-soft / --accent-border</td><td>「再试试」「全部守护」</td></tr>
+    <tr><td>行分隔</td><td class="mono">--border-subtle</td><td>行底线；行高 52、内边距 <code>--sp-3</code></td></tr>
+    <tr><td>品牌标</td><td class="mono">--brand-claude / --brand-codex</td><td>第一列；<b>不许改成 accent 色</b>，也不加 Tag 外框</td></tr>
+  </tbody>
+</table>
+
+<div class="card bad">
+  <h4>三条红线</h4>
+  <ul style="margin-bottom:0">
+    <li>图标只从 <code>frontend/src/icons.tsx</code> 取；这一页需要的是
+        <code>PlusIcon</code> 与品牌标 <code>AgentLogo</code>，<b>不新画</b>，更不用字符当图标。</li>
+    <li>可点的都是 <code>&lt;button type="button"&gt;</code>；只有会话名是真 <code>&lt;a href="#/w?…"&gt;</code>，
+        因为它真的导航。</li>
+    <li>每条 <code>:hover</code> 写成 <code>:where(html[data-pointer="fine"]) X:hover</code>，
+        <code>npm run hover:check</code> 守门。</li>
+  </ul>
+</div>
+
+<h2><span class="n">10</span>落地映射</h2>
+
+<table>
+  <thead><tr><th>这一页的哪块</th><th>落到哪</th></tr></thead>
+  <tbody>
+    <tr><td>整个 tab</td><td class="mono">frontend/src/components/plugins/KeepalivePanel.tsx</td></tr>
+    <tr><td>tab 挂载</td><td class="mono">PluginsPanel.tsx · 按 id 加一支（同 CRON_ID）</td></tr>
+    <tr><td>列表 / 卡片样式</td><td class="mono">index.css · .tt-ka-row / .tt-ka-card（对照 .tt-cron-card）</td></tr>
+    <tr><td>数据</td><td class="mono">POST /plugins/roam.keepalive/run · keepalive.list（一条给齐）</td></tr>
+    <tr><td>开关 / 催一下 / 全部</td><td class="mono">keepalive.on · off · ping · all</td></tr>
+    <tr><td>那句白话</td><td class="mono">keepalive.settings（不带参数是读）</td></tr>
+    <tr><td>规则抽屉</td><td class="mono">keepalive.rules</td></tr>
+    <tr><td>记录抽屉</td><td class="mono">keepalive.history</td></tr>
+    <tr><td>所有文案</td><td class="mono">i18n · ka.* （zh-CN 与 en-US 同一个变更里给齐）</td></tr>
+  </tbody>
+</table>
+
+<div class="foot">
+  Roami · docs/design/plugin/keepalive-panel.html · v0.1 · 2026-09-18<br>
+  上游：<a href="keepalive.html">会话守护插件设计稿</a>（形态、判据、规则表、四道闸）。
+  样式参照 <code>frontend/src/index.css</code> 的 <code>.tt-cron-card</code> 与
+  <code>docs/development/ui-design-system.md</code>。
+</div>
+
+</div>
+
+<script>
+(function () {
+  var b = document.getElementById('themeBtn');
+  var dark = !window.matchMedia('(prefers-color-scheme: light)').matches;
+  function apply() {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    b.textContent = dark ? '浅色' : '深色';
+  }
+  b.addEventListener('click', function () { dark = !dark; apply(); });
+  apply();
+})();
+</script>
+</body>
+</html>

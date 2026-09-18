@@ -3628,3 +3628,159 @@ html[data-size="compact"] .tt-histname { flex: 1 1 auto; max-width: none; }
 }
 :where(html[data-pointer="coarse"]) .tt-statusbar .cell { padding: 0 var(--sp-3); gap: var(--sp-2); }
 :where(html[data-pointer="coarse"]) .tt-statusbar .cell svg { width: 16px; height: 16px; }
+
+/* ══ 会话守护面板（roam.keepalive）══
+   界面稿：docs/design/plugin/keepalive-panel.html
+   五列一处定义（表头和行共用同一条 grid，分开写必然在某次改动后错位）：
+   身份标 28 / 会话 1fr≥260 / 安静了 96 / 守护 200 / 操作 176。
+   固定列合计 548，加上会话列下限 260 → 这张表的最小可用宽度是 808px。 */
+.tt-ka-head, .tt-ka-row {
+  display: grid; grid-template-columns: 28px minmax(200px, 1fr) 96px 200px 176px;
+  gap: var(--sp-3); align-items: center; padding: 0 var(--sp-3);
+}
+.tt-ka-head {
+  height: 30px; border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-dim); font-size: var(--fs-micro); letter-spacing: .06em; text-transform: uppercase;
+}
+.tt-ka-head .num { text-align: right; }
+.tt-ka-head .ops { text-align: right; }
+/* 行高 52 ＝ 名字（--fs-body）+ 目录（--fs-micro）两行。一行 32 只塞得下名字，
+   而目录才是认人的那一行——名字重名是常态（三个「优化」）。 */
+.tt-ka-row { height: 52px; border-bottom: 1px solid var(--border-subtle); }
+:where(html[data-pointer="fine"]) .tt-ka-row:hover { background: var(--list-hover); }
+.tt-ka-row .mk { display: flex; align-items: center; justify-content: center; }
+.tt-ka-row .name { min-width: 0; }
+.tt-ka-row .name a { font-size: var(--fs-body); font-weight: 600; color: var(--text-bright); text-decoration: none; }
+:where(html[data-pointer="fine"]) .tt-ka-row .name a:hover { color: var(--accent); text-decoration: underline; }
+.tt-ka-row .name small {
+  display: block; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-dimmer);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 唯一可纵向扫的数字：等宽 + 右对齐，一列才排得成一条线 */
+.tt-ka-row .quiet {
+  font-family: var(--mono); font-size: var(--fs-meta); color: var(--text-dim);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+/* 超过阈值 = 下一轮就会被催。颜色全表只用三次：暖=超阈值、绿=刚催过、红=已停手 */
+.tt-ka-row .quiet.long { color: var(--warn); }
+.tt-ka-row .guard { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+/* 两行：第一行是态（守护中/未守护/已停手），第二行是最近发生了什么。
+   文案里的 \n 在这里断行——开关和它的后果必须挨着，拆去别的列人就得左右对。 */
+.tt-ka-row .guard .st {
+  font-size: var(--fs-micro); color: var(--text-dim); line-height: 1.35; min-width: 0;
+  white-space: pre-line;
+}
+.tt-ka-row .guard .st.bad { color: var(--danger); }
+.tt-ka-row .guard .st.ok { color: var(--ok); }
+.tt-ka-row .ops { display: flex; gap: 6px; justify-content: flex-end; }
+/* 未守护的行**不灰化**：它们是候选，不是禁用项——这一页一半的价值就是让你
+   从这些行里挑一个打开。 */
+.tt-ka-row.off { opacity: 1; }
+
+/* 顶部横幅：这一页的诚实性担保。它不说「已启用」，它说「12 秒前巡检过一轮」
+   ——一个只有真的在跑才写得出来的数字。 */
+.tt-ka-banner {
+  display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+  padding: 8px var(--sp-3); border: 1px solid var(--ok-border); background: var(--ok-soft);
+  border-radius: var(--r-sm); font-size: var(--fs-sm);
+}
+.tt-ka-banner .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.tt-ka-banner .txt { color: var(--text-bright); }
+.tt-ka-banner .sp { flex: 1; }
+.tt-ka-banner.idle { border-color: var(--border); background: var(--bg-container); }
+.tt-ka-banner.idle .dot { background: var(--text-dimmer); }
+.tt-ka-banner.idle .txt { color: var(--text-dim); }
+.tt-ka-banner.warn { border-color: var(--warn-border); background: var(--warn-soft); }
+.tt-ka-banner.warn .dot { background: var(--warn); }
+.tt-ka-banner .tt-act.sm { height: 24px; padding: 0 9px; font-size: var(--fs-micro); }
+html[data-pointer="coarse"] .tt-ka-banner .tt-act.sm { height: 36px; padding: 0 12px; }
+
+/* 全局默认：一句白话 + 一块守护语。
+   三个**数字**嵌在句子里（一张有四个 label 的表单说不出它们之间的关系，
+   而这句话说得出）；**守护语单独成块**——它是一整句甚至几句，塞进句子会挤成一坨。 */
+.tt-ka-rule {
+  border: 1px dashed var(--border); border-radius: var(--r-sm); background: var(--bg-container);
+  padding: 10px var(--sp-4);
+}
+.tt-ka-rule .say { font-size: var(--fs-sm); line-height: 2.1; color: var(--text-dim); }
+/* 可点的数字：虚线下划线是唯一的「这里能改」提示 */
+.tt-ka-rule .say .num {
+  border: 0; background: none; padding: 0 3px; margin: 0 1px; font: inherit; font-weight: 600;
+  color: var(--accent); border-bottom: 1px dashed var(--accent-border); cursor: pointer;
+}
+.tt-ka-rule .say .num:disabled { color: var(--text-dim); border-bottom-color: var(--border); cursor: default; }
+:where(html[data-pointer="fine"]) .tt-ka-rule .say .num:hover:not(:disabled) { background: var(--accent-soft); }
+.tt-ka-rule .say .num:focus-visible { outline: 1px solid var(--accent-border); outline-offset: 1px; }
+.tt-ka-rule .numedit { display: inline-flex; align-items: center; gap: 4px; margin: 0 2px; }
+.tt-ka-rule .numedit .ant-input-number { width: 78px; }
+.tt-ka-rule .numedit .unit { color: var(--text-dim); font-size: var(--fs-meta); }
+/* 越界当场说清区间，**不静默夹值**——静默夹值会让人以为自己设成了 0 而实际跑的是 10 */
+.tt-ka-rule .numedit .bad { color: var(--danger); font-size: var(--fs-micro); }
+
+.tt-ka-prompt {
+  display: flex; align-items: flex-start; gap: var(--sp-2);
+  margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px dashed var(--border-subtle);
+}
+.tt-ka-prompt .lb { flex: none; color: var(--text-dim); font-size: var(--fs-meta); padding-top: 6px; }
+.tt-ka-prompt .box { flex: 1; min-width: 0; }
+.tt-ka-prompt .chips { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+.tt-ka-prompt .chips .tt-act.sm { height: 22px; padding: 0 9px; font-size: var(--fs-micro); border-radius: var(--r-pill); }
+html[data-pointer="coarse"] .tt-ka-prompt .chips .tt-act.sm { height: 34px; padding: 0 13px; }
+.tt-ka-prompt .chips .tt-act.on { color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); }
+.tt-ka-prompt .count {
+  flex: none; padding-top: 6px; color: var(--text-dimmer);
+  font-family: var(--mono); font-size: var(--fs-micro); font-variant-numeric: tabular-nums;
+}
+.tt-ka-prompt .count.bad { color: var(--danger); }
+
+/* 逐会话覆盖抽屉里的一行 */
+.tt-ka-frow {
+  display: grid; grid-template-columns: 104px 1fr; gap: var(--sp-3); align-items: start;
+  padding: 10px 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-sm);
+}
+.tt-ka-frow .lb { color: var(--text-dim); font-size: var(--fs-meta); padding-top: 4px; }
+
+/* 守护语规则抽屉：顺序即优先级，兜底那条钉在最后、不可拖不可删 */
+.tt-ka-rules { display: flex; flex-direction: column; }
+.tt-ka-rules .rr {
+  display: grid; grid-template-columns: 26px 1fr 58px; gap: var(--sp-2); align-items: start;
+  padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
+}
+.tt-ka-rules .rr:last-child { border-bottom: 0; }
+.tt-ka-rules .rr .body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tt-ka-rules .rr .tail { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+.tt-ka-rules .rr .fbnote { color: var(--text-dimmer); font-size: var(--fs-micro); font-style: italic; }
+.tt-ka-rules .tt-act.xs { height: 20px; width: 22px; padding: 0; font-size: var(--fs-micro); }
+html[data-pointer="coarse"] .tt-ka-rules .tt-act.xs { height: 30px; width: 34px; }
+
+/* 发送记录：一次发送一颗点，越往下越早（同定时任务的执行记录） */
+.tt-ka-hist { display: flex; flex-direction: column; }
+.tt-ka-hist .h { display: grid; grid-template-columns: 14px 1fr; gap: var(--sp-3); padding: 9px 0;
+  border-bottom: 1px solid var(--border-subtle); }
+.tt-ka-hist .h:last-child { border-bottom: 0; }
+.tt-ka-hist .h .d { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-top: 6px; }
+.tt-ka-hist .h.bad .d { background: var(--danger); }
+.tt-ka-hist .h .hd { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; }
+.tt-ka-hist .h .hd b { font-size: var(--fs-sm); }
+.tt-ka-hist .h .hd span { color: var(--text-dimmer); font-size: var(--fs-micro); }
+.tt-ka-hist .h .hd .tag {
+  border: 1px solid var(--border); border-radius: var(--r-pill); padding: 0 8px; color: var(--text-dim);
+}
+.tt-ka-hist .h .hd .tag.bad { border-color: var(--danger-border); color: var(--danger); background: var(--danger-soft); }
+.tt-ka-hist .h .msg { color: var(--text-dim); font-size: var(--fs-meta); margin-top: 2px; }
+.tt-ka-hist .h .err { color: var(--danger); font-size: var(--fs-micro); margin-top: 3px; }
+
+/* 手机档：桌面那五列合计 ≥808，360 的屏必然横滚，而横滚表格等于每列都要滑到才看得见。
+   出事那张（已停手）描红边并靠排序置顶——手机上人只看得见前两屏。 */
+.tt-ka-card {
+  padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--r-card);
+  background: var(--bg-container); display: flex; flex-direction: column; gap: 7px;
+}
+.tt-ka-card.stopped { border-color: var(--danger-border); }
+.tt-ka-card .hd { display: flex; align-items: center; gap: 8px; }
+.tt-ka-card .hd b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-ka-card .m { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  color: var(--text-dim); font-size: var(--fs-meta); }
+.tt-ka-card .m .long { color: var(--warn); }
+.tt-ka-card .m .sep { color: var(--text-dimmer); }
+.tt-ka-card .ops { display: flex; gap: 8px; flex-wrap: wrap; }

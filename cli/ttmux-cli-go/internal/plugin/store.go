@@ -423,6 +423,22 @@ func (s *Store) Notifications(limit int) ([]Notification, error) {
 	return out, rows.Err()
 }
 
+// ── plugin storage(插件私有 KV,读写都经 roam/storage.*)──
+
+// StoragePath is the per-plugin KV file under the storage dir.
+func (e Env) StoragePath(id string) string { return filepath.Join(e.StorageDir(id), "kv.json") }
+
+// LoadStorage reads a plugin's private KV(文件不在 = 空表)。宿主侧只读:
+// plugind 要据此判断「这个插件此刻有没有活要干」(如守护插件有没有守护对象),
+// 而写入仍只发生在插件自己的 roam/storage.set 里。
+func (e Env) LoadStorage(id string) map[string]string {
+	kv := map[string]string{}
+	if b, err := os.ReadFile(e.StoragePath(id)); err == nil {
+		_ = json.Unmarshal(b, &kv)
+	}
+	return kv
+}
+
 // ── plugin config (schema 默认 < 全局配置;工作区覆盖为后续增量) ──
 
 // ConfigPath is the per-plugin JSON config under the storage dir.

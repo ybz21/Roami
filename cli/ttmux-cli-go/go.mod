@@ -29,6 +29,7 @@ require (
 	roam-plugins/cron v0.0.0
 	roam-plugins/hostmonitor v0.0.0
 	roam-plugins/im v0.0.0
+	roam-plugins/keepalive v0.0.0
 	roam-plugins/reviewmesh v0.0.0
 )
 
@@ -39,3 +40,5 @@ replace (
 )
 
 replace roam-plugins/cron => ../../plugins/cron
+
+replace roam-plugins/keepalive => ../../plugins/keepalive

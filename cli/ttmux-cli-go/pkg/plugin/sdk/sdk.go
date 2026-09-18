@@ -189,6 +189,28 @@ func (c *Ctx) SessionList() ([]SessionInfo, error) {
 	return out, err
 }
 
+// AllSession 是本机一条会话的概览(roam/session.listAll)。与 SessionList 的
+// 区别:那个只给本插件 spawn/track 过的会话,这个给**所有**会话——守护/巡检类
+// 插件要看的正是别人建的那些。
+type AllSession struct {
+	Session  string `json:"session"`  // 会话 id(改名不变,拿它当主键)
+	Label    string `json:"label"`    // 展示名(会变,只配拿来显示)
+	Agent    string `json:"agent"`    // claude | codex | ""(认不出)
+	Dir      string `json:"dir"`      // 归属目录
+	Attached bool   `json:"attached"` // 此刻有人 attach 着
+	Activity int64  `json:"activity"` // 最后一次有动静(unix 秒)
+	IdleSec  int64  `json:"idleSec"`  // 安静了多久(秒)
+	Created  int64  `json:"created"`
+}
+
+// SessionListAll returns every session on this machine (需 sessions:read)。
+// 基础设施会话(_ttmux-*)由宿主过滤掉。
+func (c *Ctx) SessionListAll() ([]AllSession, error) {
+	var out []AllSession
+	err := c.call("roam/session.listAll", map[string]string{}, &out, 30*time.Second)
+	return out, err
+}
+
 func (c *Ctx) SessionLog(name string) (string, error) {
 	var out struct {
 		Log string `json:"log"`

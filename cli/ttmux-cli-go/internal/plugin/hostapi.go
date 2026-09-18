@@ -14,6 +14,7 @@ import (
 	"ttmux-cli-go/internal/command/spawn"
 	"ttmux-cli-go/internal/plugin/rpc"
 	"ttmux-cli-go/internal/runtime"
+	"ttmux-cli-go/internal/sessmeta"
 )
 
 // HostAPI serves roam/* platform calls for one hosted plugin. 它是"平台 API →
@@ -52,6 +53,8 @@ func (h *HostAPI) Handle(method string, params json.RawMessage) (any, error) {
 		return h.sessionLog(params)
 	case "roam/session.list":
 		return h.sessionList(params)
+	case "roam/session.listAll":
+		return h.sessionListAll(params)
 	case "roam/session.send":
 		return h.sessionSend(params)
 	case "roam/storage.get":
@@ -422,6 +425,84 @@ func (h *HostAPI) sessionList(params json.RawMessage) (any, error) {
 	return out, nil
 }
 
+// AllSessionRow 是「本机所有会话」里的一行(roam/session.listAll)。它和
+// sessionList 那张表不是一回事:那张只看本插件 spawn/track 登记过的会话,
+// 而守护类插件(roam.keepalive)要守的恰恰是**别人建的**那些。
+//
+// 权限仍是 sessions:read,没有扩大能力面:capture/log/alive 本来就对任意会话
+// 名放行,少的只是「有哪些名字」这一条——逼得插件去猜名字或自己敲 tmux,
+// 反而绕开了审计。
+type AllSessionRow struct {
+	Session  string `json:"session"`  // 会话 id(= tmux 会话名,改名不变)
+	Label    string `json:"label"`    // 展示名
+	Agent    string `json:"agent"`    // claude | codex | ""(认不出)
+	Dir      string `json:"dir"`      // 归属目录
+	Attached bool   `json:"attached"` // 此刻有人 attach 着
+	Activity int64  `json:"activity"` // 最后一次有动静(unix 秒)
+	IdleSec  int64  `json:"idleSec"`  // 安静了多久(秒)
+	Created  int64  `json:"created"`
+}
+
+// sessionListAll 列出本机所有会话。`_ttmux-` 前缀的基础设施会话(plugind、
+// IM 长连接、守护循环自己)一律不出现:它们不是人的工作会话,守护它们等于
+// 让插件对着自己的循环发消息。
+func (h *HostAPI) sessionListAll(params json.RawMessage) (any, error) {
+	if err := h.requirePerm("sessions:read", "session.listAll", ""); err != nil {
+		return nil, err
+	}
+	states := h.Env.RT.SessionStates()
+	meta := sessmeta.New(h.Env.RT.HomeDir)
+	panes := h.paneCommands()
+	now := time.Now().Unix()
+	out := make([]AllSessionRow, 0, len(states))
+	for _, st := range states {
+		if strings.HasPrefix(st.Name, "_ttmux-") {
+			continue
+		}
+		row := AllSessionRow{
+			Session: st.Name, Label: st.DisplayLabel(), Attached: st.Attached,
+			Activity: st.Activity, Created: st.Created,
+		}
+		if st.Activity > 0 && now > st.Activity {
+			row.IdleSec = now - st.Activity
+		}
+		if r, ok := meta.Get(st.Name); ok {
+			row.Agent, row.Dir = r.AgentKind, r.Dir()
+		}
+		// 台账只认得 Roami 自己拉起的 agent 会话;人手敲 `claude` 起来的那些
+		// 靠 pane 里在跑什么兜一层(只认可执行名,不扫整条命令行——prompt 就在
+		// argv 里,见 backend/api/agent_kind_test.go 那桩真机误判)。
+		if row.Agent == "" {
+			row.Agent = panes[st.Name]
+		}
+		out = append(out, row)
+	}
+	h.audit("session.listAll", "", "allowed", fmt.Sprintf("%d sessions", len(out)))
+	return out, nil
+}
+
+// paneCommands 一次问齐所有 pane 在跑什么,认出 agent 会话(会话名 → kind)。
+func (h *HostAPI) paneCommands() map[string]string {
+	out := map[string]string{}
+	raw, err := h.Env.RT.TmuxOutput("list-panes", "-a", "-F", "#{session_name}\t#{pane_current_command}")
+	if err != nil {
+		return out
+	}
+	for _, line := range strings.Split(strings.TrimRight(raw, "\n"), "\n") {
+		sess, cmd, ok := strings.Cut(strings.TrimSpace(line), "\t")
+		if !ok || out[sess] != "" {
+			continue
+		}
+		switch strings.TrimSpace(cmd) {
+		case "claude":
+			out[sess] = "claude"
+		case "codex":
+			out[sess] = "codex"
+		}
+	}
+	return out
+}
+
 // sessionSend types text + Enter into a session(高危:sessions:write;
 // 互审意见回灌原会话让 Agent 修改就走这里)。
 func (h *HostAPI) sessionSend(params json.RawMessage) (any, error) {
@@ -461,17 +542,9 @@ func (h *HostAPI) sessionSend(params json.RawMessage) (any, error) {
 
 // ── storage(插件私有 KV,落 storage/<id>/kv.json)──
 
-func (h *HostAPI) storagePath() string {
-	return filepath.Join(h.Env.StorageDir(h.Plugin.Manifest.ID), "kv.json")
-}
+func (h *HostAPI) storagePath() string { return h.Env.StoragePath(h.Plugin.Manifest.ID) }
 
-func (h *HostAPI) loadKV() map[string]string {
-	kv := map[string]string{}
-	if b, err := os.ReadFile(h.storagePath()); err == nil {
-		_ = json.Unmarshal(b, &kv)
-	}
-	return kv
-}
+func (h *HostAPI) loadKV() map[string]string { return h.Env.LoadStorage(h.Plugin.Manifest.ID) }
 
 func (h *HostAPI) storageGet(params json.RawMessage) (any, error) {
 	var req struct {

@@ -19,6 +19,11 @@ const DaemonSession = "_ttmux-plugind"
 // (入站 @机器人 派活;由 plugind 托管:配置齐且插件启用时自动拉起,掉了重拉)。
 const IMListenerSession = "_ttmux-im"
 
+// KeepaliveSession hosts the session-guard sweep loop(roam.keepalive:
+// 屏幕太久没动就替人催一句)。同样由 plugind 托管——用户在设置页打开一个
+// 开关,东西就该真的跑起来,而不是再去装一个 systemd timer。
+const KeepaliveSession = "_ttmux-keepalive"
+
 // RunDaemonForeground runs plugind: a unix-socket control API plus the
 // session watcher that synthesizes agent.exited events for plugin-owned
 // sessions (spawn 时 wait=false 的异步收尾路径)。
@@ -55,6 +60,7 @@ func RunDaemonForeground(env Env) error {
 	for range ticker.C {
 		watchOnce(env, store)
 		ensureIMListener(env, store)
+		ensureKeepaliveLoop(env, store)
 	}
 	return nil
 }
@@ -101,6 +107,45 @@ func ensureIMListener(env Env, store *Store) {
 	}
 	fmt.Printf("[plugind] im listener started in session %s\n", IMListenerSession)
 }
+
+// ensureKeepaliveLoop keeps the session-guard sweep loop alive while the
+// plugin has something to guard. `plugin run` 的 invoke 上限 24h,循环会话
+// 日级回收后由这里重拉,天然自愈——和 IM 长连接同一个机制。
+//
+// 「有没有活要干」由**插件自己举手**:它在私有 storage 里写 wanted=1。宿主只
+// 读这一个键,不去解析守护表——插件的数据结构是插件的家事。守护表空了循环会
+// 自己退出(见 plugins/keepalive/watch.go 的 serve),这里也就不会再拉。
+func ensureKeepaliveLoop(env Env, store *Store) {
+	if env.RT.HasSession(KeepaliveSession) {
+		return
+	}
+	if time.Since(lastKeepaliveStart) < keepaliveCooldown {
+		return
+	}
+	p, err := store.Get("roam.keepalive")
+	if err != nil || !p.Enabled {
+		return
+	}
+	if env.LoadStorage(p.Manifest.ID)["wanted"] != "1" {
+		return
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	lastKeepaliveStart = time.Now()
+	if err := env.RT.Tmux("new-session", "-d", "-s", KeepaliveSession, self+" plugin run keepalive.serve"); err != nil {
+		fmt.Fprintf(os.Stderr, "[plugind] keepalive loop start failed: %v\n", err)
+		return
+	}
+	fmt.Printf("[plugind] keepalive loop started in session %s\n", KeepaliveSession)
+}
+
+// lastKeepaliveStart 节流重拉。冷却比 IM 那条短得多(10s 对 60s):这里没有
+// 外部接口可锤,循环退出多半是因为守护表空了,而用户刚打开一个开关时不该等一分钟。
+var lastKeepaliveStart time.Time
+
+const keepaliveCooldown = 10 * time.Second
 
 // reconcileStale settles sessions that died while plugind was down. reviewer
 // 会话照常派发收尾(解析日志落 findings 迟到也有价值);review:auto 的开发

@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roami · 会话守护插件 roam.keepalive（设计稿 v0.1）</title>
+<style>
+/* ── 令牌：直接取 frontend/src/theme.tsx 的真值 ─────────────────────────── */
+:root {
+  --bg-base:#0d1117; --bg-container:#161b22; --bg-elevated:#1b222b; --bg-term:#06090d;
+  --border:#30363d; --border-subtle:#21262d;
+  --text-bright:#e6edf3; --text-dim:#8b949e; --text-dimmer:#6e7681;
+  --accent:#58a6ff; --accent-solid:#1f6feb; --accent-soft:rgba(31,111,235,.14); --accent-border:rgba(88,166,255,.45);
+  --ok:#3fb950; --ok-solid:#238636; --ok-soft:rgba(63,185,80,.14); --ok-border:rgba(63,185,80,.42);
+  --danger:#f85149; --danger-soft:rgba(248,81,73,.12); --danger-border:rgba(248,81,73,.40);
+  --warn:#d29922; --warn-soft:rgba(210,153,34,.12); --warn-border:rgba(210,153,34,.40);
+  --list-hover:rgba(255,255,255,.025);
+  --fs-micro:11px; --fs-meta:12px; --fs-sm:13px; --fs-body:14px; --fs-lg:16px; --fs-title:22px;
+  --r-xs:6px; --r-sm:10px; --r-card:14px; --r-pill:999px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+html[data-theme="light"] {
+  --bg-base:#f6f8fa; --bg-container:#ffffff; --bg-elevated:#ffffff; --bg-term:#ffffff;
+  --border:#d0d7de; --border-subtle:#e6e9ec;
+  --text-bright:#1f2328; --text-dim:#57606a; --text-dimmer:#8c959f;
+  --accent:#0969da; --accent-solid:#1f6feb; --accent-soft:rgba(31,111,235,.10); --accent-border:rgba(31,111,235,.40);
+  --ok:#1a7f37; --ok-solid:#1f883d; --ok-soft:rgba(31,136,61,.10); --ok-border:rgba(31,136,61,.40);
+  --danger:#cf222e; --danger-soft:rgba(207,34,46,.09); --danger-border:rgba(207,34,46,.35);
+  --warn:#9a6700; --warn-soft:rgba(154,103,0,.10); --warn-border:rgba(154,103,0,.35);
+  --list-hover:rgba(27,31,36,.04);
+}
+* { box-sizing:border-box; }
+html { background:#07090d; }
+html[data-theme="light"] { background:#eef1f5; }
+body {
+  margin:0; color:var(--text-bright);
+  font:var(--fs-body)/1.65 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button { font:inherit; cursor:pointer; }
+
+.top {
+  position:sticky; top:0; z-index:20;
+  display:flex; align-items:center; gap:var(--sp-3);
+  padding:10px clamp(16px,3vw,40px);
+  background:color-mix(in srgb, var(--bg-base) 84%, transparent);
+  border-bottom:1px solid var(--border-subtle); backdrop-filter:blur(18px);
+}
+.top .kicker { font-size:var(--fs-micro); letter-spacing:.14em; text-transform:uppercase; color:var(--text-dimmer); }
+.top h1 { margin:0; font-size:var(--fs-sm); font-weight:600; }
+.top .sp { flex:1; }
+.tbtn { border:1px solid var(--border); background:var(--bg-container); color:var(--text-dim);
+  border-radius:var(--r-pill); padding:5px 14px; font-size:var(--fs-meta); }
+.tbtn:hover { color:var(--text-bright); border-color:var(--accent-border); }
+
+.wrap { max-width:1060px; margin:0 auto; padding:34px clamp(16px,3vw,40px) 110px; }
+.lede { color:var(--text-dim); font-size:var(--fs-lg); line-height:1.7; margin:0 0 var(--sp-5); }
+h2 { margin:56px 0 6px; padding-top:26px; font-size:var(--fs-lg); font-weight:600; border-top:1px solid var(--border-subtle); }
+h2:first-of-type { margin-top:8px; border-top:0; padding-top:0; }
+h2 .n { color:var(--text-dimmer); font-family:var(--mono); font-size:var(--fs-meta); margin-right:var(--sp-2); }
+h3 { margin:30px 0 8px; font-size:var(--fs-body); font-weight:600; }
+p { margin:10px 0; }
+code { font-family:var(--mono); font-size:.92em; background:var(--bg-elevated);
+  border:1px solid var(--border-subtle); border-radius:var(--r-xs); padding:1px 5px; }
+pre { margin:var(--sp-3) 0; padding:var(--sp-4); overflow-x:auto;
+  background:var(--bg-term); border:1px solid var(--border-subtle); border-radius:var(--r-sm);
+  font-family:var(--mono); font-size:var(--fs-meta); line-height:1.65; color:var(--text-bright); }
+pre code { background:none; border:0; padding:0; }
+pre .c { color:var(--text-dimmer); }
+pre .k { color:var(--accent); }
+pre .g { color:var(--ok); }
+pre .r { color:var(--danger); }
+pre .y { color:var(--warn); }
+ul,ol { margin:10px 0; padding-left:22px; }
+li { margin:5px 0; }
+a { color:var(--accent); }
+
+.card { background:var(--bg-container); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:var(--sp-4) var(--sp-5); margin:var(--sp-4) 0; }
+.card.warn { border-color:var(--warn-border); background:var(--warn-soft); }
+.card.bad  { border-color:var(--danger-border); background:var(--danger-soft); }
+.card.good { border-color:var(--ok-border); background:var(--ok-soft); }
+.card > :first-child { margin-top:0; }
+.card > :last-child { margin-bottom:0; }
+.card h4 { margin:0 0 var(--sp-2); font-size:var(--fs-sm); font-weight:600; letter-spacing:.01em; }
+
+.tag { display:inline-block; font-size:var(--fs-micro); letter-spacing:.06em; padding:2px 9px;
+  border-radius:var(--r-pill); border:1px solid var(--border); color:var(--text-dim); vertical-align:2px; }
+.tag.on   { border-color:var(--ok-border); color:var(--ok); background:var(--ok-soft); }
+.tag.bad  { border-color:var(--danger-border); color:var(--danger); background:var(--danger-soft); }
+.tag.mid  { border-color:var(--warn-border); color:var(--warn); background:var(--warn-soft); }
+.tag.info { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
+
+table { width:100%; border-collapse:collapse; margin:var(--sp-3) 0; font-size:var(--fs-sm); }
+th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border-subtle); vertical-align:top; }
+th { color:var(--text-dim); font-weight:600; font-size:var(--fs-meta); letter-spacing:.04em; text-transform:uppercase; }
+td.mono { font-family:var(--mono); font-size:var(--fs-meta); white-space:nowrap; }
+
+.cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:var(--sp-3); margin:var(--sp-4) 0; }
+
+.flow { display:grid; gap:var(--sp-2); margin:var(--sp-4) 0; }
+.step { display:grid; grid-template-columns:26px 1fr; gap:var(--sp-3); align-items:start;
+  padding:var(--sp-3) var(--sp-4); background:var(--bg-container);
+  border:1px solid var(--border-subtle); border-radius:var(--r-sm); }
+.step .i { width:26px; height:26px; border-radius:var(--r-pill); background:var(--accent-soft);
+  border:1px solid var(--accent-border); color:var(--accent);
+  display:flex; align-items:center; justify-content:center; font-size:var(--fs-meta); font-family:var(--mono); }
+.step .i.g { background:var(--ok-soft); border-color:var(--ok-border); color:var(--ok); }
+.step .i.r { background:var(--danger-soft); border-color:var(--danger-border); color:var(--danger); }
+.step .i.y { background:var(--warn-soft); border-color:var(--warn-border); color:var(--warn); }
+.step > div > b { display:block; font-weight:600; font-size:var(--fs-sm); margin-bottom:2px; }
+.step small { color:var(--text-dim); font-size:var(--fs-meta); line-height:1.6; }
+
+/* ── 线框 ── */
+.mock { background:var(--bg-base); border:1px solid var(--border); border-radius:var(--r-card);
+  overflow:hidden; margin:var(--sp-4) 0; }
+.mock .mhd { padding:8px var(--sp-4); border-bottom:1px solid var(--border-subtle);
+  font-size:var(--fs-micro); letter-spacing:.12em; text-transform:uppercase; color:var(--text-dimmer); }
+.mock .mbd { padding:var(--sp-4); }
+.mock.phone { max-width:360px; }
+
+.banner { display:flex; align-items:center; gap:var(--sp-3); padding:9px var(--sp-3);
+  border:1px solid var(--ok-border); background:var(--ok-soft); border-radius:var(--r-sm);
+  font-size:var(--fs-meta); color:var(--text-dim); margin-bottom:var(--sp-3); }
+.banner.warn { border-color:var(--warn-border); background:var(--warn-soft); }
+.banner .dot { width:8px; height:8px; border-radius:50%; background:var(--ok); flex:none; }
+.banner.warn .dot { background:var(--warn); }
+.banner .sp { flex:1; }
+
+.sentence { padding:var(--sp-3) var(--sp-4); border:1px dashed var(--border); border-radius:var(--r-sm);
+  background:var(--bg-container); font-size:var(--fs-sm); margin-bottom:var(--sp-3); line-height:1.8; }
+.sentence b { color:var(--accent); font-weight:600; border-bottom:1px dashed var(--accent-border); cursor:default; }
+
+.krow { display:grid; grid-template-columns:20px 1fr 88px 120px 150px; gap:var(--sp-3); align-items:center;
+  padding:9px var(--sp-3); font-size:var(--fs-sm); border-bottom:1px solid var(--border-subtle); }
+.krow.hd { color:var(--text-dim); font-size:var(--fs-micro); letter-spacing:.06em; text-transform:uppercase; }
+.krow:last-child { border-bottom:0; }
+.krow .nm b { display:block; font-weight:600; }
+.krow .nm small { color:var(--text-dimmer); font-size:var(--fs-micro); font-family:var(--mono); }
+.krow .st { font-size:var(--fs-micro); color:var(--text-dim); }
+.sw { width:30px; height:17px; border-radius:var(--r-pill); background:var(--border);
+  position:relative; display:inline-block; }
+.sw::after { content:''; position:absolute; top:2px; left:2px; width:13px; height:13px;
+  border-radius:50%; background:var(--text-dim); }
+.sw.on { background:var(--ok-solid); }
+.sw.on::after { left:15px; background:#fff; }
+.btns { display:flex; gap:6px; }
+.b { border:1px solid var(--border); background:transparent; color:var(--text-dim);
+  border-radius:var(--r-xs); padding:2px 9px; font-size:var(--fs-micro); }
+.b.pri { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
+.b.dg { border-color:var(--danger-border); color:var(--danger); }
+
+.rule { display:grid; grid-template-columns:20px 1fr 1fr 76px; gap:var(--sp-3); align-items:center;
+  padding:9px var(--sp-3); font-size:var(--fs-sm); border-bottom:1px solid var(--border-subtle); }
+.rule.hd { color:var(--text-dim); font-size:var(--fs-micro); letter-spacing:.06em; text-transform:uppercase; }
+.rule:last-child { border-bottom:0; }
+.rule .mt { font-family:var(--mono); font-size:var(--fs-micro); color:var(--warn); }
+.rule .pt { color:var(--text-bright); }
+.rule.fallback .mt { color:var(--text-dimmer); font-style:italic; font-family:inherit; }
+
+.hrow { display:grid; grid-template-columns:14px 1fr; gap:var(--sp-3); padding:8px var(--sp-3);
+  border-bottom:1px solid var(--border-subtle); font-size:var(--fs-sm); }
+.hrow:last-child { border-bottom:0; }
+.hrow .d { width:8px; height:8px; border-radius:50%; background:var(--ok); margin-top:7px; }
+.hrow.bad .d { background:var(--danger); }
+.hrow .hd2 { display:flex; gap:var(--sp-2); align-items:baseline; flex-wrap:wrap; }
+.hrow .hd2 b { font-size:var(--fs-sm); }
+.hrow .hd2 span { color:var(--text-dimmer); font-size:var(--fs-micro); }
+.hrow .msg { color:var(--text-dim); font-size:var(--fs-meta); margin-top:2px; }
+
+.pcard { border:1px solid var(--border-subtle); border-radius:var(--r-sm); padding:var(--sp-3);
+  margin-bottom:var(--sp-2); background:var(--bg-container); }
+.pcard .h { display:flex; align-items:center; gap:var(--sp-2); }
+.pcard .h b { flex:1; font-size:var(--fs-sm); }
+.pcard .m { color:var(--text-dimmer); font-size:var(--fs-micro); margin-top:4px; font-family:var(--mono); }
+.pcard .o { display:flex; gap:6px; margin-top:var(--sp-2); }
+
+.foot { margin-top:70px; padding-top:var(--sp-4); border-top:1px solid var(--border-subtle);
+  color:var(--text-dimmer); font-size:var(--fs-meta); }
+@media (max-width:640px) {
+  .krow { grid-template-columns:20px 1fr 96px; }
+  .krow .st, .krow .btns { display:none; }
+  .rule { grid-template-columns:20px 1fr; }
+  .rule .pt, .rule .btns { display:none; }
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <div class="kicker">Roami · Plugin</div>
+    <h1>会话守护 roam.keepalive</h1>
+  </div>
+  <div class="sp"></div>
+  <button class="tbtn" id="themeBtn" type="button">浅色</button>
+</div>
+
+<div class="wrap">
+
+<p class="lede">
+Agent 停下来不吭声，十有八九不是它死了，是它<b>在等一句话</b>：等你回「继续」、
+等你发现刚才那次请求断在半路、等你想起来让它自己回头检查一遍。而你可能两个小时后
+才点开那个标签。这份稿子设计一个替你看着的插件——它盯的不是进程还在不在，
+是<b>屏幕还动不动</b>；它说的也不是一句死话，是<b>看见什么说什么</b>。
+形态先定在 §01：<b>builtin Go 插件 + 由 plugind 托管的常驻循环</b>，
+点开关就跑，不用再装任何东西。
+</p>
+
+<h2><span class="n">01</span>形态：它长成什么、谁来驱动它</h2>
+
+<p>先定形态。这个仓库里「形态」有三层，三层都得定死，而<b>第二层</b>——谁来驱动那个
+「每隔一段时间」——才是真正的分水岭：它决定了用户在设置页点一下开关之后，
+东西到底会不会真的跑起来。</p>
+
+<h3>1.1 分发形态：builtin Go</h3>
+
+<table>
+  <thead><tr><th></th><th>builtin Go（cron / im / review-mesh 那档）</th><th>插件包（exec/node）</th></tr></thead>
+  <tbody>
+    <tr><td>分发</td><td>编译进 ttmux 二进制，<b>默认启用</b></td><td><code>ttmux plugin install</code>，默认不启用</td></tr>
+    <tr><td>迭代</td><td>改了要 <code>go build</code> 重装才生效</td><td>热迭代，改完即用</td></tr>
+    <tr><td>平台 API</td><td colspan="2">完全一样（同一套 JSON-RPC 协议，宿主分不出谁是谁）</td></tr>
+  </tbody>
+</table>
+
+<p>守护会话是「24 小时得在跑、装完就该有」的能力，和定时任务、IM 桥同一档 →
+<b>builtin</b>。<code>plugins/keepalive/</code>，独立 Go 模块，
+<code>init()</code> 里 <code>sdk.RegisterBuiltin</code> 自注册，宿主代码零手改。</p>
+
+<div class="card">
+  <h4>「改了要重编译」为什么不咬人</h4>
+  <p>会频繁调的东西只有一样：<b>守护语</b>。而它本来就该落插件私有 storage 而不是写死在
+  代码里——面板上要能改，常驻循环还要每轮重读（见 §10）。真正需要重编译的是判断逻辑，
+  那本来就该慎重。</p>
+</div>
+
+<h3>1.2 运行形态：常驻循环挂在 plugind 上（<span class="tag info">决定</span>）</h3>
+
+<p>宿主的 watcher 调度器（manifest <code>watchers</code> / <code>onSchedule</code>）
+<b>还没落地</b>，所以只剩两条路，而这两条本仓库都各跑过一遍：</p>
+
+<div class="cols">
+  <div class="card good">
+    <h4>路 A · 常驻循环（<code>im.listen</code> 那条路）✅</h4>
+    <p><code>_ttmux-keepalive</code> 会话里跑 <code>keepalive.serve</code>，30 秒一轮，
+    由 plugind 那个 3 秒循环托管：插件在 storage 里举一面 <code>wanted</code> 的旗，
+    有守护对象就拉起，掉了重拉。</p>
+  </div>
+  <div class="card">
+    <h4>路 B · 外部 timer 叫 tick（<code>roam.cron</code> 那条路）</h4>
+    <p>装一个 <code>roami-keepalive-tick.timer</code>，每分钟叫一次
+    <code>keepalive.tick</code>，机器上不多一个常驻进程。</p>
+  </div>
+</div>
+
+<p>选 A，两条实打实的理由：</p>
+
+<div class="flow">
+  <div class="step">
+    <div class="i r">1</div>
+    <div>
+      <b>B 这条路在真机上是断的</b>
+      <small>自检脚本里「<code>没人叫 cron.tick —— 定时任务一条都不会触发</code>」
+      这一条至今会亮红。让用户在设置页点了开关、还得再去装一个 systemd unit 才真的跑起来
+      ——这个产品就是坏的。<b>点了开关就该跑</b>是这个插件的底线。</small>
+    </div>
+  </div>
+  <div class="step">
+    <div class="i y">2</div>
+    <div>
+      <b>B 更贵</b>
+      <small><code>plugin run</code> 每次调用都<b>新起一个子进程</b>。30 个会话、每分钟
+      拉起一次进程再 capture 一轮，比一个常驻进程睡 30 秒贵得多。</small>
+    </div>
+  </div>
+</div>
+
+<div class="card good">
+  <h4>而且这不是单点押注：两条路共用同一份逻辑</h4>
+  <p><code>serve</code> 就是 <code>for { tick(); sleep(30s) }</code>——屏幕指纹反正都要落
+  storage 才能跨轮比较，所以 <b>tick 本来就是幂等的、可被任何人驱动的一轮</b>。
+  两个都给的成本接近零：<b>A 作默认，B 作退路</b>，
+  面板顶上那条状态横幅对两种来源一视同仁，它只问「上一轮巡检是什么时候」。</p>
+</div>
+
+<pre><code><span class="c">// internal/plugin/daemon.go —— 抄 ensureIMListener 的同一套</span>
+<span class="k">func</span> ensureKeepaliveLoop(env Env, store *Store) {
+    <span class="k">if</span> env.RT.HasSession(<span class="g">"_ttmux-keepalive"</span>) { <span class="k">return</span> }   <span class="c">// 已经在跑</span>
+    <span class="k">if</span> !enabled(<span class="g">"roam.keepalive"</span>) { <span class="k">return</span> }
+    <span class="c">// 插件自己举的手：storage 里 wanted=1 表示「我有守护对象」。</span>
+    <span class="c">// 宿主只读这一个键，不去解析插件的数据结构——那是插件的家事。</span>
+    <span class="k">if</span> env.LoadStorage(<span class="g">"roam.keepalive"</span>)[<span class="g">"wanted"</span>] != <span class="g">"1"</span> { <span class="k">return</span> }
+    tmux new-session -d -s _ttmux-keepalive <span class="g">'ttmux plugin run keepalive.serve'</span>
+}</code></pre>
+
+<div class="card good">
+  <h4>由此白拿的三个性质</h4>
+  <ul>
+    <li><b>开了就跑</b>：打开第一个开关后 ≤10 秒循环起来，不用装任何东西。</li>
+    <li><b>关了就停</b>：最后一个开关关掉 → <code>wanted</code> 落下 →
+        循环下一轮自己退出，tmux 会话随之消失。<b>不留空转进程</b>。</li>
+    <li><b>24h 自愈</b>：<code>plugin run</code> 的 invoke 上限是 24 小时，
+        到点被回收后 plugind 3 秒内重拉——和 IM 长连接同一个机制，已经在线上跑着。</li>
+  </ul>
+</div>
+
+<h3>1.3 面板形态：宿主侧内置面板</h3>
+
+<p>manifest 的 <code>configFields</code> 自动渲染撑不起这个交互——要列<b>所有会话</b>、
+每行一个开关、还要一张规则表。走宿主侧内置面板，和
+<code>CronPanel</code> / <code>HostMonitorPanel</code> 一样按插件 id 挂进详情页的 tab
+（<code>PluginsPanel.tsx</code> 里已有现成的挂载点）。交互全文见 §07。</p>
+
+<h3>1.4 顺便否掉的两个形态</h3>
+
+<div class="cols">
+  <div class="card bad">
+    <h4>✗ 塞进 roam.cron 当一种新动作</h4>
+    <p>cron 的模型是<b>到点触发</b>，守护是<b>没动静才触发</b>，判据根本不是一回事。
+    硬塞进去，cron 的 <code>Job</code> 要长出 <code>idleMin</code> / <code>streak</code> /
+    <code>hash</code> 这些对它其它任务毫无意义的字段，一张表服务两套语义，
+    下一个人改哪边都会踩到另一边。</p>
+  </div>
+  <div class="card bad">
+    <h4>✗ 做成核心功能（会话列表上直接一个开关）</h4>
+    <p>更顺手，但守护会<b>替你花钱、会往会话里写东西</b>——这正是需要权限声明
+    （<code>sessions:write</code>）和审计日志的那类能力，插件机制现成提供，
+    做成核心功能反而把这层丢了。折中：以后在会话列表上放个入口，<b>能力仍归插件</b>。</p>
+  </div>
+</div>
+
+<h2><span class="n">02</span>先说清楚：要接住的是哪三种「停住」</h2>
+
+<p>三种都长得一样——会话还在、进程还在、屏幕不动了。但它们该说的话完全不同，
+这是整个设计的起点。</p>
+
+<div class="flow">
+  <div class="step">
+    <div class="i">1</div>
+    <div>
+      <b>它在等你说话</b>
+      <small>干完一段、问了个问题、或者停在「要我继续吗」。最常见的一种。
+        该说的话：<code>继续</code>。</small>
+    </div>
+  </div>
+  <div class="step">
+    <div class="i r">2</div>
+    <div>
+      <b>它断在半路</b>
+      <small><code>API Error: Connection lost mid-response</code>、
+        <code>Request timed out</code>、<code>fetch failed</code> ——上一句话说到一半没了，
+        它自己不会重来。该说的话不是「继续」，是
+        <code>刚才那次请求断了，从断掉的地方接着说</code>：一句「继续」很可能让它
+        <b>从头再跑一遍</b>，白烧一遍 token。</small>
+    </div>
+  </div>
+  <div class="step">
+    <div class="i y">3</div>
+    <div>
+      <b>它以为自己干完了</b>
+      <small>改完就停，没跑构建、没跑测试、没回头看一眼。该说的话是
+        <code>先自查一遍：跑构建和测试，把结果贴出来</code>。</small>
+    </div>
+  </div>
+</div>
+
+<div class="card bad">
+  <h4>为什么不能用同一句话糊过去</h4>
+  <p>第 2 种是真正贵的那种。断线之后发「继续」，Claude/Codex 往往理解成
+  「继续这个任务」而不是「接上刚才那句」，于是它重新开一遍思路；如果刚才已经改了半个仓库，
+  第二遍还会跟第一遍打架。守护语必须能<b>按屏幕上看见的东西分叉</b>，否则这个插件
+  在最该帮上忙的场景里反而添乱。</p>
+</div>
+
+<h2><span class="n">03</span>怎么判断「它停住了」：别信 tmux 的活动时间</h2>
+
+<p>第一直觉是拿 tmux 的 <code>session_activity</code>——错的，而且错得很隐蔽。</p>
+
+<div class="cols">
+  <div class="card bad">
+    <h4>session_activity 不行</h4>
+    <p>它在我们自己 <code>paste-buffer</code> 那句守护语的时候<b>同样会跳</b>。
+    拿它判断「它动了没」，等于自己跟自己确认「它动了」——催完一句，
+    活动时间刷新，插件满意了，而会话那头一个字都没多出来。</p>
+  </div>
+  <div class="card good">
+    <h4>屏幕指纹可以</h4>
+    <p>每轮 <code>capture-pane</code> 末尾 <b>40 行</b>，压成一个哈希。
+    Agent 干活时这块一直在滚（连 <code>· Thinking… 45s</code> 那个秒数都在跳），
+    停下来等人时它一动不动。<b>值变了 = 真的有新东西；值没变 = 真的停住了。</b></p>
+  </div>
+</div>
+
+<div class="card warn">
+  <h4>那催完之后的那次变化怎么办？</h4>
+  <p>我们打进去的那行字自己就在屏幕上，指纹必然变。所以设一道
+  <b>60 秒宽限</b>：催完 60 秒内的变化一律不算「它动起来了」，只有过了这道坎还在变的，
+  才记成一次真正的响应。60 秒 = 比巡检周期（30s）长一轮有余，又短到不会把
+  「答一句就完事」的正常响应误判成没反应。</p>
+</div>
+
+<h2><span class="n">04</span>守护语不是一句话，是一张规则表</h2>
+
+<p>这是这份设计里唯一一个「结构」上的决定：把「说什么」从一个输入框，
+升格成一张<b>有序规则表</b>。每条规则回答「屏幕上出现这个 → 就说这句」，
+最后一条是兜底。表从上往下匹配，命中即用。</p>
+
+<div class="mock">
+  <div class="mhd">守护语规则（默认装好三条，可改可删可加）</div>
+  <div class="mbd" style="padding:0">
+    <div class="rule hd"><span></span><span>屏幕上出现</span><span>就发这句</span><span>启用</span></div>
+    <div class="rule">
+      <span class="tag bad" style="padding:1px 6px">断</span>
+      <span class="mt">Connection lost mid-response<br>|API Error|Request timed out</span>
+      <span class="pt">刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍</span>
+      <span><i class="sw on"></i></span>
+    </div>
+    <div class="rule">
+      <span class="tag mid" style="padding:1px 6px">查</span>
+      <span class="mt">（不按屏幕匹配，按「催到第 2 次」触发）</span>
+      <span class="pt">先别往下写了，回头自查一遍：跑一遍构建和测试，把结果贴出来</span>
+      <span><i class="sw"></i></span>
+    </div>
+    <div class="rule fallback">
+      <span class="tag" style="padding:1px 6px">底</span>
+      <span class="mt">其它一切情况（兜底，删不掉，只能改它说什么）</span>
+      <span class="pt">你是不是已经完成了你的任务？没有完成，那么继续。</span>
+      <span><i class="sw on"></i></span>
+    </div>
+  </div>
+</div>
+
+<h3>三个必须讲清楚的细节</h3>
+
+<ul>
+  <li><b>匹配只看屏幕末尾 40 行。</b>往上翻整屏会把半小时前的一次报错重新认成「刚断线」，
+      然后对着一个正在好好干活的会话喊「你断了」。</li>
+  <li><b>匹配串是子串，不是正则</b>——第一版故意不给正则。规则表是给人填的，
+      填错一个正则的代价是「这条规则永远不命中」，而且没人看得出来。
+      多个关键词用 <code>|</code> 分隔，插件按「任一命中即算命中」处理。</li>
+  <li><b>「自查」那条不按屏幕匹配。</b>屏幕上没有任何字样能表示「它该检查了」。
+      它挂的是另一个条件：<b>同一个会话第 N 次被催</b>（默认 N=2）。
+      第一次说「继续」，还不动，第二次就换成「先自查一遍」——这恰好也是人的做法。</li>
+</ul>
+
+<div class="card">
+  <h4>预设，不是让你从空白开始</h4>
+  <p>输入框旁边给一排预设胶囊，点一下填进去：
+  <span class="tag info">确认是否完成</span>
+  <span class="tag">继续</span>
+  <span class="tag">断线重连</span>
+  <span class="tag">回头自查</span>
+  <span class="tag">清空自己写</span>
+  ——绝大多数人这辈子只会用第一个，不该逼他们自己想措辞。</p>
+  <p><b>默认兜底语是第一条</b>（「你是不是已经完成了你的任务？没有完成，那么继续。」）而不是「继续」：
+  一句「继续」不给 Agent 留台阶，真干完了的它会去<b>找点事做</b>——翻出个无关的改进、
+  再重构一遍刚写好的东西；你本来只想确认它还活着,结果换来一次计划外的改动。
+  先问后推那句则是干完了就回一句交代，没干完才接着干。
+  详见<a href="keepalive-panel.html">界面稿 §05.1</a>。</p>
+</div>
+
+<h2><span class="n">05</span>什么时候发，以及什么时候<u>绝不</u>发</h2>
+
+<p>发消息很容易，难的是不发。打断一个正在干活的 Agent 比不守护更糟：
+它会把你的「继续」当成新指令插进上下文。四道闸，全过了才发。</p>
+
+<table>
+  <thead><tr><th>闸</th><th>判据</th><th>默认</th><th>为什么</th></tr></thead>
+  <tbody>
+    <tr><td>① 安静够久</td><td class="mono">屏幕指纹连续未变 ≥ N 分钟</td><td class="mono">10 分钟</td>
+        <td>够把「正在想」和「真停了」分开</td></tr>
+    <tr><td>② 离上次催够久</td><td class="mono">now − lastSent ≥ M 分钟</td><td class="mono">30 分钟</td>
+        <td>就算①判错了，一小时里也最多打扰它两次</td></tr>
+    <tr><td>③ 看得见</td><td class="mono">capture 成功且会话还在</td><td>—</td>
+        <td>「看不见」不等于「安静」，读不到屏幕就这一轮什么都不做</td></tr>
+    <tr><td>④ 没到停手线</td><td class="mono">连败次数 &lt; maxQuiet</td><td class="mono">3 次</td>
+        <td>见下一节</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="c">// 一轮巡检对一条守护做的全部判断（纯函数，可单测）</span>
+<span class="k">if</span> !enabled || !alive || hash == "" { <span class="c">// ③ 看不见就什么都不改</span>
+    <span class="k">return</span>
+}
+<span class="k">if</span> hash != g.Hash {                 <span class="c">// 屏幕变了 = 它还活着</span>
+    <span class="k">if</span> now-g.LastSent &gt; graceSec { g.Responded = <span class="g">true</span> }  <span class="c">// 过了宽限的变化才算响应</span>
+    g.Hash, g.QuietSince = hash, now
+    <span class="k">return</span>
+}
+<span class="k">if</span> now-g.QuietSince &lt; idleMin*60 { <span class="k">return</span> }   <span class="c">// ①</span>
+<span class="k">if</span> now-g.LastSent   &lt; everyMin*60 { <span class="k">return</span> }   <span class="c">// ②</span>
+<span class="k">if</span> g.Responded { g.Streak = 0 }    <span class="c">// 上次催真换来了干活，旧账一笔勾销</span>
+<span class="k">if</span> g.Streak &gt;= maxQuiet { stop(); <span class="k">return</span> }    <span class="c">// ④</span>
+send(pickPrompt(screen, g.Streak))  <span class="c">// ← 规则表在这里分叉</span></code></pre>
+
+<div class="card">
+  <h4>被排除在外的会话</h4>
+  <p><code>_ttmux-*</code> 命名空间的基础设施会话（plugind、IM 长连接、守护循环<b>自己</b>）
+  在平台 API 那一层就被滤掉了——否则这个插件会对着自己的循环发「继续」。</p>
+</div>
+
+<h2><span class="n">06</span>停手：一个会一直烧钱的功能必须有刹车</h2>
+
+<p>被守护的会话可能早就不是 Agent 了——它崩回了 shell。那时候每一句「继续」
+都变成一行 <code>command not found</code>，而插件会永远催下去。</p>
+
+<div class="flow">
+  <div class="step">
+    <div class="i y">1</div>
+    <div><b>连败计数</b><small>每催一次 <code>+1</code>；只要观察到一次「宽限期之外的屏幕变化」就清零。
+      也就是说：<b>它真干活了，账就一笔勾销</b>。</small></div>
+  </div>
+  <div class="step">
+    <div class="i r">2</div>
+    <div><b>到 3 次自动停手</b><small>把这条守护置为停用，不再发任何东西。配置留着，
+      面板上这一行显示「连催 3 次没反应，已停手」，旁边一个「再试试」按钮。</small></div>
+  </div>
+  <div class="step">
+    <div class="i g">3</div>
+    <div><b>发一条通知</b><small><code>keepalive.stopped</code> 进 Roami 通知流；
+      装了 IM 桥就会变成一张飞书卡片。<b>停手必须吭声</b>——
+      静悄悄停掉的守护，和从来没开过是一回事。</small></div>
+  </div>
+</div>
+
+<h2><span class="n">07</span>交互：设置页</h2>
+
+<p>这一页要在<b>不滚动</b>的情况下回答四个问题，顺序就是下面这个顺序——
+每往下一个，用户的关心程度就低一档：</p>
+
+<div class="flow">
+  <div class="step"><div class="i g">1</div><div><b>它在跑吗</b>
+    <small>顶部横幅。这类插件最恶劣的失败是「配得好好的，但根本没在跑」——所以它排第一，
+    而不是塞进某个角落的状态徽章。</small></div></div>
+  <div class="step"><div class="i">2</div><div><b>它在守谁</b>
+    <small>主列表：<b>所有会话</b>，每行一个开关。</small></div></div>
+  <div class="step"><div class="i">3</div><div><b>它会说什么</b>
+    <small>横幅下面那句白话（全局默认）+ 「守护语规则」抽屉。</small></div></div>
+  <div class="step"><div class="i">4</div><div><b>它刚才说了什么</b>
+    <small>「发送记录」抽屉。</small></div></div>
+</div>
+
+<div class="card">
+  <h4>信息架构：一个 tab，两个抽屉，不新开页</h4>
+  <p>插件详情页里只加<b>一个</b> tab（「守护」）。规则表和发送记录都走抽屉——
+  它们是「偶尔要看一眼」的东西，做成并列 tab 会让主任务（开关谁）和它们抢同一层级的注意力。
+  逐会话覆盖同理：抽屉，不是展开行。</p>
+</div>
+
+<h3>7.1 主视图</h3>
+
+<div class="card good">
+  <h4>真尺寸落地版另开了一份</h4>
+  <p>下面是示意图。列宽、行高、字号、六种行状态、那句白话的编辑三态、三个抽屉的真尺寸样子，
+  全部在 <a href="keepalive-panel.html"><b>会话守护面板 · 界面稿</b></a> 里按 1440 宽画死。</p>
+</div>
+
+<div class="mock">
+  <div class="mhd">插件页 → 会话守护 → 守护</div>
+  <div class="mbd">
+
+    <div class="banner">
+      <i class="dot"></i>
+      <span>守护中 <b>3</b> 个会话 · 12 秒前巡检过一轮 · 每 30 秒看一眼</span>
+      <span class="sp"></span>
+      <button class="b">发送记录</button>
+      <button class="b">守护语规则</button>
+      <button class="b pri">全部守护 ▾</button>
+    </div>
+
+    <div class="sentence">
+      现在的规矩是：一个会话的屏幕 <b>10 分钟</b> 没动静，就替你催它一句；
+      同一个会话最快 <b>30 分钟</b> 催一次；连催 <b>3 次</b> 都没换来动静，就停手并通知你。
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-subtle);
+        display:flex;gap:8px;align-items:center;font-size:var(--fs-meta)">
+        <span style="color:var(--text-dim)">催它这句话</span>
+        <span style="flex:1;border:1px solid var(--border);border-radius:var(--r-xs);padding:4px 9px;
+          background:var(--bg-base);color:var(--text-bright)">你是不是已经完成了你的任务？没有完成，那么继续。</span>
+        <button class="b">预设 ▾</button>
+      </div>
+    </div>
+
+    <div class="krow hd">
+      <span></span><span>会话</span><span>安静了</span><span>守护</span><span>操作</span>
+    </div>
+    <div class="krow">
+      <span class="tag info" style="padding:1px 6px">CC</span>
+      <span class="nm"><b>ttmux 优化</b><small>~/codes/ttmux</small></span>
+      <span class="st">2 分钟</span>
+      <span><i class="sw on"></i> <span class="st">催过 2 次</span></span>
+      <span class="btns"><button class="b">催一下</button><button class="b">单独设置</button></span>
+    </div>
+    <div class="krow">
+      <span class="tag info" style="padding:1px 6px">CX</span>
+      <span class="nm"><b>小慧优化</b><small>~/codes/ybz/xh/XiaoHui</small></span>
+      <span class="st">41 分钟</span>
+      <span><i class="sw on"></i> <span class="st">3 分钟前催过</span></span>
+      <span class="btns"><button class="b">催一下</button><button class="b">单独设置</button></span>
+    </div>
+    <div class="krow">
+      <span class="tag bad" style="padding:1px 6px">停</span>
+      <span class="nm"><b>p2p 直连</b><small>~/codes/ttmux-p2p</small></span>
+      <span class="st">6 小时</span>
+      <span><i class="sw"></i> <span class="st" style="color:var(--danger)">催 3 次没反应</span></span>
+      <span class="btns"><button class="b pri">再试试</button><button class="b">看一眼</button></span>
+    </div>
+    <div class="krow">
+      <span class="tag" style="padding:1px 6px">sh</span>
+      <span class="nm"><b>随手开的终端</b><small>~</small></span>
+      <span class="st">3 天</span>
+      <span><i class="sw"></i> <span class="st">未守护</span></span>
+      <span class="btns"><button class="b">催一下</button></span>
+    </div>
+
+  </div>
+</div>
+
+<h3>7.2 六个交互决定，以及理由</h3>
+
+<div class="cols">
+  <div class="card">
+    <h4>① 列的是「所有会话」，不是「守护表」</h4>
+    <p>你要开守护的时候，脑子里想的是<b>某个会话</b>，不是某条配置。列全部会话、
+    每行一个开关，开关就是全部操作——不需要「新增守护」这个动作，
+    也就不存在「新增了一条守护但会话名填错」这种错误。这一条是和定时任务插件
+    最大的分野：那边的对象是你造出来的任务，这边的对象是本来就在的会话。</p>
+  </div>
+  <div class="card">
+    <h4>② 全局设置 = 一句白话 + 一块守护语</h4>
+    <p>三个<b>数字</b>嵌在句子里，点一下就地变输入框——一张有四个 label 的表单说不出
+    它们之间的关系（间隔和安静阈值哪个套哪个？），而这句话说得出。
+    但<b>守护语单独成块</b>：它是一整句甚至几句话
+    （「你是不是已经完成了你的任务？没有完成，那么继续。」），
+    硬塞进句子里只会挤成一坨。见<a href="keepalive-panel.html">界面稿 §05</a>。</p>
+  </div>
+  <div class="card">
+    <h4>③ 「催一下」对未守护的会话也给</h4>
+    <p>它是<b>试用入口</b>：还没决定要不要长期守护时，先手动催一次，
+    看看发出去的到底是什么、那个会话吃不吃这一套。试过一次再打开开关，心里是有底的。</p>
+  </div>
+  <div class="card">
+    <h4>④ 「全部守护」带一个默认打开的过滤</h4>
+    <p>下拉里是「<b>全部守护（只挑 Agent 会话）</b>」而不是光秃秃的「全部守护」。
+    往一个裸 shell 里打「继续」换来的是一行 <code>command not found</code>——
+    认不出是 Agent 的会话默认不碰，但允许你单独打开它。</p>
+  </div>
+  <div class="card">
+    <h4>⑤ 调度器状态永远在第一行</h4>
+    <p>见 §01.2：这条横幅是这一页的<b>诚实性担保</b>。它不说「已启用」（那只说明配置存在），
+    它说「<b>12 秒前巡检过一轮</b>」——一个只有真的在跑才写得出来的数字。</p>
+  </div>
+  <div class="card">
+    <h4>⑥ 「单独设置」是抽屉，不是展开行</h4>
+    <p>逐会话覆盖是少数情况。放进抽屉，主列表就只剩「谁被守着」这一件事；
+    抽屉顶部写清楚「不填就跟着全局走：10 分钟 / 继续 / 30 分钟」，
+    <b>把默认值直接印在占位符里</b>，而不是让人回主页面去对。</p>
+  </div>
+</div>
+
+<h3>7.3 顶部横幅的四种状态</h3>
+
+<p>横幅永远在，措辞跟着状态走。关键是<b>每种非正常状态都要说出「怎么办」</b>，
+而不是只报一个现象。</p>
+
+<div class="mock">
+  <div class="mhd">四态</div>
+  <div class="mbd">
+    <div class="banner"><i class="dot"></i>
+      <span><b>正常</b> · 守护中 3 个会话 · 12 秒前巡检过一轮 · 每 30 秒看一眼</span></div>
+    <div class="banner" style="border-color:var(--border);background:var(--bg-container)">
+      <i class="dot" style="background:var(--text-dimmer)"></i>
+      <span><b>还没守护任何会话</b> · 下面挑一个打开开关，守护循环会自动起来</span></div>
+    <div class="banner warn"><i class="dot"></i>
+      <span><b>守着 3 个，但巡检停了 6 分钟</b> · 守护循环没在跑，这 3 条一句都不会发
+      <button class="b" style="margin-left:8px">怎么回事？</button></span></div>
+    <div class="banner warn"><i class="dot"></i>
+      <span><b>插件已停用</b> · 守护表留着，但不会巡检也不会发送
+      <button class="b" style="margin-left:8px">启用插件</button></span></div>
+  </div>
+</div>
+
+<div class="card warn">
+  <h4>「怎么回事？」点开说什么</h4>
+  <p>不是一句「请检查 plugind」。按顺序给三条可核对的事实：
+  <b>plugind 在不在</b>（<code>_ttmux-plugind</code> 会话）、
+  <b>守护循环在不在</b>（<code>_ttmux-keepalive</code> 会话）、
+  <b>上一轮巡检是什么时候</b>。再给一条可直接粘的命令作退路
+  （<code>ttmux plugin run keepalive.tick</code>）。
+  用户得能自己判断是「循环崩了」还是「从来没起来过」。</p>
+</div>
+
+<h3>7.4 空态：第一次点进来看到什么</h3>
+
+<p>第一次进来时守护表是空的，但<b>会话列表不空</b>——这是这一页的运气：
+它天然就有内容可显示，不需要画一个抱着箱子的插画。空态要做的只有一件事：
+<b>把第一个动作指出来</b>。</p>
+
+<div class="mock">
+  <div class="mhd">空态（一条守护都没有）</div>
+  <div class="mbd">
+    <div class="banner" style="border-color:var(--accent-border);background:var(--accent-soft)">
+      <i class="dot" style="background:var(--accent)"></i>
+      <span>挑一个会话打开右边的开关，它安静 10 分钟就会被催一句。
+        <b>不确定？先点「催一下」试一次</b>，看看发出去的是什么。</span>
+      <span class="sp"></span>
+      <button class="b pri">全部守护（只挑 Agent 会话）</button>
+    </div>
+    <div class="krow">
+      <span class="tag info" style="padding:1px 6px">CC</span>
+      <span class="nm"><b>ttmux 优化</b><small>~/codes/ttmux</small></span>
+      <span class="st">2 分钟</span>
+      <span><i class="sw"></i> <span class="st">未守护</span></span>
+      <span class="btns"><button class="b">催一下</button></span>
+    </div>
+  </div>
+</div>
+
+<h3>7.5 守护语规则抽屉</h3>
+
+<p>规则表（§04）的编辑界面。三件事决定了它的样子：<b>兜底那条删不掉</b>、
+<b>顺序即优先级</b>、<b>填完能当场验</b>。</p>
+
+<div class="mock">
+  <div class="mhd">抽屉 · 守护语规则</div>
+  <div class="mbd">
+    <div class="sentence" style="margin-bottom:12px">
+      从上往下匹配会话屏幕的<b>末尾 40 行</b>，命中第一条就用它，都不命中就用最下面那条兜底。
+    </div>
+    <div class="rule hd"><span></span><span>屏幕上出现</span><span>就发这句</span><span>启用</span></div>
+    <div class="rule">
+      <span class="tag bad" style="padding:1px 6px">⠿</span>
+      <span class="mt">Connection lost mid-response<br>|API Error|Request timed out</span>
+      <span class="pt">刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍</span>
+      <span><i class="sw on"></i></span>
+    </div>
+    <div class="rule">
+      <span class="tag mid" style="padding:1px 6px">⠿</span>
+      <span class="mt">（不看屏幕，按「催到第 2 次」触发）</span>
+      <span class="pt">先别往下写了，回头自查一遍：跑一遍构建和测试，把结果贴出来</span>
+      <span><i class="sw"></i></span>
+    </div>
+    <div class="rule fallback">
+      <span class="tag" style="padding:1px 6px">底</span>
+      <span class="mt">其它一切情况（兜底，删不掉）</span>
+      <span class="pt">继续</span>
+      <span><i class="sw on"></i></span>
+    </div>
+    <div style="display:flex;gap:8px;padding:12px 12px 0">
+      <button class="b">＋ 加一条</button>
+      <span class="sp" style="flex:1"></span>
+      <button class="b">拿「小慧优化」当前的屏幕试一下 ▾</button>
+    </div>
+  </div>
+</div>
+
+<div class="cols">
+  <div class="card good">
+    <h4>「试一下」是这个抽屉里最要紧的按钮</h4>
+    <p>选一个正在跑的会话，抽屉底部当场显示：<b>命中了哪条规则、会发出哪句话</b>。
+    没有它，用户填完一条匹配串只能等下一次真出事才知道对不对——
+    而那正是最不想试错的时刻。</p>
+  </div>
+  <div class="card">
+    <h4>顺序可拖，但不玩花的</h4>
+    <p>左边一个拖柄，上下拖改优先级。兜底那条钉死在最后、不可拖不可删，
+    只能改它说什么。<b>不给正则</b>（§04）：多个关键词用 <code>|</code> 分隔，
+    填错一个正则的代价是「这条永远不命中」，而且没人看得出来。</p>
+  </div>
+</div>
+
+<h3>7.6 单独设置抽屉</h3>
+
+<div class="mock">
+  <div class="mhd">抽屉 · 小慧优化 的单独设置</div>
+  <div class="mbd">
+    <div class="sentence" style="margin-bottom:12px">
+      三项都可以留空——<b>留空就跟着全局走</b>：安静 <b>10 分钟</b>、
+      发「<b>你是不是已经完成了你的任务？没有完成，那么继续。</b>」、最快 <b>30 分钟</b> 一次。
+    </div>
+    <div class="krow" style="grid-template-columns:120px 1fr">
+      <span class="st">守护语</span>
+      <span class="nm"><b style="color:var(--text-dimmer);font-weight:400">跟着全局：你是不是已经完成了你的任务？没有完成，那么继续。</b>
+        <small style="font-family:inherit">预设：确认是否完成 · 继续 · 断线重连 · 回头自查 · 清空自己写</small></span>
+    </div>
+    <div class="krow" style="grid-template-columns:120px 1fr">
+      <span class="st">安静多久算停住</span>
+      <span class="nm"><b style="color:var(--text-dimmer);font-weight:400">跟着全局：10 分钟</b></span>
+    </div>
+    <div class="krow" style="grid-template-columns:120px 1fr">
+      <span class="st">最快多久催一次</span>
+      <span class="nm"><b style="color:var(--text-dimmer);font-weight:400">跟着全局：30 分钟</b></span>
+    </div>
+    <div class="krow" style="grid-template-columns:120px 1fr;border-bottom:0">
+      <span class="st">这个会话</span>
+      <span class="nm"><b style="font-weight:400">共催过 2 次 · 3 分钟前一次 · 连败 1 次</b>
+        <small style="font-family:inherit">再连败 2 次就会自动停手</small></span>
+    </div>
+  </div>
+</div>
+
+<p>最后那一块是抽屉的隐藏价值：它把「这条守护此刻处在什么位置」摊开讲——
+<b>还差几次就要被自动停掉</b>。主列表上塞不下这句话，但它恰恰是用户在
+「这东西是不是要放弃我了」这个时刻最想知道的。</p>
+
+<h3>7.7 反馈、确认与撤销</h3>
+
+<table>
+  <thead><tr><th>动作</th><th>反馈</th><th>要不要确认</th></tr></thead>
+  <tbody>
+    <tr><td>打开/关闭一行开关</td>
+        <td>就地生效，那一行右侧的状态字改写（「未守护」→「刚开始守护」）</td>
+        <td>不要。开关是可逆的，加确认只是噪音</td></tr>
+    <tr><td>催一下</td>
+        <td><b>行内</b>变成「刚刚催过」，同时发送记录里多一条；不用 toast——
+            用户的眼睛在那一行上，不在屏幕角落</td>
+        <td>不要，但受最小间隔约束（§05 第二道闸）</td></tr>
+    <tr><td>全部守护</td>
+        <td>横幅数字跳到新值，并说清「<b>开了 5 个，跳过 3 个非 Agent 会话</b>」</td>
+        <td>要。一次动很多行，且每一行都会开始花钱</td></tr>
+    <tr><td>全部取消</td>
+        <td>同上，外加一句「配置留着，随时可以再打开」</td>
+        <td>要，但语气轻——这是刹车，不该比油门还难踩</td></tr>
+    <tr><td>自动停手后「再试试」</td>
+        <td>连败计数清零、安静起点重新计时，立刻变回守护中</td>
+        <td>不要。它本来就是从一个安全状态出发</td></tr>
+    <tr><td>改全局那句话</td>
+        <td>失焦即存，那句话本身就是回执；改完下一轮巡检生效（≤30 秒）</td>
+        <td>不要</td></tr>
+  </tbody>
+</table>
+
+<div class="card bad">
+  <h4>一个必须避免的反模式：静悄悄</h4>
+  <p>这个插件的所有动作都发生在你不看着的时候。所以三件事<b>必须留下痕迹</b>：
+  发了一句话（→ 发送记录）、自动停手了（→ 通知 + 那一行的红字）、
+  循环没在跑（→ 横幅转黄）。<b>静悄悄停掉的守护，和从来没开过是一回事。</b></p>
+</div>
+
+<h3>7.8 发送记录抽屉</h3>
+
+<p>「催过 2 次」这个数字答不出的东西都在这里。新的在前，每条说清
+<b>什么时候 · 发给谁 · 为什么发（命中了哪条规则 / 当时安静多久）· 发了什么</b>。</p>
+
+<div class="mock">
+  <div class="mhd">抽屉 · 发送记录</div>
+  <div class="mbd" style="padding:0">
+    <div class="hrow">
+      <i class="d"></i>
+      <div>
+        <div class="hd2"><b>3 分钟前</b><span>小慧优化</span><span>自动 · 当时已安静 41 分钟</span>
+          <span class="tag bad" style="padding:1px 6px">断线规则命中</span></div>
+        <div class="msg">刚才那次请求断在半路了，从断掉的地方接着说，别重头再来一遍</div>
+      </div>
+    </div>
+    <div class="hrow">
+      <i class="d"></i>
+      <div>
+        <div class="hd2"><b>1 小时前</b><span>ttmux 优化</span><span>自动 · 当时已安静 12 分钟</span></div>
+        <div class="msg">继续</div>
+      </div>
+    </div>
+    <div class="hrow bad">
+      <i class="d"></i>
+      <div>
+        <div class="hd2"><b>2 小时前</b><span>p2p 直连</span><span>自动 · 第 3 次</span>
+          <span class="tag bad" style="padding:1px 6px">已停手</span></div>
+        <div class="msg">继续 —— 连催 3 次屏幕都没动，已停止守护并发出通知</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>7.9 加载、失败与无障碍</h3>
+
+<ul>
+  <li><b>加载</b>：<code>keepalive.list</code> 一条命令给齐全部数据（§10），
+      所以这一页只有一个 loading 态，不存在「会话列表已到、守护状态还在转」的半截画面。</li>
+  <li><b>失败</b>：命令挂了就在横幅位置报错并保留上一次的数据，
+      <b>不清空列表</b>——把用户看着的东西抹掉换成一句红字，是最糟的错误处理。</li>
+  <li><b>轮询</b>：这一页开着时每 5 秒重取一次（「安静了多久」要走字）。
+      抽屉打开时暂停轮询，免得数据在手底下跳。</li>
+  <li><b>可点的都是 <code>&lt;button&gt;</code></b>：「看一眼」真的跳路由才用 <code>&lt;a&gt;</code>。
+      图标按钮把名字写在 <code>aria-label</code> 里而不是只挂 Tooltip
+      （粗指针下 Tooltip 站点级隐藏）。</li>
+  <li><b>hover 一律 <code>:where(html[data-pointer="fine"])</code></b> 门控，
+      <code>npm run hover:check</code> 守门。</li>
+</ul>
+
+<h2><span class="n">08</span>手机档</h2>
+
+<p>主列表那五列合计约 600px，360 的屏上必然横滚，而横滚表格在手机上等于
+「每一列都要滑到才看得见」。<code>data-size=compact</code> 下换成卡片，
+沿用定时任务插件已经验证过的那套（<code>.tt-cron-card</code> 的同款结构）。
+按钮 ≥44px 命中区、hover 一律 <code>:where(html[data-pointer="fine"])</code> 门控。</p>
+
+<div class="mock phone">
+  <div class="mhd">compact · 卡片</div>
+  <div class="mbd">
+    <div class="banner"><i class="dot"></i><span>守护 3 个 · 12 秒前巡检</span></div>
+    <div class="pcard">
+      <div class="h"><b>小慧优化</b><span class="tag info" style="padding:1px 6px">Codex</span><i class="sw on"></i></div>
+      <div class="m">安静 41 分钟 · 3 分钟前催过 · 共 2 次</div>
+      <div class="o"><button class="b">催一下</button><button class="b">单独设置</button><button class="b">记录</button></div>
+    </div>
+    <div class="pcard">
+      <div class="h"><b>p2p 直连</b><span class="tag bad" style="padding:1px 6px">已停手</span><i class="sw"></i></div>
+      <div class="m">连催 3 次没反应 · 6 小时没动静</div>
+      <div class="o"><button class="b pri">再试试</button><button class="b">看一眼</button></div>
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">09</span>平台 API：补一条 <code>session.listAll</code></h2>
+
+<p>现有的 <code>session.list</code> 只给<b>本插件自己 spawn/track 过的</b>会话——
+而守护插件要守的恰恰是<b>别人建的</b>那些。插件不能自己去敲 tmux
+（<a href="../../../plugins/README.md">plugins/README</a> 的铁律：一切经平台 API，
+否则没有权限记录与审计），所以这条得补在宿主侧。</p>
+
+<table>
+  <thead><tr><th>字段</th><th>含义</th><th>取自</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">session</td><td>会话 id（改名不变，守护表的主键）</td><td class="mono">#{session_name}</td></tr>
+    <tr><td class="mono">label</td><td>展示名（只配拿来显示）</td><td class="mono">@roam_name</td></tr>
+    <tr><td class="mono">agent</td><td><code>claude</code> / <code>codex</code> / 空</td><td>台账 <code>agent_kind</code>，兜底看 pane 在跑什么</td></tr>
+    <tr><td class="mono">idleSec</td><td>粗粒度的安静时长（只用于<b>显示</b>）</td><td class="mono">max(session_activity, window_activity)</td></tr>
+    <tr><td class="mono">attached / dir / created</td><td>列表上的辅助信息</td><td>tmux + 台账</td></tr>
+  </tbody>
+</table>
+
+<div class="card warn">
+  <h4>权限面没有变大</h4>
+  <p>仍是 <code>sessions:read</code>。<code>capture</code> / <code>log</code> / <code>alive</code>
+  本来就对任意会话名放行，少的只是「有哪些名字」这一条——而缺了它，插件只能去猜名字
+  或自己敲 tmux，<b>反而绕开了审计</b>。<code>idleSec</code> 只用于列表显示，
+  真正的判据始终是屏幕指纹（见 §03）。</p>
+</div>
+
+<h2><span class="n">10</span>数据与命令</h2>
+
+<h3>插件私有 storage（<code>kv.json</code>，五个键）</h3>
+
+<table>
+  <thead><tr><th>键</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">guards</td><td>守护表：<code>[{session,label,enabled,prompt?,idleMin?,everyMin?, hash,quietSince,lastSent,sends,streak,responded,stoppedAt}]</code></td></tr>
+    <tr><td class="mono">settings</td><td>全局默认：<code>{prompt,idleMin,everyMin,maxQuiet,checkAtNth}</code></td></tr>
+    <tr><td class="mono">rules</td><td>守护语规则表（有序）：<code>[{match,prompt,enabled}]</code></td></tr>
+    <tr><td class="mono">history</td><td>发送记录环，最多 200 条，新的在前</td></tr>
+    <tr><td class="mono">wanted / tick</td><td>给宿主的一面旗子；上一轮巡检时刻（面板的「在不在跑」）</td></tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h4>为什么设置不走 manifest 的 <code>configFields</code></h4>
+  <p>两个原因。其一，<code>ctx.Config</code> 是<b>激活时注入</b>的快照——常驻循环一跑 24 小时，
+  中途改了守护语它看不见，得重启循环才生效，而用户不会知道要重启什么。
+  放 storage 则每轮重读，<b>改完下一轮就生效</b>。
+  其二，全局默认和逐会话开关是同一件事的两层，拆到「配置」页和面板两处填，
+  人就得在两个地方来回对。</p>
+</div>
+
+<h3>命令</h3>
+
+<table>
+  <thead><tr><th>命令</th><th>做什么</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">keepalive.list</td><td>面板的唯一数据源：所有会话（各自带守护状态）+ 全局默认 + 规则表 + 巡检是否在跑。分成三条命令就会出现「会话列表是新的、守护状态是旧的」</td></tr>
+    <tr><td class="mono">keepalive.on / off</td><td>开 / 关一个会话的守护（<code>on</code> 顺带收逐会话覆盖）</td></tr>
+    <tr><td class="mono">keepalive.all</td><td>一键全开 / 全关，<code>--agentOnly</code> 默认 true</td></tr>
+    <tr><td class="mono">keepalive.settings</td><td>不带参数是读，带参数是改（只改传进来的那几项）</td></tr>
+    <tr><td class="mono">keepalive.rules</td><td>读 / 覆写守护语规则表</td></tr>
+    <tr><td class="mono">keepalive.ping</td><td>立刻对一个会话发一次（面板的「催一下」；不计连败）</td></tr>
+    <tr><td class="mono">keepalive.history</td><td>发送记录</td></tr>
+    <tr><td class="mono">keepalive.tick</td><td>巡检一轮（幂等，可由外部 timer 驱动）</td></tr>
+    <tr><td class="mono">keepalive.serve</td><td>常驻循环，30 秒一轮（由 plugind 拉起）</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">11</span>风险，和这一版明确不做的事</h2>
+
+<div class="cols">
+  <div class="card bad">
+    <h4>风险：它会替你花钱</h4>
+    <p>每一句守护语都是一次真实的 Agent 调用。所以默认值全部偏保守
+    （10 分钟 / 30 分钟 / 3 次停手），而且<b>开关默认全关</b>：
+    插件默认启用只意味着「这一页能用了」，守护表是空的，一行都不会自己打开。
+    新建的会话也不会自动进来——<b>没有「以后新建的自动守护」这个选项</b>，
+    每一条守护都必须有人亲手打开过。</p>
+  </div>
+  <div class="card bad">
+    <h4>风险：打断正在干活的会话</h4>
+    <p>§05 那四道闸就是为它设的。真出现误判，代价是上下文里多一句「继续」；
+    可接受，但不能频繁——所以第二道闸（最小间隔）是硬的，
+    连「催一下」按钮也认它。</p>
+  </div>
+  <div class="card warn">
+    <h4>不做：自动回答确认框</h4>
+    <p>Agent 停在 <code>Do you want to proceed? (y/n)</code> 时替你按 y —— 这是另一个量级的
+    授权，规则表能表达，但<b>不预置、不推荐</b>。真要做，得先有一套单独的授权模型。</p>
+  </div>
+  <div class="card warn">
+    <h4>不做：正则匹配 / 跨会话编排</h4>
+    <p>第一版只有子串与 <code>|</code>。「A 会话停了就去问 B」这类编排属于蜂群，
+    不属于守护。</p>
+  </div>
+</div>
+
+<h2><span class="n">12</span>验收</h2>
+
+<ul>
+  <li><b>不打断</b>：对一个正在滚输出的会话开守护，20 分钟内一条都不发。</li>
+  <li><b>能叫醒</b>：让一个 Agent 会话停在等待态，10 分钟后它收到「继续」并动起来。</li>
+  <li><b>断线分叉</b>：屏幕上造一条 <code>API Error: Connection lost mid-response</code>，
+      发出去的必须是断线那句，不是「继续」。</li>
+  <li><b>会停手</b>：守一个裸 shell，第 3 次之后自动停用并发通知，面板那行显示「已停手」。</li>
+  <li><b>开了就跑</b>：打开第一个开关 10 秒内，顶上横幅从灰转绿；关掉最后一个开关后
+      <code>_ttmux-keepalive</code> 会话消失。</li>
+  <li><b>改了就生效</b>：循环跑着的时候改守护语，下一轮巡检用的就是新的，不用重启任何东西。</li>
+  <li><b>手机</b>：360 宽下不横滚、按钮 ≥44px、按
+      <a href="../../development/web-ui-checklist.md">web-ui-checklist</a> 过一遍真机。</li>
+  <li><b>纯函数有单测</b>：§05 那段判断逻辑（<code>Step</code>）与规则匹配（<code>pickPrompt</code>）
+      各自覆盖到边界，不依赖 tmux。</li>
+</ul>
+
+<div class="foot">
+  Roami · docs/design/plugin/keepalive.html · v0.2 · 2026-09-18<br>
+  形态（§01）已定稿：builtin Go + plugind 托管常驻循环 + 宿主侧内置面板。<br>
+  界面落地稿：<a href="keepalive-panel.html">keepalive-panel.html</a>（真尺寸、列宽、行状态、令牌清单）。<br>
+  相关：<a href="04-architecture.md">04 架构</a> ·
+  <a href="05-manifest.md">05 manifest</a> ·
+  <a href="06-platform-api.md">06 平台 API</a> ·
+  <a href="09-plugin-development.md">09 插件开发</a>。
+  形态参照 <code>plugins/cron</code>（常驻调度循环 + 宿主侧面板）与
+  <code>plugins/im</code>（plugind 托管的常驻会话）。
+</div>
+
+</div>
+
+<script>
+// 主题切换：跟随系统，可手动覆盖。设计稿常被人在亮着的屏幕上打开。
+(function () {
+  var b = document.getElementById('themeBtn');
+  var dark = !window.matchMedia('(prefers-color-scheme: light)').matches;
+  function apply() {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    b.textContent = dark ? '浅色' : '深色';
+  }
+  b.addEventListener('click', function () { dark = !dark; apply(); });
+  apply();
+})();
+</script>
+</body>
+</html>
