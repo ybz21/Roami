@@ -1364,8 +1364,8 @@ const zhCN = {
 
   'voice.input': '语音输入',
   'voice.holdToTalk': '长按说话',
-  'voice.hotkeyHint': '按 {key} 开始 / 结束',
-  'voice.hotkeyStop': '再按 {key} 识别 · Esc 取消',
+  'voice.hotkeyHint': '按住 {key} 说话，松开识别；点一下则开始、再点一下识别',
+  'voice.hotkeyStop': '松开或再按 {key} 识别 · Esc 取消',
   'voice.notConfigured': '请先在设置中配置语音识别',
   'voice.micDenied': '无法访问麦克风，请检查浏览器权限',
   'voice.insecureContext': '手机用语音需通过 HTTPS 访问；当前是 HTTP，浏览器已禁用麦克风',

@@ -19,6 +19,8 @@ const MIN_MS = 500
  */
 /** 快捷键：Mac ⌘⇧S，其它 Ctrl+Shift+S。S 取 speak；Ctrl+Shift+V 是终端粘贴，不能占 */
 const HOTKEY_LABEL = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘⇧S' : 'Ctrl+Shift+S'
+/** 按住超过这么久再松开 = 对讲机式，松开即识别；更短 = 点一下，切换式 */
+const HOLD_MS = 350
 const isHotkey = (e: KeyboardEvent) => (e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.code === 'KeyS'
 
 /**
@@ -129,24 +131,41 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   phaseRef.current = phase
   const beginRef = useRef(begin); beginRef.current = begin
   const endRef = useRef(end); endRef.current = end
+  // 两用：按住不放 = 对讲机（keydown 开录、keyup 识别）；快速点一下 = 切换式（再按一次识别）。
+  // 判据是 keydown 到 keyup 的间隔：超过 HOLD_MS 才算「按住」。S 键先松、修饰键后松也算一次 keyup
+  const downAt = useRef(0)
+  const holding = useRef(false)
   useEffect(() => {
     if (!hotkey) return
-    const onKey = (e: KeyboardEvent) => {
+    const onDown = (e: KeyboardEvent) => {
       if (e.repeat) return
       if (isHotkey(e)) {
         e.preventDefault(); e.stopPropagation()
-        if (phaseRef.current === 'idle') void beginRef.current(0, true)
-        else if (phaseRef.current === 'recording' || phaseRef.current === 'requesting') endRef.current()
+        if (phaseRef.current === 'idle') { downAt.current = Date.now(); holding.current = true; void beginRef.current(0, true) }
+        else if (phaseRef.current === 'recording' || phaseRef.current === 'requesting') { holding.current = false; endRef.current() }
         return
       }
       if (e.key === 'Escape' && byKeyRef.current && (phaseRef.current === 'recording' || phaseRef.current === 'requesting')) {
         e.preventDefault(); e.stopPropagation()
         cancelRef.current = true
+        holding.current = false
         endRef.current()
       }
     }
-    window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey, { capture: true } as any)
+    const onUp = (e: KeyboardEvent) => {
+      if (!holding.current) return
+      const isKey = e.code === 'KeyS' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta'
+      if (!isKey) return
+      if (Date.now() - downAt.current < HOLD_MS) { holding.current = false; return } // 点一下：留给切换式
+      holding.current = false
+      if (phaseRef.current === 'recording' || phaseRef.current === 'requesting') endRef.current()
+    }
+    window.addEventListener('keydown', onDown, { capture: true })
+    window.addEventListener('keyup', onUp, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', onDown, { capture: true } as any)
+      window.removeEventListener('keyup', onUp, { capture: true } as any)
+    }
   }, [hotkey])
 
   // 录音停止后：取消 / 太短 / 正常识别。

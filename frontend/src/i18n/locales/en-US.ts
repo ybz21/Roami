@@ -1362,8 +1362,8 @@ const enUS = {
 
   'voice.input': 'Voice input',
   'voice.holdToTalk': 'Hold to talk',
-  'voice.hotkeyHint': 'Press {key} to start / stop',
-  'voice.hotkeyStop': 'Press {key} again to recognize · Esc to cancel',
+  'voice.hotkeyHint': 'Hold {key} to talk, release to recognize; or tap to start and tap again to recognize',
+  'voice.hotkeyStop': 'Release or press {key} again to recognize · Esc to cancel',
   'voice.notConfigured': 'Configure speech recognition in Settings first',
   'voice.micDenied': 'Cannot access microphone, please check browser permissions',
   'voice.insecureContext': 'Voice on mobile needs HTTPS; the browser blocks the microphone over plain HTTP',
