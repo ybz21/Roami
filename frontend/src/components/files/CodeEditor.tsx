@@ -2,6 +2,7 @@
 // 依赖较重，仅由 FileBrowser 的 Viewer 懒加载引入，不进首屏包。
 // 用本地打包的 monaco（loader.config），不依赖 CDN，离线/局域网也能用。
 import { useEffect, useRef } from 'react'
+import { recallEditorView, rememberEditorView } from './fileview/view-state-memory'
 import Editor, { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
@@ -23,8 +24,10 @@ import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 loader.config({ monaco })
 
 export default function CodeEditor({
-  value, language, dark, readOnly, onChange, onSave, revealLine,
+  value, language, dark, readOnly, onChange, onSave, revealLine, stateKey,
 }: {
+  /** 给了就在卸载时存下视图状态（滚动、光标、选区），下次挂上对回去 */
+  stateKey?: string
   value: string
   language: string
   dark: boolean
@@ -37,6 +40,9 @@ export default function CodeEditor({
   revealLine?: { line: number; nonce: number }
 }) {
   const edRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+  // 卸载（标签切走）时存视图状态。ref 取最新的 key：同一个编辑器实例不会换文件，但保险起见
+  const keyRef = useRef(stateKey); keyRef.current = stateKey
+  useEffect(() => () => { if (keyRef.current && edRef.current) rememberEditorView(keyRef.current, edRef.current.saveViewState()) }, [])
   useEffect(() => {
     const ed = edRef.current
     if (!ed || !revealLine?.line) return
@@ -65,6 +71,7 @@ export default function CodeEditor({
         // Ctrl/Cmd+S 保存（onSave 读最新 draft，见 Viewer）
         editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.KeyS, () => onSave())
         if (revealLine?.line) { editor.revealLineInCenter(revealLine.line); editor.setPosition({ lineNumber: revealLine.line, column: 1 }) }
+        else if (stateKey) { const st = recallEditorView(stateKey) as monaco.editor.ICodeEditorViewState | undefined; if (st) editor.restoreViewState(st) }
       }}
       options={{
         readOnly,

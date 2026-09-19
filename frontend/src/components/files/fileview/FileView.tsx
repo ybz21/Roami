@@ -212,10 +212,10 @@ export function FileView({
               {isSheet
                 ? <CsvView path={path} text={data.content} sep={extOf(path) === 'tsv' ? '\t' : ','} height={previewHeight} inline={inline} truncated={data.truncated} />
                 : isMd && (!source || forcePreview)
-                  ? <MarkdownView content={data.content} accent={accent} height={previewHeight} pad={forcePreview ? '0 8px' : undefined} resolveHref={resolvePreviewHref} onLinkClick={openPreviewLink} />
+                  ? <MarkdownView path={path} content={data.content} accent={accent} height={previewHeight} pad={forcePreview ? '0 8px' : undefined} resolveHref={resolvePreviewHref} onLinkClick={openPreviewLink} />
                   : isHtml && (!source || forcePreview)
-                    ? <HtmlView rawUrl={serveUrl} name={name} mtime={data.mtime} height={previewHeight} />
-                    : <CodeView value={draft} language={monacoLangOf(path)} dark={mode === 'dark'} readOnly={!editable} tabbed={tabbed} height={previewHeight} onChange={setDraft} onSave={() => saveRef.current()} />}
+                    ? <HtmlView path={path} rawUrl={serveUrl} name={name} mtime={data.mtime} height={previewHeight} />
+                    : <CodeView stateKey={path} value={draft} language={monacoLangOf(path)} dark={mode === 'dark'} readOnly={!editable} tabbed={tabbed} height={previewHeight} onChange={setDraft} onSave={() => saveRef.current()} />}
               {data.truncated && <div style={{ color: '#d29922', fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}><WarnIcon size={12} />{t('file.truncatedLong')}</div>}
             </>
           )}
