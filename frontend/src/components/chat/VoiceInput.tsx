@@ -6,8 +6,7 @@ import { App as AntApp, Tooltip } from 'antd'
 import { useLayout } from '../../layout'
 import { api, transcribe } from '../../api'
 import { useI18n } from '../../i18n'
-import { usePreferences } from '../../preferences'
-import { DEFAULT_VOICE_HOTKEY, formatHotkey, isHotkeyKeyUp, matchHotkey, parseHotkey } from './voice-hotkey'
+import { isHotkeyKeyUp, matchHotkey, useKeybindings } from '../shell/keybindings'
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'transcribing'
 
@@ -22,7 +21,7 @@ const MAX_MS = 5 * 60 * 1000
  * 三种形态：悬浮（默认，右下角圆钮，手机用）/ inline（composer 控制条上的 pill）/
  * toolbar（会话工具条上的一枚扁平按钮，带「语音输入」字样——终端视图也能按住说话）。
  */
-/** 快捷键在设置里改（偏好 voiceHotkey），默认 Mod+Shift+S。S 取 speak；Ctrl+Shift+V 是终端粘贴，不能占 */
+/** 快捷键在 设置 › 界面 › 快捷键 里改，默认 Mod+Shift+S。S 取 speak；Ctrl+Shift+V 是终端粘贴，不能占 */
 /** 按住超过这么久再松开 = 对讲机式，松开即识别；更短 = 点一下，切换式 */
 const HOLD_MS = 350
 
@@ -34,14 +33,13 @@ const HOLD_MS = 350
 export function VoiceInput({ accent, onResult, inline = false, toolbar = false, hotkey = false }: { accent: string; onResult: (text: string) => void; inline?: boolean; toolbar?: boolean; hotkey?: boolean }) {
   const { t } = useI18n()
   const { message } = AntApp.useApp()
-  const [prefs] = usePreferences()
+  const kb = useKeybindings().voice
   // 鼠标：点一下开录、再点一下识别（GPT 那种）；触屏：按住说话、上滑取消（微信那种）
   const { coarse } = useLayout()
   const clickMode = !coarse
   const maxTimer = useRef<number | undefined>(undefined)
-  const hotkeySpec = prefs.voiceHotkey || DEFAULT_VOICE_HOTKEY
-  const HOTKEY_LABEL = formatHotkey(hotkeySpec)
-  const hkRef = useRef(parseHotkey(hotkeySpec)); hkRef.current = parseHotkey(hotkeySpec)
+  const HOTKEY_LABEL = kb.label
+  const hkRef = useRef(kb.key); hkRef.current = kb.key
   // 录音能力探测：getUserMedia/MediaRecorder 仅在安全上下文(HTTPS / localhost)可用。
   // 手机走 LAN 的 http:// 访问时 navigator.mediaDevices 为 undefined，按了也录不了，
   // 故按钮置灰并给出「需 HTTPS」的明确提示，而不是含糊的「麦克风被拒」。

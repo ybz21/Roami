@@ -78,6 +78,7 @@ import { normalizeRoute, setHashParams, readTermTokens, NO_TERMS, TASK_ROUTE } f
 import type { ClaudeInfo } from './components/terminal/claude-info'
 import { dropDeadTokens, loadTabs, saveTabs, type FileTab } from './components/terminal/term-tabs-store'
 import { lastTabOf, rememberLastTab } from './components/shell/task-last-tab'
+import { matchHotkey, useKeybindings } from './components/shell/keybindings'
 import type { FileTabMode } from './components/files/FilePathBar'
 import { CloudIcon, ExitFullscreenIcon, FullscreenIcon, LogoutIcon, MoonIcon, MoreIcon, SearchIcon, SunIcon } from './icons'
 import { lazyRetry } from './components/lazy-retry'
@@ -330,7 +331,8 @@ export default function App() {
     if (next.panel !== panel) setPanel(next.panel)
   }, [insTab, taskView, space.large])
   const { message: antMessage, modal: antModal } = AntApp.useApp()
-  const modKeyLabel = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl+'
+  const keys = useKeybindings()
+  const keysRef = useRef(keys); keysRef.current = keys
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
   useEffect(() => {
     const on = () => setOnline(navigator.onLine)
@@ -488,17 +490,21 @@ export default function App() {
   useEffect(() => {
     if (!hasSider) return
     const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey
-      if (mod && e.key.toLowerCase() === 'j') {
+      const k = keysRef.current
+      // 键位都从绑定表来（设置 › 界面 › 快捷键），这里只认动作
+      if (matchHotkey(e, k.toggleInspector.key)) {
         e.preventDefault()
-        // 任务视图：⌘J 开合右栏（Dock 没了，这个键让给它）；⌘⇧J 仍是 Focus
-        if (taskView && !e.shiftKey) { toggleInspector(); return }
-        if (e.shiftKey) { if (taskView) space.setNavCollapsed(!space.navCollapsed); else space.toggleFocus() }
-        else { space.setFocus('none'); space.toggleDock() }
+        // 任务视图：开合右栏（Dock 没了，这个键让给它）；Page 态开合终端坞
+        if (taskView) toggleInspector(); else { space.setFocus('none'); space.toggleDock() }
         return
       }
-      // ⌘N 开任务（当前项目下，弹 composer）；⌘T 在当前 worktree 里派生终端；⌘W 收起当前标签（23 设计 §6）
-      if (mod && !e.shiftKey && e.key.toLowerCase() === 'n') {
+      if (matchHotkey(e, k.focus.key)) {
+        e.preventDefault()
+        if (taskView) space.setNavCollapsed(!space.navCollapsed); else space.toggleFocus()
+        return
+      }
+      // 开任务（当前项目下，弹 composer）；在当前 worktree 里派生终端；收起当前标签（23 设计 §6）
+      if (matchHotkey(e, k.newTask.key)) {
         e.preventDefault()
         const key = activeTaskRef.current
         const tr = treeRef.current
@@ -507,23 +513,23 @@ export default function App() {
         if (dir) setNewTaskDir(dir)
         return
       }
-      if (mod && !e.shiftKey && taskView && e.key.toLowerCase() === 't') { e.preventDefault(); void newTerminalInTask('shell'); return }
-      if (mod && !e.shiftKey && taskView && e.key.toLowerCase() === 'w') {
+      if (taskView && matchHotkey(e, k.newTerminal.key)) { e.preventDefault(); void newTerminalInTask('shell'); return }
+      if (taskView && matchHotkey(e, k.closeTab.key)) {
         e.preventDefault()
         if (curFile) closeFileTab(curFile); else if (active) closeTerm(active)
         return
       }
-      // ⌘⇧F：右栏切到「内容」搜索并聚焦（22 设计 §9）
-      if (mod && e.shiftKey && taskView && e.key.toLowerCase() === 'f') {
+      // 右栏切到「内容」搜索并聚焦（22 设计 §9）
+      if (taskView && matchHotkey(e, k.searchContent.key)) {
         e.preventDefault()
         showInspector('files')
         setSearchNonce((n) => n + 1)
         return
       }
-      // 右栏切面板：⌘⇧E 文件、⌘⇧G Git（22 设计 §9）
-      if (mod && e.shiftKey && taskView && (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'g')) {
+      // 右栏切面板：文件 / Git（22 设计 §9）
+      if (taskView && (matchHotkey(e, k.panelFiles.key) || matchHotkey(e, k.panelGit.key))) {
         e.preventDefault()
-        showInspector(e.key.toLowerCase() === 'e' ? 'files' : 'git')
+        showInspector(matchHotkey(e, k.panelFiles.key) ? 'files' : 'git')
         return
       }
       // Esc 收一层：覆盖态先收面板，聚焦态退回分栏。两者都不关终端、不离开页面。
@@ -875,7 +881,7 @@ export default function App() {
       onFileTab={setActiveFile} onCloseFile={closeFileTab} onPinFile={pinFileTab} onFileMode={setFileMode} reveal={reveal}
       // Focus 只在桌面有意义：手机上终端本来就是全屏覆盖层；任务视图里 focus 是常态，没有开关
       // 任务视图里不放 Focus 钮：它干的就是侧栏脚「收起」那件事（⌘⇧J 仍在）；expanded 档的覆盖面板才需要它
-      focus={!hasSider || taskView ? undefined : { on: space.focus !== 'none', toggle: space.toggleFocus, hint: `${modKeyLabel}⇧J` }}
+      focus={!hasSider || taskView ? undefined : { on: space.focus !== 'none', toggle: space.toggleFocus, hint: keys.focus.label }}
     />
   )
 
@@ -1069,7 +1075,7 @@ export default function App() {
             settings={{ key: 'settings', label: t('nav.env'), icon: ICONS.settings }}
             nodeMenu={nodeItems}
             onSearch={openPalette}
-            searchHint={`${modKeyLabel}K`}
+            searchHint={keys.search.label}
             tree={<ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
               onProject={onTreeProject} onTask={onTreeTask} onSession={(key, name) => (terms.includes(name) ? returnToTask(key, name) : openTerm(name, key))}
               onAddProject={() => setNewProjectOpen(true)}
@@ -1148,7 +1154,7 @@ export default function App() {
               <SessionCapsule
                 label={sessionLabel(active) || active} count={terms.length}
                 onOpen={() => { space.setFocus('none'); space.setDockOpen(true) }}
-                title={`${sessionDisplay(active)} · ${t('terminal.expandTitle')} (${modKeyLabel}J)`}
+                title={`${sessionDisplay(active)} · ${t('terminal.expandTitle')} (${keys.toggleInspector.label})`}
               />
             ) : null}
           />

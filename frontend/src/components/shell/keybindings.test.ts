@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { parseHotkey, matchHotkey, hotkeyFromEvent, formatHotkey, DEFAULT_VOICE_HOTKEY } from './voice-hotkey'
+import { parseHotkey, matchHotkey, hotkeyFromEvent, formatHotkey, DEFAULT_KEYBINDINGS, resolveKeybindings, keybindingConflicts } from './keybindings'
 
 const ev = (o: Partial<KeyboardEvent>) => ({ ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, code: '', key: '', ...o }) as KeyboardEvent
 
 describe('语音快捷键', () => {
   it('默认 Mod+Shift+S：Ctrl 或 ⌘ 都算 Mod', () => {
-    const h = parseHotkey(DEFAULT_VOICE_HOTKEY)
+    const h = parseHotkey(DEFAULT_KEYBINDINGS.voice)
     expect(matchHotkey(ev({ ctrlKey: true, shiftKey: true, code: 'KeyS' }), h)).toBe(true)
     expect(matchHotkey(ev({ metaKey: true, shiftKey: true, code: 'KeyS' }), h)).toBe(true)
     expect(matchHotkey(ev({ ctrlKey: true, code: 'KeyS' }), h)).toBe(false)
@@ -30,5 +30,14 @@ describe('语音快捷键', () => {
     expect(formatHotkey('Ctrl+Shift+KeyS')).toMatch(/S$/)
     expect(formatHotkey('Alt+Digit1')).toMatch(/1$/)
     expect(formatHotkey('nonsense')).toBe('')
+  })
+  it('覆盖叠在默认上，坏串当没改；同键冲突能查出来', () => {
+    const kb = resolveKeybindings({ voice: 'Ctrl+Alt+KeyR', search: 'garbage', newTask: 'Mod+KeyW' })
+    expect(kb.voice.spec).toBe('Ctrl+Alt+KeyR')
+    expect(kb.search.spec).toBe(DEFAULT_KEYBINDINGS.search)
+    const c = keybindingConflicts(kb)
+    expect(c.newTask).toBe('closeTab')
+    expect(c.closeTab).toBe('newTask')
+    expect(c.voice).toBeUndefined()
   })
 })

@@ -7,7 +7,8 @@
 //
 // 键盘监听走**捕获阶段**：xterm 自己在 textarea 上挂了 keydown 并且会 stopPropagation，
 // 冒泡阶段的监听在终端聚焦时根本收不到 ⌘K——这正是「在终端页按不出搜索」的原因。
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { matchHotkey, useKeybindings } from '../keybindings'
 import { CommandPalette } from './CommandPalette'
 import type { PaletteActions, PaletteItem } from './types'
 
@@ -22,13 +23,15 @@ export function GlobalSearch({ items, actions, dir }: {
   dir?: string
 }) {
   const [open, setOpen] = useState(false)
+  const searchKey = useKeybindings().search.key
+  const keyRef = useRef(searchKey); keyRef.current = searchKey
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null
       const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
       const inTerm = !!el?.closest?.('.xterm')
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if (matchHotkey(e, keyRef.current)) {
         e.preventDefault()
         // 终端聚焦时还要拦住冒泡，否则 xterm 会把 ⌃K 当作 readline 的「删到行尾」发下去，
         // 面板开着的同时命令行被截断了半截
