@@ -16,6 +16,7 @@ import { CheckIcon, ChevronDown, CircleIcon, PaperclipIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
+import { kickoffBrief, type BriefWhere } from './kickoff-brief'
 
 export type TaskComposerHandle = { focus: () => void; insert: (text: string) => void }
 
@@ -170,15 +171,15 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         // 是不是一回事」。会话改名那一条也回来了：派生出来的名字是需求原文的前 16 个字，
         // 只配当占位，真名字得等 agent 看懂任务之后再起。
         const existingWt = wtsAll.find((w: any) => w.path === sessionDir)
-        const naming = (wantWt
-          ? t('session.wt.briefNew', { path: sessionDir, base: wtBase || defBranch || 'main', branch: wtBranch || finalName, sess: actual })
+        const where: BriefWhere = wantWt
+          ? { kind: 'new', path: sessionDir, base: wtBase || defBranch || 'main', branch: wtBranch || finalName }
           : adopt
-            ? t('session.wt.briefAdopt', { path: sessionDir, branch: wtBranch || adopt, base: wtBase || defBranch || 'main', sess: actual })
+            ? { kind: 'adopt', path: sessionDir, branch: wtBranch || adopt, base: wtBase || defBranch || 'main' }
             : isGit
-              ? t('session.wt.briefRepo', { path: sessionDir, branch: existingWt?.branch || defBranch || 'main', sess: actual })
-              : t('session.wt.briefPlain', { path: sessionDir, sess: actual })
-        ) + (autoReview ? t('session.wt.briefReview') : '') + '\n\n'
-        await api('POST', '/tasks/_/send', { sess: actual, msg: prompt.trim() ? `${cmd} ${shq(naming + prompt.trim())}` : cmd })
+              ? { kind: 'repo', path: sessionDir, branch: existingWt?.branch || defBranch || 'main' }
+              : { kind: 'plain', path: sessionDir }
+        const brief = kickoffBrief(where, actual, autoReview, prompt, t)
+        await api('POST', '/tasks/_/send', { sess: actual, msg: brief ? `${cmd} ${shq(brief)}` : cmd })
         if (autoReview) {
           await api('POST', '/plugin/track', {
             session: actual,

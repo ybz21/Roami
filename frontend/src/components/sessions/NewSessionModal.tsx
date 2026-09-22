@@ -13,6 +13,7 @@ import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { relTime } from '../../time-format'
+import { kickoffBrief, type BriefWhere } from './kickoff-brief'
 
 // 由 prompt 首句推会话名：派活时用户只写了要干什么，名字不该再问一遍。
 // worktree 分支默认名：会话名 slug（小写、非字母数字转 -）
@@ -192,15 +193,14 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
           // 开工简报按**这张表单真正选的**拼：在哪个目录、从哪个分支切的、占位分支叫什么、
           // 会话现在叫什么（见 TaskComposer 里同一段注释）
           const existingWt = existingWts.find((w: any) => w.path === sessionDir)
-          const naming = (madeWt
-            ? t('session.wt.briefNew', { path: sessionDir, base: wtBase || defBranch || 'main', branch: wtBranch || finalName, sess: actual })
+          const where: BriefWhere = madeWt
+            ? { kind: 'new', path: sessionDir, base: wtBase || defBranch || 'main', branch: wtBranch || finalName }
             : adopt
-              ? t('session.wt.briefAdopt', { path: sessionDir, branch: wtBranch || adopt, base: wtBase || defBranch || 'main', sess: actual })
+              ? { kind: 'adopt', path: sessionDir, branch: wtBranch || adopt, base: wtBase || defBranch || 'main' }
               : isGitRepo
-                ? t('session.wt.briefRepo', { path: sessionDir || dir, branch: existingWt?.branch || defBranch || 'main', sess: actual })
-                : t('session.wt.briefPlain', { path: sessionDir || dir, sess: actual })
-          ) + (autoReview ? t('session.wt.briefReview') : '') + '\n\n'
-          launch = `${cmd} ${shq(naming + prompt.trim())}`
+                ? { kind: 'repo', path: sessionDir || dir, branch: existingWt?.branch || defBranch || 'main' }
+                : { kind: 'plain', path: sessionDir || dir }
+          launch = `${cmd} ${shq(kickoffBrief(where, actual, autoReview, prompt, t))}`
         }
         await api('POST', '/tasks/_/send', { sess: actual, msg: launch })
         if (autoReview && !sessionDir) {
