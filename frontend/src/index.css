@@ -1626,6 +1626,16 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
 :where(html[data-pointer="fine"]) .tt-tab .tt-x:hover { background: var(--danger-soft); color: var(--danger); }
 /* 触屏没有 hover，关闭按钮常显 */
 @media (pointer: coarse) { .tt-tab .tt-x { opacity: 1; } }
+/* 「全部标签」清单的行：名字省略，行尾一枚 ×。静息淡着，悬停这一行才亮；触屏常亮 */
+.tt-tabmenu-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tt-tabmenu-row .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-tabmenu-row .tt-x {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  border: 0; padding: 0; background: transparent; border-radius: 5px; color: var(--text-dimmer); opacity: .45; cursor: pointer;
+}
+:where(html[data-pointer="fine"]) .ant-dropdown-menu-item:hover .tt-tabmenu-row .tt-x { opacity: 1; }
+:where(html[data-pointer="fine"]) .tt-tabmenu-row .tt-x:hover { background: var(--danger-soft); color: var(--danger); }
+html[data-pointer="coarse"] .tt-tabmenu-row .tt-x { opacity: 1; width: 28px; height: 28px; }
 
 /* 工具条按钮：默认无框、hover 才浮起 */
 .tt-tbtn {
