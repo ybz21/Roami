@@ -73,6 +73,13 @@ export function AboutSettings() {
       </Space>
       <span style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-meta)' }}>{t('install.settingsHelp')}</span>
       {installGuide}
+      {/* 证书与推送（24 稿 §7）：连通性和证书都是部署者的事，这里只把话说清楚、给链接 */}
+      <div style={{ marginTop: 'var(--sp-3)', padding: 'var(--sp-3)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)', background: 'var(--bg-base)', fontSize: 'var(--fs-meta)', color: 'var(--text-dim)', lineHeight: 1.7 }}>
+        <div style={{ color: 'var(--text-bright)', fontWeight: 600, marginBottom: 2 }}>{t('about.certTitle')}</div>
+        <div>{t('about.certAndroid')}</div>
+        <div>{t('about.certIphone')} <a href="/cert.crt" target="_blank" rel="noreferrer">{t('about.certDownload')}</a></div>
+        <div>{t('about.certOwn')}</div>
+      </div>
     </Space>
   )
 }

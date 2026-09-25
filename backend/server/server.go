@@ -82,6 +82,7 @@ func New(cfg Config) *gin.Engine {
 	go h.SyncLoop()                 // 后台兜底远端同步（10 §3 第三档），失败静默
 	go h.AgentLinkLoop()            // 会话 ↔ claude 对话 id 对账、归属跟着 worktree 走（api/session-home-sync.go）
 	h.SyncClaudeThemeOnce()         // Claude Code 主题对齐 Roami 主题（api/claude-theme-sync.go）
+	go h.SessionEventLoop()         // 「会话在等你」→ 收件箱 + Web Push（api/session-events.go）
 	browser.InitConfig(cfg.DataDir) // Chrome 启动配置持久化到 dataDir
 	phone.InitConfig(cfg.DataDir)   // 手机后端配置（本机模拟器/远程设备/真机）持久化到 dataDir
 	hub := stream.New(tt, cfg.LogsDir)
@@ -256,6 +257,12 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/plugins/:id/restore", h.PluginRestore)
 		g.GET("/plugin/findings", h.PluginFindings)
 		g.GET("/plugin/notifications", h.PluginNotifications)
+		g.GET("/inbox", h.InboxList)               // 收件箱：会话事件（等你 / 做完 / 出错）+ 角标
+		g.POST("/inbox/read", h.InboxRead)         // 已读（ids 或 all）
+		g.GET("/push/vapid", h.PushVAPID)          // 本部署的 VAPID 公钥
+		g.POST("/push/subscribe", h.PushSubscribe) // 手机 PWA 的推送订阅
+		g.DELETE("/push/subscribe", h.PushUnsubscribe)
+		g.POST("/push/test", h.PushTest) // 发一条测试
 		g.POST("/plugins/:id/enable", h.PluginSetEnabled(true))
 		g.POST("/plugins/:id/disable", h.PluginSetEnabled(false))
 		g.GET("/plugins/:id/config", h.PluginConfig)

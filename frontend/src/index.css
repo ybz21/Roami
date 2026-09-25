@@ -3784,3 +3784,25 @@ html[data-pointer="coarse"] .tt-ka-rules .tt-act.xs { height: 30px; width: 34px;
 .tt-ka-card .m .long { color: var(--warn); }
 .tt-ka-card .m .sep { color: var(--text-dimmer); }
 .tt-ka-card .ops { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── 收件箱（24 稿 §5）：三段时间线，一行 = 图标 · 会话名 + 摘要 · 时间 ───────── */
+.tt-inbox { padding: var(--pad-page, 16px); max-width: 760px; }
+.tt-inbox-sec { margin-top: var(--sp-4); }
+.tt-inbox-sec h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-meta); color: var(--text-dimmer); font-weight: 600; letter-spacing: .04em; }
+.tt-inbox-sec h3 span { color: var(--text-dimmer); font-weight: 400; margin-left: 4px; }
+.tt-inbox-row {
+  display: flex; align-items: center; gap: var(--sp-3); width: 100%; text-align: left;
+  padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  background: var(--bg-container); color: inherit; font: inherit; cursor: pointer; min-height: 44px;
+}
+:where(html[data-pointer="fine"]) .tt-inbox-row:hover { background: var(--list-hover); }
+.tt-inbox-row .ic { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-size: var(--fs-meta); font-weight: 700; color: #fff; background: var(--text-dimmer); }
+.tt-inbox-row.waiting .ic { background: var(--warn); }
+.tt-inbox-row.done .ic { background: var(--ok-solid); }
+.tt-inbox-row.error .ic { background: var(--danger); }
+.tt-inbox-row.waiting.unread { border-color: var(--warn-border); background: var(--warn-soft); }
+.tt-inbox-row .t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tt-inbox-row .t b { font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-inbox-row .t span { font-size: var(--fs-meta); color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-inbox-row.unread .t b { color: var(--text-bright); }
+.tt-inbox-row em { flex: 0 0 auto; font-style: normal; color: var(--text-dimmer); font: 400 var(--fs-micro)/1 var(--mono); }

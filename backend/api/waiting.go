@@ -35,7 +35,8 @@ func waitClean(s string) string {
 
 // sessionCapture 抓会话当前屏纯文本（=name 精确匹配，避开 tmux -t 前缀匹配 footgun）。
 func sessionCapture(name string, lines int) string {
-	out, err := exec.Command("tmux", "capture-pane", "-t", "="+name, "-p", "-J", "-S", "-"+strconv.Itoa(lines)).Output()
+	// `=name:`：pane 类命令对裸 `=name` 报 can't find pane（tmux 3.4），带冒号才按「该会话当前窗口」解析
+	out, err := exec.Command("tmux", "capture-pane", "-t", "="+name+":", "-p", "-J", "-S", "-"+strconv.Itoa(lines)).Output()
 	if err != nil {
 		return ""
 	}
@@ -142,4 +143,86 @@ func sessionWaiting(capture string) bool {
 		break
 	}
 	return false
+}
+
+// waitingPrompt 从一屏 capture 里取出正在等的那个问题和它的选项（给通知正文用）。
+// 与 sessionWaiting 同一套判据：最后一组从 1 起连续编号的选项 + 上面最多三行问题。
+// 认不出选项时返回 ok=false，调用方退回 sessionTail。
+func waitingPrompt(capture string) (question string, options []string, ok bool) {
+	lines := strings.Split(strings.ReplaceAll(waitStripCtl(capture), "\r", ""), "\n")
+	type opt struct {
+		num, idx int
+		label    string
+	}
+	var opts []opt
+	for idx, raw := range lines {
+		if m := waitOpt.FindStringSubmatch(waitClean(raw)); m != nil {
+			n, _ := strconv.Atoi(m[1])
+			opts = append(opts, opt{num: n, idx: idx, label: strings.TrimSpace(m[2])})
+		}
+	}
+	var g []opt
+	for i := len(opts) - 1; i >= 0; i-- {
+		if len(g) == 0 || g[0].idx-opts[i].idx <= 12 {
+			g = append([]opt{opts[i]}, g...)
+		} else {
+			break
+		}
+	}
+	if len(g) < 2 {
+		return "", nil, false
+	}
+	for k, o := range g {
+		if o.num != k+1 {
+			return "", nil, false
+		}
+	}
+	var qlines []string
+	for i := g[0].idx - 1; i >= 0 && g[0].idx-i <= 6; i-- {
+		c := waitClean(lines[i])
+		if c == "" {
+			if len(qlines) > 0 {
+				break
+			}
+			continue
+		}
+		if waitOpt.MatchString(c) {
+			continue
+		}
+		qlines = append([]string{c}, qlines...)
+		if len(qlines) >= 3 {
+			break
+		}
+	}
+	for _, o := range g {
+		options = append(options, o.label)
+	}
+	return strings.TrimSpace(strings.Join(qlines, " ")), options, true
+}
+
+// waitingSummary 通知正文：「问题 · 1. Yes / 2. No」，认不出就退回最后一行
+func waitingSummary(capture string, max int) string {
+	q, opts, ok := waitingPrompt(capture)
+	if !ok {
+		return sessionTail(capture, max)
+	}
+	parts := make([]string, 0, len(opts))
+	for i, o := range opts {
+		if i >= 3 {
+			parts = append(parts, "…")
+			break
+		}
+		if r := []rune(o); len(r) > 24 {
+			o = string(r[:24]) + "…"
+		}
+		parts = append(parts, strconv.Itoa(i+1)+". "+o)
+	}
+	s := strings.Join(parts, " / ")
+	if q != "" {
+		s = q + " · " + s
+	}
+	if r := []rune(s); len(r) > max {
+		return string(r[:max]) + "…"
+	}
+	return s
 }

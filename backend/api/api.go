@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -35,6 +36,8 @@ type API struct {
 	Football    *FootballStore
 	Speech      *SpeechStore      // 语音识别(ASR)配置 + 转录
 	Prefs       *PreferencesStore // 用户偏好（主题/语言/Agent 命令等）
+	Push        *PushStore        // Web Push：VAPID 密钥 + 设备订阅（api/push.go）
+	Inbox       *InboxStore       // 收件箱：会话事件 + 已读（api/inbox.go）
 	Races       *race.Store       // 竞赛（W5/W6）业务数据模型
 	Projects    *project.Store    // 项目（08）：knownRepos 弱台账 + UI 偏好
 	FileIndex   *search.FileIndex // 全局搜索（⌘K）的项目文件名索引，见 search.go
@@ -57,6 +60,12 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 	return &API{TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir),
 		Prefs: NewPreferencesStore(dataDir), Races: race.NewStore(dataDir, meta),
+		Push: NewPushStore(dataDir), Inbox: NewInboxStore(dataDir, func() *sql.DB {
+			if meta.OK() {
+				return meta.SQL()
+			}
+			return nil
+		}),
 		Projects: project.NewStore(dataDir, meta), FileIndex: search.NewFileIndex(), Meta: meta,
 		agentLink: newAgentLinker()}
 }

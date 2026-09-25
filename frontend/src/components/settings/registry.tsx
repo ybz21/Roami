@@ -8,6 +8,7 @@
 //
 // 标签走 labelKey/descKey 而不是中文串：搜索索引必须在 t() 之后建，否则英文界面搜不到任何东西。
 import type { ReactNode } from 'react'
+import { PushSettings } from './push-settings'
 import { HotkeyRecorder } from './hotkey-recorder'
 import { BrowserSettings } from './browser-settings'
 import { PhoneSettings } from './phone-settings'
@@ -160,6 +161,11 @@ export function buildSettings(deps: {
     keywords: '语音 快捷键 hotkey shortcut 按住',
     control: { kind: 'custom', node: <HotkeyRecorder value={prefs.voiceHotkey || 'Mod+Shift+KeyS'} fallback="Mod+Shift+KeyS" onChange={(v) => deps.setPrefs({ voiceHotkey: v })} /> },
   }
+  const pushItem: SettingItem = {
+    id: 'push', label: t('set.push'), desc: t('set.pushHelp'), key: 'push',
+    keywords: '推送 通知 push notification 手机 锁屏',
+    control: { kind: 'custom', node: <PushSettings /> },
+  }
   const voiceItem: SettingItem = {
     id: 'showVoiceButton', label: t('set.voiceButton'), desc: t('set.voiceButtonHelp'), key: 'showVoiceButton',
     control: { kind: 'switch', get: () => prefs.showVoiceButton !== false, set: (on) => deps.setPrefs({ showVoiceButton: on }) },
@@ -173,6 +179,7 @@ export function buildSettings(deps: {
         { ...localeItem, from: `${t('set.groupUi')} · ${t('set.pageLook')}` },
         { ...claudeItem, from: `${t('set.groupAgent')} · ${t('set.pageBin')}` },
         { ...promptPopupItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
+        { ...pushItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
         { ...voiceItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
         { ...voiceHotkeyItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
       ],
@@ -237,6 +244,7 @@ export function buildSettings(deps: {
           id: 'quickCommands', label: t('settings.quickCommands'), desc: t('settings.quickCommandsHelp'),
           key: 'quickCommands', control: { kind: 'custom', node: <QuickCommandsSettings /> },
         },
+        pushItem,
         promptPopupItem,
         voiceItem,
         voiceHotkeyItem,

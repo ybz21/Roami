@@ -29,6 +29,7 @@ const WorktreePanel = lazyRetry(() => import('./components/git/WorktreePanel'))
 const RaceCreateModal = lazyRetry(() => import('./components/swarm/Race').then((m) => ({ default: m.RaceCreateModal })))
 const RaceComparePanel = lazyRetry(() => import('./components/swarm/Race').then((m) => ({ default: m.RaceComparePanel })))
 const PluginsPanel = lazyRetry(() => import('./components/plugins/PluginsPanel'))
+const InboxPage = lazyRetry(() => import('./components/inbox/InboxPage'))
 const BrowserView = lazyRetry(() => import('./components/mirror/BrowserView'))
 const PhoneView = lazyRetry(() => import('./components/mirror/PhoneView'))
 const Swarm = lazyRetry(() => import('./components/swarm/Swarm'))
@@ -93,6 +94,7 @@ const { Text } = Typography
 // 「概览」已并进项目页（18 设计）：两页画的是同一批项目卡、拉的是同一条 /projects，
 // 概览独有的问候条/行动队列/活动轨现在挂在项目列表页顶上。旧链接由 normalizeRoute 接住。
 const NAV = [
+  { key: 'inbox', labelKey: 'nav.inbox' },
   { key: 'projects', labelKey: 'nav.projects' },
   { key: 'files', labelKey: 'nav.files' },
   { key: 'browser', labelKey: 'nav.browser' },
@@ -103,7 +105,7 @@ const NAV = [
 
 // 桌面导航的两组（14 §4.4）。NAV 仍是全量注册表——命令面板和手机「更多」都从它取，
 // 所以 settings 留在 NAV 里，只是不进这两组：它单独摆在侧栏底部（见 Navigation 的 settings）。
-const NAV_WORKSPACE = ['projects', 'files']
+const NAV_WORKSPACE = ['inbox', 'projects', 'files']
 const NAV_TOOLS = ['browser', 'phone', 'plugins']
 
 // 手机底栏。13 §4.1 当初把「浏览器/手机镜像」折进「更多」，理由是低频且窄屏下几乎不可用
@@ -111,7 +113,7 @@ const NAV_TOOLS = ['browser', 'phone', 'plugins']
 // 恰恰是本机最常用的两个工具，藏在二级 sheet 里每次要点两下。现在放回底栏。
 // 概览并进项目页后这里空出一格，不再补人：4 格 + 「更多」= 5 个按钮，390 宽下每格 78，
 // 比原来 6 格的 65 宽出一截（13 §7.1 的命中区下限是 44，但相邻图标还要留够间隙）。
-const MOBILE_NAV_KEYS = ['projects', 'files', 'browser', 'phone']
+const MOBILE_NAV_KEYS = ['inbox', 'projects', 'files', 'browser', 'phone']
 // 「更多」sheet 里的两段：会话属于工作区主线，不归到工具下面
 const MOBILE_MORE_WORKSPACE: string[] = [] // 会话页退役（23 设计 §5）：不再有入口，路由留给老链接
 const MOBILE_MORE_TOOLS = ['plugins', 'settings']
@@ -151,6 +153,7 @@ export default function App() {
   const swarmSub = tab === 'swarm' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的蜂群
   const projectSub = tab === 'projects' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的项目
   const pluginSub = tab === 'plugins' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的插件（状态条点进来）
+  const inboxSub = tab === 'inbox' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 从推送通知点进来要开的会话
   const settingsSub = tab === 'settings' && route.includes('/') ? route.slice(route.indexOf('/') + 1) : '' // 设置的哪一类（node/browser）
   const go = (k: string) => {
     const qi = location.hash.indexOf('?')
@@ -887,6 +890,7 @@ export default function App() {
     settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
+    inbox: <InboxPage onOpenSession={(n) => openTerm(n)} openOnMount={inboxSub || undefined} />,
     browser: <BrowserView />,
     phone: <PhoneView />,
   }

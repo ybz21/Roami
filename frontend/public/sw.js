@@ -120,3 +120,53 @@ async function fileBytes(event) {
     return fetch(req)
   }
 }
+
+// ── Web Push（24 稿 §6）─────────────────────────────────────────────────────
+// 后端 push.go 发来的 JSON：{id,type,session,label,title,body,actions,badge}。
+// 通知按钮（允许 / 拒绝）在这儿直接打 /api/sessions/:name/keys，不开页面、不解锁；
+// 点通知本体 → 打开 #/inbox/<session>，页面接到后直接开那个会话。
+self.addEventListener('push', (event) => {
+  let p = {}
+  try { p = event.data ? event.data.json() : {} } catch { p = { title: 'Roami', body: event.data && event.data.text() } }
+  const actions = (p.actions || []).map((a) => (a === 'allow' ? { action: 'allow', title: '允许' } : a === 'deny' ? { action: 'deny', title: '拒绝' } : null)).filter(Boolean)
+  event.waitUntil((async () => {
+    await self.registration.showNotification(p.title || p.label || 'Roami', {
+      body: p.body || '',
+      tag: p.session ? 'session:' + p.session : 'roami:' + (p.id || Date.now()), // 同一会话的新通知顶掉旧的
+      renotify: true,
+      icon: '/logo-mark-192.png',
+      badge: '/logo-mark-192.png',
+      data: { session: p.session || '', type: p.type || '', id: p.id || 0 },
+      actions,
+    })
+    try { if (typeof p.badge === 'number') { if (p.badge > 0) await self.navigator.setAppBadge(p.badge); else await self.navigator.clearAppBadge() } } catch {}
+  })())
+})
+
+self.addEventListener('notificationclick', (event) => {
+  const n = event.notification
+  const d = n.data || {}
+  n.close()
+  event.waitUntil((async () => {
+    if ((event.action === 'allow' || event.action === 'deny') && d.session) {
+      // 允许 = Enter（选中项就是 Yes / 1）；拒绝 = Escape。白名单在后端，这里只发这两个
+      const keys = event.action === 'allow' ? ['Enter'] : ['Escape']
+      try {
+        const r = await fetch('/api/sessions/' + encodeURIComponent(d.session) + '/keys', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keys }),
+        })
+        if (r.ok) {
+          await self.registration.showNotification(n.title, { body: event.action === 'allow' ? '已允许' : '已拒绝', tag: n.tag, icon: '/logo-mark-192.png', silent: true })
+          return
+        }
+      } catch {}
+      // 发不出去（没登录 / 后端不通）：退回打开页面
+    }
+    const url = '/#/inbox' + (d.session ? '/' + encodeURIComponent(d.session) : '')
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    for (const c of all) {
+      if ('focus' in c) { try { await c.navigate(url) } catch {} ; return c.focus() }
+    }
+    return self.clients.openWindow(url)
+  })())
+})

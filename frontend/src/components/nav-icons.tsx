@@ -10,6 +10,7 @@ const svg = (paths: any) => (
     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths}</svg>
 )
 export const ICONS: Record<string, any> = {
+  inbox: svg(<><path d="M3 13h5l1.5 2.5h5L16 13h5" /><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" /></>),
   projects: svg(<><path d="M3 10.2 12 3l9 7.2" /><path d="M5.5 9v11h13V9" /><path d="M9.5 20v-5h5v5" /></>),
   sessions: svg(<><polyline points="5 8 9 12 5 16" /><line x1="12" y1="16" x2="18" y2="16" /></>),
   swarm: svg(<><circle cx="12" cy="5" r="2.4" /><circle cx="5" cy="17" r="2.4" /><circle cx="19" cy="17" r="2.4" /><line x1="12" y1="7.4" x2="6.5" y2="14.8" /><line x1="12" y1="7.4" x2="17.5" y2="14.8" /></>),
