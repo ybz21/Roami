@@ -1,3 +1,4 @@
+import type { AgentKind } from '../../../agent-kind'
 // 项目列表页的读模型 —— 全部来自 GET /projects 一条接口（18 设计 §9）。
 // 会话的 running/waiting/agent/tail 由后端一趟进程树扫描算好，前端不再逐会话探测。
 
@@ -9,7 +10,7 @@ export type ProjSession = {
   state?: 'live' | 'dormant'
   // 只有逼近内存上限时后端才带这一段——平时不占位置。
   mem?: { cur: number; peak?: number; limit?: number }
-  agent?: 'claude' | 'codex'  // 品牌标；后端进程树扫描分得出，不再前端逐会话问
+  agent?: AgentKind  // 品牌标；后端进程树扫描分得出，不再前端逐会话问
   tail?: string               // 仅 waiting 时非空：那一屏最后一行，给行动卡当摘要
   lastActivity: number; branch?: string; linked?: boolean
 }

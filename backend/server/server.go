@@ -205,6 +205,7 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/search/content", h.SearchContent)
 
 		g.GET("/sessions", h.Sessions)
+		g.GET("/sessions/agents", h.SessionAgents)
 		g.GET("/sessions/history", h.SessionHistory)        // 已结束的会话（M3）
 		g.POST("/sessions/:name/restore", h.SessionRestore) // 按台账重开一个壳
 		g.POST("/sessions", h.NewSession)

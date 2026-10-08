@@ -1,3 +1,4 @@
+import type { AgentKind } from '../../agent-kind'
 // 左栏项目树的读模型：项目 → 任务（worktree）→ 会话（22 设计 §3.2）。
 //
 // 三条现成接口合成，没有新接口：
@@ -15,7 +16,7 @@ export type TreeSession = {
   at?: number
   /** 休眠：被重启带走、台账还认得，点开即在原目录重开 */
   dormant?: boolean
-  agent?: 'claude' | 'codex'
+  agent?: AgentKind
   running?: boolean
   waiting?: boolean
   /** 互审陪跑会话（<被审会话>-review）：审谁写在这儿，树上挂到被审那条下面 */
@@ -48,11 +49,11 @@ export type TaskTree = { projects: TreeProject[]; loose: TreeSession[] }
 type ProjIn = {
   key: string; name: string; dir: string; git: boolean
   waiting?: number; unfinished?: number
-  top?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: 'claude' | 'codex'; state?: string }[] | null
-  needs?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: 'claude' | 'codex'; state?: string }[] | null
+  top?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; state?: string }[] | null
+  needs?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; state?: string }[] | null
 }
 type WtIn = { path: string; branch: string; isMain: boolean; committedAhead?: number; dirty?: number; untracked?: number; behind?: number; mergedInto?: string; pushed?: boolean; sessions?: { session: string; dormant?: boolean }[] | null }
-type SessIn = { name: string; label?: string; lastActivity?: number; agent?: 'claude' | 'codex' }
+type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind }
 
 export function buildTaskTree(o: {
   projects: ProjIn[]
@@ -60,7 +61,7 @@ export function buildTaskTree(o: {
   worktrees: Record<string, WtIn[]>
   sessions: SessIn[]
   /** 已打开会话里探测到的 agent（比 /projects 的 top 名单准、也更新） */
-  agentOf?: (name: string) => 'claude' | 'codex' | undefined
+  agentOf?: (name: string) => AgentKind | undefined
   /** 会话归属表（/sessions/annotations，15s 一轮）：会话 → 项目 key + worktree 路径 */
   placement?: Record<string, { key: string; worktree?: string; branch?: string }>
   /** 人给任务起的名（偏好 taskNames）：有就用它，会话改名不再连带任务改名 */
@@ -72,7 +73,7 @@ export function buildTaskTree(o: {
 }): TaskTree {
   // 会话的展示信息：先从 /projects 的 top / needs 里捞（带 agent / running / waiting），再补 /sessions 的 label
   const info = new Map<string, TreeSession>()
-  const put = (s: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: 'claude' | 'codex'; lastActivity?: number; state?: string; dormant?: boolean }) => {
+  const put = (s: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; lastActivity?: number; state?: string; dormant?: boolean }) => {
     const cur = info.get(s.name) || { name: s.name, label: s.label || s.name }
     info.set(s.name, {
       ...cur,

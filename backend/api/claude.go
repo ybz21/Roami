@@ -150,8 +150,22 @@ func argvIsCodex(argv []string) bool {
 		!agentExcluded(argv, "codex-web", "mcp-server", "app-server")
 }
 
+func argvIsOpenCode(argv []string) bool {
+	launch := agentLaunchArgs(argv)
+	return filepath.Base(launch) == "opencode" || strings.Contains(launch, "/opencode/") ||
+		strings.Contains(launch, "/opencode-ai/") || strings.HasSuffix(launch, "/opencode")
+}
+
+func argvIsPi(argv []string) bool {
+	launch := agentLaunchArgs(argv)
+	return filepath.Base(launch) == "pi" || strings.Contains(launch, "/pi-coding-agent/") ||
+		strings.HasSuffix(launch, "/pi")
+}
+
 // cmdlineHasClaude 判断进程跑的是不是 claude。
-func cmdlineHasClaude(pid int) bool { return argvIsClaude(processArgv(pid)) }
+func cmdlineHasClaude(pid int) bool   { return argvIsClaude(processArgv(pid)) }
+func cmdlineHasOpenCode(pid int) bool { return argvIsOpenCode(processArgv(pid)) }
+func cmdlineHasPi(pid int) bool       { return argvIsPi(processArgv(pid)) }
 
 // treeMatch 从 pid 起 DFS 子进程树，任一进程命中 match 即返回 true。
 func treeMatch(pid int, children map[int][]int, depth int, match func(int) bool) bool {
@@ -189,7 +203,7 @@ func paneToolDir(name string, match func(int) bool) string {
 // paneClaudeProc 返回正在跑 claude 的 pane 的工作目录和 claude 进程 pid；没有则返回 "", 0。
 func paneClaudeProc(name string) (string, int) { return paneToolProc(name, cmdlineHasClaude) }
 
-// runningAgentSessions 一次性扫全部 pane 的进程树，返回会话名 → 在跑的 agent（"claude"/"codex"）。
+// runningAgentSessions 一次性扫全部 pane 的进程树，返回会话名 → 在跑的 agent 种类。
 // 供项目列表批量判「活跃」——绿点语义（设计 W2）：agent 进程在跑才算活跃。避免前端
 // 逐会话打 /claude+/codex（N×2 请求），也纠正原先拿 session_attached（有没有人 attach）
 // 当活跃代理的误判：后台干活没人看=灰、开着终端却 idle=绿 的反相。
@@ -200,6 +214,11 @@ func runningAgentSessions() map[string]string {
 		out[sess] = p.Kind
 	}
 	return out
+}
+
+// SessionAgents GET /sessions/agents —— 全部正在运行的交互式代理及其种类。
+func (a *API) SessionAgents(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"data": runningAgentSessions()})
 }
 
 // runningAgentProcs 一次扫描：会话 → 正在跑的 agent 进程（种类、cwd、pid）。
@@ -224,6 +243,10 @@ func runningAgentProcs() map[string]agentProc {
 			running[parts[0]] = agentProc{Kind: "claude", Dir: parts[2], Pid: got}
 		} else if got := treeFind(pid, children, 0, cmdlineHasCodex); got != 0 {
 			running[parts[0]] = agentProc{Kind: "codex", Dir: parts[2], Pid: got}
+		} else if got := treeFind(pid, children, 0, cmdlineHasOpenCode); got != 0 {
+			running[parts[0]] = agentProc{Kind: "opencode", Dir: parts[2], Pid: got}
+		} else if got := treeFind(pid, children, 0, cmdlineHasPi); got != 0 {
+			running[parts[0]] = agentProc{Kind: "pi", Dir: parts[2], Pid: got}
 		}
 	}
 	return running

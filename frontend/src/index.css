@@ -1869,6 +1869,10 @@ html[data-pointer="coarse"] .tt-send::after { content: ''; position: absolute; l
    一行里跟 worktree/等待这些真·标签挤在一起还会打架。裸标 + 可选文字。 */
 .tt-agentmark { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
   font-size: var(--fs-meta); color: var(--text-dim); white-space: nowrap; }
+.tt-opencode-logo { display: inline-flex; flex: 0 0 auto; }
+.tt-opencode-logo .light { display: none; }
+html[data-theme="light"] .tt-opencode-logo .dark { display: none; }
+html[data-theme="light"] .tt-opencode-logo .light { display: block; }
 
 /* ── 链接：默认偏中性，hover 才上主色 ── */
 .ant-typography a, a.ant-typography { color: var(--accent); }

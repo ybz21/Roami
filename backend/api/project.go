@@ -32,9 +32,9 @@ type projectSession struct {
 	Name         string `json:"name"`
 	Label        string `json:"label,omitempty"`
 	Attached     bool   `json:"attached"`
-	Running      bool   `json:"running"`         // 会话里跑着 claude/codex 进程——绿点语义（设计 W2）
+	Running      bool   `json:"running"`         // 会话里跑着交互式 agent 进程——绿点语义（设计 W2）
 	Waiting      bool   `json:"waiting"`         // 屏上有等待输入的交互框——黄点（设计 W2，优先于绿）
-	Agent        string `json:"agent,omitempty"` // claude | codex：品牌标用。进程树扫描本就分得出，别让前端再逐会话问一遍
+	Agent        string `json:"agent,omitempty"` // 品牌标用。进程树扫描本就分得出，别让前端再逐会话问一遍
 	Tail         string `json:"tail,omitempty"`  // 仅 Waiting 时非空：判待输入抓的那一屏的最后一行，给行动卡当摘要
 	LastActivity int64  `json:"lastActivity"`
 	Branch       string `json:"branch,omitempty"` // 落在 worktree 里才有

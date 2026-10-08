@@ -12,6 +12,7 @@ import {
 import { api } from '../../api'
 import { useLayout } from '../../layout'
 import { AgentLogo, ArrowDown, ArrowUp, PlusIcon, TrashIcon } from '../../icons'
+import { isAgentKind, useAgentKinds, type AgentKind } from '../../agent-kind'
 import {
   FILTER_FROM, bulkPreview, counts, filterRows, fmtIdle, idleIsLong, moveRule, normalizeRules,
   nudgedRecently, quietSec, rowState, sortRows,
@@ -36,6 +37,7 @@ type ListResult = {
 const POLL_MS = 5000
 
 export default function KeepalivePanel({ pluginId, enabled, t }: { pluginId: string; enabled: boolean; t: T }) {
+  const agentKinds = useAgentKinds()
   const { phone: isPhone } = useLayout()
   const [data, setData] = useState<ListResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -153,7 +155,7 @@ export default function KeepalivePanel({ pluginId, enabled, t }: { pluginId: str
         : isPhone
           ? <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {shown.map((r) => (
-                <GuardCard key={r.session} r={r} now={now} st={st} t={t} enabled={enabled}
+                <GuardCard key={r.session} r={r} now={now} st={st} t={t} enabled={enabled} agentKinds={agentKinds}
                   busy={busy === r.session} onToggle={toggle} onNudge={nudge} onEdit={setEditing} />
               ))}
             </div>
@@ -166,7 +168,7 @@ export default function KeepalivePanel({ pluginId, enabled, t }: { pluginId: str
                 <span className="ops">{t('ka.colOps')}</span>
               </div>
               {shown.map((r) => (
-                <GuardRow key={r.session} r={r} now={now} st={st} t={t} enabled={enabled}
+                <GuardRow key={r.session} r={r} now={now} st={st} t={t} enabled={enabled} agentKinds={agentKinds}
                   busy={busy === r.session} onToggle={toggle} onNudge={nudge} onEdit={setEditing} />
               ))}
             </div>}
@@ -378,14 +380,14 @@ function openSession(r: KaRow) {
   return `#/w?terms=${encodeURIComponent(r.session)}&active=${encodeURIComponent(r.session)}`
 }
 
-function GuardRow({ r, now, st, t, enabled, busy, onToggle, onNudge, onEdit }: {
-  r: KaRow; now: number; st?: KaSettings; t: T; enabled: boolean; busy: boolean
+function GuardRow({ r, now, st, t, enabled, busy, agentKinds, onToggle, onNudge, onEdit }: {
+  r: KaRow; now: number; st?: KaSettings; t: T; enabled: boolean; busy: boolean; agentKinds: Record<string, AgentKind>
   onToggle: (r: KaRow, on: boolean) => void; onNudge: (r: KaRow) => void; onEdit: (r: KaRow) => void
 }) {
   const { state, g, long, fresh, line } = useRowBits(r, now, st, t)
   return (
     <div className={`tt-ka-row ${state}`}>
-      <span className="mk">{r.agent ? <AgentLogo kind={r.agent as 'claude' | 'codex'} size={14} /> : null}</span>
+      <span className="mk">{(agentKinds[r.session] || (isAgentKind(r.agent) ? r.agent : undefined)) && <AgentLogo kind={agentKinds[r.session] || (r.agent as AgentKind)} size={14} />}</span>
       <span className="name">
         {/* 会话名是真链接（它真的导航到工作区），不是 a onClick */}
         <a href={openSession(r)}>{r.label}</a>
@@ -413,15 +415,15 @@ function GuardRow({ r, now, st, t, enabled, busy, onToggle, onNudge, onEdit }: {
 }
 
 /** 手机档换卡片：桌面那五列合计 ≥808px，360 的屏必然横滚。 */
-function GuardCard({ r, now, st, t, enabled, busy, onToggle, onNudge, onEdit }: {
-  r: KaRow; now: number; st?: KaSettings; t: T; enabled: boolean; busy: boolean
+function GuardCard({ r, now, st, t, enabled, busy, agentKinds, onToggle, onNudge, onEdit }: {
+  r: KaRow; now: number; st?: KaSettings; t: T; enabled: boolean; busy: boolean; agentKinds: Record<string, AgentKind>
   onToggle: (r: KaRow, on: boolean) => void; onNudge: (r: KaRow) => void; onEdit: (r: KaRow) => void
 }) {
   const { state, g, long, line } = useRowBits(r, now, st, t)
   return (
     <div className={`tt-ka-card ${state}`}>
       <div className="hd">
-        {r.agent && <AgentLogo kind={r.agent as 'claude' | 'codex'} size={14} />}
+        {(agentKinds[r.session] || (isAgentKind(r.agent) ? r.agent : undefined)) && <AgentLogo kind={agentKinds[r.session] || (r.agent as AgentKind)} size={14} />}
         <b>{r.label}</b>
         <Switch size="small" checked={state === 'guarded'} loading={busy} disabled={!enabled}
           aria-label={t('ka.colGuard')} onChange={(on) => onToggle(r, on)} />

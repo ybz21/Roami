@@ -435,7 +435,7 @@ func (h *HostAPI) sessionList(params json.RawMessage) (any, error) {
 type AllSessionRow struct {
 	Session  string `json:"session"`  // 会话 id(= tmux 会话名,改名不变)
 	Label    string `json:"label"`    // 展示名
-	Agent    string `json:"agent"`    // claude | codex | ""(认不出)
+	Agent    string `json:"agent"`    // claude | codex | opencode | pi | ""(认不出)
 	Dir      string `json:"dir"`      // 归属目录
 	Attached bool   `json:"attached"` // 此刻有人 attach 着
 	Activity int64  `json:"activity"` // 最后一次有动静(unix 秒)
@@ -498,6 +498,10 @@ func (h *HostAPI) paneCommands() map[string]string {
 			out[sess] = "claude"
 		case "codex":
 			out[sess] = "codex"
+		case "opencode":
+			out[sess] = "opencode"
+		case "pi":
+			out[sess] = "pi"
 		}
 	}
 	return out

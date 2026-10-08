@@ -8,8 +8,10 @@ import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { sessionDisplay, setSessionLabels, useSessionLabel } from '../sessions/session-label'
 import { type PaletteActions } from '../shell/palette'
 import { GlobalSearch } from '../shell/palette'
+import { useAgentKinds } from '../../agent-kind'
 
 export default function SoloTerminal({ name }: { name: string }) {
+  const agentKinds = useAgentKinds()
   const [fontSize, setFontSize] = useState(13)
   const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
   const [claudeMap, setClaudeMap] = useState<Record<string, ClaudeInfo>>({})
@@ -56,6 +58,7 @@ export default function SoloTerminal({ name }: { name: string }) {
         termRefs={termRefs} sendKey={(seq) => termRefs.current[name]?.send(seq)}
         claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
         codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}
+        agentKinds={agentKinds}
         onRename={(_, newName) => { location.hash = '#/term/' + encodeURIComponent(newName) }}
         fileDock="left"
       />

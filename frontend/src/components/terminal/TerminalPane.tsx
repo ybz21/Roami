@@ -34,6 +34,7 @@ import { MobileSheet, SheetRow, SheetSection } from '../shell/MobileSheet'
 import { SessionSwitchSheet } from '../shell/SessionDock'
 import { Button, Dropdown, Input, Modal, Spin, Tooltip, App as AntApp } from 'antd'
 import { AgentLogo, ChevronDown, ChevronLeft, ChevronRight, PlusIcon, StopIcon, TabsIcon, TerminalIcon, PanelRightIcon } from '../../icons'
+import { agentName, type AgentKind } from '../../agent-kind'
 // ── 终端面板（多标签 + 工具栏 + 快捷键栏），桌面右栏与手机覆盖层共用 ──
 export default function TerminalPane(props: {
   terms: string[]; active: string | null; setActive: (n: string) => void; closeTerm: (n: string) => void
@@ -43,6 +44,7 @@ export default function TerminalPane(props: {
   sendKey: (seq: string) => void; onCollapse?: () => void
   claudeMap: Record<string, ClaudeInfo>; claudeView: Record<string, boolean>; setClaudeView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   codexMap: Record<string, ClaudeInfo>; codexView: Record<string, boolean>; setCodexView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
+  agentKinds: Record<string, AgentKind>
   onRename: (oldName: string, newName: string) => void
   /** 标签拖拽排序；不传就不可拖（独立单终端页没有多标签） */
   onReorder?: (name: string, to: number) => void
@@ -73,7 +75,7 @@ export default function TerminalPane(props: {
   /** 从对话里点「path:line」跳过来要定位到那一行；nonce 让同一处点第二次也响 */
   reveal?: { path: string; line: number; nonce: number }
 }) {
-  const { terms, active, setActive, closeTerm, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, onRename, onReorder, onNeedsInput, focus, onNew, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const tabs = terms
   const curFile = activeFile || ''
   // 文件标签的脏标记：FileView 报上来，关标签前问一句（FileWorkspace 同款）
@@ -132,7 +134,7 @@ export default function TerminalPane(props: {
   const dot = activeNeedsInput ? 'var(--warn)' : st === 'connected' ? 'var(--ok)' : st === 'connecting' ? 'var(--warn)' : 'var(--danger)'
   // 灵动岛的「活着」判据：有 Agent 在跑。会话只是连着（st==='connected'）不算——
   // 那是个静态事实，让点一直呼吸等于把呼吸这个信号用废了。
-  const activeAgentLive = !!(active && (claudeMap[active]?.running || codexMap[active]?.running))
+  const activeAgentLive = !!(active && (agentKinds[active] || claudeMap[active]?.running || codexMap[active]?.running))
   // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框，
   // 终端那条移动输入条 + 快捷键栏要隐藏，否则手机上会出现两个输入框。
   const inChat = !!active && ((claudeView[active] && claudeMap[active]?.running) || (codexView[active] && codexMap[active]?.running))
@@ -297,7 +299,7 @@ export default function TerminalPane(props: {
     const src = readDrag(e.dataTransfer)
     const v = canDrop(src, {
       id: target, node: currentNodeId() || '',
-      hasAgent: !!(claudeMap[target]?.running || codexMap[target]?.running),
+      hasAgent: !!(agentKinds[target] || claudeMap[target]?.running || codexMap[target]?.running),
     })
     if (!src) return
     if (!v.ok) {
@@ -616,12 +618,10 @@ export default function TerminalPane(props: {
     <i style={{ width: size, height: size, borderRadius: '50%', flex: `0 0 ${size}px`, background: color, boxShadow: `0 0 0 3px ${color}26` }} />
   )
   // 标签内的会话标记：官方品牌标，跟状态点同一行且同一光学尺寸（颜色由标自己带，见 AgentLogo）
-  const agentMarks = (name: string) => (
-    <>
-      {claudeMap[name]?.running && <span title={t('session.runningClaude')} style={{ display: 'inline-flex' }}><AgentLogo kind="claude" /></span>}
-      {codexMap[name]?.running && <span title={t('session.runningCodex')} style={{ display: 'inline-flex' }}><AgentLogo kind="codex" /></span>}
-    </>
-  )
+  const agentMarks = (name: string) => {
+    const kind = agentKinds[name] || (claudeMap[name]?.running ? 'claude' : codexMap[name]?.running ? 'codex' : undefined)
+    return kind && <span title={agentName(kind)} style={{ display: 'inline-flex' }}><AgentLogo kind={kind} /></span>
+  }
   const sessionTab = (
     <>
       {statusDot(active ? dotOf(active) : '#f85149')}
@@ -674,7 +674,7 @@ export default function TerminalPane(props: {
                 if (isSessionDrag(e)) {
                   // dragover 里读不到 dataTransfer 的内容（浏览器只在 drop 时给），
                   // 所以这里只按「目标有没有 Agent」决定亮不亮；剩下的判定落在 drop
-                  const ok = !!(claudeMap[termName]?.running || codexMap[termName]?.running)
+                  const ok = !!(agentKinds[termName] || claudeMap[termName]?.running || codexMap[termName]?.running)
                   e.preventDefault(); e.stopPropagation()
                   // **一律 copy**：dropEffect='none' 会让浏览器干脆不投递 drop 事件，
                   // 于是「不接」变成静默失败，人连原因都看不到。接住再解释。
@@ -766,7 +766,7 @@ export default function TerminalPane(props: {
             ...(tabs.length ? [{ type: 'group' as const, key: 'g-term', label: t('tabs.allSessions'),
               children: tabs.map((n) => ({
                 key: 'term:' + n,
-                icon: claudeMap[n]?.running ? <AgentLogo kind="claude" size={13} /> : codexMap[n]?.running ? <AgentLogo kind="codex" size={13} /> : <TerminalIcon size={13} />,
+                icon: agentKinds[n] ? <AgentLogo kind={agentKinds[n]} size={13} /> : claudeMap[n]?.running ? <AgentLogo kind="claude" size={13} /> : codexMap[n]?.running ? <AgentLogo kind="codex" size={13} /> : <TerminalIcon size={13} />,
                 label: sessionDisplay(n) || n,
                 onClick: () => setActive(n),
               })) }] : []),
@@ -853,7 +853,7 @@ export default function TerminalPane(props: {
       </div>
       <SessionSwitchSheet open={switchOpen} onClose={() => setSwitchOpen(false)}
         sessions={terms} active={active} needsInput={termNeedsInput}
-        running={(n) => !!(claudeMap[n]?.running || codexMap[n]?.running)}
+        running={(n) => !!(agentKinds[n] || claudeMap[n]?.running || codexMap[n]?.running)}
         onPick={setActive} onCloseSession={closeTerm} />
       <MobileSheet open={moreSheet} title={t('common.more')} onClose={() => setMoreSheet(false)}>
         <SheetSection>{t('mobile.groupSession')}</SheetSection>
@@ -952,7 +952,7 @@ export default function TerminalPane(props: {
   // **只在 TUI 里出现**——Claude/Codex 在跑的时候。它存在的全部理由是「在选项列表里选一项
   // 时不必弹软键盘」；普通 shell 下你本来就要打字，键盘总要弹，一个没有标签的十字浮在那儿
   // 只会让人问「这是干嘛的」（用户原话）。对话视图有自己的输入框，同样不挂。
-  const agentRunning = !!(active && (claudeMap[active]?.running || codexMap[active]?.running))
+  const agentRunning = !!(active && (agentKinds[active] || claudeMap[active]?.running || codexMap[active]?.running))
   const dpad = isPhone && !inChat && agentRunning && ws.dpadOn ? (
     <>
       <DPad side={ws.dpadSide} onSend={(seq) => tapKey(seq)} onHide={() => saveWorkspace({ dpadOn: false })} />

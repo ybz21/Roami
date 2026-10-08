@@ -13,6 +13,7 @@ import { useLayout } from '../../../layout'
 import { relTime } from '../../../time-format'
 import { sessionLabel } from '../../sessions/session-label'
 import { AgentLogo, ChevronRight, CloseIcon, FlagIcon, StarIcon, SwarmIcon } from '../../../icons'
+import { agentName } from '../../../agent-kind'
 import { BranchIcon } from '../../git/parts'
 import { icoOf } from './project-model'
 import type { Proj, ProjSwarm } from './project-model'
@@ -106,7 +107,7 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
                   : `${s.label || sessionLabel(s.name)}（${s.name}）`}>{s.label || sessionLabel(s.name)}</span>
               {s.linked && <span className="tt-branch" title={s.branch}><BranchIcon size={11} /></span>}
               {s.agent && (
-                <span className="tt-agentmark" title={t(s.agent === 'claude' ? 'session.runningClaude' : 'session.runningCodex')}>
+                <span className="tt-agentmark" title={agentName(s.agent)}>
                   <AgentLogo kind={s.agent} size={12} />
                 </span>
               )}

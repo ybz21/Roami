@@ -1,3 +1,4 @@
+import { agentName, useAgentKinds } from '../../agent-kind'
 // 项目页（08 设计）——「项目 = 目录（git 可选），任务驱动」：
 //   #/projects        P1 工作台：问候+行动队列（原概览页，18 设计）+ 项目卡栅格 + 散会话 + 活动轨
 //   #/projects/<key>  P2 主页：composer（描述任务 ⏎ 开干）+ 任务流（会话 ∪ 孤儿 worktree）
@@ -774,6 +775,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [defBranch, setDefBranch] = useState('')
   const [sessions, setSessions] = useState<any[]>([])
   const [ann, setAnn] = useState<Record<string, any>>({})
+  const agentKinds = useAgentKinds()
   const [cc, setCc] = useState<Record<string, boolean>>({})
   const [cx, setCx] = useState<Record<string, boolean>>({})
   const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
@@ -1181,7 +1183,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const changes = (w?.dirty || 0) + (w?.untracked || 0)
     const gs = wtStage(w)
     const merged = gs === 'merged'
-    const running = cc[s.name] || cx[s.name]
+    const running = !!agentKinds[s.name] || cc[s.name] || cx[s.name]
     const waiting = needsInput[s.name]
     // 休眠：机器重启带走了 tmux 那一半，点开即恢复。它没有进程，
     // 所以生命周期导轨/未提交改动那些运行时判断对它都不适用。
@@ -1200,7 +1202,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       const drag = {
         id: s.name, label: s.label || sessionLabel(s.name),
         project: proj.name, dir: hit.worktree || proj.dir,
-        agent: cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : '',
+        agent: agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
       }
       const v = canDrop(drag, { id: activeTerm })
       if (!v.ok) { message.warning(t('pair.cannotSelf')); return }
@@ -1221,7 +1223,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           e.dataTransfer.setData(SESSION_MIME, JSON.stringify({
             id: s.name, label: s.label || sessionLabel(s.name),
             project: proj.name, dir: hit.worktree || proj.dir,
-            agent: cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : '',
+            agent: agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
             node: currentNodeId() || '',
           }))
           e.dataTransfer.effectAllowed = 'copy'
@@ -1242,8 +1244,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
             {swarmMap[s.name]?.role === 'leader' && <Tag color="purple" style={{ margin: 0 }}>{t('project.swarm.leaderTag')}</Tag>}
             {swarmMap[s.name]?.subrole && <Tag style={{ margin: 0 }}>{t(('swarm.subrole.' + swarmMap[s.name]!.subrole) as any) || swarmMap[s.name]!.subrole}</Tag>}
             {swarmMap[s.name]?.done && <Tag color="purple" style={{ margin: 0 }}>{t('project.swarm.integrate')}</Tag>}
-            {cc[s.name] && <span className="tt-agentmark" title={t('session.runningClaude')}><AgentLogo kind="claude" size={13} /></span>}
-            {cx[s.name] && <span className="tt-agentmark" title={t('session.runningCodex')}><AgentLogo kind="codex" size={13} /></span>}
+            {(agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : undefined)) && <span className="tt-agentmark" title={agentName(agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex'))}><AgentLogo kind={agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex')} size={13} /></span>}
             {waiting && <Tag color="warning" style={{ margin: 0 }}>{t('session.waiting')}</Tag>}
             <MemBar mem={s.mem} />
             {a.ambiguous && (
@@ -1593,10 +1594,9 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                       <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {(w.sessions || []).map((ref: any) => (
                           <div key={ref.session} className="prj-subrow" onClick={() => openTerm(ref.session)}>
-                            {dot(false, cc[ref.session] || cx[ref.session] ? 'var(--ok)' : undefined)}
+                            {dot(false, agentKinds[ref.session] || cc[ref.session] || cx[ref.session] ? 'var(--ok)' : undefined)}
                             <span style={{ fontWeight: 600, fontSize: 13 }} title={ref.session}>{sessionLabel(ref.session)}</span>
-                            {cc[ref.session] && <span className="tt-agentmark" title={t('session.runningClaude')}><AgentLogo kind="claude" size={12} /></span>}
-                            {cx[ref.session] && <span className="tt-agentmark" title={t('session.runningCodex')}><AgentLogo kind="codex" size={12} /></span>}
+                            {agentKinds[ref.session] && <span className="tt-agentmark" title={agentName(agentKinds[ref.session])}><AgentLogo kind={agentKinds[ref.session]} size={12} /></span>}
                             <span className="prj-peek">{peeks[ref.session] || '…'}</span>
                             <a style={{ fontSize: 'var(--fs-meta)' }} onClick={(e) => { e.stopPropagation(); openTerm(ref.session) }}>{t('project.enter')}</a>
                           </div>
@@ -1662,7 +1662,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
             const memberRow = (session: string, role: string, subrole?: string, done?: boolean, status?: string, label?: string) => {
               // 按 dir 认领的群：成员会话不在 ls 清单里（被蜂群过滤挡掉），但确实属于本项目
               const inProj = mineNames.has(session) || !!sw.byDir
-              const running = cc[session] || cx[session] || status === 'running'
+              const running = !!agentKinds[session] || cc[session] || cx[session] || status === 'running'
               return (
                 <div key={session} className="prj-subrow" style={{ opacity: inProj ? 1 : 0.45 }}
                   onClick={() => { if (inProj) openTerm(session) }}>

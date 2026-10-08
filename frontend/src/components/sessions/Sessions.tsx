@@ -1,3 +1,4 @@
+import { agentName, useAgentKinds } from '../../agent-kind'
 // ── 会话（可新建/指定目录 / 进终端 / 关闭） ──
 import { Suspense, useEffect, useState } from 'react'
 import { RaceComparePanel, RaceCreateModal } from '../swarm/Race'
@@ -27,6 +28,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
 }) {
   const { phone: isPhone } = useLayout()
   const [list, setList] = useState<any[]>([])
+  const agentKinds = useAgentKinds()
   const [cc, setCc] = useState<Record<string, boolean>>({})
   const [cx, setCx] = useState<Record<string, boolean>>({})
   const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
@@ -132,7 +134,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const goSwarm = (sw: string) => { location.hash = '#/swarm/' + encodeURIComponent(sw) }
   // ── 筛选 / 搜索 ──
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<'all' | 'waiting' | 'claude' | 'codex' | 'swarm' | 'idle'>('all')
+  const [filter, setFilter] = useState<'all' | 'waiting' | 'claude' | 'codex' | 'opencode' | 'pi' | 'swarm' | 'idle'>('all')
   const ql = q.trim().toLowerCase()
   const isSwarm = (s: any) => !!swarmMap[s.name]
   // 默认不展示蜂群会话（它们有专门的蜂群页）；仅「蜂群」筛选时才列出
@@ -143,7 +145,9 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     switch (f) {
       case 'claude': return !!cc[s.name]
       case 'codex': return !!cx[s.name]
-      case 'idle': return !cc[s.name] && !cx[s.name]
+      case 'opencode': return agentKinds[s.name] === 'opencode'
+      case 'pi': return agentKinds[s.name] === 'pi'
+      case 'idle': return !agentKinds[s.name] && !cc[s.name] && !cx[s.name]
       default: return true
     }
   }
@@ -323,6 +327,8 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
             { label: `${t('session.waiting')} ${cnt('waiting')}`, value: 'waiting' },
             { label: `Claude ${cnt('claude')}`, value: 'claude' },
             { label: `Codex ${cnt('codex')}`, value: 'codex' },
+            { label: `OpenCode ${cnt('opencode')}`, value: 'opencode' },
+            { label: `Pi ${cnt('pi')}`, value: 'pi' },
             { label: `${t('nav.swarm')} ${cnt('swarm')}`, value: 'swarm' },
             { label: `${t('terminal.status.idle')} ${cnt('idle')}`, value: 'idle' },
           ]} />
@@ -382,7 +388,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
               const indent = !!en.indent
               const sw = swarmMap[s.name]
               const connected = s.attached == 1
-              const agent = cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : null
+              const agent = agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : null)
               const waiting = !!needsInput[s.name]
               // 休眠：机器重启带走了 tmux 那一半，台账还认得它，点开即恢复。
               // 它没有进程，所以 attached/agent/待输入这些运行时判断都不适用。
@@ -406,7 +412,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                 onDragStart={(e) => {
                   e.dataTransfer.setData(SESSION_MIME, JSON.stringify({
                     id: s.name, label: sessionLabel(s.name),
-                    dir: s.cwd || '', agent: s.agent || '',
+                    dir: s.cwd || '', agent: agent || '',
                     node: currentNodeId() || '',
                   }))
                   e.dataTransfer.effectAllowed = 'copy'
@@ -460,8 +466,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                       })()}
                       {sw && <Tag color="blue" style={{ margin: 0, flex: '0 0 auto' }}>{t('nav.swarm')}:{sw.swarm}{sw.role === 'leader' ? `·${t('swarm.master')}` : ''}</Tag>}
                       {waiting && !dormant && <Tag color="warning" style={{ margin: 0, flex: '0 0 auto' }}>{t('session.waiting')}</Tag>}
-                      {cc[s.name] && !dormant && <span className="tt-agentmark"><AgentLogo kind="claude" size={12} />Claude</span>}
-                      {cx[s.name] && !dormant && <span className="tt-agentmark"><AgentLogo kind="codex" size={12} />Codex</span>}
+                      {agent && !dormant && <span className="tt-agentmark"><AgentLogo kind={agent} size={12} />{agentName(agent)}</span>}
                       {/* 休眠会话必须一眼看得出来。从前它和活会话一样显示「空闲中」，
                           于是点下去才发现是要重开的——那正是「点击恢复又新建了一个」的由来。 */}
                       {dormant && (

@@ -1,3 +1,4 @@
+import { isAgentKind, useAgentKinds, type AgentKind } from './agent-kind'
 // ttmux Web 控制台 — React + Vite + Antd（统一深色主题）
 // 布局（见 docs/design/web/01-overview.md）：
 //   电脑 ≥1200 → 三栏：导航 Sider | 列表(页面) | 终端面板(常驻, 多标签)
@@ -136,6 +137,7 @@ function sameProbe(a: any, b: any): boolean {
 }
 
 export default function App() {
+  const agentKinds = useAgentKinds()
   // 多机：底座那枚按钮 + 账户菜单顶部的机器列表。单机时两者都为空，界面与今天一致。
   // **必须在任何提前 return 之前**——这个组件下面有 `if (!authed) return <Login/>` 这类分支，
   // 放到后面就是条件调用 hook，登录成功那一帧 hook 数量变化，React 直接抛 #310（踩过）。
@@ -270,7 +272,7 @@ export default function App() {
   const [newTaskDir, setNewTaskDir] = useState<string | null>(null)
   // 树头「+」：就地弹新建项目框，不再先跳去项目列表页（建完自己跳到新项目主页）
   const [newProjectOpen, setNewProjectOpen] = useState(false)
-  const [sessList, setSessList] = useState<{ name: string; label?: string; lastActivity?: number; agent?: 'claude' | 'codex' }[]>([])
+  const [sessList, setSessList] = useState<{ name: string; label?: string; lastActivity?: number; agent?: AgentKind }[]>([])
   // /sessions **成功**回来过一轮才算数（树按它判会话还在不在）。不能拿 sessIds 当这个信号：
   // 它在请求失败时也会被置成空表（那是为了放行标签还原），首轮就失败的话等于宣布「一个会话
   // 都没有」，树上的任务和会话会被一起抹掉。
@@ -573,13 +575,13 @@ export default function App() {
       const byId: Record<string, string> = {}
       const byName: Record<string, string> = {}
       const labels: Record<string, string> = {}
-      const names: { name: string; label?: string; lastActivity?: number; agent?: 'claude' | 'codex' }[] = []
+      const names: { name: string; label?: string; lastActivity?: number; agent?: AgentKind }[] = []
       for (const s of Array.isArray(list) ? list : []) {
         // 基础设施会话（_ttmux-plugind / _ttmux-im）不进任何人看的列表：树、标签、⌘K、计数
         if (s?.name && isInfraSession(s.name)) continue
         if (s?.id && s?.name) { byId[s.id] = s.name; byName[s.name] = s.id }
         if (s?.name && s?.label) labels[s.name] = s.label
-        if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: s.agent === 'claude' || s.agent === 'codex' ? s.agent : undefined })
+        if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined })
       }
       setSessIds({ byId, byName })
       setSessListLoaded(true)
@@ -645,12 +647,12 @@ export default function App() {
   const tree = useMemo(() => buildTaskTree({
     projects: treeSrc.projects, worktrees: treeSrc.worktrees, sessions: sessList, placement: projTable,
     nameOf: (p) => prefs.taskNames?.[p] || undefined,
-    agentOf: (n) => (claudeMap[n]?.running ? 'claude' : codexMap[n]?.running ? 'codex' : undefined),
+    agentOf: (n) => agentKinds[n] || (claudeMap[n]?.running ? 'claude' : codexMap[n]?.running ? 'codex' : undefined),
     // 会话表一到就以它为准：快照/60s 的 worktree 名单里那些已经关掉的会话不该还挂在树上
     sessionsLoaded: sessListLoaded,
     // 互审陪跑叫 `<被审会话id>-review`，靠 id 表还原成人看得懂的那个会话
     nameOfId: (id) => sessIds?.byId[id],
-  }), [treeSrc, sessList, claudeMap, codexMap, projTable, prefs.taskNames, sessIds, sessListLoaded])
+  }), [treeSrc, sessList, agentKinds, claudeMap, codexMap, projTable, prefs.taskNames, sessIds, sessListLoaded])
   treeRef.current = tree
 
   // hash 路由：URL #/xxx 与当前页同步（支持前进/后退、刷新保持、收藏分享）
@@ -860,6 +862,7 @@ export default function App() {
       termRefs={termRefs} sendKey={sendKey}
       claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
       codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}
+      agentKinds={agentKinds}
       onRename={renameOpenTerm}
       // 任务视图里没有「收起」：中间整块就是它，收起等于回项目页——点导航去
       onCollapse={taskView ? undefined : () => { setOverlay(false); space.setDockOpen(false) }}
@@ -1032,7 +1035,7 @@ export default function App() {
     sessions: terms.length,
     waiting: Object.values(mobileWaiting).filter(Boolean).length,
     unfinished,
-    agents: terms.filter((n) => claudeMap[n]?.running || codexMap[n]?.running).length,
+    agents: terms.filter((n) => agentKinds[n] || claudeMap[n]?.running || codexMap[n]?.running).length,
     version: roamVersion,
     git,
     projectKey: activeProject?.key || '',
@@ -1197,7 +1200,7 @@ export default function App() {
             分开两个 fixed 就得手算彼此的高度，底栏一改高度就错位 */}
         <SessionDock
           sessions={terms} active={active} needsInput={mobileWaiting}
-          running={(n) => !!(claudeMap[n]?.running || codexMap[n]?.running)}
+          running={(n) => !!(agentKinds[n] || claudeMap[n]?.running || codexMap[n]?.running)}
           onOpen={() => setOverlay(true)}
           onPick={(n) => { setActive(n); setOverlay(true) }}
           onClose={closeTerm}
@@ -1295,6 +1298,3 @@ export default function App() {
     api('POST', '/logout').catch(() => {}).finally(() => setAuthed(false))
   }
 }
-
-
-

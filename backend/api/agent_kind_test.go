@@ -56,3 +56,25 @@ func TestAgentKindIgnoresPromptText(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenCodeAndPiLaunchArgs(t *testing.T) {
+	cases := []struct {
+		argv         []string
+		openCode, pi bool
+	}{
+		{argv: []string{"/usr/local/bin/opencode", "pi should review this"}, openCode: true},
+		{argv: []string{"node", "/usr/lib/node_modules/opencode-ai/bin/opencode", "hello"}, openCode: true},
+		{argv: []string{"/home/ai/.local/bin/pi", "opencode can help"}, pi: true},
+		{argv: []string{"node", "/usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"}, pi: true},
+		{argv: []string{"bash", "-lc", "cd /home/ai/opencode && pi"}},
+		{argv: []string{"/usr/bin/ping", "pi"}},
+	}
+	for _, c := range cases {
+		if got := argvIsOpenCode(c.argv); got != c.openCode {
+			t.Errorf("argvIsOpenCode(%q) = %v, want %v", c.argv, got, c.openCode)
+		}
+		if got := argvIsPi(c.argv); got != c.pi {
+			t.Errorf("argvIsPi(%q) = %v, want %v", c.argv, got, c.pi)
+		}
+	}
+}
