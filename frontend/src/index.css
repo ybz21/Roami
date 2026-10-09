@@ -1093,6 +1093,17 @@ html[data-pointer="coarse"] .mc { --ctl-h: 36px; }
 .tt-page-mobile {
   padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
+.tt-global-tabs { flex: 0 0 auto; min-width: 0; }
+.tt-page-card {
+  margin: var(--sp-2);
+  min-height: calc(100% - 2 * var(--sp-2));
+  height: calc(100% - 2 * var(--sp-2));
+  width: calc(100% - 2 * var(--sp-2));
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  background: var(--bg-container);
+}
 /* 有会话坞时底部再让出 50——否则页面最后一行永远压在坞底下 */
 .tt-page-mobile.has-dock {
   padding-bottom: calc(126px + env(safe-area-inset-bottom));
@@ -1378,6 +1389,10 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
   height: 100%;
   min-height: 0;
 }
+.tt-page.tt-page-card {
+  height: calc(100% - 2 * var(--sp-2));
+  min-height: calc(100% - 2 * var(--sp-2));
+}
 .tt-page .ant-space-vertical {
   align-items: stretch;
 }
@@ -1572,6 +1587,17 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
    改成选中底 + 顶上那条 accent 线：跟侧栏选中行是同一套语言（中性底 + 一条强调线）。 */
 .tt-tab.on { background: var(--sel-bg); color: var(--text-bright); font-weight: 600;
   box-shadow: inset 0 2px 0 var(--accent); }
+.tt-tab-page { padding: 0 var(--sp-1) 0 0; gap: 0; }
+.tt-tab-page-open {
+  display: inline-flex; flex: 1; align-items: center; gap: var(--sp-2); min-width: 0;
+  height: 100%; padding: 0 var(--sp-2); border: 0; background: transparent;
+  color: inherit; font: inherit; cursor: pointer;
+}
+.tt-tab-page-icon { display: inline-flex; flex: 0 0 auto; }
+.tt-tab-page-icon svg { width: 16px; height: 16px; }
+.tt-tab-page .tt-tab-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-tab-page .tt-x { flex: 0 0 auto; padding: 0; border: 0; background: transparent; cursor: pointer; }
+html[data-pointer="coarse"] .tt-tab-page .tt-x::after { content: ''; position: absolute; inset: -13px -4px; }
 .tt-tab .tt-wait { flex: 0 0 auto; color: var(--warn); font-weight: 600; }
 /* 会话拖到标签上（21 设计）：落点亮成实心强调边。跟标签重排那条 .dropL
    （一条竖插入线）区分开——一个是「插到这儿」，一个是「说给这个会话听」。 */

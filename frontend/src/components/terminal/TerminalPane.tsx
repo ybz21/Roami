@@ -1,6 +1,8 @@
 import { TBtn, TI } from './terminal-toolbar'
 import { atPath, atPaths } from '../../agent-paths'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 import ClaudeChat from '../chat/ClaudeChat'
 import CodexChat from '../chat/CodexChat'
 import FileBrowser from '../files/FileBrowser'
@@ -39,6 +41,11 @@ import { agentName, type AgentKind } from '../../agent-kind'
 // ── 终端面板（多标签 + 工具栏 + 快捷键栏），桌面右栏与手机覆盖层共用 ──
 export default function TerminalPane(props: {
   terms: string[]; active: string | null; setActive: (n: string) => void; closeTerm: (n: string) => void
+  pageTabs?: { key: string; label: string; icon: ReactNode }[]
+  activePage?: string
+  onPageTab?: (key: string) => void
+  onClosePage?: (key: string) => void
+  tabBarHost?: HTMLElement | null
   fontSize: number; setFontSize: (n: number) => void
   statusMap: Record<string, TermStatus>; setStatus: (n: string, s: TermStatus) => void
   termRefs: React.MutableRefObject<Record<string, TermHandle | null>>
@@ -78,7 +85,7 @@ export default function TerminalPane(props: {
   /** 从对话里点「path:line」跳过来要定位到那一行；nonce 让同一处点第二次也响 */
   reveal?: { path: string; line: number; nonce: number }
 }) {
-  const { terms, active, setActive, closeTerm, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, tabBarHost, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const tabs = terms
   const curFile = activeFile || ''
   // 文件标签的脏标记：FileView 报上来，关标签前问一句（FileWorkspace 同款）
@@ -276,7 +283,7 @@ export default function TerminalPane(props: {
     const delta = (er.left + er.width / 2) - (sr.left + sr.width / 2) // 标签中心 → 条中心
     const next = Math.max(0, Math.min(strip.scrollWidth - strip.clientWidth, strip.scrollLeft + delta))
     if (Math.abs(next - strip.scrollLeft) > 1) strip.scrollTo({ left: next, behavior: 'smooth' })
-  }, [active, activeFile])
+  }, [active, activeFile, activePage, tabBarHost])
 
   // 标签拖拽排序（14 §7.1）：dragTab / dropAt 只用来画反馈（半透明 + 插入线），
   // 落点判定全部走事件本身，见下面两个 helper。
@@ -609,7 +616,7 @@ export default function TerminalPane(props: {
     else h?.send(key)
     setCtx(null)
   }
-  if (terms.length === 0) {
+  if (terms.length === 0 && !pageTabs?.length) {
     return (
       <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>
         <div style={{ textAlign: 'center' }}>
@@ -660,8 +667,19 @@ export default function TerminalPane(props: {
           if (!el || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
           el.scrollLeft += e.deltaY
         }}>
+        {(pageTabs || []).map((page) => (
+          <span key={'page:' + page.key} ref={activePage === page.key ? activeTabRef : undefined}
+            className={`tt-tab tt-tab-page${activePage === page.key ? ' on' : ''}`}>
+            <button type="button" className="tt-tab-page-open" onClick={() => onPageTab?.(page.key)}
+              aria-current={activePage === page.key ? 'page' : undefined} title={page.label}>
+              <span className="tt-tab-page-icon">{page.icon}</span><span className="tt-tab-nm">{page.label}</span>
+            </button>
+            <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')}
+              onClick={() => onClosePage?.(page.key)}>{TI.close}</button>
+          </span>
+        ))}
         {tabs.map((termName, i) => {
-          const on = termName === active
+          const on = !activePage && !curFile && termName === active
           const waiting = termNeedsInput[termName]
           const proj = sessionProject(termName)
           // 分支进 Tooltip，不占标签宽度（14 §6.3.2）
@@ -736,7 +754,7 @@ export default function TerminalPane(props: {
         {/* 文件标签（22 设计 §3.3）：接在会话标签后面，同一款 .tt-tab；预览态斜体，单击别的文件会替换它，
             双击转正；脏了标签上带点。文件标签第一期不参与拖拽排序。 */}
         {(fileTabs || []).map((f) => {
-          const on = curFile === f.path
+          const on = !activePage && curFile === f.path
           const name = f.path.split('/').pop() || f.path
           const dirty = dirtyFiles.has(f.path)
           return (
@@ -770,8 +788,13 @@ export default function TerminalPane(props: {
           一屏 8–10 行，比横着翻快一个数量级——标签条本身再怎么滑，也只能同时露出两三枚。 */}
       {(fadeL || fadeR) && (
         <Dropdown trigger={['click']} placement="bottomRight" menu={{
-          selectedKeys: [curFile ? 'file:' + curFile : 'term:' + active],
+          selectedKeys: [activePage ? 'page:' + activePage : curFile ? 'file:' + curFile : 'term:' + active],
           items: [
+            ...((pageTabs || []).length ? [{ type: 'group' as const, key: 'g-page', label: t('workspace.groupPages'),
+              children: (pageTabs || []).map((page) => ({
+                key: 'page:' + page.key, icon: page.icon, label: page.label,
+                onClick: () => onPageTab?.(page.key),
+              })) }] : []),
             ...(tabs.length ? [{ type: 'group' as const, key: 'g-term', label: t('tabs.allSessions'),
               children: tabs.map((n) => ({
                 key: 'term:' + n,
@@ -789,7 +812,7 @@ export default function TerminalPane(props: {
           ],
         }}>
           <button type="button" className="tt-tabs-nav wide" aria-label={t('tabs.all')} title={t('tabs.all')}>
-            <TabsIcon size={15} /><b>{tabs.length + (fileTabs || []).length}</b>
+            <TabsIcon size={15} /><b>{tabs.length + (fileTabs || []).length + (pageTabs || []).length}</b>
           </button>
         </Dropdown>
       )}
@@ -1180,7 +1203,7 @@ export default function TerminalPane(props: {
       ) : (
         <div ref={phoneRootRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {phoneChrome || <>{tabStrip}{curFile
+            {phoneChrome || <>{tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip}{curFile
               ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)} />
               : sessionToolbar}</>}
             {terminalArea}

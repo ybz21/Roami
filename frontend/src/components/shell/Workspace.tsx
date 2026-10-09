@@ -73,7 +73,7 @@ export function Workspace({
   return (
     // 这里**不能**写 height:100dvh：100dvh 会让整列比可视区高出一个顶栏，最底下那条快捷键条只露得出几像素。
     // 跟着 Layout 的列走 flex:1 即可。
-    <div style={{ position: 'relative', display: 'flex', height: '100%', minHeight: 0, minWidth: 0, flex: 1 }}>
+    <div style={{ position: 'relative', display: 'flex', minHeight: 0, minWidth: 0, flex: 1 }}>
       <div style={{
         flex: canvasHidden ? '0 0 0px' : '1 1 auto', width: canvasHidden ? 0 : undefined,
         minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column',

@@ -116,6 +116,15 @@ const NAV = [
 // 所以 settings 留在 NAV 里，只是不进这两组：它单独摆在侧栏底部（见 Navigation 的 settings）。
 const NAV_WORKSPACE = ['inbox', 'projects', 'files']
 const NAV_TOOLS = ['browser', 'phone', 'plugins']
+const DESKTOP_PAGE_KEYS = new Set(['inbox', 'projects', 'files', 'browser', 'phone', 'plugins', 'settings', 'sessions', 'swarm', 'hub'])
+const PAGE_TABS_KEY = 'roam.pageTabs'
+function loadPageTabs(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PAGE_TABS_KEY) || '[]')
+    if (Array.isArray(saved)) return Array.from(new Set(saved.filter((key): key is string => typeof key === 'string' && DESKTOP_PAGE_KEYS.has(key))))
+  } catch { /* 存储不可用时从当前页开始 */ }
+  return []
+}
 
 // 手机底栏。13 §4.1 当初把「浏览器/手机镜像」折进「更多」，理由是低频且窄屏下几乎不可用
 // （地址栏固定 150、设备选择器固定 240）——那两处固定宽度后来都改成自适应了，而这两页
@@ -157,6 +166,24 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [route, setRoute] = useState(() => normalizeRoute(location.hash.replace(/^#\/?/, '') || 'projects'))
   const tab = route.split('/')[0]                                  // 基础页（swarm/leave → swarm）
+  const [pageTabs, setPageTabs] = useState<string[]>(loadPageTabs)
+  const [tabBarHost, setTabBarHost] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (DESKTOP_PAGE_KEYS.has(tab)) setPageTabs((list) => list.includes(tab) ? list : [...list, tab])
+  }, [tab])
+  useEffect(() => {
+    try { localStorage.setItem(PAGE_TABS_KEY, JSON.stringify(pageTabs)) } catch { /* 可继续使用当前标签 */ }
+  }, [pageTabs])
+  const closePageTab = (key: string) => {
+    const at = pageTabs.indexOf(key)
+    const next = pageTabs.filter((item) => item !== key)
+    if (!next.length && !terms.length) next.push('projects')
+    setPageTabs(next)
+    if (tab === key) {
+      const target = next[at] || next[at - 1]
+      go(target || (terms.length ? TASK_ROUTE : 'projects'))
+    }
+  }
   const swarmSub = tab === 'swarm' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的蜂群
   const projectSub = tab === 'projects' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的项目
   const pluginSub = tab === 'plugins' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的插件（状态条点进来）
@@ -913,7 +940,10 @@ export default function App() {
 
   const termPane = (
     <TerminalPane
-      terms={terms} active={active} setActive={activateSession} closeTerm={closeTerm}
+      terms={terms} active={active} setActive={(n) => { activateSession(n); if (hasSider) go(TASK_ROUTE) }} closeTerm={closeTerm}
+      pageTabs={hasSider ? pageTabs.map((key) => ({ key, label: t(key === 'hub' ? 'hub.title' : NAV.find((n) => n.key === key)?.labelKey || `nav.${key}`), icon: key === 'hub' ? <CloudIcon size={16} /> : ICONS[key] })) : undefined}
+      activePage={hasSider && !taskView ? tab : undefined}
+      onPageTab={go} onClosePage={closePageTab} tabBarHost={hasSider ? tabBarHost : null}
       fontSize={fontSize} setFontSize={setFontSize} statusMap={statusMap} setStatus={setStatus}
       termRefs={termRefs} sendKey={sendKey}
       claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
@@ -921,7 +951,7 @@ export default function App() {
       agentKinds={agentKinds}
       onRename={renameOpenTerm}
       // 任务视图里没有「收起」：中间整块就是它，收起等于回项目页——点导航去
-      onCollapse={taskView ? undefined : () => { setOverlay(false); space.setDockOpen(false) }}
+      onCollapse={hasSider ? undefined : () => { setOverlay(false); space.setDockOpen(false) }}
       onReorder={reorderTerm}
       onNeedsInput={setMobileWaiting}
       onOpenSession={(n) => openTerm(n)}
@@ -930,9 +960,9 @@ export default function App() {
       onOpenFile={taskView ? (path, line) => openFileTab(path, line) : undefined}
       onOpenGit={taskView ? () => showInspector('git') : undefined}
       inspector={taskView ? { open: !space.inspectorCollapsed, toggle: toggleInspector } : undefined}
-      fileTabs={taskView ? fileTabs : undefined} activeFile={taskView ? curFile : undefined}
+      fileTabs={hasSider ? fileTabs : undefined} activeFile={hasSider ? curFile : undefined}
       taskDir={activeTask && !isLooseTask(activeTask) ? activeTask : (activeProject?.dir || '')}
-      onFileTab={setActiveFile} onCloseFile={closeFileTab} onPinFile={pinFileTab} onFileMode={setFileMode} reveal={reveal}
+      onFileTab={(path) => { setActiveFile(path); if (hasSider) go(TASK_ROUTE) }} onCloseFile={closeFileTab} onPinFile={pinFileTab} onFileMode={setFileMode} reveal={reveal}
       // Focus 只在桌面有意义：手机上终端本来就是全屏覆盖层；任务视图里 focus 是常态，没有开关
       // 任务视图里不放 Focus 钮：它干的就是侧栏脚「收起」那件事（⌘⇧J 仍在）；expanded 档的覆盖面板才需要它
       focus={!hasSider || taskView ? undefined : { on: space.focus !== 'none', toggle: space.toggleFocus, hint: `${modKeyLabel}⇧J` }}
@@ -975,7 +1005,7 @@ export default function App() {
   const page = <Suspense fallback={lazyFallback}>{taskView ? null : (pages[tab] || pages.projects)}</Suspense>
   // browser 全幅(自带工具栏铺满)；phone 与概览/会话一致走 tt-page（同 16px 留白 + 满高，见 tt-page-phone）。
   // 浏览器页不再全幅特例：与 文件/手机 同走 tt-page 满高容器，五页左上角起点统一 (16,16)
-  const pageNode = <div className={`tt-page tt-page-${tab}${isMobile ? ' tt-page-mobile' : ''}${isMobile && terms.length ? ' has-dock' : ''}`}>{page}</div>
+  const pageNode = <div className={`tt-page tt-page-${tab}${hasSider ? ' tt-page-card' : ''}${isMobile ? ' tt-page-mobile' : ''}${isMobile && terms.length ? ' has-dock' : ''}`}>{page}</div>
   // Canvas 与 Dock 各包一层：两者在 Page / Split / Focus 三态间只改宽度，不改挂载
   // ⌘K 面板的**本地**条目：页面导航 + 已打开的会话——这两样数据就在内存里，打字即出。
   // 项目 / 全部会话 / 项目文件走后端 /search（见 shell/palette），不在这里凑。
@@ -1208,8 +1238,9 @@ export default function App() {
 
       {/* 主区：Canvas ｜ Dock ｜ Inspector。终端**常驻挂载**（收起时宽度归零、Focus 时页面归零），换形态不断连接。*/}
       <Layout style={{ background: 'var(--bg-base)', minWidth: 0 }}>
+        {hasSider && <div className="tt-global-tabs" ref={setTabBarHost} />}
         {/* 顶栏 Command Center 撤了（22 设计 §3.5）：搜索去了侧栏、「新建」去了标签条与项目页、终端数状态条本来就有 */}
-        {hasSider && (terms.length > 0 || taskView) ? (
+        {hasSider ? (
           // 三态（page / overlay / focus）都走同一个 Workspace：换的是几何，
           // 不是组件树，终端因此不会在开合时被卸载重建。
           <Workspace
