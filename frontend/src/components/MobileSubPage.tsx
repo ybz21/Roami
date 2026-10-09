@@ -16,7 +16,8 @@ import { createPortal } from 'react-dom'
 import { useI18n } from '../i18n'
 import { useEdgeSwipe } from './shell/edge-swipe'
 import { useBackDismiss } from './shell/useBackDismiss'
-import { ChevronLeft } from '../icons'
+import { openPalette } from './shell/palette'
+import { ChevronLeft, SearchIcon } from '../icons'
 
 export default function MobileSubPage({ title, onBack, action, manageHistory = true, layer = 'page', keepBottomNav = false, children }: {
   title?: ReactNode
@@ -52,6 +53,9 @@ export default function MobileSubPage({ title, onBack, action, manageHistory = t
           </button>
           <strong>{title}</strong>
           {action && <button type="button" onClick={action.onClick} aria-label={action.label}>{action.icon}</button>}
+          <button type="button" onClick={openPalette} aria-label={t('workspace.search')}>
+            <SearchIcon size={20} />
+          </button>
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

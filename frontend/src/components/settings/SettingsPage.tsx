@@ -72,12 +72,13 @@ function PaneHead({ page, model, compact }: { page: SettingsPageDef; model: Sett
   )
 }
 
-export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscreen }: {
+export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscreen, searchNonce = 0 }: {
   sub?: string
   onNav?: (route: string) => void
   onLogout?: () => void
   onInstall?: () => void
   fullscreen?: { active: boolean; toggle: () => void }
+  searchNonce?: number
 }) {
   const { t, locale, setLocale } = useI18n()
   const { message, modal } = AntApp.useApp()
@@ -88,8 +89,20 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const nodes = useClusterNodes()
   const nodeId = useCurrentNodeId()
   const [q, setQ] = useState('')
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [openParents, setOpenParents] = useState<Record<string, boolean>>({})
   const searchRef = useRef<HTMLInputElement>(null)
+  const lastSearchNonce = useRef(searchNonce)
+  useEffect(() => {
+    if (!compact || searchNonce === lastSearchNonce.current) return
+    lastSearchNonce.current = searchNonce
+    setMobileSearchOpen(true)
+  }, [compact, searchNonce])
+  useEffect(() => {
+    if (!compact || !mobileSearchOpen) return
+    const frame = requestAnimationFrame(() => searchRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [compact, mobileSearchOpen, searchNonce])
 
   const nodeLabel = nodes.find((n) => n.id === nodeId)?.name || ''
   const model = useMemo(() => buildSettings({
@@ -107,6 +120,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const current = model.pages[routed] ? routed : DEFAULT_PAGE
   const go = (id: string) => {
     setQ('')
+    setMobileSearchOpen(false)
     if (onNav) onNav('settings/' + routeFromPage(id))
     else location.hash = '#/settings/' + routeFromPage(id)
   }
@@ -190,10 +204,11 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     const openSub = sub ? model.pages[routed] : null
     return (
       <div className="tt-set">
-        <div className="tt-set-mobile-head">
+        {(mobileSearchOpen || q) && <div className="tt-set-mobile-head">
           <MobilePageSearch inputRef={searchRef} value={q} onChange={setQ}
-            placeholder={t('set.searchPlaceholder')} resultCount={query ? t('set.hitCount', { n: totalHits }) : undefined} />
-        </div>
+            placeholder={t('set.searchPlaceholder')} resultCount={query ? t('set.hitCount', { n: totalHits }) : undefined}
+            onDismiss={() => { setQ(''); setMobileSearchOpen(false) }} />
+        </div>}
         {query ? results : (
           <div className="tt-set-catlist">
             {onInstall && <>

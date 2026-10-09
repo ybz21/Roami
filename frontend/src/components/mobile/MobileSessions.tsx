@@ -23,17 +23,31 @@ function ago(sec: number | undefined, t: (k: string) => string): string {
   return `${Math.floor(d / 86400)}d`
 }
 
-export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject }: {
+export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject, searchNonce = 0 }: {
   onOpen: (name: string) => void
   /** 首页点项目进来：at 每次都变，同一个项目点两次也能再开 */
   openProject?: { name: string; dir: string; at: number } | null
   onNewTask: (dir?: string) => void
   onNewInWorktree: (kind: 'claude' | 'codex' | 'shell', path: string) => void
+  searchNonce?: number
 }) {
   const { t } = useI18n()
   const [items, setItems] = useState<OverviewItem[] | null>(() => readMobileOverview())
   const [loadError, setLoadError] = useState(false)
   const [q, setQ] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInput = useRef<HTMLInputElement>(null)
+  const lastSearchNonce = useRef(searchNonce)
+  useEffect(() => {
+    if (searchNonce === lastSearchNonce.current) return
+    lastSearchNonce.current = searchNonce
+    setSearchOpen(true)
+  }, [searchNonce])
+  useEffect(() => {
+    if (!searchOpen) return
+    const frame = requestAnimationFrame(() => searchInput.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [searchOpen, searchNonce])
   // 筛选药丸 + 每组先露 5 条（Lody 手机端的做法）：十几个会话时一屏能看到所有项目，而不是被第一个项目占满
   const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle'>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -172,9 +186,10 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           <button type="button" className="tt-mobile-action" onClick={() => onNewTask()}><PlusIcon size={16} />{t('mobile.newSession')}</button>
         </div>
       </header>
-      <div className="tt-msess-head">
-        <MobilePageSearch value={q} onChange={setQ} placeholder={t('mobile.searchSessions')} />
-      </div>
+      {(searchOpen || q) && <div className="tt-msess-head">
+        <MobilePageSearch inputRef={searchInput} value={q} onChange={setQ} placeholder={t('mobile.searchSessions')}
+          onDismiss={() => { setQ(''); setSearchOpen(false) }} />
+      </div>}
       <div className="tt-msess-pills">
         {(['all', 'waiting', 'running', 'idle'] as const).map((k) => {
           const n = k === 'all' ? items.length : items.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length

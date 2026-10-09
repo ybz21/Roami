@@ -253,6 +253,7 @@ export default function App() {
   const [activeFile, setActiveFile] = useState('')
   const [reveal, setReveal] = useState<{ path: string; line: number; nonce: number } | undefined>()
   const [searchNonce, setSearchNonce] = useState(0)
+  const [mobileSearchNonce, setMobileSearchNonce] = useState(0)
   const curFile = activeFile
   const curFileTab = curFile ? fileTabs.find((f) => f.path === curFile) : undefined
   // 当前任务：文件标签 → 它记的任务；会话标签 → 它的 worktree；什么都没开 → 没有
@@ -967,7 +968,7 @@ export default function App() {
 
   // 手机会话页：项目分组标题点进去是 worktree 视图；「新会话」没项目可选就先建项目
   const mobileSessions = (
-    <MobileSessions onOpen={(n) => openTerm(n)} openProject={mobileProject}
+    <MobileSessions onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
       onNewTask={(dir) => { const d = dir || treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}
       onNewInWorktree={(kind, path) => { void newTerminalAt(kind, path) }} />
   )
@@ -981,7 +982,7 @@ export default function App() {
       ? mobileSessions
       : <Sessions openTerm={openTerm} closeTerm={closeTerm} activeTerm={active} />,
     files: <FilesPage openTerm={openTerm} />,
-    settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout}
+    settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout} searchNonce={mobileSearchNonce}
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
@@ -1152,15 +1153,18 @@ export default function App() {
     else if (a.kind === 'pluginView') location.hash = '#/plugins/' + encodeURIComponent(a.id)
   }
 
-  const mobileNavRoot = tab === 'sessions' ? 'projects' : tab === 'install' ? 'settings' : tab
-  const mobilePrimary = MOBILE_NAV_KEYS.includes(mobileNavRoot)
+  const mobileNavRoot = tab === 'sessions' || tab === 'swarm' || tab === 'w' ? 'projects'
+    : tab === 'install' || tab === 'about' ? 'settings'
+      : ['files', 'browser', 'phone', 'plugins', 'hub'].includes(tab) ? 'tools'
+        : tab === 'inbox' ? lastMobilePrimary.current : tab
+  const mobilePrimary = MOBILE_NAV_KEYS.includes(tab) || tab === 'sessions'
   const mobileBack = tab === 'inbox' ? lastMobilePrimary.current
     : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
   const mobileTitle = tab === 'install' ? t('install.pageTitle')
     : tab === 'about' ? t('nav.about')
-      : tab === 'swarm' || tab === 'w' ? t('nav.projects')
+      : tab === 'sessions' || tab === 'swarm' || tab === 'w' ? t('nav.projects')
         : tab === 'hub' ? t('hub.title')
-          : t(NAV.find((n) => n.key === mobileNavRoot)?.labelKey || 'nav.home')
+          : t(NAV.find((n) => n.key === tab)?.labelKey || 'nav.home')
 
   return (
     // 外壳改成列向：[ 横向行(侧栏 + 工作区) ][ 状态条 ]。状态条必须占位——
@@ -1178,12 +1182,16 @@ export default function App() {
         </button>
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
-          {mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
+          {mobilePrimary && mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
             onClick={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}><PlusIcon size={20} /></button>}
           {tab !== 'inbox' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('nav.inbox')} onClick={() => go('inbox')}>
             {ICONS.inbox}{waitingTotal > 0 && <i className="bd">{waitingTotal}</i>}
           </button>}
-          {mobileNavRoot !== 'projects' && mobileNavRoot !== 'settings' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('workspace.search')} onClick={openPalette}><SearchIcon size={20} /></button>}
+          <button type="button" className="tt-mobile-topbar-icon"
+            aria-label={t(tab === 'projects' || tab === 'sessions' ? 'mobile.searchSessions' : tab === 'settings' ? 'set.searchPlaceholder' : 'workspace.search')}
+            onClick={() => { if (tab === 'projects' || tab === 'sessions' || tab === 'settings') setMobileSearchNonce((n) => n + 1); else openPalette() }}>
+            <SearchIcon size={20} />
+          </button>
         </span>
       </nav>
     </header>}
