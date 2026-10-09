@@ -983,7 +983,7 @@ export default function App() {
     home: <MobileHome last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
-    install: isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false}><InstallPage /></MobileSubPage> : <InstallPage />,
+    install: isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false} keepBottomNav><InstallPage /></MobileSubPage> : <InstallPage />,
     tools: <MobileTools onNav={(k) => go(k)} />,
     browser: <BrowserView />,
     phone: <PhoneView />,
@@ -1146,7 +1146,7 @@ export default function App() {
     else if (a.kind === 'pluginView') location.hash = '#/plugins/' + encodeURIComponent(a.id)
   }
 
-  const mobileNavRoot = tab === 'sessions' ? 'projects' : tab
+  const mobileNavRoot = tab === 'sessions' ? 'projects' : tab === 'install' ? 'settings' : tab
   const mobilePrimary = MOBILE_NAV_KEYS.includes(mobileNavRoot)
   const mobileBack = tab === 'inbox' ? lastMobilePrimary.current
     : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
@@ -1319,7 +1319,7 @@ export default function App() {
             const n = NAV.find((x) => x.key === key)!
             return (
               <button key={n.key} type="button" onClick={() => go(n.key)} className="tt-bottomnav-btn"
-                aria-current={tab === n.key || (n.key === 'projects' && tab === 'sessions') ? 'page' : undefined}>
+                aria-current={mobileNavRoot === n.key ? 'page' : undefined}>
                 <span className="ic">{ICONS[n.key]}</span><span>{t(n.labelKey)}</span>
               </button>
             )

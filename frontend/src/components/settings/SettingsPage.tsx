@@ -217,7 +217,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           </div>
         )}
         {openSub && (
-          <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))} manageHistory={false}>
+          <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
               <PaneHead page={openSub} model={model} compact />
               <div className="rows">{openSub.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>

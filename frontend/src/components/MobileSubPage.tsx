@@ -18,13 +18,14 @@ import { useEdgeSwipe } from './shell/edge-swipe'
 import { useBackDismiss } from './shell/useBackDismiss'
 import { ChevronLeft } from '../icons'
 
-export default function MobileSubPage({ title, onBack, action, manageHistory = true, layer = 'page', children }: {
+export default function MobileSubPage({ title, onBack, action, manageHistory = true, layer = 'page', keepBottomNav = false, children }: {
   title?: ReactNode
   onBack: () => void
   action?: { label: string; icon: ReactNode; onClick: () => void }
   manageHistory?: boolean
   /** 'session' = 从会话全屏覆盖层里唤起（Git / 文件） */
   layer?: 'page' | 'session'
+  keepBottomNav?: boolean
   children: ReactNode
 }) {
   const { t } = useI18n()
@@ -34,11 +35,15 @@ export default function MobileSubPage({ title, onBack, action, manageHistory = t
 
   const node = (
     <div ref={rootRef} style={{
-      position: 'fixed', inset: 0, background: 'var(--bg-base)',
+      position: 'fixed', inset: 0,
+      bottom: keepBottomNav ? 'calc(var(--mobile-nav-h, calc(var(--tap) + var(--sp-4))) + var(--safe-b))' : 0,
+      background: 'var(--bg-base)',
       zIndex: `var(${layer === 'session' ? '--z-session-sub' : '--z-subpage'})` as unknown as number,
       display: 'flex', flexDirection: 'column',
       paddingTop: 'var(--safe-t)', paddingLeft: 'var(--safe-l)', paddingRight: 'var(--safe-r)',
-      paddingBottom: 'max(var(--kb), var(--safe-b))',
+      paddingBottom: keepBottomNav
+        ? 'max(0px, calc(var(--kb) - var(--mobile-nav-h, calc(var(--tap) + var(--sp-4))) - var(--safe-b)))'
+        : 'max(var(--kb), var(--safe-b))',
     }}>
       {title !== undefined && (
         <div className="tt-mobile-subpage-head">
