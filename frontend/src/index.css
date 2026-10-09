@@ -3827,6 +3827,12 @@ html[data-pointer="coarse"] .tt-ka-rules .tt-act.xs { height: 30px; width: 34px;
 .tt-inbox-row .t span { font-size: var(--fs-meta); color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tt-inbox-row.unread .t b { color: var(--text-bright); }
 .tt-inbox-row em { flex: 0 0 auto; font-style: normal; color: var(--text-dimmer); font: 400 var(--fs-micro)/1 var(--mono); }
+.tt-inbox-empty-icon { display: inline-flex; color: var(--text-dimmer); }
+.tt-inbox-empty-icon svg { width: var(--sp-5); height: var(--sp-5); }
+.tt-inbox-empty { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-5); padding: var(--sp-5); color: var(--text-dim); font-size: var(--fs-sm); }
+.tt-inbox-empty p { margin: 0; }
+.tt-data-error { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--danger-border); border-radius: var(--r-sm); background: var(--danger-soft); color: var(--text-bright); font-size: var(--fs-sm); }
+.tt-data-error .tt-act { flex: 0 0 auto; }
 
 /* ── 手机「会话」页（24 稿 §5）：按项目分组，顶上钉「需要你」 ───────────────── */
 .tt-msess { padding: var(--pad-page, 12px); padding-bottom: var(--sp-5); }

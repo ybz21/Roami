@@ -41,17 +41,17 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
   const { message } = AntApp.useApp()
   const [items, setItems] = useState<Item[] | null>(() => readMobileOverview())
   const [inbox, setInbox] = useState<Inbox[]>([])
-  const [unread, setUnread] = useState(0)
   const [projects, setProjects] = useState<Proj[]>([])
   const [host, setHost] = useState<Host | null>(null)
   const [hostStatus, setHostStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
   const [acting, setActing] = useState('')
+  const [overviewError, setOverviewError] = useState(false)
 
-  const loadLive = useCallback(() => api('GET', '/sessions/overview').then((r) => setItems(writeMobileOverview(r.data.items || []))).catch(() => setItems((c) => c || [])), [])
+  const loadLive = useCallback(() => api('GET', '/sessions/overview').then((r) => { setItems(writeMobileOverview(r.data.items || [])); setOverviewError(false) }).catch(() => { setOverviewError(true); setItems((c) => c || []) }), [])
   useEffect(() => {
     let stop = false
     const slow = () => {
-      api('GET', '/inbox?limit=40').then((r) => { if (!stop) { setInbox(r.data.items || []); setUnread(r.data.badge || 0) } }).catch(() => {})
+      api('GET', '/inbox?limit=40').then((r) => { if (!stop) setInbox(r.data.items || []) }).catch(() => {})
       api('GET', '/projects').then((r) => { if (!stop) setProjects(r.data.projects || []) }).catch(() => {})
       api('POST', `/plugins/${encodeURIComponent(HOST_MONITOR)}/run`, { command: 'host-monitor.stats', args: {} }).then((d) => {
         if (stop) return
@@ -73,6 +73,8 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
   if (items === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}><Spin /></div>
 
   const waiting = items.filter((s) => s.waiting)
+  const activeWaiting = new Set(waiting.map((s) => s.name))
+  const unread = inbox.filter((x) => x.type === 'session.waiting' && !x.read && activeWaiting.has(x.session)).length
   const running = items.filter((s) => s.running)
   const dayStart = new Date().setHours(0, 0, 0, 0) / 1000
   const doneToday = inbox.filter((x) => x.type === 'session.done' && x.at >= dayStart)
@@ -126,6 +128,7 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
   return (
     <div className="tt-mhome">
       <AppUpdateBanner />
+      {overviewError && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => void loadLive()}>{t('inbox.retry')}</button></div>}
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">
           <div className="kicker">{new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', weekday: 'long' })}{host?.hostname ? ` · ${host.hostname}` : ''}</div>

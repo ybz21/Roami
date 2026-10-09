@@ -31,6 +31,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 }) {
   const { t } = useI18n()
   const [items, setItems] = useState<OverviewItem[] | null>(() => readMobileOverview())
+  const [loadError, setLoadError] = useState(false)
   const [q, setQ] = useState('')
   // 筛选药丸 + 每组先露 5 条（Lody 手机端的做法）：十几个会话时一屏能看到所有项目，而不是被第一个项目占满
   const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle'>('all')
@@ -47,7 +48,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const lpCancel = () => clearTimeout(lp.current.timer)
   const [renaming, setRenaming] = useState<OverviewItem | null>(null)
   const [renameVal, setRenameVal] = useState('')
-  const reload = () => api('GET', '/sessions/overview').then((r) => setItems(writeMobileOverview(r.data.items || []))).catch(() => {})
+  const reload = () => api('GET', '/sessions/overview').then((r) => { setItems(writeMobileOverview(r.data.items || [])); setLoadError(false) }).catch(() => { setLoadError(true); setItems((cur) => cur || []) })
   const interrupt = async (s: OverviewItem) => {
     try { await api('POST', `/sessions/${encodeURIComponent(s.name)}/keys`, { keys: ['Escape'] }); message.success(t('mobile.interrupted')) }
     catch (e: any) { message.error(e.message) }
@@ -64,7 +65,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }
   useEffect(() => {
     let stop = false
-    const load = () => api('GET', '/sessions/overview').then((r) => { if (!stop) setItems(writeMobileOverview(r.data.items || [])) }).catch(() => { if (!stop) setItems((c) => c || []) })
+    const load = () => api('GET', '/sessions/overview').then((r) => { if (!stop) { setItems(writeMobileOverview(r.data.items || [])); setLoadError(false) } }).catch(() => { if (!stop) { setLoadError(true); setItems((c) => c || []) } })
     load()
     const i = setInterval(load, 5000)
     return () => { stop = true; clearInterval(i) }
@@ -158,6 +159,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   if (cur) return <MobileProjectDetail name={cur.name} dir={cur.dir} onBack={() => setCur(null)} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} onNewTask={onNewTask} />
   return (
     <div className="tt-msess">
+      {loadError && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => void reload()}>{t('inbox.retry')}</button></div>}
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">
           <div className="kicker">{t('mobile.sessions.kicker')}</div>

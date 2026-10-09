@@ -1,11 +1,12 @@
 // 会话通知记录：需要你 / 刚做完 / 出错了。
 // 数据来自 GET /inbox（后端从台账 plugin_notifications 里筛 source=roam.web）。
 import { useEffect, useState } from 'react'
-import { Button, Empty, Spin } from 'antd'
+import { Button, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { setBadge } from '../../push'
-import { AgentLogo, CheckIcon, CloseIcon, QuestionIcon } from '../../icons'
+import { CheckIcon, CloseIcon, QuestionIcon } from '../../icons'
+import { ICONS } from '../nav-icons'
 
 export type InboxItem = { id: number; type: string; session: string; label: string; body: string; at: number; read: boolean }
 
@@ -20,13 +21,17 @@ function ago(sec: number, t: (k: string, p?: any) => string): string {
 export default function InboxPage({ onOpenSession }: { onOpenSession: (name: string) => void }) {
   const { t } = useI18n()
   const [items, setItems] = useState<InboxItem[] | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   const load = async () => {
     try {
-      const r = await api('GET', '/inbox?limit=100')
-      setItems(r.data.items || [])
-      setBadge(r.data.badge || 0)
-    } catch { setItems((cur) => cur || []) }
+      const [r, overview] = await Promise.all([api('GET', '/inbox?limit=100'), api('GET', '/sessions/overview')])
+      const active = new Set((overview.data.items || []).filter((s: { waiting: boolean }) => s.waiting).map((s: { name: string }) => s.name))
+      const next: InboxItem[] = (r.data.items || []).filter((it: InboxItem) => it.type !== 'session.waiting' || active.has(it.session))
+      setItems(next)
+      setBadge(next.filter((it) => it.type === 'session.waiting' && !it.read).length)
+      setLoadError(false)
+    } catch { setLoadError(true); setItems((cur) => cur || []) }
   }
   useEffect(() => {
     void load()
@@ -35,7 +40,8 @@ export default function InboxPage({ onOpenSession }: { onOpenSession: (name: str
   }, [])
   const markRead = async (ids: number[] | 'all') => {
     setItems((cur) => (cur || []).map((it) => (ids === 'all' || ids.includes(it.id) ? { ...it, read: true } : it)))
-    try { const r = await api('POST', '/inbox/read', ids === 'all' ? { all: true } : { ids }); setBadge(r.data?.badge || 0) } catch { /* 下轮刷新会对齐 */ }
+    setBadge((items || []).filter((it) => it.type === 'session.waiting' && !it.read && ids !== 'all' && !ids.includes(it.id)).length)
+    try { await api('POST', '/inbox/read', ids === 'all' ? { all: true } : { ids }) } catch { /* 下轮刷新会对齐 */ }
   }
   const open = (it: InboxItem) => { if (!it.read) void markRead([it.id]); onOpenSession(it.session) }
 
@@ -59,11 +65,11 @@ export default function InboxPage({ onOpenSession }: { onOpenSession: (name: str
   return (
     <div className="tt-inbox">
       <div className="tt-pagehead">
-        <div className="kicker">{t('inbox.kicker')}</div>
-        <div className="row"><h1>{t('nav.inbox')}</h1>{unread && <Button size="small" type="text" onClick={() => markRead('all')}>{t('inbox.readAll')}</Button>}</div>
-        <div className="desc">{t('inbox.desc')}</div>
+        <div className="ttl"><div className="kicker">{t('inbox.kicker')}</div><h2>{t('nav.inbox')}</h2><p>{t('inbox.desc')}</p></div>
+        {unread && <div className="acts"><Button size="small" type="text" onClick={() => markRead('all')}>{t('inbox.readAll')}</Button></div>}
       </div>
-      {!items.length && <Empty description={t('inbox.empty')} image={<AgentLogo kind="claude" size={28} />} />}
+      {loadError && <div className="tt-data-error" role="alert">{t('inbox.loadFailed')} <button type="button" className="tt-act" onClick={() => void load()}>{t('inbox.retry')}</button></div>}
+      {!items.length && !loadError && <div className="tt-inbox-empty"><span className="tt-inbox-empty-icon">{ICONS.inbox}</span><p>{t('inbox.empty')}</p></div>}
       {section(t('inbox.waiting'), waiting)}
       {section(t('inbox.done'), done)}
       {section(t('inbox.errors'), errors)}

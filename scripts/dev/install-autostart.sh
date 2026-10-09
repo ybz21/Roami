@@ -42,6 +42,8 @@ Type=simple
 WorkingDirectory=${REPO}
 # start.sh fg 前台 exec 后端，参数与手工启动完全一致（含 -web frontend/dist）。
 ExecStart=/bin/bash ${REPO}/start.sh fg
+# tmux server is spawned from the web process; keep its panes alive across web restarts.
+KillMode=process
 Restart=always
 RestartSec=3
 # start.sh 在 dist 比源码旧时会先跑一次前端构建（这个前端要一分多钟）。
