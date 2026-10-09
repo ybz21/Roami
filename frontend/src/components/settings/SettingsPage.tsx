@@ -209,7 +209,6 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
               return ids.map((id) => (
                 <button key={id} type="button" className="tt-set-cat" onClick={() => go(id)}>
                   <span>{model.pages[id].name}</span>
-                  {rowCount(model.pages[id]) > 0 && <span className="n">{rowCount(model.pages[id])}</span>}
                   <Chevron open={false} />
                 </button>
               ))

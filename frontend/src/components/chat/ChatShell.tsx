@@ -449,7 +449,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
                   onFiles={() => fileRef.current?.click()} onCycleMode={cycleMode}
                   onCommand={sendCommand} onOpenGit={onOpenGit} />
                 {agent && (
-                  <span className={`tt-pill on${agent === 'codex' ? ' ok' : ''}`} aria-label={agent === 'claude' ? 'Claude' : 'Codex'}>
+                  <span className="tt-pill on" aria-label={agent === 'claude' ? 'Claude' : 'Codex'}>
                     <AgentLogo kind={agent} size={12} />{agent === 'claude' ? 'Claude' : 'Codex'}
                   </span>
                 )}

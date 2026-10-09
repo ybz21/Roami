@@ -1176,35 +1176,37 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
 .tt-seg-scroll::-webkit-scrollbar { height: 0; }
 .tt-seg-scroll > .ant-segmented { min-width: max-content; }
 
-/* ── 手机会话页顶栏（13 §5.1）：一行 50，取代原来「标签条 + 工具条」两行 79 ──
-   省下的 29px 直接给终端画布；标签条换成中间胶囊点开的切换 sheet。 */
+/* 手机会话顶栏与一级页等高；会话切换在居中的胶囊里。 */
 .tt-sesshead {
-  flex: 0 0 50px; height: 50px; padding: 0 4px;
-  display: flex; align-items: center; gap: 4px;
+  position: relative; flex: 0 0 var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4)));
+  height: var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4))); padding: 0 var(--sp-2);
+  display: flex; align-items: center; gap: var(--sp-2);
   background: var(--bg-container); border-bottom: 1px solid var(--border-subtle);
 }
+.tt-sesshead .actions { margin-left: auto; display: flex; align-items: center; }
 .tt-sesshead .ic {
-  flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center;
-  border: 0; border-radius: 10px; background: transparent; color: var(--text-dim); cursor: pointer;
+  flex: 0 0 var(--tap); width: var(--tap); height: var(--tap); display: grid; place-items: center;
+  border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-dim); cursor: pointer;
 }
 .tt-sesshead .ic.on { color: var(--accent); background: var(--accent-soft); }
 .tt-sesshead .pill {
-  flex: 1 1 auto; min-width: 0; height: 36px; padding: 0 10px;
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: calc(100% - 2 * (var(--tap) + var(--sp-4)));
+  min-width: 0; height: var(--tap); padding: 0 var(--sp-2);
   display: flex; align-items: center; gap: 7px;
-  border: 1px solid var(--border-subtle); border-radius: 18px;
+  border: 1px solid var(--border-subtle); border-radius: var(--r-pill);
   background: var(--bg-base); color: var(--text-bright); font-size: var(--fs-meta); cursor: pointer;
 }
 /* 名字**绝对居中**，两侧簇各贴一边。
    之前用「名字 flex:1 + justify-content:center」只是在余量里居中——左边是 8px 的状态点、
    右边是箭头(+计数)，两侧不等宽，名字就整体偏了；一出现会话计数偏得更多。
    绝对定位之后，两侧簇宽度差多少都不影响名字落在胶囊正中。 */
-.tt-sesshead .pill { position: relative; }
 .tt-sesshead .pill .tt-name {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  /* 两侧各留 50：够放下 8 的点、15 的箭头和 18 的计数，名字不会压到它们身上 */
-  max-width: calc(100% - 100px);
+  /* 两侧留给状态点和箭头，名字始终在胶囊正中。 */
+  max-width: calc(100% - 2 * (var(--sp-5) + var(--sp-1)));
   justify-content: center;
   pointer-events: none;
 }
@@ -3380,8 +3382,6 @@ html[data-size="compact"] .cc-run-slot { width: auto; }
   border: 0; border-bottom: 1px solid var(--border-subtle); background: none;
   color: var(--text-bright); font-size: var(--fs-body); text-align: left; cursor: pointer;
 }
-/* 两个都写 auto：有条数时条数吃掉空白、箭头贴着它；没有条数时箭头自己吃 */
-.tt-set-cat .n { margin-left: auto; font-size: var(--fs-micro); color: var(--text-dimmer); }
 .tt-set-cat .cv { margin-left: auto; color: var(--text-dimmer); flex: 0 0 12px; }
 .tt-set-cat:active { background: var(--list-hover); }
 @media (pointer: coarse) {

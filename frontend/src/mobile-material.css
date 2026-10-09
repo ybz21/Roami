@@ -1,7 +1,9 @@
 /* Mobile Material 3 roles mapped to Roami's existing color, type, shape and space tokens. */
+html[data-size="compact"], html[data-size="medium"] {
+  --mobile-topbar-h: calc(var(--tap) + var(--sp-4));
+}
 html[data-size="compact"] {
   --mobile-nav-h: calc(var(--tap) + var(--sp-4));
-  --mobile-topbar-h: calc(var(--tap) + var(--sp-4));
   --pad-page: var(--sp-4);
 }
 .tt-mobile-topbar {

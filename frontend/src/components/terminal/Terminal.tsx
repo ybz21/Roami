@@ -1021,6 +1021,7 @@ const Term = forwardRef<TermHandle, {
       if (t && tapStart && e.touches.length === 0
         && Math.hypot(t.clientX - tapStart.x, t.clientY - tapStart.y) < 12) {
         sendMoveCursor(t.clientX, t.clientY)
+        termRef.current?.focus()
       }
       tapStart = null
     }

@@ -150,22 +150,15 @@ export default function TerminalPane(props: {
   // 灵动岛的「活着」判据：有 Agent 在跑。会话只是连着（st==='connected'）不算——
   // 那是个静态事实，让点一直呼吸等于把呼吸这个信号用废了。
   const activeAgentLive = !!(active && (agentKinds[active] || claudeMap[active]?.running || codexMap[active]?.running))
-  // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框，
-  // 终端那条移动输入条 + 快捷键栏要隐藏，否则手机上会出现两个输入框。
+  // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框。
   const inChat = !!active && ((claudeView[active] && claudeMap[active]?.running) || (codexView[active] && codexMap[active]?.running))
 
-  // 移动端可靠输入：xterm 隐藏 textarea 在软键盘/输入法「合成/预测词」下会把字留在
-  // 合成缓冲里不提交，onData 不触发 → 打完字发不出去。触摸设备改用独立输入框：整行送 PTY。
   const { coarse: isTouch } = useLayout()
-  const [line, setLine] = useState('')
-  const mobileInputRef = useRef<import('antd').InputRef>(null)
   const sendRaw = (s: string) => { if (active) termRefs.current[active]?.send(s, true) } // keepFocus：不抢 xterm 焦点 → 软键盘不收起
   // 滚上去看历史会让 tmux 进 copy-mode，此时输入被它截走（要先按「底」才生效）。
-  // 输入框聚焦/发送前先回到底部退出 copy-mode，省去手动按「底」。
+  // 发送前先回到底部退出 copy-mode，省去手动按「底」。
   const exitCopyMode = () => { if (active) termRefs.current[active]?.toBottom() }
-  const flushLine = () => { if (line) { exitCopyMode(); sendRaw(line); setLine('') } }   // 把输入框待发文本先送出（不带回车）
-  const submitLine = () => { exitCopyMode(); sendRaw(line + '\r'); setLine('') }          // 整行 + 回车
-  const tapKey = (seq: string) => { flushLine(); if (isTouch) sendRaw(seq); else sendKey(seq) } // 控制键：先 flush 待发文本
+  const tapKey = (seq: string) => { if (isTouch) sendRaw(seq); else sendKey(seq) }
 
   /**
    * 中断当前会话（^C）。
@@ -409,13 +402,6 @@ export default function TerminalPane(props: {
     termRefs.current[active]?.selectPaneAt(e.clientX, e.clientY)
     exitCopyMode()
     termRefs.current[active]?.send(mention + ' ', true)
-  }
-  // 拖到移动端输入框：追加到待编辑文本，用户可改后再发。
-  const onInputDrop = (e: React.DragEvent) => {
-    if (!isPathDrag(e)) return
-    e.preventDefault()
-    const mention = toMention(readDropPath(e))
-    if (mention) setLine((l) => (l ? l.replace(/\s*$/, ' ') : '') + mention + ' ')
   }
   const [ctx, setCtx] = useState<{ x: number; y: number; session: string; selection: string } | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
@@ -843,7 +829,7 @@ export default function TerminalPane(props: {
       )}
     </div>
   )
-  // ── 手机会话页顶栏（13 §5.1）：一行 50，取代「标签条 + 工具条」两行 79 ──
+  // ── 手机会话页顶栏：与一级页同高，取代「标签条 + 工具条」两行 ──
   // 中间胶囊点开 = 会话切换 sheet（取代横滑标签条）；除 Agent 视图切换外，其余控件全进「⋯」。
   // **不能按 !inChat 收窄**：切到 Claude/Codex 对话视图后 phoneChrome 变 null，
   // 整块外壳就掉回桌面那套「标签条 + 工具条」——按一下渲染模式，页面样式全变了。
@@ -868,30 +854,23 @@ export default function TerminalPane(props: {
             <span className="ca">{TI.caret}</span>
           </span>
         </button>
-        {active && claudeMap[active]?.running && (
-          <button type="button" className={`ic${claudeView[active] ? ' on' : ''}`} aria-label="Claude"
-            onClick={() => setClaudeView((v) => ({ ...v, [active!]: !v[active!] }))}>
-            <AgentLogo kind="claude" size={16} />
+        <div className="actions">
+          <button type="button" className="ic" aria-label={t('common.more')} onClick={() => setMoreSheet(true)}>
+            {TI.dots}
           </button>
-        )}
-        {active && codexMap[active]?.running && (
-          <button type="button" className={`ic${codexView[active] ? ' on' : ''}`} aria-label="Codex"
-            onClick={() => setCodexView((v) => ({ ...v, [active!]: !v[active!] }))}>
-            <AgentLogo kind="codex" size={16} />
-          </button>
-        )}
-        <button type="button" className={`ic${showGit ? ' on' : ''}`} aria-label={t('git.changes')} onClick={toggleGit}>
-          {TI.git}
-        </button>
-        <button type="button" className="ic" aria-label={t('common.more')} onClick={() => setMoreSheet(true)}>
-          {TI.dots}
-        </button>
+        </div>
       </div>
       <MobileSessionSwitch open={switchOpen} onClose={() => setSwitchOpen(false)} active={active}
         onPick={(n) => (onOpenSession ? onOpenSession(n) : setActive(n))}
         onAll={() => { onCollapse?.(); location.hash = '#/sessions' }} />
       <MobileSheet open={moreSheet} title={t('common.more')} onClose={() => setMoreSheet(false)}>
         <SheetSection>{t('mobile.groupSession')}</SheetSection>
+        {active && claudeMap[active]?.running && <SheetRow icon={<AgentLogo kind="claude" size={20} />} title="Claude"
+          desc={t(claudeView[active] ? 'common.on' : 'common.off')}
+          onClick={() => { setMoreSheet(false); setClaudeView((v) => ({ ...v, [active]: !v[active] })) }} />}
+        {active && codexMap[active]?.running && <SheetRow icon={<AgentLogo kind="codex" size={20} />} title="Codex"
+          desc={t(codexView[active] ? 'common.on' : 'common.off')}
+          onClick={() => { setMoreSheet(false); setCodexView((v) => ({ ...v, [active]: !v[active] })) }} />}
         <SheetRow icon={TI.rename} title={t('session.rename')} onClick={() => { setMoreSheet(false); active && setRenameSession(active) }} />
         <SheetRow icon={TI.newTab} title={t('terminal.newTab')}
           onClick={() => { setMoreSheet(false); active && window.open(`/#/term/${encodeURIComponent(active)}`, '_blank') }} />
@@ -936,7 +915,7 @@ export default function TerminalPane(props: {
           title={t('chat.switchToClaude')} onClick={() => setClaudeView((v) => ({ ...v, [active!]: !v[active!] }))} />
       )}
       {active && codexMap[active]?.running && (
-        <TBtn icon={<AgentLogo kind="codex" size={14} />} label="Codex" tone="ok" on={!!codexView[active]}
+        <TBtn icon={<AgentLogo kind="codex" size={14} />} label="Codex" on={!!codexView[active]}
           title={t('chat.switchToCodex')} onClick={() => setCodexView((v) => ({ ...v, [active!]: !v[active!] }))} />
       )}
     </>
@@ -1007,6 +986,8 @@ export default function TerminalPane(props: {
   const terminalArea = (
     <div className={dpad ? 'tt-has-dpad' : undefined}
       style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}
+      onFocusCapture={(e) => { if ((e.target as HTMLElement).classList.contains('xterm-helper-textarea')) setTyping(true) }}
+      onBlurCapture={(e) => { if ((e.target as HTMLElement).classList.contains('xterm-helper-textarea')) setTimeout(() => setTyping(false), 180) }}
       onDragOver={(e) => {
         // 会话拖到画面上 = 说给**当前**会话听。自定义 MIME 与路径拖拽
         // (application/x-ttmux-path) 天然分得开，两条路互不干扰
@@ -1088,19 +1069,6 @@ export default function TerminalPane(props: {
   )
   const sessionBottom = (
     <>
-      {/* 输入条 / 快捷键条只在手机档（24 稿 §3 #8）：触屏笔记本有实体键盘，不需要这两条 */}
-      {isPhone && !inChat && (
-        <div style={{ display: 'flex', gap: 'var(--sp-2)', padding: '8px 8px 0' }} onDragOver={allowPathDrop} onDrop={onInputDrop}>
-          <Input ref={mobileInputRef} value={line}
-            onFocus={() => { exitCopyMode(); setTyping(true) }}
-            // 延后收起：点快捷键条上的键会先让输入框失焦，立刻收就把那一条抽走了
-            onBlur={() => setTimeout(() => setTyping(false), 180)}
-            onChange={(e) => setLine(e.target.value)}
-            onPressEnter={(e) => { if ((e.nativeEvent as any).isComposing) return; submitLine() }}
-            placeholder={t('terminal.mobileInputPlaceholder')} allowClear autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
-          <Button type="primary" onMouseDown={noBlur} onClick={submitLine}>{t('common.send')}</Button>
-        </div>
-      )}
       {/* 快捷键条只在输入态出现（13 §5.2）：它常驻 49px，而不打字时一个键也用不上——
           手机上这 49px 直接等于终端少 3 行。桌面不受影响。
           `tt-keyrow` 给两侧渐隐 + 滚轮横移：这一条 15 个按钮宽 913，窄栏里只露得出 605，
@@ -1116,11 +1084,11 @@ export default function TerminalPane(props: {
           data-l={keyFadeL ? '1' : undefined} data-r={keyFadeR ? '1' : undefined}
           style={{ display: 'flex', gap: 'var(--sp-2)', padding: 8, borderTop: '1px solid var(--border)', overflowX: 'auto' }}>
           <Button type="primary" onMouseDown={noBlur} style={{ flex: '0 0 auto' }}
-            onClick={() => (isTouch ? submitLine() : sendKey('\r'))}>Enter</Button>
+            onClick={() => tapKey('\r')}>Enter</Button>
           {/* 触屏没有 Ctrl+Shift+V / 右键菜单在长按选词后也不再弹出，丝带上补一个直达粘贴 */}
           {isTouch && <Button onMouseDown={noBlur} onClick={() => active && pasteClipboard(active)} style={{ flex: '0 0 auto' }}>{t('terminal.pasteAction')}</Button>}
           {(prefsData.quickCommands || []).map((cmd) => (
-            <Button key={cmd} onMouseDown={noBlur} onClick={() => { if (isTouch) { setLine(cmd); requestAnimationFrame(() => mobileInputRef.current?.focus()) } else { sendRaw(cmd) } }} style={{ flex: '0 0 auto' }}>{cmd}</Button>
+            <Button key={cmd} onMouseDown={noBlur} onClick={() => sendRaw(cmd)} style={{ flex: '0 0 auto' }}>{cmd}</Button>
           ))}
           {KEYS.map(([label, seq]) => (
             <Button key={label} onMouseDown={noBlur} onClick={() => tapKey(seq)} style={{ flex: '0 0 auto' }}>{label}</Button>
@@ -1146,9 +1114,9 @@ export default function TerminalPane(props: {
 
   return (
     // paddingBottom=env(keyboard-inset-height)：软键盘悬浮覆盖时(见 main.tsx/index.html)，
-    // 把整块内容抬到键盘之上，让底部输入条/快捷键栏不被遮住。桌面无虚拟键盘 → 0，无影响。
+    // 把整块内容抬到键盘之上，让终端和快捷键栏不被遮住。桌面无虚拟键盘 → 0，无影响。
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: 'env(keyboard-inset-height, 0px)', transition: 'padding-bottom .15s ease-out' }}>
-      {active && <PromptDialog name={active} accent={codexMap[active]?.running ? 'var(--ok)' : 'var(--accent)'} enabled={!inChat && !promptOff} />}
+      {active && <PromptDialog name={active} accent="var(--accent)" enabled={!inChat && !promptOff} />}
       <Modal
         open={pasteOpen}
         title={t('terminal.pasteTitle')}

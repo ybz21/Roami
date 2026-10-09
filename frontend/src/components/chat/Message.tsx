@@ -15,7 +15,7 @@ import { noticePrefixOf } from '../shell/session-drop'
 import { IMG_EXT } from '../files/file-utils'
 import { MentionedImage } from './MentionedImage'
 
-export const CODEX_ACCENT = 'var(--ok)' // Codex 一方的强调色＝全站唯一那支绿
+export const CODEX_ACCENT = 'var(--accent)'
 
 export type Side = 'claude' | 'codex'
 
@@ -162,8 +162,8 @@ function UserMessage({ m, accent }: { m: Msg; accent: string }) {
 }
 
 export const ChatMessage = memo(function ChatMessage({ m, results, side }: { m: Msg; results: Record<string, Block>; side: Side }) {
-  const accent = side === 'codex' ? CODEX_ACCENT : 'var(--accent)'
-  const solid = side === 'codex' ? 'var(--ok-solid)' : 'var(--accent-solid)'
+  const accent = 'var(--accent)'
+  const solid = 'var(--accent-solid)'
 
   // Roam 自己塞进去的那段话（如「旁边还有一个会话」的介绍词）：它是经
   // SendPromptSubmit 投进输入框并回车的，转录里就记成一个 user turn——可它不是
