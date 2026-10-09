@@ -9,9 +9,11 @@ import { sessionDisplay, setSessionLabels, useSessionLabel } from '../sessions/s
 import { type PaletteActions } from '../shell/palette'
 import { GlobalSearch } from '../shell/palette'
 import { useAgentKinds } from '../../agent-kind'
+import { useLayout } from '../../layout'
 
 export default function SoloTerminal({ name }: { name: string }) {
   const agentKinds = useAgentKinds()
+  const { phone } = useLayout()
   const [fontSize, setFontSize] = useState(13)
   const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
   const [claudeMap, setClaudeMap] = useState<Record<string, ClaudeInfo>>({})
@@ -31,13 +33,23 @@ export default function SoloTerminal({ name }: { name: string }) {
   useEffect(() => {
     let stop = false
     const check = async () => {
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(name)}/claude`); if (!stop) setClaudeMap((m) => ({ ...m, [name]: r.data })) } catch {}
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(name)}/codex`); if (!stop) setCodexMap((m) => ({ ...m, [name]: r.data })) } catch {}
+      try {
+        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/claude`)
+        if (stop) return
+        setClaudeMap((m) => ({ ...m, [name]: r.data }))
+        if (phone && r.data?.running) setClaudeView((v) => (name in v ? v : { ...v, [name]: true }))
+      } catch {}
+      try {
+        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/codex`)
+        if (stop) return
+        setCodexMap((m) => ({ ...m, [name]: r.data }))
+        if (phone && r.data?.running) setCodexView((v) => (name in v ? v : { ...v, [name]: true }))
+      } catch {}
     }
     check()
     const t = setInterval(check, 5000)
     return () => { stop = true; clearInterval(t) }
-  }, [name])
+  }, [name, phone])
 
   // 独立页也要能搜（⌘K）。这页没有侧栏也没有顶栏，本地条目就只有「当前这个会话」；
   // 结果照样从后端来。打开方式换成同一个标签内换 hash——独立页本身就是同一个 SPA，

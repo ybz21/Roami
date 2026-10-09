@@ -751,12 +751,17 @@ export default function App() {
         // 第一次探到 Claude 在跑就进对话视图：这是 Claude 会话的常态，终端是切过去看的那一面
         if (r.data?.running) setClaudeView((v) => (n in v ? v : { ...v, [n]: true }))
       } catch {}
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(n)}/codex`); if (!stop) setCodexMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data })) } catch {}
+      try {
+        const r = await api('GET', `/sessions/${encodeURIComponent(n)}/codex`)
+        if (stop) return
+        setCodexMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
+        if (isMobile && r.data?.running) setCodexView((v) => (n in v ? v : { ...v, [n]: true }))
+      } catch {}
     })
     check()
     const t = setInterval(check, 5000)
     return () => { stop = true; clearInterval(t) }
-  }, [authed, terms])
+  }, [authed, terms, isMobile])
 
   // 通用传输 Phase 1a：登录后且用户偏好开 P2P → 建会话级常驻 control PC（左边栏全局状态）。
   // 偏好关闭 / 登出即拆链。P2P 是否真正可用由 transport 内部拉 /api/p2p/config 决定。

@@ -151,9 +151,12 @@ export default function TerminalPane(props: {
   // 那是个静态事实，让点一直呼吸等于把呼吸这个信号用废了。
   const activeAgentLive = !!(active && (agentKinds[active] || claudeMap[active]?.running || codexMap[active]?.running))
   // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框。
-  const inChat = !!active && ((claudeView[active] && claudeMap[active]?.running) || (codexView[active] && codexMap[active]?.running))
-
-  const { coarse: isTouch } = useLayout()
+  const { coarse: isTouch, phone: isPhone } = useLayout()
+  const showClaudeChat = (name: string) => (claudeView[name] === true || (isPhone && claudeView[name] !== false)) &&
+    (claudeMap[name]?.running || (isPhone && !claudeMap[name] && agentKinds[name] === 'claude'))
+  const showCodexChat = (name: string) => (codexView[name] === true || (isPhone && codexView[name] !== false)) &&
+    (codexMap[name]?.running || (isPhone && !codexMap[name] && agentKinds[name] === 'codex'))
+  const inChat = !!active && !!(showClaudeChat(active) || showCodexChat(active))
   const sendRaw = (s: string) => { if (active) termRefs.current[active]?.send(s, true) } // keepFocus：不抢 xterm 焦点 → 软键盘不收起
   // 滚上去看历史会让 tmux 进 copy-mode，此时输入被它截走（要先按「底」才生效）。
   // 发送前先回到底部退出 copy-mode，省去手动按「底」。
@@ -280,7 +283,6 @@ export default function TerminalPane(props: {
 
   // 标签拖拽排序（14 §7.1）：dragTab / dropAt 只用来画反馈（半透明 + 插入线），
   // 落点判定全部走事件本身，见下面两个 helper。
-  const { phone: isPhone } = useLayout()
   // 手机：左边缘右滑收起会话页，右边缘左滑翻到「改动」面（24 稿 §5 会话页两面）
   const phoneRootRef = useRef<HTMLDivElement>(null)
   useEdgeSwipe(phoneRootRef, { enabled: isPhone, onBack: onCollapse, onForward: () => openGitRef.current?.() })
@@ -1033,14 +1035,14 @@ export default function TerminalPane(props: {
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}
               onImagePaste={(files) => { setActive(termName); pasteImage(termName, files) }} />
-            {claudeView[termName] && claudeMap[termName]?.running && (
+            {showClaudeChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
-                <ClaudeChat name={termName} file={claudeMap[termName].file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+                <ClaudeChat name={termName} file={claudeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>
             )}
-            {codexView[termName] && codexMap[termName]?.running && (
+            {showCodexChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
-                <CodexChat name={termName} file={codexMap[termName].file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+                <CodexChat name={termName} file={codexMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>
             )}
             {/* 悬浮话筒只留给手机：桌面的在工具条上（重命名旁边） */}
