@@ -1,8 +1,26 @@
-// 语音输入快捷键：偏好里存成 'Mod+Shift+KeyS' 这种串（修饰键 + KeyboardEvent.code），
+// 全站快捷键：每个动作一条偏好，存成 'Mod+Shift+KeyS' 这种串（修饰键 + KeyboardEvent.code），
 // 按 code 匹配不看布局。Mod = Mac 上 ⌘、其它 Ctrl；显式写 Ctrl / Meta 就只认那一个。
+// 都能在 设置 › 界面 › 快捷键 里改：本机别的软件占了哪个键，换一个就是，不用改代码。
+import { useMemo } from 'react'
+import { usePreferences } from '../../preferences'
+
+export const KEY_ACTIONS = ['search', 'newTask', 'newTerminal', 'closeTab', 'toggleInspector', 'focus', 'searchContent', 'panelFiles', 'panelGit', 'voice'] as const
+export type KeyAction = typeof KEY_ACTIONS[number]
+export const DEFAULT_KEYBINDINGS: Record<KeyAction, string> = {
+  search: 'Mod+KeyK',
+  newTask: 'Mod+KeyN',
+  newTerminal: 'Mod+KeyT',
+  closeTab: 'Mod+KeyW',
+  toggleInspector: 'Mod+KeyJ',
+  focus: 'Mod+Shift+KeyJ',
+  searchContent: 'Mod+Shift+KeyF',
+  panelFiles: 'Mod+Shift+KeyE',
+  panelGit: 'Mod+Shift+KeyG',
+  voice: 'Mod+Shift+KeyS',
+}
+
 export type Hotkey = { mod: boolean; ctrl: boolean; meta: boolean; alt: boolean; shift: boolean; code: string }
 
-export const DEFAULT_VOICE_HOTKEY = 'Mod+Shift+KeyS'
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '')
 
 export function parseHotkey(s: string | undefined | null): Hotkey | null {
@@ -67,4 +85,29 @@ export function formatHotkey(s: string | undefined | null): string {
   if (h.shift) parts.push(isMac ? '⇧' : 'Shift')
   parts.push(keyLabel(h.code))
   return isMac ? parts.join('') : parts.join('+')
+}
+
+export type Keybindings = Record<KeyAction, { spec: string; key: Hotkey | null; label: string }>
+
+/** 偏好里的覆盖叠在默认值上；存坏了的串当没改 */
+export function resolveKeybindings(overrides: Partial<Record<string, string>> | undefined): Keybindings {
+  const out = {} as Keybindings
+  for (const a of KEY_ACTIONS) {
+    const o = overrides?.[a]
+    const spec = o && parseHotkey(o) ? o : DEFAULT_KEYBINDINGS[a]
+    out[a] = { spec, key: parseHotkey(spec), label: formatHotkey(spec) }
+  }
+  return out
+}
+
+/** 两个动作绑到同一个键：返回 动作 → 和它撞的另一个动作 */
+export function keybindingConflicts(kb: Keybindings): Partial<Record<KeyAction, KeyAction>> {
+  const out: Partial<Record<KeyAction, KeyAction>> = {}
+  for (const a of KEY_ACTIONS) for (const b of KEY_ACTIONS) if (a !== b && kb[a].spec === kb[b].spec) { out[a] = b; break }
+  return out
+}
+
+export function useKeybindings(): Keybindings {
+  const [prefs] = usePreferences()
+  return useMemo(() => resolveKeybindings(prefs.keybindings), [prefs.keybindings])
 }

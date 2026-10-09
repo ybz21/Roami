@@ -178,16 +178,8 @@ func tmuxScroll(name, dir string, lines int) (inCopyMode bool) {
 	return false
 }
 
-// altLinesPerNotch 备用屏里手指位移多少行才发一格滚轮。实测 Claude Code 每格滚轮约滚 1.7 行
-// （tmux 里发 22 格滚了 38 行），按行发格子等于把触控板的位移放大近一倍。2 行一格 ≈ 1:1。
-const altLinesPerNotch = 2
-
-// tmuxScrollAccum 带累积的滚动：普通屏按行原样走 tmuxScroll；备用屏把行数攒到 acc 里，
-// 每 altLinesPerNotch 行发一格滚轮，零头留到下一条消息。acc 由每条连接自己持有。
-// wheelState 每条连接一份：行累积 + 屏幕状态缓存。paneState 要起一个 tmux 进程，
-// 一次滑动几十条消息逐条查等于几十个进程，滚起来一卡一卡；300ms 内当它没变。
+// A scroll burst shares pane state so touch events do not each spawn tmux.
 type wheelState struct {
-	acc     int
 	alt     bool
 	mouseOn bool
 	sgr     bool
@@ -203,37 +195,21 @@ func (ws *wheelState) refresh(name string) {
 	ws.at = time.Now()
 }
 
-func tmuxScrollAccum(name, dir string, lines int, ws *wheelState) (inCopyMode bool) {
+func tmuxScrollCached(name, dir string, lines int, ws *wheelState) (inCopyMode bool) {
 	if dir == "bottom" || lines <= 0 {
-		ws.acc = 0
 		return tmuxScroll(name, dir, lines)
 	}
 	ws.refresh(name)
 	if !ws.alt {
-		ws.acc = 0
 		return tmuxScroll(name, dir, lines)
 	}
 	if !ws.mouseOn {
 		return false
 	}
-	if dir == "up" {
-		ws.acc += lines
-	} else {
-		ws.acc -= lines
+	if lines > maxWheelNotches {
+		lines = maxWheelNotches
 	}
-	n := ws.acc / altLinesPerNotch
-	if n == 0 {
-		return false
-	}
-	ws.acc -= n * altLinesPerNotch
-	d, cnt := "up", n
-	if n < 0 {
-		d, cnt = "down", -n
-	}
-	if cnt > maxWheelNotches {
-		cnt = maxWheelNotches
-	}
-	altScreenWheel(name, d, cnt, ws.w, ws.h, ws.sgr)
+	altScreenWheel(name, dir, lines, ws.w, ws.h, ws.sgr)
 	return false
 }
 
@@ -589,7 +565,7 @@ func Handler(c *gin.Context) {
 	// 当导航键吃掉、到不了 shell，且新输出不再跟随到底。所以真实键入前先退出 copy-mode，
 	// 让任意按键都像真实终端那样跳回实时提示符。
 	inCopy := false
-	wheel := &wheelState{} // 备用屏滚轮的行累积与屏幕状态缓存，见 tmuxScrollAccum
+	wheel := &wheelState{}
 
 	// ws → pty（文本帧若为 resize 控制消息则调整窗口大小，否则当作键入）
 	for {
@@ -639,7 +615,7 @@ func Handler(c *gin.Context) {
 					continue
 				case "scroll":
 					// 普通屏走 copy-mode 才需在真实键入前退出；备用屏 TUI 喂的是滚轮，inCopyMode=false。
-					inCopy = tmuxScrollAccum(name, ctrl.Dir, ctrl.Lines, wheel)
+					inCopy = tmuxScrollCached(name, ctrl.Dir, ctrl.Lines, wheel)
 					continue
 				case "select-pane":
 					tmuxSelectPaneAt(name, ctrl.Col, ctrl.Row)

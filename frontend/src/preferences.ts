@@ -16,7 +16,7 @@ export interface Preferences {
   opencodeCommand: string
   quickCommands: string[]
   showVoiceButton: boolean
-  voiceHotkey: string // 语音输入快捷键，'Mod+Shift+KeyS' 这种串，见 chat/voice-hotkey.ts
+  keybindings: Partial<Record<string, string>> // 快捷键覆盖：动作 → 'Mod+Shift+KeyS' 这种串，默认表在 shell/keybindings.ts
   overviewTab: 'projects' | 'sessions' // 概览页 项目/会话 切换 tab，记住上次选择
   p2pEnabled: boolean // P2P 直连总开关（实验性，默认关）；关闭后 下载/镜像等一律走 frp 中转
   p2pStunServers: string // 逗号分隔的 STUN 服务器；留空用服务端默认（/api/p2p/config）。仅影响本浏览器
@@ -96,7 +96,7 @@ const DEFAULTS: Preferences = {
   opencodeCommand: 'opencode',
   quickCommands: [],
   showVoiceButton: true,
-  voiceHotkey: 'Mod+Shift+KeyS',
+  keybindings: {},
   overviewTab: 'projects',
   p2pEnabled: false, // 实验性：待真实跨网/Android/iOS 验收后再默认开
   p2pStunServers: '',
@@ -204,6 +204,10 @@ export async function loadPreferences() {
     // workspace 是嵌套对象：整体展开会让服务端存的旧结构缺字段变 undefined，单独深合一层
     // 本地存过的观感项压在服务端之上：这一条是「跟着我走」与「这台机器」的分界线
     cache = { ...DEFAULTS, ...r?.data, ...readLookMirror(), workspace: { ...WORKSPACE_DEFAULTS, ...r?.data?.workspace } }
+    if (r?.data?.voiceHotkey && !cache.keybindings?.voice) {
+      cache.keybindings = { ...cache.keybindings, voice: r.data.voiceHotkey }
+      api('PUT', '/preferences', cache).catch(() => {})
+    }
     writeWorkspaceMirror(cache.workspace)
     if (!cache._migrated) {
       migrateFromLocalStorage()

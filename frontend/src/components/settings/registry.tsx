@@ -10,6 +10,7 @@
 import type { ReactNode } from 'react'
 import { PushSettings } from './push-settings'
 import { HotkeyRecorder } from './hotkey-recorder'
+import { KEY_ACTIONS, DEFAULT_KEYBINDINGS, keybindingConflicts, resolveKeybindings, type KeyAction } from '../shell/keybindings'
 import { BrowserSettings } from './browser-settings'
 import { PhoneSettings } from './phone-settings'
 import { SpeechSettings } from './speech-settings'
@@ -172,16 +173,20 @@ export function buildSettings(deps: {
     id: 'promptPopupOff', label: t('settings.promptPopupDefault'), desc: t('settings.promptPopupDefaultHelp'), key: 'promptPopupOff',
     control: { kind: 'switch', get: () => !prefs.promptPopupOff, set: (on) => deps.setPrefs({ promptPopupOff: !on }) },
   }
-  const voiceHotkeyItem: SettingItem = {
-    id: 'voiceHotkey', label: t('set.voiceHotkey'), desc: t('set.voiceHotkeyHelp'), key: 'voiceHotkey',
-    keywords: '语音 快捷键 hotkey shortcut 按住',
-    control: { kind: 'custom', node: <HotkeyRecorder value={prefs.voiceHotkey || 'Mod+Shift+KeyS'} fallback="Mod+Shift+KeyS" onChange={(v) => deps.setPrefs({ voiceHotkey: v })} /> },
-  }
   const pushItem: SettingItem = {
     id: 'push', label: t('set.push'), desc: t('set.pushHelp'), key: 'push',
     keywords: '推送 通知 push notification 手机 锁屏',
     control: { kind: 'custom', node: <PushSettings /> },
   }
+  const kb = resolveKeybindings(prefs.keybindings)
+  const kbConflicts = keybindingConflicts(kb)
+  const keyItems: SettingItem[] = KEY_ACTIONS.map((a: KeyAction) => ({
+    id: 'key.' + a, label: t('key.' + a), desc: t('key.' + a + 'Help'), key: 'keybindings.' + a,
+    keywords: '快捷键 hotkey shortcut keybinding',
+    control: { kind: 'custom', node: <HotkeyRecorder value={kb[a].spec} fallback={DEFAULT_KEYBINDINGS[a]}
+      conflict={kbConflicts[a] ? t('key.' + kbConflicts[a]) : undefined}
+      onChange={(v) => deps.setPrefs({ keybindings: { ...(prefs.keybindings || {}), [a]: v } })} /> },
+  }))
   const voiceItem: SettingItem = {
     id: 'showVoiceButton', label: t('set.voiceButton'), desc: t('set.voiceButtonHelp'), key: 'showVoiceButton',
     control: { kind: 'switch', get: () => prefs.showVoiceButton !== false, set: (on) => deps.setPrefs({ showVoiceButton: on }) },
@@ -197,7 +202,6 @@ export function buildSettings(deps: {
         { ...promptPopupItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
         { ...pushItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
         { ...voiceItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
-        { ...voiceHotkeyItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
       ],
     },
     {
@@ -241,6 +245,14 @@ export function buildSettings(deps: {
       ],
     },
     {
+      id: 'ui.keys', name: t('set.pageKeys'), parent: t('set.groupUi'), scope: 'mine', note: t('set.pageKeysNote'),
+      items: keyItems.slice(0, 6),
+    },
+    {
+      id: 'ui.keys.more', name: t('set.pageMoreKeys'), parent: t('set.groupUi'), scope: 'mine', note: t('set.pageKeysNote'),
+      items: keyItems.slice(6),
+    },
+    {
       id: 'ui.status', name: t('status.settings'), parent: t('set.groupUi'), scope: 'mine',
       note: t('status.settingsDesc'),
       items: [{
@@ -263,7 +275,6 @@ export function buildSettings(deps: {
         pushItem,
         promptPopupItem,
         voiceItem,
-        voiceHotkeyItem,
       ],
     },
     {
@@ -352,7 +363,7 @@ export function buildSettings(deps: {
   const nodes: TreeNode[] = [
     { kind: 'section', title: t('set.secMine'), note: '' },
     { kind: 'leaf', page: 'common' },
-    { kind: 'parent', id: 'ui', title: t('set.groupUi'), kids: ['ui.look', 'ui.layout', 'ui.status'] },
+    { kind: 'parent', id: 'ui', title: t('set.groupUi'), kids: ['ui.look', 'ui.layout', 'ui.keys', 'ui.keys.more', 'ui.status'] },
     { kind: 'parent', id: 'agent', title: t('set.groupAgent'), kids: ['agent.bin', 'agent.new'] },
     // 这一段的页直接摊平：段标题已经写了「这台机器」，再套一层同名的父节点是把同一件事说两遍
     { kind: 'section', title: deps.nodeLabel ? t('set.secNode', { node: deps.nodeLabel }) : t('set.groupNode'), note: '' },

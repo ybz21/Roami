@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react'
 import { Button } from 'antd'
 import { useI18n } from '../../i18n'
-import { formatHotkey, hotkeyFromEvent, parseHotkey } from '../chat/voice-hotkey'
+import { formatHotkey, hotkeyFromEvent, parseHotkey } from '../shell/keybindings'
 
-export function HotkeyRecorder({ value, fallback, onChange }: { value: string; fallback: string; onChange: (v: string) => void }) {
+export function HotkeyRecorder({ value, fallback, onChange, conflict }: { value: string; fallback: string; onChange: (v: string) => void; conflict?: string }) {
   const { t } = useI18n()
   const [rec, setRec] = useState(false)
   const [bad, setBad] = useState(false)
@@ -27,6 +27,7 @@ export function HotkeyRecorder({ value, fallback, onChange }: { value: string; f
         {rec ? (bad ? t('set.hotkeyNeedMod') : t('set.hotkeyPress')) : <kbd style={{ fontFamily: 'var(--mono)' }}>{formatHotkey(value) || formatHotkey(fallback)}</kbd>}
       </Button>
       {value && value !== fallback && <Button size="small" type="text" onClick={() => onChange(fallback)}>{t('set.hotkeyReset')}</Button>}
+      {conflict && <span style={{ color: 'var(--danger)', fontSize: 'var(--fs-meta)' }}>{t('set.hotkeyConflict', { name: conflict })}</span>}
     </span>
   )
 }

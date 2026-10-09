@@ -785,14 +785,16 @@ export default function TerminalPane(props: {
               children: tabs.map((n) => ({
                 key: 'term:' + n,
                 icon: agentKinds[n] ? <AgentLogo kind={agentKinds[n]} size={13} /> : claudeMap[n]?.running ? <AgentLogo kind="claude" size={13} /> : codexMap[n]?.running ? <AgentLogo kind="codex" size={13} /> : <TerminalIcon size={13} />,
-                label: sessionDisplay(n) || n,
+                label: <span className="tt-tabmenu-row"><span className="nm">{sessionDisplay(n) || n}</span>
+                  <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')} onClick={(e) => { e.stopPropagation(); closeTerm(n) }}>{TI.close}</button></span>,
                 onClick: () => setActive(n),
               })) }] : []),
             ...((fileTabs || []).length ? [{ type: 'group' as const, key: 'g-file', label: t('tabs.allFiles'),
               children: (fileTabs || []).map((f) => ({
                 key: 'file:' + f.path,
                 icon: <FileTypeIcon name={f.path.split('/').pop() || f.path} />,
-                label: f.path.split('/').pop() || f.path,
+                label: <span className="tt-tabmenu-row" title={f.path}><span className="nm">{f.path.split('/').pop() || f.path}</span>
+                  <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')} onClick={(e) => { e.stopPropagation(); closeFile(f.path) }}>{TI.close}</button></span>,
                 onClick: () => onFileTab?.(f.path),
               })) }] : []),
           ],
