@@ -16,6 +16,7 @@ import { useThemeMode } from '../../theme'
 import { api } from '../../api'
 import { useClusterNodes, useCurrentNodeId } from '../cluster/node-url'
 import MobileSubPage from '../MobileSubPage'
+import MobilePageSearch from '../mobile/MobilePageSearch'
 import { SettingRow } from './SettingRow'
 import { buildSettings, itemText, rowCount, type SettingsModel, type SettingsPageDef } from './registry'
 
@@ -189,7 +190,10 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     const openSub = sub ? model.pages[routed] : null
     return (
       <div className="tt-set">
-        {head}
+        <div className="tt-set-mobile-head">
+          <MobilePageSearch inputRef={searchRef} value={q} onChange={setQ}
+            placeholder={t('set.searchPlaceholder')} resultCount={query ? t('set.hitCount', { n: totalHits }) : undefined} />
+        </div>
         {query ? results : (
           <div className="tt-set-catlist">
             {onInstall && <>
@@ -210,10 +214,11 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
                 </button>
               ))
             })}
+            <button type="button" className="tt-set-cat" onClick={showJson}><span>{t('set.jsonButton')}</span><Chevron open={false} /></button>
           </div>
         )}
         {openSub && (
-          <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))}>
+          <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))} manageHistory={false}>
             <div className="tt-set-pane scroll">
               <PaneHead page={openSub} model={model} compact />
               <div className="rows">{openSub.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>

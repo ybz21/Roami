@@ -22,7 +22,7 @@ already exists in code.
 All compact Web pages follow [`docs/development/mobile-material-ui.md`](docs/development/mobile-material-ui.md).
 Keep the top app bar and bottom navigation consistent across routes; put Home, Projects, Tools,
 and Settings in the bottom bar. Open Notifications from the top bar and Home summary. A page must not repeat its
-route title below the top bar. Use the existing design tokens for Material surfaces, type, space,
+route title below the top bar. Secondary pages use one equal-height return bar and one scroll container; URL-backed pages must not also push overlay history. Use the existing design tokens for Material surfaces, type, space,
 and state. Verify both bars, safe areas, page scrolling, and a real touch navigation pass on an
 Android phone before calling mobile UI done.
 

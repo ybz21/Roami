@@ -7,7 +7,7 @@ import { api } from '../../api'
 import { nodeApi } from '../cluster/node-url'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { AppLaunchIcon, CheckIcon, ChevronLeft, ShieldIcon, DeviceIcon, MegaphoneIcon } from '../../icons'
+import { AppLaunchIcon, CheckIcon, ShieldIcon, DeviceIcon, MegaphoneIcon } from '../../icons'
 import { usePwaInstall } from '../auth/install'
 import { PushSettings } from '../settings/push-settings'
 import { pushEnabled, pushSupported } from '../../push'
@@ -33,7 +33,7 @@ function Step({ n, icon, title, done, children }: { n: number; icon: ReactNode; 
   )
 }
 
-export default function InstallPage({ onBack }: { onBack?: () => void }) {
+export default function InstallPage() {
   const { t } = useI18n()
   const { phone } = useLayout()
   const [info, setInfo] = useState<Info | null>(null)
@@ -51,9 +51,7 @@ export default function InstallPage({ onBack }: { onBack?: () => void }) {
 
   return (
     <div className="tt-install">
-      {phone && onBack
-        ? <header className="tt-pagehead tt-mobile-pagehead tt-mobile-detailhead"><button type="button" className="tt-mobile-back" onClick={onBack} aria-label={t('common.back')}><ChevronLeft size={20} /></button><div className="ttl"><div className="kicker">{t('nav.me')}</div><h2>{t('install.pageTitle')}</h2><p>{t('install.pageLead')}</p></div></header>
-        : <div className="tt-pagehead" style={{ marginBottom: 'var(--sp-4)' }}><div className="ttl"><div className="kicker">{t('install.eyebrow')}</div><h2>{t('install.pageTitle')}</h2><p>{t('install.pageLead')}</p></div></div>}
+      {!phone && <div className="tt-pagehead" style={{ marginBottom: 'var(--sp-4)' }}><div className="ttl"><div className="kicker">{t('install.eyebrow')}</div><h2>{t('install.pageTitle')}</h2><p>{t('install.pageLead')}</p></div></div>}
 
       {!phone && (
         <section className="tt-install-qr">

@@ -983,7 +983,7 @@ export default function App() {
     home: <MobileHome last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
-    install: <InstallPage onBack={() => go('settings')} />,
+    install: isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false}><InstallPage /></MobileSubPage> : <InstallPage />,
     tools: <MobileTools onNav={(k) => go(k)} />,
     browser: <BrowserView />,
     phone: <PhoneView />,
@@ -1177,7 +1177,7 @@ export default function App() {
           {tab !== 'inbox' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('nav.inbox')} onClick={() => go('inbox')}>
             {ICONS.inbox}{waitingTotal > 0 && <i className="bd">{waitingTotal}</i>}
           </button>}
-          <button type="button" className="tt-mobile-topbar-icon" aria-label={t('workspace.search')} onClick={openPalette}><SearchIcon size={20} /></button>
+          {mobileNavRoot !== 'projects' && mobileNavRoot !== 'settings' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('workspace.search')} onClick={openPalette}><SearchIcon size={20} /></button>}
         </span>
       </nav>
     </header>}

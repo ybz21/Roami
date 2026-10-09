@@ -5,11 +5,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Input, Modal, Spin, App as AntApp } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, CloseIcon, PencilIcon, SearchIcon, StopIcon, SwarmIcon, TerminalIcon, PlusIcon } from '../../icons'
+import { AgentLogo, ChevronRight, CloseIcon, PencilIcon, StopIcon, SwarmIcon, TerminalIcon, PlusIcon } from '../../icons'
 import { MobileSheet, SheetRow } from '../shell/MobileSheet'
 import { BranchIcon } from '../git/parts'
-import { useBackDismiss } from '../shell/useBackDismiss'
 import MobileProjectDetail from './MobileProjectDetail'
+import MobilePageSearch from './MobilePageSearch'
+import MobileSubPage from '../MobileSubPage'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 export type { OverviewItem } from './mobile-overview-cache'
 
@@ -38,7 +39,6 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 点开的项目（worktree 视图）；安卓返回手势退回列表
   const [cur, setCur] = useState<{ name: string; dir: string } | null>(null)
-  useBackDismiss(!!cur, () => setCur(null))
   useEffect(() => { if (openProject) setCur({ name: openProject.name, dir: openProject.dir }) }, [openProject?.at]) // eslint-disable-line react-hooks/exhaustive-deps
   // 长按一行：改名 / 中断 / 关闭（24 稿 §5 会话列表）
   const { message, modal } = AntApp.useApp()
@@ -155,7 +155,10 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }
 
   if (items === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}><Spin /></div>
-  if (cur) return <MobileProjectDetail name={cur.name} dir={cur.dir} onBack={() => setCur(null)} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} onNewTask={onNewTask} />
+  if (cur) return <MobileSubPage title={cur.name} onBack={() => setCur(null)}
+    action={{ label: t('mobile.proj.newTask'), icon: <PlusIcon size={20} />, onClick: () => onNewTask(cur.dir) }}>
+    <MobileProjectDetail dir={cur.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} />
+  </MobileSubPage>
   return (
     <div className="tt-msess">
       {loadError && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => void reload()}>{t('inbox.retry')}</button></div>}
@@ -170,7 +173,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
         </div>
       </header>
       <div className="tt-msess-head">
-        <Input allowClear prefix={<SearchIcon size={14} />} placeholder={t('mobile.searchSessions')} value={q} onChange={(e) => setQ(e.target.value)} />
+        <MobilePageSearch value={q} onChange={setQ} placeholder={t('mobile.searchSessions')} />
       </div>
       <div className="tt-msess-pills">
         {(['all', 'waiting', 'running', 'idle'] as const).map((k) => {

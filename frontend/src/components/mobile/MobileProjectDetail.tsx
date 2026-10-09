@@ -1,13 +1,12 @@
 // 手机上一个项目的 worktree 视图（从项目分组标题进入）：
 // 每张卡 = 分支 + 收尾状态 + 挂着的会话 + 在这个目录开 Claude / Codex / 终端；顶上「开任务」。
 // 桌面项目页那套问候 / 行动卡 / 筛选 chips / 路径在手机上是硬缩，这里不复用。
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, ChevronLeft, DiffIcon, PlusIcon, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronRight, DiffIcon, TerminalIcon } from '../../icons'
 import AdaptivePanel from '../shell/AdaptivePanel'
-import { useEdgeSwipe } from '../shell/edge-swipe'
 
 const GitPanel = lazy(() => import('../git/GitPanel'))
 import { BranchIcon } from '../git/parts'
@@ -15,13 +14,10 @@ import type { OverviewItem } from './MobileSessions'
 
 type Wt = { path: string; branch: string; isMain: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; pushed?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
 
-export default function MobileProjectDetail({ name, dir, onBack, onOpenSession, onNewInWorktree, onNewTask }: {
-  name: string
+export default function MobileProjectDetail({ dir, onOpenSession, onNewInWorktree }: {
   dir: string
-  onBack: () => void
   onOpenSession: (name: string) => void
   onNewInWorktree: (kind: 'claude' | 'codex' | 'shell', path: string) => void
-  onNewTask: (dir: string) => void
 }) {
   const { t } = useI18n()
   const [wts, setWts] = useState<Wt[] | null>(null)
@@ -30,8 +26,6 @@ export default function MobileProjectDetail({ name, dir, onBack, onOpenSession, 
   // 「改动」二级页：桌面右栏那个 Git 面板原样，手机档它自己会变成全屏二级页
   const [gitAt, setGitAt] = useState<string | null>(null)
   const [showQuiet, setShowQuiet] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  useEdgeSwipe(rootRef, { onBack })
 
   useEffect(() => {
     let stop = false
@@ -66,12 +60,7 @@ export default function MobileProjectDetail({ name, dir, onBack, onOpenSession, 
   const rank = (w: Wt) => ((w.sessions || []).length ? 0 : busy(w) ? 1 : 2)
   const shown = [...all.filter((w) => busy(w) || w.isMain).sort((a, b) => rank(a) - rank(b)), ...(showQuiet ? quiet : [])]
   return (
-    <div className="tt-mproj" ref={rootRef}>
-      <header className="tt-pagehead tt-mobile-pagehead tt-mobile-detailhead">
-        <button type="button" className="tt-mobile-back" onClick={onBack} aria-label={t('common.back')}><ChevronLeft size={20} /></button>
-        <div className="ttl"><div className="kicker">{t('nav.sessions')}</div><h2>{name}</h2></div>
-        <div className="acts"><button type="button" className="tt-mobile-action" onClick={() => onNewTask(dir)}><PlusIcon size={16} />{t('mobile.proj.newTask')}</button></div>
-      </header>
+    <div className="tt-mproj">
       {wts === null && <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}><Spin /></div>}
       {shown.map((w) => (
         <div key={w.path} className="tt-mproj-wt">

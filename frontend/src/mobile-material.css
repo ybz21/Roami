@@ -1,6 +1,7 @@
 /* Mobile Material 3 roles mapped to Roami's existing color, type, shape and space tokens. */
 html[data-size="compact"] {
   --mobile-nav-h: calc(var(--tap) + var(--sp-4));
+  --mobile-topbar-h: calc(var(--tap) + var(--sp-4));
   --pad-page: var(--sp-4);
 }
 .tt-mobile-topbar {
@@ -10,7 +11,12 @@ html[data-size="compact"] {
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-container);
 }
-.tt-mobile-topbar nav { display: flex; align-items: center; min-height: calc(var(--tap) + var(--sp-4)); }
+.tt-mobile-topbar nav { display: flex; align-items: center; min-height: var(--mobile-topbar-h); }
+.tt-mobile-subpage-head { display: flex; flex: 0 0 auto; align-items: center; gap: var(--sp-2); min-height: var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4))); padding-inline: var(--sp-2); border-bottom: 1px solid var(--border-subtle); background: var(--bg-container); }
+.tt-mobile-subpage-head strong { flex: 1; min-width: 0; overflow: hidden; color: var(--text-bright); font-size: var(--fs-title); text-overflow: ellipsis; white-space: nowrap; }
+.tt-mobile-subpage-head button { display: grid; flex: 0 0 var(--tap); place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-dim); cursor: pointer; }
+:where(html[data-pointer="fine"]) .tt-mobile-subpage-head button:hover { background: var(--list-hover); }
+.tt-mobile-subpage-head button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tt-mobile-topbar-title { flex: 1; min-width: 0; overflow: hidden; color: var(--text-bright); font-size: var(--fs-title); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .tt-mobile-topbar-actions { display: flex; flex: 0 0 auto; align-items: center; }
 .tt-mobile-topbar-icon { position: relative; display: grid; flex: 0 0 var(--tap); place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-dim); cursor: pointer; }
@@ -143,7 +149,14 @@ html[data-size="compact"] .tt-mhome .quick button { min-height: calc(var(--tap) 
 html[data-size="compact"] .tt-mhome .projs { gap: var(--sp-3); }
 html[data-size="compact"] .tt-mhome .projs button { min-height: calc(var(--tap) + var(--sp-5)); }
 html[data-size="compact"] .tt-msess-head { margin-bottom: var(--sp-3); }
-html[data-size="compact"] .tt-msess-head .ant-input-affix-wrapper { min-height: var(--tap); border-radius: var(--r-pill); background: var(--bg-container); }
+html[data-size="compact"] .tt-mobile-page-search { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: var(--tap); padding-left: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-container); color: var(--text-dim); }
+html[data-size="compact"] .tt-mobile-page-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+html[data-size="compact"] .tt-mobile-page-search input { flex: 1; min-width: 0; height: var(--tap); padding: 0; border: 0; outline: 0; background: transparent; color: var(--text-bright); font: inherit; font-size: var(--fs-body); }
+html[data-size="compact"] .tt-mobile-page-search input::placeholder { color: var(--text-dimmer); }
+html[data-size="compact"] .tt-mobile-page-search .count { flex: 0 0 auto; color: var(--text-dim); font-size: var(--fs-meta); }
+html[data-size="compact"] .tt-mobile-page-search button { display: grid; flex: 0 0 var(--tap); place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-dim); cursor: pointer; }
+:where(html[data-pointer="fine"]) .tt-mobile-page-search button:hover { background: var(--list-hover); }
+html[data-size="compact"] .tt-mobile-page-search button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 html[data-size="compact"] .tt-msess-pills { flex-wrap: wrap; overflow: visible; margin-block: var(--sp-3) var(--sp-4); }
 html[data-size="compact"] .tt-msess-pills .tt-pill { flex: 0 1 auto; min-height: var(--tap); border-radius: var(--r-pill); }
 html[data-size="compact"] .tt-msess-sec { margin-top: var(--sp-5); }
@@ -244,6 +257,15 @@ html[data-size="compact"] .tt-set-headrow > .tt-pagename,
 html[data-size="compact"] .tt-set-headrow > .tt-pagedivider { display: none; }
 html[data-size="compact"] .tt-set-head { padding-inline: 0; }
 html[data-size="compact"] .tt-set-search { min-height: var(--tap); }
+html[data-size="compact"] .tt-set-mobile-head { flex: 0 0 auto; padding-block: var(--sp-2) var(--sp-3); }
+html[data-size="compact"] .tt-set-pane { overflow-y: auto; padding-inline: var(--sp-3); }
+html[data-size="compact"] .tt-set-pane .rows,
+html[data-size="compact"] .tt-set-pane.scroll .rows { flex: 0 0 auto; overflow: visible; padding-right: 0; }
+html[data-size="compact"] .tt-set-row .key { display: none; }
+html[data-size="compact"] .tt-mproj,
+html[data-size="compact"] .tt-install { flex: 1; min-height: 0; overflow-y: auto; }
+html[data-size="compact"] .tt-mproj-wt .acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-size="compact"] .tt-mproj-wt .acts > button { min-width: 0; justify-content: center; }
 html[data-size="compact"] .tt-mme-push { min-height: calc(var(--tap) + var(--sp-3)); padding: var(--sp-3); }
 
 .tt-bottomnav {
