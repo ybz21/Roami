@@ -129,7 +129,7 @@ export default function PluginsPanel({ initialId }: { initialId?: string } = {})
     // 比页面亮一档的底，和会话工作区/镜像页那种「一整块，靠 1px 线断句」完全不是一套语言。
     // 卡片本身留着（antd 的头/体布局还用得上），外观由 .tt-plugins 收平，见 index.css。
     <div className="tt-plugins" style={{ display: 'flex', height: '100%', minHeight: 0 }}>
-      <Card size="small" className="tt-plugins-list" style={isMobile ? { flex: 1, minWidth: 0, overflow: 'auto' } : { width: 280, flex: '0 0 280px', overflow: 'auto' }} title={t('plugins.title')}
+      <Card size="small" className="tt-plugins-list" style={isMobile ? { flex: 1, minWidth: 0, overflow: 'auto' } : { width: 280, flex: '0 0 280px', overflow: 'auto' }} title={isMobile ? undefined : t('plugins.title')}
         extra={<Space size={4}>
           <Button size="small" type="primary" onClick={() => setInstallOpen(true)}>{t('plugins.install')}</Button>
           <Tooltip title={t('plugins.marketSoon')}>

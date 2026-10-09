@@ -1,4 +1,4 @@
-// 手机上一个项目的 worktree 视图（24 稿 §5，改成从会话页的项目分组标题点进来，不再是一级页）：
+// 手机上一个项目的 worktree 视图（从项目分组标题进入）：
 // 每张卡 = 分支 + 收尾状态 + 挂着的会话 + 在这个目录开 Claude / Codex / 终端；顶上「开任务」。
 // 桌面项目页那套问候 / 行动卡 / 筛选 chips / 路径在手机上是硬缩，这里不复用。
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'

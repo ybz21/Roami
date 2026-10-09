@@ -1,4 +1,4 @@
-// 手机「会话」页（24 稿 §5）：按项目分组的会话列表，顶上钉「需要你」。
+// 手机「项目」页：按项目分组的会话列表。
 // 数据只吃一条 GET /sessions/overview（会话 + 归属 + 探测循环的活状态），5s 一轮——
 // 桌面树那三条原料手机上不齐（worktree 那趟被省了），拿来画只会全成散会话。
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -111,7 +111,6 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     // 散会话垫底
     return Array.from(by.entries()).sort((a, b) => (a[0] === '' ? 1 : 0) - (b[0] === '' ? 1 : 0)).map(([, g]) => g)
   }, [items, needle, filter]) // eslint-disable-line react-hooks/exhaustive-deps
-  const needs = useMemo(() => (items || []).filter((s) => s.waiting && hit(s)), [items, needle, filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const status = (s: OverviewItem) => s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
   const row = (s: OverviewItem, sub = false) => (
@@ -163,7 +162,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">
           <div className="kicker">{t('mobile.sessions.kicker')}</div>
-          <h2>{t('nav.sessions')}</h2>
+          <h2>{t('nav.projects')}</h2>
           <p>{t('mobile.sessions.lead')}</p>
         </div>
         <div className="acts">
@@ -179,9 +178,6 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           return <button key={k} type="button" className={`tt-pill${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{t(k === 'all' ? 'mobile.filter.all' : 'mobile.st.' + k)}<span>{n}</span></button>
         })}
       </div>
-      {!needle && filter === 'all' && needs.length > 0 && (
-        <section className="tt-msess-sec hot"><h3>{t('inbox.waiting')} <span>{needs.length}</span></h3>{needs.map((s) => row(s))}</section>
-      )}
       {groups.map((g, i) => (
         <section key={i} className="tt-msess-sec">
           {g.dir

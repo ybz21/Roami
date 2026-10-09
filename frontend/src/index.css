@@ -548,6 +548,7 @@ html[data-pointer="coarse"] .tt-nav-collapse::after {
 }
 /* 左栏靠一条竖线跟右栏断句；两栏同底，不再一亮一暗 */
 .tt-plugins > .tt-plugins-list { border-right: 1px solid var(--border-subtle); }
+.tt-filebrowser-title { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
 .tt-plugins-detail > .ant-card > .ant-card-body { padding-inline: var(--sp-4); }
 
 /* ── 右栏三面板（22 设计 §3.4）：活动条 + 作用域头 + 文件 / Git / Worktree ── */
@@ -3827,6 +3828,10 @@ html[data-pointer="coarse"] .tt-ka-rules .tt-act.xs { height: 30px; width: 34px;
 .tt-inbox-row .t span { font-size: var(--fs-meta); color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tt-inbox-row.unread .t b { color: var(--text-bright); }
 .tt-inbox-row em { flex: 0 0 auto; font-style: normal; color: var(--text-dimmer); font: 400 var(--fs-micro)/1 var(--mono); }
+.tt-inbox-entry { margin-bottom: var(--sp-2); }
+.tt-inbox-entry .tt-inbox-row { margin-bottom: 0; }
+.tt-inbox-acts { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-1); }
+html[data-pointer="coarse"] .tt-inbox-acts .tt-act { min-height: var(--tap); }
 .tt-inbox-empty-icon { display: inline-flex; color: var(--text-dimmer); }
 .tt-inbox-empty-icon svg { width: var(--sp-5); height: var(--sp-5); }
 .tt-inbox-empty { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-5); padding: var(--sp-5); color: var(--text-dim); font-size: var(--fs-sm); }

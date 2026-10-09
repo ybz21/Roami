@@ -219,6 +219,7 @@ function applyCssVars(mode: ThemeMode) {
   for (const [key, value] of Object.entries(THEME_TOKENS[mode].css)) {
     root.style.setProperty(key, value)
   }
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_TOKENS[mode].css['--bg-container'])
   // 实心强调色以 antd 推导出来的为准，自绘控件才不会比 antd 控件差一档蓝
   root.style.setProperty('--accent-solid', solidAccent(mode))
 }

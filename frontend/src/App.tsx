@@ -36,7 +36,7 @@ const InboxPage = lazyRetry(() => import('./components/inbox/InboxPage'))
 const MobileSessions = lazyRetry(() => import('./components/mobile/MobileSessions'))
 const MobileHome = lazyRetry(() => import('./components/mobile/MobileHome'))
 const InstallPage = lazyRetry(() => import('./components/install/InstallPage'))
-const MobileMe = lazyRetry(() => import('./components/mobile/MobileMe'))
+const MobileTools = lazyRetry(() => import('./components/mobile/MobileTools'))
 const BrowserView = lazyRetry(() => import('./components/mirror/BrowserView'))
 const PhoneView = lazyRetry(() => import('./components/mirror/PhoneView'))
 const Swarm = lazyRetry(() => import('./components/swarm/Swarm'))
@@ -86,7 +86,7 @@ import type { ClaudeInfo } from './components/terminal/claude-info'
 import { dropDeadTokens, loadTabs, saveTabs, type FileTab } from './components/terminal/term-tabs-store'
 import { lastTabOf, rememberLastTab } from './components/shell/task-last-tab'
 import type { FileTabMode } from './components/files/FilePathBar'
-import { CloudIcon, ExitFullscreenIcon, FullscreenIcon, LogoutIcon, MoonIcon, MoreIcon, SearchIcon, SunIcon } from './icons'
+import { ChevronLeft, CloudIcon, LogoutIcon, MoreIcon, PlusIcon, SearchIcon } from './icons'
 import { lazyRetry } from './components/lazy-retry'
 
 const { Sider, Content } = Layout
@@ -108,8 +108,8 @@ const NAV = [
   { key: 'phone', labelKey: 'nav.phone' },
   { key: 'plugins', labelKey: 'nav.plugins' },
   { key: 'settings', labelKey: 'nav.env' },
-  { key: 'sessions', labelKey: 'nav.sessions' }, // 手机底栏第二格；桌面不列（23 设计 §5 退役的老会话页只留路由）
-  { key: 'me', labelKey: 'nav.me' },             // 手机「我」页：机器 · 通知 · 工具 · 账户
+  { key: 'sessions', labelKey: 'nav.sessions' }, // 兼容旧会话页路由；手机归入项目，桌面不列
+  { key: 'tools', labelKey: 'nav.groupTools' },
 ]
 
 // 桌面导航的两组（14 §4.4）。NAV 仍是全量注册表——命令面板和手机「更多」都从它取，
@@ -126,13 +126,8 @@ function loadPageTabs(): string[] {
   return []
 }
 
-// 手机底栏。13 §4.1 当初把「浏览器/手机镜像」折进「更多」，理由是低频且窄屏下几乎不可用
-// （地址栏固定 150、设备选择器固定 240）——那两处固定宽度后来都改成自适应了，而这两页
-// 恰恰是本机最常用的两个工具，藏在二级 sheet 里每次要点两下。现在放回底栏。
-// 概览并进项目页后这里空出一格，不再补人：4 格 + 「更多」= 5 个按钮，390 宽下每格 78，
-// 比原来 6 格的 65 宽出一截（13 §7.1 的命中区下限是 44，但相邻图标还要留够间隙）。
-// 24 稿 §5：手机四格 收件箱 · 会话 · 项目 · 我。文件 / 浏览器 / 手机镜像 / 插件 / 设置 从「我」进，不再有「更多」
-const MOBILE_NAV_KEYS = ['home', 'sessions', 'me']
+// 手机主导航按工作路径排列；通知由顶部入口进入。
+const MOBILE_NAV_KEYS = ['home', 'projects', 'tools', 'settings']
 
 // 用 Canvas 容器查询排版的页面（见 index.css 的 .tt-canvas[data-cq]）。逐页开，
 // 不是全局开：container-type 会改变 fixed 后代的包含块。
@@ -166,6 +161,8 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [route, setRoute] = useState(() => normalizeRoute(location.hash.replace(/^#\/?/, '') || 'projects'))
   const tab = route.split('/')[0]                                  // 基础页（swarm/leave → swarm）
+  const lastMobilePrimary = useRef('home')
+  useEffect(() => { if (MOBILE_NAV_KEYS.includes(tab)) lastMobilePrimary.current = tab }, [tab])
   const [pageTabs, setPageTabs] = useState<string[]>(loadPageTabs)
   const [tabBarHost, setTabBarHost] = useState<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -194,10 +191,9 @@ export default function App() {
     const qs = qi >= 0 ? location.hash.slice(qi) : ''
     location.hash = '#/' + k + qs
   }
-  const { mode, toggle: toggleTheme } = useThemeMode()
+  const { mode } = useThemeMode()
   const { t } = useI18n()
   const [prefs] = usePreferences()
-  const themeIcon = mode === 'dark' ? <SunIcon size={18} /> : <MoonIcon size={18} />
   const { phone: isMobile, desktop: hasSider } = useLayout()
   // 点通知进来：#/inbox/<会话> → 直接开那个会话。放在这里而不是收件箱页里：那边只在挂载时认一次，
   // 已经停在收件箱、或者同一个会话第二次来通知，就只会落在消息列表上。开完把地址收回 #/inbox，下次还能再触发。
@@ -214,11 +210,6 @@ export default function App() {
     setTimeout(() => openTermRef.current?.(name), 60)
   }, [authed, inboxSub]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!isMobile || tab !== 'projects') return
-    const qi = location.hash.indexOf('?')
-    location.replace('#/home' + (qi >= 0 ? location.hash.slice(qi) : ''))
-  }, [isMobile, tab])
   // 全屏（平板更易用：隐藏浏览器栏，等价 F11）。监听变化以同步按钮图标
   const [isFs, setIsFs] = useState(false)
   useEffect(() => {
@@ -936,7 +927,6 @@ export default function App() {
       (docEl.requestFullscreen || docEl.webkitRequestFullscreen)?.call(docEl)
     }
   }
-  const fsIcon = isFs ? <ExitFullscreenIcon /> : <FullscreenIcon />
 
   const termPane = (
     <TerminalPane
@@ -985,17 +975,16 @@ export default function App() {
       ? mobileSessions
       : <Sessions openTerm={openTerm} closeTerm={closeTerm} activeTerm={active} />,
     files: <FilesPage openTerm={openTerm} />,
-    settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout} />,
+    settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout}
+      onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
     inbox: <InboxPage onOpenSession={(n) => openTerm(n)} />,
     home: <MobileHome last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
-      onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('sessions') }}
-      onNewTask={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }} />,
-    install: <InstallPage onBack={() => go('me')} />,
-    me: <MobileMe nodes={clusterNodes} curNodeId={curNodeId} onSwitchNode={(id) => switchNode(id)} onNav={(k) => go(k)} onSearch={openPalette} onNewProject={() => setNewProjectOpen(true)}
-      themeIcon={themeIcon} themeLabel={mode === 'dark' ? t('common.lightTheme') : t('common.darkTheme')} onToggleTheme={toggleTheme}
-      fsSupported={fsSupported} fsIcon={fsIcon} fsLabel={isFs ? t('common.exitFullscreen') : t('common.fullscreen')} onToggleFs={toggleFs} onLogout={logout} />,
+      onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
+    />,
+    install: <InstallPage onBack={() => go('settings')} />,
+    tools: <MobileTools onNav={(k) => go(k)} />,
     browser: <BrowserView />,
     phone: <PhoneView />,
   }
@@ -1157,6 +1146,16 @@ export default function App() {
     else if (a.kind === 'pluginView') location.hash = '#/plugins/' + encodeURIComponent(a.id)
   }
 
+  const mobileNavRoot = tab === 'sessions' ? 'projects' : tab
+  const mobilePrimary = MOBILE_NAV_KEYS.includes(mobileNavRoot)
+  const mobileBack = tab === 'inbox' ? lastMobilePrimary.current
+    : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
+  const mobileTitle = tab === 'install' ? t('install.pageTitle')
+    : tab === 'about' ? t('nav.about')
+      : tab === 'swarm' || tab === 'w' ? t('nav.projects')
+        : tab === 'hub' ? t('hub.title')
+          : t(NAV.find((n) => n.key === mobileNavRoot)?.labelKey || 'nav.home')
+
   return (
     // 外壳改成列向：[ 横向行(侧栏 + 工作区) ][ 状态条 ]。状态条必须占位——
     // 用 position:fixed 的话上面那层照旧按 100dvh 算高，页面最后一行会永远
@@ -1165,6 +1164,23 @@ export default function App() {
     {/* overflow 用 clip 不用 hidden：hidden 仍是滚动容器，收起的终端坞（宽 0、内容仍挂着）里
         一个 autoFocus 就能让浏览器把整个 Layout 往右「滚」出去，左侧栏只剩右边缘露在屏幕外——
         会话页上就是这么被挤成一条窄轨的。clip 不是滚动容器，谁也滚不动它 */}
+    {isMobile && <header className="tt-mobile-topbar">
+      <nav aria-label={t('mobile.nav.top')}>
+        <button type="button" className="tt-mobile-topbar-icon" aria-label={t(mobilePrimary ? 'nav.home' : 'common.back')}
+          onClick={() => go(mobilePrimary ? 'home' : mobileBack)}>
+          {mobilePrimary ? <img src="/logo-mark.svg" alt="" /> : <ChevronLeft size={20} />}
+        </button>
+        <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
+        <span className="tt-mobile-topbar-actions">
+          {mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
+            onClick={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}><PlusIcon size={20} /></button>}
+          {tab !== 'inbox' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('nav.inbox')} onClick={() => go('inbox')}>
+            {ICONS.inbox}{waitingTotal > 0 && <i className="bd">{waitingTotal}</i>}
+          </button>}
+          <button type="button" className="tt-mobile-topbar-icon" aria-label={t('workspace.search')} onClick={openPalette}><SearchIcon size={20} /></button>
+        </span>
+      </nav>
+    </header>}
     <Layout style={{ flex: 1, minHeight: 0, overflow: 'clip', background: 'var(--bg-base)' }}>
       <UpdateBanner />
       {/* Focus 时导航收成 64px 轨而不是消失——上下文始终可找回（14 §4.1，老 dockMax 的病根）。
@@ -1294,17 +1310,17 @@ export default function App() {
         )
       })()}
 
-      {/* 手机三项导航与页面内容保持固定的底部安全距离。 */}
+      {/* 手机四项导航与页面内容保持固定的底部安全距离。 */}
       {isMobile && (
         <div className="tt-bottomnav">
         {offline && <div className="tt-offline">{t('mobile.offline')}</div>}
-        <nav aria-label={t('nav.home')}>
+        <nav aria-label={t('mobile.nav.bottom')}>
           {MOBILE_NAV_KEYS.map((key) => {
             const n = NAV.find((x) => x.key === key)!
             return (
               <button key={n.key} type="button" onClick={() => go(n.key)} className="tt-bottomnav-btn"
-                aria-current={tab === n.key ? 'page' : undefined}>
-                <span className="ic">{ICONS[n.key]}{n.key === 'home' && waitingTotal > 0 && <i className="bd">{waitingTotal}</i>}</span><span>{t(n.labelKey)}</span>
+                aria-current={tab === n.key || (n.key === 'projects' && tab === 'sessions') ? 'page' : undefined}>
+                <span className="ic">{ICONS[n.key]}</span><span>{t(n.labelKey)}</span>
               </button>
             )
           })}
@@ -1312,7 +1328,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 全局搜索挂在这里而不是顶栏里：手机没有顶栏、终端聚焦时 xterm 会吃掉按键，
+      {/* 全局搜索浮层挂在根节点：终端聚焦时 xterm 会吃掉按键，
           都得靠这一处（见 shell/palette/GlobalSearch）。入口另给：顶栏那枚框、
           手机「更多」里那一行、以及 ⌘K / Ctrl+K。 */}
       <GlobalSearch items={paletteItems} actions={paletteActions} dir={activeProject?.worktree || activeProject?.dir} />

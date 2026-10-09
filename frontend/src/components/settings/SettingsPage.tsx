@@ -71,7 +71,13 @@ function PaneHead({ page, model, compact }: { page: SettingsPageDef; model: Sett
   )
 }
 
-export default function SettingsPage({ sub, onNav, onLogout }: { sub?: string; onNav?: (route: string) => void; onLogout?: () => void }) {
+export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscreen }: {
+  sub?: string
+  onNav?: (route: string) => void
+  onLogout?: () => void
+  onInstall?: () => void
+  fullscreen?: { active: boolean; toggle: () => void }
+}) {
   const { t, locale, setLocale } = useI18n()
   const { message, modal } = AntApp.useApp()
   const { mode, setMode } = useThemeMode()
@@ -186,6 +192,13 @@ export default function SettingsPage({ sub, onNav, onLogout }: { sub?: string; o
         {head}
         {query ? results : (
           <div className="tt-set-catlist">
+            {onInstall && <>
+              <div className="tt-set-sec">{t('mobile.settings.app')}</div>
+              <button type="button" className="tt-set-cat" onClick={onInstall}><span>{t('install.meRow')}</span><Chevron open={false} /></button>
+              {fullscreen && <button type="button" className="tt-set-cat" onClick={fullscreen.toggle}>
+                <span>{t(fullscreen.active ? 'common.exitFullscreen' : 'mobile.fullscreenHideStatus')}</span><Chevron open={false} />
+              </button>}
+            </>}
             {model.nodes.map((n, i) => {
               if (n.kind === 'section') return <div key={i} className="tt-set-sec">{n.title}</div>
               const ids = n.kind === 'leaf' ? [n.page] : n.kids

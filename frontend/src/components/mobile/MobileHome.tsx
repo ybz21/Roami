@@ -1,13 +1,10 @@
-// 手机首页：一屏回答「现在要不要我动手、机器撑不撑得住」。
-// 从上到下按「要我处理 → 状态概览 → 快捷入口」排：等你批的带着按钮摆最前，不用点进会话就能放行；
-// 机器状态是 Roami 自托管才有的一块——2026-09-28 那次 16G 被挤爆，就是因为手机上看不到内存已经见底。
+// 手机首页只给状态摘要；会话提醒在收件箱处理，项目收尾在项目页查看。
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { App as AntApp, Spin } from 'antd'
+import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, CheckIcon, ChevronRight, CloseIcon, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronRight, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
-import { ICONS } from '../nav-icons'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { AppUpdateBanner } from './app-update'
 
@@ -15,9 +12,6 @@ const HOST_MONITOR = 'roam.host-monitor'
 type Inbox = { id: number; type: string; session: string; label: string; body: string; at: number; read: boolean }
 type Host = { hostname: string; cpu: number; temp: number; mem: number; memFree: number; swap: number; disk: number; load: number; cores: number }
 type Item = OverviewItem & { yesNo?: boolean }
-
-// 摘要是 agent 回答的开头，常带 markdown 记号；首页只要一行白话
-const plain = (v: string) => v.replace(/(^|\s)#{1,6}\s+/g, '$1').replace(/[*_`]{1,3}/g, '').replace(/\s+/g, ' ').trim()
 
 function ago(sec: number, t: (k: string) => string): string {
   const d = Math.max(0, Math.floor(Date.now() / 1000 - sec))
@@ -29,22 +23,19 @@ function ago(sec: number, t: (k: string) => string): string {
 
 type Proj = { key: string; name: string; dir: string; sessions: number; running: number; waiting: number; unfinished: number; worktrees: number; lastActivity: number }
 
-export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProject }: {
+export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   /** 上次看的会话，给「继续上次」用 */
   last: string | null
   onOpen: (name: string) => void
   onNav: (key: string) => void
-  onNewTask: () => void
   onOpenProject: (p: { name: string; dir: string }) => void
 }) {
   const { t } = useI18n()
-  const { message } = AntApp.useApp()
   const [items, setItems] = useState<Item[] | null>(() => readMobileOverview())
   const [inbox, setInbox] = useState<Inbox[]>([])
   const [projects, setProjects] = useState<Proj[]>([])
   const [host, setHost] = useState<Host | null>(null)
   const [hostStatus, setHostStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
-  const [acting, setActing] = useState('')
   const [overviewError, setOverviewError] = useState(false)
 
   const loadLive = useCallback(() => api('GET', '/sessions/overview').then((r) => { setItems(writeMobileOverview(r.data.items || [])); setOverviewError(false) }).catch(() => { setOverviewError(true); setItems((c) => c || []) }), [])
@@ -73,33 +64,20 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
   if (items === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}><Spin /></div>
 
   const waiting = items.filter((s) => s.waiting)
-  const activeWaiting = new Set(waiting.map((s) => s.name))
-  const unread = inbox.filter((x) => x.type === 'session.waiting' && !x.read && activeWaiting.has(x.session)).length
   const running = items.filter((s) => s.running)
   const dayStart = new Date().setHours(0, 0, 0, 0) / 1000
   const doneToday = inbox.filter((x) => x.type === 'session.done' && x.at >= dayStart)
   const errors = inbox.filter((x) => x.type === 'session.error' && !x.read)
 
-  const toFinish = projects.filter((p) => p.unfinished > 0)
-  const unfinished = toFinish.reduce((n, p) => n + p.unfinished, 0)
-  const needs = waiting.length + toFinish.length + errors.length
+  const unfinished = projects.reduce((n, p) => n + p.unfinished, 0)
+  const needs = waiting.length + errors.length
   // 和电脑版主页同一句话：先问候，再说今天有几件事要你
   const h = new Date().getHours()
   const greet = t(h < 12 ? 'overview.greetMorning' : h < 18 ? 'overview.greetAfternoon' : 'overview.greetEvening')
-  const headline = greet + (needs ? t('overview.headlineNeeds', { count: needs })
+  const headline = greet + (needs ? t('mobile.home.headNeeds', { n: needs })
     : running.length ? t('mobile.home.headRunning', { n: running.length }) : t('mobile.home.headQuiet'))
   const lastItem = last ? items.find((x) => x.name === last && !x.waiting) : undefined
   const busyProjects = [...projects].filter((p) => p.sessions > 0).sort((a, b) => b.lastActivity - a.lastActivity)
-
-  const answer = async (s: Item, key: 'Enter' | 'Escape') => {
-    setActing(s.name + key)
-    try {
-      await api('POST', `/sessions/${encodeURIComponent(s.name)}/keys`, { keys: [key] })
-      message.success(t(key === 'Enter' ? 'mobile.home.allowed' : 'mobile.home.denied', { name: s.label }))
-      setItems((cur) => writeMobileOverview((cur || []).map((x) => (x.name === s.name ? { ...x, waiting: false } : x))))
-      setTimeout(() => { void loadLive() }, 1500)
-    } catch (e: any) { message.error(e.message) } finally { setActing('') }
-  }
 
   const tile = (n: number, label: string, tone: '' | 'warn' | 'ok', to: string) => (
     <button type="button" className={`tile ${n > 0 ? tone : ''}`} onClick={() => onNav(to)}>
@@ -117,7 +95,6 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
     )
   }
   const icon = (s: { agent?: string }) => (s.agent === 'claude' || s.agent === 'codex' ? <AgentLogo kind={s.agent} size={16} /> : <TerminalIcon size={16} />)
-  const where = (s: Item) => [s.project, s.branch].filter(Boolean).join(' · ')
   const section = (title: string, n: number | null, more: (() => void) | null, children: ReactNode) => (
     <section className="sec">
       <h3>{title}{n !== null && <span>{n}</span>}{more && <button type="button" onClick={more}>{t('mobile.home.all')}<ChevronRight size={12} /></button>}</h3>
@@ -135,28 +112,18 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
           <h2>{headline}</h2>
           <p>{t('mobile.home.lead')}</p>
         </div>
-        <div className="acts">
-          <button type="button" className="bell" aria-label={t('nav.inbox')} onClick={() => onNav('inbox')}>
-            {ICONS.inbox}{unread > 0 && <i>{unread}</i>}
-          </button>
-        </div>
       </header>
 
       <div className="tiles">
-        {tile(waiting.length, t('mobile.st.waiting'), 'warn', 'sessions')}
-        {tile(running.length, t('mobile.st.running'), 'ok', 'sessions')}
+        {tile(waiting.length, t('mobile.st.waiting'), 'warn', 'inbox')}
+        {tile(running.length, t('mobile.st.running'), 'ok', 'projects')}
         {tile(doneToday.length, t('mobile.home.doneToday'), '', 'inbox')}
-        {tile(unfinished, t('mobile.home.unfinished'), '', 'sessions')}
+        {tile(unfinished, t('mobile.home.unfinished'), '', 'projects')}
       </div>
 
-      {section(t('mobile.home.machine'), null, null, host ? (
-        <div className="host">
-          {meter(t('mobile.home.mem'), host.mem, t('mobile.home.memFree', { gb: (host.memFree / 1073741824).toFixed(1) }))}
-          {meter(t('mobile.home.swap'), host.swap, `${Math.round(host.swap)}%`)}
-          {meter('CPU', host.cpu, `${Math.round(host.cpu)}% · ${t('mobile.home.load', { n: host.load.toFixed(1), cores: host.cores })}${host.temp ? ` · ${Math.round(host.temp)}°C` : ''}`)}
-          {meter(t('mobile.home.disk'), host.disk, `${Math.round(host.disk)}%`)}
-        </div>
-      ) : <div className="host-empty" role="status">{t(hostStatus === 'loading' ? 'mobile.home.machineLoading' : 'mobile.home.machineUnavailable')}</div>)}
+      {needs > 0 && <button type="button" className="inbox-link" onClick={() => onNav('inbox')}>
+        <span>{t('mobile.home.inboxSummary', { n: needs })}</span><ChevronRight size={16} />
+      </button>}
 
       {lastItem && (
         <button type="button" className="resume" onClick={() => onOpen(lastItem.name)}>
@@ -166,37 +133,7 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
         </button>
       )}
 
-      {(waiting.length > 0 || toFinish.length > 0) && section(t('inbox.waiting'), waiting.length + toFinish.length, null, <>{waiting.map((s) => (
-        <div key={s.name} className="need">
-          <button type="button" className="body" onClick={() => onOpen(s.name)}>
-            <span className="ic">{icon(s)}</span>
-            <span className="t"><b>{s.label}</b>{where(s) && <small>{where(s)}</small>}<p>{s.tail || t('inbox.noSummary')}</p></span>
-          </button>
-          <div className="acts">
-            {s.yesNo && <>
-              <button type="button" className="tt-act ok" disabled={!!acting} onClick={() => answer(s, 'Enter')}><CheckIcon size={13} />{t('mobile.home.allow')}</button>
-              <button type="button" className="tt-act danger" disabled={!!acting} onClick={() => answer(s, 'Escape')}><CloseIcon size={13} />{t('mobile.home.deny')}</button>
-            </>}
-            <button type="button" className="tt-act" onClick={() => onOpen(s.name)}>{t('mobile.home.open')}<ChevronRight size={12} /></button>
-          </div>
-        </div>
-      ))}{toFinish.map((p) => (
-        <button key={p.key} type="button" className="need finish" onClick={() => onOpenProject(p)}>
-          <span className="ic"><BranchIcon size={14} /></span>
-          <span className="t"><b>{t('overview.unfinishedN', { count: p.unfinished })}</b><small>{p.name}</small></span>
-          <span className="go">{t('overview.goFinish')}<ChevronRight size={12} /></span>
-        </button>
-      ))}</>)}
-
-      {errors.length > 0 && section(t('inbox.errors'), errors.length, () => onNav('inbox'), errors.slice(0, 3).map((x) => (
-        <button key={x.id} type="button" className="tt-msess-row err" onClick={() => onOpen(x.session)}>
-          <span className="ic"><CloseIcon size={14} /></span>
-          <span className="t"><b>{x.label}</b><span className="st"><span className="tail">{plain(x.body)}</span></span></span>
-          <em>{ago(x.at, t)}</em>
-        </button>
-      )))}
-
-      {section(t('mobile.home.running'), running.length, () => onNav('sessions'), running.length ? running.slice(0, 3).map((s) => (
+      {section(t('mobile.home.running'), running.length, () => onNav('projects'), running.length ? running.slice(0, 3).map((s) => (
         <button key={s.name} type="button" className="tt-msess-row" onClick={() => onOpen(s.name)}>
           <span className="ic">{icon(s)}</span>
           <span className="t">
@@ -208,7 +145,7 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
         </button>
       )) : <div className="none">{t('mobile.home.noneRunning')}</div>)}
 
-      {busyProjects.length > 0 && section(t('nav.projects'), busyProjects.length, () => onNav('sessions'), (
+      {busyProjects.length > 0 && section(t('nav.projects'), busyProjects.length, () => onNav('projects'), (
         <div className="projs">
           {busyProjects.slice(0, 4).map((p) => (
             <button key={p.key} type="button" onClick={() => onOpenProject(p)}>
@@ -225,6 +162,15 @@ export default function MobileHome({ last, onOpen, onNav, onNewTask, onOpenProje
           ))}
         </div>
       ))}
+
+      {section(t('mobile.home.machine'), null, null, host ? (
+        <div className="host">
+          {meter(t('mobile.home.mem'), host.mem, t('mobile.home.memFree', { gb: (host.memFree / 1073741824).toFixed(1) }))}
+          {meter(t('mobile.home.swap'), host.swap, `${Math.round(host.swap)}%`)}
+          {meter('CPU', host.cpu, `${Math.round(host.cpu)}% · ${t('mobile.home.load', { n: host.load.toFixed(1), cores: host.cores })}${host.temp ? ` · ${Math.round(host.temp)}°C` : ''}`)}
+          {meter(t('mobile.home.disk'), host.disk, `${Math.round(host.disk)}%`)}
+        </div>
+      ) : <div className="host-empty" role="status">{t(hostStatus === 'loading' ? 'mobile.home.machineLoading' : 'mobile.home.machineUnavailable')}</div>)}
 
     </div>
   )
