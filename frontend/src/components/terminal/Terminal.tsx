@@ -15,6 +15,7 @@ import { paneCellsToPixelRect } from './terminal-geometry'
 import { RESUME_RESYNC_MS, resumeHealFor, shouldJiggleAfterAttach } from './terminal-resize'
 import type { ResumeHeal, TerminalDimensions } from './terminal-resize'
 import { parseTerminalPong, parseTerminalRevived } from './terminal-lifecycle'
+import { useLayout } from '../../layout'
 
 export type TermStatus = 'connecting' | 'connected' | 'closed'
 
@@ -207,6 +208,7 @@ const Term = forwardRef<TermHandle, {
   onPaste?: () => void // Ctrl+Shift+V / Cmd+V：交父组件走应用粘贴（读剪贴板→失败弹手动框）
   onImagePaste?: (files: File[]) => void // 粘贴事件含图片时回调（绕过键盘拦截时的兜底）
 }>(function Term({ name, fontSize, active, onStatus, onRevived, onContextMenu, onSelectionMenu, onPaste, onImagePaste }, ref) {
+  const { coarse } = useLayout()
   const elRef = useRef<HTMLDivElement>(null)
   const handoffCanvasRef = useRef<HTMLCanvasElement>(null)
   const restoredFrameRef = useRef<HTMLImageElement>(null)
@@ -511,7 +513,8 @@ const Term = forwardRef<TermHandle, {
     ws.onopen = () => {
       silentReconnect.current = false
       retryDelay.current = RETRY_BASE_MS
-      onStatus?.('connected'); termRef.current?.focus()
+      onStatus?.('connected')
+      if (!coarse) termRef.current?.focus()
       // query 已经决定了新 pty 的尺寸，把它记为“已同步”。若连接建立期间布局又变了，
       // applyResize 会只补发最终的新尺寸；没有变化则不再发送一次重复 resize。
       lastSent.current = requested || { cols: 0, rows: 0 }
@@ -597,7 +600,7 @@ const Term = forwardRef<TermHandle, {
   }
 
   useImperativeHandle(ref, () => ({
-    send: (s, keepFocus) => { const ws = wsRef.current; if (ws && ws.readyState === 1) ws.send(s); if (!keepFocus) termRef.current?.focus() },
+    send: (s, keepFocus) => { const ws = wsRef.current; if (ws && ws.readyState === 1) ws.send(s); if (!keepFocus && !coarse) termRef.current?.focus() },
     fit: () => { applyResize() },
     copy: () => {
       const sel = termRef.current?.getSelection() || ''
@@ -1151,7 +1154,7 @@ const Term = forwardRef<TermHandle, {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fontSize])
 
-  // 非当前标签用 visibility 隐藏但始终保留相同布局尺寸，切回时不需要再次 fit，只需聚焦。
+  // 非当前标签用 visibility 隐藏但始终保留相同布局尺寸，切回时桌面只需聚焦。
   useEffect(() => {
     if (!active) return
     if (resumeHealPending.current !== 'none') {
@@ -1159,10 +1162,11 @@ const Term = forwardRef<TermHandle, {
       resumeHealPending.current = 'none'
       runResumeHeal(heal)
     }
+    if (coarse) return
     const raf = requestAnimationFrame(() => termRef.current?.focus())
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active])
+  }, [active, coarse])
 
   // 触摸选区手柄（Android 风格泪滴）：start 挂在选区首字符左下、end 挂在末字符右下，可拖动微调
   const handleStyle = (which: 'start' | 'end'): CSSProperties => ({
