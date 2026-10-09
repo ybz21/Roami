@@ -9,7 +9,8 @@ import { INTENT_EVENT, OPEN_FILE_INTENT, takeIntentData } from '../../intents'
 import { useLayout } from '../../layout'
 import { pathBasename, pathDirname } from '../../path-name'
 import { usePreferences } from '../../preferences'
-import { shellQuote } from '../../shell-quote'
+import { agentName, type AgentKind } from '../../agent-kind'
+import { agentLaunch } from '../../agent-command'
 import { App as AntApp } from 'antd'
 
 export default function FilesPage({ openTerm }: { openTerm: (name: string) => void }) {
@@ -33,18 +34,16 @@ export default function FilesPage({ openTerm }: { openTerm: (name: string) => vo
     window.addEventListener(INTENT_EVENT, on)
     return () => window.removeEventListener(INTENT_EVENT, on)
   }, [isMobile])
-  const openAgent = async (kind: 'claude' | 'codex', file: string) => {
+  const openAgent = async (kind: AgentKind, file: string) => {
     const base = pathBasename(file).replace(/[^a-zA-Z0-9_.-]+/g, '-').slice(0, 28) || 'file'
     const name = `${kind}-${base}-${Date.now().toString(36).slice(-5)}`
     const dir = pathDirname(file)
-    const prompt = `请打开并查看这个文件：${file}`
-    const agentCmd = kind === 'claude' ? (prefs.claudeCommand || 'claude') : (prefs.codexCommand || 'codex')
-    const cmd = `${agentCmd} ${shellQuote(prompt)}`
+    const cmd = agentLaunch(kind, prefs, t('file.agentPrompt', { path: file }))
     try {
       const res = await api('POST', '/sessions', { name, dir })
       const actual = res.name || name
       await api('POST', '/tasks/_/send', { sess: actual, msg: cmd })
-      message.success(t('file.openedInAgent', { agent: kind === 'claude' ? 'Claude Code' : 'Codex' }))
+      message.success(t('file.openedInAgent', { agent: kind === 'claude' ? 'Claude Code' : agentName(kind) }))
       openTerm(actual)
     } catch (e: any) {
       message.error(t('file.openFailed', { message: e.message }))

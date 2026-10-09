@@ -6,8 +6,9 @@ import { api } from '../../api'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
+import { agentLaunch } from '../../agent-command'
+import type { AgentKind } from '../../agent-kind'
 import { sessionLabel } from './session-label'
-import { shellQuote as shq } from '../../shell-quote'
 import { AutoComplete, Button, Checkbox, Input, Modal, Radio, Segmented, Select, Space, Tag, Tooltip, App as AntApp } from 'antd'
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
@@ -51,7 +52,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const [nameTouched, setNameTouched] = useState(false)
   const [dir, setDir] = useState('')
   const [pick, setPick] = useState(false)
-  const [agent, setAgent] = useState<'none' | 'claude' | 'codex'>('claude')
+  const [agent, setAgent] = useState<AgentKind | 'none'>('claude')
   // 工作区三选一（W1 交互修订）：主仓库 / 新建隔离 worktree / 进入已有 worktree
   // 工作区两选一（22 设计 D4）：新建 worktree / 已有 worktree；非 git 目录才退回「就在这个目录」
   const [wtMode, setWtMode] = useState<'repo' | 'new' | 'existing'>('new')
@@ -187,8 +188,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
         actual = res.name || finalName
       }
       if (agent !== 'none') {
-        const cmd = agent === 'claude' ? (prefs.claudeCommand || 'claude') : (prefs.codexCommand || 'codex')
-        let launch = cmd
+        let launch = agentLaunch(agent, prefs)
         if (prompt.trim()) {
           // 开工简报按**这张表单真正选的**拼：在哪个目录、从哪个分支切的、占位分支叫什么、
           // 会话现在叫什么（见 TaskComposer 里同一段注释）
@@ -200,7 +200,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
               : isGitRepo
                 ? { kind: 'repo', path: sessionDir || dir, branch: existingWt?.branch || defBranch || 'main' }
                 : { kind: 'plain', path: sessionDir || dir }
-          launch = `${cmd} ${shq(kickoffBrief(where, actual, autoReview, prompt, t))}`
+          launch = agentLaunch(agent, prefs, kickoffBrief(where, actual, autoReview, prompt, t))
         }
         await api('POST', '/tasks/_/send', { sess: actual, msg: launch })
         if (autoReview && !sessionDir) {
@@ -354,6 +354,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
             <Radio.Button value="none">{t('session.agentNone')}</Radio.Button>
             <Radio.Button value="claude">{t('session.agentClaude')}</Radio.Button>
             <Radio.Button value="codex">{t('session.agentCodex')}</Radio.Button>
+            <Radio.Button value="pi">{t('session.agentPi')}</Radio.Button>
+            <Radio.Button value="opencode">{t('session.agentOpenCode')}</Radio.Button>
           </Radio.Group>
           <Input.TextArea placeholder={t('session.promptPlaceholder')} value={prompt}
             onChange={(e) => setPrompt(e.target.value)}

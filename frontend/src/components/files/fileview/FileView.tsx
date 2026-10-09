@@ -7,6 +7,7 @@ import { Button, Modal, Space, Spin, App as AntApp, Tooltip } from 'antd'
 import { api } from '../../../api'
 import ErrorBoundary from '../../ErrorBoundary'
 import { useI18n } from '../../../i18n'
+import type { AgentKind } from '../../../agent-kind'
 import { useThemeMode } from '../../../theme'
 import { MD_EXT, extOf, fileKind, fileNameOf, fmtSize, localPathFromRef, monacoLangOf } from '../file-utils'
 import { CloseIcon, ExternalLinkIcon, IconButton, PreviewIcon, PreviewSideIcon } from '../file-icons'
@@ -49,7 +50,7 @@ export function FileView({
   // 移动端二级页语境：标题栏最左显「←」返回（代替右侧关闭 ×），工具按钮可换行。
   onBack?: () => void
   onOpenPath: (p: string) => void
-  onOpenAgent?: (kind: 'claude' | 'codex', path: string) => void
+  onOpenAgent?: (kind: AgentKind, path: string) => void
   // 编辑器脏状态上报（供外层 tab 显示未保存圆点）
   onDirtyChange?: (path: string, dirty: boolean) => void
   // 在侧栏打开渲染预览（外层 FileWorkspace 处理，开另一栏）
@@ -225,9 +226,11 @@ export function FileView({
         <Modal open={agentPick} title={t('file.openInAgent')} footer={null} onCancel={() => setAgentPick(false)}>
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             <div style={{ color: 'var(--text-dim)', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all' }}>{path}</div>
-            <Space>
+            <Space wrap>
               <Button type="primary" onClick={() => { setAgentPick(false); onOpenAgent('claude', path) }}>Claude Code</Button>
               <Button onClick={() => { setAgentPick(false); onOpenAgent('codex', path) }}>Codex</Button>
+              <Button onClick={() => { setAgentPick(false); onOpenAgent('pi', path) }}>Pi</Button>
+              <Button onClick={() => { setAgentPick(false); onOpenAgent('opencode', path) }}>OpenCode</Button>
             </Space>
           </Space>
         </Modal>

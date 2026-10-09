@@ -10,6 +10,9 @@ import { api } from '../../api'
 import { useLayout } from '../../layout'
 import CronEditor from './CronEditor'
 import { PlusIcon } from '../../icons'
+import { AgentLogo } from '../../icons'
+import { agentName, isAgentKind } from '../../agent-kind'
+import { discoverAgents, type RegisteredAgent } from '../../agent-registry'
 
 // 一条任务的原始配置 + 运行态(与 Go 端 jobView 对齐)。
 type Action = 'agent' | 'exec'
@@ -467,7 +470,22 @@ function JobModal({ open, job, existing, t, pluginId, onClose, onSaved, submit }
 }) {
   const [form] = Form.useForm<FormValues>()
   const [saving, setSaving] = useState(false)
+  const [agents, setAgents] = useState<RegisteredAgent[]>([])
+  const [agentsLoading, setAgentsLoading] = useState(false)
+  const [agentsError, setAgentsError] = useState(false)
   const isEdit = !!job
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setAgentsLoading(true)
+    setAgentsError(false)
+    discoverAgents()
+      .then((rows) => { if (!cancelled) setAgents(rows) })
+      .catch(() => { if (!cancelled) setAgentsError(true) })
+      .finally(() => { if (!cancelled) setAgentsLoading(false) })
+    return () => { cancelled = true }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -540,11 +558,18 @@ function JobModal({ open, job, existing, t, pluginId, onClose, onSaved, submit }
           {({ getFieldValue }) => {
             if (getFieldValue('action') === 'agent') return (
               <>
-                <Form.Item name="provider" label={t('cron.fieldProvider')}>
-                  <Select allowClear placeholder={t('cron.providerAuto')} options={[
-                    { value: 'claude', label: 'Claude' },
-                    { value: 'codex', label: 'Codex' },
-                  ]} />
+                <Form.Item name="provider" label={t('cron.fieldProvider')} extra={agentsError
+                  ? <a href="#/plugins/roam.agent-discovery">{t('agentDiscovery.unavailable')}</a> : undefined}>
+                  <Select allowClear loading={agentsLoading} placeholder={t('cron.providerAuto')}
+                    options={agents.map((agent) => ({
+                      value: agent.kind,
+                      disabled: !agent.installed,
+                      label: <Space size={6}>
+                        {isAgentKind(agent.kind) && <AgentLogo kind={agent.kind} size={14} />}
+                        {isAgentKind(agent.kind) ? agentName(agent.kind) : agent.kind}
+                        {!agent.installed && <Typography.Text type="secondary">{t('agentDiscovery.missing')}</Typography.Text>}
+                      </Space>,
+                    }))} />
                 </Form.Item>
                 <Form.Item name="prompt" label={t('cron.fieldPrompt')} rules={[{ required: true, message: t('cron.promptRequired') }]}>
                   <Input.TextArea rows={5} placeholder={t('cron.promptPlaceholder')} />

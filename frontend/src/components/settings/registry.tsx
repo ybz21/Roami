@@ -151,6 +151,22 @@ export function buildSettings(deps: {
       set: (v) => deps.setPrefs({ codexCommand: v.trim() || 'codex' }),
     },
   }
+  const piItem: SettingItem = {
+    id: 'piCommand', label: t('set.piCmd'), desc: t('set.piCmdHelp'), key: 'piCommand',
+    control: {
+      kind: 'text', placeholder: 'pi',
+      get: () => prefs.piCommand || '',
+      set: (v) => deps.setPrefs({ piCommand: v.trim() || 'pi' }),
+    },
+  }
+  const opencodeItem: SettingItem = {
+    id: 'opencodeCommand', label: t('set.opencodeCmd'), desc: t('set.opencodeCmdHelp'), key: 'opencodeCommand',
+    control: {
+      kind: 'text', placeholder: 'opencode',
+      get: () => prefs.opencodeCommand || '',
+      set: (v) => deps.setPrefs({ opencodeCommand: v.trim() || 'opencode' }),
+    },
+  }
   const promptPopupItem: SettingItem = {
     id: 'promptPopupOff', label: t('settings.promptPopupDefault'), desc: t('settings.promptPopupDefaultHelp'), key: 'promptPopupOff',
     control: { kind: 'switch', get: () => !prefs.promptPopupOff, set: (on) => deps.setPrefs({ promptPopupOff: !on }) },
@@ -228,7 +244,7 @@ export function buildSettings(deps: {
     },
     {
       id: 'agent.bin', name: t('set.pageBin'), parent: t('set.groupAgent'), scope: 'mine',
-      items: [claudeItem, codexItem],
+      items: [claudeItem, codexItem, piItem, opencodeItem],
     },
     {
       id: 'agent.new', name: t('set.pageNewSession'), parent: t('set.groupAgent'), scope: 'mine',

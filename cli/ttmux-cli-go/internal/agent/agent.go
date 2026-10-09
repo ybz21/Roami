@@ -6,6 +6,8 @@
 //	                 指定对话 id            接回一段对话
 //	claude   --session-id <uuid>（我们指定）  claude --resume <id>
 //	codex    不支持（只能事后认）             codex resume <id>
+//	pi       --session-id <uuid>（我们指定）  pi --session <id>
+//	opencode 不支持                        不支持
 //
 // 从前这些差异散成一串 `if kind == "codex"`（spawn/agent.go、revive、collect
 // 各判一次），加一型就得把这些地方全找一遍，漏一处就是那一型在某条路上悄悄失效——
@@ -54,9 +56,8 @@ type Agent interface {
 
 	// OneShotArgs 一次性任务的参数（不含 Bin、不含 prompt 本身）。
 	//
-	// 返回的参数**必须已经让它从 stdin 读 prompt** —— 调用方只负责在后面接
-	// `< 文件` 或一段 heredoc，不知道该给谁加 `-`。两型的做法就不一样：
-	// claude 的 `-p` 本身就读 stdin，codex 要显式的位置参数 `-`。
+	// 默认从 stdin 读 prompt。只支持位置参数的实现另加 OneShotPromptArg() bool，
+	// 调用方据此把 prompt 文件内容作为一个参数传入。
 	OneShotArgs(opt StartOpts) []string
 
 	// ResumeCommand 在 shell 里敲什么能接回 convID 那段对话。

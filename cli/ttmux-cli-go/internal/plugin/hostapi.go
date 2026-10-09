@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"ttmux-cli-go/internal/agent"
 	"ttmux-cli-go/internal/command/spawn"
 	"ttmux-cli-go/internal/plugin/rpc"
 	"ttmux-cli-go/internal/runtime"
@@ -152,9 +153,9 @@ func (h *HostAPI) git(dir string, args ...string) string {
 
 func (h *HostAPI) agentProviders() (any, error) {
 	providers := map[string]bool{}
-	for _, bin := range []string{"claude", "codex"} {
-		_, err := exec.LookPath(bin)
-		providers[bin] = err == nil
+	for _, kind := range agent.Kinds() {
+		_, err := exec.LookPath(agent.Get(kind).Bin())
+		providers[kind] = err == nil
 	}
 	return providers, nil
 }
@@ -192,6 +193,9 @@ func (h *HostAPI) agentSpawn(params json.RawMessage) (any, error) {
 	workdir := orDefault(req.Workdir, h.Workdir)
 	ac := spawn.DefaultAgentConfig(workdir)
 	if req.Provider != "" {
+		if agent.Get(req.Provider) == nil {
+			return nil, fmt.Errorf("unknown agent provider: %s", req.Provider)
+		}
 		ac.Kind = req.Provider
 	}
 	sess, err := rt.CreateSession(runtime.CreateOpts{Label: req.SessionName, Width: "220", Height: "50"})

@@ -23,8 +23,8 @@ func Manifest() manifest.Manifest {
 		DisplayName:     manifest.LocaleText{"zh-CN": "定时任务", "en-US": "Cron"},
 		Version:         "0.1.0",
 		Description: manifest.LocaleText{
-			"zh-CN": "定时任务调度:按「每隔 N」或「每天 HH:MM」触发——定时启动 cc/codex 按 prompt 干活,或跑一条 shell 命令;常驻 cron.serve 巡检,也可让系统 crontab 调 cron.tick",
-			"en-US": "Scheduled tasks: fire on an interval or a daily time to launch cc/codex with a prompt, or run a shell command; run cron.serve resident, or drive cron.tick from system crontab",
+			"zh-CN": "定时任务调度:按「每隔 N」或「每天 HH:MM」触发——定时启动已注册 Agent 按 prompt 干活,或跑一条 shell 命令;常驻 cron.serve 巡检,也可让系统 crontab 调 cron.tick",
+			"en-US": "Scheduled tasks: fire on an interval or a daily time to launch a registered agent with a prompt, or run a shell command; run cron.serve resident, or drive cron.tick from system crontab",
 		},
 		Runtime: manifest.Runtime{Kind: "builtin"},
 		Permissions: manifest.Perms{

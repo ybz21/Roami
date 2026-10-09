@@ -12,6 +12,8 @@ export interface Preferences {
   recentDirs: string[]
   claudeCommand: string
   codexCommand: string
+  piCommand: string
+  opencodeCommand: string
   quickCommands: string[]
   showVoiceButton: boolean
   voiceHotkey: string // 语音输入快捷键，'Mod+Shift+KeyS' 这种串，见 chat/voice-hotkey.ts
@@ -90,6 +92,8 @@ const DEFAULTS: Preferences = {
   recentDirs: [],
   claudeCommand: 'claude',
   codexCommand: 'codex',
+  piCommand: 'pi',
+  opencodeCommand: 'opencode',
   quickCommands: [],
   showVoiceButton: true,
   voiceHotkey: 'Mod+Shift+KeyS',

@@ -55,7 +55,7 @@ export default function TerminalPane(props: {
   fileDock?: 'right' | 'left'   // 文件面板停靠：'right'=右侧浮动抽屉（默认），'left'=左侧 VSCode 栏（新标签全屏页）
   /** 标签条右端「新建 ▾」：在当前任务里开终端 / 去项目页开新任务。不传就不画 */
   /** 标签条「新建」：三样都在当前任务的 worktree 里派生；taskLabel 写在菜单顶上说明白 */
-  onNew?: { terminal: () => void; claude: () => void; codex: () => void; taskLabel?: string }
+  onNew?: { terminal: () => void; claude: () => void; codex: () => void; pi: () => void; opencode: () => void; taskLabel?: string }
   /** 右栏开关（任务视图）：亮着 = 开着 */
   inspector?: { open: boolean; toggle: () => void }
   /** 对话里点 Read/Edit 的路径 → 右栏文件面板打开（22 设计 §3.4）；不传就退回今天的路（文件页） */
@@ -792,6 +792,8 @@ export default function TerminalPane(props: {
               { key: 'terminal', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: onNew.terminal },
               { key: 'claude', icon: <AgentLogo kind="claude" size={14} />, label: t('tabs.newClaude'), onClick: onNew.claude },
               { key: 'codex', icon: <AgentLogo kind="codex" size={14} />, label: t('tabs.newCodex'), onClick: onNew.codex },
+              { key: 'pi', icon: <AgentLogo kind="pi" size={14} />, label: t('tabs.newPi'), onClick: onNew.pi },
+              { key: 'opencode', icon: <AgentLogo kind="opencode" size={14} />, label: t('tabs.newOpenCode'), onClick: onNew.opencode },
             ],
           }] }}>
             <button type="button" className="tt-tbtn" title={t('tabs.new')}>

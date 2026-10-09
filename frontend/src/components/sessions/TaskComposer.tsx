@@ -7,12 +7,13 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import { App as AntApp, Button, Dropdown, Input } from 'antd'
 import { api, upload, makeClipboardImageFile } from '../../api'
 import { appendPaths } from '../../agent-paths'
+import { agentLaunch } from '../../agent-command'
+import { agentName, type AgentKind } from '../../agent-kind'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
-import { shellQuote as shq } from '../../shell-quote'
 import { taskNameFromPrompt } from './NewSessionModal'
 import { VoiceInput } from '../chat/VoiceInput'
-import { CheckIcon, ChevronDown, CircleIcon, PaperclipIcon } from '../../icons'
+import { AgentLogo, CheckIcon, ChevronDown, CircleIcon, PaperclipIcon, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
@@ -33,7 +34,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   const [prefs] = usePreferences()
   const [prompt, setPrompt] = useState('')
   const [wtMode, setWtMode] = useState<'new' | 'existing'>('new')
-  const [agent, setAgent] = useState<'claude' | 'codex' | 'none'>('claude')
+  const [agent, setAgent] = useState<AgentKind | 'none'>('claude')
   const [wtsAll, setWtsAll] = useState<any[]>([])
   // 「已有」选中值：'wt:<路径>'（进这个工作区）/ 'br:<分支>'（为这条分支开一个工作区）
   const [existing, setExisting] = useState('')
@@ -165,7 +166,6 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         actual = res.name || finalName
       }
       if (agent !== 'none') {
-        const cmd = agent === 'claude' ? (prefs.claudeCommand || 'claude') : (prefs.codexCommand || 'codex')
         // 开工简报：把这张表单上真正选了什么写给 agent——在哪个目录、从哪个分支切的、占位分支叫什么、
         // 会话现在叫什么。从前这里是两条写死的话，agent 只能猜自己在哪儿，人也无从核对「选的和发出去的
         // 是不是一回事」。会话改名那一条也回来了：派生出来的名字是需求原文的前 16 个字，
@@ -179,7 +179,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
               ? { kind: 'repo', path: sessionDir, branch: existingWt?.branch || defBranch || 'main' }
               : { kind: 'plain', path: sessionDir }
         const brief = kickoffBrief(where, actual, autoReview, prompt, t)
-        await api('POST', '/tasks/_/send', { sess: actual, msg: brief ? `${cmd} ${shq(brief)}` : cmd })
+        await api('POST', '/tasks/_/send', { sess: actual, msg: agentLaunch(agent, prefs, brief) })
         if (autoReview) {
           await api('POST', '/plugin/track', {
             session: actual,
@@ -229,10 +229,15 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
             )}
           </span>
         )}
-        <span className="tt-cgrp">
-          <button type="button" className={`tt-pill${agent === 'claude' ? ' on' : ''}`} aria-pressed={agent === 'claude'} onClick={() => setAgent('claude')}>Claude</button>
-          <button type="button" className={`tt-pill${agent === 'codex' ? ' on' : ''}`} aria-pressed={agent === 'codex'} onClick={() => setAgent('codex')}>Codex</button>
-          <button type="button" className={`tt-pill${agent === 'none' ? ' on' : ''}`} aria-pressed={agent === 'none'} onClick={() => setAgent('none')}>{t('project.agent.none')}</button>
+        <span className="tt-cgrp" role="group" aria-label={t('set.groupAgent')}>
+          {(['claude', 'codex', 'pi', 'opencode'] as const).map((kind) => (
+            <button key={kind} type="button" className={`tt-pill ico${agent === kind ? ' on' : ''}`}
+              title={agentName(kind)} aria-label={agentName(kind)} aria-pressed={agent === kind}
+              onClick={() => setAgent(kind)}><AgentLogo kind={kind} size={16} /></button>
+          ))}
+          <button type="button" className={`tt-pill ico${agent === 'none' ? ' on' : ''}`}
+            title={t('session.agentNone')} aria-label={t('session.agentNone')} aria-pressed={agent === 'none'}
+            onClick={() => setAgent('none')}><TerminalIcon size={16} /></button>
         </span>
         {agent !== 'none' && (
           <span className="tt-cgrp">

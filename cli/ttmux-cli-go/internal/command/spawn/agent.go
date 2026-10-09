@@ -12,7 +12,7 @@ import (
 type AgentConfig struct {
 	ClaudeBin   string
 	CodexBin    string
-	Kind        string // claude | codex
+	Kind        string // agent registry kind
 	Interactive bool   // resident TUI member (vs one-shot task)
 	Permission  string
 	Model       string
@@ -110,6 +110,9 @@ func (c AgentConfig) Command(task string) string {
 	if c.Interactive {
 		return c.prefix(true) + " " + shellQuote(task)
 	}
+	if a, ok := c.resolve().(interface{ OneShotPromptArg() bool }); ok && a.OneShotPromptArg() {
+		return c.prefix(false) + " " + shellQuote(task)
+	}
 	return c.prefix(false) + heredoc(task)
 }
 
@@ -117,6 +120,9 @@ func (c AgentConfig) Command(task string) string {
 // from a file on stdin. tmux send-keys 有命令长度上限(整段 diff 内联会报
 // "command too long"),经会话拉起 Agent 的调用方必须用这个短命令形态。
 func (c AgentConfig) CommandFromPromptFile(path string) string {
+	if a, ok := c.resolve().(interface{ OneShotPromptArg() bool }); ok && a.OneShotPromptArg() {
+		return c.prefix(false) + ` "$(cat ` + shellQuote(path) + `)"`
+	}
 	return c.prefix(false) + " < " + shellQuote(path)
 }
 

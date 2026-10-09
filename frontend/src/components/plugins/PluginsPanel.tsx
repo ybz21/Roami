@@ -12,6 +12,7 @@ import { useI18n } from '../../i18n'
 import HostMonitorPanel from './HostMonitorPanel'
 import CronPanel from './CronPanel'
 import KeepalivePanel from './KeepalivePanel'
+import AgentDiscoveryPanel from './AgentDiscoveryPanel'
 import MobileSubPage from '../MobileSubPage'
 import { useLayout } from '../../layout'
 
@@ -19,6 +20,7 @@ import { useLayout } from '../../layout'
 const HOST_MONITOR_ID = 'roam.host-monitor'
 const CRON_ID = 'roam.cron'
 const KEEPALIVE_ID = 'roam.keepalive'
+const AGENT_DISCOVERY_ID = 'roam.agent-discovery'
 
 type LocaleText = Record<string, string> | undefined
 
@@ -341,6 +343,10 @@ function PluginDetail({ plugin, locale, t, onChanged }: {
           ...(m.id === KEEPALIVE_ID ? [{
             key: 'guards', label: t('ka.tab'),
             children: <KeepalivePanel pluginId={m.id} enabled={plugin.enabled} t={t} />,
+          }] : []),
+          ...(m.id === AGENT_DISCOVERY_ID ? [{
+            key: 'agents', label: t('agentDiscovery.tab'),
+            children: <AgentDiscoveryPanel enabled={plugin.enabled} t={t} />,
           }] : []),
           {
             key: 'config', label: t('plugins.tabConfig'),

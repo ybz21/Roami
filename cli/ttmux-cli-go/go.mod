@@ -26,6 +26,7 @@ require (
 )
 
 require (
+	roam-plugins/agentdiscovery v0.0.0
 	roam-plugins/cron v0.0.0
 	roam-plugins/hostmonitor v0.0.0
 	roam-plugins/im v0.0.0
@@ -42,3 +43,5 @@ replace (
 replace roam-plugins/cron => ../../plugins/cron
 
 replace roam-plugins/keepalive => ../../plugins/keepalive
+
+replace roam-plugins/agentdiscovery => ../../plugins/agentdiscovery

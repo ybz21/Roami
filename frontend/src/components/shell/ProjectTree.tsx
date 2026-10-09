@@ -11,6 +11,7 @@
 import { useState, type ReactNode } from 'react'
 import { Dropdown, Tooltip } from 'antd'
 import { useI18n } from '../../i18n'
+import type { AgentKind } from '../../agent-kind'
 
 import { AgentLogo, ArchiveIcon, ChevronDown, CloseIcon, HomeIcon, MoreIcon, OpenInIcon, PencilIcon, PlusIcon, TerminalIcon, TrashIcon, WorktreeIcon } from '../../icons'
 import { icoOf } from '../projects/project-list/project-model'
@@ -66,7 +67,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
   /** 右键任务行「收尾」：关掉它的会话并处理 worktree */
   onFinishTask?: (task: TreeTask) => void
   /** 右键任务行：在它的 worktree 里派生一个终端 / Claude / Codex */
-  onNewInTask?: (key: TaskKey, kind: 'shell' | 'claude' | 'codex') => void
+  onNewInTask?: (key: TaskKey, kind: 'shell' | AgentKind) => void
   /** 项目行「…」菜单里的「移除项目」（只动台账，不动目录和会话） */
   onRemoveProject?: (key: string) => void
 }) {
@@ -97,6 +98,8 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
       { key: 'sh', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: () => onNewInTask(task.key, 'shell') },
       { key: 'cc', icon: <AgentLogo kind="claude" size={14} />, label: t('tabs.newClaude'), onClick: () => onNewInTask(task.key, 'claude') },
       { key: 'cx', icon: <AgentLogo kind="codex" size={14} />, label: t('tabs.newCodex'), onClick: () => onNewInTask(task.key, 'codex') },
+      { key: 'pi', icon: <AgentLogo kind="pi" size={14} />, label: t('tabs.newPi'), onClick: () => onNewInTask(task.key, 'pi') },
+      { key: 'oc', icon: <AgentLogo kind="opencode" size={14} />, label: t('tabs.newOpenCode'), onClick: () => onNewInTask(task.key, 'opencode') },
     ] }] : []
   const killSession = (s: TreeSession) => onKill
     ? [{ type: 'divider' as const }, { key: 'kill', icon: <CloseIcon size={14} />, label: t('tree.menu.close'), danger: true, onClick: () => onKill(s.name) }] : []

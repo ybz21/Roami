@@ -1873,6 +1873,10 @@ html[data-pointer="coarse"] .tt-send::after { content: ''; position: absolute; l
 .tt-opencode-logo .light { display: none; }
 html[data-theme="light"] .tt-opencode-logo .dark { display: none; }
 html[data-theme="light"] .tt-opencode-logo .light { display: block; }
+:where(html[data-pointer="coarse"]) .tt-agent-discovery-action { position: relative; }
+:where(html[data-pointer="coarse"]) .tt-agent-discovery-action::after {
+  content: ''; position: absolute; inset: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-1));
+}
 
 /* ── 链接：默认偏中性，hover 才上主色 ── */
 .ant-typography a, a.ant-typography { color: var(--accent); }

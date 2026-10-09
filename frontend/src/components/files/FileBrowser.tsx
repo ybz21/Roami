@@ -10,6 +10,7 @@ import { pathLabelKey, type P2PPathLabel } from '../../p2p/labels'
 import { P2PTransferStatus, type TransferView } from '../../p2p/P2PTransferStatus'
 import { recentDirs } from '../sessions/DirPicker'
 import { usePreferences } from '../../preferences'
+import type { AgentKind } from '../../agent-kind'
 import { dirname, fileNameOf, fmtSize, joinPath, normalizePath } from './file-utils'
 import { loadExpandedDirs, saveExpandedDirs } from './tree-expansion-memory'
 import { copyText } from '../chat/blocks'
@@ -371,7 +372,7 @@ export default function FileBrowser({
   layout?: 'sidebar' | 'split' | 'dock'
   onClose?: () => void
   onInsertPath?: (p: string) => void
-  onOpenAgent?: (kind: 'claude' | 'codex', path: string) => void
+  onOpenAgent?: (kind: AgentKind, path: string) => void
   // dock 布局下由外层（编辑器 tab 区）接管文件打开：点文件不再弹内置预览，而是回调让外层开 tab。
   onOpenFile?: (path: string) => void
   /** 外部要求打开某个路径（对话里点 Read/Edit 的文件名）。

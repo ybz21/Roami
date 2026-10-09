@@ -7,6 +7,7 @@ import FileBrowser from './FileBrowser'
 import { FileView } from './fileview'
 import { FileTypeIcon } from './file-icons'
 import { useI18n } from '../../i18n'
+import type { AgentKind } from '../../agent-kind'
 import { PointerResizeShield, usePointerResize } from '../mirror/PointerResize'
 import { useLayout } from '../../layout'
 import { CloseIcon, MoreIcon } from '../../icons'
@@ -42,7 +43,7 @@ export default function FileWorkspace({
 }: {
   dir: string
   accent?: string
-  onOpenAgent?: (kind: 'claude' | 'codex', path: string) => void
+  onOpenAgent?: (kind: AgentKind, path: string) => void
   explorerOpen?: boolean
   onExplorerClose?: () => void
   /** 收起后把手留在原地，点它把文件树叫回来；不给就没有回程，那时把手也不画 */

@@ -1,7 +1,7 @@
 // Package cron is the builtin scheduled-task plugin. 它在插件私有 storage 里
 // 维护一张定时任务表,由常驻会话 cron.serve 按点巡检触发(或系统 crontab 周期
 // 调 cron.tick 无常驻触发)。排期用标准 5 段 cron 表达式(见 schedule.go)。
-// 每个任务到点执行两类动作之一:定时启动 cc/codex 干活(可选保持交互会话)、
+// 每个任务到点执行两类动作之一:定时启动已注册 Agent 干活(可选保持交互会话)、
 // 或跑一条 shell 命令。
 //
 // 为什么不用 manifest 的 watchers/onSchedule:那套宿主调度器(docs/design/
@@ -34,7 +34,7 @@ type Job struct {
 	Action  string `json:"action"` // agent | exec
 	Enabled bool   `json:"enabled"`
 
-	// action=agent(定时启动 cc/codex 干活)
+	// action=agent(定时启动已注册 Agent 干活)
 	Provider    string `json:"provider,omitempty"`
 	Prompt      string `json:"prompt,omitempty"`
 	Workdir     string `json:"workdir,omitempty"`

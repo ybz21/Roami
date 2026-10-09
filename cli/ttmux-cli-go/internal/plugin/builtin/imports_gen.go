@@ -3,6 +3,7 @@
 package builtin
 
 import (
+	_ "roam-plugins/agentdiscovery"
 	_ "roam-plugins/cron"
 	_ "roam-plugins/hostmonitor"
 	_ "roam-plugins/im"
