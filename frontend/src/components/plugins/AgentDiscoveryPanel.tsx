@@ -47,10 +47,10 @@ export default function AgentDiscoveryPanel({ enabled, t }: { enabled: boolean; 
           <Typography.Text>{t(agent.installed ? 'agentDiscovery.detected' : 'agentDiscovery.missing')}</Typography.Text>
           {q.state === 'available' && q.windows?.length ? q.windows.map((window) =>
             <Typography.Text key={window.windowMinutes} type="secondary">
-              {t('agentDiscovery.remaining', { percent: Math.round(window.remainingPercent), minutes: window.windowMinutes })}
+              {t('agentDiscovery.remaining', { percent: Math.round(window.remainingPercent), hours: formatWindowHours(window.windowMinutes) })}
             </Typography.Text>) : <Typography.Text type="secondary">
             {q.state === 'available' && q.remainingPercent !== undefined
-              ? t('agentDiscovery.remaining', { percent: Math.round(q.remainingPercent), minutes: q.windowMinutes || 0 })
+              ? t('agentDiscovery.remaining', { percent: Math.round(q.remainingPercent), hours: formatWindowHours(q.windowMinutes || 0) })
               : t('agentDiscovery.quotaUnknown')}
           </Typography.Text>}
           {q.observedAt && <Typography.Text type="secondary">{t('agentDiscovery.observed', { time: new Date(q.observedAt).toLocaleString() })}</Typography.Text>}
@@ -58,4 +58,9 @@ export default function AgentDiscoveryPanel({ enabled, t }: { enabled: boolean; 
       </Card>
     })}
   </Space>
+}
+
+function formatWindowHours(minutes: number): string {
+  const hours = minutes / 60
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
 }

@@ -1783,7 +1783,7 @@ const enUS = {
   'agentDiscovery.install': 'Install',
   'agentDiscovery.installConfirm': 'Install {name} globally with npm?',
   'agentDiscovery.installed': 'Agent installed',
-  'agentDiscovery.remaining': '{percent}% remaining in the {minutes}-minute window',
+  'agentDiscovery.remaining': '{percent}% remaining in the {hours}-hour window',
   'agentDiscovery.quotaUnknown': 'Remaining quota unavailable',
   'agentDiscovery.observed': 'Last observed: {time}',
   'plugins.installTitle': 'Install plugin',

@@ -1789,7 +1789,7 @@ const zhCN = {
   'agentDiscovery.install': '安装',
   'agentDiscovery.installConfirm': '通过 npm 全局安装 {name}？',
   'agentDiscovery.installed': 'Agent 已安装',
-  'agentDiscovery.remaining': '{minutes} 分钟窗口剩余 {percent}%',
+  'agentDiscovery.remaining': '{hours} 小时窗口剩余 {percent}%',
   'agentDiscovery.quotaUnknown': '无法获取剩余额度',
   'agentDiscovery.observed': '最后观测：{time}',
   'plugins.installTitle': '安装插件',
