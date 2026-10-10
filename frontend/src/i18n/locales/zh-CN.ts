@@ -692,6 +692,7 @@ const zhCN = {
   'chat.model': '模型',
   'chat.effort': '推理档',
   'chat.context': '上下文',
+  'chat.contextUsed': '上下文已用',
   'chat.quotaTitle': '套餐额度已用',
   'chat.modelPick': '点击切换模型',
   'chat.errorsTitle': '{count} 次失败，点击跳到最近一次',

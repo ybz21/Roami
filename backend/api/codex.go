@@ -315,9 +315,9 @@ func scanCodexStatus(line string, st cStatus, quota *float64) cStatus {
 		var p struct {
 			Type string `json:"type"`
 			Info struct {
-				Total struct {
+				Last struct {
 					TotalTokens int `json:"total_tokens"`
-				} `json:"total_token_usage"`
+				} `json:"last_token_usage"`
 				Window int `json:"model_context_window"`
 			} `json:"info"`
 			RateLimits struct {
@@ -329,8 +329,9 @@ func scanCodexStatus(line string, st cStatus, quota *float64) cStatus {
 		if json.Unmarshal(raw.Payload, &p) != nil || p.Type != "token_count" {
 			return st
 		}
-		if p.Info.Total.TotalTokens > 0 {
-			st.Used = p.Info.Total.TotalTokens
+		// total_token_usage 是整场累计值，长会话早就超过上下文窗口。
+		if p.Info.Last.TotalTokens > 0 {
+			st.Used = p.Info.Last.TotalTokens
 		}
 		if p.Info.Window > 0 {
 			st.Window = p.Info.Window

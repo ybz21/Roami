@@ -92,7 +92,7 @@ func TestScanCodexStatus(t *testing.T) {
 
 	// token_count 直接给窗口，不用按模型 id 猜
 	tok := `{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":` +
-		`{"total_tokens":16543},"model_context_window":258400},` +
+		`{"total_tokens":158263367},"last_token_usage":{"total_tokens":16543},"model_context_window":258400},` +
 		`"rate_limits":{"primary":{"used_percent":44.0}}}}`
 	st = scanCodexStatus(tok, st, &quota)
 	if st.Used != 16543 || st.Window != 258400 {
@@ -100,6 +100,11 @@ func TestScanCodexStatus(t *testing.T) {
 	}
 	if quota != 44.0 {
 		t.Errorf("quota = %v, want 44", quota)
+	}
+	// 累计 token 可远超上下文窗口；缺少本轮用量时保留上一轮值。
+	st = scanCodexStatus(`{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":999999999}}}}`, st, &quota)
+	if st.Used != 16543 {
+		t.Errorf("累计用量不应覆盖本轮上下文: used=%d", st.Used)
 	}
 
 	// 没有协作模式时退回沙箱策略——「它现在能不能动我的盘」比模式名更要紧

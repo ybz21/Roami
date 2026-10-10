@@ -94,6 +94,8 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
   // 上下文接近满了要变色：85% 起黄，95% 起红。这是唯一会「越用越糟」的指标。
   const tight = !!ctx && ctx.percent >= CTX_TIGHT
   const ctxColor = !ctx ? accent : ctx.percent >= CTX_FULL ? 'var(--danger)' : tight ? 'var(--warn)' : accent
+  const quotaColor = status.quota != null && status.quota >= CTX_FULL ? 'var(--danger)'
+    : status.quota != null && status.quota >= CTX_TIGHT ? 'var(--warn)' : accent
   const hasAny = status.mode || ctx || status.tasks || status.quota || status.branch || status.errors || unread > 0
   if (!hasAny) return null
 
@@ -121,14 +123,16 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
           <Chip onClick={() => toggle('info')} expanded={panel === 'info'}
             title={`${fmtTokens(ctx.used)} / ${fmtTokens(ctx.window)}`}>
             <Ring percent={ctx.percent} color={ctxColor} />
+            <span>{t('chat.contextUsed')}</span>
             <span style={{ color: ctxColor, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
           </Chip>
         )}
 
         {status.quota != null && (
           <Chip title={t('chat.quotaTitle')}>
-            <Ring percent={status.quota} color="var(--warn)" />
-            <span style={{ color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>{Math.round(status.quota)}%</span>
+            <Ring percent={status.quota} color={quotaColor} />
+            <span>{t('chat.quotaTitle')}</span>
+            <span style={{ color: quotaColor, fontVariantNumeric: 'tabular-nums' }}>{Math.round(status.quota)}%</span>
           </Chip>
         )}
 

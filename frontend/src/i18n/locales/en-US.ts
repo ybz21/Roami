@@ -690,6 +690,7 @@ const enUS = {
   'chat.model': 'Model',
   'chat.effort': 'Effort',
   'chat.context': 'Context',
+  'chat.contextUsed': 'Context used',
   'chat.quotaTitle': 'Plan quota used',
   'chat.modelPick': 'Click to switch model',
   'chat.errorsTitle': '{count} failure(s) — click to jump to the latest',
