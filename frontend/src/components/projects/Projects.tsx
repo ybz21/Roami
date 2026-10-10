@@ -150,6 +150,9 @@ html[data-size="compact"] .prj-filters{overflow-x:auto;scrollbar-width:none;flex
   mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent 100%)}
 html[data-size="compact"] .prj-filters::-webkit-scrollbar{height:0}
 html[data-size="compact"] .prj-filters>*{flex:0 0 auto}
+html[data-size="compact"] .prj-filters .prj-chip{position:relative;height:calc(var(--tap) - var(--sp-2))}
+html[data-size="compact"] .prj-filters .prj-chip::after{content:"";position:absolute;left:calc(-1 * var(--sp-1));right:calc(-1 * var(--sp-1));
+  top:50%;height:var(--tap);transform:translateY(-50%)}
 html[data-size="compact"] .prj-filters .sp,
 /* 手机：排序走右侧钉住的 ⇅ 图标 + 底部 sheet，筛选带里那枚排序控件是重复的 */
 html[data-size="compact"] .prj-filters .ant-segmented,
