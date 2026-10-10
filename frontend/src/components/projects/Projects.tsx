@@ -34,6 +34,7 @@ import { projNeeds, runningCount, waitingCount } from './project-list/project-mo
 import type { Proj, ProjSession } from './project-list/project-model'
 import { NeedsQueue, WorkbenchHead, buildNeedCards, NEEDS_CSS } from './project-list/needs-queue'
 import { ActivityRail, useRecentActivity, RAIL_CSS } from './project-list/activity-rail'
+import { SessionActivity, SESSION_ACTIVITY_CSS } from './project-list/session-activity'
 import { ProjectCard, CARD_CSS } from './project-list/project-card'
 import { useSwarmProjection, normDir } from './project-list/swarm-projection'
 import FileBrowser from '../files/FileBrowser'
@@ -71,15 +72,16 @@ const PRJ_CSS = `
 /* 左对齐不居中：全站页面统一从 tt-page 的 (16,16) 起笔，限宽只管可读性 */
 .prj-wrap{max-width:880px;margin:0;padding:0 0 32px}
 /* 概览并进来之后这一页带右轨：1180 是没有右轨时定的，减掉 320 只剩一列半 */
-.prj-wrap-wide{max-width:var(--content-overview);margin:0;padding:0 0 32px;
+.prj-wrap-wide{width:100%;min-width:0;margin:0;padding:0 0 var(--sp-5);
   display:flex;flex-direction:column;gap:var(--sp-3)}
 /* 栅格与右轨。阈值一律看 Canvas 容器，不看 viewport——终端坞开合只改 Canvas 宽度 */
 .prj-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4);align-items:start;
   padding-inline:var(--pad-page)}
 .prj-feed{min-width:0;display:flex;flex-direction:column}
+.prj-side{display:flex;min-width:0;flex-direction:column;gap:var(--sp-3)}
 @container canvas (min-width: 1180px){
   .prj-layout{grid-template-columns:minmax(0,1fr) var(--activity-rail)}
-  .prj-rail{position:sticky;top:0;align-self:start}
+  .prj-side{align-self:start}
   /* 右轨吃掉 320，剩下的宽度按 .prj-grid 的 auto-fill(320) 自然落成 2 列；
      ≥1560 才够 3 列——1320 减去右轨只剩 980，三列会挤破 320 的下限 */
 }
@@ -296,7 +298,7 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
 
   return (
     <>
-      <style>{PRJ_CSS + NEEDS_CSS + CARD_CSS + RAIL_CSS}</style>
+      <style>{PRJ_CSS + NEEDS_CSS + CARD_CSS + RAIL_CSS + SESSION_ACTIVITY_CSS}</style>
       {initialKey
         ? <ProjectHome proj={data.projects.find((x) => x.key === initialKey)} allProjects={data.projects} loaded={loaded} openTerm={openTerm} closeTerm={closeTerm} refresh={load} activeTerm={activeTerm} />
         : <ProjectList data={data} loaded={loaded} openTerm={openTerm} refresh={load} />}
@@ -638,7 +640,10 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
           )}
         </div>
 
-        <ActivityRail acts={acts} />
+        <div className="prj-side">
+          <SessionActivity onOpenSession={openTerm} />
+          <ActivityRail acts={acts} />
+        </div>
       </div>
       <NewProjectModal open={newOpen} onClose={() => { setNewOpen(false); refresh() }} />
     </div>

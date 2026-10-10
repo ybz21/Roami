@@ -146,7 +146,7 @@ async function fileBytes(event) {
 // ── Web Push（24 稿 §6）─────────────────────────────────────────────────────
 // 后端 push.go 发来的 JSON：{id,type,session,label,title,body,actions,badge}。
 // 通知按钮（允许 / 拒绝）在这儿直接打 /api/sessions/:name/keys，不开页面、不解锁；
-// 点通知本体 → 打开 #/inbox/<session>，页面接到后直接开那个会话。
+// 点通知本体后直接打开对应会话；无会话时进入项目页。
 self.addEventListener('push', (event) => {
   let p = {}
   try { p = event.data ? event.data.json() : {} } catch { p = { title: 'Roami', body: event.data && event.data.text() } }
@@ -184,7 +184,7 @@ self.addEventListener('notificationclick', (event) => {
       } catch {}
       // 发不出去（没登录 / 后端不通）：退回打开页面
     }
-    const url = '/#/inbox' + (d.session ? '/' + encodeURIComponent(d.session) : '')
+    const url = d.session ? '/#/inbox/' + encodeURIComponent(d.session) : '/#/projects'
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const c of all) {
       if ('focus' in c) { try { await c.navigate(url) } catch {} ; return c.focus() }

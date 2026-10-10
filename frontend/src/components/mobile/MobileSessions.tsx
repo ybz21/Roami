@@ -11,6 +11,7 @@ import { BranchIcon } from '../git/parts'
 import MobileProjectDetail from './MobileProjectDetail'
 import MobilePageSearch from './MobilePageSearch'
 import MobileSubPage from '../MobileSubPage'
+import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 export type { OverviewItem } from './mobile-overview-cache'
 
@@ -41,6 +42,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   useEffect(() => {
     if (searchNonce === lastSearchNonce.current) return
     lastSearchNonce.current = searchNonce
+    setFilter('all')
     setSearchOpen(true)
   }, [searchNonce])
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     return () => cancelAnimationFrame(frame)
   }, [searchOpen, searchNonce])
   // 筛选药丸 + 每组先露 5 条（Lody 手机端的做法）：十几个会话时一屏能看到所有项目，而不是被第一个项目占满
-  const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle'>('all')
+  const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle' | 'activity'>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 点开的项目（worktree 视图）；安卓返回手势退回列表
   const [cur, setCur] = useState<{ name: string; dir: string } | null>(null)
@@ -112,7 +114,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }, [])
 
   const needle = q.trim().toLowerCase()
-  const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : !s.waiting && !s.running && !s.dormant)
+  const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : filter === 'activity' ? false : !s.waiting && !s.running && !s.dormant)
   const hit = (s: OverviewItem) => inFilter(s) && (!needle || s.label.toLowerCase().includes(needle) || s.name.toLowerCase().includes(needle) || (s.branch || '').toLowerCase().includes(needle))
   const groups = useMemo(() => {
     const by = new Map<string, { name: string; dir: string; list: OverviewItem[] }>()
@@ -175,6 +177,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   </MobileSubPage>
   return (
     <div className="tt-msess">
+      <style>{SESSION_ACTIVITY_CSS}</style>
       {loadError && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => void reload()}>{t('inbox.retry')}</button></div>}
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">
@@ -191,12 +194,12 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           onDismiss={() => { setQ(''); setSearchOpen(false) }} />
       </div>}
       <div className="tt-msess-pills">
-        {(['all', 'waiting', 'running', 'idle'] as const).map((k) => {
-          const n = k === 'all' ? items.length : items.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length
-          return <button key={k} type="button" className={`tt-pill${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{t(k === 'all' ? 'mobile.filter.all' : 'mobile.st.' + k)}<span>{n}</span></button>
+        {(['all', 'waiting', 'running', 'idle', 'activity'] as const).map((k) => {
+          const n = k === 'activity' ? null : k === 'all' ? items.length : items.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length
+          return <button key={k} type="button" className={`tt-pill${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => { setFilter(k); if (k === 'activity') { setQ(''); setSearchOpen(false) } }}>{t(k === 'all' ? 'mobile.filter.all' : k === 'activity' ? 'project.sessionActivity' : 'mobile.st.' + k)}{n !== null && <span>{n}</span>}</button>
         })}
       </div>
-      {groups.map((g, i) => (
+      {filter === 'activity' ? <SessionActivity onOpenSession={onOpen} showEmpty /> : groups.map((g, i) => (
         <section key={i} className="tt-msess-sec">
           {g.dir
             ? <button type="button" className="tt-msess-proj" onClick={() => setCur({ name: g.name, dir: g.dir })}><h3>{g.name} <span>{g.list.length}</span></h3><ChevronRight size={14} /></button>
@@ -209,7 +212,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           )}
         </section>
       ))}
-      {!items.length && <div className="tt-msess-empty">{t('tree.noTasks')}</div>}
+      {filter !== 'activity' && !items.length && <div className="tt-msess-empty">{t('tree.noTasks')}</div>}
       <MobileSheet open={!!menu} title={menu?.label || ''} onClose={() => setMenu(null)}>
         {menu && <>
           <SheetRow icon={<PencilIcon size={16} />} title={t('session.rename')} onClick={() => { setRenameVal(menu.label); setRenaming(menu); setMenu(null) }} />

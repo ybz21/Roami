@@ -32,7 +32,6 @@ const WorktreePanel = lazyRetry(() => import('./components/git/WorktreePanel'))
 const RaceCreateModal = lazyRetry(() => import('./components/swarm/Race').then((m) => ({ default: m.RaceCreateModal })))
 const RaceComparePanel = lazyRetry(() => import('./components/swarm/Race').then((m) => ({ default: m.RaceComparePanel })))
 const PluginsPanel = lazyRetry(() => import('./components/plugins/PluginsPanel'))
-const InboxPage = lazyRetry(() => import('./components/inbox/InboxPage'))
 const MobileSessions = lazyRetry(() => import('./components/mobile/MobileSessions'))
 const MobileHome = lazyRetry(() => import('./components/mobile/MobileHome'))
 const InstallPage = lazyRetry(() => import('./components/install/InstallPage'))
@@ -102,7 +101,6 @@ const { Text } = Typography
 // 概览独有的问候条/行动队列/活动轨现在挂在项目列表页顶上。旧链接由 normalizeRoute 接住。
 const NAV = [
   { key: 'home', labelKey: 'nav.home' },
-  { key: 'inbox', labelKey: 'nav.inbox' },
   { key: 'projects', labelKey: 'nav.projects' },
   { key: 'files', labelKey: 'nav.files' },
   { key: 'browser', labelKey: 'nav.browser' },
@@ -115,9 +113,9 @@ const NAV = [
 
 // 桌面导航的两组（14 §4.4）。NAV 仍是全量注册表——命令面板和手机「更多」都从它取，
 // 所以 settings 留在 NAV 里，只是不进这两组：它单独摆在侧栏底部（见 Navigation 的 settings）。
-const NAV_WORKSPACE = ['inbox', 'projects', 'files']
+const NAV_WORKSPACE = ['projects', 'files']
 const NAV_TOOLS = ['browser', 'phone', 'plugins']
-const DESKTOP_PAGE_KEYS = new Set(['inbox', 'projects', 'files', 'browser', 'phone', 'plugins', 'settings', 'sessions', 'swarm', 'hub'])
+const DESKTOP_PAGE_KEYS = new Set(['projects', 'files', 'browser', 'phone', 'plugins', 'settings', 'sessions', 'swarm', 'hub'])
 const PAGE_TABS_KEY = 'roam.pageTabs'
 function loadPageTabs(): string[] {
   try {
@@ -127,7 +125,7 @@ function loadPageTabs(): string[] {
   return []
 }
 
-// 手机主导航按工作路径排列；通知由顶部入口进入。
+// 手机主导航按工作路径排列；会话动态归项目页。
 const MOBILE_NAV_KEYS = ['home', 'projects', 'tools', 'settings']
 
 // 用 Canvas 容器查询排版的页面（见 index.css 的 .tt-canvas[data-cq]）。逐页开，
@@ -162,8 +160,6 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [route, setRoute] = useState(() => normalizeRoute(location.hash.replace(/^#\/?/, '') || 'projects'))
   const tab = route.split('/')[0]                                  // 基础页（swarm/leave → swarm）
-  const lastMobilePrimary = useRef('home')
-  useEffect(() => { if (MOBILE_NAV_KEYS.includes(tab)) lastMobilePrimary.current = tab }, [tab])
   const [pageTabs, setPageTabs] = useState<string[]>(loadPageTabs)
   const [tabBarHost, setTabBarHost] = useState<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -199,15 +195,15 @@ export default function App() {
   const [prefs] = usePreferences()
   const { phone: isMobile, desktop: hasSider } = useLayout()
   // 点通知进来：#/inbox/<会话> → 直接开那个会话。放在这里而不是收件箱页里：那边只在挂载时认一次，
-  // 已经停在收件箱、或者同一个会话第二次来通知，就只会落在消息列表上。开完把地址收回 #/inbox，下次还能再触发。
+  // 同一个会话第二次来通知也要能打开。开完收回项目页，下次还能再触发。
   // hook 必须在所有提前 return 之前；openTerm 定义在后面，走 ref 取最新的
   const openTermRef = useRef<((n: string) => void) | null>(null)
   useEffect(() => {
     if (!authed || !inboxSub) return
     const name = inboxSub
     const qi = location.hash.indexOf('?')
-    history.replaceState(history.state, '', '#/inbox' + (qi >= 0 ? location.hash.slice(qi) : ''))
-    setRoute('inbox')
+    history.replaceState(history.state, '', '#/projects' + (qi >= 0 ? location.hash.slice(qi) : ''))
+    setRoute('projects')
     // 等路由变化引起的那轮覆盖层清理过去再开，否则刚打开就被一起收掉
     // 不在清理函数里取消：上面 setRoute 会让这个 effect 立刻重跑一次，取消了就永远开不了
     setTimeout(() => openTermRef.current?.(name), 60)
@@ -408,27 +404,15 @@ export default function App() {
   // 会话坞要显示「几个在等你」，而这个信号是 TerminalPane 抓屏算出来的（detectPrompt）。
   // 它已经在为每个已开会话轮询，别再开第二份——让它把结果递上来即可。
   const [mobileWaiting, setMobileWaiting] = useState<Record<string, boolean>>({})
-  // 会话坞右侧那个「N 等你」数的是全部会话，不只是打开过的：手机上 5s 拉一次 overview
-  const [waitingTotal, setWaitingTotal] = useState(0)
   // 首页点了某个项目：会话页直接落在那个项目的 worktree 视图上
   const [mobileProject, setMobileProject] = useState<{ name: string; dir: string; at: number } | null>(null)
-  // 离线条：sw 会把快照喂给收件箱 / 会话页，页面看着还活着，得明说这是上次的
+  // 离线条：sw 会把快照喂给项目 / 会话页，页面看着还活着，得明说这是上次的
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
   useEffect(() => {
     const on = () => setOffline(false), off = () => setOffline(true)
     window.addEventListener('online', on); window.addEventListener('offline', off)
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
   }, [])
-  useEffect(() => {
-    if (!authed || !isMobile) return
-    let stop = false
-    const load = () => api('GET', '/sessions/overview')
-      .then((r) => { if (!stop) setWaitingTotal(((r.data?.items || []) as { waiting: boolean }[]).filter((x) => x.waiting).length) })
-      .catch(() => {})
-    load()
-    const i = setInterval(load, 5000)
-    return () => { stop = true; clearInterval(i) }
-  }, [authed, isMobile])
   // 版本给状态条最右那一格用：**一次性**取，不是轮询（免登录接口，见 server.go）
   const [roamVersion, setRoamVersion] = useState('')
   useEffect(() => {
@@ -993,7 +977,6 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    inbox: <InboxPage onOpenSession={(n) => openTerm(n)} />,
     home: <MobileHome last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
@@ -1163,10 +1146,9 @@ export default function App() {
   const mobileNavRoot = tab === 'sessions' || tab === 'swarm' || tab === 'w' ? 'projects'
     : tab === 'install' || tab === 'about' ? 'settings'
       : ['files', 'browser', 'phone', 'plugins', 'hub'].includes(tab) ? 'tools'
-        : tab === 'inbox' ? lastMobilePrimary.current : tab
+        : tab
   const mobilePrimary = MOBILE_NAV_KEYS.includes(tab) || tab === 'sessions'
-  const mobileBack = tab === 'inbox' ? lastMobilePrimary.current
-    : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
+  const mobileBack = tab === 'install' || tab === 'about' ? 'settings' : 'tools'
   const mobileTitle = tab === 'install' ? t('install.pageTitle')
     : tab === 'about' ? t('nav.about')
       : tab === 'sessions' || tab === 'swarm' || tab === 'w' ? t('nav.projects')
@@ -1191,9 +1173,6 @@ export default function App() {
         <span className="tt-mobile-topbar-actions">
           {mobilePrimary && mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
             onClick={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}><PlusIcon size={20} /></button>}
-          {tab !== 'inbox' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('nav.inbox')} onClick={() => go('inbox')}>
-            {ICONS.inbox}{waitingTotal > 0 && <i className="bd">{waitingTotal}</i>}
-          </button>}
           <button type="button" className="tt-mobile-topbar-icon"
             aria-label={t(tab === 'projects' || tab === 'sessions' ? 'mobile.searchSessions' : tab === 'settings' ? 'set.searchPlaceholder' : 'workspace.search')}
             onClick={() => { if (tab === 'projects' || tab === 'sessions' || tab === 'settings') setMobileSearchNonce((n) => n + 1); else openPalette() }}>

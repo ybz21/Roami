@@ -1,4 +1,4 @@
-// 手机首页只给状态摘要；会话提醒在收件箱处理，项目收尾在项目页查看。
+// 手机首页只给状态摘要；会话提醒与项目收尾都在项目页处理。
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../api'
@@ -124,14 +124,14 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
       </header>
 
       <div className="tiles">
-        {tile(waiting.length, t('mobile.st.waiting'), 'warn', 'inbox')}
+        {tile(waiting.length, t('mobile.st.waiting'), 'warn', 'projects')}
         {tile(running.length, t('mobile.st.running'), 'ok', 'projects')}
-        {tile(doneToday.length, t('mobile.home.doneToday'), '', 'inbox')}
+        {tile(doneToday.length, t('mobile.home.doneToday'), '', 'projects')}
         {tile(unfinished, t('mobile.home.unfinished'), '', 'projects')}
       </div>
 
-      {needs > 0 && <button type="button" className="inbox-link" onClick={() => onNav('inbox')}>
-        <span>{t('mobile.home.inboxSummary', { n: needs })}</span><ChevronRight size={16} />
+      {needs > 0 && <button type="button" className="inbox-link" onClick={() => onNav('projects')}>
+        <span>{t('mobile.home.projectNeeds', { n: needs })}</span><ChevronRight size={16} />
       </button>}
 
       {lastItem && (
