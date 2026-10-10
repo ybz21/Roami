@@ -270,6 +270,7 @@ html[data-size="compact"] .tt-set-pane.scroll .rows { flex: 0 0 auto; overflow: 
 html[data-size="compact"] .tt-set-row .key { display: none; }
 html[data-size="compact"] .tt-mproj,
 html[data-size="compact"] .tt-install { flex: 1; min-height: 0; overflow-y: auto; }
+html[data-size="compact"] .tt-mproj { box-sizing: border-box; width: 100%; }
 html[data-size="compact"] .tt-mproj-wt .acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 html[data-size="compact"] .tt-mproj-wt .acts > button { min-width: 0; justify-content: center; }
 html[data-size="compact"] .tt-mme-push { min-height: calc(var(--tap) + var(--sp-3)); padding: var(--sp-3); }
