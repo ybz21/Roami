@@ -7,6 +7,7 @@ export function normalizeRoute(raw: string): string {
   const route = raw.split('?')[0]
   if (route === 'env' || route.startsWith('env/')) return 'settings' + route.slice(3)
   if (route === 'overview' || route.startsWith('overview/')) return 'projects'
+  if (route === 'inbox') return 'projects'
   if (route === 'about') return 'settings/about'  // 关于页并进设置（18 设计：设置页收下版本与安装）
   if (route === 'me') return 'tools'
   return route

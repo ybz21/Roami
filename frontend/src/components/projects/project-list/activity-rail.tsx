@@ -49,7 +49,7 @@ export function ActivityRail({ acts }: { acts: Act[] }) {
   if (!acts.length) return null
   return (
     <aside className="prj-rail prj-in" style={{ animationDelay: '160ms' }}>
-      <h3>{t('overview.recentActivity')}</h3>
+      <h3>{t('project.codeActivity')}</h3>
       <div className="prj-tl">
         {acts.map((e) => (
           <div key={(e.oid || e.branch) + '' + e.at} className={`prj-ev ${e.kind === 'trace' ? 'p' : ''}`}>
