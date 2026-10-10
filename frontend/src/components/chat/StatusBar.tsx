@@ -13,6 +13,7 @@
 //   用时 → 详情
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '../../i18n'
+import { useLayout } from '../../layout'
 import { ArrowToBottom, ChecklistIcon, ChevronRight, ClockIcon, WarnIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { CTX_FULL, CTX_TIGHT, MODE_COLOR, fmtElapsed, fmtTokens, modeKey, type AgentStatus } from './status'
@@ -67,6 +68,7 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
   actions?: StatusActions
 }) {
   const { t } = useI18n()
+  const { phone } = useLayout()
   const [panel, setPanel] = useState<Panel>('none')
   const toggle = (p: Panel) => setPanel((cur) => (cur === p ? 'none' : p))
 
@@ -123,7 +125,7 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
           <Chip onClick={() => toggle('info')} expanded={panel === 'info'}
             title={`${fmtTokens(ctx.used)} / ${fmtTokens(ctx.window)}`}>
             <Ring percent={ctx.percent} color={ctxColor} />
-            <span>{t('chat.contextUsed')}</span>
+            <span>{t(phone ? 'chat.contextShort' : 'chat.contextUsed')}</span>
             <span style={{ color: ctxColor, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
           </Chip>
         )}
@@ -131,7 +133,7 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
         {status.quota != null && (
           <Chip title={t('chat.quotaTitle')}>
             <Ring percent={status.quota} color={quotaColor} />
-            <span>{t('chat.quotaTitle')}</span>
+            <span>{t(phone ? 'chat.quotaShort' : 'chat.quotaTitle')}</span>
             <span style={{ color: quotaColor, fontVariantNumeric: 'tabular-nums' }}>{Math.round(status.quota)}%</span>
           </Chip>
         )}
