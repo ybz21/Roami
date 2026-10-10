@@ -35,6 +35,7 @@ import { useEdgeSwipe } from '../shell/edge-swipe'
 import { DPad } from '../shell/DPad'
 import { MobileSheet, SheetRow, SheetSection } from '../shell/MobileSheet'
 import { MobileSessionSwitch } from '../mobile/MobileSessionSwitch'
+import { tabCloseTargets, type TabCloseScope } from '../shell/tab-actions'
 import { Button, Dropdown, Input, Modal, Spin, Tooltip, App as AntApp } from 'antd'
 import { AgentLogo, ChevronDown, ChevronLeft, ChevronRight, PlusIcon, StopIcon, TabsIcon, TerminalIcon, PanelRightIcon } from '../../icons'
 import { agentName, type AgentKind } from '../../agent-kind'
@@ -45,6 +46,7 @@ export default function TerminalPane(props: {
   activePage?: string
   onPageTab?: (key: string) => void
   onClosePage?: (key: string) => void
+  onClosePages?: (keys: string[]) => void
   tabBarHost?: HTMLElement | null
   fontSize: number; setFontSize: (n: number) => void
   statusMap: Record<string, TermStatus>; setStatus: (n: string, s: TermStatus) => void
@@ -85,7 +87,7 @@ export default function TerminalPane(props: {
   /** 从对话里点「path:line」跳过来要定位到那一行；nonce 让同一处点第二次也响 */
   reveal?: { path: string; line: number; nonce: number }
 }) {
-  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, tabBarHost, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const tabs = terms
   const curFile = activeFile || ''
   // 文件标签的脏标记：FileView 报上来，关标签前问一句（FileWorkspace 同款）
@@ -106,6 +108,41 @@ export default function TerminalPane(props: {
         okButtonProps: { danger: true }, onOk: () => { setFileDirty(p, false); onCloseFile(p) },
       })
     } else onCloseFile(p)
+  }
+  const [pinnedTabIds, setPinnedTabIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('roam.workspace.pinnedTabs') || '[]')) } catch { return new Set() }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('roam.workspace.pinnedTabs', JSON.stringify([...pinnedTabIds])) } catch { /* 当前页仍可固定 */ }
+  }, [pinnedTabIds])
+  const allTabIds = [
+    ...(pageTabs || []).map((p) => `page:${p.key}`),
+    ...terms.map((n) => `term:${n}`),
+    ...(fileTabs || []).map((f) => `file:${f.path}`),
+  ]
+  const visualTabIds = [...allTabIds.filter((id) => pinnedTabIds.has(id)), ...allTabIds.filter((id) => !pinnedTabIds.has(id))]
+  const togglePin = (id: string) => setPinnedTabIds((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const closeTabIds = (ids: string[]) => {
+    const pages = ids.filter((id) => id.startsWith('page:')).map((id) => id.slice(5))
+    if (pages.length && onClosePages) onClosePages(pages)
+    else pages.forEach((key) => onClosePage?.(key))
+    ids.filter((id) => id.startsWith('term:')).forEach((id) => closeTerm(id.slice(5)))
+    ids.filter((id) => id.startsWith('file:')).forEach((id) => closeFile(id.slice(5)))
+  }
+  const tabMenu = (id: string, closeOne: () => void) => {
+    const targets = (scope: TabCloseScope) => tabCloseTargets(visualTabIds, pinnedTabIds, id, scope)
+    return { onClick: ({ domEvent }: { domEvent: { stopPropagation: () => void } }) => domEvent.stopPropagation(), items: [
+      { key: 'pin', label: t(pinnedTabIds.has(id) ? 'tabs.unpin' : 'tabs.pin'), onClick: () => togglePin(id) },
+      { type: 'divider' as const },
+      { key: 'close', label: t('common.close'), onClick: closeOne },
+      { key: 'others', label: t('tabs.closeOthers'), disabled: !targets('others').length, onClick: () => closeTabIds(targets('others')) },
+      { key: 'right', label: t('tabs.closeRight'), disabled: !targets('right').length, onClick: () => closeTabIds(targets('right')) },
+      { key: 'left', label: t('tabs.closeLeft'), disabled: !targets('left').length, onClick: () => closeTabIds(targets('left')) },
+    ] }
   }
   const st = active ? statusMap[active] : undefined
   const [termNeedsInput, setTermNeedsInput] = useState<Record<string, boolean>>({})
@@ -656,15 +693,18 @@ export default function TerminalPane(props: {
           el.scrollLeft += e.deltaY
         }}>
         {(pageTabs || []).map((page) => (
-          <span key={'page:' + page.key} ref={activePage === page.key ? activeTabRef : undefined}
-            className={`tt-tab tt-tab-page${activePage === page.key ? ' on' : ''}`}>
+          <Dropdown key={'page:' + page.key} trigger={['contextMenu']}
+            menu={tabMenu(`page:${page.key}`, () => onClosePage?.(page.key))}>
+          <span ref={activePage === page.key ? activeTabRef : undefined}
+            style={{ order: pinnedTabIds.has(`page:${page.key}`) ? 0 : 1 }}
+            className={`tt-tab tt-tab-page${activePage === page.key ? ' on' : ''}${pinnedTabIds.has(`page:${page.key}`) ? ' pinned' : ''}`}>
             <button type="button" className="tt-tab-page-open" onClick={() => onPageTab?.(page.key)}
               aria-current={activePage === page.key ? 'page' : undefined} title={page.label}>
               <span className="tt-tab-page-icon">{page.icon}</span><span className="tt-tab-nm">{page.label}</span>
             </button>
             <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')}
               onClick={() => onClosePage?.(page.key)}>{TI.close}</button>
-          </span>
+          </span></Dropdown>
         ))}
         {tabs.map((termName, i) => {
           const on = !activePage && !curFile && termName === active
@@ -675,7 +715,8 @@ export default function TerminalPane(props: {
             .filter(Boolean).join(' · ')
           const tab = (
             <span key={termName} ref={on ? activeTabRef : undefined}
-              className={`tt-tab${on ? ' on' : ''}${dragTab === termName ? ' dragging' : ''}${dropAt === i ? ' dropL' : ''}${dropPeer === termName ? ' dropPeer' : ''}`}
+              className={`tt-tab${on ? ' on' : ''}${pinnedTabIds.has(`term:${termName}`) ? ' pinned' : ''}${dragTab === termName ? ' dragging' : ''}${dropAt === i ? ' dropL' : ''}${dropPeer === termName ? ' dropPeer' : ''}`}
+              style={{ order: pinnedTabIds.has(`term:${termName}`) ? 0 : 1 }}
               title={tip} onClick={() => setActive(termName)}
               draggable={!!onReorder}
               onDragStart={(e) => {
@@ -724,18 +765,19 @@ export default function TerminalPane(props: {
               {waiting && <span className="tt-wait" title={t('prompt.confirmRequired')}>{t('session.waiting')}</span>}
               {agentMarks(termName)}
               <TabName name={termName} />
-              <a className="tt-x" title={t('common.close')} onClick={(e) => { e.stopPropagation(); closeTerm(termName) }}>{TI.close}</a>
+              <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')}
+                onClick={(e) => { e.stopPropagation(); closeTerm(termName) }}>{TI.close}</button>
             </span>
           )
           // 右键菜单：标签是跨页常驻的，「这个会话是哪来的」得有个地方能问（14 §6.3.4）
           return (
-            <Dropdown key={termName} trigger={['contextMenu']} menu={{ items: [
+            <Dropdown key={termName} trigger={['contextMenu']} menu={{ onClick: ({ domEvent }) => domEvent.stopPropagation(), items: [
               ...(proj ? [{ key: 'proj', label: t('terminal.openOwnerProject', { name: proj.name }),
                 onClick: () => { location.hash = '#/projects/' + encodeURIComponent(proj.key) } }] : []),
               { key: 'newtab', label: t('terminal.openInNewTabTitle'),
                 onClick: () => window.open(`/#/term/${encodeURIComponent(termName)}`, '_blank') },
               { type: 'divider' as const },
-              { key: 'close', danger: true, label: t('common.close'), onClick: () => closeTerm(termName) },
+              ...tabMenu(`term:${termName}`, () => closeTerm(termName)).items,
             ] }}>{tab}</Dropdown>
           )
         })}
@@ -746,18 +788,23 @@ export default function TerminalPane(props: {
           const name = f.path.split('/').pop() || f.path
           const dirty = dirtyFiles.has(f.path)
           return (
-            <span key={'file:' + f.path} ref={on ? activeTabRef : undefined}
-              className={`tt-tab tt-tab-file${on ? ' on' : ''}${f.preview ? ' prev' : ''}${dirty ? ' dirty' : ''}`}
+            <Dropdown key={'file:' + f.path} trigger={['contextMenu']}
+              menu={tabMenu(`file:${f.path}`, () => closeFile(f.path))}>
+            <span ref={on ? activeTabRef : undefined}
+              style={{ order: pinnedTabIds.has(`file:${f.path}`) ? 0 : 1 }}
+              className={`tt-tab tt-tab-file${on ? ' on' : ''}${pinnedTabIds.has(`file:${f.path}`) ? ' pinned' : ''}${f.preview ? ' prev' : ''}${dirty ? ' dirty' : ''}`}
               title={f.path} onClick={() => onFileTab?.(f.path)} onDoubleClick={() => onPinFile?.(f.path)}>
               <span className="tt-tab-fi"><FileTypeIcon name={name} /></span>
               <span className="tt-tab-nm">{name}</span>
-              <a className="tt-x" title={dirty ? t('file.unsaved') : t('common.close')} onClick={(e) => { e.stopPropagation(); closeFile(f.path) }}>{dirty ? <span className="tt-tab-dirty" /> : TI.close}</a>
-            </span>
+              <button type="button" className="tt-x" aria-label={dirty ? t('file.unsaved') : t('common.close')}
+                title={dirty ? t('file.unsaved') : t('common.close')}
+                onClick={(e) => { e.stopPropagation(); closeFile(f.path) }}>{dirty ? <span className="tt-tab-dirty" /> : TI.close}</button>
+            </span></Dropdown>
           )
         })}
         {/* 拖到最右侧：最后一个标签的右半边已经给出 i+1，这里只补"空白区也能落" */}
         {dragTab && (
-          <span className="tt-tab-tail"
+          <span className="tt-tab-tail" style={{ order: 2 }}
             onDragOver={(e) => { if (!isTabDrag(e)) return; e.preventDefault(); setDropAt(tabs.length) }}
             onDrop={(e) => {
               if (!isTabDrag(e)) return

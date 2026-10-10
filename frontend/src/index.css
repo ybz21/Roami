@@ -1007,8 +1007,14 @@ html[data-pointer="coarse"] .mc { --ctl-h: 36px; }
 }
 :where(html[data-pointer="fine"]) .mc-tab:hover { background: var(--list-hover); color: var(--text-bright); }
 .mc-tab.is-on { background: var(--bg-container); color: var(--text-bright); }
+.mc-tab.pinned { flex: 0 0 var(--tap); min-width: var(--tap); justify-content: center; padding: 0; }
+.mc-tab.pinned .mc-tab-t, .mc-tab.pinned .mc-tab-x { display: none; }
 .mc-tab-fav { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 4px; background: var(--bg-elevated); }
 .mc-tab.is-on .mc-tab-fav { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); border-radius: 50%; width: 7px; height: 7px; margin: 0 3px; }
+.mc-tab.pinned .mc-tab-fav, .mc-tab.pinned.is-on .mc-tab-fav {
+  display: grid; place-items: center; width: var(--sp-4); height: var(--sp-4); margin: 0;
+  background: transparent; box-shadow: none; color: var(--text-dim);
+}
 .mc-tab-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 关闭钮只在悬停/激活时出现：一排 ✕ 常驻会抢注意力 */
 .mc-tab-x {
@@ -1396,6 +1402,14 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
   height: calc(100% - 2 * var(--sp-2));
   min-height: calc(100% - 2 * var(--sp-2));
 }
+.tt-page-browser.tt-page-card {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+}
 .tt-page .ant-space-vertical {
   align-items: stretch;
 }
@@ -1590,6 +1604,8 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
    改成选中底 + 顶上那条 accent 线：跟侧栏选中行是同一套语言（中性底 + 一条强调线）。 */
 .tt-tab.on { background: var(--sel-bg); color: var(--text-bright); font-weight: 600;
   box-shadow: inset 0 2px 0 var(--accent); }
+.tt-tab.pinned { min-width: var(--tap); max-width: var(--tap); justify-content: center; padding: 0; }
+.tt-tab.pinned .tt-tab-nm, .tt-tab.pinned .tt-name, .tt-tab.pinned .tt-x, .tt-tab.pinned .tt-wait { display: none; }
 .tt-tab-page { padding: 0 var(--sp-1) 0 0; gap: 0; }
 .tt-tab-page-open {
   display: inline-flex; flex: 1; align-items: center; gap: var(--sp-2); min-width: 0;
@@ -1636,7 +1652,8 @@ html[data-pointer="coarse"] .tt-tab-page .tt-x::after { content: ''; position: a
 .tt-tab-tail { flex: 1 0 24px; align-self: stretch; }
 .tt-tab .tt-x {
   display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
-  border-radius: 5px; color: var(--text-dimmer); opacity: 0; transition: opacity .12s ease;
+  padding: 0; border: 0; border-radius: var(--r-xs); background: transparent; cursor: pointer;
+  color: var(--text-dimmer); opacity: 0; transition: opacity .12s ease;
 }
 :where(html[data-pointer="fine"]) .tt-tab:hover .tt-x, .tt-tab.on .tt-x { opacity: 1; }
 :where(html[data-pointer="fine"]) .tt-tab .tt-x:hover { background: var(--danger-soft); color: var(--danger); }
