@@ -21,7 +21,7 @@ function ago(sec: number, t: (k: string) => string): string {
   return `${Math.floor(d / 86400)}d`
 }
 
-type Proj = { key: string; name: string; dir: string; sessions: number; running: number; waiting: number; unfinished: number; worktrees: number; lastActivity: number }
+type Proj = { key: string; name: string; dir: string; sessions: number; unfinished: number; worktrees: number; lastActivity: number }
 
 export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   /** 上次看的会话，给「继续上次」用 */
@@ -78,6 +78,15 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
     : running.length ? t('mobile.home.headRunning', { n: running.length }) : t('mobile.home.headQuiet'))
   const lastItem = last ? items.find((x) => x.name === last && !x.waiting) : undefined
   const busyProjects = [...projects].filter((p) => p.sessions > 0).sort((a, b) => b.lastActivity - a.lastActivity)
+  // /projects 的 running 是 Agent 进程数；首页与会话筛选用的是当前忙碌状态。
+  const projectActivity = new Map<string, { running: number; waiting: number }>()
+  for (const s of items) {
+    if (!s.projectKey) continue
+    const activity = projectActivity.get(s.projectKey) || { running: 0, waiting: 0 }
+    if (s.running) activity.running++
+    if (s.waiting) activity.waiting++
+    projectActivity.set(s.projectKey, activity)
+  }
 
   const tile = (n: number, label: string, tone: '' | 'warn' | 'ok', to: string) => (
     <button type="button" className={`tile ${n > 0 ? tone : ''}`} onClick={() => onNav(to)}>
@@ -147,19 +156,20 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
 
       {busyProjects.length > 0 && section(t('nav.projects'), busyProjects.length, () => onNav('projects'), (
         <div className="projs">
-          {busyProjects.slice(0, 4).map((p) => (
-            <button key={p.key} type="button" onClick={() => onOpenProject(p)}>
+          {busyProjects.slice(0, 4).map((p) => {
+            const activity = projectActivity.get(p.key)
+            return <button key={p.key} type="button" onClick={() => onOpenProject(p)}>
               <span className="av">{p.name.slice(0, 1).toUpperCase()}</span>
               <span className="t">
                 <b>{p.name}</b>
                 <small>{t('mobile.home.projMeta', { s: p.sessions, w: p.worktrees })}</small>
               </span>
-              <span className="cnt">
-                {p.waiting > 0 && <i className="w">{t('mobile.proj.waiting', { n: p.waiting })}</i>}
-                {p.running > 0 && <i className="r">{t('mobile.proj.running', { n: p.running })}</i>}
-              </span>
+              {(activity?.waiting || activity?.running) ? <span className="cnt">
+                {!!activity?.waiting && <i className="w">{t('mobile.proj.waiting', { n: activity.waiting })}</i>}
+                {!!activity?.running && <i className="r">{t('mobile.proj.running', { n: activity.running })}</i>}
+              </span> : null}
             </button>
-          ))}
+          })}
         </div>
       ))}
 
