@@ -172,16 +172,18 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(PAGE_TABS_KEY, JSON.stringify(pageTabs)) } catch { /* 可继续使用当前标签 */ }
   }, [pageTabs])
-  const closePageTab = (key: string) => {
-    const at = pageTabs.indexOf(key)
-    const next = pageTabs.filter((item) => item !== key)
+  const closePageTabs = (keys: string[]) => {
+    const closing = new Set(keys)
+    const at = pageTabs.findIndex((item) => closing.has(item))
+    const next = pageTabs.filter((item) => !closing.has(item))
     if (!next.length && !terms.length) next.push('projects')
     setPageTabs(next)
-    if (tab === key) {
+    if (closing.has(tab)) {
       const target = next[at] || next[at - 1]
       go(target || (terms.length ? TASK_ROUTE : 'projects'))
     }
   }
+  const closePageTab = (key: string) => closePageTabs([key])
   const swarmSub = tab === 'swarm' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的蜂群
   const projectSub = tab === 'projects' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的项目
   const pluginSub = tab === 'plugins' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的插件（状态条点进来）
@@ -945,7 +947,7 @@ export default function App() {
       terms={terms} active={active} setActive={(n) => { activateSession(n); if (hasSider) go(TASK_ROUTE) }} closeTerm={closeTerm}
       pageTabs={hasSider ? pageTabs.map((key) => ({ key, label: t(key === 'hub' ? 'hub.title' : NAV.find((n) => n.key === key)?.labelKey || `nav.${key}`), icon: key === 'hub' ? <CloudIcon size={16} /> : ICONS[key] })) : undefined}
       activePage={hasSider && !taskView ? tab : undefined}
-      onPageTab={go} onClosePage={closePageTab} tabBarHost={hasSider ? tabBarHost : null}
+      onPageTab={go} onClosePage={closePageTab} onClosePages={closePageTabs} tabBarHost={hasSider ? tabBarHost : null}
       fontSize={fontSize} setFontSize={setFontSize} statusMap={statusMap} setStatus={setStatus}
       termRefs={termRefs} sendKey={sendKey}
       claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
@@ -1005,7 +1007,7 @@ export default function App() {
   // 任务视图（#/w）时 Canvas 归零，页面不用画；#/w 不在 pages 里，退回项目页
   const page = <Suspense fallback={lazyFallback}>{taskView ? null : (pages[tab] || pages.projects)}</Suspense>
   // browser 全幅(自带工具栏铺满)；phone 与概览/会话一致走 tt-page（同 16px 留白 + 满高，见 tt-page-phone）。
-  // 浏览器页不再全幅特例：与 文件/手机 同走 tt-page 满高容器，五页左上角起点统一 (16,16)
+  // 浏览器页与会话一样从标签条下沿直接开始；其他页面仍使用自己的容器布局。
   const pageNode = <div className={`tt-page tt-page-${tab}${hasSider ? ' tt-page-card' : ''}${isMobile ? ' tt-page-mobile' : ''}${isMobile && terms.length ? ' has-dock' : ''}`}>{page}</div>
   // Canvas 与 Dock 各包一层：两者在 Page / Split / Focus 三态间只改宽度，不改挂载
   // ⌘K 面板的**本地**条目：页面导航 + 已打开的会话——这两样数据就在内存里，打字即出。

@@ -91,6 +91,18 @@ export default function BrowserView() {
   const addrFocused = useRef(false) // 地址栏聚焦时不被轮询回写覆盖
   // 标签页（复用同一台 Chrome）
   const [tabs, setTabs] = useState<TabInfo[]>([])
+  const [pinnedTabs, setPinnedTabs] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('roam.browser.pinnedTabs') || '[]')) } catch { return new Set() }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('roam.browser.pinnedTabs', JSON.stringify([...pinnedTabs])) } catch { /* 当前页仍可固定 */ }
+  }, [pinnedTabs])
+  const displayTabs = [...tabs.filter((tb) => pinnedTabs.has(tb.id)), ...tabs.filter((tb) => !pinnedTabs.has(tb.id))]
+  const togglePin = (id: string) => setPinnedTabs((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
   const tabsRef = useRef<TabInfo[]>([]) // 供 ws.onmessage 等闭包读到最新标签集（识别新开的那个）
   const [target, setTarget] = useState('') // 当前镜像的标签页 id；空 = 第一个
   // 导航起始页地址（后端 /api/me 提供，形如 http://127.0.0.1:<port>/home）；
@@ -214,19 +226,20 @@ export default function BrowserView() {
       setTarget(fresh?.id || list[list.length - 1]?.id || '')
     } catch (e: any) { message.error(e.message) }
   }
-  const closeTab = async (id: string) => {
-    try {
-      await api('DELETE', `/browser/tabs/${id}`)
-    } catch (e: any) {
-      // not_closable = Chrome 收下了关闭请求但那一页还在（后端确认过，见 ErrNotClosable）
-      if (e?.apiError?.code !== 'not_closable') { message.error(e.message); return }
-      dismissedRef.current.add(id)
-      setTabs((prev) => prev.filter((x) => x.id !== id))
-      setTarget((cur) => (cur === id ? '' : cur))
-      message.info(t('browser.tabHidden'))
-    }
+  const closeTabs = async (ids: string[]) => {
+    await Promise.all(ids.map(async (id) => {
+      try {
+        await api('DELETE', `/browser/tabs/${id}`)
+      } catch (e: any) {
+        // Chrome 自身的页面拒绝关闭时，仅从镜像标签条隐藏。
+        if (e?.apiError?.code !== 'not_closable') { message.error(e.message); return }
+        dismissedRef.current.add(id)
+        message.info(t('browser.tabHidden'))
+      }
+    }))
     await loadTabs()
   }
+  const closeTab = (id: string) => closeTabs([id])
 
   // 地址栏跟随当前标签页真实 URL（聚焦编辑时不覆盖；about:blank 显示为空）
   useEffect(() => {
@@ -704,7 +717,8 @@ export default function BrowserView() {
             从前是五行散装控件——「前往」实心按钮比地址栏还抢戏、四档清晰度常驻一整行、
             「外部打开」被挤成第五行的孤儿。现在只有一个主角：omnibox。 */}
         {shelf !== 'narrow' && (
-          <TabStrip tabs={tabs} active={target} onSelect={switchTab} onClose={closeTab} onAdd={newTab}
+          <TabStrip tabs={displayTabs} active={target} pinned={pinnedTabs} onPin={togglePin}
+            onSelect={switchTab} onClose={closeTab} onCloseMany={closeTabs} onAdd={newTab}
             extra={<StatusChip icon={followPaused ? <UserIcon size={12} /> : <BotIcon size={12} />}
               strong={followPaused ? t('browser.followModeHuman') : t('browser.followModeAgent')}
               active={!followPaused} onClick={() => (followPaused ? resumeFollow() : pauseFollow())} />} />
@@ -746,7 +760,8 @@ export default function BrowserView() {
           </> : undefined}
         />
         {/* 手机标签：横条在 360 上放不下第三枚，换成「⧉N + 抽屉」（设计 17 §4） */}
-        <TabSheet open={tabsOpen} tabs={tabs} active={target} onClose={() => setTabsOpen(false)}
+        <TabSheet open={tabsOpen} tabs={displayTabs} active={target} pinned={pinnedTabs}
+          onPin={togglePin} onCloseMany={closeTabs} onClose={() => setTabsOpen(false)}
           onSelect={(id) => { switchTab(id); setTabsOpen(false) }}
           onCloseTab={closeTab} onAdd={() => { newTab(); setTabsOpen(false) }} />
         <style>{`

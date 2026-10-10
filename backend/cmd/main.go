@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"ttmux-web/browser"
@@ -165,6 +166,7 @@ func main() {
 		}
 		cfg.NodeClient = cl
 		r = server.New(cfg)
+		go maintainPluginDaemon(context.Background(), bin, 15*time.Second)
 		if cl != nil {
 			cl.Handler = r // 业务 Handler 不变，隧道请求经内部主体放行本地鉴权
 			go cl.Run(context.Background())
