@@ -127,8 +127,8 @@ function loadPageTabs(): string[] {
   return []
 }
 
-// 手机主导航按工作路径排列；通知由顶部入口进入。
-const MOBILE_NAV_KEYS = ['home', 'projects', 'tools', 'settings']
+// 浏览器放在底栏，方便直接验证 Agent 做好的页面；通知由顶部入口进入。
+const MOBILE_NAV_KEYS = ['home', 'projects', 'browser', 'tools', 'settings']
 
 // 用 Canvas 容器查询排版的页面（见 index.css 的 .tt-canvas[data-cq]）。逐页开，
 // 不是全局开：container-type 会改变 fixed 后代的包含块。

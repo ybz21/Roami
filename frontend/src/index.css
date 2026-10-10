@@ -1176,78 +1176,29 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
 .tt-seg-scroll::-webkit-scrollbar { height: 0; }
 .tt-seg-scroll > .ant-segmented { min-width: max-content; }
 
-/* 手机会话顶栏与一级页等高；会话切换在居中的胶囊里。 */
+/* 手机会话顶栏与一级页等高；会话切换在居中的标题里。 */
 .tt-sesshead {
-  position: relative; flex: 0 0 var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4)));
+  flex: 0 0 var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4)));
   height: var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4))); padding: 0 var(--sp-2);
   display: flex; align-items: center; gap: var(--sp-2);
   background: var(--bg-container); border-bottom: 1px solid var(--border-subtle);
 }
-.tt-sesshead .actions { margin-left: auto; display: flex; align-items: center; }
 .tt-sesshead .ic {
   flex: 0 0 var(--tap); width: var(--tap); height: var(--tap); display: grid; place-items: center;
   border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-dim); cursor: pointer;
 }
 .tt-sesshead .ic.on { color: var(--accent); background: var(--accent-soft); }
-.tt-sesshead .pill {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  width: calc(100% - 2 * (var(--tap) + var(--sp-4)));
-  min-width: 0; height: var(--tap); padding: 0 var(--sp-2);
-  display: flex; align-items: center; gap: 7px;
-  border: 1px solid var(--border-subtle); border-radius: var(--r-pill);
-  background: var(--bg-base); color: var(--text-bright); font-size: var(--fs-meta); cursor: pointer;
+.tt-sesshead .side { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--sp-1); }
+.tt-sesshead .side.start { justify-content: flex-start; }
+.tt-sesshead .side.end { justify-content: flex-end; }
+.tt-sesshead .session-title {
+  flex: 0 1 auto; min-width: 0; min-height: var(--tap); padding: 0 var(--sp-2);
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-bright);
+  font: inherit; font-size: var(--fs-body); cursor: pointer;
 }
-/* 名字**绝对居中**，两侧簇各贴一边。
-   之前用「名字 flex:1 + justify-content:center」只是在余量里居中——左边是 8px 的状态点、
-   右边是箭头(+计数)，两侧不等宽，名字就整体偏了；一出现会话计数偏得更多。
-   绝对定位之后，两侧簇宽度差多少都不影响名字落在胶囊正中。 */
-.tt-sesshead .pill .tt-name {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  /* 两侧留给状态点和箭头，名字始终在胶囊正中。 */
-  max-width: calc(100% - 2 * (var(--sp-5) + var(--sp-1)));
-  justify-content: center;
-  pointer-events: none;
-}
-.tt-sesshead .pill .ri { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-/* 待确认时状态比名字要紧：回到流式布局，名字左对齐让位给「待确认」角标 */
-.tt-sesshead .pill.wait .tt-name {
-  position: static;
-  transform: none;
-  max-width: none;
-  flex: 1 1 auto;
-  justify-content: flex-start;
-}
-.tt-sesshead .pill .ca { flex: 0 0 auto; display: inline-flex; opacity: .55; }
-.tt-sesshead .pill .d { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; position: relative; }
-/* 有 Agent 在跑：状态点带一圈呼吸。静态点分不出「在干活」和「卡住了」。 */
-.tt-sesshead .pill .d.live::after {
-  content: ''; position: absolute; inset: -3px; border-radius: 50%;
-  border: 1px solid currentColor; color: inherit;
-  animation: tt-island-breathe 1.8s ease-out infinite;
-}
-@keyframes tt-island-breathe {
-  0% { opacity: .55; transform: scale(.7); }
-  70%, 100% { opacity: 0; transform: scale(1.5); }
-}
-@media (prefers-reduced-motion: reduce) { .tt-sesshead .pill .d.live::after { animation: none; opacity: .4; } }
-/* 待确认：整颗岛变黄 + 浮出文字。这是全屏唯一需要人立刻动手的状态，值得整块变色。 */
-.tt-sesshead .pill.wait {
-  border-color: var(--warn-border);
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-.tt-sesshead .pill .tag {
-  flex: 0 0 auto; padding: 1px 7px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--warn) 22%, transparent);
-  color: var(--warn); font-size: var(--fs-micro); font-weight: 600; white-space: nowrap;
-}
-.tt-sesshead .pill .n {
-  flex: 0 0 auto; min-width: 18px; height: 18px; padding: 0 5px;
-  display: grid; place-items: center; border-radius: 9px;
-  background: var(--accent-solid); color: #fff; font: 600 var(--fs-micro)/1 ui-monospace, monospace;
-}
+.tt-sesshead .session-title .tt-name { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-sesshead .session-title .ca { flex: 0 0 auto; display: inline-flex; opacity: .55; }
 /* 溢出 sheet 里的「画面」一行四格图标 */
 .tt-sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 4px 2px 8px; }
 .tt-sheet-grid button {

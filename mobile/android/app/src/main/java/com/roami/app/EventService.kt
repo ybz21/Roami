@@ -110,7 +110,13 @@ class EventService : Service() {
         val type = o.optString("type")
         if (!type.startsWith("session.") && type != "test") return
         val session = o.optString("session")
-        val title = o.optString("title").ifBlank { o.optString("label") }
+        val label = o.optString("title").ifBlank { o.optString("label") }
+        val waiting = type == "session.waiting"
+        val title = when (type) {
+            "session.waiting" -> getString(R.string.event_waiting_title, label)
+            "session.done" -> getString(R.string.event_done_title, label)
+            else -> label
+        }
         val body = o.optString("body")
         val open = PendingIntent.getActivity(this, session.hashCode(),
             Intent(this, WebActivity::class.java).putExtra("path", "/#/inbox/" + java.net.URLEncoder.encode(session, "UTF-8")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -118,13 +124,20 @@ class EventService : Service() {
         val b = NotificationCompat.Builder(this, CH_EVENTS)
             .setSmallIcon(R.drawable.ic_stat).setContentTitle(title).setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setContentIntent(open).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(open).setAutoCancel(!waiting).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(waiting).setOnlyAlertOnce(true)
+        if (waiting) {
+            b.setRequestPromotedOngoing(true)
+                .setShortCriticalText(getString(R.string.event_waiting_chip))
+        }
         val actions = o.optJSONArray("actions")
         if (actions != null) for (i in 0 until actions.length()) {
             val a = actions.getString(i)
             val key = when (a) { "allow" -> "Enter"; "deny" -> "Escape"; else -> continue }
             val pi = PendingIntent.getBroadcast(this, (session + a).hashCode(),
-                Intent(this, ActionReceiver::class.java).putExtra("base", base).putExtra("session", session).putExtra("key", key).putExtra("nid", session.hashCode()),
+                Intent(this, ActionReceiver::class.java)
+                    .putExtra("base", base).putExtra("session", session).putExtra("key", key)
+                    .putExtra("nid", session.hashCode()).putExtra("title", title).putExtra("body", body),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             b.addAction(0, getString(if (a == "allow") R.string.act_allow else R.string.act_deny), pi)
         }

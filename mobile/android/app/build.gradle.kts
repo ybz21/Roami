@@ -5,13 +5,13 @@ plugins {
 
 android {
     namespace = "com.roami.app"
-    compileSdk = 34
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.roami.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.4.0"
     }
     buildTypes {
         release {
@@ -25,7 +25,7 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

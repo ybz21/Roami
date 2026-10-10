@@ -1,6 +1,8 @@
 package api
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +12,21 @@ const waitScreen = "Do you want to proceed?\n❯ 1. Yes\n  2. No\nEnter to selec
 
 func inputOf(sessions map[string]string, screen string) observeInput {
 	return observeInput{sessions: sessions, capture: func(string) string { return screen }, agents: map[string]bool{}}
+}
+
+func TestCodexLastTurn(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "rollout.jsonl")
+	content := strings.Join([]string{
+		`{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","phase":"final_answer"}}}`,
+		`{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-123","completed_at":1791538424,"last_agent_message":"已完成首页验证"}}`,
+	}, "\n")
+	if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := codexLastTurn(file)
+	if got.key != "turn-123" || got.stop != "end_turn" || got.text != "已完成首页验证" || got.at.Unix() != 1791538424 {
+		t.Fatalf("Codex 完成事件解析错误: %+v", got)
+	}
 }
 
 func TestSessionEventsDebounceAndReset(t *testing.T) {

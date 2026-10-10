@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, TerminalIcon } from '../../icons'
+import { AgentLogo, CheckIcon, ChevronRight, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { AppUpdateBanner } from './app-update'
@@ -20,6 +20,8 @@ function ago(sec: number, t: (k: string) => string): string {
   if (d < 86400) return `${Math.floor(d / 3600)}h`
   return `${Math.floor(d / 86400)}d`
 }
+
+const plain = (v: string) => v.replace(/(^|\s)#{1,6}\s+/g, '$1').replace(/[*_`]{1,3}/g, '').replace(/\s+/g, ' ').trim()
 
 type Proj = { key: string; name: string; dir: string; sessions: number; running: number; waiting: number; unfinished: number; worktrees: number; lastActivity: number }
 
@@ -67,6 +69,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   const running = items.filter((s) => s.running)
   const dayStart = new Date().setHours(0, 0, 0, 0) / 1000
   const doneToday = inbox.filter((x) => x.type === 'session.done' && x.at >= dayStart)
+  const recentDone = inbox.filter((x) => x.type === 'session.done').slice(0, 2)
   const errors = inbox.filter((x) => x.type === 'session.error' && !x.read)
 
   const unfinished = projects.reduce((n, p) => n + p.unfinished, 0)
@@ -132,6 +135,14 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
           <ChevronRight size={16} />
         </button>
       )}
+
+      {recentDone.length > 0 && section(t('inbox.done'), null, () => onNav('inbox'), recentDone.map((x) => (
+        <button key={x.id} type="button" className="tt-msess-row" onClick={() => onOpen(x.session)}>
+          <span className="ic"><CheckIcon size={14} /></span>
+          <span className="t"><b>{x.label}</b><span className="st"><span className="tail">{plain(x.body) || t('inbox.noSummary')}</span></span></span>
+          <em>{ago(x.at, t)}</em>
+        </button>
+      )))}
 
       {section(t('mobile.home.running'), running.length, () => onNav('projects'), running.length ? running.slice(0, 3).map((s) => (
         <button key={s.name} type="button" className="tt-msess-row" onClick={() => onOpen(s.name)}>

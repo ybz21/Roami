@@ -8,7 +8,7 @@ export default function MobileTools({ onNav }: { onNav: (key: string) => void })
     <div className="tt-mme">
       <p className="tt-mobile-section-lead">{t('mobile.tools.lead')}</p>
       <div className="tt-mme-group">
-        {(['files', 'browser', 'phone', 'plugins'] as const).map((key) => (
+        {(['files', 'phone', 'plugins'] as const).map((key) => (
           <SheetRow key={key} icon={ICONS[key]} title={t('nav.' + key)} desc={t('mobile.tools.' + key)} onClick={() => onNav(key)} />
         ))}
       </div>

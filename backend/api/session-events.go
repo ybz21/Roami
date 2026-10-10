@@ -2,7 +2,7 @@ package api
 
 // 会话事件（24 稿 §6）：把 tmux 里看得见的三件事变成通知——
 //   session.waiting  屏上出现等你的选择框（抓屏，连续两轮为真才发；回到不等就复位）
-//   session.done     Claude 一轮说完了（转录最后一条 assistant 是 end_turn 且不在等你）
+//   session.done     Claude/Codex 一轮说完了（转录出现完成事件且不在等你）
 //   session.error    agent 进程没了、屏上还留着报错
 // 5s 一轮；启动那一轮只登记不发（进程一重启就把早已在等的再推一遍是噪音）。
 // event → 收件箱落库 + Web Push 广播。
@@ -172,6 +172,59 @@ func claudeLastTurn(file string) lastTurnInfo {
 	return lastTurnInfo{}
 }
 
+// codexLastTurn 读取 Codex rollout 尾部的 task_complete 事件。
+func codexLastTurn(file string) lastTurnInfo {
+	if file == "" {
+		return lastTurnInfo{}
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return lastTurnInfo{}
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return lastTurnInfo{}
+	}
+	const tailBytes = 64 << 10
+	off := st.Size() - tailBytes
+	if off < 0 {
+		off = 0
+	}
+	buf := make([]byte, st.Size()-off)
+	if _, err := f.ReadAt(buf, off); err != nil && len(buf) == 0 {
+		return lastTurnInfo{}
+	}
+	lines := bytes.Split(buf, []byte("\n"))
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := bytes.TrimSpace(lines[i])
+		if len(l) == 0 || !bytes.Contains(l, []byte(`"task_complete"`)) {
+			continue
+		}
+		var row struct {
+			Type    string `json:"type"`
+			Payload struct {
+				Type             string  `json:"type"`
+				TurnID           string  `json:"turn_id"`
+				CompletedAt      float64 `json:"completed_at"`
+				CompletedAtMS    int64   `json:"completed_at_ms"`
+				LastAgentMessage string  `json:"last_agent_message"`
+			} `json:"payload"`
+		}
+		if json.Unmarshal(l, &row) != nil || row.Type != "event_msg" || row.Payload.Type != "task_complete" {
+			continue
+		}
+		at := time.Time{}
+		if row.Payload.CompletedAtMS > 0 {
+			at = time.UnixMilli(row.Payload.CompletedAtMS)
+		} else if row.Payload.CompletedAt > 0 {
+			at = time.Unix(int64(row.Payload.CompletedAt), 0)
+		}
+		return lastTurnInfo{key: row.Payload.TurnID, stop: "end_turn", text: row.Payload.LastAgentMessage, at: at}
+	}
+	return lastTurnInfo{}
+}
+
 // SessionEventLoop 后台探测循环
 func (a *API) SessionEventLoop() {
 	ev := newSessionEvents()
@@ -220,18 +273,25 @@ func (a *API) SessionEventLoop() {
 		}
 		lastTurn := func(name string) lastTurnInfo {
 			p, ok := procs[name]
-			if !ok || p.Kind != "claude" {
+			if !ok || (p.Kind != "claude" && p.Kind != "codex") {
 				return lastTurnInfo{}
 			}
 			k := fileKey{name, p.Pid}
 			file, cached := files[k]
 			if !cached {
-				file = pickTranscript(projectDirFor(p.Dir), procArgvOf(p.Pid), procStartOf(p.Pid))
+				if p.Kind == "claude" {
+					file = pickTranscript(projectDirFor(p.Dir), procArgvOf(p.Pid), procStartOf(p.Pid))
+				} else {
+					file = newestCodexRollout(p.Dir)
+				}
 				if file != "" {
 					files[k] = file
 				}
 			}
-			return claudeLastTurn(file)
+			if p.Kind == "claude" {
+				return claudeLastTurn(file)
+			}
+			return codexLastTurn(file)
 		}
 		for _, p := range ev.observe(observeInput{sessions: sessions, capture: capture, agents: agents, lastTurn: lastTurn}) {
 			p.ID = a.Inbox.Publish(p.Type, p.Session, p.Label, p.Body)

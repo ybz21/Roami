@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
 # 两个变量指向不同目录时 Gradle 直接拒绝构建；ANDROID_SDK_ROOT 已弃用，统一成一个
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-[ -d "$ANDROID_HOME" ] || { echo "缺 Android SDK：装 cmdline-tools 后 sdkmanager \"platforms;android-34\" \"build-tools;34.0.0\"，或设 ANDROID_HOME" >&2; exit 1; }
+[ -d "$ANDROID_HOME" ] || { echo "缺 Android SDK：装 cmdline-tools 后 sdkmanager \"platforms;android-36\" \"build-tools;35.0.0\"，或设 ANDROID_HOME" >&2; exit 1; }
 cd "$ROOT/mobile/android"
 ./gradlew --no-daemon -q assembleRelease
 APK=app/build/outputs/apk/release/app-release.apk

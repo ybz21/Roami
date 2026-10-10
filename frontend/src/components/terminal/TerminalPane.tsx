@@ -146,10 +146,6 @@ export default function TerminalPane(props: {
     if (statusMap[name] === 'connected' || claudeMap[name]?.running || codexMap[name]?.running) return 'var(--ok)'
     return statusMap[name] === 'connecting' ? 'var(--warn)' : 'var(--danger)'
   }
-  const dot = active ? dotOf(active) : 'var(--danger)'
-  // 灵动岛的「活着」判据：有 Agent 在跑。会话只是连着（st==='connected'）不算——
-  // 那是个静态事实，让点一直呼吸等于把呼吸这个信号用废了。
-  const activeAgentLive = !!(active && (agentKinds[active] || claudeMap[active]?.running || codexMap[active]?.running))
   // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框。
   const { coarse: isTouch, phone: isPhone } = useLayout()
   const showClaudeChat = (name: string) => (claudeView[name] === true || (isPhone && claudeView[name] !== false)) &&
@@ -834,31 +830,24 @@ export default function TerminalPane(props: {
     </div>
   )
   // ── 手机会话页顶栏：与一级页同高，取代「标签条 + 工具条」两行 ──
-  // 中间胶囊点开 = 会话切换 sheet（取代横滑标签条）；除 Agent 视图切换外，其余控件全进「⋯」。
+  // 中间会话标题点开 = 会话切换 sheet；其余控件全进「⋯」。
   // **不能按 !inChat 收窄**：切到 Claude/Codex 对话视图后 phoneChrome 变 null，
   // 整块外壳就掉回桌面那套「标签条 + 工具条」——按一下渲染模式，页面样式全变了。
-  // 对话只该换中间那块内容，顶栏（返回 / 会话胶囊 / Agent 切换 / 更多）自始至终是同一条。
+  // 对话只该换中间那块内容，顶栏（返回 / 会话标题 / 更多）自始至终是同一条。
   const phoneChrome = isPhone ? (
     <>
       <div className="tt-sesshead">
-        <button type="button" className="ic" aria-label={t('common.collapse')} onClick={onCollapse}>
-          {TI.back}
-        </button>
-        {/* 灵动岛：胶囊本身就是当前会话的状态显示器，不只是个「点我换会话」的按钮。
-            名字吃掉所有余量、右侧那簇贴边——之前名字不 grow，一胶囊右半截是空的，
-            看着像没画完。待确认时整颗岛变黄并浮出文字：那是唯一需要人立刻动手的状态，
-            只把 8px 的点变黄在 50px 顶栏里根本注意不到。 */}
-        <button type="button" className={`pill${activeNeedsInput ? ' wait' : ''}`} onClick={() => setSwitchOpen(true)}>
-          <i className={`d${activeAgentLive && !activeNeedsInput ? ' live' : ''}`} style={{ background: dot }} />
+        <div className="side start">
+          <button type="button" className="ic" aria-label={t('common.collapse')} onClick={onCollapse}>
+            {TI.back}
+          </button>
+        </div>
+        <button type="button" className="session-title" aria-label={t('mobile.switchSession')}
+          onClick={() => setSwitchOpen(true)}>
           {active && <TabName name={active} project={false} />}
-          {/* 右侧那簇裹成一个：名字要绝对居中，就得让流里只剩「左一个、右一个」，
-              否则 space-between 会把计数也均分到中间去 */}
-          <span className="ri">
-            {activeNeedsInput && <span className="tag">{t('session.waiting')}</span>}
-            <span className="ca">{TI.caret}</span>
-          </span>
+          <span className="ca" aria-hidden>{TI.caret}</span>
         </button>
-        <div className="actions">
+        <div className="side end">
           <button type="button" className="ic" aria-label={t('common.more')} onClick={() => setMoreSheet(true)}>
             {TI.dots}
           </button>
@@ -913,7 +902,7 @@ export default function TerminalPane(props: {
   // 连接状态 + Claude/Codex 视图开关：工具条左侧，终端视图和对话视图一样
   const sessionLead = (
     <>
-      <span className="tt-status">{statusDot(dot, 7)}{connLabel}</span>
+      <span className="tt-status">{statusDot(active ? dotOf(active) : 'var(--danger)', 7)}{connLabel}</span>
       {active && claudeMap[active]?.running && (
         <TBtn icon={<AgentLogo kind="claude" size={14} />} label="Claude" on={!!claudeView[active]}
           title={t('chat.switchToClaude')} onClick={() => setClaudeView((v) => ({ ...v, [active!]: !v[active!] }))} />

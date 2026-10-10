@@ -23,4 +23,8 @@
     <string name="link_stop">断开</string>
     <string name="act_allow">允许</string>
     <string name="act_deny">拒绝</string>
+    <string name="event_waiting_title">等待确认 · %1$s</string>
+    <string name="event_done_title">任务已完成 · %1$s</string>
+    <string name="event_waiting_chip">待确认</string>
+    <string name="action_failed">提交失败。检查网络或登录状态后，可重试操作。</string>
 </resources>
