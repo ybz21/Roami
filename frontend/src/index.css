@@ -3086,8 +3086,8 @@ html[data-size="compact"] .cc-run-slot { width: auto; }
 }
 
 /* ── 会话状态条（chat/StatusBar.tsx，15 设计 §11）──────────────────────────
-   输入框正上方一行 28px：模式 · 推理档 · 上下文占用 · 任务进度 · 未读回底。
-   手机上这 28px 是从终端行数里借的，所以窄屏只留三件（模型名/推理档收进点击浮层）。 */
+   输入框正上方一行：模型 · 上下文占用 · 任务进度 · 未读回底。
+   手机视觉控件收至 28px，行与可点项的命中区仍为 44px。 */
 .cc-statusbar {
   position: relative;
   display: flex;
@@ -3222,6 +3222,14 @@ html[data-size="compact"] .cc-run-slot { width: auto; }
   .cc-st-pill, .cc-st-jump, .cc-st-item.is-btn { min-height: 36px; }
   .cc-st-scroll { min-height: 36px; }
 }
+html[data-size="compact"] .cc-statusbar { padding-block: 0; font-size: var(--fs-meta); }
+html[data-size="compact"] .cc-st-scroll { height: var(--tap); min-height: var(--tap); }
+html[data-size="compact"] .cc-st-pill,
+html[data-size="compact"] .cc-st-item,
+html[data-size="compact"] .cc-st-jump { box-sizing: border-box; position: relative; height: calc(var(--tap) - var(--sp-4)); min-height: 0; padding-block: 0; }
+html[data-size="compact"] .cc-st-pill.is-btn::after,
+html[data-size="compact"] .cc-st-item.is-btn::after,
+html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; inset: 50% calc(-1 * var(--sp-1)) auto; height: var(--tap); transform: translateY(-50%); }
 
 /* ── 输入行的「+」面板（ComposerPlus）──
    一张小卡片，不是一列菜单项：每行右端是**当前值**（权限模式 / 模型 / 上下文占用），
