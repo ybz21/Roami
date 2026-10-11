@@ -36,6 +36,14 @@ class WebActivity : AppCompatActivity() {
     private lateinit var base: String
     private lateinit var shake: ShakeDetector
     private var askingSsl = false
+    private var pendingAudio: PermissionRequest? = null
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val request = pendingAudio ?: return@registerForActivityResult
+        pendingAudio = null
+        if (granted && ServerOrigin.matches(base, request.origin.toString()))
+            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+        else request.deny()
+    }
 
     // 网页里的 <input type=file>（上传文件到工作目录、贴图）：WebView 默认什么都不做，得自己接系统选择器
     private var fileCb: ValueCallback<Array<Uri>>? = null
@@ -73,10 +81,12 @@ class WebActivity : AppCompatActivity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 // 站内照常；外链交给系统浏览器
-                val u = req.url.toString()
-                return if (u.startsWith(base)) false else { runCatching { startActivity(Intent(Intent.ACTION_VIEW, req.url)) }; true }
+                if (!req.isForMainFrame) return false
+                return if (ServerOrigin.matches(base, req.url.toString())) false
+                    else { runCatching { startActivity(Intent(Intent.ACTION_VIEW, req.url)) }; true }
             }
             override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+                if (!ServerOrigin.matches(base, error.url)) { handler.cancel(); return }
                 val cert = error.certificate?.x509Certificate
                 val host = runCatching { java.net.URI(base).host }.getOrNull() ?: ""
                 if (cert == null || host.isEmpty()) { handler.cancel(); return }
@@ -94,8 +104,23 @@ class WebActivity : AppCompatActivity() {
             }
         }
         web.webChromeClient = object : WebChromeClient() {
-            // 语音输入要麦克风：页面请求时直接给（应用级权限在下面另外要）
-            override fun onPermissionRequest(request: PermissionRequest) { request.grant(request.resources) }
+            override fun onPermissionRequest(request: PermissionRequest) {
+                if (!ServerOrigin.matches(base, request.origin.toString()) ||
+                    PermissionRequest.RESOURCE_AUDIO_CAPTURE !in request.resources) {
+                    request.deny()
+                    return
+                }
+                if (ContextCompat.checkSelfPermission(this@WebActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                } else {
+                    pendingAudio?.deny()
+                    pendingAudio = request
+                    micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                if (pendingAudio === request) pendingAudio = null
+            }
             override fun onShowFileChooser(view: WebView, cb: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
                 fileCb?.onReceiveValue(null) // 上一次没收尾的先还掉，不然页面那个 input 永远卡住
                 fileCb = cb
@@ -146,8 +171,7 @@ class WebActivity : AppCompatActivity() {
     }
 
     private fun askPermissions() {
-        val want = mutableListOf(Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= 33) want += Manifest.permission.POST_NOTIFICATIONS
+        val want = if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()
         val missing = want.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1)
     }
@@ -159,5 +183,10 @@ class WebActivity : AppCompatActivity() {
 
     override fun onResume() { super.onResume(); shake.start(); web.onResume() }
     override fun onPause() { super.onPause(); shake.stop(); web.onPause() }
-    override fun onDestroy() { super.onDestroy(); web.destroy() }
+    override fun onDestroy() {
+        pendingAudio?.deny()
+        pendingAudio = null
+        super.onDestroy()
+        if (::web.isInitialized) web.destroy()
+    }
 }

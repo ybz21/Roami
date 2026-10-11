@@ -28,11 +28,12 @@ Roami 默认用自签证书。手机不认它的话，浏览器不把这里当�
 
 ## Android App（mobile/android）
 
-打开先选环境或输网址（摇一摇随时回来），里面就是 Roami 网页；App 额外处理自签证书信任、文件上传和下载，
+打开先选环境或输网址（摇一摇随时回来），里面通过 WebView 加载同一个 React 站点；网页更新后 App 界面也会更新，
+无需重新打包。App 额外处理自签证书信任、文件上传和下载、按需请求麦克风权限，
 并用前台服务长连接接收通知，可在通知栏直接允许或拒绝。
 
 ```bash
-# 需要 JDK 17 + Android SDK（ANDROID_HOME 或 ~/android-sdk：platforms;android-34、build-tools;34.0.0）
+# 需要 JDK 17+、Android SDK（ANDROID_HOME、ANDROID_SDK_ROOT 或常见安装目录；platforms;android-35、build-tools;35.0.0）
 scripts/build/build-apk.sh --install
 ```
 
