@@ -1,6 +1,11 @@
 package api
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
 
 // 样本取自真实转录（~/.claude/projects 与 ~/.codex/sessions），字段名和嵌套层级照抄，
 // 不是手编的——这两个解析器唯一的风险就是「上游换了字段名而我们不知道」。
@@ -118,6 +123,34 @@ func TestScanCodexStatus(t *testing.T) {
 	st = scanCodexStatus(`{"type":"event_msg","payload":{"type":"agent_message","message":"hi"}}`, st, &quota)
 	if st != before {
 		t.Errorf("无关事件改了状态: %+v -> %+v", before, st)
+	}
+}
+
+func TestPickCodexRolloutSameDirectory(t *testing.T) {
+	dir := t.TempDir()
+	makeRollout := func(id, stamp string) string {
+		p := filepath.Join(dir, "rollout-"+stamp+"-"+id+".jsonl")
+		line := `{"type":"session_meta","payload":{"cwd":"/work","timestamp":"` + stamp + `"}}` + "\n"
+		if err := os.WriteFile(p, []byte(line), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	old := makeRollout("11111111-1111-1111-1111-111111111111", "2026-10-10T10:00:00Z")
+	newer := makeRollout("22222222-2222-2222-2222-222222222222", "2026-10-11T10:00:00Z")
+	files := []string{newer, old}
+	if got := pickCodexRollout(files, "/work", "11111111-1111-1111-1111-111111111111", time.Time{}); got != old {
+		t.Fatalf("resume id selected %q, want %q", got, old)
+	}
+	started, _ := time.Parse(time.RFC3339, "2026-10-10T10:00:01Z")
+	if got := pickCodexRollout(files, "/work", "", started); got != old {
+		t.Fatalf("process start selected %q, want %q", got, old)
+	}
+	if got := pickCodexRollout(files, "/work", "", started.Add(3*time.Hour)); got != "" {
+		t.Fatalf("ambiguous rollout selected %q", got)
+	}
+	if got := codexResumeID([]string{"codex", "resume", "11111111-1111-1111-1111-111111111111"}); got == "" {
+		t.Fatal("resume id not recognized")
 	}
 }
 

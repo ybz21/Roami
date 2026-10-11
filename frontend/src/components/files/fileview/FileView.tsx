@@ -19,7 +19,7 @@ import { CsvView } from './CsvView'
 import { CodeView } from './CodeView'
 import { OfficeView } from './OfficeView'
 import { MediaView } from './MediaView'
-import { ChevronRight, WarnIcon } from '../../../icons'
+import { ChevronRight, CopyIcon, WarnIcon } from '../../../icons'
 
 export function FileView({
   path,
@@ -144,6 +144,25 @@ export function FileView({
       message.error(t('common.copyFailed'))
     }
   }
+  const copyContent = async () => {
+    if (!data?.content) return
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(data.content)
+      message.success(t('file.contentCopied'))
+    } catch {
+      const field = document.createElement('textarea')
+      field.value = data.content
+      field.style.position = 'fixed'
+      field.style.opacity = '0'
+      document.body.appendChild(field)
+      let copied = false
+      try { field.select(); copied = document.execCommand('copy') } catch { /* show failure below */ }
+      finally { field.remove() }
+      if (copied) message.success(t('file.contentCopied'))
+      else message.error(t('common.copyFailed'))
+    }
+  }
   const resolvePreviewHref = (href: string, refKind: 'link' | 'image') => {
     const local = localPathFromRef(path, href)
     if (!local) return href
@@ -186,6 +205,7 @@ export function FileView({
         <Button size="small" onClick={() => setAgentPick(true)}>{t('file.openInAgent')}</Button>
       )}
       <Button size="small" onClick={copyPath}>{t('file.copyPath')}</Button>
+      {data && !data.binary && (isMd || isHtml || isSheet) && <Button size="small" onClick={() => void copyContent()}>{t('file.copyContent')}</Button>}
       <Button size="small" href={downloadUrl} download={downloadName}>{t('file.download')}</Button>
       <a href={rawUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--text-dim)', fontSize: 12 }}>{t('file.raw')}</a>
       {inline && !tabbed && !onBack && <IconButton title={t('file.closePreview')} onClick={onClose}><CloseIcon /></IconButton>}
@@ -249,12 +269,15 @@ export function FileView({
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: tabbed ? 0 : 12, position: 'relative' }}>
           <ErrorBoundary>{bodyNode}</ErrorBoundary>
           {/* tab 语境无头部：markdown/HTML 右上角 VSCode 式按钮（切换预览 / 侧栏打开预览 / 新标签打开） */}
-          {tabbed && (isMd || isHtml) && !forcePreview && data && !data.binary && (
+          {tabbed && (isMd || isHtml || isSheet) && data && !data.binary && (
             <div style={{ position: 'absolute', top: 6, right: 8, zIndex: 10, display: 'inline-flex', gap: 2, background: 'color-mix(in srgb, var(--bg-base) 82%, transparent)', borderRadius: 8, padding: 2 }}>
-              <Tooltip title={source ? t('file.preview') : t('file.source')} placement="bottom">
-                <Button type="text" size="small" onClick={() => setSource((s) => !s)} style={{ color: !source ? accent : 'var(--text-dim)', width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PreviewIcon /></Button>
+              {(isMd || isHtml) && !forcePreview && <Tooltip title={source ? t('file.preview') : t('file.source')} placement="bottom">
+                <Button type="text" size="small" onClick={() => setSource((s) => !s)} aria-label={source ? t('file.preview') : t('file.source')} style={{ color: !source ? accent : 'var(--text-dim)', width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PreviewIcon /></Button>
+              </Tooltip>}
+              <Tooltip title={t('file.copyContent')} placement="bottom">
+                <Button type="text" size="small" onClick={() => void copyContent()} aria-label={t('file.copyContent')} style={{ color: 'var(--text-dim)', width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><CopyIcon size={16} /></Button>
               </Tooltip>
-              {onPreviewToSide && (
+              {!forcePreview && onPreviewToSide && (
                 <Tooltip title={t('file.previewToSide')} placement="bottom">
                   <Button type="text" size="small" onClick={() => onPreviewToSide(path)} style={{ color: 'var(--text-dim)', width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><PreviewSideIcon /></Button>
                 </Tooltip>

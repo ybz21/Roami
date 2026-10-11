@@ -5,14 +5,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.Manifest
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.webkit.CookieManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -20,6 +23,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * 通知来源（Gotify / ntfy 的做法）：前台服务常驻一条 WebSocket 到 /api/events/ws，
@@ -33,11 +37,16 @@ class EventService : Service() {
     private var backoff = 5_000L
     private val main = Handler(Looper.getMainLooper())
     private var stopped = false
+    @Volatile private var refreshing = false
+    private val statusLoop = object : Runnable {
+        override fun run() { refreshStatus(); main.postDelayed(this, 15_000) }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) { stopped = true; ws?.close(1000, null); stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_STOP) { stopped = true; ws?.close(1000, null); getSystemService(NotificationManager::class.java).cancel(NOTIF_ATTENTION); stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_REFRESH && ::base.isInitialized) { refreshStatus(); return START_STICKY }
         val b = intent?.getStringExtra("base") ?: Prefs(this).current ?: run { stopSelf(); return START_NOT_STICKY }
         if (::base.isInitialized && base == b && ws != null) return START_STICKY
         base = b
@@ -47,15 +56,19 @@ class EventService : Service() {
         stopped = false
         ws?.close(1000, null); ws = null
         connect()
+        main.removeCallbacks(statusLoop)
+        main.post(statusLoop)
         return START_STICKY
     }
 
     private fun channels() {
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CH_LINK, getString(R.string.ch_link), NotificationManager.IMPORTANCE_MIN))
+        nm.createNotificationChannel(NotificationChannel(CH_LINK, getString(R.string.ch_link), NotificationManager.IMPORTANCE_MIN).apply { setShowBadge(false) })
         nm.createNotificationChannel(NotificationChannel(CH_EVENTS, getString(R.string.ch_events), NotificationManager.IMPORTANCE_HIGH).apply {
             description = getString(R.string.ch_events_desc)
+            setShowBadge(false)
         })
+        nm.createNotificationChannel(NotificationChannel(CH_ATTENTION, getString(R.string.ch_attention), NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(true) })
     }
 
     private fun startFg(text: String) {
@@ -90,7 +103,7 @@ class EventService : Service() {
         ws = client().newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 backoff = 5_000
-                main.post { startFg(getString(R.string.link_connected, host)) }
+                main.post { startFg(getString(R.string.link_connected, host)); refreshStatus() }
             }
             override fun onMessage(webSocket: WebSocket, text: String) { runCatching { onEvent(JSONObject(text)) } }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { retry(response?.code) }
@@ -108,6 +121,7 @@ class EventService : Service() {
 
     private fun onEvent(o: JSONObject) {
         val type = o.optString("type")
+        if (type == "session.waiting" || type == "session.done") refreshStatus()
         if (!type.startsWith("session.") && type != "test") return
         val session = o.optString("session")
         val title = o.optString("title").ifBlank { o.optString("label") }
@@ -132,12 +146,49 @@ class EventService : Service() {
         getSystemService(NotificationManager::class.java).notify(session.hashCode(), b.build())
     }
 
-    override fun onDestroy() { stopped = true; ws?.close(1000, null); super.onDestroy() }
+    private fun refreshStatus() {
+        if (stopped || refreshing || !::base.isInitialized) return
+        val cookie = CookieManager.getInstance().getCookie(base) ?: return
+        refreshing = true
+        thread {
+            try {
+                val req = Request.Builder().url("$base/api/sessions/overview").header("Cookie", cookie).build()
+                client().newCall(req).execute().use { response ->
+                    if (!response.isSuccessful) return@use
+                    val items = JSONObject(response.body?.string() ?: "").getJSONObject("data").getJSONArray("items")
+                    val snapshot = WidgetSnapshot.fromOverview(items)
+                    snapshot.save(this, base)
+                    StatusWidget.update(this)
+                    updateAttention(snapshot.waiting)
+                }
+            } catch (_: Exception) {
+            } finally { refreshing = false }
+        }
+    }
+
+    private fun updateAttention(count: Int) {
+        val nm = getSystemService(NotificationManager::class.java)
+        if (count == 0) { nm.cancel(NOTIF_ATTENTION); return }
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val open = PendingIntent.getActivity(this, 410, Intent(this, WebActivity::class.java).putExtra("path", "/#/projects"),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val notification = NotificationCompat.Builder(this, CH_ATTENTION)
+            .setSmallIcon(R.drawable.ic_stat)
+            .setContentTitle(getString(R.string.attention_title, count))
+            .setContentText(getString(R.string.attention_body))
+            .setContentIntent(open).setNumber(count).setOnlyAlertOnce(true).setSilent(true).build()
+        nm.notify(NOTIF_ATTENTION, notification)
+    }
+
+    override fun onDestroy() { stopped = true; main.removeCallbacks(statusLoop); ws?.close(1000, null); super.onDestroy() }
 
     companion object {
-        const val CH_LINK = "link"
-        const val CH_EVENTS = "events"
+        const val CH_LINK = "link_v2"
+        const val CH_EVENTS = "events_v2"
+        const val CH_ATTENTION = "attention"
         const val NOTIF_LINK = 1
+        const val NOTIF_ATTENTION = 2
         const val ACTION_STOP = "com.roami.app.STOP"
+        const val ACTION_REFRESH = "com.roami.app.REFRESH"
     }
 }

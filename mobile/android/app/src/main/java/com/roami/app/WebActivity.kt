@@ -38,6 +38,7 @@ class WebActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private lateinit var base: String
     private lateinit var shake: ShakeDetector
+    private lateinit var apkUpdate: ApkUpdate
     private var askingSsl = false
     private var pendingAudio: PermissionRequest? = null
     private var lastImeHeight = -1
@@ -69,6 +70,7 @@ class WebActivity : AppCompatActivity() {
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         base = intent.getStringExtra("url") ?: Prefs(this).current ?: run { finish(); return }
+        apkUpdate = ApkUpdate(this, base)
         web = WebView(this)
         setContentView(web)
         // adjustNothing keeps the page stable; WebView does not expose its IME height to JS.
@@ -147,8 +149,12 @@ class WebActivity : AppCompatActivity() {
                 return try { pickFiles.launch(Intent.createChooser(i, null)); true } catch (_: Exception) { fileCb = null; false }
             }
         }
-        // 下载（文件页的下载、证书、apk）：交给系统下载管理器，带上登录 Cookie
+        // APK 使用已信任的自签证书直接安装；其他文件仍交给系统下载管理器。
         web.setDownloadListener { url, ua, disposition, mime, _ ->
+            if (ServerOrigin.matches(base, url) && Uri.parse(url).path == "/api/apk") {
+                apkUpdate.download(url)
+                return@setDownloadListener
+            }
             runCatching {
                 val name = URLUtil.guessFileName(url, disposition, mime)
                 val req = DownloadManager.Request(Uri.parse(url))
@@ -197,7 +203,7 @@ class WebActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
     }
 
-    override fun onResume() { super.onResume(); shake.start(); web.onResume() }
+    override fun onResume() { super.onResume(); shake.start(); web.onResume(); apkUpdate.onResume() }
     override fun onPause() { super.onPause(); shake.stop(); web.onPause() }
     override fun onDestroy() {
         pendingAudio?.deny()

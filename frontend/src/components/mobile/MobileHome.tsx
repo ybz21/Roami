@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronRight, FolderIcon, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
@@ -146,8 +146,10 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
           <span className="ic">{icon(s)}</span>
           <span className="t">
             <b>{s.label}</b>
-            <span className="st"><span className="tail">{s.tail || t('mobile.st.running')}</span></span>
-            {s.branch && <span className="br"><BranchIcon size={11} />{s.branch}</span>}
+            <span className="st">
+              <span className="project"><FolderIcon size={12} /><span>{s.project || t('mobile.home.noProject')}</span></span>
+              {s.branch && <span className="branch"><BranchIcon size={11} /><span>{s.branch}</span></span>}
+            </span>
           </span>
           <em>{ago(s.lastActivity, t)}</em>
         </button>

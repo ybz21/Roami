@@ -23,4 +23,21 @@
     <string name="link_stop">断开</string>
     <string name="act_allow">允许</string>
     <string name="act_deny">拒绝</string>
+    <string name="update_downloading">正在下载更新包…</string>
+    <string name="update_failed">更新包下载失败：%1$s</string>
+    <string name="update_bad_response">服务器未返回 APK</string>
+    <string name="widget_description">正在跑的会话和需要处理的事项</string>
+    <string name="widget_running_count">%1$d 在跑</string>
+    <string name="widget_waiting_count">%1$d 等你</string>
+    <string name="widget_waiting_item">等你 · %1$s · %2$s</string>
+    <string name="widget_running_item">在跑 · %1$s · %2$s</string>
+    <string name="widget_empty">当前没有运行中的会话</string>
+    <string name="widget_no_waiting">目前没有需要介入的会话</string>
+    <string name="widget_no_project">其他会话</string>
+    <string name="widget_not_connected">打开 Roami 连接服务器</string>
+    <string name="widget_updated">%1$s 更新</string>
+    <string name="widget_open_projects">打开项目查看全部会话</string>
+    <string name="ch_attention">需要处理</string>
+    <string name="attention_title">%1$d 个会话等你处理</string>
+    <string name="attention_body">点此查看正在等待回复的会话</string>
 </resources>

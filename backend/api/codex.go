@@ -18,6 +18,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -60,11 +62,22 @@ func listRollouts() []string {
 	return out
 }
 
-// rolloutCwd 读取 rollout 首行 session_meta 的 cwd。
-func rolloutCwd(path string) string {
+// rolloutMeta 读取 rollout 首行的目录和创建时间。
+type codexRolloutMeta struct {
+	dir string
+	at  time.Time
+}
+
+var codexMetaCache sync.Map
+
+func rolloutMeta(path string) (string, time.Time) {
+	if cached, ok := codexMetaCache.Load(path); ok {
+		m := cached.(codexRolloutMeta)
+		return m.dir, m.at
+	}
 	f, err := os.Open(path)
 	if err != nil {
-		return ""
+		return "", time.Time{}
 	}
 	defer f.Close()
 	sc := bufio.NewScanner(f)
@@ -73,31 +86,84 @@ func rolloutCwd(path string) string {
 		var raw struct {
 			Type    string `json:"type"`
 			Payload struct {
-				Cwd string `json:"cwd"`
+				Cwd       string `json:"cwd"`
+				Timestamp string `json:"timestamp"`
 			} `json:"payload"`
 		}
 		if json.Unmarshal(sc.Bytes(), &raw) == nil && raw.Type == "session_meta" {
-			return raw.Payload.Cwd
+			started, _ := time.Parse(time.RFC3339Nano, raw.Payload.Timestamp)
+			codexMetaCache.Store(path, codexRolloutMeta{raw.Payload.Cwd, started})
+			return raw.Payload.Cwd, started
+		}
+	}
+	return "", time.Time{}
+}
+
+var codexSessionID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f-]{27,}$`)
+
+func codexResumeID(argv []string) string {
+	for i, arg := range argv {
+		if arg == "resume" && i+1 < len(argv) && codexSessionID.MatchString(argv[i+1]) {
+			return argv[i+1]
 		}
 	}
 	return ""
 }
 
-// newestCodexRollout 选 cwd 匹配且最近修改的 rollout；无匹配则退回最近修改的（多半即活跃会话）。
-func newestCodexRollout(cwd string) string {
+// Codex 可以在同一目录开多个会话；按 cwd 取最新会把旧会话的模型和消息串到新会话。
+func codexRollout(cwd string, pid int) string {
 	files := listRollouts()
 	if len(files) == 0 {
 		return ""
 	}
+	resumeID := ""
+	started := time.Time{}
+	if pid != 0 {
+		resumeID = codexResumeID(processArgv(pid))
+		if info, err := os.Stat(filepath.Join("/proc", strconv.Itoa(pid))); err == nil {
+			started = info.ModTime()
+		}
+	}
+	return pickCodexRollout(files, cwd, resumeID, started)
+}
+
+func pickCodexRollout(files []string, cwd, resumeID string, started time.Time) string {
+	if resumeID != "" {
+		for _, p := range files {
+			if strings.HasSuffix(p, "-"+resumeID+".jsonl") {
+				return p
+			}
+		}
+	}
+	best, newest, matches := "", "", 0
+	bestDiff := 2 * time.Minute
 	for i, p := range files {
 		if i >= 200 { // 仅在最近的若干个里找匹配，避免遍历历史全量
 			break
 		}
-		if rolloutCwd(p) == cwd {
-			return p
+		if dir, created := rolloutMeta(p); dir == cwd {
+			if newest == "" {
+				newest = p
+			}
+			matches++
+			if !started.IsZero() && !created.IsZero() {
+				diff := created.Sub(started)
+				if diff < 0 {
+					diff = -diff
+				}
+				if diff < bestDiff {
+					best, bestDiff = p, diff
+				}
+			}
 		}
 	}
-	return files[0]
+	if best != "" {
+		return best
+	}
+	if matches == 1 || started.IsZero() {
+		return newest
+	}
+	return ""
 }
 
 // CodexStatus GET /sessions/:name/codex —— 检测会话是否在跑 codex，并定位其 rollout。
@@ -122,9 +188,9 @@ func (a *API) CodexStatus(c *gin.Context) {
 		if treeMatch(pid, children, 0, cmdlineHasClaude) {
 			continue
 		}
-		if treeMatch(pid, children, 0, cmdlineHasCodex) {
+		if codexPID := treeFind(pid, children, 0, cmdlineHasCodex); codexPID != 0 {
 			dir := parts[1]
-			c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": newestCodexRollout(dir)}})
+			c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": codexRollout(dir, codexPID)}})
 			return
 		}
 	}
@@ -348,8 +414,8 @@ func scanCodexStatus(line string, st cStatus, quota *float64) cStatus {
 func (a *API) CodexTranscript(c *gin.Context) {
 	file := c.Query("file")
 	if file == "" {
-		if dir := paneToolDir(a.sessionTarget(c), cmdlineHasCodex); dir != "" {
-			file = newestCodexRollout(dir)
+		if dir, pid := paneToolProc(a.sessionTarget(c), cmdlineHasCodex); dir != "" {
+			file = codexRollout(dir, pid)
 		}
 	}
 	// 同 ClaudeTranscript：还没有 rollout 文件＝agent 刚起，不是坏请求。

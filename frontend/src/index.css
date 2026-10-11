@@ -3912,6 +3912,14 @@ html[data-pointer="coarse"] .tt-inbox-acts .tt-act { min-height: var(--tap); }
 .tt-msess-row .t .st .tail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-dimmer); }
 .tt-msess-row.wait .t .st i { color: var(--warn); }
 .tt-msess-row .t .br { display: inline-flex; align-items: center; gap: 4px; font: 400 var(--fs-micro)/1.4 var(--mono); color: var(--text-dimmer); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-mhome .tt-msess-row .t .st { gap: var(--sp-3); overflow: hidden; margin-top: var(--sp-1); }
+.tt-mhome .tt-msess-row .st .project,
+.tt-mhome .tt-msess-row .st .branch { display: inline-flex; align-items: center; gap: var(--sp-1); min-width: 0; white-space: nowrap; }
+.tt-mhome .tt-msess-row .st .project { flex: 0 1 auto; color: var(--accent); }
+.tt-mhome .tt-msess-row .st .branch { flex: 0 2 auto; color: var(--text-dimmer); }
+.tt-mhome .tt-msess-row .st svg { flex: 0 0 auto; }
+.tt-mhome .tt-msess-row .st .project span,
+.tt-mhome .tt-msess-row .st .branch span { overflow: hidden; text-overflow: ellipsis; }
 /* 手机「项目」页 */
 .tt-mproj { padding: var(--pad-page, 12px); padding-bottom: var(--sp-5); }
 .tt-mproj-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
