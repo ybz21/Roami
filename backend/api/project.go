@@ -202,21 +202,23 @@ func (a *API) ProjectsList(c *gin.Context) {
 		}
 	}
 
-	agentRunning := runningAgentSessions() // 一次进程树扫描，供绿点判活跃（设计 W2）
+	agentRunning := runningAgentSessions() // 一次进程树扫描，定位需要抓屏的 Agent 会话
 
 	addSession := func(p *projectSummary, top *[]projectSession, name, label string, attached bool, last int64, branch string, linked, dormant bool) {
 		claimed[name] = true
 		p.Sessions++
-		ps := projectSession{Name: name, Label: label, Attached: attached, Agent: agentRunning[name], Running: agentRunning[name] != "", LastActivity: last, Linked: linked, Branch: branch}
+		ps := projectSession{Name: name, Label: label, Attached: attached, Agent: agentRunning[name], LastActivity: last, Linked: linked, Branch: branch}
 		ps.Mem = noteworthyMem(sessMemOf[name])
 		if dormant {
 			// 休眠会话没有进程：绿点/待输入一律不适用，更不该去 capture-pane 一个不存在的 pane。
 			ps = projectSession{Name: name, Label: label, LastActivity: last, State: "dormant"}
 			p.Dormant++
 		}
-		if ps.Running { // 只对在跑的会话抓屏判待输入，省掉给 idle 会话的 capture-pane
+		if ps.Agent != "" {
 			screen := sessionCapture(name, 50)
-			if ps.Waiting = sessionWaiting(screen); ps.Waiting {
+			ps.Waiting = sessionWaiting(screen)
+			ps.Running = screenBusy(screen) && !ps.Waiting
+			if ps.Waiting {
 				ps.Tail = sessionTail(screen, 120) // 摘要只有待输入卡用得上，不待输入就不占返回体积
 			}
 		}
@@ -355,14 +357,16 @@ func (a *API) ProjectsList(c *gin.Context) {
 
 	for _, s := range sessions {
 		if !claimed[s.Name] {
-			ls := projectSession{Name: s.Name, Label: s.Label, Attached: rawInt(s.Attached) > 0, Agent: agentRunning[s.Name], Running: agentRunning[s.Name] != "", LastActivity: rawInt(s.LastActivity), Mem: noteworthyMem(s.Mem)}
+			ls := projectSession{Name: s.Name, Label: s.Label, Attached: rawInt(s.Attached) > 0, Agent: agentRunning[s.Name], LastActivity: rawInt(s.LastActivity), Mem: noteworthyMem(s.Mem)}
 			if s.dormant() {
 				// 休眠会话不跑进程，绿点/待输入一律不适用，也不该去 capture-pane。
 				ls = projectSession{Name: s.Name, Label: s.Label, LastActivity: rawInt(s.LastActivity), State: "dormant"}
 			}
-			if ls.Running {
+			if ls.Agent != "" {
 				screen := sessionCapture(s.Name, 50)
-				if ls.Waiting = sessionWaiting(screen); ls.Waiting {
+				ls.Waiting = sessionWaiting(screen)
+				ls.Running = screenBusy(screen) && !ls.Waiting
+				if ls.Waiting {
 					ls.Tail = sessionTail(screen, 120)
 				}
 			}

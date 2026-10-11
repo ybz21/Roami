@@ -2,21 +2,21 @@ package api
 
 import "testing"
 
-// Top 被截到三行，所以它算不出总数。一个项目有 5 个活跃会话、其中第 4、5 个在等待输入时，
+// Top 被截到三行，所以它算不出总数。一个项目有 3 个运行中、2 个等待输入的会话时，
 // 那两条**不能**从计数和「需要你」队列里消失——这是 #186 合并后前端拿 Top 数数留下的账。
 func TestSummarizeSessionsCountsBeyondTop(t *testing.T) {
 	top := []projectSession{
 		{Name: "a", Running: true, Attached: true, LastActivity: 500},
 		{Name: "b", Running: true, LastActivity: 400},
 		{Name: "c", Running: true, LastActivity: 300},
-		{Name: "d", Running: true, Waiting: true, LastActivity: 200, Tail: "proceed? (y/n)"},
-		{Name: "e", Running: true, Waiting: true, LastActivity: 100},
+		{Name: "d", Waiting: true, LastActivity: 200, Tail: "proceed? (y/n)"},
+		{Name: "e", Waiting: true, LastActivity: 100},
 	}
 	var p projectSummary
 	summarizeSessions(&p, top)
 
-	if p.Running != 5 {
-		t.Errorf("running = %d，期望 5（全量，不是 Top 里的三条）", p.Running)
+	if p.Running != 3 {
+		t.Errorf("running = %d，期望 3（全量，不是 Top 里的三条）", p.Running)
 	}
 	if p.Waiting != 2 {
 		t.Errorf("waiting = %d，期望 2——第 4/5 个会话的等待被漏掉了", p.Waiting)
