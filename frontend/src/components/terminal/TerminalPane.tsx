@@ -29,7 +29,7 @@ import { useLayout } from '../../layout'
 import { savePreferences, saveWorkspace, usePreferences } from '../../preferences'
 import { PromptDialog, PromptSignal, advancePromptSignal, detectPrompt } from '../prompt'
 import { SessionTitle, TabName, sessionDisplay } from '../sessions/session-label'
-import { sessionProject } from '../sessions/session-project'
+import { sessionProject, useSessionProject } from '../sessions/session-project'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useEdgeSwipe } from '../shell/edge-swipe'
 import { DPad } from '../shell/DPad'
@@ -88,6 +88,7 @@ export default function TerminalPane(props: {
   reveal?: { path: string; line: number; nonce: number }
 }) {
   const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const activeProject = useSessionProject(active)
   const tabs = terms
   const curFile = activeFile || ''
   // 文件标签的脏标记：FileView 报上来，关标签前问一句（FileWorkspace 同款）
@@ -184,9 +185,6 @@ export default function TerminalPane(props: {
     return statusMap[name] === 'connecting' ? 'var(--warn)' : 'var(--danger)'
   }
   const dot = active ? dotOf(active) : 'var(--danger)'
-  // 灵动岛的「活着」判据：有 Agent 在跑。会话只是连着（st==='connected'）不算——
-  // 那是个静态事实，让点一直呼吸等于把呼吸这个信号用废了。
-  const activeAgentLive = !!(active && (agentKinds[active] || claudeMap[active]?.running || codexMap[active]?.running))
   // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框。
   const { coarse: isTouch, phone: isPhone } = useLayout()
   const showClaudeChat = (name: string) => (claudeView[name] === true || (isPhone && claudeView[name] !== false)) &&
@@ -891,15 +889,17 @@ export default function TerminalPane(props: {
         <button type="button" className="ic" aria-label={t('common.collapse')} onClick={onCollapse}>
           {TI.back}
         </button>
-        {/* 灵动岛：胶囊本身就是当前会话的状态显示器，不只是个「点我换会话」的按钮。
-            名字吃掉所有余量、右侧那簇贴边——之前名字不 grow，一胶囊右半截是空的，
-            看着像没画完。待确认时整颗岛变黄并浮出文字：那是唯一需要人立刻动手的状态，
-            只把 8px 的点变黄在 50px 顶栏里根本注意不到。 */}
+        {/* 标题按胶囊中心定位，避免右侧角标改变会话名的位置。 */}
         <button type="button" className={`pill${activeNeedsInput ? ' wait' : ''}`} onClick={() => setSwitchOpen(true)}>
-          <i className={`d${activeAgentLive && !activeNeedsInput ? ' live' : ''}`} style={{ background: dot }} />
-          {active && <TabName name={active} project={false} />}
-          {/* 右侧那簇裹成一个：名字要绝对居中，就得让流里只剩「左一个、右一个」，
-              否则 space-between 会把计数也均分到中间去 */}
+          {active && <span className="tt-island-label">
+            <span className="title-row">
+              <i className="d" style={{ background: dot }} />
+              <TabName name={active} project={false} />
+            </span>
+            {activeProject && <span className="project-row">
+              <span className="project-name">{activeProject.name}</span>
+            </span>}
+          </span>}
           <span className="ri">
             {activeNeedsInput && <span className="tag">{t('session.waiting')}</span>}
             <span className="ca">{TI.caret}</span>
