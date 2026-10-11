@@ -55,11 +55,12 @@ function currentSize(): WindowSize {
 }
 
 /**
- * 软键盘高度。VirtualKeyboard API（main.tsx 里已开 overlaysContent）优先，
- * visualViewport 兜底——iOS Safari 不支持前者，只认后者。两者取大。
+ * 软键盘高度。Android App 用系统 IME Insets；浏览器用 VirtualKeyboard API
+ * 或 visualViewport。取最大值，避免输入区被键盘盖住。
  */
 function currentKeyboard(): number {
   if (typeof window === 'undefined') return 0
+  const byNative = (window as Window & { __roamiNativeKeyboardHeight?: number }).__roamiNativeKeyboardHeight || 0
   let byApi = 0
   try {
     const rect = (navigator as any).virtualKeyboard?.boundingRect
@@ -68,7 +69,7 @@ function currentKeyboard(): number {
   const vv = window.visualViewport
   const byVv = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0
   // 30px 以下多半是地址栏收放造成的抖动，不当成键盘
-  const kb = Math.max(byApi, byVv)
+  const kb = Math.max(byNative, byApi, byVv)
   return kb > 30 ? Math.round(kb) : 0
 }
 
@@ -111,6 +112,7 @@ function applyDom(s: LayoutState) {
   root.dataset.size = s.size
   root.dataset.orient = s.landscape ? 'landscape' : 'portrait'
   root.dataset.pointer = s.coarse ? 'coarse' : 'fine'
+  root.dataset.keyboard = s.keyboard > 0 ? 'open' : 'closed'
   root.style.setProperty('--kb', `${s.keyboard}px`)
 }
 
@@ -127,6 +129,7 @@ function start() {
   }
   window.addEventListener('resize', publish)
   window.addEventListener('orientationchange', publish)
+  window.addEventListener('roami-keyboard', publish)
   // VirtualKeyboard API 自己的事件。少了它，--kb 只能靠 resize/visualViewport 顺带刷新——
   // 真机上抓到过 `env(keyboard-inset-height)` 已经是 314、而 --kb 还停在 0 的状态：
   // 布局按 314 让了位，吃 --kb 的浮层（sheet、会话坞）却以为键盘没弹。

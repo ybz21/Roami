@@ -37,13 +37,13 @@ export default function MobileSubPage({ title, onBack, action, manageHistory = t
   const node = (
     <div ref={rootRef} style={{
       position: 'fixed', inset: 0,
-      bottom: keepBottomNav ? 'calc(var(--mobile-nav-h, calc(var(--tap) + var(--sp-4))) + var(--safe-b))' : 0,
+      bottom: keepBottomNav ? 'var(--mobile-nav-offset, calc(var(--mobile-nav-h) + var(--safe-b)))' : 0,
       background: 'var(--bg-base)',
       zIndex: `var(${layer === 'session' ? '--z-session-sub' : '--z-subpage'})` as unknown as number,
       display: 'flex', flexDirection: 'column',
       paddingTop: 'var(--safe-t)', paddingLeft: 'var(--safe-l)', paddingRight: 'var(--safe-r)',
       paddingBottom: keepBottomNav
-        ? 'max(0px, calc(var(--kb) - var(--mobile-nav-h, calc(var(--tap) + var(--sp-4))) - var(--safe-b)))'
+        ? 'max(0px, calc(var(--kb) - var(--mobile-nav-offset, 0px)))'
         : 'max(var(--kb), var(--safe-b))',
     }}>
       {title !== undefined && (

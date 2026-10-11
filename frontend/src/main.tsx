@@ -35,7 +35,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 
 // 安卓 Chrome 软键盘默认会压缩布局视口（把界面挤一下）。这里让虚拟键盘「悬浮覆盖」内容，
-// 行为对齐 iOS；同时暴露 CSS env(keyboard-inset-height)，供输入区抬高到键盘之上（见 App.tsx）。
+// 行为对齐 iOS；同时暴露 CSS env(keyboard-inset-height)，供输入区抬高到键盘之上。
 try {
   const vk = (navigator as any).virtualKeyboard
   if (vk) vk.overlaysContent = true

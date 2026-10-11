@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ApplicationInfo
 import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
@@ -28,15 +29,18 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import java.security.cert.X509Certificate
 
-/** 就是 Roami 网页本身。App 只多三样：自签证书首次询问、摇一摇回环境页、拉起通知服务。 */
+/** Roami WebView 容器：自签证书、系统键盘、摇一摇切环境与通知服务。 */
 class WebActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private lateinit var base: String
     private lateinit var shake: ShakeDetector
     private var askingSsl = false
     private var pendingAudio: PermissionRequest? = null
+    private var lastImeHeight = -1
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val request = pendingAudio ?: return@registerForActivityResult
         pendingAudio = null
@@ -62,10 +66,22 @@ class WebActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) WebView.setWebContentsDebuggingEnabled(true)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         base = intent.getStringExtra("url") ?: Prefs(this).current ?: run { finish(); return }
         web = WebView(this)
         setContentView(web)
+        // adjustNothing keeps the page stable; WebView does not expose its IME height to JS.
+        ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { _, insets ->
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            val height = ((ime - nav).coerceAtLeast(0) / resources.displayMetrics.density).toInt()
+            if (height != lastImeHeight) {
+                lastImeHeight = height
+                web.evaluateJavascript("window.__roamiNativeKeyboardHeight=$height;window.dispatchEvent(new Event('roami-keyboard'))", null)
+            }
+            insets
+        }
         web.setBackgroundColor(0xFF0D1117.toInt())
         web.settings.apply {
             javaScriptEnabled = true

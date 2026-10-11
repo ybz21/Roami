@@ -1,11 +1,14 @@
 /* Mobile Material 3 roles mapped to Roami's existing color, type, shape and space tokens. */
 html[data-size="compact"], html[data-size="medium"] {
   --mobile-topbar-h: calc(var(--tap) + var(--sp-4));
+  --mobile-nav-h: calc(var(--tap) + var(--sp-4));
+  --mobile-nav-offset: calc(var(--mobile-nav-h) + var(--safe-b));
 }
 html[data-size="compact"] {
-  --mobile-nav-h: calc(var(--tap) + var(--sp-4));
   --pad-page: var(--sp-4);
 }
+html[data-size="compact"][data-keyboard="open"],
+html[data-size="medium"][data-keyboard="open"] { --mobile-nav-offset: 0px; }
 .tt-mobile-topbar {
   flex: 0 0 auto;
   z-index: var(--z-nav);
@@ -28,7 +31,7 @@ html[data-size="compact"] {
 .tt-mobile-topbar-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 html[data-size="compact"] .tt-canvas {
   box-sizing: border-box;
-  padding-bottom: calc(var(--mobile-nav-h) + var(--safe-b)) !important;
+  padding-bottom: var(--mobile-nav-offset) !important;
   background: var(--bg-base);
 }
 html[data-size="compact"] .tt-canvas,
@@ -323,6 +326,7 @@ html[data-size="compact"] .tt-mme-push { min-height: calc(var(--tap) + var(--sp-
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-base);
 }
+html[data-keyboard="open"] .tt-bottomnav { display: none; }
 .tt-bottomnav nav { display: flex; min-height: var(--mobile-nav-h); }
 .tt-bottomnav-btn { justify-content: center; gap: var(--sp-1); min-height: var(--mobile-nav-h); padding: var(--sp-1); color: var(--text-dim); font-size: var(--fs-meta); font-weight: 500; }
 .tt-bottomnav-btn .ic { justify-content: center; align-items: center; overflow: visible; }

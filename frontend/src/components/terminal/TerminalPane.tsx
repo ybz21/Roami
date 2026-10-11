@@ -1164,9 +1164,9 @@ export default function TerminalPane(props: {
   )
 
   return (
-    // paddingBottom=env(keyboard-inset-height)：软键盘悬浮覆盖时(见 main.tsx/index.html)，
+    // 软键盘悬浮覆盖时(见 main.tsx/index.html)，
     // 把整块内容抬到键盘之上，让终端和快捷键栏不被遮住。桌面无虚拟键盘 → 0，无影响。
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: 'env(keyboard-inset-height, 0px)', transition: 'padding-bottom .15s ease-out' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: 'max(var(--kb), env(keyboard-inset-height, 0px))', transition: 'padding-bottom .15s ease-out' }}>
       {active && <PromptDialog name={active} accent="var(--accent)" enabled={!inChat && !promptOff} />}
       <Modal
         open={pasteOpen}
