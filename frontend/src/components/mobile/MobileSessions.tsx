@@ -13,6 +13,7 @@ import MobilePageSearch from './MobilePageSearch'
 import MobileSubPage from '../MobileSubPage'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
+import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
 export type { OverviewItem } from './mobile-overview-cache'
 
 function ago(sec: number | undefined, t: (k: string) => string): string {
@@ -34,6 +35,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 }) {
   const { t } = useI18n()
   const [items, setItems] = useState<OverviewItem[] | null>(() => readMobileOverview())
+  const [projects, setProjects] = useState<MobileProject[] | null>(() => readMobileProjects())
   const [loadError, setLoadError] = useState(false)
   const [q, setQ] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -51,7 +53,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     return () => cancelAnimationFrame(frame)
   }, [searchOpen, searchNonce])
   // 筛选药丸 + 每组先露 5 条（Lody 手机端的做法）：十几个会话时一屏能看到所有项目，而不是被第一个项目占满
-  const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle' | 'activity'>('all')
+  const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle' | 'unfinished' | 'activity'>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 点开的项目（worktree 视图）；安卓返回手势退回列表
   const [cur, setCur] = useState<{ name: string; dir: string } | null>(null)
@@ -86,6 +88,13 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     const i = setInterval(load, 5000)
     return () => { stop = true; clearInterval(i) }
   }, [])
+  useEffect(() => {
+    let stop = false
+    const load = () => api('GET', '/projects').then((r) => { if (!stop) setProjects(writeMobileProjects(r.data.projects || [])) }).catch(() => {})
+    load()
+    const timer = setInterval(load, 20000)
+    return () => { stop = true; clearInterval(timer) }
+  }, [])
 
   // 蜂群：成员会话折成一张卡（领队一行、成员缩进、N 待解锁），点卡头进蜂群页。和桌面会话页同一条取数路
   const [swarmOf, setSwarmOf] = useState<Record<string, { swarm: string; role: 'leader' | 'member' }>>({})
@@ -114,7 +123,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }, [])
 
   const needle = q.trim().toLowerCase()
-  const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : filter === 'activity' ? false : !s.waiting && !s.running && !s.dormant)
+  const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : filter === 'activity' || filter === 'unfinished' ? false : !s.waiting && !s.running && !s.dormant)
   const hit = (s: OverviewItem) => inFilter(s) && (!needle || s.label.toLowerCase().includes(needle) || s.name.toLowerCase().includes(needle) || (s.branch || '').toLowerCase().includes(needle))
   const groups = useMemo(() => {
     const by = new Map<string, { name: string; dir: string; list: OverviewItem[] }>()
@@ -127,6 +136,12 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     // 散会话垫底
     return Array.from(by.entries()).sort((a, b) => (a[0] === '' ? 1 : 0) - (b[0] === '' ? 1 : 0)).map(([, g]) => g)
   }, [items, needle, filter]) // eslint-disable-line react-hooks/exhaustive-deps
+  const unfinishedByDir = new Map((projects || []).map((p) => [p.dir, p.unfinished]))
+  const unfinishedProjects = (projects || []).filter((p) => p.unfinished > 0 && (!needle || p.name.toLowerCase().includes(needle)))
+  const visibleGroups = filter === 'all' ? [
+    ...groups,
+    ...unfinishedProjects.filter((p) => !groups.some((g) => g.dir === p.dir)).map((p) => ({ name: p.name, dir: p.dir, list: [] as OverviewItem[] })),
+  ] : groups
 
   const status = (s: OverviewItem) => s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
   const row = (s: OverviewItem, sub = false) => (
@@ -171,7 +186,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }
 
   if (items === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}><Spin /></div>
-  if (cur) return <MobileSubPage title={cur.name} onBack={() => setCur(null)}
+  if (cur) return <MobileSubPage title={cur.name} onBack={() => setCur(null)} keepBottomNav
     action={{ label: t('mobile.proj.newTask'), icon: <PlusIcon size={20} />, onClick: () => onNewTask(cur.dir) }}>
     <MobileProjectDetail dir={cur.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} />
   </MobileSubPage>
@@ -194,15 +209,23 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           onDismiss={() => { setQ(''); setSearchOpen(false) }} />
       </div>}
       <div className="tt-msess-pills">
-        {(['all', 'waiting', 'running', 'idle', 'activity'] as const).map((k) => {
-          const n = k === 'activity' ? null : k === 'all' ? items.length : items.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length
-          return <button key={k} type="button" className={`tt-pill${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => { setFilter(k); if (k === 'activity') { setQ(''); setSearchOpen(false) } }}>{t(k === 'all' ? 'mobile.filter.all' : k === 'activity' ? 'project.sessionActivity' : 'mobile.st.' + k)}{n !== null && <span>{n}</span>}</button>
+        {(['all', 'waiting', 'running', 'idle', 'unfinished', 'activity'] as const).map((k) => {
+          const n = k === 'activity' ? null : k === 'unfinished' ? projects?.reduce((sum, p) => sum + p.unfinished, 0) ?? null : k === 'all' ? items.length : items.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length
+          return <button key={k} type="button" className={`tt-pill${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => { setFilter(k); if (k === 'activity') { setQ(''); setSearchOpen(false) } }}>{t(k === 'all' ? 'mobile.filter.all' : k === 'unfinished' ? 'mobile.home.unfinished' : k === 'activity' ? 'project.sessionActivity' : 'mobile.st.' + k)}{n !== null && <span>{n}</span>}</button>
         })}
       </div>
-      {filter === 'activity' ? <SessionActivity onOpenSession={onOpen} showEmpty /> : groups.map((g, i) => (
+      {filter === 'activity' ? <SessionActivity onOpenSession={onOpen} showEmpty /> : filter === 'unfinished' ? (
+        projects === null ? <div className="tt-msess-empty" role="status">{t('common.loading')}</div>
+          : unfinishedProjects.length ? unfinishedProjects.map((p) => (
+            <button key={p.key} type="button" className="tt-msess-unfinished" onClick={() => setCur({ name: p.name, dir: p.dir })}>
+              <span className="av">{p.name.slice(0, 1).toUpperCase()}</span><span className="name">{p.name}</span>
+              <span className="count">{t('mobile.proj.unfinished', { n: p.unfinished })}</span><ChevronRight size={14} />
+            </button>
+          )) : <div className="tt-msess-empty">{t('tree.noTasks')}</div>
+      ) : visibleGroups.map((g, i) => (
         <section key={i} className="tt-msess-sec">
           {g.dir
-            ? <button type="button" className="tt-msess-proj" onClick={() => setCur({ name: g.name, dir: g.dir })}><h3>{g.name} <span>{g.list.length}</span></h3><ChevronRight size={14} /></button>
+            ? <button type="button" className="tt-msess-proj" onClick={() => setCur({ name: g.name, dir: g.dir })}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
             : <h3>{g.name} <span>{g.list.length}</span></h3>}
           {swarmCards(needle || filter !== 'all' || expanded.has(g.name) ? g.list : g.list.slice(0, 5))}
           {!needle && filter === 'all' && g.list.length > 5 && (
@@ -212,7 +235,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           )}
         </section>
       ))}
-      {filter !== 'activity' && !items.length && <div className="tt-msess-empty">{t('tree.noTasks')}</div>}
+      {filter !== 'activity' && filter !== 'unfinished' && !visibleGroups.length && <div className="tt-msess-empty">{t('tree.noTasks')}</div>}
       <MobileSheet open={!!menu} title={menu?.label || ''} onClose={() => setMenu(null)}>
         {menu && <>
           <SheetRow icon={<PencilIcon size={16} />} title={t('session.rename')} onClick={() => { setRenameVal(menu.label); setRenaming(menu); setMenu(null) }} />

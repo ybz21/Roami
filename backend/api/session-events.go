@@ -243,7 +243,7 @@ func (a *API) SessionEventLoop() {
 		for name := range sessions {
 			cap := capture(name)
 			snap := liveSnap{Waiting: sessionWaiting(cap), At: now}
-			if p, ok := procs[name]; ok && (p.Kind == "claude" || p.Kind == "codex") {
+			if p, ok := procs[name]; ok && p.Kind != "" {
 				snap.Agent = p.Kind
 				snap.Busy = screenBusy(cap)
 			}

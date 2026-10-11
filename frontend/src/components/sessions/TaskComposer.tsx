@@ -203,7 +203,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
       {/* 控制条按「在哪干活 / 谁来干 / 动作」三组排，组内 6px、组间 16px，不画分隔线 */}
       <div className="tt-cbar">
         {isGit && (
-          <span className="tt-cgrp">
+          <span className="tt-cgrp where">
             <button type="button" className={`tt-pill${wtMode === 'new' ? ' on' : ''}`} aria-pressed={wtMode === 'new'} onClick={() => setWtMode('new')}><BranchIcon size={11} />{t('project.where.new')}</button>
             <button type="button" className={`tt-pill${wtMode === 'existing' ? ' on' : ''}`} aria-pressed={wtMode === 'existing'}
               disabled={!existingCount} onClick={() => setWtMode('existing')}>{t('project.where.existing', { count: existingCount })}</button>
@@ -229,7 +229,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
             )}
           </span>
         )}
-        <span className="tt-cgrp" role="group" aria-label={t('set.groupAgent')}>
+        <span className="tt-cgrp agents" role="group" aria-label={t('set.groupAgent')}>
           {(['claude', 'codex', 'pi', 'opencode'] as const).map((kind) => (
             <button key={kind} type="button" className={`tt-pill ico${agent === kind ? ' on' : ''}`}
               title={agentName(kind)} aria-label={agentName(kind)} aria-pressed={agent === kind}

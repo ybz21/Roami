@@ -19,13 +19,15 @@ import (
 
 // liveSnap 探测循环每轮写一份：会话此刻在干什么
 type liveSnap struct {
-	Agent   string // claude | codex | ""
-	Busy    bool   // agent 正在干活（屏上有 esc to interrupt / thinking）；停在提示符上不算
+	Agent   string // claude | codex | pi | opencode | ""
+	Busy    bool   // agent 正在响应；进程停在提示符时不算“在跑”
 	Waiting bool
 	YesNo   bool // 等的是「允许 / 拒绝」这种二选一，首页能直接给两个按钮；自由选择题不给
 	Tail    string
 	At      time.Time
 }
+
+func (s liveSnap) running() bool { return s.Agent != "" && s.Busy && !s.Waiting }
 
 type liveTable struct {
 	mu sync.RWMutex
@@ -129,7 +131,7 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		if snap, ok := a.Live.get(s.Name); ok {
 			it.Agent, it.Waiting, it.Tail = snap.Agent, snap.Waiting, snap.Tail
 			it.YesNo = snap.Waiting && snap.YesNo
-			it.Running = snap.Agent != "" && snap.Busy && !snap.Waiting
+			it.Running = snap.running()
 		}
 		items = append(items, it)
 	}

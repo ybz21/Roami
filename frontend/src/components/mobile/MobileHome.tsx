@@ -102,7 +102,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
       </div>
     )
   }
-  const icon = (s: { agent?: string }) => (s.agent === 'claude' || s.agent === 'codex' ? <AgentLogo kind={s.agent} size={16} /> : <TerminalIcon size={16} />)
+  const icon = (s: OverviewItem) => (s.agent ? <AgentLogo kind={s.agent} size={16} /> : <TerminalIcon size={16} />)
   const section = (title: string, n: number | null, more: (() => void) | null, children: ReactNode) => (
     <section className="sec">
       <h3>{title}{n !== null && <span>{n}</span>}{more && <button type="button" onClick={more}>{t('mobile.home.all')}<ChevronRight size={12} /></button>}</h3>

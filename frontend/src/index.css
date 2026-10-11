@@ -1187,7 +1187,7 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
   position: relative; flex: 0 0 var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4)));
   height: var(--mobile-topbar-h, calc(var(--tap) + var(--sp-4))); padding: 0 var(--sp-2);
   display: flex; align-items: center; gap: var(--sp-2);
-  background: var(--bg-container); border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-base); border-bottom: 1px solid var(--border-subtle);
 }
 .tt-sesshead .actions { margin-left: auto; display: flex; align-items: center; }
 .tt-sesshead .ic {
@@ -1201,7 +1201,7 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
   min-width: 0; height: var(--tap); padding: 0 var(--sp-2);
   display: flex; align-items: center; gap: 7px;
   border: 1px solid var(--border-subtle); border-radius: var(--r-pill);
-  background: var(--bg-base); color: var(--text-bright); font-size: var(--fs-meta); cursor: pointer;
+  background: var(--bg-container); color: var(--text-bright); font-size: var(--fs-meta); cursor: pointer;
 }
 /* 名字**绝对居中**，两侧簇各贴一边。
    之前用「名字 flex:1 + justify-content:center」只是在余量里居中——左边是 8px 的状态点、
