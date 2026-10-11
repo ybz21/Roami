@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- 提示符 >_ ：终端就是 Roami 的本体 -->
-    <path android:strokeColor="#58a6ff" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
-        android:pathData="M34,38 L52,54 L34,70" />
-    <path android:strokeColor="#e6edf3" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000"
-        android:pathData="M58,72 L76,72" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Same ribbon paths and fills as frontend/public/logo-mark.svg. -->
+    <group android:translateX="36.18" android:translateY="28.62"
+        android:scaleX="0.27" android:scaleY="0.27">
+        <path android:fillColor="#1F6FEB" android:pathData="M66,0 L66,56 L42,72 L0,44 Z" />
+        <path android:fillColor="#1F6FEB" android:pathData="M90,72 L132,100 L108,116 L66,88 Z" />
+        <path android:fillColor="#1F6FEB" android:pathData="M21,114 L63,142 L0,184 L0,128 Z" />
+        <path android:fillColor="#58A6FF" android:pathData="M66,0 L132,44 L132,100 L90,72 L66,56 Z" />
+        <path android:fillColor="#58A6FF" android:pathData="M0,44 L132,132 L132,188 L0,100 Z" />
+    </group>
 </vector>

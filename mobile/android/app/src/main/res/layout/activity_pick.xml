@@ -3,8 +3,14 @@
     android:id="@+id/root"
     android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:padding="24dp" android:background="#0d1117">
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="48dp"
-        android:text="@string/pick_title" android:textColor="#e6edf3" android:textSize="28sp" android:textStyle="bold" />
+    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="40dp" android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:layout_width="40dp" android:layout_height="57dp"
+            android:src="@drawable/ic_roami_mark" android:contentDescription="@string/app_name" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="16dp" android:text="@string/pick_title"
+            android:textColor="#e6edf3" android:textSize="28sp" android:textStyle="bold" />
+    </LinearLayout>
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp"
         android:text="@string/pick_sub" android:textColor="#8b949e" android:textSize="15sp" />
     <TextView android:id="@+id/auto" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="28dp"
