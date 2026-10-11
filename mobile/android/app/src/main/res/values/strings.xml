@@ -32,6 +32,7 @@
     <string name="widget_state_waiting">等你</string>
     <string name="widget_state_running">在跑</string>
     <string name="widget_session">%1$s · %2$s</string>
+    <string name="widget_position">%1$d/%2$d</string>
     <string name="widget_empty">当前没有在跑或待处理的会话</string>
     <string name="widget_no_project">其他会话</string>
     <string name="widget_not_connected">打开 Roami 连接服务器</string>

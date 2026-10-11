@@ -28,7 +28,7 @@ import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { useLayout } from '../../layout'
 import { savePreferences, saveWorkspace, usePreferences } from '../../preferences'
 import { PromptDialog, PromptSignal, advancePromptSignal, detectPrompt } from '../prompt'
-import { SessionTitle, TabName, sessionDisplay } from '../sessions/session-label'
+import { SessionTitle, TabName, sessionDisplay, useSessionLabel } from '../sessions/session-label'
 import { sessionProject, useSessionProject } from '../sessions/session-project'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useEdgeSwipe } from '../shell/edge-swipe'
@@ -89,6 +89,10 @@ export default function TerminalPane(props: {
 }) {
   const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
+  const activeLabel = useSessionLabel(active)
+  const opaqueLabel = !!activeProject && (activeLabel === active || /^\d{4}-\d{4}-\d{4}-\d{4}(?:-[a-z0-9]+)?$/i.test(activeLabel))
+  const islandTitle = opaqueLabel ? activeProject.name : activeLabel
+  const islandDetail = opaqueLabel ? activeLabel.match(/\d{4}(?:-[a-z0-9]+)?$/i)?.[0] : activeProject?.name
   const tabs = terms
   const curFile = activeFile || ''
   // 文件标签的脏标记：FileView 报上来，关标签前问一句（FileWorkspace 同款）
@@ -889,19 +893,18 @@ export default function TerminalPane(props: {
         <button type="button" className="ic" aria-label={t('common.collapse')} onClick={onCollapse}>
           {TI.back}
         </button>
-        {/* 标题按胶囊中心定位，避免右侧角标改变会话名的位置。 */}
-        <button type="button" className={`pill${activeNeedsInput ? ' wait' : ''}`} onClick={() => setSwitchOpen(true)}>
+        <button type="button" className="pill" onClick={() => setSwitchOpen(true)}>
           {active && <span className="tt-island-label">
             <span className="title-row">
               <i className="d" style={{ background: dot }} />
-              <TabName name={active} project={false} />
+              <span className="island-title">{islandTitle}</span>
             </span>
-            {activeProject && <span className="project-row">
-              <span className="project-name">{activeProject.name}</span>
+            {(islandDetail || activeNeedsInput) && <span className="project-row">
+              {islandDetail && <span className="project-name">{islandDetail}</span>}
+              {activeNeedsInput && <span className="island-status">{t('session.waiting')}</span>}
             </span>}
           </span>}
           <span className="ri">
-            {activeNeedsInput && <span className="tag">{t('session.waiting')}</span>}
             <span className="ca">{TI.caret}</span>
           </span>
         </button>

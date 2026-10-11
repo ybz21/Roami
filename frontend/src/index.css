@@ -1213,36 +1213,18 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
 }
 .tt-sesshead .pill .title-row,
 .tt-sesshead .pill .project-row { display: flex; align-items: center; justify-content: center; gap: var(--sp-1); max-width: 100%; min-width: 0; }
-.tt-sesshead .pill .title-row { position: relative; }
-.tt-sesshead .pill .tt-name { max-width: 100%; justify-content: center; font-weight: 600; }
+.tt-sesshead .pill .island-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600;
+}
 .tt-sesshead .pill .project-name {
   max-width: 100%; overflow: hidden; color: var(--text-dim); font-size: var(--fs-micro);
   line-height: 1.2; text-overflow: ellipsis; white-space: nowrap;
 }
 .tt-sesshead .pill .ri { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-1); flex: 0 0 auto; }
-/* 待确认时让出右侧角标，项目名跟随会话名左对齐。 */
-.tt-sesshead .pill.wait .tt-island-label {
-  position: static;
-  transform: none;
-  flex: 1 1 auto;
-  align-items: flex-start;
-}
-.tt-sesshead .pill.wait .title-row,
-.tt-sesshead .pill.wait .project-row { justify-content: flex-start; }
-.tt-sesshead .pill.wait .title-row .d { position: static; transform: none; }
 .tt-sesshead .pill .ca { flex: 0 0 auto; display: inline-flex; opacity: .55; }
-.tt-sesshead .pill .d { position: absolute; top: 50%; right: calc(100% + var(--sp-1)); width: var(--sp-1); height: var(--sp-1); flex: 0 0 var(--sp-1); border-radius: 50%; transform: translateY(-50%); }
-/* 待确认：整颗岛变黄 + 浮出文字。这是全屏唯一需要人立刻动手的状态，值得整块变色。 */
-.tt-sesshead .pill.wait {
-  border-color: var(--warn-border);
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-.tt-sesshead .pill .tag {
-  flex: 0 0 auto; padding: 1px 7px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--warn) 22%, transparent);
-  color: var(--warn); font-size: var(--fs-micro); font-weight: 600; white-space: nowrap;
-}
+.tt-sesshead .pill .d { width: var(--sp-1); height: var(--sp-1); flex: 0 0 var(--sp-1); border-radius: 50%; }
+.tt-sesshead .pill .island-status { flex: 0 0 auto; color: var(--warn); font-size: var(--fs-micro); font-weight: 600; white-space: nowrap; }
 .tt-sesshead .pill .n {
   flex: 0 0 auto; min-width: 18px; height: 18px; padding: 0 5px;
   display: grid; place-items: center; border-radius: 9px;

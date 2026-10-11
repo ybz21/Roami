@@ -176,7 +176,8 @@ class EventService : Service() {
             .setSmallIcon(R.drawable.ic_stat)
             .setContentTitle(getString(R.string.attention_title, count))
             .setContentText(getString(R.string.attention_body))
-            .setContentIntent(open).setNumber(count).setOnlyAlertOnce(true).setSilent(true).build()
+            .setContentIntent(open).setNumber(count).setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
+            .setOnlyAlertOnce(true).setSilent(true).build()
         nm.notify(NOTIF_ATTENTION, notification)
     }
 

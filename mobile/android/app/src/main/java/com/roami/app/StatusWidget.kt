@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
@@ -21,12 +22,9 @@ data class WidgetRow(val session: WidgetSession, val waiting: Boolean)
 
 data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: List<WidgetSession>,
     val waitingItems: List<WidgetSession>, val updated: Long) {
-    fun rows(limit: Int): List<WidgetRow> {
-        val firstWaiting = waitingItems.size.coerceAtMost((limit + 1) / 2)
-        val selectedRunning = runningItems.take(limit - firstWaiting)
-        val selectedWaiting = waitingItems.take(limit - selectedRunning.size)
-        return selectedWaiting.map { WidgetRow(it, true) } + selectedRunning.map { WidgetRow(it, false) }
-    }
+    fun carouselRows(): List<WidgetRow> = if (runningItems.isNotEmpty())
+        runningItems.map { WidgetRow(it, false) }
+    else waitingItems.take(1).map { WidgetRow(it, true) }
 
     companion object {
         fun fromOverview(items: JSONArray): WidgetSnapshot {
@@ -37,8 +35,8 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
             for (i in 0 until items.length()) {
                 val item = items.optJSONObject(i) ?: continue
                 val session = WidgetSession(item.optString("name"), item.optString("label"), item.optString("project"))
-                if (item.optBoolean("waiting")) { waiting++; if (waitingItems.size < 4) waitingItems += session }
-                if (item.optBoolean("running")) { running++; if (runningItems.size < 4) runningItems += session }
+                if (item.optBoolean("waiting")) { waiting++; if (waitingItems.isEmpty()) waitingItems += session }
+                if (item.optBoolean("running")) { running++; runningItems += session }
             }
             return WidgetSnapshot(running, waiting, runningItems, waitingItems, System.currentTimeMillis())
         }
@@ -83,7 +81,11 @@ class StatusWidget : AppWidgetProvider() {
 
     override fun onReceive(ctx: Context, intent: Intent) {
         super.onReceive(ctx, intent)
-        if (intent.action == ACTION_REFRESH) {
+        if (intent.action == PowerManager.ACTION_POWER_SAVE_MODE_CHANGED) {
+            update(ctx)
+        } else if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED && Prefs(ctx).current != null) {
+            ctx.startForegroundService(Intent(ctx, EventService::class.java))
+        } else if (intent.action == ACTION_REFRESH) {
             val service = Intent(ctx, EventService::class.java).setAction(EventService.ACTION_REFRESH)
             if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(service) else ctx.startService(service)
         }
@@ -91,6 +93,7 @@ class StatusWidget : AppWidgetProvider() {
 
     companion object {
         private const val ACTION_REFRESH = "com.roami.app.REFRESH_WIDGET"
+        private const val CAROUSEL_INTERVAL_MS = 10_000
 
         fun update(ctx: Context) {
             val manager = AppWidgetManager.getInstance(ctx)
@@ -115,23 +118,25 @@ class StatusWidget : AppWidgetProvider() {
             val refresh = PendingIntent.getBroadcast(ctx, 411, Intent(ctx, StatusWidget::class.java).setAction(ACTION_REFRESH),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             view.setOnClickPendingIntent(R.id.widget_updated, refresh)
-            val rows = snap?.rows(1).orEmpty()
-            val rowIds = intArrayOf(R.id.widget_row_1)
-            val stateIds = intArrayOf(R.id.widget_state_1)
-            val titleIds = intArrayOf(R.id.widget_title_1)
-            rowIds.forEachIndexed { index, id ->
-                val row = rows.getOrNull(index)
-                view.setViewVisibility(id, if (row != null) View.VISIBLE else View.GONE)
-                if (row != null) {
-                    view.setTextViewText(stateIds[index], ctx.getString(if (row.waiting) R.string.widget_state_waiting else R.string.widget_state_running))
-                    view.setTextColor(stateIds[index], ContextCompat.getColor(ctx,
-                        if (row.waiting) R.color.widget_attention else R.color.widget_running))
-                    val project = row.session.project.ifBlank { ctx.getString(R.string.widget_no_project) }
-                    view.setTextViewText(titleIds[index], ctx.getString(R.string.widget_session, project, row.session.label))
-                    view.setOnClickPendingIntent(id, open(ctx,
-                        "/#/inbox/" + java.net.URLEncoder.encode(row.session.name, "UTF-8"), widgetId * 10 + index + 1))
-                }
+            val rows = snap?.carouselRows().orEmpty()
+            view.removeAllViews(R.id.widget_session_flipper)
+            val powerSave = ctx.getSystemService(PowerManager::class.java).isPowerSaveMode
+            view.setInt(R.id.widget_session_flipper, "setFlipInterval",
+                if (rows.size > 1 && !powerSave) CAROUSEL_INTERVAL_MS else Int.MAX_VALUE)
+            rows.forEachIndexed { index, row ->
+                val item = RemoteViews(ctx.packageName, R.layout.widget_session_row)
+                item.setTextViewText(R.id.widget_session_state, ctx.getString(if (row.waiting) R.string.widget_state_waiting else R.string.widget_state_running))
+                item.setTextColor(R.id.widget_session_state, ContextCompat.getColor(ctx,
+                    if (row.waiting) R.color.widget_attention else R.color.widget_running))
+                val project = row.session.project.ifBlank { ctx.getString(R.string.widget_no_project) }
+                item.setTextViewText(R.id.widget_session_title, ctx.getString(R.string.widget_session, project, row.session.label))
+                item.setTextViewText(R.id.widget_session_position,
+                    if (rows.size > 1) ctx.getString(R.string.widget_position, index + 1, rows.size) else "")
+                item.setOnClickPendingIntent(R.id.widget_session_row, open(ctx,
+                    "/#/inbox/" + java.net.URLEncoder.encode(row.session.name, "UTF-8"), widgetId * 100 + index + 1))
+                view.addView(R.id.widget_session_flipper, item)
             }
+            view.setViewVisibility(R.id.widget_session_flipper, if (rows.isEmpty()) View.GONE else View.VISIBLE)
             view.setTextViewText(R.id.widget_empty, if (snap == null) ctx.getString(R.string.widget_not_connected)
                 else ctx.getString(R.string.widget_empty))
             view.setViewVisibility(R.id.widget_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
