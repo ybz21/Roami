@@ -206,7 +206,7 @@ func (a *API) SessionEventLoop() {
 		procs := runningAgentProcs()
 		agents := map[string]bool{}
 		for name, p := range procs {
-			agents[name] = p.Kind == "claude" || p.Kind == "codex"
+			agents[name] = p.Kind != ""
 		}
 		// 这一轮的抓屏只抓一次：observe 用，overview 的活状态也用
 		caps := map[string]string{}

@@ -8,6 +8,7 @@ import { BranchIcon } from '../git/parts'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
 import { AppUpdateBanner } from './app-update'
+import AppDownloadEntry from './AppDownloadEntry'
 
 const HOST_MONITOR = 'roam.host-monitor'
 type Inbox = { id: number; type: string; session: string; label: string; body: string; at: number; read: boolean }
@@ -113,6 +114,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   return (
     <div className="tt-mhome">
       <AppUpdateBanner />
+      <AppDownloadEntry onGuide={() => onNav('install')} />
       {overviewError && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => void loadLive()}>{t('inbox.retry')}</button></div>}
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">

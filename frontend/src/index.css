@@ -163,7 +163,7 @@ html[data-pointer="coarse"] { --ctl-h: max(var(--ctl-h), 40px); }
 }
 
 html, body, #root { height: 100%; margin: 0; }
-/* 禁掉移动端「下拉刷新」与滚动链/边缘回弹：轻微下拉不再误触整页刷新 */
+/* 原生 overscroll 会拖动整个固定外壳；手机页面由 MobilePullRefresh 提供明确的下拉刷新。 */
 html, body { overscroll-behavior: none; }
 /* 文档本身**不滚动**：这是个定高外壳，每一页的滚动都在内部容器里（实测五条路由
    scrollHeight == clientHeight）。不写这条，任何一处溢出 1px 都会冒出 10px 宽的文档
@@ -3396,6 +3396,10 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
   color: var(--text-bright); font-size: var(--fs-body); text-align: left; cursor: pointer;
 }
 .tt-set-cat .cv { margin-left: auto; color: var(--text-dimmer); flex: 0 0 12px; }
+.tt-set-cat-app { min-height: calc(var(--tap) + var(--sp-4)); color: var(--accent); }
+.tt-set-cat-app .copy { display: flex; flex: 1; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.tt-set-cat-app .copy b { color: var(--text-bright); font-size: var(--fs-body); font-weight: 600; }
+.tt-set-cat-app .copy small { color: var(--text-dim); font-size: var(--fs-meta); }
 .tt-set-cat:active { background: var(--list-hover); }
 @media (pointer: coarse) {
   /* 手机上不画「已改」竖条：44px 行里那 2px 看不清，改用文字入口 */
@@ -3938,6 +3942,7 @@ html[data-pointer="coarse"] .tt-inbox-acts .tt-act { min-height: var(--tap); }
 .tt-msess-task.swarm .tn > svg:last-child { color: var(--text-dimmer); }
 .tt-install-step.app { border-color: var(--accent-border); background: var(--accent-soft); }
 .tt-install-step.app .hd .ic { background: var(--accent-soft); color: var(--accent); }
+.tt-install-step.app .hd .version { color: var(--text-dim); font-size: var(--fs-meta); }
 .tt-mproj-more { display: block; width: 100%; min-height: 44px; margin-bottom: var(--sp-3); border: 1px dashed var(--border-subtle); border-radius: var(--r-sm); background: none; color: var(--text-dim); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
 .tt-bottomnav-btn .ic { position: relative; display: inline-flex; }
 .tt-bottomnav-btn .ic .bd { position: absolute; top: -6px; left: 14px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-pill); background: var(--warn); color: var(--bg-base); font: 700 var(--fs-micro)/16px var(--mono); font-style: normal; text-align: center; }

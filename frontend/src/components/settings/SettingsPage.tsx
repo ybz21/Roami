@@ -8,7 +8,7 @@
 // 唯一允许滚的是搜索结果页：它天然跨类、条数不可控。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { App as AntApp, Button, Modal } from 'antd'
-import { CloseIcon, SearchIcon } from '../../icons'
+import { AppLaunchIcon, CloseIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { usePreferences, saveWorkspace, getPreferences } from '../../preferences'
@@ -213,7 +213,11 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           <div className="tt-set-catlist">
             {onInstall && <>
               <div className="tt-set-sec">{t('mobile.settings.app')}</div>
-              <button type="button" className="tt-set-cat" onClick={onInstall}><span>{t('install.meRow')}</span><Chevron open={false} /></button>
+              <button type="button" className="tt-set-cat tt-set-cat-app" onClick={onInstall}>
+                <AppLaunchIcon size={20} />
+                <span className="copy"><b>{t('install.mobileEntryTitle')}</b><small>{t('install.mobileEntryHelp')}</small></span>
+                <Chevron open={false} />
+              </button>
               {fullscreen && <button type="button" className="tt-set-cat" onClick={fullscreen.toggle}>
                 <span>{t(fullscreen.active ? 'common.exitFullscreen' : 'mobile.fullscreenHideStatus')}</span><Chevron open={false} />
               </button>}

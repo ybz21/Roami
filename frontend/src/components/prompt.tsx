@@ -21,6 +21,7 @@ const OPT = /^(?:[❯➤▶►▸→›»☞◉●>]\s*)?(\d+)[.)]\s+(\S.*)$/u /
 // Agent 的普通编号总结很容易命中，造成后台标签在“待确认/运行中”之间反复闪动。
 const QUESTION = /(?:would you like|do you want|are you sure|should (?:we|i)|(?:proceed|allow|continue|overwrite|approve|trust).*[?？]|是否(?:继续|允许|确认|执行)|(?:继续|允许|确认|执行).*[?？])/i
 const ACTION_HINT = /(?:(?:enter|return).*(?:select|confirm|continue|submit|accept)|(?:esc|escape).*(?:cancel|back)|(?:回车|enter).*(?:选择|确认|继续)|(?:按|press).*(?:y|n|yes|no).*(?:确认|confirm))/i
+const MENU_TITLE = /^(?:select|choose|pick)\b|^which\b.*[?？]|^(?:请选择|选择(?:模型|版本|选项)|请确认|是否.*[?？])/i
 const CURSOR_ONLY = /^(\s*)[❯➤▶►▸›»](\s+)(\S.*)$/u        // [缩进]游标 文本（无编号选项）
 const BOX_LEAD = /^\s*[│┃|╎┆┊╭╰├╞┝─━═]+/u                  // 只吃框线与它前面的空白，缩进要留着
 const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]/g
@@ -61,10 +62,11 @@ export function detectPrompt(capture: string): Prompt | null {
     }
     const question = qlines.join(' ').trim()
     const windowText = lines.slice(Math.max(0, g[0].idx - 8), Math.min(lines.length, g[g.length - 1].idx + 3)).map(clean).join(' ')
-    // 有开头游标，或“明确提问 + Enter/Esc 等操作提示”同时成立，才认定为选择框。
-    // 不能仅凭普通关键词判断，否则 Agent 输出的命令清单会被误报为待确认。
+    // Codex 的普通输入框也能以「› 1.」开头，不能仅凭游标把后续编号正文当菜单。
     const selectedCount = g.filter((o) => o.selected).length
-    if (selectedCount === 1 || (QUESTION.test(question) && ACTION_HINT.test(windowText))) {
+    const before = lines.slice(Math.max(0, g[0].idx - 20), g[0].idx).map(clean)
+    const menuEvidence = ACTION_HINT.test(windowText) || before.some((line) => MENU_TITLE.test(line))
+    if ((selectedCount === 1 && menuEvidence) || (QUESTION.test(question) && ACTION_HINT.test(windowText))) {
       const choices = g.map((o) => ({ num: o.num, label: o.label, selected: o.selected }))
       if (!choices.some((c) => c.selected)) choices[0].selected = true
       return { kind: 'select', question, choices }

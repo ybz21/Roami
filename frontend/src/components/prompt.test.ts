@@ -101,6 +101,13 @@ const COMPOSER = `
    ⏵⏵ auto mode on · 1 shell · ← for agents
 `
 
+const NUMBERED_COMPOSER = `
+ Worked for 56m 58s
+› 1. 手机支持下拉刷新页面
+  2. 下载 App 要有能够感知到的地方
+ GPT-6-Sol medium · ← for agents · ? for shortcuts
+`
+
 // 窄屏（手机 attach 后 tmux 只剩四十来列）：提问被折成五行，离选项十几行远。
 const TRUST_NARROW = `
  /tmp/trust-probe-e1
@@ -179,6 +186,7 @@ describe('detectPrompt', () => {
 
   it('输入框那行 ❯ 不当选择框', () => {
     expect(detectPrompt(COMPOSER)).toBeNull()
+    expect(detectPrompt(NUMBERED_COMPOSER)).toBeNull()
   })
 
   it('空屏返回 null', () => {

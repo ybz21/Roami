@@ -35,7 +35,7 @@ export default function MobileSubPage({ title, onBack, action, manageHistory = t
   useEdgeSwipe(rootRef, { onBack })
 
   const node = (
-    <div ref={rootRef} style={{
+    <div ref={rootRef} data-mobile-refresh-root={keepBottomNav ? '' : undefined} style={{
       position: 'fixed', inset: 0,
       bottom: keepBottomNav ? 'var(--mobile-nav-offset, calc(var(--mobile-nav-h) + var(--safe-b)))' : 0,
       background: 'var(--bg-base)',

@@ -19,6 +19,7 @@ var (
 	waitOpt          = regexp.MustCompile(`^(?:[❯➤▶►▸→›»☞◉●>]\s*)?(\d+)[.)]\s+(\S.*)$`)
 	waitQuestion     = regexp.MustCompile(`(?i)(would you like|do you want|are you sure|should (we|i)|(proceed|allow|continue|overwrite|approve|trust).*[?？]|是否(继续|允许|确认|执行)|(继续|允许|确认|执行).*[?？])`)
 	waitAction       = regexp.MustCompile(`(?i)((enter|return).*(select|confirm|continue|submit|accept)|(esc|escape).*(cancel|back)|(回车|enter).*(选择|确认|继续)|(按|press).*(y|n|yes|no).*(确认|confirm))`)
+	waitMenuTitle    = regexp.MustCompile(`(?i)^(select|choose|pick)\b|^which\b.*[?？]|^(请选择|选择(模型|版本|选项)|请确认|是否.*[?？])`)
 	waitYesNo        = regexp.MustCompile(`(?i)\((?:y/n|yes/no)\)|\[y/n\]`)
 )
 
@@ -43,13 +44,13 @@ func sessionCapture(name string, lines int) string {
 	return string(out)
 }
 
-// chromeLine Claude Code / Codex 自己的外壳行：状态栏、标签栏、输入框边框、提示符那行（空的，或用户刚敲的话）、
+// chromeLine Agent 自己的外壳行：状态栏、标签栏、输入框边框、提示符那行（空的，或用户刚敲的话）、
 // 转圈的进度行（✻ Improvising… (19m · ↓ 15k tokens)）。当摘要没意义：摘要要的是 agent 说的最后一句。
-var chromeLine = regexp.MustCompile(`^(⏵⏵|⧉|❯|>\s*$|\S\s+\S+…\s*\(|\S\s+\S+ for \d+[hms]|[─━═]+$|\?\s*for shortcuts)|shift\+tab to cycle|for agents|esc to interrupt|to run in background|to send now|Jump to bottom|\d: Bad\s+\d: Fine|to review · \d+ to send|What should Claude do instead|ctrl\+o to expand|/rc\s*$|· /effort|Tip: |Update installed|login expires|until auto-compact|/clear to save|/rc failed|^◯ |^● (high|medium|low) ·`)
+var chromeLine = regexp.MustCompile(`^(⏵⏵|⧉|❯|>\s*$|\S\s+\S+…\s*\(|\S\s+\S+ for \d+[hms]|[─━═]+$|[⠁-⣿] Working$|esc (again to )?interrupt$|\?\s*for shortcuts)|shift\+tab to cycle|for agents|esc to interrupt|to run in background|to send now|Jump to bottom|\d: Bad\s+\d: Fine|to review · \d+ to send|What should Claude do instead|ctrl\+o to expand|/rc\s*$|· /effort|Tip: |Update installed|login expires|until auto-compact|/clear to save|/rc failed|^◯ |^● (high|medium|low) ·`)
 
-// agentBusy 一行里有没有「正在干活」的迹象：(esc to interrupt)，或转圈那行 ✻ Improvising… (19m 35s · …)。
+// agentBusy 匹配各 Agent 运行时的状态栏，不匹配对话正文。
 // 「✻ Crunched for 17s」是干完之后的小结，不算。
-var agentBusy = regexp.MustCompile(`esc to interrupt|\S…\s*\([^)\n]*(\d+s|thinking)`)
+var agentBusy = regexp.MustCompile(`esc to interrupt|\S…\s*\([^)\n]*(\d+s|thinking)|^[⠁-⣿] Working$|^esc (again to )?interrupt$`)
 
 // screenBusy 只看屏幕最底下十来行：整屏匹配的话，滚动区里一句旧的「esc to interrupt」、
 // 或者对话里正好提到这几个词，都会把停着的会话判成在跑。
@@ -153,7 +154,11 @@ func sessionWaiting(capture string) bool {
 				selectedCount++
 			}
 		}
-		if selectedCount == 1 || (waitQuestion.MatchString(question) && waitAction.MatchString(windowText)) {
+		menuEvidence := waitAction.MatchString(windowText)
+		for i := g[0].idx - 1; i >= 0 && g[0].idx-i <= 20 && !menuEvidence; i-- {
+			menuEvidence = waitMenuTitle.MatchString(waitClean(lines[i]))
+		}
+		if (selectedCount == 1 && menuEvidence) || (waitQuestion.MatchString(question) && waitAction.MatchString(windowText)) {
 			return true
 		}
 	}

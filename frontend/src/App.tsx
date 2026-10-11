@@ -23,6 +23,7 @@ import FileWorkspace from './components/files/FileWorkspace'
 import AdaptivePanel from './components/shell/AdaptivePanel'
 import { InspectorColumn } from './components/shell/InspectorColumn'
 import MobileSubPage from './components/MobileSubPage'
+import MobilePullRefresh from './components/mobile/MobilePullRefresh'
 import { useBackDismiss } from './components/shell/useBackDismiss'
 import SettingsPage from './components/settings/SettingsPage'
 // 非首屏的重页面（蜂群/Git 面板/浏览器/手机镜像/插件）按路由懒加载：切到对应 tab 才拉 chunk，
@@ -1321,6 +1322,7 @@ export default function App() {
           </div>
         )}
       </Layout>
+      <MobilePullRefresh enabled={isMobile && ['home', 'projects', 'sessions', 'tools', 'settings', 'install'].includes(tab)} />
 
       {/* 右栏三面板：唯一的 AdaptivePanel，portal 进 InspectorColumn 的槽位；Page 态 open=false 自动收起 */}
       {hasSider && (() => {

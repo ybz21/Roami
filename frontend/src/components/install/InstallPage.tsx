@@ -12,7 +12,7 @@ import { usePwaInstall } from '../auth/install'
 import { PushSettings } from '../settings/push-settings'
 import { pushEnabled, pushSupported } from '../../push'
 
-type Info = { tls: boolean; selfSigned: boolean; apk?: boolean }
+type Info = { tls: boolean; selfSigned: boolean; apk?: boolean; apkVersion?: string }
 
 function isIOS(): boolean {
   const ua = navigator.userAgent || ''
@@ -67,7 +67,7 @@ export default function InstallPage() {
           装了它就不用下面三步——网址在 App 里输，通知走 App 自己的长连接 */}
       {info.apk && !ios && (
         <section className="tt-install-step app">
-          <div className="hd"><span className="ic"><AppLaunchIcon size={16} /></span><b>{t('install.appTitle')}</b></div>
+          <div className="hd"><span className="ic"><AppLaunchIcon size={16} /></span><b>{t('install.appTitle')}</b>{info.apkVersion && <span className="version">{info.apkVersion}</span>}</div>
           <div className="bd">
             <p>{t('install.appHelp')}</p>
             <Button type="primary" href={nodeApi('/apk')}>{t('install.appDownload')}</Button>
