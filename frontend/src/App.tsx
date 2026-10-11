@@ -80,7 +80,7 @@ import Tasks from './components/tasks/Tasks'
 import TerminalPane from './components/terminal/TerminalPane'
 import SoloTerminal from './components/terminal/SoloTerminal'
 import { ICONS } from './components/nav-icons'
-import { normalizeRoute, setHashParams, readTermTokens, NO_TERMS, TASK_ROUTE } from './route-hash'
+import { normalizeRoute, getHashParams, setHashParams, readTermTokens, NO_TERMS, TASK_ROUTE } from './route-hash'
 import type { ClaudeInfo } from './components/terminal/claude-info'
 import { dropDeadTokens, loadTabs, saveTabs, type FileTab } from './components/terminal/term-tabs-store'
 import { lastTabOf, rememberLastTab } from './components/shell/task-last-tab'
@@ -316,6 +316,7 @@ export default function App() {
   const [renameTaskVal, setRenameTaskVal] = useState('')
   // 项目行「+」/ ⌘N：在这个项目下开新任务——弹的是项目主页那个 composer（TaskComposer），不是老表单
   const [newTaskDir, setNewTaskDir] = useState<string | null>(null)
+  const quickTaskOpening = useRef(false)
   // 树头「+」：就地弹新建项目框，不再先跳去项目列表页（建完自己跳到新项目主页）
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [sessList, setSessList] = useState<{ name: string; label?: string; lastActivity?: number; agent?: AgentKind }[]>([])
@@ -380,6 +381,33 @@ export default function App() {
     if (next.panel !== panel) setPanel(next.panel)
   }, [insTab, taskView, space.large])
   const { message: antMessage, modal: antModal } = AntApp.useApp()
+  useEffect(() => {
+    if (!authed || !isMobile) return
+    const openQuickTask = () => {
+      if (location.hash.split('?')[0] !== '#/projects' || getHashParams().get('compose') !== '1' || quickTaskOpening.current) return
+      quickTaskOpening.current = true
+      const open = (projects: TreeSrc['projects']) => {
+        const params = getHashParams()
+        params.delete('compose')
+        const query = params.toString()
+        history.replaceState(history.state, '', '#/projects' + (query ? '?' + query : ''))
+        const dir = projects[0]?.dir
+        if (dir) setNewTaskDir(dir)
+        else setNewProjectOpen(true)
+        quickTaskOpening.current = false
+      }
+      const known = treeSrcRef.current.projects
+      if (known.length) { open(known); return }
+      api('GET', '/projects').then((r) => {
+        const projects = (r?.data?.projects || []) as TreeSrc['projects']
+        setTreeSrc((cur) => ({ ...cur, projects }))
+        open(projects)
+      }).catch((e: Error) => { quickTaskOpening.current = false; antMessage.error(e.message) })
+    }
+    openQuickTask()
+    window.addEventListener('hashchange', openQuickTask)
+    return () => window.removeEventListener('hashchange', openQuickTask)
+  }, [authed, isMobile, antMessage])
   const keys = useKeybindings()
   const keysRef = useRef(keys); keysRef.current = keys
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)

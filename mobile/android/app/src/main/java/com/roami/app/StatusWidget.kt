@@ -17,44 +17,56 @@ import java.util.Date
 import java.util.Locale
 
 data class WidgetSession(val name: String, val label: String, val project: String)
+data class WidgetRow(val session: WidgetSession, val waiting: Boolean)
 
 data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: List<WidgetSession>,
-    val waitingItem: WidgetSession?, val updated: Long) {
+    val waitingItems: List<WidgetSession>, val updated: Long) {
+    fun rows(limit: Int): List<WidgetRow> {
+        val firstWaiting = waitingItems.size.coerceAtMost((limit + 1) / 2)
+        val selectedRunning = runningItems.take(limit - firstWaiting)
+        val selectedWaiting = waitingItems.take(limit - selectedRunning.size)
+        return selectedWaiting.map { WidgetRow(it, true) } + selectedRunning.map { WidgetRow(it, false) }
+    }
+
     companion object {
         fun fromOverview(items: JSONArray): WidgetSnapshot {
             var running = 0
             var waiting = 0
             val runningItems = mutableListOf<WidgetSession>()
-            var waitingItem: WidgetSession? = null
+            val waitingItems = mutableListOf<WidgetSession>()
             for (i in 0 until items.length()) {
                 val item = items.optJSONObject(i) ?: continue
                 val session = WidgetSession(item.optString("name"), item.optString("label"), item.optString("project"))
-                if (item.optBoolean("waiting")) { waiting++; if (waitingItem == null) waitingItem = session }
-                if (item.optBoolean("running")) { running++; if (runningItems.size < 3) runningItems += session }
+                if (item.optBoolean("waiting")) { waiting++; if (waitingItems.size < 4) waitingItems += session }
+                if (item.optBoolean("running")) { running++; if (runningItems.size < 4) runningItems += session }
             }
-            return WidgetSnapshot(running, waiting, runningItems, waitingItem, System.currentTimeMillis())
+            return WidgetSnapshot(running, waiting, runningItems, waitingItems, System.currentTimeMillis())
         }
 
         fun read(ctx: Context, base: String?): WidgetSnapshot? = runCatching {
             val sp = ctx.getSharedPreferences("widget", Context.MODE_PRIVATE)
             if (base == null || sp.getString("base", null) != base) return null
             val o = JSONObject(sp.getString("snapshot", "") ?: "")
-            fun item(key: String): WidgetSession? = o.optJSONObject(key)?.let {
-                WidgetSession(it.optString("name"), it.optString("label"), it.optString("project"))
+            fun items(key: String): List<WidgetSession> {
+                val rows = o.optJSONArray(key) ?: JSONArray()
+                return (0 until rows.length()).mapNotNull { rows.optJSONObject(it)?.let { row ->
+                    WidgetSession(row.optString("name"), row.optString("label"), row.optString("project"))
+                } }
             }
-            val rows = o.optJSONArray("runningItems") ?: JSONArray()
-            val runningItems = (0 until rows.length()).mapNotNull { rows.optJSONObject(it)?.let { row ->
-                WidgetSession(row.optString("name"), row.optString("label"), row.optString("project"))
-            } }
-            WidgetSnapshot(o.optInt("running"), o.optInt("waiting"), runningItems, item("waitingItem"), o.optLong("updated"))
+            val previousWaiting = o.optJSONObject("waitingItem")?.let {
+                listOf(WidgetSession(it.optString("name"), it.optString("label"), it.optString("project")))
+            } ?: emptyList()
+            WidgetSnapshot(o.optInt("running"), o.optInt("waiting"), items("runningItems"),
+                o.optJSONArray("waitingItems")?.let { items("waitingItems") } ?: previousWaiting, o.optLong("updated"))
         }.getOrNull()
     }
 
     fun save(ctx: Context, base: String) {
-        fun item(s: WidgetSession?) = s?.let { JSONObject().put("name", it.name).put("label", it.label).put("project", it.project) }
+        fun items(list: List<WidgetSession>) = JSONArray().apply {
+            list.forEach { put(JSONObject().put("name", it.name).put("label", it.label).put("project", it.project)) }
+        }
         val o = JSONObject().put("running", running).put("waiting", waiting).put("updated", updated)
-            .put("runningItems", JSONArray().apply { runningItems.forEach { put(item(it)) } })
-            .put("waitingItem", item(waitingItem))
+            .put("runningItems", items(runningItems)).put("waitingItems", items(waitingItems))
         ctx.getSharedPreferences("widget", Context.MODE_PRIVATE).edit()
             .putString("base", base).putString("snapshot", o.toString()).apply()
     }
@@ -62,7 +74,11 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
 
 class StatusWidget : AppWidgetProvider() {
     override fun onUpdate(ctx: Context, manager: AppWidgetManager, ids: IntArray) {
-        ids.forEach { manager.updateAppWidget(it, views(ctx)) }
+        ids.forEach { manager.updateAppWidget(it, views(ctx, it)) }
+    }
+
+    override fun onAppWidgetOptionsChanged(ctx: Context, manager: AppWidgetManager, id: Int, options: android.os.Bundle) {
+        manager.updateAppWidget(id, views(ctx, id))
     }
 
     override fun onReceive(ctx: Context, intent: Intent) {
@@ -79,14 +95,14 @@ class StatusWidget : AppWidgetProvider() {
         fun update(ctx: Context) {
             val manager = AppWidgetManager.getInstance(ctx)
             val ids = manager.getAppWidgetIds(ComponentName(ctx, StatusWidget::class.java))
-            ids.forEach { manager.updateAppWidget(it, views(ctx)) }
+            ids.forEach { manager.updateAppWidget(it, views(ctx, it)) }
         }
 
         private fun open(ctx: Context, path: String, request: Int): PendingIntent =
             PendingIntent.getActivity(ctx, request, Intent(ctx, WebActivity::class.java).putExtra("path", path),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        private fun views(ctx: Context): RemoteViews {
+        private fun views(ctx: Context, widgetId: Int): RemoteViews {
             val snap = WidgetSnapshot.read(ctx, Prefs(ctx).current)
             val view = RemoteViews(ctx.packageName, R.layout.widget_status)
             view.setTextViewText(R.id.widget_running_count, ctx.getString(R.string.widget_running_count, snap?.running ?: 0))
@@ -95,27 +111,33 @@ class StatusWidget : AppWidgetProvider() {
                 if ((snap?.waiting ?: 0) > 0) R.color.widget_attention else R.color.widget_muted))
             val time = snap?.updated?.let { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it)) }
             view.setTextViewText(R.id.widget_updated, time?.let { ctx.getString(R.string.widget_updated, it) } ?: ctx.getString(R.string.widget_not_connected))
-            view.setOnClickPendingIntent(R.id.widget_root, open(ctx, "/#/projects", 410))
+            view.setOnClickPendingIntent(R.id.widget_root, open(ctx, "/#/projects", widgetId * 10))
             val refresh = PendingIntent.getBroadcast(ctx, 411, Intent(ctx, StatusWidget::class.java).setAction(ACTION_REFRESH),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             view.setOnClickPendingIntent(R.id.widget_updated, refresh)
-            val waiting = snap?.waitingItem
-            view.setTextViewText(R.id.widget_waiting_item, if (waiting == null) ctx.getString(R.string.widget_no_waiting)
-                else ctx.getString(R.string.widget_waiting_item, waiting.project.ifBlank { ctx.getString(R.string.widget_no_project) }, waiting.label))
-            view.setTextColor(R.id.widget_waiting_item, ContextCompat.getColor(ctx,
-                if (waiting != null) R.color.widget_foreground else R.color.widget_muted))
-            if (waiting != null) {
-                view.setOnClickPendingIntent(R.id.widget_waiting_item, open(ctx, "/#/inbox/" + java.net.URLEncoder.encode(waiting.name, "UTF-8"), 412))
+            val rows = snap?.rows(1).orEmpty()
+            val rowIds = intArrayOf(R.id.widget_row_1)
+            val stateIds = intArrayOf(R.id.widget_state_1)
+            val titleIds = intArrayOf(R.id.widget_title_1)
+            rowIds.forEachIndexed { index, id ->
+                val row = rows.getOrNull(index)
+                view.setViewVisibility(id, if (row != null) View.VISIBLE else View.GONE)
+                if (row != null) {
+                    view.setTextViewText(stateIds[index], ctx.getString(if (row.waiting) R.string.widget_state_waiting else R.string.widget_state_running))
+                    view.setTextColor(stateIds[index], ContextCompat.getColor(ctx,
+                        if (row.waiting) R.color.widget_attention else R.color.widget_running))
+                    val project = row.session.project.ifBlank { ctx.getString(R.string.widget_no_project) }
+                    view.setTextViewText(titleIds[index], ctx.getString(R.string.widget_session, project, row.session.label))
+                    view.setOnClickPendingIntent(id, open(ctx,
+                        "/#/inbox/" + java.net.URLEncoder.encode(row.session.name, "UTF-8"), widgetId * 10 + index + 1))
+                }
             }
-            val ids = intArrayOf(R.id.widget_running_item, R.id.widget_running_item_2, R.id.widget_running_item_3)
-            ids.forEachIndexed { index, id ->
-                val session = snap?.runningItems?.getOrNull(index)
-                view.setViewVisibility(id, if (session != null || index == 0 && snap?.running == 0) View.VISIBLE else View.GONE)
-                view.setTextViewText(id, if (session == null) ctx.getString(R.string.widget_empty)
-                    else ctx.getString(R.string.widget_running_item, session.project.ifBlank { ctx.getString(R.string.widget_no_project) }, session.label))
-                if (session != null) view.setOnClickPendingIntent(id,
-                    open(ctx, "/#/inbox/" + java.net.URLEncoder.encode(session.name, "UTF-8"), 413 + index))
-            }
+            view.setTextViewText(R.id.widget_empty, if (snap == null) ctx.getString(R.string.widget_not_connected)
+                else ctx.getString(R.string.widget_empty))
+            view.setViewVisibility(R.id.widget_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
+            view.setOnClickPendingIntent(R.id.widget_new_task, open(ctx, "/#/projects?compose=1", widgetId * 10 + 6))
+            view.setOnClickPendingIntent(R.id.widget_sessions, open(ctx, "/#/projects", widgetId * 10 + 7))
+            view.setOnClickPendingIntent(R.id.widget_waiting_action, open(ctx, "/#/projects?filter=waiting", widgetId * 10 + 8))
             return view
         }
     }

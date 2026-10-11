@@ -14,6 +14,7 @@ import MobileSubPage from '../MobileSubPage'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
+import { getHashParams, setHashParams } from '../../route-hash'
 export type { OverviewItem } from './mobile-overview-cache'
 
 function ago(sec: number | undefined, t: (k: string) => string): string {
@@ -54,6 +55,19 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }, [searchOpen, searchNonce])
   // 筛选药丸 + 每组先露 5 条（Lody 手机端的做法）：十几个会话时一屏能看到所有项目，而不是被第一个项目占满
   const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle' | 'unfinished' | 'activity'>('all')
+  useEffect(() => {
+    const fromLink = () => {
+      const params = getHashParams()
+      const target = params.get('filter')
+      if (target !== 'waiting' && target !== 'running') return
+      setFilter(target)
+      params.delete('filter')
+      setHashParams(Object.fromEntries(params))
+    }
+    fromLink()
+    window.addEventListener('hashchange', fromLink)
+    return () => window.removeEventListener('hashchange', fromLink)
+  }, [])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 点开的项目（worktree 视图）；安卓返回手势退回列表
   const [cur, setCur] = useState<{ name: string; dir: string } | null>(null)
