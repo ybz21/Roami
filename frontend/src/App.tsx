@@ -977,7 +977,7 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    home: <MobileHome last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
+    home: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
     install: isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false} keepBottomNav><InstallPage /></MobileSubPage> : <InstallPage />,

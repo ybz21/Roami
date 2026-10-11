@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n'
 import { AgentLogo, ChevronRight, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
+import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
 import { AppUpdateBanner } from './app-update'
 
 const HOST_MONITOR = 'roam.host-monitor'
@@ -21,8 +22,6 @@ function ago(sec: number, t: (k: string) => string): string {
   return `${Math.floor(d / 86400)}d`
 }
 
-type Proj = { key: string; name: string; dir: string; sessions: number; unfinished: number; worktrees: number; lastActivity: number }
-
 export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   /** 上次看的会话，给「继续上次」用 */
   last: string | null
@@ -33,7 +32,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   const { t } = useI18n()
   const [items, setItems] = useState<Item[] | null>(() => readMobileOverview())
   const [inbox, setInbox] = useState<Inbox[]>([])
-  const [projects, setProjects] = useState<Proj[]>([])
+  const [projects, setProjects] = useState<MobileProject[] | null>(() => readMobileProjects())
   const [host, setHost] = useState<Host | null>(null)
   const [hostStatus, setHostStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
   const [overviewError, setOverviewError] = useState(false)
@@ -43,7 +42,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
     let stop = false
     const slow = () => {
       api('GET', '/inbox?limit=40').then((r) => { if (!stop) setInbox(r.data.items || []) }).catch(() => {})
-      api('GET', '/projects').then((r) => { if (!stop) setProjects(r.data.projects || []) }).catch(() => {})
+      api('GET', '/projects').then((r) => { if (!stop) setProjects(writeMobileProjects(r.data.projects || [])) }).catch(() => {})
       api('POST', `/plugins/${encodeURIComponent(HOST_MONITOR)}/run`, { command: 'host-monitor.stats', args: {} }).then((d) => {
         if (stop) return
         if (!d?.memory) { setHostStatus((s) => s === 'ready' ? s : 'unavailable'); return }
@@ -69,7 +68,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   const doneToday = inbox.filter((x) => x.type === 'session.done' && x.at >= dayStart)
   const errors = inbox.filter((x) => x.type === 'session.error' && !x.read)
 
-  const unfinished = projects.reduce((n, p) => n + p.unfinished, 0)
+  const unfinished = (projects || []).reduce((n, p) => n + p.unfinished, 0)
   const needs = waiting.length + errors.length
   // 和电脑版主页同一句话：先问候，再说今天有几件事要你
   const h = new Date().getHours()
@@ -77,7 +76,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   const headline = greet + (needs ? t('mobile.home.headNeeds', { n: needs })
     : running.length ? t('mobile.home.headRunning', { n: running.length }) : t('mobile.home.headQuiet'))
   const lastItem = last ? items.find((x) => x.name === last && !x.waiting) : undefined
-  const busyProjects = [...projects].filter((p) => p.sessions > 0).sort((a, b) => b.lastActivity - a.lastActivity)
+  const busyProjects = [...(projects || [])].filter((p) => p.sessions > 0).sort((a, b) => b.lastActivity - a.lastActivity)
   // /projects 的 running 是 Agent 进程数；首页与会话筛选用的是当前忙碌状态。
   const projectActivity = new Map<string, { running: number; waiting: number }>()
   for (const s of items) {
@@ -154,8 +153,9 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
         </button>
       )) : <div className="none">{t('mobile.home.noneRunning')}</div>)}
 
-      {busyProjects.length > 0 && section(t('nav.projects'), busyProjects.length, () => onNav('projects'), (
-        <div className="projs">
+      {(projects === null || busyProjects.length > 0) && section(t('nav.projects'), projects === null ? null : busyProjects.length, () => onNav('projects'), (
+        <div className="projs" role={projects === null ? 'status' : undefined} aria-label={projects === null ? t('common.loading') : undefined}>
+          {projects === null && Array.from({ length: 4 }, (_, index) => <div key={index} className="placeholder" aria-hidden="true"><span className="av" /><span className="t"><b /><small /></span></div>)}
           {busyProjects.slice(0, 4).map((p) => {
             const activity = projectActivity.get(p.key)
             return <button key={p.key} type="button" onClick={() => onOpenProject(p)}>
