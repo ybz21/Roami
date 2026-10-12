@@ -414,7 +414,7 @@ func (a *API) SessionType(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
-	a.text(c, "send-keys", "-t", name, "-l", b.Text)
+	a.text(c, "send-keys", "-t", "="+name+":", "-l", b.Text)
 }
 
 // Tasks（命令 + Agent 统一）

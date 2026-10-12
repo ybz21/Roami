@@ -21,6 +21,7 @@ import { copyText } from '../chat/blocks'
 import RenameSessionModal from '../sessions/RenameSessionModal'
 import { type ClaudeInfo } from './claude-info'
 import { KEYS, PFX, tmuxMenu } from './tmux-keys'
+import { codexReconnectFailed, codexResumeCommand } from './codex-recovery'
 import { useI18n } from '../../i18n'
 import { SESSION_MIME, buildIntro, canDrop, readDrag } from '../shell/session-drop'
 import { currentNodeId } from '../cluster/node-url'
@@ -37,7 +38,7 @@ import { MobileSheet, SheetRow, SheetSection } from '../shell/MobileSheet'
 import { MobileSessionSwitch } from '../mobile/MobileSessionSwitch'
 import { tabCloseTargets, type TabCloseScope } from '../shell/tab-actions'
 import { Button, Dropdown, Input, Modal, Spin, Tooltip, App as AntApp } from 'antd'
-import { AgentLogo, ChevronDown, ChevronLeft, ChevronRight, PlusIcon, StopIcon, TabsIcon, TerminalIcon, PanelRightIcon } from '../../icons'
+import { AgentLogo, ChevronDown, ChevronLeft, ChevronRight, CopyIcon, PlusIcon, StopIcon, TabsIcon, TerminalIcon, PanelRightIcon } from '../../icons'
 import { agentName, type AgentKind } from '../../agent-kind'
 // ── 终端面板（多标签 + 工具栏 + 快捷键栏），桌面右栏与手机覆盖层共用 ──
 export default function TerminalPane(props: {
@@ -152,6 +153,7 @@ export default function TerminalPane(props: {
   }
   const st = active ? statusMap[active] : undefined
   const [termNeedsInput, setTermNeedsInput] = useState<Record<string, boolean>>({})
+  const [reconnectFailures, setReconnectFailures] = useState<Record<string, boolean>>({})
   const promptSignals = useRef<Record<string, PromptSignal>>({})
   // 危险操作目标可视化 / 就地确认：关闭 pane 前先定位目标（几何+cwd+前台进程），
   // confirm 走结构化后端接口，不再盲发 Ctrl-b x 字节（那样只会撞上 tmux 底部原生 y/n 提示）。
@@ -211,13 +213,14 @@ export default function TerminalPane(props: {
    * 或刚从别处切回来 ws 还在重连），ws 那条路那一下就静悄悄地丢了。
    * 只发一次——Claude Code 里短时间连按两次 Ctrl+C 是退出整个 TUI，不是中断。
    */
-  const interruptActive = async () => {
-    if (!active) return
+  const interruptSession = async (name: string) => {
     try {
-      await api('POST', `/sessions/${encodeURIComponent(active)}/keys`, { keys: ['C-c'] })
+      await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys: ['C-c'] })
       message.success(t('terminal.interruptSent'))
-    } catch (e: any) { message.error(e.message) }
+      return true
+    } catch (e: any) { message.error(e.message); return false }
   }
+  const interruptActive = () => active && interruptSession(active)
   const noBlur = isTouch ? (e: React.MouseEvent) => e.preventDefault() : undefined        // 点按钮不夺走输入框焦点（软键盘保持）
 
   // 弹框提醒全局开关
@@ -341,6 +344,66 @@ export default function TerminalPane(props: {
   }, [])
   const [switchOpen, setSwitchOpen] = useState(false)
   const [moreSheet, setMoreSheet] = useState(false)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [recoverySession, setRecoverySession] = useState('')
+  const [recoveryScreen, setRecoveryScreen] = useState('')
+  const [recoveryCommand, setRecoveryCommand] = useState('codex resume --last')
+  const [recoveryCopied, setRecoveryCopied] = useState(false)
+  const [recoveryCopyFailed, setRecoveryCopyFailed] = useState(false)
+  const [recoveryInterrupted, setRecoveryInterrupted] = useState(false)
+  const recoveryActionBusy = useRef(false)
+  const recoveryCaptureSeq = useRef(0)
+  useEffect(() => { recoveryCaptureSeq.current++; setRecoveryOpen(false) }, [active])
+  const openRecovery = async () => {
+    if (!active) return
+    const name = active
+    const seq = ++recoveryCaptureSeq.current
+    setMoreSheet(false)
+    setRecoveryOpen(true)
+    setRecoverySession(name)
+    setRecoveryScreen('')
+    setRecoveryCommand(codexResumeCommand(codexMap[name]?.file))
+    setRecoveryCopied(false)
+    setRecoveryCopyFailed(false)
+    setRecoveryInterrupted(false)
+    const [screen, codex] = await Promise.allSettled([
+      api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=50`),
+      api('GET', `/sessions/${encodeURIComponent(name)}/codex`),
+    ])
+    if (seq !== recoveryCaptureSeq.current) return
+    if (screen.status === 'fulfilled') setRecoveryScreen(screen.value.data || '')
+    else { setRecoveryCopyFailed(true); message.error(screen.reason.message) }
+    if (codex.status === 'fulfilled') setRecoveryCommand(codexResumeCommand(codex.value.data?.file || codexMap[name]?.file))
+  }
+  const copyRecoveryScreen = async () => {
+    if (!recoveryScreen) { message.error(t('terminal.recoveryCaptureFailed')); return }
+    try {
+      await navigator.clipboard.writeText(recoveryScreen)
+      setRecoveryCopied(true)
+      message.success(t('terminal.recoveryCopied'))
+    } catch { setRecoveryCopyFailed(true); message.error(t('terminal.recoveryCopyFailed')) }
+  }
+  const interruptRecovery = async () => {
+    if (!recoveryCopied) { message.warning(t('terminal.recoveryBackupFirst')); return }
+    if (!recoverySession || recoveryInterrupted || recoveryActionBusy.current) return
+    recoveryActionBusy.current = true
+    try {
+      if (await interruptSession(recoverySession)) setRecoveryInterrupted(true)
+    } finally { recoveryActionBusy.current = false }
+  }
+  const resumeCodex = async () => {
+    if (!recoverySession || recoveryActionBusy.current) return
+    recoveryActionBusy.current = true
+    try {
+      const r = await api('GET', '/sessions/agents')
+      if (r.data?.[recoverySession]) { message.warning(t('terminal.recoveryStillRunning')); return }
+      await api('POST', `/sessions/${encodeURIComponent(recoverySession)}/type`, { text: recoveryCommand })
+      await api('POST', `/sessions/${encodeURIComponent(recoverySession)}/keys`, { keys: ['Enter'] })
+      setRecoveryOpen(false)
+      message.success(t('terminal.recoveryResuming'))
+    } catch (e: any) { message.error(e.message) }
+    finally { recoveryActionBusy.current = false }
+  }
   const [dragTab, setDragTab] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<number | null>(null)
   // 自定义 MIME：文件区/终端的拖放判定按 type 分流，共用 text/plain 会被它们当路径接走
@@ -465,6 +528,7 @@ export default function TerminalPane(props: {
     if (!terms.length) {
       promptSignals.current = {}
       setTermNeedsInput((previous) => Object.keys(previous).length ? {} : previous)
+      setReconnectFailures((previous) => Object.keys(previous).length ? {} : previous)
       return
     }
     let stop = false
@@ -472,18 +536,20 @@ export default function TerminalPane(props: {
       const entries = await Promise.all(terms.map(async (name) => {
         try {
           const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=50`)
-          return [name, !!detectPrompt(r.data || '')] as const
+          return [name, !!detectPrompt(r.data || ''), codexReconnectFailed(r.data || '')] as const
         } catch {
-          return [name, false] as const
+          return [name, false, false] as const
         }
       }))
       if (stop) return
       const nextSignals: Record<string, PromptSignal> = {}
       const nextState: Record<string, boolean> = {}
-      entries.forEach(([name, candidate]) => {
+      const failures: Record<string, boolean> = {}
+      entries.forEach(([name, candidate, failed]) => {
         const signal = advancePromptSignal(promptSignals.current[name], candidate)
         nextSignals[name] = signal
         nextState[name] = signal.stable
+        failures[name] = failed
       })
       promptSignals.current = nextSignals
       // 未发生语义变化时复用旧对象，避免后台抓屏每 4 秒让整个终端区无意义重渲染。
@@ -491,6 +557,10 @@ export default function TerminalPane(props: {
         const keys = Object.keys(nextState)
         const unchanged = keys.length === Object.keys(previous).length && keys.every((name) => previous[name] === nextState[name])
         return unchanged ? previous : nextState
+      })
+      setReconnectFailures((previous) => {
+        const keys = Object.keys(failures)
+        return keys.length === Object.keys(previous).length && keys.every((name) => previous[name] === failures[name]) ? previous : failures
       })
     }
     checkPrompts()
@@ -930,6 +1000,9 @@ export default function TerminalPane(props: {
         <SheetRow icon={TI.rename} title={t('session.rename')} onClick={() => { setMoreSheet(false); active && setRenameSession(active) }} />
         <SheetRow icon={TI.newTab} title={t('terminal.newTab')}
           onClick={() => { setMoreSheet(false); active && window.open(`/#/term/${encodeURIComponent(active)}`, '_blank') }} />
+        {active && (agentKinds[active] === 'codex' || codexMap[active]?.running || reconnectFailures[active]) &&
+          <SheetRow icon={TI.reconnect} title={t('terminal.recoveryTitle')}
+            desc={t('terminal.recoveryEntry')} onClick={() => { void openRecovery() }} />}
         {/* 「中断」得在这儿常驻：带 ^C 的快捷键条只在打字时才升起来，而 agent 跑飞了要停它的
             那一刻，手根本不在输入框上。danger 是给这一下的分量做的记号。 */}
         <SheetRow icon={<StopIcon size={20} />} danger title={t('terminal.interrupt')} desc={t('terminal.interruptDesc')}
@@ -956,6 +1029,26 @@ export default function TerminalPane(props: {
           <button type="button" onClick={() => active && termRefs.current[active]?.redraw()}>{TI.redraw}</button>
           <button type="button" onClick={() => active && termRefs.current[active]?.reconnect()}>{TI.reconnect}</button>
         </div>}
+      </MobileSheet>
+      <MobileSheet open={recoveryOpen} title={t('terminal.recoveryTitle')} onClose={() => setRecoveryOpen(false)}>
+        <p className="tt-recovery-help">{t('terminal.recoveryHelp')}</p>
+        <SheetSection>{t('terminal.recoveryStepBackup')}</SheetSection>
+        <SheetRow icon={<CopyIcon size={20} />} title={t('terminal.recoveryCopyScreen')}
+          desc={recoveryCopied ? t('terminal.recoveryCopied') : t('terminal.recoveryCopyDesc')}
+          onClick={() => { void copyRecoveryScreen() }} />
+        {recoveryCopyFailed && <>
+          {recoveryScreen ? <Input.TextArea className="tt-recovery-text" readOnly value={recoveryScreen} autoSize={{ minRows: 3, maxRows: 6 }} />
+            : <p className="tt-recovery-help">{t('terminal.recoveryCaptureFailed')}</p>}
+          <SheetRow title={t('terminal.recoverySavedManually')} onClick={() => setRecoveryCopied(true)} />
+        </>}
+        <SheetSection>{t('terminal.recoveryStepExit')}</SheetSection>
+        <SheetRow icon={<StopIcon size={20} />} danger title={t('terminal.recoveryInterrupt')}
+          desc={recoveryInterrupted ? t('terminal.interruptSent') : t('terminal.recoveryInterruptDesc')}
+          onClick={() => { void interruptRecovery() }} />
+        <SheetSection>{t('terminal.recoveryStepResume')}</SheetSection>
+        <SheetRow icon={TI.reconnect} title={t('terminal.recoveryResume')}
+          desc={t(recoveryCommand.endsWith('--last') ? 'terminal.recoveryResumeLatest' : 'terminal.recoveryResumeExact')}
+          onClick={() => { void resumeCodex() }} />
       </MobileSheet>
     </>
   ) : null
@@ -1230,6 +1323,10 @@ export default function TerminalPane(props: {
             {phoneChrome || <>{tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip}{curFile
               ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)} />
               : sessionToolbar}</>}
+            {isPhone && active && reconnectFailures[active] && !curFile &&
+              <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
+                <span>{t('terminal.recoveryAlert')}</span><strong>{t('terminal.recoveryAction')}</strong>
+              </button>}
             {terminalArea}
             {!curFile && sessionBottom}
           </div>

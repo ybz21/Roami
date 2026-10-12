@@ -29,9 +29,25 @@ func keysSetup(t *testing.T) (*gin.Engine, string, func() string) {
 	h := &API{TT: ttmux.New(bin)}
 	r := gin.New()
 	r.POST("/sessions/:name/keys", h.Keys)
+	r.POST("/sessions/:name/type", h.SessionType)
 	return r, "2026-0101-0000-tabc", func() string {
 		b, _ := os.ReadFile(log)
 		return string(b)
+	}
+}
+
+func TestSessionTypeTargetsExactSession(t *testing.T) {
+	r, name, args := keysSetup(t)
+	req := httptest.NewRequest(http.MethodPost, "/sessions/"+name+"/type", bytes.NewBufferString(`{"text":"codex resume --last"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("type returned %d: %s", w.Code, w.Body.String())
+	}
+	want := "send-keys\n-t\n=" + name + ":\n-l\ncodex resume --last\n"
+	if got := args(); got != want {
+		t.Fatalf("tmux args mismatch:\ngot  %q\nwant %q", got, want)
 	}
 }
 

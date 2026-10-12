@@ -1230,6 +1230,16 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
   display: grid; place-items: center; border-radius: 9px;
   background: var(--accent-solid); color: #fff; font: 600 var(--fs-micro)/1 ui-monospace, monospace;
 }
+.tt-recovery-alert {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  min-height: var(--tap); padding: var(--sp-2) var(--sp-3);
+  border: 0; border-bottom: 1px solid var(--warn-border);
+  background: var(--warn-soft); color: var(--text-bright);
+  font-size: var(--fs-sm); text-align: left; cursor: pointer;
+}
+.tt-recovery-alert strong { color: var(--warn); white-space: nowrap; }
+.tt-recovery-help { margin: 0; padding: var(--sp-2) var(--sp-3); color: var(--text-dim); font-size: var(--fs-sm); }
+.tt-recovery-text { margin: var(--sp-2) 0; }
 /* 溢出 sheet 里的「画面」一行四格图标 */
 .tt-sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 4px 2px 8px; }
 .tt-sheet-grid button {
