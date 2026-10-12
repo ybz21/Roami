@@ -148,7 +148,7 @@ func altScreenPage(name, dir string) {
 
 // tmuxScroll 滚动会话历史，返回本连接是否仍停在 tmux copy-mode（供 handler 决定真实键入前是否需退出）。
 //   - 普通屏：走 tmux copy-mode 滚真实 scrollback（attach 全屏，xterm 本地缓冲为空）。
-//   - 备用屏(全屏 TUI)：copy-mode 无效，改合成滚轮序列发给应用，让它滚自己的对话缓冲。
+//   - 备用屏(全屏 TUI)：copy-mode 无效，按鼠标模式用滚轮或翻页键滚应用的缓冲。
 func tmuxScroll(name, dir string, lines int) (inCopyMode bool) {
 	if lines <= 0 {
 		lines = 1
