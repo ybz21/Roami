@@ -46,7 +46,8 @@ func sessionCapture(name string, lines int) string {
 
 // chromeLine Agent 自己的外壳行：状态栏、标签栏、输入框边框、提示符那行（空的，或用户刚敲的话）、
 // 转圈的进度行（✻ Improvising… (19m · ↓ 15k tokens)）。当摘要没意义：摘要要的是 agent 说的最后一句。
-var chromeLine = regexp.MustCompile(`^(⏵⏵|⧉|❯|>\s*$|\S\s+\S+…\s*\(|\S\s+\S+ for \d+[hms]|[─━═]+$|[⠁-⣿] Working$|esc (again to )?interrupt$|\?\s*for shortcuts)|shift\+tab to cycle|for agents|esc to interrupt|to run in background|to send now|Jump to bottom|\d: Bad\s+\d: Fine|to review · \d+ to send|What should Claude do instead|ctrl\+o to expand|/rc\s*$|· /effort|Tip: |Update installed|login expires|until auto-compact|/clear to save|/rc failed|^◯ |^● (high|medium|low) ·`)
+var openCodeProgress = regexp.MustCompile(`^[⬝■]{3,}\s+esc (?:again to )?interrupt(?:\s|$)`)
+var chromeLine = regexp.MustCompile(`^(⏵⏵|⧉|❯|>\s*$|\S\s+\S+…\s*\(|\S\s+\S+ for \d+[hms]|[─━═]+$|╹▀{3,}$|(?:Build|Plan) · .* · (?:low|medium|high)$|[⠁-⣿] Working$|esc (again to )?interrupt$|\?\s*for shortcuts)|shift\+tab to cycle|for agents|esc to interrupt|to run in background|to send now|Jump to bottom|\d: Bad\s+\d: Fine|to review · \d+ to send|What should Claude do instead|ctrl\+o to expand|/rc\s*$|· /effort|Tip: |Update installed|login expires|until auto-compact|/clear to save|/rc failed|^◯ |^● (high|medium|low) ·`)
 
 // agentBusy 匹配各 Agent 运行时的状态栏，不匹配对话正文。
 // 「✻ Crunched for 17s」是干完之后的小结，不算。
@@ -63,7 +64,7 @@ func screenBusy(capture string) bool {
 			continue
 		}
 		seen++
-		if agentBusy.MatchString(l) {
+		if agentBusy.MatchString(l) || openCodeProgress.MatchString(l) {
 			return true
 		}
 	}
@@ -75,7 +76,7 @@ func screenBusy(capture string) bool {
 func sessionTail(capture string, max int) string {
 	lines := strings.Split(strings.ReplaceAll(waitStripCtl(capture), "\r", ""), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
-		if s := waitClean(lines[i]); s != "" && !chromeLine.MatchString(s) {
+		if s := waitClean(lines[i]); s != "" && !chromeLine.MatchString(s) && !openCodeProgress.MatchString(s) {
 			if r := []rune(s); len(r) > max {
 				return string(r[:max])
 			}

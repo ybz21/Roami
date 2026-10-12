@@ -67,6 +67,8 @@ func TestScreenBusyAgentStatus(t *testing.T) {
 		{"pi working", "── ⠸ Working ──────────\n~/codes/project\n↑46k ↓18k", true},
 		{"pi idle", "Result delivered\n~/codes/project\n↑46k ↓18k", false},
 		{"opencode running", "Output in progress\nesc interrupt\n", true},
+		{"opencode progress bar", "Output in progress\n⬝■■■⬝⬝⬝⬝ esc interrupt      79.8K (8%)  ctrl+p commands\n", true},
+		{"opencode progress armed", "Output in progress\n■■⬝⬝⬝ esc again to interrupt      79.8K (8%)\n", true},
 		{"opencode interrupt armed", "Output in progress\nesc again to interrupt\n", true},
 		{"opencode idle", "Output complete\n~/codes/project\n", false},
 		{"historical opencode status", "esc interrupt\n" + strings.Repeat("new output\n", 12), false},
@@ -77,5 +79,12 @@ func TestScreenBusyAgentStatus(t *testing.T) {
 				t.Errorf("screenBusy() = %v, want %v", got, tc.busy)
 			}
 		})
+	}
+}
+
+func TestSessionTailSkipsOpenCodeProgress(t *testing.T) {
+	cap := "Actual answer\nBuild · GLM 5.3 Blade AI · medium\n╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n⬝■■■⬝⬝⬝⬝ esc interrupt      79.8K (8%)  ctrl+p commands\n"
+	if got := sessionTail(cap, 80); got != "Actual answer" {
+		t.Fatalf("tail = %q", got)
 	}
 }
