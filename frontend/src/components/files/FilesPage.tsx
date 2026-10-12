@@ -11,6 +11,7 @@ import { pathBasename, pathDirname } from '../../path-name'
 import { usePreferences } from '../../preferences'
 import { agentName, type AgentKind } from '../../agent-kind'
 import { agentLaunch } from '../../agent-command'
+import { loadAgentCapabilities, taskWithCapabilities } from '../sessions/kickoff-brief'
 import { App as AntApp } from 'antd'
 
 export default function FilesPage({ openTerm }: { openTerm: (name: string) => void }) {
@@ -38,15 +39,16 @@ export default function FilesPage({ openTerm }: { openTerm: (name: string) => vo
     const base = pathBasename(file).replace(/[^a-zA-Z0-9_.-]+/g, '-').slice(0, 28) || 'file'
     const name = `${kind}-${base}-${Date.now().toString(36).slice(-5)}`
     const dir = pathDirname(file)
-    const cmd = agentLaunch(kind, prefs, t('file.agentPrompt', { path: file }))
     try {
+      const capabilities = await loadAgentCapabilities()
+      const cmd = agentLaunch(kind, prefs, taskWithCapabilities(t('file.agentPrompt', { path: file }), t, capabilities))
       const res = await api('POST', '/sessions', { name, dir })
       const actual = res.name || name
       await api('POST', '/tasks/_/send', { sess: actual, msg: cmd })
       message.success(t('file.openedInAgent', { agent: kind === 'claude' ? 'Claude Code' : agentName(kind) }))
       openTerm(actual)
     } catch (e: any) {
-      message.error(t('file.openFailed', { message: e.message }))
+      message.error(t('file.openFailed', { message: e.apiError?.code === 'CAPABILITIES_READ_ERROR' ? t('session.capabilitiesReadFailed') : e.message }))
     }
   }
   if (isMobile) {

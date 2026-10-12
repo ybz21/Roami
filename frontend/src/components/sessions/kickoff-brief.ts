@@ -27,14 +27,20 @@ export function briefPreamble(where: BriefWhere, sess: string, autoReview: boole
 
 export async function loadAgentCapabilities(): Promise<string> {
   const fileRawBase = nodeApi('/file/raw')
+  const fileServeBase = nodeApi('/file/serve')
   const response = await api('GET', '/agent/capabilities')
-  return String(response.data?.content || '').split('{{FILE_RAW_BASE}}').join(fileRawBase).trim()
+  return String(response.data?.content || '').split('{{FILE_RAW_BASE}}').join(fileRawBase)
+    .split('{{FILE_SERVE_BASE}}').join(fileServeBase).trim()
+}
+
+export function taskWithCapabilities(task: string, t: T, capabilities: string): string {
+  const guide = capabilities.trim()
+  return `${guide ? `${guide}\n\n` : ''}${t('session.wt.briefTask')}\n${task.trim()}`
 }
 
 /** 完整简报：前言、能力说明、任务原文。任务为空返回空串。 */
 export function kickoffBrief(where: BriefWhere, sess: string, autoReview: boolean, task: string, t: T, capabilities = ''): string {
   const body = task.trim()
   if (!body) return ''
-  const guide = capabilities.trim()
-  return `${briefPreamble(where, sess, autoReview, t)}${guide ? `\n\n${guide}` : ''}\n\n${t('session.wt.briefTask')}\n${body}`
+  return `${briefPreamble(where, sess, autoReview, t)}\n\n${taskWithCapabilities(body, t, capabilities)}`
 }

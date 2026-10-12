@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { kickoffBrief, loadAgentCapabilities } from './kickoff-brief'
+import { kickoffBrief, loadAgentCapabilities, taskWithCapabilities } from './kickoff-brief'
 import { setCurrentNode } from '../cluster/node-url'
 
 afterEach(() => {
@@ -42,11 +42,14 @@ describe('开工简报', () => {
   it('从当前节点读取模板，并将所有文件入口绑定到该节点', async () => {
     setCurrentNode('remote node')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: { content: '图片 {{FILE_RAW_BASE}}?path=x 视频 {{FILE_RAW_BASE}}?path=y' },
+      data: { content: '图片 {{FILE_RAW_BASE}}?path=x 视频 {{FILE_RAW_BASE}}?path=y HTML {{FILE_SERVE_BASE}}/tmp/demo.html' },
     }), { headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
-    expect(await loadAgentCapabilities()).toBe('图片 /n/remote%20node/api/file/raw?path=x 视频 /n/remote%20node/api/file/raw?path=y')
+    expect(await loadAgentCapabilities()).toBe('图片 /n/remote%20node/api/file/raw?path=x 视频 /n/remote%20node/api/file/raw?path=y HTML /n/remote%20node/api/file/serve/tmp/demo.html')
     expect(fetchMock.mock.calls[0][0]).toBe('/n/remote%20node/api/agent/capabilities')
+  })
+  it('文件启动 Agent 也携带能力说明和原任务', () => {
+    expect(taskWithCapabilities('查看 /tmp/demo.md', t, 'Roami 能力')).toBe('Roami 能力\n\n任务：\n查看 /tmp/demo.md')
   })
   it('模板不可读时中止提交，调用方不会创建空会话', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
