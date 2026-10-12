@@ -138,6 +138,14 @@ func altScreenWheel(name, dir string, notches, w, h int, sgr bool) {
 	_ = exec.Command("tmux", "send-keys", "-t", paneTarget(name), "-l", "--", strings.Repeat(seq, notches)).Run()
 }
 
+func altScreenPage(name, dir string) {
+	key := "PageUp"
+	if dir == "down" {
+		key = "PageDown"
+	}
+	_ = exec.Command("tmux", "send-keys", "-t", paneTarget(name), key).Run()
+}
+
 // tmuxScroll 滚动会话历史，返回本连接是否仍停在 tmux copy-mode（供 handler 决定真实键入前是否需退出）。
 //   - 普通屏：走 tmux copy-mode 滚真实 scrollback（attach 全屏，xterm 本地缓冲为空）。
 //   - 备用屏(全屏 TUI)：copy-mode 无效，改合成滚轮序列发给应用，让它滚自己的对话缓冲。
@@ -146,9 +154,11 @@ func tmuxScroll(name, dir string, lines int) (inCopyMode bool) {
 		lines = 1
 	}
 	if alt, mouseOn, sgr, w, h := paneState(name); alt {
-		// 全屏但没开鼠标上报：合成的滚轮字节不会被消费，会当普通输入打进应用的输入行
-		// （命令行被 "65;137;33M…" 灌满、整屏花掉）。这种情况宁可不滚。
+		// Codex 等全屏 TUI 不开鼠标上报；滚轮字节会污染输入行，改用翻页键。
 		if !mouseOn {
+			if dir == "up" || dir == "down" {
+				altScreenPage(name, dir)
+			}
 			return false
 		}
 		switch dir {
@@ -185,6 +195,19 @@ type wheelState struct {
 	sgr     bool
 	w, h    int
 	at      time.Time
+	pageAt  time.Time
+	pageDir string
+}
+
+func (ws *wheelState) pageTurn(dir string, now time.Time) bool {
+	if dir != "up" && dir != "down" {
+		return false
+	}
+	if dir == ws.pageDir && now.Sub(ws.pageAt) < 250*time.Millisecond {
+		return false
+	}
+	ws.pageAt, ws.pageDir = now, dir
+	return true
 }
 
 func (ws *wheelState) refresh(name string) {
@@ -204,6 +227,9 @@ func tmuxScrollCached(name, dir string, lines int, ws *wheelState) (inCopyMode b
 		return tmuxScroll(name, dir, lines)
 	}
 	if !ws.mouseOn {
+		if ws.pageTurn(dir, time.Now()) {
+			altScreenPage(name, dir)
+		}
 		return false
 	}
 	if lines > maxWheelNotches {

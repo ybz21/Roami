@@ -68,9 +68,8 @@ func longFile(t *testing.T) string {
 	return p
 }
 
-// 备用屏但没开鼠标上报（less 不加 --mouse）：必须一个字节都不合成，
-// 否则滚轮序列会被当普通输入打进应用。
-func TestScrollAltScreenWithoutMouseSendsNothing(t *testing.T) {
+// 备用屏但没开鼠标上报：用翻页键滚动，不能把滚轮序列打进输入行。
+func TestScrollAltScreenWithoutMouseUsesPageKeys(t *testing.T) {
 	requireTmux(t)
 	if _, err := exec.LookPath("less"); err != nil {
 		t.Skip("无 less，跳过")
@@ -86,7 +85,7 @@ func TestScrollAltScreenWithoutMouseSendsNothing(t *testing.T) {
 	}
 
 	before := capture(t, name)
-	if inCopy := tmuxScroll(name, "up", 5); inCopy {
+	if inCopy := tmuxScroll(name, "down", 5); inCopy {
 		t.Error("备用屏不应进入 copy-mode")
 	}
 	time.Sleep(300 * time.Millisecond)
@@ -98,8 +97,19 @@ func TestScrollAltScreenWithoutMouseSendsNothing(t *testing.T) {
 			t.Fatalf("合成的滚轮字节被当普通输入吃进去了，屏幕出现 %q:\n%s", junk, after)
 		}
 	}
-	if after != before {
-		t.Errorf("没开鼠标上报时不该改动应用状态\n--- before ---\n%s\n--- after ---\n%s", before, after)
+	if after == before {
+		t.Errorf("没开鼠标上报时翻页键应滚动应用\n--- before ---\n%s\n--- after ---\n%s", before, after)
+	}
+}
+
+func TestPageTurnLimitsTouchBurst(t *testing.T) {
+	var ws wheelState
+	now := time.Now()
+	if !ws.pageTurn("up", now) || ws.pageTurn("up", now.Add(100*time.Millisecond)) {
+		t.Fatal("同向滑动应在短时间内只翻一页")
+	}
+	if !ws.pageTurn("down", now.Add(100*time.Millisecond)) || !ws.pageTurn("down", now.Add(350*time.Millisecond)) {
+		t.Fatal("反向滑动及间隔后的滑动应立即响应")
 	}
 }
 
