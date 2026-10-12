@@ -167,6 +167,20 @@ func cmdlineHasClaude(pid int) bool   { return argvIsClaude(processArgv(pid)) }
 func cmdlineHasOpenCode(pid int) bool { return argvIsOpenCode(processArgv(pid)) }
 func cmdlineHasPi(pid int) bool       { return argvIsPi(processArgv(pid)) }
 
+func procStopped(pid int) bool {
+	b, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	return err == nil && procStatStopped(string(b))
+}
+
+func procStatStopped(stat string) bool {
+	i := strings.LastIndexByte(stat, ')')
+	return i >= 0 && len(stat) > i+2 && (stat[i+2] == 'T' || stat[i+2] == 't')
+}
+
+func activeAgentMatch(match func(int) bool) func(int) bool {
+	return func(pid int) bool { return !procStopped(pid) && match(pid) }
+}
+
 // treeMatch 从 pid 起 DFS 子进程树，任一进程命中 match 即返回 true。
 func treeMatch(pid int, children map[int][]int, depth int, match func(int) bool) bool {
 	return treeFind(pid, children, depth, match) != 0
@@ -239,13 +253,13 @@ func runningAgentProcs() map[string]agentProc {
 		if err != nil {
 			continue
 		}
-		if got := treeFind(pid, children, 0, cmdlineHasClaude); got != 0 {
+		if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasClaude)); got != 0 {
 			running[parts[0]] = agentProc{Kind: "claude", Dir: parts[2], Pid: got}
-		} else if got := treeFind(pid, children, 0, cmdlineHasCodex); got != 0 {
+		} else if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasCodex)); got != 0 {
 			running[parts[0]] = agentProc{Kind: "codex", Dir: parts[2], Pid: got}
-		} else if got := treeFind(pid, children, 0, cmdlineHasOpenCode); got != 0 {
+		} else if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasOpenCode)); got != 0 {
 			running[parts[0]] = agentProc{Kind: "opencode", Dir: parts[2], Pid: got}
-		} else if got := treeFind(pid, children, 0, cmdlineHasPi); got != 0 {
+		} else if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasPi)); got != 0 {
 			running[parts[0]] = agentProc{Kind: "pi", Dir: parts[2], Pid: got}
 		}
 	}
