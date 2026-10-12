@@ -160,6 +160,32 @@ func pickCodexRollout(files []string, cwd, resumeID string, started time.Time) s
 	if best != "" {
 		return best
 	}
+	if !started.IsZero() {
+		// A resumed thread keeps its original creation time, and Codex may have moved
+		// from the pane directory into a worktree. Only accept a unique rollout
+		// written since this process started; otherwise ownership is ambiguous.
+		active := ""
+		for i, p := range files {
+			if i >= 200 {
+				break
+			}
+			dir, _ := rolloutMeta(p)
+			if dir != cwd && !strings.HasPrefix(filepath.Clean(dir)+string(filepath.Separator), filepath.Clean(cwd)+string(filepath.Separator)) {
+				continue
+			}
+			info, err := os.Stat(p)
+			if err != nil || info.ModTime().Before(started.Add(-2*time.Minute)) {
+				continue
+			}
+			if active != "" {
+				return ""
+			}
+			active = p
+		}
+		if active != "" {
+			return active
+		}
+	}
 	if matches == 1 || started.IsZero() {
 		return newest
 	}

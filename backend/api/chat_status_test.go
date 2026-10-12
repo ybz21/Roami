@@ -154,6 +154,33 @@ func TestPickCodexRolloutSameDirectory(t *testing.T) {
 	}
 }
 
+func TestPickCodexRolloutResumedInWorktree(t *testing.T) {
+	dir := t.TempDir()
+	started := time.Date(2026, 10, 12, 9, 42, 0, 0, time.UTC)
+	makeRollout := func(name, cwd string, modified time.Time) string {
+		p := filepath.Join(dir, name+".jsonl")
+		line := `{"type":"session_meta","payload":{"cwd":"` + cwd + `","timestamp":"2026-10-09T20:28:56Z"}}` + "\n"
+		if err := os.WriteFile(p, []byte(line), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, modified, modified); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	stale := makeRollout("stale", "/repo", started.Add(-time.Hour))
+	active := makeRollout("active", "/repo/.worktrees/task", started.Add(time.Minute))
+	other := makeRollout("other", "/repository/.worktrees/task", started.Add(time.Minute))
+	files := []string{active, other, stale}
+	if got := pickCodexRollout(files, "/repo", "", started); got != active {
+		t.Fatalf("resumed worktree rollout = %q, want %q", got, active)
+	}
+	second := makeRollout("second", "/repo/.worktrees/other", started.Add(time.Minute))
+	if got := pickCodexRollout(append(files, second), "/repo", "", started); got != "" {
+		t.Fatalf("ambiguous resumed rollouts selected %q", got)
+	}
+}
+
 func TestClipUsesSentinel(t *testing.T) {
 	long := make([]byte, blockCap+10)
 	for i := range long {
