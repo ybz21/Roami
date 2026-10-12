@@ -78,7 +78,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
     : running.length ? t('mobile.home.headRunning', { n: running.length }) : t('mobile.home.headQuiet'))
   const lastItem = last ? items.find((x) => x.name === last && !x.waiting) : undefined
   const busyProjects = [...(projects || [])].filter((p) => p.sessions > 0).sort((a, b) => b.lastActivity - a.lastActivity)
-  // /projects 的 running 是 Agent 进程数；首页与会话筛选用的是当前忙碌状态。
+  // 项目状态从会话概览汇总，和首页、会话筛选使用同一份忙碌状态。
   const projectActivity = new Map<string, { running: number; waiting: number }>()
   for (const s of items) {
     if (!s.projectKey) continue

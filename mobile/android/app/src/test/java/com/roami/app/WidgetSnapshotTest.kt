@@ -2,9 +2,21 @@ package com.roami.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.json.JSONArray
 
 class WidgetSnapshotTest {
     private fun session(name: String) = WidgetSession(name, name, "project")
+
+    @Test fun overviewCountsBusyAgentsNotIdleProcesses() {
+        val items = JSONArray("""[
+            {"name":"pi-busy","label":"Pi busy","project":"P","agent":"pi","running":true,"waiting":false},
+            {"name":"pi-idle","label":"Pi idle","project":"P","agent":"pi","running":false,"waiting":false},
+            {"name":"codex-busy","label":"Codex busy","project":"C","agent":"codex","running":true,"waiting":false}
+        ]""")
+        val snapshot = WidgetSnapshot.fromOverview(items)
+        assertEquals(2, snapshot.running)
+        assertEquals(listOf("pi-busy", "codex-busy"), snapshot.runningItems.map { it.name })
+    }
 
     @Test fun runningSessionsRotateWithoutWaitingTakingTheirPlace() {
         val snapshot = WidgetSnapshot(3, 3, listOf(session("run1"), session("run2"), session("run3")),

@@ -32,6 +32,8 @@ import { CloseWorktreeModal } from '../sessions/CloseWorktreeModal'
 import { DirPicker, recentDirs, pushRecentDir } from '../sessions/DirPicker'
 import { projNeeds, runningCount, waitingCount } from './project-list/project-model'
 import type { Proj, ProjSession } from './project-list/project-model'
+import type { OverviewItem } from '../../session-overview'
+import { mergeProjectActivity } from './project-list/project-activity'
 import { NeedsQueue, WorkbenchHead, buildNeedCards, NEEDS_CSS } from './project-list/needs-queue'
 import { ActivityRail, useRecentActivity, RAIL_CSS } from './project-list/activity-rail'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from './project-list/session-activity'
@@ -51,7 +53,7 @@ const NewSwarmModal = lazyRetry(() => import('../swarm/Swarm').then((m) => ({ de
 // 项目列表排序模式（置顶恒在最前；选择持久化）。
 // 「需要你」是默认档——概览并进来之后，首屏第一问是「该做什么」，不是「按名字排一排」。
 type ProjSort = 'needs' | 'name' | 'created' | 'active'
-type ProjFilter = 'needs' | 'active' | 'unfinished' | 'all'
+type ProjFilter = 'needs' | 'running' | 'active' | 'unfinished' | 'all'
 const SORT_KEY = 'roam.projects.sort'
 const SORTS = ['needs', 'name', 'created', 'active'] as const
 // 设计系统 §2：箭头/符号一律 SVG。⌕ ⇅ ✓ 这类文字符号在手机字体上画得又细又歪
@@ -79,6 +81,17 @@ const PRJ_CSS = `
   padding-inline:var(--pad-page)}
 .prj-feed{min-width:0;display:flex;flex-direction:column}
 .prj-side{display:flex;min-width:0;flex-direction:column;gap:var(--sp-3)}
+.prj-live{min-width:0;padding-inline:var(--pad-page)}
+.prj-live .prj-sect{margin:0 0 var(--sp-2)}
+.prj-live-list{display:flex;gap:var(--sp-2);overflow-x:auto;scrollbar-width:thin;padding-bottom:var(--sp-1)}
+.prj-live-item{min-width:260px;max-width:380px;flex:1 0 260px;display:flex;align-items:center;gap:var(--sp-3);
+  padding:var(--sp-3);border:1px solid var(--ok-border);border-radius:var(--r-card);background:var(--bg-container);
+  color:var(--text-bright);text-align:left;cursor:pointer}
+:where(html[data-pointer="fine"]) .prj-live-item:hover{border-color:var(--ok);background:var(--list-hover)}
+.prj-live-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.prj-live-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:var(--sp-1)}
+.prj-live-copy b{font-size:var(--fs-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prj-live-copy small{font-size:var(--fs-meta);color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @container canvas (min-width: 1180px){
   .prj-layout{grid-template-columns:minmax(0,1fr) var(--activity-rail)}
   .prj-side{align-self:start}
@@ -288,12 +301,18 @@ export function Lifec({ done, cur }: { done: number; cur?: number }) {
 }
 
 export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }: { openTerm: (n: string) => void; closeTerm: (n: string) => void; initialKey?: string; activeTerm?: string | null }) {
-  const [data, setData] = useState<{ projects: Proj[]; loose: ProjSession[] }>({ projects: [], loose: [] })
+  const [data, setData] = useState<{ projects: Proj[]; loose: ProjSession[]; overview: OverviewItem[] | null }>({ projects: [], loose: [], overview: null })
   const [loaded, setLoaded] = useState(false)
-  const load = () => api('GET', '/projects').then((r) => {
-    setData({ projects: r?.data?.projects || [], loose: r?.data?.loose || [] })
+  const load = async () => {
+    const [projects, overview] = await Promise.allSettled([api('GET', '/projects'), api('GET', '/sessions/overview')])
+    if (projects.status !== 'fulfilled') return
+    const items: OverviewItem[] | null = overview.status === 'fulfilled' ? overview.value?.data?.items || [] : null
+    setData({
+      projects: mergeProjectActivity(projects.value?.data?.projects || [], items),
+      loose: projects.value?.data?.loose || [], overview: items,
+    })
     setLoaded(true)
-  }).catch(() => {})
+  }
   useEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [])
 
   return (
@@ -409,7 +428,7 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
 // 数据只有一条 GET /projects（+ /swarms 投影、/activity 右轨）——绿点/黄点/agent 品牌标
 // 后端一趟进程树扫描就算好了，前端不再逐会话探测（18 §9）。
 function ProjectList({ data, loaded, openTerm, refresh }: {
-  data: { projects: Proj[]; loose: ProjSession[] }; loaded: boolean
+  data: { projects: Proj[]; loose: ProjSession[]; overview: OverviewItem[] | null }; loaded: boolean
   openTerm: (n: string) => void; refresh: () => void
 }) {
   const { t } = useI18n()
@@ -431,7 +450,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
   const [searching, setSearching] = useState(false)
   const [sortSheet, setSortSheet] = useState(false)
   const searchRef = useRef<InputRef>(null)
-  const [filter, setFilter] = useState<ProjFilter>('needs')
+  const [filter, setFilter] = useState<ProjFilter>('all')
 
   const needsOf = (p: Proj) => projNeeds(p, swarms)
   // 排序：置顶恒在最前；需要你(默认) / 名称(稳定) / 创建时间 / 最近活跃
@@ -445,6 +464,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
 
   const counts = useMemo(() => ({
     needs: data.projects.filter((p) => needsOf(p) > 0).length,
+    running: data.projects.filter((p) => runningCount(p) > 0).length,
     active: data.projects.filter((p) => p.sessions > 0).length,
     unfinished: data.projects.filter((p) => p.unfinished > 0).length,
     all: data.projects.length,
@@ -453,6 +473,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
     const kw = q.trim().toLowerCase()
     return sorted.filter((p) => {
       if (filter === 'needs' && needsOf(p) <= 0) return false
+      if (filter === 'running' && runningCount(p) <= 0) return false
       if (filter === 'active' && p.sessions <= 0) return false
       if (filter === 'unfinished' && p.unfinished <= 0) return false
       if (!kw) return true
@@ -484,8 +505,8 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
     [data.projects, swarms, t])
   // 计数走后端的全量字段：top 只有三行，拿它数会漏掉第 4 个以后的会话（#186 的账）
   const stats = {
-    running: data.projects.reduce((n, p) => n + runningCount(p), 0),
-    waiting: data.projects.reduce((n, p) => n + waitingCount(p), 0),
+    running: data.overview ? data.overview.filter((item) => item.running).length : data.projects.reduce((n, p) => n + runningCount(p), 0),
+    waiting: data.overview ? data.overview.filter((item) => item.waiting).length : data.projects.reduce((n, p) => n + waitingCount(p), 0),
     unfinished: data.projects.reduce((n, p) => n + (p.unfinished || 0), 0),
     swarms: swarms.length,
   }
@@ -513,12 +534,27 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
     // 参照系，而这一层并不真的滚动（真正滚的是 .tt-canvas），于是页头永远粘不住。
     <div className="prj-wrap-wide">
       {/* ① 问候 + 状态条 */}
-      <WorkbenchHead needs={cards.length} stats={stats} lastAt={lastAt} phone={isPhone}
+      <WorkbenchHead stats={stats} lastAt={lastAt} phone={isPhone}
         onNew={() => setNewOpen(true)}
         onSummaryClick={(f) => { setFilter(f); setQ('') }} />
 
+      {!!data.overview?.some((item) => item.running) && !isPhone && (
+        <section className="prj-live" aria-label={t('project.runningNow')}>
+          <div className="prj-sect"><b>{t('project.runningNow')}</b><span className="n">{stats.running}</span><span className="ln" /></div>
+          <div className="prj-live-list">
+            {data.overview.filter((item) => item.running).map((item) => (
+              <button key={item.name} type="button" className="prj-live-item" onClick={() => openTerm(item.name)}>
+                <span className="tt-agentmark">{item.agent ? <AgentLogo kind={item.agent} size={18} /> : <TerminalIcon size={18} />}</span>
+                <span className="prj-live-copy"><b>{item.label || item.name}</b><small>{item.project || t('project.loose')}{item.branch ? ` · ${item.branch}` : ''}</small></span>
+                <i className="prj-sd" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ② 行动条：搜索/筛选进行时收成一行（它是跨项目待办，不该被过滤掉） */}
-      <NeedsQueue cards={cards} collapsed={!!q.trim() || filter !== 'needs'}
+      <NeedsQueue cards={cards} collapsed={!!q.trim() || (filter !== 'needs' && stats.waiting === 0)}
         onViewAll={() => { setQ(''); setFilter('needs') }} />
 
       {/* ③ 工具条：滚到列表深处时这一条还在——筛选条件跟着内容滚走，等于要滚回顶部才能改 */}
@@ -527,6 +563,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
         <div className="prj-filters">
           {([
             ['needs', t('project.filterNeeds'), counts.needs],
+            ['running', t('project.filterRunning'), counts.running],
             ['active', t('project.filterActive'), counts.active],
             ['unfinished', t('project.section.unfinished'), counts.unfinished],
             ['all', t('project.filterAll'), counts.all],

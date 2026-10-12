@@ -56,12 +56,11 @@ export function buildNeedCards(
 const Go = () => <span className="prj-goi"><ChevronRight size={12} /></span>
 
 /** 页头：问候 + 一句话状态 + 状态概况 + 快捷创建。数字都是导航入口，零值不渲染。 */
-export function WorkbenchHead({ needs, stats, lastAt, onNew, onSummaryClick, phone }: {
-  needs: number
+export function WorkbenchHead({ stats, lastAt, onNew, onSummaryClick, phone }: {
   stats: { running: number; waiting: number; unfinished: number; swarms: number }
   lastAt: number
   onNew: () => void
-  onSummaryClick: (filter: 'needs' | 'active') => void
+  onSummaryClick: (filter: 'needs' | 'running') => void
   phone: boolean
 }) {
   const { t, locale } = useI18n()
@@ -73,7 +72,7 @@ export function WorkbenchHead({ needs, stats, lastAt, onNew, onSummaryClick, pho
   const total = stats.running + stats.waiting + stats.unfinished + stats.swarms
 
   // 「0 等待输入」不是信息，是噪声——四格里常有三格是 0，一排 0 比不显示更空洞
-  const item = (n: number, cls: string, label: string, to: 'needs' | 'active') => (n > 0 ? (
+  const item = (n: number, cls: string, label: string, to: 'needs' | 'running') => (n > 0 ? (
     <button key={label} type="button" onClick={() => onSummaryClick(to)}>
       <i className={`prj-sd ${cls}`} /><b>{n}</b>{label}
     </button>
@@ -82,7 +81,8 @@ export function WorkbenchHead({ needs, stats, lastAt, onNew, onSummaryClick, pho
   return (
     <header className="tt-pagehead prj-head">
       <div className="ttl">
-        <h2>{greet}{needs > 0 ? t('overview.headlineNeeds', { count: needs }) : t('overview.headlineQuiet')}</h2>
+        <h2>{greet}{stats.waiting > 0 ? t('mobile.home.headNeeds', { n: stats.waiting })
+          : stats.running > 0 ? t('mobile.home.headRunning', { n: stats.running }) : t('mobile.home.headQuiet')}</h2>
         {/* 数字归状态条，一个数只说一次：副句里不再重复「N 个任务正在运行」 */}
         <p>{kicker}{' · '}{stats.running > 0
           ? t('overview.metaActivity', { time: relTime(lastAt, t) })
@@ -93,7 +93,7 @@ export function WorkbenchHead({ needs, stats, lastAt, onNew, onSummaryClick, pho
       <div className="acts">
         {total > 0 && (
           <div className="prj-sum">
-            {item(stats.running, '', t('overview.sumRunning'), 'active')}
+            {item(stats.running, '', t('overview.sumRunning'), 'running')}
             {item(stats.waiting, 'a', t('overview.sumWaiting'), 'needs')}
             {item(stats.unfinished, 'a', t('overview.sumUnfinished'), 'needs')}
             {item(stats.swarms, 'p', t('overview.sumSwarms'), 'needs')}
@@ -134,7 +134,7 @@ export function NeedsQueue({ cards, collapsed, onViewAll }: {
     return (
       <button type="button" className="prj-needbar" onClick={() => setOpen(true)}>
         <i className="prj-sd a" />
-        <b>{t('overview.headlineNeeds', { count: cards.length }).replace(/^[，,]\s*/, '')}</b>
+        <b>{t('overview.followUp')} {cards.length}</b>
         <span className="sub">{parts}</span>
         <span className="sp" />
         <span className="ex">{t('common.expand')}<ChevronDown size={12} /></span>
@@ -145,7 +145,7 @@ export function NeedsQueue({ cards, collapsed, onViewAll }: {
   return (
     <>
       <div className="prj-sect">
-        <b>{t('overview.needsYou')}</b><span className="n">{cards.length}</span><span className="ln" />
+        <b>{t('overview.followUp')}</b><span className="n">{cards.length}</span><span className="ln" />
         {collapsed && open && (
           <button type="button" className="prj-sectbtn" onClick={() => setOpen(false)}>
             {t('common.collapse')}<ChevronUp size={12} />
@@ -187,11 +187,11 @@ export const NEEDS_CSS = `
 :where(html[data-pointer="fine"]) .prj-new:hover{filter:brightness(1.08)}
 .prj-sum{display:flex;align-items:center;gap:var(--sp-2) var(--sp-5);flex-wrap:wrap;
   min-height:34px;font-size:var(--fs-meta)}
-.prj-sum button{display:inline-flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1);
-  margin:calc(var(--sp-1) * -1);border:0;border-radius:var(--r-xs);
-  background:none;color:var(--text-dim);font:inherit;cursor:pointer}
+.prj-sum button{display:inline-flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);
+  border:1px solid var(--border-subtle);border-radius:var(--r-pill);
+  background:var(--bg-container);color:var(--text-dim);font:inherit;cursor:pointer}
 :where(html[data-pointer="fine"]) .prj-sum button:hover{color:var(--text-bright);background:var(--list-hover)}
-.prj-sum b{font-family:ui-monospace,monospace;font-weight:700;font-size:var(--fs-sm);color:var(--text-bright)}
+.prj-sum b{font-family:ui-monospace,monospace;font-weight:700;font-size:var(--fs-body);color:var(--text-bright)}
 /* 状态点：画出来的，不是打出来的（● 会跟着字体走） */
 .prj-sd{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 auto;display:block}
 .prj-sd.a{background:var(--warn)}.prj-sd.p{background:var(--swarm)}

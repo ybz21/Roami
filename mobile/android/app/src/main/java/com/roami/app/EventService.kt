@@ -148,13 +148,14 @@ class EventService : Service() {
 
     private fun refreshStatus() {
         if (stopped || refreshing || !::base.isInitialized) return
-        val cookie = CookieManager.getInstance().getCookie(base) ?: return
+        val cookie = CookieManager.getInstance().getCookie(base)
+        if (cookie.isNullOrBlank()) { invalidateStatus(); return }
         refreshing = true
         thread {
             try {
                 val req = Request.Builder().url("$base/api/sessions/overview").header("Cookie", cookie).build()
                 client().newCall(req).execute().use { response ->
-                    if (!response.isSuccessful) return@use
+                    if (!response.isSuccessful) { invalidateStatus(); return@use }
                     val items = JSONObject(response.body?.string() ?: "").getJSONObject("data").getJSONArray("items")
                     val snapshot = WidgetSnapshot.fromOverview(items)
                     snapshot.save(this, base)
@@ -162,8 +163,14 @@ class EventService : Service() {
                     updateAttention(snapshot.waiting)
                 }
             } catch (_: Exception) {
+                invalidateStatus()
             } finally { refreshing = false }
         }
+    }
+
+    private fun invalidateStatus() {
+        if (WidgetSnapshot.clear(this)) StatusWidget.update(this)
+        updateAttention(0)
     }
 
     private fun updateAttention(count: Int) {

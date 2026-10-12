@@ -620,6 +620,9 @@ func summarizeSessions(p *projectSummary, top []projectSession) {
 		if top[i].Waiting != top[j].Waiting {
 			return top[i].Waiting
 		}
+		if top[i].Running != top[j].Running {
+			return top[i].Running
+		}
 		if top[i].Attached != top[j].Attached {
 			return top[i].Attached
 		}

@@ -10,8 +10,8 @@ android {
         applicationId = "com.roami.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "0.3.6"
+        versionCode = 11
+        versionName = "0.3.7"
     }
     buildTypes {
         release {
@@ -30,4 +30,5 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

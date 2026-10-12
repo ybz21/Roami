@@ -44,3 +44,16 @@ func TestSummarizeSessionsSmall(t *testing.T) {
 		t.Errorf("单会话汇总不对: running=%d waiting=%d needs=%d top=%d", p.Running, p.Waiting, len(p.Needs), len(p.Top))
 	}
 }
+
+func TestSummarizeSessionsShowsRunningBeforeIdle(t *testing.T) {
+	var p projectSummary
+	summarizeSessions(&p, []projectSession{
+		{Name: "idle-a", Attached: true, LastActivity: 30},
+		{Name: "idle-b", Attached: true, LastActivity: 20},
+		{Name: "idle-c", Attached: true, LastActivity: 10},
+		{Name: "pi", Agent: "pi", Running: true, LastActivity: 5},
+	})
+	if len(p.Top) != 3 || p.Top[0].Name != "pi" {
+		t.Fatalf("running CLI session must remain visible in the project preview: %+v", p.Top)
+	}
+}

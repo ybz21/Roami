@@ -50,6 +50,7 @@ export default function TerminalPane(props: {
   tabBarHost?: HTMLElement | null
   fontSize: number; setFontSize: (n: number) => void
   statusMap: Record<string, TermStatus>; setStatus: (n: string, s: TermStatus) => void
+  activityMap?: Record<string, { running: boolean; waiting: boolean }>
   termRefs: React.MutableRefObject<Record<string, TermHandle | null>>
   sendKey: (seq: string) => void; onCollapse?: () => void
   claudeMap: Record<string, ClaudeInfo>; claudeView: Record<string, boolean>; setClaudeView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
@@ -87,7 +88,7 @@ export default function TerminalPane(props: {
   /** 从对话里点「path:line」跳过来要定位到那一行；nonce 让同一处点第二次也响 */
   reveal?: { path: string; line: number; nonce: number }
 }) {
-  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
   const activeLabel = useSessionLabel(active)
   const opaqueLabel = !!activeProject && (activeLabel === active || /^\d{4}-\d{4}-\d{4}-\d{4}(?:-[a-z0-9]+)?$/i.test(activeLabel))
@@ -184,8 +185,9 @@ export default function TerminalPane(props: {
   }
   const activeNeedsInput = !!(active && termNeedsInput[active])
   const dotOf = (name: string) => {
-    if (termNeedsInput[name]) return 'var(--warn)'
-    if (statusMap[name] === 'connected' || claudeMap[name]?.running || codexMap[name]?.running) return 'var(--ok)'
+    if (activityMap?.[name]?.waiting || termNeedsInput[name]) return 'var(--warn)'
+    if (activityMap?.[name]?.running) return 'var(--ok)'
+    if (statusMap[name] === 'connected' || agentKinds[name] || claudeMap[name]?.running || codexMap[name]?.running) return 'var(--text-dimmer)'
     return statusMap[name] === 'connecting' ? 'var(--warn)' : 'var(--danger)'
   }
   const dot = active ? dotOf(active) : 'var(--danger)'

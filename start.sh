@@ -194,18 +194,29 @@ elif [ "$(find frontend/src frontend/index.html frontend/vite.config.ts -newer f
   (cd frontend && ensure_frontend_deps && npm run build)
 fi
 
-# ── 后端：dev 增量编译；非 dev 直接用 install.sh 产物 ─────────────
+# ── 后端：源码比二进制新时编译；纯安装包继续用 install.sh 产物 ─────────────
+build_backend() {
+  local version
+  version="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+  (cd backend && go build -ldflags "-X main.version=${version}" -o ttmux-web.next ./cmd) || {
+    rm -f backend/ttmux-web.next
+    return 1
+  }
+  mv backend/ttmux-web.next "$BIN"
+}
 if [ "$DEV" = 1 ]; then
   # 检测 .go 与 go:embed 的资源(*.tmpl/*.html)变更，避免改模板却跳过编译
   if [ ! -f "$BIN" ] || [ "$(find backend \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
     echo "==> 编译后端..."
-    ROAMI_VER="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
-    (cd backend && go build -ldflags "-X main.version=${ROAMI_VER}" -o ttmux-web ./cmd)
+    build_backend
   else
     echo "==> 后端无变更，跳过编译"
   fi
 elif [ ! -x "$BIN" ]; then
   echo "✘ 未找到 $BIN —— 先构建：bash install.sh   或   bash start.sh --dev"; exit 1
+elif [ -d backend/api ] && [ "$(find backend \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
+  echo "==> 检测到后端源码变更，自动重新编译..."
+  build_backend
 fi
 
 # ── KVM：--dev 才动手拿权限，平时只提醒 ──────────────────────────

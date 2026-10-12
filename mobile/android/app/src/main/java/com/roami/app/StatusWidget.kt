@@ -27,6 +27,8 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
     else waitingItems.take(1).map { WidgetRow(it, true) }
 
     companion object {
+        private const val MAX_AGE_MS = 60_000L
+
         fun fromOverview(items: JSONArray): WidgetSnapshot {
             var running = 0
             var waiting = 0
@@ -54,9 +56,18 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
             val previousWaiting = o.optJSONObject("waitingItem")?.let {
                 listOf(WidgetSession(it.optString("name"), it.optString("label"), it.optString("project")))
             } ?: emptyList()
+            val updated = o.optLong("updated")
+            if (updated <= 0 || System.currentTimeMillis() - updated !in 0..MAX_AGE_MS) return null
             WidgetSnapshot(o.optInt("running"), o.optInt("waiting"), items("runningItems"),
-                o.optJSONArray("waitingItems")?.let { items("waitingItems") } ?: previousWaiting, o.optLong("updated"))
+                o.optJSONArray("waitingItems")?.let { items("waitingItems") } ?: previousWaiting, updated)
         }.getOrNull()
+
+        fun clear(ctx: Context): Boolean {
+            val sp = ctx.getSharedPreferences("widget", Context.MODE_PRIVATE)
+            if (!sp.contains("snapshot")) return false
+            sp.edit().remove("snapshot").apply()
+            return true
+        }
     }
 
     fun save(ctx: Context, base: String) {
@@ -108,8 +119,10 @@ class StatusWidget : AppWidgetProvider() {
         private fun views(ctx: Context, widgetId: Int): RemoteViews {
             val snap = WidgetSnapshot.read(ctx, Prefs(ctx).current)
             val view = RemoteViews(ctx.packageName, R.layout.widget_status)
-            view.setTextViewText(R.id.widget_running_count, ctx.getString(R.string.widget_running_count, snap?.running ?: 0))
-            view.setTextViewText(R.id.widget_waiting_count, ctx.getString(R.string.widget_waiting_count, snap?.waiting ?: 0))
+            view.setTextViewText(R.id.widget_running_count,
+                if (snap == null) ctx.getString(R.string.widget_running_unavailable) else ctx.getString(R.string.widget_running_count, snap.running))
+            view.setTextViewText(R.id.widget_waiting_count,
+                if (snap == null) ctx.getString(R.string.widget_waiting_unavailable) else ctx.getString(R.string.widget_waiting_count, snap.waiting))
             view.setTextColor(R.id.widget_waiting_count, ContextCompat.getColor(ctx,
                 if ((snap?.waiting ?: 0) > 0) R.color.widget_attention else R.color.widget_muted))
             val time = snap?.updated?.let { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it)) }

@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import type { MenuProps } from 'antd'
 import { api, setUnauthorizedHandler } from './api'
+import type { OverviewItem } from './session-overview'
 import Term, { TermHandle, TermStatus } from './components/terminal/Terminal'
 import ClaudeChat from './components/chat/ClaudeChat'
 import CodexChat from './components/chat/CodexChat'
@@ -419,6 +420,7 @@ export default function App() {
   }, [])
   const [fontSize, setFontSize] = useState(13)
   const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
+  const [activityMap, setActivityMap] = useState<Record<string, { running: boolean; waiting: boolean }>>({})
   const termRefs = useRef<Record<string, TermHandle | null>>({})
   // Claude Code / Codex 检测（针对已打开的终端）+ 每个标签的「对话/终端」视图切换
   const [claudeMap, setClaudeMap] = useState<Record<string, ClaudeInfo>>({})
@@ -778,6 +780,20 @@ export default function App() {
     return () => { stop = true; clearInterval(t) }
   }, [authed, terms, isMobile])
 
+  useEffect(() => {
+    if (!authed || terms.length === 0) return
+    let stop = false
+    const check = () => api('GET', '/sessions/overview').then((r) => {
+      if (stop) return
+      const next: Record<string, { running: boolean; waiting: boolean }> = {}
+      for (const item of (r.data?.items || []) as OverviewItem[]) next[item.name] = { running: item.running, waiting: item.waiting }
+      setActivityMap(next)
+    }).catch(() => { if (!stop) setActivityMap({}) })
+    void check()
+    const timer = setInterval(check, 5000)
+    return () => { stop = true; clearInterval(timer) }
+  }, [authed, terms.length])
+
   // 通用传输 Phase 1a：登录后且用户偏好开 P2P → 建会话级常驻 control PC（左边栏全局状态）。
   // 偏好关闭 / 登出即拆链。P2P 是否真正可用由 transport 内部拉 /api/p2p/config 决定。
   const link = useLinkStatus()
@@ -962,6 +978,7 @@ export default function App() {
       activePage={hasSider && !taskView ? tab : undefined}
       onPageTab={go} onClosePage={closePageTab} onClosePages={closePageTabs} tabBarHost={hasSider ? tabBarHost : null}
       fontSize={fontSize} setFontSize={setFontSize} statusMap={statusMap} setStatus={setStatus}
+      activityMap={activityMap}
       termRefs={termRefs} sendKey={sendKey}
       claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
       codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}

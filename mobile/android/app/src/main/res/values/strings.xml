@@ -28,7 +28,9 @@
     <string name="update_bad_response">服务器未返回 APK</string>
     <string name="widget_description">正在跑的会话和需要处理的事项</string>
     <string name="widget_running_count">%1$d 在跑</string>
+    <string name="widget_running_unavailable">— 在跑</string>
     <string name="widget_waiting_count">%1$d 项待处理</string>
+    <string name="widget_waiting_unavailable">— 项待处理</string>
     <string name="widget_state_waiting">等你</string>
     <string name="widget_state_running">在跑</string>
     <string name="widget_session">%1$s · %2$s</string>
