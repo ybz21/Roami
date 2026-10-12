@@ -177,6 +177,9 @@ func (a *API) SessionEventLoop() {
 	ev := newSessionEvents()
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
+	var openCodeAt time.Time
+	var openCodeActive map[string]bool
+	openCodeDirs := map[string]string{}
 	// 转录文件按 (会话, pid) 缓存：pickTranscript 要扫目录，不必每 5s 扫一遍
 	type fileKey struct {
 		name string
@@ -204,6 +207,10 @@ func (a *API) SessionEventLoop() {
 			sessions[s.Name] = label
 		}
 		procs := runningAgentProcs()
+		if time.Since(openCodeAt) >= 10*time.Second {
+			openCodeActive = scanOpenCodeActive(procs, openCodeDirs)
+			openCodeAt = time.Now()
+		}
 		agents := map[string]bool{}
 		for name, p := range procs {
 			agents[name] = p.Kind != ""
@@ -245,7 +252,7 @@ func (a *API) SessionEventLoop() {
 			snap := liveSnap{Waiting: sessionWaiting(cap), At: now}
 			if p, ok := procs[name]; ok && p.Kind != "" {
 				snap.Agent = p.Kind
-				snap.Busy = screenBusy(cap)
+				snap.Busy = screenBusy(cap) || (p.Kind == "opencode" && openCodeActive[name])
 			}
 			if snap.Waiting {
 				snap.Tail = waitingSummary(cap, 100)

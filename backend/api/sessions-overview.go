@@ -29,6 +29,16 @@ type liveSnap struct {
 
 func (s liveSnap) running() bool { return s.Agent != "" && s.Busy && !s.Waiting }
 
+func (a *API) sessionRunning(name, agent, screen string, waiting bool) bool {
+	if waiting || agent == "" {
+		return false
+	}
+	if snap, ok := a.Live.get(name); ok && snap.Agent == agent && time.Since(snap.At) < 15*time.Second {
+		return snap.running()
+	}
+	return screenBusy(screen)
+}
+
 type liveTable struct {
 	mu sync.RWMutex
 	m  map[string]liveSnap

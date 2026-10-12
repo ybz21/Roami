@@ -217,7 +217,7 @@ func (a *API) ProjectsList(c *gin.Context) {
 		if ps.Agent != "" {
 			screen := sessionCapture(name, 50)
 			ps.Waiting = sessionWaiting(screen)
-			ps.Running = screenBusy(screen) && !ps.Waiting
+			ps.Running = a.sessionRunning(name, ps.Agent, screen, ps.Waiting)
 			if ps.Waiting {
 				ps.Tail = sessionTail(screen, 120) // 摘要只有待输入卡用得上，不待输入就不占返回体积
 			}
@@ -365,7 +365,7 @@ func (a *API) ProjectsList(c *gin.Context) {
 			if ls.Agent != "" {
 				screen := sessionCapture(s.Name, 50)
 				ls.Waiting = sessionWaiting(screen)
-				ls.Running = screenBusy(screen) && !ls.Waiting
+				ls.Running = a.sessionRunning(s.Name, ls.Agent, screen, ls.Waiting)
 				if ls.Waiting {
 					ls.Tail = sessionTail(screen, 120)
 				}
