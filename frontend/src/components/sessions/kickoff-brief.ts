@@ -4,6 +4,9 @@
 // 简报说「做完再开始下面的任务」，可下面紧跟的就是用户原话，**没有「任务：」标题**。
 // 前面几步一长，agent 很容易把需求读成最后一步的续文。现在两边都走这里。
 
+import { api } from '../../api'
+import { nodeApi } from '../cluster/node-url'
+
 export type BriefWhere =
   | { kind: 'new'; path: string; base: string; branch: string }
   | { kind: 'adopt'; path: string; base: string; branch: string }
@@ -22,9 +25,16 @@ export function briefPreamble(where: BriefWhere, sess: string, autoReview: boole
   return head + (autoReview ? t('session.wt.briefReview') : '')
 }
 
-/** 完整简报：前言 + 空行 +「任务：」+ 任务原文。任务为空返回空串 */
-export function kickoffBrief(where: BriefWhere, sess: string, autoReview: boolean, task: string, t: T): string {
+export async function loadAgentCapabilities(): Promise<string> {
+  const fileRawBase = nodeApi('/file/raw')
+  const response = await api('GET', '/agent/capabilities')
+  return String(response.data?.content || '').split('{{FILE_RAW_BASE}}').join(fileRawBase).trim()
+}
+
+/** 完整简报：前言、能力说明、任务原文。任务为空返回空串。 */
+export function kickoffBrief(where: BriefWhere, sess: string, autoReview: boolean, task: string, t: T, capabilities = ''): string {
   const body = task.trim()
   if (!body) return ''
-  return `${briefPreamble(where, sess, autoReview, t)}\n\n${t('session.wt.briefTask')}\n${body}`
+  const guide = capabilities.trim()
+  return `${briefPreamble(where, sess, autoReview, t)}${guide ? `\n\n${guide}` : ''}\n\n${t('session.wt.briefTask')}\n${body}`
 }

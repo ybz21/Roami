@@ -17,7 +17,7 @@ import { AgentLogo, CheckIcon, ChevronDown, CircleIcon, PaperclipIcon, TerminalI
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
-import { kickoffBrief, type BriefWhere } from './kickoff-brief'
+import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-brief'
 
 export type TaskComposerHandle = { focus: () => void; insert: (text: string) => void }
 
@@ -137,6 +137,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
     }
     try {
       setCreating(true)
+      const capabilities = agent !== 'none' ? await loadAgentCapabilities() : ''
       let actual: string
       const wantWt = isGit && wtMode === 'new'
       // 选的是分支：同样走建 worktree 那条编排，只是分支已经有了（existing=true，后端检出而不新建）
@@ -178,7 +179,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
             : isGit
               ? { kind: 'repo', path: sessionDir, branch: existingWt?.branch || defBranch || 'main' }
               : { kind: 'plain', path: sessionDir }
-        const brief = kickoffBrief(where, actual, autoReview, prompt, t)
+        const brief = kickoffBrief(where, actual, autoReview, prompt, t, capabilities)
         await api('POST', '/tasks/_/send', { sess: actual, msg: agentLaunch(agent, prefs, brief) })
         if (autoReview) {
           await api('POST', '/plugin/track', {
@@ -188,7 +189,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         }
       }
       setPrompt(''); message.success(t('session.created')); openTerm(actual); onCreated?.(actual)
-    } catch (e: any) { message.error(e.message) }
+    } catch (e: any) { message.error(e.apiError?.code === 'CAPABILITIES_READ_ERROR' ? t('session.capabilitiesReadFailed') : e.message) }
     finally { setCreating(false) }
   }
 

@@ -14,7 +14,7 @@ import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { relTime } from '../../time-format'
-import { kickoffBrief, type BriefWhere } from './kickoff-brief'
+import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-brief'
 
 // 由 prompt 首句推会话名：派活时用户只写了要干什么，名字不该再问一遍。
 // worktree 分支默认名：会话名 slug（小写、非字母数字转 -）
@@ -145,6 +145,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     }
     try {
       setCreating(true)
+      const capabilities = agent !== 'none' && prompt.trim() ? await loadAgentCapabilities() : ''
       let sessionDir = dir.trim()
       let actual: string
       let wtBranch = ''   // 新建 worktree 时后端给的占位分支
@@ -200,7 +201,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
               : isGitRepo
                 ? { kind: 'repo', path: sessionDir || dir, branch: existingWt?.branch || defBranch || 'main' }
                 : { kind: 'plain', path: sessionDir || dir }
-          launch = agentLaunch(agent, prefs, kickoffBrief(where, actual, autoReview, prompt, t))
+          launch = agentLaunch(agent, prefs, kickoffBrief(where, actual, autoReview, prompt, t, capabilities))
         }
         await api('POST', '/tasks/_/send', { sess: actual, msg: launch })
         if (autoReview && !sessionDir) {
@@ -215,7 +216,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       }
       pushRecentDir(dir); message.success(t(parent ? 'session.fork.created' : 'session.created')); onClose(); onDone(actual)
     }
-    catch (e: any) { message.error(e.message) }
+    catch (e: any) { message.error(e.apiError?.code === 'CAPABILITIES_READ_ERROR' ? t('session.capabilitiesReadFailed') : e.message) }
     finally { setCreating(false) }
   }
   return (

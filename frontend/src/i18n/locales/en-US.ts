@@ -616,6 +616,7 @@ const enUS = {
   'session.renamed': 'Renamed',
   'session.nameRequired': 'Enter a name',
   'session.created': 'Created',
+  'session.capabilitiesReadFailed': 'Cannot read the session capability guide. Check agent-capabilities.md and retry.',
   'session.namePlaceholder': 'Display name, e.g. work',
   'session.agentNone': 'No agent',
   'session.agentClaude': 'Launch Claude Code',

@@ -616,6 +616,7 @@ const zhCN = {
   'session.renamed': '已重命名',
   'session.nameRequired': '请输入名称',
   'session.created': '已创建',
+  'session.capabilitiesReadFailed': '无法读取会话能力说明，请检查 agent-capabilities.md 后重试',
   'session.namePlaceholder': '显示名称，如 work',
   'session.agentNone': '不启动',
   'session.agentClaude': '启动 Claude Code',

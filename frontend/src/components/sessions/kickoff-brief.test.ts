@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { kickoffBrief } from './kickoff-brief'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { kickoffBrief, loadAgentCapabilities } from './kickoff-brief'
+import { setCurrentNode } from '../cluster/node-url'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  setCurrentNode(null)
+})
 
 const t = (k: string, v?: Record<string, unknown>) => {
   const table: Record<string, string> = {
@@ -28,5 +34,24 @@ describe('开工简报', () => {
   it('互审那句跟在前言后面、标题前面', () => {
     const b = kickoffBrief({ kind: 'plain', path: '/p' }, 's2', true, 'x', t)
     expect(b).toBe('你在 /p，会话 s2\n另有互审。\n\n任务：\nx')
+  })
+  it('能力说明位于任务前，任务原文保持不变', () => {
+    const b = kickoffBrief(where, 's1', false, '生成视频', t, '文件入口：/api/file/raw')
+    expect(b).toMatch(/ttmux rename s1 <新名字>\n\n文件入口：\/api\/file\/raw\n\n任务：\n生成视频$/)
+  })
+  it('从当前节点读取模板，并将所有文件入口绑定到该节点', async () => {
+    setCurrentNode('remote node')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: { content: '图片 {{FILE_RAW_BASE}}?path=x 视频 {{FILE_RAW_BASE}}?path=y' },
+    }), { headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await loadAgentCapabilities()).toBe('图片 /n/remote%20node/api/file/raw?path=x 视频 /n/remote%20node/api/file/raw?path=y')
+    expect(fetchMock.mock.calls[0][0]).toBe('/n/remote%20node/api/agent/capabilities')
+  })
+  it('模板不可读时中止提交，调用方不会创建空会话', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'CAPABILITIES_READ_ERROR' },
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } })))
+    await expect(loadAgentCapabilities()).rejects.toThrow('CAPABILITIES_READ_ERROR')
   })
 })
