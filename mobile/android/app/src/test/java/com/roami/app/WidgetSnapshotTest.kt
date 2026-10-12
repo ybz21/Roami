@@ -31,4 +31,14 @@ class WidgetSnapshotTest {
         assertEquals(listOf("wait1"), snapshot.carouselRows().map { it.session.name })
         assertEquals(true, snapshot.carouselRows().single().waiting)
     }
+
+    @Test fun attentionIncludesUnfinishedWorktrees() {
+        val projects = JSONArray("""[
+            {"name":"a","unfinished":2}, {"name":"b","unfinished":5}, {"name":"c","unfinished":0}
+        ]""")
+        val snapshot = WidgetSnapshot(1, 3, emptyList(), emptyList(), 0,
+            WidgetSnapshot.unfinishedFromProjects(projects))
+        assertEquals(7, snapshot.unfinished)
+        assertEquals(10, snapshot.attentionCount)
+    }
 }

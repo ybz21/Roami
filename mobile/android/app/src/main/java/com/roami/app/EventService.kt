@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.webkit.CookieManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -38,6 +39,8 @@ class EventService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private var stopped = false
     @Volatile private var refreshing = false
+    private var unfinished = 0
+    private var unfinishedAt = 0L
     private val statusLoop = object : Runnable {
         override fun run() { refreshStatus(); main.postDelayed(this, 15_000) }
     }
@@ -50,6 +53,8 @@ class EventService : Service() {
         val b = intent?.getStringExtra("base") ?: Prefs(this).current ?: run { stopSelf(); return START_NOT_STICKY }
         if (::base.isInitialized && base == b && ws != null) return START_STICKY
         base = b
+        unfinished = 0
+        unfinishedAt = 0L
         host = runCatching { java.net.URI(base).host }.getOrNull() ?: base
         channels()
         startFg(getString(R.string.link_connecting, host))
@@ -153,14 +158,15 @@ class EventService : Service() {
         refreshing = true
         thread {
             try {
+                val http = client()
                 val req = Request.Builder().url("$base/api/sessions/overview").header("Cookie", cookie).build()
-                client().newCall(req).execute().use { response ->
+                http.newCall(req).execute().use { response ->
                     if (!response.isSuccessful) { invalidateStatus(); return@use }
                     val items = JSONObject(response.body?.string() ?: "").getJSONObject("data").getJSONArray("items")
-                    val snapshot = WidgetSnapshot.fromOverview(items)
+                    val snapshot = WidgetSnapshot.fromOverview(items).copy(unfinished = unfinishedCount(http, cookie))
                     snapshot.save(this, base)
                     StatusWidget.update(this)
-                    updateAttention(snapshot.waiting)
+                    updateAttention(snapshot.attentionCount)
                 }
             } catch (_: Exception) {
                 invalidateStatus()
@@ -168,7 +174,26 @@ class EventService : Service() {
         }
     }
 
+    private fun unfinishedCount(http: OkHttpClient, cookie: String): Int {
+        val now = SystemClock.elapsedRealtime()
+        if (unfinishedAt != 0L && now - unfinishedAt < 60_000) return unfinished
+        try {
+            val req = Request.Builder().url("$base/api/projects").header("Cookie", cookie).build()
+            http.newCall(req).execute().use { response ->
+                if (response.isSuccessful) {
+                    val projects = JSONObject(response.body?.string() ?: "").getJSONObject("data").getJSONArray("projects")
+                    unfinished = WidgetSnapshot.unfinishedFromProjects(projects)
+                    unfinishedAt = now
+                }
+            }
+        } catch (_: Exception) { }
+        if (unfinishedAt == 0L || now - unfinishedAt > 120_000) unfinished = 0
+        return unfinished
+    }
+
     private fun invalidateStatus() {
+        unfinished = 0
+        unfinishedAt = 0L
         if (WidgetSnapshot.clear(this)) StatusWidget.update(this)
         updateAttention(0)
     }

@@ -44,6 +44,6 @@
     <string name="widget_new_task">发任务</string>
     <string name="widget_waiting_action">待处理</string>
     <string name="ch_attention">需要处理</string>
-    <string name="attention_title">%1$d 个会话等你处理</string>
-    <string name="attention_body">点此查看正在等待回复的会话</string>
+    <string name="attention_title">%1$d 项需要处理</string>
+    <string name="attention_body">待确认会话和待收尾任务</string>
 </resources>

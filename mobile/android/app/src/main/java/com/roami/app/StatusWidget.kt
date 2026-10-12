@@ -21,7 +21,8 @@ data class WidgetSession(val name: String, val label: String, val project: Strin
 data class WidgetRow(val session: WidgetSession, val waiting: Boolean)
 
 data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: List<WidgetSession>,
-    val waitingItems: List<WidgetSession>, val updated: Long) {
+    val waitingItems: List<WidgetSession>, val updated: Long, val unfinished: Int = 0) {
+    val attentionCount: Int get() = waiting + unfinished
     fun carouselRows(): List<WidgetRow> = if (runningItems.isNotEmpty())
         runningItems.map { WidgetRow(it, false) }
     else waitingItems.take(1).map { WidgetRow(it, true) }
@@ -43,6 +44,10 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
             return WidgetSnapshot(running, waiting, runningItems, waitingItems, System.currentTimeMillis())
         }
 
+        fun unfinishedFromProjects(projects: JSONArray): Int = (0 until projects.length()).sumOf { index ->
+            projects.optJSONObject(index)?.optInt("unfinished")?.coerceAtLeast(0) ?: 0
+        }
+
         fun read(ctx: Context, base: String?): WidgetSnapshot? = runCatching {
             val sp = ctx.getSharedPreferences("widget", Context.MODE_PRIVATE)
             if (base == null || sp.getString("base", null) != base) return null
@@ -59,7 +64,8 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
             val updated = o.optLong("updated")
             if (updated <= 0 || System.currentTimeMillis() - updated !in 0..MAX_AGE_MS) return null
             WidgetSnapshot(o.optInt("running"), o.optInt("waiting"), items("runningItems"),
-                o.optJSONArray("waitingItems")?.let { items("waitingItems") } ?: previousWaiting, updated)
+                o.optJSONArray("waitingItems")?.let { items("waitingItems") } ?: previousWaiting, updated,
+                o.optInt("unfinished"))
         }.getOrNull()
 
         fun clear(ctx: Context): Boolean {
@@ -74,7 +80,7 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
         fun items(list: List<WidgetSession>) = JSONArray().apply {
             list.forEach { put(JSONObject().put("name", it.name).put("label", it.label).put("project", it.project)) }
         }
-        val o = JSONObject().put("running", running).put("waiting", waiting).put("updated", updated)
+        val o = JSONObject().put("running", running).put("waiting", waiting).put("unfinished", unfinished).put("updated", updated)
             .put("runningItems", items(runningItems)).put("waitingItems", items(waitingItems))
         ctx.getSharedPreferences("widget", Context.MODE_PRIVATE).edit()
             .putString("base", base).putString("snapshot", o.toString()).apply()
@@ -122,9 +128,9 @@ class StatusWidget : AppWidgetProvider() {
             view.setTextViewText(R.id.widget_running_count,
                 if (snap == null) ctx.getString(R.string.widget_running_unavailable) else ctx.getString(R.string.widget_running_count, snap.running))
             view.setTextViewText(R.id.widget_waiting_count,
-                if (snap == null) ctx.getString(R.string.widget_waiting_unavailable) else ctx.getString(R.string.widget_waiting_count, snap.waiting))
+                if (snap == null) ctx.getString(R.string.widget_waiting_unavailable) else ctx.getString(R.string.widget_waiting_count, snap.attentionCount))
             view.setTextColor(R.id.widget_waiting_count, ContextCompat.getColor(ctx,
-                if ((snap?.waiting ?: 0) > 0) R.color.widget_attention else R.color.widget_muted))
+                if ((snap?.attentionCount ?: 0) > 0) R.color.widget_attention else R.color.widget_muted))
             val time = snap?.updated?.let { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it)) }
             view.setTextViewText(R.id.widget_updated, time?.let { ctx.getString(R.string.widget_updated, it) } ?: ctx.getString(R.string.widget_not_connected))
             view.setOnClickPendingIntent(R.id.widget_root, open(ctx, "/#/projects", widgetId * 10))
