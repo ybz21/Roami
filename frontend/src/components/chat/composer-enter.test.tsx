@@ -74,5 +74,7 @@ describe('对话输入框：回车与输入法组合态', () => {
 
     await waitFor(() => expect(sentMessages(fetchMock)).toEqual(['/tmp/a.png 看下这张图']))
     await waitFor(() => expect((box as HTMLTextAreaElement).value).toBe(''))
+    const request = fetchMock.mock.calls.find(([url]) => String(url).includes('/tasks/_/send'))
+    expect(JSON.parse(String((request?.[1] as RequestInit).body)).activity).toBe('dialogue')
   })
 })

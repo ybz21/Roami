@@ -30,6 +30,7 @@ import (
 const labelOption = "@roam_name"
 
 type API struct {
+	Footprints  *AIFootprintStore
 	TT          *ttmux.Client
 	WT          *worktree.Service // Worktree 领域服务（独占 git worktree 操作）
 	BrowserHome string            // 浏览器导航起始页地址（供前端设为默认主页）
@@ -59,7 +60,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 			metadb.RetireLegacyFiles(dataDir)
 		}
 	}()
-	return &API{TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
+	return &API{Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir),
 		Prefs: NewPreferencesStore(dataDir), Races: race.NewStore(dataDir, meta),
 		Push: NewPushStore(dataDir), Inbox: NewInboxStore(dataDir, func() *sql.DB {
@@ -425,10 +426,11 @@ func (a *API) TaskKill(c *gin.Context)    { a.text(c, "group", "kill", c.Param("
 
 func (a *API) Send(c *gin.Context) {
 	var b struct {
-		Sess string `json:"sess"`
-		Msg  string `json:"msg"`
+		Sess     string `json:"sess"`
+		Msg      string `json:"msg"`
+		Activity string `json:"activity"`
 	}
-	if err := c.ShouldBindJSON(&b); err != nil || b.Sess == "" || b.Msg == "" {
+	if err := c.ShouldBindJSON(&b); err != nil || b.Sess == "" || b.Msg == "" || (b.Activity != "" && b.Activity != "dialogue" && b.Activity != "task") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
@@ -441,6 +443,9 @@ func (a *API) Send(c *gin.Context) {
 	}
 	time.Sleep(90 * time.Millisecond)
 	a.text(c, "send-keys", "-t", b.Sess, "Enter")
+	if c.Writer.Status() < 400 {
+		a.Footprints.Record(b.Activity, 1)
+	}
 }
 
 func (a *API) Spawn(c *gin.Context) {
@@ -487,6 +492,9 @@ func (a *API) Spawn(c *gin.Context) {
 		}
 	}
 	a.text(c, args...)
+	if c.Writer.Status() < 400 && b.Type == "agent" {
+		a.Footprints.Record("task", len(b.Tasks))
+	}
 }
 
 // Env

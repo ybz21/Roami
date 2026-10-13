@@ -9,6 +9,7 @@ import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mo
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
 import { AppUpdateBanner } from './app-update'
 import AppDownloadEntry from './AppDownloadEntry'
+import DailyActivity from '../activity/DailyActivity'
 
 const HOST_MONITOR = 'roam.host-monitor'
 type Inbox = { id: number; type: string; session: string; label: string; body: string; at: number; read: boolean }
@@ -156,6 +157,8 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
           <em>{ago(s.lastActivity, t)}</em>
         </button>
       )) : <div className="none">{t('mobile.home.noneRunning')}</div>)}
+
+      <DailyActivity />
 
       {(projects === null || busyProjects.length > 0) && section(t('nav.projects'), projects === null ? null : busyProjects.length, () => onNav('projects'), (
         <div className="projs" role={projects === null ? 'status' : undefined} aria-label={projects === null ? t('common.loading') : undefined}>

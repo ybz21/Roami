@@ -32,6 +32,9 @@ export async function api(method: string, path: string, body?: any, opts?: { sig
     err.apiError = errObj
     throw err
   }
+  if (method === 'POST' && (body?.activity || (path === '/tasks' && body?.type === 'agent'))) {
+    window.dispatchEvent(new Event('roam:footprints-updated'))
+  }
   return data
 }
 

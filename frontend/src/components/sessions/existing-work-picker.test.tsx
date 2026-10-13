@@ -108,6 +108,7 @@ describe('开任务 · 「已有」选择器', () => {
     await waitFor(() => expect(body('/worktree-sessions')).toHaveLength(1))
     expect(body('/worktree-sessions')[0]).toMatchObject({ dir: '/repo', branch: 'feat/old', existing: true })
     await waitFor(() => expect(body('/tasks/_/send')).toHaveLength(1))
+    expect(body('/tasks/_/send')[0].activity).toBe('task')
     const msg = body('/tasks/_/send')[0].msg as string
     expect(msg).toContain('/repo/.worktrees/sess-1')
     expect(msg).toContain('feat/old')

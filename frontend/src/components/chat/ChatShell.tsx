@@ -93,7 +93,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
       return
     }
     try {
-      await api('POST', '/tasks/_/send', { sess: name, msg: buildIntro(drag, name, t) })
+      await api('POST', '/tasks/_/send', { sess: name, msg: buildIntro(drag, name, t), activity: 'dialogue' })
       message.success(t('pair.sent', { name: sessionDisplay(name), peer: drag.label || drag.id }))
     } catch (e: any) { message.error(e.message) }
   }
@@ -263,7 +263,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     if (!text || sending) return
     setSending(true); setSendErr('')
     try {
-      await api('POST', '/tasks/_/send', { sess: name, msg: text })
+      await api('POST', '/tasks/_/send', { sess: name, msg: text, activity: 'dialogue' })
       setInput(''); atBottom.current = true
       setOutbox((q) => [...q, { id: q.length ? q[q.length - 1].id + 1 : 1, text }])
     }

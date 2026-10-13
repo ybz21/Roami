@@ -260,6 +260,8 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/plugins/:id/restore", h.PluginRestore)
 		g.GET("/plugin/findings", h.PluginFindings)
 		g.GET("/plugin/notifications", h.PluginNotifications)
+		g.GET("/activity/daily", h.DailyActivity)
+
 		g.GET("/sessions/overview", h.SessionsOverview) // 手机会话页：会话 + 归属 + 活状态一次给全
 		g.GET("/inbox", h.InboxList)                    // 收件箱：会话事件（等你 / 做完 / 出错）+ 角标
 		g.POST("/inbox/read", h.InboxRead)              // 已读（ids 或 all）

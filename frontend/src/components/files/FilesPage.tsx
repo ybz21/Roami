@@ -44,7 +44,7 @@ export default function FilesPage({ openTerm }: { openTerm: (name: string) => vo
       const cmd = agentLaunch(kind, prefs, taskWithCapabilities(t('file.agentPrompt', { path: file }), t, capabilities))
       const res = await api('POST', '/sessions', { name, dir })
       const actual = res.name || name
-      await api('POST', '/tasks/_/send', { sess: actual, msg: cmd })
+      await api('POST', '/tasks/_/send', { sess: actual, msg: cmd, activity: 'task' })
       message.success(t('file.openedInAgent', { agent: kind === 'claude' ? 'Claude Code' : agentName(kind) }))
       openTerm(actual)
     } catch (e: any) {

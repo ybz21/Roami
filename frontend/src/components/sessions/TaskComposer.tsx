@@ -180,7 +180,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
               ? { kind: 'repo', path: sessionDir, branch: existingWt?.branch || defBranch || 'main' }
               : { kind: 'plain', path: sessionDir }
         const brief = kickoffBrief(where, actual, autoReview, prompt, t, capabilities)
-        await api('POST', '/tasks/_/send', { sess: actual, msg: agentLaunch(agent, prefs, brief) })
+        await api('POST', '/tasks/_/send', { sess: actual, msg: agentLaunch(agent, prefs, brief), activity: 'task' })
         if (autoReview) {
           await api('POST', '/plugin/track', {
             session: actual,

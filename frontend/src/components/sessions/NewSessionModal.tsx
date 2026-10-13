@@ -203,7 +203,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
                 : { kind: 'plain', path: sessionDir || dir }
           launch = agentLaunch(agent, prefs, kickoffBrief(where, actual, autoReview, prompt, t, capabilities))
         }
-        await api('POST', '/tasks/_/send', { sess: actual, msg: launch })
+        await api('POST', '/tasks/_/send', { sess: actual, msg: launch, activity: prompt.trim() ? 'task' : undefined })
         if (autoReview && !sessionDir) {
           message.warning(t('session.autoReviewNeedsDir'))
         } else if (autoReview && sessionDir) {

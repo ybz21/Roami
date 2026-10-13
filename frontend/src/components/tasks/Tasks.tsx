@@ -140,7 +140,7 @@ function SendModal({ tasks, onClose }: { tasks: any[] | null; onClose: () => voi
   useEffect(() => { if (tasks?.length) setSess(tasks[0].name) }, [tasks])
   const go = async () => {
     if (!sess || !msg) return
-    try { await api('POST', '/tasks/_/send', { sess, msg }); message.success(t('task.sent')); onClose() } catch (e: any) { message.error(e.message) }
+    try { await api('POST', '/tasks/_/send', { sess, msg, activity: 'dialogue' }); message.success(t('task.sent')); onClose() } catch (e: any) { message.error(e.message) }
   }
   return (
     <Modal open={!!tasks} onCancel={onClose} onOk={go} okText={t('common.send')} title={t('task.appendInstruction')} destroyOnClose>
