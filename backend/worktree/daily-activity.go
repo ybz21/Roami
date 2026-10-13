@@ -32,18 +32,20 @@ func (s *Service) ActivityCommits(ctx context.Context, repo Repo) ([]ActivityCom
 	if ok && time.Since(cached.at) < time.Minute {
 		return cached.commits, nil
 	}
-	out, err := git(ctx, repo.Root, "log", "--all", "--no-merges", "--since-as-filter=370.days", "--format=%H%x09%ct")
+	// Filter after walking: old Git lacks --since-as-filter, and --since skips newer ancestors after a backdated commit.
+	out, err := git(ctx, repo.Root, "log", "--all", "--no-merges", "--format=%H%x09%ct")
 	if err != nil {
 		return nil, errf("GIT_ERROR", "%s", out)
 	}
 	commits := []ActivityCommit{}
+	cutoff := time.Now().AddDate(0, 0, -370).Unix()
 	for _, line := range strings.Split(out, "\n") {
 		parts := strings.Split(line, "\t")
 		if len(parts) != 2 {
 			continue
 		}
 		at, err := strconv.ParseInt(parts[1], 10, 64)
-		if err == nil {
+		if err == nil && at >= cutoff {
 			commits = append(commits, ActivityCommit{OID: parts[0], At: at})
 		}
 	}
