@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,5 +65,33 @@ func TestGitFootprintsReportsUnwritableArchive(t *testing.T) {
 	s := NewGitFootprintStore(path)
 	if err := s.Import(context.Background(), nil); err == nil {
 		t.Fatal("expected archive error")
+	}
+}
+
+func TestGitFootprintsUpgradesLegacyArchiveWithoutChangingCounts(t *testing.T) {
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "ai-footprints.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE git_commits(oid TEXT PRIMARY KEY, at INTEGER NOT NULL); INSERT INTO git_commits VALUES ('existing', 12345)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	s := NewGitFootprintStore(dir)
+	defer s.db.Close()
+	commit := worktree.ActivityCommit{OID: "existing", At: 12345, Repo: "/projects/app", Subject: "Fix login"}
+	for i := 0; i < 2; i++ {
+		if err := s.Import(context.Background(), []worktree.ActivityCommit{commit}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	records, err := s.Day(context.Background(), 12345, 12346)
+	if err != nil || len(records) != 1 || records[0].Subject != "Fix login" || records[0].Repo != "/projects/app" {
+		t.Fatalf("upgraded day=%v err=%v", records, err)
+	}
+	next, err := s.Day(context.Background(), 12346, 12347)
+	if err != nil || len(next) != 0 {
+		t.Fatalf("day boundary=%v err=%v", next, err)
 	}
 }

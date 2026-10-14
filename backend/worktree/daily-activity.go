@@ -9,8 +9,10 @@ import (
 )
 
 type ActivityCommit struct {
-	OID string `json:"oid"`
-	At  int64  `json:"at"`
+	OID     string `json:"oid"`
+	At      int64  `json:"at"`
+	Repo    string `json:"-"`
+	Subject string `json:"-"`
 }
 
 var activityCache = struct {
@@ -48,19 +50,19 @@ func (s *Service) AllActivityCommits(ctx context.Context, repo Repo) ([]Activity
 		return cached.commits, nil
 	}
 	// Walk all history for durable backfill, including ancestors beyond backdated commits.
-	out, err := git(ctx, repo.Root, "log", "--all", "--no-merges", "--format=%H%x09%ct")
+	out, err := git(ctx, repo.Root, "log", "--all", "--no-merges", "--format=%H%x09%ct%x09%s")
 	if err != nil {
 		return nil, errf("GIT_ERROR", "%s", out)
 	}
 	commits := []ActivityCommit{}
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, "\t")
-		if len(parts) != 2 {
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) != 3 {
 			continue
 		}
 		at, err := strconv.ParseInt(parts[1], 10, 64)
 		if err == nil {
-			commits = append(commits, ActivityCommit{OID: parts[0], At: at})
+			commits = append(commits, ActivityCommit{OID: parts[0], At: at, Repo: repo.Root, Subject: parts[2]})
 		}
 	}
 	activityCache.Lock()

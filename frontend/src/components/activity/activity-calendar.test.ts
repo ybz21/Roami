@@ -33,6 +33,13 @@ describe('activity calendar', () => {
   it('handles an empty history and intensity thresholds', () => {
     const result = activityCalendar([], new Date(2026, 9, 12))
     expect([result.total, result.active, result.current, result.longest]).toEqual([0, 0, 0, 0])
-    expect([0, 1, 2, 3, 5, 6, 9, 10].map(activityLevel)).toEqual([0, 1, 1, 2, 2, 3, 3, 4])
+    expect([0, 1, 2, 3, 5, 6, 9, 10].map((count) => activityLevel(count, [2, 5, 9]))).toEqual([0, 1, 1, 2, 2, 3, 3, 4])
   })
 })
+
+ it('distributes dense historical days across four tiers without an outlier flattening them', () => {
+   const now = new Date(2026, 9, 14, 12)
+   const result = activityCalendar([12, 24, 36, 48, 60, 72, 84, 10000].map((commits, i) => ({ at: new Date(2026, 9, i + 1, 12).getTime() / 1000, commits })), now)
+   expect(result.thresholds).toEqual([24, 48, 72])
+   expect([0, 12, 24, 36, 48, 60, 72, 84, 10000].map((n) => activityLevel(n, result.thresholds))).toEqual([0, 1, 1, 2, 2, 3, 3, 4, 4])
+ })

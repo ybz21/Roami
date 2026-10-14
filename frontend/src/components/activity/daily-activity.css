@@ -13,9 +13,9 @@
 .tt-activity-day, .tt-activity-blank { width: var(--activity-cell); height: var(--activity-cell); flex: 0 0 var(--activity-cell); }
 .tt-activity-day { display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-xs); background: transparent; cursor: pointer; position: relative; }
 .tt-activity-day i, .tt-activity-legend i { display: block; width: var(--sp-4); height: var(--sp-4); border-radius: var(--r-xs); background: var(--border-subtle); }
-.tt-activity-day.level-1 i, .tt-activity-legend .level-1 { background: var(--ok-soft); }
-.tt-activity-day.level-2 i, .tt-activity-legend .level-2 { background: var(--ok-border); }
-.tt-activity-day.level-3 i, .tt-activity-legend .level-3 { background: var(--ok-solid); }
+.tt-activity-day.level-1 i, .tt-activity-legend .level-1 { background: color-mix(in srgb, var(--ok) 25%, var(--bg-container)); }
+.tt-activity-day.level-2 i, .tt-activity-legend .level-2 { background: color-mix(in srgb, var(--ok) 50%, var(--bg-container)); }
+.tt-activity-day.level-3 i, .tt-activity-legend .level-3 { background: color-mix(in srgb, var(--ok) 75%, var(--bg-container)); }
 .tt-activity-day.level-4 i, .tt-activity-legend .level-4 { background: var(--ok); }
 .tt-activity-day[aria-pressed="true"] i { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tt-activity-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -55,7 +55,7 @@
 .tt-activity-date-nav button:focus-visible { outline: 2px solid var(--accent); }
 :where(html[data-pointer="fine"]) .tt-activity-date-nav > button:hover { border-color: var(--accent); }
 
-.tt-activity-desktop { margin: var(--sp-4) 0; padding: var(--sp-3); }
+.tt-activity-desktop { box-sizing: border-box; width: 100%; max-width: calc(var(--sp-5) * 40); margin: var(--sp-4) 0; padding: var(--sp-3); }
 .tt-activity-desktop .tt-activity-copy { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-3); }
 .tt-activity-desktop .tt-activity-heading { justify-content: flex-start; }
 .tt-activity-desktop .tt-activity-summary { font-size: var(--fs-meta); margin: 0; }
@@ -79,3 +79,14 @@
 .tt-activity-year-footer .tt-act { position: relative; }
 :where(html[data-pointer="coarse"]) .tt-activity-year-footer .tt-act::after { content: ''; position: absolute; inset: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-1)); }
 .tt-activity-year-footer .tt-activity-legend i { width: var(--sp-3); height: var(--sp-3); border-radius: 0; }
+
+.tt-activity-timeline { margin: var(--sp-4) 0; }
+.tt-activity-timeline h4 { margin: 0 0 var(--sp-3); font-size: var(--fs-body); color: var(--text-bright); }
+.tt-activity-timeline ul { padding: 0; margin: 0; list-style: none; }
+.tt-activity-timeline li { display: flex; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--border-subtle); }
+.tt-activity-timeline time { flex: 0 0 calc(var(--sp-5) * 2); color: var(--text-dim); font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
+.tt-activity-timeline li > div { min-width: 0; }
+.tt-activity-timeline li p { margin: 0 0 var(--sp-1); overflow-wrap: anywhere; font-size: var(--fs-body); color: var(--text-bright); }
+.tt-activity-timeline li span { color: var(--text-dim); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.tt-activity-timeline > .tt-act { position: relative; margin-top: var(--sp-3); }
+:where(html[data-pointer="coarse"]) .tt-activity-timeline > .tt-act { min-height: var(--tap); }

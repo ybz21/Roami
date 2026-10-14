@@ -6,6 +6,7 @@ import { useLayout } from '../../layout'
 import { ChevronLeft, ChevronRight, CloseIcon } from '../../icons'
 import { MobileSheet } from '../shell/MobileSheet'
 import { activityCalendar, activityLevel, dayKey, type ActivityDay, type ActivityEvent } from './activity-calendar'
+import DayFootprints from './DayFootprints'
 import './daily-activity.css'
 
 type Activity = { commits: { oid: string; at: number }[]; usage?: ActivityEvent[]; commitHistoryFailed?: boolean; recordingFailed?: boolean; repositories: number; failed: number }
@@ -49,7 +50,11 @@ export default function DailyActivity() {
       const first = week.find((day) => day && (day.date.getDate() === 1 || i === 0))
       return <span className="tt-activity-week" key={i}>
         <span className="tt-activity-month">{first ? new Intl.DateTimeFormat(locale, { month: 'short' }).format(first.date) : ''}</span>
-        {week.map((day, row) => !day ? <span className="tt-activity-blank" key={row} /> : interactive ? <button type="button" key={day.key} className={`tt-activity-day level-${activityLevel(day.count)}`} aria-label={dayLabel(day)} data-day={day.key} tabIndex={detail.key === day.key ? 0 : -1} aria-pressed={detail.key === day.key} title={dayLabel(day)} onClick={() => setSelected(day.key)} onKeyDown={(event) => {
+        {week.map((day, row) => !day ? <span className="tt-activity-blank" key={row} /> : interactive ? <button type="button" key={day.key} className={`tt-activity-day level-${activityLevel(day.count, calendar.thresholds)}`} aria-label={dayLabel(day)} data-day={day.key} tabIndex={detail.key === day.key ? 0 : -1} aria-pressed={detail.key === day.key} title={dayLabel(day)} onClick={(event) => {
+          setSelected(day.key); setExpanded(true)
+          const panel = event.currentTarget.closest<HTMLElement>('.tt-sheet-body') || event.currentTarget.closest<HTMLElement>('.tt-activity-panel')
+          panel?.scrollTo?.({ top: 0, behavior: 'smooth' })
+        }} onKeyDown={(event) => {
           const offset = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1 }[event.key]
           if (offset === undefined && event.key !== 'Home' && event.key !== 'End') return
           event.preventDefault()
@@ -58,18 +63,14 @@ export default function DailyActivity() {
           const key = calendar.days[next].key
           setSelected(key)
           event.currentTarget.closest('.tt-activity-weeks')?.querySelector<HTMLButtonElement>(`[data-day="${key}"]`)?.focus()
-        }}><i /></button> : <span className={`tt-activity-day tt-activity-static-day level-${activityLevel(day.count)}`} key={day.key}><i /></span>)}
+        }}><i /></button> : <span className={`tt-activity-day tt-activity-static-day level-${activityLevel(day.count, calendar.thresholds)}`} key={day.key}><i /></span>)}
       </span>
     })}
   </span>
   const legend = <div className="tt-activity-footer"><span>{t('activity.less')}</span><div className="tt-activity-legend" aria-hidden="true">{[0, 1, 2, 3, 4].map((level) => <i className={`level-${level}`} key={level} />)}</div><span>{t('activity.more')}</span></div>
-  const scope = <p className="tt-activity-scope">{t('activity.usageScope')}{' '}{t('activity.scope', { count: number(data?.repositories || 0) })}{!!data?.failed && <span role="status"> {t('activity.partial', { count: number(data.failed) })}</span>}</p>
+  const scope = <p className="tt-activity-scope">{t('activity.usageScope')}{' '}{t('activity.colorScope')}{' '}{t('activity.scope', { count: number(data?.repositories || 0) })}{!!data?.failed && <span role="status"> {t('activity.partial', { count: number(data.failed) })}</span>}</p>
   const detailIndex = calendar.days.findIndex((day) => day.key === detail.key)
   const details = <div className="tt-activity-panel">
-    <p className="tt-activity-scope">{t('activity.year')}</p>
-    {stats}
-    <div className={`tt-activity-scroll${phone ? ' tt-activity-static' : ''}`} ref={scroll}>{heatmap(calendar.weeks, !phone)}</div>
-    {legend}
     <div className="tt-activity-date-nav">
       <button type="button" disabled={detailIndex === 0} aria-label={t('activity.previousDay')} onClick={() => setSelected(calendar.days[detailIndex - 1].key)}><ChevronLeft /></button>
       <label><span>{t('activity.chooseDate')}</span><input type="date" value={detail.key} min={calendar.days[0].key} max={calendar.days[calendar.days.length - 1].key} onChange={(event) => { if (calendar.days.some((day) => day.key === event.target.value)) setSelected(event.target.value) }} /></label>
@@ -77,6 +78,11 @@ export default function DailyActivity() {
     </div>
     <p className="tt-activity-detail" aria-live="polite">{dayLabel(detail)}</p>
     <p className="tt-activity-scope">{t('activity.dayCommits', { count: number(detail.commits) })}</p>
+    <DayFootprints date={detail.date} />
+    <p className="tt-activity-scope">{t('activity.year')}</p>
+    {stats}
+    <div className="tt-activity-scroll" ref={scroll}>{heatmap(calendar.weeks, true)}</div>
+    {legend}
     {calendar.total === 0 && <p>{t('activity.empty')}</p>}
     {scope}
   </div>

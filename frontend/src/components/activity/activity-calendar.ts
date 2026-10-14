@@ -30,6 +30,8 @@ export function activityCalendar(events: ActivityEvent[], now = new Date()) {
   while (cells.length % 7) cells.push(null)
   const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7))
   const totals = days.reduce((n, d) => ({ dialogues: n.dialogues + d.dialogues, tasks: n.tasks + d.tasks, commits: n.commits + d.commits }), { dialogues: 0, tasks: 0, commits: 0 })
-  return { days, weeks, totals, total: totals.dialogues + totals.tasks + totals.commits, active: days.filter((d) => d.count > 0).length, current, longest }
+  const positive = days.map((day) => day.count).filter((count) => count > 0).sort((a, b) => a - b)
+  const thresholds = [0.25, 0.5, 0.75].map((q) => positive[Math.floor((positive.length - 1) * q)] || 0)
+  return { days, weeks, totals, thresholds, total: totals.dialogues + totals.tasks + totals.commits, active: days.filter((d) => d.count > 0).length, current, longest }
 }
-export function activityLevel(count: number) { return count === 0 ? 0 : count <= 2 ? 1 : count <= 5 ? 2 : count <= 9 ? 3 : 4 }
+export function activityLevel(count: number, thresholds: readonly number[]) { return count <= 0 ? 0 : count <= thresholds[0] ? 1 : count <= thresholds[1] ? 2 : count <= thresholds[2] ? 3 : 4 }

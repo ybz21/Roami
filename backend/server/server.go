@@ -261,6 +261,7 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/plugin/findings", h.PluginFindings)
 		g.GET("/plugin/notifications", h.PluginNotifications)
 		g.GET("/activity/daily", h.DailyActivity)
+		g.GET("/activity/day", h.DayActivity)
 
 		g.GET("/sessions/overview", h.SessionsOverview) // 手机会话页：会话 + 归属 + 活状态一次给全
 		g.GET("/inbox", h.InboxList)                    // 收件箱：会话事件（等你 / 做完 / 出错）+ 角标
