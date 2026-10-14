@@ -17,7 +17,7 @@ export function activityCalendar(events: ActivityEvent[], now = new Date()) {
   const days: ActivityDay[] = []
   for (const date = new Date(start); date <= today; date.setDate(date.getDate() + 1)) {
     const key = dayKey(date), values = counts.get(key) || { dialogues: 0, tasks: 0, commits: 0 }
-    days.push({ key, date: new Date(date), count: values.dialogues + values.tasks, ...values })
+    days.push({ key, date: new Date(date), count: values.dialogues + values.tasks + values.commits, ...values })
   }
   let longest = 0, run = 0
   for (const day of days) { run = day.count ? run + 1 : 0; longest = Math.max(longest, run) }
@@ -30,6 +30,6 @@ export function activityCalendar(events: ActivityEvent[], now = new Date()) {
   while (cells.length % 7) cells.push(null)
   const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7))
   const totals = days.reduce((n, d) => ({ dialogues: n.dialogues + d.dialogues, tasks: n.tasks + d.tasks, commits: n.commits + d.commits }), { dialogues: 0, tasks: 0, commits: 0 })
-  return { days, weeks, totals, total: totals.dialogues + totals.tasks, active: days.filter((d) => d.count > 0).length, current, longest }
+  return { days, weeks, totals, total: totals.dialogues + totals.tasks + totals.commits, active: days.filter((d) => d.count > 0).length, current, longest }
 }
 export function activityLevel(count: number) { return count === 0 ? 0 : count <= 2 ? 1 : count <= 5 ? 2 : count <= 9 ? 3 : 4 }

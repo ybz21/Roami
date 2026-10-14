@@ -22,13 +22,13 @@ describe('activity calendar', () => {
     expect(yesterday.current).toBe(2)
     expect(dayKey(yesterday.days[yesterday.days.length - 1].date)).toBe('2026-10-12')
   })
-  it('counts dialogues and tasks separately and keeps commits out of streaks', () => {
+  it('counts dialogues and tasks separately and includes historical commits in activity', () => {
     const now = new Date(2026, 9, 13, 12), at = now.getTime() / 1000
     const result = activityCalendar([{ at, dialogues: 3 }, { at, tasks: 2 }, { at, commits: 10 }], now)
     expect(result.totals).toEqual({ dialogues: 3, tasks: 2, commits: 10 })
-    expect(result.total).toBe(5)
+    expect(result.total).toBe(15)
     expect(result.current).toBe(1)
-    expect(activityCalendar([{ at, commits: 10 }], now).active).toBe(0)
+    expect(activityCalendar([{ at, commits: 10 }], now).active).toBe(1)
   })
   it('handles an empty history and intensity thresholds', () => {
     const result = activityCalendar([], new Date(2026, 9, 12))

@@ -26,7 +26,7 @@ describe('mobile AI footprints', () => {
     const preview = await screen.findByRole('button', { name: '查看 AI 足迹详情' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(container.querySelectorAll('button.tt-activity-day')).toHaveLength(0)
-    expect(screen.getByText('对话 2 次 · 下任务 1 次')).toBeTruthy()
+    expect(screen.getByText('对话 2 次 · 下任务 1 次 · 提交 0 次')).toBeTruthy()
     fireEvent.click(preview)
     expect(screen.getByRole('dialog', { name: 'AI 足迹' })).toBeTruthy()
     const picker = screen.getByLabelText('选择日期') as HTMLInputElement
@@ -46,7 +46,7 @@ describe('mobile AI footprints', () => {
     vi.mocked(api).mockRejectedValueOnce(new Error('offline'))
     fireEvent(window, new Event('roam:footprints-updated'))
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
-    expect(screen.getByText('对话 2 次 · 下任务 1 次')).toBeTruthy()
+    expect(screen.getByText('对话 2 次 · 下任务 1 次 · 提交 0 次')).toBeTruthy()
   })
 })
 

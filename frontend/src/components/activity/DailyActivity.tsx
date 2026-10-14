@@ -8,7 +8,7 @@ import { MobileSheet } from '../shell/MobileSheet'
 import { activityCalendar, activityLevel, dayKey, type ActivityDay, type ActivityEvent } from './activity-calendar'
 import './daily-activity.css'
 
-type Activity = { commits: { oid: string; at: number }[]; usage?: ActivityEvent[]; recordingFailed?: boolean; repositories: number; failed: number }
+type Activity = { commits: { oid: string; at: number }[]; usage?: ActivityEvent[]; commitHistoryFailed?: boolean; recordingFailed?: boolean; repositories: number; failed: number }
 export default function DailyActivity() {
   const { t, locale } = useI18n()
   const { phone, coarse } = useLayout()
@@ -40,7 +40,7 @@ export default function DailyActivity() {
   const dateFormat = new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' })
   const dateText = (date: Date) => dateFormat.format(date)
   const detail = calendar.days.find((day) => day.key === selected) || calendar.days[calendar.days.length - 1]
-  const dayLabel = (day: ActivityDay) => t('activity.dayUsage', { date: dateText(day.date), dialogues: number(day.dialogues), tasks: number(day.tasks) })
+  const dayLabel = (day: ActivityDay) => t('activity.dayUsage', { date: dateText(day.date), dialogues: number(day.dialogues), tasks: number(day.tasks), commits: number(day.commits) })
   const stats = <div className="tt-activity-stats">
     {([[calendar.totals.dialogues, 'activity.dialogues'], [calendar.totals.tasks, 'activity.tasks'], [calendar.totals.commits, 'activity.commits'], [calendar.active, 'activity.active'], [calendar.current, 'activity.streak'], [calendar.longest, 'activity.longest']] as const).map(([value, key]) => <div key={key}><b>{number(value)}</b><span>{t(key)}</span></div>)}
   </div>
@@ -85,8 +85,9 @@ export default function DailyActivity() {
       <div className="tt-activity-copy">
         <div className="tt-activity-heading"><h3>{t('activity.title')}</h3><span>{phone ? t('activity.streakSummary', { count: number(calendar.current) }) : t('activity.year')}</span></div>
         {error && <div role="alert" className="tt-data-error">{t('activity.failed')} <button type="button" className="tt-act" onClick={() => setRefresh((value) => value + 1)}>{t('inbox.retry')}</button></div>}
+        {data?.commitHistoryFailed && <p role="alert" className="tt-data-error">{t('activity.commitHistoryFailed')}</p>}
         {data?.recordingFailed && <p role="alert" className="tt-data-error">{t('activity.recordingFailed')}</p>}
-        {!data ? <p role="status">{t(error ? 'activity.unavailable' : 'common.loading')}</p> : <p className="tt-activity-summary">{t('activity.usageSummary', { dialogues: number(calendar.totals.dialogues), tasks: number(calendar.totals.tasks) })}</p>}
+        {!data ? <p role="status">{t(error ? 'activity.unavailable' : 'common.loading')}</p> : <p className="tt-activity-summary">{t('activity.usageSummary', { dialogues: number(calendar.totals.dialogues), tasks: number(calendar.totals.tasks), commits: number(calendar.totals.commits) })}</p>}
       </div>
       {data && phone && <button type="button" className="tt-activity-preview" aria-label={t('activity.viewDetails')} onClick={() => setExpanded(true)}>
         {heatmap(calendar.weeks.slice(-16), false)}

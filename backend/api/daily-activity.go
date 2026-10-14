@@ -38,7 +38,7 @@ func (a *API) DailyActivity(c *gin.Context) {
 			continue
 		}
 		repos[repo.CommonDir] = true
-		items, err := a.WT.ActivityCommits(projectCtx, repo)
+		items, err := a.WT.AllActivityCommits(projectCtx, repo)
 		projectCancel()
 		if err != nil {
 			failed++
@@ -53,6 +53,30 @@ func (a *API) DailyActivity(c *gin.Context) {
 			}
 		}
 	}
+	commitHistoryFailed := false
+	if a.GitFootprints != nil {
+		if err := a.GitFootprints.Import(ctx, commits); err != nil {
+			commitHistoryFailed = true
+		}
+		if archived, err := a.GitFootprints.Recent(ctx); err == nil {
+			for _, commit := range archived {
+				if !seen[commit.OID] {
+					commits = append(commits, commit)
+					seen[commit.OID] = true
+				}
+			}
+		} else {
+			commitHistoryFailed = true
+		}
+	}
+	recent := []worktree.ActivityCommit{}
+	cutoff := time.Now().AddDate(0, 0, -370).Unix()
+	for _, commit := range commits {
+		if commit.At >= cutoff {
+			recent = append(recent, commit)
+		}
+	}
+	commits = recent
 	usage, recordingFailed := a.Footprints.Snapshot()
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"commits": commits, "usage": usage, "recordingFailed": recordingFailed, "repositories": counted, "failed": failed}})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"commits": commits, "usage": usage, "recordingFailed": recordingFailed, "commitHistoryFailed": commitHistoryFailed, "repositories": counted, "failed": failed}})
 }
