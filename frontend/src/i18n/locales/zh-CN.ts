@@ -1,7 +1,8 @@
 const zhCN = {
+  'activity.projectCommits': '{count} 次提交',
   'activity.dayTimeline': '当天足迹',
   'activity.archivedCommit': '已归档提交',
-  'activity.unknownProject': '项目暂不可追溯',
+  'activity.unknownProject': '未归属项目',
   'activity.dialogueEvent': '发送 {count} 次对话',
   'activity.taskEvent': '下发 {count} 个 AI 任务',
   'activity.usageEventScope': '仅记录时间与次数，未保存对话内容',

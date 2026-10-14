@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"ttmux-web/worktree"
 )
@@ -12,10 +13,10 @@ import (
 func TestDayActivityValidatesRangeAndReturnsOnlySelectedDay(t *testing.T) {
 	store := NewGitFootprintStore(t.TempDir())
 	defer store.db.Close()
-	if err := store.Import(context.Background(), []worktree.ActivityCommit{{OID: "start", At: 100, Repo: "/project", Subject: "Ship"}, {OID: "end", At: 200}}); err != nil {
+	if err := store.Import(context.Background(), []worktree.ActivityCommit{{OID: "start", At: 100, Repo: "/project", Subject: "Ship"}, {OID: "second", At: 120, Repo: "/project", Subject: "Private detail"}, {OID: "third", At: 150, Repo: "/other"}, {OID: "end", At: 200}}); err != nil {
 		t.Fatal(err)
 	}
-	a := &API{GitFootprints: store}
+	a := &API{GitFootprints: store, Footprints: &AIFootprintStore{events: []AIFootprint{{At: 100, Dialogues: 2}, {At: 150, Tasks: 1}, {At: 200, Dialogues: 7}}}}
 	for _, tc := range []struct {
 		query  string
 		status int
@@ -28,13 +29,21 @@ func TestDayActivityValidatesRangeAndReturnsOnlySelectedDay(t *testing.T) {
 			t.Fatalf("%s: %d", tc.query, w.Code)
 		}
 		if tc.status == 200 {
+			if strings.Contains(w.Body.String(), "Private detail") || strings.Contains(w.Body.String(), "subject") {
+				t.Fatal("summary leaked individual details")
+			}
 			var body struct {
-				Data struct{ Commits []GitDayFootprint }
+				Data struct {
+					Commits   int
+					Dialogues int
+					Tasks     int
+					Projects  []DayProjectCount
+				}
 			}
 			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 				t.Fatal(err)
 			}
-			if len(body.Data.Commits) != 1 || body.Data.Commits[0].OID != "start" {
+			if body.Data.Commits != 3 || len(body.Data.Projects) != 2 || body.Data.Projects[0].Repo != "/project" || body.Data.Projects[0].Count != 2 || body.Data.Dialogues != 2 || body.Data.Tasks != 1 {
 				t.Fatalf("unexpected day: %s", w.Body.String())
 			}
 		}

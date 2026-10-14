@@ -1,7 +1,8 @@
 const enUS = {
+  'activity.projectCommits': '{count} commits',
   'activity.dayTimeline': 'This day’s footprints',
   'activity.archivedCommit': 'Archived commit',
-  'activity.unknownProject': 'Project unavailable',
+  'activity.unknownProject': 'Unassigned project',
   'activity.dialogueEvent': 'Sent {count} messages',
   'activity.taskEvent': 'Launched {count} AI tasks',
   'activity.usageEventScope': 'Only time and counts were recorded; message content was not stored',

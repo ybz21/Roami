@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"sort"
 	"strconv"
 )
 
@@ -23,11 +24,31 @@ func (a *API) DayActivity(c *gin.Context) {
 		return
 	}
 	events, failed := a.Footprints.Snapshot()
-	usage := []AIFootprint{}
+	dialogues, tasks := 0, 0
 	for _, event := range events {
 		if event.At >= from && event.At < to {
-			usage = append(usage, event)
+			dialogues += event.Dialogues
+			tasks += event.Tasks
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"commits": commits, "usage": usage, "recordingFailed": failed}})
+	counts := map[string]int{}
+	for _, commit := range commits {
+		counts[commit.Repo]++
+	}
+	projects := []DayProjectCount{}
+	for repo, count := range counts {
+		projects = append(projects, DayProjectCount{Repo: repo, Count: count})
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		if projects[i].Count == projects[j].Count {
+			return projects[i].Repo < projects[j].Repo
+		}
+		return projects[i].Count > projects[j].Count
+	})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"projects": projects, "commits": len(commits), "dialogues": dialogues, "tasks": tasks, "recordingFailed": failed}})
+}
+
+type DayProjectCount struct {
+	Repo  string `json:"repo"`
+	Count int    `json:"count"`
 }
