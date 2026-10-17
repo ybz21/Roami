@@ -1,6 +1,8 @@
 import asyncio
 import json
 
+import pytest
+
 from roami_agent.app import Runtime
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.storage.database import row
@@ -283,5 +285,80 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
         messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
         assert len(messages) == 14
         assert messages[-1]["content"]["text"].startswith("Answer:")
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("with_snapshot", [False, True])
+async def test_completion_evidence_stays_before_its_tool_round_after_context_rebuild(
+    store, with_snapshot
+):
+    class CompletionToolsModel:
+        model = "completion-order-fixture"
+
+        def __init__(self):
+            self.main_prompts = []
+
+        async def stream(self, messages, tools):
+            if messages[0]["content"].startswith("Summarize"):
+                yield ModelEvent("text", "Retain prior confirmed decisions.")
+                return
+            if any(tool["function"]["name"] == "shell" for tool in tools):
+                yield ModelEvent("text", "Worker evidence")
+                return
+            self.main_prompts.append(json.loads(json.dumps(messages)))
+            if len(self.main_prompts) == 1:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "completion-memory",
+                        "function": {
+                            "name": "memory_search",
+                            "arguments": '{"query":"prior decisions"}',
+                        },
+                    },
+                )
+            else:
+                yield ModelEvent("text", "Reported verified evidence")
+
+    model = CompletionToolsModel()
+    runtime = Runtime(store, model, memory_model=ConversationModel())
+    await runtime.start()
+    try:
+        if with_snapshot:
+            from test_context_provider import completed_conversation
+
+            conversation = await completed_conversation(store)
+            operation = await runtime.context.request("alice", conversation["id"], "snapshot")
+            await runtime.context.run(operation["id"])
+            assert (await runtime.context.project("alice", conversation["id"]))["snapshotId"]
+        else:
+            conversation = await runtime.conversations.create("alice")
+        await runtime.tasks.create(
+            "alice", conversation["id"], "Research", key="completion-order", record_intent=True
+        )
+        runtime.wakeup.set()
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM turns WHERE conversation_id=? AND trigger_kind='completion' AND state='completed'",
+                (conversation["id"],),
+            ),
+        )
+        assert len(model.main_prompts) == 2
+        second = model.main_prompts[1]
+        evidence = next(
+            index
+            for index, message in enumerate(second)
+            if message["content"].startswith("Background task result")
+        )
+        call = next(index for index, message in enumerate(second) if message.get("tool_calls"))
+        result = next(index for index, message in enumerate(second) if message["role"] == "tool")
+        assert evidence < call < result
+        assert second[-1]["role"] == "tool"
+        assert (
+            sum(message["content"].startswith("Background task result") for message in second) == 1
+        )
     finally:
         await runtime.close()

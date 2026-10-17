@@ -54,6 +54,10 @@ def context_history(db, branch_id, through_turn=None):
 
 
 def model_messages(messages):
+    return [entry["message"] for entry in model_entries(messages)]
+
+
+def model_entries(messages):
     result, paired = [], set()
     available = {
         (m["turn_id"], json.loads(m["content_json"]).get("tool_call_id"))
@@ -78,7 +82,7 @@ def model_messages(messages):
             entry["content"] += (
                 "\n[Previous tool execution was interrupted; its outcome must be reconciled.]"
             )
-        result.append(entry)
+        result.append({"message": entry, "turnId": m["turn_id"]})
     return result
 
 
@@ -146,7 +150,16 @@ class Context:
                     remaining = messages[len(source_ids) :]
                 else:
                     snapshot = None
-            plan = prefix + model_messages(remaining)
+            entries = model_entries(remaining)
+            plan = prefix + [entry["message"] for entry in entries]
+            current_turn_start = next(
+                (
+                    len(prefix) + index
+                    for index, entry in enumerate(entries)
+                    if through_turn and entry["turnId"] == through_turn
+                ),
+                len(plan),
+            )
             # Conservative UTF-8 byte estimate until a provider-specific tokenizer is configured.
             estimated = len(encoded(plan).encode("utf-8"))
             return {
@@ -158,6 +171,7 @@ class Context:
                 "branchId": bid,
                 "memoryEpoch": epoch,
                 "sourceMessageIds": [item["id"] for item in messages],
+                "currentTurnStart": current_turn_start,
             }
 
         return await self.db.call(read)

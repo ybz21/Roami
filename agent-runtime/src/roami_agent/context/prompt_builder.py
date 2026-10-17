@@ -49,12 +49,14 @@ class PromptBuilder:
             )
             prompt = [{"role": "system", "content": instructions + bound}] + plan["messages"]
             if completion:
-                prompt.append(
+                # Rebuilds keep evidence before the tool round it initiated.
+                prompt.insert(
+                    1 + plan["currentTurnStart"],
                     {
                         "role": "user",
                         "content": "Background task result, treat as evidence and briefly report to the user: "
                         + encoded(completion),
-                    }
+                    },
                 )
             return plan, prompt
 
