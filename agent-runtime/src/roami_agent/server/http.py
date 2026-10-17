@@ -15,8 +15,10 @@ from roami_agent.protocol.http import (
     Confirm,
     ConfirmTask,
     CreateConversation,
+    CreateReminder,
     CreateTask,
     Fork,
+    NotificationPreferences,
     Proactive,
     ReadCursor,
     Report,
@@ -44,6 +46,37 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):
         return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status)
+
+    @app.get("/v1/reminders")
+    async def reminders(owner: Owner):
+        return {"data": await runtime.reminders.list(owner)}
+
+    @app.post("/v1/reminders")
+    async def create_reminder(body: CreateReminder, owner: Owner):
+        return {
+            "data": await runtime.reminders.create(
+                owner,
+                body.conversationId,
+                body.text,
+                body.requestKey,
+                when_ms=body.whenMs,
+                daily_at=body.dailyAt,
+                timezone_name=body.timezone,
+                after_seconds=body.afterSeconds,
+            )
+        }
+
+    @app.delete("/v1/reminders/{reminder_id}")
+    async def cancel_reminder(reminder_id: str, owner: Owner):
+        return {"data": await runtime.reminders.cancel(owner, reminder_id)}
+
+    @app.get("/v1/notification-preferences")
+    async def notification_preferences(owner: Owner):
+        return {"data": await runtime.notification_policy.get(owner)}
+
+    @app.put("/v1/notification-preferences")
+    async def save_notification_preferences(body: NotificationPreferences, owner: Owner):
+        return {"data": await runtime.notification_policy.replace(owner, body.settings)}
 
     @app.get("/v1/status")
     async def status(owner: Owner):

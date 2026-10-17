@@ -218,6 +218,67 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                         break
                     await asyncio.sleep(0.05)
             assert steering["data"]["state"] == "applied" and steering["data"]["revision"] == 2
+            scheduled = await cli(
+                "reminder",
+                "add",
+                "--conversation",
+                cid,
+                "--key",
+                "clock-once",
+                "--text",
+                "Scheduled CLI reminder",
+                "--after-seconds",
+                "1",
+            )
+            again = await cli(
+                "reminder",
+                "add",
+                "--conversation",
+                cid,
+                "--key",
+                "clock-once",
+                "--text",
+                "Scheduled CLI reminder",
+                "--after-seconds",
+                "1",
+            )
+            assert again["data"]["id"] == scheduled["data"]["id"]
+            async with asyncio.timeout(5):
+                while True:
+                    history = await cli("history", "--conversation", cid)
+                    matching = [
+                        item
+                        for item in history["data"]["messages"]
+                        if item["content"].get("text") == "Scheduled CLI reminder"
+                    ]
+                    if matching:
+                        break
+                    await asyncio.sleep(0.05)
+            assert len(matching) == 1
+            daily = await cli(
+                "reminder",
+                "add",
+                "--conversation",
+                cid,
+                "--key",
+                "daily-cli",
+                "--text",
+                "Daily check",
+                "--daily-at",
+                "09:00",
+                "--timezone",
+                "Asia/Shanghai",
+            )
+            assert (await cli("reminder", "ls"))["data"][0]["id"] == daily["data"]["id"]
+            await cli("reminder", "cancel", "--id", daily["data"]["id"])
+            preferences = (await cli("notification-preferences", "get"))["data"]
+            preferences["quietHours"] = {"start": "22:00", "end": "08:00"}
+            settings_file = tmp_path / "notification-settings.json"
+            settings_file.write_text(json.dumps(preferences))
+            assert (await cli("notification-preferences", "set", "--file", str(settings_file)))[
+                "data"
+            ] == preferences
+            assert (await cli("notification-preferences", "get"))["data"] == preferences
             # Python holds the same lock domain used by unified database maintenance.
             busy = await asyncio.create_subprocess_exec(
                 str(roami_binary),

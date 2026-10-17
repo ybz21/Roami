@@ -1,8 +1,12 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 3
-UPGRADES = {2: "0002_artifact_metadata.sql", 3: "0003_resource_controls.sql"}
+SCHEMA_VERSION = 4
+UPGRADES = {
+    2: "0002_artifact_metadata.sql",
+    3: "0003_resource_controls.sql",
+    4: "0004_reminder_policy.sql",
+}
 
 
 def initial_schema():

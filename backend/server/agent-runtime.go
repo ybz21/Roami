@@ -35,6 +35,8 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"GET", "/agent/conversations/:cid/context"}, {"GET", "/agent/conversations/:cid/context/snapshots/:snapshot"},
 		{"POST", "/agent/conversations/:cid/compact"}, {"GET", "/agent/conversations/:cid/compactions/:operation"},
 		{"POST", "/agent/conversations/:cid/compactions/:operation/cancel"}, {"POST", "/agent/conversations/:cid/read"},
+		{"GET", "/agent/notification-preferences"}, {"PUT", "/agent/notification-preferences"},
+		{"GET", "/agent/reminders"}, {"POST", "/agent/reminders"}, {"DELETE", "/agent/reminders/:reminder"},
 		{"GET", "/agent/notifications"}, {"GET", "/agent/tasks/:task"}, {"GET", "/agent/tasks"}, {"POST", "/agent/tasks"},
 		{"GET", "/agent/artifacts"}, {"GET", "/agent/artifacts/:artifact"}, {"GET", "/agent/artifacts/:artifact/content"}, {"DELETE", "/agent/artifacts/:artifact"},
 		{"POST", "/agent/tasks/:task/steer"}, {"GET", "/agent/tasks/:task/steering/:operation"},

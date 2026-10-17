@@ -19,6 +19,7 @@ from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.core.loop import AgentLoop
+from roami_agent.dispatch.reminders import Reminders
 from roami_agent.dispatch.resource_controls import ResourceControls
 from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.runner import TaskDispatcher
@@ -34,6 +35,7 @@ from roami_agent.memory.records import Memories
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.artifact_store import ArtifactStore
@@ -48,6 +50,7 @@ from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.registry import Tools
+from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 
 log = logging.getLogger(__name__)
@@ -83,6 +86,10 @@ class Runtime:
             artifacts=self.artifacts,
         )
         self.notifications = Notifications(database)
+        self.notification_policy = NotificationPolicy(
+            database, timezone_name=self.settings.memory_timezone
+        )
+        self.reminders = Reminders(database)
         self.context = Context(database, model, input_budget=self.settings.input_budget)
         self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
         self.tools = Tools()
@@ -95,7 +102,9 @@ class Runtime:
         self.browser_monitor = None
         self.desktop_monitor = None
         self.control_monitor = None
+        self.reminder_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
+        register_reminder_tools(self.tools, self.reminders, self.settings.memory_timezone)
         add_worker_tools(self.tools, self.settings, self.artifacts)
         register_file_tools(self.tools, self.files)
         register_artifact_tools(self.tools, self.artifacts)
@@ -180,7 +189,16 @@ class Runtime:
         self.browser_monitor = asyncio.create_task(self._monitor_browser())
         self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
         self.control_monitor = asyncio.create_task(self._monitor_controls())
+        self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
         self.wakeup.set()
+
+    async def _monitor_reminders(self):
+        while not self.stopping:
+            try:
+                await self.reminders.tick()
+            except Exception:
+                log.exception("Reminder scheduling failed")
+            await asyncio.sleep(1)
 
     async def _monitor_browser(self):
         while not self.stopping:
@@ -237,6 +255,9 @@ class Runtime:
         if self.external_monitor:
             self.external_monitor.cancel()
             await asyncio.gather(self.external_monitor, return_exceptions=True)
+        if self.reminder_monitor:
+            self.reminder_monitor.cancel()
+            await asyncio.gather(self.reminder_monitor, return_exceptions=True)
         if self.browser_monitor:
             self.browser_monitor.cancel()
             await asyncio.gather(self.browser_monitor, return_exceptions=True)

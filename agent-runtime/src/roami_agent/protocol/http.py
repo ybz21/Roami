@@ -79,3 +79,17 @@ class SteerTask(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     revision: int = Field(ge=1)
     text: str = Field(min_length=1, max_length=10000)
+
+
+class CreateReminder(Payload):
+    requestKey: str = Field(min_length=1, max_length=200)
+    conversationId: str
+    text: str = Field(min_length=1, max_length=10000)
+    whenMs: int | None = Field(default=None, ge=0, le=8_000_000_000_000, strict=True)
+    afterSeconds: int | None = Field(default=None, ge=1, le=2_678_400, strict=True)
+    dailyAt: str | None = Field(default=None, min_length=5, max_length=5)
+    timezone: str = Field(default="UTC", min_length=1, max_length=100)
+
+
+class NotificationPreferences(Payload):
+    settings: dict

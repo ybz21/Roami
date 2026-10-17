@@ -120,13 +120,23 @@ Preparation consumes the task's original deadline. `preparing` becomes `running`
 
 Cross-language tests use the real Go CLI, Python runtime and local Shell processes in an isolated registered project. They verify default cwd, task state ordering, independent acceptance, cancellation/child stop, workspace reuse, and quarantine after an uncertain cancellation. The provider is an injected fixture; these tests do not contact a real model or a user's coding sessions.
 
+## Scheduled reminders and notification policy
+
+Explicit one-shot reminders accept an absolute UTC `whenMs` or a relative `afterSeconds`; daily reminders use `dailyAt` (`HH:MM`) plus an IANA timezone. Main has three short reminder tools, bound to its current conversation and live turn. Ordinary questions still call the model directly. Creating a reminder returns the saved next due time immediately; firing a fixed reminder uses no model call and runs outside Main/Worker model capacity.
+
+`roami agent reminder add --conversation ID --key KEY --text TEXT --after-seconds 60`, `reminder ls`, and `reminder cancel --id ID` use the same Python application service as authenticated `/api/agent/reminders`. Reusing a request key preserves its original due time; changed parameters conflict. Each firing, assistant message, event, completed trace job and next due time commit together. Restart catches up one latest daily occurrence and records the count of skipped dates, avoiding a flood of old reminders. Spring clock gaps move to the first valid minute; a repeated hour fires once per local date. Cancellation preserves existing messages and firing history.
+
+`roami agent notification-preferences get` returns the complete settings object; `set --file SETTINGS.json` replaces it. Authenticated Web clients use GET/PUT `/api/agent/notification-preferences`. Preferences separate task results, decisions, reminders and suggestions, with timezone/quiet hours, explicit attention bypass, hidden previews and suggestion rate limits. Suggestions default off. The policy admission service keeps its rate reservations durable and counts one event once across retries. These settings do not remove chat messages or consume unread state. External delivery adapters must apply this policy before sending; the App/Web Push bridge and its delivery-state UI remain in progress, so saving preferences is not evidence of system notification delivery.
+
+Schema 4 adds reminders, firing history and notification policy under the Python-owned migration mechanism. Go backup/restore accepts versions 1 through 4 and rejects newer schemas; Go does not run these DDL migrations.
+
 ## Remaining work toward the full framework
 
 1. Physical Android acceptance of the integrated chat, keyboard, touch navigation and safe areas; additional executor target controls and system push UI.
 2. Finish automatic lifecycle wiring for existing Codex sessions and a definitive completion adapter for Claude TUI continuation. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
 3. Browser/Computer tool adapters, resource leases and artifact retention and layout-migration coverage. MCP stdio and Streamable HTTP adapters now externalize binary and oversized results into owner-scoped artifacts.
 4. Broaden legacy forgetting/re-learning recovery cases; implement provider cache controls and provider/model routing resilience.
-5. Proactive triggers/scheduling, notification preferences, quiet hours, rate limits and existing App push delivery adapters. The notification store is implemented, but an outbox row is not proof of external delivery.
+5. Connect existing App/Web Push delivery adapters to the notification policy and durable outbox, with actual adapter receipts and device-delivery limits; add their UI. Fixed reminder scheduling, preferences, quiet hours and rate admission are implemented; event-driven model suggestions and daily brief generation remain.
 6. Broader end-to-end recovery, verification edge cases and real-device acceptance. A single real-provider memory extraction smoke check produced a source-backed candidate without activating it; no latency/cache/cost benchmark has run.
 
 The design and product prototype remain in `docs/design/20261017-agent框架设计/`.

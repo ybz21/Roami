@@ -23,51 +23,56 @@ class Notifications:
             or priority not in {"normal", "attention"}
         ):
             raise DomainError("INVALID_NOTIFICATION")
+        return await self.db.call(
+            lambda db: self.publish_in_transaction(
+                db, owner, cid, text, source=source, dedupe_key=dedupe_key, priority=priority
+            ),
+            write=True,
+        )
+
+    @staticmethod
+    def publish_in_transaction(db, owner, cid, text, *, source, dedupe_key, priority="normal"):
         key = (
             "notice:"
             + hashlib.sha256(encoded([owner, cid, source, dedupe_key]).encode()).hexdigest()
         )
         digest = hashlib.sha256(encoded([text, priority]).encode()).hexdigest()
-
-        def write(db):
-            conversation = owned(db, owner, cid)
-            old = row(db, "SELECT * FROM events WHERE event_key=?", (key,))
-            if old:
-                if json.loads(old["payload_json"])["digest"] != digest:
-                    raise DomainError("NOTIFICATION_KEY_CONFLICT", 409)
-                return {"eventId": old["id"], "messageId": old["message_id"], "reused": True}
-            mid = message(
-                db,
-                cid,
-                conversation["active_branch_id"],
-                "assistant",
-                {"text": text, "source": source, "proactive": True},
+        conversation = owned(db, owner, cid)
+        old = row(db, "SELECT * FROM events WHERE event_key=?", (key,))
+        if old:
+            if json.loads(old["payload_json"])["digest"] != digest:
+                raise DomainError("NOTIFICATION_KEY_CONFLICT", 409)
+            return {"eventId": old["id"], "messageId": old["message_id"], "reused": True}
+        mid = message(
+            db,
+            cid,
+            conversation["active_branch_id"],
+            "assistant",
+            {"text": text, "source": source, "proactive": True},
+        )
+        cursor = event(
+            db,
+            cid,
+            "message.completed",
+            {
+                "messageId": mid,
+                "proactive": True,
+                "source": source,
+                "priority": priority,
+                "digest": digest,
+            },
+            key=key,
+            message_id=mid,
+        )
+        # Delivery outbox is committed with the message; adapters can fail independently.
+        for binding in rows(
+            db, "SELECT id FROM channel_bindings WHERE conversation_id=? AND enabled=1", (cid,)
+        ):
+            db.execute(
+                "INSERT INTO deliveries(id,event_id,channel_id,state) VALUES(?,?,?,'pending')",
+                (f"{cursor}:{binding['id']}", cursor, binding["id"]),
             )
-            cursor = event(
-                db,
-                cid,
-                "message.completed",
-                {
-                    "messageId": mid,
-                    "proactive": True,
-                    "source": source,
-                    "priority": priority,
-                    "digest": digest,
-                },
-                key=key,
-                message_id=mid,
-            )
-            # Delivery outbox is committed with the message; adapters can fail independently.
-            for binding in rows(
-                db, "SELECT id FROM channel_bindings WHERE conversation_id=? AND enabled=1", (cid,)
-            ):
-                db.execute(
-                    "INSERT INTO deliveries(id,event_id,channel_id,state) VALUES(?,?,?,'pending')",
-                    (f"{cursor}:{binding['id']}", cursor, binding["id"]),
-                )
-            return {"eventId": cursor, "messageId": mid, "reused": False}
-
-        return await self.db.call(write, write=True)
+        return {"eventId": cursor, "messageId": mid, "reused": False}
 
     async def list(self, owner):
         def read(db):
