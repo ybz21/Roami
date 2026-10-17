@@ -1,6 +1,6 @@
 # Roami Agent runtime
 
-Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service and CLI are runnable; real frontend integration, external coding executors and proactive delivery policy are still being implemented. Nothing has been deployed to the running user instance.
+Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service and CLI are runnable; real frontend integration, external executor orchestration and proactive delivery policy are still being implemented. Nothing has been deployed to the running user instance.
 
 ## Development and verification
 
@@ -12,7 +12,7 @@ uv run ruff format --check src tests
 uv run pytest -q
 ```
 
-Dependencies are pinned in `uv.lock`. Tests use temporary databases and injected model/HTTP transports; they never start a real coding Agent or use a live model account. The cross-language test builds the actual Go CLI, registers the Agent database, starts Python through that CLI, streams from a local HTTP model fixture, reads the durable answer, posts a proactive message and verifies maintenance-lock exclusion. The root quality gate runs these checks too.
+Dependencies are pinned in `uv.lock`. Tests use temporary databases and injected model/HTTP transports; they never start a real coding Agent or use a live model account. The cross-language test builds the actual Go CLI, registers the Agent database, starts Python through that CLI, streams from a local HTTP model fixture, reads the durable answer, posts a proactive message and verifies maintenance-lock exclusion. The root quality gate runs these checks too. A separate integration test starts actual Go runners in an isolated tmux server with substitute `codex`/`claude` executables, verifying multiline input, literal shell characters, replay/conflict handling, cancellation, nonzero exits and interrupted-launch reconciliation.
 
 ## Run in an isolated instance
 
@@ -46,6 +46,14 @@ Public HTTP/SSE is `/api/agent/*` on the existing Go server, using its normal lo
 - `internal/agentruntime`, `cmd/roami/agent.go`, `backend/server/agent-runtime.go`: unified paths/catalog initialization, CLI, private transport and authenticated public proxy with immediate SSE flushing. Unified database restore rejects unsupported Agent schema versions.
 
 The runtime schema started from the dated design's candidate schema, and additionally includes `conversation_reads`. Python owns the business DDL; Go registers the database and coordinates maintenance. Stop the runtime before unified database backup/layout migration. Current database backup does not yet form a complete Agent artifact recovery package.
+
+## Coding execution transport
+
+`roami agent execution launch --file SPEC.json` launches a one-shot coding process in a new, recorded tmux session. `status --key KEY` returns the durable result; `cancel --key KEY` requests cancellation and must be followed by status to confirm it. A spec contains `key`, `executor` (`codex` or `claude`), an absolute `directory`, `prompt`, `timeoutSeconds` (1–86400), and optional `model`/`permission`.
+
+The Go service uses the existing Agent registry and application session service. Arguments use argv, prompts use stdin, and private execution receipts live under `<DataRoot>/agents/executions`. It never guesses a Codex conversation ID. A reused key must have exactly the same spec; an unknown launch or interrupted runner is never blindly re-executed. Output remains visible in the session while running, with bounded stdout/stderr tails persisted for retrieval. Timeout, cancellation and shutdown signals terminate the execution process group. The default permission comes from the coding CLI; explicit bypass is only applied when requested in the spec.
+
+This transport is not yet connected to the Python task coordinator. Existing-session continuation, project resolution and fresh Go worktree preparation remain required; callers must not substitute an arbitrary current directory for a project target.
 
 ## Remaining work toward the full framework
 

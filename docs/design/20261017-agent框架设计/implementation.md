@@ -15,3 +15,9 @@ Memory 的后台提取 / 每日汇总、完整忘记传播与来源屏蔽、缓�
 已接通 Runtime 模型循环、独立 Main / Worker 容量、按轮次组装上下文、手动 / 自动压缩、工具调用、子任务汇合、共享祖先步骤预算、验证与主对话回报；新增 FastAPI HTTP / SSE、六个命令与私有回调。统一 roami agent setup/init/serve/status/new/send/history/report/notify 已可运行。Go 使用现有鉴权组和固定私有 Socket 透明代理，私有回调未对公网挂载。
 
 实际验证包括 Go→目录登记→Python 私有 Socket→本地 HTTP 模型夹具→持久化回答→CLI 历史 / 主动消息，以及维护锁排斥。模型使用测试服务，并非已接真实账号。生产前端、外部编码执行器、MCP、调度 / 免打扰和 App 推送仍未完成。
+
+## 编码执行传输层
+
+增加 `roami agent execution launch/status/cancel`，复用 Agent 参数注册表与应用层会话服务，在 tmux 新会话中启动一次性 Codex / Claude Code。启动前保存私有凭据；相同 key 必须具有相同任务，未知启动不自动重放。结果保存有界输出和退出码，取消需等待实际执行结果，超时与退出信号终止执行进程组。
+
+实际使用隔离 tmux、真实 Go CLI 和替身 Codex / Claude 可执行文件验证，多行与 Shell 字符保持原文、幂等重试、冲突、取消、非零退出与中断均有覆盖；未调用真实模型账号。此层尚未接入 Python 任务编排，项目工作区准备、已有会话续派与自动回报仍需继续实现。

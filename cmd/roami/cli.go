@@ -222,7 +222,7 @@ const completionScript = `_roami_complete() {
  case "${COMP_WORDS[1]}" in
  session) words="ls new attach detach kill rename send capture fork children parent swarm env info" ;;
  chrome) words="tabs goto click fill text eval screenshot record setup help" ;;
- agent) words="setup init serve status conversations new send history report notify" ;;
+ agent) words="setup init serve status conversations new send history report notify execution" ;;
  project) words="ls show create prefs activity remove" ;;
  db) words="status migrate backup" ;;
  auth) words="login logout status" ;;

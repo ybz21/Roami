@@ -144,3 +144,122 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                 await service.wait()
         provider.should_exit = True
         await provider_task
+
+
+async def test_go_coding_execution_tmux_replay_cancel_and_unknown(tmp_path, roami_binary):
+    """Real isolated tmux and Go runners; fake agent binaries avoid paid/account calls."""
+    import shlex
+
+    if not shutil.which("tmux"):
+        pytest.skip("tmux required for coding executor integration")
+    binary_dir = tmp_path / "bin with 'quotes"
+    binary_dir.mkdir()
+    calls = tmp_path / "calls"
+    for kind in ["codex", "claude"]:
+        agent = binary_dir / kind
+        agent.write_text(
+            "#!/bin/sh\n"
+            + f"printf '%s\\n' {shlex.quote(kind)} >> {shlex.quote(str(calls))}\n"
+            + 'prompt=$(cat)\ncase "$prompt" in\n'
+            + "  slow*) sleep 30;;\n"
+            + '  fail*) printf "intentional stderr" >&2; exit 7;;\n'
+            + 'esac\nprintf "Answer: %s" "$prompt"\n'
+        )
+        agent.chmod(0o755)
+    tmux_socket = "roami-execution-" + tmp_path.name + "-" + str(os.getpid())
+    wrapper = binary_dir / "tmux"
+    actual_tmux = shutil.which("tmux")
+    wrapper.write_text(
+        f'#!/bin/sh\nexec {shlex.quote(actual_tmux)} -L {shlex.quote(tmux_socket)} "$@"\n'
+    )
+    wrapper.chmod(0o755)
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(("ROAMI_", "ROAM_", "TTMUX_")) and k != "TMUX"
+    }
+    env.update(
+        ROAMI_HOME=str(tmp_path / "home"),
+        ROAMI_DATA=str(tmp_path / "home"),
+        TMUX_BIN=str(wrapper),
+        PATH=str(binary_dir) + os.pathsep + os.environ["PATH"],
+    )
+
+    async def cli(sub, *args, spec=None, success=True):
+        p = await asyncio.create_subprocess_exec(
+            str(roami_binary),
+            "agent",
+            "execution",
+            sub,
+            *args,
+            env=env,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await p.communicate(json.dumps(spec).encode() if spec else b"")
+        if success:
+            assert p.returncode == 0, err.decode()
+            return json.loads(out)
+        assert p.returncode != 0
+        return err.decode()
+
+    async def finished(key):
+        async with asyncio.timeout(15):
+            while True:
+                result = await cli("status", "--key", key)
+                if result.get("result"):
+                    return result
+                await asyncio.sleep(0.05)
+
+    try:
+        for kind in ["codex", "claude"]:
+            spec = {
+                "key": kind,
+                "executor": kind,
+                "directory": str(binary_dir),
+                "prompt": "literal $(touch SHOULD_NOT_EXIST) `uname` ' 中文\nnext line",
+                "timeoutSeconds": 20,
+            }
+            first = await cli("launch", "--file", "-", spec=spec)
+            assert first["session"]
+            result = await finished(kind)
+            assert result["result"]["state"] == "succeeded"
+            assert result["result"]["summary"] == "Answer: " + spec["prompt"]
+            assert not (binary_dir / "SHOULD_NOT_EXIST").exists()
+            assert await cli("launch", "--file", "-", spec=spec) == result
+            assert "LAUNCH_KEY_CONFLICT" in await cli(
+                "launch", "--file", "-", spec={**spec, "prompt": "different"}, success=False
+            )
+        assert calls.read_text().splitlines() == ["codex", "claude"]
+        slow = {
+            "key": "slow",
+            "executor": "codex",
+            "directory": str(binary_dir),
+            "prompt": "slow please",
+            "timeoutSeconds": 20,
+        }
+        await cli("launch", "--file", "-", spec=slow)
+        cancelled = await cli("cancel", "--key", "slow")
+        assert cancelled["state"] == "cancelling"
+        assert (await finished("slow"))["state"] == "cancelled"
+        failed = {**slow, "key": "failure", "prompt": "fail please"}
+        await cli("launch", "--file", "-", spec=failed)
+        result = await finished("failure")
+        assert result["result"]["exitCode"] == 7
+        assert result["result"]["stderr"] == "intentional stderr"
+        unknown = {**slow, "key": "unknown"}
+        live = await cli("launch", "--file", "-", spec=unknown)
+        await asyncio.to_thread(
+            subprocess.run, [str(wrapper), "kill-session", "-t", "=" + live["session"]], check=True
+        )
+        observed = await cli("status", "--key", "unknown")
+        assert observed["state"] in {"unknown", "failed"}
+        before_retry = calls.read_text()
+        retried = await cli("launch", "--file", "-", spec=unknown)
+        assert retried["state"] in {"unknown", "failed"}
+        assert calls.read_text() == before_retry
+    finally:
+        await asyncio.to_thread(
+            subprocess.run, [str(wrapper), "kill-server"], capture_output=True, check=False
+        )
