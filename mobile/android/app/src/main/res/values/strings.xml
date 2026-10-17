@@ -46,4 +46,5 @@
     <string name="ch_attention">需要处理</string>
     <string name="attention_title">%1$d 项需要处理</string>
     <string name="attention_body">待确认会话和待收尾任务</string>
+    <string name="agent_new_message">大总管有新消息</string>
 </resources>

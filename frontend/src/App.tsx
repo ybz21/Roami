@@ -168,9 +168,9 @@ export default function App() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const agentInbox = useAgentInbox(authed === true, curNodeId)
   const [agentInboxOpen, setAgentInboxOpen] = useState(false)
-  const selectAgent = useCallback((cid: string, branch?: string) => {
+  const selectAgent = useCallback((cid: string, branch?: string, message?: string) => {
     const params = getHashParams().toString()
-    const next = 'home/' + (cid ? encodeURIComponent(cid) + (branch ? '/' + encodeURIComponent(branch) : '') : 'new')
+    const next = 'home/' + (cid ? encodeURIComponent(cid) + (branch ? '/' + encodeURIComponent(branch) + (message ? '/' + encodeURIComponent(message) : '') : '') : 'new')
     setRoute(next)
     location.hash = '#/' + next + (params ? '?' + params : '')
   }, [])
@@ -178,6 +178,7 @@ export default function App() {
   const agentParts = route.split('/')
   const agentCID = agentParts[0] === 'home' && agentParts[1] && agentParts[1] !== 'new' ? decodeURIComponent(agentParts[1]) : ''
   const agentBranch = agentParts[0] === 'home' && agentParts[2] ? decodeURIComponent(agentParts[2]) : ''
+  const agentMessage = agentParts[0] === 'home' && agentParts[3] ? decodeURIComponent(agentParts[3]) : ''
   const tab = route.split('/')[0]                                  // 基础页（swarm/leave → swarm）
   const [pageTabs, setPageTabs] = useState<string[]>(loadPageTabs)
   const [tabBarHost, setTabBarHost] = useState<HTMLDivElement | null>(null)
@@ -1040,7 +1041,7 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    home: <AgentChat cid={agentCID} branch={agentBranch} fresh={route === 'home/new'} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} />,
+    home: <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} fresh={route === 'home/new'} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} />,
     activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
@@ -1398,7 +1399,7 @@ export default function App() {
       {/* 全局搜索浮层挂在根节点：终端聚焦时 xterm 会吃掉按键，
           都得靠这一处（见 shell/palette/GlobalSearch）。入口另给：顶栏那枚框、
           手机「更多」里那一行、以及 ⌘K / Ctrl+K。 */}
-      <AgentNotifications open={agentInboxOpen} close={() => setAgentInboxOpen(false)} inbox={agentInbox} select={selectAgent} />
+      <AgentNotifications node={curNodeId} open={agentInboxOpen} close={() => setAgentInboxOpen(false)} inbox={agentInbox} select={selectAgent} />
       <GlobalSearch items={paletteItems} actions={paletteActions} dir={activeProject?.worktree || activeProject?.dir} />
 
       {/* 手机/平板：全屏会话覆盖层（桌面用右侧停靠栏，不走这里）*/}

@@ -255,7 +255,7 @@ func TestExplicitStoreRootCannotInheritAnotherDatabase(t *testing.T) {
 func TestRestoreRejectsUnsupportedAgentSchema(t *testing.T) {
 	p := isolatedPaths(t)
 	_, err := OpenManaged(p, DatabaseDescriptor{ID: "agent-runtime", Kind: "agent", Owner: "python-agent", Path: filepath.Join(p.Database, "agents", "runtime.db")},
-		[]Step{{Version: 1, Name: "first", SQL: "CREATE TABLE agent_test (id TEXT PRIMARY KEY)"}, {Version: 2, Name: "metadata", SQL: "ALTER TABLE agent_test ADD COLUMN metadata TEXT"}, {Version: 3, Name: "resources", SQL: "ALTER TABLE agent_test ADD COLUMN resources TEXT"}, {Version: 4, Name: "reminders", SQL: "ALTER TABLE agent_test ADD COLUMN reminders TEXT"}, {Version: 5, Name: "future", SQL: "ALTER TABLE agent_test ADD COLUMN future TEXT"}}, Options{HomeDir: p.Home, DataDir: p.Data})
+		[]Step{{Version: 1, Name: "first", SQL: "CREATE TABLE agent_test (id TEXT PRIMARY KEY)"}, {Version: 2, Name: "metadata", SQL: "ALTER TABLE agent_test ADD COLUMN metadata TEXT"}, {Version: 3, Name: "resources", SQL: "ALTER TABLE agent_test ADD COLUMN resources TEXT"}, {Version: 4, Name: "reminders", SQL: "ALTER TABLE agent_test ADD COLUMN reminders TEXT"}, {Version: 5, Name: "delivery", SQL: "ALTER TABLE agent_test ADD COLUMN delivery TEXT"}, {Version: 6, Name: "future", SQL: "ALTER TABLE agent_test ADD COLUMN future TEXT"}}, Options{HomeDir: p.Home, DataDir: p.Data})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,10 +269,10 @@ func TestRestoreRejectsUnsupportedAgentSchema(t *testing.T) {
 }
 
 func TestRestoreAcceptsSupportedPythonAgentSchemaVersions(t *testing.T) {
-	for _, version := range []int{1, 2, 3, 4} {
+	for _, version := range []int{1, 2, 3, 4, 5} {
 		t.Run(strconv.Itoa(version), func(t *testing.T) {
 			p := isolatedPaths(t)
-			steps := []Step{{Version: 1, Name: "first", SQL: "CREATE TABLE agent_test(id TEXT PRIMARY KEY)"}, {Version: 2, Name: "metadata", SQL: "ALTER TABLE agent_test ADD COLUMN metadata TEXT"}, {Version: 3, Name: "resources", SQL: "ALTER TABLE agent_test ADD COLUMN resources TEXT"}, {Version: 4, Name: "reminders", SQL: "ALTER TABLE agent_test ADD COLUMN reminders TEXT"}}
+			steps := []Step{{Version: 1, Name: "first", SQL: "CREATE TABLE agent_test(id TEXT PRIMARY KEY)"}, {Version: 2, Name: "metadata", SQL: "ALTER TABLE agent_test ADD COLUMN metadata TEXT"}, {Version: 3, Name: "resources", SQL: "ALTER TABLE agent_test ADD COLUMN resources TEXT"}, {Version: 4, Name: "reminders", SQL: "ALTER TABLE agent_test ADD COLUMN reminders TEXT"}, {Version: 5, Name: "delivery", SQL: "ALTER TABLE agent_test ADD COLUMN delivery TEXT"}}
 			_, err := OpenManaged(p, DatabaseDescriptor{ID: "agent-runtime", Kind: "agent", Owner: "python-agent", Path: filepath.Join(p.Database, "agents", "runtime.db")}, steps[:version], Options{HomeDir: p.Home, DataDir: p.Data})
 			if err != nil {
 				t.Fatal(err)

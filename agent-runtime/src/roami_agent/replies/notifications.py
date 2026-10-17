@@ -6,6 +6,7 @@ import json
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.replies.notification_policy import notification_category
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.transcript_repository import message, owned
 
@@ -66,11 +67,20 @@ class Notifications:
         )
         # Delivery outbox is committed with the message; adapters can fail independently.
         for binding in rows(
-            db, "SELECT id FROM channel_bindings WHERE conversation_id=? AND enabled=1", (cid,)
+            db,
+            "SELECT id,json_extract(route_json,'$.kind') AS kind FROM channel_bindings WHERE conversation_id=? AND enabled=1",
+            (cid,),
         ):
             db.execute(
-                "INSERT INTO deliveries(id,event_id,channel_id,state) VALUES(?,?,?,'pending')",
-                (f"{cursor}:{binding['id']}", cursor, binding["id"]),
+                "INSERT INTO deliveries(id,event_id,channel_id,state,category) VALUES(?,?,?,'pending',?)",
+                (
+                    f"{cursor}:{binding['id']}",
+                    cursor,
+                    binding["id"],
+                    (notification_category(source, priority, proactive=True))
+                    if binding["kind"] == "app"
+                    else None,
+                ),
             )
         return {"eventId": cursor, "messageId": mid, "reused": False}
 

@@ -12,6 +12,16 @@ from roami_agent.storage.database import row
 CATEGORIES = {"task_result", "decision", "reminder", "suggestion"}
 
 
+def notification_category(source, priority="normal", task_state=None, *, proactive=False):
+    if source in {"task", "task_result"}:
+        return (
+            "decision" if task_state == "waiting_user" or priority == "attention" else "task_result"
+        )
+    if source in {"decision", "reminder", "suggestion"}:
+        return source
+    return ("decision" if priority == "attention" else "reminder") if proactive else None
+
+
 class NotificationPolicy:
     def __init__(self, database, *, timezone_name="UTC", clock=now_ms):
         zone(timezone_name)
@@ -65,13 +75,18 @@ class NotificationPolicy:
 
     async def replace(self, owner, settings):
         settings = self.validate(settings)
-        await self.db.call(
-            lambda db: db.execute(
+
+        def write(db):
+            db.execute(
                 "INSERT INTO notification_preferences VALUES(?,?,?) ON CONFLICT(owner_id) DO UPDATE SET settings_json=excluded.settings_json,updated_ms=excluded.updated_ms",
                 (owner, encoded(settings), self.clock()),
-            ),
-            write=True,
-        )
+            )
+            db.execute(
+                "UPDATE deliveries SET retry_ms=0 WHERE state='pending' AND channel_id IN (SELECT b.id FROM channel_bindings b JOIN conversations c ON c.id=b.conversation_id WHERE c.owner_id=?)",
+                (owner,),
+            )
+
+        await self.db.call(write, write=True)
         return settings
 
     @staticmethod

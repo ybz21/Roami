@@ -42,6 +42,10 @@ class Conversations:
                 (bid, cid, now_ms()),
             )
             db.execute("UPDATE conversations SET active_branch_id=? WHERE id=?", (bid, cid))
+            db.execute(
+                "INSERT INTO channel_bindings(id,conversation_id,channel_kind,route_json,created_ms) VALUES(?,?,'im',?,?)",
+                ("agent.app:" + cid, cid, encoded({"kind": "app"}), now_ms()),
+            )
             if request_key:
                 db.execute(
                     "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",

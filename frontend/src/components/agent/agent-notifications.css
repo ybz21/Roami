@@ -1,0 +1,21 @@
+.agent-notifications-body { display:flex; flex-direction:column; gap:var(--sp-3); max-height:calc(100dvh - var(--kb) - var(--safe-t) - var(--safe-b) - var(--sp-5) * 9); overflow:auto; overflow-x:hidden; overscroll-behavior:contain; padding-right:var(--sp-1); }
+.agent-notifications-wrap { padding-bottom:calc(var(--kb) + var(--safe-b)); box-sizing:border-box; }
+.agent-notifications-body .agent-panel-list { max-height:none; overflow:visible; margin-top:0; }
+.agent-notification-settings fieldset { flex:none; display:flex; flex-direction:column; gap:var(--sp-3); border:0; padding:0; margin:0; min-width:0; }
+.agent-notification-toggle { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); }
+.agent-notification-toggle label { flex:1; font-size:var(--fs-body); }
+.agent-notification-times { display:flex; gap:var(--sp-3); flex-wrap:wrap; }
+.agent-notification-times label { flex:1; min-width:0; }
+.agent-notification-record { display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-2); padding-block:var(--sp-3); border-bottom:1px solid var(--border-subtle); overflow-wrap:anywhere; }
+.agent-notification-record p { margin:0; white-space:pre-wrap; }
+.agent-notification-record b { font-size:var(--fs-body); font-weight:500; }
+.agent-notifications-body .tt-act { min-height:var(--tap); display:inline-flex; align-items:center; justify-content:center; padding:var(--sp-1) var(--sp-2); }
+html[data-size="compact"] .agent-notifications-dialog { max-width:calc(100% - var(--sp-4)); margin-inline:auto; }
+html[data-pointer="coarse"] .agent-notifications-body input { min-height:var(--tap); }
+html[data-pointer="coarse"] .agent-notifications-body .tt-act { position:relative; }
+html[data-pointer="coarse"] .agent-notifications-body .tt-act::after { content:''; position:absolute; inset:calc(-1 * var(--sp-1)); }
+html[data-pointer="coarse"] .agent-notification-toggle .ant-switch::after { content:''; position:absolute; height:var(--tap); left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; transform:translateY(-50%); }
+html[data-pointer="coarse"] .agent-notification-settings .ant-btn { position:relative; }
+html[data-pointer="coarse"] .agent-notification-settings .ant-btn::after { content:''; position:absolute; inset:calc(-1 * var(--sp-2)); }
+
+.agent-notification-settings .agent-field { margin-bottom:0; }

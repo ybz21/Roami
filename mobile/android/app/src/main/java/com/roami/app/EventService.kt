@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.Manifest
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.ServiceInfo
 import android.content.pm.PackageManager
 import android.os.Build
@@ -24,6 +25,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import java.util.Locale
 import kotlin.concurrent.thread
 
 /**
@@ -127,19 +129,24 @@ class EventService : Service() {
     private fun onEvent(o: JSONObject) {
         val type = o.optString("type")
         if (type == "session.waiting" || type == "session.done") refreshStatus()
-        if (!type.startsWith("session.") && type != "test") return
+        if (!type.startsWith("session.") && type != "test" && type != "agent.message") return
+        val agentMessage = type == "agent.message"
         val session = o.optString("session")
+        val notificationKey = if (agentMessage) AgentNotification.key(o) else session
+        val path = if (agentMessage) AgentNotification.path(o) else "/#/inbox/" + java.net.URLEncoder.encode(session, "UTF-8")
         val title = o.optString("title").ifBlank { o.optString("label") }
-        val body = o.optString("body")
-        val open = PendingIntent.getActivity(this, session.hashCode(),
-            Intent(this, WebActivity::class.java).putExtra("path", "/#/inbox/" + java.net.URLEncoder.encode(session, "UTF-8")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        val notificationLocale = o.optString("locale").takeIf { it == "zh-CN" || it == "en-US" }
+        val localized = if (notificationLocale != null) createConfigurationContext(Configuration(resources.configuration).apply { setLocale(Locale.forLanguageTag(notificationLocale)) }) else this
+        val body = if (agentMessage && o.optBoolean("hidePreview")) localized.getString(R.string.agent_new_message) else o.optString("body")
+        val open = PendingIntent.getActivity(this, notificationKey.hashCode(),
+            Intent(this, WebActivity::class.java).putExtra("path", path).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val b = NotificationCompat.Builder(this, CH_EVENTS)
             .setSmallIcon(R.drawable.ic_stat).setContentTitle(title).setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(open).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH)
         val actions = o.optJSONArray("actions")
-        if (actions != null) for (i in 0 until actions.length()) {
+        if (!agentMessage && actions != null) for (i in 0 until actions.length()) {
             val a = actions.getString(i)
             val key = when (a) { "allow" -> "Enter"; "deny" -> "Escape"; else -> continue }
             val pi = PendingIntent.getBroadcast(this, (session + a).hashCode(),
@@ -148,7 +155,8 @@ class EventService : Service() {
             b.addAction(0, getString(if (a == "allow") R.string.act_allow else R.string.act_deny), pi)
         }
         // 同一会话复用一条：等你 → 做完 只更新，不叠一摞
-        getSystemService(NotificationManager::class.java).notify(session.hashCode(), b.build())
+        if (agentMessage) b.setNumber(o.optInt("badge", 0).coerceAtLeast(0))
+        getSystemService(NotificationManager::class.java).notify(notificationKey.hashCode(), b.build())
     }
 
     private fun refreshStatus() {

@@ -17,6 +17,7 @@ from roami_agent.protocol.http import (
     CreateConversation,
     CreateReminder,
     CreateTask,
+    DeliveryReceipt,
     Fork,
     NotificationPreferences,
     Proactive,
@@ -46,6 +47,22 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):
         return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status)
+
+    @app.get("/v1/notification-deliveries")
+    async def notification_deliveries(owner: Owner):
+        return {"data": await runtime.deliveries.list(owner)}
+
+    @app.post("/internal/deliveries/claim")
+    async def claim_delivery(owner: Owner):
+        return {"data": await runtime.deliveries.claim(owner)}
+
+    @app.post("/internal/deliveries/{delivery_id}/receipt")
+    async def settle_delivery(delivery_id: str, body: DeliveryReceipt, owner: Owner):
+        return {
+            "data": await runtime.deliveries.settle(
+                owner, delivery_id, body.claimToken, body.outcome
+            )
+        }
 
     @app.get("/v1/reminders")
     async def reminders(owner: Owner):

@@ -257,7 +257,7 @@ async def test_unread_count_is_not_limited_by_inbox_page_and_delivery_is_atomic(
                 "SELECT COUNT(*) FROM deliveries WHERE state='pending'"
             ).fetchone()[0]
         )
-        == 205
+        == 410
     )
     assert await notifications.unread("bob") == 0
 

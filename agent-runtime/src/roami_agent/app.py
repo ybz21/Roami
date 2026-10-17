@@ -35,6 +35,7 @@ from roami_agent.memory.records import Memories
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.server.configuration import Settings
@@ -90,6 +91,7 @@ class Runtime:
             database, timezone_name=self.settings.memory_timezone
         )
         self.reminders = Reminders(database)
+        self.deliveries = DeliveryOutbox(database, self.notification_policy)
         self.context = Context(database, model, input_budget=self.settings.input_budget)
         self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
         self.tools = Tools()
@@ -104,7 +106,9 @@ class Runtime:
         self.control_monitor = None
         self.reminder_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
-        register_reminder_tools(self.tools, self.reminders, self.settings.memory_timezone)
+        register_reminder_tools(
+            self.tools, self.reminders, self.settings.memory_timezone, self.notification_policy
+        )
         add_worker_tools(self.tools, self.settings, self.artifacts)
         register_file_tools(self.tools, self.files)
         register_artifact_tools(self.tools, self.artifacts)

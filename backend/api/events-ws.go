@@ -43,15 +43,20 @@ func (h *EventHub) Count() int {
 }
 
 // Broadcast 不阻塞：客户端读得慢就丢它这条，别拖住探测循环
-func (h *EventHub) Broadcast(p PushPayload) {
+func (h *EventHub) Broadcast(p PushPayload) { h.enqueue(p) }
+
+func (h *EventHub) enqueue(p PushPayload) (accepted, dropped int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.subs {
 		select {
 		case ch <- p:
+			accepted++
 		default:
+			dropped++
 		}
 	}
+	return
 }
 
 var eventsUpgrader = websocket.Upgrader{

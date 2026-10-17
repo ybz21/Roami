@@ -147,18 +147,29 @@ async function fileBytes(event) {
 // 后端 push.go 发来的 JSON：{id,type,session,label,title,body,actions,badge}。
 // 通知按钮（允许 / 拒绝）在这儿直接打 /api/sessions/:name/keys，不开页面、不解锁；
 // 点通知本体后直接打开对应会话；无会话时进入项目页。
+function agentNotificationPath(data) {
+  const valid = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,200}$/.test(id)
+  if (!valid(data.conversation) || !valid(data.branch) || !valid(data.message)) return '/#/home'
+  return '/#/home/' + data.conversation + '/' + data.branch + '/' + data.message
+}
+
+function hiddenAgentMessage(locale) {
+  return String(locale || self.navigator.language).toLowerCase().startsWith('en')
+    ? 'New message from your agent' : '大总管有新消息'
+}
+
 self.addEventListener('push', (event) => {
   let p = {}
   try { p = event.data ? event.data.json() : {} } catch { p = { title: 'Roami', body: event.data && event.data.text() } }
   const actions = (p.actions || []).map((a) => (a === 'allow' ? { action: 'allow', title: '允许' } : a === 'deny' ? { action: 'deny', title: '拒绝' } : null)).filter(Boolean)
   event.waitUntil((async () => {
     await self.registration.showNotification(p.title || p.label || 'Roami', {
-      body: p.body || '',
-      tag: p.session ? 'session:' + p.session : 'roami:' + (p.id || Date.now()), // 同一会话的新通知顶掉旧的
+      body: p.type === 'agent.message' && p.hidePreview ? hiddenAgentMessage(p.locale) : p.body || '',
+      tag: p.type === 'agent.message' ? 'agent:' + p.conversation : p.session ? 'session:' + p.session : 'roami:' + (p.id || Date.now()), // 同一会话的新通知顶掉旧的
       renotify: true,
       icon: '/logo-mark-192.png',
       badge: '/logo-mark-192.png',
-      data: { session: p.session || '', type: p.type || '', id: p.id || 0 },
+      data: { session: p.session || '', type: p.type || '', id: p.id || 0, conversation: p.conversation, branch: p.branch, message: p.message },
       actions,
     })
     try { if (typeof p.badge === 'number') { if (p.badge > 0) await self.navigator.setAppBadge(p.badge); else await self.navigator.clearAppBadge() } } catch {}
@@ -170,7 +181,7 @@ self.addEventListener('notificationclick', (event) => {
   const d = n.data || {}
   n.close()
   event.waitUntil((async () => {
-    if ((event.action === 'allow' || event.action === 'deny') && d.session) {
+    if (d.type !== 'agent.message' && (event.action === 'allow' || event.action === 'deny') && d.session) {
       // 允许 = Enter（选中项就是 Yes / 1）；拒绝 = Escape。白名单在后端，这里只发这两个
       const keys = event.action === 'allow' ? ['Enter'] : ['Escape']
       try {
@@ -184,7 +195,7 @@ self.addEventListener('notificationclick', (event) => {
       } catch {}
       // 发不出去（没登录 / 后端不通）：退回打开页面
     }
-    const url = d.session ? '/#/inbox/' + encodeURIComponent(d.session) : '/#/projects'
+    const url = d.type === 'agent.message' ? agentNotificationPath(d) : d.session ? '/#/inbox/' + encodeURIComponent(d.session) : '/#/projects'
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const c of all) {
       if ('focus' in c) { try { await c.navigate(url) } catch {} ; return c.focus() }

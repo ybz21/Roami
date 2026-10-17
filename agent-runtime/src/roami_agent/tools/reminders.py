@@ -3,8 +3,12 @@
 from roami_agent.protocol.tools import Tool, object_schema
 
 
-def register_reminder_tools(registry, reminders, timezone_name):
+def register_reminder_tools(registry, reminders, timezone_name, policy=None):
+    async def timezone(owner):
+        return (await policy.get(owner))["timezone"] if policy else timezone_name
+
     async def create(args, binding):
+        selected_timezone = args.get("timezone") or await timezone(binding["owner"])
         return await reminders.create(
             binding["owner"],
             binding["conversation"],
@@ -13,7 +17,7 @@ def register_reminder_tools(registry, reminders, timezone_name):
             when_ms=args.get("whenMs"),
             daily_at=args.get("dailyAt"),
             after_seconds=args.get("afterSeconds"),
-            timezone_name=args.get("timezone", timezone_name),
+            timezone_name=selected_timezone,
             source_turn_id=binding["turnId"],
         )
 
@@ -21,7 +25,7 @@ def register_reminder_tools(registry, reminders, timezone_name):
         items = await reminders.list(binding["owner"], binding["conversation"])
         return {
             "nowMs": reminders.clock(),
-            "timezone": timezone_name,
+            "timezone": await timezone(binding["owner"]),
             "reminders": [
                 {**item, "spec": {**item["spec"], "text": item["spec"]["text"][:300]}}
                 for item in items[:20]

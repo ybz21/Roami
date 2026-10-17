@@ -93,18 +93,39 @@ class TurnJournal:
                         "messageId": mid,
                         "turnId": turn["id"],
                         "source": "task" if completion else "main",
+                        **(
+                            {
+                                "taskId": completion.get("taskId"),
+                                "taskRevision": completion.get("taskRevision"),
+                                "taskState": completion.get("state"),
+                            }
+                            if completion
+                            else {}
+                        ),
                     },
                     turn_id=turn["id"],
                     message_id=mid,
                 )
                 for binding in rows(
                     db,
-                    "SELECT id FROM channel_bindings WHERE conversation_id=? AND enabled=1",
+                    "SELECT id,json_extract(route_json,'$.kind') AS kind FROM channel_bindings WHERE conversation_id=? AND enabled=1",
                     (turn["conversation_id"],),
                 ):
+                    if binding["kind"] == "app" and not completion:
+                        continue
+                    category = (
+                        "decision"
+                        if completion and completion.get("state") == "waiting_user"
+                        else "task_result"
+                    )
                     db.execute(
-                        "INSERT INTO deliveries(id,event_id,channel_id,state) VALUES(?,?,?,'pending')",
-                        (identity(), cursor, binding["id"]),
+                        "INSERT INTO deliveries(id,event_id,channel_id,state,category) VALUES(?,?,?,'pending',?)",
+                        (
+                            identity(),
+                            cursor,
+                            binding["id"],
+                            category if binding["kind"] == "app" else None,
+                        ),
                     )
             else:
                 event(

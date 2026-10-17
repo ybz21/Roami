@@ -1,6 +1,6 @@
 # Roami Agent runtime
 
-Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service, CLI and main chat frontend are runnable; additional executor targets and proactive delivery policy are still being implemented. Nothing has been deployed to the running user instance.
+Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service, CLI and main chat frontend are runnable; additional executor targets and event-driven proactive generation are still being implemented. Nothing has been deployed to the running user instance.
 
 ## Development and verification
 
@@ -126,9 +126,21 @@ Explicit one-shot reminders accept an absolute UTC `whenMs` or a relative `after
 
 `roami agent reminder add --conversation ID --key KEY --text TEXT --after-seconds 60`, `reminder ls`, and `reminder cancel --id ID` use the same Python application service as authenticated `/api/agent/reminders`. Reusing a request key preserves its original due time; changed parameters conflict. Each firing, assistant message, event, completed trace job and next due time commit together. Restart catches up one latest daily occurrence and records the count of skipped dates, avoiding a flood of old reminders. Spring clock gaps move to the first valid minute; a repeated hour fires once per local date. Cancellation preserves existing messages and firing history.
 
-`roami agent notification-preferences get` returns the complete settings object; `set --file SETTINGS.json` replaces it. Authenticated Web clients use GET/PUT `/api/agent/notification-preferences`. Preferences separate task results, decisions, reminders and suggestions, with timezone/quiet hours, explicit attention bypass, hidden previews and suggestion rate limits. Suggestions default off. The policy admission service keeps its rate reservations durable and counts one event once across retries. These settings do not remove chat messages or consume unread state. External delivery adapters must apply this policy before sending; the App/Web Push bridge and its delivery-state UI remain in progress, so saving preferences is not evidence of system notification delivery.
+`roami agent notification-preferences get` returns the complete settings object; `set --file SETTINGS.json` replaces it. Authenticated Web clients use GET/PUT `/api/agent/notification-preferences`. Preferences separate task results, decisions, reminders and suggestions, with timezone/quiet hours, explicit attention bypass, hidden previews and suggestion rate limits. Suggestions default off. The policy admission service keeps its rate reservations durable and counts one event once across retries. These settings do not remove chat messages or consume unread state. App/Web Push adapters apply this policy before claiming a send; saving preferences is not evidence of system notification delivery.
 
-Schema 4 adds reminders, firing history and notification policy under the Python-owned migration mechanism. Go backup/restore accepts versions 1 through 4 and rejects newer schemas; Go does not run these DDL migrations.
+Schema 4 adds reminders, firing history and notification policy under the Python-owned migration mechanism. Go backup/restore accepts versions 1 through 5 and rejects newer schemas; Go does not run these DDL migrations.
+
+## App and Web Push delivery
+
+Python owns the outbox, preferences, unread counts and claim/receipt state; Go forwards notifications to the existing App WebSocket and Web Push adapters. The Go loop uses the existing private Unix transport with the local owner and no new login. Its claim and receipt routes are private and are not mounted in the public proxy. The public `/api/agent/notification-deliveries` endpoint returns the latest 50 owner-scoped transport records.
+
+Main conversation creation installs an App channel binding, and proactive/terminal-task messages commit their event and outbox row together. Native Worker branches do not get App bindings. Ordinary direct chat answers stay in the conversation; background task results, pending decisions, explicit reminders and trusted proactive triggers can notify. Task completion events retain task revision/state so changed or continued tasks cannot send old results. Read/deleted/forgotten or superseded messages are skipped before admission. Schema 5 adds a migration watermark so installing this adapter does not push the existing unread archive.
+
+Quiet hours, category settings, preview hiding and suggestion rate limits are checked while claiming. Changing preferences wakes held pending records; it does not recall a send already in progress. A claim has a unique token and 30-second receipt deadline. Go bounds fan-out to four workers and a ten-second overall send context. Confirmed failures retry the same message with backoff, up to six attempts. An expired sender, lost receipt, network ambiguity or partial fan-out stays unknown and is never blindly resent. A late matching terminal receipt can settle that same claim; an older claim cannot overwrite a newer attempt.
+
+`adapter_accepted` means queued to an App connection or accepted by a push gateway. It never means the device displayed or the user read the message; every public receipt retains `deviceDelivered: false`. Offline devices, revoked notification permissions and platform delivery remain outside that acknowledgement. Integration tests use actual Python persistence, Go transport and a connected isolated App WebSocket. Web Push encryption/gateway acceptance and failure cases use the existing SDK with a local injected HTTP client; no real user's devices are contacted.
+
+The notification panel includes reminders, preferences and delivery records. Main reminder tools use the owner's saved notification timezone when no timezone is supplied. New App and Service Worker notifications retain the original conversation/branch/message and open a validated route. The chat positions the target after lazy Markdown layout settles, stops pinning when the user interacts, and preserves the existing visible-message read protocol. Web and Android notification content supports Chinese and English. Android unit tests and desktop/compact browser checks pass; physical-device notification, permission, keyboard and touch acceptance remains pending.
 
 ## Remaining work toward the full framework
 
@@ -136,7 +148,7 @@ Schema 4 adds reminders, firing history and notification policy under the Python
 2. Finish automatic lifecycle wiring for existing Codex sessions and a definitive completion adapter for Claude TUI continuation. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
 3. Browser/Computer tool adapters, resource leases and artifact retention and layout-migration coverage. MCP stdio and Streamable HTTP adapters now externalize binary and oversized results into owner-scoped artifacts.
 4. Broaden legacy forgetting/re-learning recovery cases; implement provider cache controls and provider/model routing resilience.
-5. Connect existing App/Web Push delivery adapters to the notification policy and durable outbox, with actual adapter receipts and device-delivery limits; add their UI. Fixed reminder scheduling, preferences, quiet hours and rate admission are implemented; event-driven model suggestions and daily brief generation remain.
+5. Add event-driven model suggestions and daily brief generation with a separate bounded background budget. Explicit reminders, notification policy, App/Web Push adapters and their UI are implemented; real-device delivery acceptance remains.
 6. Broader end-to-end recovery, verification edge cases and real-device acceptance. A single real-provider memory extraction smoke check produced a source-backed candidate without activating it; no latency/cache/cost benchmark has run.
 
 The design and product prototype remain in `docs/design/20261017-agent框架设计/`.

@@ -10,6 +10,7 @@ import AgentTasks from './AgentTasks'
 import { conversationTitle } from './AgentHistory'
 import { useAgentThread } from './useAgentThread'
 import { useAgentDraft } from './useAgentDraft'
+import { useAgentMessageFocus } from './useAgentMessageFocus'
 import { useVisibleAgentReads } from './useVisibleAgentReads'
 import type { AgentInboxState } from './useAgentInbox'
 import type { AgentMessage } from './agent-protocol'
@@ -21,8 +22,8 @@ export function agentFailure(error: any, t: (key: string) => string) {
 }
 const newKey = () => crypto.randomUUID()
 
-export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, select, notifications, projects, onSession, onOverview }: {
-  cid: string; branch: string; fresh: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
+export default function AgentChat({ cid, branch, focusMessage = '', fresh, node, inbox, inboxOpen, select, notifications, projects, onSession, onOverview }: {
+  cid: string; branch: string; focusMessage?: string; fresh: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
   select: (cid: string, branch?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
 }) {
@@ -68,6 +69,7 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
     }
   }, [draftKey])
   useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight }, [thread.view?.messages, cid])
+  useAgentMessageFocus(scroll, cid, branch, focusMessage, visible.map((item) => item.id).join(','), stick)
   const changeDraft = (value: string) => { setDraft(value); try { localStorage.setItem(draftKey, value) } catch {} }
   const ensureConversation = async () => {
     if (cid) return cid
@@ -156,7 +158,7 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {readOnly && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80 }}>
-      <div className="agent-thread">{thread.loading && <Spin />}{visible.map((m) => <article key={m.id} className={`agent-message ${m.role}`}>
+      <div className="agent-thread">{thread.loading && <Spin />}{visible.map((m) => <article key={m.id} data-message-id={m.id} data-notification-focus={m.id === focusMessage || undefined} className={`agent-message ${m.role}`}>
         {m.role === 'assistant' && <div className="agent-author">Roami{m.status === 'streaming' && <Spin size="small" />}</div>}
         {m.content.text && (m.role === 'user' ? <p className="agent-user-text">{m.content.text}</p> : <Markdown>{m.content.text}</Markdown>)}
         {['failed', 'interrupted'].includes(m.status) && <small className="agent-muted">{t('agent.interrupted')}</small>}

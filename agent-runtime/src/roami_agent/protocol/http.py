@@ -93,3 +93,8 @@ class CreateReminder(Payload):
 
 class NotificationPreferences(Payload):
     settings: dict
+
+
+class DeliveryReceipt(Payload):
+    claimToken: str = Field(min_length=1, max_length=200)
+    outcome: dict
