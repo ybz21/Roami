@@ -60,6 +60,6 @@ func NewHub(cfg Config) *gin.Engine {
 	ng := r.Group("/n/:nodeId", a.Middleware())
 	ng.Any("/*path", brk.ProxyNode)
 
-	mountWeb(r, cfg.FrontendDir)
+	mountWeb(r, cfg.FrontendDir, nil)
 	return r
 }

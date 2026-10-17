@@ -260,6 +260,30 @@ func (a *API) FileRaw(c *gin.Context) {
 	c.File(p)
 }
 
+// FilePath accepts legacy links with the file path appended directly to /api/file.
+func (a *API) FilePath(c *gin.Context) {
+	p := strings.TrimPrefix(c.Request.URL.Path, "/api/file/")
+	p = strings.TrimPrefix(p, "raw/")
+	if p == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_PATH"}})
+		return
+	}
+	// A single separator commonly stands for the filesystem root; relative links fall back to cwd.
+	absolute := filepath.Clean("/" + p)
+	if _, err := os.Stat(absolute); !os.IsNotExist(err) {
+		p = absolute
+	} else {
+		var err error
+		p, err = filepath.Abs(p)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_PATH"}})
+			return
+		}
+	}
+	c.Params = append(c.Params, gin.Param{Key: "path", Value: p})
+	a.FileServe(c)
+}
+
 // FileServe GET /file/serve/*path —— 把文件绝对路径直接编进 URL 路径来提供文件
 // （区别于 /file/raw 的 ?path= 查询参数）。这样 HTML 内的同目录相对引用（style.css、
 // ./app.js、../img/x.png）会被浏览器按 URL 相对规则解析到同目录资源，再命中本路由取到
@@ -274,6 +298,11 @@ func (a *API) FileServe(c *gin.Context) {
 	info, err := os.Stat(p)
 	if err != nil || info.IsDir() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "NOT_FILE"}})
+		return
+	}
+	c.Header("X-Roami-File-Path", url.PathEscape(p))
+	if c.Query("dl") != "" {
+		serveAttachment(c, p, filepath.Base(p))
 		return
 	}
 	f, err := os.Open(p)

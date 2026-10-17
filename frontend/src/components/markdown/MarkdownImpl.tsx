@@ -1,15 +1,21 @@
 // 对话文本的 Markdown 渲染实现（Claude / Codex 共用）。深色主题、紧凑边距以贴合气泡。
 // 工具输出/命令仍按原样 <pre> 显示，不走这里。入口在 Markdown.tsx（懒加载壳），业务代码勿直接引本文件。
+import { Spin } from 'antd'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import type { CSSProperties, MouseEvent } from 'react'
-import {Suspense } from 'react'
+import { Suspense, useState } from 'react'
+import { useLayout } from '../../layout'
+import { nodeApi } from '../cluster/node-url'
+import { fileLink, type FileLink } from './file-link'
 import { CodeBox } from '../chat/blocks'
 import { useI18n } from '../../i18n'
 import { lazyRetry } from '../lazy-retry'
 
-// Mermaid 组件连同其重依赖(mermaid/d3/cytoscape…)整体懒加载，只有真渲染 ```mermaid 才拉取，不进首屏。
+const MobileFilePreview = lazyRetry(() => import('./MobileFilePreview'))
+
+// Mermaid 只在渲染图表时加载。
 const Mermaid = lazyRetry(() => import('./Mermaid'))
 
 const mono = 'ui-monospace, SFMono-Regular, Menlo, monospace'
@@ -40,6 +46,8 @@ export default function Markdown({
   fill?: boolean // 整块代码/JSON 预览：让唯一的代码块撑满父容器高度
 }) {
   const { t } = useI18n()
+  const { phone } = useLayout()
+  const [preview, setPreview] = useState<FileLink | null>(null)
   return (
     <div style={{ fontSize: 13.5, lineHeight: 1.55, wordBreak: 'break-word', height: fill ? '100%' : undefined }}>
       <ReactMarkdown
@@ -57,7 +65,12 @@ export default function Markdown({
           h4: ({ children }) => <h4 style={{ fontSize: 13.5, margin: '6px 0 4px', fontWeight: 600 }}>{children}</h4>,
           a: ({ children, href }) => {
             const resolved = href ? (resolveHref?.(href, 'link') || href) : undefined
-            return <a href={resolved} target="_blank" rel="noreferrer" onClick={(e) => { if (href) onLinkClick?.(href, e) }} style={{ color: accent, textDecoration: 'underline' }}>{children}</a>
+            return <a href={resolved} target="_blank" rel="noreferrer" onClick={(e) => {
+              if (href) onLinkClick?.(href, e)
+              if (e.defaultPrevented || !phone || !resolved || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+              const link = fileLink(resolved, location.origin, nodeApi('/file/raw'))
+              if (link) { e.preventDefault(); setPreview(link) }
+            }} style={{ color: accent, textDecoration: 'underline' }}>{children}</a>
           },
           blockquote: ({ children }) => <blockquote style={{ margin: '6px 0', padding: '2px 10px', borderLeft: '3px solid var(--border)', color: 'var(--text-dim)' }}>{children}</blockquote>,
           hr: () => <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '8px 0' }} />,
@@ -83,6 +96,7 @@ export default function Markdown({
       >
         {children}
       </ReactMarkdown>
+      {preview && <Suspense fallback={<Spin />}><MobileFilePreview link={preview} onBack={() => setPreview(null)} /></Suspense>}
     </div>
   )
 }
