@@ -1,0 +1,111 @@
+"""Owner-facing takeover waits for confirmed input stop before returning control."""
+
+from roami_agent.protocol.errors import DomainError
+from roami_agent.storage.database import row, rows
+
+
+class ResourceControls:
+    def __init__(self, database, leases):
+        self.db, self.leases = database, leases
+
+    def _view(self, db, resource):
+        pending = self.leases._pending(db, resource["id"]) is not None
+        released = (
+            resource["lease_until_ms"] is None
+            and resource["state"] in {"idle", "paused"}
+            and not pending
+        )
+        observation = row(
+            db,
+            "SELECT id,task_id FROM resource_observations WHERE resource_id=? ORDER BY rowid DESC LIMIT 1",
+            (resource["id"],),
+        )
+        return {
+            "id": resource["id"],
+            "kind": resource["kind"],
+            "state": resource["state"],
+            "taskId": resource["owner_task_id"],
+            "runId": resource["owner_run_id"],
+            "leaseEpoch": resource["lease_epoch"],
+            "sceneEpoch": resource["scene_epoch"],
+            "actionPending": pending,
+            "controlReleased": released,
+            "takeoverReady": released and resource["state"] == "paused",
+            "canPause": resource["state"] in {"held", "pausing", "quarantined"},
+            "canResume": released and resource["state"] == "paused",
+            "observationId": observation["id"] if observation else None,
+            "observationTaskId": observation["task_id"] if observation else None,
+        }
+
+    async def get(self, owner, resource_id):
+        return await self.db.call(
+            lambda db: self._view(db, self.leases._owned(db, owner, resource_id))
+        )
+
+    async def task(self, owner, task_id):
+        def read(db):
+            if not row(db, "SELECT id FROM tasks WHERE id=? AND owner_id=?", (task_id, owner)):
+                raise DomainError("TASK_NOT_FOUND", 404)
+            tree = "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id WHERE t.owner_id=?) "
+            items = rows(
+                db,
+                tree
+                + "SELECT DISTINCT r.* FROM resources r LEFT JOIN resource_observations o ON o.resource_id=r.id "
+                "WHERE r.owner_id=? AND (o.task_id IN (SELECT id FROM tree) OR r.owner_task_id IN (SELECT id FROM tree)) "
+                "AND (r.owner_task_id IS NULL OR r.owner_task_id IN (SELECT id FROM tree)) "
+                "ORDER BY CASE WHEN r.owner_task_id IS NULL THEN 1 ELSE 0 END,r.rowid DESC LIMIT 51",
+                (task_id, owner, owner),
+            )
+            actions = rows(
+                db,
+                tree
+                + "SELECT a.id,a.resource_id AS resourceId,a.task_id AS taskId,a.run_id AS runId,a.state,"
+                "a.created_ms AS createdMs,a.updated_ms AS updatedMs,"
+                "json_extract(a.result_json,'$.inputStopped') AS inputStopped,"
+                "json_extract(a.result_json,'$.outcomeKnown') AS outcomeKnown,"
+                "json_extract(a.result_json,'$.error') AS errorCode "
+                "FROM resource_actions a WHERE a.task_id IN (SELECT id FROM tree) ORDER BY a.rowid DESC LIMIT 21",
+                (task_id, owner),
+            )
+            for action in actions:
+                for field in ("inputStopped", "outcomeKnown"):
+                    if action[field] is not None:
+                        action[field] = bool(action[field])
+            return {
+                "taskId": task_id,
+                "resources": [self._view(db, item) for item in items[:50]],
+                "resourcesTruncated": len(items) > 50,
+                "actions": actions[:20],
+                "actionsTruncated": len(actions) > 20,
+            }
+
+        return await self.db.call(read)
+
+    async def release_ready(self, owner=None):
+        def write(db):
+            paused = rows(
+                db,
+                "SELECT * FROM resources WHERE state IN ('pausing','paused') "
+                "AND (lease_until_ms IS NOT NULL OR state='pausing')"
+                + (" AND owner_id=?" if owner else "")
+                + " ORDER BY rowid LIMIT 32",
+                (owner,) if owner else (),
+            )
+            for resource in paused:
+                if self.leases._pending(db, resource["id"]):
+                    continue
+                db.execute(
+                    "UPDATE resources SET state='paused',lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
+                    (resource["id"],),
+                )
+
+        await self.db.call(write, write=True)
+
+    async def pause(self, owner, resource_id):
+        await self.leases.pause(owner, resource_id)
+        await self.release_ready(owner)
+        return await self.get(owner, resource_id)
+
+    async def resume(self, owner, resource_id):
+        await self.leases.resume(owner, resource_id)
+        return await self.get(owner, resource_id)

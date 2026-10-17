@@ -80,7 +80,8 @@ class Scheduler:
                 "handle": handle,
                 "group": group,
                 "branch": branch,
-                "task": job["aggregate_id"] if job["kind"] == "task.run" else None,
+                "task": job["aggregate_id"] if job["kind"] in {"task.run", "task.verify"} else None,
+                "kind": job["kind"],
                 "memory": memory_job,
             }
             handle.add_done_callback(lambda _, key=job["id"]: self._finished(key))

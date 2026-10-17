@@ -38,6 +38,8 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"GET", "/agent/notifications"}, {"GET", "/agent/tasks"}, {"POST", "/agent/tasks"},
 		{"GET", "/agent/artifacts"}, {"GET", "/agent/artifacts/:artifact"}, {"GET", "/agent/artifacts/:artifact/content"}, {"DELETE", "/agent/artifacts/:artifact"},
 		{"POST", "/agent/tasks/:task/cancel"}, {"POST", "/agent/tasks/:task/verify"},
+		{"GET", "/agent/tasks/:task/resources"}, {"GET", "/agent/resources/:resource"},
+		{"POST", "/agent/resources/:resource/pause"}, {"POST", "/agent/resources/:resource/resume"},
 		{"GET", "/agent/memories/:memory"}, {"GET", "/agent/memories"}, {"POST", "/agent/memories"}, {"DELETE", "/agent/memories/:memory"},
 		{"POST", "/agent/memories/:memory/confirm"},
 		{"GET", "/agent/memories/:memory/sources"},

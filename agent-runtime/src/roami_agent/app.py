@@ -19,6 +19,7 @@ from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.core.loop import AgentLoop
+from roami_agent.dispatch.resource_controls import ResourceControls
 from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
@@ -72,6 +73,7 @@ class Runtime:
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
         self.files = WorkspaceFiles(self.settings)
         self.resources = ResourceLeases(database)
+        self.controls = ResourceControls(database, self.resources)
         self.memory = Memories(database, self.settings.memory_timezone)
         self.memory_jobs = MemoryJobs(
             database,
@@ -92,6 +94,7 @@ class Runtime:
         self.external_monitor = None
         self.browser_monitor = None
         self.desktop_monitor = None
+        self.control_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         add_worker_tools(self.tools, self.settings, self.artifacts)
         register_file_tools(self.tools, self.files)
@@ -174,10 +177,9 @@ class Runtime:
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):
             self.external_monitor = asyncio.create_task(self._monitor_external())
-        if self.browser.config.get("enabled"):
-            self.browser_monitor = asyncio.create_task(self._monitor_browser())
-        if self.desktop.config["enabled"]:
-            self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
+        self.browser_monitor = asyncio.create_task(self._monitor_browser())
+        self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
+        self.control_monitor = asyncio.create_task(self._monitor_controls())
         self.wakeup.set()
 
     async def _monitor_browser(self):
@@ -195,6 +197,14 @@ class Runtime:
             except (DomainError, OSError, TimeoutError):
                 log.exception("Desktop operation observation failed")
             await asyncio.sleep(1)
+
+    async def _monitor_controls(self):
+        while not self.stopping:
+            try:
+                await self.controls.release_ready()
+            except (DomainError, OSError):
+                log.exception("Resource takeover observation failed")
+            await asyncio.sleep(0.2)
 
     async def _monitor_external(self):
         while not self.stopping:
@@ -233,6 +243,9 @@ class Runtime:
         if self.desktop_monitor:
             self.desktop_monitor.cancel()
             await asyncio.gather(self.desktop_monitor, return_exceptions=True)
+        if self.control_monitor:
+            self.control_monitor.cancel()
+            await asyncio.gather(self.control_monitor, return_exceptions=True)
         running = [item["handle"] for item in self.active.values()]
         for handle in running:
             handle.cancel()

@@ -27,7 +27,9 @@ from roami_agent.tools.process import execute
 
 
 class BrowserDriver:
-    def __init__(self, database, settings, resources, artifacts, *, runner=execute):
+    def __init__(
+        self, database, settings, resources, artifacts, *, runner=execute, receipt_reader=None
+    ):
         self.db, self.settings, self.resources, self.artifacts = (
             database,
             settings,
@@ -41,6 +43,29 @@ class BrowserDriver:
         self.socket_root = Path(tempfile.gettempdir()) / ("roami-browser-" + str(os.getuid()))
         self.instance = hashlib.sha256(str(self.root).encode()).hexdigest()[:24]
         self.reconcile_cursor = ""
+        self.receipt_reader = receipt_reader or self._stored_receipt
+
+    def _read_receipt_file(self, operation_id):
+        if not re.fullmatch(r"[a-f0-9]{32}", operation_id):
+            raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
+        for directory in (self.root / "agents", self.receipts):
+            info = directory.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                raise DomainError("BROWSER_PRIVATE_DIRECTORY_INVALID", 503)
+        descriptor = os.open(
+            self.receipts / (operation_id + ".json"), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        )
+        with os.fdopen(descriptor, "rb") as file:
+            info = os.fstat(file.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > 256_000:
+                raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
+            try:
+                return json.load(file)
+            except (ValueError, TypeError):
+                raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503) from None
+
+    async def _stored_receipt(self, operation_id):
+        return await asyncio.to_thread(self._read_receipt_file, operation_id)
 
     async def reconcile(self):
         pending = await self.db.call(
@@ -57,9 +82,7 @@ class BrowserDriver:
         self.reconcile_cursor = pending[-1]["id"] if pending else ""
         for action in pending:
             try:
-                receipt = self._receipt(
-                    await self._cli("operation-status", operation_id=action["id"]), action["id"]
-                )
+                receipt = self._receipt(await self.receipt_reader(action["id"]), action["id"])
                 if not receipt["inputStopped"]:
                     continue
                 await self._complete({"owner": action["owner_id"]}, action, receipt)

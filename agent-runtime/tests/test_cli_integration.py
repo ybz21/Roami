@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import httpx
 import pytest
 import uvicorn
 from fastapi import FastAPI
@@ -181,6 +182,22 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
             )
             after = await cli("history", "--conversation", cid)
             assert after["data"]["messages"][-1]["content"]["text"] == "Time to review"
+            async with httpx.AsyncClient(
+                transport=httpx.AsyncHTTPTransport(uds=str(actual_socket)), base_url="http://agent"
+            ) as client:
+                task = await client.post(
+                    "/v1/tasks",
+                    headers={"X-Roami-Owner": "local"},
+                    json={
+                        "conversationId": cid,
+                        "requestKey": "control-list-task",
+                        "goal": "Return a read-only analysis",
+                    },
+                )
+            assert task.status_code == 202
+            tid = task.json()["data"]["id"]
+            controls = await cli("control", "ls", "--task", tid)
+            assert controls["data"]["taskId"] == tid and controls["data"]["resources"] == []
             # Python holds the same lock domain used by unified database maintenance.
             busy = await asyncio.create_subprocess_exec(
                 str(roami_binary),

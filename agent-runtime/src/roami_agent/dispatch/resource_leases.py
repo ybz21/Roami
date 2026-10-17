@@ -85,7 +85,15 @@ class ResourceLeases:
     def _input_admitted(db, task_id):
         if row(
             db,
-            "SELECT id FROM resources WHERE owner_task_id=? AND state IN ('paused','pausing','quarantined') LIMIT 1",
+            "WITH RECURSIVE ancestors(id,parent_id,owner_id,depth) AS ("
+            "SELECT id,parent_task_id,owner_id,0 FROM tasks WHERE id=? "
+            "UNION ALL SELECT t.id,t.parent_task_id,t.owner_id,a.depth+1 FROM tasks t JOIN ancestors a ON t.id=a.parent_id "
+            "WHERE t.owner_id=a.owner_id AND a.depth<16),"
+            "root(id,owner_id) AS (SELECT id,owner_id FROM ancestors ORDER BY depth DESC LIMIT 1),"
+            "tree(id,owner_id,depth) AS (SELECT id,owner_id,0 FROM root UNION ALL "
+            "SELECT t.id,t.owner_id,p.depth+1 FROM tasks t JOIN tree p ON t.parent_task_id=p.id WHERE t.owner_id=p.owner_id AND p.depth<16) "
+            "SELECT r.id FROM resources r JOIN tree t ON t.id=r.owner_task_id "
+            "WHERE r.state IN ('paused','pausing','quarantined') LIMIT 1",
             (task_id,),
         ):
             raise DomainError("RESOURCE_INPUT_PAUSED", 409)

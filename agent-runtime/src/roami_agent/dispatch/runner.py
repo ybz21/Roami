@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 
 import httpx
 
@@ -10,11 +11,26 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row, rows
 
+log = logging.getLogger(__name__)
+
 
 class TaskDispatcher:
-    def __init__(self, database, tasks, executor, verifier, native_executor, wakeup, active):
+    def __init__(
+        self,
+        database,
+        tasks,
+        executor,
+        verifier,
+        native_executor,
+        wakeup,
+        active,
+        *,
+        verification_timeout=15,
+    ):
         self.db, self.tasks, self.executor, self.verifier = database, tasks, executor, verifier
         self.native_executor, self.wakeup, self.active = native_executor, wakeup, active
+        self.verification_timeout = verification_timeout
+        self.verifying = set()
 
     async def charge_budget(self, task_id):
         def write(db):
@@ -277,7 +293,33 @@ class TaskDispatcher:
         verified = False
         if result["state"] == "succeeded" and task["state"] != "cancelling":
             if self.verifier:
-                verified = await self.verifier(task, result)
+                self.verifying.add(task["id"])
+                try:
+                    verified = await asyncio.wait_for(
+                        self.verifier(task, result), self.verification_timeout
+                    )
+                except asyncio.CancelledError:
+                    current = await self.db.call(
+                        lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
+                    )
+                    if current["state"] != "cancelling":
+                        raise
+                    await self.complete(task, run, result, "cancelled", job_id=job["id"])
+                    return
+                except Exception as exc:  # noqa: BLE001 — injected verifier boundary
+                    # Verifier diagnostics may contain provider credentials or private evidence.
+                    log.warning("Task verifier unavailable: %s", type(exc).__name__)
+                    result = {
+                        **result,
+                        "verification": {
+                            "state": "unavailable",
+                            "errorCode": "VERIFICATION_TIMEOUT"
+                            if isinstance(exc, TimeoutError)
+                            else "VERIFICATION_FAILED",
+                        },
+                    }
+                finally:
+                    self.verifying.discard(task["id"])
             else:
                 # Native read-only answers can finish; writes require explicit acceptance.
                 writes = await self.db.call(
@@ -410,8 +452,18 @@ class TaskDispatcher:
             lambda db: rows(db, "SELECT * FROM tasks WHERE state='cancelling'")
         )
         for task in cancelling:
-            active = next((a for a in self.active.values() if a["task"] == task["id"]), None)
-            if active and getattr(self.executor, "can_reconcile", False):
+            active_jobs = [
+                a
+                for a in self.active.values()
+                if a["task"] == task["id"]
+                and (a.get("kind") != "task.verify" or task["id"] in self.verifying)
+            ]
+            active = next(iter(active_jobs), None)
+            if (
+                active
+                and active.get("kind", "task.run") == "task.run"
+                and getattr(self.executor, "can_reconcile", False)
+            ):
                 attempt = await self.db.call(
                     lambda db, task=task: row(
                         db,
@@ -422,8 +474,9 @@ class TaskDispatcher:
                 if attempt and attempt["executor_kind"] == "cli":
                     continue
             if active:
-                if not active["handle"].cancelling():
-                    active["handle"].cancel()
+                for item in active_jobs:
+                    if not item["handle"].cancelling():
+                        item["handle"].cancel()
             else:
                 run = await self.db.call(
                     lambda db, task=task: row(

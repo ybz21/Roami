@@ -201,6 +201,11 @@ async def native_browser(store, fixture, *, workers=1):
         verifier=verify,
     )
     runtime.browser.runner = fixture
+
+    async def receipt_reader(operation_id):
+        return fixture.receipts[operation_id]
+
+    runtime.browser.receipt_reader = receipt_reader
     await runtime.start()
     conversation = await runtime.conversations.create("alice")
     task = await runtime.tasks.create(

@@ -221,6 +221,22 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.wakeup.set()
         return {"data": result}
 
+    @app.get("/v1/tasks/{task_id}/resources")
+    async def task_resources(task_id: str, owner: Owner):
+        return {"data": await runtime.controls.task(owner, task_id)}
+
+    @app.get("/v1/resources/{resource_id}")
+    async def resource_control(resource_id: str, owner: Owner):
+        return {"data": await runtime.controls.get(owner, resource_id)}
+
+    @app.post("/v1/resources/{resource_id}/pause")
+    async def pause_resource(resource_id: str, owner: Owner):
+        return {"data": await runtime.controls.pause(owner, resource_id)}
+
+    @app.post("/v1/resources/{resource_id}/resume")
+    async def resume_resource(resource_id: str, owner: Owner):
+        return {"data": await runtime.controls.resume(owner, resource_id)}
+
     @app.post("/v1/tasks/{task_id}/verify")
     async def verify_task(task_id: str, body: Confirm, owner: Owner):
         return {"data": await runtime.dispatch.confirm(owner, task_id, body.accepted)}

@@ -186,3 +186,99 @@ async def test_cancel_with_unknown_own_stop_never_claims_confirmed_cancelled(sto
         assert await state(runtime, task) == "interrupted"
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("failure", ["timeout", "exception"])
+async def test_unavailable_verifier_requests_acceptance_and_preserves_raw_evidence(store, failure):
+    async def verifier(task, result):
+        if failure == "exception":
+            raise RuntimeError("private provider diagnostics")
+        await asyncio.Event().wait()
+
+    runtime = Runtime(store, QuietModel(), verifier=verifier)
+    runtime.dispatch.verification_timeout = 0.02
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task, run = await task_run(runtime, conversation, "unavailable-verifier")
+        evidence = {"state": "succeeded", "summary": "Executor evidence"}
+        await runtime.tasks.report("alice", task["id"], run["id"], 1, evidence)
+        await runtime.dispatch.verify(await verification(runtime, task))
+        assert await state(runtime, task) == "waiting_user"
+        saved = await store.call(
+            lambda db: row(db, "SELECT result_json FROM task_attempts WHERE id=?", (run["id"],))
+        )
+        assert json.loads(saved["result_json"]) == evidence
+        notice = await store.call(
+            lambda db: row(
+                db,
+                "SELECT payload_json FROM events WHERE task_id=? AND kind='task.waiting_user'",
+                (task["id"],),
+            )
+        )
+        result = json.loads(notice["payload_json"])["result"]
+        assert result["verification"]["errorCode"] == (
+            "VERIFICATION_TIMEOUT" if failure == "timeout" else "VERIFICATION_FAILED"
+        )
+        assert "private provider diagnostics" not in notice["payload_json"]
+        await runtime.dispatch.confirm("alice", task["id"], True)
+        assert await state(runtime, task) == "succeeded"
+    finally:
+        await runtime.close()
+
+
+async def test_supervisor_cancels_blocked_verifier_without_waiting_for_deadline(store):
+    entered, stopped = asyncio.Event(), asyncio.Event()
+
+    async def verifier(task, result):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    runtime = Runtime(store, QuietModel(), verifier=verifier)
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task, run = await task_run(runtime, conversation, "cancel-blocked-verifier")
+        await runtime.tasks.report("alice", task["id"], run["id"], 1, {"state": "succeeded"})
+        await runtime.start()
+        await asyncio.wait_for(entered.wait(), 2)
+        await runtime.tasks.cancel("alice", task["id"])
+        await asyncio.wait_for(stopped.wait(), 2)
+        async with asyncio.timeout(2):
+            while await state(runtime, task) != "cancelled":
+                await asyncio.sleep(0.01)
+        assert (await verification(runtime, task))["state"] == "done"
+    finally:
+        await runtime.close()
+
+
+async def test_shutdown_during_verification_rechecks_evidence_after_restart(store):
+    entered = asyncio.Event()
+
+    async def blocked(task, result):
+        entered.set()
+        await asyncio.Event().wait()
+
+    runtime = Runtime(store, QuietModel(), verifier=blocked)
+    conversation = await runtime.conversations.create("alice")
+    task, run = await task_run(runtime, conversation, "restart-verification")
+    await runtime.tasks.report("alice", task["id"], run["id"], 1, {"state": "succeeded"})
+    await runtime.start()
+    await asyncio.wait_for(entered.wait(), 2)
+    await runtime.close()
+    assert await state(runtime, task) == "verifying"
+    assert (await verification(runtime, task))["state"] == "queued"
+
+    async def accepted(task, result):
+        return True
+
+    restarted = Runtime(store, QuietModel(), verifier=accepted)
+    try:
+        await restarted.start()
+        async with asyncio.timeout(2):
+            while await state(restarted, task) != "succeeded":
+                await asyncio.sleep(0.01)
+        assert (await verification(restarted, task))["state"] == "done"
+    finally:
+        await restarted.close()
