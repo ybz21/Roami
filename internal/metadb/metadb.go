@@ -64,6 +64,15 @@ func (d *DB) Close() error {
 	return d.db.Close()
 }
 
+// NewLocal binds an already resolved platform database without consulting process environment.
+func NewLocal(d *core.DB) *DB {
+	if d == nil {
+		return legacy("local database is unavailable")
+	}
+	v, _ := d.Version()
+	return &DB{db: d.DB, local: d, mode: ModeSQLite, info: Info{Path: d.Path(), Version: v, MinCompat: 1, Journal: "wal"}}
+}
+
 // Open 握手并连上台账库。**永不返回 nil，也永不因为库的问题让后端起不来**：
 // 终端、文件、浏览器这些和台账无关的功能不该被一个 SQLite 问题连坐
 // （集群 hub 节点更是压根不跑业务，却照样会走到这里）。
@@ -74,8 +83,7 @@ func Open(ctx context.Context, tt *ttmux.Client, fallbackBin string) *DB {
 		if err != nil {
 			return legacy(err.Error())
 		}
-		v, _ := d.Version()
-		return &DB{db: d.DB, local: d, mode: ModeSQLite, info: Info{Path: d.Path(), Version: v, MinCompat: 1, Journal: "wal"}}
+		return NewLocal(d)
 	}
 
 	info, err := handshake(ctx, tt, fallbackBin)

@@ -109,3 +109,30 @@ async def test_cancel_parent_marks_entire_child_tree_without_claiming_stopped(st
         )
     await tasks.cancel("alice", parent["id"])
     assert {t["state"] for t in await tasks.list("alice")} == {"cancelling"}
+
+
+async def test_child_coding_task_inherits_parent_deadline(store):
+    from roami_agent.storage import encoded, now_ms
+
+    conversations, c, _ = await origin(store)
+    tasks = Tasks(store, conversations)
+    parent = await tasks.create("alice", c["id"], "Parent", key="parent-deadline")
+    deadline = now_ms() + 10_000
+    budget = json.loads(parent["budget_json"])
+    budget["deadlineMs"] = deadline
+    await store.call(
+        lambda db: db.execute(
+            "UPDATE tasks SET state='running',budget_json=? WHERE id=?",
+            (encoded(budget), parent["id"]),
+        ),
+        write=True,
+    )
+    child = await tasks.create(
+        "alice",
+        c["id"],
+        "Coding child",
+        key="child-deadline",
+        executor="codex",
+        parent_task_id=parent["id"],
+    )
+    assert json.loads(child["budget_json"])["deadlineMs"] == deadline

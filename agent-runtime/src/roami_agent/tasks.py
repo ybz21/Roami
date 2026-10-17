@@ -123,7 +123,17 @@ class Tasks:
                     origin["id"],
                     parent_task_id,
                     encoded(spec),
-                    encoded({"depth": depth, "maxTurns": 16, "deadlineMs": now_ms() + 600_000}),
+                    encoded(
+                        {
+                            "depth": depth,
+                            "maxTurns": 16,
+                            "deadlineMs": min(
+                                now_ms() + 600_000, json.loads(parent["budget_json"])["deadlineMs"]
+                            )
+                            if parent
+                            else now_ms() + 600_000,
+                        }
+                    ),
                     now_ms(),
                     now_ms(),
                 ),
@@ -189,6 +199,16 @@ class Tasks:
                     "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
                     (task["id"],),
                 )
+                if task["latestAttempt"]:
+                    preparation = row(
+                        db,
+                        "SELECT payload_json FROM events WHERE event_key=?",
+                        ("workspace:" + task["latestAttempt"]["runId"],),
+                    )
+                    if preparation:
+                        task["latestAttempt"]["workspace"] = json.loads(
+                            preparation["payload_json"]
+                        )["workspace"]
             return tasks
 
         return await self.db.call(read)

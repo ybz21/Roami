@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ybz21/Roami/internal/gitcontext"
 	"github.com/ybz21/Roami/internal/revive"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/terminalui"
@@ -222,8 +223,10 @@ func repoRootOf(dir string) string {
 	if dir == "" {
 		return ""
 	}
-	out, err := exec.Command("git", "-C", dir, "rev-parse",
-		"--path-format=absolute", "--git-common-dir").Output()
+	cmd := exec.Command("git", "-C", dir, "rev-parse",
+		"--path-format=absolute", "--git-common-dir")
+	cmd.Env = gitcontext.ForDirectory(os.Environ())
+	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}

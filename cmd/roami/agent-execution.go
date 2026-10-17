@@ -15,7 +15,7 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\n  launch creates a new one-shot coding session; existing sessions and worktree preparation use their own services")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\n  launch creates a new one-shot coding session; projectId prepares a fresh project worktree through Go")
 		return 0
 	}
 	sub := args[0]

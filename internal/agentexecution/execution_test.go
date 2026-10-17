@@ -89,7 +89,10 @@ func TestRunnerBoundsOutputAndKeepsNonzeroExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	bin := filepath.Join(dir, "codex")
-	script := "#!/bin/sh\nhead -c 100000 /dev/zero | tr '\\000' 'x'\nprintf 'diagnostic' >&2\nexit 7\n"
+	t.Setenv("GIT_DIR", "/foreign/repository")
+	t.Setenv("GIT_INDEX_FILE", "/foreign/index")
+	t.Setenv("GIT_IMPLICIT_WORK_TREE", "0")
+	script := "#!/bin/sh\nif [ -n \"${GIT_DIR+x}${GIT_INDEX_FILE+x}${GIT_IMPLICIT_WORK_TREE+x}\" ]; then exit 77; fi\nhead -c 100000 /dev/zero | tr '\\000' 'x'\nprintf 'diagnostic' >&2\nexit 7\n"
 	if err := os.WriteFile(bin, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}

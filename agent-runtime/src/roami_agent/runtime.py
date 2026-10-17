@@ -308,7 +308,7 @@ class Runtime:
         external_running = await self.db.call(
             lambda db: db.execute(
                 "SELECT COUNT(*) FROM tasks t JOIN task_attempts a ON a.task_id=t.id AND a.task_revision=t.revision "
-                "WHERE a.executor_kind='cli' AND t.state IN ('running','cancelling')"
+                "WHERE a.executor_kind='cli' AND t.state IN ('preparing','running','cancelling')"
             ).fetchone()[0]
         )
         for job in queued:
@@ -795,12 +795,16 @@ class Runtime:
             db.execute(
                 "UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=?", (job["id"],)
             )
-            db.execute(
-                "UPDATE tasks SET state='running',updated_ms=? WHERE id=?", (now_ms(), task["id"])
+            preparing = run["executor_kind"] == "cli" and getattr(
+                self.executor, "can_reconcile", False
             )
             db.execute(
-                "UPDATE task_attempts SET state='running',started_ms=? WHERE id=?",
-                (now_ms(), run["id"]),
+                "UPDATE tasks SET state=?,updated_ms=? WHERE id=?",
+                ("preparing" if preparing else "running", now_ms(), task["id"]),
+            )
+            db.execute(
+                "UPDATE task_attempts SET state=?,started_ms=? WHERE id=?",
+                ("starting" if preparing else "running", now_ms(), run["id"]),
             )
             turn = None
             if run["executor_kind"] == "native":
@@ -820,7 +824,7 @@ class Runtime:
             event(
                 db,
                 task["origin_conversation_id"],
-                "task.started",
+                "task.preparing" if preparing else "task.started",
                 {"taskId": task["id"], "runId": run["id"]},
                 task_id=task["id"],
             )
@@ -1060,7 +1064,7 @@ class Runtime:
 
     async def _recover_tasks(self):
         def write(db):
-            for task in rows(db, "SELECT * FROM tasks WHERE state='running'"):
+            for task in rows(db, "SELECT * FROM tasks WHERE state IN ('preparing','running')"):
                 external = row(
                     db,
                     "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=? AND executor_kind='cli' AND result_json IS NULL",

@@ -16,6 +16,7 @@ package worktree
 import (
 	"context"
 	"fmt"
+	"github.com/ybz21/Roami/internal/gitcontext"
 	"github.com/ybz21/Roami/internal/metadb"
 	"os"
 	"os/exec"
@@ -76,18 +77,7 @@ const listCacheTTL = 3 * time.Second
 // scrubGitEnv 去掉环境里的 GIT_*（GIT_DIR/GIT_INDEX_FILE/GIT_WORK_TREE…）：
 // 进程若诞生于 git 钩子或被设置过这些变量，子进程 git 会被劫持到错误仓库。
 func scrubGitEnv() []string {
-	env := os.Environ()
-	out := env[:0]
-	for _, kv := range env {
-		k, _, _ := strings.Cut(kv, "=")
-		switch k {
-		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
-			"GIT_COMMON_DIR", "GIT_PREFIX", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE":
-			continue
-		}
-		out = append(out, kv)
-	}
-	return out
+	return gitcontext.ForDirectory(os.Environ())
 }
 
 func git(ctx context.Context, dir string, args ...string) (string, error) {

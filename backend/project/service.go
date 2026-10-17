@@ -395,6 +395,17 @@ func (s *Store) Entries() map[string]Entry {
 }
 
 // Dir 反查 id（或老 key）→ 目录。API 只接受在册 key，顺带杜绝任意路径探测。
+// Entry returns a copy and resolves historical project aliases without writing the catalog.
+func (s *Store) Entry(key string) (Entry, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	k := s.resolve(key)
+	if k == "" {
+		return Entry{}, false
+	}
+	return *s.repos[k], true
+}
+
 func (s *Store) Dir(key string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

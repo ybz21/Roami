@@ -17,7 +17,7 @@ class CodingExecutor:
     async def command(self, sub, *args, spec=None):
         response = await execute(
             [self.settings.cli_bin, "agent", "execution", sub, *args],
-            timeout=15,
+            timeout=180 if spec and spec.get("projectId") else 15,
             input_data=encoded(spec).encode() if spec is not None else None,
         )
         if response["exitCode"]:
@@ -36,30 +36,39 @@ class CodingExecutor:
     async def run(self, task, run):
         spec = json.loads(task["intent_json"])
         target = spec["target"]
-        if target["kind"] != "new_session":
+        if target["kind"] not in {"new_session", "project"}:
             raise DomainError("CODING_TARGET_ADAPTER_NOT_IMPLEMENTED")
         if spec.get("fromMessageId"):
             raise DomainError("CODING_CHECKPOINT_FORK_NOT_IMPLEMENTED")
-        directory = target.get("directory") or self.settings.coding_directory
-        if not isinstance(directory, (str, Path)) or not Path(directory).is_absolute():
-            raise DomainError("CODING_DIRECTORY_REQUIRED")
+        launch = {
+            "key": run["launch_id"],
+            "executor": spec["executor"],
+            "prompt": spec["goal"],
+            "timeoutSeconds": max(
+                1, math.ceil((json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000)
+            ),
+        }
+        if target["kind"] == "project":
+            if not isinstance(target.get("projectId"), str) or not target["projectId"]:
+                raise DomainError("CODING_PROJECT_ID_REQUIRED")
+            if target.get("directory") or target.get("workspaceId"):
+                raise DomainError("CODING_PROJECT_WORKSPACE_OVERRIDE_UNSUPPORTED")
+            launch.update(
+                projectId=target["projectId"],
+                base=target.get("base", ""),
+                remote=target.get("remote", ""),
+            )
+        else:
+            directory = target.get("directory") or self.settings.coding_directory
+            if not isinstance(directory, (str, Path)) or not Path(directory).is_absolute():
+                raise DomainError("CODING_DIRECTORY_REQUIRED")
+            launch["directory"] = str(Path(directory).resolve())
         try:
             receipt = await self.command(
                 "launch",
                 "--file",
                 "-",
-                spec={
-                    "key": run["launch_id"],
-                    "executor": spec["executor"],
-                    "directory": str(Path(directory).resolve()),
-                    "prompt": spec["goal"],
-                    "timeoutSeconds": max(
-                        1,
-                        math.ceil(
-                            (json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000
-                        ),
-                    ),
-                },
+                spec=launch,
             )
         except (DomainError, OSError, TimeoutError):
             await self.record(task, run, {"state": "unknown"})
@@ -76,6 +85,62 @@ class CodingExecutor:
             current = row(db, "SELECT * FROM task_attempts WHERE id=?", (run["id"],))
             if not current or current["result_json"]:
                 return
+            if receipt.get("workspace"):
+                workspace_key = "workspace:" + run["id"]
+                existing = row(
+                    db, "SELECT payload_json FROM events WHERE event_key=?", (workspace_key,)
+                )
+                workspace = {
+                    "taskId": task["id"],
+                    "runId": run["id"],
+                    "workspace": receipt["workspace"],
+                }
+                if existing and json.loads(existing["payload_json"]) != workspace:
+                    raise DomainError("WORKSPACE_BINDING_CONFLICT", 409)
+                if not existing:
+                    event(
+                        db,
+                        task["origin_conversation_id"],
+                        "task.workspace_prepared",
+                        workspace,
+                        task_id=task["id"],
+                        key=workspace_key,
+                    )
+            if receipt.get("workspace"):
+                db.execute(
+                    "UPDATE tasks SET target_json=? WHERE id=? AND revision=?",
+                    (
+                        encoded(
+                            {
+                                "nodeId": "local",
+                                "projectId": receipt["workspace"].get("projectId"),
+                                "workdir": receipt["workspace"].get("directory"),
+                                "sessionId": receipt.get("session"),
+                                "workspace": receipt["workspace"],
+                            }
+                        ),
+                        task["id"],
+                        run["task_revision"],
+                    ),
+                )
+            if state == "running" and receipt.get("session"):
+                was_preparing = row(
+                    db,
+                    "SELECT id FROM tasks WHERE id=? AND state='preparing' AND revision=?",
+                    (task["id"], run["task_revision"]),
+                )
+                if was_preparing:
+                    db.execute(
+                        "UPDATE tasks SET state='running',updated_ms=? WHERE id=?",
+                        (now_ms(), task["id"]),
+                    )
+                    event(
+                        db,
+                        task["origin_conversation_id"],
+                        "task.started",
+                        {"taskId": task["id"], "runId": run["id"]},
+                        task_id=task["id"],
+                    )
             db.execute(
                 "UPDATE task_attempts SET session_id=COALESCE(?,session_id),state=? WHERE id=?",
                 (receipt.get("session"), state or current["state"], run["id"]),
@@ -107,7 +172,12 @@ class CodingExecutor:
             "cancelled",
         }:
             raise DomainError("INVALID_EXECUTOR_RESULT")
-        return {**result, "sessionId": receipt.get("session"), "executor": "roami-cli"}
+        return {
+            **result,
+            "sessionId": receipt.get("session"),
+            "workspace": receipt.get("workspace"),
+            "executor": "roami-cli",
+        }
 
     async def poll(self, tasks):
         pending = await self.db.call(
@@ -115,7 +185,7 @@ class CodingExecutor:
                 db,
                 "SELECT a.*,t.owner_id FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
                 "WHERE a.executor_kind='cli' AND a.result_json IS NULL "
-                "AND a.task_revision=t.revision AND t.state IN ('running','cancelling') "
+                "AND a.task_revision=t.revision AND t.state IN ('preparing','running','cancelling') "
                 "AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind='task.run' AND j.aggregate_id=t.id AND j.state IN ('queued','running')) "
                 "ORDER BY a.started_ms LIMIT 100",
             )

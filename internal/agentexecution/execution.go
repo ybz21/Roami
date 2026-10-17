@@ -20,6 +20,7 @@ import (
 
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/application"
+	"github.com/ybz21/Roami/internal/gitcontext"
 	sessmeta "github.com/ybz21/Roami/internal/sessionstore"
 	runtime "github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -27,7 +28,10 @@ import (
 type Spec struct {
 	Key            string `json:"key"`
 	Executor       string `json:"executor"`
-	Directory      string `json:"directory"`
+	Directory      string `json:"directory,omitempty"`
+	ProjectID      string `json:"projectId,omitempty"`
+	Base           string `json:"base,omitempty"`
+	Remote         string `json:"remote,omitempty"`
 	Prompt         string `json:"prompt"`
 	Model          string `json:"model,omitempty"`
 	Permission     string `json:"permission,omitempty"`
@@ -35,8 +39,10 @@ type Spec struct {
 }
 
 type Receipt struct {
-	Session string `json:"session,omitempty"`
-	State   string `json:"state"`
+	Session    string     `json:"session,omitempty"`
+	State      string     `json:"state"`
+	Workspace  *Workspace `json:"workspace,omitempty"`
+	DeadlineMS int64      `json:"deadlineMs,omitempty"`
 }
 
 type Result struct {
@@ -128,15 +134,8 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if spec.Executor != "codex" && spec.Executor != "claude" {
 		return Status{}, fmt.Errorf("INVALID_EXECUTOR")
 	}
-	if !filepath.IsAbs(spec.Directory) || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
+	if (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) || (spec.ProjectID != "" && spec.Directory != "") || (spec.ProjectID == "" && (spec.Base != "" || spec.Remote != "")) || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
 		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
-	}
-	info, err := os.Stat(spec.Directory)
-	if err != nil {
-		return Status{}, err
-	}
-	if !info.IsDir() {
-		return Status{}, fmt.Errorf("INVALID_EXECUTION_DIRECTORY")
 	}
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return Status{}, err
@@ -164,12 +163,32 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if err = writeJSON(filepath.Join(dir, "spec.json"), spec); err != nil {
 		return Status{}, err
 	}
-	if err = writeJSON(filepath.Join(dir, "receipt.json"), Receipt{State: "starting"}); err != nil {
+	receipt := Receipt{State: "preparing", DeadlineMS: time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second).UnixMilli()}
+	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return Status{}, err
 	}
 	hash := filepath.Base(dir)
+	prepareDeadline := time.Now().Add(120 * time.Second)
+	if taskDeadline := time.UnixMilli(receipt.DeadlineMS); taskDeadline.Before(prepareDeadline) {
+		prepareDeadline = taskDeadline
+	}
+	prepareCtx, cancel := context.WithDeadline(ctx, prepareDeadline)
+	workspace, prepErr := s.prepareWorkspace(prepareCtx, spec, hash)
+	cancel()
+	if prepErr != nil {
+		result := Result{State: "failed", Summary: preparationCode(prepErr), ExitCode: -1, FinishedMS: time.Now().UnixMilli()}
+		if err = writeJSON(filepath.Join(dir, "result.json"), result); err != nil {
+			return Status{}, err
+		}
+		return s.Status(spec.Key)
+	}
+	receipt.Workspace = &workspace
+	receipt.State = "starting"
+	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
+		return Status{}, err
+	}
 	command := "exec " + quote(s.Executable) + " agent execution run --key " + quote(spec.Key)
-	opt := runtime.CreateOpts{Label: spec.Executor + ": " + truncate(strings.Join(strings.Fields(spec.Prompt), " "), 60), Dir: spec.Directory, Extra: []string{
+	opt := runtime.CreateOpts{Label: spec.Executor + ": " + truncate(strings.Join(strings.Fields(spec.Prompt), " "), 60), Dir: workspace.Directory, Extra: []string{
 		"-e", "ROAMI_HOME=" + s.Runtime.HomeDir, "-e", "ROAMI_DATA=" + s.Runtime.DataDir,
 		"-e", "TMUX_BIN=" + s.Runtime.TmuxBin, "-e", "PATH=" + os.Getenv("PATH"),
 		"-e", "ROAMI_AGENT_LAUNCH=" + hash, command,
@@ -182,7 +201,11 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		return Status{}, fmt.Errorf("EXECUTION_LAUNCH_UNCERTAIN: %w", err)
 	}
 	_ = meta.SetAgentKind(created.Session, spec.Executor)
-	if err = writeJSON(filepath.Join(dir, "receipt.json"), Receipt{Session: created.Session, State: "launched"}); err != nil {
+	if workspace.ProjectID != "" {
+		s.bindWorkspace(ctx, created.Session, workspace)
+	}
+	receipt.Session, receipt.State = created.Session, "launched"
+	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return Status{}, err
 	}
 	return s.Status(spec.Key)
@@ -290,10 +313,26 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if promptArg, ok := a.(interface{ OneShotPromptArg() bool }); ok && promptArg.OneShotPromptArg() {
 		args = append(args, spec.Prompt)
 	}
-	runCtx, cancel := context.WithTimeout(ctx, time.Duration(spec.TimeoutSeconds)*time.Second)
+	var receipt Receipt
+	if err = readJSON(filepath.Join(dir, "receipt.json"), &receipt); err != nil {
+		return err
+	}
+	directory := spec.Directory
+	if receipt.Workspace != nil {
+		directory = receipt.Workspace.Directory
+	}
+	if spec.ProjectID != "" && (receipt.Workspace == nil || receipt.Workspace.ProjectID == "") {
+		return fmt.Errorf("PROJECT_WORKSPACE_NOT_PREPARED")
+	}
+	deadline := time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second)
+	if receipt.DeadlineMS != 0 {
+		deadline = time.UnixMilli(receipt.DeadlineMS)
+	}
+	runCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	cmd := exec.CommandContext(runCtx, a.Bin(), args...)
-	cmd.Dir = spec.Directory
+	cmd.Dir = directory
+	cmd.Env = gitcontext.ForDirectory(os.Environ())
 	cmd.Stdin = strings.NewReader(spec.Prompt)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
