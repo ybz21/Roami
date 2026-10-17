@@ -235,7 +235,7 @@ async def test_schema_v1_upgrades_without_losing_existing_artifacts_and_future_s
             await database.call(
                 lambda db: db.execute("SELECT MAX(version) FROM schema_meta").fetchone()[0]
             )
-            == 2
+            == migrations.SCHEMA_VERSION
         )
         await database.call(
             lambda db: db.execute("INSERT INTO schema_meta(version,applied_ms) VALUES(999,1)"),

@@ -18,6 +18,7 @@ from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.core.loop import AgentLoop
+from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.tasks import Tasks
@@ -62,6 +63,7 @@ class Runtime:
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
+        self.resources = ResourceLeases(database)
         self.memory = Memories(database, self.settings.memory_timezone)
         self.memory_jobs = MemoryJobs(
             database, memory_model or self.worker_model, self.memory, self.memory.daily
@@ -133,6 +135,7 @@ class Runtime:
     async def start(self):
         await self.conversations.recover()
         await self.memory_jobs.recover()
+        await self.resources.recover()
         await self.dispatch.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):
