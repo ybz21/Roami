@@ -7,6 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.models import model_endpoint
 
 MAIN_INSTRUCTIONS = (
     "You are the user's Roami assistant. Answer simple questions directly and briefly. "
@@ -32,6 +33,9 @@ class Settings:
     model: str = ""
     key_env: str = "ROAMI_AGENT_API_KEY"
     worker_model: str = ""
+    model_retries: int = 2
+    model_capabilities: dict = field(default_factory=dict)
+    model_cache: dict = field(default_factory=dict)
     main_instructions: str = MAIN_INSTRUCTIONS
     worker_instructions: str = WORKER_INSTRUCTIONS
     main_concurrency: int = 2
@@ -55,10 +59,13 @@ class Settings:
         raw = tomllib.loads(path.read_text())
         model, runtime, tools = (raw.get(k, {}) for k in ["model", "runtime", "tools"])
         result = cls(
-            endpoint=model.get("endpoint", ""),
+            endpoint=model_endpoint(model.get("endpoint", "")),
             model=model.get("name", ""),
             key_env=model.get("key_env", "ROAMI_AGENT_API_KEY"),
             worker_model=model.get("worker", ""),
+            model_retries=model.get("max_retries", 2),
+            model_capabilities=model.get("capabilities", {}),
+            model_cache=model.get("cache", {}),
             main_instructions=raw.get("main", {}).get("instructions", MAIN_INSTRUCTIONS),
             worker_instructions=raw.get("worker", {}).get("instructions", WORKER_INSTRUCTIONS),
             main_concurrency=runtime.get("main_concurrency", 2),
@@ -92,14 +99,16 @@ class Settings:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if bool(result.model) != bool(result.endpoint):
             raise DomainError("INVALID_MODEL_CONFIG")
+        if (
+            not isinstance(result.model_retries, int)
+            or isinstance(result.model_retries, bool)
+            or not 0 <= result.model_retries <= 3
+        ):
+            raise DomainError("INVALID_MODEL_CONFIG")
         try:
             ZoneInfo(result.memory_timezone)
         except (ValueError, TypeError, ZoneInfoNotFoundError) as exc:
             raise DomainError("INVALID_MEMORY_TIMEZONE") from exc
-        if result.endpoint and not result.endpoint.startswith(
-            ("https://", "http://127.0.0.1:", "http://localhost:")
-        ):
-            raise DomainError("MODEL_ENDPOINT_REQUIRES_TLS")
         return result
 
     def credentials(self):

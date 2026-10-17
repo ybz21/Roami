@@ -3,7 +3,20 @@
 endpoint = ""
 name = ""
 key_env = "ROAMI_AGENT_API_KEY"
+max_retries = 2 # only transient failures before any event; 0 disables retries
 # worker = "a-model-supported-by-the-same-endpoint"
+
+# Declare capabilities only after verifying this endpoint/model combination.
+# [model.capabilities]
+# version = "chat-v1"
+# tools = true
+# stream_usage = true
+# prompt_cache_key = true
+# prompt_cache_options = true
+# [model.cache]
+# namespace = "roami-instance-v1"
+# mode = "implicit"
+# ttl = "30m"
 
 [runtime]
 main_concurrency = 2

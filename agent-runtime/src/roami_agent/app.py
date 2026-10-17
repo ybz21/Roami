@@ -184,7 +184,13 @@ async def serve(args):
         await database.close()
         return
     provider = ChatCompletions(
-        settings.endpoint, settings.model, settings.credentials(), timeout=settings.timeout_seconds
+        settings.endpoint,
+        settings.model,
+        settings.credentials(),
+        timeout=settings.timeout_seconds,
+        max_retries=settings.model_retries,
+        capabilities=settings.model_capabilities,
+        cache=settings.model_cache,
     )
     worker = (
         ChatCompletions(
@@ -192,6 +198,9 @@ async def serve(args):
             settings.worker_model,
             settings.credentials(),
             timeout=settings.timeout_seconds,
+            max_retries=settings.model_retries,
+            capabilities=settings.model_capabilities,
+            cache=settings.model_cache,
         )
         if settings.worker_model
         else provider

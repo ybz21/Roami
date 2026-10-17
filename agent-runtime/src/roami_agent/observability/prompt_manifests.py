@@ -19,7 +19,7 @@ class PromptManifests:
                     identity(),
                     tid,
                     step + 1,
-                    "chat-completions",
+                    plan.get("providerKey", "unidentified"),
                     model_key,
                     wire_hash,
                     plan["snapshotId"],
@@ -29,6 +29,7 @@ class PromptManifests:
                             "role": role,
                             "sourceMessageIds": plan.get("sourceMessageIds", []),
                             "catalogHash": hashlib.sha256(encoded(catalog).encode()).hexdigest(),
+                            "modelSettingsHash": plan.get("modelSettingsHash"),
                         }
                     ),
                     now_ms(),

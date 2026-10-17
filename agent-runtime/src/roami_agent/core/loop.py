@@ -54,9 +54,21 @@ class AgentLoop:
                 for step in range(self.settings.max_steps):
                     if task_id:
                         await self.charge_task(task_id)
-                    wire_hash = hashlib.sha256(encoded([prompt, catalog]).encode()).hexdigest()
+                    provider_key = getattr(model, "provider_key", "unidentified")
+                    settings_hash = getattr(model, "settings_hash", None)
+                    wire_hash = hashlib.sha256(
+                        encoded(
+                            [provider_key, model.model, "chat-v1", settings_hash, prompt, catalog]
+                        ).encode()
+                    ).hexdigest()
                     await self.manifests.record(
-                        turn, step + 1, model.model, wire_hash, plan, catalog, role
+                        turn,
+                        step + 1,
+                        model.model,
+                        wire_hash,
+                        dict(plan, providerKey=provider_key, modelSettingsHash=settings_hash),
+                        catalog,
+                        role,
                     )
                     mid = await self.journal.start(turn)
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
