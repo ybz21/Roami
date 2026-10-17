@@ -34,6 +34,7 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
 from roami_agent.storage.turn_journal import TurnJournal
+from roami_agent.tools.artifacts import register_artifact_tools
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
@@ -76,8 +77,9 @@ class Runtime:
         self.supervisor = None
         self.external_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
-        add_worker_tools(self.tools, self.settings)
-        self.mcp = MCPConnections(self.tools, self.settings.mcp_servers)
+        add_worker_tools(self.tools, self.settings, self.artifacts)
+        register_artifact_tools(self.tools, self.artifacts)
+        self.mcp = MCPConnections(self.tools, self.settings.mcp_servers, self.artifacts)
 
         self.mailbox = TurnMailbox(database)
         self.journal = TurnJournal(database)

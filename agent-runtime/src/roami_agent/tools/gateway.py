@@ -89,11 +89,17 @@ class ToolGateway:
 
                 await self.db.call(write_progress, write=True)
 
-            value = await self.tools.invoke(call, role, dict(binding, progress=progress))
+            value = await self.tools.invoke(
+                call, role, dict(binding, progress=progress, assistantMessageId=mid)
+            )
             state = "succeeded"
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
-            state = "unknown" if value["error"] == "MCP_OUTCOME_UNKNOWN" else "failed"
+            state = (
+                "unknown"
+                if value["error"] in {"MCP_OUTCOME_UNKNOWN", "TOOL_OUTCOME_UNKNOWN"}
+                else "failed"
+            )
             if state == "unknown":
                 value.update(outcomeKnown=False, retryable=False)
         except asyncio.CancelledError:

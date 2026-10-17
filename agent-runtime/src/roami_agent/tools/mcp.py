@@ -20,6 +20,7 @@ from mcp.client.streamable_http import streamable_http_client
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.mcp_results import MCPResults
 
 log = logging.getLogger(__name__)
 
@@ -126,8 +127,9 @@ class TrackedStream:
 
 
 class MCPConnections:
-    def __init__(self, registry, configs):
+    def __init__(self, registry, configs, artifacts=None):
         validate_servers(configs)
+        self.results = MCPResults(artifacts)
         self.registry = registry
         self.connections = {name: Connection(name, config) for name, config in configs.items()}
         self.closed = False
@@ -184,12 +186,18 @@ class MCPConnections:
             slug = re.sub(r"[^a-zA-Z0-9_-]", "_", remote.name)[:24]
             alias = f"mcp_{connection.name}_{slug}_{digest[:10]}"
 
-            async def invoke(args, binding, alias=alias, connection=connection):
-                return await self._request(
+            async def invoke(
+                args, binding, alias=alias, connection=connection, remote_name=remote.name
+            ):
+                answer = await self._request(
                     connection,
                     "call",
                     {"alias": alias, "arguments": args, "progress": binding.get("progress")},
                 )
+                try:
+                    return await self.results.project(answer, binding, connection.name, remote_name)
+                except (DomainError, OSError):
+                    raise DomainError("MCP_OUTCOME_UNKNOWN") from None
 
             prepared.append(Tool(alias, description, schema, invoke, effect=effect))
             names[alias] = remote.name
@@ -350,14 +358,7 @@ class MCPConnections:
                         )
                         if answer.isError:
                             raise DomainError("MCP_OUTCOME_UNKNOWN")
-                        if any(not isinstance(part, types.TextContent) for part in answer.content):
-                            raise DomainError("MCP_BINARY_OUTPUT_REQUIRES_ARTIFACT")
-                        result = {
-                            "content": [part.text for part in answer.content],
-                            "structuredContent": answer.structuredContent,
-                        }
-                        if len(encoded(result).encode()) > 64_000:
-                            raise DomainError("MCP_OUTPUT_LIMIT")
+                        result = answer
                     if not request.future.done():
                         request.future.set_result(result)
                     connection.current = None

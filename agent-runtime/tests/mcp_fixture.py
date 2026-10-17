@@ -1,6 +1,7 @@
 """Real stdio MCP fixture; state files make disconnect and catalog changes observable."""
 
 import asyncio
+import base64
 import json
 import os
 import sys
@@ -27,7 +28,7 @@ async def tools():
         schema["properties"]["text"]["maxLength"] = 10
     return [
         types.Tool(name=name, description="Fixture " + name, inputSchema=schema)
-        for name in ["echo", "slow", "large", "failure", "changed"]
+        for name in ["echo", "slow", "large", "image", "failure", "changed"]
         if name not in state.get("removed", [])
     ]
 
@@ -48,6 +49,16 @@ async def call(name, arguments):
     if name == "failure":
         return types.CallToolResult(
             content=[types.TextContent(type="text", text="secret fixture details")], isError=True
+        )
+    if name == "image":
+        return types.CallToolResult(
+            content=[
+                types.ImageContent(
+                    type="image",
+                    mimeType="image/png",
+                    data=base64.b64encode(b"fixture-image").decode(),
+                )
+            ]
         )
     body = {
         "text": arguments["text"],

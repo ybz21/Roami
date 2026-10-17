@@ -16,6 +16,7 @@ async def execute(
     input_data=None,
     env: dict | None = None,
     max_bytes=128_000,
+    raw_output=False,
 ):
     if cwd is not None and env is None:
         bindings = {
@@ -49,7 +50,8 @@ async def execute(
             if size > max_bytes:
                 raise DomainError("PROCESS_OUTPUT_LIMIT")
             parts.append(chunk)
-        return b"".join(parts).decode("utf-8", errors="replace")
+        body = b"".join(parts)
+        return body if raw_output else body.decode("utf-8", errors="replace")
 
     async def exchange():
         if input_data is not None:

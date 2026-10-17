@@ -7,7 +7,7 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.process import execute
 
 
-def register_shell(registry, settings):
+def register_shell(registry, settings, artifacts=None):
     async def shell(args, binding):
         workspace = binding.get("workspace")
         if binding.get("taskId") and not workspace:
@@ -22,7 +22,42 @@ def register_shell(registry, settings):
         roots = [Path(workspace["directory"]).resolve()] if workspace else settings.shell_roots
         if not any(cwd == root or root in cwd.parents for root in roots):
             raise DomainError("WORKSPACE_OUTSIDE_CONFIGURED_ROOTS")
-        return await execute(args["argv"], cwd=cwd, timeout=min(args.get("timeout", 60), 60))
+        if not artifacts:
+            return await execute(args["argv"], cwd=cwd, timeout=min(args.get("timeout", 60), 60))
+        result = await execute(
+            args["argv"],
+            cwd=cwd,
+            timeout=min(args.get("timeout", 60), 60),
+            max_bytes=min(artifacts.max_bytes, 2 * 1024 * 1024),
+            raw_output=True,
+        )
+        references = []
+        for stream in ["stdout", "stderr"]:
+            body = result[stream]
+            try:
+                text = body.decode("utf-8")
+                binary = "\0" in text
+            except UnicodeDecodeError:
+                text, binary = "", True
+            if len(body) > 16000 or binary:
+                try:
+                    reference = await artifacts.put(
+                        binding["owner"],
+                        body,
+                        mime_type="application/octet-stream" if binary else "text/plain",
+                        name="shell-" + stream + (".bin" if binary else ".txt"),
+                        task_id=binding.get("taskId"),
+                        message_id=binding.get("assistantMessageId"),
+                        metadata={"source": "shell", "stream": stream},
+                    )
+                except (DomainError, OSError):
+                    raise DomainError("TOOL_OUTCOME_UNKNOWN") from None
+                references.append(reference)
+                text = "" if binary else body[:4000].decode(errors="ignore")
+            result[stream] = text
+        if references:
+            result.update(artifactRefs=references, outputExternalized=True)
+        return result
 
     registry.add(
         Tool(

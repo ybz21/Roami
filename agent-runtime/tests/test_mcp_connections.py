@@ -220,7 +220,15 @@ def test_invalid_configuration_fails_before_starting_a_process(config):
         validate_servers({"test": config})
 
 
-@pytest.mark.parametrize("remote, expected", [("echo", "succeeded"), ("failure", "interrupted")])
+@pytest.mark.parametrize(
+    "remote, expected",
+    [
+        ("echo", "succeeded"),
+        ("image", "waiting_user"),
+        ("large", "waiting_user"),
+        ("failure", "interrupted"),
+    ],
+)
 async def test_worker_discovers_calls_and_records_mcp_outcomes(
     store, tmp_path, monkeypatch, remote, expected
 ):
@@ -274,9 +282,22 @@ async def test_worker_discovers_calls_and_records_mcp_outcomes(
         calls = await store.call(
             lambda db: rows(db, "SELECT tool_name,state FROM tool_calls ORDER BY created_ms")
         )
+        if remote in {"image", "large"}:
+            artifacts = await runtime.artifacts.list("alice", task_id=task["id"])
+            assert len(artifacts) == 1 and artifacts[0]["messageId"]
+            reference, body = await runtime.artifacts.read("alice", artifacts[0]["id"])
+            assert body == (b"fixture-image" if remote == "image" else b"x" * 65_000)
+            assert reference["metadata"]["tool"] == remote
+            tool_messages = await store.call(
+                lambda db: rows(db, "SELECT content_json FROM messages WHERE role='tool'")
+            )
+            assert any(reference["id"] in message["content_json"] for message in tool_messages)
+            assert all(len(message["content_json"]) < 16_000 for message in tool_messages)
+            with pytest.raises(DomainError, match="ARTIFACT_NOT_FOUND"):
+                await runtime.artifacts.read("bob", reference["id"])
         assert len(calls) == 2
-        assert calls[-1]["state"] == ("succeeded" if remote == "echo" else "unknown")
-        assert model.calls == (3 if remote == "echo" else 2)
+        assert calls[-1]["state"] == ("succeeded" if expected != "interrupted" else "unknown")
+        assert model.calls == (3 if expected != "interrupted" else 2)
         manifests = await store.call(
             lambda db: rows(
                 db,

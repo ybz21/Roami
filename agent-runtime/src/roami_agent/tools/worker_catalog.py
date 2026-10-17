@@ -7,8 +7,8 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.shell import register_shell
 
 
-def add_worker_tools(registry, settings):
-    register_shell(registry, settings)
+def add_worker_tools(registry, settings, artifacts=None):
+    register_shell(registry, settings, artifacts)
 
     for name, config in settings.http_tools.items():
 

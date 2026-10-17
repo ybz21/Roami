@@ -29,6 +29,70 @@ def roami_binary(tmp_path_factory):
     return binary
 
 
+async def test_python_artifacts_survive_real_go_backup_and_restore(tmp_path, roami_binary):
+    from roami_agent.conversation.transcript import Conversations
+    from roami_agent.storage.artifact_store import ArtifactStore
+    from roami_agent.storage.database import Database
+
+    source, target = tmp_path / "source", tmp_path / "restored"
+    source.mkdir()
+    runtime_dir = Path(__file__).resolve().parents[1]
+    base_env = {
+        k: v for k, v in os.environ.items() if not k.startswith(("ROAMI_", "ROAM_", "TTMUX_"))
+    }
+
+    async def cli(root, *args):
+        env = dict(
+            base_env,
+            ROAMI_HOME=str(root),
+            ROAMI_DATA=str(root),
+            ROAMI_CONFIG=str(root / "config.yaml"),
+        )
+        process = await asyncio.create_subprocess_exec(
+            str(roami_binary),
+            *args,
+            env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await process.communicate()
+        assert process.returncode == 0, err.decode()
+        return json.loads(out)
+
+    await cli(source, "agent", "init", "--runtime-dir", str(runtime_dir))
+    database = Database(source / "database/agents/runtime.db", source)
+    await database.open()
+    artifacts = ArtifactStore(database)
+    try:
+        conversation = await Conversations(database).create("alice")
+        accepted = await Conversations(database).accept(
+            "alice", conversation["id"], "evidence", "Keep evidence"
+        )
+        reference = await artifacts.put(
+            "alice",
+            b"exact binary\x00\xff",
+            mime_type="application/octet-stream",
+            message_id=accepted["messageId"],
+            metadata={"source": "fixture"},
+        )
+    finally:
+        await artifacts.close()
+        await database.close()
+    backup = await cli(source, "db", "backup")
+    await cli(target, "db", "restore", backup)
+    restored = Database(target / "database/agents/runtime.db", target)
+    await restored.open()
+    artifacts = ArtifactStore(restored)
+    try:
+        actual, body = await artifacts.read("alice", reference["id"])
+        assert actual == reference and body == b"exact binary\x00\xff"
+        history = await Conversations(restored).messages("alice", conversation["id"])
+        assert history["messages"][0]["id"] == reference["messageId"]
+    finally:
+        await artifacts.close()
+        await restored.close()
+
+
 async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
     model_app = FastAPI()
 
