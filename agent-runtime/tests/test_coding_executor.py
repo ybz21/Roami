@@ -221,3 +221,89 @@ async def test_coding_new_project_resolves_before_launch_without_using_loose_dir
     executor.command = command
     assert await executor.run(task, run) is None
     assert calls == ["provision", "launch"]
+
+
+async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(store, tmp_path):
+    import pytest
+
+    from roami_agent.protocol.errors import DomainError
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    c = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        c["id"],
+        "Continue",
+        key="session",
+        executor="codex",
+        target={"kind": "session", "sessionId": "stable-session"},
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings(coding_directory=tmp_path / "unrelated"))
+    receipt = {
+        "state": "running",
+        "session": "stable-session",
+        "sessionBinding": {"id": "stable-session", "providerConversationId": "exact-provider-id"},
+        "workspace": {"directory": str(tmp_path)},
+    }
+
+    async def command(sub, *args, spec=None):
+        assert spec["sessionId"] == "stable-session"
+        assert "directory" not in spec and "projectId" not in spec
+        return receipt
+
+    executor.command = command
+    assert await executor.run(task, run) is None
+    assert (await tasks.list("alice"))[0]["latestAttempt"][
+        "agentConversationId"
+    ] == "exact-provider-id"
+    with pytest.raises(DomainError, match="SESSION_BINDING_CONFLICT"):
+        await executor.record(
+            task,
+            run,
+            {
+                **receipt,
+                "sessionBinding": {
+                    "id": "stable-session",
+                    "providerConversationId": "wrong-provider",
+                },
+            },
+        )
+    assert (await tasks.list("alice"))[0]["latestAttempt"][
+        "agentConversationId"
+    ] == "exact-provider-id"
+
+
+async def test_session_preflight_rejection_is_distinct_from_submission_uncertainty(store):
+    from roami_agent.protocol.errors import DomainError
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    c = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        c["id"],
+        "Continue",
+        key="preflight",
+        executor="codex",
+        target={"kind": "session", "sessionId": "stable-session"},
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings())
+    code = "SESSION_LIFECYCLE_UNAVAILABLE"
+
+    async def command(*args, **kwargs):
+        raise DomainError(code)
+
+    executor.command = command
+    assert await executor.run(task, run) == {"state": "failed", "summary": code}
+    code = "SESSION_SUBMISSION_UNKNOWN"
+    assert await executor.run(task, run) is None
+    assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "unknown"

@@ -198,7 +198,7 @@ class Tasks:
             for task in tasks:
                 task["latestAttempt"] = row(
                     db,
-                    "SELECT id AS runId,state,session_id AS sessionId,executor_kind AS executorKind "
+                    "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind "
                     "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
                     (task["id"],),
                 )

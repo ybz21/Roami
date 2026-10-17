@@ -11,6 +11,17 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row, rows
 from roami_agent.tools.process import execute
 
+SESSION_REJECTIONS = {
+    "SESSION_LIFECYCLE_UNAVAILABLE",
+    "SESSION_NOT_IDLE",
+    "SESSION_DIRECTORY_CHANGED",
+    "SESSION_TARGET_AMBIGUOUS",
+    "SESSION_TARGET_NOT_FOUND",
+    "SESSION_PANE_AMBIGUOUS",
+    "SESSION_PROCESS_OBSERVATION_UNAVAILABLE",
+    "INVALID_SESSION_EXECUTION_SPEC",
+}
+
 
 class CodingExecutor:
     can_reconcile = True
@@ -26,6 +37,8 @@ class CodingExecutor:
         )
         if response["exitCode"]:
             # CLI diagnostics may contain paths or account details; keep them out of model context.
+            if sub == "launch" and response["stderr"].strip() in SESSION_REJECTIONS:
+                raise DomainError(response["stderr"].strip())
             raise DomainError("CODING_EXECUTOR_UNAVAILABLE", 503)
         try:
             value = json.loads(response["stdout"])
@@ -42,7 +55,7 @@ class CodingExecutor:
         target = spec["target"]
         if target["kind"] == "new_project":
             target = await provision_project(self.settings, task, run)
-        if target["kind"] not in {"new_session", "project"}:
+        if target["kind"] not in {"new_session", "project", "session"}:
             raise DomainError("CODING_TARGET_ADAPTER_NOT_IMPLEMENTED")
         if spec.get("fromMessageId"):
             raise DomainError("CODING_CHECKPOINT_FORK_NOT_IMPLEMENTED")
@@ -56,7 +69,20 @@ class CodingExecutor:
                 1, math.ceil((json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000)
             ),
         }
-        if target["kind"] == "project":
+        if target.get("nodeId", "local") != "local":
+            raise DomainError("CODING_NODE_UNAVAILABLE")
+        if target["kind"] == "session":
+            if spec["executor"] != "codex":
+                raise DomainError("SESSION_COMPLETION_ADAPTER_UNAVAILABLE")
+            if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
+                raise DomainError("CODING_SESSION_ID_REQUIRED")
+            if any(
+                target.get(key)
+                for key in ["directory", "projectId", "workspaceId", "base", "remote"]
+            ):
+                raise DomainError("CODING_SESSION_TARGET_CONFLICT")
+            launch["sessionId"] = target["sessionId"]
+        elif target["kind"] == "project":
             if not isinstance(target.get("projectId"), str) or not target["projectId"]:
                 raise DomainError("CODING_PROJECT_ID_REQUIRED")
             if target.get("directory"):
@@ -84,7 +110,12 @@ class CodingExecutor:
                 "-",
                 spec=launch,
             )
-        except (DomainError, OSError, TimeoutError):
+        except DomainError as exc:
+            if exc.code in SESSION_REJECTIONS:
+                return {"state": "failed", "summary": exc.code}
+            await self.record(task, run, {"state": "unknown"})
+            return None
+        except (OSError, TimeoutError):
             await self.record(task, run, {"state": "unknown"})
             return None
         await self.record(task, run, receipt)
@@ -99,6 +130,25 @@ class CodingExecutor:
             current = row(db, "SELECT * FROM task_attempts WHERE id=?", (run["id"],))
             if not current or current["result_json"]:
                 return
+            binding = receipt.get("sessionBinding")
+            if binding:
+                if not isinstance(binding, dict):
+                    raise DomainError("INVALID_SESSION_BINDING")
+                provider_id = binding.get("providerConversationId")
+                if (
+                    not isinstance(provider_id, str)
+                    or not provider_id
+                    or binding.get("id") != receipt.get("session")
+                ):
+                    raise DomainError("INVALID_SESSION_BINDING")
+                if current["agent_conversation_id"] not in {None, provider_id} or current[
+                    "session_id"
+                ] not in {None, receipt["session"]}:
+                    raise DomainError("SESSION_BINDING_CONFLICT", 409)
+                db.execute(
+                    "UPDATE task_attempts SET agent_conversation_id=? WHERE id=?",
+                    (provider_id, run["id"]),
+                )
             if receipt.get("workspace"):
                 workspace_key = "workspace:" + run["id"]
                 existing = row(

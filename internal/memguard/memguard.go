@@ -228,6 +228,39 @@ func ScopeOf(pid int) string {
 	return unit
 }
 
+// ScopeProcesses includes orphaned children that remain in the pane's dedicated cgroup.
+func ScopeProcesses(pid int) (string, []int, error) {
+	directory := cgroupDir(pid)
+	if directory == "" || !strings.HasPrefix(filepath.Base(directory), "tmux-spawn-") || !strings.HasSuffix(directory, ".scope") {
+		return "", nil, fmt.Errorf("pane process scope unavailable")
+	}
+	var pids []int
+	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, problem error) error {
+		if problem != nil {
+			return problem
+		}
+		if entry.Name() != "cgroup.procs" || entry.IsDir() {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) && path != filepath.Join(directory, "cgroup.procs") {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		for _, value := range strings.Fields(string(content)) {
+			n, err := strconv.Atoi(value)
+			if err != nil || n <= 0 {
+				return fmt.Errorf("invalid scope process")
+			}
+			pids = append(pids, n)
+		}
+		return nil
+	})
+	return directory, pids, err
+}
+
 // 设上限要重试，而且**只能以回读的结果为准**。
 //
 // tmux 建 pane 和 systemd 注册那个 scope 是异步的，而且两边不同步：内核层面的

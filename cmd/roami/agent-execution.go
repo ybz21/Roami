@@ -16,17 +16,19 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\n  launch creates a new one-shot coding session; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution hook-config --executor codex\nroami agent execution event --executor codex --file -\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
-	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" {
+	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
 	fs := flag.NewFlagSet("agent execution "+sub, flag.ContinueOnError)
 	file := fs.String("file", "", "execution spec, or - for stdin")
 	key := fs.String("key", "", "stable launch key")
+	executor := fs.String("executor", "", "lifecycle callback provider")
+	notification := fs.String("notification", "", "provider completion JSON argument")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
@@ -47,6 +49,37 @@ func runAgentExecution(args []string) int {
 	service := agentexecution.Service{Runtime: runtime.New(), Executable: exe}
 	var status agentexecution.Status
 	switch sub {
+	case "hook-config":
+		config, err := agentexecution.HookConfiguration(exe, *executor)
+		if err != nil {
+			return fail(err)
+		}
+		if err = json.NewEncoder(os.Stdout).Encode(config); err != nil {
+			return fail(err)
+		}
+		return 0
+	case "event":
+		if (*file == "") == (*notification == "") {
+			return fail(fmt.Errorf("event requires either --file or --notification"))
+		}
+		content, err := agentInput(*file, *notification)
+		if err != nil {
+			return fail(err)
+		}
+		event, err := agentexecution.DecodeSessionEvent(content)
+		if err != nil {
+			return fail(err)
+		}
+		if err = service.ObserveSessionEvent(context.Background(), *executor, os.Getenv("TMUX_PANE"), event); err != nil {
+			if err.Error() == "SESSION_TASK_CANCEL_REQUESTED" {
+				_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"hookSpecificOutput": map[string]string{"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "The Roami task was cancelled; finish without starting another tool."}})
+				return 0
+			}
+			return fail(err)
+		}
+		// Hooks consume this output; never inject receipt JSON as developer context.
+		fmt.Println("{}")
+		return 0
 	case "hold":
 		if *file != "-" {
 			return fail(fmt.Errorf("hold requires --file - and newline-delimited JSON"))

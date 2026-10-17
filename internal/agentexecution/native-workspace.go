@@ -12,7 +12,7 @@ import (
 
 // HoldNative prepares through Go and keeps the shared writer lease until explicit stop confirmation.
 func (s Service) HoldNative(ctx context.Context, spec Spec, input *json.Decoder, output io.Writer) error {
-	if spec.Executor != "native" || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 || (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) || (spec.ProjectID != "" && spec.Directory != "") || (spec.ProjectID == "" && (spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "")) || (spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != "")) {
+	if spec.Executor != "native" || spec.SessionID != "" || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 || (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) || (spec.ProjectID != "" && spec.Directory != "") || (spec.ProjectID == "" && (spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "")) || (spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != "")) {
 		return fmt.Errorf("INVALID_NATIVE_WORKSPACE_SPEC")
 	}
 	dir, err := s.directory(spec.Key)

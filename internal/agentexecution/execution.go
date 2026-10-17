@@ -31,6 +31,7 @@ type Spec struct {
 	Directory      string `json:"directory,omitempty"`
 	ProjectID      string `json:"projectId,omitempty"`
 	WorkspaceID    string `json:"workspaceId,omitempty"`
+	SessionID      string `json:"sessionId,omitempty"`
 	Base           string `json:"base,omitempty"`
 	Remote         string `json:"remote,omitempty"`
 	Prompt         string `json:"prompt"`
@@ -40,10 +41,11 @@ type Spec struct {
 }
 
 type Receipt struct {
-	Session    string     `json:"session,omitempty"`
-	State      string     `json:"state"`
-	Workspace  *Workspace `json:"workspace,omitempty"`
-	DeadlineMS int64      `json:"deadlineMs,omitempty"`
+	Session    string          `json:"session,omitempty"`
+	State      string          `json:"state"`
+	Workspace  *Workspace      `json:"workspace,omitempty"`
+	DeadlineMS int64           `json:"deadlineMs,omitempty"`
+	Binding    *SessionBinding `json:"sessionBinding,omitempty"`
 }
 
 type Result struct {
@@ -128,6 +130,9 @@ func readJSON(path string, value any) error {
 
 // Launch journals intent before starting tmux. An uncertain launch is reconciled, never replayed.
 func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
+	if spec.SessionID != "" {
+		return s.continueSession(ctx, spec)
+	}
 	dir, err := s.directory(spec.Key)
 	if err != nil {
 		return Status{}, err
@@ -239,6 +244,9 @@ func (s Service) Status(key string) (Status, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return status, err
 	}
+	if status.Binding != nil {
+		return s.sessionExecutionStatus(key, status)
+	}
 	// Query success matters: a transport failure is not proof that an agent stopped.
 	out, err := s.Runtime.TmuxOutput("list-sessions", "-F", "#{session_name}\t#{ROAMI_AGENT_LAUNCH}")
 	if err != nil && !runtime.NoServer(out) {
@@ -309,6 +317,9 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	var spec Spec
 	if err = readJSON(filepath.Join(dir, "spec.json"), &spec); err != nil {
 		return err
+	}
+	if spec.SessionID != "" {
+		return fmt.Errorf("SESSION_RUNNER_UNSUPPORTED")
 	}
 	a := agent.Get(spec.Executor)
 	if a == nil {

@@ -19,7 +19,7 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "target_search",
-            "Find projects or live sessions by literal name/ID, with bounded pages. Use only when routing needs it. Never guess among duplicate names. Discovery does not enable session continuation.",
+            "Find projects or live sessions by literal name/ID, with bounded pages. Use only when routing needs it. Never guess among duplicate names. Continuing a session requires lifecycle callbacks.",
             object_schema(
                 {
                     "kind": {"type": "string", "enum": ["project", "session"]},
@@ -141,7 +141,7 @@ def register_main_tools(registry, tasks, memory, targets):
                     "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
                     "target": {
                         "type": "object",
-                        "description": "Explicit target intent. To create a separate project use kind=new_project, name and optional absolute baseDir; templates require configuration. For project work use kind=project and projectId. Omit workspaceId for a fresh worktree; to continue an existing branch, use its workspaceId from task_status. Reuse preserves local work and cannot be combined with base/remote/directory overrides.",
+                        "description": "Explicit intent: new_project + name (+ absolute baseDir) creates a separate project. project + projectId prepares a fresh worktree; adding workspaceId continues that branch without base/remote/directory overrides. session + sessionId continues an enrolled Codex TUI. Reuse preserves local work.",
                     },
                     "fromMessageId": {"type": "string"},
                 },
