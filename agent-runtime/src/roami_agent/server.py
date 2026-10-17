@@ -19,6 +19,7 @@ class Payload(BaseModel):
 
 
 class CreateConversation(Payload):
+    requestKey: str | None = Field(default=None, min_length=1, max_length=200)
     title: str = Field(default="New conversation", max_length=200)
 
 
@@ -117,11 +118,15 @@ def create_app(runtime: Runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):
-        return {"data": await runtime.conversations.create(owner, body.title)}
+        return {
+            "data": await runtime.conversations.create(
+                owner, body.title, request_key=body.requestKey
+            )
+        }
 
     @app.get("/v1/conversations/{cid}/messages")
-    async def messages(cid: str, owner: Owner):
-        return {"data": await runtime.conversations.messages(owner, cid)}
+    async def messages(cid: str, owner: Owner, branch: str | None = None):
+        return {"data": await runtime.conversations.messages(owner, cid, branch)}
 
     @app.post("/v1/conversations/{cid}/messages", status_code=202)
     async def send(cid: str, body: SendMessage, owner: Owner):
@@ -173,7 +178,12 @@ def create_app(runtime: Runtime, *, manage_lifecycle=True):
     @app.get("/v1/conversations/{cid}/context")
     async def context(cid: str, owner: Owner):
         result = await runtime.context.project(owner, cid)
-        return {"data": {k: v for k, v in result.items() if k != "messages"}}
+        return {
+            "data": {
+                "model": runtime.model.model,
+                **{k: v for k, v in result.items() if k != "messages"},
+            }
+        }
 
     @app.get("/v1/conversations/{cid}/context/snapshots/{snapshot_id}")
     async def snapshot(cid: str, snapshot_id: str, owner: Owner):

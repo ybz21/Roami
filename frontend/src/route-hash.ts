@@ -21,7 +21,7 @@ export function getHashParams(): URLSearchParams {
 
 export function setHashParams(params: Record<string, string>) {
   const h = location.hash
-  const base = (h.split('?')[0]) || '#/projects'
+  const base = (h.split('?')[0]) || '#/home'
   const sp = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) { if (v) sp.set(k, v) }
   const qs = sp.toString()

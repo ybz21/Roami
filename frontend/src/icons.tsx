@@ -227,3 +227,5 @@ export const Swatch = ({ color, size = 9 }: { color: string; size?: number }) =>
     background: color, flex: '0 0 auto',
   }} />
 )
+
+export const BellIcon = ({ size = 18 }: P) => line(<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>, size)

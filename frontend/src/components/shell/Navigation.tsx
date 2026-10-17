@@ -20,6 +20,7 @@ export type NavEntry = {
   label: string
   icon: ReactNode
   /** 只显示「需要行动」的数量，不显示普通总数（14 §4.4） */
+  badgeTone?: string
   badge?: number
   badgeTitle?: string
 }
@@ -55,10 +56,10 @@ export function Navigation({
   const item = (n: NavEntry) => {
     const btn = (
       <button key={n.key} type="button" className={`tt-nav-item${active === n.key ? ' on' : ''}`}
-        onClick={() => onGo(n.key)} aria-current={active === n.key ? 'page' : undefined}>
+        onClick={() => onGo(n.key)} aria-label={n.label} aria-current={active === n.key ? 'page' : undefined}>
         <span className="ic">{n.icon}</span>
         {!rail && <span className="nm">{n.label}</span>}
-        {!!n.badge && <span className="bd" title={n.badgeTitle}>{n.badge > 99 ? '99+' : n.badge}</span>}
+        {!!n.badge && <span className={`bd ${n.badgeTone || ''}`} title={n.badgeTitle}>{n.badge > 99 ? '99+' : n.badge}</span>}
       </button>
     )
     // 轨态下文字没了，Tooltip 是唯一的名字来源（14 §4.4「所有图标有 Tooltip」）

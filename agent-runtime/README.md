@@ -1,6 +1,6 @@
 # Roami Agent runtime
 
-Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service and CLI are runnable; real frontend integration, external executor orchestration and proactive delivery policy are still being implemented. Nothing has been deployed to the running user instance.
+Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service, CLI and main chat frontend are runnable; additional executor targets and proactive delivery policy are still being implemented. Nothing has been deployed to the running user instance.
 
 ## Development and verification
 
@@ -27,11 +27,15 @@ cp agent-runtime/agent.example.toml /tmp/agent-demo/agent.toml
 scripts/dev/isolated-roami.sh /tmp/agent-demo /tmp/roami-agent agent serve --runtime-dir "$PWD/agent-runtime"
 ```
 
+`[model].endpoint`, `name`, optional `worker`, and `key_env` select the provider, Main model, Worker model and credential environment variable. Keep credentials in a private file outside the checkout (directory mode 0700, file mode 0600), load that file into the launcher environment, and never place the key in TOML, command arguments, screenshots or version control. Configurations are instance-local; changing them requires restarting that instance's Python service. Verify both streaming and tool calls against the selected model: a model listed by `/models` may still be unavailable to the account.
+
 In another terminal, use the same instance wrapper with `agent status`, `agent new --title NAME`, `agent send --conversation ID --text TEXT`, and `agent history --conversation ID`. Sending returns a durable intake receipt; it does not wait for model completion. `agent report --task ID --run ID --revision N --file result.json` is the local executor callback. `agent notify --conversation ID --source SOURCE --key KEY --file message.txt` is the trusted local trigger adapter. Use stable keys when retrying.
 
 Public HTTP/SSE is `/api/agent/*` on the existing Go server, using its normal login. Python listens only on a private Unix socket (0600 under a 0700 directory); it does not implement a second login service. Go strips browser-supplied owner/cookie/auth headers and forwards the verified current single-user identity. Internal report/notify endpoints are not publicly mounted. For an installed binary, set `ROAMI_AGENT_RUNTIME` or pass `--runtime-dir` to locate the Python project.
 
 ## Implemented
+
+- `frontend/src/components/agent/`: authenticated streaming Main chat, per-conversation drafts/history, retained desktop project/session tree and project quick task entry, coding target selection, task progress, source-backed memory editing, context summary/manual compression and six slash commands. In-app notifications stay unread until a completed message is visible and unobscured; opening the inbox alone does not consume them. Mobile keeps the existing four navigation entries. Browser tests cover message replay, stream framing/Unicode, stale conversation cancellation and visible read confirmation; physical Android acceptance remains pending.
 
 - `storage.py`: SQLite transactions on one dedicated thread; bounded admission; lifetime shared platform maintenance lock and exclusive Agent instance lock; schema/catalog compatibility checks; missing ready database is an error.
 - `conversation.py`: owner-scoped conversations, request idempotency, append-only branches, completed-checkpoint Fork and persisted event replay. Recovery preserves partial messages and marks unknown tool outcomes rather than replaying them.

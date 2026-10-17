@@ -1,3 +1,4 @@
+import { ChecklistIcon } from '../icons'
 // 侧栏/底栏导航的图标集：路由 key → 图标，成组只服务导航，所以单独放一处。
 //
 // 画法与 icons.tsx 一致（24 网格、currentColor 描边、无 emoji）。svg() 只在本文件内用——
@@ -10,6 +11,7 @@ const svg = (paths: any) => (
     strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths}</svg>
 )
 export const ICONS: Record<string, any> = {
+  activity: <ChecklistIcon size={18} />,
   me: svg(<><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></>),
   home: svg(<><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" /><path d="M10 21v-6h4v6" /></>),
   tools: svg(<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>),

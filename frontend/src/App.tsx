@@ -5,7 +5,7 @@ import { agentCommand } from './agent-command'
 //   电脑 ≥1200 → 三栏：导航 Sider | 列表(页面) | 终端面板(常驻, 多标签)
 //   平板/手机   → 终端为全屏覆盖层；手机底部 Tab 导航
 // 终端：多标签 / 字号调节 / 复制 / 更多快捷键 / 断线自动重连。
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { bootstrapCluster, setCurrentNode, useClusterNodes, useCurrentNodeId } from './components/cluster/node-url'
 import { NodeMark, nodeDotColor } from './components/cluster/NodeMark'
 import { hubReasonText, useHubHealth } from './components/cluster/hub-health'
@@ -88,8 +88,13 @@ import { dropDeadTokens, loadTabs, saveTabs, type FileTab } from './components/t
 import { lastTabOf, rememberLastTab } from './components/shell/task-last-tab'
 import { matchHotkey, useKeybindings } from './components/shell/keybindings'
 import type { FileTabMode } from './components/files/FilePathBar'
-import { ChevronLeft, CloudIcon, LogoutIcon, MoreIcon, PlusIcon, SearchIcon } from './icons'
+import { BellIcon, ChevronLeft, CloudIcon, LogoutIcon, MoreIcon, PlusIcon, SearchIcon } from './icons'
 import { lazyRetry } from './components/lazy-retry'
+import { useAgentInbox } from './components/agent/useAgentInbox'
+import AgentHistory from './components/agent/AgentHistory'
+import AgentNotifications from './components/agent/AgentNotifications'
+import './components/agent/agent-chat.css'
+const AgentChat = lazyRetry(() => import('./components/agent/AgentChat'))
 
 const { Sider, Content } = Layout
 const { Text } = Typography
@@ -103,6 +108,7 @@ const { Text } = Typography
 // 概览独有的问候条/行动队列/活动轨现在挂在项目列表页顶上。旧链接由 normalizeRoute 接住。
 const NAV = [
   { key: 'home', labelKey: 'nav.home' },
+  { key: 'activity', labelKey: 'agent.overview' },
   { key: 'projects', labelKey: 'nav.projects' },
   { key: 'files', labelKey: 'nav.files' },
   { key: 'browser', labelKey: 'nav.browser' },
@@ -115,9 +121,9 @@ const NAV = [
 
 // 桌面导航的两组（14 §4.4）。NAV 仍是全量注册表——命令面板和手机「更多」都从它取，
 // 所以 settings 留在 NAV 里，只是不进这两组：它单独摆在侧栏底部（见 Navigation 的 settings）。
-const NAV_WORKSPACE = ['projects', 'files']
+const NAV_WORKSPACE = ['home', 'projects', 'files']
 const NAV_TOOLS = ['browser', 'phone', 'plugins']
-const DESKTOP_PAGE_KEYS = new Set(['projects', 'files', 'browser', 'phone', 'plugins', 'settings', 'sessions', 'swarm', 'hub'])
+const DESKTOP_PAGE_KEYS = new Set(['home', 'activity', 'projects', 'files', 'browser', 'phone', 'plugins', 'settings', 'sessions', 'swarm', 'hub'])
 const PAGE_TABS_KEY = 'roam.pageTabs'
 function loadPageTabs(): string[] {
   try {
@@ -160,7 +166,18 @@ export default function App() {
   const hubHealth = useHubHealth()
 
   const [authed, setAuthed] = useState<boolean | null>(null)
-  const [route, setRoute] = useState(() => normalizeRoute(location.hash.replace(/^#\/?/, '') || 'projects'))
+  const agentInbox = useAgentInbox(authed === true, curNodeId)
+  const [agentInboxOpen, setAgentInboxOpen] = useState(false)
+  const selectAgent = useCallback((cid: string, branch?: string) => {
+    const params = getHashParams().toString()
+    const next = 'home/' + (cid ? encodeURIComponent(cid) + (branch ? '/' + encodeURIComponent(branch) : '') : 'new')
+    setRoute(next)
+    location.hash = '#/' + next + (params ? '?' + params : '')
+  }, [])
+  const [route, setRoute] = useState(() => normalizeRoute(location.hash.replace(/^#\/?/, '') || 'home'))
+  const agentParts = route.split('/')
+  const agentCID = agentParts[0] === 'home' && agentParts[1] && agentParts[1] !== 'new' ? decodeURIComponent(agentParts[1]) : ''
+  const agentBranch = agentParts[0] === 'home' && agentParts[2] ? decodeURIComponent(agentParts[2]) : ''
   const tab = route.split('/')[0]                                  // 基础页（swarm/leave → swarm）
   const [pageTabs, setPageTabs] = useState<string[]>(loadPageTabs)
   const [tabBarHost, setTabBarHost] = useState<HTMLDivElement | null>(null)
@@ -750,7 +767,7 @@ export default function App() {
 
   // hash 路由：URL #/xxx 与当前页同步（支持前进/后退、刷新保持、收藏分享）
   useEffect(() => {
-    const apply = () => setRoute(normalizeRoute(location.hash.replace(/^#\/?/, '') || 'projects'))
+    const apply = () => setRoute(normalizeRoute(location.hash.replace(/^#\/?/, '') || 'home'))
     apply()
     window.addEventListener('hashchange', apply)
     return () => window.removeEventListener('hashchange', apply)
@@ -1023,7 +1040,8 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    home: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
+    home: <AgentChat cid={agentCID} branch={agentBranch} fresh={route === 'home/new'} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} />,
+    activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
     install: isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false} keepBottomNav><InstallPage /></MobileSubPage> : <InstallPage />,
@@ -1067,7 +1085,7 @@ export default function App() {
   const canvasNode = (
     <Content className="tt-canvas" data-cq={CQ_PAGES.has(tab) ? 'on' : undefined} style={{
       flex: 1, minWidth: 0, minHeight: 0, height: '100%', padding: 0,
-      overflow: tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
+      overflow: tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
     }}>{pageNode}</Content>
   )
   const dockNode = (
@@ -1089,7 +1107,8 @@ export default function App() {
         // badge 只报「需要行动」的数量，不报普通总数（14 §4.4）。这里取跨项目待收尾
         // 数：它来自 /projects 一条请求，全局常新；「等待输入」要逐会话抓屏才知道，
         // 为一个角标常驻轮询十几个会话不划算，那个数留在概览页。
-        badge: n.key === 'projects' ? unfinished : undefined,
+        badge: n.key === 'home' ? agentInbox.unread : n.key === 'projects' ? unfinished : undefined,
+        badgeTone: n.key === 'home' ? 'danger' : undefined,
         badgeTitle: n.key === 'projects' ? t('overview.unfinishedN', { count: unfinished }) : undefined,
       }
     }),
@@ -1189,12 +1208,12 @@ export default function App() {
     else if (a.kind === 'pluginView') location.hash = '#/plugins/' + encodeURIComponent(a.id)
   }
 
-  const mobileNavRoot = tab === 'sessions' || tab === 'swarm' || tab === 'w' ? 'projects'
+  const mobileNavRoot = tab === 'activity' ? 'home' : tab === 'sessions' || tab === 'swarm' || tab === 'w' ? 'projects'
     : tab === 'install' || tab === 'about' ? 'settings'
       : ['files', 'browser', 'phone', 'plugins', 'hub'].includes(tab) ? 'tools'
         : tab
   const mobilePrimary = MOBILE_NAV_KEYS.includes(tab) || tab === 'sessions'
-  const mobileBack = tab === 'install' || tab === 'about' ? 'settings' : 'tools'
+  const mobileBack = tab === 'activity' ? 'home' : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
   const mobileTitle = tab === 'install' ? t('install.pageTitle')
     : tab === 'about' ? t('nav.about')
       : tab === 'sessions' || tab === 'swarm' || tab === 'w' ? t('nav.projects')
@@ -1217,6 +1236,7 @@ export default function App() {
         </button>
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
+          <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={() => { agentInbox.refresh(); setAgentInboxOpen(true) }}><BellIcon />{!!agentInbox.unread && <span className="agent-badge">{agentInbox.unread > 99 ? '99+' : agentInbox.unread}</span>}</button>
           {mobilePrimary && mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
             onClick={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}><PlusIcon size={20} /></button>}
           <button type="button" className="tt-mobile-topbar-icon"
@@ -1241,7 +1261,7 @@ export default function App() {
             nodeMenu={nodeItems}
             onSearch={openPalette}
             searchHint={keys.search.label}
-            tree={<ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
+            tree={<><AgentHistory conversations={agentInbox.conversations} notices={agentInbox.notices} active={agentCID} select={selectAgent} create={() => selectAgent('')} /><ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
               onProject={onTreeProject} onTask={onTreeTask} onSession={(key, name) => (terms.includes(name) ? returnToTask(key, name) : openTerm(name, key))}
               onAddProject={() => setNewProjectOpen(true)}
               onRename={setRenameInTree}
@@ -1251,7 +1271,7 @@ export default function App() {
               onRemoveProject={(key) => antModal.confirm({
                 title: t('project.removeConfirm'), okText: t('project.remove'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
                 onOk: async () => { try { await api('DELETE', `/projects/${encodeURIComponent(key)}`); antMessage.success(t('project.removed')); treeReload.current?.() } catch (e: any) { antMessage.error(e.message) } },
-              })} />}
+              })} /></>}
             hubAlarm={hubHealth.level === 'ok' ? undefined : hubReasonText(hubHealth, t)}
             node={curNode ? {
               name: curNode.name,
@@ -1378,6 +1398,7 @@ export default function App() {
       {/* 全局搜索浮层挂在根节点：终端聚焦时 xterm 会吃掉按键，
           都得靠这一处（见 shell/palette/GlobalSearch）。入口另给：顶栏那枚框、
           手机「更多」里那一行、以及 ⌘K / Ctrl+K。 */}
+      <AgentNotifications open={agentInboxOpen} close={() => setAgentInboxOpen(false)} inbox={agentInbox} select={selectAgent} />
       <GlobalSearch items={paletteItems} actions={paletteActions} dir={activeProject?.worktree || activeProject?.dir} />
 
       {/* 手机/平板：全屏会话覆盖层（桌面用右侧停靠栏，不走这里）*/}

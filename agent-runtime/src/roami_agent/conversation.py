@@ -64,8 +64,22 @@ class Conversations:
     def __init__(self, database: Database):
         self.db = database
 
-    async def create(self, owner: str, title="New conversation"):
+    async def create(self, owner: str, title="New conversation", *, request_key=None):
+        if request_key is not None and (not request_key or len(request_key) > 200):
+            raise DomainError("INVALID_REQUEST_KEY")
+        digest = hashlib.sha256(encoded(["create_conversation", title]).encode()).hexdigest()
+
         def write(db):
+            if request_key:
+                prior = row(
+                    db,
+                    "SELECT * FROM requests WHERE owner_id=? AND request_key=?",
+                    (owner, request_key),
+                )
+                if prior:
+                    if prior["payload_sha256"] != digest:
+                        raise DomainError("REQUEST_KEY_CONFLICT", 409)
+                    return owned(db, owner, prior["conversation_id"])
             cid, bid = identity(), identity()
             db.execute("INSERT OR IGNORE INTO owner_versions(owner_id) VALUES(?)", (owner,))
             db.execute(
@@ -78,6 +92,11 @@ class Conversations:
                 (bid, cid, now_ms()),
             )
             db.execute("UPDATE conversations SET active_branch_id=? WHERE id=?", (bid, cid))
+            if request_key:
+                db.execute(
+                    "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",
+                    (identity(), owner, request_key, digest, cid, now_ms()),
+                )
             event(db, cid, "conversation.created", {"conversationId": cid, "branchId": bid})
             return owned(db, owner, cid)
 
@@ -87,8 +106,9 @@ class Conversations:
         return await self.db.call(
             lambda db: rows(
                 db,
-                "SELECT * FROM conversations WHERE owner_id=? "
-                "AND deleted_ms IS NULL ORDER BY updated_ms DESC LIMIT 200",
+                "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) "
+                "ORDER BY c.updated_ms DESC LIMIT 200",
                 (owner,),
             )
         )
@@ -96,16 +116,52 @@ class Conversations:
     async def get(self, owner, cid):
         return await self.db.call(lambda db: owned(db, owner, cid))
 
-    async def messages(self, owner, cid):
+    async def messages(self, owner, cid, branch_id=None):
         def read(db):
             c = owned(db, owner, cid)
-            result = history(db, c["active_branch_id"])
+            selected = branch_id or c["active_branch_id"]
+            if not row(
+                db, "SELECT id FROM branches WHERE id=? AND conversation_id=?", (selected, cid)
+            ):
+                raise DomainError("BRANCH_NOT_FOUND", 404)
+            result = history(db, selected)
+            completed = {
+                r["message_id"]: r["id"]
+                for r in rows(
+                    db,
+                    "SELECT id,message_id FROM events WHERE conversation_id=? AND kind='message.completed'",
+                    (cid,),
+                )
+            }
             cursor = db.execute(
                 "SELECT COALESCE(MAX(id),0) FROM events WHERE conversation_id=?", (cid,)
             ).fetchone()[0]
+            compact = row(
+                db,
+                "SELECT id,payload_json FROM jobs WHERE kind='context.compact' AND json_extract(payload_json,'$.branchId')=? ORDER BY rowid DESC LIMIT 1",
+                (selected,),
+            )
             return {
+                "compaction": (
+                    {"operationId": compact["id"], **json.loads(compact["payload_json"])}
+                    if compact
+                    else None
+                ),
                 "conversation": c,
-                "messages": [dict(m, content=json.loads(m["content_json"])) for m in result],
+                "branchId": selected,
+                "messages": [
+                    dict(
+                        m,
+                        content=json.loads(m["content_json"]),
+                        completedEventId=completed.get(m["id"]),
+                    )
+                    for m in result
+                ],
+                "turns": rows(
+                    db,
+                    "SELECT id,state FROM turns WHERE branch_id=? ORDER BY created_ms DESC LIMIT 200",
+                    (selected,),
+                ),
                 "snapshotCursor": cursor,
             }
 
@@ -126,7 +182,19 @@ class Conversations:
             if old:
                 if old["payload_sha256"] != digest:
                     raise DomainError("REQUEST_KEY_CONFLICT", 409)
-                return {"turnId": old["turn_id"], "requestId": old["id"], "reused": True}
+                accepted = row(
+                    db,
+                    "SELECT id FROM messages WHERE turn_id=? AND role='user' ORDER BY seq LIMIT 1",
+                    (old["turn_id"],),
+                )
+                receipt = row(db, "SELECT id FROM events WHERE event_key=?", (old["id"],))
+                return {
+                    "turnId": old["turn_id"],
+                    "requestId": old["id"],
+                    "messageId": accepted["id"] if accepted else None,
+                    "cursor": receipt["id"] if receipt else None,
+                    "reused": True,
+                }
             rid, tid = identity(), identity()
             db.execute(
                 "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,"
@@ -153,6 +221,10 @@ class Conversations:
                 key=rid,
                 turn_id=tid,
                 message_id=mid,
+            )
+            db.execute(
+                "UPDATE conversations SET title=CASE WHEN title='New conversation' THEN ? ELSE title END,updated_ms=? WHERE id=?",
+                (text.strip()[:80], now_ms(), cid),
             )
             return {"turnId": tid, "requestId": rid, "messageId": mid, "cursor": cursor}
 
@@ -202,7 +274,9 @@ class Conversations:
                 dict(e, payload=json.loads(e["payload_json"]))
                 for e in rows(
                     db,
-                    "SELECT * FROM events WHERE conversation_id=? AND id>? ORDER BY id LIMIT 100",
+                    "SELECT e.*,COALESCE(m.branch_id,t.branch_id,k.origin_branch_id) AS branchId "
+                    "FROM events e LEFT JOIN messages m ON m.id=e.message_id LEFT JOIN turns t ON t.id=e.turn_id "
+                    "LEFT JOIN tasks k ON k.id=e.task_id WHERE e.conversation_id=? AND e.id>? ORDER BY e.id LIMIT 100",
                     (cid, cursor),
                 )
             ]

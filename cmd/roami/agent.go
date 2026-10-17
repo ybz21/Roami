@@ -90,7 +90,11 @@ func runAgent(args []string) int {
 	case "conversations":
 		path = "/v1/conversations"
 	case "new":
-		method, path, body = "POST", "/v1/conversations", map[string]string{"title": *title}
+		request := map[string]string{"title": *title}
+		if *key != "" {
+			request["requestKey"] = *key
+		}
+		method, path, body = "POST", "/v1/conversations", request
 	case "history":
 		if *conversation == "" {
 			return fail(fmt.Errorf("--conversation is required"))

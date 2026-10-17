@@ -92,3 +92,15 @@ export async function transcribe(audio: Blob): Promise<string> {
   if (!r.ok) throw new Error(data?.error?.message || data?.error?.code || 'HTTP ' + r.status)
   return data?.data?.text || ''
 }
+
+export async function openEventStream(path: string, signal: AbortSignal): Promise<Response> {
+  const response = await fetch(nodeApi(path), { signal, cache: 'no-store', headers: { Accept: 'text/event-stream' } })
+  if (response.status === 401) { onUnauth(); throw new Error('UNAUTHORIZED') }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    const error = new Error(body?.error?.code || 'HTTP ' + response.status) as Error & { apiError?: Record<string, unknown> }
+    error.apiError = body?.error
+    throw error
+  }
+  return response
+}

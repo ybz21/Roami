@@ -8,7 +8,7 @@ import pytest
 from roami_agent.conversation import Conversations, message
 from roami_agent.memory import Memories
 from roami_agent.notifications import Notifications
-from roami_agent.storage import Database, DomainError
+from roami_agent.storage import Database, DomainError, row
 
 
 async def test_intake_retry_conflict_owner_and_restart(store):
@@ -17,6 +17,8 @@ async def test_intake_retry_conflict_owner_and_restart(store):
     receipt = await conversations.accept("alice", first["id"], "request-1", "remember this")
     again = await conversations.accept("alice", first["id"], "request-1", "remember this")
     assert again["turnId"] == receipt["turnId"]
+    assert again["messageId"] == receipt["messageId"]
+    assert again["cursor"] == receipt["cursor"]
     with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
         await conversations.accept("alice", first["id"], "request-1", "different")
     with pytest.raises(DomainError, match="CONVERSATION_NOT_FOUND"):
@@ -256,3 +258,43 @@ async def test_unread_count_is_not_limited_by_inbox_page_and_delivery_is_atomic(
         == 205
     )
     assert await notifications.unread("bob") == 0
+
+
+async def test_conversation_creation_retry_and_worker_history_scope(store):
+    from roami_agent.tasks import Tasks
+
+    conversations = Conversations(store)
+    first = await conversations.create("alice", request_key="new-chat")
+    assert (await conversations.create("alice", request_key="new-chat"))["id"] == first["id"]
+    with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
+        await conversations.create("alice", "Different", request_key="new-chat")
+    await conversations.accept("alice", first["id"], "first-turn", "A useful conversation title")
+    assert (await conversations.list("alice"))[0]["title"] == "A useful conversation title"
+    task = await Tasks(store, conversations).create("alice", first["id"], "Child", key="worker")
+    child = await store.call(
+        lambda db: row(
+            db,
+            "SELECT b.conversation_id FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE a.task_id=?",
+            (task["id"],),
+        )
+    )
+    assert child["conversation_id"] != first["id"]
+    assert [c["id"] for c in await conversations.list("alice")] == [first["id"]]
+    notifications = Notifications(store)
+    await notifications.publish(
+        "alice", child["conversation_id"], "Internal result", source="worker", dedupe_key="result"
+    )
+    assert await notifications.unread("alice") == 0
+    assert await notifications.list("alice") == []
+    notice = await notifications.publish(
+        "alice", first["id"], "User result", source="main", dedupe_key="result"
+    )
+    assert await notifications.unread("alice") == 1
+    assert (await notifications.list("alice"))[0]["branch_id"] == first["active_branch_id"]
+    snapshot = await conversations.messages("alice", first["id"], first["active_branch_id"])
+    assert snapshot["messages"][-1]["completedEventId"] == notice["eventId"]
+    events = await conversations.events("alice", first["id"])
+    assert events[-1]["branchId"] == snapshot["branchId"]
+    child_snapshot = await conversations.messages("alice", child["conversation_id"])
+    with pytest.raises(DomainError, match="BRANCH_NOT_FOUND"):
+        await conversations.messages("alice", first["id"], child_snapshot["branchId"])
