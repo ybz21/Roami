@@ -14,6 +14,7 @@ import uvicorn
 
 from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
+from roami_agent.context.vision_inputs import VisionInputs
 from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.transcript import Conversations
@@ -120,7 +121,14 @@ class Runtime:
             model,
             self.worker_model,
             self.settings,
-            PromptBuilder(database, self.context, self.settings),
+            PromptBuilder(
+                database,
+                self.context,
+                self.settings,
+                vision=VisionInputs(database, self.artifacts)
+                if self.settings.model_capabilities.get("images")
+                else None,
+            ),
             self.journal,
             self.tools,
             self.manifests,

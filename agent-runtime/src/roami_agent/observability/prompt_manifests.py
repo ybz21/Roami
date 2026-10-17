@@ -30,6 +30,8 @@ class PromptManifests:
                             "sourceMessageIds": plan.get("sourceMessageIds", []),
                             "catalogHash": hashlib.sha256(encoded(catalog).encode()).hexdigest(),
                             "modelSettingsHash": plan.get("modelSettingsHash"),
+                            "imageEvidence": plan.get("imageEvidence", []),
+                            "imageError": plan.get("imageError"),
                         }
                     ),
                     now_ms(),

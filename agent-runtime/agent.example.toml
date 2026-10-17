@@ -8,6 +8,7 @@ max_retries = 2 # only transient failures before any event; 0 disables retries
 
 # Declare capabilities only after verifying this endpoint/model combination.
 # [model.capabilities]
+# images = false # Set true only after validating screenshot input with this model.
 # version = "chat-v1"
 # tools = true
 # stream_usage = true

@@ -8,8 +8,14 @@ from roami_agent.storage.database import row
 
 
 class PromptBuilder:
-    def __init__(self, database, context, settings):
+    def __init__(self, database, context, settings, *, vision=None):
         self.db, self.context, self.settings = database, context, settings
+        self.vision = vision
+
+    async def _images(self, turn, plan, prompt):
+        if self.vision:
+            return await self.vision.attach(turn, plan, prompt)
+        return plan, prompt
 
     async def build(self, turn, instructions, catalog, completion):
         if completion:
@@ -62,7 +68,7 @@ class PromptBuilder:
 
         plan, prompt = await build()
         if len(encoded([prompt, catalog]).encode()) <= self.settings.input_budget:
-            return plan, prompt
+            return await self._images(turn, plan, prompt)
         try:
             job = await self.context.request(
                 turn["owner_id"], turn["conversation_id"], "auto:" + turn["id"], automatic=True
@@ -86,4 +92,4 @@ class PromptBuilder:
         plan, prompt = await build()
         if len(encoded([prompt, catalog]).encode()) > self.settings.input_budget:
             raise DomainError("CONTEXT_TOO_LARGE", 409)
-        return plan, prompt
+        return await self._images(turn, plan, prompt)

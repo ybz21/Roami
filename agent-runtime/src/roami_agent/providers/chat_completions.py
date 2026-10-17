@@ -65,6 +65,15 @@ class ChatCompletions:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         if tools and not self.capabilities["tools"]:
             raise DomainError("MODEL_TOOLS_UNSUPPORTED")
+        if not self.capabilities["images"] and any(
+            isinstance(message.get("content"), list)
+            and any(
+                isinstance(part, dict) and part.get("type") == "image_url"
+                for part in message["content"]
+            )
+            for message in messages
+        ):
+            raise DomainError("MODEL_IMAGES_UNSUPPORTED")
         deadline = time.monotonic() + self.timeout
         emitted = False
         try:

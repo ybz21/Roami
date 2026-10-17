@@ -16,7 +16,14 @@ def request_policy(capabilities=None, cache=None):
         raise DomainError("INVALID_MODEL_POLICY")
     capabilities = dict(capabilities or {})
     cache = dict(cache or {})
-    allowed = {"version", "tools", "stream_usage", "prompt_cache_key", "prompt_cache_options"}
+    allowed = {
+        "version",
+        "tools",
+        "stream_usage",
+        "prompt_cache_key",
+        "prompt_cache_options",
+        "images",
+    }
     if set(capabilities) - allowed or any(
         not isinstance(value, bool) for key, value in capabilities.items() if key != "version"
     ):
@@ -26,6 +33,7 @@ def request_policy(capabilities=None, cache=None):
         raise DomainError("INVALID_MODEL_CAPABILITIES")
     capabilities.setdefault("tools", True)
     capabilities.setdefault("stream_usage", True)
+    capabilities.setdefault("images", False)
     if set(cache) - {"namespace", "mode", "ttl"}:
         raise DomainError("INVALID_MODEL_CACHE_CONFIG")
     if "namespace" in cache and (
