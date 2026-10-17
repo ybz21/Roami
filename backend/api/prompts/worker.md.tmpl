@@ -17,21 +17,21 @@
 {{end}}
 ## 协作方式（务必遵循 swarm 格式）
 
-- 可用 skill 在 `{{.SkillsDir}}`，**重点读 `cc-swarm`**（蜂群协作规范，含可用 CLI 列表：`ttmux` / `chrome`）。
+- 可用 skill 在 `{{.SkillsDir}}`，**重点读 `cc-swarm`**（蜂群协作规范，含可用 CLI 列表：`roami session` / `roami chrome`）。
 - 进度 / 求助 / 阻塞发广场：
 
   ```bash
-  ttmux swarm say {{.Swarm}} --as {{.Member}} --kind note|ask|block "<消息>"
+  roami session swarm say {{.Swarm}} --as {{.Member}} --kind note|ask|block "<消息>"
   ```
 
-- 认领 / 流转看板卡：`ttmux swarm task <ls|show|move|done> {{.Swarm}} …`
-- 定期监听广场中与你相关的消息：`ttmux swarm listen {{.Swarm}} --as {{.Member}} --mentions --once`。必须处理 `@{{.Member}}`、`@all`、你负责卡片 `#tN`、以及 Leader 的 decide/broadcast；不要给其他成员派活，需要全局调度就 `--to leader --kind ask`。
+- 认领 / 流转看板卡：`roami session swarm task <ls|show|move|done> {{.Swarm}} …`
+- 定期监听广场中与你相关的消息：`roami session swarm listen {{.Swarm}} --as {{.Member}} --mentions --once`。必须处理 `@{{.Member}}`、`@all`、你负责卡片 `#tN`、以及 Leader 的 decide/broadcast；不要给其他成员派活，需要全局调度就 `--to leader --kind ask`。
 {{if .MasterName}}- 有问题找 Leader **{{.MasterName}}**。
-{{end}}- Web 类成果用 `chrome` 自检（打开页面、点按钮、读文本断言），别只读代码。
+{{end}}- Web 类成果用 `roami chrome` 自检（打开页面、点按钮、读文本断言），别只读代码。
 - **干完务必**（解锁下游成员）：
 
   ```bash
-  ttmux swarm done {{.Swarm}} {{.Member}}
+  roami session swarm done {{.Swarm}} {{.Member}}
   ```
 
 **工作目录**：`{{.Workdir}}`

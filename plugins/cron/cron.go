@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // storeKey 是任务表在插件 KV 里的键(整表一个 JSON 数组,同 review-mesh 存法)。
@@ -323,7 +323,7 @@ func tick(ctx *sdk.Ctx, args map[string]string) (any, error) {
 // serve 常驻调度器:每 tickInterval 巡检一次,直到进程被回收(plugin run 的
 // invoke 上限 24h)。跑在专用 tmux 会话里可 attach 看日志:
 //
-//	tmux new-session -d -s _ttmux-cron 'ttmux plugin run cron.serve'
+//	tmux new-session -d -s _ttmux-cron 'roami plugin run cron.serve'
 func serve(ctx *sdk.Ctx, args map[string]string) (any, error) {
 	fmt.Fprintf(os.Stderr, "[%s] cron 调度器启动,每 %s 巡检一次\n", now(), tickInterval)
 	ctx.Logf("scheduler loop started (tick=%s)", tickInterval)

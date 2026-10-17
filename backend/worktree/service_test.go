@@ -30,6 +30,7 @@ func mkRepo(t *testing.T) string {
 	}
 	run("add", ".")
 	run("commit", "-m", "init")
+	run("remote", "add", "origin", dir)
 	return dir
 }
 
@@ -259,7 +260,7 @@ func TestBranchesAndCreateFromRemote(t *testing.T) {
 	gitIn(upstream, "checkout", "-q", "main")
 
 	local := mkRepo(t)
-	gitIn(local, "remote", "add", "origin", upstream)
+	gitIn(local, "remote", "set-url", "origin", upstream)
 	gitIn(local, "fetch", "-q", "origin")
 	// 歧义引用名：本地分支恰叫 origin/main 时 %(refname:short) 会输出
 	// remotes/origin/main——远端分支不能因此被漏掉
@@ -336,7 +337,7 @@ func TestMergedDetection(t *testing.T) {
 	}
 	origin := filepath.Join(t.TempDir(), "origin.git")
 	gitIn(repo, "clone", "--bare", repo, origin)
-	gitIn(repo, "remote", "add", "origin", origin)
+	gitIn(repo, "remote", "set-url", "origin", origin)
 
 	find := func(path string) Worktree {
 		t.Helper()
@@ -448,7 +449,7 @@ func TestMergedEmptyWorktreeRemoteOnlyBase(t *testing.T) {
 	}
 	origin := filepath.Join(t.TempDir(), "origin.git")
 	gitIn(repo, "clone", "--bare", repo, origin)
-	gitIn(repo, "remote", "add", "origin", origin)
+	gitIn(repo, "remote", "set-url", "origin", origin)
 	// base 分支只留在远端：本地建 relbase→推送→删本地，制造「无 refs/heads/relbase」
 	gitIn(repo, "branch", "relbase")
 	gitIn(repo, "push", "-q", "origin", "relbase")
@@ -495,7 +496,7 @@ func TestPushedDetection(t *testing.T) {
 	}
 	origin := filepath.Join(t.TempDir(), "origin.git")
 	gitIn(repo, "clone", "--bare", repo, origin)
-	gitIn(repo, "remote", "add", "origin", origin)
+	gitIn(repo, "remote", "set-url", "origin", origin)
 
 	find := func(path string) Worktree {
 		t.Helper()

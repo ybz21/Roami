@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // 产物贴进通知的末段上限：卡片不是日志窗，超了只会把「跑完了」这句话挤下去

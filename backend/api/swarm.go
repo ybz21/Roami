@@ -1,5 +1,5 @@
 // 蜂群(swarm) 资源的 HTTP handler —— 全部通过 ttmux.Client 转发到 CLI，自身不含编排逻辑。
-// 读 = ttmux swarm ... --json；写 = 对应子命令。路径/字段都作独立 argv 传入，杜绝命令注入。
+// 读 = roami session swarm ... --json；写 = 对应子命令。路径/字段都作独立 argv 传入，杜绝命令注入。
 // Web 端只读 + 广场/看板轻操作；建群/加成员/接管/标记成员完成等重编排仍只在 CLI/终端。
 package api
 

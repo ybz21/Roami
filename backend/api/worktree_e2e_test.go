@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/ttmux"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 // scrubGitEnv 同 worktree 包：剥掉钩子注入的 GIT_*，避免子进程 git 被劫持。
@@ -55,7 +55,7 @@ func e2eSetup(t *testing.T) (*gin.Engine, string, func(...string) string) {
 		t.Fatal(err)
 	}
 	t.Setenv("TMUX_BIN", wrapper)
-	t.Setenv("ROAM_HOME", filepath.Join(tmp, "roam-home"))
+	isolateTestStorage(t, tmp)
 	t.Setenv("TMUX", "") // 测试进程可能跑在 tmux 里，避免 CLI 误判
 	t.Cleanup(func() { _ = exec.Command("tmux", "-L", sock, "kill-server").Run() })
 
@@ -64,8 +64,8 @@ func e2eSetup(t *testing.T) (*gin.Engine, string, func(...string) string) {
 	root, _ := filepath.Abs("../..")
 	// -buildvcs=false：从 git 钩子里跑测试时会继承 GIT_DIR，go 的 VCS 标记
 	// 会因此认错仓库直接失败；这里只是造个临时二进制，版本戳没意义。
-	build := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "./cmd/ttmux-cli-go")
-	build.Dir = filepath.Join(root, "cli", "ttmux-cli-go")
+	build := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "./cmd/roami")
+	build.Dir = root
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build cli: %v\n%s", err, out)
 	}
@@ -112,6 +112,7 @@ func e2eRepo(t *testing.T, tmp string) string {
 	}
 	run("add", ".")
 	run("commit", "-m", "init")
+	run("remote", "add", "origin", repo)
 	return repo
 }
 
@@ -349,7 +350,7 @@ func TestWorktreeCreateAutoBaseFollowsRemote(t *testing.T) {
 	}
 	origin := filepath.Join(tmp, "origin.git")
 	gitIn(repo, "clone", "--bare", repo, origin)
-	gitIn(repo, "remote", "add", "origin", origin)
+	gitIn(repo, "remote", "set-url", "origin", origin)
 	localHead := gitIn(repo, "rev-parse", "HEAD")
 
 	// 在独立克隆里推进 origin/main 一格：本地 repo 的 main 与 origin 跟踪 ref 都不动，
@@ -407,7 +408,7 @@ func TestWorktreeSyncRoute(t *testing.T) {
 	}
 	origin := filepath.Join(tmp, "origin.git")
 	gitIn(repo, "clone", "--bare", repo, origin)
-	gitIn(repo, "remote", "add", "origin", origin)
+	gitIn(repo, "remote", "set-url", "origin", origin)
 
 	wt, err := h.WT.Create(context.Background(), worktree.CreateReq{Dir: repo, Branch: "roam/feat-sync", Base: "main"})
 	if err != nil {

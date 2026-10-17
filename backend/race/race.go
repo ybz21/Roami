@@ -21,8 +21,8 @@ import (
 	"strings"
 	"sync"
 
-	"ttmux-web/internal/id"
-	"ttmux-web/internal/metadb"
+	"github.com/ybz21/Roami/internal/id"
+	"github.com/ybz21/Roami/internal/metadb"
 )
 
 type Contestant struct {

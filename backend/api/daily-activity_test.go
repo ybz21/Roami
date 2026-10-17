@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/project"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/project"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 func TestDailyActivityDeduplicatesClonesAndReportsMissingProjects(t *testing.T) {

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // Activate registers the plugin's commands (sdk.Serve 的入口)。

@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 func TestPluginRunE2E(t *testing.T) {
@@ -25,14 +25,14 @@ func TestPluginRunE2E(t *testing.T) {
 		t.Skip("go not available to build CLI")
 	}
 	tmp := t.TempDir()
-	t.Setenv("ROAM_HOME", filepath.Join(tmp, "roam-home"))
+	isolateTestStorage(t, tmp)
 
 	bin := filepath.Join(tmp, "ttmux-e2e")
 	root, _ := filepath.Abs("../..")
 	// -buildvcs=false：从 git 钩子里跑测试时会继承 GIT_DIR，go 的 VCS 标记
 	// 会因此认错仓库直接失败；这里只是造个临时二进制，版本戳没意义。
-	build := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "./cmd/ttmux-cli-go")
-	build.Dir = filepath.Join(root, "cli", "ttmux-cli-go")
+	build := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "./cmd/roami")
+	build.Dir = root
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build cli: %v\n%s", err, out)
 	}

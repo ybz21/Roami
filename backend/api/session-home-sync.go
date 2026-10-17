@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"ttmux-web/ttmux"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 // AgentLinkLoop 后台每 15s 扫一次进程树：对「会话 ↔ claude 对话 id」的账、把跑进 worktree 的会话

@@ -1,12 +1,18 @@
-// Package ttmux 是 ttmux CLI 的封装层 —— 唯一接触子进程的地方。
-// 读 = 调 `ttmux <cmd> --json`；写 = 调对应子命令。所有参数独立传入，杜绝命令注入。
+// Package ttmux adapts backend requests to the in-process session core.
+// An explicitly configured external CLI remains available for compatibility.
 package ttmux
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/ybz21/Roami/internal/cli"
+	"github.com/ybz21/Roami/internal/tmuxruntime"
+	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 )
 
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -27,6 +33,58 @@ func (c *Client) Run(args ...string) (string, error) {
 // 启动期的握手必须用它：`Run` 没有超时，一个卡住的 ttmux（比如它自己在等一把
 // 数据库锁）会把整个 server 的启动挂死。
 func (c *Client) RunCtx(ctx context.Context, args ...string) (string, error) {
+	if c.Local() {
+		service := app.New().WithContext(ctx).Sessions()
+		if len(args) > 0 {
+			switch args[0] {
+			case "ls":
+				if len(args) == 2 && args[1] == "--json" {
+					rows, err := service.List(ctx)
+					if err != nil {
+						return "", err
+					}
+					b, err := json.Marshal(rows)
+					return string(b), err
+				}
+			case "send":
+				if len(args) >= 3 {
+					return "", service.Send(ctx, args[1], strings.Join(args[2:], " "))
+				}
+			case "rename":
+				if len(args) >= 3 {
+					return "", service.Rename(ctx, args[1], strings.Join(args[2:], " "))
+				}
+			case "kill":
+				if len(args) >= 2 {
+					return "", service.Kill(ctx, args[1], slicesContain(args[2:], "--cascade"))
+				}
+			case "resolve":
+				if len(args) >= 2 {
+					row, err := service.Resolve(args[1])
+					if err != nil {
+						return "", err
+					}
+					if slicesContain(args[2:], "--json") {
+						b, err := json.Marshal(row)
+						return string(b), err
+					}
+					return row["name"], nil
+				}
+			case "capture":
+				if len(args) >= 2 {
+					lines := "200"
+					if len(args) >= 4 && (args[2] == "--lines" || args[2] == "-n") {
+						lines = args[3]
+					}
+					return service.Capture(ctx, args[1], lines)
+				}
+			}
+		}
+		var out bytes.Buffer
+		err := app.New().WithContext(ctx).WithOutput(&out).Run(args)
+		return out.String(), err
+	}
+
 	cmd := exec.CommandContext(ctx, c.Bin, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -42,6 +100,14 @@ func (c *Client) RunCtx(ctx context.Context, args ...string) (string, error) {
 // 浏览器只会看到「Unexpected token 'r'」，而真正发生了什么（那行日志）反被吞掉。
 // 出错时两股都要：诊断信息通常正在 stderr 里。
 func (c *Client) RunJSON(args ...string) (stdout, stderr string, err error) {
+	if c.Local() {
+		out, err := c.RunCtx(context.Background(), args...)
+		if err != nil {
+			return out, fmt.Sprint(err), err
+		}
+		return out, "", nil
+	}
+
 	cmd := exec.CommandContext(context.Background(), c.Bin, args...)
 	var o, e bytes.Buffer
 	cmd.Stdout = &o
@@ -52,3 +118,22 @@ func (c *Client) RunJSON(args ...string) (stdout, stderr string, err error) {
 
 // StripANSI 去除文本中的 ANSI 颜色转义。
 func StripANSI(s string) string { return ansiRE.ReplaceAllString(s, "") }
+
+func (c *Client) Local() bool {
+	self, _ := os.Executable()
+	return c.Bin == self || c.Bin == "roami"
+}
+
+func slicesContain(args []string, word string) bool {
+	for _, a := range args {
+		if a == word {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Client) CreateSession(ctx context.Context, label, dir string) (string, error) {
+	result, err := app.New().WithContext(ctx).Sessions().Create(ctx, runtime.CreateOpts{Label: label, Dir: dir}, false)
+	return result.Session, err
+}

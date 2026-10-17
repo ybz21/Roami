@@ -1,7 +1,7 @@
 // Claude Code 集成：检测会话是否在跑 claude，并把其对话记录(JSONL)解析成可渲染的对话。
 //
 // 机制：会话里运行的是交互式 claude（一个进程）。本模块只「读」它的 JSONL 记录渲染成
-// 对话气泡；「发」消息复用 ttmux send（send-keys 注入该会话），不另起 claude 进程，避免冲突。
+// 对话气泡；「发」消息复用 roami session send（send-keys 注入该会话），不另起 claude 进程，避免冲突。
 package api
 
 import (

@@ -23,7 +23,7 @@ backend_build() {
     (cd "${SCRIPT_DIR}/frontend" && npx vite build)
     # 后端：go build → backend/ttmux-web
     step "构建后端 (go build) → backend/ttmux-web..."
-    (cd "${SCRIPT_DIR}/backend" && go build -o ttmux-web ./cmd)
+    (cd "${SCRIPT_DIR}" && go build -o backend/ttmux-web ./cmd/roami)
 }
 
 module_backend() {

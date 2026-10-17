@@ -124,6 +124,11 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	return Parse(b, path)
+}
+
+// Parse reads existing configuration without creating files.
+func Parse(b []byte, path string) (*Config, error) {
 	var file struct {
 		Web     Web     `yaml:"web"`
 		Cluster Cluster `yaml:"cluster"`

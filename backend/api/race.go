@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/internal/id"
-	"ttmux-web/race"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/race"
+	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/id"
 )
 
 // killContestant 杀掉选手会话：优先用 tmux session_id 反查它**现在**叫什么（用户
-// 可能改过名），拿不到再退回建赛时记下的名字。走 ttmux kill 以便清 meta。
+// 可能改过名），拿不到再退回建赛时记下的名字。走 roami session kill 以便清 meta。
 func (a *API) killContestant(ct *race.Contestant) {
 	name := ct.Session
 	if ct.SessionID != "" {
@@ -56,6 +56,11 @@ func (a *API) RaceCreate(c *gin.Context) {
 	ctx, cancel := wtCtx(c)
 	defer cancel()
 
+	prepared, err := a.WT.PrepareBase(ctx, b.Dir, b.Base, "")
+	if err != nil {
+		wtErr(c, err)
+		return
+	}
 	r := &race.Race{
 		ID:        id.New(),
 		Name:      b.Name,
@@ -86,7 +91,7 @@ func (a *API) RaceCreate(c *gin.Context) {
 		ct.Session = sess
 		a.WT.BindSessionHome(ct.Session, b.Dir) // 选手会话归属本仓库；cdInto 之后改钉到各自 worktree
 		ct.SessionID = a.WT.SessionID(ct.Session)
-		wt, err := a.WT.Create(ctx, worktree.CreateReq{Dir: b.Dir, Branch: autoBranch(b.Name) + "-" + letter, Base: b.Base, Dirname: sess})
+		wt, err := a.WT.CreateFromBase(ctx, worktree.CreateReq{Dir: b.Dir, Branch: autoBranch(b.Name) + "-" + letter, Base: b.Base, Dirname: sess}, prepared)
 		if err != nil {
 			_, _ = a.TT.Run("kill", ct.Session, "--yes")
 			fail("worktree: " + err.Error())
@@ -96,15 +101,19 @@ func (a *API) RaceCreate(c *gin.Context) {
 		if r.Base == "" {
 			r.Base = wt.Base
 		}
-		_ = a.cdInto(ct.Session, wt.Path)
-		// 发题：启动命令 + prompt 作为单引号 CLI 参数（多行原样保留），独立回车提交
+		if err = a.cdInto(ct.Session, wt.Path); err != nil {
+			a.rollbackPreparedSession(ct.Session, wt, true)
+			fail("workspace: " + err.Error())
+			continue
+		}
 		if cmd := strings.TrimSpace(in.Cmd); cmd != "" {
-			launch := cmd + " " + shellQuote(b.Prompt)
-			if _, err := a.TT.Run("send-keys", "-t", "="+ct.Session+":", "-l", launch); err == nil {
-				time.Sleep(90 * time.Millisecond)
-				_, _ = a.TT.Run("send-keys", "-t", "="+ct.Session+":", "Enter")
+			if _, err = a.TT.Run("send", ct.Session, cmd+" "+shellQuote(b.Prompt)); err != nil {
+				a.rollbackPreparedSession(ct.Session, wt, true)
+				fail("launch: " + err.Error())
+				continue
 			}
 		}
+
 		r.Contestants = append(r.Contestants, ct)
 		ok++
 	}

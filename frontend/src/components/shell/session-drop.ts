@@ -1,7 +1,7 @@
 // 把一个会话拖到另一个会话上（21 设计）。
 //
 // 落下之后只做一件事：**往当前会话里注一段话**，告诉它旁边那个是谁、怎么跟它说话。
-// 通信能力本来就有——`ttmux send <会话> <消息>` 走 SendPromptSubmit，对面 pane 里
+// 通信能力本来就有——`roami session send <会话> <消息>` 走 SendPromptSubmit，对面 pane 里
 // 出现这行并自动回车。缺的只是 Agent 不知道有这条命令、也不知道对面是谁。
 //
 // 这里全是纯函数：接不接得住、那段话长什么样。文案是纯函数，喂固定输入断言就够，
@@ -36,7 +36,7 @@ export type Verdict = { ok: boolean; why?: 'self' | 'cross' | 'noagent' }
  *
  * 两处必须拦：
  *
- * **跨机** —— `ttmux send` 走的是本机 tmux，两个会话在不同机器上时它找不到对方，
+ * **跨机** —— `roami session send` 走的是本机 tmux，两个会话在不同机器上时它找不到对方，
  * 而 Agent 会拿到一句「会话不存在」然后开始瞎猜。明确拒绝好过让它撞一堵看不见的墙。
  *
  * **目标不是 Agent** —— 这条是真机上撞出来的，比想象的严重。投递是「粘一段文本 +
@@ -101,7 +101,7 @@ export function buildIntro(src: SessionDrag, selfId: string, t: T): string {
   const who = [src.project, src.label || src.id].filter(Boolean).join(' · ')
   const kind = src.agent ? `（${src.agent}）` : ''
   // 对面没有 Agent 在跑 = 那是个普通 shell，发过去的**是一条命令**，会被直接执行。
-  // 不拦（给 shell 发命令本来就是 ttmux send 的正当用法），但必须说清楚——
+  // 不拦（给 shell 发命令本来就是 roami session send 的正当用法），但必须说清楚——
   // 否则收到介绍的那一方会照着写一句人话过去，然后在那头变成 command not found。
   const peerNote = src.agent ? 'pair.intro.note' : 'pair.intro.noteShell'
   const lines = [
@@ -114,10 +114,10 @@ export function buildIntro(src: SessionDrag, selfId: string, t: T): string {
     '  ' + t('pair.intro.id', { id: src.id }),
     '',
     '  ' + t('pair.intro.sendHead'),
-    `    ttmux send ${src.id} "…"`,
+    `    roami session send ${src.id} "…"`,
     '',
     '  ' + t('pair.intro.replyHead'),
-    `    ttmux send ${selfId} "…"`,
+    `    roami session send ${selfId} "…"`,
     '',
     '  ' + t(peerNote),
   )

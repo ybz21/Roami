@@ -6,7 +6,7 @@ package im
 import (
 	"fmt"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 type dingtalkProvider struct{}

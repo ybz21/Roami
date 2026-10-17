@@ -29,6 +29,10 @@ tracked_source_files() {
     ':!:frontend/dist/*' ':!:frontend/node_modules/*'
 }
 
+section "CLI entry audit"
+node scripts/dev/quality/cli-entry-audit.mjs
+bash scripts/dev/selftest/install-storage-preflight.sh
+
 section "Shell syntax"
 shell_files="$(git ls-files '*.sh' 'scripts/*.sh')"
 if [ -n "$shell_files" ]; then
@@ -41,7 +45,7 @@ fi
 section "Go formatting"
 go_files="$(git ls-files '*.go')"
 if [ -n "$go_files" ]; then
-  unformatted="$(gofmt -l $go_files)"
+  unformatted="$(gofmt -l $(printf '%s\n' "$go_files" | while IFS= read -r f; do [ ! -f "$f" ] || printf '%s\n' "$f"; done))"
   if [ -n "$unformatted" ]; then
     printf 'Go files need gofmt:\n%s\n' "$unformatted" >&2
     exit 1
@@ -49,11 +53,7 @@ if [ -n "$go_files" ]; then
 fi
 
 section "Go tests"
-(cd backend && go test ./...)
-(cd cli/ttmux-cli-go && go test ./...)
-for mod in plugins/*/go.mod; do
-  (cd "$(dirname "$mod")" && go test ./...)
-done
+go test ./...
 
 section "Frontend checks"
 if [ ! -d frontend/node_modules ]; then

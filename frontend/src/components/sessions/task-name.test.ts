@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { taskNameFromPrompt } from './NewSessionModal'
 
-// 这个名字只是占位——真名字由 agent 开工后 ttmux rename。但占位也不能难看到
+// 这个名字只是占位——真名字由 agent 开工后 roami session rename。但占位也不能难看到
 // 「你去英伟达的-DGX-Spark」这种：半个词吊在末尾，开头两个字还只是在说「有人在派活」。
 describe('taskNameFromPrompt：派生占位名', () => {
   it('剥掉开头的人称与招呼', () => {

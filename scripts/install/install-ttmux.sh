@@ -3,32 +3,14 @@
 # shellcheck shell=bash
 
 ttmux_bin() {
-    # 本地有 Go 源码：优先 Go 原生构建（自动按主机 x86/arm 出二进制），失败回退 bash；
-    # 否则从 GitHub Releases 下对应 <os>-<arch> 预编译产物。
-    if [[ -d "${GO_SRC}/cmd/ttmux-cli-go" ]]; then
-        if command -v go &>/dev/null; then
-            step "用 Go 构建 ttmux (原生二进制)..."
-            if (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/ttmux" ./cmd/ttmux-cli-go); then
-                info "ttmux (Go) 已安装到 ${INSTALL_DIR}/ttmux"
-            else
-                warn "Go 构建失败，回退 bash 构建"
-                bash "$TTMUX_BUILD" "${INSTALL_DIR}/ttmux" >/dev/null
-                info "ttmux (bash) 已安装到 ${INSTALL_DIR}/ttmux"
-            fi
-        else
-            step "未检测到 Go，构建 bash ttmux..."
-            bash "$TTMUX_BUILD" "${INSTALL_DIR}/ttmux" >/dev/null
-            info "ttmux (bash) 已安装到 ${INSTALL_DIR}/ttmux"
-        fi
-    else
-        step "从 GitHub Releases 下载 ttmux ($(release_target))..."
-        if download_asset ttmux "ttmux-$(release_target)"; then
-            info "ttmux 已安装到 ${INSTALL_DIR}/ttmux"
-        else
-            die "下载失败；请确认已发布 release，或克隆仓库本地安装"
-        fi
+    mkdir -p "$INSTALL_DIR"
+    if [[ -f "${GO_SRC}/go.mod" ]]; then
+        (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami" ./cmd/roami)
+    elif [[ ! -x "${INSTALL_DIR}/roami" ]]; then
+        download_asset roami "roami-$(release_target)" || die "Roami download failed"
     fi
-    chmod +x "${INSTALL_DIR}/ttmux"
+    ln -sf roami "${INSTALL_DIR}/ttmux"
+    ln -sf roami "${INSTALL_DIR}/roam"
 }
 
 ttmux_skills() {
@@ -89,7 +71,8 @@ ttmux_skills() {
 
 ttmux_completion() {
     step "安装 Tab 补全..."
-    "${INSTALL_DIR}/ttmux" completion 2>/dev/null || true
+    mkdir -p "${HOME}/.local/share/bash-completion/completions"
+    "${INSTALL_DIR}/roami" completion > "${HOME}/.local/share/bash-completion/completions/roami"
 }
 
 module_ttmux() {

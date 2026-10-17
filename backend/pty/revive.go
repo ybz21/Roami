@@ -1,12 +1,14 @@
 package pty
 
 import (
+	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 // 会话懒恢复：attach 一个 tmux 里已经不存在的会话时，先问台账认不认得它。
@@ -22,7 +24,7 @@ import (
 
 // reviveLocks 按会话名串行化。手机和桌面同时点开同一个休眠会话时，
 // 两个 WS 会同时发现「tmux 里没有」并各恢复一次，建出两个会话去抢同一份 transcript。
-// CLI 那边也有一道进程内锁，但两个 ttmux 子进程之间只有这里拦得住。
+// CLI 那边也有一道进程内锁，这里统一串行化来自终端的恢复请求。
 var reviveLocks sync.Map // session name -> *sync.Mutex
 
 func reviveLock(name string) *sync.Mutex {
@@ -65,32 +67,18 @@ func reviveDormant(name string) (string, bool) {
 	return res.Session, true
 }
 
-// ttmuxBin 是 CLI 的可执行名。与后端别处保持一致：TTMUX_BIN 覆盖，默认 ttmux。
+// ttmuxBin 是 CLI 的可执行名。与后端别处保持一致：TTMUX_BIN 兼容外部适配，默认使用进程内核心。
 func ttmuxBin() string {
 	if b := strings.TrimSpace(os.Getenv("TTMUX_BIN")); b != "" {
 		return b
 	}
-	return "ttmux"
+	return "roami"
 }
 
 func ttmuxRun(timeout time.Duration, args ...string) (string, error) {
-	cmd := exec.Command(ttmuxBin(), args...)
-	var sb strings.Builder
-	cmd.Stdout = &sb
-	cmd.Stderr = &sb
-	if err := cmd.Start(); err != nil {
-		return "", err
-	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	select {
-	case err := <-done:
-		return sb.String(), err
-	case <-time.After(timeout):
-		_ = cmd.Process.Kill()
-		<-done
-		return sb.String(), errTimeout
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return ttmux.New(ttmuxBin()).RunCtx(ctx, args...)
 }
 
 // lastJSONLine 取输出里最后一行 JSON。CLI 偶尔会在 JSON 前面打一行提示，
@@ -104,9 +92,3 @@ func lastJSONLine(out string) string {
 	}
 	return ""
 }
-
-type timeoutErr struct{}
-
-func (timeoutErr) Error() string { return "ttmux 调用超时" }
-
-var errTimeout = timeoutErr{}

@@ -123,6 +123,13 @@ after what it actually contains — the concrete domain concept (`session-identi
 `terminal-orphan-cleanup.ts`) over the generic role (`session-helpers.ts`, `term-utils.ts`). If
 `helpers` feels right, the file probably has more than one responsibility.
 
+## Design Document Directories
+
+New design proposals live in `docs/design/YYYYMMDD-主题名称/` (for example,
+`20261017-CLI统一设计/`), using the proposal's creation date. Keep a `README.md` as the entry
+point; put HTML reports, assets, and actual revision snapshots in the same directory
+(`index.html`, `revisions/` as needed). Update the same directory as the design evolves.
+
 # Considerations
 
 ## The Phone Is a First-Class Client

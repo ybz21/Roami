@@ -6,8 +6,15 @@
 
 set -euo pipefail
 
-TTMUX="${TTMUX:-./ttmux}"
+ROAMI_BIN="${ROAMI_BIN:-roami}"
+session_cli() { "$ROAMI_BIN" session "$@"; }
+TTMUX=session_cli
 TMP="$(mktemp -d /tmp/ttmux-swarm-listen.XXXXXX)"
+for storage_prefix in ROAMI ROAM TTMUX; do
+  for storage_suffix in HOME DATA CONFIG DATABASE_DIR BACKUP_DIR; do
+    unset "${storage_prefix}_${storage_suffix}"
+  done
+done
 export TTMUX_HOME="${TMP}/home"
 export TTMUX_DATA="${TMP}/data"
 FAKE_BIN="${TMP}/bin"
@@ -17,6 +24,7 @@ cat > "${FAKE_BIN}/tmux" <<'FAKE_TMUX'
 #!/usr/bin/env bash
 echo "$*" >> "${FAKE_TMUX_LOG:?}"
 case "${1:-}" in
+  load-buffer) cat >> "${FAKE_TMUX_LOG:?}"; exit 0 ;;
   display-message)
     case "$*" in *pane_dead*) echo 0; exit 0 ;; *) exit 1 ;; esac
     ;;
@@ -94,11 +102,11 @@ echo -e "${bold}[准备]${reset}"
 "$TTMUX" swarm new listen-case --goal "监听 case" --no-master >/dev/null
 pass "创建蜂群"
 
-swarm_id=$(sqlite3 "${TTMUX_HOME}/meta.db" "SELECT id FROM swarms WHERE name='listen-case';")
-sqlite3 "${TTMUX_HOME}/swarms/${swarm_id}/swarm.db" "INSERT INTO members(name,type,task,role,pending,done) VALUES('oldlead','agent','旧 leader','master',0,0),('oldmember','agent','旧 member','worker',0,0),('oldrun','agent','运行中 member','worker',0,0);"
+swarm_id=$(sqlite3 "${TTMUX_DATA}/database/meta.db" "SELECT id FROM swarms WHERE name='listen-case';")
+sqlite3 "${TTMUX_DATA}/database/meta.db" "INSERT INTO swarm_members(swarm_id,name,type,task,role,pending,done) VALUES('${swarm_id}','oldlead','agent','旧 leader','leader',0,0),('${swarm_id}','oldmember','agent','旧 member','member',0,0),('${swarm_id}','oldrun','agent','运行中 member','member',0,0);"
 status_json=$("$TTMUX" swarm status listen-case --json)
-assert_contains "$status_json" '"role":"leader"' "旧 role=master 迁移为 leader"
-assert_contains "$status_json" '"role":"member"' "旧 role=worker 迁移为 member"
+assert_contains "$status_json" '"role":"leader"' "leader 角色可读取"
+assert_contains "$status_json" '"role":"member"' "member 角色可读取"
 assert_contains "$status_json" '"status":"idle"' "空闲 agent 状态显示为 idle"
 assert_contains "$status_json" '"status":"waiting"' "待确认 agent 状态显示为 waiting"
 assert_contains "$status_json" '"status":"running"' "Claude 活动状态显示为 running"
@@ -111,7 +119,8 @@ card=$("$TTMUX" swarm task add listen-case "前端返工" --assignee web 2>/dev/
 "$TTMUX" swarm say listen-case --as api --kind note "普通进度" >/dev/null
 pass "写入 leader/web/普通三类广场消息"
 status_json=$("$TTMUX" swarm status listen-case --json)
-assert_contains "$status_json" '"name":"oldlead","type":"agent","task":"旧 leader","deps":"","done":0,"kind":"claude","role":"leader","status":"running"' "发给 leader 后短期显示 running"
+leader_status=$(python3 -c 'import json,sys; print(next(m["status"] for m in json.load(sys.stdin)["members"] if m["name"]=="oldlead"))' <<< "$status_json")
+assert_contains "$leader_status" 'running' "发给 leader 后短期显示 running"
 echo ""
 
 echo -e "${bold}[@mention 写入]${reset}"
@@ -152,14 +161,14 @@ assert_contains "$status_json" '"leader_last_post":4' "状态 JSON 暴露 leader
 echo ""
 
 echo -e "${bold}[leader 会话通知]${reset}"
-sqlite3 "${TTMUX_HOME}/meta.db" "UPDATE swarms SET supervisor='cc-listen-case' WHERE name='listen-case';"
+sqlite3 "${TTMUX_DATA}/database/meta.db" "UPDATE swarms SET supervisor='cc-listen-case' WHERE name='listen-case';"
 : > "$FAKE_TMUX_LOG"
 "$TTMUX" swarm say listen-case --as human --to leader --kind ask "触发 leader 通知" >/dev/null
 notify_log=$(<"$FAKE_TMUX_LOG")
-assert_contains "$notify_log" "has-session -t cc-listen-case" "检查 supervisor 会话是否存在"
-assert_contains "$notify_log" "paste-buffer -d -b ttmux-prompt -t cc-listen-case" "human 消息粘贴给 leader"
-assert_contains "$notify_log" "send-keys -t cc-listen-case Enter" "human 消息强制提交给 leader"
-assert_contains "$notify_log" "ttmux swarm listen listen-case --as leader --once" "通知内容要求 leader 执行 listen"
+assert_contains "$notify_log" "has-session -t =cc-listen-case" "检查 supervisor 会话是否存在"
+assert_contains "$notify_log" "paste-buffer -p -d -b roami-prompt-" "human 消息粘贴给 leader"
+assert_contains "$notify_log" "send-keys -t =cc-listen-case: Enter" "human 消息强制提交给 leader"
+assert_contains "$notify_log" "roami session swarm listen listen-case --as leader --once" "通知内容要求 leader 执行 listen"
 echo ""
 
 echo -e "${dim}$(printf '─%.0s' {1..44})${reset}"

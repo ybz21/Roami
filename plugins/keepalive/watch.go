@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // tickInterval 是常驻循环的巡检周期,也就是「安静了多久」这个判断的精度。

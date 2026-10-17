@@ -5,7 +5,7 @@ ttmux 有 **两种使用模式**，按需取用，也可叠加：
 | 模式 | 场景 | 装什么 | 必需依赖 |
 |------|------|--------|----------|
 | **① 本地 CLI** | 在终端 / 服务器上直接编排并行任务、Agent、蜂群 | `ttmux` 单文件二进制 | `tmux`（Claude Code 按需） |
-| **② 远程控制台** | **远程办公**：手机 / 平板 / 笔记本随地查看·操控（实时终端 + 浏览器镜像） | `roami` 预构建单文件二进制（内嵌前端 + ttmux CLI）+ frp 内网穿透 | 目标机零依赖（`go`、`node`+`npm` 仅从源码构建时才需要；远程暴露用 frp） |
+| **② 远程控制台** | **远程办公**：手机 / 平板 / 笔记本随地查看·操控（实时终端 + 浏览器镜像） | `roami` 预构建单文件二进制（内嵌前端 + 统一会话核心）+ frp 内网穿透 | 目标机零依赖（`go`、`node`+`npm` 仅从源码构建时才需要；远程暴露用 frp） |
 
 > 模式 ② 跑在你的开发机 / 长期常驻的机器上，模式 ① 是它的底座——**远程控制台本质是 CLI 的网页封装**，
 > 读 = 代理 `ttmux <cmd> --json`，写 = 调对应子命令，行为与 CLI 永远一致。`roami` 二进制已把
@@ -30,7 +30,7 @@ ttmux 有 **两种使用模式**，按需取用，也可叠加：
 
 | 依赖 | 用途 | 没有它会怎样 | 安装 |
 |------|------|--------------|------|
-| `tmux` | CLI / 会话的运行基座 | 会话无法工作（`roami` 内嵌 ttmux，但仍需宿主机装 `tmux`） | `apt install tmux` / `brew install tmux` |
+| `tmux` | CLI / 会话的运行基座 | 会话无法工作（`roami` 集成会话核心，但仍需宿主机装 `tmux`） | `apt install tmux` / `brew install tmux` |
 | Claude Code | `spawn --agent` / 蜂群成员 | 仅 Agent 类任务不可用 | 见 [claude.ai/code](https://claude.ai/code) |
 | `go` ≥ 1.21 | **仅源码构建**：编译 CLI + Web 后端 | 只影响 `start.sh --dev`；预构建二进制无需 | [go.dev/dl](https://go.dev/dl/) |
 | `node` ≥ 18 + `npm` | **仅源码构建**：构建前端 + `chrome` 自动化 | 只影响 `start.sh --dev` / `chrome`；预构建二进制无需 | [nodejs.org](https://nodejs.org/) |
@@ -40,65 +40,61 @@ ttmux 有 **两种使用模式**，按需取用，也可叠加：
 
 ## 一、本地 CLI
 
-`ttmux` CLI 有三种取用方式，任选其一：
-
-### 1. 内嵌在 `roami` 里（跑了远程控制台就自动有）
-
-`roami` 二进制**内嵌**了 `ttmux` CLI，首次运行时自动解压到 `~/.roami/bin/ttmux`。
-所以只要装了[② 远程控制台](#二远程控制台)，本机就已有一份可用的 `ttmux`（后端也用它）。
-想在自己的 `PATH` 里直接敲 `ttmux`，把它软链/拷贝出来即可：
+安装后的正式 CLI 为 `roami`，会话、浏览器、项目与数据库都从这里访问。安装器为旧 `ttmux`、`chrome`、`roam` 命令保留兼容入口；它们指向同一应用，不再解压第二份会话二进制。
 
 ```bash
-ln -sf ~/.roami/bin/ttmux ~/.local/bin/ttmux
+roami session help
+roami chrome help
+roami project help
+roami db status --json
 ```
 
-### 2. 从 Releases 下载独立二进制（推荐单独用 CLI 时）
-
-标准 `ttmux` CLI 也单独发布为 `ttmux-<os>-<arch>`（linux/darwin，amd64/arm64）。
-下载对应资产 → 放进 `PATH` → 装 Tab 补全：
+源码构建在仓库根目录执行：
 
 ```bash
-# 以 linux amd64 为例，按你的系统/架构替换资产名
-curl -fSL -o ~/.local/bin/ttmux \
-  https://github.com/ybz21/Roam/releases/latest/download/ttmux-linux-amd64
-chmod +x ~/.local/bin/ttmux
-ttmux completion          # 安装 Tab 补全
+CGO_ENABLED=0 go build -o ~/.local/bin/roami ./cmd/roami
+ln -sf roami ~/.local/bin/ttmux
+ln -sf roami ~/.local/bin/chrome
+mkdir -p ~/.local/share/bash-completion/completions
+roami completion > ~/.local/share/bash-completion/completions/roami
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-若 `~/.local/bin` 不在 `PATH`，追加一行：
+数据库默认位于 `~/.roami/database/`，备份位于 `~/.roami/backups/`。旧版数据库不自动移动；安装器发现旧布局时会保留候选 `roami.upgrade`，在替换现有程序和兼容入口之前停止安装。使用候选程序先只读盘点，停止服务及所有旧插件/CLI 写者后才执行离线迁移；完成后重新安装：
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"   # 写进 ~/.bashrc 或 ~/.zshrc
+roami db migrate --layout --dry-run
+# 确认全部旧写者已停止后执行；保留旧源库和 pre-layout 备份。
+roami db migrate --layout --offline
 ```
 
-### 3. 从源码构建
-
-CLI 主实现是 Go（`cli/ttmux-cli-go`）。在 clone 里直接编译到 `~/.local/bin`：
+全新实例可用 `roami db migrate` 初始化。完整备份与恢复：
 
 ```bash
-cd cli/ttmux-cli-go
-CGO_ENABLED=0 go build -o ~/.local/bin/ttmux ./cmd/ttmux-cli-go
-chmod +x ~/.local/bin/ttmux
-ttmux completion
+# 当前完整备份要求停止服务与插件宿主，活跃实例会返回 STORAGE_BUSY。
+roami db backup /path/to/backup-set
+# 恢复目标必须是空实例，包含布局与 catalog 元数据，并校验数据库 hash。
+roami --home /new/home --data-dir /new/data --database-dir /new/data/database db restore /path/to/backup-set
+# 发布中断时保留 journal 和 staging，显式完成恢复。
+roami db migrate --recover
 ```
 
-（另有 bash 单文件变体，用 `bash cli/ttmux-cli/build.sh` 生成；细节见
-[`../../cli/ttmux-cli/README.md`](../../cli/ttmux-cli/README.md)。）
+CLI 和服务必须使用同一组 Home/Data/DatabaseRoot；配置可用 `storage.data_dir`、`storage.database_dir`、`storage.backup_dir`，或正式 `ROAMI_*` 路径变量覆盖。开发隔离使用 `scripts/dev/isolated-roami.sh`，不能只设置 ROAMI_HOME 后继承旧 DATA/DATABASE_DIR。
 
 ### 4. 验证
 
 ```bash
-ttmux help
-ttmux new dev
-ttmux spawn build "lint" "echo ok" "test" "echo pass"
-ttmux status build
+roami session help
+roami session new dev
+roami session spawn build "lint" "echo ok" "test" "echo pass"
+roami session status build
 ```
 
 ---
 
 ## 二、远程控制台
 
-远程控制台是 `roami` —— 一个**内嵌前端 + `ttmux` CLI 的自包含二进制**，发布为 `roami-<os>-<arch>`（linux/darwin，amd64/arm64）。配置与数据都在 `~/.roami/`（`config.yaml` 首次运行自动生成）。装在你的开发机 / 长期常驻的机器上，本节先让它在本机 / 局域网跑起来；要从外网随地访问，见 [四、远程办公](#四远程办公--frp-内网穿透)。
+远程控制台是 `roami` —— 一个**内嵌前端 + 统一会话核心 的自包含二进制**，发布为 `roami-<os>-<arch>`（linux/darwin，amd64/arm64）。配置与数据都在 `~/.roami/`（`config.yaml` 首次运行自动生成）。装在你的开发机 / 长期常驻的机器上，本节先让它在本机 / 局域网跑起来；要从外网随地访问，见 [四、远程办公](#四远程办公--frp-内网穿透)。
 
 三种装法，任选其一：
 
@@ -177,7 +173,7 @@ journalctl --user -u roami -f       # 跟随日志
 cd frontend && npm install && npx vite build && cd ..
 
 # 后端编译并运行（flag 覆盖配置；口令来自 config.yaml / 首次运行界面设置）
-cd backend && go build -o ttmux-web ./cmd
+go build -o backend/ttmux-web ./cmd/roami
 TTMUX_BIN=../ttmux \
   ./ttmux-web -addr 127.0.0.1:13579 -web ../frontend/dist
 ```
@@ -185,7 +181,7 @@ TTMUX_BIN=../ttmux \
 ### 开发模式（前后端分离热更新）
 
 ```bash
-cd backend  && TTMUX_BIN=../ttmux go run ./cmd   # 后端 :8080（口令来自 config.yaml）
+ go run ./cmd/roami server   # 后端 :8080（口令来自 config.yaml）
 cd frontend && npm run dev                        # 前端 :5173（代理 /api 含 WS）
 ```
 
@@ -353,20 +349,20 @@ bindPort = 13579        # 映射到本机
 依赖 `node` + `npm`，`install.sh` 会随 `chrome` 一起 `npm i playwright-core`（`connectOverCDP` 复用已开的 Chrome，**不下载 Playwright 自带浏览器**，很轻）。手动或重装：
 
 ```bash
-chrome setup                       # 安装/更新依赖（node + playwright-core）
-chrome goto https://example.com    # 打开网址
-chrome text h1                      # 取文本
-chrome eval "document.title"        # 页面内执行 JS
-chrome screenshot shot.png --full   # 整页截图
-chrome screenshot shot.png --fresh --goto https://example.com --viewport 1280x800
-chrome tabs                         # 列标签页
-chrome help                         # 全部动词与选项
+roami chrome setup                       # 安装/更新依赖（node + playwright-core）
+roami chrome goto https://example.com    # 打开网址
+roami chrome text h1                      # 取文本
+roami chrome eval "document.title"        # 页面内执行 JS
+roami chrome screenshot shot.png --full   # 整页截图
+roami chrome screenshot shot.png --fresh --goto https://example.com --viewport 1280x800
+roami chrome tabs                         # 列标签页
+roami chrome help                         # 全部动词与选项
 ```
 
 动词：`goto / click / fill / type / press / text / html / attr / eval / wait / screenshot / pdf / tabs / new / close`；
 通用选项 `--tab <序号>` / `--url <子串>` 选目标标签页、`--timeout <ms>`、`--cdp <地址>`。
 批量截图优先用 `--fresh --goto <url>`；需要复用已登录状态或在 Web「浏览器」标签围观时再用默认共享 Chrome。
-源码与开发见 [`../../cli/chrome-cli/README.md`](../../cli/chrome-cli/README.md)。
+源码与开发见 [`../development/chrome-cli.md`](../development/chrome-cli.md)。
 
 ---
 
@@ -394,11 +390,11 @@ rm -rf ~/.roami                                # 配置 + 数据 + 蜂群 meta.d
 
 | 现象 | 排查 |
 |------|------|
-| `command not found: ttmux` | `~/.local/bin` 不在 `PATH`，按[一、本地 CLI](#一本地-cli) 追加；或把 `~/.roami/bin/ttmux` 软链出来。 |
+| `command not found: ttmux` | `~/.local/bin` 不在 `PATH`，按[一、本地 CLI](#一本地-cli) 追加；或把 `~/.local/bin/roami` 软链出来。 |
 | `command not found: roami` | `~/.local/bin` 不在 `PATH`，追加 `export PATH="$HOME/.local/bin:$PATH"`。 |
 | 装 `roami` 报缺 go/node | 预构建二进制**无需**任何运行时依赖；只有从源码构建（`./start.sh --dev` / `ROAMI_FROM_SOURCE=1`）才需要 go+node，直接用一键脚本下载二进制即可。 |
-| 启动报「需要先安装 tmux」 | 装 `tmux`（`roami` 内嵌 ttmux，但会话仍需宿主机的 `tmux`）。 |
-| 后端日志「找不到 ttmux」 | `TTMUX_BIN` 没指对，或 ttmux 不在 PATH。`roami` 会自动解压内嵌 ttmux 到 `~/.roami/bin/ttmux`。 |
+| 启动报「需要先安装 tmux」 | 装 `tmux`（`roami` 集成会话核心，但会话仍需宿主机的 `tmux`）。 |
+| 后端日志「找不到 ttmux」 | `TTMUX_BIN` 没指对，或 ttmux 不在 PATH。新版本会话能力已编入 Roami；重新运行安装器刷新兼容入口，源码开发在根目录构建 `./cmd/roami`。 |
 | 端口被占用 / 想换端口 | 改 `~/.roami/config.yaml` 的 `web.bind`，或停掉旧进程（`systemctl --user restart roami` / `./start.sh stop`）。 |
 | 前端是「内嵌回退页」很简陋 | 源码运行时说明没构建 React，跑 `./start.sh --dev`；预构建 `roami` 已内嵌前端，不会出现。 |
 | 浏览器标签连不上 | 确认装了 `google-chrome`；检查 `TTMUX_CHROME_CDP` 指向的端口。 |

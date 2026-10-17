@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 // 返回 JSON 的端点只认 stdout。

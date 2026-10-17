@@ -47,14 +47,14 @@ ttmux 支持全局环境变量，所有新建的 session 自动继承：
 
 ```bash
 # 设置代理（通常已配好，先检查）
-ttmux env
+roami session env
 
 # 如需设置
-ttmux env set https_proxy=http://127.0.0.1:7890
-ttmux env set http_proxy=http://127.0.0.1:7890
+roami session env set https_proxy=http://127.0.0.1:7890
+roami session env set http_proxy=http://127.0.0.1:7890
 ```
 
-**重要：启动 Agent 前先 `ttmux env` 确认代理等环境变量已设好。**
+**重要：启动 Agent 前先 `roami session env` 确认代理等环境变量已设好。**
 
 ## 任务拆分原则
 
@@ -78,7 +78,7 @@ ttmux env set http_proxy=http://127.0.0.1:7890
 ### 第二步：启动 Agent 组
 
 ```bash
-ttmux agent spawn <组名> \
+roami session agent spawn <组名> \
   "<任务1名>" "<任务1详细描述>" \
   "<任务2名>" "<任务2详细描述>" \
   "<任务3名>" "<任务3详细描述>" \
@@ -98,7 +98,7 @@ ttmux agent spawn <组名> \
 
 ```bash
 # 每隔一段时间检查状态
-ttmux agent status <组名>
+roami session agent status <组名>
 ```
 
 状态含义：
@@ -112,8 +112,8 @@ ttmux agent status <组名>
 ### 第四步：收集结果
 
 ```bash
-ttmux agent collect <组名>          # 人类可读
-ttmux agent collect <组名> --json   # 结构化输出
+roami session agent collect <组名>          # 人类可读
+roami session agent collect <组名> --json   # 结构化输出
 ```
 
 ### 第五步：验证
@@ -125,7 +125,7 @@ ttmux agent collect <组名> --json   # 结构化输出
 3. **运行测试** — 如果有测试就跑，没有就手动验证
 4. **修复问题** — 如果某个 Agent 的产出有问题，可以：
    - 自己直接修复（优先）
-   - 用 `ttmux agent send <会话名> "修复指令"` 让 Agent 修
+   - 用 `roami session agent send <会话名> "修复指令"` 让 Agent 修
 
 ### 第六步：组装
 
@@ -137,7 +137,7 @@ ttmux agent collect <组名> --json   # 结构化输出
 ### 第七步：清理
 
 ```bash
-ttmux agent kill <组名>
+roami session agent kill <组名>
 ```
 
 **必须清理**，不要留下孤立会话。
@@ -175,14 +175,14 @@ ttmux agent kill <组名>
 适合跑 shell 命令（非 Claude 任务）：
 
 ```bash
-ttmux spawn build \
+roami session spawn build \
   "lint"  "npm run lint" \
   "test"  "npm test" \
   "types" "npx tsc --noEmit"
 
-ttmux wait build --timeout 120
-ttmux collect build
-ttmux group kill build
+roami session wait build --timeout 120
+roami session collect build
+roami session group kill build
 ```
 
 ## 模式三：蜂群编排（swarm）
@@ -193,25 +193,25 @@ ttmux group kill build
 
 ```bash
 # 1. 建蜂群（带目标）
-ttmux swarm new login --goal "给项目加登录功能：注册/登录/JWT"
+roami session swarm new login --goal "给项目加登录功能：注册/登录/JWT"
 
 # 2. 加成员（agent 或 task；可声明依赖）
-ttmux swarm add login api   --type agent --dir ~/proj "实现登录/注册 API"
-ttmux swarm add login ui    --type agent --dir ~/proj "实现登录页面"
-ttmux swarm add login e2e   --type task  --depends-on api,ui "npm run e2e"
+roami session swarm add login api   --type agent --dir ~/proj "实现登录/注册 API"
+roami session swarm add login ui    --type agent --dir ~/proj "实现登录页面"
+roami session swarm add login e2e   --type task  --depends-on api,ui "npm run e2e"
 
 # 3. 看状态 / 收集
-ttmux swarm ls
-ttmux swarm status login
-ttmux swarm collect login
+roami session swarm ls
+roami session swarm status login
+roami session swarm collect login
 
 # 4. 交给 cc 监护（自动拉起一个交互式指挥会话 cc-login，作用域只盯这个蜂群）
-ttmux swarm adopt login          # 或 --by <已有cc会话> 复用现有指挥
+roami session swarm adopt login          # 或 --by <已有cc会话> 复用现有指挥
 
 # 5. 收尾
-ttmux swarm done login           # 标记完成（不杀会话）
-ttmux swarm archive login        # 杀会话、留元数据
-ttmux swarm rm login             # 彻底删除
+roami session swarm done login           # 标记完成（不杀会话）
+roami session swarm archive login        # 杀会话、留元数据
+roami session swarm rm login             # 彻底删除
 ```
 
 **何时用蜂群 vs spawn/agent**：
@@ -225,7 +225,7 @@ ttmux swarm rm login             # 彻底删除
 
 当用户通过 `/ttmux` 调用时：
 
-- **无参数** → `ttmux status`，汇报当前状态
+- **无参数** → `roami session status`，汇报当前状态
 - **`run <描述>`** → 分析任务、拆分、启动 Agent 组、监控、收集、组装、验证
 - **`swarm <描述>`** → 建蜂群、加成员、（可选）`swarm adopt` 交给 cc 监护
 - **`check <组名>`** → 查看状态
@@ -241,10 +241,10 @@ ttmux swarm rm login             # 彻底删除
 
 ```bash
 # 1. 确认环境
-ttmux env
+roami session env
 
 # 2. 启动 3 个 Agent
-ttmux agent spawn minitools \
+roami session agent spawn minitools \
   "string" "你是一个Python开发者。在 /tmp/project/string_utils.py 中实现 reverse(s), count_vowels(s), to_snake_case(s) 三个函数。只写这一个文件。" \
   "math"   "你是一个Python开发者。在 /tmp/project/math_utils.py 中实现 is_prime(n), fibonacci(n), gcd(a,b) 三个函数。只写这一个文件。" \
   "file"   "你是一个Python开发者。在 /tmp/project/file_utils.py 中实现 read_lines(path), word_count(path), find_files(dir,pattern) 三个函数。只写这一个文件。" \
@@ -252,14 +252,14 @@ ttmux agent spawn minitools \
 
 # 3. 等待（首次等 30s）
 sleep 30
-ttmux agent status minitools
+roami session agent status minitools
 
 # 4. 状态还是运行中就继续等
 sleep 15
-ttmux agent status minitools
+roami session agent status minitools
 
 # 5. 全部完成后收集
-ttmux agent collect minitools
+roami session agent collect minitools
 
 # 6. 验证文件
 ls /tmp/project/*.py
@@ -271,19 +271,19 @@ ls /tmp/project/*.py
 python3 /tmp/project/main.py
 
 # 9. 清理
-ttmux agent kill minitools
+roami session agent kill minitools
 
 # 10. 向用户汇报
 ```
 
 ## 规则
 
-1. **先检查环境** — 启动前 `ttmux env` 确认代理配好，`ttmux ls` 检查无同名会话
+1. **先检查环境** — 启动前 `roami session env` 确认代理配好，`roami session ls` 检查无同名会话
 2. **先收集再清理** — 永远 collect → kill，顺序不能反
 3. **最多 6 个 Agent** — 并行太多反而慢
 4. **文件不能冲突** — 每个 Agent 操作自己的文件，绝不交叉
 5. **必须验证** — 收集后一定要检查文件存在、内容正确、能运行
 6. **组装是你的活** — 子 Agent 写模块，你来整合
-7. **失败先看日志** — `ttmux capture <会话名>` 或 `cat ~/.local/share/ttmux/logs/<会话名>.log`
-8. **必须清理** — 完成后 `ttmux agent kill <组名>`
+7. **失败先看日志** — `roami session capture <会话名>` 或 `cat ~/.local/share/ttmux/logs/<会话名>.log`
+8. **必须清理** — 完成后 `roami session agent kill <组名>`
 9. **汇报要完整** — 向用户说明每个子任务的结果，不遗漏

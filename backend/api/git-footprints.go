@@ -3,88 +3,74 @@ package api
 import (
 	"context"
 	"database/sql"
-	"os"
-	"path/filepath"
 	"time"
 
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/worktree"
+	metadb "github.com/ybz21/Roami/internal/storage"
 )
 
 // GitFootprintStore owns a separate archive; meta.db schema remains CLI-owned.
 type GitFootprintStore struct {
-	db  *sql.DB
-	err error
+	managed *metadb.DB
+	db      *sql.DB
+	err     error
 }
 
 func NewGitFootprintStore(dataDir string) *GitFootprintStore {
 	s := &GitFootprintStore{}
-	if s.err = os.MkdirAll(dataDir, 0o755); s.err != nil {
+	paths, e := metadb.ResolvePaths(dataDir, dataDir)
+	if e != nil {
+		s.err = e
 		return s
 	}
-	s.db, s.err = sql.Open("sqlite", "file:"+filepath.Join(dataDir, "ai-footprints.db")+"?_pragma=busy_timeout(10000)")
-	if s.err != nil {
+	if _, s.err = paths.Ensure(); s.err != nil {
 		return s
 	}
-	s.db.SetMaxOpenConns(1)
-	_, s.err = s.db.Exec(`CREATE TABLE IF NOT EXISTS git_commits (oid TEXT PRIMARY KEY, at INTEGER NOT NULL, repo TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '')`)
+	s.managed, s.err = metadb.OpenManaged(paths, metadb.DatabaseDescriptor{ID: "git-archive", Kind: "archive", Path: paths.ArchivePath(), Owner: "git-archive"}, []metadb.Step{{Version: 1, Name: "git-archive", SQL: `CREATE TABLE IF NOT EXISTS git_commits (oid TEXT PRIMARY KEY, at INTEGER NOT NULL, repo TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '')`, Fn: func(tx *sql.Tx, _ metadb.Options) error {
+		for _, name := range []string{"repo", "subject"} {
+			if e := archiveColumn(tx, name); e != nil {
+				return e
+			}
+		}
+		_, e := tx.Exec(`CREATE INDEX IF NOT EXISTS git_commits_at ON git_commits(at)`)
+		return e
+	}}}, metadb.Options{})
 	if s.err == nil {
-		s.err = s.migrateDetails()
+		s.db = s.managed.DB
 	}
+
 	return s
 }
 
-func (s *GitFootprintStore) migrateDetails() error {
-	rows, err := s.db.Query(`PRAGMA table_info(git_commits)`)
-	if err != nil {
-		return err
+func archiveColumn(tx *sql.Tx, name string) error {
+	cols, e := metadb.Columns(tx, "git_commits")
+	if e != nil {
+		return e
 	}
-	columns := map[string]bool{}
-	for rows.Next() {
-		var index, notNull, primary int
-		var name, typ string
-		var def any
-		if err := rows.Scan(&index, &name, &typ, &notNull, &def, &primary); err != nil {
-			rows.Close()
-			return err
-		}
-		columns[name] = true
+	if cols[name] {
+		return nil
 	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	for _, name := range []string{"repo", "subject"} {
-		if !columns[name] {
-			if _, err := s.db.Exec(`ALTER TABLE git_commits ADD COLUMN ` + name + ` TEXT NOT NULL DEFAULT ''`); err != nil {
-				return err
-			}
-		}
-	}
-	_, err = s.db.Exec(`CREATE INDEX IF NOT EXISTS git_commits_at ON git_commits(at)`)
-	return err
+	_, e = tx.Exec("ALTER TABLE git_commits ADD COLUMN " + name + " TEXT NOT NULL DEFAULT ''")
+	return e
 }
 
 func (s *GitFootprintStore) Import(ctx context.Context, commits []worktree.ActivityCommit) error {
 	if s.err != nil {
 		return s.err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO git_commits (oid, at, repo, subject) VALUES (?, ?, ?, ?) ON CONFLICT(oid) DO UPDATE SET repo=excluded.repo, subject=excluded.subject WHERE git_commits.repo='' AND excluded.repo<>''`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	for _, commit := range commits {
-		if _, err := stmt.ExecContext(ctx, commit.OID, commit.At, commit.Repo, commit.Subject); err != nil {
+	return s.managed.Tx(func(tx *sql.Tx) error {
+		stmt, err := tx.PrepareContext(ctx, `INSERT INTO git_commits (oid, at, repo, subject) VALUES (?, ?, ?, ?) ON CONFLICT(oid) DO UPDATE SET repo=excluded.repo, subject=excluded.subject WHERE git_commits.repo='' AND excluded.repo<>''`)
+		if err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		defer stmt.Close()
+		for _, commit := range commits {
+			if _, err := stmt.ExecContext(ctx, commit.OID, commit.At, commit.Repo, commit.Subject); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *GitFootprintStore) Recent(ctx context.Context) ([]worktree.ActivityCommit, error) {

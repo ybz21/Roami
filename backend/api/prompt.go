@@ -1,7 +1,7 @@
 // prompt.go：蜂群成员的提示词模板渲染（Go 标准库 text/template，零依赖）。
 //
 // 后端在「加成员」时按角色(leader/member)渲染出完整 prompt，作为任务传给
-// `ttmux swarm add`；CLI 收到的即最终 prompt（不再二次模板）。模板内置于二进制，
+// `roami session swarm add`；CLI 收到的即最终 prompt（不再二次模板）。模板内置于二进制，
 // 可用 TTMUX_PROMPT_DIR 指向外部目录覆盖；skill 目录用 TTMUX_SKILLS_DIR（默认 ~/.claude/skills）。
 package api
 

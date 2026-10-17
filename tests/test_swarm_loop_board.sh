@@ -6,8 +6,15 @@
 
 set -euo pipefail
 
-TTMUX="${TTMUX:-./ttmux}"
+ROAMI_BIN="${ROAMI_BIN:-roami}"
+session_cli() { "$ROAMI_BIN" session "$@"; }
+TTMUX=session_cli
 TMP="$(mktemp -d /tmp/ttmux-swarm-loop-board.XXXXXX)"
+for storage_prefix in ROAMI ROAM TTMUX; do
+  for storage_suffix in HOME DATA CONFIG DATABASE_DIR BACKUP_DIR; do
+    unset "${storage_prefix}_${storage_suffix}"
+  done
+done
 export TTMUX_HOME="${TMP}/home"
 export TTMUX_DATA="${TMP}/data"
 

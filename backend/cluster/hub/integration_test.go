@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/cluster/hub"
-	"ttmux-web/cluster/node"
+	"github.com/ybz21/Roami/backend/cluster/hub"
+	"github.com/ybz21/Roami/backend/cluster/node"
 )
 
 // TestTunnelProxyEndToEnd 拉起一个 中心（gin + httptest），让一个节点经隧道注册进来，

@@ -52,7 +52,7 @@ cc-swarm 同时是 **包工头** 和 **监护人**：
 | CLI | 用处 |
 |-----|------|
 | **`ttmux`** | 会话 / 任务 / 蜂群编排：建群、加成员、广场（`swarm say` / `swarm feed`）、看板（`swarm task …`）、`swarm done` / `activate` / `collect`。完整用法见 **ttmux** skill。 |
-| **`chrome`** | 浏览器自动化（Playwright over CDP）：`goto` / `click` / `fill` / `text` / `eval` / `screenshot` / `tabs` …。**验收 Web 类成果时用它真跑一遍**（打开页面、点按钮、读文本断言），比只读代码可靠。用法 `chrome help`。 |
+| **`chrome`** | 浏览器自动化（Playwright over CDP）：`goto` / `click` / `fill` / `text` / `eval` / `screenshot` / `tabs` …。**验收 Web 类成果时用它真跑一遍**（打开页面、点按钮、读文本断言），比只读代码可靠。用法 `roami chrome help`。 |
 
 派活给成员时，对 Web 任务可在描述里点名："完成后用 `chrome` 自检页面（打开、点按钮、断言文本）"。
 
@@ -107,15 +107,15 @@ cc-swarm 同时是 **包工头** 和 **监护人**：
 
 ```bash
 # 你(master)
-ttmux swarm task add <群> "<子任务>" [--deps t1]      # 拆活上板
-ttmux swarm task assign <群> <卡> <成员>              # 派活
-ttmux swarm feed <群> --kind block   # 巡检：谁卡住
-ttmux swarm board <群>               # 巡检：任务全貌
-ttmux swarm say <群> --kind broadcast "<指挥>"
+roami session swarm task add <群> "<子任务>" [--deps t1]      # 拆活上板
+roami session swarm task assign <群> <卡> <成员>              # 派活
+roami session swarm feed <群> --kind block   # 巡检：谁卡住
+roami session swarm board <群>               # 巡检：任务全貌
+roami session swarm say <群> --kind broadcast "<指挥>"
 # 成员（在自己会话里，自动署名）
-ttmux swarm task ls <群> --assignee <我>   # 我的卡
-ttmux swarm task move <群> <卡> doing/review
-ttmux swarm say <群> --kind done/block/ask "<...>"
+roami session swarm task ls <群> --assignee <我>   # 我的卡
+roami session swarm task move <群> <卡> doing/review
+roami session swarm say <群> --kind done/block/ask "<...>"
 ```
 
 > 三套机制（广场 / 看板 / 成员依赖门控）**正交**，串联由你显式做：审过某成员就
@@ -128,12 +128,12 @@ cc-swarm 的参数决定它从生命周期的哪一步进入：
 - **`<目标描述>`**（自由文字，最常见）→ **完整流程**：接需求 → 建需求 → 拆任务 → 开子会话 → 巡检 → 集成。
   例：`/cc-swarm 给项目加上 OAuth 登录和 RBAC 权限`
 - **无参数** → 进入**纯监护模式**：不开新会话，直接持续巡检已有的 `cc-*` 会话。
-- **`--swarm <名> [目标]`** → 进入**蜂群作用域**：只针对该蜂群（`ttmux swarm <名>`）操作，不扫全局 `cc-*`。
+- **`--swarm <名> [目标]`** → 进入**蜂群作用域**：只针对该蜂群（`roami session swarm <名>`）操作，不扫全局 `cc-*`。
   - **不带目标** → 纯监护：持续巡检该蜂群已有成员（审批/催测试/review/调度/解锁/集成）。
-  - **带目标**（`ttmux swarm new <名> --goal "…"` 自带 master 时即注入此形态）→ 对该目标走**完整生命周期**，
-    但所有产物都落在这个蜂群下：拆任务上看板(`ttmux swarm task add <名> …`)→开成员(`ttmux swarm add <名> <成员> --type agent …`，
-    有依赖用 `--depends-on`)→广播开工(`ttmux swarm say <名> --kind broadcast`)→巡检(`feed`/`board`)→标完成解锁(`swarm done`)→集成验收。
-  这是 `ttmux swarm new`(自带 master) 与 `ttmux swarm adopt <名>` 拉起指挥会话时自动注入的入口。详见 docs/patrol.md「蜂群作用域」。
+  - **带目标**（`roami session swarm new <名> --goal "…"` 自带 master 时即注入此形态）→ 对该目标走**完整生命周期**，
+    但所有产物都落在这个蜂群下：拆任务上看板(`roami session swarm task add <名> …`)→开成员(`roami session swarm add <名> <成员> --type agent …`，
+    有依赖用 `--depends-on`)→广播开工(`roami session swarm say <名> --kind broadcast`)→巡检(`feed`/`board`)→标完成解锁(`swarm done`)→集成验收。
+  这是 `roami session swarm new`(自带 master) 与 `roami session swarm adopt <名>` 拉起指挥会话时自动注入的入口。详见 docs/patrol.md「蜂群作用域」。
 - **`plan <目标>`** → 只做到第 ③ 步：建需求 + 拆任务 + 输出计划，**不开会话**，等用户确认。
 - **`once`** → 只跑一轮巡检。
 - **`status`** → 只看状态不操作，输出表格（需求进度 + 各会话状态）。
@@ -170,7 +170,7 @@ cc-swarm 的参数决定它从生命周期的哪一步进入：
 | 在提问 | Claude 问了用户一个问题 | → 理解问题，回复合适指令 |
 | 在评分 | 出现 "How is Claude doing" 评分提示 | → 发 `0` dismiss |
 | 执行中 | 正在写代码/读文件/跑命令 | → 跳过不干预 |
-| 已完成 | 输出了总结，idle 在空 prompt | → review；蜂群里 `ttmux swarm done <群> <成员>` 标完成→自动解锁下游 |
+| 已完成 | 输出了总结，idle 在空 prompt | → review；蜂群里 `roami session swarm done <群> <成员>` 标完成→自动解锁下游 |
 | 出错了 | 429/报错/卡死 | → 诊断，等待或修复 |
 | 方向错 | 做的东西偏离需求规格 | → 发纠正指令 |
 

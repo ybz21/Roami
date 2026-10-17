@@ -16,25 +16,25 @@
 | `done` | 已完成 |
 | `blocked` | 被阻塞 |
 
-## 命令：`ttmux swarm task <子命令>`
+## 命令：`roami session swarm task <子命令>`
 
 ```bash
 # leader：建卡（返回卡 id 如 t1）
-ttmux swarm task add <群> "<标题>" [--desc "<细节>"] [--assignee <成员>] [--deps t1,t2] [--col <列>]
+roami session swarm task add <群> "<标题>" [--desc "<细节>"] [--assignee <成员>] [--deps t1,t2] [--col <列>]
 
 # leader：把卡派给成员
-ttmux swarm task assign <群> <卡id> <成员>
+roami session swarm task assign <群> <卡id> <成员>
 
 # 看板全貌 / 我的卡
-ttmux swarm task ls <群> [--col <列>] [--assignee <成员>] [--json]
-ttmux swarm task show <群> <卡id>
+roami session swarm task ls <群> [--col <列>] [--assignee <成员>] [--json]
+roami session swarm task show <群> <卡id>
 
 # 成员：流转自己名下的卡
-ttmux swarm task move <群> <卡id> <列>     # 如 move t3 doing / review
-ttmux swarm task done <群> <卡id>          # = move 到 done
+roami session swarm task move <群> <卡id> <列>     # 如 move t3 doing / review
+roami session swarm task done <群> <卡id>          # = move 到 done
 
 # leader：删卡
-ttmux swarm task rm <群> <卡id>
+roami session swarm task rm <群> <卡id>
 ```
 
 `--deps t1,t2`：表达卡之间的先后关系（画依赖、供参考）；它**不挂起成员**（成员仍立即开工，软依赖靠广场协调）。
@@ -47,6 +47,6 @@ ttmux swarm task rm <群> <卡id>
 
 ## 典型流
 
-1. leader：`t1=$(ttmux swarm task add 群 "认证后端" --desc "注册/登录/JWT" --assignee api)`。
+1. leader：`t1=$(roami session swarm task add 群 "认证后端" --desc "注册/登录/JWT" --assignee api)`。
 2. api 成员：开工 `task move 群 t1 doing` → 完成 `task done 群 t1` + `swarm say 群 --kind done --re t1 "接口已就绪"`。
 3. leader 巡检 `task ls 群` 看全貌，审完推进 / 派下游。

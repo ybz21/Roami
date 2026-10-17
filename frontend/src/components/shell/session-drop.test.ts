@@ -43,7 +43,7 @@ describe('接不接得住', () => {
   it('没说有没有 Agent 时不拦 —— 判定不了就别假装判定得了', () => {
     expect(canDrop(src, { id: 'x' }).ok).toBe(true)
   })
-  it('跨机不接 —— ttmux send 走本机 tmux，过不去', () => {
+  it('跨机不接 —— roami session send 走本机 tmux，过不去', () => {
     // 让它撞一堵看不见的墙，Agent 只会拿到「会话不存在」然后开始瞎猜
     expect(canDrop({ ...src, node: 'jetson' }, { id: 'x', node: '' }))
       .toEqual({ ok: false, why: 'cross' })
@@ -76,13 +76,13 @@ describe('注进去的那段话', () => {
 
   it('命令里用会话 id，不用展示名', () => {
     // Resolve 认展示名，但展示名可以重复（同名取排序第一个）——用 id 才不会发错人
-    expect(intro).toContain('ttmux send 2026-0824-1501-006h "…"')
-    expect(intro).not.toContain('ttmux send fix-missing-search')
+    expect(intro).toContain('roami session send 2026-0824-1501-006h "…"')
+    expect(intro).not.toContain('roami session send fix-missing-search')
   })
 
   it('带上自己的会话名当回信地址', () => {
     // 少了这行，对面收到消息只能干瞪眼
-    expect(intro).toContain('ttmux send 2026-0823-1043-0001 "…"')
+    expect(intro).toContain('roami session send 2026-0823-1043-0001 "…"')
   })
 
   it('身份那行带项目、展示名和 Agent 种类', () => {
@@ -100,7 +100,7 @@ describe('注进去的那段话', () => {
   it('没有工作目录时那一行整行不出现，不留空占位', () => {
     const bare = buildIntro({ id: 'a', label: 'A' }, 'self', t)
     expect(bare).not.toContain('工作目录')
-    expect(bare).toContain('ttmux send a "…"')
+    expect(bare).toContain('roami session send a "…"')
   })
 
   it('没有 Agent 种类时不留空括号', () => {

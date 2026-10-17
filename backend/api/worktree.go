@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/project"
-	"ttmux-web/ttmux"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/project"
+	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 func wtCtx(c *gin.Context) (context.Context, context.CancelFunc) {
@@ -298,12 +298,27 @@ func shellQuote(s string) string {
 func (a *API) cdInto(session, path string) error {
 	// 编排层把会话挪进某目录 = 它以后属于那儿（建 worktree 会话/竞赛/派生都走这里）。
 	// 归属钉死后不再随用户在终端里的 cd 漂移。
-	a.WT.BindSessionHome(session, path)
-	if _, err := a.TT.Run("send-keys", "-t", "="+session+":", "-l", "cd "+shellQuote(path)); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := a.TT.RunCtx(ctx, "send-keys", "-t", "="+session+":", "-l", "cd "+shellQuote(path)); err != nil {
 		return err
 	}
-	_, err := a.TT.Run("send-keys", "-t", "="+session+":", "Enter")
-	return err
+	if _, err := a.TT.RunCtx(ctx, "send-keys", "-t", "="+session+":", "Enter"); err != nil {
+		return err
+	}
+	for {
+		actual, err := a.TT.RunCtx(ctx, "display-message", "-t", "="+session+":", "-p", "#{pane_current_path}")
+		if err == nil && filepath.Clean(strings.TrimSpace(actual)) == filepath.Clean(path) {
+			a.WT.BindSessionHome(session, path)
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(30 * time.Millisecond):
+		}
+	}
+
 }
 
 // WorktreeSessionCreate POST /worktree-sessions {name, dir, branch?, base?, remote?, existing?}
@@ -347,12 +362,16 @@ func (a *API) WorktreeSessionCreate(c *gin.Context) {
 		wtErr(c, err)
 		return
 	}
-	_ = a.cdInto(sess, wt.Path)
+	if err = a.cdInto(sess, wt.Path); err != nil {
+		a.rollbackPreparedSession(sess, wt, !b.Existing)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "WORKSPACE_NOT_READY", "message": err.Error()}})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"session": sess, "label": label, "path": wt.Path, "branch": wt.Branch, "base": wt.Base}, "name": sess})
 }
 
 // SessionFork POST /sessions/:name/fork {child, dir?}
-// 纯 subSession 派生（无 worktree）：ttmux fork（meta 记 parent，缺省继承父 cwd）。
+// 纯 subSession 派生（无 worktree）：roami session fork（meta 记 parent，缺省继承父 cwd）。
 func (a *API) SessionFork(c *gin.Context) {
 	parent := a.sessionTarget(c)
 	var b struct {
@@ -385,7 +404,7 @@ func (a *API) SessionFork(c *gin.Context) {
 }
 
 // SessionForkWorktree POST /sessions/:name/fork-worktree {child, branch?, base?, remote?, dir?}
-// 编排（先 subSession 后 worktree）：ttmux fork（cwd=父仓库目录，meta 记 parent）→
+// 编排（先 subSession 后 worktree）：roami session fork（cwd=父仓库目录，meta 记 parent）→
 // 建 worktree（分支缺省自动占位）→ 子会话内注入 cd；失败反向补偿 kill 子会话。
 func (a *API) SessionForkWorktree(c *gin.Context) {
 	parent := a.sessionTarget(c)
@@ -441,11 +460,15 @@ func (a *API) SessionForkWorktree(c *gin.Context) {
 		wtErr(c, err)
 		return
 	}
-	_ = a.cdInto(child, wt.Path)
+	if err = a.cdInto(child, wt.Path); err != nil {
+		a.rollbackPreparedSession(child, wt, !b.Existing)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "WORKSPACE_NOT_READY", "message": err.Error()}})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"session": child, "label": label, "parent": parent, "path": wt.Path, "branch": wt.Branch, "base": wt.Base}, "name": child})
 }
 
-// forkedSession 从 `ttmux fork --json` 的输出里取子会话名(= 会话 id)；
+// forkedSession 从 `roami session fork --json` 的输出里取子会话名(= 会话 id)；
 // 解析不出来（老版本 CLI / 输出异常）退回展示名，让调用方至少还能按名字操作。
 func forkedSession(out, fallback string) string {
 	var res struct {
@@ -682,4 +705,11 @@ func otherSessions(w worktree.Worktree, name string) []string {
 		}
 	}
 	return out
+}
+
+func (a *API) rollbackPreparedSession(name string, wt worktree.CreateResp, newBranch bool) {
+	_, _ = a.TT.Run("kill", name, "--yes")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = a.WT.Remove(ctx, worktree.RemoveReq{Path: wt.Path, ForceWorktree: true, DeleteBranch: newBranch, ForceDeleteBranch: newBranch, IgnoreSessions: true})
 }

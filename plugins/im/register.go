@@ -2,8 +2,8 @@
 package im
 
 import (
-	"ttmux-cli-go/pkg/plugin/manifest"
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/manifest"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 func init() { sdk.RegisterBuiltin(Manifest(), Activate) }
@@ -103,7 +103,7 @@ func Manifest() manifest.Manifest {
 					Placeholder: "04:00"},
 				{Key: "owner_open_id", Group: "inbound",
 					Title:       manifest.LocaleText{"zh-CN": "Owner open_id", "en-US": "Owner open_id"},
-					Description: manifest.LocaleText{"zh-CN": "唯一能指挥管家的主人;推荐经绑定流程自动写入:本机执行 ttmux plugin run im-bridge.bind-token 拿一次性口令,再在飞书里说「绑定通知 <口令>」", "en-US": "The only user who commands the concierge; prefer the bind flow: run im-bridge.bind-token locally, then say \"绑定通知 <token>\" in Feishu"},
+					Description: manifest.LocaleText{"zh-CN": "唯一能指挥管家的主人;推荐经绑定流程自动写入:本机执行 roami plugin run im-bridge.bind-token 拿一次性口令,再在飞书里说「绑定通知 <口令>」", "en-US": "The only user who commands the concierge; prefer the bind flow: run im-bridge.bind-token locally, then say \"绑定通知 <token>\" in Feishu"},
 					Placeholder: "ou_xxxxxxxx"},
 				{Key: "allow_users", Group: "inbound",
 					Title:       manifest.LocaleText{"zh-CN": "额外允许的用户", "en-US": "Additional allowed users"},

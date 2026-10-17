@@ -1,5 +1,5 @@
 // 插件资源的 HTTP handler —— 全部通过 ttmux.Client 转发到 CLI(v1 backend 不直连
-// plugind,见 docs/design/plugin/04 通路⑥)。读 = ttmux plugin ... --json;
+// plugind,见 docs/design/plugin/04 通路⑥)。读 = roami plugin ... --json;
 // 写 = 对应子命令。所有参数独立 argv 传入,杜绝命令注入。
 package api
 
@@ -17,12 +17,12 @@ func (a *API) Plugins(c *gin.Context) { a.json(c, "plugin", "ls", "--json") }
 // GET /api/plugin/status —— plugind 守护进程与插件会话状态
 func (a *API) PluginStatus(c *gin.Context) { a.json(c, "plugin", "status", "--json") }
 
-// POST /api/plugin/daemon/start —— 拉起 plugind(等价终端执行 ttmux plugin daemon,
+// POST /api/plugin/daemon/start —— 拉起 plugind(等价终端执行 roami plugin daemon,
 // 幂等:已运行则直接返回)
 func (a *API) PluginDaemonStart(c *gin.Context) { a.text(c, "plugin", "daemon") }
 
 // POST /api/plugin/install —— 安装插件:multipart 上传 .tgz 包,或 JSON {path}
-// 安装本机目录。落到 CLI `ttmux plugin install <src>`,安装后默认未启用。
+// 安装本机目录。落到 CLI `roami plugin install <src>`,安装后默认未启用。
 func (a *API) PluginInstall(c *gin.Context) {
 	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/") {
 		fh, err := c.FormFile("file")

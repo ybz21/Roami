@@ -102,7 +102,7 @@ if tmux ls >/dev/null 2>&1; then
 else
   bad "tmux server" "连不上（会话全在这上面）"
 fi
-tmux has-session -t "=_ttmux-plugind" 2>/dev/null \
+roami plugin status --json 2>/dev/null | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("daemon") else 1)' \
   && ok "plugind 守护进程" "在" \
   || bad "plugind 守护进程" "不在——插件的定时/常驻能力全停摆"
 # 到点触发靠外面按分钟叫一次 cron.tick（插件宿主没有内置调度器）。这一条不在，
@@ -115,10 +115,10 @@ else
   bad "定时任务巡检" "没人叫 cron.tick —— 定时任务一条都不会触发（装 scripts/deploy/systemd/）"
 fi
 
-if out=$(ttmux ls --json 2>/dev/null) && printf '%s' "$out" | python3 -c 'import sys,json;json.load(sys.stdin)' 2>/dev/null; then
-  ok "ttmux ls --json"
+if out=$(roami session ls --json 2>/dev/null) && printf '%s' "$out" | python3 -c 'import sys,json;json.load(sys.stdin)' 2>/dev/null; then
+  ok "roami session ls --json"
 else
-  bad "ttmux ls --json" "CLI 台账读不出来"
+  bad "roami session ls --json" "CLI 台账读不出来"
 fi
 
 section "前端产物"

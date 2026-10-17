@@ -3,7 +3,7 @@
 //	GET /search?q=&kinds=&limit=&dir=   项目 / 会话 / 项目文件 / 插件 / 蜂群（名字模糊匹配）
 //	GET /search/content?q=&dir=&limit=  文件内容（rg，没有则退回 grep）
 //
-// 这里只做「装配数据源 → 交给引擎 → 出 JSON」。打分、排序、截断在 ttmux-web/search；
+// 这里只做「装配数据源 → 交给引擎 → 出 JSON」。打分、排序、截断在 github.com/ybz21/Roami/backend/search；
 // 各数据源在 search_sources.go——**要让一类新东西可搜，改那个文件就够了**。
 package api
 
@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/search"
+	"github.com/ybz21/Roami/backend/search"
 )
 
 const maxContentHits = 60

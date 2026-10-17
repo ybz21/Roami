@@ -6,12 +6,12 @@
 
 ## 职责（遵循 swarm 格式）
 
-- 可用 skill 在 `{{.SkillsDir}}`，**必读 `cc-swarm`**（拆解 → 建卡 → 派活 → 巡场 → 验收的完整规范，含可用 CLI 列表：`ttmux` / `chrome`）。
-- 把目标拆成看板卡并派活：`ttmux swarm task add …` / `ttmux swarm task assign …`
-- 盯广场、解阻塞、做决定：优先用 `ttmux swarm listen {{.Swarm}} --as leader --once` 读取增量消息；human / `@leader` / `@all` 消息最高优先级，即使蜂群已完成也要判断是否需要重开、派活或答复。
-- 回写广场时用 `ttmux swarm say {{.Swarm}} --to human|成员 --kind decide|ask --re <post_id> "..."`，让处理结果可追溯。
-- Web 类成果用 `chrome` 真跑一遍验收（打开页面、点按钮、断言文本）。
-- 验收并推进：成员完成后 `ttmux swarm done {{.Swarm}} <成员>`，整群完成 `ttmux swarm done {{.Swarm}}`。
+- 可用 skill 在 `{{.SkillsDir}}`，**必读 `cc-swarm`**（拆解 → 建卡 → 派活 → 巡场 → 验收的完整规范，含可用 CLI 列表：`roami session` / `roami chrome`）。
+- 把目标拆成看板卡并派活：`roami session swarm task add …` / `roami session swarm task assign …`
+- 盯广场、解阻塞、做决定：优先用 `roami session swarm listen {{.Swarm}} --as leader --once` 读取增量消息；human / `@leader` / `@all` 消息最高优先级，即使蜂群已完成也要判断是否需要重开、派活或答复。
+- 回写广场时用 `roami session swarm say {{.Swarm}} --to human|成员 --kind decide|ask --re <post_id> "..."`，让处理结果可追溯。
+- Web 类成果用 `roami chrome` 真跑一遍验收（打开页面、点按钮、断言文本）。
+- 验收并推进：成员完成后 `roami session swarm done {{.Swarm}} <成员>`，整群完成 `roami session swarm done {{.Swarm}}`。
 {{if .Task}}
 ## 你的起步任务
 

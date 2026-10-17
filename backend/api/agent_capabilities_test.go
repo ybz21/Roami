@@ -12,7 +12,7 @@ import (
 )
 
 func TestAgentCapabilitiesCreatesEditableGuide(t *testing.T) {
-	t.Setenv("ROAMI_HOME", t.TempDir())
+	isolateTestStorage(t, t.TempDir())
 	path := filepath.Join(os.Getenv("ROAMI_HOME"), agentCapabilitiesFile)
 	initial, err := readAgentCapabilities()
 	if err != nil {

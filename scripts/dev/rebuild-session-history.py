@@ -20,9 +20,10 @@ Reconcile 把整表当死行硬删——历史会话一条不剩，而 logs/、m
     logs/<id>.log            存在性 + 最后活动时刻（唯一覆盖全量的源）
 
 schema 归 ttmux CLI 所有：本脚本只 INSERT，绝不建表也绝不改结构。
-库还没建起来时先跑一次 `ttmux db status`。
+库还没建起来时先跑一次 `roami db migrate`。
 """
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -34,11 +35,6 @@ from pathlib import Path
 
 # 会话 id 自带创建时刻：2026-0811-1629-0009
 ID_RE = re.compile(r"^(\d{4})-(\d{2})(\d{2})-(\d{2})(\d{2})-[0-9a-z]{4}$")
-
-
-def roam_home() -> Path:
-    return Path(os.environ.get("ROAM_HOME") or os.environ.get("TTMUX_HOME")
-                or Path.home() / ".roam")
 
 
 def read(p: Path) -> str:
@@ -99,7 +95,7 @@ class Salvage:
                 row[k] = v
 
 
-def collect(home: Path) -> Salvage:
+def collect(home: Path, db_path: Path) -> Salvage:
     s = Salvage()
 
     for f in sorted((home / "logs").glob("*.log")):
@@ -117,14 +113,14 @@ def collect(home: Path) -> Salvage:
 
     swarm_born = {}  # 蜂群 id → 创建时刻；成员表没有时间戳，只能继承群的
     for sid, sup, created, wd in query(
-            home / "meta.db",
+            db_path,
             "select id, IFNULL(supervisor,''), created, IFNULL(dir,'') from swarms"):
         swarm_born[sid] = rfc3339(created)
         s.add(sup, "swarm-lead", initial_cwd=wd, created_at=swarm_born[sid],
               created_by="swarm")
 
     for sess, labels, created, updated in query(
-            home / "meta.db",
+            db_path,
             "select session, IFNULL(labels,''), created, updated from plugin_sessions"):
         try:
             wd = (json.loads(labels) or {}).get("workdir", "")
@@ -174,20 +170,30 @@ def main() -> int:
     ap.add_argument("--home", type=Path, default=None, help="Roam 主目录（默认 $ROAM_HOME 或 ~/.roam）")
     args = ap.parse_args()
 
-    home = args.home or roam_home()
-    db_path = home / "meta.db"
-    if not db_path.exists():
-        print(f"没有 {db_path}，先跑一次 ttmux 让它建库", file=sys.stderr)
+    command = ["roami"]
+    if args.home:
+        command += ["--home", str(args.home.resolve())]
+    command += ["db", "status", "--json"]
+    status = subprocess.run(command, check=True, capture_output=True, text=True)
+    state = json.loads(status.stdout)
+    if state.get("mode") != "sqlite":
+        print("先完成 roami db migrate；不会回退旧数据库路径", file=sys.stderr)
         return 1
+    home = Path(state["paths"]["dataRoot"])
+    db_path = Path(state["path"])
+    lock_dir = home / "locks"
+    lock_dir.mkdir(mode=0o700, exist_ok=True)
+    lease = (lock_dir / "storage.lock").open("a+b")
+    fcntl.flock(lease, fcntl.LOCK_SH | fcntl.LOCK_NB)
 
     conn = sqlite3.connect(db_path)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)")}
     if "status" not in cols:
-        print("sessions 还是老表结构：先用新版 ttmux 跑一次 `ttmux ls --tree` 完成迁移",
+        print("sessions 还是老表结构：先用新版 ttmux 跑一次 `roami session ls --tree` 完成迁移",
               file=sys.stderr)
         return 1
 
-    salvage = collect(home)
+    salvage = collect(home, db_path)
     existing = {r[0] for r in conn.execute("select id from sessions")}
     alive = live_sessions()
 

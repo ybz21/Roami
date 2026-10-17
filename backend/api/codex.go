@@ -1,5 +1,5 @@
 // Codex 集成：检测会话是否在跑 codex（OpenAI Codex CLI），并把其会话记录(rollout JSONL)
-// 解析成可渲染的对话。机制与 claude.go 一致——只「读」记录渲染，「发」消息复用 ttmux send。
+// 解析成可渲染的对话。机制与 claude.go 一致——只「读」记录渲染，「发」消息复用 roami session send。
 //
 // rollout 文件位于 ~/.codex/sessions/YYYY/MM/DD/rollout-<时间>-<uuid>.jsonl。
 // 每行一个 JSON：response_item 承载对话主体（message/reasoning/function_call/...），

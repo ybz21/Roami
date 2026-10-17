@@ -15,7 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 type Hub struct {

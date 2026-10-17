@@ -184,8 +184,8 @@ closed.
 
 ## Install And Start
 
-`roami` is a single self-contained binary with the frontend and the `ttmux` CLI
-embedded, so the target machine needs no go/node/npm. Config and data live in
+`roami` is a single binary with an embedded frontend and an integrated session core.
+The web console needs no Go/Node/npm on the target; browser automation uses Node and Chrome. Config and data live in
 `~/.roami/` (`config.yaml` is generated on first run).
 
 ### Option A — install as a service (recommended for always-on / 24×7 machines)
@@ -313,8 +313,8 @@ roami help                        # what is installed and how to reach it
 roami cron list                   # scheduled tasks
 roami im send --text "done"       # message yourself through the IM bridge
 roami host stats                  # host resource snapshot
-roami ls                          # sessions — forwarded to ttmux
-roami ttmux swarm ls              # explicit passthrough when a name collides
+roami session ls                  # sessions — integrated core
+roami session swarm ls              # explicit passthrough when a name collides
 roami -addr 0.0.0.0:13579         # no subcommand: start the web console (unchanged)
 ```
 
@@ -332,7 +332,7 @@ group with no extra wiring.
 
 Command details are intentionally not expanded on the home page, so the README
 does not become a tool manual. When needed, see
-**[docs/install/](docs/install/)**, `roami help`, `ttmux help`, and `chrome help`.
+**[docs/install/](docs/install/)**, `roami help`, `roami session help`, and `roami chrome help`.
 
 ## Development And Contribution
 
@@ -367,8 +367,7 @@ npm run dev
 Backend only:
 
 ```bash
-cd backend
-TTMUX_BIN=../ttmux TTMUX_WEB_PASSWORD=dev go run ./cmd
+TTMUX_WEB_PASSWORD=dev go run ./cmd/roami server
 ```
 
 CLI smoke test:

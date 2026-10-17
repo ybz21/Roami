@@ -3,12 +3,13 @@ package api
 import (
 	"context"
 	"database/sql"
+	metadb "github.com/ybz21/Roami/internal/storage"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 func TestGitFootprintsBackfillIsDurableAndIdempotent(t *testing.T) {
@@ -78,6 +79,10 @@ func TestGitFootprintsUpgradesLegacyArchiveWithoutChangingCounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.Close()
+	p, _ := metadb.ResolvePaths(dir, dir)
+	if err := p.MigrateLayout(true); err != nil {
+		t.Fatal(err)
+	}
 	s := NewGitFootprintStore(dir)
 	defer s.db.Close()
 	commit := worktree.ActivityCommit{OID: "existing", At: 12345, Repo: "/projects/app", Subject: "Fix login"}

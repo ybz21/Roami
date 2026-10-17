@@ -20,10 +20,15 @@ bad()  { printf '  \033[31m✘\033[0m %s\n' "$1"; [ $# -gt 1 ] && printf '      
 skip() { printf '  \033[33m—\033[0m %s (%s)\n' "$1" "${2:-跳过}"; SKIP=$((SKIP+1)); }
 sect() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
-TTMUX="${TTMUX_BIN:-ttmux}"
-command -v "$TTMUX" >/dev/null || { echo "✘ 找不到 ttmux"; exit 1; }
+ROAMI_BIN="${ROAMI_BIN:-roami}"
+session_cli() { "$ROAMI_BIN" session "$@"; }
+TTMUX=session_cli
+command -v "$ROAMI_BIN" >/dev/null || { echo "✘ 找不到 roami"; exit 1; }
 
 # 本次跑出来的会话都打这个前缀，收尾一并清掉，绝不碰用户自己的会话。
+TEST_DATABASE_PATH=$("$ROAMI_BIN" db status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["path"])')
+[ -f "$TEST_DATABASE_PATH" ] || { echo "数据库尚未初始化"; exit 1; }
+export TEST_DATABASE_PATH
 TAG="e2e-rel-$$"
 cleanup() {
   tmux ls -F '#{session_name}	#{@roam_name}' 2>/dev/null | while IFS=$'\t' read -r s l; do
@@ -51,7 +56,7 @@ make_dormant() {
   python3 - "$sid" "$epoch" <<'PYEOF'
 import sqlite3,sys,os,datetime,time
 sid,epoch=sys.argv[1],sys.argv[2]
-db=os.path.expanduser('~/.roami/meta.db')
+db=os.environ['TEST_DATABASE_PATH']
 want=epoch+'-old'
 # 写完回读确认，不对就重来——和产品里 memguard.Apply 必须回读 memory.max 同一个道理：
 # 有别的写者在并发改这张表，"命令返回 0" 证明不了状态。
@@ -86,7 +91,7 @@ pane_pid() { tmux list-panes -s -t "=$1" -F '#{pane_pid}' 2>/dev/null | head -1;
 cg_dir()   { local p; p=$(pane_pid "$1"); [ -n "$p" ] && echo "/sys/fs/cgroup$(cut -d: -f3 < /proc/"$p"/cgroup 2>/dev/null)"; }
 db()       { python3 -c "
 import sqlite3,sys,os
-c=sqlite3.connect(os.path.expanduser('~/.roami/meta.db'))
+c=sqlite3.connect(os.environ['TEST_DATABASE_PATH'])
 r=list(c.execute(sys.argv[1], sys.argv[2:]))
 print(r[0][0] if r and r[0][0] is not None else '')" "$@"; }
 
@@ -277,7 +282,7 @@ print(sum(1 for x in json.load(sys.stdin) if x['name']=='$s' and x.get('state')=
   local kinds
   kinds=$(python3 -c "
 import subprocess,json
-out=subprocess.run(['$TTMUX','agent','kinds','--json'],capture_output=True,text=True).stdout.strip()
+out=subprocess.run(['$ROAMI_BIN','session','agent','kinds','--json'],capture_output=True,text=True).stdout.strip()
 print(out if out else '')" 2>/dev/null)
   if [ -z "$kinds" ]; then
     # 没有 CLI 子命令就直接按已知两型验（接口在 internal/agent 里已有单测覆盖全集）
@@ -292,7 +297,7 @@ print(out if out else '')" 2>/dev/null)
     python3 - "$fake" "$kind" "$newid" <<'PYEOF'
 import sqlite3,sys,os
 sid,kind,cid=sys.argv[1],sys.argv[2],sys.argv[3]
-c=sqlite3.connect(os.path.expanduser('~/.roami/meta.db'))
+c=sqlite3.connect(os.environ['TEST_DATABASE_PATH'])
 c.execute("update sessions set agent_kind=?, agent_session_uuid=? where id=?",(kind,cid,sid))
 c.commit()
 PYEOF
@@ -342,9 +347,9 @@ print(sum(1 for x in json.load(sys.stdin) if x['name']=='$k' and x.get('state')=
 # ── UI（需要 chrome CLI + 服务在跑）────────────────────────────────────
 run_ui() {
   sect "UI（chrome）"
-  command -v chrome >/dev/null || { skip "整组" "没有 chrome CLI"; return; }
+  command -v roami >/dev/null || { skip "整组" "没有 chrome CLI"; return; }
   curl -sk -o /dev/null "https://127.0.0.1:${PORT:-13579}/" 2>/dev/null || { skip "整组" "服务没在跑"; return; }
-  chrome eval "1" >/dev/null 2>&1 || { skip "整组" "Chrome 没起（chrome goto 一次即可）"; return; }
+  roami chrome eval "1" >/dev/null 2>&1 || { skip "整组" "Chrome 没起（roami chrome goto 一次即可）"; return; }
 
   # 自己造一个休眠会话再看——不能指望跑测试时环境里正好有一个，
   # 那样这条最该守的用例会长期停在 skip 上，等于没有。
@@ -353,21 +358,21 @@ run_ui() {
 
   # 掉登录就自己登回去：服务重启会清 session，而这组用例常跟在一次部署后面跑，
   # 不自愈的话它就变成「每次都要人先去点一下登录」，那种测试没人会跑。
-  chrome goto "https://127.0.0.1:${PORT:-13579}/" >/dev/null 2>&1; sleep 3
-  if chrome eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
+  roami chrome goto "https://127.0.0.1:${PORT:-13579}/" >/dev/null 2>&1; sleep 3
+  if roami chrome eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
     local pw; pw=$(grep -m1 '^TTMUX_WEB_PASSWORD=' .env 2>/dev/null | cut -d= -f2-)
     if [ -n "$pw" ]; then
-      chrome fill "input[type=password]" "$pw" >/dev/null 2>&1
-      chrome click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1
+      roami chrome fill "input[type=password]" "$pw" >/dev/null 2>&1
+      roami chrome click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1
       sleep 4
     else
       skip "整组" "在登录页且 .env 里读不到口令"; return
     fi
   fi
 
-  chrome eval "location.hash='#/sessions'; 1" >/dev/null 2>&1; sleep 4
+  roami chrome eval "location.hash='#/sessions'; 1" >/dev/null 2>&1; sleep 4
   local r
-  r=$(chrome eval "
+  r=$(roami chrome eval "
 const rows=[...document.querySelectorAll('.tt-srow')];
 const dor=rows.filter(r=>/休眠|Dormant/.test(r.querySelector('.tags')?.innerText||''));
 const hollow=rows.filter(r=>{const i=r.querySelector('i');return i&&getComputedStyle(i).backgroundColor==='rgba(0, 0, 0, 0)'});
@@ -404,17 +409,17 @@ JSON.stringify({rows:rows.length,dormantTag:dor.length,hollow:hollow.length,memb
   if [ -z "$hub" ]; then
     skip "U3 主机监控颜色令牌化" "没给 HUB_URL（形如 https://<中心>:13570）"
   else
-    chrome goto "$hub" >/dev/null 2>&1; sleep 3
-    if chrome eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
+    roami chrome goto "$hub" >/dev/null 2>&1; sleep 3
+    if roami chrome eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
       [ -n "${HUB_PASSWORD:-}" ] && {
-        chrome fill "input[type=password]" "$HUB_PASSWORD" >/dev/null 2>&1
-        chrome click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1; sleep 4
+        roami chrome fill "input[type=password]" "$HUB_PASSWORD" >/dev/null 2>&1
+        roami chrome click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1; sleep 4
       }
     fi
-    chrome eval "location.hash='#/hub'; 1" >/dev/null 2>&1; sleep 4
-    chrome eval "const f=[...document.querySelectorAll('.tt-hub-fold')].find(x=>/这台机器|This machine/.test(x.innerText)); const b=f&&f.querySelector('button'); b&&b.click(); 1" >/dev/null 2>&1; sleep 4
+    roami chrome eval "location.hash='#/hub'; 1" >/dev/null 2>&1; sleep 4
+    roami chrome eval "const f=[...document.querySelectorAll('.tt-hub-fold')].find(x=>/这台机器|This machine/.test(x.innerText)); const b=f&&f.querySelector('button'); b&&b.click(); 1" >/dev/null 2>&1; sleep 4
     local hr
-    hr=$(chrome eval "
+    hr=$(roami chrome eval "
 const bars=[...document.querySelectorAll('.ant-progress-line .ant-progress-bg')].map(b=>b.style.background||b.style.backgroundColor);
 JSON.stringify({swap:/Swap /.test(document.body.innerText),bars:bars.length,hard:bars.filter(b=>/#f5222d|#faad14/.test(b)).length})
 " 2>/dev/null | tail -1)

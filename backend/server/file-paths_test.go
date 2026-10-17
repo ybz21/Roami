@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/api"
-	"ttmux-web/auth"
+	"github.com/ybz21/Roami/backend/api"
+	"github.com/ybz21/Roami/backend/auth"
 )
 
 func TestFilePathLinks(t *testing.T) {

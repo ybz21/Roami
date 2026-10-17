@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"ttmux-web/internal/id"
+	"github.com/ybz21/Roami/internal/id"
 )
 
 // 老竞赛记录（race-<纳秒>）加载时统一重写成可读 id；老 id 落 legacyId，

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // 清空交换空间：`swapoff -a` 把换出去的页全部读回内存,`swapon -a` 再挂回来。
@@ -60,7 +60,7 @@ func planSwapClear(swapUsed, memAvailable uint64) SwapPlan {
 // 所以拆成两段:apply 只**起一个脱离的子进程**就返回,状态写进 StorageDir;
 // 页面轮询 status 看进度(swap 还剩多少)。
 //
-// 子进程跑的是这个插件自己的 swap-cycle 命令(`ttmux plugin run host-monitor.swap-cycle`),
+// 子进程跑的是这个插件自己的 swap-cycle 命令(`roami plugin run host-monitor.swap-cycle`),
 // 不是 `sh -c "swapoff -a && swapon -a"`:后者要往权限白名单里塞一个 shell,
 // 而白名单上现在只有 swapoff / swapon 两条,这是它值钱的地方。
 // swapoff 与 swapon 的先后顺序由那个子进程自己保证——它会一直活到两条都跑完,

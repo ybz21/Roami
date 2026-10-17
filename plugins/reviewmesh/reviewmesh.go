@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 const (
@@ -261,7 +261,7 @@ func watch(ctx *sdk.Ctx, args map[string]string) (any, error) {
 				return finish(ctx, dev, fmt.Sprintf("互审通过：这份改动没发现问题（第 %d 轮）", roundsDone(ctx, dev)), "clean")
 			}
 			if res.Exhausted {
-				return finish(ctx, dev, fmt.Sprintf("已达 %d 轮上限，陪跑结束；要再审：ttmux plugin run review-mesh.review --workdir %s", rounds, workdir), "rounds-exhausted")
+				return finish(ctx, dev, fmt.Sprintf("已达 %d 轮上限，陪跑结束；要再审：roami plugin run review-mesh.review --workdir %s", rounds, workdir), "rounds-exhausted")
 			}
 			if res.Reviewed {
 				lastPane = "" // 回灌后画面会变;重置指纹等下一轮
@@ -332,7 +332,7 @@ func autoReviewOnce(ctx *sdk.Ctx, dev, workdir string, maxRounds int, wait bool)
 		return outcome{}, nil // 这份变更已审过(空闲但没新改动,或复审后未再动)
 	}
 	if st.Rounds >= maxRounds {
-		fmt.Fprintf(os.Stderr, "[%s] 已达 %d 轮上限,不再自动复审(手动: ttmux plugin run review-mesh.review --workdir %s)\n",
+		fmt.Fprintf(os.Stderr, "[%s] 已达 %d 轮上限,不再自动复审(手动: roami plugin run review-mesh.review --workdir %s)\n",
 			now(), maxRounds, workdir)
 		return outcome{Exhausted: true}, nil
 	}
@@ -409,7 +409,7 @@ func finalizeSession(ctx *sdk.Ctx, jobID, sess string) (*reviewResult, error) {
 	}
 	res, err := finalizeText(ctx, jobID, logText)
 	if err != nil {
-		return nil, fmt.Errorf("reviewer output not parseable: %w (inspect: ttmux capture %s)", err, sess)
+		return nil, fmt.Errorf("reviewer output not parseable: %w (inspect: roami session capture %s)", err, sess)
 	}
 	res.Session = sess
 	return res, nil

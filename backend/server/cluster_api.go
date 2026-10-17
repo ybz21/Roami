@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/cluster/node"
-	"ttmux-web/config"
+	"github.com/ybz21/Roami/backend/cluster/node"
+	"github.com/ybz21/Roami/backend/config"
 )
 
 // 设置页的「多机」那一块：读当前角色与接入状态、写回 config.yaml。

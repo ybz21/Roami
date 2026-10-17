@@ -9,7 +9,7 @@ afterEach(() => {
 
 const t = (k: string, v?: Record<string, unknown>) => {
   const table: Record<string, string> = {
-    'session.wt.briefNew': '开工前先做三件事，做完再开始下面的任务：\n1. 工作区 {path}（从 {base} 切，占位分支 {branch}）\n3. ttmux rename {sess} <新名字>',
+    'session.wt.briefNew': '开工前先做三件事，做完再开始下面的任务：\n1. 工作区 {path}（从 {base} 切，占位分支 {branch}）\n3. roami session rename {sess} <新名字>',
     'session.wt.briefPlain': '你在 {path}，会话 {sess}',
     'session.wt.briefReview': '\n另有互审。',
     'session.wt.briefTask': '任务：',
@@ -23,7 +23,7 @@ describe('开工简报', () => {
     // 前言说「做完再开始下面的任务」，下面紧跟用户原话而没有标题时，
     // agent 容易把需求读成第 3 步的续文
     const b = kickoffBrief(where, 's1', false, '把 /pools 改成 /pools/{id}', t)
-    expect(b).toMatch(/ttmux rename s1 <新名字>\n\n任务：\n把 \/pools 改成/)
+    expect(b).toMatch(/roami session rename s1 <新名字>\n\n任务：\n把 \/pools 改成/)
   })
   it('任务原文前后空白去掉，内容原样保留', () => {
     expect(kickoffBrief(where, 's1', false, '  第一行\n第二行  \n', t).endsWith('任务：\n第一行\n第二行')).toBe(true)
@@ -37,7 +37,7 @@ describe('开工简报', () => {
   })
   it('能力说明位于任务前，任务原文保持不变', () => {
     const b = kickoffBrief(where, 's1', false, '生成视频', t, '文件入口：/api/file/raw')
-    expect(b).toMatch(/ttmux rename s1 <新名字>\n\n文件入口：\/api\/file\/raw\n\n任务：\n生成视频$/)
+    expect(b).toMatch(/roami session rename s1 <新名字>\n\n文件入口：\/api\/file\/raw\n\n任务：\n生成视频$/)
   })
   it('从当前节点读取模板，并将所有文件入口绑定到该节点', async () => {
     setCurrentNode('remote node')

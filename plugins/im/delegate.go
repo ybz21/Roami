@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 func delegate(ctx *sdk.Ctx, args map[string]string) (any, error) {
@@ -25,7 +25,7 @@ func delegate(ctx *sdk.Ctx, args map[string]string) (any, error) {
 		task = string(b)
 	}
 	if name == "" || dir == "" || strings.TrimSpace(task) == "" {
-		return nil, fmt.Errorf("usage: ttmux plugin run im-bridge.delegate --name w-<主题> --dir <绝对路径> --task '…'|--brief-file <文件> [--chat <chat_id>] [--provider claude|codex] [--interactive]")
+		return nil, fmt.Errorf("usage: roami plugin run im-bridge.delegate --name w-<主题> --dir <绝对路径> --task '…'|--brief-file <文件> [--chat <chat_id>] [--provider claude|codex] [--interactive]")
 	}
 	if !filepath.IsAbs(dir) {
 		return nil, fmt.Errorf("delegate: --dir 必须是绝对路径,got %q", dir)
@@ -78,7 +78,7 @@ func workerContract(chat, sess, resultPath string, interactive bool) string {
 	b.WriteString("\n\n---\n# 回报契约(必须遵守)\n")
 	fmt.Fprintf(&b, "1. 最终结果写到 %s(结构化:结论、改动清单、PR 链接、遗留问题)——这是验收的唯一依据;\n", resultPath)
 	if chat != "" {
-		fmt.Fprintf(&b, "2. 关键里程碑或阻塞可直接告知用户: ttmux plugin run im-bridge.send --chat %s --text '…'(勿滥用,普通进度写 RESULT.md 即可);\n", chat)
+		fmt.Fprintf(&b, "2. 关键里程碑或阻塞可直接告知用户: roami plugin run im-bridge.send --chat %s --text '…'(勿滥用,普通进度写 RESULT.md 即可);\n", chat)
 	} else {
 		b.WriteString("2. 不要直接给用户发消息,一切经 RESULT.md 汇报;\n")
 	}

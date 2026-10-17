@@ -8,7 +8,9 @@ set -euo pipefail
 
 PASS=0
 FAIL=0
-TTMUX="${TTMUX:-ttmux}"
+ROAMI_BIN="${ROAMI_BIN:-roami}"
+session_cli() { "$ROAMI_BIN" session "$@"; }
+TTMUX=session_cli
 TMP="/tmp/ttmux-test-$$"
 
 bold=$'\033[1m'

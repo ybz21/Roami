@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 func TestAIFootprintsPersistCountsOnly(t *testing.T) {

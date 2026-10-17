@@ -15,12 +15,10 @@ GOOS="${GOOS:-$(go env GOOS)}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
 OUT="${OUT:-backend/dist/roami-$GOOS-$GOARCH}"
 
-WEBUI_DIST="backend/internal/webui/site"
-CLIBIN="backend/internal/clibin/ttmux"
+WEBUI_DIST="internal/webui/site"
 
 restore() {
   rm -rf "$WEBUI_DIST"; mkdir -p "$WEBUI_DIST"; echo keep > "$WEBUI_DIST/.gitkeep"
-  printf 'ROAM_CLI_PLACEHOLDER\n' > "$CLIBIN"
 }
 trap restore EXIT
 
@@ -34,14 +32,10 @@ fi
 rm -rf "$WEBUI_DIST"; mkdir -p "$WEBUI_DIST"
 cp -r frontend/dist/. "$WEBUI_DIST/"
 
-# 3) 目标平台的 ttmux CLI → 后端内嵌
-CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-  go -C cli/ttmux-cli-go build -o "$ROOT/$CLIBIN" ./cmd/ttmux-cli-go
-
 # 4) 编译 roami（内嵌前端 + CLI；版本号由 ROAMI_BUILD_VERSION 注入，默认 dev）
 mkdir -p "$(dirname "$OUT")"
 VER="${ROAMI_BUILD_VERSION:-dev}"
 CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-  go -C backend build -ldflags "-X main.version=${VER}" -o "$ROOT/$OUT" ./cmd
+  go build -ldflags "-X main.version=${VER}" -o "$ROOT/$OUT" ./cmd/roami
 
 echo "built $OUT ($(du -h "$OUT" | cut -f1))"

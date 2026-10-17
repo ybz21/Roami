@@ -29,3 +29,8 @@ ttmux-web
 /.roami/
 *.bak-gitpanel
 /frontend/dist.bak-*/
+
+/internal/webui/site/*
+!/internal/webui/site/.gitkeep
+/dist/
+/backend/dist/

@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/internal/id"
-	"ttmux-web/internal/metadb"
-	"ttmux-web/project"
-	"ttmux-web/race"
-	"ttmux-web/search"
-	"ttmux-web/ttmux"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/project"
+	"github.com/ybz21/Roami/backend/race"
+	"github.com/ybz21/Roami/backend/search"
+	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/id"
+	"github.com/ybz21/Roami/internal/metadb"
 )
 
 // labelOption 会话展示名所在的 tmux 用户选项（与 CLI 侧 runtime.LabelOption 同名，
@@ -124,7 +124,7 @@ func (a *API) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"authed": true, "browserHome": a.BrowserHome}})
 }
 
-// Info 透传 ttmux info，并补一个 metaDb 字段说明台账走的是库还是降级的 JSON。
+// Info 透传 roami session info，并补一个 metaDb 字段说明台账走的是库还是降级的 JSON。
 // **只增字段不改既有字段**，前端不用动；降级时用户能在界面上看见原因，
 // 而不是「项目卡为什么没有历史」查不出所以然。
 func (a *API) Info(c *gin.Context) {
@@ -251,9 +251,12 @@ func (a *API) NewSession(c *gin.Context) {
 }
 
 // newSession 建一个 detached 会话，返回会话名(= 会话 id)。
-// 走 CLI 的 `ttmux new --json` 而不是自己拼 tmux new-session：会话 id 的生成、
+// 走 CLI 的 `roami session new --json` 而不是自己拼 tmux new-session：会话 id 的生成、
 // @roam_name 的落地只有一份实现（CLI 侧），后端不再复制一遍。
 func (a *API) newSession(label, dir string) (string, error) {
+	if a.TT.Local() {
+		return a.TT.CreateSession(context.Background(), label, strings.TrimSpace(dir))
+	}
 	args := []string{"new", "--json", "--no-reuse", label}
 	if d := strings.TrimSpace(dir); d != "" {
 		args = append(args, "--dir", d)
@@ -328,7 +331,7 @@ func (a *API) RenameSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"name": sess, "label": label}})
 }
 
-// 走 ttmux kill --yes（非交互）：孤儿收养/meta 清理在 CLI 内完成；?cascade=1 级联杀子树。
+// 走 roami session kill --yes（非交互）：孤儿收养/meta 清理在 CLI 内完成；?cascade=1 级联杀子树。
 func (a *API) KillSession(c *gin.Context) {
 	name := a.sessionTarget(c)
 	args := []string{"kill", name, "--yes"}

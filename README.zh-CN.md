@@ -143,7 +143,7 @@ Roami 的重点不是「多一个终端工具」，而是让开发机变成一�
 
 ## 安装与启动
 
-`roami` 是把前端与 `ttmux` CLI 内嵌在一起的单一自包含二进制，目标机无需 go/node/npm。
+`roami` 将前端与会话核心编入同一二进制；Web 控制台运行不需要 Go/Node/npm，浏览器自动化另需 Node 与 Chrome。
 配置与数据都在 `~/.roami/`（`config.yaml` 首次运行自动生成）。
 
 ### 方式 A — 装成常驻服务（推荐给 24 小时常驻运行的机器）
@@ -250,7 +250,7 @@ Roami 也提供命令行入口，方便脚本、自动化流程和 AI Agent 调�
 prompt 并自带配置面板。
 
 命令细节不放在首页展开，避免 README 变成工具手册。需要时请看
-**[docs/install/](docs/install/)**、`ttmux help` 和 `chrome help`。
+**[docs/install/](docs/install/)**、`roami session help` 和 `roami chrome help`。
 
 ## 开发与贡献
 
@@ -284,8 +284,7 @@ npm run dev
 只跑后端：
 
 ```bash
-cd backend
-TTMUX_BIN=../ttmux TTMUX_WEB_PASSWORD=dev go run ./cmd
+TTMUX_WEB_PASSWORD=dev go run ./cmd/roami server
 ```
 
 CLI smoke test：

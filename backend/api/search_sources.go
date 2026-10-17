@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"ttmux-web/search"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/search"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 // projRoot 是「一个项目目录」：文件源的搜索根，也是会话/文件结果上「属于哪个项目」的来源。

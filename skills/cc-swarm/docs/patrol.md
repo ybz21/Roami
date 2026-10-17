@@ -5,18 +5,18 @@
 ## 两种作用域
 
 - **全局监护**（无参数）：监护所有 `cc-*` 前缀会话。
-- **蜂群作用域**（`--swarm <名>`，由 `ttmux swarm adopt` 注入）：**只**监护该蜂群的成员。
+- **蜂群作用域**（`--swarm <名>`，由 `roami session swarm adopt` 注入）：**只**监护该蜂群的成员。
 
 ### 蜂群作用域怎么探测成员
 
-被 `--swarm <名>` 调起时，**不要**用 `ttmux ls` 扫全局，而是读蜂群的三个面：
+被 `--swarm <名>` 调起时，**不要**用 `roami session ls` 扫全局，而是读蜂群的三个面：
 
 ```bash
-ttmux swarm status <名>            # 成员运行态 + 依赖 + 挂起
-ttmux swarm board  <名>            # 看板：谁负责什么、卡在哪一列
-ttmux swarm listen <名> --as master --once # 广场增量 + @master/@all/human 优先级标注 + 状态摘要
-ttmux swarm feed   <名> --since <上次id>   # 兜底：直接读广场完成/提问/阻塞 的结构化播报
-ttmux swarm collect <名>           # (兜底)各成员的终端输出
+roami session swarm status <名>            # 成员运行态 + 依赖 + 挂起
+roami session swarm board  <名>            # 看板：谁负责什么、卡在哪一列
+roami session swarm listen <名> --as master --once # 广场增量 + @master/@all/human 优先级标注 + 状态摘要
+roami session swarm feed   <名> --since <上次id>   # 兜底：直接读广场完成/提问/阻塞 的结构化播报
+roami session swarm collect <名>           # (兜底)各成员的终端输出
 ```
 
 > **巡检信号优先读「广场 + 看板」，不要纯抓终端。** 成员把进展/提问/阻塞结构化地发到广场、
@@ -34,15 +34,15 @@ ttmux swarm collect <名>           # (兜底)各成员的终端输出
 - **依赖解锁（关键闭环）**：带依赖且依赖未满足的成员会被 ttmux **挂起为 pending**（`swarm status` 底部「挂起(等依赖)」段列出，`依赖→ X`）。解锁靠你打「完成」标记驱动：
   - **agent 成员是长驻会话**（claude 不退出），脚本判不出它「完成」。所以**当你读 capture 判定某成员 X 真的完成了**（输出了总结、idle 在空 prompt、产出对照需求 OK），就执行：
     ```bash
-    ttmux swarm done <名> X        # 标记成员 X 完成 → 自动级联解锁依赖 X 的下游成员
+    roami session swarm done <名> X        # 标记成员 X 完成 → 自动级联解锁依赖 X 的下游成员
     ```
     这一步是把「AI 的完成判断」喂给门控的**唯一**入口，不打标 → 下游永远挂着。
-  - 打标后 `ttmux swarm status <名>` 每轮也会顺手自动解锁就绪的挂起成员；也可显式 `ttmux swarm activate <名>`。
+  - 打标后 `roami session swarm status <名>` 每轮也会顺手自动解锁就绪的挂起成员；也可显式 `roami session swarm activate <名>`。
   - task 成员若命令会退出，脚本能自动判完成；判不准时同样用 `swarm done <名> X` 兜底。
-  - 依赖成员**失败但你决定继续**：`ttmux swarm activate <名> X --force` 强制解锁 X（无视依赖）。
+  - 依赖成员**失败但你决定继续**：`roami session swarm activate <名> X --force` 强制解锁 X（无视依赖）。
   - X 没完成前**不要**手动 spawn/催挂起成员——交给门控。
 - **自我排除**：跳过指挥会话自己（`supervisor`，通常 `cc-<名>`）。
-- **闭环**：每个成员完成就 `swarm done <名> <成员>` 打标解锁下游；全部成员完成（`swarm status` 无挂起残留）并对照目标验收通过后，`ttmux swarm done <名>`（不带成员=标记整群完成），再汇报用户。
+- **闭环**：每个成员完成就 `swarm done <名> <成员>` 打标解锁下游；全部成员完成（`swarm status` 无挂起残留）并对照目标验收通过后，`roami session swarm done <名>`（不带成员=标记整群完成），再汇报用户。
 
 > 蜂群作用域下，下面流程里的「`cc-*` 会话」一律替换成「该蜂群的成员会话」。
 
@@ -51,19 +51,19 @@ ttmux swarm collect <名>           # (兜底)各成员的终端输出
 ### Step 1: 探测 session
 
 ```bash
-ttmux ls
+roami session ls
 ```
 
 从输出中提取所有 `cc-*` 前缀的会话名，排除自身（通常是 `cc-神` 或运行 cc-swarm 的 session）。
 
-> 蜂群作用域（`--swarm <名>`）下改为：`ttmux swarm status <名>` 读成员清单，只盯这些成员。
+> 蜂群作用域（`--swarm <名>`）下改为：`roami session swarm status <名>` 读成员清单，只盯这些成员。
 
 ### Step 2: 抓取上下文
 
 对每个 session：
 
 ```bash
-ttmux capture <session> --lines 40
+roami session capture <session> --lines 40
 ```
 
 抓最近 40 行通常够用。但注意：
@@ -99,7 +99,7 @@ ttmux capture <session> --lines 40
 2. **有待发命令的** → prompt 里有用户（或上轮 cc-swarm）输入的文字但没按 Enter，帮它发 `tmux send-keys -t <session> Enter`
 3. **在提问的** → 回答问题，解除阻塞
 4. **出错的** → 诊断修复
-5. **已完成的** → 安排下一步（测试/review/commit）；蜂群作用域下，确认完成后 `ttmux swarm done <名> <成员>` 打标，解锁等它的下游
+5. **已完成的** → 安排下一步（测试/review/commit）；蜂群作用域下，确认完成后 `roami session swarm done <名> <成员>` 打标，解锁等它的下游
 6. **执行中的** → 跳过
 
 ### Step 6: 间隔等待
@@ -123,7 +123,7 @@ cc-swarm 的默认运行方式是 **持续循环巡检**，不是跑一次就停
 
 循环:
   while true:
-    1. 探测 session (ttmux ls)
+    1. 探测 session (roami session ls)
     2. 读记忆 + capture
     3. AI 分析 + 决策
     4. 执行（审批/发指令/review）

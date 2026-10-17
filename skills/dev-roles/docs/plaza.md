@@ -3,10 +3,10 @@
 蜂群里所有人（human / leader / 成员）共享一条消息流 = **广场**。进度、提问、阻塞、决策都走它。
 比抓终端可靠，是协作的主通道。
 
-## 发言：`ttmux swarm say`
+## 发言：`roami session swarm say`
 
 ```bash
-ttmux swarm say <群> [--as 成员] [--to 目标] [--kind 类型] [--re <#id>] "<消息>"
+roami session swarm say <群> [--as 成员] [--to 目标] [--kind 类型] [--re <#id>] "<消息>"
 ```
 
 | 选项 | 说明 |
@@ -33,16 +33,16 @@ ttmux swarm say <群> [--as 成员] [--to 目标] [--kind 类型] [--re <#id>] "
 
 ```bash
 # 回复某条具体消息（推荐：带 --re 让对话成串，可追溯）
-ttmux swarm say <群> --to <对方> --kind note --re 12 "按你说的改好了，接口已就绪"
+roami session swarm say <群> --to <对方> --kind note --re 12 "按你说的改好了，接口已就绪"
 
 # 回答一个提问 #8（你是被问的人）
-ttmux swarm say <群> --to leader --kind note --re 8 "用 POST /auth/login，返回 {token}"
+roami session swarm say <群> --to leader --kind note --re 8 "用 POST /auth/login，返回 {token}"
 
 # 回复 human（控制台里 human 的消息默认是给 leader 的）
-ttmux swarm say <群> --to human --kind decide --re 5 "已派 3 个成员，预计…"
+roami session swarm say <群> --to human --kind decide --re 5 "已派 3 个成员，预计…"
 
 # leader 裁决一个阻塞 #15
-ttmux swarm say <群> --to <成员> --kind decide --re 15 "改用方案B，我已更新契约，见 #16"
+roami session swarm say <群> --to <成员> --kind decide --re 15 "改用方案B，我已更新契约，见 #16"
 ```
 
 要点：
@@ -53,9 +53,9 @@ ttmux swarm say <群> --to <成员> --kind decide --re 15 "改用方案B，我�
 ## 读广场：该回什么、谁找你
 
 ```bash
-ttmux swarm listen <群> --as <我> --mentions --once   # 只看与我相关的增量（@我 / 我的卡 / @all）
-ttmux swarm listen <群> --as leader --once            # leader：看需要我处理的增量
-ttmux swarm feed   <群> [-n N] [--from 成员] [--kind ask|block] [--since #id] [--json]
+roami session swarm listen <群> --as <我> --mentions --once   # 只看与我相关的增量（@我 / 我的卡 / @all）
+roami session swarm listen <群> --as leader --once            # leader：看需要我处理的增量
+roami session swarm feed   <群> [-n N] [--from 成员] [--kind ask|block] [--since #id] [--json]
 ```
 
 - **必须处理**：`@我`、`@all`、你负责的卡 `#tN`、以及 leader 的 `decide`/`broadcast`。

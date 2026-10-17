@@ -11,7 +11,7 @@
 ## 第一步：先读规范
 
 可用 skill 在 `{{.SkillsDir}}`：
-- **必读 `cc-swarm`** —— 「接需求 → 建需求 → 拆任务 → 开子会话 → 巡检 → 集成」的完整规范，含可用 CLI 列表（`ttmux` 蜂群编排 / `chrome` 浏览器真跑验收）。
+- **必读 `cc-swarm`** —— 「接需求 → 建需求 → 拆任务 → 开子会话 → 巡检 → 集成」的完整规范，含可用 CLI 列表（`roami session` 蜂群编排 / `roami chrome` 浏览器真跑验收）。
 - **拆班子前读 `dev-roles`** —— 软件开发该分成哪几个角色、每个角色的 scope（负责什么/产出什么/边界）、按规模怎么选角色、角色怎么协作。决定给每个成员定哪个 `--subrole`/`--duty` 时照它来。
 
 先读完再动手，按它执行。
@@ -32,15 +32,15 @@ human 建议的角色：{{range .Roster}}`{{.}}` {{end}}。
 ## 全生命周期（照 cc-swarm 做）
 
 1. **建需求**：把目标写成清晰规格（范围 / 验收标准 / 约束）。目标模糊就先扫项目或问 human，**别拿模糊目标硬开会话**。
-2. **拆任务上看板**：拆成可并行 / 有依赖的子任务 —— `ttmux swarm task add {{.Swarm}} "<子任务>" [--deps tN]`。
+2. **拆任务上看板**：拆成可并行 / 有依赖的子任务 —— `roami session swarm task add {{.Swarm}} "<子任务>" [--deps tN]`。
 3. **派活**：每个子任务开一个子会话，并给它定**细分角色 + 职责** ——
-   `ttmux swarm add {{.Swarm}} <成员> --type agent --subrole <pm|architect|frontend|backend|fullstack|qa|designer|reviewer|devops|docs> --duty "<长期负责什么>" "<起步任务>"`
+   `roami session swarm add {{.Swarm}} <成员> --type agent --subrole <pm|architect|frontend|backend|fullstack|qa|designer|reviewer|devops|docs> --duty "<长期负责什么>" "<起步任务>"`
    （依赖加 `--depends-on`，但注意：**依赖是软的——成员一建出来就立即开工，不会挂起**；缺上游产出时它自己去广场等/问），
-   再 `ttmux swarm task assign {{.Swarm}} <卡> <成员>`。
+   再 `roami session swarm task assign {{.Swarm}} <卡> <成员>`。
    - 像组建一支班子：产品/架构/前后端/测试各司其职（**角色清单与各自 scope 见 `dev-roles` skill**）；`--subrole` 决定子会话拿到的角色化 prompt，**务必给每个成员带 `--subrole` 和 `--duty`**。
    - 一次把成员加全，让它们**并行开工**、靠广场+看板协调；**严禁自己一个人闷头实现**。
-4. **巡检**：持续读增量 —— `ttmux swarm listen {{.Swarm}} --as leader --once` / `feed` / `board`。human、`@leader`、`@all` 消息最高优先级，即使群已完成也要判断是否需重开 / 派活 / 答复。
-5. **推进解锁**：成员完成 → 验收 → `ttmux swarm done {{.Swarm}} <成员>` 解锁下游。Web 类成果用 `chrome` 真跑一遍（开页面 / 点按钮 / 断言文本），别只读代码。
-6. **集成验收**：全部完成后集成、对照验收标准检查，再 `ttmux swarm done {{.Swarm}}` 收尾并向 human 汇报。
+4. **巡检**：持续读增量 —— `roami session swarm listen {{.Swarm}} --as leader --once` / `feed` / `board`。human、`@leader`、`@all` 消息最高优先级，即使群已完成也要判断是否需重开 / 派活 / 答复。
+5. **推进解锁**：成员完成 → 验收 → `roami session swarm done {{.Swarm}} <成员>` 解锁下游。Web 类成果用 `roami chrome` 真跑一遍（开页面 / 点按钮 / 断言文本），别只读代码。
+6. **集成验收**：全部完成后集成、对照验收标准检查，再 `roami session swarm done {{.Swarm}}` 收尾并向 human 汇报。
 {{end}}
-回写广场用 `ttmux swarm say {{.Swarm}} --to human|成员 --kind decide|ask --re <post_id> "..."`，让每一步处理可追溯。
+回写广场用 `roami session swarm say {{.Swarm}} --to human|成员 --kind decide|ask --re <post_id> "..."`，让每一步处理可追溯。

@@ -22,9 +22,9 @@ allowed-tools:
 ### 广场（异步沟通，最常用）
 
 ```bash
-ttmux swarm say <群> --as <我> --kind note|ask|block "<消息>"   # 播报进度 / 提问 / 报阻塞（自动署名）
-ttmux swarm listen <群> --as <我> --mentions --once             # 拉与我相关的增量消息
-ttmux swarm feed <群>                                           # 看整条消息流
+roami session swarm say <群> --as <我> --kind note|ask|block "<消息>"   # 播报进度 / 提问 / 报阻塞（自动署名）
+roami session swarm listen <群> --as <我> --mentions --once             # 拉与我相关的增量消息
+roami session swarm feed <群>                                           # 看整条消息流
 ```
 - **必处理**：`@我`、`@all`、你负责的卡 `#tN`、以及 leader 的 `decide`/`broadcast`。
 - 需要全局调度/别人的活 → `--to leader --kind ask`，**不要自己替别人派活**。
@@ -32,17 +32,17 @@ ttmux swarm feed <群>                                           # 看整条消�
 ### 看板（分工，谁负责什么一目了然）
 
 ```bash
-ttmux swarm task ls|show|move|done <群> …    # 看 / 认领 / 流转你名下的卡
+roami session swarm task ls|show|move|done <群> …    # 看 / 认领 / 流转你名下的卡
 ```
 - 卡 = "要做的事"；你只推进**自己名下**的卡（`move` 到 doing/review，完成 `done`）。
 
 ### chrome（CLI · Web 验收）
 
 ```bash
-chrome goto|click|fill|text|eval|screenshot|tabs …   # 用法: chrome help
+roami chrome goto|click|fill|text|eval|screenshot|tabs …   # 用法: roami chrome help
 ```
 - Web 类成果**用 chrome 真跑一遍**（开页面、点按钮、断言文本），比只读代码可靠。
-- **干完务必**（解锁下游）：`ttmux swarm done <群> <我>`。
+- **干完务必**（解锁下游）：`roami session swarm done <群> <我>`。
 
 > 以上是速记。**详细说明各一篇**：[docs/plaza.md](docs/plaza.md)（广场，含**怎么回复** `--re`/`--to`/kind）、
 > [docs/board.md](docs/board.md)（看板，列与卡片流转）、[docs/chrome.md](docs/chrome.md)（chrome CLI 全部命令+验收套路）。
@@ -89,10 +89,10 @@ chrome goto|click|fill|text|eval|screenshot|tabs …   # 用法: chrome help
 leader 拆完后，每个角色开一个成员，**务必带 `--subrole` 和 `--duty`**：
 
 ```bash
-ttmux swarm add <群> arch --type agent --subrole architect --duty "定 API 契约与数据结构，冻结后广播"          "<起步任务>"
-ttmux swarm add <群> api  --type agent --subrole backend   --duty "按契约实现服务与数据层" --depends-on arch  "<起步任务>"
-ttmux swarm add <群> ui   --type agent --subrole frontend  --duty "按契约实现页面与交互"   --depends-on arch  "<起步任务>"
-ttmux swarm add <群> qa   --type agent --subrole qa        --duty "端到端验收与回归"       --depends-on api,ui "<起步任务>"
+roami session swarm add <群> arch --type agent --subrole architect --duty "定 API 契约与数据结构，冻结后广播"          "<起步任务>"
+roami session swarm add <群> api  --type agent --subrole backend   --duty "按契约实现服务与数据层" --depends-on arch  "<起步任务>"
+roami session swarm add <群> ui   --type agent --subrole frontend  --duty "按契约实现页面与交互"   --depends-on arch  "<起步任务>"
+roami session swarm add <群> qa   --type agent --subrole qa        --duty "端到端验收与回归"       --depends-on api,ui "<起步任务>"
 ```
 
 `--subrole` 决定该成员拿到的角色化 prompt；`--depends-on` 只表达关系（软依赖：成员立即开工，不挂起）。

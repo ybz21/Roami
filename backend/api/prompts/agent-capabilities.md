@@ -4,9 +4,9 @@
 
 ## 会话与浏览器
 
-- `ttmux ls` 查看会话，`ttmux capture <会话>` 读取屏幕，`ttmux send <会话> "消息"` 向另一会话提交消息，`ttmux rename <旧名> <新名>` 更改展示名。先运行 `ttmux help` 确认更多命令。
-- `chrome` 操作 Roami 浏览器标签里的同一台 Chrome：`chrome tabs`、`chrome goto <url>`、`chrome text <选择器>`、`chrome click <选择器>`、`chrome fill <选择器> <文本>`、`chrome screenshot /tmp/page.png`。先运行 `chrome help` 查看完整参数。浏览器登录态可能包含用户数据，按正常任务权限使用。
-- 多个浏览器标签页时用 `chrome --tab <序号> ...` 或 `chrome --url <网址子串> ...` 选择目标；`chrome eval "<JS>"` 可读取页面状态和验证交互。截图用 `chrome screenshot /tmp/page.png --full`；演示视频用 `chrome record start /tmp/demo.mp4` 开始、`chrome record stop` 停止并保存。完成后用下面的文件链接向用户展示结果。
+- `roami session ls` 查看会话，`roami session capture <会话>` 读取屏幕，`roami session send <会话> "消息"` 向另一会话提交消息，`roami session rename <旧名> <新名>` 更改展示名。先运行 `roami session help` 确认更多命令。
+- `roami chrome` 操作 Roami 浏览器标签里的同一台 Chrome：`roami chrome tabs`、`roami chrome goto <url>`、`roami chrome text <选择器>`、`roami chrome click <选择器>`、`roami chrome fill <选择器> <文本>`、`roami chrome screenshot /tmp/page.png`。先运行 `roami chrome help` 查看完整参数。浏览器登录态可能包含用户数据，按正常任务权限使用。
+- 多个浏览器标签页时用 `roami chrome --tab <序号> ...` 或 `roami chrome --url <网址子串> ...` 选择目标；`roami chrome eval "<JS>"` 可读取页面状态和验证交互。截图用 `roami chrome screenshot /tmp/page.png --full`；演示视频用 `roami chrome record start /tmp/demo.mp4` 开始、`roami chrome record stop` 停止并保存。完成后用下面的文件链接向用户展示结果。
 
 ## 给用户展示本机文件
 

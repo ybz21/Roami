@@ -6,23 +6,23 @@
 ## 命令
 
 ```bash
-chrome setup                       # 安装/更新依赖 (node + playwright-core)，首次用一次
-chrome goto <url>                  # 打开网址
-chrome click <选择器>              # 点击
-chrome fill  <选择器> <文本>       # 填表单（直接设值）
+roami chrome setup                       # 安装/更新依赖 (node + playwright-core)，首次用一次
+roami chrome goto <url>                  # 打开网址
+roami chrome click <选择器>              # 点击
+roami chrome fill  <选择器> <文本>       # 填表单（直接设值）
 chrome type  <选择器> <文本>       # 逐字键入
-chrome press [选择器] <键>         # 按键，如 Enter / Control+a
-chrome text  [选择器]              # 取可见文本（默认 body）——断言常用
+roami chrome press [选择器] <键>         # 按键，如 Enter / Control+a
+roami chrome text  [选择器]              # 取可见文本（默认 body）——断言常用
 chrome html  [选择器]              # 取 HTML（默认整页）
 chrome attr  <选择器> <属性>       # 取属性值
-chrome eval  "<js>"               # 页面内执行 JS 并打印返回(JSON)
-chrome wait  <选择器>              # 等元素出现
-chrome screenshot [文件] [--full]  # 截图（默认 screenshot.png）
+roami chrome eval  "<js>"               # 页面内执行 JS 并打印返回(JSON)
+roami chrome wait  <选择器>              # 等元素出现
+roami chrome screenshot [文件] [--full]  # 截图（默认 screenshot.png）
 chrome pdf   [文件]                # 导出 PDF (headless)
-chrome tabs                        # 列标签页（序号 / 标题 / url）
-chrome new   [url]                 # 新开标签页
-chrome close                       # 关闭标签页
-chrome help                        # 完整用法
+roami chrome tabs                        # 列标签页（序号 / 标题 / url）
+roami chrome new   [url]                 # 新开标签页
+roami chrome close                       # 关闭标签页
+roami chrome help                        # 完整用法
 ```
 
 ## 选项
@@ -35,12 +35,12 @@ chrome help                        # 完整用法
 ## 验收套路（qa / frontend / fullstack 必用）
 
 ```bash
-chrome goto "http://127.0.0.1:<端口>/<页面>"
-chrome wait "#app"                       # 等渲染
-chrome text ".result"                    # 取文本，对照预期断言
-chrome click "button.submit"             # 模拟交互
-chrome text ".toast"                     # 断言交互后的反馈
-chrome screenshot /tmp/check.png --full  # 留证据 / 人工复核
+roami chrome goto "http://127.0.0.1:<端口>/<页面>"
+roami chrome wait "#app"                       # 等渲染
+roami chrome text ".result"                    # 取文本，对照预期断言
+roami chrome click "button.submit"             # 模拟交互
+roami chrome text ".toast"                     # 断言交互后的反馈
+roami chrome screenshot /tmp/check.png --full  # 留证据 / 人工复核
 ```
 
 - 断言要**对照验收标准**逐条跑（正常 / 边界 / 异常路径都点一遍），别只截一张图就说"看起来对"。

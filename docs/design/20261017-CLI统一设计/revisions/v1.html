@@ -1,0 +1,742 @@
+<!doctype html><html lang="zh-CN" data-pointer="fine"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>Roami CLI 统一设计 v1 历史方案</title><style>:root {
+  color-scheme: dark;
+  --bg-base: #0d1117;
+  --bg-container: #161b22;
+  --bg-elevated: #1b222b;
+  --bg-term: #0b0f14;
+  --border: #30363d;
+  --border-subtle: #21262d;
+  --text-bright: #e6edf3;
+  --text-dim: #8b949e;
+  --text-dimmer: #6e7681;
+  --brand-grad: linear-gradient(180deg, #f5f7fa 0%, #c3c9d1 46%, #9aa1ab 56%, #e7ebef 100%);
+  /* Agent 品牌标：用官方色，不许按我们的强调色重新上色。Claude 是陶土橙 #D97757；
+     OpenAI/Codex 的标官方就是单色（深底走白），所以跟前景色走。 */
+  --brand-claude: #d97757;
+  --brand-codex: var(--text-bright);
+  /* 强调色：全站只有这一组，实心块用 --accent-solid，线/文字用 --accent（见 theme.tsx） */
+  --accent: #58a6ff;
+  --accent-solid: #1f6feb;
+  --accent-soft: rgba(31, 111, 235, .14);
+  --accent-border: rgba(88, 166, 255, .45);
+  /* 选中行的底：中性提亮，不带色相（见 theme.tsx 的注释）。
+     --accent-soft 留给强调件（芯片/徽标/聚焦光晕），两者不再混用。 */
+  --sel-bg: rgba(255, 255, 255, .065);
+  /* 成功/运行绿：全站也只有这一组（见 theme.tsx） */
+  --ok: #3fb950;
+  --ok-solid: #238636;
+  --ok-soft: rgba(63, 185, 80, .14);
+  --ok-border: rgba(63, 185, 80, .42);
+  /* 危险/断开红、警示黄：各只有一组（见 theme.tsx） */
+  --danger: #f85149;
+  --danger-soft: rgba(248, 81, 73, .16);
+  --danger-border: rgba(248, 81, 73, .45);
+  --warn: #d29922;
+  --warn-soft: rgba(210, 153, 34, .12);
+  --warn-border: rgba(210, 153, 34, .40);
+  /* 蜂群紫：一直散在 Overview/Projects/App 里各写一遍 #a371f7，现在收成一组 */
+  --swarm: #a371f7;
+  --swarm-soft: rgba(163, 113, 247, .12);
+  --swarm-border: rgba(163, 113, 247, .38);
+  --list-hover: rgba(255, 255, 255, .025);
+  --scroll-thumb: #2a313a;
+  --scroll-thumb-hover: #3d444d;
+  --card-hover-shadow: 0 8px 24px rgba(1, 4, 9, .5);
+  --elevated-shadow: 0 16px 48px rgba(1, 4, 9, .55);
+  --xterm-bg: #0b0f14;
+  --xterm-fg: #e6edf3;
+  /* highlight.js token 配色（深色，GitHub-ish） */
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-title: #d2a8ff;
+  --hl-attr: #7ee787;
+  --hl-built: #ffa657;
+}
+:root {
+  /* 密度：留白是给眼睛的，触控区是给手指的，两者独立 */
+  --tap: 44px;                    /* 最小命中边长 */
+  --ctl-h: 32px;                  /* 控件高（桌面档） */
+  --pad-page: 16px;               /* 页面四周留白 */
+  --gap: 10px;
+  /* 字号刻度（只有这六档）。此前一个页面上能数出 10 种字号，最常用的三种是
+     11.5 / 11 / 10.5——半像素级的差别没人看得出是刻意的，只会读成"随手写的"。
+     除眉标/角标外不许低于 12。 */
+  --fs-micro: 11px;               /* 眉标、角标，唯一允许 <12 的一档 */
+  --fs-meta: 12px;                /* 次要信息：时间、路径、计数 */
+  --fs-sm: 13px;                  /* 密集列表行 */
+  --fs-body: 14px;                /* 正文 */
+  --fs-lg: 16px;                  /* 区块标题 */
+  --fs-title: 22px;               /* 页面标题 */
+  --fs-chip: 12px;
+
+  /* 圆角刻度（四档）：控件 / 行 / 卡片 / 胶囊 */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-card: 14px;
+  --r-pill: 999px;
+  --r-sheet: 16px;
+
+  /* 间距刻度（五档）：4 的倍数，不再出现 3/5/7/9/11/13 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --row-cozy: 42px;
+  --row-compact: 34px;
+
+  /* 桌面壳层：Navigation ｜ Canvas ｜ rail ｜ Dock 的尺寸契约 */
+  --nav-w: 280px;
+  --nav-rail: 48px;
+  --topbar-h: 40px;
+  --status-h: 24px;               /* 底部状态条；粗指针下长到 --tap（见 .tt-statusbar） */
+  --canvas-min: 560px;
+  --split-rail: 8px;
+  --split-hit: 20px;
+  --activity-rail: 320px;
+  --content-overview: 1680px;
+  --content-form: 920px;
+
+  /* 层级：九个具名层，取代 50/90/100/1000/1199/1200/1201/1300/9999 那堆魔数。
+     同层不叠——并排显示的两个 sheet 由栈管理器决定谁在上，不靠差 1 硬顶。 */
+  --z-sticky: 10;                 /* 页面内粘性头 */
+  --z-fab: 30;                    /* 悬浮按钮 / 方向键簇 */
+  --z-nav: 50;                    /* 底栏 / 导航轨 */
+  --z-subpage: 90;                /* 全屏二级页 */
+  --z-session: 100;               /* 会话全屏 */
+  --z-session-sub: 110;           /* 会话全屏里再开的二级页（Git/文件从终端里唤起） */
+  --z-scrim: 900;                 /* 遮罩 */
+  --z-sheet: 1000;                /* 底部 sheet / 抽屉 */
+  --z-panel: 1200;                /* 桌面右侧浮动面板：压过 sheet(1000)，低于 antd 弹层基座(1300) */
+  --z-popup: 1300;                /* antd 弹层基座 */
+  --z-toast: 1500;
+  --z-drag: 9999;                 /* 拖拽幽灵 */
+
+  /* 边界：所有 position:fixed 的层必须显式吃安全区；--kb 由 layout.ts 回填 */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --kb: 0px;
+}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden}body{font:var(--fs-body)/1.8 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text-bright);background:var(--bg-base)}a{color:var(--accent);text-decoration:none}button,input,select{font:inherit}button,a,summary{-webkit-tap-highlight-color:transparent}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}button{cursor:pointer}.shell{height:100dvh;display:flex;flex-direction:column;container-type:inline-size}.topbar{padding:calc(var(--sp-3) + var(--safe-t)) max(var(--sp-5),var(--safe-r)) var(--sp-3) max(var(--sp-5),var(--safe-l));display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);border-bottom:1px solid var(--border-subtle);flex:none}.brand{font-size:var(--fs-lg);font-weight:650}.stamp{font-size:var(--fs-meta);color:var(--text-dim)}.workarea{min-height:0;flex:1;display:grid;grid-template-columns:240px minmax(0,1fr)}nav{overflow:auto;padding:var(--sp-4);border-right:1px solid var(--border-subtle)}nav p{font-size:var(--fs-meta);color:var(--text-dim);margin:var(--sp-2) var(--sp-3) var(--sp-4)}nav a{display:flex;gap:var(--sp-3);align-items:center;min-height:var(--tap);padding:var(--sp-2) var(--sp-3);color:var(--text-dim);border-radius:var(--r-xs);font-size:var(--fs-sm)}nav a.active{background:var(--accent-soft);color:var(--accent)}nav small{font-size:var(--fs-meta);color:var(--text-dimmer)}main{min-width:0;overflow:auto;scroll-behavior:smooth;scroll-padding-top:var(--sp-5);padding:var(--sp-5) max(var(--sp-5),var(--safe-r)) calc(var(--sp-5) + var(--safe-b));container-type:inline-size}.reading{max-width:1080px;margin:auto}.tt-pagehead{margin:var(--sp-4) 0 calc(var(--sp-5)*2)}.kicker{font-size:var(--fs-micro);color:var(--accent);font-weight:650;letter-spacing:.12em}.tt-pagehead h1{font-size:var(--fs-title);line-height:1.5;margin:var(--sp-2) 0}.tt-pagehead p{color:var(--text-dim);max-width:75ch;margin:var(--sp-2) 0}.tags{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-4)}.tag{border:1px solid var(--border);border-radius:var(--r-pill);padding:var(--sp-1) var(--sp-3);font-size:var(--fs-meta);color:var(--text-dim)}.tag.proposal{color:var(--warn);border-color:var(--warn-border);background:var(--warn-soft)}section{padding:var(--sp-5) 0;border-top:1px solid var(--border-subtle);scroll-margin-top:var(--sp-4)}.section-title{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}.section-title span{font-size:var(--fs-meta);color:var(--accent)}h2{font-size:var(--fs-title);margin:0}h3{font-size:var(--fs-lg);margin:var(--sp-5) 0 var(--sp-3)}h4{font-size:var(--fs-body)}p{margin:var(--sp-3) 0}li{margin:var(--sp-2) 0}ul,ol{padding-left:var(--sp-5)}strong{font-weight:650}code{font:var(--fs-sm)/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;color:var(--accent)}pre{background:var(--bg-term);border:1px solid var(--border-subtle);border-radius:var(--r-sm);padding:var(--sp-4);overflow:auto;max-width:100%;margin:var(--sp-4) 0}pre code{color:var(--text-bright);overflow-wrap:normal;white-space:pre}.table-scroll{overflow:auto;max-width:100%;margin:var(--sp-4) 0;border:1px solid var(--border-subtle);border-radius:var(--r-sm)}table{border-collapse:collapse;width:100%;font-size:var(--fs-sm);min-width:560px}th,td{text-align:left;padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--border-subtle);vertical-align:top}th{color:var(--text-dim);background:var(--bg-container);font-weight:500}tr:last-child td{border-bottom:0}.lead{border-left:2px solid var(--accent);background:var(--accent-soft);padding:var(--sp-4);border-radius:var(--r-xs)}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-3);margin:var(--sp-4) 0}.card{background:var(--bg-container);border-radius:var(--r-card);padding:var(--sp-4)}.card small{font-size:var(--fs-meta);color:var(--text-dim)}.card h3{margin:var(--sp-2) 0;font-size:var(--fs-lg)}.card p{margin:0;color:var(--text-dim);font-size:var(--fs-sm)}.architecture{background:var(--bg-container);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--sp-5);margin:var(--sp-4) 0}.architecture .entry{text-align:center;background:var(--accent-soft);border:1px solid var(--accent-border);padding:var(--sp-3);border-radius:var(--r-sm);color:var(--accent)}.layer{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp-2);padding-top:var(--sp-4);margin-top:var(--sp-4);border-top:1px solid var(--border)}.node{padding:var(--sp-3);border-radius:var(--r-xs);background:var(--bg-base);font-size:var(--fs-sm)}.node small{display:block;color:var(--text-dim);font-size:var(--fs-meta)}.diagram-caption{text-align:center;color:var(--text-dim);font-size:var(--fs-meta);margin-top:var(--sp-3)}details{border:1px solid var(--border-subtle);border-radius:var(--r-sm);margin:var(--sp-4) 0;padding:0 var(--sp-4)}summary{cursor:pointer;min-height:var(--tap);display:flex;align-items:center;font-size:var(--fs-sm);color:var(--accent)}summary:after{content:'展开';margin-left:auto;color:var(--text-dim);font-size:var(--fs-meta)}details[open]>summary:after{content:'收起'}summary::-webkit-details-marker{display:none}.scenario{background:var(--bg-container);border-radius:var(--r-card);padding:var(--sp-4);margin:var(--sp-4) 0}.switches{display:flex;flex-wrap:wrap;gap:var(--sp-2)}.switches button{min-height:var(--tap);padding:var(--sp-2) var(--sp-4);border:1px solid var(--border);border-radius:var(--r-xs);color:var(--text-dim);background:var(--bg-base)}.switches button[aria-pressed=true]{color:var(--accent);border-color:var(--accent-border);background:var(--accent-soft)}.steps{padding-left:var(--sp-5)}.steps li[data-state=stop]{color:var(--danger)}.steps li[data-state=ok]{color:var(--ok)}.scenario-note{font-size:var(--fs-meta);color:var(--text-dim)}.footer{color:var(--text-dim);font-size:var(--fs-meta);padding:var(--sp-5) 0} :where(html[data-pointer="fine"]) nav a:hover{background:var(--sel-bg);color:var(--text-bright)}:where(html[data-pointer="fine"]) .switches button:hover{border-color:var(--accent-border)}@container(max-width:760px){.workarea{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}nav{display:flex;overflow:auto;border-right:0;border-bottom:1px solid var(--border-subtle);padding:var(--sp-2);gap:var(--sp-1)}nav p{display:none}nav a{white-space:nowrap;flex:none}main{padding:var(--sp-4) max(var(--sp-4),var(--safe-r)) calc(var(--sp-5) + var(--safe-b))}.topbar{padding-left:var(--sp-4);padding-right:var(--sp-4)}.stamp{max-width:40%;text-align:right}.tt-pagehead{margin-top:var(--sp-2)}.cards{grid-template-columns:1fr}.layer{grid-template-columns:repeat(2,minmax(0,1fr))}.architecture{padding:var(--sp-4)}section{padding:var(--sp-5) 0}body{font-size:var(--fs-body)}}@media print{html,body{height:auto;overflow:visible}.shell{height:auto}.topbar,nav{display:none}.workarea{display:block}main{overflow:visible;padding:0}section,pre,table{break-inside:avoid}details>*{display:block}body{color:var(--text-bright)}}
+</style></head><body><div class="shell"><header class="topbar"><span class="brand">Roami · 统一 CLI 设计</span><span class="stamp">2026.10.17 · 历史方案 v1</span></header><div class="workarea"><nav aria-label="报告目录"><p>技术设计报告</p><a href="../index.html">打开当前 v2 方案</a></nav><main id="content"><div class="reading"><div class="lead">历史方案 v1：曾计划保留两个 Go module，由总入口转发旧会话引擎。已由当前 v2 单一核心架构替代。</div><h1>Roami CLI 统一改造方案</h1>
+<p>统一公开入口为 <code>roami &lt;能力&gt; &lt;命令&gt;</code>，核心分组为 <code>session</code>、<code>chrome</code>、<code>project</code>，插件继续按名称提供分组。需求中的 <code>romai project</code> 按 <code>roami project</code> 处理，不新增拼写别名。</p>
+<p>本轮交付方案；下列命令为目标接口，尚未实现。首期复用现有会话和浏览器引擎，补齐项目命令，保留旧入口兼容。源码目录、数据库字段和 tmux 会话 ID 不随入口改名。</p>
+<p>本目录包含：</p>
+<ul>
+<li><a href="../index.html#execution">技术方案</a>：进程调用链、参数与信号、API 认证、数据库维护协议、远端基准准备和实施依赖。</li>
+<li><a href="../index.html#tree">代码架构</a>：包和文件布局、依赖方向、接口草图、存储职责及具体改动与测试位置。</li>
+<li>本页作为设计总览，维护命令范围、兼容规则与验收标准。</li>
+</ul>
+<h2>现有能力与缺口</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>能力</th>
+<th>当前实现</th>
+<th>改造点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>总入口</td>
+<td><code>backend/cmd/cli.go</code> 已支持插件分组、<code>roami ttmux ...</code>，未知词转发给 ttmux</td>
+<td>增加固定分组，明确命令优先级和错误行为</td>
+</tr>
+<tr>
+<td>会话</td>
+<td><code>cli/ttmux-cli-go/internal/app/app.go</code> 提供会话、窗格、蜂群、环境、插件等命令</td>
+<td><code>roami session ...</code> 转发到原引擎，保持参数和行为</td>
+</tr>
+<tr>
+<td>浏览器</td>
+<td><code>cli/chrome-cli/launcher.sh</code> 加 <code>driver.mjs</code>，由 <code>build.sh</code> 生成独立 <code>chrome</code></td>
+<td>纳入总入口、构建与发布，保留 Playwright over CDP</td>
+</tr>
+<tr>
+<td>项目</td>
+<td><code>backend/api/project.go</code> 提供列表、创建、移除、偏好和活动 API</td>
+<td>新增 CLI 客户端，复用服务端业务语义</td>
+</tr>
+<tr>
+<td>分发</td>
+<td><code>scripts/build/build-roami.sh</code> 内嵌会话 CLI；Chrome launcher 单独发布</td>
+<td>总入口同时携带会话引擎和浏览器 launcher</td>
+</tr>
+</tbody>
+</table></div>
+<p>项目支持普通目录和 Git 仓库；Git worktree 会归一到主仓库。项目身份采用不可变 ID，显示名可以重复。<code>backend/project/service.go</code> 的 Store 维护内存快照并持久化，CLI 另开进程直接写库会引入并发与缓存一致性问题。</p>
+<h2>命令结构</h2>
+<pre><code class="language-text">roami
+  session &lt;原 ttmux 命令与参数&gt;
+  chrome  &lt;原 chrome 命令与参数&gt;
+  project ls|show|create|remove|prefs|activity
+  server  [原 Web 服务启动参数]
+  auth    login|logout|status
+  db      status|migrate|backup
+  plugin  &lt;原插件管理命令与参数&gt;
+  &lt;已安装插件名&gt; &lt;插件命令与参数&gt;
+  help [分组]
+  version
+  completion
+</code></pre>
+<p><code>session</code> 首期完整承接原 ttmux 能力，包括 <code>swarm</code>、<code>env</code>、<code>db</code> 和窗格命令。<code>roami plugin ...</code> 是原 <code>ttmux plugin ...</code> 的显式入口，插件业务命令仍可使用 <code>roami cron list</code>、<code>roami im send</code> 等现有写法。首期不再增加 <code>browser</code>、<code>sessions</code>、<code>projects</code> 等同义入口。</p>
+<p>典型用法：</p>
+<pre><code class="language-bash">roami session ls --json
+roami session new dev
+roami session rename &lt;session-id&gt; CLI统一方案
+roami session send &lt;session-id&gt; &quot;执行测试&quot;
+roami session capture &lt;session-id&gt;
+roami session swarm ls
+
+roami chrome tabs
+roami chrome --tab 2 goto https://example.com
+roami chrome screenshot /tmp/page.png --full
+
+roami auth login
+roami project ls --json
+roami project create . --name Roami
+roami project show &lt;project-id&gt;
+roami project prefs &lt;project-id&gt; --pinned true
+roami project activity &lt;project-id&gt; --json
+roami project remove &lt;project-id&gt;
+
+roami server -addr 0.0.0.0:13579
+roami plugin ls --json
+roami cron list
+</code></pre>
+<h2>分派与兼容规则</h2>
+<p>分派顺序固定为：内置分组、旧入口兼容表、插件精确名称、插件唯一前缀、未知命令报错。固定分组和兼容命令不再被新安装的插件抢占；冲突插件仍可通过 <code>roami plugin run &lt;plugin-id&gt;:&lt;command&gt;</code> 调用。</p>
+<p><code>session</code>、<code>chrome</code> 必须在插件扫描前分派。列会话、浏览器帮助不应依赖插件守护进程健康。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>旧写法</th>
+<th>新的正式写法</th>
+<th>兼容方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ttmux ls</code></td>
+<td><code>roami session ls</code></td>
+<td>保留原二进制入口</td>
+</tr>
+<tr>
+<td><code>ttmux swarm ls</code></td>
+<td><code>roami session swarm ls</code></td>
+<td>同上，保留完整命令能力</td>
+</tr>
+<tr>
+<td><code>chrome tabs</code></td>
+<td><code>roami chrome tabs</code></td>
+<td>保留兼容 launcher，调用同一浏览器实现</td>
+</tr>
+<tr>
+<td><code>roami ttmux ...</code></td>
+<td><code>roami session ...</code></td>
+<td>总入口别名</td>
+</tr>
+<tr>
+<td><code>roami ls</code>、<code>roami a ...</code></td>
+<td><code>roami session ls</code>、<code>roami session attach ...</code></td>
+<td>使用明确的旧命令表兼容</td>
+</tr>
+<tr>
+<td><code>roami cron list</code> 等插件入口</td>
+<td>保持现有写法</td>
+<td>保留精确名称和唯一前缀解析</td>
+</tr>
+<tr>
+<td><code>roami</code>、<code>roami -addr ...</code></td>
+<td>推荐 <code>roami server ...</code></td>
+<td>保留原启动行为与 systemd 用法</td>
+</tr>
+<tr>
+<td><code>roam ...</code></td>
+<td><code>roami ...</code></td>
+<td>保留已有兼容软链</td>
+</tr>
+</tbody>
+</table></div>
+<p>当前“所有未知顶层命令直接透传 tmux”的行为收敛为显式兼容表。任意原生 tmux 操作改用 <code>roami session &lt;tmux-command&gt;</code>；例如拼错 <code>roami projet</code> 应提示可用分组并以非零状态退出。兼容表从原 CLI 的公开分支及现有调用点整理，不包含 <code>__autoconfirm</code>、<code>_plugin-host</code> 等内部入口；内部入口继续由原引擎处理。</p>
+<p>首期不移除旧二进制，也不向旧命令 stdout 添加弃用提示，以免破坏脚本与 JSON。文档、安装完成提示、Agent 提示词和技能示例统一展示新命令。</p>
+<h2>三个核心分组的实现</h2>
+<h3>Session</h3>
+<p><code>roami session</code> 剥离分组后，将剩余 argv 原样交给现有 Go CLI，复用 <code>forward</code>，不拼接 shell 字符串。标准输入输出、退出码和交互式 attach 行为保持一致；需要验证 Ctrl-C、终止信号和交互终端恢复。</p>
+<p>裸 <code>roami session</code> 进入原 ttmux 的交互选择器。<code>roami session help</code> 展示新前缀的帮助；原 <code>ttmux help</code> 保留旧前缀。名称解析继续区分稳定 ID 与展示名，rename 仍只改展示名。</p>
+<p>保留后端 <code>TTMUX_BIN</code> 与原有内嵌会话引擎，避免本轮改动 Web 调用链。继续使用精确 tmux target 和 <code>SendPromptSubmit</code>，不重新实现会话发送逻辑。</p>
+<h3>Chrome</h3>
+<p>将生成的 launcher 内嵌到 Roami，按内容版本释放到私有运行目录，例如 <code>&lt;数据目录&gt;/bin/roami-chrome</code>。总入口优先使用随发行包携带的 launcher；源码开发允许显式指定开发产物。不得通过 PATH 的 <code>chrome</code> 盲目查找，避免调用到浏览器本体或兼容入口形成递归。</p>
+<p>原 <code>chrome</code> 与新入口执行同一份驱动，保留 <code>--tab</code>、<code>--url</code>、<code>--cdp</code> 的位置和语义，以及截图、录制、daemon、锁与浏览器配置读取行为。兼容入口不能转回自身。</p>
+<p>同时修正 launcher 的配置目录解析：目前 <code>_roam_data</code> 读取 <code>ROAM_*</code>、<code>TTMUX_*</code> 并默认 <code>~/.roam</code>，与后端现行 <code>~/.roami</code> 存在偏差。新入口以 <code>ROAMI_*</code> 为正式配置名，保留旧变量兼容，并通过一致性测试对齐后端的目录解析和旧目录迁移行为，避免操作另一份 profile。</p>
+<p>统一入口仍需要 Node、<code>playwright-core</code> 和 Chrome；内嵌 launcher 不等于内嵌这些运行时。<code>roami chrome setup</code> 安装浏览器自动化依赖，<code>help</code> 不触发下载或启动浏览器，缺依赖时给出对应安装提示。</p>
+<h3>Project</h3>
+<p>首期通过已有 HTTP API 操作项目，由正在运行的 Roami 服务持有 Store，CLI 不直接读写 SQLite 或 <code>projects.json</code>。这样沿用同一套发现、归档、缓存失效和工作树归属逻辑。项目命令需要服务运行；会话和 Chrome 命令保持本地独立运行能力。远程项目管理不纳入首期验收范围。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>对应能力与语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>project ls</code></td>
+<td><code>GET /api/projects</code>，展示项目 ID、名称、目录和会话摘要</td>
+</tr>
+<tr>
+<td><code>project show &lt;id&gt;</code></td>
+<td>首期从同一列表响应中按 ID 精确选择，不新增详情 API；只承诺现有 summary 字段</td>
+</tr>
+<tr>
+<td><code>project create &lt;dir&gt; [--name ...] [--clone ...]</code></td>
+<td><code>POST /api/projects</code>，映射 dir、displayName、cloneUrl</td>
+</tr>
+<tr>
+<td><code>project remove &lt;id&gt;</code></td>
+<td><code>DELETE /api/projects/:key</code>，只移除项目台账，保留目录、worktree 与会话；仍有会话时可能被重新发现</td>
+</tr>
+<tr>
+<td><code>project prefs &lt;id&gt; [--name ...] [--pinned true或false] [--agent ...] [--base ...]</code></td>
+<td><code>PATCH /api/projects/:key/prefs</code>；未传参数不修改，允许显式清空字符串偏好</td>
+</tr>
+<tr>
+<td><code>project activity &lt;id&gt;</code></td>
+<td><code>GET /api/projects/:key/activity</code>，沿用现有提交与收尾留痕响应</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>create</code> 将调用者的相对路径转换为本机绝对路径，再交后端处理；不存在的目录按当前 API 语义创建。项目选择使用稳定 ID，兼容服务端已有旧 key；不按显示名模糊选择项目。</p>
+<p>连接参数使用 <code>--server</code> / <code>ROAMI_SERVER</code>，缺省按本机配置推导地址；设置请求超时，不在失败时偷偷启动后台服务。服务未运行时提示 <code>roami server</code>。</p>
+<p>新增 <code>roami auth login</code> 复用 <code>/api/login</code> 的口令及 TOTP 认证，交互输入口令，不把口令放入 argv；仅保存现有认证流程签发的 Cookie，凭据文件权限为 0600，并按服务地址隔离。非交互登录可从 stdin 输入凭据。使用正常 TLS 验证，本机自签证书复用已有 CA；不默认跳过验证。401 时返回认证错误，不自动反复重试登录；logout 清除本地凭据并使用服务端现有退出机制（若有）。</p>
+<h2>数据库统一管理</h2>
+<p>数据库随 CLI 一起统一管理：业务元数据继续归入主库，所有 Roami 自有数据库具有统一的路径解析、版本登记和运维入口。主库沿用 <code>meta.db</code> 文件名，避免入口改名引起无必要的数据搬迁。</p>
+<h3>当前存储与目标边界</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>存储</th>
+<th>当前用途</th>
+<th>目标</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>meta.db</code></td>
+<td>会话、项目及别名、竞赛、会话归属、蜂群注册/成员/看板、插件会话等</td>
+<td>继续作为业务元数据真相源，不再为同一实体新建另一套台账</td>
+</tr>
+<tr>
+<td><code>swarms/&lt;id&gt;/swarm.db</code></td>
+<td>每群消息流 posts；旧库可能保留已迁移的成员、看板表</td>
+<td>保留消息流分库，成员和看板以主库为准，历史表不再双写</td>
+</tr>
+<tr>
+<td><code>ai-footprints.db</code></td>
+<td>Git 提交归档</td>
+<td>先保留独立归档库，纳入统一登记、迁移与备份；是否物理并库另行评估容量和写入负载</td>
+</tr>
+<tr>
+<td>旧 JSON 台账</td>
+<td>主库历史迁移来源与现有降级模式</td>
+<td>幂等导入、校验和保留备份；正常模式不再作为第二份业务真相源</td>
+</tr>
+<tr>
+<td>Chrome profile、Cookie、运行时 socket、录屏等</td>
+<td>外部浏览器数据与运行产物</td>
+<td>保留专用文件布局，不导入主库；登录凭据按既有认证边界管理</td>
+</tr>
+</tbody>
+</table></div>
+<p>分库仍需明确用途。蜂群 posts 当前刻意独立，以隔离高频写入和按群归档；统一管理不要求把它并入主库。以后新增数据库必须登记用途、路径、迁移所有者、备份与清理策略。</p>
+<h3>路径与迁移</h3>
+<p>默认数据根统一为 <code>~/.roami</code>，正式配置使用 <code>ROAMI_*</code>。兼容已有 <code>ROAM_*</code>、<code>TTMUX_*</code> 和显式设置的分离 HOME/DATA 路径；升级时发现多个既有库，不凭文件时间猜测、不创建空库替代旧数据、不自动覆盖合并。</p>
+<p>数据库实际路径由统一解析和握手结果提供。后端当前通过 <code>ttmux db status --json</code> 获取主库路径，这一契约继续兼容，新公开入口改为 <code>roami db status --json</code>。各命令不得自行拼接默认路径。新旧配置冲突时采用明确且可测试的优先级，并在 status 中展示生效路径和配置来源。</p>
+<p>主库 schema 和迁移继续由现有会话引擎的 <code>internal/metadb</code> 单点管理；后端保持业务 DML 权限，不另建同一套 DDL。蜂群库和归档库分别保留各自迁移版本链，由统一入口调度其所有者；归档库现有建表、补列逻辑需收敛为可追踪的版本迁移。已发布迁移只追加、不修改。</p>
+<p>数据库异常必须可观察。正常升级路径先备份、迁移、校验，再切换；迁移失败中止并保留原始数据。现有 JSON 降级模式需明确上报状态与原因；受影响的写入命令返回错误，防止用户在不知情时写出另一套台账。终端与浏览器等不依赖故障台账的能力可继续工作。</p>
+<h3>写入职责与并发</h3>
+<p>统一入口不等于单一进程。会话引擎和插件宿主、Roami 服务仍可并行运行，沿用表级写入职责：会话/蜂群/插件表由现有引擎维护，项目/竞赛/会话归属由服务端维护。<code>roami project</code> 继续通过 API 写入，避免绕过服务端内存缓存。</p>
+<p>连接策略统一规定 WAL、foreign_keys、busy_timeout 和写事务方式，并保留受支持文件系统上的明确降级策略。WAL 不能消除多个写者的竞争；事务保持短小，失败不能吞掉，同一业务变更不能跨库假装具有原子性。需要跨库时采用可重试、可校验的分阶段操作。</p>
+<h3>运维命令</h3>
+<p><code>roami db</code> 作为固定内置分组，旧 <code>ttmux db ...</code>、<code>roami session db ...</code> 继续兼容。首批正式入口为：</p>
+<pre><code class="language-bash">roami db status --json
+roami db migrate
+roami db backup &lt;destination&gt;
+</code></pre>
+<p>status 展示主库、蜂群消息库和归档库清单、实际路径、schema 版本、运行模式及错误原因。原有主库握手字段保持兼容，附加库信息使用新增字段；内部会话历史与恢复命令继续支持，不借本轮改名删除。</p>
+<p>backup 生成包含清单、版本和校验信息的备份集，覆盖全部已登记数据库，不能只复制主库文件，也不能直接复制运行中的 SQLite 文件漏掉 WAL。使用 SQLite 一致性备份机制；首期完整备份集要求所有相关写者进入维护状态，拒绝无法协调的并发写入，再顺序取得各库快照。恢复前停写、校验全部快照和兼容版本；作为备份集整体恢复，不把不同时间的库任意拼接。自动迁移前同样遵守该备份要求。</p>
+<h2>开工前新建 worktree 必须同步远端</h2>
+<p>Roami 为新任务创建 worktree 时，必须先成功获取选定远端基准分支的最新提交，再从本次获取并锁定的提交 OID 创建任务分支。Agent 在 worktree 准备成功后才能开始工作；不能依赖 Agent 开工后自行 pull 或 rebase 补救。</p>
+<p>目前 <code>backend/worktree/service.go</code> 的自动同步仅在 base、remote 都未指定时启用，且 fetch 失败仍会静默使用旧远端引用或本地分支。改造后统一执行以下规则：</p>
+<ul>
+<li>先确定远端和基准分支：显式选择优先，其次使用基准分支的 upstream，再回落到 origin 的默认主干；多个远端无法唯一判定时返回明确错误，不猜测。只指定 <code>base=main</code> 也必须同步其对应的远端分支。</li>
+<li>每次创建新任务分支都执行有超时的定向 fetch；从本次 fetch 的准确结果取得 OID，并在创建期间固定使用它，避免并发 fetch 更新引用导致起点漂移。基准跟踪引用也按本次获取结果更新，不移动本地主干、不触碰其他 worktree 的未提交改动。</li>
+<li>网络、权限、超时或远端分支不存在时，停止创建并返回可重试错误；不得静默退回本地旧分支或缓存引用。没有可用远端的仓库也返回明确错误；如以后支持本地仓库模式，必须作为显式选择提供，不能默认降级。</li>
+<li>Web、手机、项目开工、子会话和蜂群等新建任务 worktree 的调用点都通过同一个 <code>worktree.Service.Create</code> 约束；CLI 如提供该能力也复用同一业务路径。任务提示只能在同步和创建成功后提交；中途失败清理本次创建的临时会话等资源。</li>
+<li>“接着已有分支继续工作”保留该分支现有提交，不自动 reset 或 rebase；它与“从远端最新基准新建任务”明确区分。恢复现有会话也不改写任务分支。</li>
+</ul>
+<p>这里的“最新”指创建准备阶段成功从远端取得的提交快照；远端随后新增提交不会自动改写已经开始工作的分支。</p>
+<h2>帮助与输出契约</h2>
+<p><code>roami help</code> / <code>roami --help</code> / <code>roami -h</code> 展示统一命令树；Web 参数帮助移到 <code>roami server --help</code>。<code>roami help session</code>、<code>roami session --help</code> 和 <code>roami chrome --help</code> 均可发现各自能力。<code>roami version</code> / <code>roami --version</code> 展示总入口版本，<code>roami completion</code> 补全固定分组、原会话命令和可用插件。</p>
+<p>会话与 Chrome 的数据输出和退出码原样保留，不能宣称所有现有子命令都支持 <code>--json</code>。项目首批命令统一支持 <code>--json</code>：stdout 只输出一个 JSON 值，成功沿用 API 的 <code>data</code> 包装，失败输出 <code>error.code</code> 和 <code>error.message</code> 并返回非零退出码；人类提示走 stderr。项目新命令约定 0 成功、2 参数错误、1 业务或连接错误，使用帮助时返回 0。</p>
+<p>CLI 终端输出与开发文档按仓库 i18n 标准属于允许例外；如错误信息会同时展示到 Web UI，沿用现有错误码和 i18n，不新增硬编码 UI 文案。</p>
+<h2>实施顺序与修改范围</h2>
+<ol>
+<li><strong>总入口与会话分组</strong>：修改 <code>backend/cmd/cli.go</code>、<code>cli_test.go</code> 和 <code>main.go</code>，增加固定路由、旧命令兼容表、server/help/version/completion，复用原会话引擎。先验证插件冲突和原服务启动兼容。</li>
+<li><strong>浏览器纳入发行包</strong>：调整 <code>cli/chrome-cli</code> 的帮助与目录解析，新增浏览器 launcher 内嵌模块，更新 <code>scripts/build/build-roami.sh</code>、安装脚本及 <code>.github/workflows/release.yml</code>，验证单独下载 Roami 后可使用 Chrome 分组。</li>
+<li><strong>认证与项目命令</strong>：在 backend module 内新增具体命名的 CLI 客户端与项目命令模块，复用现有认证和项目 HTTP API。首期不改项目存储结构、不新增远程主机管理。</li>
+<li><strong>开工基准同步</strong>：收紧 <code>backend/worktree/service.go</code> 的基准选择和 fetch 失败处理，审查全部新建任务 worktree 调用点的参数传递、Agent 启动顺序与失败清理，保证显式 base 也使用远端最新 OID。</li>
+<li><strong>数据库统一管理</strong>：增加固定 <code>roami db</code> 分组，统一实际路径解析、数据库清单、归档库版本迁移、降级状态以及完整备份集；保留主库 schema 所有权和现有写入边界。</li>
+<li><strong>迁移调用示例与发布说明</strong>：更新中英文 README、<code>docs/install</code>、两个 CLI README、skills、Agent 会话提示模板及可见操作指引。内部 tmux 调用、协议字段、历史迁移与兼容测试中的旧名称保留。旧 release 资产暂时继续发布。</li>
+</ol>
+<p>每一步可以独立评审；最终交付以三个核心分组均可用为准。首期不合并两个 Go module，不重写 Chrome 为 Go，也不批量改名所有源码中的 ttmux 字样。</p>
+<h2>验收标准</h2>
+<ul>
+<li>新旧会话入口使用同一份会话数据；覆盖 ls、new、rename、send 多行提示、capture、attach、fork 和 swarm，验证前缀相近的会话不会被误操作。</li>
+<li>原有插件精确名、唯一前缀、歧义报错、停用行为保持正确；与固定分组冲突时，插件完整 ID 入口仍可达。未知顶层命令不能落入 tmux。</li>
+<li>Chrome 的 tab/url/cdp 参数原样传递；新旧入口复用同一 CDP 实例及已登录 profile；截图和录制产物可打开。新旧环境变量、默认数据目录和缺运行时提示均有覆盖。</li>
+<li>项目 ls/create/show/prefs/activity/remove 与 Web API 结果一致；覆盖非 Git 目录、worktree 归位、重名显示名、旧 key、服务未启动、认证过期和 TOTP。CLI 修改后 Web 下一次查询能看到结果，移除项目不删除目录或关闭会话。</li>
+<li>用真实本地 bare remote 覆盖：本地主干和远端跟踪引用均落后、显式 base、显式 remote、自定义 upstream、非 origin 远端、并发创建；新任务 HEAD 必须等于本次 fetch 锁定的远端 OID。另测 fetch 失败、超时、远端分支删除和无远端仓库：不能创建旧基准任务、不能启动 Agent、不能泄漏临时资源。已有分支接续不丢提交，本地主干和未提交修改保持完整。</li>
+<li>干净 PATH 的 release 安装覆盖 Linux/macOS、amd64/arm64；会话不要求 Node，help 不安装依赖；旧 <code>roami</code> 启动方式和 systemd 服务可继续运行。</li>
+<li>数据库验收覆盖新旧配置优先级、HOME/DATA 分离、旧数据幂等导入、重复执行迁移、主库 schema 契约、并发写入与缓存一致性。完整备份恢复后逐库核对版本及数据，测试 WAL 存在、维护状态下仍有写者、磁盘满、迁移中断和版本不兼容，确保失败不产生空库或静默双写。</li>
+<li>实现阶段运行 <code>scripts/dev/quality/check.sh quick</code>；运行行为变更开 PR 前运行 <code>full</code>，并补充 CLI 分派测试、真实 tmux 隔离 socket 验证和 Chrome/CDP 冒烟。若改动前端，追加仓库要求的前端检查与 Android 真机验收。</li>
+<li>PR 按仓库规则附新命令帮助、实际运行或测试结果截图，上传到 <code>pr-shots</code>，不把一次性截图提交到主分支。</li>
+</ul>
+<h1>Roami CLI 技术方案</h1>
+<p>本文定义目标实现，尚未落地。产品范围和兼容规则见 <a href="../index.html">设计总览</a>，包结构与接口见 <a href="../index.html#tree">代码架构</a>。</p>
+<h2>进程与模块选择</h2>
+<p>保留两个 Go module：backend 负责 Roami 总入口、HTTP 服务和项目客户端，ttmux-cli-go 继续作为独立会话引擎。二者通过 argv、退出码和版本化 JSON 通信，不跨 module 导入 internal 包，也不为入口统一重写 tmux 逻辑。Chrome 仍使用 Bash launcher、Node 和 Playwright。</p>
+<p>统一的是公开命令树、配置解析和数据库管理契约。首期发行包仍是一个 Roami Go 二进制，内嵌前端、目标平台会话引擎、生成的 Chrome launcher；Node 和 Chrome 是外部运行时。</p>
+<p>原架构图以本版本文字说明为准。</p>
+<h2>启动与路由流程</h2>
+<p><code>main</code> 只负责进程组装：构造基础 IO、解析路由、运行目标命令、设置退出码。命令路由在 Web 服务初始化前执行，<code>session help</code> 不加载项目 Store、TLS 服务或浏览器。</p>
+<ol>
+<li>识别根级 help/version 及固定分组；无参数和旧服务参数转换为 server 路由。</li>
+<li>匹配显式旧命令兼容表，包括 <code>ttmux</code> 和旧的会话顶层命令。</li>
+<li>仅在可能是插件时查询插件清单，精确名优先于唯一前缀。</li>
+<li>未知词返回参数错误。禁止顶层任意回落到 tmux；session 分组继续允许原生 tmux 透传。</li>
+</ol>
+<p>根级参数只消费总入口已声明的参数，后端引擎参数按 argv 切片传递。尤其 <code>roami chrome --tab 2 ...</code> 和 <code>roami session --quiet ...</code> 的参数不交给 server 的 flag parser。项目连接参数放在对应分组内；全局 <code>-config</code>、<code>-addr</code> 等旧参数保持 server 兼容语义。</p>
+<p>插件保留独立查询结果和错误：固定路由无需插件发现；用户请求插件而发现失败时报告发现错误，不能误报“未安装”。插件名称冲突通过 <code>roami plugin run &lt;完整ID&gt;:&lt;命令&gt;</code> 消歧。</p>
+<h2>子进程与发行产物</h2>
+<p>会话引擎选择顺序保持显式 <code>TTMUX_BIN</code>、可用的已安装引擎、内嵌引擎；显式路径无效要报错，不能无声忽略用户配置。数据库操作额外校验协议兼容性，必要时明确提示升级。Chrome 使用显式开发产物或内嵌 launcher，不搜索泛称 chrome 的 PATH 程序。</p>
+<p>引擎释放到按内容 hash 命名的私有目录，临时文件写入、设置执行权限后原子 rename。并发释放可重入；不能覆盖正在使用的可执行文件。缺少嵌入内容的开发构建必须指向开发产物，并提供可操作的错误。</p>
+<p>公开兼容命令与私有引擎路径分离：旧 <code>ttmux</code> 保持原引擎；旧 <code>chrome</code> launcher 调用相同驱动，不能形成 <code>chrome -&gt; roami chrome -&gt; chrome</code> 环。构建顺序为前端、会话引擎、Chrome launcher、Roami，退出 trap 恢复嵌入占位文件。</p>
+<p>交互式执行直接连接 stdin/stdout/stderr，不额外套 PTY；非交互 JSON 调用分离 stdout 和 stderr。Linux/macOS 使用子进程启动与信号处理适配：子进程启动失败返回 1，正常退出透传退出码，信号退出映射为 <code>128 + signal</code>。避免同时把终端进程组已收到的 SIGINT 再转发一次；测试前台 attach 的 Ctrl-C、Ctrl-Z 和退出后终端状态。</p>
+<h2>项目与认证链路</h2>
+<p>项目命令通过服务端 API 操作，复用现有鉴权中间件和项目 Store。CLI 不从项目 API handler 导入业务代码，也不直写数据库。show 首期使用列表 summary，不承诺完整会话列表；后续若需要详情，单独增加 API。</p>
+<p>原架构图以本版本文字说明为准。</p>
+<p>HTTP 客户端设置超时、取消和响应体大小上限。POST 创建、clone 和 DELETE 等操作不自动重试；请求超时可能已经产生副作用，提示查询当前状态再重试。服务端错误码保留，网络与 TLS 失败使用客户端错误码，禁止把内部日志拼入 JSON stdout。</p>
+<p>auth login 调用现有 <code>POST /api/login</code>，提交 password、code；logout 使用现有退出 handler 对应路由并清除本地 Cookie。凭据按完整规范化 origin（scheme、host、port）隔离，文件原子写入并设 0600；目录设 0700。密码不持久化，不从配置文件明文复用。跨 origin 重定向不能携带凭据，自签 CA 显式加载，不关闭证书验证。</p>
+<p>默认 URL 来自本机配置：监听 <code>0.0.0.0</code> 时连接 loopback；HTTPS 名称必须匹配现有证书 SAN。显式 <code>--server</code>、<code>ROAMI_SERVER</code> 覆盖自动推导。首期只保证本机服务：远端目录转换、远端主机选择和服务器自动启动不在范围内。</p>
+<h2>数据库管理与一致性</h2>
+<p>主库继续由会话引擎的 metadb 管理 DDL，后端只执行所属业务 DML。将“数据库清单”与“业务 Store”分开：清单记录 ID、种类、实际路径、schema、所有者、运行模式，业务命令只能通过对应所有者操作数据。</p>
+<p>公开 <code>roami db status --json</code> 保留旧握手字段，在 <code>databases</code> 增加各库状态。主库路径来自原引擎握手；蜂群库来自同一实例的已登记蜂群目录；归档库由服务配置解析。不得扫描整个 HOME 后把任意 <code>.db</code> 认作 Roami 数据。</p>
+<p>迁移分两层：各库 owner 负责版本链和单库事务；总入口负责完整预备份、调度、错误传播和结果记录。跨库升级不承诺 SQLite 原子事务。备份未完成不得开始迁移；迁移中断记录各库完成阶段，校验后可幂等续跑。发生不兼容时停止业务写入，不能自动切到 JSON 继续写。</p>
+<h3>维护协调协议</h3>
+<p>当前没有覆盖所有进程的全局维护协议，完整备份要求新增协调能力，不能仅靠现有单连接互斥锁。</p>
+<ul>
+<li>同一数据实例使用一个维护锁文件，Linux/macOS 采用现有平台可用的 advisory file lock。正常写入在事务前持共享锁，backup/migrate 持独占锁；锁文件位于主库握手确认的实例目录。</li>
+<li>所有受支持写者都参加：服务端 Store、会话 CLI、长驻插件宿主、蜂群消息写入和归档写入。创建/删除分库也属于写入，避免备份期间清单变化。</li>
+<li>锁顺序统一为“实例维护锁、进程内 Store/DB 锁、SQLite 事务”。协调器持独占锁后通过显式维护执行上下文调用 owner，不递归申请共享锁；该上下文不能由普通命令行环境变量伪造。</li>
+<li>进入维护后排空已有写事务，取得稳定清单，再逐库 <code>VACUUM INTO</code> 生成快照，执行完整性检查和 hash 校验。临时备份目录在全部成功后原子发布 manifest；部分失败不得标记为完整备份。</li>
+<li>新协议落地前，整套备份只支持停掉所有写者后的维护窗口。旧版本引擎/插件宿主不支持协调时必须先升级或停止；不能靠“当前没有 SQL 锁”推断之后不会写入。</li>
+</ul>
+<p>已有 <code>metadb.DB.Backup</code> 使用 <code>VACUUM INTO</code>，可复用单库快照方式。整套一致性来自停写协调，不能由逐库快照本身保证。首期恢复流程为离线校验、关闭所有连接、保存现有数据集、替换并检查整套快照，重启后端重建内存缓存；失败回滚整个数据集。自动化 restore 命令另行实现，首期提供明确操作文档。</p>
+<h2>新任务 worktree 的远端起点</h2>
+<p>新增可测试的准备阶段，放在 <code>worktree.Service.Create</code> 内，所有调用点共同受约束：</p>
+<ol>
+<li>ResolveRepo 并解析远端/基准选择。显式 remote+base 优先；只有 base 时解析该分支 upstream；无 upstream 时选择 origin 上的同名基准；完全缺省时使用可明确解析的远端默认主干。</li>
+<li>不明确时返回 <code>REMOTE_UNRESOLVED</code> / <code>BASE_UNRESOLVED</code>；没有远端时返回 <code>REMOTE_REQUIRED</code>，不自行使用当前 feature 分支。</li>
+<li>为本次操作生成独占的临时 ref，例如 <code>refs/roami/prepares/&lt;随机ID&gt;</code>，定向 fetch 远端 <code>refs/heads/&lt;base&gt;</code> 到该 ref。读取该 ref 的 commit OID；不能读取可能被另一 fetch 改写的全局 FETCH_HEAD。</li>
+<li>校验 OID 后更新对应 tracking ref。临时 ref 与引用更新过程放在统一仓库操作锁内，序列化同实例更新；失败或取消时清理临时 ref。网络超时受请求 context 约束，锁顺序固定，不能重复获取已有的非重入锁。</li>
+<li>从固定 OID 创建新任务分支，记录 baseref、startoid 以及新增的远端来源元信息。worktree 创建失败按阶段回收临时分支与目录；不得删除用户原有分支。</li>
+<li>worktree 和会话 cwd 绑定成功后才提交 Agent 启动命令及任务提示。会话可先分配，但只能停在普通 shell；失败关闭本次会话。</li>
+</ol>
+<p>默认请求每次同步远端，不用 TTL 跳过 fetch。竞赛一次创建多个选手时，首期允许每次各自 fetch，保证各自基于新快照；需要相同基线比较时，应在竞赛层明确准备一个共享快照再传入受控接口，不能对客户端开放任意 OID 绕过同步。</p>
+<p><code>Existing=true</code> 走独立接续路径，不修改已有分支、不自动合入远端。纯会话 fork 若不新建 worktree，也不触发该同步流程。直接使用原生 git 创建的外部 worktree 不在 Roami 新任务创建保证范围内。</p>
+<h2>实施依赖与验证</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>产出</th>
+<th>前置与通过条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 总入口</td>
+<td>固定路由、兼容表、server/help/version、会话适配</td>
+<td>原服务 flags 与会话交互回归通过</td>
+</tr>
+<tr>
+<td>2 分发与 Chrome</td>
+<td>launcher 内嵌、同源配置、release 与补全</td>
+<td>干净 PATH 下帮助及浏览器冒烟通过</td>
+</tr>
+<tr>
+<td>3 项目客户端</td>
+<td>auth 与 project 命令</td>
+<td>本机 HTTPS/TOTP、API 一致性测试通过</td>
+</tr>
+<tr>
+<td>4 开工基准</td>
+<td>远端解析、定向 fetch、固定 OID 和回收</td>
+<td>真实 bare remote 回归及启动顺序测试通过</td>
+</tr>
+<tr>
+<td>5 数据库</td>
+<td>清单、归档版本链、维护协议、完整备份</td>
+<td>全部写入路径完成协调改造后才能开放在线备份</td>
+</tr>
+<tr>
+<td>6 迁移文档</td>
+<td>技能、提示模板、安装说明与证据截图</td>
+<td>无新入口示例遗漏，完整质量门禁通过</td>
+</tr>
+</tbody>
+</table></div>
+<p>文档阶段不运行应用或触碰实际数据库。实现阶段重点测跨进程边界：真实 CLI 子进程、隔离 tmux socket、本地 HTTPS 服务、真实临时 SQLite 与 bare Git remote。使用人工构造的旧库验证迁移与备份，不在用户真实库上试验。完整门禁和 PR 截图要求沿用总览及 AGENTS.md。</p>
+<h1>Roami CLI 代码架构</h1>
+<p>本文件描述拟新增或调整的代码，目录不是已实现清单。行为约定见 <a href="../index.html">设计总览</a>，执行细节见 <a href="../index.html#execution">技术方案</a>。</p>
+<h2>目录与职责</h2>
+<pre><code class="language-text">backend/
+  cmd/
+    main.go                         组装进程，调用 CLI 或服务启动
+    cli.go                          保留薄适配，迁出分派实现
+    server.go                       从 main 提取原 Web 启动流程
+  internal/
+    roamicli/
+      app.go                        应用依赖与执行入口
+      route.go                      固定路由与插件路由决策
+      compatibility.go              旧顶层命令和参数兼容表
+      help.go                       命令目录与帮助渲染
+      completion.go                 总命令树补全
+      process.go                    argv、IO、信号与退出码适配
+      session.go                    会话命令转发
+      chrome.go                     浏览器命令转发
+      project.go                    参数校验与项目 API 映射
+      auth.go                       登录、退出、凭据选择
+      database.go                   数据库清单与维护命令编排
+      output.go                     新命令的 text/JSON 输出
+    roamiapi/
+      client.go                     HTTP、超时、TLS 和错误解码
+      projects.go                   项目请求与响应 DTO
+      authentication.go             现有登录与退出协议
+      credentials.go                Cookie 持久化与 origin 隔离
+    chromebin/
+      chromebin.go                  内容寻址释放 launcher
+      launcher                      构建注入的生成物，占位文件受版本管理
+    clibin/                         保留现有会话引擎内嵌能力
+    metadb/                         保留后端握手、DML 连接和兼容校验
+    dbmaintenance/
+      lock.go                       后端维护锁协议实现
+      catalog.go                    聚合 owner 描述，禁止扫描任意数据库
+      backup.go                     备份 manifest 与离线恢复校验
+  config/
+    paths.go                        后端配置路径解析与来源信息
+  worktree/
+    service.go                      Create 的事务阶段编排
+    remote-base.go                  远端基准选择、fetch 和 OID 固定
+    remote-base_test.go             真实临时远端测试
+  api/
+    worktree.go                     复用 Create，确保失败回收和启动顺序
+    race.go                         同上，明确选手基准语义
+    git-footprints.go               归档业务；迁出建表与迁移代码
+  gitarchive/
+    database.go                     归档库连接和版本链
+
+cli/ttmux-cli-go/
+  internal/
+    app/app.go                      继续作为独立会话引擎入口
+    command/db/db.go                保留旧契约，增加 owner 能力
+    command/help/help.go            支持调用者提供的显示前缀
+    metadb/                         主库唯一 schema 与迁移所有者
+    dbmaintenance/lock.go           会话引擎维护锁协议实现
+    runtime/                        正式环境变量与旧名兼容
+    swarm/                          主库成员/看板及独立 posts owner
+
+cli/chrome-cli/
+  launcher.sh                       统一配置与帮助，无额外业务实现
+  driver.mjs                        继续承载 Playwright 命令
+  build.sh                          生成兼容 CLI 和可嵌入 launcher
+</code></pre>
+<p>这些是职责边界，实施中若现有模块已经承载相同职责，应就地扩展，避免为表格机械拆文件。不新增名为 helpers、utils、common、misc 或 shared 的目录和文件。</p>
+<h2>依赖方向</h2>
+<p>原架构图以本版本文字说明为准。</p>
+<p>roamicli 不依赖 Gin handler；roamiapi 不依赖 Store；project 和 worktree 不反向依赖命令解析器。后端 <code>ttmux.Client</code> 继续是服务端引擎调用适配器，CLI 交互转发使用独立 ProcessRunner，避免其合并 stdout/stderr 的现有 Run 行为污染 JSON。</p>
+<p>维护锁协议与配置规则跨 Go module 用文档契约和同一组测试向量约束；首期各模块实现小型适配，不跨 internal 导入。Chrome 接收总入口解析的正式环境变量，单独运行兼容入口时也遵守相同优先级。长期是否抽出独立 Go module 不作为本轮依赖。</p>
+<h2>核心接口草图</h2>
+<p>以下是设计级签名，具体 DTO 由实现时与现有协议对齐，不承诺直接复制即可编译。</p>
+<pre><code class="language-go">type Route struct {
+    Group string
+    Args  []string
+}
+
+type Streams struct {
+    In  io.Reader
+    Out io.Writer
+    Err io.Writer
+}
+
+type ProcessRunner interface {
+    Run(ctx context.Context, bin string, args []string, streams Streams) int
+}
+
+type ProjectClient interface {
+    List(ctx context.Context) (ProjectList, error)
+    Create(ctx context.Context, req CreateProject) (ProjectResult, error)
+    Remove(ctx context.Context, id string) error
+    SetPrefs(ctx context.Context, id string, patch ProjectPrefsPatch) error
+    Activity(ctx context.Context, id string) (ProjectActivity, error)
+}
+</code></pre>
+<p>Route 解析是可纯测的决策，不在解析中启动服务或安装依赖。ProjectPrefsPatch 使用指针或可选值保留“未设置”与“显式清空”的区别。App 只持有 runner、client、流、产物解析器和插件目录等明确依赖，不引入通用的全局 service locator。</p>
+<pre><code class="language-go">type RemoteBase struct {
+    Remote string
+    Branch string
+    Ref    string // refs/heads/&lt;branch&gt;
+}
+
+type PreparedBase struct {
+    Source RemoteBase
+    OID    string
+}
+</code></pre>
+<p>远端解析与 fetch 分为两个内部函数；PreparedBase 仅由 worktree 服务准备阶段生成。调用者传业务选择，不允许客户端自行提交任意 PreparedBase 绕过同步。创建函数最终消费固定 OID，不再次按可变分支名解析。</p>
+<pre><code class="language-go">type DatabaseDescriptor struct {
+    ID            string
+    Kind          string
+    Path          string
+    SchemaVersion int
+    Owner         string
+    Mode          string
+}
+
+type DatabaseOwner interface {
+    Describe(ctx context.Context) ([]DatabaseDescriptor, error)
+    Migrate(ctx context.Context, scope MaintenanceScope) error
+    Snapshot(ctx context.Context, scope MaintenanceScope, dest string) error
+}
+</code></pre>
+<p>MaintenanceScope 只由维护协调器在持独占锁时创建，owner 为进程内适配或受控子进程适配；跨进程不能假设一个 Go 值就能传递锁权。子进程 owner 必须使用有生命周期约束的锁句柄继承/握手，不能使用公开的 <code>--skip-lock</code>。设计无法验证锁权时改用离线维护流程，不开放绕锁接口。</p>
+<h2>配置与持久化协议</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>契约</th>
+<th>唯一责任</th>
+<th>跨边界验证</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>命令树、别名和帮助</td>
+<td>roamicli 命令目录</td>
+<td>固定分组冲突、未知命令、补全一致性</td>
+</tr>
+<tr>
+<td>会话命令执行</td>
+<td>原会话引擎</td>
+<td>argv 保真、退出码、交互信号</td>
+</tr>
+<tr>
+<td>项目业务</td>
+<td>现有 HTTP API 与 project Store</td>
+<td>CLI/API 同场景结果、缓存刷新</td>
+</tr>
+<tr>
+<td>主库路径和 schema</td>
+<td>引擎 metadb 与握手</td>
+<td>保留旧 status 字段，扩展数据库清单</td>
+</tr>
+<tr>
+<td>分库 schema</td>
+<td>各 database owner</td>
+<td>归档及 posts 各自版本链</td>
+</tr>
+<tr>
+<td>完整备份</td>
+<td>维护协调器</td>
+<td>所有写者停写、稳定清单、manifest 完整发布</td>
+</tr>
+<tr>
+<td>远端基准</td>
+<td>worktree 服务</td>
+<td>fetch 成功与固定 OID 是创建前置条件</td>
+</tr>
+</tbody>
+</table></div>
+<p>数据库先沿用文件路径和表名。新数据库清单返回完整路径时仅面向已授权本机 CLI，不增加公开未鉴权端点。备份 manifest 至少包含格式版本、实例 ID、创建时间、Roami 版本、各库 ID/相对备份路径/schema/hash 和完整状态；不包含密码或 Cookie。</p>
+<p>数据根与 CLI 配置通过 config 模块解析；服务启动函数接收已解析配置，不重复隐式迁移。业务子命令只执行它需要的初始化，不因 <code>roami help</code> 迁移真实用户数据。</p>
+<h2>具体改动与测试位置</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>现有位置</th>
+<th>改动</th>
+<th>关键验证</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backend/cmd/main.go</code>、<code>cli.go</code>、<code>cli_test.go</code></td>
+<td>抽出服务启动、迁移分派逻辑</td>
+<td>无参/旧 flags，内置/插件/兼容优先级</td>
+</tr>
+<tr>
+<td><code>backend/internal/clibin</code></td>
+<td>复用并完善内容版本释放</td>
+<td>多进程释放、显式引擎选择</td>
+</tr>
+<tr>
+<td><code>scripts/build/build-roami.sh</code>、release workflow</td>
+<td>注入 Chrome launcher，保留旧资产</td>
+<td>四个平台编译、占位恢复、干净 PATH 冒烟</td>
+</tr>
+<tr>
+<td><code>cli/chrome-cli</code></td>
+<td>配置优先级、前缀帮助、兼容入口</td>
+<td>同 CDP/profile，无递归和意外初始化</td>
+</tr>
+<tr>
+<td><code>backend/auth</code>、项目 API</td>
+<td>原认证和业务语义复用</td>
+<td>TLS、Cookie 隔离、TOTP、登录锁定</td>
+</tr>
+<tr>
+<td><code>backend/worktree/service.go</code></td>
+<td>提取准备阶段并收紧失败行为</td>
+<td>remote-base 测试覆盖旧 ref、显式 base 与超时</td>
+</tr>
+<tr>
+<td><code>backend/api/worktree.go</code>、<code>race.go</code></td>
+<td>新任务调用链审查与补偿</td>
+<td>同步失败不发 Agent prompt，资源无泄漏</td>
+</tr>
+<tr>
+<td>两侧 metadb、swarm、project、归档写入点</td>
+<td>维护协议、版本化归档、显式降级</td>
+<td>并发写入、维护排空、备份恢复、异常不中途双写</td>
+</tr>
+<tr>
+<td><code>backend/api/prompts/agent-capabilities.md</code> 等模板</td>
+<td>注入正式命令前缀</td>
+<td>新会话收到新入口指引，已有任务仍可用旧命令</td>
+</tr>
+</tbody>
+</table></div>
+<p>按技术方案阶段交付，先将路由与原行为分离验证，再接新增能力；不以一次大范围重命名替代模块边界调整。文档类检查通过不代表运行时已实现，代码阶段仍须执行仓库质量门禁和对应真实进程验收。</p><p class="footer">本页为技术设计，流程演示不执行真实命令。实现与验收按本文阶段推进。</p></div></main></div></div><script>
+document.documentElement.dataset.pointer=navigator.maxTouchPoints?'coarse':'fine';
+addEventListener('pointerdown',e=>document.documentElement.dataset.pointer=e.pointerType==='mouse'?'fine':'coarse');
+const main=document.querySelector('main'), links=[...document.querySelectorAll('nav a')];
+links.forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const id=a.hash.slice(1),target=document.getElementById(id);target.scrollIntoView({behavior:'smooth',block:'start'});history.replaceState(null,'','#'+id);links.forEach(x=>x.classList.toggle('active',x===a));}));
+const ob=new IntersectionObserver(entries=>{const current=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top)[0];if(current)links.forEach(a=>a.classList.toggle('active',a.hash==='#'+current.target.id));},{root:main,rootMargin:'0px 0px -65% 0px'});document.querySelectorAll('section').forEach(s=>ob.observe(s));
+const scenarios={success:[['解析远端基准与 upstream','ok'],['成功 fetch 到本次私有 ref，固定 OID','ok'],['从该 OID 建任务分支与 worktree','ok'],['绑定会话 cwd 后提交 Agent 提示','ok']],failure:[['解析远端基准','ok'],['fetch 失败：停止创建，返回 FETCH_FAILED','stop'],['不使用旧远端引用或本地主干','stop'],['回收本次临时资源，不启动 Agent','stop']],existing:[['识别为继续已有分支','ok'],['保留现有提交，不自动 reset/rebase','ok'],['检出已有分支并绑定会话 cwd','ok'],['准备成功后继续原任务','ok']]};
+document.querySelectorAll('[data-scenario]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-scenario]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));const list=document.querySelector('.steps');list.replaceChildren(...scenarios[b.dataset.scenario].map(([s,state])=>{const li=document.createElement('li');li.textContent=s;li.dataset.state=state;return li;}));}));
+</script></body></html>

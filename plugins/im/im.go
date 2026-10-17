@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // Activate registers commands + the notification sink handler.
@@ -55,7 +55,7 @@ func onAgentExited(ctx *sdk.Ctx, payload json.RawMessage) error {
 	if ev.Labels["im:worker"] == "1" {
 		// delegate 出去的 worker 结束:只写 inbox(单一投递者原则,
 		// 由 listener 的 delivery loop 投给管家),绝不直接回用户
-		msg := fmt.Sprintf("worker %s 已结束。验收:读 %s 与 `ttmux capture %s`,通过后向用户汇报,不通过带原因重派",
+		msg := fmt.Sprintf("worker %s 已结束。验收:读 %s 与 `roami session capture %s`,通过后向用户汇报,不通过带原因重派",
 			ev.Session, filepath.Join(ev.Labels["im:task_dir"], "RESULT.md"), ev.Session)
 		if _, err := appendInbox(ctx, inboxItem{Type: "system", Chat: ev.Labels["im:chat"], Text: msg}); err != nil {
 			ctx.Logf("worker-exit inbox append failed: %v", err)

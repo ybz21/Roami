@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/project"
-	"ttmux-web/search"
+	"github.com/ybz21/Roami/backend/project"
+	"github.com/ybz21/Roami/backend/search"
 )
 
 // 只测不依赖 tmux 的两类（项目 / 项目文件）：会话那一段要真的有 tmux server，

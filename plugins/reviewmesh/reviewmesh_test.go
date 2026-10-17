@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 func TestResolveRounds(t *testing.T) {

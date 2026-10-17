@@ -23,8 +23,8 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/project"
-	"ttmux-web/worktree"
+	"github.com/ybz21/Roami/backend/project"
+	"github.com/ybz21/Roami/backend/worktree"
 )
 
 type projectSession struct {
@@ -73,7 +73,7 @@ type projectSummary struct {
 	Needs   []projectSession `json:"needs"`   // 全部等待输入的会话——「需要你」队列要的是它，不是 Top
 }
 
-// sessListItem 兼容解析 ttmux ls --json（数值字段 CLI 可能给字符串）。
+// sessListItem 兼容解析 roami session ls --json（数值字段 CLI 可能给字符串）。
 type sessListItem struct {
 	Name         string          `json:"name"`
 	Label        string          `json:"label"`
@@ -89,7 +89,7 @@ type sessListItem struct {
 	Repo string `json:"repo,omitempty"`
 }
 
-// sessMem 会话内存画像，原样从 ttmux ls --json 透传给前端。
+// sessMem 会话内存画像，原样从 roami session ls --json 透传给前端。
 type sessMem struct {
 	Cur   int64 `json:"cur"`
 	Peak  int64 `json:"peak,omitempty"`

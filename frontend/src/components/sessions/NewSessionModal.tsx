@@ -20,7 +20,7 @@ import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-
 // worktree 分支默认名：会话名 slug（小写、非字母数字转 -）
 // prompt 派生任务名：取首行、去引号标点、截 24 字、空白转 -；中文原样保留（tmux 会话名支持中文）。
 /**
- * 从需求派生一个**占位**名字。真名字由 agent 开工后 `ttmux rename`（见 session.wt.brief*）。
+ * 从需求派生一个**占位**名字。真名字由 agent 开工后 `roami session rename`（见 session.wt.brief*）。
  *
  * 三步：剥掉开头的招呼与人称（「你去/帮我/请…」——它们只说了「有人在派活」，
  * 没说这是什么活）、在首个标点处断句、按长度截断但不切在拉丁词中间。

@@ -2,7 +2,7 @@ package browser
 
 import "testing"
 
-// 模式值的收敛表。chrome CLI（cli/chrome-cli/launcher.sh 的 _load_browser_cfg）照抄了这张表，
+// 模式值的收敛表。chrome CLI（backend/browser/automation/launcher.sh 的 _load_browser_cfg）照抄了这张表，
 // 改这里要一起改那边，否则 CLI 和后端会对同一份配置得出不同的无头/有头结论。
 func TestNormalizeHeadless(t *testing.T) {
 	cases := map[string]string{

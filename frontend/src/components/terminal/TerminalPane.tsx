@@ -409,7 +409,7 @@ export default function TerminalPane(props: {
   // 自定义 MIME：文件区/终端的拖放判定按 type 分流，共用 text/plain 会被它们当路径接走
   const isTabDrag = (e: React.DragEvent) => e.dataTransfer.types.includes('application/x-tt-tab')
   // 会话拖到标签上（21 设计）：不建链路、不留台账，只往**这个**会话里注一段话，
-  // 告诉它旁边那个是谁、怎么用 ttmux send 跟它说话。剩下的交给大模型自己安排。
+  // 告诉它旁边那个是谁、怎么用 roami session send 跟它说话。剩下的交给大模型自己安排。
   const isSessionDrag = (e: React.DragEvent) => e.dataTransfer.types.includes(SESSION_MIME)
   const [dropPeer, setDropPeer] = useState('')
   const introduce = async (e: React.DragEvent, target: string) => {
@@ -420,7 +420,7 @@ export default function TerminalPane(props: {
     })
     if (!src) return
     if (!v.ok) {
-      // 跨机说清楚原因：ttmux send 走本机 tmux，静默失败会让 Agent 拿到
+      // 跨机说清楚原因：roami session send 走本机 tmux，静默失败会让 Agent 拿到
       // 一句「会话不存在」然后开始瞎猜
       if (v.why === 'cross') message.warning(t('pair.crossNode', { name: src.label || src.id }))
       // 落进普通 shell 会把介绍词的每一行当命令跑掉（真机撞出来的）

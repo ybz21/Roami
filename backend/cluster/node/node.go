@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"ttmux-web/auth"
-	"ttmux-web/cluster/tunnel"
+	"github.com/ybz21/Roami/backend/auth"
+	"github.com/ybz21/Roami/backend/cluster/tunnel"
 )
 
 // 与 broker 侧约定的接入头（见 cluster/broker/broker.go）。

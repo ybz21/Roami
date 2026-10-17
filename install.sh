@@ -22,7 +22,13 @@ set -euo pipefail
 
 REPO="ybz21/Roam"
 VERSION="${ROAMI_VERSION:-latest}"
-BIN_DIR="${ROAMI_BIN_DIR:-${HOME}/.local/bin}"
+INSTALL_RUN_USER="${SUDO_USER:-$(id -un)}"
+INSTALL_RUN_HOME="${HOME}"
+if [ "${ROAMI_SYSTEM:-0}" = 1 ] && [ -n "${SUDO_USER:-}" ]; then
+  INSTALL_RUN_HOME="$(getent passwd "$INSTALL_RUN_USER" | cut -d: -f6)"
+  [ -n "$INSTALL_RUN_HOME" ] || { echo "Cannot resolve service user home" >&2; exit 1; }
+fi
+BIN_DIR="${ROAMI_BIN_DIR:-${INSTALL_RUN_HOME}/.local/bin}"
 SERVICE_NAME="roami"
 
 # ── 输出助手 ─────────────────────────────────────────────────────
@@ -73,6 +79,47 @@ download_url() {  # <tag>
 }
 
 # ── 安装二进制：下载 release，或（ROAMI_FROM_SOURCE / 下载失败且在 clone 内）从源码构建 ──
+# Inspect the staged release before replacing any live binary or compatibility entry.
+preflight_storage() {
+  local candidate="$1" report
+  chmod +x "$candidate"
+  local -a command=("$candidate" db status --json)
+  if [ "${ROAMI_SYSTEM:-0}" = 1 ] && [ "$(id -u)" = 0 ] && [ "$INSTALL_RUN_USER" != root ]; then
+    command=(runuser -u "$INSTALL_RUN_USER" -- env "HOME=$INSTALL_RUN_HOME" "${command[@]}")
+  fi
+  if ! report="$("${command[@]}")"; then
+    die "存储预检失败；现有安装未替换。检查候选程序: $candidate"
+  fi
+  if printf '%s' "$report" | grep -Eq '"migrationRequired"[[:space:]]*:[[:space:]]*true'; then
+    local pending="${candidate%.tmp}.upgrade"
+    mv -f "$candidate" "$pending"
+    die "检测到旧数据库布局，现有安装未替换。先停止旧服务与插件写者，用 $pending db migrate --layout --dry-run 盘点，再用 --layout --offline 迁移，完成后重新安装。"
+  fi
+}
+
+service_path_environment() {
+  local prefix suffix key value
+  local format="${1:-systemd}"
+  for prefix in ROAMI ROAM TTMUX; do
+    for suffix in HOME DATA CONFIG DATABASE_DIR BACKUP_DIR; do
+      key="${prefix}_${suffix}"
+      value="${!key:-}"
+      [ -n "$value" ] || continue
+      if [ "$format" = plist ]; then
+        value="${value//&/\&amp;}"
+        value="${value//</\&lt;}"
+        value="${value//>/\&gt;}"
+        printf '<key>%s</key><string>%s</string>\n' "$key" "$value"
+        continue
+      fi
+      value="${value//\\/\\\\}"
+      value="${value//\"/\\\"}"
+      value="${value//%/%%}"
+      printf 'Environment="%s=%s"\n' "$key" "$value"
+    done
+  done
+}
+
 install_binary() {
   mkdir -p "$BIN_DIR"
   local dest="${BIN_DIR}/roami"
@@ -81,6 +128,7 @@ install_binary() {
     local tag url; tag="$(resolve_tag)"; url="$(download_url "$tag")"
     step "下载 ${ASSET} (${tag:-latest})..."
     if curl -fSL --progress-bar -o "${dest}.tmp" "$url"; then
+      preflight_storage "${dest}.tmp"
       mv "${dest}.tmp" "$dest"; chmod +x "$dest"
       link_legacy_name "$dest"
       info "roami 已安装到 $dest"
@@ -95,10 +143,12 @@ install_binary() {
   if [ -f "${here}/scripts/build/build-roami.sh" ] && command -v go >/dev/null && command -v npm >/dev/null; then
     step "从源码构建 roami（scripts/build/build-roami.sh）..."
     ( cd "$here" && bash scripts/build/build-roami.sh )
-    local built; built="$(ls -1 "${here}/backend/dist/roami-"* 2>/dev/null | head -1)"
-    [ -n "$built" ] || die "源码构建未产出二进制"
+    local built="${here}/backend/dist/${ASSET}"
+    [ -f "$built" ] || die "源码构建未产出当前平台二进制"
     # 服务正跑着时 cp 直接覆盖会报「文本文件忙」；先落临时名再 mv，rename 对运行中的二进制是原子的
-    cp "$built" "${dest}.tmp"; chmod +x "${dest}.tmp"; mv -f "${dest}.tmp" "$dest"
+    cp "$built" "${dest}.tmp"; chmod +x "${dest}.tmp"
+    preflight_storage "${dest}.tmp"
+    mv -f "${dest}.tmp" "$dest"
     link_legacy_name "$dest"
     info "roami 已从源码构建并安装到 $dest"
     return 0
@@ -202,13 +252,14 @@ ensure_kvm() {
 # 旧名 roam 留一条软链：改名之前写好的脚本、别人的 crontab、自己的手指记忆都还在。
 # 已经存在同名**真文件**（旧版二进制）时也换成软链——留着两个二进制只会让人不知道跑的是哪个。
 link_legacy_name() {
-  local dest="$1" legacy="${BIN_DIR}/roam"
-  [ "$dest" = "$legacy" ] && return 0
-  if [ -e "$legacy" ] && [ ! -L "$legacy" ]; then
-    rm -f "$legacy"
-  fi
-  ln -sfn "$dest" "$legacy" 2>/dev/null && info "旧名 roam 已指向 roami（兼容软链）"
+  local dest="$1" legacy
+  for legacy in roam ttmux chrome; do
+    ln -sfn "$dest" "${BIN_DIR}/${legacy}"
+  done
+  mkdir -p "${HOME}/.local/share/bash-completion/completions"
+  "$dest" completion > "${HOME}/.local/share/bash-completion/completions/roami"
 }
+
 
 # 升级路径：把改名前的 roam.service 停掉再删，否则两个服务抢同一个端口，
 # 而且用户会看到一个永远重启失败的 roam.service。
@@ -236,6 +287,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+$(service_path_environment)
 ExecStart=${BIN_DIR}/roami
 Restart=always
 RestartSec=3
@@ -258,8 +310,7 @@ EOF
 install_service_system() {
   command -v systemctl >/dev/null || die "无 systemd，无法注册系统级服务"
   local sudo=""; [ "$(id -u)" -ne 0 ] && sudo="sudo"
-  local user="${SUDO_USER:-$USER}" home
-  home="$(eval echo "~${user}")"
+  local user="$INSTALL_RUN_USER" service_home="$INSTALL_RUN_HOME"
   $sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF
 [Unit]
 Description=Roami web console
@@ -268,7 +319,8 @@ Wants=network-online.target
 
 [Service]
 User=${user}
-Environment=HOME=${home}
+Environment=HOME=${service_home}
+$(service_path_environment)
 ExecStart=${BIN_DIR}/roami
 Restart=always
 RestartSec=3
@@ -295,6 +347,9 @@ install_service_launchd() {
 <dict>
   <key>Label</key><string>com.roami.console</string>
   <key>ProgramArguments</key><array><string>${BIN_DIR}/roami</string></array>
+  <key>EnvironmentVariables</key><dict>
+$(service_path_environment plist)
+  </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>${HOME}/.roami/roami.log</string>

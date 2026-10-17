@@ -53,7 +53,7 @@ bash tests/reliability_e2e.sh ui         # 只跑浏览器那几条
 
 ## UI（chrome CLI）
 
-跑之前需要 Chrome 起着（`chrome goto <url>` 一次即可）。用例会自己登录、自己造休眠会话。
+跑之前需要 Chrome 起着（`roami chrome goto <url>` 一次即可）。用例会自己登录、自己造休眠会话。
 
 | # | 用例 | 断言 | 守的是什么 |
 |---|---|---|---|

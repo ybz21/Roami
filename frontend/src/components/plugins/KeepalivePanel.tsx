@@ -245,7 +245,7 @@ function Banner({ data, enabled, t, onRules, onHistory, onBulk, hasRows }: {
         <Typography.Paragraph style={{ whiteSpace: 'pre-line', marginBottom: 12 }}>
           {t('ka.whyBody')}
         </Typography.Paragraph>
-        <Typography.Text code copyable style={{ fontSize: 12 }}>ttmux plugin run keepalive.tick</Typography.Text>
+        <Typography.Text code copyable style={{ fontSize: 12 }}>roami plugin run keepalive.tick</Typography.Text>
       </Modal>
     </div>
   )

@@ -1,71 +1,37 @@
-# ttmux-web — Web 控制台后端（Go + Gin）
+# Roami Web 服务端
 
-ttmux 的 Web 控制台后端，是 ttmux CLI 的薄封装：读 = 调 `ttmux <cmd> --json` 透传；写 = 调对应子命令。
-前端是独立项目 [`../frontend/`](../frontend/)（React + Vite + Antd），**不在本目录内**；后端从磁盘代理其
-构建产物 `frontend/dist`。完整设计见 [`../docs/design/web/`](../docs/design/web/)。
+Web 服务、会话核心和 CLI 共用仓库根目录的一个 Go module：`github.com/ybz21/Roami`。
+服务端通过进程内 application/session 核心管理会话；终端桥接仍调用原生 tmux。
+CLI 的正式入口为 `roami session`、`roami chrome`、`roami project`、`roami auth`、`roami db`。
 
-## 快速开始
+从仓库根目录运行：
 
 ```bash
-# 在仓库根目录（构建前端 → 编译后端 → 启动）
 ./start.sh --dev
+go build -o /tmp/roami ./cmd/roami
+/tmp/roami server -addr 127.0.0.1:8080 -web frontend/dist
 ```
 
-配置走 **`~/.roami/config.yaml`**（首次启动由内嵌模板自动生成；schema 见仓库
-[`configs/config.yaml.template`](../configs/config.yaml.template)）。优先级：命令行 flag >
-环境变量（`ROAM_*`，兼容旧 `TTMUX_*`）> 配置文件 > 默认值：
-```yaml
-web:
-  password: ""            # 登录口令；留空 = 首次打开网页时在界面上设置
-  bind: 0.0.0.0:13579     # 监听地址（默认所有网卡，手机同 WiFi 可访问）
-  tls: true               # 自签 HTTPS（手机麦克风/剪贴板需安全上下文）
-```
-> ⚠ 默认监听 `0.0.0.0`，局域网内任何设备可访问——首次务必设置强口令；外网访问走
-> Tailscale / Cloudflare Tunnel，不要直开公网端口。
+完整自包含构建使用 `scripts/build/build-roami.sh`，前端构建后嵌入正式二进制。
+分离开发时，在另一终端运行 `cd frontend && npm run dev`。
 
-手动运行（flag 覆盖配置）：
-```bash
-cd backend && go build -o ttmux-web ./cmd
-TTMUX_BIN=../ttmux ./ttmux-web -addr 127.0.0.1:8080 -web ../frontend/dist
-```
-单一自包含二进制（内嵌前端 + ttmux CLI）：`scripts/build/build-roam.sh`。
+配置默认位于 `~/.roami/config.yaml`，schema 见
+[`config.yaml.template`](../configs/config.yaml.template)。存储路径支持 `ROAMI_HOME`、
+`ROAMI_DATA`、`ROAMI_DATABASE_DIR`、`ROAMI_BACKUP_DIR`；默认数据库位于
+`~/.roami/database/`。旧布局必须先停写，再用 `roami db migrate --layout --dry-run`
+盘点、用 `roami db migrate --layout --offline` 显式迁移。
 
-## 已实现
+| 目录 | 职责 |
+| --- | --- |
+| `cmd/roami/`（仓库根） | 统一命令入口、参数与服务启动 |
+| `internal/application/`（仓库根） | 会话应用服务 |
+| `internal/storage/`（仓库根） | 数据库 schema、布局、清单、锁、备份与恢复 |
+| `backend/server/` | HTTP 路由、中间件、回退页 |
+| `backend/api/` | API handlers |
+| `backend/ttmux/` | 进程内核心适配与旧外部 CLI 兼容 |
+| `backend/pty/` | 原生 tmux 与 WebSocket 终端桥接 |
+| `backend/auth/` | 认证与访问控制 |
+| `backend/browser/automation/` | `roami chrome` 内嵌驱动 |
 
-- **认证**：口令登录 → HMAC 签名 Cookie（HttpOnly/SameSite=Strict）+ 失败退避/锁定（可配 `TTMUX_WEB_LOCK_AFTER/SECS`）。
-- **API**（`/api`，均需认证）：
-  - `sessions`：列出 / 关闭 / capture
-  - `tasks`：列出 / 状态 / 收集 / 创建（命令 & Agent 统一）/ 清理 / 追加指令(send)
-  - `env`：列出 / 设置 / 删除 / 推送；`info`
-  - **`term/:name`（WebSocket）**：桥接 `tmux attach`，每个会话 = 实时命令行
-  - **`stream/status`（SSE）**：定期推送 tasks+sessions 快照；**`logs/:name`（WS）**：日志 `tail -f`
-- **前端**：[`../frontend/`](../frontend/) React + Vite + Antd SPA，三端响应式（见 `docs/design/web/01-overview.md`），
-  覆盖 概览 / 任务 / 会话 / Env；创建任务（选类型）、收集、追加指令、清理；
-  **每个会话/任务可进 xterm.js 终端**（手机带快捷键栏 Enter/Esc/^C/Tab/↑/↓）。
-  后端从磁盘读取 `frontend/dist`；找不到时回退到内嵌的 `server/fallback.html`。
-
-## 结构（按职责分包）
-
-```
-backend/                module: ttmux-web
-├── cmd/main.go         入口、flag 解析（-addr / -web）、配置组装
-├── server/             Gin 引擎、路由注册、中间件 + fallback.html（内嵌回退页）
-├── api/                各资源 handler（sessions/tasks/env/info）
-├── ttmux/              CLI 封装层（唯一接触 shell 的地方）
-├── auth/               token 签发/校验、防爆破、认证中间件
-├── pty/                终端 PTY 桥接（tmux attach ↔ WebSocket）
-└── stream/             SSE 状态推送 + 日志 tail（WebSocket）
-```
-
-## 路线图（TODO）
-
-- **实时**：前端接入 SSE/日志 WS（后端已就绪），替换当前 3s 轮询。
-- **认证增强**：argon2 口令哈希、TOTP / Passkey。
-- **终端**：多终端分屏 / 标签、断线自动重连。
-
-## 开发模式（前后端分离热更新）
-
-```bash
-cd backend && TTMUX_BIN=../ttmux TTMUX_WEB_PASSWORD=dev go run ./cmd   # 后端 :8080
-cd frontend && npm run dev                                            # 前端 :5173（代理 /api 含 WS 到 :8080）
-```
+统一架构和迁移边界见
+[CLI 统一设计](../docs/design/20261017-CLI统一设计/index.html)。

@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"ttmux-web/internal/id"
-	"ttmux-web/internal/metadb"
+	"github.com/ybz21/Roami/internal/id"
+	"github.com/ybz21/Roami/internal/metadb"
 )
 
 // Prefs 是项目的 UI 偏好（PATCH /projects/:key/prefs 可改）。

@@ -36,35 +36,6 @@ fi
 
 BIND="${TTMUX_WEB_BIND:-0.0.0.0:13579}"
 PORT="${BIND##*:}"
-export TTMUX_BIN="${TTMUX_BIN:-ttmux}"   # 系统级 ttmux（install.sh 装到 ~/.local/bin，已在 PATH）
-# 若 TTMUX_BIN 指向具体路径却不存在（如继承了已删除的仓库根 ./ttmux），回退到 PATH 上的 ttmux，
-# 否则后端 exec 不到 ttmux，所有 swarm/会话操作会 500。
-if [[ "$TTMUX_BIN" == */* && ! -x "$TTMUX_BIN" ]]; then
-  echo "==> TTMUX_BIN=$TTMUX_BIN 不存在，回退用 PATH 上的 ttmux"
-  export TTMUX_BIN=ttmux
-fi
-# 确保 ttmux CLI 可用：找不到时尝试从源码自动编译，失败则报错退出。
-if ! command -v "$TTMUX_BIN" &>/dev/null && [[ "$TTMUX_BIN" != */* || ! -x "$TTMUX_BIN" ]]; then
-  CLI_SRC="$(pwd)/cli/ttmux-cli-go"
-  INSTALL_DIR="${HOME}/.local/bin"
-  if [[ -d "$CLI_SRC" ]] && command -v go &>/dev/null; then
-    echo "==> ttmux 未安装，从 cli/ttmux-cli-go 自动编译..."
-    mkdir -p "$INSTALL_DIR"
-    if (cd "$CLI_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/ttmux" ./cmd/ttmux-cli-go); then
-      chmod +x "${INSTALL_DIR}/ttmux"
-      echo "==> ttmux 已编译安装到 ${INSTALL_DIR}/ttmux"
-    else
-      echo "✘ ttmux 自动编译失败。请手动运行: cd cli/ttmux-cli-go && go build -o ~/.local/bin/ttmux ./cmd/ttmux-cli-go"
-      exit 1
-    fi
-  else
-    echo "✘ 找不到 ttmux CLI（$TTMUX_BIN），新建/管理会话将全部失败。"
-    echo "  安装方法："
-    echo "    1. 运行 bash install.sh 完整安装"
-    echo "    2. 或手动编译: cd cli/ttmux-cli-go && go build -o ~/.local/bin/ttmux ./cmd/ttmux-cli-go"
-    exit 1
-  fi
-fi
 # 登录口令在子命令(stop/status/logs)处理之后再解析，避免这些操作也触发生成/写 .env。
 # 自签 HTTPS：默认开启。手机经局域网用麦克风(语音)/剪贴板(一键粘贴)需「安全上下文」，
 # 纯 http 会被浏览器禁用这些能力。设 TTMUX_WEB_TLS=0 可退回 http。证书由后端就地生成。
@@ -138,8 +109,8 @@ if [ "$DEV" = 1 ] && [ -d scripts/install ]; then
   echo "==> [dev] 从源码刷新 ttmux CLI + chrome + skills..."
   SRC="$(pwd)"
   export SCRIPT_DIR="$SRC"
-  export GO_SRC="$SRC/cli/ttmux-cli-go"
-  export CHROME_BUILD="$SRC/cli/chrome-cli/build.sh"
+  export GO_SRC="$SRC"
+  export CHROME_BUILD="$SRC/scripts/build/build-chrome.sh"
   export INSTALL_DIR="$HOME/.local/bin"
   export SKILL_DIR="$HOME/.claude/skills"
   export REPO="ybz21/Roam" BRANCH="${TTMUX_INSTALL_BRANCH:-main}"
@@ -198,7 +169,7 @@ fi
 build_backend() {
   local version
   version="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
-  (cd backend && go build -ldflags "-X main.version=${version}" -o ttmux-web.next ./cmd) || {
+  go build -ldflags "-X main.version=${version}" -o backend/ttmux-web.next ./cmd/roami || {
     rm -f backend/ttmux-web.next
     return 1
   }
@@ -206,7 +177,7 @@ build_backend() {
 }
 if [ "$DEV" = 1 ]; then
   # 检测 .go 与 go:embed 的资源(*.tmpl/*.html)变更，避免改模板却跳过编译
-  if [ ! -f "$BIN" ] || [ "$(find backend \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
+  if [ ! -f "$BIN" ] || [ "$(find backend cmd internal pkg plugins \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
     echo "==> 编译后端..."
     build_backend
   else
@@ -214,7 +185,7 @@ if [ "$DEV" = 1 ]; then
   fi
 elif [ ! -x "$BIN" ]; then
   echo "✘ 未找到 $BIN —— 先构建：bash install.sh   或   bash start.sh --dev"; exit 1
-elif [ -d backend/api ] && [ "$(find backend \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
+elif [ -d backend/api ] && [ "$(find backend cmd internal pkg plugins \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
   echo "==> 检测到后端源码变更，自动重新编译..."
   build_backend
 fi

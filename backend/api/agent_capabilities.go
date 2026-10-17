@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/config"
+	"github.com/ybz21/Roami/backend/config"
 )
 
 //go:embed prompts/agent-capabilities.md

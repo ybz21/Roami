@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // listen 命令:前台长连接监听(plugind 托管在 _ttmux-im 会话里,掉线/回收后
-// 自动重拉;手动跑 `ttmux plugin run im-bridge.listen` 也可以,面板即界面)。
+// 自动重拉;手动跑 `roami plugin run im-bridge.listen` 也可以,面板即界面)。
 func listen(ctx *sdk.Ctx, args map[string]string) (any, error) {
 	prov, err := activeProvider(ctx)
 	if err != nil {
@@ -165,7 +165,7 @@ func dispatchTask(ctx *sdk.Ctx, chatID, text string) {
 	var prompt string
 	if interactive {
 		prompt = fmt.Sprintf(`你在为一位 IM 用户干活。与 TA 沟通的唯一渠道是执行这条命令(用 Bash):
-  ttmux plugin run im-bridge.send --chat %s --text '要发的内容'
+  roami plugin run im-bridge.send --chat %s --text '要发的内容'
 沟通规则:
 - 开工时先发一条简短消息说明你的理解和计划;
 - 缺信息或需要用户拍板时,发消息提问后停下等待,用户的回复会作为新消息直接出现在本对话里;
@@ -193,7 +193,7 @@ func dispatchTask(ctx *sdk.Ctx, chatID, text string) {
 	}
 	ctx.Logf("im task spawned: session=%s workdir=%s interactive=%v", name, workdir, interactive)
 	if !interactive {
-		replyText(ctx, chatID, fmt.Sprintf("已开工 🛠️\n会话: %s\n目录: %s\n围观: ttmux a %s\n完成后我会在这里回报结果。", name, workdir, name))
+		replyText(ctx, chatID, fmt.Sprintf("已开工 🛠️\n会话: %s\n目录: %s\n围观: roami session a %s\n完成后我会在这里回报结果。", name, workdir, name))
 	}
 	// 交互模式不由插件发「已开工」——Agent 自己会先打招呼说明计划
 }
@@ -220,14 +220,14 @@ func statusText(ctx *sdk.Ctx) string {
 }
 
 // send 命令:供派活 Agent 在任务里主动给用户发消息(进度、提问、总结)。
-// `ttmux plugin run im-bridge.send --chat <chat_id> --text '...'`
+// `roami plugin run im-bridge.send --chat <chat_id> --text '...'`
 func send(ctx *sdk.Ctx, args map[string]string) (any, error) {
 	chat, text := args["chat"], args["text"]
 	if chat == "" {
 		chat = notifyChat(ctx) // 不指定就发到绑定的通知群
 	}
 	if chat == "" || text == "" {
-		return nil, fmt.Errorf("usage: ttmux plugin run im-bridge.send --chat <chat_id> --text <文本>(chat 可省略,默认绑定的通知群)")
+		return nil, fmt.Errorf("usage: roami plugin run im-bridge.send --chat <chat_id> --text <文本>(chat 可省略,默认绑定的通知群)")
 	}
 	prov, err := activeProvider(ctx)
 	if err != nil {

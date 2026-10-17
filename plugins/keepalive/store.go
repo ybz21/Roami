@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 // 插件私有 KV 里的几张表。整表一个 JSON、读改写(同 roam.cron 的存法):

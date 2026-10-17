@@ -26,12 +26,12 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/ybz21/Roami/internal/metadb"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-	"ttmux-web/internal/metadb"
 )
 
 // homeRow 一个会话的归属。Name 只是名字快照（排障 + v1 文件认领），不参与判定。
@@ -285,7 +285,7 @@ func (h *homeStore) reconcile(alive map[string]bool) {
 //
 // **与 CLI 侧 sessmeta.Store.Dormant() 是同一个口径**，改一处就要改另一处
 // （两个 module 读同一张 sessions 表，没法共享代码）。逐条筛选条件的理由写在
-// cli/ttmux-cli-go/internal/sessmeta/sessmeta.go 的 Dormant() 上，此处不再抄一遍。
+// cli/github.com/ybz21/Roami/internal/sessionstore/sessmeta.go 的 Dormant() 上，此处不再抄一遍。
 const dormantSQL = `SELECT d.id, IFNULL(d.home_dir,IFNULL(d.initial_cwd,''))
 	FROM sessions d
 	WHERE d.status='dead' AND d.died_reason='host-restart'

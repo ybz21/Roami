@@ -15,8 +15,8 @@
 逐个子会话确认产出：
 
 ```bash
-ttmux capture cc-<name> --lines 60        # 交互式会话的最终总结
-ttmux agent collect <group> --json        # 无人值守会话的产出
+roami session capture cc-<name> --lines 60        # 交互式会话的最终总结
+roami session agent collect <group> --json        # 无人值守会话的产出
 ```
 
 从每个会话提取：改了哪些文件、对外接口/契约是什么、有没有遗留 TODO。
@@ -41,7 +41,7 @@ ttmux agent collect <group> --json        # 无人值守会话的产出
 - 或新开一个 `cc-integration` 会话专门做集成测试（前后端一起跑通一条主流程）。
 
 ```bash
-ttmux send cc-web "起开发服务器，手动走一遍 注册→登录→访问受保护页 这条链路，报告每一步结果"
+roami session send cc-web "起开发服务器，手动走一遍 注册→登录→访问受保护页 这条链路，报告每一步结果"
 ```
 
 ### Step 4: 对照需求规格验收
@@ -71,7 +71,7 @@ ttmux send cc-web "起开发服务器，手动走一遍 注册→登录→访问
 
 ## 收尾
 
-- 验收通过的子会话：记忆标记 done。是否 `ttmux kill` / `agent kill` 由用户决定，**不要擅自杀掉**用户可能还想看的会话，先问。
+- 验收通过的子会话：记忆标记 done。是否 `roami session kill` / `agent kill` 由用户决定，**不要擅自杀掉**用户可能还想看的会话，先问。
 - `_spec.md` / `_tasks.md` 标记本次需求完结，保留作历史。
 
 ## 反模式

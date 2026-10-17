@@ -32,14 +32,14 @@
 - **无依赖的** → 同时开（受并发上限约束，见 concurrency.md）。
 - **有依赖的** → 先开上游，上游产出接口契约后再开下游（或下游先 mock）。
 
-> **软依赖（成员一建出来就开工）**：`ttmux swarm add <群> <成员> --depends-on a,b ...` 里的
+> **软依赖（成员一建出来就开工）**：`roami session swarm add <群> <成员> --depends-on a,b ...` 里的
 > `--depends-on` **只表达依赖关系**（画拓扑连线 + 写进成员 prompt 让它自行协调），**不会挂起、不会拦着不 spawn**。
 > 你按任务图把全部成员一次加好，它们会**全部立即起会话并行开工**；有依赖的成员会被告知「缺上游产出就去广场等/问，
 > 别凭空臆造接口」。所以放心一次加全，让大家并行干，靠广场+看板协调，别指望靠"挂起"排序。
 
 > **给每个成员定细分角色 + 职责**（组班子）：派活时带上 `--subrole` 与 `--duty`：
 > ```bash
-> ttmux swarm add <群> api --type agent \
+> roami session swarm add <群> api --type agent \
 >   --subrole backend --duty "实现推演引擎计算与数据接口" \
 >   --depends-on arch "<起步任务>"
 > ```
@@ -52,8 +52,8 @@
 
 > **把任务图落到看板**：拆完后，每个子任务在看板上建一张卡，作为全群可见的分工底账：
 > ```bash
-> t1=$(ttmux swarm task add <群> "认证后端" --desc "注册/登录/JWT")
-> t2=$(ttmux swarm task add <群> "登录前端" --deps "$t1")
+> t1=$(roami session swarm task add <群> "认证后端" --desc "注册/登录/JWT")
+> t2=$(roami session swarm task add <群> "登录前端" --deps "$t1")
 > ```
 > 卡片是「要做的事」，成员会话是「干活的人」——开会话后用 `swarm task assign <群> <卡> <成员>` 把卡派给成员。
 > **只有你(master)派活**；成员只认领、推进自己名下的卡。看板让全群随时看清谁负责什么、卡在哪。

@@ -21,24 +21,14 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: cli/ttmux-cli-go/go.mod
-          cache-dependency-path: cli/ttmux-cli-go/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Build ttmux CLI binaries (CGO off, all targets)
-        working-directory: cli/ttmux-cli-go
-        run: |
-          mkdir -p dist
-          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 freebsd/amd64; do
-            os=${t%/*}; arch=${t#*/}
-            echo "building ttmux-$os-$arch"
-            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -o "dist/ttmux-$os-$arch" ./cmd/ttmux-cli-go
-          done
 
       - name: Build frontend once (reused by all roami targets)
         working-directory: frontend
@@ -56,15 +46,22 @@ jobs:
             SKIP_FRONTEND=1 GOOS=$os GOARCH=$arch bash scripts/build/build-roami.sh
           done
 
-      - name: Build chrome (bash, arch-independent)
-        run: bash cli/chrome-cli/build.sh cli/ttmux-cli-go/dist/chrome
+      - name: Build compatibility entry assets
+        run: |
+          mkdir -p dist
+          for binary in backend/dist/roami-*; do
+            target=${binary##*/roami-}
+            cp "$binary" "dist/ttmux-$target"
+          done
+          CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -ldflags "-X main.version=${{ github.ref_name }}" -o dist/ttmux-freebsd-amd64 ./cmd/roami
+          bash scripts/build/build-chrome.sh dist/chrome
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             backend/dist/roami-*
-            cli/ttmux-cli-go/dist/*
+            dist/*
           fail_on_unmatched_files: true
           # tag 里带连字符（如 v0.1.0-rc.1）视为 prerelease
           prerelease: ${{ contains(github.ref_name, '-') }}

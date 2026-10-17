@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 // Keys 端点：白名单放行什么、tmux 收到的到底是哪几个参数。

@@ -19,7 +19,7 @@ import (
 	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 	larkws "github.com/larksuite/oapi-sdk-go/v3/ws"
 
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 type feishuProvider struct{}
@@ -31,7 +31,7 @@ var mentionKeyRe = regexp.MustCompile(`@_user_\d+`)
 func (feishuProvider) Listen(ctx *sdk.Ctx, onMsg func(Message)) error {
 	appID, appSecret := ctx.Config["app_id"], ctx.Config["app_secret"]
 	if appID == "" || appSecret == "" {
-		return fmt.Errorf("app_id/app_secret 未配置(飞书开放平台建自建应用后: ttmux plugin config im-bridge set app_id <cli_xxx> && set app_secret <secret>)")
+		return fmt.Errorf("app_id/app_secret 未配置(飞书开放平台建自建应用后: roami plugin config im-bridge set app_id <cli_xxx> && set app_secret <secret>)")
 	}
 	handler := dispatcher.NewEventDispatcher("", "").
 		OnP2MessageReceiveV1(func(_ context.Context, ev *larkim.P2MessageReceiveV1) error {

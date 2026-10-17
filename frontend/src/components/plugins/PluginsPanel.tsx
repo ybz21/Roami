@@ -1,6 +1,6 @@
 // 插件统一管理/配置页(VS Code 扩展页式):左侧插件列表,右侧详情
 // (配置表单按 manifest.configFields 自动渲染 / 命令 / 审计)。
-// 数据全部走 backend 薄封装 REST(exec ttmux plugin ... --json),前端不感知 plugind。
+// 数据全部走 backend 薄封装 REST(roami plugin ... --json),前端不感知 plugind。
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { nodeApi } from '../cluster/node-url'
 import {

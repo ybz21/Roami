@@ -2,8 +2,8 @@
 package keepalive
 
 import (
-	"ttmux-cli-go/pkg/plugin/manifest"
-	"ttmux-cli-go/pkg/plugin/sdk"
+	"github.com/ybz21/Roami/pkg/plugin/manifest"
+	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
 func init() { sdk.RegisterBuiltin(Manifest(), Activate) }

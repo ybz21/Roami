@@ -95,7 +95,7 @@ tmux send-keys -t <session> 0
 
 ### 待发命令
 prompt `❯` 后有文字但没按 Enter。这通常是：
-- 上一轮 `ttmux send` 发过去了但因为 session 在审批状态没处理
+- 上一轮 `roami session send` 发过去了但因为 session 在审批状态没处理
 - 用户手动输入了但忘了按回车
 
 判断文字内容合理后：

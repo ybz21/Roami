@@ -5,7 +5,7 @@
 // 只在进程起来时做一次桥接：ROAMI_X 与 ROAM_X 互为别名，谁写了算谁，
 // 两个都写以新名（ROAMI_）为准。读取点一行都不用动。
 //
-// CLI 那边有一份一模一样的（cli/ttmux-cli-go/internal/runtime/envalias.go）：
+// CLI 那边有一份一模一样的（cli/github.com/ybz21/Roami/internal/tmuxruntime/envalias.go）：
 // backend 与 cli 是两个独立 go module，为二十行代码拉一个共享 module 不划算——
 // 改动时两边一起改。
 package config

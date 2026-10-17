@@ -41,7 +41,7 @@ tmp_dr="$(mktemp)"; merge_skill "$tmp_dr" dev-roles $DEV_ROLES_DOCS
 for d in "${TARGETS[@]}"; do
     mkdir -p "$d"
     rm -f "${d}/ttmux.md" "${d}/cc-swarm.md"   # 清掉历史遗留的扁平文件
-    # ttmux skill：单文件（chrome CLI 不单独建技能，由 cc-swarm 的 CLI 列表引用）
+    # roami session skill：单文件（chrome CLI 不单独建技能，由 cc-swarm 的 CLI 列表引用）
     if [[ -f "${SRC}/ttmux/SKILL.md" ]]; then
         mkdir -p "${d}/ttmux"
         cp "${SRC}/ttmux/SKILL.md" "${d}/ttmux/SKILL.md"

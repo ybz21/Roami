@@ -12,9 +12,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"ttmux-web/internal/id"
-	"ttmux-web/internal/metadb"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/internal/id"
+	"github.com/ybz21/Roami/internal/metadb"
 )
 
 func TestStorePersistAndConverge(t *testing.T) {

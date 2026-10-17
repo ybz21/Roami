@@ -6,7 +6,7 @@
 
 | | 交互式（默认，推荐） | 无人值守（headless） |
 |---|---|---|
-| 启动 | `ttmux new` + 发 `claude` | `ttmux agent spawn`（跑 `claude -p`） |
+| 启动 | `roami session new` + 发 `claude` | `roami session agent spawn`（跑 `claude -p`） |
 | 权限 | 会弹审批菜单，由 cc-swarm 巡检审批 | `--dangerously-skip-permissions` 自动放行 |
 | 适合 | 需要监护、review、改方向的开发任务 | 边界清晰、可信、一次性的批量小任务 |
 | 结束 | 一直开着，可追加指令 | 跑完即退出 |
@@ -53,22 +53,22 @@ mkdir -p ~/.local/share/ttmux/cc-swarm/tasks
 ### Step 2: 创建会话并启动交互式 claude
 
 ```bash
-ttmux new cc-auth
+roami session new cc-auth
 # 注入环境后启动交互式 claude，并把任务文件作为初始 prompt 带入
-ttmux send cc-auth "claude \"\$(cat ~/.local/share/ttmux/cc-swarm/tasks/auth.md)\""
+roami session send cc-auth "claude \"\$(cat ~/.local/share/ttmux/cc-swarm/tasks/auth.md)\""
 ```
 
 `claude "<prompt>"` 会启动交互式会话并把 `<prompt>` 作为第一条消息。
-`ttmux send` 末尾自带回车，会话随即开始干活。
+`roami session send` 末尾自带回车，会话随即开始干活。
 
 > 如果项目需要在特定目录运行，先在任务文件里或命令里 `cd`：
-> `ttmux send cc-auth "cd /path/to/repo && claude \"\$(cat ...auth.md)\""`
+> `roami session send cc-auth "cd /path/to/repo && claude \"\$(cat ...auth.md)\""`
 
 ### Step 3: 确认启动成功
 
 ```bash
 sleep 8
-ttmux capture cc-auth --lines 40
+roami session capture cc-auth --lines 40
 ```
 
 确认 claude 已经起来并开始处理任务（看到它在读文件/规划），而不是卡在 shell 或报错。
@@ -101,15 +101,15 @@ ttmux capture cc-auth --lines 40
 适合一批可信、独立、跑完即弃的小任务。一条命令开一组：
 
 ```bash
-ttmux agent spawn fix \
+roami session agent spawn fix \
   "typo"   "修正 README 里的错别字并 commit" \
   "lint"   "跑 npm run lint --fix 并提交" \
   --dir /path/to/repo --model sonnet
 
-ttmux agent status fix          # 看进度
-ttmux agent send fix-typo "顺便检查 CONTRIBUTING.md"   # 追加
-ttmux agent collect fix --json  # 跑完收集结果
-ttmux agent kill fix            # 清理
+roami session agent status fix          # 看进度
+roami session agent send fix-typo "顺便检查 CONTRIBUTING.md"   # 追加
+roami session agent collect fix --json  # 跑完收集结果
+roami session agent kill fix            # 清理
 ```
 
 这些会话用 `claude -p --dangerously-skip-permissions`，**不弹审批、不需要巡检**，
@@ -120,18 +120,18 @@ ttmux agent kill fix            # 清理
 开完成员会话后，把它对应的看板卡派给它，并在给成员的**任务 prompt 里**写明协作纪律：
 
 ```bash
-ttmux swarm task assign <群> <卡id> <成员>      # 把卡派给刚开的成员（自动进 assigned）
+roami session swarm task assign <群> <卡id> <成员>      # 把卡派给刚开的成员（自动进 assigned）
 ```
 
 给成员的任务文件末尾加一段（让成员主动用广场/看板，而不是等你来抓屏）：
 
 ```markdown
 ## 协作约定（本蜂群）
-- 认领：开工前 `ttmux swarm task move <群> <你的卡> doing`。
-- 播报：有产出/契约就 `ttmux swarm say <群> --kind done "<一句话+契约>"`（会自动署名你）。
-- 卡住：缺东西就 `ttmux swarm say <群> --kind block "<缺什么>"`，别干等。
-- 提问：`ttmux swarm say <群> --kind ask "<问题>"`，我会在广场回你。
-- 交付：做完 `ttmux swarm task move <群> <你的卡> review`，等我审。
+- 认领：开工前 `roami session swarm task move <群> <你的卡> doing`。
+- 播报：有产出/契约就 `roami session swarm say <群> --kind done "<一句话+契约>"`（会自动署名你）。
+- 卡住：缺东西就 `roami session swarm say <群> --kind block "<缺什么>"`，别干等。
+- 提问：`roami session swarm say <群> --kind ask "<问题>"`，我会在广场回你。
+- 交付：做完 `roami session swarm task move <群> <你的卡> review`，等我审。
 ```
 
 > 成员**不自己派活**、不替别人决策；只推进自己名下的卡 + 在广场喊话。派活权只在 master。

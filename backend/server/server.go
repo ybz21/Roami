@@ -20,17 +20,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"ttmux-web/api"
-	"ttmux-web/auth"
-	"ttmux-web/browser"
-	"ttmux-web/cluster/node"
-	"ttmux-web/config"
-	"ttmux-web/home"
-	"ttmux-web/p2p"
-	"ttmux-web/phone"
-	"ttmux-web/pty"
-	"ttmux-web/stream"
-	"ttmux-web/ttmux"
+	"github.com/ybz21/Roami/backend/api"
+	"github.com/ybz21/Roami/backend/auth"
+	"github.com/ybz21/Roami/backend/browser"
+	"github.com/ybz21/Roami/backend/cluster/node"
+	"github.com/ybz21/Roami/backend/config"
+	"github.com/ybz21/Roami/backend/home"
+	"github.com/ybz21/Roami/backend/p2p"
+	"github.com/ybz21/Roami/backend/phone"
+	"github.com/ybz21/Roami/backend/pty"
+	"github.com/ybz21/Roami/backend/stream"
+	"github.com/ybz21/Roami/backend/ttmux"
 )
 
 //go:embed fallback.html
