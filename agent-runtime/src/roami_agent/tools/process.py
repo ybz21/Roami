@@ -17,6 +17,21 @@ async def execute(
     env: dict | None = None,
     max_bytes=128_000,
 ):
+    if cwd is not None and env is None:
+        bindings = {
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_COMMON_DIR",
+            "GIT_PREFIX",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_NAMESPACE",
+            "GIT_IMPLICIT_WORK_TREE",
+            "GIT_SHALLOW_FILE",
+            "GIT_GRAFT_FILE",
+        }
+        env = {name: value for name, value in os.environ.items() if name not in bindings}
     process = await asyncio.create_subprocess_exec(
         *argv,
         cwd=cwd,

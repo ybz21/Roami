@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,11 +16,11 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\n  launch creates a new one-shot coding session; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\n  launch creates a new one-shot coding session; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
-	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" {
+	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -46,6 +47,21 @@ func runAgentExecution(args []string) int {
 	service := agentexecution.Service{Runtime: runtime.New(), Executable: exe}
 	var status agentexecution.Status
 	switch sub {
+	case "hold":
+		if *file != "-" {
+			return fail(fmt.Errorf("hold requires --file - and newline-delimited JSON"))
+		}
+		decoder := json.NewDecoder(io.LimitReader(os.Stdin, 200000))
+		var spec agentexecution.Spec
+		if err = decoder.Decode(&spec); err != nil {
+			return fail(err)
+		}
+		runCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+		defer stop()
+		if err = service.HoldNative(runCtx, spec, decoder, os.Stdout); err != nil {
+			return fail(err)
+		}
+		return 0
 	case "launch":
 		if *file == "" {
 			return fail(fmt.Errorf("--file is required"))

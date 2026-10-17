@@ -10,6 +10,7 @@ class Tool:
     handler: Callable[[dict, dict], Awaitable[object]]
     effect: str = "read"
     main: bool = False
+    cancellation_stops_execution: bool = False
 
     def wire(self):
         return {

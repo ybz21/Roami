@@ -85,7 +85,9 @@ class Runtime:
             self.tasks,
             executor,
             verifier,
-            NativeExecutor(lambda *args, **kwargs: self.loop.run(*args, **kwargs)),
+            NativeExecutor(
+                lambda *args, **kwargs: self.loop.run(*args, **kwargs), database, self.settings
+            ),
             self.wakeup,
             self.active,
         )

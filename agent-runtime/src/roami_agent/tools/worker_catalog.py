@@ -1,43 +1,14 @@
 import hashlib
-from pathlib import Path
 
 import httpx
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
-from roami_agent.tools.process import execute
+from roami_agent.tools.shell import register_shell
 
 
 def add_worker_tools(registry, settings):
-    if settings.shell_roots:
-
-        async def shell(args, binding):
-            cwd = Path(args["cwd"]).expanduser().resolve()
-            if not any(cwd == root or root in cwd.parents for root in settings.shell_roots):
-                raise DomainError("WORKSPACE_OUTSIDE_CONFIGURED_ROOTS")
-            return await execute(args["argv"], cwd=cwd, timeout=min(args.get("timeout", 60), 60))
-
-        registry.add(
-            Tool(
-                "shell",
-                "Execute an argv in a configured workspace; no implicit shell.",
-                object_schema(
-                    {
-                        "argv": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                            "maxItems": 100,
-                        },
-                        "cwd": {"type": "string"},
-                        "timeout": {"type": "integer", "minimum": 1, "maximum": 60},
-                    },
-                    ["argv", "cwd"],
-                ),
-                shell,
-                effect="write",
-            )
-        )
+    register_shell(registry, settings)
 
     for name, config in settings.http_tools.items():
 

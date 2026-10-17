@@ -106,6 +106,7 @@ class AgentLoop:
                             "taskId": task_id,
                             "originMessageId": origin["id"] if origin else None,
                             "toolCallId": call["id"],
+                            "workspace": turn.get("workspace"),
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
                         prompt.append(

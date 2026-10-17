@@ -220,7 +220,7 @@ def test_invalid_configuration_fails_before_starting_a_process(config):
         validate_servers({"test": config})
 
 
-@pytest.mark.parametrize("remote, expected", [("echo", "succeeded"), ("failure", "failed")])
+@pytest.mark.parametrize("remote, expected", [("echo", "succeeded"), ("failure", "interrupted")])
 async def test_worker_discovers_calls_and_records_mcp_outcomes(
     store, tmp_path, monkeypatch, remote, expected
 ):

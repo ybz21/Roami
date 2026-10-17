@@ -99,8 +99,12 @@ class ToolGateway:
         except asyncio.CancelledError:
             await self.db.call(
                 lambda db: db.execute(
-                    "UPDATE tool_calls SET state='unknown',updated_ms=? WHERE id=?",
-                    (now_ms(), tool_id),
+                    "UPDATE tool_calls SET state=?,updated_ms=? WHERE id=?",
+                    (
+                        "cancelled" if tool and tool.cancellation_stops_execution else "unknown",
+                        now_ms(),
+                        tool_id,
+                    ),
                 ),
                 write=True,
             )

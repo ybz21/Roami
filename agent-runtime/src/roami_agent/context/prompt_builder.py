@@ -37,7 +37,17 @@ class PromptBuilder:
                 branch_id=turn["branch_id"],
                 through_turn=turn["id"],
             )
-            prompt = [{"role": "system", "content": instructions}] + plan["messages"]
+            workspace = turn.get("workspace")
+            bound = (
+                (
+                    "\nPrepared task workspace (trusted runtime binding): "
+                    + encoded(workspace)
+                    + ". Use this directory for project tools; preserve unrelated local changes."
+                )
+                if workspace
+                else ""
+            )
+            prompt = [{"role": "system", "content": instructions + bound}] + plan["messages"]
             if completion:
                 prompt.append(
                     {

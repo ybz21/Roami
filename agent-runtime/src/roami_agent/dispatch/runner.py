@@ -52,8 +52,11 @@ class TaskDispatcher:
             db.execute(
                 "UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=?", (job["id"],)
             )
-            preparing = run["executor_kind"] == "cli" and getattr(
-                self.executor, "can_reconcile", False
+            preparing = (
+                run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False)
+            ) or (
+                run["executor_kind"] == "native"
+                and getattr(self.native_executor, "requires_workspace", lambda task: False)(task)
             )
             db.execute(
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?",
@@ -122,6 +125,7 @@ class TaskDispatcher:
             if run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False):
                 # The Go runner outlives Python; restart observes the same launch key.
                 raise
+            await self.end_prepared_turn(turn, "interrupted", "TURN_INTERRUPTED")
             current = await self.db.call(
                 lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
             )
@@ -142,11 +146,43 @@ class TaskDispatcher:
                 )
             raise
         except (DomainError, OSError, ValueError, httpx.HTTPError, TimeoutError) as exc:
+            await self.end_prepared_turn(
+                turn, "failed", exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED"
+            )
             result = {
                 "state": "failed",
                 "summary": exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED",
             }
+            if result["summary"] in {
+                "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
+                "NATIVE_WORKSPACE_RELEASE_UNKNOWN",
+                "TOOL_OUTCOME_UNKNOWN",
+                "MCP_OUTCOME_UNKNOWN",
+            }:
+                result.update(outcomeKnown=False, retryable=False)
+                await self.complete(task, run, result, "interrupted", unknown=True)
+                return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
+
+    async def end_prepared_turn(self, turn, state, code):
+        if turn is None:
+            return
+
+        def write(db):
+            changed = db.execute(
+                "UPDATE turns SET state=?,finished_ms=? WHERE id=? AND state='running'",
+                (state, now_ms(), turn["id"]),
+            )
+            if changed.rowcount:
+                event(
+                    db,
+                    turn["conversation_id"],
+                    "turn." + state,
+                    {"turnId": turn["id"], "error": code},
+                    turn_id=turn["id"],
+                )
+
+        await self.db.call(write, write=True)
 
     async def verify(self, job):
         task = await self.db.call(
@@ -224,7 +260,7 @@ class TaskDispatcher:
         )
         await self.complete(task, run, result, state, job_id=job["id"])
 
-    async def complete(self, task, run, result, state, *, job_id=None):
+    async def complete(self, task, run, result, state, *, job_id=None, unknown=False):
         def write(db):
             current = row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
             if current["revision"] != run["task_revision"] or current["state"] in {
@@ -234,6 +270,11 @@ class TaskDispatcher:
                 if job_id:
                     db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
                 return
+            if unknown:
+                db.execute(
+                    "UPDATE task_attempts SET state='unknown',result_json=? WHERE id=? AND task_revision=?",
+                    (encoded(result), run["id"], run["task_revision"]),
+                )
             completion = {"taskId": task["id"], "state": state, "result": result}
             db.execute(
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?", (state, now_ms(), task["id"])
