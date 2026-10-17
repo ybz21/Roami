@@ -41,7 +41,7 @@ const MAX_PRESSES = 8
 export function ComposerPlus({ name, agent, status, uploading, onFiles, onCycleMode, onCommand, onOpenGit, onMouseDown }: {
   /** 会话名：面板要自己回读终端画面，看当前是哪一档、目标跑成什么样 */
   name: string
-  agent?: 'claude' | 'codex'
+  agent?: 'claude' | 'codex' | 'opencode'
   status?: AgentStatus
   uploading?: boolean
   onFiles: () => void

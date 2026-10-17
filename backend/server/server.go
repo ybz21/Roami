@@ -223,8 +223,10 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/sessions/:name/transcript", h.ClaudeTranscript)      // 读 claude 对话记录
 		g.GET("/sessions/:name/codex", h.CodexStatus)                // 检测是否在跑 codex
 		g.GET("/sessions/:name/codex-transcript", h.CodexTranscript) // 读 codex 对话记录
-		g.GET("/sessions/:name/panes/active", h.ActivePane)          // 活动 pane 几何+cwd+前台进程（危险操作目标可视化）
-		g.POST("/sessions/:name/panes/:paneId/close", h.ClosePane)   // 结构化关闭 pane（不走 confirm-before 按键路径）
+		g.GET("/sessions/:name/opencode", h.OpenCodeStatus)
+		g.GET("/sessions/:name/opencode-transcript", h.OpenCodeTranscript)
+		g.GET("/sessions/:name/panes/active", h.ActivePane)        // 活动 pane 几何+cwd+前台进程（危险操作目标可视化）
+		g.POST("/sessions/:name/panes/:paneId/close", h.ClosePane) // 结构化关闭 pane（不走 confirm-before 按键路径）
 
 		g.GET("/tasks", h.Tasks)
 		g.POST("/tasks", h.Spawn)

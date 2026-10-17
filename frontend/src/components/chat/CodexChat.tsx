@@ -26,7 +26,7 @@ export default memo(function CodexChat({ name, file, onOpenFile, onOpenGit, acti
 
   return (
     <ChatShell
-      emptyHint={resolvedFile === '' ? t('chat.noTranscriptYet') : undefined}
+      emptyHint={resolvedFile !== undefined && msgs.length === 0 ? t('chat.noTranscriptYet') : undefined}
       name={name} accent={CODEX_ACCENT} error={err} onOpenFile={onOpenFile} tasks={tasks} status={status} onOpenGit={onOpenGit} lastErrorId={derived.lastErrorId}
       placeholder={t('chat.sendTo', { name: label })} agent="codex"
       messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}

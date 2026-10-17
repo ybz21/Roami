@@ -166,9 +166,9 @@ export type EditParts = { path: string; oldText: string; newText: string; isNew:
 export function editParts(name: string, o: any): EditParts | null {
   if (!o) return null
   const path = s(o.file_path ?? o.path ?? o.notebook_path)
-  const isNew = name === 'Write' || name === 'create_file'
-  const oldText = isNew ? '' : s(o.old_string ?? o.old_str)
-  const newText = isNew ? s(o.content) : s(o.new_string ?? o.new_str ?? o.new_source)
+  const isNew = name === 'Write' || name === 'write' || name === 'create_file'
+  const oldText = isNew ? '' : s(o.old_string ?? o.oldString ?? o.old_str)
+  const newText = isNew ? s(o.content) : s(o.new_string ?? o.newString ?? o.new_str ?? o.new_source)
   if (!path && !oldText && !newText) return null
   return { path, oldText, newText, isNew }
 }
@@ -388,6 +388,15 @@ const TOOLS: Record<string, Renderer> = {
   read_file: read,
   view_image: oneLine(<ImageIcon />, 'accent', ['path', 'url']),
   web_search: web,
+  edit,
+  write: edit,
+  read,
+  grep: search,
+  glob: search,
+  question: ask,
+  execute: command,
+  webfetch: web,
+  subagent,
 }
 
 // ── 路由 ────────────────────────────────────────────────────────────────

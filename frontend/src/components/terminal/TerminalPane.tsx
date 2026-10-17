@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import ClaudeChat from '../chat/ClaudeChat'
 import CodexChat from '../chat/CodexChat'
+import OpenCodeChat from '../chat/OpenCodeChat'
 import FileBrowser from '../files/FileBrowser'
 import { FileView } from '../files/fileview'
 import { FileTypeIcon } from '../files/file-icons'
@@ -56,6 +57,7 @@ export default function TerminalPane(props: {
   sendKey: (seq: string) => void; onCollapse?: () => void
   claudeMap: Record<string, ClaudeInfo>; claudeView: Record<string, boolean>; setClaudeView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   codexMap: Record<string, ClaudeInfo>; codexView: Record<string, boolean>; setCodexView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
+  openCodeMap: Record<string, ClaudeInfo>; openCodeView: Record<string, boolean>; setOpenCodeView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   agentKinds: Record<string, AgentKind>
   onRename: (oldName: string, newName: string) => void
   /** 标签拖拽排序；不传就不可拖（独立单终端页没有多标签） */
@@ -89,7 +91,7 @@ export default function TerminalPane(props: {
   /** 从对话里点「path:line」跳过来要定位到那一行；nonce 让同一处点第二次也响 */
   reveal?: { path: string; line: number; nonce: number }
 }) {
-  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
   const activeLabel = useSessionLabel(active)
   const opaqueLabel = !!activeProject && (activeLabel === active || /^\d{4}-\d{4}-\d{4}-\d{4}(?:-[a-z0-9]+)?$/i.test(activeLabel))
@@ -199,7 +201,9 @@ export default function TerminalPane(props: {
     (claudeMap[name]?.running || (isPhone && !claudeMap[name] && agentKinds[name] === 'claude'))
   const showCodexChat = (name: string) => (codexView[name] === true || (isPhone && codexView[name] !== false)) &&
     (codexMap[name]?.running || (isPhone && !codexMap[name] && agentKinds[name] === 'codex'))
-  const inChat = !!active && !!(showClaudeChat(active) || showCodexChat(active))
+  const showOpenCodeChat = (name: string) => (openCodeView[name] === true || (isPhone && openCodeView[name] !== false)) &&
+    (openCodeMap[name]?.running || (isPhone && !openCodeMap[name] && agentKinds[name] === 'opencode'))
+  const inChat = !!active && !!(showClaudeChat(active) || showCodexChat(active) || showOpenCodeChat(active))
   const sendRaw = (s: string) => { if (active) termRefs.current[active]?.send(s, true) } // keepFocus：不抢 xterm 焦点 → 软键盘不收起
   // 滚上去看历史会让 tmux 进 copy-mode，此时输入被它截走（要先按「底」才生效）。
   // 发送前先回到底部退出 copy-mode，省去手动按「底」。
@@ -997,6 +1001,9 @@ export default function TerminalPane(props: {
         {active && codexMap[active]?.running && <SheetRow icon={<AgentLogo kind="codex" size={20} />} title="Codex"
           desc={t(codexView[active] ? 'common.on' : 'common.off')}
           onClick={() => { setMoreSheet(false); setCodexView((v) => ({ ...v, [active]: !v[active] })) }} />}
+        {active && openCodeMap[active]?.running && <SheetRow icon={<AgentLogo kind="opencode" size={20} />} title={t('chat.agentOpenCode')}
+          desc={t(openCodeView[active] ? 'common.on' : 'common.off')}
+          onClick={() => { setMoreSheet(false); setOpenCodeView((v) => ({ ...v, [active]: !v[active] })) }} />}
         <SheetRow icon={TI.rename} title={t('session.rename')} onClick={() => { setMoreSheet(false); active && setRenameSession(active) }} />
         <SheetRow icon={TI.newTab} title={t('terminal.newTab')}
           onClick={() => { setMoreSheet(false); active && window.open(`/#/term/${encodeURIComponent(active)}`, '_blank') }} />
@@ -1066,6 +1073,10 @@ export default function TerminalPane(props: {
       {active && codexMap[active]?.running && (
         <TBtn icon={<AgentLogo kind="codex" size={14} />} label="Codex" on={!!codexView[active]}
           title={t('chat.switchToCodex')} onClick={() => setCodexView((v) => ({ ...v, [active!]: !v[active!] }))} />
+      )}
+      {active && openCodeMap[active]?.running && (
+        <TBtn icon={<AgentLogo kind="opencode" size={14} />} label="OpenCode" on={!!openCodeView[active]}
+          title={t('chat.switchToOpenCode')} onClick={() => setOpenCodeView((v) => ({ ...v, [active!]: !v[active!] }))} />
       )}
     </>
   )
@@ -1190,8 +1201,13 @@ export default function TerminalPane(props: {
                 <CodexChat name={termName} file={codexMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>
             )}
+            {showOpenCodeChat(termName) && (
+              <div style={{ position: 'absolute', inset: 0 }}>
+                <OpenCodeChat name={termName} file={openCodeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+              </div>
+            )}
             {/* 悬浮话筒只留给手机：桌面的在工具条上（重命名旁边） */}
-            {showVoice && isPhone && !claudeView[termName] && !codexView[termName] && (
+            {showVoice && isPhone && !claudeView[termName] && !codexView[termName] && !openCodeView[termName] && (
               <VoiceInput accent="var(--accent)" onResult={(text) => { api('POST', `/sessions/${encodeURIComponent(termName)}/type`, { text }).catch((e: any) => message.error(e.message)) }} />
             )}
           </div>

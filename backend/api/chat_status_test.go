@@ -181,6 +181,78 @@ func TestPickCodexRolloutResumedInWorktree(t *testing.T) {
 	}
 }
 
+func TestPickCodexRolloutResumedOldThreadOverStartupFile(t *testing.T) {
+	dir := t.TempDir()
+	started := time.Date(2026, 10, 15, 15, 42, 0, 0, time.UTC)
+	makeRollout := func(name, created string, modified time.Time) string {
+		p := filepath.Join(dir, name+".jsonl")
+		line := `{"type":"session_meta","payload":{"cwd":"/repo","timestamp":"` + created + `"}}` + "\n"
+		if err := os.WriteFile(p, []byte(line), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, modified, modified); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	startup := makeRollout("startup", "2026-10-15T15:42:01Z", started.Add(time.Minute))
+	resumed := makeRollout("resumed", "2026-10-08T15:23:34Z", started.Add(time.Hour))
+	if got := pickCodexRollout([]string{resumed, startup}, "/repo", "", started); got != resumed {
+		t.Fatalf("selected %q, want resumed thread", got)
+	}
+}
+
+func TestPickCodexRolloutFromVisibleHistory(t *testing.T) {
+	dir := t.TempDir()
+	started := time.Date(2026, 10, 15, 15, 44, 0, 0, time.UTC)
+	startup := filepath.Join(dir, "startup.jsonl")
+	old := filepath.Join(dir, "old.jsonl")
+	meta := func(at string) string {
+		return `{"type":"session_meta","payload":{"cwd":"/repo","timestamp":"` + at + `"}}` + "\n"
+	}
+	if err := os.WriteFile(startup, []byte(meta("2026-10-15T15:44:01Z")+`{"type":"event_msg","payload":{"type":"thread_settings_applied"}}`+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte(meta("2026-10-08T20:06:15Z")+`{"type":"event_msg","payload":{"type":"task_started"}}`+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(startup, started.Add(time.Minute), started.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(old, started.Add(time.Minute+2*time.Second), started.Add(time.Minute+2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	files := []string{old, startup}
+	if got := pickCodexRolloutWithHistory(files, "/repo", "", started, true); got != old {
+		t.Fatalf("visible history selected %q", got)
+	}
+	if got := pickCodexRolloutWithHistory(files, "/repo", "", started, false); got != startup {
+		t.Fatalf("empty screen selected %q", got)
+	}
+}
+
+func TestPickCodexRolloutKeepsVisibleDirectory(t *testing.T) {
+	dir := t.TempDir()
+	started := time.Date(2026, 10, 15, 15, 46, 0, 0, time.UTC)
+	makeRollout := func(name, cwd string, modified time.Time) string {
+		p := filepath.Join(dir, name+".jsonl")
+		body := `{"type":"session_meta","payload":{"cwd":"` + cwd + `","timestamp":"2026-10-08T16:20:29Z"}}` + "\n" +
+			`{"type":"event_msg","payload":{"type":"task_started"}}` + "\n"
+		if err := os.WriteFile(p, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, modified, modified); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	exact := makeRollout("weekly", "/repo", started.Add(time.Minute))
+	worktree := makeRollout("connector", "/repo/.worktrees/connector", started.Add(time.Hour))
+	if got := pickCodexRolloutWithHistory([]string{worktree, exact}, "/repo", "", started, true); got != exact {
+		t.Fatalf("selected another pane's worktree %q", got)
+	}
+}
+
 func TestClipUsesSentinel(t *testing.T) {
 	long := make([]byte, blockCap+10)
 	for i := range long {

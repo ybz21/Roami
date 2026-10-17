@@ -709,6 +709,8 @@ const zhCN = {
   'chat.fileManager': '文件管理',
   'chat.switchToClaude': '切换到 Claude Code 对话界面',
   'chat.switchToCodex': '切换到 Codex 对话界面',
+  'chat.switchToOpenCode': '切换到 OpenCode 对话界面',
+  'chat.agentOpenCode': 'OpenCode',
   'chat.generating': '正在生成',
   'chat.cwdMissing': '无法定位工作目录',
   'chat.uploadedFiles': '已上传 {count} 个文件到 {dir}',

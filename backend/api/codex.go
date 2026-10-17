@@ -111,7 +111,7 @@ func codexResumeID(argv []string) string {
 }
 
 // Codex 可以在同一目录开多个会话；按 cwd 取最新会把旧会话的模型和消息串到新会话。
-func codexRollout(cwd string, pid int) string {
+func codexRollout(cwd string, pid int, capture string) string {
 	files := listRollouts()
 	if len(files) == 0 {
 		return ""
@@ -124,14 +124,83 @@ func codexRollout(cwd string, pid int) string {
 			started = info.ModTime()
 		}
 	}
-	return pickCodexRollout(files, cwd, resumeID, started)
+	return pickCodexRolloutWithHistory(files, cwd, resumeID, started, strings.Contains(capture, "Worked for "))
 }
 
 func pickCodexRollout(files []string, cwd, resumeID string, started time.Time) string {
+	return pickCodexRolloutWithHistory(files, cwd, resumeID, started, false)
+}
+
+func rolloutHasConversation(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1024*1024), 8*1024*1024)
+	for i := 0; i < 16 && sc.Scan(); i++ {
+		var line struct {
+			Type    string `json:"type"`
+			Payload struct {
+				Type string `json:"type"`
+			} `json:"payload"`
+		}
+		if json.Unmarshal(sc.Bytes(), &line) == nil && (line.Type == "response_item" || (line.Type == "event_msg" && line.Payload.Type == "task_started")) {
+			return true
+		}
+	}
+	return false
+}
+
+func pickCodexRolloutWithHistory(files []string, cwd, resumeID string, started time.Time, hasHistory bool) string {
 	if resumeID != "" {
 		for _, p := range files {
 			if strings.HasSuffix(p, "-"+resumeID+".jsonl") {
 				return p
+			}
+		}
+	}
+	if hasHistory {
+		var exact, descendants []string
+		for i, p := range files {
+			if i >= 200 {
+				break
+			}
+			dir, _ := rolloutMeta(p)
+			if dir != cwd && !strings.HasPrefix(filepath.Clean(dir)+string(filepath.Separator), filepath.Clean(cwd)+string(filepath.Separator)) {
+				continue
+			}
+			if !rolloutHasConversation(p) {
+				continue
+			}
+			if dir == cwd {
+				exact = append(exact, p)
+			} else {
+				descendants = append(descendants, p)
+			}
+		}
+		candidates := exact
+		if len(candidates) == 0 {
+			candidates = descendants
+		}
+		var recent []string
+		for _, p := range candidates {
+			if info, err := os.Stat(p); err == nil && (started.IsZero() || !info.ModTime().Before(started.Add(-2*time.Minute))) {
+				recent = append(recent, p)
+			}
+		}
+		if len(recent) == 1 {
+			return recent[0]
+		}
+		if len(recent) == 0 && len(candidates) == 1 {
+			return candidates[0]
+		}
+		if len(recent) > 1 {
+			first, e1 := os.Stat(recent[0])
+			second, e2 := os.Stat(recent[1])
+			if e1 == nil && e2 == nil && first.ModTime().After(second.ModTime().Add(10*time.Second)) {
+				return recent[0]
 			}
 		}
 	}
@@ -157,39 +226,65 @@ func pickCodexRollout(files []string, cwd, resumeID string, started time.Time) s
 			}
 		}
 	}
+	active, ambiguous := freshestCodexRollout(files, cwd, started)
 	if best != "" {
+		if active != "" && active != best {
+			current, e1 := os.Stat(active)
+			startup, e2 := os.Stat(best)
+			// An old thread resumed from the TUI keeps its original creation time.
+			// Prefer it once it has clearly received newer output than the empty startup rollout.
+			if e1 == nil && e2 == nil && current.ModTime().After(startup.ModTime().Add(10*time.Second)) {
+				return active
+			}
+		}
 		return best
 	}
 	if !started.IsZero() {
-		// A resumed thread keeps its original creation time, and Codex may have moved
-		// from the pane directory into a worktree. Only accept a unique rollout
-		// written since this process started; otherwise ownership is ambiguous.
-		active := ""
-		for i, p := range files {
-			if i >= 200 {
-				break
-			}
-			dir, _ := rolloutMeta(p)
-			if dir != cwd && !strings.HasPrefix(filepath.Clean(dir)+string(filepath.Separator), filepath.Clean(cwd)+string(filepath.Separator)) {
-				continue
-			}
-			info, err := os.Stat(p)
-			if err != nil || info.ModTime().Before(started.Add(-2*time.Minute)) {
-				continue
-			}
-			if active != "" {
-				return ""
-			}
-			active = p
-		}
 		if active != "" {
 			return active
+		}
+		if ambiguous {
+			return ""
 		}
 	}
 	if matches == 1 || started.IsZero() {
 		return newest
 	}
 	return ""
+}
+
+func freshestCodexRollout(files []string, cwd string, started time.Time) (string, bool) {
+	if started.IsZero() {
+		return "", false
+	}
+	var freshest, second string
+	var newest, runnerUp time.Time
+	for i, p := range files {
+		if i >= 200 {
+			break
+		}
+		dir, _ := rolloutMeta(p)
+		if dir != cwd && !strings.HasPrefix(filepath.Clean(dir)+string(filepath.Separator), filepath.Clean(cwd)+string(filepath.Separator)) {
+			continue
+		}
+		info, err := os.Stat(p)
+		if err != nil || info.ModTime().Before(started.Add(-2*time.Minute)) {
+			continue
+		}
+		if info.ModTime().After(newest) {
+			second, runnerUp = freshest, newest
+			freshest, newest = p, info.ModTime()
+		} else if info.ModTime().After(runnerUp) {
+			second, runnerUp = p, info.ModTime()
+		}
+	}
+	if freshest == "" {
+		return "", false
+	}
+	if second != "" && !newest.After(runnerUp.Add(10*time.Second)) {
+		return "", true
+	}
+	return freshest, false
 }
 
 // CodexStatus GET /sessions/:name/codex —— 检测会话是否在跑 codex，并定位其 rollout。
@@ -216,7 +311,9 @@ func (a *API) CodexStatus(c *gin.Context) {
 		}
 		if codexPID := treeFind(pid, children, 0, cmdlineHasCodex); codexPID != 0 {
 			dir := parts[1]
-			c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": codexRollout(dir, codexPID)}})
+			capture := sessionCapture(name, 80)
+			dir = paneWorktreeDir(dir, capture)
+			c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": codexRollout(dir, codexPID, capture)}})
 			return
 		}
 	}
@@ -440,8 +537,10 @@ func scanCodexStatus(line string, st cStatus, quota *float64) cStatus {
 func (a *API) CodexTranscript(c *gin.Context) {
 	file := c.Query("file")
 	if file == "" {
-		if dir, pid := paneToolProc(a.sessionTarget(c), cmdlineHasCodex); dir != "" {
-			file = codexRollout(dir, pid)
+		name := a.sessionTarget(c)
+		if dir, pid := paneToolProc(name, cmdlineHasCodex); dir != "" {
+			capture := sessionCapture(name, 80)
+			file = codexRollout(paneWorktreeDir(dir, capture), pid, capture)
 		}
 	}
 	// 同 ClaudeTranscript：还没有 rollout 文件＝agent 刚起，不是坏请求。

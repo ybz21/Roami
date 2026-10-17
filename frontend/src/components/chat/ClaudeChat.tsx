@@ -26,7 +26,7 @@ export default memo(function ClaudeChat({ name, file, onOpenFile, onOpenGit, act
 
   return (
     <ChatShell
-      emptyHint={resolvedFile === '' ? t('chat.noTranscriptYet') : undefined}
+      emptyHint={resolvedFile !== undefined && msgs.length === 0 ? t('chat.noTranscriptYet') : undefined}
       name={name} accent="var(--accent)" error={err} onOpenFile={onOpenFile} tasks={tasks} status={status} onOpenGit={onOpenGit} lastErrorId={derived.lastErrorId}
       placeholder={t('chat.sendTo', { name: label })} agent="claude"
       messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}

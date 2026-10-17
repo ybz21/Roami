@@ -427,6 +427,8 @@ export default function App() {
   const [claudeView, setClaudeView] = useState<Record<string, boolean>>({})
   const [codexMap, setCodexMap] = useState<Record<string, ClaudeInfo>>({})
   const [codexView, setCodexView] = useState<Record<string, boolean>>({})
+  const [openCodeMap, setOpenCodeMap] = useState<Record<string, ClaudeInfo>>({})
+  const [openCodeView, setOpenCodeView] = useState<Record<string, boolean>>({})
 
   // 一条轮询喂两件事（15s）：
   //   ① 导航 badge 的跨项目待收尾数（14 §4.4）
@@ -774,6 +776,12 @@ export default function App() {
         setCodexMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
         if (isMobile && r.data?.running) setCodexView((v) => (n in v ? v : { ...v, [n]: true }))
       } catch {}
+      try {
+        const r = await api('GET', `/sessions/${encodeURIComponent(n)}/opencode`)
+        if (stop) return
+        setOpenCodeMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
+        if (isMobile && r.data?.running) setOpenCodeView((v) => (n in v ? v : { ...v, [n]: true }))
+      } catch {}
     })
     check()
     const t = setInterval(check, 5000)
@@ -907,6 +915,16 @@ export default function App() {
       const { [oldName]: oldValue, ...rest } = m
       return { ...rest, [newName]: oldValue }
     })
+    setOpenCodeMap((m) => {
+      if (!(oldName in m)) return m
+      const { [oldName]: oldValue, ...rest } = m
+      return { ...rest, [newName]: oldValue }
+    })
+    setOpenCodeView((m) => {
+      if (!(oldName in m)) return m
+      const { [oldName]: oldValue, ...rest } = m
+      return { ...rest, [newName]: oldValue }
+    })
     if (termRefs.current[oldName]) {
       termRefs.current[newName] = termRefs.current[oldName]
       delete termRefs.current[oldName]
@@ -982,6 +1000,7 @@ export default function App() {
       termRefs={termRefs} sendKey={sendKey}
       claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
       codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}
+      openCodeMap={openCodeMap} openCodeView={openCodeView} setOpenCodeView={setOpenCodeView}
       agentKinds={agentKinds}
       onRename={renameOpenTerm}
       // 任务视图里没有「收起」：中间整块就是它，收起等于回项目页——点导航去

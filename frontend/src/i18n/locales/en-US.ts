@@ -709,6 +709,8 @@ const enUS = {
   'chat.fileManager': 'File manager',
   'chat.switchToClaude': 'Switch to Claude Code chat view',
   'chat.switchToCodex': 'Switch to Codex chat view',
+  'chat.switchToOpenCode': 'Switch to OpenCode chat view',
+  'chat.agentOpenCode': 'OpenCode',
   'chat.generating': 'Generating',
   'chat.cwdMissing': 'Could not locate working directory',
   'chat.uploadedFiles': 'Uploaded {count} file(s) to {dir}',

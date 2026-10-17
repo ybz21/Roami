@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { commandFromRaw, extractCommand, toolStatus } from './tool-render'
+import { commandFromRaw, editParts, extractCommand, toolStatus } from './tool-render'
 import { shortPath } from './tool-parts'
 import type { Block } from './types'
 
 const result = (text: string, isError = false): Block => ({ kind: 'tool_result', text, isError })
+
+it('OpenCode edit 的 camelCase 入参能画出前后差异', () => {
+  expect(editParts('edit', { path: 'src/a.ts', oldString: 'before', newString: 'after' })).toEqual({
+    path: 'src/a.ts', oldText: 'before', newText: 'after', isNew: false,
+  })
+})
 
 describe('extractCommand', () => {
   it('Claude 的字符串命令原样返回', () => {

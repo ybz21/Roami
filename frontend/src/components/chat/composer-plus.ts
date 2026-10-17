@@ -43,7 +43,7 @@ export function modeFromPane(text: string): string | undefined {
  * 而不是「没读到」。Claude 每一档都画，读不出就是真读不出（页脚正在重画），
  * 这时候宁可交回转录那份，也不要猜。
  */
-export function paneMode(text: string, agent?: 'claude' | 'codex'): string | undefined {
+export function paneMode(text: string, agent?: 'claude' | 'codex' | 'opencode'): string | undefined {
   if (!String(text).trim()) return undefined
   return modeFromPane(text) || (agent === 'codex' ? 'default' : undefined)
 }
@@ -70,7 +70,7 @@ export function goalFromPane(text: string): GoalState | undefined {
  *
  * Codex 的 Shift+Tab 只在「计划 ↔ 默认」之间倒，沙箱与审批策略是另一件事，走 /approvals。
  */
-export function modeChoices(agent?: 'claude' | 'codex', current?: string): string[] {
+export function modeChoices(agent?: 'claude' | 'codex' | 'opencode', current?: string): string[] {
   const base = agent === 'codex' ? ['plan', 'default'] : ['plan', 'manual', 'auto', 'acceptEdits']
   // 当前这档必须在列——老版本 Claude 报 default，新版本报 auto，谁都不该从列表里消失
   return current && !base.includes(current) ? [current, ...base] : base
@@ -105,7 +105,7 @@ function ctxColor(percent: number): string | undefined {
 
 export function plusGroups(o: {
   /** 没有 agent（纯终端会话）时整组「这一轮怎么干」不出现：那几条都是发给 agent 的 */
-  agent?: 'claude' | 'codex'
+  agent?: 'claude' | 'codex' | 'opencode'
   status?: AgentStatus
   /** 从终端画面读到的当前权限档；有就盖过转录那份（转录要下一轮才更新） */
   mode?: AgentStatus['mode']
@@ -128,7 +128,7 @@ export function plusGroups(o: {
     // 认不出的模式 id 原样显示：新模式先出现在 CLI 里是常态，不该把 key 画到面板上
     const mode = o.mode ?? status?.mode
     const label = mode ? t(modeKey(mode.id)) : ''
-    rows.push({
+    if (o.agent !== 'opencode') rows.push({
       id: 'mode',
       value: o.modePending ? t('chat.plus.modeWaiting') : mode ? (label.startsWith('chat.mode.') ? mode.id : label) : undefined,
       dot: mode && !o.modePending ? MODE_COLOR[mode.tone] : undefined,
@@ -159,7 +159,7 @@ export function plusGroups(o: {
   }
 
   // 「顺手让它做」：不是设置，是当场派一件活。/review 两端都有
-  if (o.agent) groups.push({ id: 'do', rows: [{ id: 'review' }] })
+  if (o.agent && o.agent !== 'opencode') groups.push({ id: 'do', rows: [{ id: 'review' }] })
 
   if (o.canGit) groups.push({ id: 'goto', rows: [{ id: 'git' }] })
   return groups

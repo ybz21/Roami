@@ -17,7 +17,7 @@ import { MentionedImage } from './MentionedImage'
 
 export const CODEX_ACCENT = 'var(--accent)'
 
-export type Side = 'claude' | 'codex'
+export type Side = 'claude' | 'codex' | 'opencode'
 
 // 后端对 redacted_thinking 只能给个占位；文案在前端出，后端不写死中文（见 backend/api/claude.go）
 const REDACTED_THINKING = '[redacted_thinking]'
@@ -72,7 +72,7 @@ function Footer({ m, align }: { m: Msg; align: 'flex-start' | 'flex-end' }) {
 
 function Prose({ blocks, accent, side }: { blocks: Block[]; accent: string; side: Side }) {
   const { t } = useI18n()
-  const thinkLabel = side === 'codex' ? t('chat.reasoning') : t('chat.thinking')
+  const thinkLabel = side === 'claude' ? t('chat.thinking') : t('chat.reasoning')
   return (
     <>
       {blocks.map((b, i) => {

@@ -24,6 +24,7 @@ export function useTranscript(name: string, file: string | undefined, path: stri
   const [refreshKey, setRefreshKey] = useState(0)
   // 还有更早的没取：后端截过头才为真。前端不再自己算「隐藏了几条」——它手里根本没有全量。
   const [hasEarlier, setHasEarlier] = useState(false)
+  const [serverPending, setServerPending] = useState<boolean | undefined>(undefined)
   const [tail, setTail] = useState(FIRST_PAGE)
   const refresh = useCallback(() => setRefreshKey((n) => n + 1), [])
   // 间隔走 ref：后台会话把间隔放宽时不能重启 effect——重启等于清空重拉整个首屏
@@ -36,7 +37,7 @@ export function useTranscript(name: string, file: string | undefined, path: stri
     let offset = 0
     let f = file
     let lastFile = file || ''
-    setMsgs([]); setErr(''); setStatus({}); setResolvedFile(undefined)
+    setMsgs([]); setErr(''); setStatus({}); setResolvedFile(undefined); setServerPending(undefined)
     const poll = async () => {
       try {
         // boff=1：告诉后端这个 offset 是字节偏移（升级前的页面不会带，后端据此重新锚定）
@@ -65,7 +66,23 @@ export function useTranscript(name: string, file: string | undefined, path: stri
           setStatus((prev) => mergeStatus(prev, d.status, d.quota))
         }
         if (typeof d.truncated === 'boolean') setHasEarlier(d.truncated)
-        if (d.messages?.length) { setMsgs((m) => [...m, ...d.messages]); offset = d.nextOffset }
+        if (typeof d.pending === 'boolean') setServerPending(d.pending)
+        if (d.messages?.length) {
+          setMsgs((m) => {
+            if (path !== 'opencode-transcript') return [...m, ...d.messages]
+            const ids = new Map<string, number>()
+            const merged = [...m]
+            let changed = false
+            merged.forEach((item, i) => { if (item.id) ids.set(item.id, i) })
+            for (const item of d.messages as Msg[]) {
+              const at = item.id ? ids.get(item.id) : undefined
+              if (at === undefined) { if (item.id) ids.set(item.id, merged.length); merged.push(item); changed = true }
+              else if (JSON.stringify(merged[at]) !== JSON.stringify(item)) { merged[at] = item; changed = true }
+            }
+            return changed ? merged : m
+          })
+          offset = d.nextOffset
+        }
         else if (typeof d.nextOffset === 'number') offset = d.nextOffset
       } catch (e: any) { if (!stop) setErr(e.message) }
     }
@@ -78,7 +95,7 @@ export function useTranscript(name: string, file: string | undefined, path: stri
     return () => { stop = true; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, file, path, refreshKey, tail])
-  return { msgs, err, refresh, status, hasEarlier, loadEarlier, resolvedFile }
+  return { msgs, err, refresh, status, hasEarlier, loadEarlier, resolvedFile, serverPending }
 }
 
 // 只有非空字段才覆盖：后端每轮只回它这次扫到的东西，缺的字段不该把已知值抹掉。
@@ -102,7 +119,6 @@ export function pairToolResults(msgs: Msg[]): { results: Record<string, Block>; 
   const consumed = new Set<string>()
   for (const m of msgs) for (const b of m.blocks) if (b.kind === 'tool_use' && b.id && results[b.id]) consumed.add(b.id)
   const view = msgs.map((m) => {
-    if (m.role !== 'tool') return m
     const blocks = m.blocks.filter((b) => !(b.kind === 'tool_result' && b.toolUseId && consumed.has(b.toolUseId)))
     return { ...m, blocks }
   }).filter((m) => m.blocks.length > 0)

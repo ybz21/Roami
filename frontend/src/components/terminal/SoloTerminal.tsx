@@ -20,6 +20,8 @@ export default function SoloTerminal({ name }: { name: string }) {
   const [claudeView, setClaudeView] = useState<Record<string, boolean>>({})
   const [codexMap, setCodexMap] = useState<Record<string, ClaudeInfo>>({})
   const [codexView, setCodexView] = useState<Record<string, boolean>>({})
+  const [openCodeMap, setOpenCodeMap] = useState<Record<string, ClaudeInfo>>({})
+  const [openCodeView, setOpenCodeView] = useState<Record<string, boolean>>({})
   const termRefs = useRef<Record<string, TermHandle | null>>({})
   const label = useSessionLabel(name)
 
@@ -44,6 +46,12 @@ export default function SoloTerminal({ name }: { name: string }) {
         if (stop) return
         setCodexMap((m) => ({ ...m, [name]: r.data }))
         if (phone && r.data?.running) setCodexView((v) => (name in v ? v : { ...v, [name]: true }))
+      } catch {}
+      try {
+        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/opencode`)
+        if (stop) return
+        setOpenCodeMap((m) => ({ ...m, [name]: r.data }))
+        if (phone && r.data?.running) setOpenCodeView((v) => (name in v ? v : { ...v, [name]: true }))
       } catch {}
     }
     check()
@@ -70,6 +78,7 @@ export default function SoloTerminal({ name }: { name: string }) {
         termRefs={termRefs} sendKey={(seq) => termRefs.current[name]?.send(seq)}
         claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
         codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}
+        openCodeMap={openCodeMap} openCodeView={openCodeView} setOpenCodeView={setOpenCodeView}
         agentKinds={agentKinds}
         onRename={(_, newName) => { location.hash = '#/term/' + encodeURIComponent(newName) }}
         fileDock="left"
