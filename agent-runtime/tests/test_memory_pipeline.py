@@ -688,3 +688,72 @@ async def test_explicit_relearning_requires_a_new_source_and_version(store):
         "messageId"
     ]
     assert await store.call(lambda db: row(db, "SELECT * FROM memory_tombstones"))
+
+
+async def test_forgetting_during_model_stream_prevents_new_task_tool(store):
+    class PausedRecall:
+        model = "paused-memory-recall"
+
+        def __init__(self):
+            self.started, self.release = asyncio.Event(), asyncio.Event()
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                self.started.set()
+                await self.release.wait()
+                name, args = "delegate", {"goal": "repeat private origin"}
+            elif messages[-1]["content"] == "recall":
+                name, args = "memory_get", {"memoryId": saved["id"]}
+            else:
+                yield ModelEvent("text", "acknowledged")
+                return
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": name + "-call",
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(args)},
+                },
+            )
+
+    model = PausedRecall()
+    runtime = Runtime(store, model, memory_model=ConversationModel())
+    _, receipt, _ = await source(store, text="private origin")
+    saved = await runtime.memory.save("alice", "private", "private origin", receipt["messageId"])
+    target = await runtime.conversations.create("alice")
+    await runtime.start()
+    try:
+        reply = await runtime.chat.submit("alice", target["id"], "recall", "recall")
+        await asyncio.wait_for(model.started.wait(), 3)
+        await runtime.memory.forget("alice", saved["id"])
+        model.release.set()
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='failed'", (reply["turnId"],)
+            ),
+        )
+        assert await runtime.tasks.list("alice") == []
+        assert "private origin" not in json.dumps(
+            (await runtime.context.project("alice", target["id"]))["messages"]
+        )
+    finally:
+        await runtime.close()
+
+
+async def test_forget_between_manifest_and_assistant_admission_is_rejected(store):
+    runtime = Runtime(store, ConversationModel())
+    c, receipt, _ = await source(store, text="private source")
+    saved = await runtime.memory.save("alice", "private", "private source", receipt["messageId"])
+    turn = await store.call(
+        lambda db: dict(
+            row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],)), owner_id="alice"
+        )
+    )
+    plan = await runtime.context.project("alice", c["id"])
+    await runtime.manifests.record(turn, 1, "fixture", "wire", plan, [], "main")
+    await runtime.memory.forget("alice", saved["id"])
+    with pytest.raises(DomainError, match="CONTEXT_SOURCE_FORGOTTEN"):
+        await runtime.journal.start(turn)
+    assert len((await runtime.conversations.messages("alice", c["id"]))["messages"]) == 1
+    await runtime.close()

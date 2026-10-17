@@ -9,6 +9,7 @@ import httpx
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row
 from roami_agent.storage.transcript_repository import message
 
@@ -23,8 +24,10 @@ class ToolGateway:
         except (DomainError, KeyError, TypeError):
             tool, args = None, {}
         tool_id = identity()
-        await self.db.call(
-            lambda db: db.execute(
+
+        def plan(db):
+            assert_context_admitted(db, turn)
+            db.execute(
                 "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,created_ms,updated_ms) "
                 "VALUES(?,?,?,?,?,?,'planned',?,?,?)",
                 (
@@ -38,9 +41,9 @@ class ToolGateway:
                     now_ms(),
                     now_ms(),
                 ),
-            ),
-            write=True,
-        )
+            )
+
+        await self.db.call(plan, write=True)
         try:
             await self.db.call(
                 lambda db: db.execute(

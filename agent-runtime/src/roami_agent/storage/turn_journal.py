@@ -2,6 +2,7 @@
 
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.transcript_repository import message
 
@@ -21,6 +22,7 @@ class TurnJournal:
 
     async def start(self, turn):
         def write(db):
+            assert_context_admitted(db, turn)
             mid = message(
                 db,
                 turn["conversation_id"],
