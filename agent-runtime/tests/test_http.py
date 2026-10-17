@@ -5,9 +5,9 @@ import httpx
 import uvicorn
 from test_runtime import ConversationModel, until
 
-from roami_agent.runtime import Runtime
-from roami_agent.server import create_app
-from roami_agent.storage import row
+from roami_agent.app import Runtime
+from roami_agent.server.http import create_app
+from roami_agent.storage.database import row
 
 
 async def test_http_owner_scope_slash_commands_and_task_intent(store):

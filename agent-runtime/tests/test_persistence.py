@@ -5,10 +5,12 @@ import os
 
 import pytest
 
-from roami_agent.conversation import Conversations, message
-from roami_agent.memory import Memories
-from roami_agent.notifications import Notifications
-from roami_agent.storage import Database, DomainError, row
+from roami_agent.conversation.transcript import Conversations
+from roami_agent.memory.records import Memories
+from roami_agent.protocol.errors import DomainError
+from roami_agent.replies.notifications import Notifications
+from roami_agent.storage.database import Database, row
+from roami_agent.storage.transcript_repository import message
 
 
 async def test_intake_retry_conflict_owner_and_restart(store):
@@ -261,7 +263,7 @@ async def test_unread_count_is_not_limited_by_inbox_page_and_delivery_is_atomic(
 
 
 async def test_conversation_creation_retry_and_worker_history_scope(store):
-    from roami_agent.tasks import Tasks
+    from roami_agent.dispatch.tasks import Tasks
 
     conversations = Conversations(store)
     first = await conversations.create("alice", request_key="new-chat")

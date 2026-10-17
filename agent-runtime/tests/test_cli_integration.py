@@ -235,11 +235,11 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
             )
         assert calls.read_text().splitlines() == ["codex", "claude"]
 
-        from roami_agent.coding_executor import CodingExecutor
-        from roami_agent.configuration import Settings
-        from roami_agent.providers import ModelEvent
-        from roami_agent.runtime import Runtime
-        from roami_agent.storage import row
+        from roami_agent.app import Runtime
+        from roami_agent.executors.roami_cli import CodingExecutor
+        from roami_agent.protocol.models import ModelEvent
+        from roami_agent.server.configuration import Settings
+        from roami_agent.storage.database import row
 
         for name, value in env.items():
             monkeypatch.setenv(name, value)

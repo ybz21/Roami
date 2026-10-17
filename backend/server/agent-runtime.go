@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/backend/agentproxy"
 	"github.com/ybz21/Roami/backend/config"
 	"github.com/ybz21/Roami/internal/agentruntime"
 )
@@ -21,7 +22,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 				c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "AGENT_RUNTIME_UNAVAILABLE"}})
 				return
 			}
-			handler = agentruntime.Proxy(paths.Socket)
+			handler = agentproxy.Proxy(paths.Socket)
 		}
 		h := handler
 		mu.Unlock()

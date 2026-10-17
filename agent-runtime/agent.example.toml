@@ -19,3 +19,21 @@ timeout_seconds = 120
 # This validates working directories; it is not an OS filesystem sandbox.
 shell_roots = []
 skill_roots = []
+
+# MCP tools are discovered lazily by Workers; Main keeps its short tool catalog.
+# [tools.mcp.docs]
+# transport = "stdio"
+# command = "python"
+# args = ["/absolute/path/to/mcp_server.py"]
+# timeout_seconds = 30
+# read_only = ["search"] # unlisted tools conservatively count as writes
+# [tools.mcp.docs.env_env]
+# SERVICE_API_KEY = "DOCS_API_KEY" # child variable -> runtime environment variable
+
+# [tools.mcp.remote]
+# transport = "streamable_http"
+# url = "https://mcp.example.com/mcp"
+# key_env = "MCP_API_KEY"
+# read_only = ["search"]
+# [tools.mcp.remote.header_env]
+# X-Service-Token = "MCP_SERVICE_TOKEN"

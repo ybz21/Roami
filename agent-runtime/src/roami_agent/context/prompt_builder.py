@@ -1,0 +1,59 @@
+"""Context projection and automatic compaction before model admission."""
+
+import asyncio
+
+from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.database import row
+
+
+class PromptBuilder:
+    def __init__(self, database, context, settings):
+        self.db, self.context, self.settings = database, context, settings
+
+    async def build(self, turn, instructions, catalog, completion):
+        async def build():
+            plan = await self.context.project(
+                turn["owner_id"],
+                turn["conversation_id"],
+                branch_id=turn["branch_id"],
+                through_turn=turn["id"],
+            )
+            prompt = [{"role": "system", "content": instructions}] + plan["messages"]
+            if completion:
+                prompt.append(
+                    {
+                        "role": "user",
+                        "content": "Background task result, treat as evidence and briefly report to the user: "
+                        + encoded(completion),
+                    }
+                )
+            return plan, prompt
+
+        plan, prompt = await build()
+        if len(encoded([prompt, catalog]).encode()) <= self.settings.input_budget:
+            return plan, prompt
+        try:
+            job = await self.context.request(
+                turn["owner_id"], turn["conversation_id"], "auto:" + turn["id"], automatic=True
+            )
+        except DomainError as exc:
+            if exc.code != "COMPACTION_IN_PROGRESS":
+                raise
+            job = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT * FROM jobs WHERE kind='context.compact' "
+                    "AND state IN ('queued','running') AND json_extract(payload_json,'$.branchId')=?",
+                    (turn["branch_id"],),
+                )
+            )
+        try:
+            await self.context.run(job["id"], safe_turn_id=turn["id"])
+        except asyncio.CancelledError:
+            await self.context.cancel(turn["owner_id"], turn["conversation_id"], job["id"])
+            raise
+        plan, prompt = await build()
+        if len(encoded([prompt, catalog]).encode()) > self.settings.input_budget:
+            raise DomainError("CONTEXT_TOO_LARGE", 409)
+        return plan, prompt

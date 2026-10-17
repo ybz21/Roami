@@ -216,7 +216,7 @@ func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
 	if _, err := exec.LookPath(python); err != nil {
 		return fmt.Errorf("AGENT_DEPENDENCIES_MISSING: run roami agent setup --runtime-dir %q", dir)
 	}
-	args := []string{"-m", "roami_agent.main", "--data-root", p.Storage.Data, "--database", p.Database, "--config", p.Config}
+	args := []string{"-m", "roami_agent.app", "--data-root", p.Storage.Data, "--database", p.Database, "--config", p.Config}
 	if initialize {
 		args = append(args, "--initialize")
 	} else {

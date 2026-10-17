@@ -4,10 +4,13 @@ import json
 import httpx
 import pytest
 
-from roami_agent.context import Context
-from roami_agent.conversation import Conversations, message
-from roami_agent.providers import ChatCompletions, ModelEvent
-from roami_agent.storage import DomainError, row
+from roami_agent.context.projection import Context
+from roami_agent.conversation.transcript import Conversations
+from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.models import ModelEvent
+from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.storage.database import row
+from roami_agent.storage.transcript_repository import message
 
 
 class SummaryModel:

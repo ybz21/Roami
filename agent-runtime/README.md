@@ -37,17 +37,28 @@ Public HTTP/SSE is `/api/agent/*` on the existing Go server, using its normal lo
 
 - `frontend/src/components/agent/`: authenticated streaming Main chat, per-conversation drafts/history, retained desktop project/session tree and project quick task entry, coding target selection, task progress, source-backed memory editing, context summary/manual compression and six slash commands. In-app notifications stay unread until a completed message is visible and unobscured; opening the inbox alone does not consume them. Mobile keeps the existing four navigation entries. Browser tests cover message replay, stream framing/Unicode, stale conversation cancellation and visible read confirmation; physical Android acceptance remains pending.
 
-- `storage.py`: SQLite transactions on one dedicated thread; bounded admission; lifetime shared platform maintenance lock and exclusive Agent instance lock; schema/catalog compatibility checks; missing ready database is an error.
-- `conversation.py`: owner-scoped conversations, request idempotency, append-only branches, completed-checkpoint Fork and persisted event replay. Recovery preserves partial messages and marks unknown tool outcomes rather than replaying them.
-- `runtime.py`: Main/Worker model loops with separate capacity, serialized branches, committed streaming deltas, tools, interruption, shared ancestor step/deadline budgets, descendant joins, verification and result mailbox. Native read-only answers can finish automatically; writes/external results require an injected verifier or explicit acceptance rather than trusting the executor's success claim.
-- `memory.py`: source-backed task/conversation/project/day/user scopes, CJK FTS, bounded retrieval, source reads, version replacement, tombstones and snapshot invalidation. Forgetting a memory also suppresses its source in future context projections.
-- `context.py`: canonical turn projection separate from transcript append order, persisted manual/automatic compaction, complete-round cuts, paired tools, source/epoch validation, cancellation and immutable transcripts. The current estimate is a conservative UTF-8 byte bound, not a provider tokenizer.
-- `providers.py`: configurable streaming chat-completions-compatible adapter; fragmented tool arguments, raw usage and incomplete-stream errors. Endpoint, model and credentials are explicit; no implicit provider or paid account is selected.
-- `tasks.py`: idempotent delegation, native child branches, optional checkpoint inheritance, depth/concurrency checks, revision-bound reports, verification queue and cascading cancellation intent. Cancellation intent does not claim an external process has stopped.
-- `tools.py` / `process.py`: typed/validated registry; small Main catalog; bounded worker Shell, named HTTP endpoints and on-demand Skills. Shell roots validate cwd and are not an OS filesystem sandbox. External process groups are killed/reaped on cancellation or timeout.
-- `server.py` / `main.py`: private HTTP/SSE service, durable event replay, scoped APIs, local callbacks and six slash commands: compact/status/tasks/memory/stop/help.
-- `notifications.py`: proactive assistant message + completed event + delivery outbox in one transaction, source-scoped deduplication, unread queries and monotonic per-conversation read watermarks.
-- `internal/agentruntime`, `cmd/roami/agent.go`, `backend/server/agent-runtime.go`: unified paths/catalog initialization, CLI, private transport and authenticated public proxy with immediate SSE flushing. Unified database restore rejects unsupported Agent schema versions.
+The implementation follows the approved [code layers](../docs/design/20261017-agent框架设计/technical/index.html). `app.py` is the composition root and lifecycle entry; the former flat `runtime.py` and `main.py` modules have been removed.
+
+| Layer | Implemented responsibility |
+| --- | --- |
+| `protocol/` | HTTP payloads, model events, tool contracts, errors and injected Loop ports |
+| `server/` | Private HTTP/SSE routes and instance configuration; no business SQL in routes |
+| `conversation/` | Idempotent intake, turn mailbox, message history, branches and interruption |
+| `core/loop.py` | Main/Worker model loop over injected model/context/journal/catalog/manifest/budget/clock ports; no Web, CLI or SQLite implementation imports |
+| `providers/` | Configurable streaming chat-completions adapter, fragmented tool arguments, usage and incomplete-stream errors |
+| `context/` | Prompt projection, source/epoch snapshots, manual/automatic compression and paired tools |
+| `memory/` | Source-backed records, versions, scopes, tombstones and snapshot invalidation |
+| `retrieval/` | Scope filtering, CJK tokenization and bounded FTS search |
+| `dispatch/` | Task intents, preparation, tree/budgets, scheduling, recovery, cancellation and verification |
+| `executors/` | Native branch executor and Roami unified CLI coding adapter |
+| `tools/` | Validated registry, short Main catalog, bounded Worker Shell/HTTP/Skills and lazy MCP connections |
+| `replies/` | Proactive messages, delivery outbox and monotonic unread confirmation |
+| `storage/` | Single SQLite writer, transcript/turn repositories, locks and migration loading |
+| `observability/` | Persisted prompt manifests, model/catalog fingerprints and usage trace |
+| `migrations/0001_initial.sql` | Versioned initial DDL, also included in installed wheels |
+| `backend/agentproxy/` | Go authenticated public proxy with immediate SSE flushing |
+
+`internal/agentruntime` keeps CLI/private transport and unified path/catalog registration. Python owns the Agent business DDL; Go does not write its business tables. Architecture tests enforce the core/contract/HTTP dependency boundaries. Existing lifecycle, restart, coding delegation, memory, compression and SSE tests exercise the refactored services.
 
 The runtime schema started from the dated design's candidate schema, and additionally includes `conversation_reads`. Python owns the business DDL; Go registers the database and coordinates maintenance. Stop the runtime before unified database backup/layout migration. Current database backup does not yet form a complete Agent artifact recovery package.
 
@@ -65,9 +76,9 @@ Python exposes `preparing` until an actual running receipt arrives, persists the
 
 ## Remaining work toward the full framework
 
-1. Real frontend integration while preserving the desktop project/session tree, historical conversations, project quick tasks and mobile navigation. Add unread badge, visible-message read acknowledgements, compression controls and command suggestions.
+1. Physical Android acceptance of the integrated chat, keyboard, touch navigation and safe areas; additional executor target controls and system push UI.
 2. Extend coding execution to existing Codex/Claude sessions, new projects and explicit workspace reuse. Bind native Worker project tools to prepared workspaces as well. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
-3. MCP, Browser/Computer tool adapters, resource leases and artifact storage/backup. Parsed MCP configuration is not an operational adapter yet.
+3. Browser/Computer tool adapters, resource leases and artifact storage/backup, including binary MCP results. MCP stdio and Streamable HTTP adapters are implemented; unsupported binary/oversized results stop the call rather than entering model context.
 4. Background memory extraction/daily summaries, complete forgetting propagation, provider cache controls and provider/model routing resilience.
 5. Proactive triggers/scheduling, notification preferences, quiet hours, rate limits and existing App push delivery adapters. The notification store is implemented, but an outbox row is not proof of external delivery.
 6. Broader end-to-end recovery, verification edge cases and real-device acceptance. No real provider latency/cache/cost benchmark has run.
@@ -77,3 +88,11 @@ The design and product prototype remain in `docs/design/20261017-agent框架设�
 ## Provider reference
 
 The streaming adapter follows the official [chat-completions event reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events). It implements this explicit wire contract rather than assuming all provider APIs or models have identical tool/caching capabilities.
+
+## MCP connections
+
+Configure named servers under `[tools.mcp.<name>]` as shown in `agent.example.toml`. A Worker calls `mcp_discover` for the relevant server; Main never waits for MCP startup or carries the full remote catalog. Each connection owns its SDK session in one actor and serializes its calls. Tools use namespaced, schema/version-bound aliases; catalogs are sorted for a stable model prefix. Directory changes remove old tools, and discovery/call refreshes refuse stale aliases before execution. Failed connections back off and reconnect on demand without replaying calls.
+
+Stdio children receive the SDK's minimal default environment plus explicitly mapped `env_env` variables. HTTP credentials come from `key_env` or `header_env`; endpoint URLs cannot carry credentials. Raw server errors/stderr and progress messages do not enter ordinary logs or model context. Numeric progress events are bounded and persisted against the active turn lease. Calls have bounded queues, deadlines and output; cancellation sends a best-effort MCP cancellation notification and closes the connection. A remote cancellation is not proof that a write stopped: ambiguous outcomes are persisted as unknown, end the current turn and never automatically replay. Only explicitly configured `read_only` tools count as reads; server hints alone do not remove verification.
+
+The adapter uses the official [Python SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.30.0) for the [MCP transports and lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports). Automated checks use real stdio processes and an authenticated local Streamable HTTP server, plus native Worker discovery/calls, catalog fingerprints, schema changes, timeouts, cancellation and unknown outcomes. They do not contact configured production MCP services.

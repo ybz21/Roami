@@ -1,9 +1,9 @@
 import asyncio
 import json
 
-from roami_agent.providers import ModelEvent
-from roami_agent.runtime import Runtime
-from roami_agent.storage import row
+from roami_agent.app import Runtime
+from roami_agent.protocol.models import ModelEvent
+from roami_agent.storage.database import row
 
 
 class ConversationModel:
@@ -42,7 +42,7 @@ async def test_runtime_streams_committed_reply_and_usage(store):
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
-        result = await runtime.submit("alice", c["id"], "one", "hello")
+        result = await runtime.chat.submit("alice", c["id"], "one", "hello")
         await until(
             store,
             lambda db: row(
@@ -72,7 +72,7 @@ async def test_delegation_runs_child_then_reports_to_original_conversation(store
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
-        await runtime.submit("alice", c["id"], "one", "delegate research")
+        await runtime.chat.submit("alice", c["id"], "one", "delegate research")
         await until(
             store,
             lambda db: (
@@ -119,9 +119,9 @@ async def test_queued_turn_context_preserves_previous_reply_without_future_input
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
-        await runtime.submit("alice", c["id"], "one", "first question")
+        await runtime.chat.submit("alice", c["id"], "one", "first question")
         await model.entered.wait()
-        second = await runtime.submit("alice", c["id"], "two", "second question")
+        second = await runtime.chat.submit("alice", c["id"], "two", "second question")
         model.release.set()
         await until(
             store,
@@ -142,9 +142,9 @@ async def test_stop_keeps_partial_and_idempotent_target(store):
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
-        first = await runtime.submit("alice", c["id"], "one", "first question")
+        first = await runtime.chat.submit("alice", c["id"], "one", "first question")
         await model.entered.wait()
-        receipt = await runtime.submit("alice", c["id"], "stop-one", "/stop")
+        receipt = await runtime.chat.submit("alice", c["id"], "stop-one", "/stop")
         assert receipt["turnId"] == first["turnId"]
         await until(
             store,
@@ -152,8 +152,8 @@ async def test_stop_keeps_partial_and_idempotent_target(store):
                 db, "SELECT id FROM turns WHERE id=? AND state='interrupted'", (first["turnId"],)
             ),
         )
-        second = await runtime.submit("alice", c["id"], "two", "second question")
-        await runtime.submit("alice", c["id"], "stop-one", "/stop")
+        second = await runtime.chat.submit("alice", c["id"], "two", "second question")
+        await runtime.chat.submit("alice", c["id"], "stop-one", "/stop")
         await until(
             store,
             lambda db: row(
@@ -209,18 +209,18 @@ class NestedModel(ConversationModel):
 
 
 async def test_nested_delegation_joins_descendants_and_reserves_main_capacity(store):
-    from roami_agent.configuration import Settings
+    from roami_agent.server.configuration import Settings
 
     model = NestedModel()
     runtime = Runtime(store, model, settings=Settings(workers=1))
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
-        await runtime.submit("alice", c["id"], "one", "root")
+        await runtime.chat.submit("alice", c["id"], "one", "root")
         await asyncio.wait_for(model.leaf_started.wait(), 5)
         parent = (await runtime.tasks.list("alice", c["id"]))[0]
         assert parent["state"] == "verifying"
-        quick = await runtime.submit("alice", c["id"], "two", "quick question")
+        quick = await runtime.chat.submit("alice", c["id"], "two", "quick question")
         await until(
             store,
             lambda db: row(
@@ -249,7 +249,7 @@ async def test_nested_delegation_joins_descendants_and_reserves_main_capacity(st
 async def test_runtime_automatically_compacts_before_oversized_model_input(store):
     from test_context_provider import completed_conversation
 
-    from roami_agent.configuration import Settings
+    from roami_agent.server.configuration import Settings
 
     class CompactingModel(ConversationModel):
         async def stream(self, messages, tools):
@@ -263,7 +263,9 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
     runtime = Runtime(store, CompactingModel(), settings=Settings(input_budget=6000))
     await runtime.start()
     try:
-        receipt = await runtime.submit("alice", c["id"], "trigger", "Trigger automatic compaction")
+        receipt = await runtime.chat.submit(
+            "alice", c["id"], "trigger", "Trigger automatic compaction"
+        )
         await until(
             store,
             lambda db: row(

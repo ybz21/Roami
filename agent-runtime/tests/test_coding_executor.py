@@ -1,10 +1,10 @@
 """Unknown process outcomes must never be converted into successful cancellation or replay."""
 
-from roami_agent.coding_executor import CodingExecutor
-from roami_agent.configuration import Settings
-from roami_agent.conversation import Conversations
-from roami_agent.storage import row
-from roami_agent.tasks import Tasks
+from roami_agent.conversation.transcript import Conversations
+from roami_agent.dispatch.tasks import Tasks
+from roami_agent.executors.roami_cli import CodingExecutor
+from roami_agent.server.configuration import Settings
+from roami_agent.storage.database import row
 
 
 def test_go_launcher_is_used_even_without_agent_configuration(tmp_path, monkeypatch):
@@ -71,7 +71,7 @@ async def test_project_execution_passes_identity_and_persists_go_preparation(sto
 
     import pytest
 
-    from roami_agent.storage import DomainError
+    from roami_agent.protocol.errors import DomainError
 
     conversations = Conversations(store)
     tasks = Tasks(store, conversations)

@@ -1,6 +1,6 @@
 import pytest
 
-from roami_agent.storage import Database
+from roami_agent.storage.database import Database
 
 
 @pytest.fixture

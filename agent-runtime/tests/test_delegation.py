@@ -2,9 +2,11 @@ import json
 
 import pytest
 
-from roami_agent.conversation import Conversations, history, message
-from roami_agent.storage import DomainError, row
-from roami_agent.tasks import Tasks
+from roami_agent.conversation.transcript import Conversations
+from roami_agent.dispatch.tasks import Tasks
+from roami_agent.protocol.errors import DomainError
+from roami_agent.storage.database import row
+from roami_agent.storage.transcript_repository import history, message
 
 
 async def origin(store):
@@ -112,7 +114,8 @@ async def test_cancel_parent_marks_entire_child_tree_without_claiming_stopped(st
 
 
 async def test_child_coding_task_inherits_parent_deadline(store):
-    from roami_agent.storage import encoded, now_ms
+    from roami_agent.protocol.identity import now_ms
+    from roami_agent.protocol.serialization import encoded
 
     conversations, c, _ = await origin(store)
     tasks = Tasks(store, conversations)

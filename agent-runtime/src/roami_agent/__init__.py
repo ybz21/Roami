@@ -1,1 +1,1 @@
-"""Persistent Agent runtime behind the Roami gateway."""
+"Persistent Agent runtime behind the Roami gateway."
