@@ -256,7 +256,7 @@ class Tasks:
             )
             # A late old revision is evidence, never authority over the current task.
             if task["revision"] == revision and task["state"] not in TERMINAL:
-                state = "verifying" if result["state"] == "succeeded" else result["state"]
+                state = "cancelling" if task["state"] == "cancelling" else "verifying"
                 db.execute(
                     "UPDATE tasks SET state=?,updated_ms=? WHERE id=?", (state, now_ms(), task_id)
                 )
@@ -302,6 +302,26 @@ class Tasks:
                         {"taskId": task["id"]},
                         task_id=task["id"],
                     )
+                    run = row(
+                        db,
+                        "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=? "
+                        "AND result_json IS NOT NULL ORDER BY attempt_no DESC LIMIT 1",
+                        (task["id"], task["revision"]),
+                    )
+                    if run:
+                        db.execute(
+                            "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
+                            "VALUES(?,'task.verify',?,?,?,'queued',?) "
+                            "ON CONFLICT(dedupe_key) DO UPDATE SET state='queued',available_ms=excluded.available_ms "
+                            "WHERE jobs.state IN ('done','failed')",
+                            (
+                                identity(),
+                                task["id"],
+                                "verify:" + run["id"],
+                                encoded({"runId": run["id"]}),
+                                now_ms(),
+                            ),
+                        )
             return {
                 "taskId": task_id,
                 "state": root["state"] if root["state"] in TERMINAL else "cancelling",

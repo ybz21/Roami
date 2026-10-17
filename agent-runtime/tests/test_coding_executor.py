@@ -59,6 +59,15 @@ async def test_monitor_waits_for_launch_and_preserves_unknown_outcome(store):
     assert (await tasks.list("alice"))[0]["state"] == "cancelling"
     receipt = {"state": "cancelled", "result": {"state": "cancelled", "summary": "Stopped"}}
     await executor.poll(tasks)
+    assert (await tasks.list("alice"))[0]["state"] == "cancelling"
+    from roami_agent.dispatch.runner import TaskDispatcher
+
+    verification = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE aggregate_id=? AND kind='task.verify'", (task["id"],)
+        )
+    )
+    await TaskDispatcher(store, tasks, executor, None, None, None, {}).verify(verification)
     assert (await tasks.list("alice"))[0]["state"] == "cancelled"
     attempt = await store.call(
         lambda db: row(db, "SELECT result_json FROM task_attempts WHERE task_id=?", (task["id"],))

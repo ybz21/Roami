@@ -646,6 +646,12 @@ async def test_forgotten_task_origin_prevents_dispatch_and_redacts_completion(st
     )
     runtime.dispatch.native_executor = NeverRun()
     await runtime.dispatch.run(job)
+    verify = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE aggregate_id=? AND kind='task.verify'", (task["id"],)
+        )
+    )
+    await runtime.dispatch.verify(verify)
     failed = await store.call(lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],)))
     assert failed["state"] == "failed"
     builder = PromptBuilder(store, runtime.context, runtime.settings)

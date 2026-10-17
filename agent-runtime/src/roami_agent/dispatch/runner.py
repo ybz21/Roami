@@ -255,10 +255,14 @@ class TaskDispatcher:
                 }
                 for c in children
             ]
-            if any(c["state"] != "succeeded" for c in children):
+            if (
+                task["state"] != "cancelling"
+                and result["state"] != "cancelled"
+                and any(c["state"] != "succeeded" for c in children)
+            ):
                 result["state"] = "failed"
         verified = False
-        if result["state"] == "succeeded":
+        if result["state"] == "succeeded" and task["state"] != "cancelling":
             if self.verifier:
                 verified = await self.verifier(task, result)
             else:
@@ -285,7 +289,7 @@ class TaskDispatcher:
         await self.complete(task, run, result, state, job_id=job["id"])
 
     async def complete(self, task, run, result, state, *, job_id=None, unknown=False):
-        def write(db):
+        def write(db, result=result, state=state):
             current = row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
             if current["revision"] != run["task_revision"] or current["state"] in {
                 "cancelled",
@@ -305,6 +309,30 @@ class TaskDispatcher:
                     "UPDATE task_attempts SET state='unknown',result_json=? WHERE id=? AND task_revision=?",
                     (encoded(result), run["id"], run["task_revision"]),
                 )
+            elif current["state"] == "cancelling":
+                children = rows(db, "SELECT state FROM tasks WHERE parent_task_id=?", (task["id"],))
+                if any(
+                    c["state"] not in {"succeeded", "failed", "cancelled", "interrupted"}
+                    for c in children
+                ):
+                    if job_id:
+                        db.execute(
+                            "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 100, job_id)
+                        )
+                    return
+                uncertain = (
+                    any(c["state"] == "interrupted" for c in children)
+                    or result.get("outcomeKnown") is False
+                    or result.get("inputStopped") is False
+                )
+                state = "interrupted" if uncertain else "cancelled"
+                result = {
+                    **result,
+                    "cancellationRequested": True,
+                    "inputStopped": not uncertain,
+                }
+                if uncertain:
+                    result.update(outcomeKnown=False, retryable=False)
             completion = {"taskId": task["id"], "state": state, "result": result}
             db.execute(
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?", (state, now_ms(), task["id"])
