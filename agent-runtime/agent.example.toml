@@ -15,6 +15,9 @@ timeout_seconds = 120
 # cli_bin = "/absolute/path/to/roami" # defaults to the Go launcher binary
 # coding_directory = "/absolute/path/for/loose-coding-tasks"
 
+[memory]
+timezone = "UTC" # IANA timezone for daily summaries
+
 [tools]
 # This validates working directories; it is not an OS filesystem sandbox.
 shell_roots = []

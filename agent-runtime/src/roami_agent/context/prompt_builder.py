@@ -12,6 +12,24 @@ class PromptBuilder:
         self.db, self.context, self.settings = database, context, settings
 
     async def build(self, turn, instructions, catalog, completion):
+        if completion:
+            allowed = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT t.id FROM tasks t WHERE t.id=? AND t.owner_id=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
+                    (completion.get("taskId"), turn["owner_id"]),
+                )
+            )
+            if not allowed:
+                completion = {
+                    "taskId": completion.get("taskId"),
+                    "state": completion.get("state"),
+                    "result": {
+                        "contextExcluded": True,
+                        "summary": "The source information was forgotten; omit the task content from model context.",
+                    },
+                }
+
         async def build():
             plan = await self.context.project(
                 turn["owner_id"],

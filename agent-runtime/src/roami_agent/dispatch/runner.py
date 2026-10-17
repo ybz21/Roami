@@ -92,6 +92,23 @@ class TaskDispatcher:
             return
         task, run, turn = started
         try:
+            forgotten = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT 1 FROM context_omissions WHERE owner_id=? AND message_id=?",
+                    (task["owner_id"], task["origin_message_id"]),
+                )
+            )
+            if forgotten:
+                if turn:
+                    await self.db.call(
+                        lambda db: db.execute(
+                            "UPDATE turns SET state='failed',finished_ms=? WHERE id=?",
+                            (now_ms(), turn["id"]),
+                        ),
+                        write=True,
+                    )
+                raise DomainError("TASK_SOURCE_FORGOTTEN")
             if turn:
                 result = await self.native_executor.run(task, run, turn=turn)
             elif self.executor:

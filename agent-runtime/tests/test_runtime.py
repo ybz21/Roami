@@ -114,8 +114,14 @@ class GatedModel:
 
 
 async def test_queued_turn_context_preserves_previous_reply_without_future_input(store):
+    class EmptyMemoryModel:
+        model = "memory-fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", '{"memories":[]}')
+
     model = GatedModel()
-    runtime = Runtime(store, model)
+    runtime = Runtime(store, model, memory_model=EmptyMemoryModel())
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")

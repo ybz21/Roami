@@ -4,6 +4,7 @@ import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from roami_agent.protocol.errors import DomainError
 
@@ -43,6 +44,7 @@ class Settings:
     mcp_servers: dict = field(default_factory=dict)
     cli_bin: str = "roami"
     coding_directory: Path | None = None
+    memory_timezone: str = "UTC"
 
     @classmethod
     def load(cls, path: Path):
@@ -67,6 +69,7 @@ class Settings:
             skill_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("skill_roots", [])),
             http_tools=tools.get("http", {}),
             mcp_servers=tools.get("mcp", {}),
+            memory_timezone=raw.get("memory", {}).get("timezone", "UTC"),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
             coding_directory=(
                 Path(runtime["coding_directory"]).expanduser().resolve()
@@ -87,6 +90,10 @@ class Settings:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if bool(result.model) != bool(result.endpoint):
             raise DomainError("INVALID_MODEL_CONFIG")
+        try:
+            ZoneInfo(result.memory_timezone)
+        except (ValueError, TypeError, ZoneInfoNotFoundError) as exc:
+            raise DomainError("INVALID_MEMORY_TIMEZONE") from exc
         if result.endpoint and not result.endpoint.startswith(
             ("https://", "http://127.0.0.1:", "http://localhost:")
         ):

@@ -47,8 +47,8 @@ The implementation follows the approved [code layers](../docs/design/20261017-ag
 | `core/loop.py` | Main/Worker model loop over injected model/context/journal/catalog/manifest/budget/clock ports; no Web, CLI or SQLite implementation imports |
 | `providers/` | Configurable streaming chat-completions adapter, fragmented tool arguments, usage and incomplete-stream errors |
 | `context/` | Prompt projection, source/epoch snapshots, manual/automatic compression and paired tools |
-| `memory/` | Source-backed records, versions, scopes, tombstones and snapshot invalidation |
-| `retrieval/` | Scope filtering, CJK tokenization and bounded FTS search |
+| `memory/` | Source-validated candidates/confirmation, background extraction, timezone-aware daily aggregates, versions, tombstones and forgetting provenance |
+| `retrieval/` | Validity/scope filtering before limits, literal OR CJK bigram FTS and bounded single-character fallback |
 | `dispatch/` | Task intents, preparation, tree/budgets, scheduling, recovery, cancellation and verification |
 | `executors/` | Native branch executor and Roami unified CLI coding adapter |
 | `tools/` | Validated registry, short Main catalog, bounded Worker Shell/HTTP/Skills and lazy MCP connections |
@@ -62,13 +62,21 @@ The implementation follows the approved [code layers](../docs/design/20261017-ag
 
 The runtime schema started from the dated design's candidate schema, and additionally includes `conversation_reads`. Python owns the business DDL; Go registers the database and coordinates maintenance. Stop the runtime before unified database backup/layout migration. Current database backup does not yet form a complete Agent artifact recovery package.
 
+## Memory lifecycle
+
+Background extraction uses the Worker model with a separate injectable test port, a durable event cursor, bounded jobs and one low-priority memory slot. It never occupies a Main slot. Model output proposes candidates; owner/scope/hash validation happens again inside the write transaction. Candidates and conflicts remain outside recall until explicitly confirmed. Conflicts do not overwrite active records. Restart requeues interrupted extraction without changing its deduplication key.
+
+The memory panel provides daily, task, conversation, project and preference views, source inspection and candidate review. Ordinary deletion removes a memory from recall and invalidates derived summaries. Complete forgetting additionally excludes traced transcript sources, memory tool blocks and dependent replies from future context while retaining visible history. Queued tasks with forgotten origins cannot dispatch; completion prompts redact their content. Input already delivered to an external model/process cannot be recalled. Older prompt manifests are reconstructed conservatively and can exclude additional dependent context.
+
+Set `[memory].timezone` to an IANA name such as `Asia/Shanghai`; the default is UTC. Daily summaries coalesce by owner/date/timezone and archive after the local day ends. Explicit daily queries refresh current-day counts. Aggregation deduplicates user messages and task IDs, attributes projects separately from unassigned work, handles 23/25-hour days, and recomputes late historical events using an event watermark. Day summaries are not returned as ordinary knowledge unless a day is selected. Tombstones prevent background extraction or daily rebuilding from silently restoring deleted information.
+
 ## Coding execution transport
 
 `roami agent execution launch --file SPEC.json` launches a one-shot coding process in a new, recorded tmux session. `status --key KEY` returns the durable result; `cancel --key KEY` requests cancellation and must be followed by status to confirm it. A spec contains `key`, `executor` (`codex` or `claude`), `prompt`, `timeoutSeconds` (1–86400), and either an absolute `directory` or a `projectId`. `model`/`permission` are optional; project specs additionally accept `base`/`remote`.
 
 The Go service uses the existing Agent registry, application session service, project store and worktree service. Arguments use argv, prompts use stdin, and private execution receipts live under `<DataRoot>/agents/executions`. It never guesses a Codex conversation ID. A reused key must have exactly the same spec; an unknown launch or interrupted runner is never blindly re-executed. Output remains visible in the session while running, with bounded stdout/stderr tails persisted for retrieval. Coding processes and shared Git workspace operations detach inherited repository bindings (including Git hook context) while retaining Git authentication settings. Timeout, cancellation and shutdown signals terminate the execution process group. The default permission comes from the coding CLI; explicit bypass is only applied when requested in the spec.
 
-`coding_executor.py` connects new loose-session and existing-project tasks to this transport. Set `runtime.coding_directory` explicitly, or provide an absolute `target.directory` for a `new_session` task. Go-launched Python defaults to the same Go executable for CLI calls. Launch returns without occupying a worker for the full coding duration; a separate monitor polls results and records the session binding. External executions have a separate bounded admission count and retain the original task deadline. Python restart observes the original launch; cancellation stays pending until the Go runner returns a terminal result. Missing launch evidence and observation failures are distinct, and uncertain execution is not replayed.
+`executors/roami_cli.py` connects new loose-session and existing-project tasks to this transport. Set `runtime.coding_directory` explicitly, or provide an absolute `target.directory` for a `new_session` task. Go-launched Python defaults to the same Go executable for CLI calls. Launch returns without occupying a worker for the full coding duration; a separate monitor polls results and records the session binding. External executions have a separate bounded admission count and retain the original task deadline. Python restart observes the original launch; cancellation stays pending until the Go runner returns a terminal result. Missing launch evidence and observation failures are distinct, and uncertain execution is not replayed.
 
 A `project` target uses `projectId`, with optional `base`/`remote`. Go resolves the stable ID (including aliases) through the existing project store, then uses the shared worktree service. Git projects require a successful fetch and create a new checkout from the returned fixed remote OID; local main stays untouched. Directory projects retain their project identity and execute in their existing directory. A caller cannot override a project's directory or silently substitute the loose-session directory. Preparation is journaled under the launch key, bounded to 120 seconds and charged against the same task deadline; retries return the same workspace receipt. Preparation failure saves a failed result and never starts the coding process. Workspaces are preserved on execution failure for inspection.
 
@@ -79,9 +87,9 @@ Python exposes `preparing` until an actual running receipt arrives, persists the
 1. Physical Android acceptance of the integrated chat, keyboard, touch navigation and safe areas; additional executor target controls and system push UI.
 2. Extend coding execution to existing Codex/Claude sessions, new projects and explicit workspace reuse. Bind native Worker project tools to prepared workspaces as well. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
 3. Browser/Computer tool adapters, resource leases and artifact storage/backup, including binary MCP results. MCP stdio and Streamable HTTP adapters are implemented; unsupported binary/oversized results stop the call rather than entering model context.
-4. Background memory extraction/daily summaries, complete forgetting propagation, provider cache controls and provider/model routing resilience.
+4. Broaden legacy forgetting/re-learning recovery cases; implement provider cache controls and provider/model routing resilience.
 5. Proactive triggers/scheduling, notification preferences, quiet hours, rate limits and existing App push delivery adapters. The notification store is implemented, but an outbox row is not proof of external delivery.
-6. Broader end-to-end recovery, verification edge cases and real-device acceptance. No real provider latency/cache/cost benchmark has run.
+6. Broader end-to-end recovery, verification edge cases and real-device acceptance. A single real-provider memory extraction smoke check produced a source-backed candidate without activating it; no latency/cache/cost benchmark has run.
 
 The design and product prototype remain in `docs/design/20261017-agent框架设计/`.
 

@@ -23,6 +23,7 @@ from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.roami_cli import CodingExecutor
+from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
@@ -48,6 +49,7 @@ class Runtime:
         *,
         settings=None,
         worker_model=None,
+        memory_model=None,
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
     ):
@@ -56,7 +58,10 @@ class Runtime:
         self.worker_model = worker_model or model
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
-        self.memory = Memories(database)
+        self.memory = Memories(database, self.settings.memory_timezone)
+        self.memory_jobs = MemoryJobs(
+            database, memory_model or self.worker_model, self.memory, self.memory.daily
+        )
         self.notifications = Notifications(database)
         self.context = Context(database, model, input_budget=self.settings.input_budget)
         self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
@@ -106,6 +111,7 @@ class Runtime:
             self.loop.run,
             self.wakeup,
             self.active,
+            self.memory_jobs,
         )
         self.chat = ConversationService(
             database,
@@ -119,6 +125,7 @@ class Runtime:
 
     async def start(self):
         await self.conversations.recover()
+        await self.memory_jobs.recover()
         await self.dispatch.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):

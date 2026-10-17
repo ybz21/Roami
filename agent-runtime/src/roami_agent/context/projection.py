@@ -156,6 +156,8 @@ class Context:
                 "inputBudget": self.input_budget,
                 "snapshotId": snapshot["id"] if snapshot else None,
                 "branchId": bid,
+                "memoryEpoch": epoch,
+                "sourceMessageIds": [item["id"] for item in messages],
             }
 
         return await self.db.call(read)

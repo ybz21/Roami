@@ -3,7 +3,7 @@
 import asyncio
 import json
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -49,6 +49,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             "data": {
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
+                "memoryTimezone": runtime.memory.daily.timezone,
                 "commands": COMMANDS,
                 "writerBacklog": runtime.db.pending,
             }
@@ -196,7 +197,27 @@ def create_app(runtime, *, manage_lifecycle=True):
         projectId: str | None = None,
         taskId: str | None = None,
         dayKey: str | None = None,
+        timezone: str | None = None,
+        state: Literal["active", "candidate", "conflict"] = "active",
+        kind: Literal["fact", "decision", "preference", "summary"] | None = None,
     ):
+        if state != "active":
+            return {
+                "data": await runtime.memory.candidates(
+                    owner,
+                    conversation_id=conversationId,
+                    project_id=projectId,
+                    task_id=taskId,
+                    day_key=dayKey,
+                    timezone=timezone,
+                    kind=kind,
+                    query=query,
+                    state=state,
+                )
+            }
+        if dayKey:
+            timezone = timezone or runtime.memory.daily.timezone
+            await runtime.memory.daily.refresh(owner, dayKey, timezone)
         return {
             "data": await runtime.memory.search(
                 owner,
@@ -205,6 +226,8 @@ def create_app(runtime, *, manage_lifecycle=True):
                 project_id=projectId,
                 task_id=taskId,
                 day_key=dayKey,
+                timezone=timezone,
+                kind=kind,
             )
         }
 
@@ -229,8 +252,16 @@ def create_app(runtime, *, manage_lifecycle=True):
         }
 
     @app.delete("/v1/memories/{memory_id}")
-    async def forget(memory_id: str, owner: Owner):
-        return {"data": await runtime.memory.forget(owner, memory_id)}
+    async def forget(memory_id: str, owner: Owner, forgetSources: bool = True):
+        return {"data": await runtime.memory.forget(owner, memory_id, forget_sources=forgetSources)}
+
+    @app.post("/v1/memories/{memory_id}/confirm")
+    async def confirm_memory(memory_id: str, body: Confirm, owner: Owner):
+        return {"data": await runtime.memory.confirm(owner, memory_id, body.accepted)}
+
+    @app.get("/v1/memories/{memory_id}/sources")
+    async def memory_sources(memory_id: str, owner: Owner):
+        return {"data": await runtime.memory.evidence(owner, memory_id)}
 
     # Go never forwards /internal/*; local callers share the OS user's private socket.
     @app.post("/internal/report")

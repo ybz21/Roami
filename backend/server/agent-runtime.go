@@ -38,6 +38,8 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"GET", "/agent/notifications"}, {"GET", "/agent/tasks"}, {"POST", "/agent/tasks"},
 		{"POST", "/agent/tasks/:task/cancel"}, {"POST", "/agent/tasks/:task/verify"},
 		{"GET", "/agent/memories/:memory"}, {"GET", "/agent/memories"}, {"POST", "/agent/memories"}, {"DELETE", "/agent/memories/:memory"},
+		{"POST", "/agent/memories/:memory/confirm"},
+		{"GET", "/agent/memories/:memory/sources"},
 	} {
 		g.Handle(route.method, route.path, forward)
 	}

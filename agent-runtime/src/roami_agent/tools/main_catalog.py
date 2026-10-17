@@ -22,29 +22,45 @@ def register_main_tools(registry, tasks, memory):
         return await tasks.list(binding["owner"], binding["conversation"])
 
     async def recall(args, binding):
-        hits = await memory.search(
+        day = args.get("scope") == "day"
+        day_key = args.get("dayKey")
+        timezone = args.get("timezone") or memory.daily.timezone
+        if day:
+            from roami_agent.memory.daily import event_day
+            from roami_agent.protocol.identity import now_ms
+
+            day_key = day_key or event_day(now_ms(), timezone)
+            await memory.daily.refresh(binding["owner"], day_key, timezone)
+        result = await memory.recall(
             binding["owner"],
-            args["query"],
+            "" if day else args["query"],
             conversation_id=binding["conversation"]
             if args.get("scope", "conversation") == "conversation"
             else None,
             project_id=args.get("projectId"),
+            day_key=day_key if day else None,
+            timezone=timezone if day else None,
             limit=8,
+            include_global=not day,
         )
-        result, remaining = [], 6000
-        for hit in hits:
-            excerpt = hit["body"][:500]
+        packed, remaining = [], 6000
+        for hit in result["hits"]:
             item = {
                 "id": hit["id"],
                 "title": hit["title"],
-                "excerpt": excerpt,
+                "excerpt": hit["body"][:500],
                 "revision": hit["revision"],
+                "sourceRefs": hit["sourceRefs"],
+                "scope": hit["scope"],
+                "rankReason": hit["rankReason"],
             }
             size = len(encoded(item).encode())
             if size > remaining:
+                result["truncated"] = True
                 break
-            result.append(item)
+            packed.append(item)
             remaining -= size
+        result["hits"] = packed
         return result
 
     async def recall_one(args, binding):
@@ -99,8 +115,10 @@ def register_main_tools(registry, tasks, memory):
             object_schema(
                 {
                     "query": {"type": "string", "maxLength": 1000},
-                    "scope": {"type": "string", "enum": ["conversation", "user"]},
+                    "scope": {"type": "string", "enum": ["conversation", "user", "day"]},
                     "projectId": {"type": "string"},
+                    "dayKey": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+                    "timezone": {"type": "string", "maxLength": 100},
                 },
                 ["query"],
             ),

@@ -103,13 +103,32 @@ class ToolGateway:
             )
             raise
 
+        memory_ids = []
+        if call["function"]["name"] in {"memory_get", "memory_search"}:
+            hits = (
+                value
+                if isinstance(value, list)
+                else value.get("hits", [value])
+                if isinstance(value, dict)
+                else []
+            )
+            memory_ids = [
+                hit["id"]
+                for hit in hits
+                if isinstance(hit, dict) and isinstance(hit.get("id"), str)
+            ][:8]
+
         def finish(db):
             result_id = message(
                 db,
                 turn["conversation_id"],
                 turn["branch_id"],
                 "tool",
-                {"text": encoded(value), "tool_call_id": call["id"]},
+                {
+                    "text": encoded(value),
+                    "tool_call_id": call["id"],
+                    **({"memoryIds": memory_ids} if memory_ids else {}),
+                },
                 turn_id=turn["id"],
             )
             db.execute(

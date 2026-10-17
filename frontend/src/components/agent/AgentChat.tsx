@@ -5,6 +5,7 @@ import { ArrowUp, BellIcon, ChecklistIcon, ClockIcon, NotebookIcon, PlusIcon, Re
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
+import AgentMemory from './AgentMemory'
 import { conversationTitle } from './AgentHistory'
 import { useAgentThread } from './useAgentThread'
 import { useAgentDraft } from './useAgentDraft'
@@ -30,10 +31,10 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
   const [panel, setPanel] = useState<'history' | 'tasks' | 'memory' | 'context' | null>(null)
-  const [tasks, setTasks] = useState<AgentTask[]>([]), [memories, setMemories] = useState<any[]>([])
+  const [tasks, setTasks] = useState<AgentTask[]>([])
   const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
   const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
-  const [query, setQuery] = useState(''), [source, setSource] = useState<AgentMessage | null>(null)
+  const [source, setSource] = useState<AgentMessage | null>(null)
   const [memoryTitle, setMemoryTitle] = useState(''), [memoryBody, setMemoryBody] = useState('')
   const [error, setError] = useState('')
   const scroll = useRef<HTMLDivElement>(null), stick = useRef(true), sendingRef = useRef(false)
@@ -76,13 +77,12 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
     inbox.refresh(); return data.id as string
   }
   const loadPanel = useCallback(async () => {
-    if (!panel || panel === 'history' || !cid) return
+    if (!panel || panel === 'history' || panel === 'memory' || !cid) return
     const version = ++panelRequest.current
     const current = () => version === panelRequest.current && activeCID.current === cid
     setPanelLoading(true); setPanelError(false)
     try {
       if (panel === 'tasks') { const r = await api('GET', '/agent/tasks?conversationId=' + encodeURIComponent(cid)); if (current()) setTasks(r.data) }
-      else if (panel === 'memory') { const r = await api('GET', '/agent/memories?conversationId=' + encodeURIComponent(cid) + '&query=' + encodeURIComponent(query)); if (current()) setMemories(r.data) }
       else {
         const r = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context`)
         if (!current()) return
@@ -90,7 +90,7 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
         if (r.data.snapshotId) { const s = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context/snapshots/${encodeURIComponent(r.data.snapshotId)}`); if (current()) setSummary(s.data.summary.text || '') }
       }
     } catch { if (current()) setPanelError(true) } finally { if (current()) setPanelLoading(false) }
-  }, [panel, cid, query])
+  }, [panel, cid])
   useEffect(() => {
     let stop = false
     const timer = setTimeout(() => { if (!stop) void loadPanel() }, 150)
@@ -184,9 +184,9 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
     </div>
     <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose>
       {panel === 'history' && <div className="agent-panel-list">{inbox.conversations.map((c) => <button className="agent-panel-row" type="button" data-conversation-id={c.id} key={c.id} onClick={() => { select(c.id); setPanel(null) }}>{conversationTitle(c, t('agent.new'))}{inbox.notices.some((n) => n.conversation_id === c.id) && <i className="agent-unread-dot" />}</button>)}</div>}
-      {panelLoading && <Spin size="small" />}{panelError && <p role="alert">{t('agent.requestFailed')}</p>}
+      {panel !== 'memory' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
       {panel === 'tasks' && <div className="agent-panel-list">{!tasks.length && !panelLoading && <p className="agent-muted">{t('agent.noTasks')}</p>}{tasks.map((task) => <div key={task.id} className="agent-task"><b>{JSON.parse(task.intent_json).goal}</b><span className="agent-muted">{t('agent.state.' + task.state)}</span>{task.latestAttempt?.workspace && <code>{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}<div className="agent-task-actions">{task.latestAttempt?.sessionId && <Button onClick={() => { setPanel(null); onSession(task.latestAttempt!.sessionId!) }}>{t('agent.openSession')}</Button>}{!terminal.has(task.state) && <Button danger disabled={task.state === 'cancelling'} onClick={() => { void action(`/agent/tasks/${encodeURIComponent(task.id)}/cancel`) }}>{t('agent.cancelTask')}</Button>}</div></div>)}</div>}
-      {panel === 'memory' && <><Input.Search aria-label={t('agent.searchMemory')} placeholder={t('agent.searchMemory')} value={query} onChange={(e) => setQuery(e.target.value)} /><div className="agent-panel-list">{!memories.length && !panelLoading && <p className="agent-muted">{t('agent.noMemories')}</p>}{memories.map((m) => <div key={m.id} className="agent-task"><b>{m.title}</b><p>{m.body}</p><Button danger onClick={async () => { try { await api('DELETE', `/agent/memories/${encodeURIComponent(m.id)}`); void loadPanel() } catch (reason) { message.error(agentFailure(reason, t)) } }}>{t('agent.forget')}</Button></div>)}</div></>}
+      {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID) => { setPanel(null); select(sourceCID) }} />}
       {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.inputBudget }) : t('agent.contextHint')}</p>{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
         <Button disabled={!cid || readOnly || compacting || running} onClick={() => { void submit('/compact') }}>{t('agent.compactNow')}</Button>
         {compacting && compact && <Button onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/compactions/${encodeURIComponent(compact.operationId)}/cancel`) }}>{t('agent.cancelCompact')}</Button>}
