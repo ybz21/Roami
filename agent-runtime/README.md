@@ -84,7 +84,15 @@ Go preparation returns a stable opaque `workspaceId` and persists its project/di
 
 Managed coding runners take an exclusive writer lock for the canonical Git checkout (or the exact canonical directory outside Git). Symlink aliases and nested directories of the same checkout share the lock; separate linked worktrees do not. The durable writer receipt remains after a runner exits: a later writer requires the earlier run's terminal result, so a lost Go runner cannot release a potentially still-active child merely by losing its OS lock. Busy or uncertain workspaces fail before starting the coding process. This coordination covers framework-managed coding runs; coordination of external/manual workspace changes and non-Shell remote resources remains required.
 
-Python exposes `preparing` until an actual running receipt arrives, persists the resolved target and workspace event, and inherits parent task deadlines. Existing-session continuation, new-project creation and external checkpoint Fork remain required. These targets fail explicitly; callers must not substitute an arbitrary current directory for a project target. External success still enters the verification path; this transport does not equate an exit code with meeting the user's goal.
+Python exposes `preparing` until an actual running receipt arrives, persists the resolved target and workspace event, and inherits parent task deadlines. Existing-session continuation and external checkpoint Fork remain required. These targets fail explicitly; callers must not substitute an arbitrary current directory for a project target. External success still enters the verification path; this transport does not equate an exit code with meeting the user's goal.
+
+## New project targets
+
+A `new_project` target supplies `name` and an optional absolute `baseDir`. Native and coding executors first call the existing authenticated `roami project create` CLI, using a stable `--provision-key` derived from the run. Go's project API remains the catalog writer; Python never writes project metadata. The default parent is `<DataRoot>/projects`. The normal create command still supports adopting existing directories; Agent provisioning uses an exclusive path that rejects name/directory conflicts and placement inside another Git worktree.
+
+Go saves intent before directory creation, verifies ownership before recovery/registration, checks catalog persistence and saves a durable resource receipt. Replaying the same request returns the same project ID, while changed parameters or a removed target fail explicitly. An ambiguous directory is preserved for reconciliation. Current Agent provisioning creates an empty directory project; configured templates/clone provisioning are still required. CLI login and the existing Go server connection must already be available; no additional Python login or fallback metadata writer is introduced.
+
+After provisioning, execution uses the normal project workspace preparation and records the resolved project/workspace binding. Memory extraction and daily counts use the resolved project, with daily attribution bounded by the preparation event watermark. A directory project that is later initialized as its own Git repository keeps its workspace ID when continued; the registry refreshes checkout metadata without fetching or resetting it.
 
 ## Native Worker workspaces
 
@@ -99,7 +107,7 @@ Cross-language tests use the real Go CLI, Python runtime and local Shell process
 ## Remaining work toward the full framework
 
 1. Physical Android acceptance of the integrated chat, keyboard, touch navigation and safe areas; additional executor target controls and system push UI.
-2. Extend coding execution to existing Codex/Claude sessions and new projects. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
+2. Extend coding execution to existing Codex/Claude sessions. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
 3. Browser/Computer tool adapters, resource leases and artifact storage/backup, including binary MCP results. MCP stdio and Streamable HTTP adapters are implemented; unsupported binary/oversized results stop the call rather than entering model context.
 4. Broaden legacy forgetting/re-learning recovery cases; implement provider cache controls and provider/model routing resilience.
 5. Proactive triggers/scheduling, notification preferences, quiet hours, rate limits and existing App push delivery adapters. The notification store is implemented, but an outbox row is not proof of external delivery.

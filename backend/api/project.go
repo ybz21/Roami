@@ -398,16 +398,35 @@ func (a *API) ProjectsList(c *gin.Context) {
 // 编队/活动能力；非 git 目录照样成为项目（目录 + 会话）。
 func (a *API) ProjectCreate(c *gin.Context) {
 	var b struct {
-		Dir         string `json:"dir"`
-		DisplayName string `json:"displayName"`
+		Dir          string `json:"dir"`
+		DisplayName  string `json:"displayName"`
+		ProvisionKey string `json:"provisionKey"`
+		BaseDir      string `json:"baseDir"`
 		// CloneURL 填了就先把它克隆到 Dir，再按 git 项目登记。
 		// 空 = 老行为（目录已存在就用它，不存在就新建一个空目录）。
 		CloneURL string `json:"cloneUrl"`
 	}
-	if err := c.ShouldBindJSON(&b); err != nil || strings.TrimSpace(b.Dir) == "" {
+	if err := c.ShouldBindJSON(&b); err != nil || (strings.TrimSpace(b.Dir) == "" && b.ProvisionKey == "") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
+	if b.ProvisionKey != "" {
+		if b.CloneURL != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "PROJECT_PROVISION_CLONE_UNSUPPORTED"}})
+			return
+		}
+		receipt, err := a.Projects.Provision(c.Request.Context(), b.ProvisionKey, b.DisplayName, b.BaseDir, b.Dir)
+		if err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": strings.SplitN(err.Error(), ":", 2)[0]}})
+			return
+		}
+		projRespMu.Lock()
+		projResp = nil
+		projRespMu.Unlock()
+		c.JSON(http.StatusOK, gin.H{"data": receipt})
+		return
+	}
+
 	dir := strings.TrimSpace(b.Dir)
 	if strings.HasPrefix(dir, "~/") || dir == "~" {
 		if home, err := os.UserHomeDir(); err == nil {

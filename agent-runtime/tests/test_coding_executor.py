@@ -173,3 +173,51 @@ async def test_explicit_workspace_reuse_passes_stable_identity_without_directory
     with pytest.raises(DomainError, match="CODING_WORKSPACE_REUSE_CONFLICT"):
         await executor.run(dict(task, intent_json=json.dumps(spec)), run)
     assert len(captured) == 1
+
+
+async def test_coding_new_project_resolves_before_launch_without_using_loose_directory(
+    store, tmp_path, monkeypatch
+):
+    from roami_agent.executors import roami_cli
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    c = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        c["id"],
+        "Create expense tracker",
+        key="new-project",
+        executor="claude",
+        target={"kind": "new_project", "name": "Expense Tracker"},
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    calls = []
+
+    async def provision(settings, original, attempt):
+        calls.append("provision")
+        assert original["id"] == task["id"] and attempt["id"] == run["id"]
+        return {"kind": "project", "projectId": "new-stable-id"}
+
+    monkeypatch.setattr(roami_cli, "provision_project", provision)
+    executor = CodingExecutor(store, Settings(coding_directory=tmp_path))
+
+    async def command(sub, *args, spec=None):
+        calls.append("launch")
+        assert spec["projectId"] == "new-stable-id" and "directory" not in spec
+        return {
+            "state": "running",
+            "session": "new-project-session",
+            "workspace": {
+                "projectId": "new-stable-id",
+                "workspaceId": "prepared-id",
+                "directory": str(tmp_path / "new-project"),
+            },
+        }
+
+    executor.command = command
+    assert await executor.run(task, run) is None
+    assert calls == ["provision", "launch"]

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ybz21/Roami/backend/project"
 	"github.com/ybz21/Roami/backend/worktree"
@@ -101,8 +102,18 @@ func (s Service) reuseWorkspace(ctx context.Context, spec Spec) (Workspace, erro
 	}
 	for _, candidate := range entries {
 		path, err := canonicalWorkspace(candidate.Path)
-		if err == nil && path == directory && candidate.Branch == workspace.Branch && !candidate.Prunable {
+		if err != nil || path != directory || candidate.Prunable {
+			continue
+		}
+		if candidate.Branch == workspace.Branch {
 			return workspace, nil
+		}
+		if workspace.Branch == "" && workspace.StartOID == "" && candidate.IsMain && repo.Root == directory {
+			workspace.Branch, workspace.Base = candidate.Branch, candidate.Base
+			if strings.Trim(candidate.Head, "0") != "" {
+				workspace.StartOID = candidate.Head
+			}
+			return s.rememberWorkspace(workspace)
 		}
 	}
 	return Workspace{}, fmt.Errorf("WORKSPACE_STALE")

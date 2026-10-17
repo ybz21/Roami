@@ -153,7 +153,8 @@ class MemoryJobs:
             if task
             else trigger["conversation_id"],
             "task_id": task["id"] if task else None,
-            "project_id": target.get("projectId"),
+            "project_id": (json.loads(task["target_json"] or "{}") if task else {}).get("projectId")
+            or target.get("projectId"),
         }
         return sources, scope
 

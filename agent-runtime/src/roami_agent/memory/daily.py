@@ -63,19 +63,19 @@ class DailyMemories:
             def page(db, cursor=cursor):
                 events = rows(
                     db,
-                    "SELECT e.*,t.intent_json FROM events e JOIN conversations c ON c.id=e.conversation_id LEFT JOIN tasks t ON t.id=e.task_id WHERE c.owner_id=? AND c.deleted_ms IS NULL AND e.id>? AND e.id<=? AND e.created_ms>=? AND e.created_ms<? AND e.kind IN ("
+                    "SELECT e.*,t.intent_json,(SELECT json_extract(p.payload_json,'$.workspace.projectId') FROM events p WHERE p.task_id=t.id AND p.kind='task.workspace_prepared' AND p.id<=? ORDER BY p.id DESC LIMIT 1) AS resolved_project_id FROM events e JOIN conversations c ON c.id=e.conversation_id LEFT JOIN tasks t ON t.id=e.task_id WHERE c.owner_id=? AND c.deleted_ms IS NULL AND e.id>? AND e.id<=? AND e.created_ms>=? AND e.created_ms<? AND e.kind IN ("
                     + ",".join("?" for _ in DAILY_KINDS)
                     + ") ORDER BY e.id LIMIT 256",
-                    (owner, cursor, watermark, start, end, *DAILY_KINDS),
+                    (watermark, owner, cursor, watermark, start, end, *DAILY_KINDS),
                 )
                 message_ids = [e["message_id"] for e in events if e["message_id"]]
                 targets = (
                     rows(
                         db,
-                        "SELECT t.origin_message_id,t.intent_json FROM tasks t WHERE t.owner_id=? AND t.origin_message_id IN ("
+                        "SELECT t.origin_message_id,t.intent_json,(SELECT json_extract(p.payload_json,'$.workspace.projectId') FROM events p WHERE p.task_id=t.id AND p.kind='task.workspace_prepared' AND p.id<=? ORDER BY p.id DESC LIMIT 1) AS resolved_project_id FROM tasks t WHERE t.owner_id=? AND t.origin_message_id IN ("
                         + ",".join("?" for _ in message_ids)
                         + ") AND EXISTS(SELECT 1 FROM events e WHERE e.task_id=t.id AND e.kind='task.accepted' AND e.id<=?)",
-                        (owner, *message_ids, watermark),
+                        (watermark, owner, *message_ids, watermark),
                     )
                     if message_ids
                     else []
@@ -87,12 +87,14 @@ class DailyMemories:
                 break
             projects = {}
             for target in targets:
-                key = (json.loads(target["intent_json"]).get("target") or {}).get(
-                    "projectId"
-                ) or "unassigned"
+                key = (
+                    target["resolved_project_id"]
+                    or (json.loads(target["intent_json"]).get("target") or {}).get("projectId")
+                    or "unassigned"
+                )
                 projects.setdefault(target["origin_message_id"], set()).add(key)
             for entry in events:
-                project = (
+                project = entry["resolved_project_id"] or (
                     (json.loads(entry["intent_json"]).get("target") or {}).get("projectId")
                     if entry["intent_json"]
                     else None

@@ -66,6 +66,7 @@ type fileShape struct {
 
 // Store 单写者：所有变更持内存互斥锁，落盘 tmp+rename 原子替换（同 RaceStore 体例）。
 type Store struct {
+	dataDir string
 	mu      sync.Mutex
 	path    string            // 旧 JSON 台账；只在降级模式下写
 	db      *metadb.DB        // 直连模式下的真相源
@@ -80,7 +81,7 @@ type Store struct {
 // 换存储只换了 load/save 两端。这样 mergeInto/resolve/退场判定/60s 节流
 // 这些语义一行没动，出了问题也只可能出在持久化这一层。
 func NewStore(dataDir string, db *metadb.DB) *Store {
-	s := &Store{repos: map[string]*Entry{}, aliases: map[string]string{}, byDir: map[string]string{}, db: db}
+	s := &Store{dataDir: dataDir, repos: map[string]*Entry{}, aliases: map[string]string{}, byDir: map[string]string{}, db: db}
 	if db.OK() {
 		s.loadDB()
 		return s

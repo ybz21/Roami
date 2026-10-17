@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"io"
 	"io/fs"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/backend/api"
 	"github.com/ybz21/Roami/backend/project"
 )
 
@@ -82,7 +85,13 @@ func TestNativeProjectThroughRealPythonAndGoCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	directory := t.TempDir()
-	projectID, _ := project.NewStore(s.Runtime.DataDir, db).Add(directory, "Native project")
+	store := project.NewStore(s.Runtime.DataDir, db)
+	projectID, _ := store.Add(directory, "Native project")
+	router := gin.New()
+	handler := &api.API{Projects: store}
+	router.POST("/api/projects", handler.ProjectCreate)
+	server := httptest.NewServer(router)
+	defer server.Close()
 	repository, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -108,13 +117,22 @@ func TestNativeProjectThroughRealPythonAndGoCLI(t *testing.T) {
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, output)
 	}
-	command := exec.Command("uv", "run", "--frozen", "--directory", filepath.Join(repository, "agent-runtime"), "python", "tests/native_workspace_scenario.py", binary, s.Runtime.HomeDir, projectID, directory)
-	command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "GIT_DIR=/foreign/repository", "GIT_INDEX_FILE=/foreign/index")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("native project integration: %v\n%s", err, output)
+	for _, mode := range []string{"existing", "new"} {
+		t.Run(mode, func(t *testing.T) {
+			currentDirectory := directory
+			if mode == "new" {
+				currentDirectory = filepath.Join(t.TempDir(), "New native project")
+			}
+			command := exec.Command("uv", "run", "--frozen", "--directory", filepath.Join(repository, "agent-runtime"), "python", "tests/native_workspace_scenario.py", binary, s.Runtime.HomeDir, projectID, currentDirectory)
+			command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "GIT_DIR=/foreign/repository", "GIT_INDEX_FILE=/foreign/index", "ROAMI_SERVER="+server.URL, "ROAMI_FIXTURE_PROJECT_MODE="+mode)
+			output, err := command.CombinedOutput()
+			if err != nil {
+				t.Fatalf("native project integration: %v\n%s", err, output)
+			}
+			if !strings.Contains(string(output), "native workspace scenario passed") {
+				t.Fatalf("missing verification: %s", output)
+			}
+		})
 	}
-	if !strings.Contains(string(output), "native workspace scenario passed") {
-		t.Fatalf("missing verification: %s", output)
-	}
+
 }

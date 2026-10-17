@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 
+from roami_agent.executors.project import provision_project
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
@@ -39,10 +40,14 @@ class CodingExecutor:
     async def run(self, task, run):
         spec = json.loads(task["intent_json"])
         target = spec["target"]
+        if target["kind"] == "new_project":
+            target = await provision_project(self.settings, task, run)
         if target["kind"] not in {"new_session", "project"}:
             raise DomainError("CODING_TARGET_ADAPTER_NOT_IMPLEMENTED")
         if spec.get("fromMessageId"):
             raise DomainError("CODING_CHECKPOINT_FORK_NOT_IMPLEMENTED")
+        if json.loads(task["budget_json"])["deadlineMs"] <= now_ms():
+            raise DomainError("TASK_BUDGET_EXCEEDED")
         launch = {
             "key": run["launch_id"],
             "executor": spec["executor"],

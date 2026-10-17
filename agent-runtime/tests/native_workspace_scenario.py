@@ -68,7 +68,13 @@ class Memory:
 async def main():
     cli, root, project, directory = sys.argv[1:]
     root, directory = Path(root), Path(directory)
-    db = Database(root / "native-runtime.db", root, managed=False)
+    owner = "native-fixture-" + os.environ.get("ROAMI_FIXTURE_PROJECT_MODE", "existing")
+    db = Database(
+        root
+        / ("native-runtime-" + os.environ.get("ROAMI_FIXTURE_PROJECT_MODE", "existing") + ".db"),
+        root,
+        managed=False,
+    )
     await db.open()
 
     async def verify(task, result):
@@ -114,28 +120,123 @@ async def main():
 
     await runtime.start()
     try:
-        c = await runtime.conversations.create("native-fixture")
+        c = await runtime.conversations.create(owner)
+        new_project = os.environ.get("ROAMI_FIXTURE_PROJECT_MODE") == "new"
+        initial_target = (
+            {"kind": "new_project", "name": directory.name, "baseDir": str(directory.parent)}
+            if new_project
+            else {"kind": "project", "projectId": project}
+        )
         task = await runtime.tasks.create(
-            "native-fixture",
+            owner,
             c["id"],
             "write proof",
             key="native-project",
-            target={"kind": "project", "projectId": project},
+            target=initial_target,
             record_intent=True,
         )
-        await wait(lambda: terminal(task["id"], "succeeded"))
-        current = (await runtime.tasks.list("native-fixture"))[0]
+
+        async def initial_done():
+            current = await db.call(
+                lambda connection: row(
+                    connection, "SELECT state FROM tasks WHERE id=?", (task["id"],)
+                )
+            )
+            if current["state"] in {"failed", "interrupted", "cancelled"}:
+                details = await db.call(
+                    lambda connection: row(
+                        connection,
+                        "SELECT result_json FROM task_attempts WHERE task_id=?",
+                        (task["id"],),
+                    )
+                )
+                raise AssertionError(details)
+            return current["state"] == "succeeded"
+
+        await wait(initial_done)
+        current = (await runtime.tasks.list(owner))[0]
         target = json.loads(current["target_json"])
         assert target["workdir"] == str(directory) and target["workspaceId"]
-        events = await runtime.conversations.events("native-fixture", c["id"])
+        project = target["projectId"]
+        if new_project:
+            from roami_agent.executors.project import provision_project
+
+            run = await db.call(
+                lambda connection: row(
+                    connection, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],)
+                )
+            )
+            replay = await provision_project(runtime.settings, task, run)
+            assert (
+                replay["projectId"] == project
+                and (directory / "native-proof.txt").read_text() == "native"
+            )
+            conflict = await runtime.tasks.create(
+                owner,
+                c["id"],
+                "must not overwrite",
+                key="conflicting-project",
+                target={
+                    "kind": "new_project",
+                    "name": directory.name,
+                    "baseDir": str(directory.parent / "elsewhere"),
+                },
+                record_intent=True,
+            )
+            await wait(lambda: terminal(conflict["id"], "failed"))
+            assert not (directory.parent / "elsewhere" / directory.name).exists()
+
+        if new_project:
+            await runtime.memory.daily.refresh(owner)
+            summary = await db.call(
+                lambda connection: row(
+                    connection,
+                    "SELECT counts_json FROM day_summaries WHERE owner_id=? AND scope_key=?",
+                    (owner, project),
+                )
+            )
+            assert summary and json.loads(summary["counts_json"])["tasksCreated"] == 1
+            assert json.loads(summary["counts_json"])["tasksCompleted"] == 1
+            completed = await db.call(
+                lambda connection: row(
+                    connection,
+                    "SELECT id FROM events WHERE task_id=? AND kind='task.succeeded'",
+                    (task["id"],),
+                )
+            )
+            _, scope = await db.call(
+                lambda connection: runtime.memory_jobs._sources(
+                    connection, {"owner": owner, "eventId": completed["id"]}
+                )
+            )
+            assert scope["project_id"] == project
+        events = await runtime.conversations.events(owner, c["id"])
         kinds = [event["kind"] for event in events if event["task_id"] == task["id"]]
         assert (
             kinds.index("task.preparing")
             < kinds.index("task.workspace_prepared")
             < kinds.index("task.started")
         )
+        if new_project:
+            from roami_agent.tools.process import execute
+
+            for argv in [
+                ["git", "init", "-b", "main"],
+                ["git", "add", "native-proof.txt"],
+                [
+                    "git",
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "commit",
+                    "-m",
+                    "initial project",
+                ],
+            ]:
+                assert (await execute(argv, cwd=directory))["exitCode"] == 0
         cancelling = await runtime.tasks.create(
-            "native-fixture",
+            owner,
             c["id"],
             "cancel long shell",
             key="native-cancel",
@@ -148,7 +249,7 @@ async def main():
 
         await wait(child_started)
         pid = int((directory / "native-pid.txt").read_text())
-        await runtime.tasks.cancel("native-fixture", cancelling["id"])
+        await runtime.tasks.cancel(owner, cancelling["id"])
         await wait(lambda: terminal(cancelling["id"], "cancelled"))
         try:
             os.kill(pid, 0)
@@ -158,7 +259,7 @@ async def main():
             raise AssertionError("Cancelled native shell is still alive")
         assert not (directory / "late-write.txt").exists()
         again = await runtime.tasks.create(
-            "native-fixture",
+            owner,
             c["id"],
             "write proof again",
             key="native-again",
@@ -167,7 +268,7 @@ async def main():
         )
         await wait(lambda: terminal(again["id"], "succeeded"))
         uncertain = await runtime.tasks.create(
-            "native-fixture",
+            owner,
             c["id"],
             "ambiguous write",
             key="native-ambiguous",
@@ -175,7 +276,7 @@ async def main():
             record_intent=True,
         )
         await asyncio.wait_for(uncertain_started.wait(), 10)
-        await runtime.tasks.cancel("native-fixture", uncertain["id"])
+        await runtime.tasks.cancel(owner, uncertain["id"])
         await wait(lambda: terminal(uncertain["id"], "interrupted"))
         details = await db.call(
             lambda connection: row(
@@ -186,7 +287,7 @@ async def main():
         )
         assert json.loads(details["result_json"])["summary"] == "NATIVE_WORKSPACE_OUTCOME_UNKNOWN"
         blocked = await runtime.tasks.create(
-            "native-fixture",
+            owner,
             c["id"],
             "must not execute",
             key="native-quarantined",

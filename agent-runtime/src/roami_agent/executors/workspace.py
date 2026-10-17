@@ -7,6 +7,7 @@ import os
 import signal
 from contextlib import asynccontextmanager
 
+from roami_agent.executors.project import provision_project
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
@@ -15,6 +16,8 @@ from roami_agent.protocol.serialization import encoded
 @asynccontextmanager
 async def hold_workspace(settings, task, run, *, stopped=None):
     target = json.loads(task["intent_json"])["target"]
+    if target["kind"] == "new_project":
+        target = await provision_project(settings, task, run)
     if target.get("nodeId", "local") != "local":
         raise DomainError("NATIVE_NODE_UNAVAILABLE")
     if "workspaceId" in target and (
