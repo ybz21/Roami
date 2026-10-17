@@ -67,6 +67,27 @@ func ListJSON(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool,
 	return json.NewEncoder(w).Encode(Collect(rt, meta, exclude))
 }
 
+// ListLiveJSON is a short identity query, without reconciliation or terminal capture.
+func ListLiveJSON(rt runtime.Runtime, exclude map[string]bool, w io.Writer) error {
+	rows, err := rt.ObserveSessionRows()
+	if err != nil {
+		return err
+	}
+	items := []map[string]string{}
+	for _, row := range rows {
+		if !exclude[row.Name] {
+			item := resolvedIdentity(row)
+			item["state"] = "live"
+			items = append(items, item)
+		}
+	}
+	return json.NewEncoder(w).Encode(items)
+}
+
+func resolvedIdentity(row runtime.SessionRow) map[string]string {
+	return map[string]string{"name": row.Name, "label": row.DisplayLabel(), "id": row.ID(), "tmux_id": row.TmuxID}
+}
+
 func InfoJSON(rt runtime.Runtime, version string, exclude map[string]bool, w io.Writer) error {
 	sessions := 0
 	for _, name := range rt.Sessions() {
@@ -126,7 +147,18 @@ func Resolve(rt runtime.Runtime, args []string, w io.Writer) error {
 		}
 	}
 	if token == "" {
-		return fmt.Errorf("usage: roami session resolve <会话名|id|展示名> [--json]")
+		return fmt.Errorf("usage: roami session resolve <会话名|id|展示名> [--json] [--strict]")
+	}
+	if has(args, "--strict") {
+		row, err := rt.ResolveStrict(token)
+		if err != nil {
+			return err
+		}
+		if has(args, "--json") {
+			return json.NewEncoder(w).Encode(resolvedIdentity(row))
+		}
+		_, err = io.WriteString(w, row.Name+"\n")
+		return err
 	}
 	name := rt.Resolve(token)
 	if !rt.HasSession(name) {
@@ -134,9 +166,7 @@ func Resolve(rt runtime.Runtime, args []string, w io.Writer) error {
 	}
 	if has(args, "--json") {
 		row := rt.SessionRow(name)
-		return json.NewEncoder(w).Encode(map[string]string{
-			"name": row.Name, "label": row.DisplayLabel(), "id": row.ID(), "tmux_id": row.TmuxID,
-		})
+		return json.NewEncoder(w).Encode(resolvedIdentity(row))
 	}
 	_, err := io.WriteString(w, name+"\n")
 	return err

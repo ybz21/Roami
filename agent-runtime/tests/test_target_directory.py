@@ -1,0 +1,182 @@
+"""Routing uses current CLI identity, bounded metadata and explicit ambiguity errors."""
+
+import json
+
+import pytest
+
+from roami_agent.app import Runtime
+from roami_agent.executors import targets
+from roami_agent.executors.targets import TargetDirectory
+from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.models import ModelEvent
+from roami_agent.server.configuration import Settings
+from roami_agent.storage.database import row
+
+
+async def test_project_discovery_pages_stable_ids_and_discards_unrelated_fields(monkeypatch):
+    calls = []
+
+    async def execute(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return {
+            "exitCode": 0,
+            "stdout": json.dumps(
+                {
+                    "data": {
+                        "projects": [
+                            {"key": f"id-{i}", "name": "Expenses", "tail": "private log"}
+                            for i in range(25, -1, -1)
+                        ]
+                    }
+                }
+            ),
+        }
+
+    monkeypatch.setattr(targets, "execute", execute)
+    directory = TargetDirectory(Settings(cli_bin="/selected/roami"))
+    first = await directory.search("project", "expenses", limit=10)
+    second = await directory.search("project", "expenses", offset=first["nextOffset"], limit=20)
+    assert first["total"] == 26 and len(first["items"]) == 10
+    assert second["nextOffset"] is None and len(second["items"]) == 16
+    assert {v["projectId"] for v in first["items"] + second["items"]} == {
+        f"id-{i}" for i in range(26)
+    }
+    assert all(v["kind"] == "project" for v in first["items"])
+    assert "private log" not in json.dumps(first)
+    assert calls[0] == (["/selected/roami", "project", "ls", "--json"], {"timeout": 5})
+
+
+async def test_live_sessions_preserve_duplicate_labels_without_selecting_one(monkeypatch):
+    calls = []
+
+    async def execute(argv, **kwargs):
+        calls.append(argv)
+        return {
+            "exitCode": 0,
+            "stdout": json.dumps(
+                [{"id": f"stable-{i}", "label": "同名", "state": "live"} for i in range(2)]
+            ),
+        }
+
+    monkeypatch.setattr(targets, "execute", execute)
+    result = await TargetDirectory(Settings()).search("session", "同名")
+    assert result["total"] == 2
+    assert {v["sessionId"] for v in result["items"]} == {"stable-0", "stable-1"}
+    assert calls[0][1:] == ["session", "ls", "--live", "--json"]
+
+
+async def test_resolution_uses_strict_cli_and_sanitizes_diagnostics(monkeypatch):
+    calls = []
+    diagnostics = "SESSION_TARGET_AMBIGUOUS"
+
+    async def execute(argv, **kwargs):
+        calls.append(argv)
+        return {"exitCode": 1, "stderr": diagnostics}
+
+    monkeypatch.setattr(targets, "execute", execute)
+    directory = TargetDirectory(Settings())
+    with pytest.raises(DomainError, match="SESSION_TARGET_AMBIGUOUS"):
+        await directory.resolve("session", "duplicate label")
+    assert calls[0][1:] == ["session", "resolve", "duplicate label", "--strict", "--json"]
+    diagnostics = "authentication failed; private account details"
+    with pytest.raises(DomainError, match="^TARGET_DISCOVERY_UNAVAILABLE$"):
+        await directory.resolve("project", "project-id")
+
+
+async def test_invalid_receipts_fail_instead_of_reporting_an_empty_catalog(monkeypatch):
+    payload = {"data": {"projects": "invalid"}}
+
+    async def execute(argv, **kwargs):
+        return {"exitCode": 0, "stdout": json.dumps(payload)}
+
+    monkeypatch.setattr(targets, "execute", execute)
+    directory = TargetDirectory(Settings())
+    with pytest.raises(DomainError, match="INVALID_TARGET_RECEIPT"):
+        await directory.search("project")
+    payload = {"data": {"projects": [{"key": "id", "name": None}]}}
+    with pytest.raises(DomainError, match="INVALID_TARGET_RECEIPT"):
+        await directory.search("project")
+    payload = []
+    with pytest.raises(DomainError, match="INVALID_TARGET_RECEIPT"):
+        await directory.resolve("session", "id")
+
+
+async def test_lookup_failure_and_output_budget_are_bounded(monkeypatch):
+    async def execute(argv, **kwargs):
+        raise TimeoutError
+
+    monkeypatch.setattr(targets, "execute", execute)
+    directory = TargetDirectory(Settings())
+    with pytest.raises(DomainError, match="TARGET_DISCOVERY_UNAVAILABLE"):
+        await directory.search("session")
+
+    async def large(argv, **kwargs):
+        return {
+            "exitCode": 0,
+            "stdout": json.dumps([{"id": str(i), "label": "测" * 160} for i in range(30)]),
+        }
+
+    monkeypatch.setattr(targets, "execute", large)
+    result = await directory.search("session", limit=20)
+    assert len(json.dumps(result, ensure_ascii=False).encode()) < 6200
+    assert 0 < result["nextOffset"] < 20
+
+
+async def test_main_routes_discovered_project_through_persisted_tool_result(store, monkeypatch):
+    from test_runtime import until
+
+    observed = []
+
+    async def execute(argv, **kwargs):
+        observed.append(argv)
+        return {
+            "exitCode": 0,
+            "stdout": json.dumps({"data": {"projects": [{"key": "expenses-id", "name": "记账"}]}}),
+        }
+
+    class Model:
+        model = "injected-routing-model"
+
+        async def stream(self, messages, catalog):
+            latest = messages[-1]
+            if latest["content"] == "给记账项目安排工作":
+                name, args = "target_search", {"kind": "project", "query": "记账"}
+            elif latest["role"] == "tool" and json.loads(latest["content"]).get("items"):
+                item = json.loads(latest["content"])["items"][0]
+                name, args = (
+                    "delegate",
+                    {"goal": "Update expenses", "executor": "codex", "target": item},
+                )
+            else:
+                yield ModelEvent("text", "已安排，任务在后台准备。")
+                return
+            yield ModelEvent(
+                "tool",
+                {"id": name, "function": {"name": name, "arguments": json.dumps(args)}},
+            )
+
+    monkeypatch.setattr(targets, "execute", execute)
+    runtime = Runtime(store, Model())
+    # Drive only the Main turn; no real coding session is messaged or created.
+    c = await runtime.conversations.create("alice")
+    reply = await runtime.chat.submit("alice", c["id"], "route", "给记账项目安排工作")
+    await runtime.start()
+    try:
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (reply["turnId"],)
+            ),
+        )
+        tasks = await runtime.tasks.list("alice", c["id"])
+        assert len(tasks) == 1
+        assert json.loads(tasks[0]["intent_json"])["target"]["projectId"] == "expenses-id"
+        assert observed[0][1:] == ["project", "ls", "--json"]
+        results = await store.call(
+            lambda db: db.execute(
+                "SELECT count(*) FROM tool_calls WHERE tool_name='target_search' AND state='succeeded'"
+            ).fetchone()[0]
+        )
+        assert results == 1
+    finally:
+        await runtime.close()

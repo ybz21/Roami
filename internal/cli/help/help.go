@@ -32,6 +32,8 @@ func Show(version string, w io.Writer) {
 	fmt.Fprintf(w, "  %s %s\n", b("子会话"), m("(subSession — 平坦 tmux 会话 + parent 关系)"))
 	fmt.Fprintf(w, "    %s %s  从父会话派生子会话(继承 cwd/env)\n", g("fork"), d("[<父>] <子> [--dir <目录>] [--detach] [--json]"))
 	fmt.Fprintf(w, "    %s %s  会话树(parent 投影)\n", g("ls --tree"), d("[--json]"))
+	fmt.Fprintf(w, "    %s  活会话身份快照；观察失败返回错误\n", g("ls --live --json"))
+	fmt.Fprintf(w, "    %s %s  严格解析；同名不自动选择\n", g("resolve <session> --strict"), d("[--json]"))
 	fmt.Fprintf(w, "    %s %s  列出直接子会话\n", g("children"), d("<会话> [--json]"))
 	fmt.Fprintf(w, "    %s %s  调整归属\n\n", g("parent"), d("set <子> <父> | clear <子> | get <子>"))
 

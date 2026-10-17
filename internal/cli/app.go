@@ -79,6 +79,12 @@ func (a App) Run(args []string) error {
 
 	// ── session management (native) ──
 	case "ls":
+		if has(rest, "--live") {
+			if !has(rest, "--json") || has(rest, "--tree") {
+				return fmt.Errorf("--live requires --json and cannot be combined with --tree")
+			}
+			return session.ListLiveJSON(a.rt, a.swarmSessions(), out)
+		}
 		if has(rest, "--tree") {
 			if has(rest, "--json") {
 				return session.TreeJSON(a.rt, a.meta(), a.swarmSessions(), out)

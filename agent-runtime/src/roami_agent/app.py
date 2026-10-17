@@ -23,6 +23,7 @@ from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.roami_cli import CodingExecutor
+from roami_agent.executors.targets import TargetDirectory
 from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
 from roami_agent.observability.prompt_manifests import PromptManifests
@@ -72,7 +73,7 @@ class Runtime:
         self.stopping = False
         self.supervisor = None
         self.external_monitor = None
-        register_main_tools(self.tools, self.tasks, self.memory)
+        register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         add_worker_tools(self.tools, self.settings)
         self.mcp = MCPConnections(self.tools, self.settings.mcp_servers)
 

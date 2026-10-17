@@ -4,7 +4,51 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 
 
-def register_main_tools(registry, tasks, memory):
+def register_main_tools(registry, tasks, memory, targets):
+    async def target_search(args, binding):
+        return await targets.search(
+            args["kind"],
+            args.get("query", ""),
+            offset=args.get("offset", 0),
+            limit=args.get("limit", 10),
+        )
+
+    async def target_resolve(args, binding):
+        return await targets.resolve(args["kind"], args["id"])
+
+    registry.add(
+        Tool(
+            "target_search",
+            "Find projects or live sessions by literal name/ID, with bounded pages. Use only when routing needs it. Never guess among duplicate names. Discovery does not enable session continuation.",
+            object_schema(
+                {
+                    "kind": {"type": "string", "enum": ["project", "session"]},
+                    "query": {"type": "string", "maxLength": 200},
+                    "offset": {"type": "integer", "minimum": 0, "maximum": 10000},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                },
+                ["kind"],
+            ),
+            target_search,
+            main=True,
+        )
+    )
+    registry.add(
+        Tool(
+            "target_resolve",
+            "Resolve an exact project ID or live session ID/name/label; duplicate labels fail. Liveness does not prove a task finished or stopped.",
+            object_schema(
+                {
+                    "kind": {"type": "string", "enum": ["project", "session"]},
+                    "id": {"type": "string", "minLength": 1, "maxLength": 300},
+                },
+                ["kind", "id"],
+            ),
+            target_resolve,
+            main=True,
+        )
+    )
+
     async def delegate(args, binding):
         return await tasks.create(
             binding["owner"],

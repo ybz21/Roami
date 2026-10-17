@@ -70,27 +70,78 @@ const sessionRowFormat = "#{session_id}\t#{session_created}\t#{session_name}\t#{
 // SessionRows 返回全部会话的身份行。tmux 没起/出错返回 nil——调用方据此进入
 // 「盲态」：不解析、不迁移，宁可原样透传也不猜。
 func (r Runtime) SessionRows() []SessionRow {
-	out, err := r.TmuxOutput("list-sessions", "-F", sessionRowFormat)
-	if err != nil {
+	rows, err := r.ObserveSessionRows()
+	if err != nil || len(rows) == 0 {
 		return nil
 	}
-	var rows []SessionRow
+	return rows
+}
+
+// ObserveSessionRows distinguishes an empty server from an unreadable snapshot.
+func (r Runtime) ObserveSessionRows() ([]SessionRow, error) {
+	out, err := r.TmuxOutput("list-sessions", "-F", sessionRowFormat)
+	if err != nil {
+		if NoServer(out) {
+			return []SessionRow{}, nil
+		}
+		return nil, fmt.Errorf("SESSION_OBSERVATION_FAILED")
+	}
+	rows := []SessionRow{}
 	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		parts := strings.SplitN(line, "\t", 4)
-		if len(parts) < 3 {
-			continue
+		if len(parts) < 3 || parts[0] == "" || parts[2] == "" {
+			return nil, fmt.Errorf("SESSION_OBSERVATION_FAILED")
 		}
-		created, _ := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+		created, parseErr := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
+		if parseErr != nil || created <= 0 {
+			return nil, fmt.Errorf("SESSION_OBSERVATION_FAILED")
+		}
 		row := SessionRow{TmuxID: strings.TrimSpace(parts[0]), Created: created, Name: parts[2]}
 		if len(parts) > 3 {
 			row.Label = strings.TrimSpace(parts[3])
 		}
 		rows = append(rows, row)
 	}
-	return rows
+	return rows, nil
+}
+
+// ResolveStrict never substitutes another session for an ambiguous display name.
+func (r Runtime) ResolveStrict(token string) (SessionRow, error) {
+	rows, err := r.ObserveSessionRows()
+	if err != nil {
+		return SessionRow{}, err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return SessionRow{}, fmt.Errorf("SESSION_TARGET_REQUIRED")
+	}
+	for _, row := range rows {
+		if row.Name == token {
+			return row, nil
+		}
+	}
+	for _, row := range rows {
+		if row.TmuxID == token || row.ID() == token {
+			return row, nil
+		}
+	}
+	var found *SessionRow
+	for _, row := range rows {
+		if row.Label == token {
+			if found != nil {
+				return SessionRow{}, fmt.Errorf("SESSION_TARGET_AMBIGUOUS")
+			}
+			copy := row
+			found = &copy
+		}
+	}
+	if found == nil {
+		return SessionRow{}, fmt.Errorf("SESSION_TARGET_NOT_FOUND")
+	}
+	return *found, nil
 }
 
 // SessionRow 按 tmux 会话名取一行身份（不存在返回零值）。
