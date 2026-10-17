@@ -24,8 +24,9 @@ EXTRACTION_PROMPT = (
 
 
 class MemoryJobs:
-    def __init__(self, database, model, memory, daily):
+    def __init__(self, database, model, memory, daily, *, artifacts=None):
         self.db, self.model, self.memory, self.daily = database, model, memory, daily
+        self.artifacts = artifacts
         self.cursor_key = "memory.scan:v1:" + daily.timezone
 
     async def recover(self):
@@ -135,6 +136,32 @@ class MemoryJobs:
             ] + [message["id"]]
         else:
             ids = ["event:" + str(trigger["id"])]
+        artifact_scope = "a.owner_id=? AND a.created_ms<=? AND " + (
+            "m.turn_id=?" if trigger["message_id"] else "a.task_id=?"
+        )
+        artifact_args = (
+            owner,
+            trigger["created_ms"],
+            message.get("turn_id") if trigger["message_id"] else task["id"] if task else None,
+        )
+        if row(
+            db,
+            "SELECT a.id FROM artifacts a LEFT JOIN messages m ON m.id=a.message_id WHERE "
+            + artifact_scope
+            + " AND a.deleted_ms IS NOT NULL LIMIT 1",
+            artifact_args,
+        ):
+            raise DomainError("MEMORY_SOURCE_NOT_FOUND")
+        ids.extend(
+            "artifact:" + artifact["id"]
+            for artifact in rows(
+                db,
+                "SELECT a.id FROM artifacts a LEFT JOIN messages m ON m.id=a.message_id WHERE "
+                + artifact_scope
+                + " ORDER BY a.created_ms DESC,a.id LIMIT 5",
+                artifact_args,
+            )
+        )
         sources = [source_snapshot(db, owner, mid) for mid in dict.fromkeys(ids)]
         for source in sources:
             if row(
@@ -185,10 +212,26 @@ class MemoryJobs:
                 for source in sources:
                     if remaining <= 0:
                         break
-                    content = (
-                        source["content_json"]
-                        .encode()[: min(4096, remaining)]
-                        .decode(errors="ignore")
+                    source_content = source["content_json"]
+                    if (
+                        self.artifacts
+                        and source.get("artifact_id")
+                        and source["size_bytes"] <= 64_000
+                        and (
+                            source["mime_type"].startswith("text/")
+                            or source["mime_type"] == "application/json"
+                        )
+                    ):
+                        _, body = await self.artifacts.read(payload["owner"], source["artifact_id"])
+                        source_content = encoded(
+                            {
+                                "artifact": json.loads(source_content)["artifact"],
+                                "text": body[:4000].decode(errors="replace"),
+                                "truncated": len(body) > 4000,
+                            }
+                        )
+                    content = source_content.encode()[: min(4096, remaining)].decode(
+                        errors="ignore"
                     )
                     evidence.append({"id": source["id"], "content": content})
                     remaining -= len(content.encode())
@@ -238,7 +281,16 @@ class MemoryJobs:
                             payload["owner"],
                             candidate.title,
                             candidate.body,
-                            candidate.sourceIds,
+                            list(
+                                dict.fromkeys(
+                                    candidate.sourceIds
+                                    + [
+                                        source_id
+                                        for source_id in expected
+                                        if source_id.startswith("artifact:")
+                                    ]
+                                )
+                            ),
                             kind=candidate.kind,
                             expected_sources=expected,
                             source_watermark=payload["eventId"],

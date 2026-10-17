@@ -137,31 +137,65 @@ class ToolGateway:
             ][:8]
 
         def finish(db):
+            committed_value, committed_state, committed_memories = value, state, memory_ids
+            if state == "succeeded" and call["function"]["name"] == "artifact_read":
+                source = row(
+                    db,
+                    "SELECT sha256 FROM artifacts WHERE id=? AND owner_id=? AND deleted_ms IS NULL",
+                    (args["id"], binding["owner"]),
+                )
+                if not source or row(
+                    db,
+                    "SELECT 1 FROM memory_tombstones WHERE owner_id=? AND source_fingerprint=?",
+                    (binding["owner"], source["sha256"]),
+                ):
+                    committed_value, committed_state = (
+                        {"error": "ARTIFACT_SOURCE_UNAVAILABLE"},
+                        "failed",
+                    )
+            if (
+                state == "succeeded"
+                and memory_ids
+                and any(
+                    not row(
+                        db,
+                        "SELECT id FROM memory_records WHERE id=? AND owner_id=? AND state='active'",
+                        (memory_id, binding["owner"]),
+                    )
+                    for memory_id in memory_ids
+                )
+            ):
+                committed_value, committed_state, committed_memories = (
+                    {"error": "MEMORY_SOURCE_CHANGED"},
+                    "failed",
+                    [],
+                )
             result_id = message(
                 db,
                 turn["conversation_id"],
                 turn["branch_id"],
                 "tool",
                 {
-                    "text": encoded(value),
+                    "text": encoded(committed_value),
                     "tool_call_id": call["id"],
-                    **({"memoryIds": memory_ids} if memory_ids else {}),
+                    **({"memoryIds": committed_memories} if committed_memories else {}),
                 },
                 turn_id=turn["id"],
             )
             db.execute(
                 "UPDATE tool_calls SET state=?,result_message_id=?,updated_ms=? WHERE id=?",
-                (state, result_id, now_ms(), tool_id),
+                (committed_state, result_id, now_ms(), tool_id),
             )
             event(
                 db,
                 turn["conversation_id"],
                 "tool.completed",
-                {"toolCallId": tool_id, "state": state},
+                {"toolCallId": tool_id, "state": committed_state},
                 turn_id=turn["id"],
             )
+            return committed_state, committed_value
 
-        await self.db.call(finish, write=True)
+        state, value = await self.db.call(finish, write=True)
         self.wakeup.set()
         if state == "unknown":
             raise DomainError("TOOL_OUTCOME_UNKNOWN")

@@ -70,6 +70,14 @@ class Memories:
             )
             if not memory:
                 raise DomainError("MEMORY_NOT_FOUND", 404)
+            if row(
+                db,
+                "SELECT 1 FROM memory_sources s LEFT JOIN artifacts a ON a.id=s.artifact_id "
+                "WHERE s.memory_id=? AND s.artifact_id IS NOT NULL "
+                "AND (a.id IS NULL OR a.deleted_ms IS NOT NULL OR a.owner_id!=?)",
+                (memory_id, owner),
+            ):
+                raise DomainError("MEMORY_SOURCE_NOT_FOUND", 404)
             memory["sources"] = rows(
                 db, "SELECT * FROM memory_sources WHERE memory_id=?", (memory_id,)
             )
@@ -250,6 +258,12 @@ class Memories:
                 )
             if forget_sources:
                 seed_dependencies(db, owner, memory)
+                db.execute(
+                    "INSERT OR IGNORE INTO context_omissions(owner_id,message_id,source_memory_id,reason,created_ms) "
+                    "SELECT ?,a.message_id,?,'forgotten_artifact',? FROM memory_sources s "
+                    "JOIN artifacts a ON a.id=s.artifact_id WHERE s.memory_id=? AND a.message_id IS NOT NULL",
+                    (owner, memory_id, now_ms(), memory_id),
+                )
                 db.execute(
                     "INSERT OR IGNORE INTO context_omissions(owner_id,message_id,source_memory_id,reason,created_ms) "
                     "SELECT ?,message_id,?,'forgotten_memory',? FROM memory_sources WHERE memory_id=? AND message_id IS NOT NULL",

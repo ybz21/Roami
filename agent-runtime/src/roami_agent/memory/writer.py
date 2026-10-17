@@ -11,6 +11,40 @@ from roami_agent.storage.transcript_repository import owned
 
 
 def source_snapshot(db, owner, message_id):
+    if message_id.startswith("artifact:"):
+        source = row(
+            db,
+            "SELECT a.*,COALESCE(m.conversation_id,t.origin_conversation_id) AS conversation_id,"
+            "m.branch_id FROM artifacts a LEFT JOIN messages m ON m.id=a.message_id "
+            "LEFT JOIN tasks t ON t.id=a.task_id LEFT JOIN conversations c ON c.id=COALESCE(m.conversation_id,t.origin_conversation_id) "
+            "WHERE a.id=? AND a.owner_id=? AND a.deleted_ms IS NULL "
+            "AND (c.id IS NULL OR (c.deleted_ms IS NULL AND c.owner_id=?)) "
+            "AND (a.message_id IS NULL OR (m.id IS NOT NULL AND m.deleted_ms IS NULL AND m.status='completed'))",
+            (message_id[9:], owner, owner),
+        )
+        if not source:
+            raise DomainError("MEMORY_SOURCE_NOT_FOUND", 404)
+        artifact_id = source["id"]
+        source.update(
+            id=message_id,
+            artifact_id=artifact_id,
+            message_id=None,
+            event_id=None,
+            kind="artifact",
+            content_json=encoded(
+                {
+                    "text": source["name"],
+                    "artifact": {
+                        "id": artifact_id,
+                        "name": source["name"],
+                        "mimeType": source["mime_type"],
+                        "sha256": source["sha256"],
+                        "sizeBytes": source["size_bytes"],
+                    },
+                }
+            ),
+        )
+        return source
     if message_id.startswith("event:"):
         source = row(
             db,
@@ -76,6 +110,8 @@ def commit_memory(
         raise DomainError("TASK_NOT_FOUND", 404)
     sources = [source_snapshot(db, owner, message_id) for message_id in dict.fromkeys(source_ids)]
     for source in sources:
+        if source.get("artifact_id") and task and source.get("task_id") not in {None, task_id}:
+            raise DomainError("MEMORY_SOURCE_SCOPE_MISMATCH", 409)
         if expected_sources is not None and expected_sources.get(source["id"]) != source["sha256"]:
             raise DomainError("MEMORY_SOURCE_CHANGED", 409)
         if (
@@ -178,8 +214,15 @@ def commit_memory(
     )
     for source in sources:
         db.execute(
-            "INSERT INTO memory_sources(memory_id,source_key,message_id,event_id,source_sha256) VALUES(?,?,?,?,?)",
-            (ident, source["id"], source["message_id"], source["event_id"], source["sha256"]),
+            "INSERT INTO memory_sources(memory_id,source_key,message_id,event_id,artifact_id,source_sha256) VALUES(?,?,?,?,?,?)",
+            (
+                ident,
+                source["id"],
+                source["message_id"],
+                source["event_id"],
+                source.get("artifact_id"),
+                source["sha256"],
+            ),
         )
     if confirmed:
         db.execute(

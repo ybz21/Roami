@@ -71,7 +71,11 @@ class Runtime:
         self.resources = ResourceLeases(database)
         self.memory = Memories(database, self.settings.memory_timezone)
         self.memory_jobs = MemoryJobs(
-            database, memory_model or self.worker_model, self.memory, self.memory.daily
+            database,
+            memory_model or self.worker_model,
+            self.memory,
+            self.memory.daily,
+            artifacts=self.artifacts,
         )
         self.notifications = Notifications(database)
         self.context = Context(database, model, input_budget=self.settings.input_budget)

@@ -56,6 +56,11 @@ class MemorySearch:
                 "r.valid_from_ms<=?",
                 "(r.valid_until_ms IS NULL OR r.valid_until_ms>?)",
                 "(r.expires_ms IS NULL OR r.expires_ms>?)",
+                (
+                    "NOT EXISTS (SELECT 1 FROM memory_sources s LEFT JOIN artifacts a ON a.id=s.artifact_id "
+                    "WHERE s.memory_id=r.id AND s.artifact_id IS NOT NULL "
+                    "AND (a.id IS NULL OR a.deleted_ms IS NOT NULL OR a.owner_id!=r.owner_id))"
+                ),
             ]
             args = [owner, timestamp, timestamp, timestamp]
             if kind is not None:

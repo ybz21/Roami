@@ -310,6 +310,31 @@ class ArtifactStore:
                 "UPDATE artifacts SET deleted_ms=COALESCE(deleted_ms,?) WHERE id=?",
                 (now_ms(), artifact_id),
             )
+            affected = rows(
+                db,
+                "WITH RECURSIVE affected(id) AS ("
+                "SELECT memory_id FROM memory_sources WHERE artifact_id=? "
+                "UNION SELECT e.derived_id FROM memory_edges e JOIN affected a ON e.parent_id=a.id) "
+                "SELECT r.id FROM memory_records r JOIN affected a ON a.id=r.id WHERE r.owner_id=? "
+                "AND (r.state IN ('active','conflict') OR EXISTS(SELECT 1 FROM memory_embeddings e WHERE e.memory_id=r.id))",
+                (artifact_id, owner),
+            )
+            for memory in affected:
+                db.execute(
+                    "UPDATE memory_records SET state='candidate',updated_ms=? WHERE id=? AND state IN ('active','conflict')",
+                    (now_ms(), memory["id"]),
+                )
+                db.execute("DELETE FROM memory_embeddings WHERE memory_id=?", (memory["id"],))
+            if affected:
+                db.execute(
+                    "UPDATE owner_versions SET memory_epoch=memory_epoch+1 WHERE owner_id=?",
+                    (owner,),
+                )
+                db.execute(
+                    "UPDATE context_snapshots SET state='invalid' WHERE branch_id IN "
+                    "(SELECT b.id FROM branches b JOIN conversations c ON c.id=b.conversation_id WHERE c.owner_id=?)",
+                    (owner,),
+                )
             return {"id": artifact_id, "deleted": True}
 
         return await self.db.call(write, write=True)

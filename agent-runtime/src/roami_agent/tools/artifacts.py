@@ -1,12 +1,22 @@
 """Owner-scoped, bounded text evidence retrieval for Workers."""
 
+from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.storage.database import row
 
 
 def register_artifact_tools(registry, artifacts):
     async def read(args, binding):
         owner, aid = binding["owner"], args["id"]
         reference = await artifacts.get(owner, aid)
+        if await artifacts.db.call(
+            lambda db: row(
+                db,
+                "SELECT 1 FROM memory_tombstones WHERE owner_id=? AND source_fingerprint=?",
+                (owner, reference["sha256"]),
+            )
+        ):
+            raise DomainError("MEMORY_FORGOTTEN", 409)
         if not (
             reference["mimeType"].startswith("text/") or reference["mimeType"] == "application/json"
         ):
