@@ -36,8 +36,10 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
 from roami_agent.storage.turn_journal import TurnJournal
+from roami_agent.storage.workspace_files import WorkspaceFiles
 from roami_agent.tools.artifacts import register_artifact_tools
 from roami_agent.tools.browser import register_browser_tools
+from roami_agent.tools.files import register_file_tools
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
@@ -65,6 +67,7 @@ class Runtime:
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
+        self.files = WorkspaceFiles(self.settings)
         self.resources = ResourceLeases(database)
         self.memory = Memories(database, self.settings.memory_timezone)
         self.memory_jobs = MemoryJobs(
@@ -83,6 +86,7 @@ class Runtime:
         self.browser_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         add_worker_tools(self.tools, self.settings, self.artifacts)
+        register_file_tools(self.tools, self.files)
         register_artifact_tools(self.tools, self.artifacts)
         self.mcp = MCPConnections(self.tools, self.settings.mcp_servers, self.artifacts)
         self.browser = BrowserDriver(database, self.settings, self.resources, self.artifacts)
@@ -201,6 +205,7 @@ class Runtime:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
         await self.mcp.close()
+        await self.files.close()
         await self.artifacts.close()
 
 

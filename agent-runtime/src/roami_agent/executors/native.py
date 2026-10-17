@@ -49,6 +49,16 @@ class NativeExecutor:
             text = await self.run_turn(
                 dict(prepared, executionRunId=run["id"]), "worker", task_id=task["id"]
             )
+            uncertain = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' "
+                    "AND state IN ('planned','running','unknown') LIMIT 1",
+                    (prepared["id"],),
+                )
+            )
+            if uncertain:
+                raise DomainError("TOOL_OUTCOME_UNKNOWN")
             result = {"state": "succeeded", "summary": text}
             if len(text.encode()) > 6000 and self.artifacts:
                 source = await self.db.call(

@@ -25,6 +25,40 @@ class Worker:
     model = "fixture-worker"
 
     async def stream(self, messages, tools):
+        if any(m["role"] == "user" and "write checked file" in m["content"] for m in messages):
+            results = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
+            step = len(results)
+            if step == 4:
+                assert results[-1]["data"] == "verified"
+                yield ModelEvent("text", "Verified the checked workspace file")
+                return
+            name, args = (
+                (
+                    "file_write",
+                    {"path": "native-file-proof.txt", "expectedSha256": None, "content": "checked"},
+                )
+                if step == 0
+                else (
+                    "file_patch",
+                    {
+                        "path": "native-file-proof.txt",
+                        "expectedSha256": results[-1]["sha256"],
+                        "oldText": "checked",
+                        "newText": "verified",
+                    },
+                )
+                if step == 2
+                else ("file_read", {"path": "native-file-proof.txt"})
+            )
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "file-" + str(step),
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(args)},
+                },
+            )
+            return
         if messages[-1]["role"] == "tool":
             result = json.loads(messages[-1]["content"])
             assert result.get("exitCode") == 0, result
@@ -78,6 +112,8 @@ async def main():
     await db.open()
 
     async def verify(task, result):
+        if json.loads(task["intent_json"])["goal"] == "write checked file":
+            return (directory / "native-file-proof.txt").read_text() == "verified"
         return (directory / "native-proof.txt").read_text() == "native"
 
     runtime = Runtime(
@@ -235,6 +271,16 @@ async def main():
                 ],
             ]:
                 assert (await execute(argv, cwd=directory))["exitCode"] == 0
+        file_task = await runtime.tasks.create(
+            owner,
+            c["id"],
+            "write checked file",
+            key="native-files",
+            target={"kind": "project", "projectId": project, "workspaceId": target["workspaceId"]},
+            record_intent=True,
+        )
+        await wait(lambda: terminal(file_task["id"], "succeeded"))
+        assert (directory / "native-file-proof.txt").read_text() == "verified"
         cancelling = await runtime.tasks.create(
             owner,
             c["id"],

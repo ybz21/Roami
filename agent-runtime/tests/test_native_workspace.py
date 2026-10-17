@@ -175,3 +175,77 @@ async def test_long_native_result_keeps_full_source_and_bounded_completion_evide
         assert (await runtime.artifacts.read("alice", reference["id"]))[1].decode() == full
     finally:
         await runtime.close()
+
+
+async def test_unknown_write_cannot_be_overridden_by_worker_summary_or_goal_verifier(store):
+    from test_runtime import ConversationModel, until
+
+    from roami_agent.app import Runtime
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.protocol.tools import Tool, object_schema
+    from roami_agent.storage.database import row
+
+    class OptimisticWorker:
+        model = "optimistic-worker"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                assert json.loads(messages[-1]["content"])["outcomeKnown"] is False
+                yield ModelEvent("text", "Everything is done")
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "unknown-write",
+                        "type": "function",
+                        "function": {"name": "uncertain_write", "arguments": "{}"},
+                    },
+                )
+
+    async def unknown_write(args, binding):
+        raise DomainError("TOOL_OUTCOME_UNKNOWN")
+
+    async def verifier(task, result):
+        pytest.fail("An unknown write reached goal acceptance")
+
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        worker_model=OptimisticWorker(),
+        verifier=verifier,
+        memory_model=ConversationModel(),
+    )
+    runtime.tools.add(
+        Tool(
+            "uncertain_write",
+            "Unknown fixture write",
+            object_schema({}),
+            unknown_write,
+            effect="write",
+        )
+    )
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Perform the write",
+            key="unknown-summary",
+            record_intent=True,
+        )
+        runtime.wakeup.set()
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM tasks WHERE id=? AND state='interrupted'", (task["id"],)
+            ),
+        )
+        attempt = await store.call(
+            lambda db: row(
+                db, "SELECT result_json FROM task_attempts WHERE task_id=?", (task["id"],)
+            )
+        )
+        assert json.loads(attempt["result_json"])["outcomeKnown"] is False
+    finally:
+        await runtime.close()
