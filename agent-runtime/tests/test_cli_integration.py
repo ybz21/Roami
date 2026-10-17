@@ -198,6 +198,26 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
             tid = task.json()["data"]["id"]
             controls = await cli("control", "ls", "--task", tid)
             assert controls["data"]["taskId"] == tid and controls["data"]["resources"] == []
+            operation = await cli(
+                "steer",
+                "--task",
+                tid,
+                "--revision",
+                "1",
+                "--key",
+                "continued-cli",
+                "--text",
+                "Include another check",
+            )
+            async with asyncio.timeout(5):
+                while True:
+                    steering = await cli(
+                        "steering", "--task", tid, "--operation", operation["data"]["operationId"]
+                    )
+                    if steering["data"]["state"] != "stopping":
+                        break
+                    await asyncio.sleep(0.05)
+            assert steering["data"]["state"] == "applied" and steering["data"]["revision"] == 2
             # Python holds the same lock domain used by unified database maintenance.
             busy = await asyncio.create_subprocess_exec(
                 str(roami_binary),

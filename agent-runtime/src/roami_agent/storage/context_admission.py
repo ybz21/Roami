@@ -22,3 +22,14 @@ def assert_context_admitted(db, turn):
         (turn["id"], turn["owner_id"], turn["owner_id"]),
     ):
         raise DomainError("CONTEXT_SOURCE_FORGOTTEN", 409)
+
+    if row(
+        db,
+        "SELECT 1 FROM prompt_manifests p LEFT JOIN tasks t ON t.id=json_extract(p.parts_json,'$.taskEvidence.taskId') "
+        "WHERE p.turn_id=? AND json_type(p.parts_json,'$.taskEvidence')='object' "
+        "AND (t.id IS NULL OR t.owner_id!=? OR t.revision!=json_extract(p.parts_json,'$.taskEvidence.revision') "
+        "OR t.state!=json_extract(p.parts_json,'$.taskEvidence.state') "
+        "OR EXISTS(SELECT 1 FROM jobs j WHERE j.kind='task.steer' AND j.aggregate_id=t.id AND j.state='queued')) LIMIT 1",
+        (turn["id"], turn["owner_id"]),
+    ):
+        raise DomainError("TASK_RESULT_SUPERSEDED", 409)

@@ -68,3 +68,9 @@ class SaveMemory(Payload):
     conversationId: str | None = None
     taskId: str | None = None
     dayKey: str | None = None
+
+
+class SteerTask(Payload):
+    requestKey: str = Field(min_length=1, max_length=200)
+    revision: int = Field(ge=1)
+    text: str = Field(min_length=1, max_length=10000)

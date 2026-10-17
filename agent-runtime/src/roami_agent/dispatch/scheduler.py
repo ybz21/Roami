@@ -36,6 +36,7 @@ class Scheduler:
                 pass
 
     async def _scan(self):
+        await self.dispatch.tasks.revisions.advance()
         queued = await self.db.call(
             lambda db: rows(
                 db,

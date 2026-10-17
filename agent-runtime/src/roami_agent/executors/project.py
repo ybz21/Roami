@@ -8,7 +8,8 @@ from roami_agent.tools.process import execute
 
 
 async def provision_project(settings, task, run):
-    target = json.loads(task["intent_json"])["target"]
+    intent = json.loads(task["intent_json"])
+    target = intent["target"]
     if target.get("nodeId", "local") != "local":
         raise DomainError("PROJECT_NODE_UNAVAILABLE")
     if any(target.get(key) for key in ["directory", "projectId", "workspaceId", "base", "remote"]):
@@ -29,7 +30,7 @@ async def provision_project(settings, task, run):
         "--name",
         name,
         "--provision-key",
-        "project:" + run["launch_id"],
+        "project:" + intent.get("provisionLaunchId", run["launch_id"]),
         "--json",
     ]
     if target.get("baseDir"):

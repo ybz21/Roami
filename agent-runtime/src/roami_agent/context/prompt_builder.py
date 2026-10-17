@@ -23,8 +23,13 @@ class PromptBuilder:
             allowed = await self.db.call(
                 lambda db: row(
                     db,
-                    "SELECT t.origin_message_id FROM tasks t WHERE t.id=? AND t.owner_id=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
-                    (completion.get("taskId"), turn["owner_id"]),
+                    "SELECT t.origin_message_id FROM tasks t WHERE t.id=? AND t.owner_id=? AND t.revision=? AND t.state=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
+                    (
+                        completion.get("taskId"),
+                        turn["owner_id"],
+                        completion.get("taskRevision", 1),
+                        completion.get("state"),
+                    ),
                 )
             )
             if allowed:
@@ -47,6 +52,11 @@ class PromptBuilder:
                 through_turn=turn["id"],
             )
             if completion_source:
+                plan["taskEvidence"] = {
+                    "taskId": completion["taskId"],
+                    "revision": completion.get("taskRevision", 1),
+                    "state": completion["state"],
+                }
                 plan["sourceMessageIds"] = list(
                     dict.fromkeys([*plan.get("sourceMessageIds", []), completion_source])
                 )

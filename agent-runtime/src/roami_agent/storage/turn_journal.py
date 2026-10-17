@@ -46,6 +46,7 @@ class TurnJournal:
 
     async def delta(self, turn, mid, text, delta):
         def write(db):
+            assert_context_admitted(db, turn)
             db.execute(
                 "UPDATE messages SET content_json=? WHERE id=?", (encoded({"text": text}), mid)
             )
@@ -67,6 +68,7 @@ class TurnJournal:
 
     async def finish(self, turn, mid, text, calls, usage, attempt, *, final, completion):
         def write(db):
+            assert_context_admitted(db, turn)
             content = {"text": text, **({"tool_calls": calls} if calls else {})}
             if completion:
                 content["source"] = "task"

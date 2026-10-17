@@ -282,6 +282,8 @@ class Memories:
                     "('task:'||k.owner_id||':'||x.idempotency_key, "
                     "'task:'||k.owner_id||':'||substr(x.idempotency_key,instr(x.idempotency_key,':')+1)) "
                     "JOIN affected a ON a.id=x.assistant_message_id WHERE k.owner_id=? "
+                    "UNION SELECT k.origin_message_id FROM tasks k JOIN json_each(k.intent_json,'$.sourceMessageIds') j "
+                    "JOIN affected a ON a.id=j.value WHERE k.owner_id=? "
                     "UNION SELECT copied.id FROM tasks k JOIN affected a ON a.id=k.origin_message_id "
                     "JOIN task_attempts r ON r.task_id=k.id JOIN messages copied ON copied.branch_id=r.native_branch_id "
                     "WHERE k.owner_id=? AND copied.role='user' "
@@ -300,6 +302,7 @@ class Memories:
                         memory_id,
                         owner,
                         memory_id,
+                        owner,
                         owner,
                         owner,
                         owner,

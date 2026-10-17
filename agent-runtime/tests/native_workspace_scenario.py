@@ -271,6 +271,33 @@ async def main():
                 ],
             ]:
                 assert (await execute(argv, cwd=directory))["exitCode"] == 0
+        steering = await runtime.tasks.revisions.request(
+            owner, task["id"], "Inspect and retain the existing proof", 1, "native-steer"
+        )
+
+        async def continued_done():
+            current = await db.call(
+                lambda connection: row(
+                    connection,
+                    "SELECT revision,state,target_json FROM tasks WHERE id=?",
+                    (task["id"],),
+                )
+            )
+            operation = await runtime.tasks.revisions.get(
+                owner, task["id"], steering["operationId"]
+            )
+            assert operation["state"] != "blocked", operation
+            return current["revision"] == 2 and current["state"] == "succeeded"
+
+        await wait(continued_done)
+        continued = await db.call(
+            lambda connection: row(
+                connection, "SELECT target_json FROM tasks WHERE id=?", (task["id"],)
+            )
+        )
+        assert json.loads(continued["target_json"])["workspaceId"] == target["workspaceId"]
+        assert json.loads(continued["target_json"])["projectId"] == project
+        assert (directory / "native-proof.txt").read_text() == "native"
         file_task = await runtime.tasks.create(
             owner,
             c["id"],

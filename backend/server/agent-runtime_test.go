@@ -15,7 +15,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	gate := auth.New("test-only-login", "", "", 5, 30, nil)
 	group := router.Group("/api", gate.Middleware())
 	mountAgentRuntime(group, Config{DataDir: t.TempDir()})
-	for _, path := range []string{"/api/agent/status", "/api/agent/conversations", "/api/agent/notifications", "/api/agent/artifacts", "/api/agent/artifacts/probe", "/api/agent/artifacts/probe/content", "/api/agent/tasks/probe/resources", "/api/agent/resources/probe"} {
+	for _, path := range []string{"/api/agent/status", "/api/agent/conversations", "/api/agent/notifications", "/api/agent/artifacts", "/api/agent/artifacts/probe", "/api/agent/artifacts/probe/content", "/api/agent/tasks/probe/resources", "/api/agent/resources/probe", "/api/agent/tasks/probe/steering/operation"} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest("GET", path, nil))
 		if recorder.Code != http.StatusUnauthorized {
@@ -30,6 +30,11 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		}
 	}
 	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/tasks/probe/steer", nil))
+	if recorder.Code != http.StatusUnauthorized {
+		t.Errorf("steer bypassed auth: %d", recorder.Code)
+	}
+	recorder = httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/internal/report", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("private route mounted publicly: %d", recorder.Code)

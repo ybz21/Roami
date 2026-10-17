@@ -37,6 +37,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/conversations/:cid/compactions/:operation/cancel"}, {"POST", "/agent/conversations/:cid/read"},
 		{"GET", "/agent/notifications"}, {"GET", "/agent/tasks"}, {"POST", "/agent/tasks"},
 		{"GET", "/agent/artifacts"}, {"GET", "/agent/artifacts/:artifact"}, {"GET", "/agent/artifacts/:artifact/content"}, {"DELETE", "/agent/artifacts/:artifact"},
+		{"POST", "/agent/tasks/:task/steer"}, {"GET", "/agent/tasks/:task/steering/:operation"},
 		{"POST", "/agent/tasks/:task/cancel"}, {"POST", "/agent/tasks/:task/verify"},
 		{"GET", "/agent/tasks/:task/resources"}, {"GET", "/agent/resources/:resource"},
 		{"POST", "/agent/resources/:resource/pause"}, {"POST", "/agent/resources/:resource/resume"},

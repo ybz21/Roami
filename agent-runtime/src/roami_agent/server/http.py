@@ -21,6 +21,7 @@ from roami_agent.protocol.http import (
     Report,
     SaveMemory,
     SendMessage,
+    SteerTask,
 )
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
@@ -214,6 +215,18 @@ def create_app(runtime, *, manage_lifecycle=True):
         )
         runtime.wakeup.set()
         return {"data": result}
+
+    @app.post("/v1/tasks/{task_id}/steer", status_code=202)
+    async def steer_task(task_id: str, body: SteerTask, owner: Owner):
+        result = await runtime.tasks.revisions.request(
+            owner, task_id, body.text, body.revision, body.requestKey
+        )
+        runtime.wakeup.set()
+        return {"data": result}
+
+    @app.get("/v1/tasks/{task_id}/steering/{operation_id}")
+    async def steering(task_id: str, operation_id: str, owner: Owner):
+        return {"data": await runtime.tasks.revisions.get(owner, task_id, operation_id)}
 
     @app.post("/v1/tasks/{task_id}/cancel")
     async def cancel_task(task_id: str, owner: Owner):

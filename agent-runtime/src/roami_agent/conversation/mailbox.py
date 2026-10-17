@@ -1,5 +1,8 @@
 """Atomic turn claims for serialized conversation branches."""
 
+import json
+
+from roami_agent.protocol.identity import now_ms
 from roami_agent.storage.database import row
 
 
@@ -15,6 +18,23 @@ class TurnMailbox:
                 (job["aggregate_id"],),
             )
             if not turn:
+                db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
+                return None
+            completion = json.loads(job["payload_json"]).get("completion")
+            if completion and not row(
+                db,
+                "SELECT id FROM tasks WHERE id=? AND owner_id=? AND revision=? AND state=? AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.kind='task.steer' AND j.aggregate_id=tasks.id AND j.state='queued')",
+                (
+                    completion.get("taskId"),
+                    turn["owner_id"],
+                    completion.get("taskRevision", 1),
+                    completion.get("state"),
+                ),
+            ):
+                db.execute(
+                    "UPDATE turns SET state='interrupted',finished_ms=? WHERE id=?",
+                    (now_ms(), turn["id"]),
+                )
                 db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
                 return None
             if row(

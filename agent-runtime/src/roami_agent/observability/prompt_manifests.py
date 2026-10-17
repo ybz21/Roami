@@ -32,6 +32,7 @@ class PromptManifests:
                             "modelSettingsHash": plan.get("modelSettingsHash"),
                             "imageEvidence": plan.get("imageEvidence", []),
                             "imageError": plan.get("imageError"),
+                            "taskEvidence": plan.get("taskEvidence"),
                         }
                     ),
                     now_ms(),

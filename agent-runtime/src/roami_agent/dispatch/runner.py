@@ -101,8 +101,13 @@ class TaskDispatcher:
                 db,
                 task["origin_conversation_id"],
                 "task.preparing" if preparing else "task.started",
-                {"taskId": task["id"], "runId": run["id"]},
+                {
+                    "taskId": task["id"],
+                    "runId": run["id"],
+                    "nativeTurnId": turn["id"] if turn else None,
+                },
                 task_id=task["id"],
+                turn_id=turn["id"] if turn else None,
             )
             return task, run, turn
 
@@ -255,7 +260,11 @@ class TaskDispatcher:
             )
             return
         children = await self.db.call(
-            lambda db: rows(db, "SELECT * FROM tasks WHERE parent_task_id=?", (task["id"],))
+            lambda db: rows(
+                db,
+                "SELECT * FROM tasks WHERE parent_task_id=? AND COALESCE(json_extract(intent_json,'$.parentTaskRevision'),1)=?",
+                (task["id"], task["revision"]),
+            )
         )
         if any(
             c["state"] not in {"succeeded", "failed", "cancelled", "interrupted"} for c in children
@@ -291,7 +300,14 @@ class TaskDispatcher:
             ):
                 result["state"] = "failed"
         verified = False
-        if result["state"] == "succeeded" and task["state"] != "cancelling":
+        uncertain_result = (
+            result.get("outcomeKnown") is False or result.get("inputStopped") is False
+        )
+        if (
+            result["state"] == "succeeded"
+            and task["state"] != "cancelling"
+            and not uncertain_result
+        ):
             if self.verifier:
                 self.verifying.add(task["id"])
                 try:
@@ -322,20 +338,30 @@ class TaskDispatcher:
                     self.verifying.discard(task["id"])
             else:
                 # Native read-only answers can finish; writes require explicit acceptance.
-                writes = await self.db.call(
-                    lambda db: row(
+                def written(db):
+                    bound = row(
                         db,
-                        "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id WHERE t.branch_id=? AND x.effect='write' AND x.tool_name!='delegate' LIMIT 1",
-                        (run["native_branch_id"],),
+                        "SELECT turn_id FROM events WHERE task_id=? AND json_extract(payload_json,'$.runId')=? AND kind IN ('task.started','task.preparing') AND turn_id IS NOT NULL LIMIT 1",
+                        (task["id"], run["id"]),
                     )
-                )
+                    return row(
+                        db,
+                        "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id WHERE "
+                        + ("t.id=?" if bound else "t.branch_id=?")
+                        + " AND x.effect='write' AND x.tool_name!='delegate' LIMIT 1",
+                        (bound["turn_id"] if bound else run["native_branch_id"],),
+                    )
+
+                writes = await self.db.call(written)
                 verified = (
                     run["executor_kind"] == "native"
                     and not writes
                     and bool(result.get("summary", "").strip())
                 )
         state = (
-            result["state"]
+            "interrupted"
+            if uncertain_result
+            else result["state"]
             if result["state"] != "succeeded"
             else "succeeded"
             if verified
@@ -365,7 +391,11 @@ class TaskDispatcher:
                     (encoded(result), run["id"], run["task_revision"]),
                 )
             elif current["state"] == "cancelling":
-                children = rows(db, "SELECT state FROM tasks WHERE parent_task_id=?", (task["id"],))
+                children = rows(
+                    db,
+                    "SELECT state FROM tasks WHERE parent_task_id=? AND COALESCE(json_extract(intent_json,'$.parentTaskRevision'),1)=?",
+                    (task["id"], task["revision"]),
+                )
                 if any(
                     c["state"] not in {"succeeded", "failed", "cancelled", "interrupted"}
                     for c in children
@@ -388,7 +418,13 @@ class TaskDispatcher:
                 }
                 if uncertain:
                     result.update(outcomeKnown=False, retryable=False)
-            completion = {"taskId": task["id"], "state": state, "result": result}
+            completion = {
+                "taskId": task["id"],
+                "taskRevision": run["task_revision"],
+                "runId": run["id"],
+                "state": state,
+                "result": result,
+            }
             db.execute(
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?", (state, now_ms(), task["id"])
             )
@@ -400,6 +436,22 @@ class TaskDispatcher:
                     "task." + state,
                     completion,
                     task_id=task["id"],
+                )
+                if job_id:
+                    db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
+                return
+            if row(
+                db,
+                "SELECT id FROM jobs WHERE kind='task.steer' AND aggregate_id=? AND state='queued'",
+                (task["id"],),
+            ):
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task." + state,
+                    completion,
+                    task_id=task["id"],
+                    key=key,
                 )
                 if job_id:
                     db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
