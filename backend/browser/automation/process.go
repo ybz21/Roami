@@ -18,9 +18,13 @@ var launcher string
 //go:embed driver.mjs
 var driver string
 
+//go:embed operation-receipts.mjs
+var operationReceipts string
+
 // Run keeps Playwright and its daemon behind the same public executable.
 func Run(args []string) error {
 	content := strings.ReplaceAll(launcher, "@@DRIVER@@", driver)
+	content = strings.ReplaceAll(content, "@@OPERATION_RECEIPTS@@", operationReceipts)
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" || args[0] == "--version" {
 		cmd := exec.Command("bash", append([]string{"-s", "--"}, args...)...)
 		cmd.Stdin = strings.NewReader(content)

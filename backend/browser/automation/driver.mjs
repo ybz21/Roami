@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve, extname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import net from 'node:net'
+import { OperationReceipts } from './operation-receipts.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
 const SOCK_PATH = process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock'
@@ -24,6 +25,7 @@ const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
 class ChromeError extends Error {}
+const OPERATION_VERBS = new Set(['new', 'goto', 'url', 'title', 'click', 'fill', 'type', 'press', 'close', 'screenshot', 'shot', 'text', 'html', 'attr', 'wait', 'pdf'])
 
 // ── 纯工具函数：不依赖某一次调用的 flags/pos，daemon 内多条请求共用也安全 ──────────────
 
@@ -525,6 +527,10 @@ const TRANSIENT_ERROR_MARKERS = ['Page crashed', 'has been closed', 'Connection 
 const IDEMPOTENT_VERBS = new Set(['goto', 'url', 'title', 'text', 'attr', 'html', 'wait', 'screenshot', 'shot', 'pdf', 'tabs', 'new', 'fill'])
 const isTransientError = (stderr) => TRANSIENT_ERROR_MARKERS.some((m) => stderr.includes(m))
 
+function operationPayload(verb, flags, pos) {
+  return [verb, pos, Object.entries(flags).filter(([key]) => !['operation-id', 'receipt-root'].includes(key)).sort(([a], [b]) => a.localeCompare(b))]
+}
+
 function makeIO() {
   const lines = []
   return { lines, log: (x) => { if (x !== undefined) lines.push(typeof x === 'string' ? x : JSON.stringify(x, null, 2)) } }
@@ -568,7 +574,8 @@ async function handleConnection(conn, session) {
   }
   let argv = Array.isArray(req.argv) ? req.argv : []
   // Older daemons reject this verb before touching a page instead of ignoring new flags.
-  if (argv[0] === '_managed') argv = argv.slice(1)
+  const operationBound = argv[0] === '_operation'
+  if (argv[0] === '_managed' || operationBound) argv = argv.slice(1)
   if (req.cwd && existsSync(req.cwd)) { try { process.chdir(req.cwd) } catch {} }
   const { verb, flags, pos } = parseArgs(argv)
   const timeoutMs = num(flags.timeout, 15000)
@@ -579,7 +586,18 @@ async function handleConnection(conn, session) {
   let stderr = ''
   const watchdog = setTimeout(() => { process.exit(1) }, timeoutS * 1000)
   try {
-    await session.run(verb, flags, pos, timeoutMs, io)
+    if (flags['operation-id']) {
+      if (!operationBound || !OPERATION_VERBS.has(verb)) throw new ChromeError('CHROME_OPERATION_UNSUPPORTED')
+      const receipts = new OperationReceipts(flags['receipt-root'])
+      const record = await receipts.execute(flags['operation-id'], OperationReceipts.hash(operationPayload(verb, flags, pos)), async () => {
+        const output = makeIO()
+        await session.run(verb, flags, pos, timeoutMs, output)
+        return { stdout: output.lines.length ? output.lines.join('\n') + '\n' : '' }
+      })
+      io.log(record)
+    } else {
+      await session.run(verb, flags, pos, timeoutMs, io)
+    }
   } catch (e) {
     code = 1
     stderr = 'chrome: ' + (e?.message || String(e)) + '\n'
@@ -603,20 +621,23 @@ async function daemonMain() {
   const session = new Session()
   let queue = Promise.resolve() // 串行队列：同一时刻只处理一条请求（chdir 是全进程状态，必须串行）
   let idleTimer = null
+  let pendingConnections = 0
   // 录制中不能空闲自杀：录制期间 agent 可能在做别的事，daemon 收不到新命令，但录制本身要
   // 一直挂着（CDP screencast 会话）——空闲计时器到点先看是不是还在录，是就顺延，不能真杀掉。
   const scheduleIdleCheck = () => {
+    if (idleTimer) clearTimeout(idleTimer)
     idleTimer = setTimeout(() => {
-      if (session.recorder.isActive()) { scheduleIdleCheck(); return }
+      if (session.recorder.isActive() || pendingConnections > 0) { scheduleIdleCheck(); return }
       shutdown()
     }, DAEMON_IDLE_MS)
   }
   const server = net.createServer((conn) => {
+    pendingConnections++
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
     queue = queue
       .then(() => handleConnection(conn, session))
       .catch(() => {})
-      .finally(() => { scheduleIdleCheck() })
+      .finally(() => { pendingConnections--; if (pendingConnections === 0) scheduleIdleCheck() })
   })
   const shutdown = async () => {
     server.close()
@@ -711,8 +732,9 @@ async function daemonRequestWithRetry(argv, timeoutMs, verb, request = daemonReq
   const fullTimeoutS = effectiveTimeoutMs(verb, timeoutMs) / 1000 + 35
   const retryTimeoutS = Math.min(fullTimeoutS, 20)
   const flags = parseArgs(argv).flags
-  const attempts = flags['no-retry'] ? 1 : 3
-  const requestArgv = flags.target != null || flags['no-retry'] ? ['_managed', ...argv] : argv
+  const attempts = flags['no-retry'] || flags['operation-id'] ? 1 : 3
+  const requestArgv = flags['operation-id'] ? ['_operation', ...argv]
+    : flags.target != null || flags['no-retry'] ? ['_managed', ...argv] : argv
   let resp = null
   for (let i = 0; i < attempts; i++) {
     const r = await request(requestArgv, i === 0 ? fullTimeoutS : retryTimeoutS)
@@ -742,6 +764,19 @@ async function main() {
   if (verb === '_daemon') { await daemonMain(); return }
 
   const timeoutMs = num(flags.timeout, 15000)
+
+  if (verb === 'operation-status' || verb === 'operation-cancel') {
+    const receipts = new OperationReceipts(flags['receipt-root'])
+    const record = verb === 'operation-cancel' ? await receipts.cancel(flags['operation-id']) : await receipts.read(flags['operation-id'])
+    console.log(JSON.stringify(record))
+    return
+  }
+  if (flags['operation-id'] || flags['receipt-root']) {
+    if (!OPERATION_VERBS.has(verb) || flags.fresh) throw new ChromeError('CHROME_OPERATION_UNSUPPORTED')
+    const receipts = new OperationReceipts(flags['receipt-root'])
+    const planned = await receipts.begin(flags['operation-id'], operationPayload(verb, flags, pos))
+    if (!planned.dispatch) { console.log(JSON.stringify(planned.record)); return }
+  }
 
   if ((verb === 'screenshot' || verb === 'shot') && flags.fresh) {
     // 私有实例与共享 Chrome 无关，不占 daemon

@@ -61,7 +61,7 @@ class ResourceLeases:
     def _pending(db, resource_id):
         return row(
             db,
-            "SELECT id FROM resource_actions WHERE resource_id=? AND state IN ('running','unknown') LIMIT 1",
+            "SELECT id FROM resource_actions WHERE resource_id=? AND (state='running' OR (state='unknown' AND COALESCE(json_extract(result_json,'$.inputStopped'),0)!=1)) LIMIT 1",
             (resource_id,),
         )
 
@@ -221,6 +221,10 @@ class ResourceLeases:
         if state not in {"succeeded", "failed", "unknown"}:
             raise DomainError("INVALID_RESOURCE_ACTION_RESULT")
         packed = self._payload(result, 64_000, "INVALID_RESOURCE_ACTION_RESULT")
+        if ("inputStopped" in result and not isinstance(result["inputStopped"], bool)) or (
+            state in {"succeeded", "failed"} and result.get("inputStopped") is not True
+        ):
+            raise DomainError("INVALID_RESOURCE_ACTION_RESULT")
 
         def write(db):
             action = row(db, "SELECT * FROM resource_actions WHERE id=?", (action_id,))

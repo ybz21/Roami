@@ -76,12 +76,12 @@ async def test_action_receipt_prevents_replay_and_requires_fresh_observation(sto
     assert not (await begin(leases, lease, observed, task, run))["dispatch"]
     with pytest.raises(DomainError, match="RESOURCE_ACTION_PENDING"):
         await begin(leases, lease, observed, task, run, "second")
-    await leases.finish("alice", action["id"], "succeeded", {"changed": True})
+    await leases.finish("alice", action["id"], "succeeded", {"changed": True, "inputStopped": True})
     assert not (await begin(leases, lease, observed, task, run))["dispatch"]
     with pytest.raises(DomainError, match="RESOURCE_SCENE_CHANGED"):
         await begin(leases, lease, observed, task, run, "third")
     with pytest.raises(DomainError, match="RESOURCE_ACTION_CONFLICT"):
-        await leases.finish("alice", action["id"], "failed", {})
+        await leases.finish("alice", action["id"], "failed", {"inputStopped": True})
 
 
 async def test_takeover_blocks_inputs_until_action_finishes_and_control_releases(store):
@@ -92,7 +92,7 @@ async def test_takeover_blocks_inputs_until_action_finishes_and_control_releases
         await begin(leases, lease, observed, task, run, "after-pause")
     with pytest.raises(DomainError, match="RESOURCE_STOP_UNCONFIRMED"):
         await leases.release("alice", lease["id"], task, run, lease["lease_epoch"])
-    await leases.finish("alice", action["id"], "succeeded", {"stopped": True})
+    await leases.finish("alice", action["id"], "succeeded", {"inputStopped": True})
     with pytest.raises(DomainError, match="RESOURCE_STOP_UNCONFIRMED"):
         await leases.resume("alice", lease["id"])
     assert (await leases.release("alice", lease["id"], task, run, lease["lease_epoch"]))[
@@ -115,7 +115,9 @@ async def test_restart_quarantines_running_action_until_real_terminal_receipt(st
     with pytest.raises(DomainError, match="RESOURCE_STOP_UNCONFIRMED"):
         await recovered.release("alice", lease["id"], task, run, lease["lease_epoch"])
     assert not (await begin(recovered, lease, observed, task, run))["dispatch"]
-    await recovered.finish("alice", action["id"], "failed", {"receipt": "actual driver stopped"})
+    await recovered.finish(
+        "alice", action["id"], "failed", {"receipt": "actual driver stopped", "inputStopped": True}
+    )
     assert (await recovered.release("alice", lease["id"], task, run, lease["lease_epoch"]))[
         "state"
     ] == "idle"
@@ -182,3 +184,23 @@ async def test_same_unknown_receipt_is_idempotent_and_resume_does_not_restore_ol
     assert before == after
     with pytest.raises(DomainError, match="RESOURCE_STOP_UNCONFIRMED"):
         await leases.resume("alice", lease["id"])
+
+
+async def test_unknown_side_effects_do_not_prevent_takeover_after_input_is_confirmed_stopped(store):
+    leases, lease, observed, task, run = await setup(store)
+    action = await begin(leases, lease, observed, task, run)
+    with pytest.raises(DomainError, match="INVALID_RESOURCE_ACTION_RESULT"):
+        await leases.finish("alice", action["id"], "succeeded", {"inputStopped": False})
+    await leases.finish(
+        "alice", action["id"], "unknown", {"inputStopped": True, "outcomeKnown": False}
+    )
+    with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
+        await begin(leases, lease, observed, task, run, "blind-retry")
+    assert (await leases.pause("alice", lease["id"]))["state"] == "paused"
+    assert (await leases.release("alice", lease["id"], task, run, lease["lease_epoch"]))[
+        "state"
+    ] == "paused"
+    receipt = await store.call(
+        lambda db: row(db, "SELECT * FROM resource_actions WHERE id=?", (action["id"],))
+    )
+    assert receipt["state"] == "unknown"
