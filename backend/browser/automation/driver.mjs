@@ -11,7 +11,7 @@
 // handleConnection）——防的是 CDP 连接在 Chrome 被内存压力杀掉/重启期间可能陷入不带退避的
 // 忙等死循环（不依赖出问题的那段代码自己配合退出，直接从外面强杀更可靠）。
 import { writeFile, mkdir, mkdtemp, rm, copyFile, rename } from 'node:fs/promises'
-import { existsSync, unlinkSync, writeFileSync, openSync } from 'node:fs'
+import { existsSync, unlinkSync, writeFileSync, openSync, realpathSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, extname, join } from 'node:path'
@@ -32,7 +32,7 @@ function parseArgs(argv) {
   const rest = argv.slice(1)
   const flags = {}
   const pos = []
-  const booleanFlags = new Set(['full', 'fast', 'fresh', 'mobile'])
+  const booleanFlags = new Set(['full', 'fast', 'fresh', 'mobile', 'no-retry'])
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i]
     if (a.startsWith('--')) {
@@ -110,11 +110,28 @@ function userPages(pages) {
 }
 
 async function pick(pages, flags, fail) {
-  const p = pickPage(pages, flags, fail)
+  const p = await pickPage(pages, flags, fail)
   await p.bringToFront().catch(() => {})
   return p
 }
-function pickPage(pages, flags, fail) {
+async function targetIdentity(page) {
+  const session = await page.context().newCDPSession(page)
+  try {
+    const { targetInfo } = await session.send('Target.getTargetInfo')
+    return targetInfo.targetId
+  } finally {
+    await session.detach().catch(() => {})
+  }
+}
+async function pickPage(pages, flags, fail) {
+  if (flags.target != null) {
+    if (flags.tab != null || flags.url) return fail('CHROME_TARGET_SELECTION_CONFLICT')
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(flags.target)) return fail('CHROME_TARGET_INVALID')
+    for (const page of pages) {
+      if (await targetIdentity(page).catch(() => null) === flags.target) return page
+    }
+    return fail('CHROME_TARGET_NOT_FOUND')
+  }
   if (flags.tab != null) return pages[Number(flags.tab)] || fail('无此 tab #' + flags.tab)
   if (flags.url) return pages.find((x) => x.url().includes(flags.url)) || fail('无匹配 url 的 tab: ' + flags.url)
   return pages[0] || fail('当前没有打开的 tab（先 chrome new <url>）')
@@ -254,8 +271,8 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io) {
       break
     }
     case 'pdf': { const f = pos[0] || 'page.pdf'; await (await pickHere()).pdf({ path: f }); io.log(f); break }
-    case 'tabs': io.log(await Promise.all(pages.map(async (pg, i) => ({ i, title: await pg.title().catch(() => ''), url: pg.url() })))); break
-    case 'new': { const np = await ctx.newPage(); if (pos[0]) { await allowInsecureTLS(ctx, np); await np.goto(pos[0], { waitUntil: 'load', timeout: to }) } await np.bringToFront().catch(() => {}); io.log({ i: userPages(ctx.pages()).indexOf(np), url: np.url() }); break }
+    case 'tabs': io.log(await Promise.all(pages.map(async (pg, i) => ({ i, targetId: await targetIdentity(pg).catch(() => null), title: await pg.title().catch(() => ''), url: pg.url() })))); break
+    case 'new': { const np = await ctx.newPage(); if (pos[0]) { await allowInsecureTLS(ctx, np); await np.goto(pos[0], { waitUntil: 'load', timeout: to }) } await np.bringToFront().catch(() => {}); io.log({ i: userPages(ctx.pages()).indexOf(np), targetId: await targetIdentity(np), url: np.url() }); break }
     case 'close': await (await pickHere()).close(); io.log('ok'); break
     default: fail('未知命令: ' + verb)
   }
@@ -549,7 +566,9 @@ async function handleConnection(conn, session) {
     conn.destroy()
     return
   }
-  const argv = Array.isArray(req.argv) ? req.argv : []
+  let argv = Array.isArray(req.argv) ? req.argv : []
+  // Older daemons reject this verb before touching a page instead of ignoring new flags.
+  if (argv[0] === '_managed') argv = argv.slice(1)
   if (req.cwd && existsSync(req.cwd)) { try { process.chdir(req.cwd) } catch {} }
   const { verb, flags, pos } = parseArgs(argv)
   const timeoutMs = num(flags.timeout, 15000)
@@ -688,23 +707,25 @@ async function daemonRequest(argv, timeoutS) {
 // 的语义）；重试是在"上一次大概率是撞见了 daemon/Chrome 瞬时故障"的前提下再搏一次，不该再
 // 陪等一整个完整预算——重试如果每次都用完整预算，最坏情况会从单次调用的 ~50s 叠加到 3 次共
 // ~150s，对 agent 来说是明显的可感知卡顿。重试专用超时给一个较短的固定上限。
-async function daemonRequestWithRetry(argv, timeoutMs, verb) {
+async function daemonRequestWithRetry(argv, timeoutMs, verb, request = daemonRequest, pause = sleep) {
   const fullTimeoutS = effectiveTimeoutMs(verb, timeoutMs) / 1000 + 35
   const retryTimeoutS = Math.min(fullTimeoutS, 20)
-  const attempts = 3
+  const flags = parseArgs(argv).flags
+  const attempts = flags['no-retry'] ? 1 : 3
+  const requestArgv = flags.target != null || flags['no-retry'] ? ['_managed', ...argv] : argv
   let resp = null
   for (let i = 0; i < attempts; i++) {
-    const r = await daemonRequest(argv, i === 0 ? fullTimeoutS : retryTimeoutS)
+    const r = await request(requestArgv, i === 0 ? fullTimeoutS : retryTimeoutS)
     resp = r.resp
     const last = i === attempts - 1
     if (resp === null) {
       if (r.sentBeforeFailure && !IDEMPOTENT_VERBS.has(verb)) return null
       if (last) return null
-      await sleep(300 * (i + 1))
+      await pause(300 * (i + 1))
       continue
     }
     const transient = resp.code && IDEMPOTENT_VERBS.has(verb) && isTransientError(resp.stderr || '')
-    if (transient && !last) { await sleep(300 * (i + 1)); continue }
+    if (transient && !last) { await pause(300 * (i + 1)); continue }
     return resp
   }
   return resp
@@ -746,4 +767,8 @@ async function main() {
   process.exitCode = resp.code || 0
 }
 
-main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })
+export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry }
+
+if (process.argv[1] && realpathSync(process.argv[1]) === SELF_PATH) {
+  main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })
+}

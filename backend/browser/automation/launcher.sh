@@ -319,7 +319,8 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
   roami chrome record stop               停止并落盘录制
   roami chrome record status             查看是否在录制
 
-  通用选项: --tab <序号> | --url <子串>  选目标标签页（默认第一个）
+  通用选项: --target <稳定ID> | --tab <序号> | --url <子串>  选目标标签页（默认第一个）
+            --no-retry（仅执行一次，未知结果不重放）
             --timeout <ms>（默认 15000）  --cdp <地址>
   截图选项: --viewport 1280x800  --wait <ms>  --clip x,y,w,h  --fast
             --fresh --goto <url>（临时干净 Chrome 截图）  --quality <1-100>（jpg）
