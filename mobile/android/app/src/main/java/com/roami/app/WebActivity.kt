@@ -32,6 +32,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.security.cert.X509Certificate
+import org.json.JSONObject
 
 /** Roami WebView 容器：自签证书、系统键盘、摇一摇切环境与通知服务。 */
 class WebActivity : AppCompatActivity() {
@@ -52,6 +53,8 @@ class WebActivity : AppCompatActivity() {
 
     // 网页里的 <input type=file>（上传文件到工作目录、贴图）：WebView 默认什么都不做，得自己接系统选择器
     private var fileCb: ValueCallback<Array<Uri>>? = null
+    private var folderTargetDir: String? = null
+    private var folderUploadPath: String? = null
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         val cb = fileCb ?: return@registerForActivityResult
         fileCb = null
@@ -62,6 +65,29 @@ class WebActivity : AppCompatActivity() {
             if (uris.isEmpty()) data.data?.let { uris += it }
         }
         cb.onReceiveValue(if (uris.isEmpty()) null else uris.toTypedArray())
+    }
+    private val pickFolder = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        val dir = folderTargetDir ?: return@registerForActivityResult
+        val path = folderUploadPath ?: return@registerForActivityResult
+        folderTargetDir = null
+        folderUploadPath = null
+        val tree = if (res.resultCode == RESULT_OK) res.data?.data else null
+        if (tree == null) {
+            folderUploadResult(JSONObject().put("cancelled", true))
+            return@registerForActivityResult
+        }
+        FolderUpload(this, base).upload(tree, dir, path) { result ->
+            val detail = result.fold(
+                { JSONObject().put("saved", it) },
+                { JSONObject().put("error", it.message ?: "FOLDER_UPLOAD_FAILED") },
+            )
+            folderUploadResult(detail)
+        }
+    }
+
+    private fun folderUploadResult(detail: JSONObject) {
+        if (::web.isInitialized && !isFinishing && !isDestroyed)
+            web.evaluateJavascript("window.dispatchEvent(new CustomEvent('roami-folder-upload', {detail: $detail}))", null)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -100,6 +126,23 @@ class WebActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 // 站内照常；外链交给系统浏览器
                 if (!req.isForMainFrame) return false
+                // WebView 不会把目录 URI 展开成 FileList，目录选择与上传须在 APK 内完成。
+                if (req.url.scheme == "roami" && req.url.host == "folder-upload") {
+                    val dir = req.url.getQueryParameter("dir")
+                    val path = req.url.getQueryParameter("path")
+                    if (!dir.isNullOrBlank() && dir.startsWith("/") &&
+                        path != null && Regex("^/(?:n/[^/]+/)?api/upload$").matches(path) && folderTargetDir == null) {
+                        folderTargetDir = dir
+                        folderUploadPath = path
+                        try { pickFolder.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)) }
+                        catch (e: Exception) {
+                            folderTargetDir = null
+                            folderUploadPath = null
+                            folderUploadResult(JSONObject().put("error", "FOLDER_PICKER_UNAVAILABLE"))
+                        }
+                    } else folderUploadResult(JSONObject().put("error", "INVALID_UPLOAD_TARGET"))
+                    return true
+                }
                 return if (ServerOrigin.matches(base, req.url.toString())) false
                     else { runCatching { startActivity(Intent(Intent.ACTION_VIEW, req.url)) }; true }
             }

@@ -99,6 +99,7 @@ interface FileMenuActions {
   onCopyTo: (target: FileTarget) => void
   onMoveTo: (target: FileTarget) => void
   onUploadHere: (target: FileTarget) => void
+  onUploadFolderHere: (target: FileTarget) => void
   onNewFile: (target: FileTarget) => void
   onNewFolder: (target: FileTarget) => void
   onDownload: (target: FileTarget) => void
@@ -147,6 +148,7 @@ function FileContextMenu({ target, children, actions }: {
       { key: 'newFile', label: t('file.newFile') },
       { key: 'newFolder', label: t('file.newFolder') },
       { key: 'uploadHere', label: t('file.uploadHere') },
+      { key: 'uploadFolderHere', label: t('file.uploadFolder') },
       { type: 'divider' as const },
     ] : []),
     { key: 'rename', label: t('file.rename') },
@@ -167,6 +169,7 @@ function FileContextMenu({ target, children, actions }: {
     else if (key === 'newFile') actions.onNewFile(target)
     else if (key === 'newFolder') actions.onNewFolder(target)
     else if (key === 'uploadHere') actions.onUploadHere(target)
+    else if (key === 'uploadFolderHere') actions.onUploadFolderHere(target)
     else if (key === 'rename') actions.onRename(target)
     else if (key === 'copyTo') actions.onCopyTo(target)
     else if (key === 'moveTo') actions.onMoveTo(target)
@@ -434,6 +437,7 @@ export default function FileBrowser({
     if (canToggleView && typeof localStorage !== 'undefined') localStorage.setItem('ttmux.fileBrowseMode', browseMode)
   }, [browseMode, canToggleView])
   const fileRef = useRef<HTMLInputElement>(null)
+  const folderRef = useRef<HTMLInputElement | null>(null)
   const uploadTargetRef = useRef<string | null>(null)
   const { message, modal } = AntApp.useApp()
   const { t, locale } = useI18n()
@@ -555,6 +559,36 @@ export default function FileBrowser({
     } catch (e: any) { message.error(t('chat.uploadFailed', { message: e.message })) }
     finally { setUploading(false) }
   }
+  useEffect(() => {
+    const onFolderUploaded = (event: Event) => {
+      const result = (event as CustomEvent<{ saved?: number; error?: string; cancelled?: boolean }>).detail
+      setUploading(false)
+      if (result?.cancelled) return
+      if (result?.error) {
+        const key = ({
+          EMPTY_FOLDER: 'file.folderEmpty',
+          FOLDER_READ_FAILED: 'file.folderReadFailed',
+          FOLDER_PICKER_UNAVAILABLE: 'file.folderPickerUnavailable',
+          INVALID_UPLOAD_TARGET: 'file.invalidUploadTarget',
+          FOLDER_UPLOAD_FAILED: 'file.folderUploadFailed',
+        } as Record<string, string>)[result.error]
+        message.error(key ? t(key) : t('chat.uploadFailed', { message: result.error }))
+      }
+      else {
+        message.success(t('file.uploadedCount', { count: result?.saved || 0 }))
+        refresh()
+      }
+    }
+    window.addEventListener('roami-folder-upload', onFolderUploaded)
+    return () => window.removeEventListener('roami-folder-upload', onFolderUploaded)
+  }, [message, t])
+  const chooseFolder = (targetDir: string) => {
+    uploadTargetRef.current = targetDir
+    if (navigator.userAgent.includes('RoamiApp/')) {
+      setUploading(true)
+      window.location.href = `roami://folder-upload?dir=${encodeURIComponent(targetDir)}&path=${encodeURIComponent(nodeApi('/upload'))}`
+    } else folderRef.current?.click()
+  }
   const doMkdir = async () => {
     const name = mkdirName.trim()
     const dir = mkdirDir || cur
@@ -674,6 +708,9 @@ export default function FileBrowser({
     uploadTargetRef.current = target.dir ? target.path : dirname(target.path)
     fileRef.current?.click()
   }
+  const uploadFolderInto = (target: FileTarget) => {
+    chooseFolder(target.dir ? target.path : dirname(target.path))
+  }
   // legacy：系统 a[download]（走 frp）。手机护栏命中或不支持 File System Access 时用它。
   const legacyAnchorDownload = (target: FileTarget) => {
     const a = document.createElement('a')
@@ -758,6 +795,7 @@ export default function FileBrowser({
     onCopyTo: startCopy,
     onMoveTo: startMove,
     onUploadHere: uploadInto,
+    onUploadFolderHere: uploadFolderInto,
     onNewFile: touchInto,
     onNewFolder: mkdirInto,
     onDownload: downloadEntry,
@@ -844,6 +882,15 @@ export default function FileBrowser({
               uploadTargetRef.current = null
               e.target.value = ''
             }} />
+          <input ref={(el) => {
+            if (el) { el.setAttribute('webkitdirectory', ''); el.setAttribute('directory', '') }
+            folderRef.current = el
+          }} type="file" multiple style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files?.length) doUpload(e.target.files, uploadTargetRef.current || cur)
+              uploadTargetRef.current = null
+              e.target.value = ''
+            }} />
           <IconButton title={t('file.back')} disabled={!canBack} onClick={goBack}><BackIcon /></IconButton>
           <IconButton title={t('file.forward')} disabled={!canForward} onClick={goForward}><ForwardIcon /></IconButton>
           <IconButton title={t('file.up')} disabled={!canUp} onClick={goUp}><FolderUpIcon /></IconButton>
@@ -859,7 +906,14 @@ export default function FileBrowser({
             </Tooltip>
           </Dropdown>
           <IconButton title={t('file.newFolder')} disabled={!cur} onClick={() => { setMkdirName(''); setMkdirDir(null); setMkdirOpen(true) }}><NewFolderIcon /></IconButton>
-          <IconButton title={t('file.uploadHere')} disabled={uploading || !cur} onClick={() => { uploadTargetRef.current = cur; fileRef.current?.click() }}>{uploading ? <Spin size="small" /> : <UploadIcon />}</IconButton>
+          <Dropdown trigger={['click']} overlayClassName="tt-file-upload-menu" menu={{ items: [
+            { key: 'files', label: t('file.uploadFiles'), onClick: () => { uploadTargetRef.current = cur; fileRef.current?.click() } },
+            { key: 'folder', label: t('file.uploadFolder'), onClick: () => chooseFolder(cur) },
+          ] }}>
+            <Button type="text" size="small" className="tt-file-upload-trigger" aria-label={t('file.uploadHere')} disabled={uploading || !cur}>
+              {uploading ? <Spin size="small" /> : <UploadIcon />}
+            </Button>
+          </Dropdown>
         </div>
       </div>
       {searchOpen && (
