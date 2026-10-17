@@ -31,6 +31,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.chat_completions import ChatCompletions
 from roami_agent.replies.notifications import Notifications
 from roami_agent.server.configuration import Settings
+from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.tools.gateway import ToolGateway
@@ -59,6 +60,7 @@ class Runtime:
         self.worker_model = worker_model or model
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
+        self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
         self.memory = Memories(database, self.settings.memory_timezone)
         self.memory_jobs = MemoryJobs(
             database, memory_model or self.worker_model, self.memory, self.memory.daily
@@ -171,6 +173,7 @@ class Runtime:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
         await self.mcp.close()
+        await self.artifacts.close()
 
 
 async def serve(args):

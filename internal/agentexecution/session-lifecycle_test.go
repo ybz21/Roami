@@ -3,7 +3,6 @@ package agentexecution
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -256,20 +255,8 @@ func TestSessionContinuationThroughRealPythonAndGoCLI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = filepath.WalkDir(filepath.Join(repository, "agent-runtime", "src"), func(path string, entry fs.DirEntry, problem error) error {
-		if problem != nil {
-			return problem
-		}
-		if !entry.IsDir() && strings.HasSuffix(path, ".py") {
-			_, problem = os.ReadFile(path)
-		}
-		return problem
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = os.ReadFile(filepath.Join(repository, "agent-runtime", "tests", "session_continuation_scenario.py")); err != nil {
-		t.Fatal(err)
-	}
+	recordRuntimeSources(t, repository, "session_continuation_scenario.py")
+
 	binary := filepath.Join(t.TempDir(), "roami")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/roami")
 	build.Dir = repository

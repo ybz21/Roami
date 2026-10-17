@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/fs"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -96,21 +95,8 @@ func TestNativeProjectThroughRealPythonAndGoCLI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Go's test cache must observe Python sources used by the child process.
-	if err = filepath.WalkDir(filepath.Join(repository, "agent-runtime", "src"), func(path string, entry fs.DirEntry, problem error) error {
-		if problem != nil {
-			return problem
-		}
-		if !entry.IsDir() && strings.HasSuffix(path, ".py") {
-			_, problem = os.ReadFile(path)
-		}
-		return problem
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = os.ReadFile(filepath.Join(repository, "agent-runtime", "tests", "native_workspace_scenario.py")); err != nil {
-		t.Fatal(err)
-	}
+	recordRuntimeSources(t, repository, "native_workspace_scenario.py")
+
 	binary := filepath.Join(t.TempDir(), "roami")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/roami")
 	build.Dir = repository

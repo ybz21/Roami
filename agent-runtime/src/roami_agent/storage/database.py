@@ -13,10 +13,9 @@ from typing import TypeVar
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.migrations import initial_schema
+from roami_agent.storage.migrations import SCHEMA_VERSION, initial_schema, upgrade_schema
 
 T = TypeVar("T")
-SCHEMA_VERSION = 1
 
 
 class Database:
@@ -84,9 +83,10 @@ class Database:
                 "BEGIN IMMEDIATE; CREATE TABLE schema_meta" + ddl + "COMMIT;"
             )
         version = self.connection.execute("SELECT MAX(version) FROM schema_meta").fetchone()[0]
-        if version != SCHEMA_VERSION:
+        if not isinstance(version, int) or not 1 <= version <= SCHEMA_VERSION:
             raise DomainError("AGENT_SCHEMA_UNSUPPORTED", 503)
         self.connection.executescript("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
+        upgrade_schema(self.connection, version)
 
     async def call(self, fn: Callable[[sqlite3.Connection], T], *, write: bool = False) -> T:
         if self.closed:

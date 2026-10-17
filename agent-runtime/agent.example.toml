@@ -31,6 +31,9 @@ timeout_seconds = 120
 [memory]
 timezone = "UTC" # IANA timezone for daily summaries
 
+[artifacts]
+max_bytes = 67108864 # per artifact, stored outside model context
+
 [tools]
 # This validates working directories; it is not an OS filesystem sandbox.
 shell_roots = []

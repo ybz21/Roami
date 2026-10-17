@@ -53,9 +53,9 @@ The implementation follows the approved [code layers](../docs/design/20261017-ag
 | `executors/` | Native branch executor and Roami unified CLI coding adapter |
 | `tools/` | Validated registry, short Main catalog, bounded Worker Shell/HTTP/Skills and lazy MCP connections |
 | `replies/` | Proactive messages, delivery outbox and monotonic unread confirmation |
-| `storage/` | Single SQLite writer, transcript/turn repositories, locks and migration loading |
+| `storage/` | Single SQLite writer, transcript/turn repositories, content-addressed artifacts, locks and transactional migrations |
 | `observability/` | Persisted prompt manifests, model/catalog fingerprints and usage trace |
-| `migrations/0001_initial.sql` | Versioned initial DDL, also included in installed wheels |
+| `migrations/` | Versioned initial DDL and ordered upgrades, also included in installed wheels |
 | `backend/agentproxy/` | Go authenticated public proxy with immediate SSE flushing |
 
 `internal/agentruntime` keeps CLI/private transport and unified path/catalog registration. Python owns the Agent business DDL; Go does not write its business tables. Architecture tests enforce the core/contract/HTTP dependency boundaries. Existing lifecycle, restart, coding delegation, memory, compression and SSE tests exercise the refactored services.
@@ -148,3 +148,9 @@ Configure named servers under `[tools.mcp.<name>]` as shown in `agent.example.to
 Stdio children receive the SDK's minimal default environment plus explicitly mapped `env_env` variables. HTTP credentials come from `key_env` or `header_env`; endpoint URLs cannot carry credentials. Raw server errors/stderr and progress messages do not enter ordinary logs or model context. Numeric progress events are bounded and persisted against the active turn lease. Calls have bounded queues, deadlines and output; cancellation sends a best-effort MCP cancellation notification and closes the connection. A remote cancellation is not proof that a write stopped: ambiguous outcomes are persisted as unknown, end the current turn and never automatically replay. Only explicitly configured `read_only` tools count as reads; server hints alone do not remove verification.
 
 The adapter uses the official [Python SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.30.0) for the [MCP transports and lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports). Automated checks use real stdio processes and an authenticated local Streamable HTTP server, plus native Worker discovery/calls, catalog fingerprints, schema changes, timeouts, cancellation and unknown outcomes. They do not contact configured production MCP services.
+
+## Artifact storage
+
+The runtime upgrades schema v1 to v2 transactionally, preserving existing rows. Unsupported future versions fail without rebuilding the database; Go backup validation accepts both supported versions. Artifact bytes live under `<DataRoot>/agent-artifacts/blobs`, addressed by SHA-256, while SQLite stores separate opaque, owner-scoped references. Task/message attachment validates ownership and branch provenance. Writes are atomic and durable before publishing a reference; reads verify size and digest. A cancelled caller cannot release the runtime maintenance lock while filesystem work is still pending.
+
+The authenticated Go proxy exposes `GET /api/agent/artifacts`, `GET /api/agent/artifacts/{id}`, `GET /api/agent/artifacts/{id}/content` and `DELETE /api/agent/artifacts/{id}`. Downloads use attachment disposition, disable caching and sniffing, and never expose storage paths. `[artifacts].max_bytes` defaults to 64 MiB. Deletion tombstones the reference without resurrecting it on a later upload; physical garbage collection and a complete file-inclusive backup package remain pending. Tool producer integration is the next step; these endpoints do not accept arbitrary file paths or public uploads.

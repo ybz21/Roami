@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, Query, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
@@ -58,6 +58,42 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/conversations")
     async def list_conversations(owner: Owner):
         return {"data": await runtime.conversations.list(owner)}
+
+    @app.get("/v1/artifacts")
+    async def artifacts(
+        owner: Owner,
+        taskId: str | None = Query(default=None, max_length=200),
+        messageId: str | None = Query(default=None, max_length=200),
+        limit: int = Query(default=50, ge=1, le=100),
+    ):
+        return {
+            "data": await runtime.artifacts.list(
+                owner, task_id=taskId, message_id=messageId, limit=limit
+            )
+        }
+
+    @app.get("/v1/artifacts/{artifact_id}")
+    async def artifact(artifact_id: str, owner: Owner):
+        return {"data": await runtime.artifacts.get(owner, artifact_id)}
+
+    @app.get("/v1/artifacts/{artifact_id}/content")
+    async def artifact_content(artifact_id: str, owner: Owner):
+        reference, path = await runtime.artifacts.verified_path(owner, artifact_id)
+        return FileResponse(
+            path,
+            media_type=reference["mimeType"],
+            filename=reference["name"],
+            content_disposition_type="attachment",
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "sandbox; default-src 'none'",
+            },
+        )
+
+    @app.delete("/v1/artifacts/{artifact_id}")
+    async def delete_artifact(artifact_id: str, owner: Owner):
+        return {"data": await runtime.artifacts.delete(owner, artifact_id)}
 
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):

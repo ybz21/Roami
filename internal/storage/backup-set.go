@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+const maxPythonAgentSchemaVersion = 2
+
 type BackupEntry struct {
 	DatabaseDescriptor
 	SHA256        string `json:"sha256"`
@@ -190,7 +192,7 @@ func ValidateBackup(path string) (BackupManifest, Catalog, error) {
 		if d.Kind == "main" && d.SchemaVersion > len(mainSteps) {
 			return m, c, fmt.Errorf("backup main schema is newer than this binary")
 		}
-		if d.Kind == "agent" && (d.Owner != "python-agent" || d.SchemaVersion != 1) {
+		if d.Kind == "agent" && (d.Owner != "python-agent" || d.SchemaVersion < 1 || d.SchemaVersion > maxPythonAgentSchemaVersion) {
 			return m, c, fmt.Errorf("unsupported Agent schema or owner: %s", d.ID)
 		}
 		if d.DatabaseDescriptor != c.Databases[i] {

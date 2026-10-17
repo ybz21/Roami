@@ -51,6 +51,7 @@ class Settings:
     cli_bin: str = "roami"
     coding_directory: Path | None = None
     memory_timezone: str = "UTC"
+    artifact_max_bytes: int = 64 * 1024 * 1024
 
     @classmethod
     def load(cls, path: Path):
@@ -79,6 +80,7 @@ class Settings:
             http_tools=tools.get("http", {}),
             mcp_servers=tools.get("mcp", {}),
             memory_timezone=raw.get("memory", {}).get("timezone", "UTC"),
+            artifact_max_bytes=raw.get("artifacts", {}).get("max_bytes", 64 * 1024 * 1024),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
             coding_directory=(
                 Path(runtime["coding_directory"]).expanduser().resolve()
@@ -97,6 +99,12 @@ class Settings:
                 raise DomainError("INVALID_RUNTIME_CONFIG")
         if not 0 <= result.max_depth <= 16:
             raise DomainError("INVALID_RUNTIME_CONFIG")
+        if (
+            not isinstance(result.artifact_max_bytes, int)
+            or isinstance(result.artifact_max_bytes, bool)
+            or not 1 <= result.artifact_max_bytes <= 512 * 1024 * 1024
+        ):
+            raise DomainError("INVALID_ARTIFACT_CONFIG")
         if bool(result.model) != bool(result.endpoint):
             raise DomainError("INVALID_MODEL_CONFIG")
         if (
