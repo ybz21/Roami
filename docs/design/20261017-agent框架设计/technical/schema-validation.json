@@ -1,0 +1,24 @@
+{
+  "sqliteVersion": "3.45.1",
+  "tables": 26,
+  "checks": [
+    "fresh schema / WAL / foreign keys",
+    "unified backup schema_meta version read",
+    "unique owner/request key",
+    "one running turn per branch",
+    "unique branch/message sequence",
+    "message JSON validation",
+    "unique CLI launch identity",
+    "unique durable event key",
+    "two-character CJK FTS / owner and project predicate",
+    "unassigned conversation memory",
+    "memory provenance foreign key",
+    "memory update transaction refreshes FTS",
+    "memory logical deletion removes FTS entry",
+    "unique deletion tombstone",
+    "message write rollback is atomic",
+    "SQLite backup restores committed WAL data",
+    "foreign-key and integrity check"
+  ],
+  "scope": "candidate DDL only; no live runtime or model benchmark"
+}

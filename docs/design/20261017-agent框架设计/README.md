@@ -1,0 +1,50 @@
+# Agent 框架设计 · 2026-10-17
+
+当前版本：[v7 设计报告](index.html) · [产品交互原型 v4](product.html) · [产品设计说明](product.md) · [整体技术设计 v2](technical/index.html)。这是设计提案，尚未实现运行时；报告内流程为交互模拟。
+
+## 设计决策记录
+
+| 版本 | 本轮确认的设计 |
+|---|---|
+| v1 | 调研 Pi、OpenClaw；Main / 子 Agent、自研工具循环、Memory、压缩、Fork、Browser / Computer Use。Claude Code / Codex 复用 Roami / ttmux CLI；记忆按任务、对话、日期组织。 |
+| v2 | 用户指定 Python 实现内核、Go 对接用户；初步划分两层接口。 |
+| v3 | 简化为 Python 完整服务，包括消息接口、流与 CLI 执行；Go 只复用现有统一鉴权并透明转发。 |
+| v4 | Main 面向用户意图，去向包括直接处理、已有项目、已有散会话、新散会话和新项目；projectId 可空。 |
+| v5 | 用户强调快问快答为第一目标；普通问答直达模型，任务快速入队，资源准备与执行后台化。按用户要求迁入日期目录。 |
+| v7 | 对齐统一 CLI v4 / main a27f13a：标准命令树、共享应用服务、项目 API 单写、固定 OID worktree、catalog / 路径 / 维护锁与备份边界。 |
+| v6 | 增加统一 ReplyService 与拟新增 agent report / reply CLI；原生 Main 直接流式输出，外部执行器通过 CLI 回报或获准代答，回复绑定原始主对话。 |
+
+迁移前版本保留为 [v4 快照](revisions/v4.html)，快问快答方案保留为 [v5 快照](revisions/v5.html)。v1–v3 的决策据会话记录整理，未伪造当时文件快照；本目录从 v4 开始保留实际快照。
+
+## 产品设计迭代
+
+- 产品 v1：主对话优先；桌面三栏、手机四项底部导航；任务去向选择、已有散会话续派、新项目、任务回报、取消和记忆浏览。交互与验收范围见产品设计说明。
+
+## 实现边界
+
+- Python：消息 API、SSE、Main / Worker、工具、记忆、压缩、调度、CLI 执行器及运行时库。
+- Go：复用 Roami 登录鉴权，统一入口，透明转发消息和流；不维护另一份 Agent 业务状态。
+- 现有 CLI：启动、续派和恢复 Claude Code / Codex；结构化回执缺口见报告。
+- 目录来源：`docs/design/agent-framework/index.html`，本轮移入此目录。
+
+## 调研与验证
+
+官方资料与本地源码依据均在报告末尾。初轮基线 `6907b15`；CLI 对齐轮重新核对 `a27f13a`（#328）与 [统一 CLI v4](../20261017-CLI统一设计/index.html)。
+
+报告交互验证覆盖 6 个宽度、6 个架构模块、5 种记忆视图和 8 个流程场景。此前 Android 真机锁屏，未完成真实触控验收；窄屏浏览器模拟已检查。延迟数值均为待实测目标，不是已获得的性能结果。
+
+## 技术设计迭代
+
+- 技术 v1：独立总览与 10 个子 HTML，覆盖对话持久化、记忆写入、范围检索、Prompt / 应用缓存、模型与工具循环、任务 / CLI 回报、Go 流转发、恢复与验收。
+- 附完整候选 `technical/schema.sql`、可重跑的 `technical/validate-schema.py` 和 `technical/validation.md`。建表规范经过临时库验证，尚未作为生产迁移运行。
+- 官方资料与项目设计选择的边界见 [技术依据](technical/sources.md)。
+
+- 技术 v2：与统一 CLI / Go 共享业务服务和统一存储规范对齐，详情见 [对齐清单](technical/cli-alignment.md)。CLI 对齐前的完整实际快照保存在 [revisions/before-cli-unification/](revisions/before-cli-unification/README.md)，已有 v4 / v5 快照不变。
+
+- 产品 v2：加入 `/compact [关注项]` 命令提示、上下文入口、排队 / 运行 / 完成 / 取消 / 无需压缩反馈与摘要查看。技术设计补齐控制接口、分支串行化与持久化复用；仍是本地交互模拟。
+
+- 同轮增加 `/help`、`/status`、`/tasks`、`/memory`、`/stop`，统一命令提示与补全；停止回复、取消任务、取消压缩分属独立操作。首批不引入清空历史或重置全部状态的命令。
+
+- 产品 v3：保留工作台导航，补齐桌面项目 / 工作会话树、历史主对话切换、新建主对话、项目快捷建任务和执行器选择；任务结果绑定原始主对话，切换历史不改变回报位置。
+
+- 产品 v4：新增大总管主动联系、右上角未读数字圈、历史红点与通知消息定位；新增技术子模块 11。Python 通知持久化已开始实现，系统推送适配尚未接通。

@@ -17,15 +17,15 @@ section() {
 
 changed_files() {
   if git rev-parse --verify HEAD >/dev/null 2>&1; then
-    git diff --name-only --cached --diff-filter=ACMR
+    git -c core.quotePath=false diff --name-only --cached --diff-filter=ACMR
   else
-    git diff --name-only --cached --diff-filter=ACMR
+    git -c core.quotePath=false diff --name-only --cached --diff-filter=ACMR
   fi
 }
 
 tracked_source_files() {
-  git ls-files \
-    '*.go' '*.sh' '*.bash' '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' \
+  git ls-files -z \
+    '*.go' '*.py' '*.sh' '*.bash' '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' \
     ':!:frontend/dist/*' ':!:frontend/node_modules/*'
 }
 
@@ -55,6 +55,13 @@ fi
 section "Go tests"
 go test ./...
 
+section "Python Agent runtime"
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is missing. Install uv, then run: cd agent-runtime && uv sync --frozen" >&2
+  exit 1
+fi
+(cd agent-runtime && uv sync --frozen --quiet && uv run --frozen ruff check src tests && uv run --frozen ruff format --check src tests && uv run --frozen pytest -q)
+
 section "Frontend checks"
 if [ ! -d frontend/node_modules ]; then
   echo "frontend/node_modules is missing. Run: cd frontend && npm install" >&2
@@ -70,11 +77,17 @@ if [ "$MODE" = "full" ]; then
 fi
 
 section "Secret scan"
-scan_files="$(tracked_source_files)"
-if [ -n "$scan_files" ]; then
-  if grep -nEI '(api[_-]?key|secret|token|password|passwd|private[_-]?key)[[:space:]]*[:=][[:space:]]*["'\''][^"'\'']{12,}' $scan_files; then
+mapfile -d '' -t scan_files < <(tracked_source_files)
+if [ "${#scan_files[@]}" -gt 0 ]; then
+  if grep -nEI '(api[_-]?key|secret|token|password|passwd|private[_-]?key)[[:space:]]*[:=][[:space:]]*["'\''][^"'\'']{12,}' "${scan_files[@]}"; then
     echo "Potential hard-coded secret found. Move secrets to .env or documented configuration." >&2
     exit 1
+  else
+    scan_status=$?
+    if [ "$scan_status" -ne 1 ]; then
+      echo "Secret scan failed to read source files." >&2
+      exit "$scan_status"
+    fi
   fi
 fi
 

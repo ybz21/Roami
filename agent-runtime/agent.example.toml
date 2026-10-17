@@ -1,0 +1,20 @@
+# Copy to <HomeRoot>/agent.toml. Select the provider's actual endpoint and model.
+[model]
+endpoint = ""
+name = ""
+key_env = "ROAMI_AGENT_API_KEY"
+# worker = "a-model-supported-by-the-same-endpoint"
+
+[runtime]
+main_concurrency = 2
+workers = 3
+max_steps = 16
+max_depth = 2
+input_budget = 24000
+timeout_seconds = 120
+cli_bin = "roami"
+
+[tools]
+# This validates working directories; it is not an OS filesystem sandbox.
+shell_roots = []
+skill_roots = []

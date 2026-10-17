@@ -1,0 +1,258 @@
+import asyncio
+import fcntl
+import json
+import os
+
+import pytest
+
+from roami_agent.conversation import Conversations, message
+from roami_agent.memory import Memories
+from roami_agent.notifications import Notifications
+from roami_agent.storage import Database, DomainError
+
+
+async def test_intake_retry_conflict_owner_and_restart(store):
+    conversations = Conversations(store)
+    first = await conversations.create("alice", "Main")
+    receipt = await conversations.accept("alice", first["id"], "request-1", "remember this")
+    again = await conversations.accept("alice", first["id"], "request-1", "remember this")
+    assert again["turnId"] == receipt["turnId"]
+    with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
+        await conversations.accept("alice", first["id"], "request-1", "different")
+    with pytest.raises(DomainError, match="CONVERSATION_NOT_FOUND"):
+        await conversations.messages("bob", first["id"])
+    assert len((await conversations.messages("alice", first["id"]))["messages"]) == 1
+    await store.close()
+    reopened = Database(store.path, store.data_root, managed=False)
+    await reopened.open()
+    try:
+        assert len((await Conversations(reopened).messages("alice", first["id"]))["messages"]) == 1
+    finally:
+        await reopened.close()
+
+
+async def test_maintenance_lock_and_single_writer_instance(store):
+    handle = os.open(store.data_root / "locks/storage.lock", os.O_RDWR)
+    try:
+        with pytest.raises(BlockingIOError):
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    finally:
+        os.close(handle)
+    second = Database(store.path, store.data_root, managed=False)
+    with pytest.raises(DomainError, match="STORAGE_BUSY"):
+        await second.open()
+    assert store.path.exists()
+
+
+async def test_commit_survives_cancelled_caller_and_atomic_rollback(store):
+    started = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    def write(db):
+        loop.call_soon_threadsafe(started.set)
+        import time
+
+        time.sleep(0.03)
+        db.execute("INSERT INTO owner_versions(owner_id) VALUES('durable')")
+
+    task = asyncio.create_task(store.call(write, write=True))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert (
+        await store.call(lambda db: db.execute("SELECT COUNT(*) FROM owner_versions").fetchone()[0])
+        == 1
+    )
+
+    def fails(db):
+        db.execute("INSERT INTO owner_versions(owner_id) VALUES('rolled-back')")
+        raise RuntimeError("rollback")
+
+    with pytest.raises(RuntimeError):
+        await store.call(fails, write=True)
+    assert (
+        await store.call(lambda db: db.execute("SELECT COUNT(*) FROM owner_versions").fetchone()[0])
+        == 1
+    )
+
+
+async def test_fork_completed_round_preserves_parent(store):
+    conversations = Conversations(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "one", "question")
+
+    def finish(db):
+        mid = message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "assistant",
+            {"text": "answer"},
+            turn_id=receipt["turnId"],
+        )
+        db.execute("UPDATE turns SET state='completed' WHERE id=?", (receipt["turnId"],))
+        return mid
+
+    mid = await store.call(finish, write=True)
+    branch = await conversations.fork("alice", c["id"], mid)
+    assert branch["branchId"] != c["active_branch_id"]
+    await conversations.accept("alice", c["id"], "two", "branch-only")
+    result = await conversations.messages("alice", c["id"])
+    assert [m["content"]["text"] for m in result["messages"]] == [
+        "question",
+        "answer",
+        "branch-only",
+    ]
+    assert (
+        await store.call(
+            lambda db: db.execute(
+                "SELECT COUNT(*) FROM messages WHERE branch_id=?", (c["active_branch_id"],)
+            ).fetchone()[0]
+        )
+        == 2
+    )
+
+
+async def test_recovery_marks_partial_and_unknown_tools(store):
+    conversations = Conversations(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "one", "question")
+
+    def partial(db):
+        db.execute("UPDATE turns SET state='running' WHERE id=?", (receipt["turnId"],))
+        return message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "assistant",
+            {"text": "partial"},
+            turn_id=receipt["turnId"],
+            status="streaming",
+        )
+
+    await store.call(partial, write=True)
+    await conversations.recover()
+    messages = (await conversations.messages("alice", c["id"]))["messages"]
+    assert messages[-1]["status"] == "interrupted"
+    assert any(
+        e["kind"] == "turn.interrupted" for e in await conversations.events("alice", c["id"])
+    )
+
+
+async def test_cjk_memory_scope_version_and_forgetting(store):
+    conversations, memories = Conversations(store), Memories(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "one", "用 Python 做记忆召回")
+    memory = await memories.save(
+        "alice",
+        "记忆决策",
+        "使用 Python 实现记忆召回",
+        receipt["messageId"],
+        conversation_id=c["id"],
+        project_id="project-a",
+    )
+    assert len(await memories.search("alice", "记忆", project_id="project-a")) == 1
+    assert await memories.search("alice", "记忆", project_id="project-b") == []
+    assert await memories.search("bob", "记忆") == []
+    updated = await memories.save(
+        "alice",
+        "记忆决策",
+        "使用 Python 和 FTS 实现记忆召回",
+        receipt["messageId"],
+        conversation_id=c["id"],
+        project_id="project-a",
+    )
+    assert updated["revision"] == 2
+    assert updated["supersedes_id"] == memory["id"]
+    await memories.forget("alice", updated["id"])
+    assert await memories.search("alice", "记忆") == []
+    with pytest.raises(DomainError, match="MEMORY_FORGOTTEN"):
+        await memories.save(
+            "alice",
+            "记忆决策",
+            "使用 Python 和 FTS 实现记忆召回",
+            receipt["messageId"],
+            conversation_id=c["id"],
+            project_id="project-a",
+        )
+
+
+async def test_proactive_delivery_atomic_dedupe_read_watermark(store):
+    conversations, notifications = Conversations(store), Notifications(store)
+    c = await conversations.create("alice")
+    first = await notifications.publish(
+        "alice", c["id"], "Task done", source="task", dedupe_key="t1"
+    )
+    retry = await notifications.publish(
+        "alice", c["id"], "Task done", source="task", dedupe_key="t1"
+    )
+    assert first["eventId"] == retry["eventId"]
+    assert await notifications.unread("alice") == 1
+    assert await notifications.unread("bob") == 0
+    with pytest.raises(DomainError, match="NOTIFICATION_KEY_CONFLICT"):
+        await notifications.publish("alice", c["id"], "Changed", source="task", dedupe_key="t1")
+    second = await notifications.publish(
+        "alice", c["id"], "Need your decision", source="task", dedupe_key="t2"
+    )
+    await notifications.mark_read("alice", c["id"], first["eventId"])
+    assert await notifications.unread("alice") == 1
+    await notifications.mark_read("alice", c["id"], second["eventId"])
+    await notifications.mark_read("alice", c["id"], first["eventId"])
+    assert await notifications.unread("alice") == 0
+    assert len((await conversations.messages("alice", c["id"]))["messages"]) == 2
+
+
+async def test_catalog_required_and_ready_file_cannot_be_recreated(tmp_path):
+    root = tmp_path / "database"
+    root.mkdir()
+    (tmp_path / "storage-layout.json").write_text(
+        json.dumps({"instanceId": "one", "paths": {"databaseRoot": str(root)}})
+    )
+    (root / "catalog.json").write_text(
+        json.dumps(
+            {
+                "instanceId": "one",
+                "databases": [
+                    {
+                        "id": "agent-runtime",
+                        "kind": "agent",
+                        "owner": "python-agent",
+                        "state": "ready",
+                        "path": "agents/runtime.db",
+                    }
+                ],
+            }
+        )
+    )
+    db = Database(root / "agents/runtime.db", tmp_path)
+    with pytest.raises(DomainError, match="DATABASE_MISSING"):
+        await db.open()
+    assert not db.path.exists()
+
+
+async def test_unread_count_is_not_limited_by_inbox_page_and_delivery_is_atomic(store):
+    conversations, notifications = Conversations(store), Notifications(store)
+    c = await conversations.create("alice")
+    await store.call(
+        lambda db: db.execute(
+            "INSERT INTO channel_bindings(id,conversation_id,channel_kind,route_json,created_ms) VALUES(?,?,'web','{}',1)",
+            ("web-channel", c["id"]),
+        ),
+        write=True,
+    )
+    for index in range(205):
+        await notifications.publish(
+            "alice", c["id"], f"Result {index}", source="test", dedupe_key=str(index)
+        )
+    assert len(await notifications.list("alice")) == 200
+    assert await notifications.unread("alice") == 205
+    assert (
+        await store.call(
+            lambda db: db.execute(
+                "SELECT COUNT(*) FROM deliveries WHERE state='pending'"
+            ).fetchone()[0]
+        )
+        == 205
+    )
+    assert await notifications.unread("bob") == 0

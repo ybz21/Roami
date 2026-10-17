@@ -34,3 +34,10 @@ ttmux-web
 !/internal/webui/site/.gitkeep
 /dist/
 /backend/dist/
+
+# Python Agent runtime
+agent-runtime/.venv/
+agent-runtime/.pytest_cache/
+agent-runtime/.ruff_cache/
+agent-runtime/**/__pycache__/
+agent-runtime/dist/

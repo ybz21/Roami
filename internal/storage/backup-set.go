@@ -190,6 +190,9 @@ func ValidateBackup(path string) (BackupManifest, Catalog, error) {
 		if d.Kind == "main" && d.SchemaVersion > len(mainSteps) {
 			return m, c, fmt.Errorf("backup main schema is newer than this binary")
 		}
+		if d.Kind == "agent" && (d.Owner != "python-agent" || d.SchemaVersion != 1) {
+			return m, c, fmt.Errorf("unsupported Agent schema or owner: %s", d.ID)
+		}
 		if d.DatabaseDescriptor != c.Databases[i] {
 			return m, c, fmt.Errorf("backup descriptor mismatch")
 		}

@@ -1,0 +1,123 @@
+:root{
+  color-scheme: dark;
+  --bg-base: #0d1117;
+  --bg-container: #161b22;
+  --bg-elevated: #1b222b;
+  --bg-term: #0b0f14;
+  --border: #30363d;
+  --border-subtle: #21262d;
+  --text-bright: #e6edf3;
+  --text-dim: #8b949e;
+  --text-dimmer: #6e7681;
+  --brand-grad: linear-gradient(180deg, #f5f7fa 0%, #c3c9d1 46%, #9aa1ab 56%, #e7ebef 100%);
+  /* Agent 品牌标：用官方色，不许按我们的强调色重新上色。Claude 是陶土橙 #D97757；
+     OpenAI/Codex 的标官方就是单色（深底走白），所以跟前景色走。 */
+  --brand-claude: #d97757;
+  --brand-codex: var(--text-bright);
+  /* 强调色：全站只有这一组，实心块用 --accent-solid，线/文字用 --accent（见 theme.tsx） */
+  --accent: #58a6ff;
+  --accent-solid: #1f6feb;
+  --accent-soft: rgba(31, 111, 235, .14);
+  --accent-border: rgba(88, 166, 255, .45);
+  /* 选中行的底：中性提亮，不带色相（见 theme.tsx 的注释）。
+     --accent-soft 留给强调件（芯片/徽标/聚焦光晕），两者不再混用。 */
+  --sel-bg: rgba(255, 255, 255, .065);
+  /* 成功/运行绿：全站也只有这一组（见 theme.tsx） */
+  --ok: #3fb950;
+  --ok-solid: #238636;
+  --ok-soft: rgba(63, 185, 80, .14);
+  --ok-border: rgba(63, 185, 80, .42);
+  /* 危险/断开红、警示黄：各只有一组（见 theme.tsx） */
+  --danger: #f85149;
+  --danger-soft: rgba(248, 81, 73, .16);
+  --danger-border: rgba(248, 81, 73, .45);
+  --warn: #d29922;
+  --warn-soft: rgba(210, 153, 34, .12);
+  --warn-border: rgba(210, 153, 34, .40);
+  /* 蜂群紫：一直散在 Overview/Projects/App 里各写一遍 #a371f7，现在收成一组 */
+  --swarm: #a371f7;
+  --swarm-soft: rgba(163, 113, 247, .12);
+  --swarm-border: rgba(163, 113, 247, .38);
+  --list-hover: rgba(255, 255, 255, .025);
+  --scroll-thumb: #2a313a;
+  --scroll-thumb-hover: #3d444d;
+  --card-hover-shadow: 0 8px 24px rgba(1, 4, 9, .5);
+  --elevated-shadow: 0 16px 48px rgba(1, 4, 9, .55);
+  --xterm-bg: #0b0f14;
+  --xterm-fg: #e6edf3;
+  /* highlight.js token 配色（深色，GitHub-ish） */
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-title: #d2a8ff;
+  --hl-attr: #7ee787;
+  --hl-built: #ffa657;
+
+  /* 密度：留白是给眼睛的，触控区是给手指的，两者独立 */
+  --tap: 44px;                    /* 最小命中边长 */
+  --ctl-h: 32px;                  /* 控件高（桌面档） */
+  --pad-page: 16px;               /* 页面四周留白 */
+  --gap: 10px;
+  /* 字号刻度（只有这六档）。此前一个页面上能数出 10 种字号，最常用的三种是
+     11.5 / 11 / 10.5——半像素级的差别没人看得出是刻意的，只会读成"随手写的"。
+     除眉标/角标外不许低于 12。 */
+  --fs-micro: 11px;               /* 眉标、角标，唯一允许 <12 的一档 */
+  --fs-meta: 12px;                /* 次要信息：时间、路径、计数 */
+  --fs-sm: 13px;                  /* 密集列表行 */
+  --fs-body: 14px;                /* 正文 */
+  --fs-lg: 16px;                  /* 区块标题 */
+  --fs-title: 22px;               /* 页面标题 */
+  --fs-chip: 12px;
+
+  /* 圆角刻度（四档）：控件 / 行 / 卡片 / 胶囊 */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-card: 14px;
+  --r-pill: 999px;
+  --r-sheet: 16px;
+
+  /* 间距刻度（五档）：4 的倍数，不再出现 3/5/7/9/11/13 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --row-cozy: 42px;
+  --row-compact: 34px;
+
+  /* 桌面壳层：Navigation ｜ Canvas ｜ rail ｜ Dock 的尺寸契约 */
+  --nav-w: 280px;
+  --nav-rail: 48px;
+  --topbar-h: 40px;
+  --status-h: 24px;               /* 底部状态条；粗指针下长到 --tap（见 .tt-statusbar） */
+  --canvas-min: 560px;
+  --split-rail: 8px;
+  --split-hit: 20px;
+  --activity-rail: 320px;
+  --content-overview: 1680px;
+  --content-form: 920px;
+
+  /* 层级：九个具名层，取代 50/90/100/1000/1199/1200/1201/1300/9999 那堆魔数。
+     同层不叠——并排显示的两个 sheet 由栈管理器决定谁在上，不靠差 1 硬顶。 */
+  --z-sticky: 10;                 /* 页面内粘性头 */
+  --z-fab: 30;                    /* 悬浮按钮 / 方向键簇 */
+  --z-nav: 50;                    /* 底栏 / 导航轨 */
+  --z-subpage: 90;                /* 全屏二级页 */
+  --z-session: 100;               /* 会话全屏 */
+  --z-session-sub: 110;           /* 会话全屏里再开的二级页（Git/文件从终端里唤起） */
+  --z-scrim: 900;                 /* 遮罩 */
+  --z-sheet: 1000;                /* 底部 sheet / 抽屉 */
+  --z-panel: 1200;                /* 桌面右侧浮动面板：压过 sheet(1000)，低于 antd 弹层基座(1300) */
+  --z-popup: 1300;                /* antd 弹层基座 */
+  --z-toast: 1500;
+  --z-drag: 9999;                 /* 拖拽幽灵 */
+
+  /* 边界：所有 position:fixed 的层必须显式吃安全区；--kb 由 layout.ts 回填 */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --kb: 0px;}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden}body{font:var(--fs-body)/1.85 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg-base);color:var(--text-bright)}h1,h2,h3,p{margin:0}h1{font-size:var(--fs-title);line-height:1.5}h2{font-size:var(--fs-lg);margin-bottom:var(--sp-3)}h3{font-size:var(--fs-body);margin-bottom:var(--sp-2)}p,li{color:var(--text-dim)}p+p{margin-top:var(--sp-3)}strong,b{font-weight:600;color:var(--text-bright)}a{color:var(--accent);text-underline-offset:var(--sp-1)}a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}button{font:inherit;cursor:pointer}code,pre{font:var(--fs-meta)/1.8 ui-monospace,SFMono-Regular,Consolas,monospace}code{overflow-wrap:anywhere;color:var(--text-bright)}pre{margin:var(--sp-3) 0;padding:var(--sp-4);border-radius:var(--r-sm);background:var(--bg-container);color:var(--text-dim);white-space:pre-wrap;overflow-wrap:anywhere}ul,ol{padding-left:var(--sp-5);margin:var(--sp-3) 0}li+li{margin-top:var(--sp-2)}.shell{height:100%;display:flex;flex-direction:column;padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l)}.top{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex:none;min-height:calc(var(--tap) + var(--sp-2));padding:var(--sp-2) var(--sp-5);border-bottom:1px solid var(--border-subtle)}.brand{font-size:var(--fs-sm);font-weight:600}.topnav{display:flex;gap:var(--sp-3);font-size:var(--fs-meta)}.top a{display:flex;align-items:center;min-height:var(--tap);text-decoration:none}.scroll{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain;scroll-behavior:smooth}.wrap{max-width:calc(var(--sp-5)*50);padding:var(--sp-5);margin:auto}.tt-pagehead{padding:var(--sp-3) 0 var(--sp-5)}.eyebrow{font-size:var(--fs-micro);letter-spacing:.1em;color:var(--accent);margin-bottom:var(--sp-2)}.tt-pagehead p{margin-top:var(--sp-3);max-width:88ch}.tags{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-3)}.tag{font-size:var(--fs-meta);border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent);padding:var(--sp-1) var(--sp-3)}.subnav{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:var(--sp-4)}.subnav a{display:flex;align-items:center;min-height:var(--tap);padding:var(--sp-2) var(--sp-3);background:var(--bg-container);border-radius:var(--r-xs);color:var(--text-dim);font-size:var(--fs-meta);text-decoration:none}.subnav a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}section{padding:var(--sp-5) 0;border-top:1px solid var(--border-subtle);scroll-margin-top:var(--sp-4)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3);margin:var(--sp-3) 0}.card{display:block;min-width:0;padding:var(--sp-4);background:var(--bg-container);border-radius:var(--r-card);text-decoration:none}.card b{display:block;margin-bottom:var(--sp-2);font-size:var(--fs-body)}.card p{font-size:var(--fs-sm)}.card small{font-size:var(--fs-meta);color:var(--accent)}.note{margin:var(--sp-3) 0;padding:var(--sp-3) var(--sp-4);background:var(--accent-soft);border-left:2px solid var(--accent);border-radius:0 var(--r-xs) var(--r-xs) 0;color:var(--text-dim);font-size:var(--fs-sm)}.note.warn{background:var(--warn-soft);border-color:var(--warn)}.tablewrap{overflow:auto;margin:var(--sp-3) 0}table{border-collapse:collapse;width:100%;font-size:var(--fs-sm)}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--border-subtle);padding:var(--sp-3) var(--sp-2)}th{color:var(--text-dim);font-size:var(--fs-meta);font-weight:500}td{color:var(--text-dim);min-width:calc(var(--sp-5)*5)}td:first-child{color:var(--text-bright)}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp-3);margin:var(--sp-4) 0}.flow>div{background:var(--bg-container);border-top:2px solid var(--accent);padding:var(--sp-3);border-radius:var(--r-xs);min-width:0}.flow b{display:block;font-size:var(--fs-sm)}.flow p{font-size:var(--fs-meta);margin-top:var(--sp-2)}.module-number{color:var(--accent);font-size:var(--fs-meta)}details{border-bottom:1px solid var(--border-subtle);padding:var(--sp-2) 0}summary{cursor:pointer;min-height:var(--tap);padding:var(--sp-2);font-size:var(--fs-sm)}details>div{padding:var(--sp-3)}.footer{display:flex;justify-content:space-between;gap:var(--sp-3);padding:var(--sp-5) 0;font-size:var(--fs-meta)}.footer a{min-height:var(--tap);display:flex;align-items:center}.sources{font-size:var(--fs-sm)}.sources a{min-height:var(--tap);display:inline-flex;align-items:center}.controls{display:flex;gap:var(--sp-2);flex-wrap:wrap;margin:var(--sp-3) 0}.controls button{min-height:var(--tap);padding:var(--sp-2) var(--sp-3);border:1px solid var(--border);border-radius:var(--r-xs);background:var(--bg-container);color:var(--text-dim);font-size:var(--fs-sm)}.controls button[aria-pressed="true"]{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-border)}.cache-parts{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin:var(--sp-3) 0}.cache-part{flex:1;min-width:calc(var(--sp-5)*5);padding:var(--sp-3);border-radius:var(--r-xs);font-size:var(--fs-meta);background:var(--bg-container);border-top:2px solid var(--border)}.cache-part.hit{border-color:var(--ok);background:var(--ok-soft);color:var(--ok)}.cache-part.miss{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}.demoresult{padding:var(--sp-4);border-radius:var(--r-sm);background:var(--bg-container);font-size:var(--fs-sm)}.demoresult p+p{margin-top:var(--sp-2)}.tiny{font-size:var(--fs-meta);color:var(--text-dim)}
+:where(html[data-pointer="fine"]) .subnav a:hover,:where(html[data-pointer="fine"]) .card:hover,:where(html[data-pointer="fine"]) .controls button:hover{background:var(--bg-elevated);color:var(--text-bright)}html[data-size="compact"] .wrap{padding:var(--sp-4)}html[data-size="compact"] .grid,html[data-size="compact"] .flow{grid-template-columns:1fr}html[data-size="compact"] .top{padding:var(--sp-2) var(--sp-3)}html[data-size="compact"] .brand{font-size:var(--fs-meta)}html[data-size="compact"] .topnav{gap:var(--sp-2)}html[data-size="compact"] td{min-width:calc(var(--sp-5)*6)}html[data-size="compact"] .subnav{flex-wrap:nowrap;overflow:auto;padding-bottom:var(--sp-1)}html[data-size="compact"] .subnav a{white-space:nowrap;flex:none}html[data-size="medium"] .flow{grid-template-columns:repeat(2,minmax(0,1fr))}
