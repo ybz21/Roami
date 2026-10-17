@@ -53,6 +53,11 @@ async def hold_workspace(settings, task, run, *, stopped=None):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
         start_new_session=True,
+        env={
+            name: value
+            for name, value in os.environ.items()
+            if name not in settings.provider_key_environments()
+        },
     )
     state, confirmed = "failed", True
     try:

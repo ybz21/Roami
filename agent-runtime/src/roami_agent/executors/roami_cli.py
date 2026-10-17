@@ -33,6 +33,7 @@ class CodingExecutor:
         response = await execute(
             [self.settings.cli_bin, "agent", "execution", sub, *args],
             timeout=180 if spec and spec.get("projectId") else 15,
+            excluded_env=self.settings.provider_key_environments(),
             input_data=encoded(spec).encode() if spec is not None else None,
         )
         if response["exitCode"]:

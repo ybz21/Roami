@@ -149,7 +149,7 @@ class BrowserDriver:
         env = {
             key: value
             for key, value in os.environ.items()
-            if key not in {self.settings.key_env, "ROAMI_AGENT_API_KEY"}
+            if key not in self.settings.provider_key_environments()
         }
         env.update(
             ROAMI_DATA=str(self.root),

@@ -42,7 +42,7 @@ class AgentLoop:
         self.turn_tasks[tid] = asyncio.current_task()
         model = self.model if role == "main" else self.worker_model
         try:
-            async with asyncio.timeout(self.settings.timeout_seconds):
+            async with asyncio.timeout(self.settings.timeout_for(role)):
                 instructions = (
                     self.settings.main_instructions
                     if role == "main"

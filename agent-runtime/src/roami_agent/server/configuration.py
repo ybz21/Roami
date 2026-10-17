@@ -2,13 +2,14 @@
 
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from roami_agent.protocol.browser import browser_config
 from roami_agent.protocol.computer import computer_config
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
 
 MAIN_INSTRUCTIONS = (
@@ -35,6 +36,7 @@ class Settings:
     model: str = ""
     key_env: str = "ROAMI_AGENT_API_KEY"
     worker_model: str = ""
+    worker_route: ModelRoute | None = None
     model_retries: int = 2
     model_capabilities: dict = field(default_factory=dict)
     model_cache: dict = field(default_factory=dict)
@@ -123,7 +125,32 @@ class Settings:
             ZoneInfo(result.memory_timezone)
         except (ValueError, TypeError, ZoneInfoNotFoundError) as exc:
             raise DomainError("INVALID_MEMORY_TIMEZONE") from exc
+        worker = raw.get("worker", {})
+        if "model" in worker:
+            result = replace(
+                result, worker_route=ModelRoute.worker(worker["model"], result.route("worker"))
+            )
         return result
 
-    def credentials(self):
-        return os.environ.get(self.key_env, "")
+    def route(self, role="main"):
+        if role != "main" and self.worker_route:
+            return self.worker_route
+        name = self.model if role == "main" else self.worker_model or self.model
+        return ModelRoute(
+            self.endpoint,
+            name,
+            self.key_env,
+            self.timeout_seconds,
+            self.model_retries,
+            self.model_capabilities,
+            self.model_cache,
+        )
+
+    def timeout_for(self, role):
+        return self.route(role).timeout_seconds
+
+    def credentials(self, role="main"):
+        return os.environ.get(self.route(role).key_env, "")
+
+    def provider_key_environments(self):
+        return {"ROAMI_AGENT_API_KEY", self.key_env, self.route("worker").key_env}

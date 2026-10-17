@@ -23,13 +23,19 @@ def register_shell(registry, settings, artifacts=None):
         if not any(cwd == root or root in cwd.parents for root in roots):
             raise DomainError("WORKSPACE_OUTSIDE_CONFIGURED_ROOTS")
         if not artifacts:
-            return await execute(args["argv"], cwd=cwd, timeout=min(args.get("timeout", 60), 60))
+            return await execute(
+                args["argv"],
+                cwd=cwd,
+                timeout=min(args.get("timeout", 60), 60),
+                excluded_env=settings.provider_key_environments(),
+            )
         result = await execute(
             args["argv"],
             cwd=cwd,
             timeout=min(args.get("timeout", 60), 60),
             max_bytes=min(artifacts.max_bytes, 2 * 1024 * 1024),
             raw_output=True,
+            excluded_env=settings.provider_key_environments(),
         )
         references = []
         for stream in ["stdout", "stderr"]:

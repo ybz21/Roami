@@ -18,14 +18,17 @@ class PromptBuilder:
         return plan, prompt
 
     async def build(self, turn, instructions, catalog, completion):
+        completion_source = None
         if completion:
             allowed = await self.db.call(
                 lambda db: row(
                     db,
-                    "SELECT t.id FROM tasks t WHERE t.id=? AND t.owner_id=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
+                    "SELECT t.origin_message_id FROM tasks t WHERE t.id=? AND t.owner_id=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
                     (completion.get("taskId"), turn["owner_id"]),
                 )
             )
+            if allowed:
+                completion_source = allowed["origin_message_id"]
             if not allowed:
                 completion = {
                     "taskId": completion.get("taskId"),
@@ -43,6 +46,10 @@ class PromptBuilder:
                 branch_id=turn["branch_id"],
                 through_turn=turn["id"],
             )
+            if completion_source:
+                plan["sourceMessageIds"] = list(
+                    dict.fromkeys([*plan.get("sourceMessageIds", []), completion_source])
+                )
             workspace = turn.get("workspace")
             bound = (
                 (

@@ -13,7 +13,11 @@ class TargetDirectory:
 
     async def _query(self, *args):
         try:
-            response = await execute([self.settings.cli_bin, *args], timeout=5)
+            response = await execute(
+                [self.settings.cli_bin, *args],
+                timeout=5,
+                excluded_env=self.settings.provider_key_environments(),
+            )
         except (OSError, TimeoutError) as exc:
             raise DomainError("TARGET_DISCOVERY_UNAVAILABLE") from exc
         if response["exitCode"]:

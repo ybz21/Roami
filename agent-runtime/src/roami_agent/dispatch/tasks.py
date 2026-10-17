@@ -5,7 +5,9 @@ import json
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -29,6 +31,8 @@ class Tasks:
         from_message_id=None,
         origin_message_id=None,
         record_intent=False,
+        source_turn_id=None,
+        source_assistant_message_id=None,
     ):
         if (
             not key
@@ -51,8 +55,23 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if source_turn_id or source_assistant_message_id:
+            spec.update(
+                sourceTurnId=source_turn_id,
+                sourceAssistantMessageId=source_assistant_message_id,
+            )
+
         def write(db):
             c = owned(db, owner, cid)
+            if source_turn_id or source_assistant_message_id:
+                if not row(
+                    db,
+                    "SELECT m.id FROM messages m JOIN turns t ON t.id=m.turn_id "
+                    "WHERE m.id=? AND t.id=? AND t.conversation_id=? AND m.role='assistant'",
+                    (source_assistant_message_id, source_turn_id, cid),
+                ):
+                    raise DomainError("INVALID_TASK_SOURCE", 409)
+                assert_context_admitted(db, {"id": source_turn_id, "owner_id": owner})
             launch_id = "task:" + owner + ":" + key
             attempt = row(db, "SELECT * FROM task_attempts WHERE launch_id=?", (launch_id,))
             if attempt:
@@ -184,7 +203,7 @@ class Tasks:
 
         return await self.db.call(write, write=True)
 
-    async def list(self, owner, cid=None):
+    async def list(self, owner, cid=None, *, for_model=False):
         def read(db):
             if cid:
                 owned(db, owner, cid)
@@ -212,7 +231,7 @@ class Tasks:
                         task["latestAttempt"]["workspace"] = json.loads(
                             preparation["payload_json"]
                         )["workspace"]
-            return tasks
+            return model_task_projection(db, owner, tasks) if for_model else tasks
 
         return await self.db.call(read)
 

@@ -273,6 +273,15 @@ class Memories:
                     "WITH RECURSIVE affected(id) AS ("
                     "SELECT message_id FROM memory_sources WHERE memory_id=? AND message_id IS NOT NULL "
                     "UNION SELECT message_id FROM context_omissions WHERE owner_id=? AND source_memory_id=? "
+                    "UNION SELECT k.origin_message_id FROM tasks k JOIN task_attempts r ON r.task_id=k.id "
+                    "JOIN messages m ON m.branch_id=r.native_branch_id JOIN affected a ON a.id=m.id WHERE k.owner_id=? "
+                    "UNION SELECT k.origin_message_id FROM tasks k JOIN affected a "
+                    "ON a.id=json_extract(k.intent_json,'$.sourceAssistantMessageId') WHERE k.owner_id=? "
+                    "UNION SELECT k.origin_message_id FROM tasks k JOIN task_attempts r ON r.task_id=k.id "
+                    "JOIN tool_calls x ON x.tool_name='delegate' AND r.launch_id IN "
+                    "('task:'||k.owner_id||':'||x.idempotency_key, "
+                    "'task:'||k.owner_id||':'||substr(x.idempotency_key,instr(x.idempotency_key,':')+1)) "
+                    "JOIN affected a ON a.id=x.assistant_message_id WHERE k.owner_id=? "
                     "UNION SELECT copied.id FROM tasks k JOIN affected a ON a.id=k.origin_message_id "
                     "JOIN task_attempts r ON r.task_id=k.id JOIN messages copied ON copied.branch_id=r.native_branch_id "
                     "WHERE k.owner_id=? AND copied.role='user' "
@@ -287,7 +296,20 @@ class Memories:
                     "WHERE original.role IN ('assistant','tool') AND paired.role IN ('assistant','tool')) "
                     "INSERT OR IGNORE INTO context_omissions(owner_id,message_id,source_memory_id,reason,created_ms) "
                     "SELECT ?,id,?,'forgotten_dependency',? FROM affected",
-                    (memory_id, owner, memory_id, owner, owner, owner, owner, memory_id, now_ms()),
+                    (
+                        memory_id,
+                        owner,
+                        memory_id,
+                        owner,
+                        owner,
+                        owner,
+                        owner,
+                        owner,
+                        owner,
+                        owner,
+                        memory_id,
+                        now_ms(),
+                    ),
                 )
             db.execute(
                 "UPDATE memory_records SET state='deleted',updated_ms=? WHERE id=?",

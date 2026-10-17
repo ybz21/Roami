@@ -17,6 +17,7 @@ async def execute(
     env: dict | None = None,
     max_bytes=128_000,
     raw_output=False,
+    excluded_env=(),
 ):
     if cwd is not None and env is None:
         bindings = {
@@ -33,6 +34,12 @@ async def execute(
             "GIT_GRAFT_FILE",
         }
         env = {name: value for name, value in os.environ.items() if name not in bindings}
+    if excluded_env:
+        env = {
+            name: value
+            for name, value in (os.environ if env is None else env).items()
+            if name not in excluded_env
+        }
     process = await asyncio.create_subprocess_exec(
         *argv,
         cwd=cwd,

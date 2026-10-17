@@ -763,3 +763,210 @@ async def test_forget_between_manifest_and_assistant_admission_is_rejected(store
         await runtime.journal.start(turn)
     assert len((await runtime.conversations.messages("alice", c["id"]))["messages"]) == 1
     await runtime.close()
+
+
+async def test_forgotten_native_child_content_redacts_owning_task_and_model_status(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "private delegated goal",
+            key="private-task",
+            record_intent=True,
+        )
+        run = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+        )
+        child_message = await store.call(
+            lambda db: row(
+                db, "SELECT * FROM messages WHERE branch_id=?", (run["native_branch_id"],)
+            )
+        )
+        saved = await runtime.memory.save(
+            "alice", "private", "private delegated goal", child_message["id"]
+        )
+        await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "public separate goal",
+            key="public-task",
+            record_intent=True,
+        )
+        await runtime.memory.forget("alice", saved["id"])
+        omitted = await store.call(
+            lambda db: row(
+                db,
+                "SELECT 1 FROM context_omissions WHERE message_id=?",
+                (task["origin_message_id"],),
+            )
+        )
+        assert omitted
+        projected = await runtime.tasks.list("alice", conversation["id"], for_model=True)
+        private = next(item for item in projected if item["id"] == task["id"])
+        assert private == {"id": task["id"], "state": "queued", "contextExcluded": True}
+        assert "private delegated goal" not in json.dumps(projected)
+        assert "public separate goal" in json.dumps(projected)
+        assert "private delegated goal" in json.dumps(await runtime.tasks.list("alice"))
+    finally:
+        await runtime.close()
+
+
+async def test_task_creation_rechecks_context_in_the_admission_transaction(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation, receipt, _ = await source(store, text="private task context")
+        turn = await store.call(
+            lambda db: dict(
+                row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],)), owner_id="alice"
+            )
+        )
+        mid = await runtime.journal.start(turn)
+        saved = await runtime.memory.save(
+            "alice", "private", "private task context", receipt["messageId"]
+        )
+        await runtime.memory.forget("alice", saved["id"])
+        with pytest.raises(DomainError, match="CONTEXT_SOURCE_FORGOTTEN"):
+            await runtime.tasks.create(
+                "alice",
+                conversation["id"],
+                "derived goal",
+                key="race",
+                source_turn_id=turn["id"],
+                source_assistant_message_id=mid,
+            )
+        assert await runtime.tasks.list("alice") == []
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_forgetting_recalled_memory_follows_delegation_and_completion(store, legacy):
+    class RecallAndDelegate:
+        model = "recall-and-delegate"
+
+        async def stream(self, messages, tools):
+            last = messages[-1]
+            if last["role"] == "tool" and last.get("tool_call_id") == "recall":
+                name, args = "delegate", {"goal": "derived private goal"}
+            elif last["role"] == "user" and last["content"] == "recall and delegate":
+                name, args = "memory_get", {"memoryId": saved["id"]}
+            else:
+                yield ModelEvent("text", "private derived reply")
+                return
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "recall" if name == "memory_get" else "delegate",
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(args)},
+                },
+            )
+
+    runtime = Runtime(
+        store,
+        RecallAndDelegate(),
+        worker_model=ConversationModel(),
+        memory_model=ConversationModel(),
+    )
+    _, receipt, _ = await source(store, text="private source fact")
+    saved = await runtime.memory.save(
+        "alice", "private", "private source fact", receipt["messageId"]
+    )
+    conversation = await runtime.conversations.create("alice")
+    try:
+        await runtime.start()
+        await runtime.chat.submit("alice", conversation["id"], "delegation", "recall and delegate")
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE trigger_kind='completion' AND state='completed'"
+            ),
+        )
+        task = (await runtime.tasks.list("alice", conversation["id"]))[0]
+        if legacy:
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE tasks SET intent_json=json_remove(intent_json,'$.sourceTurnId','$.sourceAssistantMessageId') WHERE id=?",
+                    (task["id"],),
+                ),
+                write=True,
+            )
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE task_attempts SET launch_id='task:alice:delegate' WHERE task_id=?",
+                    (task["id"],),
+                ),
+                write=True,
+            )
+        await runtime.memory.forget("alice", saved["id"])
+        assert (await runtime.tasks.list("alice", conversation["id"], for_model=True))[0][
+            "contextExcluded"
+        ]
+        projected = json.dumps(
+            (await runtime.context.project("alice", conversation["id"]))["messages"]
+        )
+        assert "private derived reply" not in projected and "derived private goal" not in projected
+    finally:
+        await runtime.close()
+
+
+async def test_task_status_revalidates_forgetting_before_tool_result_commit(store, monkeypatch):
+    class StatusModel:
+        model = "task-status-fixture"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "user" and messages[-1]["content"] == "status":
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "status",
+                        "type": "function",
+                        "function": {
+                            "name": "task_status",
+                            "arguments": "{}",
+                        },
+                    },
+                )
+            else:
+                yield ModelEvent("text", "Status received")
+
+    runtime = Runtime(store, StatusModel(), memory_model=ConversationModel())
+    conversation = await runtime.conversations.create("alice")
+    task = await runtime.tasks.create(
+        "alice", conversation["id"], "private task goal", key="status-task", record_intent=True
+    )
+    saved = await runtime.memory.save(
+        "alice", "private", "private task goal", task["origin_message_id"]
+    )
+    original = runtime.tasks.list
+
+    async def racing_list(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        await runtime.memory.forget("alice", saved["id"])
+        return result
+
+    monkeypatch.setattr(runtime.tasks, "list", racing_list)
+    try:
+        await runtime.start()
+        receipt = await runtime.chat.submit("alice", conversation["id"], "status", "status")
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM turns WHERE id=? AND state IN ('completed','failed')",
+                (receipt["turnId"],),
+            ),
+        )
+        tool = await store.call(
+            lambda db: row(
+                db,
+                "SELECT content_json FROM messages WHERE turn_id=? AND role='tool'",
+                (receipt["turnId"],),
+            )
+        )
+        assert "private task goal" not in tool["content_json"]
+        assert "contextExcluded" in tool["content_json"]
+    finally:
+        await runtime.close()

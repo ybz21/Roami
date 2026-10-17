@@ -7,6 +7,8 @@ class LoopSettings(Protocol):
     main_instructions: str
     worker_instructions: str
 
+    def timeout_for(self, role: str) -> int: ...
+
 
 class ContextBuilder(Protocol):
     async def build(

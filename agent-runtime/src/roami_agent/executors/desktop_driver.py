@@ -38,7 +38,10 @@ class DesktopDriver:
         self.pending, self.calls, self.closed = set(), set(), False
         self.closing = None
         self.reconcile_cursor = ""
-        if self.config["enabled"] and settings.model_capabilities.get("images") is not True:
+        if (
+            self.config["enabled"]
+            and settings.route("worker").capabilities.get("images") is not True
+        ):
             raise DomainError("COMPUTER_VISION_REQUIRED", 503)
 
     async def _io(self, operation, *args):
@@ -234,7 +237,7 @@ class DesktopDriver:
 
     @passive_cancel_boundary
     async def open(self, args, binding):
-        if not self.settings.model_capabilities.get("images"):
+        if not self.settings.route("worker").capabilities.get("images"):
             raise DomainError("COMPUTER_VISION_REQUIRED", 503)
         scope = await self.resources.scope(binding, input_action=True)
         driver_id = await self._io(lambda: self._connect().driver_id)

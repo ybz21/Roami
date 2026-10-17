@@ -137,7 +137,7 @@ class Runtime:
                 self.context,
                 self.settings,
                 vision=VisionInputs(database, self.artifacts)
-                if self.settings.model_capabilities.get("images") is True
+                if self.settings.route("worker").capabilities.get("images") is True
                 else None,
             ),
             self.journal,
@@ -256,6 +256,20 @@ class Runtime:
         await self.artifacts.close()
 
 
+def configured_provider(settings, role, *, client=None):
+    route = settings.route(role)
+    return ChatCompletions(
+        route.endpoint,
+        route.name,
+        settings.credentials(role),
+        timeout=route.timeout_seconds,
+        max_retries=route.max_retries,
+        capabilities=route.capabilities,
+        cache=route.cache,
+        client=client,
+    )
+
+
 async def serve(args):
     from roami_agent.server.http import create_app
 
@@ -266,27 +280,12 @@ async def serve(args):
     if args.initialize:
         await database.close()
         return
-    provider = ChatCompletions(
-        settings.endpoint,
-        settings.model,
-        settings.credentials(),
-        timeout=settings.timeout_seconds,
-        max_retries=settings.model_retries,
-        capabilities=settings.model_capabilities,
-        cache=settings.model_cache,
-    )
+
+    provider = configured_provider(settings, "main")
     worker = (
-        ChatCompletions(
-            settings.endpoint,
-            settings.worker_model,
-            settings.credentials(),
-            timeout=settings.timeout_seconds,
-            max_retries=settings.model_retries,
-            capabilities=settings.model_capabilities,
-            cache=settings.model_cache,
-        )
-        if settings.worker_model
-        else provider
+        provider
+        if settings.route("main") == settings.route("worker")
+        else configured_provider(settings, "worker")
     )
     runtime = Runtime(
         database,

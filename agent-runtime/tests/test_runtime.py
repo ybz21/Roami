@@ -362,3 +362,21 @@ async def test_completion_evidence_stays_before_its_tool_round_after_context_reb
         )
     finally:
         await runtime.close()
+
+
+async def test_provider_tool_ids_are_scoped_to_the_turn_for_delegation(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        await runtime.start()
+        first = await runtime.conversations.create("alice")
+        second = await runtime.conversations.create("alice")
+        for conversation in (first, second):
+            await runtime.chat.submit(
+                "alice", conversation["id"], "request-" + conversation["id"], "delegate research"
+            )
+        await until(store, lambda db: db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 2)
+        tasks = await runtime.tasks.list("alice")
+        assert {task["origin_conversation_id"] for task in tasks} == {first["id"], second["id"]}
+        assert len({task["intent_json"] for task in tasks}) == 2
+    finally:
+        await runtime.close()

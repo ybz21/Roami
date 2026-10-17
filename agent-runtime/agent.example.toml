@@ -19,6 +19,19 @@ max_retries = 2 # only transient failures before any event; 0 disables retries
 # mode = "implicit"
 # ttl = "30m"
 
+# Optional independent Worker route. Omitted endpoint/key_env/name/timeout/retries
+# inherit the legacy route; capabilities/cache start empty when this table is present.
+# [worker.model]
+# endpoint = "https://worker-provider.example/v1"
+# name = "verified-vision-model"
+# key_env = "ROAMI_WORKER_API_KEY"
+# timeout_seconds = 120
+# max_retries = 2
+# [worker.model.capabilities]
+# version = "worker-vision-v1"
+# images = true
+# tools = true
+
 [runtime]
 main_concurrency = 2
 workers = 3
@@ -65,7 +78,7 @@ skill_roots = []
 # max_tabs = 3 # per active task, 1..6
 # endpoint = "http://127.0.0.1:9222" # omit to follow Roami's configured Chrome
 
-# Requires a verified [model.capabilities] images = true route.
+# Requires images = true on the effective Worker route.
 # [tools.computer]
 # enabled = false
 # display = ":0" # Existing local Linux X11 display; no replacement is started.

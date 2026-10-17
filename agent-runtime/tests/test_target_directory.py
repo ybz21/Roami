@@ -43,7 +43,10 @@ async def test_project_discovery_pages_stable_ids_and_discards_unrelated_fields(
     }
     assert all(v["kind"] == "project" for v in first["items"])
     assert "private log" not in json.dumps(first)
-    assert calls[0] == (["/selected/roami", "project", "ls", "--json"], {"timeout": 5})
+    assert calls[0] == (
+        ["/selected/roami", "project", "ls", "--json"],
+        {"timeout": 5, "excluded_env": {"ROAMI_AGENT_API_KEY"}},
+    )
 
 
 async def test_live_sessions_preserve_duplicate_labels_without_selecting_one(monkeypatch):

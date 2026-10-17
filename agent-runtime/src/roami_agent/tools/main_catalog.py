@@ -54,7 +54,9 @@ def register_main_tools(registry, tasks, memory, targets):
             binding["owner"],
             binding["conversation"],
             args["goal"],
-            key=binding["toolCallId"],
+            key=binding["turnId"] + ":" + binding["toolCallId"],
+            source_turn_id=binding["turnId"],
+            source_assistant_message_id=binding["assistantMessageId"],
             parent_task_id=binding.get("taskId"),
             executor=args.get("executor", "native"),
             target=args.get("target"),
@@ -63,7 +65,7 @@ def register_main_tools(registry, tasks, memory, targets):
         )
 
     async def status(args, binding):
-        return await tasks.list(binding["owner"], binding["conversation"])
+        return await tasks.list(binding["owner"], binding["conversation"], for_model=True)
 
     async def recall(args, binding):
         day = args.get("scope") == "day"

@@ -11,6 +11,7 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row
+from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.transcript_repository import message
 
 
@@ -138,6 +139,8 @@ class ToolGateway:
 
         def finish(db):
             committed_value, committed_state, committed_memories = value, state, memory_ids
+            if state == "succeeded" and call["function"]["name"] == "task_status":
+                committed_value = model_task_projection(db, binding["owner"], value)
             if state == "succeeded" and call["function"]["name"] == "artifact_read":
                 source = row(
                     db,
