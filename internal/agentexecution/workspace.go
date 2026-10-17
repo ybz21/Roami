@@ -13,6 +13,7 @@ import (
 )
 
 type Workspace struct {
+	ID        string `json:"workspaceId,omitempty"`
 	ProjectID string `json:"projectId,omitempty"`
 	Directory string `json:"directory"`
 	Branch    string `json:"branch,omitempty"`
@@ -33,6 +34,17 @@ func (s Service) platform(ctx context.Context) (*metadb.DB, error) {
 
 // prepareWorkspace reads project identity through its store; only Go's worktree service mutates Git.
 func (s Service) prepareWorkspace(ctx context.Context, spec Spec, launchHash string) (Workspace, error) {
+	if spec.WorkspaceID != "" {
+		return s.reuseWorkspace(ctx, spec)
+	}
+	workspace, err := s.createWorkspace(ctx, spec, launchHash)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return s.rememberWorkspace(workspace)
+}
+
+func (s Service) createWorkspace(ctx context.Context, spec Spec, launchHash string) (Workspace, error) {
 	if spec.ProjectID == "" {
 		if !filepath.IsAbs(spec.Directory) {
 			return Workspace{}, fmt.Errorf("INVALID_EXECUTION_DIRECTORY")
@@ -97,7 +109,7 @@ func preparationCode(err error) string {
 		return problem.Code
 	}
 	switch err.Error() {
-	case "UNKNOWN_PROJECT", "PROJECT_CATALOG_UNAVAILABLE", "PROJECT_HAS_NO_GIT", "INVALID_PROJECT_DIRECTORY":
+	case "UNKNOWN_PROJECT", "PROJECT_CATALOG_UNAVAILABLE", "PROJECT_HAS_NO_GIT", "INVALID_PROJECT_DIRECTORY", "UNKNOWN_WORKSPACE", "WORKSPACE_PROJECT_MISMATCH", "WORKSPACE_STALE", "INVALID_WORKSPACE_TARGET":
 		return err.Error()
 	}
 	return "WORKSPACE_PREPARATION_FAILED"

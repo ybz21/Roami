@@ -95,7 +95,10 @@ def register_main_tools(registry, tasks, memory):
                 {
                     "goal": {"type": "string", "minLength": 1, "maxLength": 20000},
                     "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
-                    "target": {"type": "object"},
+                    "target": {
+                        "type": "object",
+                        "description": "Explicit target intent. For project work use kind=project and projectId. Omit workspaceId for a fresh worktree; to continue an existing branch, use its workspaceId from task_status. Reuse preserves local work and cannot be combined with base/remote/directory overrides.",
+                    },
                     "fromMessageId": {"type": "string"},
                 },
                 ["goal"],

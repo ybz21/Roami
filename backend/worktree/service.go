@@ -150,6 +150,18 @@ func (s *Service) ResolveRepo(ctx context.Context, dir string) (Repo, error) {
 	return Repo{CommonDir: common, Root: root}, nil
 }
 
+// WorktreeRoot resolves the current checkout, preserving independence between linked worktrees.
+func WorktreeRoot(ctx context.Context, directory string) (string, error) {
+	if !filepath.IsAbs(directory) {
+		return "", errf("BAD_PATH", "directory must be absolute")
+	}
+	root, err := git(ctx, directory, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", errf("NOT_GIT_REPO", "%s", root)
+	}
+	return canonical(root), nil
+}
+
 // lock 持仓库级 flock；返回解锁函数。
 func (s *Service) lock(repo Repo) (func(), error) {
 	path := filepath.Join(repo.CommonDir, "roam-worktree.lock")

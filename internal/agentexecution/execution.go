@@ -30,6 +30,7 @@ type Spec struct {
 	Executor       string `json:"executor"`
 	Directory      string `json:"directory,omitempty"`
 	ProjectID      string `json:"projectId,omitempty"`
+	WorkspaceID    string `json:"workspaceId,omitempty"`
 	Base           string `json:"base,omitempty"`
 	Remote         string `json:"remote,omitempty"`
 	Prompt         string `json:"prompt"`
@@ -134,7 +135,11 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if spec.Executor != "codex" && spec.Executor != "claude" {
 		return Status{}, fmt.Errorf("INVALID_EXECUTOR")
 	}
-	if (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) || (spec.ProjectID != "" && spec.Directory != "") || (spec.ProjectID == "" && (spec.Base != "" || spec.Remote != "")) || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
+	invalidTarget := (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) ||
+		(spec.ProjectID != "" && spec.Directory != "") ||
+		(spec.ProjectID == "" && (spec.Base != "" || spec.Remote != "" || spec.WorkspaceID != "")) ||
+		(spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != ""))
+	if invalidTarget || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
 		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
 	}
 	if err = os.MkdirAll(dir, 0700); err != nil {
@@ -324,6 +329,11 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if spec.ProjectID != "" && (receipt.Workspace == nil || receipt.Workspace.ProjectID == "") {
 		return fmt.Errorf("PROJECT_WORKSPACE_NOT_PREPARED")
 	}
+	workspaceUnlock, err := s.claimWorkspace(ctx, directory, key)
+	if err != nil {
+		return writeJSON(filepath.Join(dir, "result.json"), Result{State: "failed", Summary: workspaceLeaseCode(err), ExitCode: -1, FinishedMS: time.Now().UnixMilli()})
+	}
+	defer workspaceUnlock()
 	deadline := time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second)
 	if receipt.DeadlineMS != 0 {
 		deadline = time.UnixMilli(receipt.DeadlineMS)

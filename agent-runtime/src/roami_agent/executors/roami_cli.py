@@ -54,13 +54,19 @@ class CodingExecutor:
         if target["kind"] == "project":
             if not isinstance(target.get("projectId"), str) or not target["projectId"]:
                 raise DomainError("CODING_PROJECT_ID_REQUIRED")
-            if target.get("directory") or target.get("workspaceId"):
+            if target.get("directory"):
                 raise DomainError("CODING_PROJECT_WORKSPACE_OVERRIDE_UNSUPPORTED")
             launch.update(
                 projectId=target["projectId"],
                 base=target.get("base", ""),
                 remote=target.get("remote", ""),
             )
+            if "workspaceId" in target:
+                if not isinstance(target["workspaceId"], str) or not target["workspaceId"]:
+                    raise DomainError("CODING_WORKSPACE_ID_REQUIRED")
+                if target.get("base") or target.get("remote"):
+                    raise DomainError("CODING_WORKSPACE_REUSE_CONFLICT")
+                launch["workspaceId"] = target["workspaceId"]
         else:
             directory = target.get("directory") or self.settings.coding_directory
             if not isinstance(directory, (str, Path)) or not Path(directory).is_absolute():
@@ -117,6 +123,7 @@ class CodingExecutor:
                             {
                                 "nodeId": "local",
                                 "projectId": receipt["workspace"].get("projectId"),
+                                "workspaceId": receipt["workspace"].get("workspaceId"),
                                 "workdir": receipt["workspace"].get("directory"),
                                 "sessionId": receipt.get("session"),
                                 "workspace": receipt["workspace"],

@@ -124,3 +124,52 @@ async def test_project_execution_passes_identity_and_persists_go_preparation(sto
             task, run, {**receipt, "workspace": {**workspace, "projectId": "other-project"}}
         )
     assert (await tasks.list("alice"))[0]["latestAttempt"]["workspace"] == workspace
+
+
+async def test_explicit_workspace_reuse_passes_stable_identity_without_directory_override(store):
+    import json
+
+    import pytest
+
+    from roami_agent.protocol.errors import DomainError
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    c = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        c["id"],
+        "Continue the existing branch",
+        key="reuse",
+        executor="codex",
+        target={"kind": "project", "projectId": "project", "workspaceId": "workspace"},
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings())
+    captured = []
+
+    async def command(sub, *args, spec=None):
+        captured.append(spec)
+        return {
+            "state": "running",
+            "session": "continued-session",
+            "workspace": {
+                "workspaceId": "workspace",
+                "projectId": "project",
+                "directory": "/prepared/branch",
+            },
+        }
+
+    executor.command = command
+    assert await executor.run(task, run) is None
+    assert captured[0]["workspaceId"] == "workspace" and "directory" not in captured[0]
+    current = (await tasks.list("alice"))[0]
+    assert json.loads(current["target_json"])["workspaceId"] == "workspace"
+    spec = json.loads(task["intent_json"])
+    spec["target"]["base"] = "main"
+    with pytest.raises(DomainError, match="CODING_WORKSPACE_REUSE_CONFLICT"):
+        await executor.run(dict(task, intent_json=json.dumps(spec)), run)
+    assert len(captured) == 1

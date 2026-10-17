@@ -158,12 +158,42 @@ func TestProjectLaunchUsesFreshGoWorkspaceAndNeverRepreparesOnRetry(t *testing.T
 	if git(repo, "worktree", "list", "--porcelain") != before {
 		t.Fatal("failed fetch created a stale workspace")
 	}
+	git(workspace.Directory, "add", "execution-proof.txt")
+	git(workspace.Directory, "commit", "-m", "task checkpoint")
+	checkpoint := git(workspace.Directory, "rev-parse", "HEAD")
+	if err = os.WriteFile(filepath.Join(workspace.Directory, "base.txt"), []byte("uncommitted user work"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	beforeReuse := git(repo, "worktree", "list", "--porcelain")
+	reuseSpec := Spec{Key: "continue-project", Executor: "codex", ProjectID: projectID, WorkspaceID: workspace.ID, Prompt: "continue in the same branch", TimeoutSeconds: 30}
+	continued, err := s.Launch(context.Background(), reuseSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.Now().Add(15 * time.Second)
+	for continued.Result == nil && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+		continued, err = s.Status(reuseSpec.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if continued.Result == nil || continued.Result.State != "succeeded" || continued.Workspace == nil || *continued.Workspace != workspace {
+		t.Fatalf("reuse did not complete in its registered workspace: %+v", continued)
+	}
+	if !strings.Contains(continued.Result.Summary, checkpoint) || git(workspace.Directory, "rev-parse", "HEAD") != checkpoint || git(repo, "worktree", "list", "--porcelain") != beforeReuse {
+		t.Fatal("reuse fetched, reset or replaced the existing branch")
+	}
+	dirty, err := os.ReadFile(filepath.Join(workspace.Directory, "base.txt"))
+	if err != nil || string(dirty) != "uncommitted user work" {
+		t.Fatalf("reuse discarded uncommitted work: %q %v", dirty, err)
+	}
 	count, err := os.ReadFile(calls)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(count) != "called\n" {
-		t.Fatalf("coding agent launched more than once: %s", count)
+	if string(count) != "called\ncalled\n" {
+		t.Fatalf("unexpected coding execution count: %s", count)
 	}
 }
 
