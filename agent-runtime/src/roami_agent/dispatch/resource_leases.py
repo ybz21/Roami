@@ -383,6 +383,26 @@ class ResourceLeases:
 
     async def release_task(self, owner, task_id, run_id):
         def write(db):
+            db.execute(
+                "UPDATE resource_actions AS a SET state='unknown',result_json=?,updated_ms=? "
+                "WHERE a.task_id=? AND a.run_id=? AND a.state='running' "
+                "AND EXISTS(SELECT 1 FROM resources r WHERE r.id=a.resource_id AND r.owner_id=?) AND EXISTS("
+                "SELECT 1 FROM tool_calls x WHERE x.state='cancelled' AND a.idempotency_key IN ("
+                "x.idempotency_key||':act',x.idempotency_key||':create',x.idempotency_key||':navigate',x.idempotency_key||':desktop'))",
+                (
+                    encoded(
+                        {
+                            "inputStopped": True,
+                            "outcomeKnown": False,
+                            "error": "INPUT_STOP_CONFIRMED",
+                        }
+                    ),
+                    now_ms(),
+                    task_id,
+                    run_id,
+                    owner,
+                ),
+            )
             resources = db.execute(
                 "SELECT * FROM resources WHERE owner_id=? AND owner_task_id=? AND owner_run_id=?",
                 (owner, task_id, run_id),

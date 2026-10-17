@@ -64,3 +64,9 @@ skill_roots = []
 # existing_tabs = false # default: new task-owned background tabs only
 # max_tabs = 3 # per active task, 1..6
 # endpoint = "http://127.0.0.1:9222" # omit to follow Roami's configured Chrome
+
+# Requires a verified [model.capabilities] images = true route.
+# [tools.computer]
+# enabled = false
+# display = ":0" # Existing local Linux X11 display; no replacement is started.
+# image_side = 1280

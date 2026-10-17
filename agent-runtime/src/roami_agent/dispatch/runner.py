@@ -177,7 +177,20 @@ class TaskDispatcher:
                 "state": "failed",
                 "summary": exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED",
             }
-            if result["summary"] in {
+            pending = (
+                await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' AND state IN ('planned','running','unknown') LIMIT 1",
+                        (turn["id"],),
+                    )
+                )
+                if turn
+                else None
+            )
+            if pending and not isinstance(exc, DomainError):
+                result["summary"] = "TOOL_STOP_UNCONFIRMED"
+            if pending or result["summary"] in {
                 "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
                 "NATIVE_WORKSPACE_RELEASE_UNKNOWN",
                 "TOOL_OUTCOME_UNKNOWN",

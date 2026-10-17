@@ -9,6 +9,8 @@ dependencies = [
     "uvicorn>=0.34,<1",
     "jsonschema>=4.23,<5",
     "mcp>=1.26,<2",
+    "python-xlib>=0.33 ; sys_platform == 'linux'",
+    "pillow>=11",
 ]
 
 [project.scripts]

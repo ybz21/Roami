@@ -1,7 +1,6 @@
 """Browser Use over the unified CLI with durable, task-scoped control receipts."""
 
 import asyncio
-import functools
 import hashlib
 import json
 import math
@@ -14,26 +13,17 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from roami_agent.executors.input_cancellation import (
+    input_started,
+    input_stopped,
+    passive_cancel_boundary,
+)
 from roami_agent.protocol.browser import browser_config
 from roami_agent.protocol.errors import DomainError, ToolCancellation
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, rows
 from roami_agent.tools.process import execute
-
-
-def passive_cancel_boundary(function):
-    @functools.wraps(function)
-    async def run(*args, **kwargs):
-        try:
-            return await function(*args, **kwargs)
-        except ToolCancellation:
-            raise
-        except asyncio.CancelledError:
-            # Only _perform can have input in flight; it supplies its own stop evidence.
-            raise ToolCancellation(input_stopped=True) from None
-
-    return run
 
 
 class BrowserDriver:
@@ -331,6 +321,8 @@ class BrowserDriver:
         }
 
     async def _complete(self, scope, action, receipt):
+        if receipt["inputStopped"]:
+            input_stopped()
         state = (
             "succeeded"
             if receipt["state"] == "succeeded"
@@ -372,6 +364,7 @@ class BrowserDriver:
             return json.loads(action["result_json"])
         receipt = None
         try:
+            input_started()
             receipt = self._receipt(
                 await self._cli(
                     verb,

@@ -217,3 +217,57 @@ async def test_takeover_fence_is_checked_atomically_for_new_and_previously_claim
         await leases.claim("alice", task, run, "browser", "fixture:replacement")
     with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
         await begin(leases, other, observed, task, run)
+
+
+async def test_confirmed_tool_cancellation_releases_a_durably_admitted_action_without_faking_its_outcome(
+    store,
+):
+    from roami_agent.storage.transcript_repository import message
+
+    leases, lease, observed, task, run = await setup(store)
+    action = await begin(leases, lease, observed, task, run, "cancel-turn:cancel-call:desktop")
+
+    def stopped(db):
+        branch = row(
+            db,
+            "SELECT b.* FROM branches b JOIN task_attempts a ON a.native_branch_id=b.id WHERE a.id=?",
+            (run,),
+        )
+        db.execute(
+            "INSERT INTO turns(id,conversation_id,branch_id,trigger_kind,state,created_ms) VALUES('cancel-turn',?,?,'user','interrupted',1)",
+            (branch["conversation_id"], branch["id"]),
+        )
+        mid = message(
+            db,
+            branch["conversation_id"],
+            branch["id"],
+            "assistant",
+            {"text": ""},
+            turn_id="cancel-turn",
+        )
+        db.execute(
+            "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,created_ms,updated_ms) VALUES('cancelled-tool','cancel-turn',?,'computer_act','{}','write','cancelled','cancel-turn:cancel-call',1,1)",
+            (mid,),
+        )
+
+    await store.call(stopped, write=True)
+    await leases.release_task("bob", task, run)
+    assert (
+        await store.call(
+            lambda db: row(db, "SELECT state FROM resource_actions WHERE id=?", (action["id"],))
+        )
+    )["state"] == "running"
+    await leases.release_task("alice", task, run)
+    assert not await store.call(
+        lambda db: row(db, "SELECT id FROM resources WHERE owner_task_id=?", (task,))
+    )
+    saved = await store.call(
+        lambda db: row(
+            db, "SELECT state,result_json FROM resource_actions WHERE id=?", (action["id"],)
+        )
+    )
+    import json
+
+    assert saved["state"] == "unknown"
+    assert json.loads(saved["result_json"])["inputStopped"] is True
+    assert json.loads(saved["result_json"])["outcomeKnown"] is False
