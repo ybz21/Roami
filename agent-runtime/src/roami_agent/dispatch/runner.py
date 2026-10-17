@@ -129,7 +129,31 @@ class TaskDispatcher:
             current = await self.db.call(
                 lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
             )
-            if current["state"] == "cancelling":
+            uncertain = (
+                await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' AND state IN ('planned','running','unknown') LIMIT 1",
+                        (turn["id"],),
+                    )
+                )
+                if turn
+                else None
+            )
+            if uncertain:
+                await self.complete(
+                    task,
+                    run,
+                    {
+                        "state": "failed",
+                        "summary": "TOOL_STOP_UNCONFIRMED",
+                        "outcomeKnown": False,
+                        "retryable": False,
+                    },
+                    "interrupted",
+                    unknown=True,
+                )
+            elif current["state"] == "cancelling":
                 await self.tasks.report(
                     task["owner_id"],
                     task["id"],

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from roami_agent.protocol.browser import browser_config
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import model_endpoint
 
@@ -48,6 +49,7 @@ class Settings:
     http_tools: dict = field(default_factory=dict)
     skill_roots: tuple[Path, ...] = ()
     mcp_servers: dict = field(default_factory=dict)
+    browser: dict = field(default_factory=dict)
     cli_bin: str = "roami"
     coding_directory: Path | None = None
     memory_timezone: str = "UTC"
@@ -79,6 +81,7 @@ class Settings:
             skill_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("skill_roots", [])),
             http_tools=tools.get("http", {}),
             mcp_servers=tools.get("mcp", {}),
+            browser=browser_config(tools.get("browser", {})),
             memory_timezone=raw.get("memory", {}).get("timezone", "UTC"),
             artifact_max_bytes=raw.get("artifacts", {}).get("max_bytes", 64 * 1024 * 1024),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),

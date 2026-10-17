@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ToolCancellation
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
@@ -102,12 +102,17 @@ class ToolGateway:
             )
             if state == "unknown":
                 value.update(outcomeKnown=False, retryable=False)
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
+            stopped = tool and (
+                tool.cancellation_stops_execution
+                or isinstance(exc, ToolCancellation)
+                and exc.input_stopped
+            )
             await self.db.call(
                 lambda db: db.execute(
                     "UPDATE tool_calls SET state=?,updated_ms=? WHERE id=?",
                     (
-                        "cancelled" if tool and tool.cancellation_stops_execution else "unknown",
+                        "cancelled" if stopped else "unknown",
                         now_ms(),
                         tool_id,
                     ),

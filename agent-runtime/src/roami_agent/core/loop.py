@@ -116,6 +116,7 @@ class AgentLoop:
                             "conversation": cid,
                             "turnId": tid,
                             "taskId": task_id,
+                            "runId": turn.get("executionRunId"),
                             "originMessageId": origin["id"] if origin else None,
                             "toolCallId": call["id"],
                             "workspace": turn.get("workspace"),

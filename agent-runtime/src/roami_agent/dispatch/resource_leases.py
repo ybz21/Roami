@@ -76,9 +76,19 @@ class ResourceLeases:
             raise DomainError("RESOURCE_LEASE_STALE", 409)
         if item["state"] != "held":
             raise DomainError("RESOURCE_INPUT_PAUSED", 409)
+        self._input_admitted(db, task_id)
         if (item["lease_until_ms"] or 0) <= now_ms():
             raise DomainError("RESOURCE_LEASE_EXPIRED", 409)
         return item
+
+    @staticmethod
+    def _input_admitted(db, task_id):
+        if row(
+            db,
+            "SELECT id FROM resources WHERE owner_task_id=? AND state IN ('paused','pausing','quarantined') LIMIT 1",
+            (task_id,),
+        ):
+            raise DomainError("RESOURCE_INPUT_PAUSED", 409)
 
     async def claim(self, owner, task_id, run_id, kind, resource_key, *, created=False):
         if (
@@ -90,6 +100,7 @@ class ResourceLeases:
 
         def write(db):
             task = self._task(db, owner, task_id, run_id)
+            self._input_admitted(db, task_id)
             db.execute(
                 "INSERT OR IGNORE INTO resources(id,node_id,kind,resource_key) VALUES(?,'local',?,?)",
                 (identity(), kind, resource_key),
@@ -242,13 +253,10 @@ class ResourceLeases:
                 (state, packed, now_ms(), action_id),
             )
             if item["lease_epoch"] == action["lease_epoch"]:
-                control = (
-                    "quarantined"
-                    if state == "unknown"
-                    else "paused"
-                    if item["state"] == "pausing"
-                    else item["state"]
-                )
+                if item["state"] in {"pausing", "paused"}:
+                    control = "paused" if result.get("inputStopped") is True else "pausing"
+                else:
+                    control = "quarantined" if state == "unknown" else item["state"]
                 db.execute(
                     "UPDATE resources SET state=?,scene_epoch=scene_epoch+1 WHERE id=?",
                     (control, item["id"]),
@@ -278,9 +286,10 @@ class ResourceLeases:
             if self._pending(db, resource_id):
                 raise DomainError("RESOURCE_STOP_UNCONFIRMED", 409)
             state = "paused" if item["state"] in {"paused", "pausing"} else "idle"
+            # Retain the paused task binding so it cannot acquire a replacement resource.
             db.execute(
-                "UPDATE resources SET state=?,owner_task_id=NULL,owner_run_id=NULL,lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
-                (state, resource_id),
+                "UPDATE resources SET state=?,owner_task_id=CASE WHEN ?='paused' THEN owner_task_id ELSE NULL END,owner_run_id=CASE WHEN ?='paused' THEN owner_run_id ELSE NULL END,lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
+                (state, state, state, resource_id),
             )
             return {"id": resource_id, "state": state}
 
@@ -289,10 +298,14 @@ class ResourceLeases:
     async def resume(self, owner, resource_id):
         def write(db):
             item = self._owned(db, owner, resource_id)
-            if item["state"] != "paused" or item["owner_task_id"] or self._pending(db, resource_id):
+            if (
+                item["state"] != "paused"
+                or item["lease_until_ms"] is not None
+                or self._pending(db, resource_id)
+            ):
                 raise DomainError("RESOURCE_STOP_UNCONFIRMED", 409)
             db.execute(
-                "UPDATE resources SET state='idle',lease_epoch=lease_epoch+1 WHERE id=?",
+                "UPDATE resources SET state='idle',owner_task_id=NULL,owner_run_id=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
                 (resource_id,),
             )
             return {"id": resource_id, "state": "idle"}
@@ -308,5 +321,85 @@ class ResourceLeases:
             db.execute(
                 "UPDATE resources SET state='quarantined',lease_until_ms=NULL WHERE owner_task_id IS NOT NULL AND state NOT IN ('paused','pausing')"
             )
+
+        await self.db.call(write, write=True)
+
+    async def scope(self, binding, *, input_action=False):
+        owner, task_id, turn_id = binding["owner"], binding.get("taskId"), binding.get("turnId")
+        run_id = binding.get("runId")
+        if not task_id or not turn_id or not run_id:
+            raise DomainError("RESOURCE_TASK_REQUIRED", 409)
+
+        def read(db):
+            attempt = row(
+                db,
+                "SELECT a.id FROM task_attempts a JOIN turns t ON t.branch_id=a.native_branch_id "
+                "JOIN tasks k ON k.id=a.task_id WHERE t.id=? AND t.state='running' AND a.task_id=? AND k.owner_id=? "
+                "AND a.task_revision=k.revision AND a.id=? ORDER BY a.attempt_no DESC LIMIT 1",
+                (turn_id, task_id, owner, run_id),
+            )
+            if not attempt:
+                raise DomainError("RESOURCE_TASK_NOT_FOUND", 404)
+            self._task(db, owner, task_id, attempt["id"])
+            if input_action:
+                self._input_admitted(db, task_id)
+            return {"owner": owner, "taskId": task_id, "runId": attempt["id"]}
+
+        return await self.db.call(read)
+
+    async def resource(self, scope, resource_id):
+        def read(db):
+            item = self._owned(db, scope["owner"], resource_id)
+            if (item["owner_task_id"], item["owner_run_id"]) != (scope["taskId"], scope["runId"]):
+                raise DomainError("RESOURCE_LEASE_STALE", 409)
+            return item
+
+        return await self.db.call(read)
+
+    async def owned(self, scope):
+        return await self.db.call(
+            lambda db: [
+                dict(item)
+                for item in db.execute(
+                    "SELECT * FROM resources WHERE owner_id=? AND owner_task_id=? AND owner_run_id=?",
+                    (scope["owner"], scope["taskId"], scope["runId"]),
+                ).fetchall()
+            ]
+        )
+
+    async def observation(self, scope, observation_id):
+        def read(db):
+            item = row(
+                db,
+                "SELECT o.* FROM resource_observations o JOIN resources r ON r.id=o.resource_id "
+                "WHERE o.id=? AND r.owner_id=? AND o.task_id=? AND o.run_id=?",
+                (observation_id, scope["owner"], scope["taskId"], scope["runId"]),
+            )
+            if not item:
+                raise DomainError("RESOURCE_OBSERVATION_NOT_FOUND", 404)
+            return item
+
+        return await self.db.call(read)
+
+    async def release_task(self, owner, task_id, run_id):
+        def write(db):
+            resources = db.execute(
+                "SELECT * FROM resources WHERE owner_id=? AND owner_task_id=? AND owner_run_id=?",
+                (owner, task_id, run_id),
+            ).fetchall()
+            for item in resources:
+                if self._pending(db, item["id"]):
+                    if item["state"] not in {"pausing", "paused"}:
+                        db.execute(
+                            "UPDATE resources SET state='quarantined' WHERE id=?", (item["id"],)
+                        )
+                    continue
+                if item["state"] == "paused" and item["lease_until_ms"] is None:
+                    continue
+                state = "paused" if item["state"] in {"paused", "pausing"} else "idle"
+                db.execute(
+                    "UPDATE resources SET state=?,owner_task_id=CASE WHEN ?='paused' THEN owner_task_id ELSE NULL END,owner_run_id=CASE WHEN ?='paused' THEN owner_run_id ELSE NULL END,lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
+                    (state, state, state, item["id"]),
+                )
 
         await self.db.call(write, write=True)

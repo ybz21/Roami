@@ -36,6 +36,24 @@ test('cancelling queued work prevents a late daemon from executing it', () => fi
   assert.equal(calls, 0)
 }))
 
+test('cancellation before admission prevents delayed creation from executing', () => fixture(async receipts => {
+  const cancelled = await receipts.cancel(id)
+  assert.equal(cancelled.receiptExists, false)
+  assert.equal(cancelled.inputStopped, true)
+  const admitted = await receipts.begin(id, ['click'])
+  let calls = 0
+  const result = await receipts.execute(id, admitted.record.payloadHash, async () => { calls++ })
+  assert.equal(result.state, 'cancelled')
+  assert.equal(calls, 0)
+}))
+
+test('a missing receipt with an execution claim never proves cancellation', () => fixture(async (receipts, root) => {
+  await writeFile(join(root, id + '.lock'), '', { mode: 0o600 })
+  const cancelled = await receipts.cancel(id)
+  assert.equal(cancelled.state, 'unknown')
+  assert.equal(cancelled.inputStopped, false)
+}))
+
 test('cancelling an active operation waits for its actual terminal receipt', () => fixture(async receipts => {
   const first = await receipts.begin(id, ['click'])
   let release, started

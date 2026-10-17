@@ -56,3 +56,10 @@ skill_roots = []
 # read_only = ["search"]
 # [tools.mcp.remote.header_env]
 # X-Service-Token = "MCP_SERVICE_TOKEN"
+
+# Browser Use reuses the unified Chrome CLI and the existing browser login state.
+# [tools.browser]
+# enabled = true
+# existing_tabs = false # default: new task-owned background tabs only
+# max_tabs = 3 # per active task, 1..6
+# endpoint = "http://127.0.0.1:9222" # omit to follow Roami's configured Chrome

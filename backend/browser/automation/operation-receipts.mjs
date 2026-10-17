@@ -99,7 +99,17 @@ export class OperationReceipts {
     } catch (error) { if (error.code !== 'EEXIST') throw receiptError('CHROME_RECEIPT_UNAVAILABLE') }
     finally { await file?.close() }
     await this.sync()
-    const record = await this.read(id)
+    let record
+    try { record = await this.read(id) } catch (error) {
+      if (error.code !== 'CHROME_OPERATION_NOT_FOUND') throw error
+      let claimed = true
+      try { await lstat(this.path(id, '.lock')) } catch (missing) {
+        if (missing.code !== 'ENOENT') throw receiptError('CHROME_RECEIPT_UNAVAILABLE')
+        claimed = false
+      }
+      return { version: 1, id, state: claimed ? 'unknown' : 'cancelled',
+        outcomeKnown: !claimed, inputStopped: !claimed, receiptExists: false, cancelRequested: true }
+    }
     if (record.state === 'accepted') {
       try { await lstat(this.path(id, '.lock')) } catch (error) {
         if (error.code !== 'ENOENT') throw receiptError('CHROME_RECEIPT_UNAVAILABLE')
@@ -133,7 +143,7 @@ export class OperationReceipts {
       return await this.save({ ...running, state: 'succeeded', outcomeKnown: true, inputStopped: true,
         result, updatedMs: Date.now() })
     } catch (error) {
-      const code = /^CHROME_(TARGET_(INVALID|NOT_FOUND|SELECTION_CONFLICT)|SCENE_CHANGED)$/.test(error.message)
+      const code = /^CHROME_(TARGET_(INVALID|NOT_FOUND|SELECTION_CONFLICT)|SCENE_CHANGED|BROWSER_CHANGED)$/.test(error.message)
         ? error.message : 'CHROME_OPERATION_OUTCOME_UNKNOWN'
       const known = code !== 'CHROME_OPERATION_OUTCOME_UNKNOWN'
       return this.save({ ...running, state: known ? 'failed' : 'unknown', outcomeKnown: known,

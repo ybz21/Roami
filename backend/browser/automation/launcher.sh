@@ -180,6 +180,15 @@ ROAMI_OPERATION_RECEIPTS
     else
         mv -f "$receipt_tmp" "${CHROME_DIR}/operation-receipts.mjs"
     fi
+    local observation_tmp="${CHROME_DIR}/browser-observation.mjs.$$.tmp"
+    cat > "$observation_tmp" <<'ROAMI_BROWSER_OBSERVATION'
+@@BROWSER_OBSERVATION@@
+ROAMI_BROWSER_OBSERVATION
+    if [ -f "${CHROME_DIR}/browser-observation.mjs" ] && cmp -s "$observation_tmp" "${CHROME_DIR}/browser-observation.mjs"; then
+        rm -f "$observation_tmp"
+    else
+        mv -f "$observation_tmp" "${CHROME_DIR}/browser-observation.mjs"
+    fi
     if [ -f "${CHROME_DIR}/driver.mjs" ] && cmp -s "$tmp" "${CHROME_DIR}/driver.mjs"; then
         rm -f "$tmp"
         return 0
@@ -319,6 +328,8 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
   roami chrome wait  <选择器>            等待元素出现
   roami chrome screenshot [文件] [--full]   截图（默认 screenshot.png）
   roami chrome pdf   [文件]              导出 PDF（headless）
+  roami chrome capabilities              查询驱动能力与浏览器实例身份
+  roami chrome observe --target <id> [--screenshot <文件.png>]
   roami chrome tabs                      列出标签页（序号 / 标题 / url）
   roami chrome new   [url]               新开标签页
   roami chrome close                     关闭标签页
@@ -331,6 +342,7 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
   通用选项: --target <稳定ID> | --tab <序号> | --url <子串>  选目标标签页（默认第一个）
             --no-retry（仅执行一次，未知结果不重放）
             --operation-id <32位ID> --receipt-root <私有目录>（持久化动作回执）
+            --expected-browser <实例ID> --expected-scene <观察签名>（动作前验证）
             --timeout <ms>（默认 15000）  --cdp <地址>
   截图选项: --viewport 1280x800  --wait <ms>  --clip x,y,w,h  --fast
             --fresh --goto <url>（临时干净 Chrome 截图）  --quality <1-100>（jpg）

@@ -12,9 +12,19 @@ from roami_agent.storage.database import event, row
 
 
 class NativeExecutor:
-    def __init__(self, run_turn, database=None, settings=None, workspace_factory=hold_workspace):
+    def __init__(
+        self,
+        run_turn,
+        database=None,
+        settings=None,
+        workspace_factory=hold_workspace,
+        *,
+        resources=None,
+        artifacts=None,
+    ):
         self.run_turn, self.db, self.settings = run_turn, database, settings
         self.workspace_factory = workspace_factory
+        self.resources, self.artifacts = resources, artifacts
 
     def requires_workspace(self, task):
         target = json.loads(task["intent_json"])["target"]
@@ -25,12 +35,73 @@ class NativeExecutor:
         )
 
     async def run(self, task, run, *, turn=None):
+        try:
+            return await self._run(task, run, turn=turn)
+        finally:
+            if self.resources:
+                await self.resources.release_task(task["owner_id"], task["id"], run["id"])
+
+    async def _run(self, task, run, *, turn=None):
         if turn is None or turn["branch_id"] != run["native_branch_id"]:
             raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
 
         async def execute(prepared):
-            text = await self.run_turn(prepared, "worker", task_id=task["id"])
-            return {"state": "succeeded", "summary": text}
+            text = await self.run_turn(
+                dict(prepared, executionRunId=run["id"]), "worker", task_id=task["id"]
+            )
+            result = {"state": "succeeded", "summary": text}
+            if len(text.encode()) > 6000 and self.artifacts:
+                source = await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT id FROM messages WHERE turn_id=? AND role='assistant' AND status='completed' ORDER BY seq DESC LIMIT 1",
+                        (prepared["id"],),
+                    )
+                )
+                result.update(
+                    summary=text.encode()[:6000].decode(errors="ignore"),
+                    summaryTruncated=True,
+                    resultRef={
+                        "conversationId": prepared["conversation_id"],
+                        "branchId": prepared["branch_id"],
+                        "messageId": source["id"] if source else None,
+                    },
+                )
+                try:
+                    await self.artifacts.put(
+                        task["owner_id"],
+                        text.encode(),
+                        mime_type="text/plain",
+                        name="task-result.txt",
+                        task_id=task["id"],
+                        message_id=source["id"] if source else None,
+                        metadata={"source": "native_result", "runId": run["id"]},
+                    )
+                except (DomainError, OSError) as exc:
+                    result["artifactError"] = (
+                        exc.code if isinstance(exc, DomainError) else "ARTIFACT_STORAGE_UNAVAILABLE"
+                    )
+            if self.artifacts:
+                references = await self.artifacts.for_attempt(
+                    task["owner_id"], task["id"], run["id"]
+                )
+                if references:
+                    result["artifactRefs"] = [
+                        {
+                            key: item[key]
+                            for key in [
+                                "id",
+                                "name",
+                                "mimeType",
+                                "sizeBytes",
+                                "sha256",
+                                "downloadUrl",
+                            ]
+                        }
+                        for item in references[:4]
+                    ]
+                    result["artifactsTruncated"] = len(references) > 4
+            return result
 
         remaining = (json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000
         async with asyncio.timeout(max(0, remaining)):

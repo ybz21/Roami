@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry } from './driver.mjs'
+import { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session } from './driver.mjs'
 
 const fail = (code) => { throw new Error(code) }
 function page(id, broken = false) {
@@ -70,4 +70,30 @@ test('stable selection uses a verb an old daemon rejects before performing an ac
   const result = await daemonRequestWithRetry(['fill', '#name', 'hello', '--target', 'stable'], 1000, 'fill', oldDaemon)
   assert.equal(received[0], '_managed')
   assert.equal(result.code, 1)
+})
+
+
+test('scene and browser guards require a daemon version that understands them', async () => {
+  for (const flag of ['--expected-scene', '--expected-browser']) {
+    let received
+    const request = async argv => { received = argv; return { resp: { code: 1, stderr: 'unsupported' } } }
+    await daemonRequestWithRetry(['fill', '#name', 'hello', flag, 'expected', '--no-retry'], 1000, 'fill', request)
+    assert.equal(received[0], '_scene')
+  }
+})
+
+test('reusing a CDP port for another browser invalidates the cached connection', async () => {
+  let current = 'first', closed = 0
+  const connections = []
+  const session = new Session({
+    discover: async () => ({ id: current, websocketUrl: 'ws://fixture/devtools/browser/' + current }),
+    connect: async url => { connections.push(url); return { isConnected: () => true, close: async () => { closed++ } } },
+  })
+  const first = await session.browserFor('http://fixture')
+  assert.equal(await session.browserFor('http://fixture'), first)
+  current = 'replacement'
+  assert.notEqual(await session.browserFor('http://fixture'), first)
+  assert.equal(session.browserId, 'replacement')
+  assert.equal(closed, 1)
+  assert.deepEqual(connections, ['ws://fixture/devtools/browser/first', 'ws://fixture/devtools/browser/replacement'])
 })

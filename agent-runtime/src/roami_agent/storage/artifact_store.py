@@ -314,6 +314,21 @@ class ArtifactStore:
 
         return await self.db.call(write, write=True)
 
+    async def for_attempt(self, owner, task_id, run_id, *, limit=5):
+        def read(db):
+            self._scope(db, owner, task_id, None)
+            items = rows(
+                db,
+                "SELECT a.* FROM artifacts a JOIN messages m ON m.id=a.message_id "
+                "JOIN task_attempts t ON t.native_branch_id=m.branch_id "
+                "WHERE a.owner_id=? AND a.task_id=? AND t.task_id=? AND t.id=? AND a.deleted_ms IS NULL "
+                "ORDER BY a.created_ms DESC,a.id LIMIT ?",
+                (owner, task_id, task_id, run_id, min(max(limit, 1), 20)),
+            )
+            return [self.reference(item) for item in items]
+
+        return await self.db.call(read)
+
     async def close(self):
         if self.closed:
             return

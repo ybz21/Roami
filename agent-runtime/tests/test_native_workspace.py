@@ -120,3 +120,58 @@ async def test_preparation_cancellation_or_forgotten_origin_never_reaches_worker
         )
     finally:
         await runtime.close()
+
+
+async def test_long_native_result_keeps_full_source_and_bounded_completion_evidence(store):
+    from test_runtime import ConversationModel, until
+
+    from roami_agent.app import Runtime
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.storage.database import row
+
+    full = "完整任务结果" * 2000
+
+    class LongResult:
+        model = "long-native-result"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", full)
+
+    runtime = Runtime(store, ConversationModel(), worker_model=LongResult())
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Return the detailed result",
+            key="long-result",
+            record_intent=True,
+        )
+        runtime.wakeup.set()
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM tasks WHERE id=? AND state='succeeded'", (task["id"],)
+            ),
+        )
+        attempt = await store.call(
+            lambda db: row(
+                db, "SELECT result_json FROM task_attempts WHERE task_id=?", (task["id"],)
+            )
+        )
+        result = json.loads(attempt["result_json"])
+        assert result["summaryTruncated"] and len(result["summary"].encode()) <= 6000
+        source = await store.call(
+            lambda db: row(
+                db,
+                "SELECT content_json FROM messages WHERE id=?",
+                (result["resultRef"]["messageId"],),
+            )
+        )
+        assert json.loads(source["content_json"])["text"] == full
+        reference = result["artifactRefs"][0]
+        assert reference["name"] == "task-result.txt"
+        assert (await runtime.artifacts.read("alice", reference["id"]))[1].decode() == full
+    finally:
+        await runtime.close()

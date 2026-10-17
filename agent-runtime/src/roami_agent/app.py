@@ -22,6 +22,7 @@ from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.tasks import Tasks
+from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
@@ -36,6 +37,7 @@ from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.tools.artifacts import register_artifact_tools
+from roami_agent.tools.browser import register_browser_tools
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
@@ -78,10 +80,14 @@ class Runtime:
         self.stopping = False
         self.supervisor = None
         self.external_monitor = None
+        self.browser_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         add_worker_tools(self.tools, self.settings, self.artifacts)
         register_artifact_tools(self.tools, self.artifacts)
         self.mcp = MCPConnections(self.tools, self.settings.mcp_servers, self.artifacts)
+        self.browser = BrowserDriver(database, self.settings, self.resources, self.artifacts)
+        if self.browser.config.get("enabled"):
+            register_browser_tools(self.tools, self.browser)
 
         self.mailbox = TurnMailbox(database)
         self.journal = TurnJournal(database)
@@ -93,7 +99,11 @@ class Runtime:
             executor,
             verifier,
             NativeExecutor(
-                lambda *args, **kwargs: self.loop.run(*args, **kwargs), database, self.settings
+                lambda *args, **kwargs: self.loop.run(*args, **kwargs),
+                database,
+                self.settings,
+                resources=self.resources if self.browser.config.get("enabled") else None,
+                artifacts=self.artifacts,
             ),
             self.wakeup,
             self.active,
@@ -140,7 +150,17 @@ class Runtime:
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):
             self.external_monitor = asyncio.create_task(self._monitor_external())
+        if self.browser.config.get("enabled"):
+            self.browser_monitor = asyncio.create_task(self._monitor_browser())
         self.wakeup.set()
+
+    async def _monitor_browser(self):
+        while not self.stopping:
+            try:
+                await self.browser.reconcile()
+            except (DomainError, OSError, TimeoutError):
+                log.exception("Browser operation observation failed")
+            await asyncio.sleep(1)
 
     async def _monitor_external(self):
         while not self.stopping:
@@ -173,6 +193,9 @@ class Runtime:
         if self.external_monitor:
             self.external_monitor.cancel()
             await asyncio.gather(self.external_monitor, return_exceptions=True)
+        if self.browser_monitor:
+            self.browser_monitor.cancel()
+            await asyncio.gather(self.browser_monitor, return_exceptions=True)
         running = [item["handle"] for item in self.active.values()]
         for handle in running:
             handle.cancel()

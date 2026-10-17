@@ -46,3 +46,11 @@ roami chrome operation-cancel --operation-id <operationId> --receipt-root <recei
 ```
 
 status / cancel 不连接或启动 Chrome；目录必须为当前用户私有。取消先保存取消标记：未开始的动作可立即确认取消，运行中的动作须等待真实回执。`inputStopped` 表示该驱动不再继续输入，`outcomeKnown` 表示动作效果是否明确，两者分开；异常可以已停止但效果未知。此模式输出回执 JSON，调用方必须检查 state，不能用 CLI 的退出码判断业务目标完成。错误只保存稳定机器码，文件损坏或缺失不触发重放。升级不杀正在执行动作的旧 daemon，版本动词让不支持协议的 daemon 在动作前拒绝。
+
+## 场景观察与动作前校验
+
+`capabilities` 返回驱动能力与实际 CDP 连接所绑定的 browserId。实例身份取自 [Chrome 官方发现接口](https://chromedevtools.github.io/devtools-protocol/index.html#how-do-i-access-the-browser-target) `/json/version` 的浏览器 WebSocket 端点；不能拿每个根 CDP 会话分配的 targetId 当浏览器身份。相同端口换了 Chrome 时会重新连接，动作不会落到仍缓存的另一实例上。
+
+`observe --target <id>` 返回有界主框架文本、可见控件、viewport/DPR、时间与场景签名。原始 DOM、用于签名的完整输入集合和焦点细节不回传；可见控件值受长度上限约束，密码控件的值隐藏。超出输出预算的控件明确标记截断，跨 iframe 的内容不冒充主框架观察。可选 `--screenshot <新文件.png>` 返回图片尺寸和 viewport 到像素的比例；截图前后场景不同则丢弃混合观察。
+
+动作带 `--expected-browser <browserId> --expected-scene <signature>` 时，先验证实例和页面状态再输入。焦点检查发生在前置标签之前，避免先抢回焦点再漏掉人工切换。导航、表单值、选区、viewport/缩放、焦点或 DOM 变化会使旧观察失效。此模式使用新的内部版本动词，旧 daemon 不会忽略校验选项后继续动作。动作返回仍需再次观察和任务验收，不等于用户目标完成。

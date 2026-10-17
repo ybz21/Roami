@@ -204,3 +204,16 @@ async def test_unknown_side_effects_do_not_prevent_takeover_after_input_is_confi
         lambda db: row(db, "SELECT * FROM resource_actions WHERE id=?", (action["id"],))
     )
     assert receipt["state"] == "unknown"
+
+
+async def test_takeover_fence_is_checked_atomically_for_new_and_previously_claimed_resources(store):
+    leases, lease, _, task, run = await setup(store)
+    other = await leases.claim("alice", task, run, "browser", "fixture:second")
+    observed = await leases.observe(
+        "alice", other["id"], task, run, other["lease_epoch"], "b" * 64, {}
+    )
+    await leases.pause("alice", lease["id"])
+    with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
+        await leases.claim("alice", task, run, "browser", "fixture:replacement")
+    with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
+        await begin(leases, other, observed, task, run)
