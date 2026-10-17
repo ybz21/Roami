@@ -195,6 +195,12 @@ func (s Service) Status(key string) (Status, error) {
 	}
 	var status Status
 	if err = readJSON(filepath.Join(dir, "receipt.json"), &status.Receipt); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if _, specErr := os.Stat(filepath.Join(dir, "spec.json")); errors.Is(specErr, os.ErrNotExist) {
+				return Status{Receipt: Receipt{State: "not_started"}}, nil
+			}
+			return Status{Receipt: Receipt{State: "unknown"}}, nil
+		}
 		return status, err
 	}
 	var result Result

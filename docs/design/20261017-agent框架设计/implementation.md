@@ -21,3 +21,5 @@ Memory 的后台提取 / 每日汇总、完整忘记传播与来源屏蔽、缓�
 增加 `roami agent execution launch/status/cancel`，复用 Agent 参数注册表与应用层会话服务，在 tmux 新会话中启动一次性 Codex / Claude Code。启动前保存私有凭据；相同 key 必须具有相同任务，未知启动不自动重放。结果保存有界输出和退出码，取消需等待实际执行结果，超时与退出信号终止执行进程组。
 
 实际使用隔离 tmux、真实 Go CLI 和替身 Codex / Claude 可执行文件验证，多行与 Shell 字符保持原文、幂等重试、冲突、取消、非零退出与中断均有覆盖；未调用真实模型账号。此层尚未接入 Python 任务编排，项目工作区准备、已有会话续派与自动回报仍需继续实现。
+
+Python `CodingExecutor` 现已接通新建散会话的执行传输，保存 session 绑定；独立监视任务收取结果，释放长期 Worker 占用，并保留执行并发与原任务截止时间。Go 启动的 Python 默认复用同一 Go 可执行文件。Python 重启后观察原凭据、不重发；取消保持处理中，直到 Go runner 返回终态。真实 Go + 隔离 tmux 的测试已覆盖任务发起、Python 重启、原对话回报和实际取消；模型与编码二进制仍为测试替身。项目工作区、已有会话续派、外部 checkpoint Fork 和自动目标验证仍待补齐。

@@ -12,7 +12,8 @@ max_steps = 16
 max_depth = 2
 input_budget = 24000
 timeout_seconds = 120
-cli_bin = "roami"
+# cli_bin = "/absolute/path/to/roami" # defaults to the Go launcher binary
+# coding_directory = "/absolute/path/for/loose-coding-tasks"
 
 [tools]
 # This validates working directories; it is not an OS filesystem sandbox.

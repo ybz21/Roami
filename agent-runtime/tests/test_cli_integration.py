@@ -146,7 +146,9 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
         await provider_task
 
 
-async def test_go_coding_execution_tmux_replay_cancel_and_unknown(tmp_path, roami_binary):
+async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
+    tmp_path, roami_binary, monkeypatch, store
+):
     """Real isolated tmux and Go runners; fake agent binaries avoid paid/account calls."""
     import shlex
 
@@ -232,6 +234,107 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(tmp_path, roam
                 "launch", "--file", "-", spec={**spec, "prompt": "different"}, success=False
             )
         assert calls.read_text().splitlines() == ["codex", "claude"]
+
+        from roami_agent.coding_executor import CodingExecutor
+        from roami_agent.configuration import Settings
+        from roami_agent.providers import ModelEvent
+        from roami_agent.runtime import Runtime
+        from roami_agent.storage import row
+
+        for name, value in env.items():
+            monkeypatch.setenv(name, value)
+        settings = Settings(cli_bin=str(roami_binary), coding_directory=binary_dir)
+
+        class ResultModel:
+            model = "injected-result-model"
+
+            async def stream(self, messages, tools):
+                yield ModelEvent("text", "Coding result received in its original conversation.")
+
+        async def verifier(task, result):
+            return result["exitCode"] == 0 and result["summary"] == "Answer: resume delegated task"
+
+        def runtime():
+            return Runtime(
+                store,
+                ResultModel(),
+                settings=settings,
+                executor=CodingExecutor(store, settings),
+                verifier=verifier,
+            )
+
+        agent_runtime = runtime()
+        await agent_runtime.start()
+        try:
+            origin = await agent_runtime.conversations.create("alice")
+            other = await agent_runtime.conversations.create("alice")
+            delegated = await agent_runtime.tasks.create(
+                "alice",
+                origin["id"],
+                "resume delegated task",
+                key="runtime-restart",
+                executor="claude",
+                record_intent=True,
+            )
+            async with asyncio.timeout(15):
+                while not await store.call(
+                    lambda db: row(
+                        db,
+                        "SELECT session_id FROM task_attempts WHERE task_id=? AND session_id IS NOT NULL",
+                        (delegated["id"],),
+                    )
+                ):
+                    await asyncio.sleep(0.02)
+            await agent_runtime.close()
+            # The coding process survives a Python restart; the same launch is observed.
+            agent_runtime = runtime()
+            await agent_runtime.start()
+            async with asyncio.timeout(15):
+                while not await store.call(
+                    lambda db: row(
+                        db,
+                        "SELECT id FROM turns WHERE conversation_id=? AND trigger_kind='completion' AND state='completed'",
+                        (origin["id"],),
+                    )
+                ):
+                    await asyncio.sleep(0.02)
+            original_messages = await agent_runtime.conversations.messages("alice", origin["id"])
+            assert original_messages["messages"][-1]["content"]["text"].startswith("Coding result")
+            assert not (await agent_runtime.conversations.messages("alice", other["id"]))[
+                "messages"
+            ]
+            completed = await agent_runtime.tasks.list("alice", origin["id"])
+            assert completed[0]["state"] == "succeeded"
+            assert calls.read_text().splitlines().count("claude") == 2
+            cancelling = await agent_runtime.tasks.create(
+                "alice",
+                origin["id"],
+                "slow delegated task",
+                key="runtime-cancel",
+                executor="codex",
+                record_intent=True,
+            )
+            async with asyncio.timeout(15):
+                while not await store.call(
+                    lambda db: row(
+                        db,
+                        "SELECT session_id FROM task_attempts WHERE task_id=? AND session_id IS NOT NULL",
+                        (cancelling["id"],),
+                    )
+                ):
+                    await asyncio.sleep(0.02)
+            await agent_runtime.tasks.cancel("alice", cancelling["id"])
+            async with asyncio.timeout(15):
+                while not await store.call(
+                    lambda db: row(
+                        db,
+                        "SELECT id FROM tasks WHERE id=? AND state='cancelled'",
+                        (cancelling["id"],),
+                    )
+                ):
+                    await asyncio.sleep(0.02)
+        finally:
+            await agent_runtime.close()
         slow = {
             "key": "slow",
             "executor": "codex",

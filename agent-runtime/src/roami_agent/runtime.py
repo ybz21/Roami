@@ -60,6 +60,7 @@ class Runtime:
         self.wakeup = asyncio.Event()
         self.stopping = False
         self.supervisor = None
+        self.external_monitor = None
         self._register_tools()
         add_worker_tools(self.tools, self.settings)
 
@@ -172,13 +173,27 @@ class Runtime:
         await self.conversations.recover()
         await self._recover_tasks()
         self.supervisor = asyncio.create_task(self._supervise(), name="roami-agent-supervisor")
+        if self.executor and getattr(self.executor, "can_reconcile", False):
+            self.external_monitor = asyncio.create_task(self._monitor_external())
         self.wakeup.set()
+
+    async def _monitor_external(self):
+        while not self.stopping:
+            try:
+                await self.executor.poll(self.tasks)
+                self.wakeup.set()
+            except (DomainError, OSError, TimeoutError):
+                log.exception("External executor observation failed")
+            await asyncio.sleep(1)
 
     async def close(self):
         self.stopping = True
         self.wakeup.set()
         if self.supervisor:
             await self.supervisor
+        if self.external_monitor:
+            self.external_monitor.cancel()
+            await asyncio.gather(self.external_monitor, return_exceptions=True)
         running = [item["handle"] for item in self.active.values()]
         for handle in running:
             handle.cancel()
@@ -281,7 +296,7 @@ class Runtime:
         queued = await self.db.call(
             lambda db: rows(
                 db,
-                "SELECT j.*,t.branch_id,b.id AS native_branch_id FROM jobs j "
+                "SELECT j.*,t.branch_id,b.id AS native_branch_id,a.executor_kind FROM jobs j "
                 "LEFT JOIN turns t ON j.kind='turn.run' AND t.id=j.aggregate_id "
                 "LEFT JOIN task_attempts a ON j.kind='task.run' AND a.id=json_extract(j.payload_json,'$.runId') "
                 "LEFT JOIN branches b ON b.id=a.native_branch_id "
@@ -290,6 +305,12 @@ class Runtime:
                 (now_ms(),),
             )
         )
+        external_running = await self.db.call(
+            lambda db: db.execute(
+                "SELECT COUNT(*) FROM tasks t JOIN task_attempts a ON a.task_id=t.id AND a.task_revision=t.revision "
+                "WHERE a.executor_kind='cli' AND t.state IN ('running','cancelling')"
+            ).fetchone()[0]
+        )
         for job in queued:
             if job["id"] in self.active:
                 continue
@@ -297,6 +318,10 @@ class Runtime:
             capacity = self.settings.main_concurrency if group == "main" else self.settings.workers
             if sum(v["group"] == group for v in self.active.values()) >= capacity:
                 continue
+            if job.get("executor_kind") == "cli":
+                if external_running >= self.settings.workers:
+                    continue
+                external_running += 1
             branch = job.get("branch_id") or job.get("native_branch_id")
             if job["kind"] == "context.compact":
                 branch = json.loads(job["payload_json"])["branchId"]
@@ -810,12 +835,16 @@ class Runtime:
                 text = await self._run_turn(turn, "worker", task_id=task["id"])
                 result = {"state": "succeeded", "summary": text}
             elif self.executor:
+                await self._charge_task(task["id"])
                 result = await self.executor.run(task, run)
                 if result is None:  # External TUI is alive; report arrives via the CLI callback.
                     return
             else:
                 raise DomainError("EXTERNAL_EXECUTOR_NOT_CONFIGURED")
         except asyncio.CancelledError:
+            if run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False):
+                # The Go runner outlives Python; restart observes the same launch key.
+                raise
             current = await self.db.call(
                 lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
             )
@@ -993,6 +1022,16 @@ class Runtime:
         )
         for task in cancelling:
             active = next((a for a in self.active.values() if a["task"] == task["id"]), None)
+            if active and getattr(self.executor, "can_reconcile", False):
+                attempt = await self.db.call(
+                    lambda db, task=task: row(
+                        db,
+                        "SELECT executor_kind FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
+                        (task["id"],),
+                    )
+                )
+                if attempt and attempt["executor_kind"] == "cli":
+                    continue
             if active:
                 if not active["handle"].cancelling():
                     active["handle"].cancel()
@@ -1012,12 +1051,30 @@ class Runtime:
                         task["revision"],
                         {"state": "cancelled", "summary": "Cancelled before start"},
                     )
-                elif run["executor_kind"] == "cli" and self.executor:
+                elif (
+                    run["executor_kind"] == "cli"
+                    and self.executor
+                    and not getattr(self.executor, "can_reconcile", False)
+                ):
                     await self.executor.cancel(task, run)
 
     async def _recover_tasks(self):
         def write(db):
             for task in rows(db, "SELECT * FROM tasks WHERE state='running'"):
+                external = row(
+                    db,
+                    "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=? AND executor_kind='cli' AND result_json IS NULL",
+                    (task["id"], task["revision"]),
+                )
+                if external and getattr(self.executor, "can_reconcile", False):
+                    db.execute(
+                        "UPDATE task_attempts SET state='unknown' WHERE id=?", (external["id"],)
+                    )
+                    db.execute(
+                        "UPDATE jobs SET state='done' WHERE kind='task.run' AND aggregate_id=?",
+                        (task["id"],),
+                    )
+                    continue
                 db.execute(
                     "UPDATE task_attempts SET state='unknown' WHERE task_id=? AND state IN ('starting','running')",
                     (task["id"],),

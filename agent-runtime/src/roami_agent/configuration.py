@@ -39,11 +39,12 @@ class Settings:
     skill_roots: tuple[Path, ...] = ()
     mcp_servers: dict = field(default_factory=dict)
     cli_bin: str = "roami"
+    coding_directory: Path | None = None
 
     @classmethod
     def load(cls, path: Path):
         if not path.exists():
-            return cls()
+            return cls(cli_bin=os.environ.get("ROAMI_AGENT_CLI", "roami"))
         raw = tomllib.loads(path.read_text())
         model, runtime, tools = (raw.get(k, {}) for k in ["model", "runtime", "tools"])
         result = cls(
@@ -63,7 +64,12 @@ class Settings:
             skill_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("skill_roots", [])),
             http_tools=tools.get("http", {}),
             mcp_servers=tools.get("mcp", {}),
-            cli_bin=runtime.get("cli_bin", "roami"),
+            cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
+            coding_directory=(
+                Path(runtime["coding_directory"]).expanduser().resolve()
+                if runtime.get("coding_directory")
+                else None
+            ),
         )
         for value in [
             result.main_concurrency,

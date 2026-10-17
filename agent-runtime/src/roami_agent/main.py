@@ -9,6 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
+from .coding_executor import CodingExecutor
 from .configuration import Settings
 from .providers import ChatCompletions
 from .runtime import Runtime
@@ -36,7 +37,13 @@ async def serve(args):
         if settings.worker_model
         else provider
     )
-    runtime = Runtime(database, provider, settings=settings, worker_model=worker)
+    runtime = Runtime(
+        database,
+        provider,
+        settings=settings,
+        worker_model=worker,
+        executor=CodingExecutor(database, settings),
+    )
     try:
         args.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(args.socket.parent, 0o700)

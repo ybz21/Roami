@@ -175,13 +175,21 @@ class Tasks:
         def read(db):
             if cid:
                 owned(db, owner, cid)
-            return rows(
+            tasks = rows(
                 db,
                 "SELECT * FROM tasks WHERE owner_id=?"
                 + (" AND origin_conversation_id=?" if cid else "")
                 + " ORDER BY created_ms DESC LIMIT 200",
                 (owner, cid) if cid else (owner,),
             )
+            for task in tasks:
+                task["latestAttempt"] = row(
+                    db,
+                    "SELECT id AS runId,state,session_id AS sessionId,executor_kind AS executorKind "
+                    "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
+                    (task["id"],),
+                )
+            return tasks
 
         return await self.db.call(read)
 

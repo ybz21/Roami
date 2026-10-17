@@ -219,6 +219,9 @@ func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
 		args = append(args, "--socket", p.Socket)
 	}
 	cmd := exec.Command(python, args...)
+	if binary, err := os.Executable(); err == nil {
+		cmd.Env = append(os.Environ(), "ROAMI_AGENT_CLI="+binary)
+	}
 	cmd.Dir = dir
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()

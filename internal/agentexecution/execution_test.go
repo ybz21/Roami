@@ -37,6 +37,25 @@ func TestUnknownLaunchNeverExecutesAgain(t *testing.T) {
 	}
 }
 
+func TestMissingLaunchAndPartiallyWrittenLaunchAreDifferent(t *testing.T) {
+	s := testService(t)
+	status, err := s.Status("missing")
+	if err != nil || status.State != "not_started" {
+		t.Fatalf("missing launch: %+v, %v", status, err)
+	}
+	dir, _ := s.directory("partial")
+	if err = os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = writeJSON(filepath.Join(dir, "spec.json"), Spec{Key: "partial"}); err != nil {
+		t.Fatal(err)
+	}
+	status, err = s.Status("partial")
+	if err != nil || status.State != "unknown" {
+		t.Fatalf("partial launch must not be replayed: %+v, %v", status, err)
+	}
+}
+
 func TestObservationFailureDoesNotClaimAgentStopped(t *testing.T) {
 	s := testService(t)
 	dir, _ := s.directory("observation")
