@@ -2068,7 +2068,7 @@ const enUS = {
   'ka.bannerNeverTicked': 'Guarding {n}, but no sweep has run yet · the guard loop has not started',
   'ka.bannerDisabled': 'Plugin disabled · guards are kept but nothing is swept or sent',
   'ka.whyStale': "What's wrong?",
-  'ka.whyBody': 'The guard loop is hosted by plugind. Check these three, in order:\n\n1. Is plugind up — look for the _ttmux-plugind tmux session; the web service starts it automatically; check service logs if it stays missing.\n2. Is the guard loop up — look for the _ttmux-keepalive tmux session; plugind re-spawns it every 3 seconds, so give it ten-odd seconds.\n3. When was the last sweep — the number in the banner; frozen means the loop started but is stuck.\n\nTo run one sweep right now (also a good config check):',
+  'ka.whyBody': 'The guard loop is hosted by plugind. Check these three, in order:\n\n1. Is plugind up — look for this instance\'s _ttmux-plugind-<instance> tmux session; the web service starts it automatically; check service logs if it stays missing.\n2. Is the guard loop up — look for this instance\'s _ttmux-keepalive-<instance> tmux session; plugind re-spawns it every 3 seconds, so give it ten-odd seconds.\n3. When was the last sweep — the number in the banner; frozen means the loop started but is stuck.\n\nTo run one sweep right now (also a good config check):',
   'ka.history': 'Nudge log',
   'ka.rules': 'Nudge rules',
   'ka.bulk': 'Guard all',
