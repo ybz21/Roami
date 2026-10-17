@@ -14,7 +14,7 @@ import (
 
 // Tabs 列出当前所有 page 标签页。
 func Tabs(c *gin.Context) {
-	if err := ensureChrome(); err != nil {
+	if err := ensureBrowserInstance(c.Query("expectedBrowser")); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"message": err.Error()}})
 		return
 	}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { normalizeRoute, readTermTokens } from './route-hash'
+import { normalizeRoute, readTermTokens, setHashParams } from './route-hash'
 
 const at = (hash: string) => { location.hash = hash }
 
@@ -27,4 +27,12 @@ describe('legacy inbox links', () => {
   it('keeps session deep links for the app to open directly', () => {
     expect(normalizeRoute('inbox/session-a')).toBe('inbox/session-a')
   })
+})
+
+
+it('keeps the exact task browser target when terminal tabs synchronize the URL', () => {
+  at('#/browser/task/browser-instance/exact-tab')
+  setHashParams({ terms: 'session-a', active: 'session-a' })
+  expect(normalizeRoute(location.hash.replace(/^#\/?/, ''))).toBe('browser/task/browser-instance/exact-tab')
+  expect(readTermTokens().active).toBe('session-a')
 })

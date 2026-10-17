@@ -196,3 +196,39 @@ async def test_disabled_drivers_still_reconcile_durable_stop_receipts_without_st
         )["state"] == "failed"
     finally:
         await runtime.close()
+
+
+async def test_handoff_waits_for_sibling_input_but_not_unrelated_goal(store):
+    from test_resource_leases import controller
+
+    leases, lease, _, parent, _ = await setup(store)
+    child, child_run = await controller(store, key="sibling-input")
+    await store.call(
+        lambda db: db.execute("UPDATE tasks SET parent_task_id=? WHERE id=?", (parent, child)),
+        write=True,
+    )
+    sibling = await leases.claim("alice", child, child_run, "browser", "sibling-tab")
+    observed = await leases.observe(
+        "alice", sibling["id"], child, child_run, sibling["lease_epoch"], "b" * 64, {}
+    )
+    action = await begin(leases, sibling, observed, child, child_run, "sibling-action")
+    independent, run = await controller(store, key="unrelated-input")
+    other = await leases.claim("alice", independent, run, "browser", "unrelated-tab")
+    other_seen = await leases.observe(
+        "alice", other["id"], independent, run, other["lease_epoch"], "c" * 64, {}
+    )
+    await begin(leases, other, other_seen, independent, run, "unrelated-action")
+    runtime = Runtime(store, BrowserModel())
+    try:
+        pending = await runtime.controls.pause("alice", lease["id"])
+        assert pending["actionPending"] and not pending["takeoverReady"]
+        with pytest.raises(DomainError, match="RESOURCE_STOP_UNCONFIRMED"):
+            await runtime.controls.resume("alice", lease["id"])
+        with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
+            await begin(leases, sibling, observed, child, child_run, "after-pause")
+        await leases.finish("alice", action["id"], "unknown", {"inputStopped": True})
+        await runtime.controls.release_ready()
+        assert (await runtime.controls.get("alice", lease["id"]))["takeoverReady"]
+        assert (await runtime.controls.resume("alice", lease["id"]))["state"] == "idle"
+    finally:
+        await runtime.close()

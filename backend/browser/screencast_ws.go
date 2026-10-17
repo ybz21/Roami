@@ -134,7 +134,7 @@ func Handler(c *gin.Context) {
 
 	sink := newWSSink(front)
 	opts := scOptions{
-		target:  c.Query("target"),
+		expectedBrowser: c.Query("expectedBrowser"), target: c.Query("target"),
 		control: c.Query("control") == "1",
 		auto:    c.Query("auto") == "1",
 		q:       atoiDefault(c.Query("q"), 80),

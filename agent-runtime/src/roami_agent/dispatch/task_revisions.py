@@ -25,6 +25,7 @@ class TaskRevisions:
             "state": payload.get("status", "stopping"),
             "revision": payload.get("appliedRevision", payload["expectedRevision"]),
             "errorCode": payload.get("errorCode"),
+            "text": payload["text"],
         }
 
     async def get(self, owner, task_id, operation_id):
@@ -101,7 +102,13 @@ class TaskRevisions:
                     "taskRevision": expected_revision,
                 },
             )
-            payload = {**spec, "goal": goal, "messageId": mid, "status": "stopping"}
+            payload = {
+                **spec,
+                "goal": goal,
+                "messageId": mid,
+                "status": "stopping",
+                "stateAtRequest": task["state"],
+            }
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
                 "VALUES(?,'task.steer',?,?,?,'queued',?)",
@@ -235,7 +242,26 @@ class TaskRevisions:
                     continue
                 intent = json.loads(task["intent_json"])
                 intent.setdefault("initialIntent", dict(intent))
+                previous = intent.get("continuation", {})
+                verified_through = (
+                    task["revision"]
+                    if task["state"] == "succeeded"
+                    else previous.get("verifiedThroughRevision", 0)
+                )
+                unfinished_children = row(
+                    db,
+                    "SELECT id FROM tasks WHERE parent_task_id=? AND COALESCE(json_extract(intent_json,'$.parentTaskRevision'),1)=? AND state!='succeeded' LIMIT 1",
+                    (task["id"], task["revision"]),
+                )
+                requires_acceptance = task["state"] != "succeeded" and (
+                    task["state"] == "waiting_user"
+                    or payload.get("stateAtRequest") == "waiting_user"
+                    or previous.get("requiresAcceptance", False)
+                    or bool(unfinished_children)
+                )
                 intent["continuation"] = {
+                    "verifiedThroughRevision": verified_through,
+                    "requiresAcceptance": requires_acceptance,
                     "runId": run["id"],
                     "state": run["state"],
                     "summary": (

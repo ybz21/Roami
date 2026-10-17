@@ -113,7 +113,9 @@ async def test_active_steering_stops_the_old_worker_before_starting_new_revision
             yield ModelEvent("text", "Updated task completed")
 
     worker = Worker()
-    runtime = Runtime(store, ConversationModel(), worker_model=worker)
+    runtime = Runtime(
+        store, ConversationModel(), worker_model=worker, memory_model=ConversationModel()
+    )
     try:
         conversation = await runtime.conversations.create("alice")
         task = await runtime.tasks.create(
@@ -238,7 +240,10 @@ async def test_forgetting_old_task_source_invalidates_continued_revision(store):
 
 
 async def test_new_root_revision_does_not_join_failed_children_from_an_old_revision(store):
-    runtime = Runtime(store, ConversationModel())
+    async def independent_verifier(task, result):
+        return True
+
+    runtime = Runtime(store, ConversationModel(), verifier=independent_verifier)
     try:
         conversation = await runtime.conversations.create("alice")
         root, original = await task_run(runtime, conversation, "root")
@@ -386,4 +391,136 @@ async def test_inflight_main_reply_cannot_publish_an_obsolete_task_result(store)
         release.set()
         if handle:
             await asyncio.gather(handle, return_exceptions=True)
+        await runtime.close()
+
+
+async def test_continuation_cannot_bypass_unaccepted_writes_but_accepted_history_can_continue_read_only(
+    store, tmp_path
+):
+    import sys
+    from contextlib import asynccontextmanager
+
+    from roami_agent.server.configuration import Settings
+
+    class Worker:
+        model = "write-then-read"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                yield ModelEvent("text", "Created the proof file")
+            elif messages[-1]["content"].startswith("Continue the existing task"):
+                yield ModelEvent("text", "Read-only follow-up answer")
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "write",
+                        "type": "function",
+                        "function": {
+                            "name": "shell",
+                            "arguments": json.dumps(
+                                {
+                                    "argv": [
+                                        sys.executable,
+                                        "-c",
+                                        "from pathlib import Path; Path('proof.txt').write_text('verified')",
+                                    ]
+                                }
+                            ),
+                        },
+                    },
+                )
+
+    @asynccontextmanager
+    async def workspace(settings, task, run, **kwargs):
+        yield {"directory": str(tmp_path), "workspaceId": "verification-fixture"}
+
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        worker_model=Worker(),
+        memory_model=ConversationModel(),
+        settings=Settings(timeout_seconds=5),
+    )
+    runtime.dispatch.native_executor.workspace_factory = workspace
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Write proof",
+            key="write-first",
+            record_intent=True,
+            target={"kind": "new_session", "directory": str(tmp_path)},
+        )
+        await runtime.start()
+
+        async def reached(revision, state):
+            await until(
+                store,
+                lambda db: row(
+                    db,
+                    "SELECT id FROM tasks WHERE id=? AND revision=? AND state=?",
+                    (task["id"], revision, state),
+                ),
+            )
+
+        await reached(1, "waiting_user")
+        assert (tmp_path / "proof.txt").read_text() == "verified"
+        await runtime.tasks.revisions.request(
+            "alice", task["id"], "Answer a follow-up without writing", 1, "read-only-unaccepted"
+        )
+        await reached(2, "waiting_user")
+        assert (tmp_path / "proof.txt").read_text() == "verified"
+        await runtime.dispatch.confirm("alice", task["id"], True)
+        await runtime.tasks.revisions.request(
+            "alice", task["id"], "Another read-only follow-up", 2, "read-only-accepted"
+        )
+        await reached(3, "succeeded")
+        attempts = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT result_json FROM task_attempts WHERE task_id=? ORDER BY task_revision",
+                (task["id"],),
+            )
+        )
+        assert all(
+            json.loads(attempt["result_json"])["state"] == "succeeded" for attempt in attempts
+        )
+    finally:
+        await runtime.close()
+
+
+async def test_waiting_for_acceptance_is_not_discarded_when_verifier_becomes_unavailable(store):
+    async def not_verified(task, result):
+        return False
+
+    runtime = Runtime(store, ConversationModel(), verifier=not_verified)
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task, _, _ = await finished(runtime, conversation)
+        runtime.dispatch.verifier = None
+        await runtime.tasks.revisions.request("alice", task["id"], "Continue reading", 1, "reading")
+        await runtime.tasks.revisions.advance()
+        run = await store.call(
+            lambda db: row(
+                db, "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=2", (task["id"],)
+            )
+        )
+        await runtime.tasks.report(
+            "alice",
+            task["id"],
+            run["id"],
+            2,
+            {"state": "succeeded", "summary": "A read-only response"},
+        )
+        job = await store.call(
+            lambda db: row(db, "SELECT * FROM jobs WHERE dedupe_key=?", ("verify:" + run["id"],))
+        )
+        await runtime.dispatch.verify(job)
+        current = await store.call(
+            lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
+        )
+        assert current["state"] == "waiting_user"
+    finally:
         await runtime.close()

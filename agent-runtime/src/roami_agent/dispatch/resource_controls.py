@@ -1,5 +1,8 @@
 """Owner-facing takeover waits for confirmed input stop before returning control."""
 
+import json
+import re
+
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row, rows
 
@@ -9,7 +12,7 @@ class ResourceControls:
         self.db, self.leases = database, leases
 
     def _view(self, db, resource):
-        pending = self.leases._pending(db, resource["id"]) is not None
+        pending = self.leases.pending_scope(db, resource) is not None
         released = (
             resource["lease_until_ms"] is None
             and resource["state"] in {"idle", "paused"}
@@ -17,10 +20,16 @@ class ResourceControls:
         )
         observation = row(
             db,
-            "SELECT id,task_id FROM resource_observations WHERE resource_id=? ORDER BY rowid DESC LIMIT 1",
+            "SELECT id,task_id,body_json FROM resource_observations WHERE resource_id=? ORDER BY rowid DESC LIMIT 1",
             (resource["id"],),
         )
+        browser = re.fullmatch(
+            r"browser:([A-Za-z0-9_-]{1,128}):target:([A-Za-z0-9_-]{1,128})",
+            resource["resource_key"],
+        )
         return {
+            "browserId": browser[1] if browser else None,
+            "targetId": browser[2] if browser else None,
             "id": resource["id"],
             "kind": resource["kind"],
             "state": resource["state"],
@@ -35,6 +44,13 @@ class ResourceControls:
             "canResume": released and resource["state"] == "paused",
             "observationId": observation["id"] if observation else None,
             "observationTaskId": observation["task_id"] if observation else None,
+            "observation": {
+                key: value[: {"url": 1200, "title": 200, "screenshotRef": 128}[key]]
+                for key, value in (
+                    json.loads(observation["body_json"]) if observation else {}
+                ).items()
+                if key in {"url", "title", "screenshotRef"} and isinstance(value, str)
+            },
         }
 
     async def get(self, owner, resource_id):
@@ -49,10 +65,10 @@ class ResourceControls:
             tree = "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id WHERE t.owner_id=?) "
             items = rows(
                 db,
-                tree
-                + "SELECT DISTINCT r.* FROM resources r LEFT JOIN resource_observations o ON o.resource_id=r.id "
-                "WHERE r.owner_id=? AND (o.task_id IN (SELECT id FROM tree) OR r.owner_task_id IN (SELECT id FROM tree)) "
+                tree + "SELECT r.* FROM resources r WHERE r.owner_id=? AND "
+                "((SELECT o.task_id FROM resource_observations o WHERE o.resource_id=r.id ORDER BY o.rowid DESC LIMIT 1) IN (SELECT id FROM tree) OR r.owner_task_id IN (SELECT id FROM tree)) "
                 "AND (r.owner_task_id IS NULL OR r.owner_task_id IN (SELECT id FROM tree)) "
+                "AND NOT (r.kind='browser' AND r.resource_key GLOB 'browser:*:context') "
                 "ORDER BY CASE WHEN r.owner_task_id IS NULL THEN 1 ELSE 0 END,r.rowid DESC LIMIT 51",
                 (task_id, owner, owner),
             )
@@ -92,7 +108,7 @@ class ResourceControls:
                 (owner,) if owner else (),
             )
             for resource in paused:
-                if self.leases._pending(db, resource["id"]):
+                if self.leases.pending_scope(db, resource):
                     continue
                 db.execute(
                     "UPDATE resources SET state='paused',lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",

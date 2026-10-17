@@ -1046,7 +1046,7 @@ export default function App() {
     />,
     install: isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false} keepBottomNav><InstallPage /></MobileSubPage> : <InstallPage />,
     tools: <MobileTools onNav={(k) => go(k)} />,
-    browser: <BrowserView />,
+    browser: <BrowserView key={route} initialTarget={route.startsWith('browser/task/') ? route.split('/')[3] || '' : ''} browserInstance={route.startsWith('browser/task/') ? route.split('/')[2] || '' : ''} />,
     phone: <PhoneView />,
   }
   // 懒加载页面 chunk 拉取期间的兜底：居中转圈（体量小，通常一闪而过）

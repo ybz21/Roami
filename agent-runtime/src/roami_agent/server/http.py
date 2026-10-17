@@ -13,6 +13,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import (
     Compact,
     Confirm,
+    ConfirmTask,
     CreateConversation,
     CreateTask,
     Fork,
@@ -88,7 +89,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             headers={
                 "Cache-Control": "no-store",
                 "X-Content-Type-Options": "nosniff",
-                "Content-Security-Policy": "sandbox; default-src 'none'",
+                "Content-Security-Policy": "sandbox allow-downloads; default-src 'none'",
             },
         )
 
@@ -200,6 +201,10 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def tasks(owner: Owner, conversationId: str | None = None):
         return {"data": await runtime.tasks.list(owner, conversationId)}
 
+    @app.get("/v1/tasks/{task_id}")
+    async def task_detail(task_id: str, owner: Owner):
+        return {"data": await runtime.tasks.get(owner, task_id)}
+
     @app.post("/v1/tasks", status_code=202)
     async def create_task(body: CreateTask, owner: Owner):
         result = await runtime.tasks.create(
@@ -251,8 +256,12 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.controls.resume(owner, resource_id)}
 
     @app.post("/v1/tasks/{task_id}/verify")
-    async def verify_task(task_id: str, body: Confirm, owner: Owner):
-        return {"data": await runtime.dispatch.confirm(owner, task_id, body.accepted)}
+    async def verify_task(task_id: str, body: ConfirmTask, owner: Owner):
+        return {
+            "data": await runtime.dispatch.confirm(
+                owner, task_id, body.accepted, revision=body.revision, run_id=body.runId
+            )
+        }
 
     @app.get("/v1/memories")
     async def memories(

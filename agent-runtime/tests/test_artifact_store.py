@@ -156,6 +156,10 @@ async def test_download_checks_owner_integrity_and_uses_attachment_headers(store
             assert response.status_code == 200 and response.content == b"download evidence"
             assert response.headers["content-disposition"].startswith("attachment")
             assert response.headers["x-content-type-options"] == "nosniff"
+            assert (
+                response.headers["content-security-policy"]
+                == "sandbox allow-downloads; default-src 'none'"
+            )
             assert response.headers["cache-control"] == "no-store"
             assert (
                 await client.get(path + "/content", headers={"X-Roami-Owner": "bob"})

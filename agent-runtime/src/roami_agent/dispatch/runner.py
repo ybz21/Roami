@@ -338,23 +338,25 @@ class TaskDispatcher:
                     self.verifying.discard(task["id"])
             else:
                 # Native read-only answers can finish; writes require explicit acceptance.
+                continuation = json.loads(task["intent_json"]).get("continuation", {})
+                verified_through = continuation.get("verifiedThroughRevision", 0)
+
                 def written(db):
-                    bound = row(
-                        db,
-                        "SELECT turn_id FROM events WHERE task_id=? AND json_extract(payload_json,'$.runId')=? AND kind IN ('task.started','task.preparing') AND turn_id IS NOT NULL LIMIT 1",
-                        (task["id"], run["id"]),
-                    )
                     return row(
                         db,
-                        "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id WHERE "
-                        + ("t.id=?" if bound else "t.branch_id=?")
-                        + " AND x.effect='write' AND x.tool_name!='delegate' LIMIT 1",
-                        (bound["turn_id"] if bound else run["native_branch_id"],),
+                        "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id "
+                        "WHERE t.branch_id=? AND x.effect='write' AND x.tool_name!='delegate' "
+                        "AND (?=0 OR EXISTS(SELECT 1 FROM events e JOIN task_attempts a "
+                        "ON a.id=json_extract(e.payload_json,'$.runId') "
+                        "WHERE e.turn_id=x.turn_id AND e.kind IN ('task.started','task.preparing') "
+                        "AND a.task_id=? AND a.task_revision>?)) LIMIT 1",
+                        (run["native_branch_id"], verified_through, task["id"], verified_through),
                     )
 
                 writes = await self.db.call(written)
                 verified = (
                     run["executor_kind"] == "native"
+                    and not continuation.get("requiresAcceptance", False)
                     and not writes
                     and bool(result.get("summary", "").strip())
                 )
@@ -369,9 +371,27 @@ class TaskDispatcher:
         )
         await self.complete(task, run, result, state, job_id=job["id"])
 
-    async def complete(self, task, run, result, state, *, job_id=None, unknown=False):
+    async def complete(
+        self, task, run, result, state, *, job_id=None, unknown=False, confirmation=False
+    ):
         def write(db, result=result, state=state):
             current = row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
+            if confirmation and (
+                current["revision"] != run["task_revision"]
+                or current["state"] != "waiting_user"
+                or row(
+                    db,
+                    "SELECT id FROM jobs WHERE kind='task.steer' AND aggregate_id=? AND state='queued'",
+                    (task["id"],),
+                )
+                or row(
+                    db,
+                    "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=? ORDER BY attempt_no DESC LIMIT 1",
+                    (task["id"], current["revision"]),
+                )["id"]
+                != run["id"]
+            ):
+                raise DomainError("TASK_RESULT_SUPERSEDED", 409)
             if current["revision"] != run["task_revision"] or current["state"] in {
                 "cancelled",
                 "interrupted",
@@ -478,12 +498,14 @@ class TaskDispatcher:
 
         await self.db.call(write, write=True)
 
-    async def confirm(self, owner, task_id, accepted):
+    async def confirm(self, owner, task_id, accepted, *, revision=None, run_id=None):
         task = await self.db.call(
             lambda db: row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
         )
         if not task:
             raise DomainError("TASK_NOT_FOUND", 404)
+        if revision is not None and task["revision"] != revision:
+            raise DomainError("TASK_REVISION_CHANGED", 409)
         if task["state"] != "waiting_user":
             raise DomainError("TASK_NOT_WAITING_VERIFICATION", 409)
         run = await self.db.call(
@@ -493,8 +515,14 @@ class TaskDispatcher:
                 (task_id, task["revision"]),
             )
         )
+        if run_id is not None and run["id"] != run_id:
+            raise DomainError("TASK_RESULT_SUPERSEDED", 409)
         await self.complete(
-            task, run, json.loads(run["result_json"]), "succeeded" if accepted else "failed"
+            task,
+            run,
+            json.loads(run["result_json"]),
+            "succeeded" if accepted else "failed",
+            confirmation=True,
         )
         self.wakeup.set()
         return {"taskId": task_id, "state": "succeeded" if accepted else "failed"}

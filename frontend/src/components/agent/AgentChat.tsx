@@ -6,12 +6,13 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
+import AgentTasks from './AgentTasks'
 import { conversationTitle } from './AgentHistory'
 import { useAgentThread } from './useAgentThread'
 import { useAgentDraft } from './useAgentDraft'
 import { useVisibleAgentReads } from './useVisibleAgentReads'
 import type { AgentInboxState } from './useAgentInbox'
-import type { AgentMessage, AgentTask } from './agent-protocol'
+import type { AgentMessage } from './agent-protocol'
 import './agent-chat.css'
 
 export function agentFailure(error: any, t: (key: string) => string) {
@@ -19,7 +20,6 @@ export function agentFailure(error: any, t: (key: string) => string) {
   return t(code === 'MODEL_NOT_CONFIGURED' ? 'agent.modelMissing' : code === 'BRANCH_BUSY' || code === 'COMPACTION_IN_PROGRESS' ? 'agent.busy' : code === 'NOT_ENOUGH_HISTORY' ? 'agent.compactSkipped' : 'agent.requestFailed')
 }
 const newKey = () => crypto.randomUUID()
-const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
 
 export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, select, notifications, projects, onSession, onOverview }: {
   cid: string; branch: string; fresh: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
@@ -31,7 +31,6 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
   const [panel, setPanel] = useState<'history' | 'tasks' | 'memory' | 'context' | null>(null)
-  const [tasks, setTasks] = useState<AgentTask[]>([])
   const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
   const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
   const [source, setSource] = useState<AgentMessage | null>(null)
@@ -77,24 +76,21 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
     inbox.refresh(); return data.id as string
   }
   const loadPanel = useCallback(async () => {
-    if (!panel || panel === 'history' || panel === 'memory' || !cid) return
+    if (!panel || panel === 'history' || panel === 'memory' || panel === 'tasks' || !cid) return
     const version = ++panelRequest.current
     const current = () => version === panelRequest.current && activeCID.current === cid
     setPanelLoading(true); setPanelError(false)
     try {
-      if (panel === 'tasks') { const r = await api('GET', '/agent/tasks?conversationId=' + encodeURIComponent(cid)); if (current()) setTasks(r.data) }
-      else {
-        const r = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context`)
-        if (!current()) return
-        setContext(r.data); setSummary('')
-        if (r.data.snapshotId) { const s = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context/snapshots/${encodeURIComponent(r.data.snapshotId)}`); if (current()) setSummary(s.data.summary.text || '') }
-      }
+      const r = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context`)
+      if (!current()) return
+      setContext(r.data); setSummary('')
+      if (r.data.snapshotId) { const s = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context/snapshots/${encodeURIComponent(r.data.snapshotId)}`); if (current()) setSummary(s.data.summary.text || '') }
     } catch { if (current()) setPanelError(true) } finally { if (current()) setPanelLoading(false) }
   }, [panel, cid])
   useEffect(() => {
     let stop = false
     const timer = setTimeout(() => { if (!stop) void loadPanel() }, 150)
-    const interval = panel === 'tasks' || panel === 'context' ? setInterval(() => { void loadPanel() }, 3000) : undefined
+    const interval = panel === 'context' ? setInterval(() => { void loadPanel() }, 3000) : undefined
     return () => { stop = true; panelRequest.current++; clearTimeout(timer); clearInterval(interval) }
   }, [loadPanel, panel])
   const submit = async (text = draft) => {
@@ -182,10 +178,10 @@ export default function AgentChat({ cid, branch, fresh, node, inbox, inboxOpen, 
         <Button type="primary" htmlType="submit" icon={<ArrowUp size={18} />} aria-label={t('agent.send')} loading={sending} disabled={!draft.trim() || readOnly || (target !== 'direct' && !draft.startsWith('/') && draft.trim().length > 20000)} />
       </form>
     </div>
-    <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose>
+    <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>
       {panel === 'history' && <div className="agent-panel-list">{inbox.conversations.map((c) => <button className="agent-panel-row" type="button" data-conversation-id={c.id} key={c.id} onClick={() => { select(c.id); setPanel(null) }}>{conversationTitle(c, t('agent.new'))}{inbox.notices.some((n) => n.conversation_id === c.id) && <i className="agent-unread-dot" />}</button>)}</div>}
-      {panel !== 'memory' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
-      {panel === 'tasks' && <div className="agent-panel-list">{!tasks.length && !panelLoading && <p className="agent-muted">{t('agent.noTasks')}</p>}{tasks.map((task) => <div key={task.id} className="agent-task"><b>{JSON.parse(task.intent_json).goal}</b><span className="agent-muted">{t('agent.state.' + task.state)}</span>{task.latestAttempt?.workspace && <code>{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}<div className="agent-task-actions">{task.latestAttempt?.sessionId && <Button onClick={() => { setPanel(null); onSession(task.latestAttempt!.sessionId!) }}>{t('agent.openSession')}</Button>}{!terminal.has(task.state) && <Button danger disabled={task.state === 'cancelling'} onClick={() => { void action(`/agent/tasks/${encodeURIComponent(task.id)}/cancel`) }}>{t('agent.cancelTask')}</Button>}</div></div>)}</div>}
+      {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
+      {panel === 'tasks' && <AgentTasks key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox.refresh() }} />}
       {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID) => { setPanel(null); select(sourceCID) }} />}
       {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.inputBudget }) : t('agent.contextHint')}</p>{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
         <Button disabled={!cid || readOnly || compacting || running} onClick={() => { void submit('/compact') }}>{t('agent.compactNow')}</Button>

@@ -210,6 +210,63 @@ class Tasks:
 
         return await self.db.call(write, write=True)
 
+    @staticmethod
+    def _view(db, task):
+        task["latestAttempt"] = row(
+            db,
+            "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind "
+            "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
+            (task["id"],),
+        )
+        if task["latestAttempt"]:
+            preparation = row(
+                db,
+                "SELECT payload_json FROM events WHERE event_key=?",
+                ("workspace:" + task["latestAttempt"]["runId"],),
+            )
+            if preparation:
+                task["latestAttempt"]["workspace"] = json.loads(preparation["payload_json"])[
+                    "workspace"
+                ]
+        return task
+
+    async def get(self, owner, task_id):
+        def read(db):
+            task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
+            if not task:
+                raise DomainError("TASK_NOT_FOUND", 404)
+            attempts = rows(
+                db,
+                "SELECT id,task_revision AS revision,state,session_id AS sessionId,started_ms AS startedMs,finished_ms AS finishedMs,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 21",
+                (task_id,),
+            )
+            for attempt in attempts:
+                result_json = attempt.pop("result_json")
+                attempt["result"] = json.loads(result_json) if result_json else None
+            children = rows(
+                db,
+                "SELECT * FROM tasks WHERE parent_task_id=? AND owner_id=? ORDER BY created_ms DESC LIMIT 101",
+                (task_id, owner),
+            )
+            return {
+                "task": self._view(db, task),
+                "steering": self.revisions._receipt(steering)
+                if (
+                    steering := row(
+                        db,
+                        "SELECT * FROM jobs WHERE aggregate_id=? AND kind='task.steer' ORDER BY rowid DESC LIMIT 1",
+                        (task_id,),
+                    )
+                )
+                else None,
+                "attempts": attempts[:20],
+                "attemptsTruncated": len(attempts) > 20,
+                "children": [self._view(db, child) for child in children[:100]],
+                "childrenTruncated": len(children) > 100,
+            }
+
+        return await self.db.call(read)
+
     async def list(self, owner, cid=None, *, for_model=False):
         def read(db):
             if cid:
@@ -221,23 +278,7 @@ class Tasks:
                 + " ORDER BY created_ms DESC LIMIT 200",
                 (owner, cid) if cid else (owner,),
             )
-            for task in tasks:
-                task["latestAttempt"] = row(
-                    db,
-                    "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind "
-                    "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
-                    (task["id"],),
-                )
-                if task["latestAttempt"]:
-                    preparation = row(
-                        db,
-                        "SELECT payload_json FROM events WHERE event_key=?",
-                        ("workspace:" + task["latestAttempt"]["runId"],),
-                    )
-                    if preparation:
-                        task["latestAttempt"]["workspace"] = json.loads(
-                            preparation["payload_json"]
-                        )["workspace"]
+            tasks = [self._view(db, task) for task in tasks]
             return model_task_projection(db, owner, tasks) if for_model else tasks
 
         return await self.db.call(read)

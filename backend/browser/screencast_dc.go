@@ -160,6 +160,7 @@ func parseDCOptions(label string) scOptions {
 		return opts
 	}
 	opts.target = q.Get("target")
+	opts.expectedBrowser = q.Get("expectedBrowser")
 	opts.control = q.Get("control") == "1"
 	opts.auto = q.Get("auto") == "1"
 	opts.q = atoiDefault(q.Get("q"), 80)

@@ -59,6 +59,11 @@ class Confirm(Payload):
     accepted: bool
 
 
+class ConfirmTask(Confirm):
+    revision: int | None = Field(default=None, ge=1)
+    runId: str | None = Field(default=None, min_length=1, max_length=200)
+
+
 class SaveMemory(Payload):
     title: str = Field(max_length=200)
     body: str = Field(min_length=1, max_length=20_000)

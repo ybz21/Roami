@@ -246,10 +246,11 @@ func absFloat(n float64) float64 {
 // scOptions 是一次镜像会话的入参（从 WS query 或 DataChannel label 的 query 解析）。
 // 与底层传输无关，故 WS handler 与 DataChannel handler 共用。
 type scOptions struct {
-	target  string // 目标标签页 id（空=第一个）
-	control bool   // 是否转发鼠标/键盘输入（默认只读镜像）
-	auto    bool   // 自适应码率
-	q       int    // 手动模式初始 JPEG 质量（10~100；auto 时忽略）
+	expectedBrowser string
+	target          string // 目标标签页 id（空=第一个）
+	control         bool   // 是否转发鼠标/键盘输入（默认只读镜像）
+	auto            bool   // 自适应码率
+	q               int    // 手动模式初始 JPEG 质量（10~100；auto 时忽略）
 	// 初始视口覆盖（一般由前端连上后发 emulate 决定，这里只是兜底）
 	mobile bool
 	mw, mh int
@@ -261,11 +262,7 @@ type scOptions struct {
 // 不感知底层传输（WS/DataChannel）——只调 sink 的 writeBinary/writeText/awaitSlot 等。
 // 阻塞直到 sink 关闭或 CDP 断开。sink 的 wait() 驱动整体生命周期。
 func runScreencast(sink frameSink, opts scOptions) {
-	if err := ensureChrome(); err != nil {
-		_ = sink.writeText(map[string]any{"type": "error", "msg": err.Error()})
-		return
-	}
-	wsURL, err := targetWS(opts.target) // 空 = 第一个标签页
+	wsURL, err := targetForScreencast(opts)
 	if err != nil {
 		_ = sink.writeText(map[string]any{"type": "error", "msg": err.Error()})
 		return

@@ -68,7 +68,7 @@ function mergeTabs(prev: TabInfo[], incoming: TabInfo[]): TabInfo[] {
   return out
 }
 
-export default function BrowserView() {
+export default function BrowserView({ initialTarget = '', browserInstance = '' }: { initialTarget?: string; browserInstance?: string }) {
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   // 收纳档位按**容器**宽度算（不是窗口）：这一页会被塞进分栏，那时窗口很宽而容器很窄。
@@ -104,7 +104,10 @@ export default function BrowserView() {
     return next
   })
   const tabsRef = useRef<TabInfo[]>([]) // 供 ws.onmessage 等闭包读到最新标签集（识别新开的那个）
-  const [target, setTarget] = useState('') // 当前镜像的标签页 id；空 = 第一个
+  const [target, setTarget] = useState(initialTarget)
+  const [expectedBrowser, setExpectedBrowser] = useState(browserInstance)
+  const expectedBrowserRef = useRef(expectedBrowser); expectedBrowserRef.current = expectedBrowser
+  const pinnedTarget = useRef(initialTarget)
   // 导航起始页地址（后端 /api/me 提供，形如 http://127.0.0.1:<port>/home）；
   // 新标签默认开它、可点「主页」回到它。默认值按当前端口兜底。
   const [home, setHome] = useState(`${location.protocol}//127.0.0.1:${location.port || '8080'}/home`)
@@ -151,8 +154,8 @@ export default function BrowserView() {
   // 后端广播 {type:'active'} 会自动切到 agent 正在操作的标签；用户在画面里点击/打字
   // 视为接管，自动切到手动模式。切回智能体模式只能靠主动点按钮——不设空闲自动恢复，
   // 模式要长期保持，不能自己漂移回去（人正盯着一个 agent 没打算离开的页面时尤其如此）。
-  const [followPaused, setFollowPaused] = useState(false)
-  const followPausedRef = useRef(false)
+  const [followPaused, setFollowPaused] = useState(!!initialTarget)
+  const followPausedRef = useRef(!!initialTarget)
 
   const fs = useFullscreen(rootRef)
 
@@ -202,11 +205,12 @@ export default function BrowserView() {
   // 拉取标签页列表（每 3s 刷新，反映 agent 自己开的标签页/标题变化）
   const loadTabs = async () => {
     try {
-      const r = await api('GET', '/browser/tabs')
+      const expected = expectedBrowserRef.current
+      const r = await api('GET', '/browser/tabs' + (expected ? '?expectedBrowser=' + encodeURIComponent(expected) : ''))
       const list: TabInfo[] = visibleTabs(r?.data || [])
       setTabs((prev) => mergeTabs(prev, list)) // 稳定顺序，避免后端重排导致 tab 乱跳
-      // 当前 target 已不存在 → 切到第一个
-      setTarget((t) => (list.some((x) => x.id === t) ? t : (list[0]?.id || '')))
+      // 任务接管固定目标，消失时不切换到其他页面。
+      setTarget((current) => pinnedTarget.current && current === pinnedTarget.current ? current : list.some((item) => item.id === current) ? current : (list[0]?.id || ''))
     } catch {}
   }
   useEffect(() => {
@@ -216,6 +220,7 @@ export default function BrowserView() {
   }, [])
 
   const newTab = async () => {
+    pinnedTarget.current = ''; setExpectedBrowser('')
     try {
       const known = new Set(tabs.map((t) => t.id)) // 记下创建前的 id，用于定位新开的那个
       await api('POST', '/browser/tabs', { url: home }) // 新标签默认开导航起始页
@@ -227,6 +232,7 @@ export default function BrowserView() {
     } catch (e: any) { message.error(e.message) }
   }
   const closeTabs = async (ids: string[]) => {
+    if (ids.includes(pinnedTarget.current)) { pinnedTarget.current = ''; expectedBrowserRef.current = ''; setExpectedBrowser('') }
     await Promise.all(ids.map(async (id) => {
       try {
         await api('DELETE', `/browser/tabs/${id}`)
@@ -255,12 +261,14 @@ export default function BrowserView() {
     setFollowPaused(true)
   }
   const resumeFollow = () => {
+    pinnedTarget.current = ''; setExpectedBrowser('')
     followPausedRef.current = false
     setFollowPaused(false)
   }
 
   // 切换标签：镜像该 tab + 在 Chrome 里把它前置（让 agent 前台焦点一致）
   const switchTab = (id: string) => {
+    pinnedTarget.current = ''; setExpectedBrowser('')
     pauseFollow() // 人手动选的，别被下一条 active 广播立刻拽回去
     setTarget(id)
     api('POST', `/browser/tabs/${id}/activate`).catch(() => {})
@@ -342,6 +350,7 @@ export default function BrowserView() {
     if (quality === 'auto') params.set('auto', '1') // 仅首连/换 target 时用来定初始档；之后靠消息切
     else params.set('q', String(quality))
     if (target) params.set('target', target)
+    if (expectedBrowser) params.set('expectedBrowser', expectedBrowser)
     // 通用传输 Phase 1b：镜像走 media PC 的不可靠 DataChannel；media 未连/P2P 不可用 → 回退
     // 到原 /api/browser/stream WS（frpUrl），行为与迁移前逐字节一致。p2p 分支把 query 里的
     // params 经 init 握手带给后端（原本靠 WS query 传）。
@@ -371,7 +380,12 @@ export default function BrowserView() {
         return
       }
       const msg = JSON.parse(data)
-      if (msg.type === 'error') { message.error(msg.msg); return }
+      if (msg.type === 'error') {
+        const reason = msg.msg === 'BROWSER_RESOURCE_CHANGED' ? t('agent.task.browserChanged') : msg.msg === 'BROWSER_TARGET_UNAVAILABLE' ? t('agent.task.tabUnavailable') : msg.msg
+        message.error(reason)
+        if (expectedBrowser) { setHealthMsg(reason); setConnected(false); imgRef.current?.removeAttribute('src') }
+        return
+      }
       if (msg.type === 'pong') { setLatency(Math.round(performance.now() - msg.t)); return }
       if (msg.type === 'level') { setLevelName(msg.name || ''); return }
       // 被镜像页打开了新窗口/标签 → 镜像跟过去（点 target=_blank 链接、window.open 等）
@@ -411,7 +425,7 @@ export default function BrowserView() {
       tp.close()
       if (tpRef.current === tp) tpRef.current = null
     }
-  }, [control, target]) // 画质/device 切换都不重连，靠 quality / emulate 消息现场切换
+  }, [control, target, expectedBrowser]) // 画质/device 切换都不重连，靠 quality / emulate 消息现场切换
 
   // 设备切换：在现有连接上发 emulate（同一 CDP 会话 set/clear），不重连。
   // 观看区尺寸【不在依赖里】——远端视口不跟着窗格走，拖分隔条不该动远端一根汗毛。

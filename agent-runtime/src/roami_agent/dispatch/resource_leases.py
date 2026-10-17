@@ -65,6 +65,23 @@ class ResourceLeases:
             (resource_id,),
         )
 
+    def pending_scope(self, db, resource):
+        if not resource["owner_task_id"]:
+            return self._pending(db, resource["id"])
+        return row(
+            db,
+            "WITH RECURSIVE ancestors(id,parent_id,owner_id,depth) AS ("
+            "SELECT id,parent_task_id,owner_id,0 FROM tasks WHERE id=? AND owner_id=? "
+            "UNION ALL SELECT t.id,t.parent_task_id,t.owner_id,a.depth+1 FROM tasks t JOIN ancestors a ON t.id=a.parent_id "
+            "WHERE t.owner_id=a.owner_id AND a.depth<16),"
+            "root(id,owner_id) AS (SELECT id,owner_id FROM ancestors ORDER BY depth DESC LIMIT 1),"
+            "tree(id,owner_id,depth) AS (SELECT id,owner_id,0 FROM root UNION ALL "
+            "SELECT t.id,t.owner_id,p.depth+1 FROM tasks t JOIN tree p ON t.parent_task_id=p.id WHERE t.owner_id=p.owner_id AND p.depth<16) "
+            "SELECT a.id FROM resource_actions a WHERE (a.resource_id=? OR a.task_id IN (SELECT id FROM tree)) "
+            "AND (a.state='running' OR (a.state='unknown' AND COALESCE(json_extract(a.result_json,'$.inputStopped'),0)!=1)) LIMIT 1",
+            (resource["owner_task_id"], resource["owner_id"], resource["id"]),
+        )
+
     def _guard(self, db, owner, resource_id, task_id, run_id, epoch):
         self._task(db, owner, task_id, run_id)
         item = self._owned(db, owner, resource_id)
@@ -309,7 +326,7 @@ class ResourceLeases:
             if (
                 item["state"] != "paused"
                 or item["lease_until_ms"] is not None
-                or self._pending(db, resource_id)
+                or self.pending_scope(db, item)
             ):
                 raise DomainError("RESOURCE_STOP_UNCONFIRMED", 409)
             db.execute(
