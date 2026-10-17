@@ -146,8 +146,8 @@ func TestSessionSubmissionFailureNeverResendsOrClaimsNotStarted(t *testing.T) {
 	if strings.Count(string(submits), "submitted") != 1 {
 		t.Fatalf("uncertain submission replayed: %s", submits)
 	}
-	if _, err = s.Cancel(spec.Key); err == nil {
-		t.Fatal("cancel confirmed an unobserved turn")
+	if status, err = s.Cancel(spec.Key); err != nil || status.State != "unknown" || status.Result != nil {
+		t.Fatalf("cancel request falsely confirmed an unobserved turn: %+v %v", status, err)
 	}
 }
 

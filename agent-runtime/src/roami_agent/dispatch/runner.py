@@ -271,6 +271,12 @@ class TaskDispatcher:
                     db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
                 return
             if unknown:
+                attempt = row(db, "SELECT result_json FROM task_attempts WHERE id=?", (run["id"],))
+                if (
+                    current["state"] not in {"preparing", "running", "cancelling"}
+                    or attempt["result_json"] is not None
+                ):
+                    return
                 db.execute(
                     "UPDATE task_attempts SET state='unknown',result_json=? WHERE id=? AND task_revision=?",
                     (encoded(result), run["id"], run["task_revision"]),

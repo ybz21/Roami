@@ -249,12 +249,14 @@ class CodingExecutor:
             lambda db: rows(
                 db,
                 "SELECT a.*,t.owner_id FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
-                "WHERE a.executor_kind='cli' AND a.result_json IS NULL "
-                "AND a.task_revision=t.revision AND t.state IN ('preparing','running','cancelling') "
+                "WHERE a.executor_kind='cli' AND a.task_revision=t.revision AND ("
+                "(a.result_json IS NULL AND t.state IN ('preparing','running','cancelling')) OR "
+                "(t.state='interrupted' AND a.state='unknown' AND json_extract(a.result_json,'$.outcomeKnown')=0)) "
                 "AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind='task.run' AND j.aggregate_id=t.id AND j.state IN ('queued','running')) "
-                "ORDER BY a.started_ms LIMIT 100",
+                "ORDER BY CASE WHEN t.state='interrupted' THEN 1 ELSE 0 END,a.started_ms LIMIT 100",
             )
         )
+        expired = []
         for run in pending:
             task = await self.db.call(
                 lambda db, run=run: row(db, "SELECT * FROM tasks WHERE id=?", (run["task_id"],))
@@ -269,9 +271,17 @@ class CodingExecutor:
                     await tasks.report(
                         run["owner_id"], run["task_id"], run["id"], run["task_revision"], result
                     )
+                    continue
             except (DomainError, OSError, TimeoutError):
                 # A failed observation is neither a terminal report nor permission to relaunch.
                 await self.record(task, run, {"state": "unknown"})
+            if (
+                task["state"] != "interrupted"
+                and json.loads(task["budget_json"])["deadlineMs"] <= now_ms()
+            ):
+                await self.cancel(task, run)
+                expired.append((task, run))
+        return expired
 
     async def cancel(self, task, run):
         try:

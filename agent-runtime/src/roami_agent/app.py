@@ -138,7 +138,20 @@ class Runtime:
     async def _monitor_external(self):
         while not self.stopping:
             try:
-                await self.executor.poll(self.tasks)
+                expired = await self.executor.poll(self.tasks)
+                for task, run in expired or ():
+                    await self.dispatch.complete(
+                        task,
+                        run,
+                        {
+                            "state": "failed",
+                            "summary": "EXECUTION_DEADLINE_STOP_UNCONFIRMED",
+                            "outcomeKnown": False,
+                            "retryable": False,
+                        },
+                        "interrupted",
+                        unknown=True,
+                    )
                 self.wakeup.set()
             except (DomainError, OSError, TimeoutError):
                 log.exception("External executor observation failed")

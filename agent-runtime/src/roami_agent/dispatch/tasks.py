@@ -233,9 +233,23 @@ class Tasks:
             if not task or not run:
                 raise DomainError("TASK_RUN_NOT_FOUND", 404)
             if run["result_json"]:
-                if json.loads(run["result_json"]) != result:
+                previous = json.loads(run["result_json"])
+                if previous == result:
+                    return task
+                if (
+                    run["state"] != "unknown"
+                    or previous.get("outcomeKnown") is not False
+                    or result.get("outcomeKnown") is False
+                ):
                     raise DomainError("TASK_RESULT_CONFLICT", 409)
-                return task
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task.execution_reconciled",
+                    {"taskId": task_id, "runId": run_id, "result": result},
+                    task_id=task_id,
+                    key="execution-reconciled:" + run_id,
+                )
             db.execute(
                 "UPDATE task_attempts SET state=?,result_json=?,finished_ms=? WHERE id=?",
                 (result["state"], encoded(result), now_ms(), run_id),
