@@ -238,7 +238,16 @@ class Tasks:
                 db.execute(
                     "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
                 )
-                message(db, child, branch_id, "user", {"text": goal})
+                seed = goal
+                if (spec.get("target") or {}).get("resourceOnly"):
+                    original = json.loads(origin["content_json"]).get("text", "")
+                    seed = (
+                        "Original user request (defines the requested facts and scope):\n"
+                        + original
+                        + "\n\nDelegated goal (context only; do not broaden or change the original request):\n"
+                        + goal
+                    )
+                message(db, child, branch_id, "user", {"text": seed})
             db.execute(
                 "INSERT INTO task_attempts(id,task_id,task_revision,attempt_no,executor_kind,launch_id,"
                 "state,native_branch_id,lease_epoch) VALUES(?,?,1,1,?,?,'accepted',?,1)",

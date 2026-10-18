@@ -47,6 +47,10 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
         async def stream(self, messages, tools):
             self.step += 1
             if self.step == 1:
+                seed = messages[-1]["content"]
+                assert "Original user request" in seed
+                assert "Check the latest stock quote\n\nDelegated goal" in seed
+                assert "Check the latest stock quote with sources and time" in seed
                 name, args = "tool_search", {"query": "web-research"}
             elif self.step == 2:
                 name, args = "read", {"path": "skill://web-research"}

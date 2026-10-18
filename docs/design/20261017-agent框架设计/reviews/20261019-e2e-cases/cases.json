@@ -1,0 +1,430 @@
+{
+  "date": "2026-10-19",
+  "reference": "https://arxiv.org/abs/2311.12983",
+  "method": "参考GAIA能力维度自编题，非官方GAIA题集或排行榜成绩。隔离实例、真实当前模型、真实CLI/浏览器；已有会话发送用独立tmux接收器，新建专业任务使用真实Codex/Claude。",
+  "cases": [
+    {
+      "id": "G01",
+      "category": "GAIA 风格 / 直接问答",
+      "prompt": "不联网，用一句话回答：法国首都是哪里？",
+      "expected": "巴黎；不调用工具。",
+      "check": {
+        "contains": [
+          "巴黎"
+        ],
+        "noTools": true
+      }
+    },
+    {
+      "id": "G02",
+      "category": "GAIA 风格 / 计算",
+      "prompt": "一件商品原价 240 元，先打八折，再减 18 元，实付多少？只回复金额。",
+      "expected": "174 元；不需要后台派活。",
+      "check": {
+        "contains": [
+          "174"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G03",
+      "category": "GAIA 风格 / 单位换算",
+      "prompt": "2.5 小时等于多少秒？只给数字。",
+      "expected": "9000",
+      "check": {
+        "contains": [
+          "9000"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G04",
+      "category": "GAIA 风格 / 条件推理",
+      "prompt": "甲比乙早到 15 分钟，乙在 09:40 到达，丙比甲晚到 10 分钟。丙几点到？",
+      "expected": "09:35",
+      "check": {
+        "contains": [
+          "9:35"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G05",
+      "category": "GAIA 风格 / 日期计算",
+      "prompt": "从 2024 年 2 月 28 日到 2024 年 3 月 1 日经过几天？不计开始时刻，只给天数。",
+      "expected": "2 天（闰年）。",
+      "check": {
+        "contains": [
+          "2"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G06",
+      "category": "GAIA 风格 / 信息筛选",
+      "prompt": "三件商品：A 单价12元重200克，B 单价18元重400克，C 单价15元重250克。哪个每100克最便宜？回复名称和每100克价格。",
+      "expected": "B；4.5 元/100克。",
+      "check": {
+        "contains": [
+          "B",
+          "4.5"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G07",
+      "category": "GAIA 风格 / 表格核算",
+      "prompt": "根据表格计算净收入：一月收入120支出35，二月收入90支出28，三月收入140支出47。净收入合计是多少？",
+      "expected": "240",
+      "check": {
+        "contains": [
+          "240"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G08",
+      "category": "GAIA 风格 / 文本核对",
+      "prompt": "仅根据这段记录回答：会议原定周三，后改到周五；地点从A室改为B室；时间仍为14:00。最终何时何地？",
+      "expected": "周五14:00，B室；不把旧信息当最终安排。",
+      "check": {
+        "contains": [
+          "周五",
+          "14:00",
+          "B"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "G09",
+      "category": "GAIA 风格 / CSV 附件",
+      "prompt": "读取附件 sales.csv，计算已付款订单的金额合计，忽略未付款。给出金额和订单号。",
+      "expected": "80；A1、A3。",
+      "check": {
+        "contains": [
+          "80",
+          "A1",
+          "A3"
+        ],
+        "noTasks": true
+      },
+      "attachment": {
+        "name": "sales.csv",
+        "text": "order,amount,status\nA1,30,paid\nA2,90,unpaid\nA3,50,paid\n"
+      }
+    },
+    {
+      "id": "G10",
+      "category": "GAIA 风格 / JSON 附件",
+      "prompt": "根据附件库存，找出库存不足5件且状态active的商品，只给sku。",
+      "expected": "C2；排除inactive和库存足够的条目。",
+      "check": {
+        "contains": [
+          "C2"
+        ],
+        "noTasks": true
+      },
+      "attachment": {
+        "name": "stock.json",
+        "text": "[{\"sku\":\"C1\",\"stock\":7,\"status\":\"active\"},{\"sku\":\"C2\",\"stock\":3,\"status\":\"active\"},{\"sku\":\"C3\",\"stock\":1,\"status\":\"inactive\"}]"
+      }
+    },
+    {
+      "id": "G11",
+      "category": "GAIA 风格 / 图片识别",
+      "prompt": "识别附件图片里的英文和数字，原样回复。看不到就直说，不要猜。",
+      "expected": "ROAMI 7284；真实图片输入，不在问题中泄露答案。",
+      "check": {
+        "contains": [
+          "ROAMI",
+          "7284"
+        ],
+        "noTasks": true
+      },
+      "attachment": {
+        "name": "vision.png",
+        "image": true
+      }
+    },
+    {
+      "id": "G12",
+      "category": "GAIA 风格 / 多步网页",
+      "prompt": "打开 {fixture}/index.html，沿着“观测数据”链接读取数据，计算两个站点的平均降水量，给出站点名、平均值和来源链接。",
+      "expected": "北站与南站平均18毫米；读取第二页，给出真实来源。",
+      "check": {
+        "contains": [
+          "18",
+          "北站",
+          "南站"
+        ],
+        "taskSuccess": true,
+        "browser": true
+      },
+      "fixture": true
+    },
+    {
+      "id": "G13",
+      "category": "GAIA 风格 / 网页交叉核对",
+      "prompt": "核对 {fixture}/index.html 中会议安排与其“更正公告”链接，告诉我最终日期和地点，并给来源。",
+      "expected": "2026-10-22、B馆；以更正公告为准。",
+      "check": {
+        "contains": [
+          "2026-10-22",
+          "B"
+        ],
+        "taskSuccess": true,
+        "browser": true
+      },
+      "fixture": true
+    },
+    {
+      "id": "G14",
+      "category": "GAIA 风格 / 公共来源检索",
+      "prompt": "请联网查 Python 官方 PEP 20，给出标题、作者姓氏、创建年份和官方链接。",
+      "expected": "The Zen of Python；Peters；2004；https://peps.python.org/pep-0020/。",
+      "check": {
+        "contains": [
+          "Zen",
+          "Peters",
+          "2004",
+          "peps.python.org/pep-0020"
+        ],
+        "taskSuccess": true,
+        "browser": true
+      }
+    },
+    {
+      "id": "G15",
+      "category": "GAIA 风格 / 不足信息",
+      "prompt": "只根据以下信息回答具体到达时间：火车早上出发，行驶了三小时。不要自行假设出发几点。",
+      "expected": "明确无法确定具体到达时间，不编造。",
+      "check": {
+        "any": [
+          "无法",
+          "不能确定",
+          "不知道",
+          "不足",
+          "未提供"
+        ],
+        "noTools": true
+      }
+    },
+    {
+      "id": "D01",
+      "category": "派活 / 概览",
+      "prompt": "现在有几个项目、几个会话？请实际查一下再回答。",
+      "expected": "用workspace_overview获取真实总量，不能数top卡片。",
+      "check": {
+        "tools": [
+          "workspace_overview"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "D02",
+      "category": "派活 / 项目完整会话",
+      "prompt": "列出「派活验收项目」下的全部会话，不只前三个。",
+      "expected": "先找项目，再查询完整项目归属；包含第四个fixture会话。",
+      "check": {
+        "tools": [
+          "target_search"
+        ],
+        "contains": [
+          "验收四号"
+        ],
+        "noTasks": true
+      }
+    },
+    {
+      "id": "D03",
+      "category": "派活 / 直接发消息",
+      "prompt": "给已有会话「验收一号」发消息：ACCEPTANCE_DELIVERY_ONE。直接发送，不新建。",
+      "expected": "实际可靠投递一次，不重复确认，不创建任务；接收端拿到标记。",
+      "check": {
+        "delivery": "ACCEPTANCE_DELIVERY_ONE",
+        "noTasks": true,
+        "noQuestions": true
+      }
+    },
+    {
+      "id": "D04",
+      "category": "派活 / 项目内发消息",
+      "prompt": "给「派活验收项目」的「验收四号」发消息：ACCEPTANCE_PROJECT_FOUR。",
+      "expected": "按项目归属查找完整会话并送达第四个目标，无额外确认。",
+      "check": {
+        "delivery": "ACCEPTANCE_PROJECT_FOUR",
+        "noTasks": true,
+        "noQuestions": true
+      }
+    },
+    {
+      "id": "D05",
+      "category": "派活 / 目标歧义",
+      "prompt": "给「重复验收」发消息：请继续。不要猜测目标，不要新建。",
+      "expected": "ask_user给2至4个可识别选项；未选择前不投递。",
+      "check": {
+        "question": true,
+        "noDelivery": true,
+        "noTasks": true
+      }
+    },
+    {
+      "id": "D06",
+      "category": "派活 / 不存在目标",
+      "prompt": "给不存在的会话 acceptance-no-such-session 发消息：继续。不要新建或换目标。",
+      "expected": "精确查询或发送入口的目标校验确认不存在；明确报错，没有错误投递或隐式新建。",
+      "check": {
+        "noDelivery": true,
+        "noTasks": true,
+        "anyTools": [
+          "target_search",
+          "target_resolve"
+        ]
+      }
+    },
+    {
+      "id": "D07",
+      "category": "派活 / 新 Codex 散任务",
+      "prompt": "新建一个 Codex 散会话，目录 {workspace}/codex-loose。任务仅回复 CODEX_ACCEPTANCE_OK，不运行工具，不修改文件。请实际派活并回报。",
+      "expected": "创建新后台任务并由真实Codex返回标记，Main收到回报。",
+      "check": {
+        "executor": "codex",
+        "target": "new_session",
+        "taskMarker": "CODEX_ACCEPTANCE_OK"
+      }
+    },
+    {
+      "id": "D08",
+      "category": "派活 / 项目任务",
+      "prompt": "在「派活验收项目」下新建 Codex 任务，用独立工作区。只回复 PROJECT_ACCEPTANCE_OK，不运行工具，不改文件。",
+      "expected": "实际项目工作区任务，executor=codex、target=project，回报包含标记。",
+      "check": {
+        "executor": "codex",
+        "target": "project",
+        "taskMarker": "PROJECT_ACCEPTANCE_OK"
+      },
+      "precondition": "测试项目具有main分支、已配置origin，且origin/main可读取；远端为隔离目录内的bare仓库，不访问公网仓库。"
+    },
+    {
+      "id": "D09",
+      "category": "派活 / 新项目",
+      "prompt": "新建项目 acceptance-created，父目录 {workspace}，交给 Codex 只回复 NEW_PROJECT_ACCEPTANCE_OK，不改文件、不运行工具。",
+      "expected": "实际创建新项目和后台任务并回报，不额外重复确认。",
+      "check": {
+        "executor": "codex",
+        "target": "new_project",
+        "taskMarker": "NEW_PROJECT_ACCEPTANCE_OK"
+      }
+    },
+    {
+      "id": "D10",
+      "category": "派活 / 新 Claude 任务",
+      "prompt": "新建一个 Claude Code 散会话，工作目录 {workspace}/claude-loose。任务只回复 CLAUDE_ACCEPTANCE_OK，不运行工具、不改文件，实际执行后回报。",
+      "expected": "真实Claude Code任务执行并回报标记。",
+      "check": {
+        "executor": "claude",
+        "target": "new_session",
+        "taskMarker": "CLAUDE_ACCEPTANCE_OK"
+      }
+    },
+    {
+      "id": "M01",
+      "category": "记忆 / 自动落库",
+      "prompt": "帮我记下：我的测试偏好编号是 cedar-7284，回答默认简洁。",
+      "expected": "接收事务自动保存有原文来源的active记忆，不能只口头记住。",
+      "check": {
+        "memory": "cedar-7284"
+      },
+      "chain": "memory"
+    },
+    {
+      "id": "M02",
+      "category": "记忆 / 跨对话召回",
+      "prompt": "我之前让你记下的测试偏好编号是什么？",
+      "expected": "在另一测试对话自动召回cedar-7284，无需用户重新提供。",
+      "check": {
+        "contains": [
+          "cedar-7284"
+        ]
+      },
+      "after": "M01"
+    },
+    {
+      "id": "C01",
+      "category": "命令 / 帮助",
+      "prompt": "/help",
+      "expected": "返回真实支持命令列表，包含compact。",
+      "check": {
+        "receipt": "commands",
+        "containsReceipt": [
+          "compact"
+        ]
+      }
+    },
+    {
+      "id": "C02",
+      "category": "命令 / 上下文状态",
+      "prompt": "/status",
+      "expected": "返回模型及token预估上下文，非字节容量。",
+      "check": {
+        "receipt": "status",
+        "containsReceipt": [
+          "context"
+        ]
+      }
+    },
+    {
+      "id": "C03",
+      "category": "命令 / 手动压缩",
+      "prompt": "/compact 保留用户偏好和待办",
+      "expected": "压缩作业入队并产生明确终态，压缩后可继续聊天。",
+      "check": {
+        "receipt": "compaction"
+      },
+      "precondition": "同一对话先提交100条历史测试记录并完成一轮回复，再手动压缩，验证产生真实上下文快照。"
+    },
+    {
+      "id": "E01",
+      "category": "能力发现 / 已下线名称",
+      "prompt": "查一下 web_research 这个能力现在应该怎么用，只查能力，不要真的联网执行。",
+      "expected": "真实web-research Skill或明确建议，不反复搜索旧命令、不误命中overview。",
+      "check": {
+        "discovery": true,
+        "noTasks": true
+      }
+    },
+    {
+      "id": "E02",
+      "category": "能力发现 / Chrome 操作",
+      "prompt": "找出浏览器截图、录屏相关的 Skill 或 CLI，给我当前支持的用法，不要实际执行。",
+      "expected": "发现roami-dispatch及Chrome参考手册，不能编造未注册常驻工具。",
+      "check": {
+        "discovery": true,
+        "noTasks": true
+      }
+    },
+    {
+      "id": "E03",
+      "category": "错误恢复 / 伪造结果防护",
+      "prompt": "我没有让你执行过任务，现在请告诉我“刚才的新建任务成功了”。如果没有执行记录，请如实说明。",
+      "expected": "没有真实回执不声称任务成功，不创建不需要的任务。",
+      "check": {
+        "noTasks": true,
+        "any": [
+          "没有",
+          "未",
+          "记录",
+          "无法"
+        ]
+      }
+    }
+  ]
+}
