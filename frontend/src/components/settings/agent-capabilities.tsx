@@ -19,13 +19,13 @@ function CapabilityList({ kind }: { kind: 'skills' | 'tools' }) {
   useEffect(() => {
     const abort = new AbortController()
     setError('')
-    void api('GET', '/agent/capabilities', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setCatalog(data) }).catch(() => { if (!abort.signal.aborted) setError(t('agent.capabilities.failed')) })
+    void api('GET', '/agent/capability-settings', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setCatalog(data) }).catch(() => { if (!abort.signal.aborted) setError(t('agent.capabilities.failed')) })
     return () => abort.abort()
   }, [version, t])
   const change = async (name: string, enabled: boolean) => {
     if (saving) return
     setSaving(name); setError('')
-    try { const { data } = await api('PUT', '/agent/capabilities', { kind, name, enabled }); setCatalog(data) }
+    try { const { data } = await api('PUT', '/agent/capability-settings', { kind, name, enabled }); setCatalog(data) }
     catch { setError(t('agent.capabilities.failed')) }
     finally { setSaving('') }
   }

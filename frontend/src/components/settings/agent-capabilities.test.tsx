@@ -16,7 +16,7 @@ it('persists a skill switch and retains the saved state after an API failure', a
   expect(toggle.getAttribute('aria-checked')).toBe('true')
   fireEvent.click(toggle)
   await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('false'))
-  expect(api).toHaveBeenCalledWith('PUT', '/agent/capabilities', { kind: 'skills', name: 'roami-dispatch', enabled: false })
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-settings', { kind: 'skills', name: 'roami-dispatch', enabled: false })
   fireEvent.click(toggle)
   await screen.findByRole('alert')
   expect(toggle.getAttribute('aria-checked')).toBe('false')

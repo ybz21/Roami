@@ -54,11 +54,11 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def invalid_payload(request, exc):
         return JSONResponse({"error": {"code": "INVALID_REQUEST"}}, status_code=422)
 
-    @app.get("/v1/capabilities")
+    @app.get("/v1/capability-settings")
     async def capabilities(owner: Owner):
         return {"data": runtime.capability_settings.view(owner)}
 
-    @app.put("/v1/capabilities")
+    @app.put("/v1/capability-settings")
     async def save_capabilities(request: Request, owner: Owner):
         body = bytearray()
         async for chunk in request.stream():

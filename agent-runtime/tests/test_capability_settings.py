@@ -74,7 +74,7 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
         base_url="http://agent",
         headers={"X-Roami-Owner": "local"},
     ) as client:
-        response = await client.get("/v1/capabilities")
+        response = await client.get("/v1/capability-settings")
         assert response.status_code == 200
         data = response.json()["data"]
         assert any(
@@ -84,16 +84,18 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
         assert any(tool["name"] == "session_send" and tool["main"] for tool in data["tools"])
         assert not any(key in data for key in ["apiKey", "headers", "env", "command"])
         assert (
-            await client.get("/v1/capabilities", headers={"X-Roami-Owner": "alice"})
+            await client.get("/v1/capability-settings", headers={"X-Roami-Owner": "alice"})
         ).status_code == 403
         assert (
             await client.put(
-                "/v1/capabilities", json={"kind": "tools", "name": "invented", "enabled": False}
+                "/v1/capability-settings",
+                json={"kind": "tools", "name": "invented", "enabled": False},
             )
         ).status_code == 404
         assert (
             await client.put(
-                "/v1/capabilities", json={"kind": [], "name": "session_send", "enabled": False}
+                "/v1/capability-settings",
+                json={"kind": [], "name": "session_send", "enabled": False},
             )
         ).status_code == 400
         assert not runtime.capability_settings.path.exists()
