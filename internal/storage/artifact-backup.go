@@ -14,8 +14,9 @@ import (
 )
 
 type artifactRestorePlan struct {
-	Stage string
-	Files []ArtifactBackupEntry
+	VerifyOnly bool
+	Stage      string
+	Files      []ArtifactBackupEntry
 }
 
 type ArtifactBackupEntry struct {
@@ -180,6 +181,17 @@ func transferArtifact(source, destination string, entry ArtifactBackupEntry) err
 }
 
 func finishArtifactRestore(p Paths, journal layoutJournal) error {
+	if journal.ArtifactVerify {
+		if !journal.ArtifactRestore || journal.ArtifactStage != "" {
+			return fmt.Errorf("conflicting artifact publication mode")
+		}
+		for _, entry := range journal.Artifacts {
+			if err := transferArtifact(p.Data, "", entry); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if !journal.ArtifactRestore {
 		return nil
 	}
