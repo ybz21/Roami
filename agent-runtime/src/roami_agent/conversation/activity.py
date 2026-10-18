@@ -137,7 +137,7 @@ def conversation_activity(db, cid, transcript):
                 and value.get("state") == "delivered"
                 else call["state"],
                 "target": value.get("sessionId")
-                if isinstance(value, dict) and call["tool_name"] == "session_send"
+                if isinstance(value, dict) and call["tool_name"] in {"session_send", "delegate"}
                 else None,
                 "startedMs": call["created_ms"],
                 "updatedMs": call["updated_ms"],

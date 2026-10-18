@@ -1,7 +1,8 @@
+export type AgentQuestion = { prompt: string; options: { label: string; description?: string }[] }
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
 export type AgentMessage = {
   id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number
-  content: { text?: string; tool_calls?: unknown[]; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
+  content: { question?: AgentQuestion; text?: string; tool_calls?: unknown[]; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; name: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }
@@ -42,7 +43,7 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   }
   if (event.kind.startsWith('context.compaction.')) next.compaction = { operationId: data.operationId, state: event.kind.split('.').pop() || '', snapshotId: data.snapshotId }
   if (event.kind === 'message.completed') {
-    next.messages = view.messages.map((m) => m.id === data.messageId ? { ...m, status: 'completed', completedEventId: event.id } : m)
+    next.messages = view.messages.map((m) => m.id === data.messageId ? { ...m, content: { ...m.content, ...(data.question ? { question: data.question } : {}) }, status: 'completed', completedEventId: event.id } : m)
     next.turns = view.turns.map((t) => t.id === data.turnId ? { ...t, state: 'completed' } : t)
   }
   return { view: next, reload: true }

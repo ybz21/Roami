@@ -33,6 +33,7 @@ class TurnWriter(Protocol):
         *,
         final: bool,
         completion: dict | None,
+        question: dict | None = None,
     ) -> None: ...
     async def fail(self, turn: dict, state: str, code: str, *, completion=None) -> None: ...
 

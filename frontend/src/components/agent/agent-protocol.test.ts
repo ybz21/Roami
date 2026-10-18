@@ -51,3 +51,11 @@ it('projects started and completed tools directly, retaining order and deduplica
   expect(projectAgentEvent(done.view, { id: 4, kind: 'tool.completed', payload: { toolCallId: 'old' } }).reload).toBe(true)
   expect(projectAgentEvent(snapshot(), { ...start, branchId: 'other' }).view.activities).toBeUndefined()
 })
+
+it('shows a streamed choice question even when the assistant has no text', () => {
+  const question = { prompt: 'Which session?', options: [{ label: 'A' }, { label: 'B' }] }
+  const started = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'q', turnId: 't' } }).view
+  const completed = projectAgentEvent(started, { id: 3, kind: 'message.completed', payload: { messageId: 'q', turnId: 't', question } }).view
+  expect(completed.messages[0].content.question).toEqual(question)
+  expect(completed.turns[0].state).toBe('completed')
+})

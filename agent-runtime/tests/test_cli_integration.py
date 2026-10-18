@@ -552,3 +552,122 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
         await asyncio.to_thread(
             subprocess.run, [str(wrapper), "kill-server"], capture_output=True, check=False
         )
+
+
+async def test_existing_legacy_codex_receives_main_message_through_real_go_cli(
+    tmp_path, roami_binary, monkeypatch, store
+):
+    import asyncio
+    import os
+    import shlex
+    import shutil
+    import subprocess
+    import sys
+
+    from test_runtime import until
+
+    from roami_agent.app import Runtime
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.server.configuration import Settings
+    from roami_agent.storage.database import row
+
+    tmux = shutil.which("tmux")
+    if not tmux:
+        pytest.skip("tmux required")
+    socket = "roami-main-message-" + tmp_path.name + "-" + str(os.getpid())
+    wrapper = tmp_path / "tmux"
+    wrapper.write_text(f'#!/bin/sh\nexec {shlex.quote(tmux)} -L {shlex.quote(socket)} "$@"\n')
+    wrapper.chmod(0o700)
+    received = tmp_path / "received.txt"
+    receiver = tmp_path / "receiver.py"
+    receiver.write_text(
+        f'import pathlib,time\nprint("legacy ready",flush=True)\npathlib.Path({str(received)!r}).write_text(input())\ntime.sleep(15)\n'
+    )
+    name = "2026-1018-1935-0001"
+    for key in list(os.environ):
+        if key.startswith(("ROAMI_", "ROAM_", "TTMUX_")) or key == "TMUX":
+            monkeypatch.delenv(key)
+    monkeypatch.setenv("TMUX_BIN", str(wrapper))
+    monkeypatch.setenv("ROAMI_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("ROAMI_DATA", str(tmp_path / "home"))
+    monkeypatch.setenv("ROAMI_CONFIG", str(tmp_path / "config.yaml"))
+    await asyncio.to_thread(
+        subprocess.run,
+        [
+            tmux,
+            "-L",
+            socket,
+            "-f",
+            "/dev/null",
+            "new-session",
+            "-d",
+            "-s",
+            name,
+            "-c",
+            str(tmp_path),
+            shlex.join([sys.executable, str(receiver)]) + "; sleep 15",
+        ],
+        check=True,
+    )
+    await asyncio.to_thread(
+        subprocess.run,
+        [tmux, "-L", socket, "set-option", "-t", "$0", "@roam_name", "Legacy Codex"],
+        check=True,
+    )
+
+    class Model:
+        model = "go-send-fixture"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                yield ModelEvent("text", "Delivered to existing Codex")
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "legacy",
+                        "function": {
+                            "name": "delegate",
+                            "arguments": json.dumps(
+                                {
+                                    "goal": "Fix the layout",
+                                    "executor": "codex",
+                                    "target": {"kind": "session", "sessionId": name},
+                                }
+                            ),
+                        },
+                    },
+                )
+
+    runtime = Runtime(store, Model(), settings=Settings(cli_bin=str(roami_binary)))
+    try:
+        async with asyncio.timeout(5):
+            while b"legacy ready" not in await asyncio.to_thread(
+                subprocess.check_output,
+                [tmux, "-L", socket, "capture-pane", "-p", "-t", "$0"],
+            ):
+                await asyncio.sleep(0.05)
+        await runtime.start()
+        c = await runtime.conversations.create("alice")
+        sent = await runtime.chat.submit("alice", c["id"], "send", "Send the fix to Legacy Codex")
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (sent["turnId"],)
+            ),
+            timeout=10,
+        )
+        async with asyncio.timeout(3):
+            while not received.exists():
+                await asyncio.sleep(0.05)
+        assert received.read_text() == "Fix the layout"
+        view = await runtime.conversations.messages("alice", c["id"])
+        assert view["activities"][0]["state"] == "delivered"
+        assert (
+            await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
+        )
+    finally:
+        await runtime.close()
+        await asyncio.to_thread(
+            subprocess.run, [tmux, "-L", socket, "kill-server"], check=False, capture_output=True
+        )

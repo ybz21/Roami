@@ -67,10 +67,14 @@ class TurnJournal:
 
         await self.db.call(write, write=True)
 
-    async def finish(self, turn, mid, text, calls, usage, attempt, *, final, completion):
+    async def finish(
+        self, turn, mid, text, calls, usage, attempt, *, final, completion, question=None
+    ):
         def write(db):
             assert_context_admitted(db, turn)
             content = {"text": text, **({"tool_calls": calls} if calls else {})}
+            if question:
+                content["question"] = question
             if completion:
                 content["source"] = "task"
             db.execute(
@@ -94,6 +98,7 @@ class TurnJournal:
                         "messageId": mid,
                         "turnId": turn["id"],
                         "source": "task" if completion else "main",
+                        **({"question": question} if question else {}),
                         **(
                             {
                                 "taskId": completion.get("taskId"),

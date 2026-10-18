@@ -1,5 +1,6 @@
 """Short Main tools bound to conversation-scoped application services."""
 
+from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 
@@ -16,7 +17,7 @@ def register_main_tools(registry, tasks, memory, targets):
             "Append the user's message or work instructions to one exact existing live session. "
             "Works with legacy Codex/Claude sessions without lifecycle callbacks. Returns delivery only, "
             "NOT task completion; executionTracked=false means results must be checked separately. "
-            "Use when the user explicitly asks to message or continue an existing session. Never guess a target. "
+            "Use immediately when the user asks to message, hand work to, or continue an existing session; the request authorizes sending, so do not ask again. Resolve the destination using available context or discovery, never guess among ambiguous matches. "
             "For a new session/project or tracked task use delegate instead. Do not retry unknown outcomes.",
             object_schema(
                 {
@@ -28,6 +29,39 @@ def register_main_tools(registry, tasks, memory, targets):
             send_message,
             main=True,
             effect="write",
+        )
+    )
+
+    async def ask_user(args, binding):
+        labels = [option["label"].strip() for option in args["options"]]
+        if len(set(labels)) != len(labels) or any(not label for label in labels):
+            raise DomainError("INVALID_QUESTION_OPTIONS")
+        return {"question": args, "state": "waiting_user"}
+
+    registry.add(
+        Tool(
+            "ask_user",
+            "Ask only when a real decision is missing. Supply 2-4 concrete options, recommended first. Never ask permission again for an already authorized session message or task. This ends the turn and waits for the user's selection; call this tool alone, then stop.",
+            object_schema(
+                {
+                    "prompt": {"type": "string", "minLength": 1, "maxLength": 1000},
+                    "options": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 4,
+                        "items": object_schema(
+                            {
+                                "label": {"type": "string", "minLength": 1, "maxLength": 160},
+                                "description": {"type": "string", "maxLength": 300},
+                            },
+                            ["label"],
+                        ),
+                    },
+                },
+                ["prompt", "options"],
+            ),
+            ask_user,
+            main=True,
         )
     )
 
@@ -91,6 +125,20 @@ def register_main_tools(registry, tasks, memory, targets):
     )
 
     async def delegate(args, binding):
+        target = args.get("target") or {}
+        if target.get("kind") == "session" and not binding.get("taskId"):
+            if not target.get("sessionId"):
+                raise DomainError("CODING_SESSION_ID_REQUIRED")
+            if args.get("fromMessageId") or any(
+                target.get(k) for k in ["directory", "workspaceId", "base", "remote"]
+            ):
+                raise DomainError("CODING_SESSION_TARGET_CONFLICT")
+            destination = await targets.resolve("session", target["sessionId"])
+            return await targets.send(
+                destination["sessionId"],
+                args["goal"],
+                binding["turnId"] + ":" + binding["toolCallId"],
+            )
         task = await tasks.create(
             binding["owner"],
             binding["conversation"],
@@ -183,7 +231,7 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "delegate",
-            "Delegate long work; returns an acceptance receipt immediately, with delivery still pending. Use fromMessageId only for a completed checkpoint Fork.",
+            "Delegate long work to a project or new executor. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return queue acceptance with delivery pending. Use fromMessageId only for a completed checkpoint Fork.",
             object_schema(
                 {
                     "goal": {"type": "string", "minLength": 1, "maxLength": 20000},

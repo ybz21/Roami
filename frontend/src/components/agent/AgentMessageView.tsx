@@ -1,3 +1,4 @@
+import AgentQuestion from './AgentQuestion'
 import { useState } from 'react'
 import { App } from 'antd'
 import { CheckIcon, CopyIcon, FileTextIcon, NotebookIcon } from '../../icons'
@@ -7,7 +8,7 @@ import Markdown from '../markdown/Markdown'
 import type { AgentMessage } from './agent-protocol'
 import { activityReason } from './AgentActivity'
 
-export default function AgentMessageView({ item, focused, remember }: { item: AgentMessage; focused: boolean; remember: (item: AgentMessage) => void }) {
+export default function AgentMessageView({ item, focused, remember, canAnswer = false, answer }: { item: AgentMessage; focused: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
   const { t, locale } = useI18n(), { message } = App.useApp(), [copied, setCopied] = useState(false)
   const assistant = item.role === 'assistant'
   const copy = async () => {
@@ -17,6 +18,7 @@ export default function AgentMessageView({ item, focused, remember }: { item: Ag
   return <article data-message-id={item.id} data-notification-focus={focused || undefined} className={`agent-message ${item.role}`}>
     {assistant && <div className="agent-author">Roami{item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}</div>}
     {item.content.text && (assistant ? <Markdown>{item.content.text}</Markdown> : <p className="agent-user-text">{item.content.text}</p>)}
+    {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer} answer={answer} />}
     {item.content.taskStatus && <div className="agent-task-status" role="status"><strong>{t('agent.activity.result', { state: t('agent.state.' + item.content.taskStatus.state) })}</strong><span>{item.content.taskStatus.errorCode ? activityReason(item.content.taskStatus.errorCode, t) : t('agent.activity.resultRecorded')}</span><small>{t('agent.activity.reportUnavailable')}</small><code>{item.content.taskStatus.taskId}</code></div>}
     {!!item.content.attachments?.length && <div className="agent-message-files">{item.content.attachments.map(file => <a key={file.id} className="agent-file-card" href={nodeApi('/agent/artifacts/' + encodeURIComponent(file.id) + '/content')} download={file.name}><FileTextIcon size={20} /><span>{file.name}<small>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</small></span></a>)}</div>}
     {['failed', 'interrupted'].includes(item.status) && <small className="agent-muted">{t('agent.interrupted')}</small>}

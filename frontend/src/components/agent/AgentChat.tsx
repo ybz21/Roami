@@ -2,13 +2,12 @@ import { agentTimeline } from './agent-timeline'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
-import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PencilIcon, RefreshIcon, StopIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, RefreshIcon, StopIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
 import AgentTasks from './AgentTasks'
-import { conversationTitle } from './AgentHistory'
 import { useAgentThread } from './useAgentThread'
 import { useAgentDraft } from './useAgentDraft'
 import { useAgentMessageFocus } from './useAgentMessageFocus'
@@ -28,8 +27,8 @@ export function agentFailure(error: any, t: (key: string) => string) {
 }
 const newKey = () => crypto.randomUUID()
 
-export default function AgentChat({ cid, branch, focusMessage = '', fresh, node, inbox, inboxOpen, select, notifications, projects, onSession, onOverview }: {
-  cid: string; branch: string; focusMessage?: string; fresh: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
+export default function AgentChat({ cid, branch, focusMessage = '', node, inbox, inboxOpen, select, notifications, projects, onSession, onOverview }: {
+  cid: string; branch: string; focusMessage?: string; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
   select: (cid: string, branch?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
 }) {
@@ -37,7 +36,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   const thread = useAgentThread(cid, branch)
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
-  const [panel, setPanel] = useState<'history' | 'tasks' | 'memory' | 'context' | null>(null)
+  const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
   const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
   const [source, setSource] = useState<AgentMessage | null>(null)
@@ -52,8 +51,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   const activeCID = useRef(cid); activeCID.current = cid
   const panelRequest = useRef(0)
   const pending = useRef<{ text: string; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
-  const [creationVersion, setCreationVersion] = useState(0)
-  const createKey = useMemo(newKey, [cid, node, creationVersion])
+  const createKey = useMemo(newKey, [cid, node])
   const mirror = `roami.agent.last.${node || 'local'}`
   const draftKey = `roami.agent.draft.${node || 'local'}.${cid || 'new'}`
   const [draft, setDraft] = useAgentDraft(draftKey)
@@ -65,18 +63,18 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   const activity = thread.view?.activities || []
   const bodies = (thread.view?.messages || []).filter(m => (m.role === 'user' || m.role === 'assistant'))
   const timeline = agentTimeline(bodies, activity)
-  const visible = bodies.filter(m => m.content.text || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming')
+  const visible = bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming')
   const eventIds = visible.map((m) => m.completedEventId || '').join(',')
   useVisibleAgentReads(!panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
   useEffect(() => {
     if (cid) { try { localStorage.setItem(mirror, cid) } catch {} }
-    else if (!fresh && inbox.conversations.length) {
+    else if (inbox.conversations.length) {
       let saved = ''
       try { saved = localStorage.getItem(mirror) || '' } catch {}
       select(inbox.conversations.some((c) => c.id === saved) ? saved : inbox.conversations[0].id)
     }
-  }, [cid, fresh, mirror, inbox.conversations, select])
+  }, [cid, mirror, inbox.conversations, select])
   useEffect(() => {
     stick.current = true; setError(''); setPanel(null); setSource(null); panelRequest.current++
     if (!sendingRef.current || pending.current?.cid !== cid) {
@@ -100,7 +98,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
     inbox.refresh(); return data.id as string
   }
   const loadPanel = useCallback(async () => {
-    if (!panel || panel === 'history' || panel === 'memory' || panel === 'tasks' || !cid) return
+    if (!panel || panel === 'memory' || panel === 'tasks' || !cid) return
     const version = ++panelRequest.current
     const current = () => version === panelRequest.current && activeCID.current === cid
     setPanelLoading(true); setPanelError(false)
@@ -117,20 +115,21 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
     const interval = panel === 'context' ? setInterval(() => { void loadPanel() }, 3000) : undefined
     return () => { stop = true; panelRequest.current++; clearTimeout(timer); clearInterval(interval) }
   }, [loadPanel, panel])
-  const submit = async (text = draft, consumeDraft = true) => {
+  const submit = async (text = draft, consumeDraft = true, direct = false) => {
+    const destination = direct ? 'direct' : target
     const attachmentIds = consumeDraft ? attachments.ids : []
     const value = text.trim()
-    if ((!value && !attachmentIds.length) || (consumeDraft && attachments.blocked) || sendingRef.current || readOnly || (target !== 'direct' && !value.startsWith('/') && value.length > 20000)) return
+    if ((!value && !attachmentIds.length) || (consumeDraft && attachments.blocked) || sendingRef.current || readOnly || (destination !== 'direct' && !value.startsWith('/') && value.length > 20000)) return
     sendingRef.current = true; setSending(true); setError('')
-    if (!pending.current || pending.current.text !== value || pending.current.target !== target || pending.current.executor !== executor || JSON.stringify(pending.current.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && pending.current.cid !== cid)) pending.current = { text: value, target, executor, cid, key: newKey(), attachmentIds, scope: draftKey }
+    if (!pending.current || pending.current.text !== value || pending.current.target !== destination || pending.current.executor !== executor || JSON.stringify(pending.current.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && pending.current.cid !== cid)) pending.current = { text: value, target: destination, executor, cid, key: newKey(), attachmentIds, scope: draftKey }
     const request = pending.current
     try {
       const origin = await ensureConversation()
       request.cid = origin
       const current = () => activeCID.current === origin || (!activeCID.current && !cid)
-      if (target !== 'direct' && !value.startsWith('/')) {
+      if (destination !== 'direct' && !value.startsWith('/')) {
         await api('POST', '/agent/tasks', { conversationId: origin, goal: value, requestKey: request.key, executor,
-          target: target === 'loose' ? { kind: 'new_session' } : { kind: 'project', projectId: target.slice(8) } })
+          target: destination === 'loose' ? { kind: 'new_session' } : { kind: 'project', projectId: destination.slice(8) } })
         if (current()) { setTarget('direct'); setPanel('tasks') }
       } else {
         const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: value, attachmentIds: request.attachmentIds })
@@ -145,6 +144,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
       if (pending.current === request) pending.current = null
       if (consumeDraft) { setDraft('', request.scope); try { localStorage.removeItem(request.scope) } catch {} }; setCommandsOpen(false); thread.refresh(); inbox.refresh(); stick.current = true
       if (consumeDraft) { try { localStorage.removeItem(`roami.agent.draft.${node || 'local'}.new`) } catch {} }
+      return true
     } catch (reason) {
       const owner = request.cid || cid
       if (activeCID.current === owner || (!activeCID.current && !cid)) {
@@ -171,36 +171,31 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   }
   const openCommand = (name: string) => { setCommandsOpen(false); setCommandsDismissed(true); setCommandIndex(0); void submit('/' + name, false) }
   const moreMenu = { items: [
-    { key: 'history', label: t('agent.history'), icon: <ClockIcon size={16} /> },
     { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
     { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     { key: 'context', label: t('agent.context'), icon: <ArchiveIcon size={16} /> },
     { key: 'overview', label: t('agent.overview'), icon: <BotIcon size={16} /> },
-  ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else setPanel(key as 'history' | 'tasks' | 'memory' | 'context') } }
+  ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else setPanel(key as 'tasks' | 'memory' | 'context') } }
   const panelTitle = panel ? t(`agent.${panel}`) : ''
-  const conversation = thread.view?.conversation
-  const title = conversation ? conversationTitle(conversation, t('agent.new')) : t('agent.title')
-  const reset = () => { changeDraft(''); pending.current = null; setCreationVersion((version) => version + 1); select('') }
+  const title = 'Roami'
+  const latestUserSeq = Math.max(0, ...bodies.filter(m => m.role === 'user').map(m => m.seq))
 
   return <section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
     <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
-      <button type="button" className="tt-act" onClick={reset} aria-label={t('agent.new')}><PencilIcon size={18} /></button>
       <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
       <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
     </div></header>
     <div className="agent-mobile-actions">
-      <button type="button" className="agent-conversation-title" onClick={() => setPanel('history')} aria-label={t('agent.history')}>{title}<ChevronDown size={13} /></button>
-      <button type="button" className="tt-act" onClick={reset} aria-label={t('agent.new')}><PencilIcon size={18} /></button>
       <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     </div>
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {readOnly && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
       <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
-        <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} /> : <AgentActivity key={entry.id} items={[entry.activity]} onSession={onSession} />)}</div>
+        <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq} answer={async text => await submit(text, false, true) === true} /> : <AgentActivity key={entry.id} items={[entry.activity]} onSession={onSession} />)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>
@@ -249,7 +244,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}
     <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>
-      {panel === 'history' && <div className="agent-panel-list">{inbox.conversations.map((c) => <button className="agent-panel-row" type="button" data-conversation-id={c.id} key={c.id} onClick={() => { select(c.id); setPanel(null) }}>{conversationTitle(c, t('agent.new'))}{inbox.notices.some((n) => n.conversation_id === c.id) && <i className="agent-unread-dot" />}</button>)}</div>}
+
       {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
       {panel === 'tasks' && <AgentTasks key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox.refresh() }} />}
       {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID) => { setPanel(null); select(sourceCID) }} />}

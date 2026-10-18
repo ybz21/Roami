@@ -95,6 +95,10 @@ class AgentLoop:
                         await self.journal.delta(turn, mid, text, buffer)
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
+                    if len(calls) > 1 and any(
+                        call["function"]["name"] == "ask_user" for call in calls
+                    ):
+                        raise DomainError("QUESTION_MUST_BE_ONLY_TOOL")
                     if len(calls) > 16:
                         raise DomainError("TOOL_CALL_LIMIT")
                     await self.journal.finish(
@@ -129,6 +133,24 @@ class AgentLoop:
                             "workspace": turn.get("workspace"),
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
+                        if (
+                            call["function"]["name"] == "ask_user"
+                            and isinstance(value, dict)
+                            and value.get("question")
+                        ):
+                            await self.journal.finish(
+                                turn,
+                                mid,
+                                text,
+                                calls,
+                                usage,
+                                step + 1,
+                                final=True,
+                                completion=completion,
+                                question=value["question"],
+                            )
+                            await self.context.after_turn(turn, instructions, catalog)
+                            return text
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )

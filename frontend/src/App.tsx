@@ -91,7 +91,6 @@ import type { FileTabMode } from './components/files/FilePathBar'
 import { BellIcon, ChevronLeft, CloudIcon, LogoutIcon, MoreIcon, PlusIcon, SearchIcon } from './icons'
 import { lazyRetry } from './components/lazy-retry'
 import { useAgentInbox } from './components/agent/useAgentInbox'
-import AgentHistory from './components/agent/AgentHistory'
 import AgentNotifications from './components/agent/AgentNotifications'
 import './components/agent/agent-chat.css'
 const AgentChat = lazyRetry(() => import('./components/agent/AgentChat'))
@@ -1041,7 +1040,7 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    home: <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} fresh={route === 'home/new'} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} />,
+    home: <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} />,
     activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
@@ -1262,7 +1261,7 @@ export default function App() {
             nodeMenu={nodeItems}
             onSearch={openPalette}
             searchHint={keys.search.label}
-            tree={<><AgentHistory conversations={agentInbox.conversations} notices={agentInbox.notices} active={agentCID} select={selectAgent} create={() => selectAgent('')} /><ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
+            tree={<ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
               onProject={onTreeProject} onTask={onTreeTask} onSession={(key, name) => (terms.includes(name) ? returnToTask(key, name) : openTerm(name, key))}
               onAddProject={() => setNewProjectOpen(true)}
               onRename={setRenameInTree}
@@ -1272,7 +1271,7 @@ export default function App() {
               onRemoveProject={(key) => antModal.confirm({
                 title: t('project.removeConfirm'), okText: t('project.remove'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
                 onOk: async () => { try { await api('DELETE', `/projects/${encodeURIComponent(key)}`); antMessage.success(t('project.removed')); treeReload.current?.() } catch (e: any) { antMessage.error(e.message) } },
-              })} /></>}
+              })} />}
             hubAlarm={hubHealth.level === 'ok' ? undefined : hubReasonText(hubHealth, t)}
             node={curNode ? {
               name: curNode.name,

@@ -132,3 +132,11 @@ html[data-size="compact"] .agent-compose-bar .tt-cgrp { gap:var(--sp-1); }
 .agent-model-current { padding:var(--sp-2); display:flex; flex-direction:column; gap:var(--sp-1); }
 .agent-model-current small { color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-model-current code { color:var(--text-bright); font-size:var(--fs-sm); overflow-wrap:anywhere; user-select:text; }
+
+.agent-mobile-actions { justify-content:flex-end; }
+.agent-question { display:flex; flex-direction:column; gap:var(--sp-2); margin-block:var(--sp-3); }
+.agent-question > p { margin:0; }
+.agent-question-option { display:flex; flex-direction:column; gap:var(--sp-1); min-height:var(--tap); padding:var(--sp-3); border:1px solid var(--border-subtle); border-radius:var(--r-sm); background:var(--bg-elevated); color:var(--text-bright); text-align:left; font-size:var(--fs-body); cursor:pointer; }
+.agent-question-option small { color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-question-option:disabled { cursor:default; color:var(--text-dim); }
+:where(html[data-pointer="fine"]) .agent-question-option:not(:disabled):hover { border-color:var(--accent-border); background:var(--accent-soft); }
