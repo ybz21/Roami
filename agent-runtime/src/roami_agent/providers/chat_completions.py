@@ -12,6 +12,7 @@ import httpx
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent, model_endpoint
 from roami_agent.protocol.serialization import encoded
+from roami_agent.providers.generation_parameters import generation_parameters
 from roami_agent.providers.request_policy import (
     normalized_usage,
     request_identity,
@@ -37,6 +38,7 @@ class ChatCompletions:
         max_retries: int = 2,
         capabilities: dict | None = None,
         cache: dict | None = None,
+        parameters: dict | None = None,
         sleep=asyncio.sleep,
     ):
         self.endpoint, self.model, self.api_key = model_endpoint(endpoint), model, api_key
@@ -52,8 +54,9 @@ class ChatCompletions:
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
         self.capabilities, self.cache = request_policy(capabilities, cache)
+        self.parameters = generation_parameters(parameters)
         self.provider_key, self.settings_hash = request_identity(
-            self.endpoint, model, self.capabilities, self.cache
+            self.endpoint, model, self.capabilities, self.cache, self.parameters
         )
         self.timeout, self.max_retries, self.sleep = timeout, max_retries, sleep
         self.client = client or httpx.AsyncClient(
@@ -107,6 +110,7 @@ class ChatCompletions:
     async def _stream_once(self, messages, tools, attempt):
         headers = {"Authorization": "Bearer " + self.api_key} if self.api_key else {}
         body = {
+            **self.parameters,
             "model": self.model,
             "messages": messages,
             "stream": True,
@@ -163,13 +167,15 @@ class ChatCompletions:
             if response.status_code >= 400:
                 # Provider bodies can contain echoed prompts and credentials; do not relay them.
                 raise DomainError("MODEL_HTTP_" + str(response.status_code), 502)
-            async for line in response.aiter_lines():
+            lines = response.aiter_lines()
+            async for line in lines:
                 if len(line) > 1_000_000:
                     raise DomainError("MODEL_EVENT_TOO_LARGE", 502)
                 if not line.startswith("data:"):
                     continue
                 value = line[5:].strip()
                 if value == "[DONE]":
+                    await self._drain_terminal_body(lines)
                     break
                 try:
                     data = json.loads(value)
@@ -255,6 +261,19 @@ class ChatCompletions:
                     raise DomainError("MODEL_TOOL_CALL_INCOMPLETE", 502)
                 json.loads(call["function"]["arguments"])
                 yield ModelEvent("tool", call)
+
+    @staticmethod
+    async def _drain_terminal_body(lines):
+        # EOF returns a reusable HTTP connection; DONE alone may precede its final chunk.
+        try:
+            async with asyncio.timeout(0.05):
+                for _ in range(8):
+                    try:
+                        await anext(lines)
+                    except StopAsyncIteration:
+                        break
+        except (TimeoutError, httpx.HTTPError):
+            pass
 
     async def close(self):
         await self.client.aclose()

@@ -40,6 +40,7 @@ class Settings:
     model_retries: int = 2
     model_capabilities: dict = field(default_factory=dict)
     model_cache: dict = field(default_factory=dict)
+    model_parameters: dict = field(default_factory=dict)
     main_instructions: str = MAIN_INSTRUCTIONS
     worker_instructions: str = WORKER_INSTRUCTIONS
     main_concurrency: int = 2
@@ -73,6 +74,7 @@ class Settings:
             model_retries=model.get("max_retries", 2),
             model_capabilities=model.get("capabilities", {}),
             model_cache=model.get("cache", {}),
+            model_parameters=model.get("parameters", {}),
             main_instructions=raw.get("main", {}).get("instructions", MAIN_INSTRUCTIONS),
             worker_instructions=raw.get("worker", {}).get("instructions", WORKER_INSTRUCTIONS),
             main_concurrency=runtime.get("main_concurrency", 2),
@@ -144,6 +146,7 @@ class Settings:
             self.model_retries,
             self.model_capabilities,
             self.model_cache,
+            self.model_parameters,
         )
 
     def timeout_for(self, role):

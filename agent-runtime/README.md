@@ -142,14 +142,37 @@ Quiet hours, category settings, preview hiding and suggestion rate limits are ch
 
 The notification panel includes reminders, preferences and delivery records. Main reminder tools use the owner's saved notification timezone when no timezone is supplied. New App and Service Worker notifications retain the original conversation/branch/message and open a validated route. The chat positions the target after lazy Markdown layout settles, stops pinning when the user interacts, and preserves the existing visible-message read protocol. Web and Android notification content supports Chinese and English. Android unit tests and desktop/compact browser checks pass; physical-device notification, permission, keyboard and touch acceptance remains pending.
 
+## Main latency and generation controls
+
+`[model.parameters]` and `[worker.model.parameters]` configure bounded `reasoning_effort`, `max_tokens`, `temperature` and `top_p`. Explicit Worker routes start with their own empty parameter map. Invalid values or routing/credential/body override keys are rejected before a provider request. Generation parameters participate in the persisted settings fingerprint and cache namespace; an empty map preserves legacy fingerprints. Unsupported provider settings return their actual request error without silently switching models or replaying a partial answer. Provider-specific accepted values must be verified, for example in the [Z.AI request reference](https://docs.z.ai/api-reference/llm/chat-completion#body-reasoning-effort).
+
+At stream termination, the adapter briefly consumes the terminal HTTP chunk so its shared client can reuse connections. Cleanup has a 50ms/eight-line bound; a provider that leaves HTTP open after `DONE` cannot hold the turn indefinitely. A real local chunked-HTTP test verifies three model calls over one connection, and another verifies the open-body deadline. No post-terminal data is admitted as model output.
+
+The reproducible developer benchmark calls the configured real provider using isolated temporary conversations. Credentials come from the selected environment variable; it does not read a credential file, launch coding Agents, access projects or permit tool side effects. It verifies five simple answer types, prints counters only, and writes a private JSON report:
+
+```sh
+uv run --project agent-runtime python scripts/dev/bench/agent-main-latency.py \
+  --config /private/agent.toml --samples 20 --output /tmp/agent-main-latency.json
+```
+
+Local verification on 2026-10-18 measured intake to persisted first text/completed turn with the normal Main instructions/catalog, fresh conversations and deterministic memory extraction. These figures exclude Go/browser/phone delivery and do not benchmark general reasoning quality:
+
+| Configured Main route | Samples | First text P50 / P95 | Completed P95 |
+| --- | ---: | --- | --- |
+| `glm-5.3-flash`, provider default reasoning | 20 | 4251 / 4497ms | 4520ms |
+| `glm-5.3-flash`, `reasoning_effort=low` | 20 | 3916 / 4032ms | 4621ms |
+| `deepseek-4.1-flash`, `reasoning_effort=low` | 20 | 806 / 957ms | 991ms |
+
+Five additional answer checks all passed on the fast route. Real Main reminder creation also passed; a real Main delegated to a held deterministic Native Worker, then answered a follow-up while that Worker remained running (first text 1691ms). The task used an independent fixture verifier. Only the private development Main configuration was updated; Worker routing was preserved and the running user service was not deployed. Provider defaults and response times are account/time dependent; production choice remains instance configuration.
+
 ## Remaining work toward the full framework
 
-1. Physical Android acceptance of the integrated chat, keyboard, touch navigation and safe areas; additional executor target controls and system push UI.
+1. Physical Android acceptance of integrated chat, keyboard, touch navigation, safe areas and actual system notification delivery; additional executor target controls.
 2. Finish automatic lifecycle wiring for existing Codex sessions and a definitive completion adapter for Claude TUI continuation. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
-3. Browser/Computer tool adapters, resource leases and artifact retention and layout-migration coverage. MCP stdio and Streamable HTTP adapters now externalize binary and oversized results into owner-scoped artifacts.
-4. Broaden legacy forgetting/re-learning recovery cases; implement provider cache controls and provider/model routing resilience.
+3. Broaden late Native resource/workspace reconciliation for unknown effects, physical artifact retention and full layout-migration coverage. Browser/Computer drivers, durable leases and owner-scoped artifact references are implemented.
+4. Broaden legacy forgetting/re-learning recovery and propagate source forgetting to already-running external tasks. Provider cache controls, role routing, generation controls and pre-event retry boundaries are implemented.
 5. Add event-driven model suggestions and daily brief generation with a separate bounded background budget. Explicit reminders, notification policy, App/Web Push adapters and their UI are implemented; real-device delivery acceptance remains.
-6. Broader end-to-end recovery, verification edge cases and real-device acceptance. A single real-provider memory extraction smoke check produced a source-backed candidate without activating it; no latency/cache/cost benchmark has run.
+6. Broader end-to-end recovery, goal-specific verification cases, real-device acceptance and workload-level latency/cache/cost measurements. Current simple-answer latency samples are listed above; supplier prices and device delivery were not inferred.
 
 The design and product prototype remain in `docs/design/20261017-agent框架设计/`.
 

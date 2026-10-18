@@ -15,6 +15,7 @@ class ModelRoute:
     max_retries: int = 2
     capabilities: dict = field(default_factory=dict)
     cache: dict = field(default_factory=dict)
+    parameters: dict = field(default_factory=dict)
 
     @classmethod
     def worker(cls, raw, fallback):
@@ -28,6 +29,7 @@ class ModelRoute:
             max_retries=raw.get("max_retries", fallback.max_retries),
             capabilities=raw.get("capabilities", {}),
             cache=raw.get("cache", {}),
+            parameters=raw.get("parameters", {}),
         )
         if (
             not isinstance(route.name, str)
@@ -44,6 +46,7 @@ class ModelRoute:
             or not 0 <= route.max_retries <= 3
             or not isinstance(route.capabilities, dict)
             or not isinstance(route.cache, dict)
+            or not isinstance(route.parameters, dict)
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
         return route

@@ -53,9 +53,13 @@ def request_policy(capabilities=None, cache=None):
     return capabilities, cache
 
 
-def request_identity(endpoint, model, capabilities, cache):
+def request_identity(endpoint, model, capabilities, cache, parameters=None):
     provider = hashlib.sha256(endpoint.encode()).hexdigest()
-    settings = hashlib.sha256(encoded([model, "chat-v1", capabilities, cache]).encode()).hexdigest()
+    settings = hashlib.sha256(
+        encoded(
+            [model, "chat-v1", capabilities, cache, *([parameters] if parameters else [])]
+        ).encode()
+    ).hexdigest()
     return "chat-completions:" + provider, settings
 
 

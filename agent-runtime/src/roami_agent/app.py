@@ -291,6 +291,7 @@ def configured_provider(settings, role, *, client=None):
         max_retries=route.max_retries,
         capabilities=route.capabilities,
         cache=route.cache,
+        parameters=route.parameters,
         client=client,
     )
 
