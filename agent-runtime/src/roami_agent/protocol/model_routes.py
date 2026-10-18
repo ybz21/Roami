@@ -17,6 +17,7 @@ class ModelRoute:
     cache: dict = field(default_factory=dict)
     parameters: dict = field(default_factory=dict)
     context_window: int | None = None
+    image_limits: dict = field(default_factory=dict)
 
     @classmethod
     def worker(cls, raw, fallback):
@@ -32,6 +33,7 @@ class ModelRoute:
             cache=raw.get("cache", {}),
             parameters=raw.get("parameters", {}),
             context_window=raw.get("context_window"),
+            image_limits=raw.get("image_limits", {}),
         )
         if (
             route.context_window is not None
@@ -56,4 +58,7 @@ class ModelRoute:
             or not isinstance(route.parameters, dict)
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
+        from roami_agent.protocol.image_limits import ImageLimits
+
+        ImageLimits.configured(route.image_limits)
         return route

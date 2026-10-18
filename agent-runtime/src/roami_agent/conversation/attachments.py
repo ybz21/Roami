@@ -13,6 +13,7 @@ from PIL import Image
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
+from roami_agent.protocol.image_limits import MAX_PIXELS
 from roami_agent.storage.database import row
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -95,7 +96,7 @@ class Attachments:
                 with Image.open(io.BytesIO(body)) as image:
                     if (
                         image.format not in {"PNG", "JPEG", "WEBP"}
-                        or image.width * image.height > 16_000_000
+                        or image.width * image.height > MAX_PIXELS
                     ):
                         raise ValueError
                     mime = Image.MIME[image.format]

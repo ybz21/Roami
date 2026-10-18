@@ -366,3 +366,20 @@ compaction_ratio = 0.75
 For known model window C, automatic compaction triggers at `floor(C * compaction_ratio)`: a 1,000,000-token model triggers at 750,000, and a 1,048,576-token model at 786,432. Legacy `[runtime].input_budget` and `reserve_tokens` do not reduce this threshold. The API reports `capacityBasis="model_window"` or `"unknown"`. The context panel and `/status` expose the same model capacity and token estimate.
 
 Requests check the soft threshold before inference; completed replies queue background compaction using their actual usage without waiting for another message or generating a summary inline. Cut points preserve complete rounds and tool pairs. No safe cut below the model window is a skip; exceeding a known window remains an error. Recent raw history after compaction retains at most 20,000 tokens, shrinking for the history allowance; this retention policy is not a model capacity. Upload/output byte limits remain separate storage limits.
+
+## Chat image preparation
+
+The browser optimizes PNG/JPEG/WebP images before uploading, accepting source files up to 64 MiB and 64 million pixels while keeping non-image uploads at 10 MiB. Image decoding is serialized; optimized uploads may proceed concurrently. Retries reuse the exact prepared file and request key. The stored attachment is the received optimized image, not a promise to retain the original camera bytes. Source files on the user's device are unchanged.
+
+Python applies EXIF orientation and enforces the selected model's image limits before inference. Compliant images retain their bytes and MIME; oversized images try PNG first, then JPEG quality levels (white background for alpha), then progressively smaller dimensions. Base64 encoded size is bounded, independently of model context tokens. The default image policy follows Pi: maximum 2000×2000, encoded payload 4.5 MiB, initial JPEG quality 80. Explicit model overrides are supported:
+
+```toml
+[model.image_limits]
+max_width = 2000
+max_height = 2000
+max_encoded_bytes = 4718592
+jpeg_quality = 80
+# [worker.model.image_limits] can specify independent limits.
+```
+
+The image's actual MIME is used in `image_url` data URLs; transcript JSON retains references, never Base64. Enable the model's image capability only after verifying its actual behavior: the currently configured service advertises text-only metadata, but an isolated real image probe succeeded. These changes cover chat attachments; arbitrary file/MCP images are not claimed to be integrated into this path.

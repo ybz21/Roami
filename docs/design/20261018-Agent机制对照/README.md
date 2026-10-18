@@ -102,3 +102,7 @@ uv run --frozen --directory agent-runtime python ../docs/design/20261018-Agent�
 见 [HTML 专项报告](tool-results.html)。本次核对文件读取、Shell、MCP、图片、持久化投影和工具配对。统一结果外置、UTF-8 分页和写结果确定性属于待确认建议，本次没有据此修改工具执行协议。
 
 模型容量修订真实验收：[capacity-results.json](capacity-results.json)。从当前服务读取 Main 窗口 1,048,576，触发线 786,432；隔离真实推理 usage=26,270，超过旧 24K，未创建自动压缩任务，2 条原始消息保留。1M 边界前后通过合成 usage 回归验证，没有发送近百万 token 的真实请求。Worker 容量仍未知。
+
+用户后续另行确认按 Pi 实施聊天图片预处理：浏览器上传前优化、Python 按模型限制兜底、格式与 EXIF 保留、透明 JPEG 白底、串行解码与重试复用已纳入实现。该确认不扩大至 file_read / MCP 通用结果协议。
+
+图片实测证据：[image-preprocessing-results.json](image-preprocessing-results.json)。桌面与真实 Android 均使用实际 Canvas 处理 4000×2000、17,389,175 字节 PNG，分别得到 674,091 / 673,930 字节的 2000×1000 JPEG；新 Python 运行时通过 HTTP 上传 / 提交调用真实 Main，准确识别随机字符，发送模型前未重复编码，消息 JSON 不含 Base64。数据库独立，无生产对话写入。

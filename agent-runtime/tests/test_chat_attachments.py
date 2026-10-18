@@ -124,7 +124,7 @@ async def test_image_capability_wire_and_reference_only_history(store):
         _, prompt = await ChatImages(store, runtime.artifacts, settings).attach(
             {"owner_id": "local"}, plan, plan["messages"]
         )
-        assert "data:image/jpeg;base64," in json.dumps(prompt)
+        assert "data:image/png;base64," in json.dumps(prompt)
         raw = await store.call(
             lambda db: row(db, "SELECT content_json FROM messages WHERE role='user'")
         )

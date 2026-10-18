@@ -101,6 +101,7 @@ def effective_settings(base, saved, *, credentials=True):
             old.cache,
             old.parameters,
             window,
+            old.image_limits if (endpoint, name) == (old.endpoint, old.name) else {},
         )
     main, worker = routes["main"], routes["worker"]
     return replace(
@@ -110,6 +111,7 @@ def effective_settings(base, saved, *, credentials=True):
         key_env=main.key_env,
         model_capabilities=main.capabilities,
         context_window=main.context_window,
+        image_limits=main.image_limits,
         worker_route=worker,
         extra_key_envs=tuple(sorted(base.provider_key_environments())),
     )

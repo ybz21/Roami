@@ -2,30 +2,17 @@
 
 import asyncio
 import base64
-import io
 import json
 
-from PIL import Image
-
+from roami_agent.context.image_preparation import prepare_image
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.image_limits import ImageLimits
 from roami_agent.storage.database import rows
 
 
 class ChatImages:
     def __init__(self, database, artifacts, settings):
         self.db, self.artifacts, self.settings = database, artifacts, settings
-
-    @staticmethod
-    def rendered(body):
-        with Image.open(io.BytesIO(body)) as image:
-            if image.width * image.height > 16_000_000:
-                raise ValueError
-            image.thumbnail((1600, 1600))
-            output = io.BytesIO()
-            image.convert("RGB").save(output, format="JPEG", quality=85)
-            if output.tell() > 2 * 1024 * 1024:
-                raise ValueError
-            return output.getvalue(), image.width, image.height
 
     async def attach(self, turn, plan, prompt):
         if turn.get("executionRunId") or not plan.get("sourceMessageIds"):
@@ -52,14 +39,21 @@ class ChatImages:
         for item in reversed(items):
             try:
                 reference, body = await self.artifacts.read(turn["owner_id"], item["id"])
-                image, width, height = await asyncio.to_thread(self.rendered, body)
+                image = await asyncio.to_thread(
+                    prepare_image,
+                    body,
+                    ImageLimits.configured(self.settings.route("main").image_limits),
+                )
                 parts.extend(
                     [
                         {"type": "text", "text": "User attachment: " + item["name"]},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": "data:image/jpeg;base64," + base64.b64encode(image).decode()
+                                "url": "data:"
+                                + image["mimeType"]
+                                + ";base64,"
+                                + base64.b64encode(image["body"]).decode()
                             },
                         },
                     ]
@@ -68,8 +62,12 @@ class ChatImages:
                     {
                         "artifactId": item["id"],
                         "sha256": reference["sha256"],
-                        "width": width,
-                        "height": height,
+                        "width": image["width"],
+                        "height": image["height"],
+                        "originalWidth": image["originalWidth"],
+                        "originalHeight": image["originalHeight"],
+                        "mimeType": image["mimeType"],
+                        "optimized": image["optimized"],
                     }
                 )
             except (DomainError, OSError, ValueError):

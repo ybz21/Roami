@@ -58,6 +58,7 @@ class Settings:
     model_capabilities: dict = field(default_factory=dict)
     model_cache: dict = field(default_factory=dict)
     model_parameters: dict = field(default_factory=dict)
+    image_limits: dict = field(default_factory=dict)
     main_instructions: str = MAIN_INSTRUCTIONS
     worker_instructions: str = WORKER_INSTRUCTIONS
     main_concurrency: int = 2
@@ -102,6 +103,7 @@ class Settings:
             model_capabilities=model.get("capabilities", {}),
             model_cache=model.get("cache", {}),
             model_parameters=model.get("parameters", {}),
+            image_limits=model.get("image_limits", {}),
             main_instructions=raw.get("main", {}).get("instructions", MAIN_INSTRUCTIONS),
             worker_instructions=raw.get("worker", {}).get("instructions", WORKER_INSTRUCTIONS),
             main_concurrency=runtime.get("main_concurrency", 2),
@@ -206,6 +208,9 @@ class Settings:
             ZoneInfo(result.memory_timezone)
         except (ValueError, TypeError, ZoneInfoNotFoundError) as exc:
             raise DomainError("INVALID_MEMORY_TIMEZONE") from exc
+        from roami_agent.protocol.image_limits import ImageLimits
+
+        ImageLimits.configured(result.image_limits)
         worker = raw.get("worker", {})
         if "model" in worker:
             result = replace(
@@ -239,6 +244,7 @@ class Settings:
             self.model_cache,
             self.model_parameters,
             self.context_window if name == self.model else None,
+            self.image_limits if name == self.model else {},
         )
 
     def timeout_for(self, role):

@@ -1,0 +1,45 @@
+{
+  "model": "deepseek-4.1-flash",
+  "productionConfigImages": true,
+  "uploadHTTP": 201,
+  "submitHTTP": 202,
+  "inputDimensions": [
+    4000,
+    2000
+  ],
+  "uploadedDimensions": [
+    2000,
+    1000
+  ],
+  "uploadBytes": 674091,
+  "wire": [
+    {
+      "imageBlocks": 1,
+      "dataUrlPrefixCorrect": true,
+      "providerBytesUnchanged": true
+    }
+  ],
+  "expected": "YY4PFVZV",
+  "answer": "YY4PFVZV",
+  "recognized": true,
+  "base64StoredInTranscript": false,
+  "productionConversationModified": false,
+  "isolation": "temporary SQLite; real configured Main provider; no external tools",
+  "desktopCanvas": {
+    "sourceBytes": 17389175,
+    "bytes": 674091,
+    "type": "image/jpeg",
+    "name": "roami-image-preprocess-fixture.jpg",
+    "width": 2000,
+    "height": 1000
+  },
+  "androidCanvas": {
+    "sourceBytes": 17389175,
+    "bytes": 673930,
+    "type": "image/jpeg",
+    "name": "roami-image-preprocess-fixture.jpg",
+    "width": 2000,
+    "height": 1000
+  },
+  "source": "Pi image-process.ts / image-resize-core.ts at 482c1381a00d8d00bc81697e4a980c593db6803e"
+}

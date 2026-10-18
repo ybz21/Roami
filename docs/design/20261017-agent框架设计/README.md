@@ -56,3 +56,7 @@
 ## 2026-10-18 容量口径修订
 
 用户明确取消默认容量及固定输入 cap：按 Main / Worker 当前模型实际上下文窗口的 75% 压缩。已同步 [上下文与 Cache](technical/04-context-cache.html)，上版留在 [修订快照](revisions/before-model-capacity/technical/04-context-cache.html)。模型元数据缺失时明确未知，可在设置页填写实际规格，不能默认套用 24K。
+
+## 2026-10-18 聊天图片预处理
+
+用户确认按 Pi 做图片预处理。已同步 [上下文与 Cache](technical/04-context-cache.html) 的图片专项；上版保存在 [修订快照](revisions/before-image-preprocessing/technical/04-context-cache.html)。浏览器上传前优化，Python 按模型限制兜底，合规原格式保留、透明白底 JPEG、EXIF 与编码体积控制，重试复用同一份文件。此项不代表其他工具图片协议已统一。
