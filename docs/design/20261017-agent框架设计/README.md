@@ -52,3 +52,7 @@
 ## 2026-10-18 已确认补充
 
 用户确认上下文使用到容量 75% 时自动压缩。已同步 [上下文与 Cache](technical/04-context-cache.html)，变更前版本保存在 [修订快照](revisions/before-75-percent/technical/04-context-cache.html)。仅这一项获得实施确认；[Pi 机制审计](../20261018-Agent机制对照/README.md) 的其他补齐建议仍待确认。
+
+## 2026-10-18 容量口径修订
+
+用户明确取消默认容量及固定输入 cap：按 Main / Worker 当前模型实际上下文窗口的 75% 压缩。已同步 [上下文与 Cache](technical/04-context-cache.html)，上版留在 [修订快照](revisions/before-model-capacity/technical/04-context-cache.html)。模型元数据缺失时明确未知，可在设置页填写实际规格，不能默认套用 24K。

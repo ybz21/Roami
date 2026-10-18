@@ -129,7 +129,6 @@ class Runtime:
         self.context = Context(
             database,
             model,
-            input_budget=self.settings.input_budget,
             keep_recent_tokens=self.settings.keep_recent_tokens,
         )
         self.tools = Tools()
@@ -238,6 +237,7 @@ class Runtime:
         self.model_settings = ModelSettings(self, configured_provider)
 
     async def start(self):
+        await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
         await self.resources.recover()

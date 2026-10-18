@@ -1,0 +1,13 @@
+{
+  "model": "deepseek-4.1-flash",
+  "contextWindow": 1048576,
+  "compactionThreshold": 786432,
+  "source": "provider /models token_limits.context_window",
+  "estimatedTokens": 26270,
+  "providerUsageTokens": 26270,
+  "aboveFormer24000Cap": true,
+  "automaticCompactionJobs": 0,
+  "messagesPreserved": 2,
+  "isolation": "temporary SQLite and no external tool calls; no production messages modified",
+  "millionTokenBoundary": "749999 / 750000 / 750001 verified with synthetic usage in regression tests, not a million-token live request"
+}

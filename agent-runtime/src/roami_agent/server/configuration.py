@@ -64,7 +64,6 @@ class Settings:
     workers: int = 3
     max_steps: int = 16
     max_depth: int = 2
-    input_budget: int = 24_000
     context_window: int | None = None
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
@@ -109,8 +108,7 @@ class Settings:
             workers=runtime.get("workers", 3),
             max_steps=runtime.get("max_steps", 16),
             max_depth=runtime.get("max_depth", 2),
-            input_budget=runtime.get("input_budget", 24_000),
-            context_window=runtime.get("context_window"),
+            context_window=model.get("context_window", runtime.get("context_window")),
             reserve_tokens=runtime.get("reserve_tokens", 16_384),
             keep_recent_tokens=runtime.get("keep_recent_tokens", 20_000),
             compaction_ratio=runtime.get("compaction_ratio", 0.75),
@@ -141,7 +139,6 @@ class Settings:
             result.main_concurrency,
             result.workers,
             result.max_steps,
-            result.input_budget,
             result.keep_recent_tokens,
             result.timeout_seconds,
         ]:
@@ -168,7 +165,7 @@ class Settings:
             or result.context_window is not None
             and (
                 type(result.context_window) is not int
-                or not result.reserve_tokens < result.context_window <= 10_000_000
+                or not 1 <= result.context_window <= 100_000_000
             )
         ):
             raise DomainError("INVALID_RUNTIME_CONFIG")
@@ -218,14 +215,15 @@ class Settings:
 
     @property
     def context_input_budget(self):
-        if self.context_window is None:
-            return self.input_budget
-        return min(self.input_budget, self.context_window - self.reserve_tokens)
+        return self.route().context_window
 
     @property
     def compaction_threshold(self):
-        capacity = self.context_window or self.input_budget
-        return min(self.context_input_budget, max(1, math.floor(capacity * self.compaction_ratio)))
+        return self.threshold_for("main")
+
+    def threshold_for(self, role):
+        capacity = self.route(role).context_window
+        return max(1, math.floor(capacity * self.compaction_ratio)) if capacity else None
 
     def route(self, role="main"):
         if role != "main" and self.worker_route:
@@ -240,6 +238,7 @@ class Settings:
             self.model_capabilities,
             self.model_cache,
             self.model_parameters,
+            self.context_window if name == self.model else None,
         )
 
     def timeout_for(self, role):

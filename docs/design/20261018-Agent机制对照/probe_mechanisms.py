@@ -97,7 +97,7 @@ async def main():
 
             model = ToolModel("audit_tool")
             runtime = Runtime(
-                db, model, settings=Settings(input_budget=10000 if kind == "read-large" else 24000)
+                db, model, settings=Settings(context_window=10000 if kind == "read-large" else 24000)
             )
             runtime.tools.add(
                 Tool(

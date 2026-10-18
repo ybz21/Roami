@@ -95,21 +95,10 @@ async def test_context_reuses_actual_usage_adds_trailing_messages_and_invalidate
         await runtime.close()
 
 
-def test_context_window_reserves_reply_tokens_and_never_invents_a_model_limit():
+def test_context_window_has_no_application_cap_or_invented_default():
     assert Settings().context_window is None
-    assert Settings().context_input_budget == 24000
-    assert (
-        Settings(
-            input_budget=24000, context_window=32000, reserve_tokens=16000
-        ).context_input_budget
-        == 16000
-    )
-    assert (
-        Settings(
-            input_budget=12000, context_window=32000, reserve_tokens=16000
-        ).context_input_budget
-        == 12000
-    )
+    assert Settings().context_input_budget is None
+    assert Settings(context_window=1_000_000).context_input_budget == 1_000_000
 
 
 async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_counted(store):
@@ -122,7 +111,7 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
             yield ModelEvent("text", "Received")
 
     model = CapturedModel()
-    runtime = Runtime(store, model, settings=Settings(input_budget=8000))
+    runtime = Runtime(store, model, settings=Settings(context_window=8000))
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
@@ -149,7 +138,7 @@ async def test_tool_catalog_can_exhaust_context_even_when_user_message_is_small(
             pytest.fail("Oversized tools must be rejected before sending to the provider")
             yield ModelEvent("text", "unreachable")
 
-    runtime = Runtime(store, NeverCalled(), settings=Settings(context_window=17500))
+    runtime = Runtime(store, NeverCalled(), settings=Settings(context_window=1000))
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")

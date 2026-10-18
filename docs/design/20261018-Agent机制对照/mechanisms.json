@@ -517,14 +517,17 @@
   "approvedUpdate": {
     "name": "75% automatic compaction",
     "ratio": 0.75,
-    "defaultCapacity": 24000,
-    "defaultTrigger": 18000,
+    "defaultCapacity": null,
+    "defaultTrigger": null,
     "checks": [
       "before provider request",
       "after completed reply usage"
     ],
-    "unknownWindowBasis": "configured input cap",
+    "unknownWindowBasis": "unknown; no fallback",
     "hardLimitIsSeparate": true,
-    "otherFindingsStillProposals": true
+    "otherFindingsStillProposals": true,
+    "windowSource": "exact role endpoint/model provider metadata or explicit model specification",
+    "mainObservedWindow": 1048576,
+    "mainObservedTrigger": 786432
   }
 }

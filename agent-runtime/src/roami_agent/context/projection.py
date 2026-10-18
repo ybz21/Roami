@@ -114,9 +114,9 @@ def model_entries(messages):
 
 
 class Context:
-    def __init__(self, database, model, *, input_budget=24_000, keep_recent_tokens=20_000):
+    def __init__(self, database, model, *, keep_recent_tokens=20_000):
         self.db, self.model = database, model
-        self.input_budget, self.keep_recent_tokens = input_budget, keep_recent_tokens
+        self.keep_recent_tokens = keep_recent_tokens
         self.request_context = lambda: {"instructions": "", "catalog": [], "route": {}}
 
     async def snapshot(self, owner, cid, snapshot_id):
@@ -239,7 +239,7 @@ class Context:
                 "toolTokens": text_tokens(encoded(catalog)) if catalog else 0,
                 "requestBasis": basis,
                 "historyFingerprint": fingerprint(messages),
-                "inputBudget": configuration.get("inputBudget", self.input_budget),
+                "inputBudget": configuration.get("inputBudget"),
                 "contextWindow": configuration.get("contextWindow"),
                 "reserveTokens": configuration.get("reserveTokens"),
                 "compactionThreshold": configuration.get("compactionThreshold"),
@@ -392,7 +392,7 @@ class Context:
             available = (
                 desired_tokens
                 if desired_tokens is not None
-                else min(self.input_budget, messages_tokens(model_messages(messages)))
+                else messages_tokens(model_messages(messages))
             )
             retained = min(self.keep_recent_tokens, available // 2)
             cut = 0

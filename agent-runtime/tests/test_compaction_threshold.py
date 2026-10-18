@@ -25,22 +25,11 @@ class SummaryModel:
         yield ModelEvent("text", "Confirmed decisions retained.")
 
 
-def test_threshold_uses_capacity_ratio_and_earlier_reply_or_input_limits():
-    assert Settings().compaction_threshold == 18000
-    assert (
-        Settings(input_budget=32000, context_window=32000, reserve_tokens=4000).compaction_threshold
-        == 24000
-    )
-    assert (
-        Settings(
-            input_budget=32000, context_window=32000, reserve_tokens=16000
-        ).compaction_threshold
-        == 16000
-    )
-    assert (
-        Settings(input_budget=12000, context_window=32000, reserve_tokens=4000).compaction_threshold
-        == 12000
-    )
+def test_threshold_follows_model_window_without_application_cap_or_output_reserve():
+    assert Settings().compaction_threshold is None
+    assert Settings(context_window=1_000_000).compaction_threshold == 750_000
+    assert Settings(context_window=32_000).compaction_threshold == 24_000
+    assert Settings(context_window=32_000, reserve_tokens=16_000).compaction_threshold == 24_000
 
 
 @pytest.mark.parametrize("ratio", [0, 1, -0.1, True, "0.75"])
@@ -58,11 +47,11 @@ async def test_soft_threshold_compacts_history_before_hard_limit(store):
     c = await completed_conversation(store)
     conversations = Conversations(store)
     receipt = await conversations.accept("alice", c["id"], "soft", "new input " * 150)
-    settings = Settings(input_budget=1600)
+    settings = Settings(context_window=1600)
     model = SummaryModel()
     context = Context(store, model)
     before = await context.project("alice", c["id"])
-    assert settings.compaction_threshold < before["estimatedTokens"] < settings.input_budget
+    assert settings.compaction_threshold < before["estimatedTokens"] < settings.context_input_budget
     turn = await store.call(
         lambda db: dict(
             row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],)), owner_id="alice"
@@ -86,11 +75,13 @@ async def test_current_input_above_soft_trigger_keeps_hard_limit_semantics(store
             row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],)), owner_id="alice"
         )
     )
-    settings, model = Settings(input_budget=1000), SummaryModel()
+    settings, model = Settings(context_window=1000), SummaryModel()
     builder = PromptBuilder(store, Context(store, model), settings)
     if admitted:
         plan, _ = await builder.build(turn, "", [], None)
-        assert settings.compaction_threshold < plan["estimatedTokens"] < settings.input_budget
+        assert (
+            settings.compaction_threshold < plan["estimatedTokens"] < settings.context_input_budget
+        )
     else:
         with pytest.raises(DomainError, match="CONTEXT_TOO_LARGE"):
             await builder.build(turn, "", [], None)
@@ -100,9 +91,19 @@ async def test_current_input_above_soft_trigger_keeps_hard_limit_semantics(store
     ] == "a" * length
 
 
-@pytest.mark.parametrize("used,queued", [(17999, False), (18000, True), (18001, True)])
+@pytest.mark.parametrize(
+    "window,used,queued",
+    [
+        (24000, 17999, False),
+        (24000, 18000, True),
+        (24000, 18001, True),
+        (1000000, 749999, False),
+        (1000000, 750000, True),
+        (1000000, 750001, True),
+    ],
+)
 async def test_final_usage_schedules_compaction_after_reply_without_running_summary_inline(
-    store, used, queued
+    store, window, used, queued
 ):
     class UsageModel:
         model = "after-reply"
@@ -114,7 +115,7 @@ async def test_final_usage_schedules_compaction_after_reply_without_running_summ
             yield ModelEvent("usage", {"inputTokens": used - 10, "outputTokens": 10})
 
     model = UsageModel()
-    runtime = Runtime(store, model)
+    runtime = Runtime(store, model, settings=Settings(context_window=window))
     try:
         c = await runtime.conversations.create("alice")
         receipt = await runtime.chat.submit("alice", c["id"], "finish", "Small input")
@@ -143,9 +144,36 @@ async def test_final_usage_schedules_compaction_after_reply_without_running_summ
         assert model.calls == 1
         if compact:
             assert compact["state"] == "queued"
-            assert json.loads(compact["payload_json"])["targetTokens"] < 18000
+            assert json.loads(compact["payload_json"])["targetTokens"] < window * 0.75
             preview = await runtime.context.project("alice", c["id"])
-            assert preview["compactionThreshold"] == 18000
-            assert preview["capacityBasis"] == "input_budget"
+            assert preview["compactionThreshold"] == int(window * 0.75)
+            assert preview["capacityBasis"] == "model_window"
     finally:
         await runtime.close()
+
+
+def test_legacy_input_budget_does_not_cap_a_million_token_model(tmp_path):
+    path = tmp_path / "agent.toml"
+    path.write_text("[model]\ncontext_window=1000000\n[runtime]\ninput_budget=24000\n")
+    settings = Settings.load(path)
+    assert settings.context_input_budget == 1_000_000
+    assert settings.compaction_threshold == 750_000
+
+
+async def test_unknown_window_does_not_compact_at_an_invented_capacity(store):
+    conversations = Conversations(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "no-cap", "a" * 100000)
+    turn = await store.call(
+        lambda db: dict(
+            row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],)), owner_id="alice"
+        )
+    )
+    model = SummaryModel()
+    plan, prompt = await PromptBuilder(store, Context(store, model), Settings()).build(
+        turn, "", [], None
+    )
+    assert plan["estimatedTokens"] > 24000
+    assert plan["contextWindow"] is None and plan["compactionThreshold"] is None
+    assert plan["capacityBasis"] == "unknown" and model.summaries == 0
+    assert prompt[-1]["content"] == "a" * 100000

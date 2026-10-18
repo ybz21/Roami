@@ -268,7 +268,7 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
                     yield item
 
     c = await completed_conversation(store)
-    runtime = Runtime(store, CompactingModel(), settings=Settings(input_budget=3000))
+    runtime = Runtime(store, CompactingModel(), settings=Settings(context_window=3000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(
@@ -322,7 +322,7 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
     await store.call(enlarge_recent, write=True)
     before = (await context.project("alice", c["id"]))["snapshotId"]
     assert (await context.project("alice", c["id"]))["estimatedTokens"] > 6000
-    runtime = Runtime(store, model, settings=Settings(input_budget=6000))
+    runtime = Runtime(store, model, settings=Settings(context_window=6000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(

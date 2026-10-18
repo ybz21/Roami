@@ -49,7 +49,8 @@ class PromptBuilder:
                 through_turn=turn["id"],
                 request_context=self._configuration(turn, instructions, catalog),
             )
-            if plan["estimatedTokens"] < self.settings.compaction_threshold:
+            threshold = plan["compactionThreshold"]
+            if threshold is None or plan["estimatedTokens"] < threshold:
                 return
             await self.context.request(
                 turn["owner_id"],
@@ -59,9 +60,7 @@ class PromptBuilder:
                 branch_id=turn["branch_id"],
                 target_tokens=max(
                     0,
-                    self.settings.compaction_threshold
-                    - plan["instructionTokens"]
-                    - plan["toolTokens"],
+                    threshold - plan["instructionTokens"] - plan["toolTokens"],
                 ),
             )
         except (DomainError, OSError) as exc:
@@ -98,9 +97,7 @@ class PromptBuilder:
                         "summary": "The source information was forgotten; omit the task content from model context.",
                     },
                 }
-            completion = completion_evidence(
-                completion, budget=max(1024, min(6000, self.settings.input_budget // 3))
-            )
+            completion = completion_evidence(completion, budget=6000)
 
         async def build():
             configuration = self._configuration(turn, instructions, catalog)
@@ -140,7 +137,8 @@ class PromptBuilder:
             return {**plan, "estimatedTokens": plan["estimatedTokens"] + supplemental}, prompt
 
         plan, prompt = await build()
-        if plan["estimatedTokens"] < self.settings.compaction_threshold:
+        threshold = plan["compactionThreshold"]
+        if threshold is None or plan["estimatedTokens"] < threshold:
             return plan, prompt
         try:
             job = await self.context.request(
@@ -166,12 +164,12 @@ class PromptBuilder:
             await self.context.run(
                 job["id"],
                 safe_turn_id=turn["id"],
-                target_tokens=max(0, self.settings.compaction_threshold - overhead),
+                target_tokens=max(0, threshold - overhead),
             )
         except asyncio.CancelledError:
             await self.context.cancel(turn["owner_id"], turn["conversation_id"], job["id"])
             raise
         plan, prompt = await build()
-        if plan["estimatedTokens"] > self.settings.context_input_budget:
+        if plan["inputBudget"] is not None and plan["estimatedTokens"] > plan["inputBudget"]:
             raise DomainError("CONTEXT_TOO_LARGE", 409)
         return plan, prompt

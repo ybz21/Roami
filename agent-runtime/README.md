@@ -353,15 +353,16 @@ Context admission follows Pi's [compaction implementation](https://github.com/ea
 
 Usage is reused only for the same request configuration, unchanged source prefix, snapshot and memory epoch. Model/settings or tool changes, edits, forgetting and compaction invalidate stale baselines. Existing manifests without the new evidence fall back to character estimation; no transcript migration is required. The context panel and `/status` report the same total estimate as request admission.
 
-`[runtime].input_budget` is now an **input token cap**, default 24,000, replacing the former UTF-8 byte guard. `context_window` is optional: configure a verified window in tokens; when absent the runtime reports it as unknown rather than inventing a model limit. When present, input admission uses `min(input_budget, context_window - reserve_tokens)`. Reply reserve defaults to 16,384 tokens, matching Pi's default. Recent raw history has a 20,000-token ceiling and shrinks to fit the available history allowance, with room for a summary. Cut points preserve complete rounds and paired tools; an oversized current round is rejected rather than silently discarded. Manual `/compact` uses the same token estimates. Upload/output byte limits remain separate storage limits.
+Context capacity has **no application default or fixed input cap**. Main and Worker each use their exact endpoint/model's context window. At startup and after configuration saves, the runtime reads provider `/models` metadata (including nested `token_limits.context_window`). A role's explicit `contextWindow` in private model settings, or `context_window` in its model TOML block, takes precedence. Switching model or endpoint clears the previous role capacity. Output-only `max_tokens` is never interpreted as a context window. Failed discovery or omitted metadata leaves capacity and percentage threshold unknown; no invented limit is substituted. The settings page can supply the verified model specification. Manual `/compact` remains available.
 
 ```toml
+[model]
+# context_window = ... # optional verified model specification; no default
 [runtime]
-input_budget = 24000
-reserve_tokens = 16384
 keep_recent_tokens = 20000
 compaction_ratio = 0.75
-# context_window = ...  # set only to a verified model window in tokens
 ```
 
-Automatic compaction has a soft trigger at `[runtime].compaction_ratio` (default `0.75`). For a known model window C, trigger at `min(floor(C * ratio), effectiveInputBudget)`; without a known window, C is the configured input cap and the API reports `capacityBasis="input_budget"`. Reply reserve and lower input caps take precedence. Requests check this threshold before inference; completed replies queue background compaction when their usage crosses it. Scheduling does not run a summary inline before returning the reply. No safe cut below the hard input cap is a skip, not an admission error; exceeding the hard cap remains an error. `/status` and context metadata expose the ratio, threshold and capacity basis.
+For known model window C, automatic compaction triggers at `floor(C * compaction_ratio)`: a 1,000,000-token model triggers at 750,000, and a 1,048,576-token model at 786,432. Legacy `[runtime].input_budget` and `reserve_tokens` do not reduce this threshold. The API reports `capacityBasis="model_window"` or `"unknown"`. The context panel and `/status` expose the same model capacity and token estimate.
+
+Requests check the soft threshold before inference; completed replies queue background compaction using their actual usage without waiting for another message or generating a summary inline. Cut points preserve complete rounds and tool pairs. No safe cut below the model window is a skip; exceeding a known window remains an error. Recent raw history after compaction retains at most 20,000 tokens, shrinking for the history allowance; this retention policy is not a model capacity. Upload/output byte limits remain separate storage limits.

@@ -9,11 +9,10 @@ from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 
-import httpx
-
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
+from roami_agent.providers.model_catalog import fetch_catalog
 
 KEY_NAMES = {"main": "ROAMI_AGENT_SAVED_MAIN_KEY", "worker": "ROAMI_AGENT_SAVED_WORKER_KEY"}
 
@@ -58,7 +57,13 @@ def effective_settings(base, saved, *, credentials=True):
     for role in ("main", "worker"):
         old = base.route(role)
         value = saved.get(role, {})
-        if not isinstance(value, dict) or set(value) - {"baseUrl", "model", "apiKey", "images"}:
+        if not isinstance(value, dict) or set(value) - {
+            "baseUrl",
+            "model",
+            "apiKey",
+            "images",
+            "contextWindow",
+        }:
             raise DomainError("INVALID_MODEL_CONFIG")
         if any(
             key in value and not isinstance(value[key], str)
@@ -80,6 +85,12 @@ def effective_settings(base, saved, *, credentials=True):
         capabilities = dict(old.capabilities)
         if "images" in value:
             capabilities["images"] = value["images"]
+        window = value.get(
+            "contextWindow",
+            old.context_window if (endpoint, name) == (old.endpoint, old.name) else None,
+        )
+        if window is not None and (type(window) is not int or not 1 <= window <= 100_000_000):
+            raise DomainError("INVALID_MODEL_CONFIG")
         routes[role] = ModelRoute(
             endpoint,
             name,
@@ -89,6 +100,7 @@ def effective_settings(base, saved, *, credentials=True):
             capabilities,
             old.cache,
             old.parameters,
+            window,
         )
     main, worker = routes["main"], routes["worker"]
     return replace(
@@ -97,6 +109,7 @@ def effective_settings(base, saved, *, credentials=True):
         model=main.name,
         key_env=main.key_env,
         model_capabilities=main.capabilities,
+        context_window=main.context_window,
         worker_route=worker,
         extra_key_envs=tuple(sorted(base.provider_key_environments())),
     )
@@ -128,6 +141,8 @@ class ModelSettings:
                 "model": self.runtime.settings.route(role).name,
                 "keyConfigured": bool(self.runtime.settings.credentials(role)),
                 "images": self.runtime.settings.route(role).capabilities.get("images") is True,
+                "contextWindow": self.runtime.settings.route(role).context_window,
+                "configuredContextWindow": self.saved.get(role, {}).get("contextWindow"),
             }
             for role in ("main", "worker")
         }
@@ -142,11 +157,26 @@ class ModelSettings:
                 "model",
                 "apiKey",
                 "images",
+                "contextWindow",
             }:
                 raise DomainError("INVALID_MODEL_CONFIG")
             item = saved.setdefault(role, {})
+            current = self.runtime.settings.route(role)
+            model_changed = (
+                isinstance(changes.get("model"), str) and changes["model"].strip() != current.name
+            )
+            endpoint_changed = isinstance(changes.get("baseUrl"), str) and changes[
+                "baseUrl"
+            ].strip().rstrip("/") != current.endpoint.rstrip("/")
+            if model_changed or endpoint_changed:
+                item["contextWindow"] = None
             for key, value in changes.items():
-                if key == "images":
+                if key == "contextWindow":
+                    if value is not None and (
+                        type(value) is not int or not 1 <= value <= 100_000_000
+                    ):
+                        raise DomainError("INVALID_MODEL_CONFIG")
+                elif key == "images":
                     if type(value) is not bool:
                         raise DomainError("INVALID_MODEL_CONFIG")
                 elif (
@@ -217,7 +247,7 @@ class ModelSettings:
                 except asyncio.CancelledError:
                     temporary = await prepare
                     raise
-                settings = effective_settings(self.base, saved)
+                settings = await self.resolve_capacity(effective_settings(self.base, saved))
                 for role in ("main", "worker"):
                     candidates.append(self.factory(settings, role))
                 main, worker = candidates
@@ -289,34 +319,30 @@ class ModelSettings:
         if not route.endpoint:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         key = supplied.get("apiKey") or self.runtime.settings.credentials(role)
-        headers = {"Authorization": "Bearer " + key} if key else {}
-        try:
-            async with (
-                httpx.AsyncClient(timeout=8, follow_redirects=False) as client,
-                client.stream(
-                    "GET", route.endpoint.rstrip("/") + "/models", headers=headers
-                ) as response,
-            ):
-                if response.status_code != 200:
-                    raise DomainError("MODEL_PROVIDER_UNAVAILABLE", 502)
-                data = bytearray()
-                async for chunk in response.aiter_bytes():
-                    data.extend(chunk)
-                    if len(data) > 2 * 1024 * 1024:
-                        raise DomainError("MODEL_CATALOG_LIMIT", 502)
-            value = json.loads(data)
-            names = sorted(
-                {
-                    item["id"]
-                    for item in value["data"]
-                    if isinstance(item, dict)
-                    and isinstance(item.get("id"), str)
-                    and 0 < len(item["id"]) <= 200
-                }
-            )
-            return {"models": names[:200], "truncated": len(names) > 200}
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
-            raise DomainError("MODEL_PROVIDER_UNAVAILABLE", 502) from None
+        catalog = await fetch_catalog(route.endpoint, key)
+        names = sorted(catalog)
+        return {
+            "models": names[:200],
+            "truncated": len(names) > 200,
+            "contextWindows": {name: catalog[name] for name in names[:200] if catalog[name]},
+        }
+
+    async def resolve_capacity(self, settings):
+        async def resolve(role):
+            route = settings.route(role)
+            if route.context_window is not None or not route.endpoint or not route.name:
+                return route
+            try:
+                catalog = await fetch_catalog(route.endpoint, settings.credentials(role))
+            except DomainError:
+                return route
+            return replace(route, context_window=catalog.get(route.name))
+
+        main, worker = await asyncio.gather(resolve("main"), resolve("worker"))
+        return replace(settings, context_window=main.context_window, worker_route=worker)
+
+    async def refresh_capacity(self):
+        self.runtime.settings.current = await self.resolve_capacity(self.runtime.settings.current)
 
     async def close(self):
         for provider in self.owned_providers:

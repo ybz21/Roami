@@ -122,6 +122,7 @@ async def test_provider_discovery_uses_secret_server_side_and_blocks_redirect(st
         assert await runtime.model_settings.models("local") == {
             "models": ["model-a", "model-b"],
             "truncated": False,
+            "contextWindows": {},
         }
         assert seen == ["Bearer catalog-private-key"]
         with pytest.raises(DomainError, match="MODEL_KEY_REQUIRED_FOR_ENDPOINT"):
@@ -195,5 +196,75 @@ async def test_failed_provider_preparation_keeps_previous_config(store, monkeypa
         import os
 
         assert os.environ[KEY_NAMES["main"]] == "previous-key"
+    finally:
+        await runtime.close()
+
+
+async def test_provider_context_windows_bind_to_exact_role_and_model(store, monkeypatch):
+    original = httpx.AsyncClient
+    seen = []
+
+    def provider(request):
+        seen.append(request.url.path)
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"id": "million", "token_limits": {"context_window": 1000000}},
+                    {"id": "worker", "context_length": 200000},
+                    {"id": "unknown", "max_tokens": 999999},
+                    {"id": "invalid", "contextWindow": True},
+                ]
+            },
+        )
+
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: original(transport=httpx.MockTransport(provider), **kwargs),
+    )
+    runtime = Runtime(
+        store,
+        Model(),
+        settings=Settings(
+            endpoint="https://catalog.example/v1", model="million", worker_model="worker"
+        ),
+    )
+    runtime.model_settings.factory = lambda settings, role: Model(settings.route(role).name)
+    try:
+        await runtime.model_settings.refresh_capacity()
+        assert runtime.settings.threshold_for("main") == 750000
+        assert runtime.settings.threshold_for("worker") == 150000
+        assert runtime.model_settings.view("local")["main"]["contextWindow"] == 1000000
+        catalog = await runtime.model_settings.models("local")
+        assert catalog["contextWindows"] == {"million": 1000000, "worker": 200000}
+        saved = await runtime.model_settings.save("local", {"main": {"model": "unknown"}})
+        assert saved["main"]["contextWindow"] is None
+        assert runtime.settings.compaction_threshold is None
+        assert runtime.settings.threshold_for("worker") == 150000
+        saved = await runtime.model_settings.save("local", {"main": {"contextWindow": 1048576}})
+        assert saved["main"]["configuredContextWindow"] == 1048576
+        assert runtime.settings.compaction_threshold == 786432
+        saved = await runtime.model_settings.save("local", {"main": {"model": "invalid"}})
+        assert saved["main"]["contextWindow"] is None
+        assert saved["main"]["configuredContextWindow"] is None
+        restored = load_model_settings(runtime.model_settings.base, store.data_root)
+        assert restored.context_window is None
+        assert seen
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("window", [True, 0, -1, 1.5, "1000000"])
+async def test_invalid_context_window_rejected_without_mutation(store, window):
+    runtime = Runtime(
+        store, Model(), settings=Settings(endpoint="https://catalog.example/v1", model="initial")
+    )
+    try:
+        with pytest.raises(DomainError, match="INVALID_MODEL_CONFIG"):
+            await runtime.model_settings.save("local", {"main": {"contextWindow": window}})
+        assert (
+            runtime.settings.context_window is None and not settings_path(store.data_root).exists()
+        )
     finally:
         await runtime.close()

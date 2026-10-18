@@ -16,6 +16,7 @@ class ModelRoute:
     capabilities: dict = field(default_factory=dict)
     cache: dict = field(default_factory=dict)
     parameters: dict = field(default_factory=dict)
+    context_window: int | None = None
 
     @classmethod
     def worker(cls, raw, fallback):
@@ -30,9 +31,15 @@ class ModelRoute:
             capabilities=raw.get("capabilities", {}),
             cache=raw.get("cache", {}),
             parameters=raw.get("parameters", {}),
+            context_window=raw.get("context_window"),
         )
         if (
-            not isinstance(route.name, str)
+            route.context_window is not None
+            and (
+                type(route.context_window) is not int
+                or not 1 <= route.context_window <= 100_000_000
+            )
+            or not isinstance(route.name, str)
             or not route.name
             or not route.endpoint
             or not isinstance(route.key_env, str)

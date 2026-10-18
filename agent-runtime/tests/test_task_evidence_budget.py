@@ -91,7 +91,7 @@ async def test_long_report_generates_main_reply_while_full_attempt_evidence_is_r
             turn, "main", completion=json.loads(completion_job["payload_json"])["completion"]
         )
         assert len(model.prompts) == 1
-        assert request_tokens(model.prompts[0], []) < runtime.settings.context_input_budget
+        assert request_tokens(model.prompts[0], []) < 6000
         source = next(
             item
             for item in model.prompts[0]

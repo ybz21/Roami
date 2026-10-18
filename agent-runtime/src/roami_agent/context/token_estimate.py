@@ -46,12 +46,12 @@ def request_context(settings, instructions, catalog, role="main"):
         "instructions": instructions,
         "catalog": catalog,
         "route": asdict(settings.route(role)),
-        "inputBudget": settings.context_input_budget,
-        "contextWindow": settings.context_window,
+        "inputBudget": settings.route(role).context_window,
+        "contextWindow": settings.route(role).context_window,
         "reserveTokens": settings.reserve_tokens,
-        "compactionThreshold": settings.compaction_threshold,
+        "compactionThreshold": settings.threshold_for(role),
         "compactionRatio": settings.compaction_ratio,
-        "capacityBasis": "model_window" if settings.context_window else "input_budget",
+        "capacityBasis": "model_window" if settings.route(role).context_window else "unknown",
     }
 
 
