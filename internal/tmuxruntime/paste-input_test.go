@@ -73,6 +73,26 @@ func TestShellSubmitUsesStdinAndExactlyOneEnter(t *testing.T) {
 	}
 }
 
+func TestEnvironmentInjectionRequiresExactSession(t *testing.T) {
+	for _, session := range []string{"worker", "=worker"} {
+		rt, directory := pasteRuntime(t, false)
+		rt.EnvFile = filepath.Join(directory, "env")
+		if err := os.WriteFile(rt.EnvFile, []byte("FIXTURE_VALUE=sample\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		rt.InjectEnv(session)
+		calls := pasteCalls(t, directory)
+		if len(calls) != 3 {
+			t.Fatalf("missing environment commands: %v", calls)
+		}
+		for _, call := range calls {
+			if len(call) < 3 || call[1] != "-t" || call[2] != "=worker" {
+				t.Fatalf("environment injection can reach a prefix sibling: %v", call)
+			}
+		}
+	}
+}
+
 func TestPasteForRestoreNeverSubmitsAndFailureNeverPressesEnter(t *testing.T) {
 	for _, failPaste := range []bool{false, true} {
 		rt, directory := pasteRuntime(t, failPaste)

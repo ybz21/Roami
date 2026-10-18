@@ -35,20 +35,21 @@ func LaunchAutoconfirm(rt runtime.Runtime, sess string) {
 
 // RunAutoconfirm is the worker invoked by the hidden `__autoconfirm` subcommand.
 func RunAutoconfirm(rt runtime.Runtime, sess string) {
+	target := "=" + strings.TrimPrefix(sess, "=")
 	trusted, bypassed := false, false
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		scr, err := rt.TmuxOutput("capture-pane", "-t", sess, "-p")
+		scr, err := rt.TmuxOutput("capture-pane", "-t", target, "-p")
 		if err != nil {
 			continue
 		}
 		if !trusted && strings.Contains(scr, "trust this folder") {
-			_ = rt.Tmux("send-keys", "-t", sess, "Enter")
+			_ = rt.Tmux("send-keys", "-t", target, "Enter")
 			trusted = true
 			continue
 		}
 		if !bypassed && strings.Contains(scr, "Bypass Permissions mode") {
-			_ = rt.Tmux("send-keys", "-t", sess, "Down", "Enter")
+			_ = rt.Tmux("send-keys", "-t", target, "Down", "Enter")
 			bypassed = true
 		}
 		if trusted && bypassed {
