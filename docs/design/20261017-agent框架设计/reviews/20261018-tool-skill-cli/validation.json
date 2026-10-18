@@ -1,0 +1,65 @@
+{
+  "scope": "agreed tool design plus automatic-memory implementation; tool catalog migration and deployment pending",
+  "rendering": [
+    {
+      "client": "desktop",
+      "size": "large",
+      "pointer": "fine",
+      "overflow": false,
+      "documentScroll": 0,
+      "rows": 23,
+      "background": "rgb(13, 17, 23)"
+    },
+    {
+      "client": "phone",
+      "size": "compact",
+      "pointer": "coarse",
+      "overflow": false,
+      "documentScroll": 0,
+      "rows": 23,
+      "background": "rgb(13, 17, 23)",
+      "touchNavigation": true
+    }
+  ],
+  "staticLinks": "passed",
+  "inventory": "23 unique tools; all assigned a disposition",
+  "sourceChecks": [
+    "installed Pi 1.1.0 tool definitions",
+    "official Pi tool and Skill documentation",
+    "Roami production catalog snapshot at 7f323b1"
+  ],
+  "agreedMainTools": [
+    "read",
+    "bash",
+    "edit",
+    "write",
+    "tool_search",
+    "delegate",
+    "ask_user"
+  ],
+  "runtimeMainToolsAtBaseline": 15,
+  "automaticMemory": {
+    "quality": "scripts/dev/quality/check.sh quick: passed",
+    "pythonFullSuiteAtGate": 491,
+    "finalTargetedAutomaticMemorySuite": 11,
+    "lateJobRegression": "passed after full gate",
+    "ruff": "check and format passed after final changes",
+    "models": "deterministic fixtures; no external-provider claim",
+    "deployment": "not deployed",
+    "productionHistoryBackfill": "not run"
+  },
+  "runtimeMigration": "implemented",
+  "models": {
+    "main": 7,
+    "worker": 5,
+    "research": 3
+  },
+  "settings": "single page: tools, MCP, Skill, CLI",
+  "checks": {
+    "pythonFull": 498,
+    "frontendVitest": 656,
+    "qualityFull": "passed",
+    "researchSchemaTargeted": "passed"
+  },
+  "deployment": "pending final local release"
+}

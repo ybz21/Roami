@@ -16,6 +16,7 @@ class Tools:
         self.disabled_tools: set[str] = set()
         self.disabled_skills: set[str] = set()
         self.skills: dict[str, dict] = {}
+        self.directory = None
 
     def add(self, tool):
         if tool.name in self.registry:
@@ -26,11 +27,28 @@ class Tools:
     def catalog(self, role="main"):
         result = []
         for tool in self.registry.values():
+            if self.directory:
+                from roami_agent.tools.foundations import (
+                    FOUNDATIONS,
+                    RESEARCH_FOUNDATIONS,
+                    WORKER_FOUNDATIONS,
+                )
+
+                names = (
+                    RESEARCH_FOUNDATIONS
+                    if role == "research"
+                    else WORKER_FOUNDATIONS
+                    if role != "main"
+                    else FOUNDATIONS
+                )
+                if tool.name not in names:
+                    continue
             if (
                 tool.name in self.disabled_tools
                 or role == "main"
                 and not tool.main
                 or role == "research"
+                and not self.directory
                 and tool.name not in RESEARCH_TOOLS
             ):
                 continue
@@ -53,6 +71,18 @@ class Tools:
         tool = self.registry.get(name)
         if name in self.disabled_tools:
             raise DomainError("TOOL_DISABLED")
+        if self.directory:
+            from roami_agent.tools.foundations import FOUNDATIONS
+
+            parent = {
+                "skill_read": "read",
+                "file_read": "read",
+                "file_patch": "edit",
+                "file_write": "write",
+                "web_research": "delegate",
+            }.get(name, "bash" if name not in FOUNDATIONS else name)
+            if parent in self.disabled_tools:
+                raise DomainError("TOOL_DISABLED")
         if not tool or (role == "main" and not tool.main):
             raise DomainError("TOOL_UNAVAILABLE")
         try:
@@ -60,14 +90,26 @@ class Tools:
             Draft202012Validator(tool.schema).validate(args)
         except (ValueError, ValidationError) as exc:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
-        if role == "research" and not research_call_allowed(name, args):
+        if self.directory:
+            tool, args = self.directory.resolve(tool, args, role)
+            if tool.name in self.disabled_tools:
+                raise DomainError("TOOL_DISABLED")
+            try:
+                Draft202012Validator(tool.schema).validate(args)
+            except ValidationError as exc:
+                raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
+        if (
+            role == "research"
+            and tool.name != "tool_search"
+            and not research_call_allowed(tool.name, args)
+        ):
             raise DomainError("TOOL_UNAVAILABLE")
         return tool, args
 
     async def invoke(self, call, role, binding):
         tool, args = self.validate(call, role)
         async with asyncio.timeout(60):
-            value = await tool.handler(args, binding)
+            value = await tool.handler(args, dict(binding, role=role))
         if len(encoded(value).encode()) > 128_000:
             raise DomainError("TOOL_OUTPUT_LIMIT")
         return value

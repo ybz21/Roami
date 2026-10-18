@@ -75,6 +75,41 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.capability_settings.view(owner)
         raise DomainError("CAPABILITY_IMPORT_RESERVED", 501)
 
+    @app.get("/v1/tool-directory")
+    async def tool_directory(
+        owner: Owner,
+        query: str = Query(default="", max_length=1000),
+        kind: Literal["all", "skill", "cli"] = "all",
+    ):
+        runtime.capability_settings.view(owner)
+        return {"data": runtime.tools.directory.search(query, kind, 10)}
+
+    @app.get("/v1/tool-directory/{name}")
+    async def tool_operation(name: str, owner: Owner):
+        runtime.capability_settings.view(owner)
+        found = [
+            item
+            for item in runtime.tools.directory.search(name, "cli", 10, "worker")["items"]
+            if item["name"] == name
+        ]
+        if not found:
+            raise DomainError("CAPABILITY_NOT_FOUND", 404)
+        return {"data": found[0]}
+
+    @app.post("/v1/tool-directory/{name}/call")
+    async def call_operation(name: str, request: Request, owner: Owner):
+
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 128000:
+                raise DomainError("INVALID_TOOL_ARGUMENTS", 413)
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            raise DomainError("INVALID_TOOL_ARGUMENTS") from None
+        return {"data": await runtime.cli_commands.call(name, payload, owner)}
+
     @app.get("/v1/capability-settings")
     async def capabilities(owner: Owner):
         return {"data": runtime.capability_settings.view(owner)}

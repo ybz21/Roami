@@ -8,9 +8,10 @@ BROWSER_TOOLS = {"browser_open", "browser_observe", "browser_act"}
 
 def register_research_tools(registry, tasks):
     def availability():
-        worker = {item["function"]["name"] for item in registry.catalog("worker")}
+        worker = set(registry.registry) - registry.disabled_tools
         return (
-            BROWSER_TOOLS <= worker
+            (not registry.directory or {"read", "bash"} <= worker)
+            and BROWSER_TOOLS <= worker
             and "skill_read" in worker
             and "web-research" in registry.skills
             and "web-research" not in registry.disabled_skills

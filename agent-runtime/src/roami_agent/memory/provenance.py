@@ -44,6 +44,16 @@ def seed_dependencies(db, owner, memory):
                 "INSERT OR IGNORE INTO context_omissions(owner_id,message_id,source_memory_id,reason,created_ms) VALUES(?,?,?,'forgotten_memory_tool',?)",
                 (owner, tool["id"], memory["id"], now_ms()),
             )
+    for ident in related:
+        db.execute(
+            "INSERT OR IGNORE INTO context_omissions(owner_id,message_id,source_memory_id,reason,created_ms) "
+            "SELECT ?,m.id,?,'forgotten_recalled_memory',? FROM prompt_manifests p "
+            "JOIN json_each(p.parts_json,'$.memoryEvidence') evidence "
+            "JOIN messages m ON m.turn_id=p.turn_id JOIN conversations c ON c.id=m.conversation_id "
+            "WHERE c.owner_id=? AND m.role IN ('assistant','tool') "
+            "AND json_extract(evidence.value,'$.memoryId')=?",
+            (owner, memory["id"], now_ms(), owner, ident),
+        )
     legacy = rows(
         db,
         "SELECT p.*,t.branch_id,t.rowid AS turn_order FROM prompt_manifests p JOIN turns t ON t.id=p.turn_id JOIN conversations c ON c.id=t.conversation_id WHERE c.owner_id=? AND json_type(p.parts_json,'$.sourceMessageIds') IS NULL",

@@ -19,6 +19,9 @@ import (
 )
 
 func runAgent(args []string) int {
+	if len(args) > 0 && args[0] == "capability" {
+		return runAgentCapability(args[1:])
+	}
 	if len(args) > 0 && args[0] == "reminder" {
 		return runAgentReminder(args[1:])
 	}
@@ -32,7 +35,7 @@ func runAgent(args []string) int {
 		return runAgentExecution(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|conversations|new|send|history|report|notify|steer|steering|control|reminder|notification-preferences|execution [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		fmt.Println("roami agent setup|init|serve|status|conversations|new|send|history|report|notify|steer|steering|control|reminder|notification-preferences|execution|capability [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
 		return 0
 	}
 	sub := args[0]

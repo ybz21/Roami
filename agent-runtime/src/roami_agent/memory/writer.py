@@ -88,6 +88,7 @@ def commit_memory(
     day_key=None,
     timezone=None,
     confirmed=False,
+    automatic=False,
     expected_sources=None,
     source_watermark=None,
 ):
@@ -171,6 +172,17 @@ def commit_memory(
     active = next((item for item in existing if item["state"] == "active"), None)
     if active and active["body"] == body:
         return active
+    if confirmed and automatic and active:
+        latest = db.execute(
+            "SELECT MAX(m.created_ms) FROM memory_sources s JOIN messages m ON m.id=s.message_id WHERE s.memory_id=?",
+            (active["id"],),
+        ).fetchone()[0]
+        if (
+            latest is not None
+            and max(source["created_ms"] for source in sources if source.get("role") == "user")
+            < latest
+        ):
+            confirmed = False
     pending = next(
         (
             item

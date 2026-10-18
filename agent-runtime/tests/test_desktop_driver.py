@@ -146,7 +146,7 @@ class DesktopModel:
         self.step = 0
 
     async def stream(self, messages, tools):
-        if "computer_open" not in {tool["function"]["name"] for tool in tools}:
+        if not tools or "ask_user" in {tool["function"]["name"] for tool in tools}:
             yield ModelEvent("text", '{"memories":[]}')
             return
         self.step += 1
@@ -334,7 +334,7 @@ class DelayedDesktopModel:
     model = "delayed-desktop-model"
 
     async def stream(self, messages, tools):
-        if "computer_open" not in {tool["function"]["name"] for tool in tools}:
+        if not tools or "ask_user" in {tool["function"]["name"] for tool in tools}:
             yield ModelEvent("text", "Quick answer")
             return
         if messages[-1]["role"] != "user" or not isinstance(messages[-1]["content"], list):

@@ -50,7 +50,11 @@ async def test_tool_policy_blocks_stale_calls_and_survives_recreation(store):
     await recreated.capability_settings.save(
         "local", {"kind": "tools", "name": "session_send", "enabled": True}
     )
-    assert "session_send" in {tool["function"]["name"] for tool in recreated.tools.catalog()}
+    assert "session_send" not in {tool["function"]["name"] for tool in recreated.tools.catalog()}
+    assert any(
+        item["name"] == "session_send"
+        for item in recreated.tools.directory.search("session_send", "cli", 10)["items"]
+    )
 
 
 async def test_disabled_skill_cannot_be_read_through_existing_tool_call(store):
@@ -81,7 +85,20 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
             skill["name"] == "roami-dispatch" and skill["source"] == "builtin"
             for skill in data["skills"]
         )
-        assert any(tool["name"] == "session_send" and tool["main"] for tool in data["tools"])
+        assert {tool["name"] for tool in data["tools"]} == {
+            "read",
+            "bash",
+            "edit",
+            "write",
+            "tool_search",
+            "delegate",
+            "ask_user",
+        }
+        assert any(
+            command["name"] == "session_send"
+            for group in data["cli"]
+            for command in group["commands"]
+        )
         assert not any(key in data for key in ["apiKey", "headers", "env", "command"])
         assert (
             await client.get("/v1/capability-settings", headers={"X-Roami-Owner": "alice"})

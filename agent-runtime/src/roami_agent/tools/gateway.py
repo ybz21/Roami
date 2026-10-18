@@ -45,6 +45,7 @@ class ToolGateway:
         except (DomainError, KeyError, TypeError):
             tool, args = None, {}
         tool_id = identity()
+        operation_name = tool.name if tool else call["function"]["name"]
 
         def plan(db):
             assert_context_admitted(db, turn)
@@ -55,7 +56,7 @@ class ToolGateway:
                     tool_id,
                     turn["id"],
                     mid,
-                    call["function"]["name"],
+                    operation_name,
                     encoded(args),
                     tool.effect if tool else "read",
                     turn["id"] + ":" + call["id"],
@@ -76,7 +77,7 @@ class ToolGateway:
                     "tool.started",
                     {
                         "toolCallId": tool_id,
-                        "toolName": call["function"]["name"],
+                        "toolName": operation_name,
                         "state": "running",
                     },
                 )
@@ -124,7 +125,13 @@ class ToolGateway:
             value = await self.tools.invoke(
                 call, role, dict(binding, progress=progress, assistantMessageId=mid)
             )
-            state = "succeeded"
+            state = (
+                "failed"
+                if isinstance(value, dict)
+                and isinstance(value.get("exitCode"), int)
+                and value["exitCode"] != 0
+                else "succeeded"
+            )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
             state = (
@@ -152,7 +159,7 @@ class ToolGateway:
                     turn,
                     binding,
                     "tool.completed",
-                    {"toolCallId": tool_id, "toolName": call["function"]["name"], "state": state},
+                    {"toolCallId": tool_id, "toolName": operation_name, "state": state},
                 )
 
             await self.db.call(cancelled, write=True)
@@ -160,7 +167,7 @@ class ToolGateway:
             raise
 
         memory_ids = []
-        if call["function"]["name"] in {"memory_get", "memory_search"}:
+        if operation_name in {"memory_get", "memory_search"}:
             hits = (
                 value
                 if isinstance(value, list)
@@ -176,9 +183,9 @@ class ToolGateway:
 
         def finish(db):
             committed_value, committed_state, committed_memories = value, state, memory_ids
-            if state == "succeeded" and call["function"]["name"] == "task_status":
+            if state == "succeeded" and operation_name == "task_status":
                 committed_value = model_task_projection(db, binding["owner"], value)
-            if state == "succeeded" and call["function"]["name"] == "artifact_read":
+            if state == "succeeded" and operation_name == "artifact_read":
                 source = row(
                     db,
                     "SELECT sha256 FROM artifacts WHERE id=? AND owner_id=? AND deleted_ms IS NULL",
@@ -233,7 +240,7 @@ class ToolGateway:
                 "tool.completed",
                 {
                     "toolCallId": tool_id,
-                    "toolName": call["function"]["name"],
+                    "toolName": operation_name,
                     "state": committed_state,
                 },
             )

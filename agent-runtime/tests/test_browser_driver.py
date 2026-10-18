@@ -144,7 +144,7 @@ class BrowserModel:
         self.step = 0
 
     async def stream(self, messages, tools):
-        if "browser_open" not in {item["function"]["name"] for item in tools}:
+        if not tools or "ask_user" in {item["function"]["name"] for item in tools}:
             yield ModelEvent("text", "Reported in the original conversation")
             return
         self.step += 1

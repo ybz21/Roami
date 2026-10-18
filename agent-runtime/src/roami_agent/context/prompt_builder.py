@@ -3,6 +3,7 @@
 import asyncio
 import logging
 
+from roami_agent.context.remembered import RememberedContext
 from roami_agent.context.task_evidence import completion_evidence
 from roami_agent.context.token_estimate import request_context, request_tokens
 from roami_agent.protocol.errors import DomainError
@@ -13,10 +14,11 @@ log = logging.getLogger(__name__)
 
 
 class PromptBuilder:
-    def __init__(self, database, context, settings, *, vision=None, chat_images=None):
+    def __init__(self, database, context, settings, *, vision=None, chat_images=None, memory=None):
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
         self.chat_images = chat_images
+        self.remembered = RememberedContext(memory) if memory else None
 
     async def _images(self, turn, plan, prompt):
         if self.chat_images:
@@ -132,6 +134,11 @@ class PromptBuilder:
                     },
                 )
             plain = [{"role": "system", "content": full_instructions}] + plan["messages"]
+            if self.remembered:
+                recalled, evidence = await self.remembered.recall(turn, plan["messages"])
+                plan["memoryEvidence"] = evidence
+                if recalled:
+                    prompt.insert(1, recalled)
             plan, prompt = await self._images(turn, plan, prompt)
             supplemental = max(0, request_tokens(prompt, catalog) - request_tokens(plain, catalog))
             return {**plan, "estimatedTokens": plan["estimatedTokens"] + supplemental}, prompt

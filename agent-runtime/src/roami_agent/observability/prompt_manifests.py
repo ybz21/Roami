@@ -37,6 +37,7 @@ class PromptManifests:
                             "attachmentEvidence": plan.get("attachmentEvidence", []),
                             "imageError": plan.get("imageError"),
                             "taskEvidence": plan.get("taskEvidence"),
+                            "memoryEvidence": plan.get("memoryEvidence", []),
                         }
                     ),
                     now_ms(),

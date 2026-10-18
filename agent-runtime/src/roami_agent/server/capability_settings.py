@@ -9,6 +9,7 @@ from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.model_settings import ModelSettings
+from roami_agent.tools.foundations import FOUNDATIONS, RESEARCH_FOUNDATIONS, WORKER_FOUNDATIONS
 
 
 class CapabilitySettings:
@@ -60,10 +61,15 @@ class CapabilitySettings:
                     "schema": tool.schema,
                     "effect": tool.effect,
                     "main": tool.main,
+                    "roles": ["main"]
+                    + (["worker"] if tool.name in WORKER_FOUNDATIONS else [])
+                    + (["research"] if tool.name in RESEARCH_FOUNDATIONS else []),
                     "enabled": tool.name not in tools.disabled_tools,
                 }
                 for tool in sorted(tools.registry.values(), key=lambda tool: tool.name)
+                if not tools.directory or tool.name in FOUNDATIONS
             ],
+            "cli": tools.directory.groups() if tools.directory else [],
             "skills": [
                 {"name": name, **value, "enabled": name not in tools.disabled_skills}
                 for name, value in sorted(tools.skills.items())

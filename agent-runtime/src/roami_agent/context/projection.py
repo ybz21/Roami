@@ -204,7 +204,12 @@ class Context:
             for manifest in manifests:
                 parts = json.loads(manifest["parts_json"])
                 used = provider_tokens(json.loads(manifest["usage_json"]))
-                if not used or parts.get("requestBasis") != basis or parts.get("taskEvidence"):
+                if (
+                    not used
+                    or parts.get("requestBasis") != basis
+                    or parts.get("taskEvidence")
+                    or parts.get("memoryEvidence")
+                ):
                     continue
                 sources = parts.get("sourceMessageIds", [])
                 response = parts.get("responseMessageId")

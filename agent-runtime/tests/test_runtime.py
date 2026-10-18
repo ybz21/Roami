@@ -358,7 +358,7 @@ async def test_completion_evidence_stays_before_its_tool_round_after_context_reb
             if messages[0]["content"].startswith("Summarize"):
                 yield ModelEvent("text", "Retain prior confirmed decisions.")
                 return
-            if any(tool["function"]["name"] == "shell" for tool in tools):
+            if tools and not any(tool["function"]["name"] == "ask_user" for tool in tools):
                 yield ModelEvent("text", "Worker evidence")
                 return
             self.main_prompts.append(json.loads(json.dumps(messages)))

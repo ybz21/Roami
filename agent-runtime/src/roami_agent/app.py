@@ -54,8 +54,10 @@ from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
 from roami_agent.tools.artifacts import register_artifact_tools
 from roami_agent.tools.browser import register_browser_tools
+from roami_agent.tools.cli_commands import CLICommands
 from roami_agent.tools.computer import register_computer_tools
 from roami_agent.tools.files import register_file_tools
+from roami_agent.tools.foundations import register_foundations
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
@@ -171,6 +173,7 @@ class Runtime:
             register_computer_tools(self.tools, self.desktop)
 
         register_research_tools(self.tools, self.tasks)
+        register_foundations(self.tools, self.settings)
 
         self.context.request_context = lambda: request_context(
             self.settings, self.settings.main_instructions, self.tools.catalog("main")
@@ -179,6 +182,7 @@ class Runtime:
         self.mailbox = TurnMailbox(database)
         self.journal = TurnJournal(database)
         self.gateway = ToolGateway(database, self.tools, self.wakeup)
+        self.cli_commands = CLICommands(database, self.tools, self.journal)
         self.manifests = PromptManifests(database)
         self.dispatch = TaskDispatcher(
             database,
@@ -205,6 +209,7 @@ class Runtime:
                 database,
                 self.context,
                 self.settings,
+                memory=self.memory,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts)
                 if self.settings.route("worker").capabilities.get("images") is True

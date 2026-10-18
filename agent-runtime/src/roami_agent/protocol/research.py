@@ -1,6 +1,6 @@
 """Navigation-only tool admission for resource-only web research."""
 
-RESEARCH_TOOLS = {"skill_read", "browser_open", "browser_observe", "browser_act"}
+RESEARCH_TOOLS = {"tool_search", "skill_read", "browser_open", "browser_observe", "browser_act"}
 
 
 def research_call_allowed(name, args):

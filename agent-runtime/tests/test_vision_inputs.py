@@ -121,7 +121,7 @@ async def test_native_browser_loop_passes_current_png_to_worker_and_keeps_storag
 
         async def stream(self, messages, tools):
             if isinstance(messages[-1].get("content"), list):
-                assert "browser_open" in {tool["function"]["name"] for tool in tools}
+                assert "bash" in {tool["function"]["name"] for tool in tools}
                 assert messages[-1]["content"][1]["image_url"]["url"].startswith(
                     "data:image/png;base64,"
                 )

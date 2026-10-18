@@ -43,3 +43,8 @@ html[data-size="compact"] .agent-capability-grid { grid-template-columns:minmax(
 html[data-pointer="coarse"] .agent-capability-card .tt-act,html[data-pointer="coarse"] .agent-capability-toolbar .ant-btn { min-height:var(--tap); }
 
 html[data-pointer="coarse"] .agent-capability-dialog .ant-input { min-height:var(--tap); }
+.agent-capability-manager { min-width:0; max-width:calc(var(--sp-5) * 32); }
+.agent-capability-manager .ant-tabs-tab { min-height:var(--tap); }
+.agent-capability-cli .agent-capability-help p { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); margin:0; }
+.agent-capability-cli code { min-width:0; overflow-wrap:anywhere; }
+.agent-capability-cli .ant-switch { flex-shrink:0; }

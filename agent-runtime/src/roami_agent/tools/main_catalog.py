@@ -259,6 +259,7 @@ def register_main_tools(registry, tasks, memory, targets):
                                 "nodeId": {"type": "string", "enum": ["local"]},
                                 "label": {"type": "string", "maxLength": 160},
                                 "archived": {"type": "boolean"},
+                                "resourceOnly": {"type": "boolean"},
                                 "state": {"type": "string", "enum": ["live"]},
                             },
                             ["kind"],
@@ -270,6 +271,22 @@ def register_main_tools(registry, tasks, memory, targets):
                 ["goal"],
             ),
             delegate,
+            effect="write",
+            main=True,
+        )
+    )
+
+    async def cancel_task(args, binding):
+        return await tasks.cancel(binding["owner"], args["taskId"])
+
+    registry.add(
+        Tool(
+            "task_cancel",
+            "Cancel an owned delegated background task. This does not retract a delivered message or kill an unrelated working session.",
+            object_schema(
+                {"taskId": {"type": "string", "minLength": 1, "maxLength": 200}}, ["taskId"]
+            ),
+            cancel_task,
             effect="write",
             main=True,
         )

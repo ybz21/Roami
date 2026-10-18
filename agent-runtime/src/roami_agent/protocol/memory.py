@@ -11,6 +11,7 @@ class MemoryProposal(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     kind: Literal["fact", "decision", "preference", "summary"]
     sourceIds: list[str] = Field(min_length=1, max_length=16)
+    evidenceQuote: str | None = Field(default=None, min_length=1, max_length=2000)
 
 
 class MemoryProposals(BaseModel):

@@ -242,13 +242,15 @@ async def test_worker_discovers_calls_and_records_mcp_outcomes(
 
         async def stream(self, messages, tools):
             names = [tool["function"]["name"] for tool in tools]
-            if "mcp_discover" not in names:
+            if not tools or "ask_user" in names:
                 yield ModelEvent("text", "Task result received")
                 return
             self.calls += 1
             if messages[-1]["role"] == "tool" and "structuredContent" in messages[-1]["content"]:
                 yield ModelEvent("text", "Verified read-only MCP result")
                 return
+            if messages[-1]["role"] == "tool":
+                names = json.loads(messages[-1]["content"]).get("tools", [])
             alias = next((name for name in names if "_" + remote + "_" in name), None)
             name, args = (
                 (alias, {"text": "hello"}) if alias else ("mcp_discover", {"server": "docs"})
@@ -306,7 +308,11 @@ async def test_worker_discovers_calls_and_records_mcp_outcomes(
             )
         )
         hashes = [json.loads(manifest["parts_json"])["catalogHash"] for manifest in manifests]
-        assert len(set(hashes)) == 2
+        assert len(set(hashes)) == 1
+        discovered = runtime.tools.directory.search(remote, "cli", 10, "worker")
+        assert any("_" + remote + "_" in item["name"] for item in discovered["items"]) == (
+            expected != "interrupted"
+        )
         progress = await store.call(
             lambda db: rows(db, "SELECT payload_json FROM events WHERE kind='tool.progress'")
         )

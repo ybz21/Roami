@@ -32,8 +32,8 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
                     {
                         "id": "research",
                         "function": {
-                            "name": "web_research",
-                            "arguments": '{"goal":"Check the latest stock quote with sources and time"}',
+                            "name": "delegate",
+                            "arguments": '{"goal":"Check the latest stock quote with sources and time","executor":"native","target":{"kind":"new_session","resourceOnly":true}}',
                         },
                     },
                 )
@@ -47,10 +47,12 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
         async def stream(self, messages, tools):
             self.step += 1
             if self.step == 1:
-                name, args = "skill_read", {"name": "web-research"}
+                name, args = "tool_search", {"query": "web-research"}
             elif self.step == 2:
-                name, args = "browser_act", {}
+                name, args = "read", {"path": "skill://web-research"}
             elif self.step == 3:
+                name, args = "browser_act", {}
+            elif self.step == 4:
                 name, args = "browser_open", {"url": "https://example.org/quote"}
             else:
                 yield ModelEvent(
@@ -62,7 +64,24 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
                 "tool",
                 {
                     "id": f"read-{self.step}",
-                    "function": {"name": name, "arguments": json.dumps(args)},
+                    "function": {
+                        "name": name if name in {"read", "tool_search"} else "bash",
+                        "arguments": json.dumps(
+                            args
+                            if name in {"read", "tool_search"}
+                            else {
+                                "argv": [
+                                    "roami",
+                                    "agent",
+                                    "capability",
+                                    "call",
+                                    name,
+                                    "--input",
+                                    json.dumps(args),
+                                ]
+                            }
+                        ),
+                    },
                 },
             )
 
@@ -136,14 +155,11 @@ async def test_disabled_browser_is_discovered_and_never_blindly_enqueued(store):
 async def test_research_catalog_and_invocation_deny_non_navigation_tools(store):
     runtime = Runtime(store, MemoryModel(), settings=Settings(browser={"enabled": True}))
     catalog = runtime.tools.catalog("research")
-    assert {tool["function"]["name"] for tool in catalog} == {
-        "skill_read",
-        "browser_open",
-        "browser_observe",
-        "browser_act",
-    }
-    action = next(tool for tool in catalog if tool["function"]["name"] == "browser_act")
-    assert action["function"]["parameters"]["properties"]["kind"]["enum"] == ["goto"]
+    assert {tool["function"]["name"] for tool in catalog} == {"read", "bash", "tool_search"}
+    commands = runtime.tools.directory.search("browser", "cli", 10, "research")["items"]
+    assert {item["name"] for item in commands} == {"browser_open", "browser_observe", "browser_act"}
+    action = next(item for item in commands if item["name"] == "browser_act")
+    assert action["inputSchema"]["properties"]["kind"]["enum"] == ["goto"]
     for name, args in [
         ("shell", {"argv": ["echo", "forbidden"]}),
         ("browser_act", {"kind": "click", "observationId": "scene", "selector": "#buy"}),

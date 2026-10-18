@@ -5,6 +5,7 @@ import json
 
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.attachments import Attachments
+from roami_agent.memory.intake import remember_request
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -209,6 +210,7 @@ class Conversations:
                     "UPDATE messages SET content_json=? WHERE id=?",
                     (encoded({"text": text, "attachments": references}), mid),
                 )
+            remember_request(db, owner, cid, mid, text)
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms)"
                 " VALUES(?,'turn.run',?,?,?,'queued',?)",

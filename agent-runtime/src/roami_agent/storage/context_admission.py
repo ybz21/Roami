@@ -1,6 +1,7 @@
 """Keep in-flight forgotten context from starting another model or tool operation."""
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import now_ms
 from roami_agent.storage.database import row
 
 
@@ -50,3 +51,16 @@ def assert_context_admitted(db, turn):
         (turn["id"], turn["owner_id"]),
     ):
         raise DomainError("TASK_RESULT_SUPERSEDED", 409)
+
+    if row(
+        db,
+        "SELECT 1 FROM prompt_manifests p JOIN json_each(p.parts_json,'$.memoryEvidence') evidence "
+        "LEFT JOIN memory_records r ON r.id=json_extract(evidence.value,'$.memoryId') "
+        "WHERE p.turn_id=? AND (r.id IS NULL OR r.owner_id!=? OR r.state!='active' "
+        "OR r.revision!=json_extract(evidence.value,'$.revision') "
+        "OR r.valid_from_ms>? "
+        "OR (r.valid_until_ms IS NOT NULL AND r.valid_until_ms<=?) "
+        "OR (r.expires_ms IS NOT NULL AND r.expires_ms<=?)) LIMIT 1",
+        (turn["id"], turn["owner_id"], now_ms(), now_ms(), now_ms()),
+    ):
+        raise DomainError("CONTEXT_SOURCE_FORGOTTEN", 409)

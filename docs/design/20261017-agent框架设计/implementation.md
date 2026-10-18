@@ -33,3 +33,17 @@ Codex / Claude Code 执行复用 Go Agent 参数注册表与应用层会话服�
 执行器还需已有会话续派、新项目创建、明确复用已有工作区、外部 checkpoint Fork、native Worker 的项目目录绑定，以及目标自动验证和未知准备资源的恢复。成功退出本身不能代替目标验收。
 
 工具仍需 MCP、Browser / Computer、资源租约和产物存储 / 完整备份；记忆仍需后台提取 / 每日汇总、完整忘记传播、缓存控制和模型路由恢复。主动消息已能持久化、去重和计算未读，但触发调度、免打扰、限流及现有 App 推送适配尚待接入。最后还需完整端到端与真机验收。
+
+## 2026-10-18 自动记忆修复与工具目录修订
+
+- 已补实现（尚未部署）：用户明确记住请求随消息接收事务保存；自动提取可按用户原文证据激活偏好；每轮有界召回并记录 memoryEvidence；删除 / 遗忘阻止旧证据继续执行，追踪派生回复。晚到旧来源不能自动覆盖新偏好。
+- 已验证：quick gate 的 Go / Python 491 项及前端规范检查通过；最后新增的晚到任务回归与其余自动记忆用例合计 11 项通过；最终 Ruff 检查通过。测试使用隔离 SQLite 与模型 fixture，未部署、未补录生产历史。
+- 用户确认工具目录方向：read / bash / edit / write＋tool_search（Skill / CLI 搜索），另保留 delegate / ask_user，Main 总计 7 个。详见 technical/15-tool-discovery.html。工具目录与 CLI 迁移仍待实施，生产 Main 仍是 15 个。
+
+## 2026-10-18 七工具与统一能力管理落地
+
+- 实际模型目录：Main 7（read / bash / edit / write / tool_search / delegate / ask_user）、原生 Worker 5、检索 Worker 3；旧操作只作内部与历史兼容，不再常驻模型 schema 或工具设置卡片。
+- Go CLI 新增 agent capability search / show / call；Python 共享目录与操作适配，复用既有项目、会话、浏览器、任务、记忆及提醒服务。bash 在记录 planned 前解析操作效果；保留原动作名称、来源与执行状态。
+- 设置合并成能力管理页，顶部工具 / MCP / Skill / CLI 四 Tab；旧链接兼容。CLI 能力启停与模型执行共用策略。Skill 详情渲染 Markdown，roami-dispatch 逐项说明实际操作、参数和状态。MCP 配置仍由节点文件加载，上传接口仍为预留。
+- 代码检查：full gate 通过（Go、Python 498 项、类型 / i18n / hover / build），前端 Vitest 656 项通过；角色受限 schema 与新检索操作校验另有定向回归。
+- 真实提供方隔离验证：Main 实际收到 7 个 schema，检索 Worker 收到 3 个；搜索、读取技能、原生委派、Chrome CLI 观察、来源验证及原 Main 回报成功。一条无工作区 curl 尝试被拒绝后转入正确流程，不冒充全部调用零失败。生产部署及真机结果记录在本轮交付证明。

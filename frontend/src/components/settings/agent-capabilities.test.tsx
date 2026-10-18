@@ -42,9 +42,28 @@ it('marks the upload entry as reserved without pretending to import files', asyn
 
 it('shows unknown MCP connection state and opens connection details', async () => {
   vi.mocked(api).mockResolvedValue({ data: { ...catalog, mcp: [{ name: 'local-fixture', transport: 'stdio', state: 'unknown', tools: 0 }] } })
-  render(<AgentCapabilities kind="tools" />)
+  render(<AgentCapabilities kind="mcp" />)
   expect(await screen.findByText('local-fixture')).toBeTruthy()
   expect(screen.getByText('agent.capabilities.mcp.unknown')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'agent.capabilities.connectionDetails' }))
   expect(await screen.findByRole('dialog')).toBeTruthy()
+})
+
+it('shows seven tools and manages business operations in a separate CLI tab', async () => {
+  const names = ['read', 'bash', 'edit', 'write', 'tool_search', 'delegate', 'ask_user']
+  const tools = names.map(name => ({ name, description: 'runtime description', schema: { type: 'object' }, effect: 'read', main: true, enabled: true }))
+  const data = { ...catalog, tools, cli: [{ name: 'sessions', commands: [{ name: 'session_send', description: 'Send to a session', enabled: true }] }] }
+  vi.mocked(api).mockResolvedValue({ data })
+  const { container } = render(<AgentCapabilities kind="tools" />)
+  await screen.findByText('tool_search')
+  expect(screen.getAllByRole('tab')).toHaveLength(4)
+  expect(screen.getAllByRole('switch')).toHaveLength(7)
+  expect(Array.from(container.querySelector('.agent-capability-grid')!.querySelectorAll('.agent-capability-heading strong')).map(node => node.textContent)).toEqual(names)
+  expect(container.querySelector('.agent-capability-cli')).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.capabilities.tab.cli' }))
+  await screen.findByText('session_send')
+  expect(container.querySelector('.agent-capability-card .agent-capability-heading')).toBeNull()
+  fireEvent.click(screen.getByText('agent.capabilities.cliCommands'))
+  fireEvent.click(screen.getByRole('switch'))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-settings', { kind: 'tools', name: 'session_send', enabled: false }))
 })
