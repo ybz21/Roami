@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv("ROAMI_LIFECYCLE_FIXTURE") == "1" {
 		switch os.Args[1] {
 		case "--help":
-			fmt.Println("Codex fixture --no-daemon")
+			fmt.Println("Codex fixture --no-daemon --settings")
 		case "app-server":
 			decoder, encoder := json.NewDecoder(os.Stdin), json.NewEncoder(os.Stdout)
 			for {
@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func fixtureOptions(t *testing.T, configuration any) CodexOptions {
+func fixtureOptions(t *testing.T, configuration any) SessionOptions {
 	t.Helper()
 	data, err := json.Marshal(configuration)
 	if err != nil {
@@ -63,7 +63,7 @@ func fixtureOptions(t *testing.T, configuration any) CodexOptions {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return CodexOptions{Binary: binary, Executable: filepath.Join(t.TempDir(), "roami 'callback' $()"), Directory: t.TempDir(), DataDir: t.TempDir()}
+	return SessionOptions{Binary: binary, Executable: filepath.Join(t.TempDir(), "roami 'callback' $()"), Directory: t.TempDir(), DataDir: t.TempDir()}
 }
 
 func TestScopedArgumentsAreValidTOMLAndRetainHookTrust(t *testing.T) {
@@ -190,7 +190,7 @@ func TestInstalledCodexReadOnlyConfigurationContract(t *testing.T) {
 	executable, _ := os.Executable()
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	args, err := PrepareCodex(ctx, CodexOptions{Binary: binary, Executable: executable, Directory: t.TempDir(), DataDir: t.TempDir()})
+	args, err := PrepareCodex(ctx, SessionOptions{Binary: binary, Executable: executable, Directory: t.TempDir(), DataDir: t.TempDir()})
 	if err != nil || len(args) == 0 || args[0] != "--no-daemon" {
 		t.Fatalf("installed read-only configuration contract failed: %v", err)
 	}

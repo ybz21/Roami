@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/ybz21/Roami/internal/agent"
@@ -103,9 +104,11 @@ func (c AgentConfig) prefix(interactive bool) string {
 			args = a.OneShotArgs(c.startOpts())
 		}
 	}
-	b := "cd " + shellQuote(c.Workdir) + " && " + c.bin(a)
+	b := "cd " + shellQuote(c.Workdir) + " && " + shellWord(c.bin(a))
 	if len(args) > 0 {
-		b += " " + strings.Join(args, " ")
+		for _, arg := range args {
+			b += " " + shellWord(arg)
+		}
 	}
 	if interactive {
 		for _, arg := range c.lifecycleArgs {
@@ -117,7 +120,8 @@ func (c AgentConfig) prefix(interactive bool) string {
 
 // PrepareInteractive keeps unsupported vendor versions usable without claiming continuation readiness.
 func (c AgentConfig) PrepareInteractive(rt runtime.Runtime) (AgentConfig, error) {
-	if !c.Interactive || c.resolve().Kind() != "codex" {
+	kind := c.resolve().Kind()
+	if !c.Interactive || (kind != "codex" && kind != "claude") {
 		return c, nil
 	}
 	executable, err := os.Executable()
@@ -132,7 +136,11 @@ func (c AgentConfig) PrepareInteractive(rt runtime.Runtime) (AgentConfig, error)
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	args, err := agentlifecycle.PrepareCodex(ctx, agentlifecycle.CodexOptions{
+	prepare := agentlifecycle.PrepareCodex
+	if kind == "claude" {
+		prepare = agentlifecycle.PrepareClaude
+	}
+	args, err := prepare(ctx, agentlifecycle.SessionOptions{
 		Binary: c.bin(c.resolve()), Executable: executable, Directory: c.Workdir,
 		HomeDir: paths.Home, DataDir: paths.Data, DatabaseDir: paths.Database, BackupDir: paths.Backup, TmuxBin: rt.TmuxBin,
 	})
@@ -145,6 +153,10 @@ func (c AgentConfig) PrepareInteractive(rt runtime.Runtime) (AgentConfig, error)
 
 // ResumeInteractive preserves the original conversation while using scoped callbacks.
 func (c AgentConfig) ResumeInteractive(conversation string) string {
+	if c.resolve().Kind() == "claude" {
+		c.SessionUUID = ""
+		return c.prefix(true) + " --resume " + shellQuote(conversation)
+	}
 	return c.prefix(true) + " resume " + shellQuote(conversation)
 }
 
@@ -194,4 +206,13 @@ func orDefault(v, def string) string {
 		return def
 	}
 	return v
+}
+
+var shellWordPattern = regexp.MustCompile(`^[A-Za-z0-9_./:+,=@%-]+$`)
+
+func shellWord(value string) string {
+	if shellWordPattern.MatchString(value) {
+		return value
+	}
+	return shellQuote(value)
 }

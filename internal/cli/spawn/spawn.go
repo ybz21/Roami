@@ -36,7 +36,7 @@ func spawnOne(rt runtime.Runtime, group, name, taskType, payload string, ac Agen
 	if taskType == "agent" {
 		prepared, prepareError := ac.PrepareInteractive(rt)
 		if prepareError != nil {
-			ui.Warn(w, "Codex lifecycle callbacks unavailable: %s", prepareError)
+			ui.Warn(w, "Agent lifecycle callbacks unavailable: %s", prepareError)
 		}
 		ac = prepared
 	}

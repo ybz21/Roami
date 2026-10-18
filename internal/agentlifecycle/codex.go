@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type CodexOptions struct {
+type SessionOptions struct {
 	Binary      string
 	Executable  string
 	Directory   string
@@ -32,6 +32,9 @@ type codexConfiguration struct {
 }
 
 func HookConfiguration(executable, executor string) (map[string]any, error) {
+	if executor == "claude" {
+		return claudeHooks(shellQuote(executable) + " agent execution event --executor claude --file -"), nil
+	}
 	if executor != "codex" {
 		return nil, fmt.Errorf("SESSION_COMPLETION_ADAPTER_UNAVAILABLE")
 	}
@@ -48,7 +51,7 @@ func HookConfiguration(executable, executor string) (map[string]any, error) {
 }
 
 // PrepareCodex scopes callbacks to one invocation and preserves the effective notifier.
-func PrepareCodex(ctx context.Context, options CodexOptions) ([]string, error) {
+func PrepareCodex(ctx context.Context, options SessionOptions) ([]string, error) {
 	if !filepath.IsAbs(options.Executable) || !filepath.IsAbs(options.Directory) || !filepath.IsAbs(options.DataDir) {
 		return nil, fmt.Errorf("INVALID_CODEX_LIFECYCLE_PATH")
 	}
@@ -73,20 +76,8 @@ func PrepareCodex(ctx context.Context, options CodexOptions) ([]string, error) {
 	if config.ManagedHooksOnly || (config.Features.Hooks != nil && !*config.Features.Hooks) {
 		return nil, fmt.Errorf("CODEX_LIFECYCLE_DISABLED")
 	}
-	callback := func(sub string) []string {
-		args := []string{options.Executable}
-		for _, pair := range [][2]string{{"--home", options.HomeDir}, {"--data-dir", options.DataDir}, {"--database-dir", options.DatabaseDir}, {"--backup-dir", options.BackupDir}} {
-			if pair[1] != "" {
-				args = append(args, pair[0], pair[1])
-			}
-		}
-		args = append(args, "agent", "execution", sub, "--executor", "codex")
-		if options.TmuxBin != "" {
-			args = append(args, "--tmux-bin", options.TmuxBin)
-		}
-		return args
-	}
-	hookArgs := append(callback("event"), "--file", "-")
+
+	hookArgs := append(callbackArguments(options, "codex", "event"), "--file", "-")
 	quotedHook := make([]string, len(hookArgs))
 	for index, arg := range hookArgs {
 		quotedHook[index] = shellQuote(arg)
@@ -101,13 +92,13 @@ func PrepareCodex(ctx context.Context, options CodexOptions) ([]string, error) {
 		value := fmt.Sprintf("hooks.%s=[{hooks=[{type=\"command\",command=%s,timeout=%d}]}]", event, command, timeout)
 		args = append(args, "-c", value)
 	}
-	notify := append(callback("event"), "--notification")
+	notify := append(callbackArguments(options, "codex", "event"), "--notification")
 	if len(config.Notify) != 0 {
 		path, err := storeNotifier(options.DataDir, config.Notify)
 		if err != nil {
 			return nil, err
 		}
-		notify = append(callback("notify"), "--chain", path, "--notification")
+		notify = append(callbackArguments(options, "codex", "notify"), "--chain", path, "--notification")
 	}
 	value, _ := json.Marshal(notify)
 	return append(args, "-c", "notify="+string(value)), nil
@@ -198,4 +189,18 @@ func readCodexConfiguration(ctx context.Context, binary, directory string, overr
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
+}
+
+func callbackArguments(options SessionOptions, executor, sub string) []string {
+	args := []string{options.Executable}
+	for _, pair := range [][2]string{{"--home", options.HomeDir}, {"--data-dir", options.DataDir}, {"--database-dir", options.DatabaseDir}, {"--backup-dir", options.BackupDir}} {
+		if pair[1] != "" {
+			args = append(args, pair[0], pair[1])
+		}
+	}
+	args = append(args, "agent", "execution", sub, "--executor", executor)
+	if options.TmuxBin != "" {
+		args = append(args, "--tmux-bin", options.TmuxBin)
+	}
+	return args
 }

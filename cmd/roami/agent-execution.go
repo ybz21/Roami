@@ -17,7 +17,7 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution hook-config --executor codex\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]

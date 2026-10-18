@@ -18,7 +18,7 @@ func lifecycleBinary(t *testing.T) string {
 	script := `#!/usr/bin/env python3
 import json, os, sys
 if sys.argv[1:] == ['--help']:
- print('--no-daemon')
+ print('--no-daemon --settings')
 elif sys.argv[1:] == ['app-server', '--stdio']:
  for line in sys.stdin:
   request = json.loads(line)
@@ -108,12 +108,56 @@ func TestUnsupportedOrCancelledCodexKeepsOriginalLaunch(t *testing.T) {
 			t.Fatal("failed preparation changed launch")
 		}
 	}
-	config := AgentConfig{Kind: "claude", Interactive: true, Workdir: t.TempDir()}
+	config := AgentConfig{Kind: "pi", Interactive: true, Workdir: t.TempDir()}
 	if _, err := config.PrepareInteractive(runtime.Runtime{}); err != nil {
 		t.Fatal("unrelated provider probed")
 	}
 	config.Kind, config.Interactive = "codex", false
 	if _, err := config.PrepareInteractive(runtime.Runtime{}); err != nil {
 		t.Fatal("one-shot provider probed")
+	}
+}
+
+func TestClaudeScopedSettingsAndResumeKeepExactShellArguments(t *testing.T) {
+	root := t.TempDir()
+	binary := filepath.Join(root, "claude 'wrapper'")
+	data, err := os.ReadFile(lifecycleBinary(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(binary, data, 0700); err != nil {
+		t.Fatal(err)
+	}
+	config := AgentConfig{Kind: "claude", Interactive: true, Workdir: root, ClaudeBin: binary, Model: "model $(must-not-run)", SessionUUID: "initial-session"}
+	prepared, err := config.PrepareInteractive(runtime.Runtime{HomeDir: root, DataDir: root, TmuxBin: "tmux"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.Command("sh", "-c", prepared.Command("literal 'prompt'")).CombinedOutput()
+	if err != nil {
+		t.Fatalf("quoted executable or settings failed: %v %s", err, output)
+	}
+	var args []string
+	if json.Unmarshal(output, &args) != nil {
+		t.Fatal("invalid launch output")
+	}
+	if args[0] != "--model" || args[1] != config.Model || args[2] != "--session-id" || args[3] != "initial-session" || args[4] != "--settings" || args[len(args)-1] != "literal 'prompt'" {
+		t.Fatalf("changed launch arguments: %q", args)
+	}
+	var settings map[string]any
+	if json.Unmarshal([]byte(args[5]), &settings) != nil || len(settings) != 1 || settings["hooks"] == nil {
+		t.Fatal("observers changed model or permission settings")
+	}
+	output, err = exec.Command("sh", "-c", prepared.ResumeInteractive("original-session")).CombinedOutput()
+	if err != nil || json.Unmarshal(output, &args) != nil {
+		t.Fatalf("resume failed: %v %s", err, output)
+	}
+	for _, arg := range args {
+		if arg == "--session-id" {
+			t.Fatal("resume created a different conversation")
+		}
+	}
+	if args[len(args)-2] != "--resume" || args[len(args)-1] != "original-session" {
+		t.Fatal("lost original conversation")
 	}
 }

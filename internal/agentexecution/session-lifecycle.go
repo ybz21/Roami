@@ -39,21 +39,27 @@ type sessionLifecycle struct {
 	PromptHash string          `json:"promptHash"`
 	LaunchKey  string          `json:"launchKey,omitempty"`
 	Tools      map[string]bool `json:"tools"`
+	ClaudeStop *claudeStop     `json:"claudeStop,omitempty"`
 	UpdatedMS  int64           `json:"updatedMs"`
 }
 
 type SessionEvent struct {
-	Type             string   `json:"type"`
-	ThreadID         string   `json:"thread-id"`
-	NotificationTurn string   `json:"turn-id"`
-	Inputs           []string `json:"input-messages"`
-	LastAssistant    string   `json:"last-assistant-message"`
-	Hook             string   `json:"hook_event_name"`
-	ProviderID       string   `json:"session_id"`
-	TurnID           string   `json:"turn_id"`
-	Prompt           string   `json:"prompt"`
-	ToolID           string   `json:"tool_use_id"`
-	AgentID          string   `json:"agent_id"`
+	PromptID         string            `json:"prompt_id"`
+	NotificationType string            `json:"notification_type"`
+	StopAssistant    string            `json:"last_assistant_message"`
+	BackgroundTasks  []json.RawMessage `json:"background_tasks"`
+	SessionCrons     []json.RawMessage `json:"session_crons"`
+	Type             string            `json:"type"`
+	ThreadID         string            `json:"thread-id"`
+	NotificationTurn string            `json:"turn-id"`
+	Inputs           []string          `json:"input-messages"`
+	LastAssistant    string            `json:"last-assistant-message"`
+	Hook             string            `json:"hook_event_name"`
+	ProviderID       string            `json:"session_id"`
+	TurnID           string            `json:"turn_id"`
+	Prompt           string            `json:"prompt"`
+	ToolID           string            `json:"tool_use_id"`
+	AgentID          string            `json:"agent_id"`
 }
 
 const paneIdentityFormat = "#{session_name}\t#{session_id}\t#{session_created}\t#{pid}\t#{pane_id}\t#{pane_pid}\t#{pane_current_path}"
@@ -132,11 +138,20 @@ func (s Service) ObserveSessionEvent(ctx context.Context, executor, pane string,
 }
 
 func (s Service) applySessionEvent(executor string, binding SessionBinding, event SessionEvent) error {
+	if executor == "claude" {
+		if event.AgentID != "" && event.Hook != "SubagentStart" && event.Hook != "SubagentStop" {
+			return nil
+		}
+		event.TurnID = event.PromptID
+		if event.Hook == "PostToolUseFailure" {
+			event.Hook = "PostToolUse"
+		}
+	}
 	completed := executor == "codex" && event.Type == "agent-turn-complete"
 	if completed {
 		event.ProviderID, event.TurnID = event.ThreadID, event.NotificationTurn
 	}
-	if event.ProviderID == "" || len(event.ProviderID) > 300 || (executor == "codex" && event.TurnID == "" && event.Hook != "SessionStart" && event.Hook != "SessionEnd") {
+	if event.ProviderID == "" || len(event.ProviderID) > 300 {
 		return fmt.Errorf("INVALID_SESSION_EVENT")
 	}
 	path, err := s.lifecycleFile(binding)
@@ -160,11 +175,26 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		state.UpdatedMS = time.Now().UnixMilli()
 		return writeJSON(path, state)
 	}
+	if (event.TurnID == "" && event.Hook != "SessionStart" && event.Hook != "SessionEnd") || len(event.TurnID) > 300 {
+		state.State, state.ClaudeStop = "unknown", nil
+		state.UpdatedMS = time.Now().UnixMilli()
+		if err := writeJSON(path, state); err != nil {
+			return err
+		}
+		return fmt.Errorf("INVALID_SESSION_EVENT")
+	}
 	state.Binding.ProviderID, state.Executor = event.ProviderID, executor
 	state.UpdatedMS = time.Now().UnixMilli()
-	if event.Hook == "SessionStart" {
+	claudeHandled, claudeCompleted := false, false
+	if executor == "claude" {
+		claudeHandled, claudeCompleted = observeClaudeStop(&state, &event)
+		completed = claudeCompleted
+	}
+	switch {
+	case claudeHandled:
+	case event.Hook == "SessionStart":
 		state.State = "unknown"
-	} else if event.Hook == "UserPromptSubmit" {
+	case event.Hook == "UserPromptSubmit":
 		promptHash := workspaceHash(event.Prompt)
 		if state.State == "busy" && state.TurnID == event.TurnID && state.PromptHash == promptHash {
 			return nil
@@ -178,30 +208,30 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			}
 		}
 		state.TurnID, state.PromptHash, state.State = event.TurnID, promptHash, "busy"
-	} else if event.Hook == "PreToolUse" || event.Hook == "PostToolUse" {
+	case event.Hook == "PreToolUse" || event.Hook == "PostToolUse":
 		if event.Hook == "PreToolUse" && state.LaunchKey != "" && state.State == "busy" && state.TurnID == event.TurnID {
 			dir, _ := s.directory(state.LaunchKey)
 			if _, cancelErr := os.Stat(filepath.Join(dir, "cancel.json")); cancelErr == nil {
 				return fmt.Errorf("SESSION_TASK_CANCEL_REQUESTED")
 			}
 		}
-		if state.State != "busy" || (executor == "codex" && state.TurnID != event.TurnID) || event.ToolID == "" {
+		if state.State != "busy" || state.TurnID != event.TurnID || event.ToolID == "" {
 			state.State = "unknown"
 		} else if event.Hook == "PreToolUse" {
 			state.Tools[event.ToolID] = true
 		} else {
 			delete(state.Tools, event.ToolID)
 		}
-	} else if event.Hook == "SubagentStart" {
+	case event.Hook == "SubagentStart":
 		if event.AgentID == "" {
 			state.State = "unknown"
 		} else {
 			state.Tools["subagent:"+event.AgentID] = true
 		}
-	} else if event.Hook == "Interrupt" || event.Hook == "SessionEnd" {
+	case event.Hook == "Interrupt" || event.Hook == "SessionEnd":
 		state.State = "unknown"
-	} else if completed {
-		inputMatches := false
+	case completed:
+		inputMatches := claudeCompleted
 		for _, input := range event.Inputs {
 			inputMatches = inputMatches || workspaceHash(input) == state.PromptHash
 		}
@@ -232,7 +262,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 	if err := writeJSON(path, state); err != nil {
 		return err
 	}
-	if executor == "codex" {
+	if executor == "codex" || executor == "claude" {
 		meta := sessmeta.New(s.Runtime.HomeDir)
 		meta.DataDir = s.Runtime.DataDir
 		if row, ok := meta.Get(binding.Name); ok && row.AgentKind == executor {
@@ -243,7 +273,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 }
 
 func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error) {
-	if spec.Executor != "codex" || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
+	if (spec.Executor != "codex" && spec.Executor != "claude") || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)

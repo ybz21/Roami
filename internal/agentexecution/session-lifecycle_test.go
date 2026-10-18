@@ -249,24 +249,31 @@ func TestSessionContinuationThroughRealPythonAndGoCLI(t *testing.T) {
 	if _, err := exec.LookPath("uv"); err != nil {
 		t.Skip("uv required")
 	}
-	s, binding := sessionFixture(t)
-	seedSession(t, s, binding)
 	repository, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
 	recordRuntimeSources(t, repository, "session_continuation_scenario.py")
-
 	binary := filepath.Join(t.TempDir(), "roami")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/roami")
 	build.Dir = repository
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, output)
 	}
-	command := exec.Command("uv", "run", "--frozen", "--directory", filepath.Join(repository, "agent-runtime"), "python", "tests/session_continuation_scenario.py", binary, s.Runtime.DataDir, binding.ID)
-	command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "TMUX_BIN="+s.Runtime.TmuxBin)
-	output, err := command.CombinedOutput()
-	if err != nil || !strings.Contains(string(output), "session continuation scenario passed") {
-		t.Fatalf("continuation integration: %v\n%s", err, output)
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			s, binding := sessionFixture(t)
+			if provider == "codex" {
+				seedSession(t, s, binding)
+			} else {
+				seedClaudeSession(t, s, binding)
+			}
+			command := exec.Command("uv", "run", "--frozen", "--directory", filepath.Join(repository, "agent-runtime"), "python", "tests/session_continuation_scenario.py", binary, s.Runtime.DataDir, binding.ID, provider)
+			command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "TMUX_BIN="+s.Runtime.TmuxBin)
+			output, err := command.CombinedOutput()
+			if err != nil || !strings.Contains(string(output), "session continuation scenario passed") {
+				t.Fatalf("continuation integration: %v\n%s", err, output)
+			}
+		})
 	}
 }

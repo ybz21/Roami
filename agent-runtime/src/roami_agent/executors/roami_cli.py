@@ -81,8 +81,6 @@ class CodingExecutor:
         if target.get("nodeId", "local") != "local":
             raise DomainError("CODING_NODE_UNAVAILABLE")
         if target["kind"] == "session":
-            if spec["executor"] != "codex":
-                raise DomainError("SESSION_COMPLETION_ADAPTER_UNAVAILABLE")
             if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if any(

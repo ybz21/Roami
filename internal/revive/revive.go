@@ -152,9 +152,10 @@ func Revive(rt runtime.Runtime, meta *sessmeta.Store, name string) (Result, erro
 		// 只把命令**填在命令行上**，不替人回车：接不接、什么时候接由人定——
 		// 一次点开十几个会话同时 resume 会把机器卡住，而且有的只是想看看目录
 		_ = meta.SetAgentSession(sess, uuid)
-		if row.AgentKind == "codex" {
+		if row.AgentKind == "codex" || row.AgentKind == "claude" {
 			config := spawn.DefaultAgentConfig(dir)
-			config.Kind, config.Interactive = "codex", true
+			config.Kind, config.Interactive = row.AgentKind, true
+			config.SessionUUID, config.Permission = "", ""
 			if prepared, err := config.PrepareInteractive(rt); err == nil {
 				cmd = prepared.ResumeInteractive(uuid)
 			}

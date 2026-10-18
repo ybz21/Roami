@@ -1,5 +1,7 @@
 """Unknown process outcomes must never be converted into successful cancellation or replay."""
 
+import pytest
+
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.roami_cli import CodingExecutor
@@ -232,7 +234,10 @@ async def test_coding_new_project_resolves_before_launch_without_using_loose_dir
     assert calls == ["provision", "launch"]
 
 
-async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(store, tmp_path):
+@pytest.mark.parametrize("provider", ["codex", "claude"])
+async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(
+    store, tmp_path, provider
+):
     import pytest
 
     from roami_agent.protocol.errors import DomainError
@@ -245,7 +250,7 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
         c["id"],
         "Continue",
         key="session",
-        executor="codex",
+        executor=provider,
         target={"kind": "session", "sessionId": "stable-session"},
         record_intent=True,
     )
@@ -261,6 +266,7 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
     }
 
     async def command(sub, *args, spec=None):
+        assert spec["executor"] == provider
         assert spec["sessionId"] == "stable-session"
         assert "directory" not in spec and "projectId" not in spec
         return receipt
