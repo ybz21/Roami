@@ -33,7 +33,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/attachments"},
 		{"DELETE", "/agent/attachments/:attachment"},
 		{"GET", "/agent/model-settings"}, {"PUT", "/agent/model-settings"}, {"GET", "/agent/models"}, {"POST", "/agent/models"},
-		{"GET", "/agent/conversations/:cid/messages"}, {"POST", "/agent/conversations/:cid/messages"},
+		{"GET", "/agent/conversations/:cid/activities/:aid"}, {"GET", "/agent/conversations/:cid/messages"}, {"POST", "/agent/conversations/:cid/messages"},
 		{"GET", "/agent/conversations/:cid/events"}, {"POST", "/agent/conversations/:cid/fork"},
 		{"GET", "/agent/conversations/:cid/context"}, {"GET", "/agent/conversations/:cid/context/snapshots/:snapshot"},
 		{"POST", "/agent/conversations/:cid/compact"}, {"GET", "/agent/conversations/:cid/compactions/:operation"},

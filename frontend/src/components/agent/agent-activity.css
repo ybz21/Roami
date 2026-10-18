@@ -1,7 +1,7 @@
 .agent-activity { border-left:2px solid var(--border-subtle); padding-inline:var(--sp-2); color:var(--text-dim); min-width:0; font-size:var(--fs-sm); }
 .agent-activity.is-running { border-color:var(--accent-border); }
 .agent-activity.is-failed { border-color:var(--danger-border); }
-.agent-activity-toggle { display:flex; align-items:center; gap:var(--sp-2); width:100%; padding:var(--sp-2) 0; min-height:var(--tap); border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+.agent-activity-toggle { display:flex; align-items:center; gap:var(--sp-2); width:100%; padding:var(--sp-2) 0; min-height:calc(var(--sp-4) * 2); border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
 .agent-activity-toggle > svg { flex:none; }
 .agent-activity-toggle small,.agent-activity-summary { font-size:var(--fs-meta); }
 .agent-activity-summary { margin-left:auto; }
@@ -24,3 +24,14 @@
 .agent-activity-details { padding:var(--sp-2) 0; border-top:1px solid var(--border-subtle); overflow-wrap:anywhere; }
 .agent-activity-details code,.agent-activity-details small { font-size:var(--fs-meta); }
 .agent-activity-summary { flex:none; }
+
+.agent-activity-group { border:1px solid var(--border-subtle); border-radius:var(--r-sm); padding:0 var(--sp-3); color:var(--text-dim); font-size:var(--fs-sm); min-width:0; }
+.agent-activity-group-steps { display:flex; flex-direction:column; gap:var(--sp-1); padding-bottom:var(--sp-2); }
+.agent-activity-toggle time { flex:none; font-size:var(--fs-meta); color:var(--text-dimmer); }
+.agent-activity-payloads { display:flex; flex-direction:column; gap:var(--sp-2); }
+.agent-activity-payloads summary { display:flex; align-items:center; min-height:var(--tap); cursor:pointer; color:var(--accent); }
+.agent-activity-payloads pre { max-height:calc(var(--sp-5) * 12); overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; margin:0; padding:var(--sp-3); border-radius:var(--r-xs); background:var(--bg-container); font-size:var(--fs-meta); color:var(--text-dim); }
+html[data-pointer="coarse"] .agent-activity-toggle,html[data-pointer="coarse"] .agent-activity-details .tt-act { min-height:var(--tap); }
+html[data-size="compact"] .agent-activity-toggle time { display:none; }
+
+.agent-activity-toggle .agent-activity-failure { margin:0; }

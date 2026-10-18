@@ -48,3 +48,7 @@ html[data-pointer="coarse"] .agent-capability-dialog .ant-input { min-height:var
 .agent-capability-cli .agent-capability-help p { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); margin:0; }
 .agent-capability-cli code { min-width:0; overflow-wrap:anywhere; }
 .agent-capability-cli .ant-switch { flex-shrink:0; }
+
+.agent-capability-reference-nav { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-3); }
+.agent-capability-reference-nav [aria-pressed="true"] { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
+html[data-pointer="coarse"] .agent-capability-reference-nav .ant-btn { min-height:var(--tap); }

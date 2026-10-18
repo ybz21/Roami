@@ -11,3 +11,17 @@ export function agentTimeline(messages: AgentMessage[], activities: AgentActivit
   ]
   return entries.sort((a, b) => timed && a.time !== undefined && b.time !== undefined && a.time !== b.time ? a.time - b.time : a.position - b.position || a.id.localeCompare(b.id))
 }
+
+export type AgentTimelineGroup = { id: string; message: AgentMessage; activities?: never } | { id: string; activities: AgentActivityItem[]; message?: never }
+export function groupAgentTimeline(entries: AgentTimelineEntry[]): AgentTimelineGroup[] {
+  const groups: AgentTimelineGroup[] = []
+  for (const entry of entries) {
+    if (entry.message) groups.push({ id: entry.id, message: entry.message })
+    else {
+      const previous = groups[groups.length - 1]
+      if (previous?.activities) previous.activities.push(entry.activity)
+      else groups.push({ id: entry.id, activities: [entry.activity] })
+    }
+  }
+  return groups
+}

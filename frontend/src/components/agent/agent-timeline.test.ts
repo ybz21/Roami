@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { agentTimeline } from './agent-timeline'
+import { agentTimeline, groupAgentTimeline } from './agent-timeline'
 import { modelLabel } from './agent-models'
 import type { AgentActivityItem, AgentMessage } from './agent-protocol'
 const message = (id: string, created_ms: number, text = id): AgentMessage => ({ id, branch_id: 'b', role: 'assistant', seq: created_ms, created_ms, status: 'completed', content: { text } })
@@ -15,4 +15,14 @@ it('uses one Unicode-safe middle ellipsis rule for model labels and keeps short 
   expect(modelLabel('deepseek-4.1-flash')).toBe('deepseek…1-flash')
   expect(modelLabel('blade-35b')).toBe('blade-35b')
   expect(modelLabel('provider/a-very-long-model-name-1234567')).toBe('provider…1234567')
+})
+
+
+it('groups consecutive activities without moving them past user or assistant messages', () => {
+  const first = { id: 'a', kind: 'tool', name: 'read', state: 'succeeded', startedMs: 1, updatedMs: 1, anchorMessageId: 'm' } as const
+  const message = { id: 'reply', branch_id: 'b', role: 'assistant', status: 'completed', seq: 1, content: { text: 'Reply' } }
+  const grouped = groupAgentTimeline([{ id: 'a', activity: first }, { id: 'b', activity: { ...first, id: 'b' } }, { id: 'reply', message }, { id: 'c', activity: { ...first, id: 'c' } }])
+  expect(grouped.map(group => group.id)).toEqual(['a', 'reply', 'c'])
+  expect(grouped[0].activities?.map(item => item.id)).toEqual(['a', 'b'])
+  expect(grouped[1].message).toBe(message)
 })

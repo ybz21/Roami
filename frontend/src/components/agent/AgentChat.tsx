@@ -1,4 +1,4 @@
-import { agentTimeline } from './agent-timeline'
+import { agentTimeline, groupAgentTimeline } from './agent-timeline'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
@@ -64,7 +64,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const compacting = compact?.state === 'queued' || compact?.state === 'running' || compact?.state === 'started'
   const activity = thread.view?.activities || []
   const bodies = (thread.view?.messages || []).filter(m => (m.role === 'user' || m.role === 'assistant'))
-  const timeline = agentTimeline(bodies, activity)
+  const timeline = groupAgentTimeline(agentTimeline(bodies, activity))
   const visible = bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming')
   const eventIds = visible.map((m) => m.completedEventId || '').join(',')
   useVisibleAgentReads(!panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
@@ -194,7 +194,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
       <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
-        <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq} answer={async text => await submit(text, false, true) === true} /> : <AgentActivity key={entry.id} items={[entry.activity]} onSession={onSession} />)}</div>
+        <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq} answer={async text => await submit(text, false, true) === true} /> : <AgentActivity key={entry.id} items={entry.activities} conversationId={thread.view?.conversation.id} branchId={thread.view?.branchId} onSession={onSession} />)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>

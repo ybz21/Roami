@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { AgentCapabilities } from './agent-capabilities'
 import { api } from '../../api'
 vi.mock('../../api', () => ({ api: vi.fn() }))
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
 vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t }) } })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
@@ -67,4 +68,19 @@ it('shows seven tools and manages business operations in a separate CLI tab', as
   fireEvent.click(screen.getByText('agent.capabilities.cliCommands'))
   fireEvent.click(screen.getByRole('switch'))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-settings', { kind: 'tools', name: 'http_external', enabled: false }))
+})
+
+
+it('opens built-in skill reference documents without any edit or enable controls', async () => {
+  const builtin = { ...skill, source: 'builtin', mutable: false, references: { 'references/chrome.md': { text: '# Chrome operations\nUse roami chrome tabs.', version: 'r1' } } }
+  vi.mocked(api).mockResolvedValue({ data: { ...catalog, skills: [builtin] } })
+  render(<AgentCapabilities kind="skills" />)
+  await screen.findByText('roami-dispatch')
+  expect(screen.queryByRole('switch')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.capabilities.content' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'chrome.md' }))
+  expect(await screen.findByRole('heading', { name: 'Chrome operations' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.capabilities.skillOverview' }))
+  expect(screen.getByText('Dispatch through the CLI')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.every(call => call[0] === 'GET')).toBe(true)
 })

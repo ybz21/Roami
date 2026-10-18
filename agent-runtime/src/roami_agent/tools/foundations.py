@@ -106,6 +106,9 @@ class ToolDirectory:
             "消息": "send session",
             "浏览器": "browser web",
             "网页": "browser web",
+            "截图": "chrome screenshot",
+            "录屏": "chrome recording",
+            "标签页": "chrome browser",
             "记忆": "memory",
             "提醒": "reminder",
             "任务": "task",
@@ -172,7 +175,10 @@ class ToolDirectory:
         if tool.name == "read":
             path = args["path"]
             if path.startswith("skill://"):
-                name, args = "skill_read", {"name": path.removeprefix("skill://")}
+                skill, separator, reference = path.removeprefix("skill://").partition("/")
+                name, args = "skill_read", {"name": skill}
+                if separator:
+                    args["reference"] = reference
             elif path.startswith("artifact://"):
                 name, args = (
                     "artifact_read",
@@ -284,7 +290,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "read",
-            "Read a file, skill://NAME workflow, or artifact://ID in bounded pages. Use tool_search to discover skills. File access uses the bound workspace or configured roots.",
+            "Read a file, skill://NAME workflow, skill://NAME/references/FILE.md, or artifact://ID. Load only relevant skill references. File access uses the bound workspace or configured roots.",
             registry.registry["file_read"].schema,
             resolved_only,
             main=True,

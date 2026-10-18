@@ -284,3 +284,92 @@ async def test_command_nonzero_exit_is_failed_in_live_events_and_history(store):
     assert "private output" not in json.dumps(activity)
     events = await conversations.events("alice", c["id"])
     assert events[-1]["payload"]["activity"] == activity
+
+
+async def test_payload_details_are_owner_scoped_live_and_not_in_events(store, monkeypatch):
+    import httpx
+    from test_runtime import until
+
+    from roami_agent.server.http import create_app
+
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def query(argv, **kwargs):
+        entered.set()
+        await release.wait()
+        return {"exitCode": 0, "stdout": json.dumps({"data": {"projects": [], "loose": []}})}
+
+    class Model:
+        model = "payload-fixture"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                yield ModelEvent("text", "done")
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {"id": "lookup", "function": {"name": "workspace_overview", "arguments": "{}"}},
+                )
+
+    monkeypatch.setattr(targets, "execute", query)
+    runtime = Runtime(store, Model())
+    try:
+        await runtime.start()
+        conversation = await runtime.conversations.create("alice")
+        await runtime.chat.submit("alice", conversation["id"], "details", "Count projects")
+        await asyncio.wait_for(entered.wait(), 3)
+        snapshot = await runtime.conversations.messages("alice", conversation["id"])
+        activity = snapshot["activities"][0]
+        path = f"/v1/conversations/{conversation['id']}/activities/{activity['id']}"
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "alice"},
+        ) as client:
+            running = (await client.get(path)).json()["data"]
+            assert running["output"] is None
+            assert running["input"]["text"] == "{}"
+            assert (await client.get(path, headers={"X-Roami-Owner": "bob"})).status_code == 404
+            assert (await client.get(path + "?branchId=foreign")).status_code == 404
+            assert (
+                await client.get(path.replace(activity["id"], "tool:foreign"))
+            ).status_code == 404
+            release.set()
+            await until(
+                store, lambda db: row(db, "SELECT id FROM tool_calls WHERE state='succeeded'")
+            )
+            completed = (await client.get(path)).json()["data"]
+            assert completed["state"] == "succeeded" and completed["output"] is not None
+            assert not any(
+                "input" in event["payload"].get("activity", {})
+                for event in await runtime.conversations.events("alice", conversation["id"])
+            )
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE messages SET status='deleted' WHERE id=(SELECT result_message_id FROM tool_calls LIMIT 1)"
+                ),
+                write=True,
+            )
+            assert (await client.get(path)).status_code == 404
+    finally:
+        release.set()
+        await runtime.close()
+
+
+def test_payload_preview_redacts_credentials_and_bounds_large_content():
+    from roami_agent.conversation.activity_payloads import preview
+
+    result = preview(
+        {
+            "headers": {"Authorization": "Bearer example", "Cookie": "private"},
+            "api_key": "private",
+            "imageBase64": "private",
+            "text": "sk-012345678901234567890123",
+            "nested": ["Bearer ABCDEFGHIJKLMNOP"],
+            "large": "x" * 20000,
+        }
+    )
+    assert "private" not in result["text"]
+    assert "0123456789" not in result["text"]
+    assert "ABCDEFGHIJKLMNOP" not in result["text"]
+    assert result["truncated"] and len(result["text"]) == 16000

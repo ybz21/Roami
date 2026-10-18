@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '../../api'
 import { BotIcon, ChevronDown, ChevronRight, ClockIcon, TerminalIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import type { AgentActivityItem } from './agent-protocol'
@@ -16,11 +17,23 @@ export function activityReason(code: string | null | undefined, t: (key: string)
 const knownStates = new Set([...active, ...attention, 'succeeded', 'cancelled', 'waiting_user', 'accepted', 'delivered'])
 export function activityState(state: string) { return knownStates.has(state) ? state : 'unknown' }
 
-export default function AgentActivity({ items, onSession }: { items: AgentActivityItem[]; onSession: (id: string) => void }) {
-  return <>{items.map(item => <ActivityStep key={item.id} item={item} onSession={onSession} />)}</>
+type ActivityProps = { items: AgentActivityItem[]; onSession: (id: string) => void; conversationId?: string; branchId?: string }
+export default function AgentActivity({ items, onSession, conversationId, branchId }: ActivityProps) {
+  const { t } = useI18n(), [expanded, setExpanded] = useState(false)
+  const steps = items.map(item => <ActivityStep key={item.id} item={item} onSession={onSession} conversationId={conversationId} branchId={branchId} />)
+  if (items.length < 2) return <>{steps}</>
+  const latest = items[items.length - 1], problems = items.filter(item => attention.has(activityState(item.state))).length
+  return <section className="agent-activity-group" aria-label={t('agent.activity.title')}>
+    <button type="button" className="agent-activity-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+      <TerminalIcon size={16} /><span className="agent-activity-name">{t('agent.activity.group', { count: items.length })}<small>{latest.name}</small></span>
+      {problems > 0 && <span className="agent-activity-failure">{t('agent.activity.problems', { count: problems })}</span>}
+      <span className="agent-activity-summary">{items.some(item => active.has(item.state)) ? t('agent.activity.state.running') : problems ? t('agent.activity.needsAttention') : t('agent.activity.finished')}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+    </button>
+    {expanded && <div className="agent-activity-group-steps">{steps}</div>}
+  </section>
 }
 
-function ActivityStep({ item, onSession }: { item: AgentActivityItem; onSession: (id: string) => void }) {
+function ActivityStep({ item, onSession, conversationId, branchId }: { item: AgentActivityItem; onSession: (id: string) => void; conversationId?: string; branchId?: string }) {
   const { t, locale } = useI18n(), [expanded, setExpanded] = useState(false)
   const status = activityState(item.state)
   const name = item.kind === 'turn' ? t('agent.activity.reply') : item.kind === 'task' ? t('agent.activity.task', { name: item.name }) : t('agent.activity.' + (toolNames[item.name] || 'tool'), { name: item.name })
@@ -30,15 +43,34 @@ function ActivityStep({ item, onSession }: { item: AgentActivityItem; onSession:
   return <section className={`agent-activity is-${active.has(status) ? 'running' : failed ? 'failed' : status}`} aria-label={t('agent.activity.title')} data-activity-id={item.id} data-state={status}>
     <button type="button" className="agent-activity-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
       {item.kind === 'task' ? <BotIcon size={16} /> : item.name === 'shell' ? <TerminalIcon size={16} /> : <ClockIcon size={16} />}
-      <span className="agent-activity-name">{name}<small>{item.name}</small></span><span className="agent-activity-summary">{state}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+      <span className="agent-activity-name">{name}</span><time dateTime={new Date(item.startedMs).toISOString()}>{formatTime(item.startedMs)}</time><span className="agent-activity-summary">{state}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
     </button>
-    <time dateTime={new Date(item.startedMs).toISOString()}>{formatTime(item.startedMs)}{!active.has(status) && t('agent.activity.updatedAt', { time: formatTime(item.updatedMs) })}</time>
     {failed && <p className="agent-activity-failure" role="status">{state}{t('agent.activity.separator')}{status === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t)}</p>}
     {expanded && <div className="agent-activity-details">
+      <p className="agent-activity-reference">{t('agent.activity.startedAt', { time: formatTime(item.startedMs) })}{t('agent.activity.updatedAt', { time: formatTime(item.updatedMs) })}</p>
+      {conversationId && <ActivityPayload conversationId={conversationId} branchId={branchId} item={item} />}
       {item.target && <code>{item.target}</code>}
       {item.errorCode && <p>{activityReason(item.errorCode, t)} <code>{item.errorCode}</code></p>}
       {item.taskId && <small className="agent-activity-reference">{t('agent.activity.taskId', { id: item.taskId })}</small>}
       {item.kind === 'task' && item.delivered && item.target && <button type="button" className="tt-act" onClick={() => onSession(item.target!)}>{t('agent.activity.openSession')}</button>}
     </div>}
   </section>
+}
+
+
+type PayloadPreview = { text: string; truncated: boolean }
+type ActivityDetail = { id: string; state: string; input: PayloadPreview; output: PayloadPreview | null }
+function ActivityPayload({ conversationId, branchId, item }: { conversationId: string; branchId?: string; item: AgentActivityItem }) {
+  const { t } = useI18n(), [detail, setDetail] = useState<ActivityDetail | null>(null), [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const abort = new AbortController()
+    setDetail(null); setFailed(false)
+    void api('GET', `/agent/conversations/${encodeURIComponent(conversationId)}/activities/${encodeURIComponent(item.id)}${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`, undefined, { signal: abort.signal })
+      .then(({ data }) => { if (!abort.signal.aborted) setDetail(data) })
+      .catch(() => { if (!abort.signal.aborted) setFailed(true) })
+    return () => abort.abort()
+  }, [conversationId, branchId, item.id, item.updatedMs, item.state, attempt])
+  if (failed) return <div role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={() => setAttempt(attempt + 1)}>{t('agent.retry')}</button></div>
+  if (!detail) return <p role="status">{t('agent.activity.loadingDetails')}</p>
+  return <div className="agent-activity-payloads">{(['input', 'output'] as const).map(kind => <details key={kind} open={kind === 'output'}><summary>{t(`agent.activity.${kind}`)}</summary>{detail[kind] ? <><pre>{detail[kind]!.text}</pre>{detail[kind]!.truncated && <p>{t('agent.activity.previewTruncated')}</p>}</> : <p>{t('agent.activity.noOutput')}</p>}</details>)}</div>
 }

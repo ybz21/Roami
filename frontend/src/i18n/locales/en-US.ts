@@ -2894,9 +2894,21 @@ const enUS = {
   'agent.capabilities.tab.mcp': "MCP",
   'agent.capabilities.tab.skills': "Skill",
   'agent.capabilities.tab.cli': "CLI",
-  'agent.capabilities.skillDescription.roami-dispatch': "Manage Roami projects and sessions: discover targets, message Codex / Claude, create background work and projects, and track results.",
+  'agent.capabilities.skillDescription.roami-dispatch': 'Use Roami CLI for projects, sessions, background tasks, Chrome interactions, screenshots and recordings; load operation guides on demand.',
   'agent.capabilities.skillDescription.web-research': "Retrieve and verify web content through Roami Chrome CLI, preserving sources, retrieval time and actual execution state.",
   'agent.capabilities.builtinFixed': 'Built-in · always enabled',
+  'agent.capabilities.skillOverview': 'Skill overview',
+  'agent.activity.group': 'Execution · {count} actions',
+  'agent.activity.problems': '{count} need attention',
+  'agent.activity.input': 'Input',
+  'agent.activity.output': 'Output',
+  'agent.activity.detailsUnavailable': 'Details are unavailable, removed, or outside this conversation.',
+  'agent.activity.loadingDetails': 'Loading execution details…',
+  'agent.activity.previewTruncated': 'Showing a preview of this long result.',
+  'agent.activity.noOutput': 'No output yet.',
+  'agent.activity.needsAttention': 'Needs attention',
+  'agent.activity.finished': 'Finished',
+  'agent.activity.startedAt': 'Started {time}',
 }
 
 export default enUS

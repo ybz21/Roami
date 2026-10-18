@@ -18,12 +18,29 @@ def register_skills(registry, settings):
             if root not in resolved.parents or resolved.stat().st_size > 64_000:
                 continue
             text = resolved.read_text()
+            references = {}
+            for reference in sorted((resolved.parent / "references").glob("*.md")):
+                target = reference.resolve()
+                if (
+                    target.parent != resolved.parent / "references"
+                    or target.stat().st_size > 64_000
+                ):
+                    continue
+                content = target.read_text()
+                references["references/" + reference.name] = {
+                    "text": content,
+                    "version": hashlib.sha256(content.encode()).hexdigest(),
+                }
+            digest = hashlib.sha256(text.encode())
+            for reference, content in references.items():
+                digest.update(("\0" + reference + "\0" + content["version"]).encode())
             name = path.parent.name
             if name in skills:
                 raise DomainError("DUPLICATE_SKILL")
             skills[name] = {
                 "text": text,
-                "version": hashlib.sha256(text.encode()).hexdigest(),
+                "version": digest.hexdigest(),
+                "references": references,
                 "source": "builtin" if root == builtin else "configured",
                 "description": next(
                     (
@@ -40,6 +57,11 @@ def register_skills(registry, settings):
             if args["name"] in registry.disabled_skills:
                 raise DomainError("SKILL_DISABLED")
             value = skills[args["name"]]
+            if args.get("reference"):
+                reference = value["references"].get(args["reference"])
+                if not reference:
+                    raise DomainError("SKILL_REFERENCE_NOT_FOUND", 404)
+                return {**reference, "skillVersion": value["version"]}
             return {"text": value["text"], "version": value["version"]}
 
         registry.add(
@@ -47,7 +69,16 @@ def register_skills(registry, settings):
                 "skill_read",
                 "Read a workflow skill when needed. roami-dispatch covers project/session routing; web-research covers current public information through Roami Chrome CLI. Available: "
                 + ", ".join(skills),
-                object_schema({"name": {"type": "string", "enum": list(skills)}}, ["name"]),
+                object_schema(
+                    {
+                        "name": {"type": "string", "enum": list(skills)},
+                        "reference": {
+                            "type": "string",
+                            "pattern": r"^references/[a-zA-Z0-9_-]+\.md$",
+                        },
+                    },
+                    ["name"],
+                ),
                 skill,
                 main=True,
             )

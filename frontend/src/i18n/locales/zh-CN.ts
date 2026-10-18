@@ -2903,9 +2903,21 @@ const zhCN = {
   'agent.capabilities.tab.mcp': "MCP",
   'agent.capabilities.tab.skills': "Skill",
   'agent.capabilities.tab.cli': "CLI",
-  'agent.capabilities.skillDescription.roami-dispatch': "管理 Roami 项目与会话：发现目标、向已有 Codex / Claude 会话发消息、新建后台任务与项目、跟踪和回报结果。",
+  'agent.capabilities.skillDescription.roami-dispatch': '通过 Roami CLI 管理项目、会话、后台任务及 Chrome 网页操作、截图与录屏；按需查看操作手册。',
   'agent.capabilities.skillDescription.web-research': "通过 Roami Chrome CLI 获取并核对网页内容，保留来源、采集时间和真实执行状态。",
   'agent.capabilities.builtinFixed': '内置 · 固定启用',
+  'agent.capabilities.skillOverview': '技能概览',
+  'agent.activity.group': '执行过程 · {count} 个动作',
+  'agent.activity.problems': '{count} 项需关注',
+  'agent.activity.input': '输入',
+  'agent.activity.output': '输出',
+  'agent.activity.detailsUnavailable': '详情不可用，可能已删除或不属于当前对话。',
+  'agent.activity.loadingDetails': '正在读取执行详情…',
+  'agent.activity.previewTruncated': '内容较长，仅展示预览。',
+  'agent.activity.noOutput': '尚无输出。',
+  'agent.activity.needsAttention': '需要关注',
+  'agent.activity.finished': '已结束',
+  'agent.activity.startedAt': '开始于 {time}',
 }
 
 export default zhCN

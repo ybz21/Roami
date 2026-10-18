@@ -321,6 +321,10 @@ def create_app(runtime, *, manage_lifecycle=True):
             )
         }
 
+    @app.get("/v1/conversations/{cid}/activities/{aid}")
+    async def activity_detail(cid: str, aid: str, owner: Owner, branchId: str | None = None):
+        return {"data": await runtime.conversations.activity_detail(owner, cid, aid, branchId)}
+
     @app.get("/v1/conversations/{cid}/messages")
     async def messages(cid: str, owner: Owner, branch: str | None = None):
         return {"data": await runtime.conversations.messages(owner, cid, branch)}

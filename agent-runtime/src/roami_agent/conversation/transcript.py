@@ -101,6 +101,11 @@ class Conversations:
     async def get(self, owner, cid):
         return await self.db.call(lambda db: owned(db, owner, cid))
 
+    async def activity_detail(self, owner, cid, aid, branch_id=None):
+        from roami_agent.conversation.activity_payloads import activity_payload
+
+        return await self.db.call(lambda db: activity_payload(db, owner, cid, aid, branch_id))
+
     async def messages(self, owner, cid, branch_id=None):
         def read(db):
             c = owned(db, owner, cid)
