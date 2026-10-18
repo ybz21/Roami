@@ -1,0 +1,59 @@
+[
+  {
+    "id": "memory-token-unit",
+    "observed": {
+      "reportedTokenEstimate": 600,
+      "piCharacterEstimate": 50,
+      "characters": 200
+    },
+    "confirmed": true,
+    "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+  },
+  {
+    "id": "oversized-write-result",
+    "observed": {
+      "syntheticEffects": 1,
+      "toolState": "failed",
+      "turnState": "completed",
+      "turnError": null,
+      "modelRequests": 2
+    },
+    "confirmed": true,
+    "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+  },
+  {
+    "id": "write-response-timeout",
+    "observed": {
+      "syntheticEffects": 1,
+      "toolState": "failed",
+      "turnState": "completed",
+      "turnError": null,
+      "modelRequests": 2
+    },
+    "confirmed": true,
+    "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+  },
+  {
+    "id": "oversized-current-tool-round",
+    "observed": {
+      "syntheticEffects": 0,
+      "toolState": "succeeded",
+      "turnState": "failed",
+      "turnError": "CONTEXT_TOO_LARGE",
+      "modelRequests": 1
+    },
+    "confirmed": true,
+    "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+  },
+  {
+    "id": "provider-context-overflow",
+    "observed": {
+      "error": "MODEL_HTTP_400",
+      "providerRequests": 1,
+      "compactionJobs": 0,
+      "turnState": "failed"
+    },
+    "confirmed": true,
+    "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+  }
+]

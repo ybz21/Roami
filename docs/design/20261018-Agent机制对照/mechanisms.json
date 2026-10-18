@@ -1,0 +1,517 @@
+{
+  "date": "2026-10-18",
+  "piCommit": "482c1381a00d8d00bc81697e4a980c593db6803e",
+  "roamiCommit": "1ef1fa8326c4ef7ca206050ce590579ddc1006fc",
+  "scope": "Read-only mechanism audit; proposals are not approved design changes",
+  "mechanisms": [
+    {
+      "id": "M01",
+      "group": "模型",
+      "title": "供应商与模型协议",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/ai/README.md",
+      "localFile": "agent-runtime/src/roami_agent/providers/chat_completions.py",
+      "pi": "pi-ai 提供多供应商适配和统一模型协议。",
+      "current": "当前只有 OpenAI-compatible Chat Completions；支持显式 Main/Worker 路由及配置指纹。",
+      "next": "先保留当前服务适配；需要原生 Anthropic/Responses 等协议时增加独立 provider，不能只替换 URL。"
+    },
+    {
+      "id": "M02",
+      "group": "模型",
+      "title": "模型窗口与输出预留",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/coding-agent/docs/models.md",
+      "localFile": "agent-runtime/src/roami_agent/server/configuration.py",
+      "pi": "模型元数据携带 contextWindow/maxTokens。",
+      "current": "输入 token cap 已生效；模型窗口可选、默认为未知，窗口/预留目前是全局运行时配置。",
+      "next": "按 Main/Worker 各自模型绑定已核实窗口与输出上限；避免切模型后沿用错误容量。"
+    },
+    {
+      "id": "M03",
+      "group": "循环",
+      "title": "工具循环与上下文投影",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/agent/src/agent-loop.ts",
+      "localFile": "agent-runtime/src/roami_agent/core/loop.py",
+      "pi": "模型响应、工具执行、后续响应分阶段循环，并允许转换模型上下文。",
+      "current": "Loop 已通过 ports 隔离；每次模型请求重建持久化投影，工具结果回到下一轮。",
+      "next": "保留分层与持久化，不为对齐包名重写。"
+    },
+    {
+      "id": "M04",
+      "group": "循环",
+      "title": "工具并发",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/agent/src/agent-loop.ts",
+      "localFile": "agent-runtime/src/roami_agent/core/loop.py",
+      "pi": "当前 Pi 支持并发与串行批次，工具可要求顺序执行。",
+      "current": "同一次模型响应的工具全部依次 await；独立 Worker 任务可并发。",
+      "next": "优先考虑无冲突只读工具并发；写操作、同资源操作继续串行，并保持结果顺序。"
+    },
+    {
+      "id": "M05",
+      "group": "循环",
+      "title": "Steering 与 follow-up",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/agent/src/agent.ts",
+      "localFile": "agent-runtime/src/roami_agent/conversation/mailbox.py",
+      "pi": "运行中 steering 和自然结束后的 follow-up 分开排队。",
+      "current": "Main 同分支输入按 turn 排队；/stop 可中断，任务有 revision/steer，但不是同一套中途插话语义。",
+      "next": "设计继续追问、立即改意图、稍后追加三种输入；在安全边界消费，避免快问快答被长工具阻塞。"
+    },
+    {
+      "id": "M06",
+      "group": "流式",
+      "title": "正文流与事件重放",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/agent/src/agent-loop.ts",
+      "localFile": "agent-runtime/src/roami_agent/server/http.py",
+      "pi": "agent-core 提供模型与工具生命周期事件。",
+      "current": "正文首段落盘并 SSE 推送；支持 cursor/Last-Event-ID、断线重放、持久化调用链。",
+      "next": "保留 Go 统一入口和事件落盘后推送。"
+    },
+    {
+      "id": "M07",
+      "group": "流式",
+      "title": "思考与工具参数增量",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/ai/README.md",
+      "localFile": "agent-runtime/src/roami_agent/providers/chat_completions.py",
+      "pi": "提供 thinking 与 tool-call 参数等增量事件。",
+      "current": "主要暴露正文流；工具参数在完成后汇总，未统一 thinking 事件和显示策略。",
+      "next": "增加标准事件类型与兼容策略；只展示供应商公开返回的内容。"
+    },
+    {
+      "id": "M08",
+      "group": "工具",
+      "title": "参数校验与错误回传",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/agent/src/agent-loop.ts",
+      "localFile": "agent-runtime/src/roami_agent/tools/registry.py",
+      "pi": "工具参数解析、校验、执行结果进入循环。",
+      "current": "JSON Schema 校验、工具可见范围和结构化错误已存在。",
+      "next": "保留；补齐错误的结果确定性分类，见 M10。"
+    },
+    {
+      "id": "M09",
+      "group": "工具",
+      "title": "大输出与产物外置",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/coding-agent/src/core/tools/truncate.ts",
+      "localFile": "agent-runtime/src/roami_agent/tools/registry.py",
+      "pi": "内置文件/Shell 工具有有界输出与截断策略；输出大小限制与 token 窗口分开。",
+      "current": "Shell/MCP/文件已有产物外置；通用工具超出 128 KB 时仍直接报错，HTTP 也有直接截断失败路径。",
+      "next": "统一摘要/截断/产物引用协议；完成动作后不要因为输出大而谎报动作失败。F02 已复现。"
+    },
+    {
+      "id": "M10",
+      "group": "工具",
+      "title": "写效果未知与重试",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/tools/gateway.py",
+      "pi": "durable 提供任务生命周期；外部效果的幂等/确认仍取决于工具实现。",
+      "current": "CLI/MCP 对部分未知结果有专门处理；通用 HTTP/工具错误会把部分写结果记为 failed。",
+      "next": "先补 write 的确定失败、执行成功但回执缺失、未知三分法；未知不得自动重放。F01/F02 已复现，不声称 Pi 保证外部 exactly-once。"
+    },
+    {
+      "id": "M11",
+      "group": "上下文",
+      "title": "token 估算和 usage 校准",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/coding-agent/src/core/compaction/compaction.ts",
+      "localFile": "agent-runtime/src/roami_agent/context/token_estimate.py",
+      "pi": "有效 usage 加后续字符估计；无 usage 使用 chars/4；图片采用占位估计。",
+      "current": "请求准入、上下文面板与 /status 已使用统一机制，计入系统提示、工具及结果。",
+      "next": "保持“预估”标签，字符估计不是模型 tokenizer；保留真实 usage 校准。"
+    },
+    {
+      "id": "M12",
+      "group": "上下文",
+      "title": "失效旧 usage",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/coding-agent/src/core/compaction/compaction.ts",
+      "localFile": "agent-runtime/src/roami_agent/context/projection.py",
+      "pi": "压缩/上下文编辑后的旧计数不再直接使用。",
+      "current": "请求配置、来源前缀指纹、snapshot、memory epoch 校验；模型/工具/历史变更后回退估算。",
+      "next": "保留；已测试模型切换、编辑、压缩及遗忘。"
+    },
+    {
+      "id": "M13",
+      "group": "上下文",
+      "title": "供应商溢出与截断恢复",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/coding-agent/src/core/agent-session.ts",
+      "localFile": "agent-runtime/src/roami_agent/providers/chat_completions.py",
+      "pi": "coding-agent 区分上下文溢出与可恢复的长度截断，限制压缩重试次数。",
+      "current": "目前请求前预估；供应商上下文溢出 400 仅映射 MODEL_HTTP_400，length 终止直接失败。",
+      "next": "安全提取错误类别后压缩并有限续答；不得输出原始错误体或重放写工具。F05 已复现。"
+    },
+    {
+      "id": "M14",
+      "group": "上下文",
+      "title": "长工具回合与切分",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/coding-agent/src/core/compaction/compaction.ts",
+      "localFile": "agent-runtime/src/roami_agent/context/projection.py",
+      "pi": "支持部分长回合的分段摘要，并选择合法边界。",
+      "current": "只切完整轮次；正在进行的工具回合过大时无法压缩，直接拒绝。",
+      "next": "为已完成工具阶段设计安全切点，并配合大结果外置；保留调用/结果配对。F04 已复现。"
+    },
+    {
+      "id": "M15",
+      "group": "上下文",
+      "title": "增量摘要",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/coding-agent/src/core/compaction/compaction.ts",
+      "localFile": "agent-runtime/src/roami_agent/context/projection.py",
+      "pi": "可带上 previousSummary 更新新历史。",
+      "current": "当前摘要请求仍构造所选原始前缀；重复压缩可能反复发送很长的旧历史。",
+      "next": "改为有效旧摘要加新增待压缩片段；保留来源指纹和遗忘失效校验。此项是源码推断，未压测供应商极限。"
+    },
+    {
+      "id": "M16",
+      "group": "会话",
+      "title": "追加历史与分支",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/coding-agent/src/core/session-manager.ts",
+      "localFile": "agent-runtime/src/roami_agent/conversation/transcript.py",
+      "pi": "coding-agent 支持会话树与分支投影；durable 也有 conversation/fork。",
+      "current": "SQLite 追加消息、祖先分支投影及 fork 已实现；仅允许安全的完整助手回复点，未提供同等完整的树导航。",
+      "next": "保留安全 fork；若需要自由切换历史分支，再补树和分支摘要入口。"
+    },
+    {
+      "id": "M17",
+      "group": "持久化",
+      "title": "输入幂等与事务事件",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/storage/database.py",
+      "pi": "durable 把接收、状态和可见事件建立在提交之上。",
+      "current": "请求键校验、SQLite 单写队列、事务事件、日志重放与备份已有实现。",
+      "next": "保留；不能把不同持久化技术当成缺失功能。"
+    },
+    {
+      "id": "M18",
+      "group": "持久化",
+      "title": "断点与重启恢复",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/conversation/transcript.py",
+      "pi": "durable 有 phase checkpoint、睡眠和故障停泊等机制；该包标记 Experimental。",
+      "current": "运行中 turn 中断、未决工具 unknown；编码任务通过 Go 外部 runner 核对，具备部分恢复。",
+      "next": "当前保守恢复合理；需要原生任务逐阶段恢复/崩溃停泊时另做状态协议，不照搬实验 API。"
+    },
+    {
+      "id": "M19",
+      "group": "委派",
+      "title": "Main/Worker 与父子任务",
+      "status": "扩展",
+      "priority": "保留",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/dispatch/tasks.py",
+      "pi": "基础 CLI 的子智能体通常由扩展提供；durable 包已有子任务和 subagent 机制。",
+      "current": "原生 Worker、父子关系、深度与预算、结果回主对话已实现。",
+      "next": "保留产品调度；后续补更完整 DAG 依赖/检查点时参考 durable，但不声称 Pi 没有子任务。"
+    },
+    {
+      "id": "M20",
+      "group": "委派",
+      "title": "Codex/Claude 与项目派活",
+      "status": "扩展",
+      "priority": "保留",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/executors/roami_cli.py",
+      "pi": "Pi 提供扩展/执行宿主接口；不是 Roami 项目与 tmux 会话管理器。",
+      "current": "统一 Go CLI 接入已有会话、新散会话、项目 worktree、新项目，入队/送达/结束/核验分开。",
+      "next": "保留；旧会话的自动完成回报仍须真实生命周期回调。此前 12 场景验收记录仅作已有证据，本轮未重跑外部 Agent。"
+    },
+    {
+      "id": "M21",
+      "group": "委派",
+      "title": "取消与资源租约",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/dispatch/resource_leases.py",
+      "pi": "durable 区分取消等待与取消任务，并建立任务所有权。",
+      "current": "/stop、任务取消、进程组停止、lease/epoch 和执行回执按不同边界处理。",
+      "next": "保留层次；通用写工具异常分类仍需 M10 补齐。"
+    },
+    {
+      "id": "M22",
+      "group": "记忆",
+      "title": "任务/对话/每日记忆",
+      "status": "扩展",
+      "priority": "保留",
+      "piFile": "packages/coding-agent/docs/skills.md",
+      "localFile": "agent-runtime/src/roami_agent/memory/records.py",
+      "pi": "技能和项目上下文不等同于 Roami 所需的长期记忆业务。",
+      "current": "来源、scope、候选确认、每日整理、FTS 检索和遗忘传播已存在。",
+      "next": "保留自有记忆层；目前是词法检索，不能宣传为 embedding 语义召回。"
+    },
+    {
+      "id": "M23",
+      "group": "记忆",
+      "title": "检索长度口径",
+      "status": "部分",
+      "priority": "P1",
+      "piFile": "packages/coding-agent/src/core/compaction/compaction.ts",
+      "localFile": "agent-runtime/src/roami_agent/retrieval/memory_search.py",
+      "pi": "Pi 的字符 token 估计与请求上下文预算具有明确单位。",
+      "current": "检索命中的 tokenEstimate 仍是 len(body.encode())；200 汉字样本报 600，当前字符估计为 50。",
+      "next": "统一 tokenEstimate 或明确改名 bytes；50 仅是 Pi 字符估计，不是中文真实分词。F03 已复现。"
+    },
+    {
+      "id": "M24",
+      "group": "缓存",
+      "title": "前缀、会话身份与协议",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/ai/README.md",
+      "localFile": "agent-runtime/src/roami_agent/providers/request_policy.py",
+      "pi": "pi-ai 有供应商适配；durable 保留各会话 provider identity。",
+      "current": "已有稳定配置指纹、显式 cache 能力开关与 usage；实际参数采用当前兼容服务的字段。",
+      "next": "逐供应商验证字段和会话 affinity；观察真实 cache usage，不凭打开开关宣称命中。"
+    },
+    {
+      "id": "M25",
+      "group": "MCP",
+      "title": "连接、暴露与认证",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/coding-agent/docs/mcp.md",
+      "localFile": "agent-runtime/src/roami_agent/tools/mcp.py",
+      "pi": "当前 coding-agent 有 MCP 配置、暴露和认证机制；不能沿用“Pi 无 MCP”的旧结论。",
+      "current": "支持配置的 stdio/HTTP MCP、结果外置、进度与未知结果处理，主要作为 Worker 工具加载。",
+      "next": "补按需发现/启用策略；OAuth/动态管理按实际需求实现，不直接向 Main 塞全部 schema。"
+    },
+    {
+      "id": "M26",
+      "group": "技能",
+      "title": "技能发现与按需加载",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/coding-agent/docs/skills.md",
+      "localFile": "agent-runtime/src/roami_agent/tools/worker_catalog.py",
+      "pi": "SKILL.md frontmatter、渐进加载、附属资源和命令入口。",
+      "current": "启动扫描根目录、skill_read 按名读取；尚未等同于完整元数据索引、reload 与命令暴露。",
+      "next": "先补 description 元数据与版本刷新；继续限制目录来源。"
+    },
+    {
+      "id": "M27",
+      "group": "扩展",
+      "title": "生命周期钩子与热加载",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/coding-agent/docs/extensions.md",
+      "localFile": "agent-runtime/src/roami_agent/protocol/ports.py",
+      "pi": "有模型请求、工具前后、上下文和会话等扩展机制。",
+      "current": "内部 ports 可替换依赖，工具注册可扩展；尚无同等公共扩展 ABI/热加载生命周期。",
+      "next": "内部模块足够时保持简洁；需要第三方插件再定义 versioned hooks。"
+    },
+    {
+      "id": "M28",
+      "group": "交互",
+      "title": "斜线命令与历史操作",
+      "status": "部分",
+      "priority": "P2",
+      "piFile": "packages/coding-agent/docs/rpc.md",
+      "localFile": "agent-runtime/src/roami_agent/protocol/commands.py",
+      "pi": "coding-agent/RPC 的模型、会话、压缩和运行控制接口更多。",
+      "current": "已提供 compact/status/tasks/memory/stop/help；模型切换走输入卡，历史另有界面入口。",
+      "next": "优先考虑 /new、/model、/context、/retry 的明确语义；retry 必须受未知写结果约束。"
+    },
+    {
+      "id": "M29",
+      "group": "界面",
+      "title": "Browser/Computer 与人工接管",
+      "status": "扩展",
+      "priority": "保留",
+      "piFile": "packages/coding-agent/docs/extensions.md",
+      "localFile": "agent-runtime/src/roami_agent/dispatch/resource_controls.py",
+      "pi": "通过工具和扩展接入宿主能力。",
+      "current": "观察、lease/scene epoch、截图来源、坐标、接管与恢复有专门实现。",
+      "next": "保留资源协议；不能从租约存在推断任意页面/桌面任务都已验收。"
+    },
+    {
+      "id": "M30",
+      "group": "消息",
+      "title": "主动消息、红点与提醒",
+      "status": "扩展",
+      "priority": "保留",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/replies/delivery_outbox.py",
+      "pi": "durable 提供持久化调度和睡眠基础，产品通知由宿主构建。",
+      "current": "持久化回报、未读确认、主动建议、提醒、每日简报和回原会话已实现。",
+      "next": "保留；投递不确定状态和用户看见/读过必须分开。"
+    },
+    {
+      "id": "M31",
+      "group": "边界",
+      "title": "Go 统一鉴权与进程隔离",
+      "status": "取舍",
+      "priority": "保留",
+      "piFile": "README.md",
+      "localFile": "agent-runtime/src/roami_agent/tools/process.py",
+      "pi": "Pi CLI 默认继承宿主权限，不等于内建强隔离。",
+      "current": "Go 统一鉴权、私有本地服务、工作区路径检查与密钥环境过滤；Shell argv 仍继承系统用户能力。",
+      "next": "保留 Go 入口；cwd/root 校验和 lease 都不是 OS 沙箱。需隔离时另接容器/系统沙箱。"
+    },
+    {
+      "id": "M32",
+      "group": "验证",
+      "title": "已有测试与本轮证据",
+      "status": "具备",
+      "priority": "保留",
+      "piFile": "packages/durable/README.md",
+      "localFile": "agent-runtime/src/roami_agent/observability/prompt_manifests.py",
+      "pi": "Pi 有自身测试和检查点/事件机制；本轮没有运行其完整测试。",
+      "current": "当前已通过 420 个 Python 与 635 个前端测试；本轮额外执行 5 个隔离探针。",
+      "next": "保留证据分级：源码比较、既有测试、本轮复现，不能写成同条件性能实测。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F01",
+      "priority": "P1",
+      "title": "写响应超时被记为确定失败",
+      "probe": "write-response-timeout",
+      "impact": "已产生效果的写可能被模型误判并重试；未观测到真实重复发送。",
+      "proposal": "按 effect 与确认信息区分 failed/unknown，未知不重放。"
+    },
+    {
+      "id": "F02",
+      "priority": "P1",
+      "title": "写完成后输出过大也记为失败",
+      "probe": "oversized-write-result",
+      "impact": "执行结果与输出传输失败混在一个状态；原生验收可能看不到未知写。",
+      "proposal": "统一产物外置与截断回执，保留动作的真实结果确定性。"
+    },
+    {
+      "id": "F03",
+      "priority": "P1",
+      "title": "记忆检索仍以字节冒充 tokenEstimate",
+      "probe": "memory-token-unit",
+      "impact": "提示给模型的记忆长度元数据与请求预算口径不一致。",
+      "proposal": "复用 token_estimate 或明确区分存储大小字段。"
+    },
+    {
+      "id": "F04",
+      "priority": "P1",
+      "title": "长工具回合超限后不能继续",
+      "probe": "oversized-current-tool-round",
+      "impact": "工具已成功，后续回复却因当前轮没有安全切点失败。",
+      "proposal": "大结果有界投影配合安全 split-turn；不丢失调用/结果配对。"
+    },
+    {
+      "id": "F05",
+      "priority": "P1",
+      "title": "供应商上下文溢出未触发恢复",
+      "probe": "provider-context-overflow",
+      "impact": "字符估计偏小后真实拒绝，用户只看到普通 MODEL_HTTP_400。",
+      "proposal": "安全识别类别，最多一次压缩重试；不重复执行历史工具。"
+    },
+    {
+      "id": "F06",
+      "priority": "P1",
+      "title": "摘要会重新发送原始旧前缀",
+      "probe": null,
+      "impact": "源码显示重复发送，可能使摘要请求本身过大或慢；未压测极限。",
+      "proposal": "有效旧摘要加增量待压缩片段。"
+    },
+    {
+      "id": "F07",
+      "priority": "P1",
+      "title": "运行中插话语义还不完整",
+      "probe": null,
+      "impact": "同分支新输入排队，长工具期间不能按 steering/follow-up 处理。",
+      "proposal": "先定义消费边界、停止边界和用户可见状态，再实现队列。"
+    },
+    {
+      "id": "F08",
+      "priority": "P1",
+      "title": "窗口配置未按 Main/Worker 路由绑定",
+      "probe": null,
+      "impact": "全局配置无法表达不同模型容量；目前未知窗口没有冒充已知。",
+      "proposal": "模型目录/设置绑定核实元数据，推导各角色输入预算与输出预留。"
+    }
+  ],
+  "probes": [
+    {
+      "id": "memory-token-unit",
+      "observed": {
+        "reportedTokenEstimate": 600,
+        "piCharacterEstimate": 50,
+        "characters": 200
+      },
+      "confirmed": true,
+      "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+    },
+    {
+      "id": "oversized-write-result",
+      "observed": {
+        "syntheticEffects": 1,
+        "toolState": "failed",
+        "turnState": "completed",
+        "turnError": null,
+        "modelRequests": 2
+      },
+      "confirmed": true,
+      "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+    },
+    {
+      "id": "write-response-timeout",
+      "observed": {
+        "syntheticEffects": 1,
+        "toolState": "failed",
+        "turnState": "completed",
+        "turnError": null,
+        "modelRequests": 2
+      },
+      "confirmed": true,
+      "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+    },
+    {
+      "id": "oversized-current-tool-round",
+      "observed": {
+        "syntheticEffects": 0,
+        "toolState": "succeeded",
+        "turnState": "failed",
+        "turnError": "CONTEXT_TOO_LARGE",
+        "modelRequests": 1
+      },
+      "confirmed": true,
+      "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+    },
+    {
+      "id": "provider-context-overflow",
+      "observed": {
+        "error": "MODEL_HTTP_400",
+        "providerRequests": 1,
+        "compactionJobs": 0,
+        "turnState": "failed"
+      },
+      "confirmed": true,
+      "evidence": "isolated synthetic probe; no real external writes or production DB changes"
+    }
+  ]
+}
