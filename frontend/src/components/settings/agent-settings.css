@@ -52,3 +52,5 @@ html[data-pointer="coarse"] .agent-capability-dialog .ant-input { min-height:var
 .agent-capability-reference-nav { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-bottom:var(--sp-3); }
 .agent-capability-reference-nav [aria-pressed="true"] { border-color:var(--accent-border); color:var(--accent); background:var(--accent-soft); }
 html[data-pointer="coarse"] .agent-capability-reference-nav .ant-btn { min-height:var(--tap); }
+
+html[data-pointer="coarse"] .agent-capability-dialog .ant-modal-close::after { content:''; position:absolute; inset:calc(var(--sp-3) / -2); }

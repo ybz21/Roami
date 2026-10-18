@@ -184,3 +184,29 @@ async def test_cli_directory_and_unbound_call_rejection(store):
         )
         assert response.status_code == 409
         assert not await store.call(lambda db: row(db, "SELECT id FROM tool_calls"))
+
+
+async def test_discovery_handles_retired_names_weather_and_kind_misses_without_overview_noise(
+    store,
+):
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        settings=Settings(browser={"enabled": True, "endpoint": "http://127.0.0.1:9222"}),
+    )
+    directory = runtime.tools.directory
+    found = directory.search("web_research", "all", 5)
+    assert found["items"][0]["name"] == "web-research"
+    assert not any(item["name"] == "capability_overview" for item in found["items"])
+    for query in ("web_research", "web_research 联网查询 天气", "今天北京天气"):
+        result = directory.search(query, "cli", 5)
+        assert result["items"] == []
+        assert result["suggestions"][0]["name"] == "web-research"
+        assert "resourceOnly:true" in result["hint"]
+    assert (
+        directory.search("capability_overview", "cli")["items"][0]["name"] == "capability_overview"
+    )
+    assert (
+        directory.search("browser_open", "cli", 5, "research")["items"][0]["name"] == "browser_open"
+    )
+    assert not directory.search("zxqv493", "cli")["items"]

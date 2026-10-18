@@ -7,7 +7,7 @@ description: Find and verify current public information with Roami Chrome CLI th
 
 Main: use `delegate(executor="native", target={kind:"new_session",resourceOnly:true}, goal=...)`. The user lookup request authorizes research; do not create a code project or ask for another approval.
 
-Worker: discover browser CLI operations with `tool_search(kind="cli", query="browser")`. Execute the returned argv with `bash`: `["roami","agent","capability","call",NAME,"--input",JSON]`. These operations use the existing Roami Chrome CLI driver and task resource leases; this task needs no code workspace.
+Worker: known browser CLI operations may run directly; use one `tool_search(kind="cli", query="browser")` only when their schemas are unfamiliar. Do not search for the retired web_research CLI or repeatedly rediscover the same workflow. Execute the returned argv with `bash`: `["roami","agent","capability","call",NAME,"--input",JSON]`. These operations use the existing Roami Chrome CLI driver and task resource leases; this task needs no code workspace.
 
 1. Open a search page or a known authoritative source with the `browser_open` CLI operation. Use a new owned tab, not an arbitrary user's tab. Search queries can be URL-encoded into a search URL. If a search engine shows a challenge or no useful results, navigate the owned tab to another accessible source; never bypass challenges.
 2. Read the returned observation and use the `browser_observe` CLI operation for current DOM text. Navigate with the `browser_act` CLI operation (`kind="goto", observationId=...`) based on the latest observation. Do not guess stale observation IDs.

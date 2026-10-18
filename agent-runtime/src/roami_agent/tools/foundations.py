@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import shlex
 from copy import deepcopy
 from dataclasses import replace
@@ -49,7 +50,7 @@ class ToolDirectory:
 
     def search(self, query="", kind="all", limit=5, role="main"):
         entries = []
-        if kind != "cli" and "read" not in self.registry.disabled_tools:
+        if "read" not in self.registry.disabled_tools:
             for name, value in self.registry.skills.items():
                 if (
                     name in self.registry.disabled_skills
@@ -67,7 +68,7 @@ class ToolDirectory:
                         "location": "skill://" + name,
                     }
                 )
-        if kind != "skill" and "bash" not in self.registry.disabled_tools:
+        if "bash" not in self.registry.disabled_tools:
             for tool in self.operations(role):
                 if tool.name in self.registry.disabled_tools:
                     continue
@@ -98,7 +99,8 @@ class ToolDirectory:
                     }
                 )
         version = hashlib.sha256(encoded(entries).encode()).hexdigest()
-        words = query.casefold().split()
+        normalize = lambda value: re.sub(r"[-_\s]+", " ", value.casefold()).strip()
+        words = normalize(query).split()
         aliases = {
             "会话": "session target",
             "项目": "project workspace target",
@@ -113,6 +115,14 @@ class ToolDirectory:
             "提醒": "reminder",
             "任务": "task",
             "技能": "skill dispatch",
+            "能力": "capability overview",
+            "联网": "web research browser",
+            "天气": "web research weather forecast",
+            "股价": "web research stock quote",
+            "新闻": "web research news",
+            "统计": "workspace overview",
+            "总量": "workspace overview",
+            "取消": "task cancel reminder",
         }
         terms = set(words)
         for word, alternatives in aliases.items():
@@ -120,18 +130,38 @@ class ToolDirectory:
                 terms.update(alternatives.split())
         ranked = []
         for item in entries:
-            haystack = (item["name"] + " " + item["description"]).casefold()
-            score = sum(term in haystack for term in terms) + (
-                10 if query.casefold() == item["name"].casefold() else 0
-            )
+            name, description = normalize(item["name"]), normalize(item["description"])
+            name_score = sum(term in name.split() for term in terms)
+            if item["name"] == "capability_overview" and query and not name_score:
+                continue
+            score = name_score * 20 + sum(term in description for term in terms)
+            if normalize(query) == name:
+                score += 1000
             if not query or score:
-                ranked.append((score, item))
-        ranked.sort(key=lambda entry: (-entry[0], entry[1]["id"]))
-        return {
+                ranked.append((score, name_score, item))
+        ranked.sort(key=lambda entry: (-entry[0], entry[2]["id"]))
+        selected = [entry for entry in ranked if kind == "all" or entry[2]["kind"] == kind]
+        alternatives = [entry for entry in ranked if kind != "all" and entry[2]["kind"] != kind]
+        if alternatives and alternatives[0][1] and not any(entry[1] for entry in selected):
+            selected = []
+        result = {
             "catalogVersion": version,
-            "items": [item for _, item in ranked[:limit]],
-            "truncated": len(ranked) > limit,
+            "items": [item for _, _, item in selected[:limit]],
+            "truncated": len(selected) > limit,
         }
+        if not selected and alternatives:
+            result["suggestions"] = [item for _, _, item in alternatives[:3]]
+            result["hint"] = (
+                "No matching "
+                + kind
+                + " operation. Follow the suggested workflow or capability instead of repeating the same search."
+            )
+            if any(item["name"] == "web-research" for item in result["suggestions"]):
+                result["hint"] += (
+                    " web-research is a Skill, not a web_research CLI command. For public lookups Main can directly delegate "
+                    "executor=native, target={kind:new_session,resourceOnly:true}, passing the user's goal."
+                )
+        return result
 
     def groups(self):
         groups = {}

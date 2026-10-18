@@ -41,6 +41,7 @@ class AgentLoop:
         tid, cid, owner = (turn[k] for k in ["id", "conversation_id", "owner_id"])
         self.turn_tasks[tid] = asyncio.current_task()
         model = self.model if role == "main" else self.worker_model
+        phase = "context"
         try:
             async with asyncio.timeout(self.settings.timeout_for(role)):
                 instructions = (
@@ -73,6 +74,7 @@ class AgentLoop:
                     mid = await self.journal.start(turn)
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
                     first_delta = True
+                    phase = "model"
                     async for part in model.stream(prompt, catalog):
                         if part.kind == "text":
                             text += part.value
@@ -91,6 +93,7 @@ class AgentLoop:
                             calls.append(part.value)
                         elif part.kind == "usage":
                             usage = part.value
+                    phase = "tools"
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
                     if not text.strip() and not calls:
@@ -155,8 +158,13 @@ class AgentLoop:
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
                     catalog = [] if completion else self.tools.catalog(role)
+                    phase = "context"
                     plan, prompt = await self.context.build(turn, instructions, catalog, completion)
                 raise DomainError("AGENT_STEP_LIMIT")
+        except TimeoutError as exc:
+            code = "MODEL_DEADLINE" if phase == "model" else "AGENT_TURN_DEADLINE"
+            await self.journal.fail(turn, "failed", code, completion=completion)
+            raise DomainError(code, 504) from exc
         except BaseException as exc:
             interrupted = isinstance(exc, asyncio.CancelledError) or (
                 isinstance(exc, DomainError) and exc.code == "TURN_INTERRUPTED"

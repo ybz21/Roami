@@ -2909,6 +2909,8 @@ const enUS = {
   'agent.activity.needsAttention': 'Needs attention',
   'agent.activity.finished': 'Finished',
   'agent.activity.startedAt': 'Started {time}',
+  'agent.activity.modelTimeout': 'The model response timed out; this task did not complete.',
+  'agent.activity.turnTimeout': 'The execution turn timed out. Review the steps already completed.',
 }
 
 export default enUS

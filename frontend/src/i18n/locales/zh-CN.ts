@@ -2918,6 +2918,8 @@ const zhCN = {
   'agent.activity.needsAttention': '需要关注',
   'agent.activity.finished': '已结束',
   'agent.activity.startedAt': '开始于 {time}',
+  'agent.activity.modelTimeout': '模型响应超时，本次未完成。',
+  'agent.activity.turnTimeout': '执行回合超时，请查看已完成的步骤。',
 }
 
 export default zhCN

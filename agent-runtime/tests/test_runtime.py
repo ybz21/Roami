@@ -435,3 +435,34 @@ async def test_provider_tool_ids_are_scoped_to_the_turn_for_delegation(store):
         assert len({task["intent_json"] for task in tasks}) == 2
     finally:
         await runtime.close()
+
+
+async def test_outer_model_timeout_keeps_a_specific_deadline_error(store):
+    from dataclasses import replace
+
+    from roami_agent.server.configuration import Settings
+
+    class SlowModel:
+        model = "slow-fixture"
+
+        async def stream(self, messages, tools):
+            await asyncio.sleep(5)
+            yield ModelEvent("text", "too late")
+
+    runtime = Runtime(store, SlowModel(), settings=replace(Settings(), timeout_seconds=1))
+    try:
+        conversation = await runtime.conversations.create("alice")
+        await runtime.start()
+        receipt = await runtime.chat.submit("alice", conversation["id"], "deadline", "hello")
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='failed'", (receipt["turnId"],)
+            ),
+            timeout=3,
+        )
+        events = await runtime.conversations.events("alice", conversation["id"])
+        failed = [event for event in events if event["kind"] == "turn.failed"]
+        assert len(failed) == 1 and failed[0]["payload"]["error"] == "MODEL_DEADLINE"
+    finally:
+        await runtime.close()
