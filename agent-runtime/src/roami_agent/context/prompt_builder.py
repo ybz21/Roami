@@ -3,6 +3,7 @@
 import asyncio
 
 from roami_agent.context.task_evidence import completion_evidence
+from roami_agent.context.token_estimate import request_context, request_tokens
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
@@ -52,11 +53,25 @@ class PromptBuilder:
             )
 
         async def build():
+            workspace = turn.get("workspace")
+            bound = (
+                "\nPrepared task workspace (trusted runtime binding): "
+                + encoded(workspace)
+                + ". Use this directory for project tools; preserve unrelated local changes."
+                if workspace
+                else ""
+            )
             plan = await self.context.project(
                 turn["owner_id"],
                 turn["conversation_id"],
                 branch_id=turn["branch_id"],
                 through_turn=turn["id"],
+                request_context=request_context(
+                    self.settings,
+                    instructions + bound,
+                    catalog,
+                    "worker" if turn.get("executionRunId") else "main",
+                ),
             )
             if completion_source:
                 plan["taskEvidence"] = {
@@ -67,16 +82,6 @@ class PromptBuilder:
                 plan["sourceMessageIds"] = list(
                     dict.fromkeys([*plan.get("sourceMessageIds", []), completion_source])
                 )
-            workspace = turn.get("workspace")
-            bound = (
-                (
-                    "\nPrepared task workspace (trusted runtime binding): "
-                    + encoded(workspace)
-                    + ". Use this directory for project tools; preserve unrelated local changes."
-                )
-                if workspace
-                else ""
-            )
             prompt = [{"role": "system", "content": instructions + bound}] + plan["messages"]
             if completion:
                 # Rebuilds keep evidence before the tool round it initiated.
@@ -90,11 +95,14 @@ class PromptBuilder:
                         + encoded(completion),
                     },
                 )
-            return plan, prompt
+            plain = [{"role": "system", "content": instructions + bound}] + plan["messages"]
+            plan, prompt = await self._images(turn, plan, prompt)
+            supplemental = max(0, request_tokens(prompt, catalog) - request_tokens(plain, catalog))
+            return {**plan, "estimatedTokens": plan["estimatedTokens"] + supplemental}, prompt
 
         plan, prompt = await build()
-        if len(encoded([prompt, catalog]).encode()) <= self.settings.input_budget:
-            return await self._images(turn, plan, prompt)
+        if plan["estimatedTokens"] <= self.settings.context_input_budget:
+            return plan, prompt
         try:
             job = await self.context.request(
                 turn["owner_id"], turn["conversation_id"], "auto:" + turn["id"], automatic=True
@@ -111,18 +119,16 @@ class PromptBuilder:
                 )
             )
         try:
-            overhead = len(encoded([prompt, catalog]).encode()) - len(
-                encoded(plan["messages"]).encode()
-            )
+            overhead = request_tokens(prompt, catalog) - request_tokens(plan["messages"], [])
             await self.context.run(
                 job["id"],
                 safe_turn_id=turn["id"],
-                target_bytes=max(0, self.settings.input_budget - overhead),
+                target_tokens=max(0, self.settings.context_input_budget - overhead),
             )
         except asyncio.CancelledError:
             await self.context.cancel(turn["owner_id"], turn["conversation_id"], job["id"])
             raise
         plan, prompt = await build()
-        if len(encoded([prompt, catalog]).encode()) > self.settings.input_budget:
+        if plan["estimatedTokens"] > self.settings.context_input_budget:
             raise DomainError("CONTEXT_TOO_LARGE", 409)
-        return await self._images(turn, plan, prompt)
+        return plan, prompt

@@ -15,6 +15,7 @@ import uvicorn
 from roami_agent.context.chat_images import ChatImages
 from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
+from roami_agent.context.token_estimate import request_context
 from roami_agent.context.vision_inputs import VisionInputs
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
@@ -125,7 +126,12 @@ class Runtime:
             daily_budget=self.settings.proactive_daily_budget,
             timeout=self.settings.proactive_timeout_seconds,
         )
-        self.context = Context(database, model, input_budget=self.settings.input_budget)
+        self.context = Context(
+            database,
+            model,
+            input_budget=self.settings.input_budget,
+            keep_recent_tokens=self.settings.keep_recent_tokens,
+        )
         self.tools = Tools()
         self.active = {}
         self.turn_tasks = {}
@@ -162,6 +168,10 @@ class Runtime:
         self.desktop = DesktopDriver(database, self.settings, self.resources, self.artifacts)
         if self.desktop.config["enabled"]:
             register_computer_tools(self.tools, self.desktop)
+
+        self.context.request_context = lambda: request_context(
+            self.settings, self.settings.main_instructions, self.tools.catalog("main")
+        )
 
         self.mailbox = TurnMailbox(database)
         self.journal = TurnJournal(database)

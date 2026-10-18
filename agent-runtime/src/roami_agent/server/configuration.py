@@ -64,6 +64,9 @@ class Settings:
     max_steps: int = 16
     max_depth: int = 2
     input_budget: int = 24_000
+    context_window: int | None = None
+    reserve_tokens: int = 16_384
+    keep_recent_tokens: int = 20_000
     timeout_seconds: int = 120
     shell_roots: tuple[Path, ...] = ()
     http_tools: dict = field(default_factory=dict)
@@ -105,6 +108,9 @@ class Settings:
             max_steps=runtime.get("max_steps", 16),
             max_depth=runtime.get("max_depth", 2),
             input_budget=runtime.get("input_budget", 24_000),
+            context_window=runtime.get("context_window"),
+            reserve_tokens=runtime.get("reserve_tokens", 16_384),
+            keep_recent_tokens=runtime.get("keep_recent_tokens", 20_000),
             timeout_seconds=runtime.get("timeout_seconds", 120),
             shell_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("shell_roots", [])),
             skill_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("skill_roots", [])),
@@ -133,6 +139,7 @@ class Settings:
             result.workers,
             result.max_steps,
             result.input_budget,
+            result.keep_recent_tokens,
             result.timeout_seconds,
         ]:
             if not isinstance(value, int) or not 1 <= value <= 1_000_000:
@@ -152,6 +159,16 @@ class Settings:
             or not 1 <= result.brief_timeout_seconds <= 60
         ):
             raise DomainError("INVALID_BRIEF_CONFIG")
+        if (
+            type(result.reserve_tokens) is not int
+            or not 1 <= result.reserve_tokens <= 1_000_000
+            or result.context_window is not None
+            and (
+                type(result.context_window) is not int
+                or not result.reserve_tokens < result.context_window <= 10_000_000
+            )
+        ):
+            raise DomainError("INVALID_RUNTIME_CONFIG")
         if not 0 <= result.max_depth <= 16:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if (
@@ -188,6 +205,12 @@ class Settings:
                 result, worker_route=ModelRoute.worker(worker["model"], result.route("worker"))
             )
         return result
+
+    @property
+    def context_input_budget(self):
+        if self.context_window is None:
+            return self.input_budget
+        return min(self.input_budget, self.context_window - self.reserve_tokens)
 
     def route(self, role="main"):
         if role != "main" and self.worker_route:

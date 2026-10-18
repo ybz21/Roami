@@ -5,6 +5,14 @@ import json
 
 import httpx
 
+from roami_agent.context.token_estimate import (
+    ESTIMATOR,
+    messages_tokens,
+    provider_tokens,
+    request_basis,
+    request_tokens,
+    text_tokens,
+)
 from roami_agent.conversation.attachments import context_attachments
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -101,14 +109,15 @@ def model_entries(messages):
             entry["content"] += (
                 "\n[Previous tool execution was interrupted; its outcome must be reconciled.]"
             )
-        result.append({"message": entry, "turnId": m["turn_id"]})
+        result.append({"message": entry, "turnId": m["turn_id"], "sourceId": m["id"]})
     return result
 
 
 class Context:
-    def __init__(self, database, model, *, input_budget=24_000, keep_rounds=3):
+    def __init__(self, database, model, *, input_budget=24_000, keep_recent_tokens=20_000):
         self.db, self.model = database, model
-        self.input_budget, self.keep_rounds = input_budget, keep_rounds
+        self.input_budget, self.keep_recent_tokens = input_budget, keep_recent_tokens
+        self.request_context = lambda: {"instructions": "", "catalog": [], "route": {}}
 
     async def snapshot(self, owner, cid, snapshot_id):
         def read(db):
@@ -134,7 +143,10 @@ class Context:
 
         return await self.db.call(read)
 
-    async def project(self, owner, cid, *, branch_id=None, through_turn=None):
+    async def project(self, owner, cid, *, branch_id=None, through_turn=None, request_context=None):
+        configuration = request_context if request_context is not None else self.request_context()
+        basis = request_basis(configuration)
+
         def read(db):
             c = owned(db, owner, cid)
             bid = branch_id or c["active_branch_id"]
@@ -179,13 +191,57 @@ class Context:
                 ),
                 len(plan),
             )
-            # Conservative UTF-8 byte estimate until a provider-specific tokenizer is configured.
-            estimated = len(encoded(plan).encode("utf-8"))
+            instructions, catalog = configuration["instructions"], configuration["catalog"]
+            request = ([{"role": "system", "content": instructions}] if instructions else []) + plan
+            estimated = request_tokens(request, catalog)
+            usage_tokens, trailing_tokens = 0, estimated
+            manifests = db.execute(
+                "SELECT p.* FROM prompt_manifests p JOIN turns t ON t.id=p.turn_id "
+                "WHERE t.branch_id=? AND p.memory_epoch=? AND p.snapshot_id IS ? "
+                "AND p.usage_json IS NOT NULL ORDER BY p.rowid DESC LIMIT 20",
+                (bid, epoch, snapshot["id"] if snapshot else None),
+            )
+            for manifest in manifests:
+                parts = json.loads(manifest["parts_json"])
+                used = provider_tokens(json.loads(manifest["usage_json"]))
+                if not used or parts.get("requestBasis") != basis or parts.get("taskEvidence"):
+                    continue
+                sources = parts.get("sourceMessageIds", [])
+                response = parts.get("responseMessageId")
+                source = messages[: len(sources)]
+                if (
+                    [m["id"] for m in source] != sources
+                    or fingerprint(source) != parts.get("historyFingerprint")
+                    or len(messages) <= len(sources)
+                    or messages[len(sources)]["id"] != response
+                    or messages[len(sources)]["status"] != "completed"
+                ):
+                    continue
+                response_index = next(
+                    (i for i, entry in enumerate(entries) if entry["sourceId"] == response), None
+                )
+                if response_index is None:
+                    continue
+                usage_tokens = used
+                trailing_tokens = messages_tokens(
+                    [entry["message"] for entry in entries[response_index + 1 :]]
+                )
+                estimated = usage_tokens + trailing_tokens
+                break
             return {
                 "messages": plan,
                 "estimatedTokens": estimated,
-                "estimator": "utf8-byte-upper-bound-v1",
-                "inputBudget": self.input_budget,
+                "estimator": ESTIMATOR,
+                "usageTokens": usage_tokens,
+                "trailingTokens": trailing_tokens,
+                "historyTokens": messages_tokens(plan),
+                "instructionTokens": text_tokens(instructions),
+                "toolTokens": text_tokens(encoded(catalog)) if catalog else 0,
+                "requestBasis": basis,
+                "historyFingerprint": fingerprint(messages),
+                "inputBudget": configuration.get("inputBudget", self.input_budget),
+                "contextWindow": configuration.get("contextWindow"),
+                "reserveTokens": configuration.get("reserveTokens"),
                 "snapshotId": snapshot["id"] if snapshot else None,
                 "branchId": bid,
                 "memoryEpoch": epoch,
@@ -277,7 +333,7 @@ class Context:
 
         return await self.db.call(write, write=True)
 
-    async def run(self, job_id, *, safe_turn_id=None, target_bytes=None):
+    async def run(self, job_id, *, safe_turn_id=None, target_tokens=None):
         def prepare(db):
             job = row(
                 db,
@@ -316,15 +372,18 @@ class Context:
                 and m["status"] == "completed"
                 and not json.loads(m["content_json"]).get("tool_calls")
             ]
-            cut = boundaries[-self.keep_rounds - 1] if len(boundaries) > self.keep_rounds else 0
-            if target_bytes is not None:
-                # Reserve half the available history space for its summary.
-                for candidate in boundaries:
-                    if candidate < cut:
-                        continue
-                    cut = candidate
-                    if len(encoded(model_messages(messages[cut:])).encode()) <= target_bytes // 2:
-                        break
+            available = (
+                target_tokens
+                if target_tokens is not None
+                else min(self.input_budget, messages_tokens(model_messages(messages)))
+            )
+            retained = min(self.keep_recent_tokens, available // 2)
+            cut = 0
+            # Cut only complete rounds, with room for a summary and the current turn.
+            for candidate in boundaries:
+                cut = candidate
+                if messages_tokens(model_messages(messages[cut:])) <= retained:
+                    break
             source = messages[:cut]
             if not source:
                 p["state"] = "skipped"
@@ -368,8 +427,8 @@ class Context:
                     "role": "system",
                     "content": SUMMARY_PROMPT
                     + (
-                        f" Keep the UTF-8 summary under {max(1, target_bytes // 2)} bytes."
-                        if target_bytes is not None
+                        f" Keep the summary under approximately {max(1, target_tokens // 2)} tokens."
+                        if target_tokens is not None
                         else ""
                     ),
                 },
@@ -388,7 +447,7 @@ class Context:
                         raise DomainError("SUMMARY_TOO_LARGE", 502)
             if not text.strip():
                 raise DomainError("EMPTY_SUMMARY", 502)
-            if len(text.encode()) >= len(encoded(model_messages(source)).encode()):
+            if text_tokens(text) >= messages_tokens(model_messages(source)):
                 raise DomainError("SUMMARY_NOT_SMALLER", 502)
 
             def activate(db):

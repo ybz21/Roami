@@ -1,10 +1,11 @@
 """Bound completion evidence without changing the persisted executor report."""
 
+from roami_agent.context.token_estimate import text_tokens
 from roami_agent.protocol.serialization import encoded
 
 
 def completion_evidence(completion, *, budget):
-    if len(encoded(completion).encode()) <= budget:
+    if text_tokens(encoded(completion)) <= budget:
         return completion
     result = completion.get("result", {})
     projection = {
@@ -45,10 +46,8 @@ def completion_evidence(completion, *, budget):
     summary = result.get("summary", "")
     summary = summary if isinstance(summary, str) else ""
     for limit in [3000, 1500, 750, 300, 100, 0]:
-        projection["result"] = dict(
-            detail, summary=summary.encode()[:limit].decode(errors="ignore")
-        )
-        if len(encoded(projection).encode()) <= budget:
+        projection["result"] = dict(detail, summary=summary[:limit])
+        if text_tokens(encoded(projection)) <= budget:
             return projection
     projection["result"].pop("artifactIds", None)
     return projection

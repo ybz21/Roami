@@ -1,6 +1,6 @@
 # Roami Agent runtime
 
-Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service, CLI, Main chat, Native/coding execution, event-driven suggestions and scheduled briefs are runnable. Executor-specific recovery limits and remaining acceptance work are listed below. Nothing has been deployed to the running user instance.
+Python owns conversations, model loops, delegation, memory, context and delivery semantics. Go remains the single public authentication boundary and owns the unified CLI and storage catalog. The service, CLI, Main chat, Native/coding execution, event-driven suggestions and scheduled briefs are runnable. Executor-specific recovery limits and remaining acceptance work are listed below. Deployment and acceptance records are maintained alongside the implementation.
 
 ## Development and verification
 
@@ -346,3 +346,19 @@ Continuation retains the last independently accepted revision. Unaccepted writes
 Main can use `session_send` to append a message to an exact existing session, including legacy Codex/Claude sessions. The unified boundary is `roami agent execution send-message --file -`, accepting `{key, sessionId, text}` on stdin. A `delivered` receipt confirms submission only; `executionTracked=false` does not prove execution or completion. The Go receipt is persisted before input and reused for the same key; an unknown outcome is never automatically pasted again.
 
 Tracked work uses `delegate` and requires lifecycle callbacks for existing sessions. Chat snapshots include a bounded `activities` projection of tools and tasks; SSE publishes starts, completions and Worker activity to the originating conversation. Task-result generation failures produce a structured status message that remains available to the next Main turn. See `docs/design/20261018-agent委派验收/README.md` for the dialogue acceptance matrix and limits.
+
+## Token-based context admission
+
+Context admission follows Pi's [compaction implementation](https://github.com/earendil-works/pi/blob/482c1381a00d8d00bc81697e4a980c593db6803e/packages/coding-agent/src/core/compaction/compaction.ts): use the latest valid provider input-plus-output usage, then estimate later messages with `ceil(characters / 4)`. Without valid usage, estimate the entire request, including the system prompt, tool schemas, tool-call arguments and tool results. Images use Pi's 1,200-token placeholder rather than counting base64 characters. This is an estimate, not a model-specific tokenizer. OpenAI-compatible prompt usage already includes cached input, so cache counts are not added twice.
+
+Usage is reused only for the same request configuration, unchanged source prefix, snapshot and memory epoch. Model/settings or tool changes, edits, forgetting and compaction invalidate stale baselines. Existing manifests without the new evidence fall back to character estimation; no transcript migration is required. The context panel and `/status` report the same total estimate as request admission.
+
+`[runtime].input_budget` is now an **input token cap**, default 24,000, replacing the former UTF-8 byte guard. `context_window` is optional: configure a verified window in tokens; when absent the runtime reports it as unknown rather than inventing a model limit. When present, input admission uses `min(input_budget, context_window - reserve_tokens)`. Reply reserve defaults to 16,384 tokens, matching Pi's default. Recent raw history has a 20,000-token ceiling and shrinks to fit the available history allowance, with room for a summary. Cut points preserve complete rounds and paired tools; an oversized current round is rejected rather than silently discarded. Manual `/compact` uses the same token estimates. Upload/output byte limits remain separate storage limits.
+
+```toml
+[runtime]
+input_budget = 24000
+reserve_tokens = 16384
+keep_recent_tokens = 20000
+# context_window = ...  # set only to a verified model window in tokens
+```

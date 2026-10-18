@@ -268,7 +268,7 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
                     yield item
 
     c = await completed_conversation(store)
-    runtime = Runtime(store, CompactingModel(), settings=Settings(input_budget=12000))
+    runtime = Runtime(store, CompactingModel(), settings=Settings(input_budget=3000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(
@@ -315,14 +315,14 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
                 (json.dumps({"text": "recent long tool report " * 400}), item["id"]),
             )
 
-    await store.call(enlarge_recent, write=True)
     model = CompactingModel()
     context = Context(store, model)
     job = await context.request("alice", c["id"], "previous-fixed-cut")
     await context.run(job["id"])
+    await store.call(enlarge_recent, write=True)
     before = (await context.project("alice", c["id"]))["snapshotId"]
-    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 24000
-    runtime = Runtime(store, model, settings=Settings(input_budget=24000))
+    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 6000
+    runtime = Runtime(store, model, settings=Settings(input_budget=6000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(
@@ -336,7 +336,7 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
         )
         plan = await context.project("alice", c["id"])
         assert plan["snapshotId"] != before
-        assert plan["estimatedTokens"] < 24000
+        assert plan["estimatedTokens"] < 6000
         messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
         assert len(messages) == 14
         assert messages[-1]["content"]["text"] == "Answer: Please fix this screenshot layout."

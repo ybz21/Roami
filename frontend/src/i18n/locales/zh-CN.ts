@@ -2574,7 +2574,7 @@ const zhCN = {
   'agent.searchMemory': '搜索记忆',
   'agent.noMemories': '暂无相关记忆',
   'agent.forget': '忘记',
-  'agent.contextUsage': '历史上下文估计：{used} / {budget} UTF-8 字节（指令与工具另占预算）',
+  'agent.contextUsage': '上下文预估：{used} / {budget} tokens（含系统提示与工具）',
   'agent.contextHint': '对话开始后可以查看上下文和压缩摘要',
   'agent.compactNow': '压缩当前上下文',
   'agent.cancelCompact': '取消压缩',

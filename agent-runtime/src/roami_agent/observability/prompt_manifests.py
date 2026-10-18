@@ -27,6 +27,9 @@ class PromptManifests:
                     encoded(
                         {
                             "role": role,
+                            "requestBasis": plan.get("requestBasis"),
+                            "historyFingerprint": plan.get("historyFingerprint"),
+                            "estimatedTokens": plan.get("estimatedTokens"),
                             "sourceMessageIds": plan.get("sourceMessageIds", []),
                             "catalogHash": hashlib.sha256(encoded(catalog).encode()).hexdigest(),
                             "modelSettingsHash": plan.get("modelSettingsHash"),

@@ -78,8 +78,8 @@ class TurnJournal:
                 (encoded(content), mid),
             )
             db.execute(
-                "UPDATE prompt_manifests SET usage_json=? WHERE turn_id=? AND attempt_no=?",
-                (encoded(usage) if usage else None, turn["id"], attempt),
+                "UPDATE prompt_manifests SET usage_json=?,parts_json=json_set(parts_json,'$.responseMessageId',?) WHERE turn_id=? AND attempt_no=?",
+                (encoded(usage) if usage else None, mid, turn["id"], attempt),
             )
             if final:
                 db.execute(

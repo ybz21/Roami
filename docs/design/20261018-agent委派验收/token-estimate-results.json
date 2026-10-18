@@ -1,0 +1,14 @@
+{
+  "model": "deepseek-4.1-flash",
+  "inputBudget": 24000,
+  "fallbackEstimateTokens": 4223,
+  "providerInputTokens": 6718,
+  "providerOutputTokens": 62,
+  "measuredContextTokens": 6780,
+  "trailingContextTokens": 6880,
+  "contextAndStatusAgree": true,
+  "toolTokens": 1566,
+  "instructionTokens": 393,
+  "replyMs": 1320,
+  "acceptedWithoutCompaction": true
+}

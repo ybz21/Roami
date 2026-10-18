@@ -7,6 +7,7 @@ from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.context.task_evidence import completion_evidence
+from roami_agent.context.token_estimate import request_tokens, text_tokens
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
@@ -31,7 +32,7 @@ def test_completion_excerpt_is_bounded_and_preserves_authority_and_unknown_flags
     }
     original = encoded(completion)
     excerpt = completion_evidence(completion, budget=budget)
-    assert len(encoded(excerpt).encode()) <= budget
+    assert text_tokens(encoded(excerpt)) <= budget
     assert excerpt["state"] == "interrupted"
     assert excerpt["result"]["state"] == "succeeded"
     assert excerpt["result"]["outcomeKnown"] is False
@@ -90,7 +91,7 @@ async def test_long_report_generates_main_reply_while_full_attempt_evidence_is_r
             turn, "main", completion=json.loads(completion_job["payload_json"])["completion"]
         )
         assert len(model.prompts) == 1
-        assert len(encoded(model.prompts[0]).encode()) < runtime.settings.input_budget
+        assert request_tokens(model.prompts[0], []) < runtime.settings.context_input_budget
         source = next(
             item
             for item in model.prompts[0]
