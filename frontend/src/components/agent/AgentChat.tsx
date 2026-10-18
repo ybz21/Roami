@@ -31,7 +31,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   select: (cid: string, branch?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
 }) {
-  const { t } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
+  const { t } = useI18n(), { phone, landscape, keyboard } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch)
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
@@ -207,7 +207,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
           {item.state === 'uploading' ? <Spin size="small" /> : <>{item.state === 'failed' && <button type="button" aria-label={t('agent.retry')} disabled={sending} onClick={() => { void attachments.retry(item) }}><RefreshIcon size={15} /></button>}<button type="button" aria-label={t('agent.composer.removeFile', { name: item.name })} disabled={sending} onClick={() => { void attachments.remove(item).catch(() => message.error(t('agent.requestFailed'))) }}><CloseIcon size={15} /></button></>}
         </div>)}</div>}
         <form onSubmit={event => { event.preventDefault(); void submit() }}>
-          <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: phone ? 5 : 8 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
+          <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: !phone ? 8 : landscape ? (keyboard ? 1 : 2) : 5 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
             onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
             onKeyDown={event => {
               if (event.nativeEvent.isComposing) return
