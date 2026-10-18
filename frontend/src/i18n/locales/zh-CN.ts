@@ -2738,6 +2738,7 @@ const zhCN = {
   'agent.models.httpsRequired': "模型服务请使用 HTTPS；本机调试地址可使用 HTTP",
   'agent.models.failed': "模型服务请求失败，请检查地址、密钥和模型名称",
   'agent.models.selectCurrent': '切换模型（当前：{name}）',
+  'agent.models.current': '当前模型 · 完整名称',
   'agent.models.search': "搜索或输入模型名称",
   'agent.models.use': "使用 {name}",
   'agent.models.manual': "也可以直接输入服务商提供的模型名称。",
@@ -2808,6 +2809,8 @@ const zhCN = {
   'agent.activity.state.delivered': '已提交到会话，完成待回报',
 
   'agent.activity.resultRecorded': '执行结果已记录',
+  'agent.activity.commandFailed': '命令以非零状态退出',
+  'agent.activity.outcomeUnknown': '执行结果未知，核对后再重试',
   'agent.activity.unknownReason': '发送结果未知，请先核对目标会话，避免重复发送',
 
   'agent.activity.waiting': '待核验',

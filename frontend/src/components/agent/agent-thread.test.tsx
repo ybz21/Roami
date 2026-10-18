@@ -25,3 +25,24 @@ it('ignores a late snapshot from the previously selected conversation and aborts
   hook.unmount()
   expect(signals.every((signal) => signal.aborted)).toBe(true)
 })
+
+it('publishes live tool transitions without waiting for another history response', async () => {
+  let stream!: ReadableStreamDefaultController<Uint8Array>
+  vi.mocked(api).mockResolvedValue({ data: snapshot('live') })
+  vi.mocked(openEventStream).mockImplementation(async (_path, signal) => new Response(new ReadableStream({
+    start(controller) { stream = controller; signal.addEventListener('abort', () => controller.close(), { once: true }) },
+  })))
+  const hook = renderHook(() => useAgentThread('live'))
+  await waitFor(() => expect(hook.result.current.connected).toBe(true))
+  const reads = vi.mocked(api).mock.calls.length
+  const item = { id: 'tool:one', kind: 'tool', name: 'shell', anchorMessageId: 'm', state: 'running', startedMs: 1000, updatedMs: 1000 }
+  const send = async (id: number, state: string) => {
+    await act(async () => stream.enqueue(new TextEncoder().encode('data: ' + JSON.stringify({ id, branchId: 'live', kind: 'tool.' + (state === 'running' ? 'started' : 'completed'), payload: { activity: { ...item, state } } }) + '\n\n')))
+    await waitFor(() => expect(hook.result.current.view?.activities?.[0].state).toBe(state))
+  }
+  await send(2, 'running')
+  await send(3, 'failed')
+  expect(hook.result.current.view?.activities).toHaveLength(1)
+  expect(vi.mocked(api).mock.calls.length).toBe(reads)
+  hook.unmount()
+})

@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { agentTimeline } from './agent-timeline'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
 import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PencilIcon, RefreshIcon, StopIcon } from '../../icons'
@@ -13,7 +14,7 @@ import { useAgentDraft } from './useAgentDraft'
 import { useAgentMessageFocus } from './useAgentMessageFocus'
 import { useVisibleAgentReads } from './useVisibleAgentReads'
 import type { AgentInboxState } from './useAgentInbox'
-import type { AgentActivityItem, AgentMessage } from './agent-protocol'
+import type { AgentMessage } from './agent-protocol'
 import AgentComposerPlus from './AgentComposerPlus'
 import AgentMessageView from './AgentMessageView'
 import AgentActivity from './AgentActivity'
@@ -63,17 +64,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   const compacting = compact?.state === 'queued' || compact?.state === 'running' || compact?.state === 'started'
   const activity = thread.view?.activities || []
   const bodies = (thread.view?.messages || []).filter(m => (m.role === 'user' || m.role === 'assistant'))
-  const activityAnchors = new Map<string, string>(), activityGroups = new Map<string, AgentActivityItem[]>()
-  let lastBody = ''
-  for (const m of bodies) {
-    if (m.content.text || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming') lastBody = m.id
-    activityAnchors.set(m.id, lastBody || m.id)
-  }
-  for (const item of activity) {
-    const anchor = activityAnchors.get(item.anchorMessageId) || item.anchorMessageId
-    activityGroups.set(anchor, [...(activityGroups.get(anchor) || []), item])
-  }
-  const visible = bodies.filter(m => m.content.text || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming' || activityGroups.has(m.id))
+  const timeline = agentTimeline(bodies, activity)
+  const visible = bodies.filter(m => m.content.text || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming')
   const eventIds = visible.map((m) => m.completedEventId || '').join(',')
   useVisibleAgentReads(!panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
@@ -91,7 +83,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
       setTarget('direct')
     }
   }, [draftKey])
-  useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight }, [thread.view?.messages, cid])
+  useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight }, [thread.view?.messages, thread.view?.activities, cid])
   useAgentMessageFocus(scroll, cid, branch, focusMessage, visible.map((item) => item.id).join(','), stick)
   const changeDraft = (value: string) => { setDraft(value); try { localStorage.setItem(draftKey, value) } catch {} }
   const ensureConversation = async () => {
@@ -208,7 +200,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
     {readOnly && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
       <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
-        <div className="agent-thread">{thread.loading && <Spin />}{visible.map(m => <Fragment key={m.id}>{(m.content.text || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming') && <AgentMessageView item={m} focused={m.id === focusMessage} remember={beginMemory} />}<AgentActivity items={activityGroups.get(m.id) || []} onSession={onSession} /></Fragment>)}</div>
+        <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} /> : <AgentActivity key={entry.id} items={[entry.activity]} onSession={onSession} />)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>

@@ -6,10 +6,11 @@ import logging
 
 import httpx
 
+from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.database import row, rows
 
 log = logging.getLogger(__name__)
 

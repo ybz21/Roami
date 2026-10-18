@@ -2,11 +2,12 @@
 
 import json
 
+from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.database import row, rows
 from roami_agent.storage.transcript_repository import message, owned
 
 STABLE = {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}

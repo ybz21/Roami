@@ -44,7 +44,9 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
         assert snapshot["activities"][0]["state"] == "running"
         assert snapshot["activities"][0]["name"] == "workspace_overview"
         events = await runtime.conversations.events("alice", c["id"])
-        assert any(e["kind"] == "tool.started" for e in events)
+        started = next(e for e in events if e["kind"] == "tool.started")
+        assert started["payload"]["activity"] == snapshot["activities"][0]
+        assert started["payload"]["activity"]["state"] == "running"
         assert not any(e["kind"] == "tool.completed" for e in events)
         release.set()
         from test_runtime import until
@@ -53,6 +55,14 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
         snapshot = await runtime.conversations.messages("alice", c["id"])
         assert snapshot["activities"][0]["state"] == "succeeded"
         assert "arguments_json" not in json.dumps(snapshot["activities"])
+        replay = await runtime.conversations.events("alice", c["id"])
+        assert (
+            next(e for e in replay if e["id"] == started["id"])["payload"]["activity"]["state"]
+            == "running"
+        )
+        completed = next(e for e in replay if e["kind"] == "tool.completed")
+        assert completed["payload"]["activity"] == snapshot["activities"][0]
+        assert completed["id"] > started["id"]
     finally:
         release.set()
         await runtime.close()
@@ -171,6 +181,19 @@ async def test_worker_tool_activity_reaches_origin_conversation_while_running(st
         assert child["state"] == "running" and child["taskId"]
         assert child["anchorMessageId"] in {m["id"] for m in view["messages"]}
         events = await runtime.conversations.events("alice", c["id"])
+        bubbled = next(
+            e
+            for e in events
+            if e["kind"] == "task.activity" and e["payload"].get("toolName") == "memory_search"
+        )
+        assert bubbled["payload"]["activity"] == child
+        assert bubbled["branchId"] == view["branchId"]
+        assert any(
+            e["kind"] == "task.started"
+            and e["branchId"] == view["branchId"]
+            and e["payload"].get("activity", {}).get("kind") == "task"
+            for e in events
+        )
         assert any(
             e["kind"] == "task.activity" and e["payload"]["toolName"] == "memory_search"
             for e in events
@@ -213,3 +236,51 @@ async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
         "acceptedOnly": True,
         "delivery": "pending",
     }
+
+
+async def test_command_nonzero_exit_is_failed_in_live_events_and_history(store):
+    from roami_agent.conversation.activity_events import activity_event
+    from roami_agent.conversation.transcript import Conversations
+    from roami_agent.storage.transcript_repository import message
+
+    conversations = Conversations(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "command", "Run a command")
+
+    def record(db):
+        mid = message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "assistant",
+            {"text": "Checking"},
+            turn_id=receipt["turnId"],
+        )
+        result = message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "tool",
+            {"text": json.dumps({"exitCode": 7, "stderr": "private output"})},
+            turn_id=receipt["turnId"],
+        )
+        db.execute(
+            "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,result_message_id,created_ms,updated_ms) VALUES('command',?,?,'shell','{}','write','succeeded','command-key',?,1,2)",
+            (receipt["turnId"], mid, result),
+        )
+        activity_event(
+            db,
+            c["id"],
+            "tool.completed",
+            {"toolCallId": "command", "toolName": "shell", "state": "succeeded"},
+            turn_id=receipt["turnId"],
+        )
+
+    await store.call(record, write=True)
+    snapshot = await conversations.messages("alice", c["id"])
+    activity = snapshot["activities"][0]
+    assert activity["state"] == "failed"
+    assert activity["errorCode"] == "COMMAND_EXIT_NONZERO"
+    assert "private output" not in json.dumps(activity)
+    events = await conversations.events("alice", c["id"])
+    assert events[-1]["payload"]["activity"] == activity

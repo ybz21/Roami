@@ -36,3 +36,18 @@ it('stops the running indicator immediately when a turn fails', () => {
   expect(failed.view.turns[0].state).toBe('failed')
   expect(failed.view.messages[0].status).toBe('failed')
 })
+
+it('projects started and completed tools directly, retaining order and deduplicating replay', () => {
+  const activity = { id: 'tool:one', kind: 'tool', name: 'shell', anchorMessageId: 'm', state: 'running', startedMs: 100, updatedMs: 100 }
+  const start = { id: 2, kind: 'tool.started', branchId: 'b', payload: { activity } }
+  const running = projectAgentEvent(snapshot(), start)
+  expect(running.reload).toBe(false)
+  expect(running.view.activities?.[0].state).toBe('running')
+  const done = projectAgentEvent(running.view, { ...start, id: 3, kind: 'tool.completed', payload: { activity: { ...activity, state: 'unknown', updatedMs: 200 } } })
+  expect(done.reload).toBe(false)
+  expect(done.view.activities).toHaveLength(1)
+  expect(done.view.activities?.[0].state).toBe('unknown')
+  expect(projectAgentEvent(done.view, start).view).toBe(done.view)
+  expect(projectAgentEvent(done.view, { id: 4, kind: 'tool.completed', payload: { toolCallId: 'old' } }).reload).toBe(true)
+  expect(projectAgentEvent(snapshot(), { ...start, branchId: 'other' }).view.activities).toBeUndefined()
+})

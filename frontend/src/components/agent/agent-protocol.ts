@@ -1,12 +1,12 @@
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
 export type AgentMessage = {
-  id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string
+  id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number
   content: { text?: string; tool_calls?: unknown[]; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; name: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
-export type AgentEvent = { id: number; kind: string; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
+export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
 export type AgentNotice = { id: number; message_id?: string; conversation_id: string; branch_id: string; title: string; content_json: string; created_ms: number }
 export type AgentTask = { id: string; state: string; revision: number; parent_task_id?: string | null; intent_json: string; latestAttempt?: { sessionId?: string; workspace?: { directory: string; branch?: string }; state: string } | null }
 
@@ -15,6 +15,12 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   const next = { ...view, snapshotCursor: event.id }
   if (event.branchId && event.branchId !== view.branchId) return { view: next, reload: false }
   const data = event.payload
+  if ((event.kind.startsWith('tool.') || event.kind.startsWith('task.')) && data.activity) {
+    const item = data.activity as AgentActivityItem
+    next.activities = [...(view.activities || []).filter(existing => existing.id !== item.id), item]
+      .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
+    return { view: next, reload: false }
+  }
   if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted') {
     next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: event.kind.slice(5) } : turn)
     next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: event.kind.slice(5) } : message)
@@ -23,7 +29,7 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   if (event.kind === 'message.started') {
     if (!view.messages.some((m) => m.id === data.messageId)) next.messages = [...view.messages, {
       id: data.messageId, branch_id: view.branchId, role: 'assistant', status: 'streaming',
-      turn_id: data.turnId, seq: Math.max(0, ...view.messages.map((m) => m.seq)) + 1, content: { text: '' },
+      created_ms: event.created_ms, turn_id: data.turnId, seq: Math.max(0, ...view.messages.map((m) => m.seq)) + 1, content: { text: '' },
     }]
     next.turns = [...view.turns.filter((t) => t.id !== data.turnId), { id: data.turnId, state: 'running' }]
     return { view: next, reload: false }

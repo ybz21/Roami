@@ -2729,6 +2729,7 @@ const enUS = {
   'agent.models.httpsRequired': "Use HTTPS for the model service. Local development addresses may use HTTP.",
   'agent.models.failed': "Could not reach the model service. Check the URL, key and model name.",
   'agent.models.selectCurrent': 'Switch model (current: {name})',
+  'agent.models.current': 'Current model · Full name',
   'agent.models.search': "Search or enter a model name",
   'agent.models.use': "Use {name}",
   'agent.models.manual': "You can also enter a model name supplied by your provider.",
@@ -2799,6 +2800,8 @@ const enUS = {
   'agent.activity.state.delivered': 'Submitted to session; completion pending',
 
   'agent.activity.resultRecorded': 'The execution result has been recorded',
+  'agent.activity.commandFailed': 'Command exited with a nonzero status',
+  'agent.activity.outcomeUnknown': 'Outcome unknown; verify before retrying',
   'agent.activity.unknownReason': 'Delivery is unknown; check the target session before sending again',
 
   'agent.activity.waiting': 'Awaiting review',

@@ -4,11 +4,12 @@ import json
 import math
 from pathlib import Path
 
+from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.executors.project import provision_project
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.database import row, rows
 from roami_agent.tools.process import execute
 
 SESSION_REJECTIONS = {

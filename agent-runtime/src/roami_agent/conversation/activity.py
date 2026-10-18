@@ -65,7 +65,9 @@ def conversation_activity(db, cid, transcript):
                 "anchorMessageId": anchor(task),
                 "taskId": task["id"],
                 "parentTaskId": task["parent_task_id"],
-                "state": task["state"],
+                "state": "unknown"
+                if report.get("outcomeKnown") is False or attempt.get("state") == "unknown"
+                else task["state"],
                 "target": attempt.get("session_id")
                 or target.get("sessionId")
                 or target.get("projectId")
@@ -112,6 +114,13 @@ def conversation_activity(db, cid, transcript):
             )
         except (ValueError, TypeError, KeyError):
             pass
+        command_failed = (
+            call["tool_name"] == "shell"
+            and call["state"] == "succeeded"
+            and isinstance(value, dict)
+            and isinstance(value.get("exitCode"), int)
+            and value["exitCode"] != 0
+        )
         activities.append(
             {
                 "id": "tool:" + call["id"],
@@ -120,7 +129,9 @@ def conversation_activity(db, cid, transcript):
                 "anchorMessageId": anchor(task) if task else call["assistant_message_id"],
                 "taskId": task["id"] if task else None,
                 "parentTaskId": task["parent_task_id"] if task else None,
-                "state": "delivered"
+                "state": "failed"
+                if command_failed
+                else "delivered"
                 if call["state"] == "succeeded"
                 and isinstance(value, dict)
                 and value.get("state") == "delivered"
@@ -130,7 +141,9 @@ def conversation_activity(db, cid, transcript):
                 else None,
                 "startedMs": call["created_ms"],
                 "updatedMs": call["updated_ms"],
-                "errorCode": public_error_code(value.get("error"))
+                "errorCode": "COMMAND_EXIT_NONZERO"
+                if command_failed
+                else public_error_code(value.get("error"))
                 if isinstance(value, dict) and call["state"] in {"failed", "unknown"}
                 else None,
             }

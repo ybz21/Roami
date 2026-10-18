@@ -114,10 +114,10 @@ html[data-pointer="coarse"] .agent-compose-options > .ant-input[type="date"],htm
 .agent-message[data-notification-focus="true"] { background:var(--accent-soft); border-radius:var(--r-xs); padding:var(--sp-2); }
 
 .agent-compose-bar .tt-cend { min-width:0; gap:var(--sp-2); }
-.agent-composer .agent-model-trigger { min-width:0; max-width:calc(var(--sp-5) * 9); color:var(--text-dim); }
+.agent-composer .agent-model-trigger { min-width:0; max-width:calc(var(--sp-5) * 11); color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-model-trigger > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .agent-model-trigger > svg,.agent-mode-trigger > svg { flex:none; }
-html[data-size="compact"] .agent-composer .agent-model-trigger { max-width:calc(var(--sp-5) * 7); padding-inline:var(--sp-2); }
+html[data-size="compact"] .agent-composer .agent-model-trigger { max-width:calc(var(--sp-5) * 9); padding-inline:var(--sp-2); }
 html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-composer { padding:var(--sp-1) var(--sp-3); }
 html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-compose-card form { display:flex; align-items:center; }
 html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-compose-card form > textarea { flex:1; min-width:0; width:0; }
@@ -125,3 +125,10 @@ html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .ag
 html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-model-trigger { max-width:calc(var(--sp-5) * 4); }
 html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-jump-latest { left:auto; right:var(--sp-3); transform:none; }
 html[data-size="compact"] .agent-compose-bar .tt-cgrp { gap:var(--sp-1); }
+
+.agent-composer-dialog-wrap .agent-composer-dialog { position:absolute; max-width:calc(100% - var(--safe-l) - var(--safe-r) - var(--sp-3) * 2); }
+.agent-composer-dialog .ant-modal-content { padding:0; background:var(--bg-elevated); border-radius:var(--r-card); }
+.agent-composer-dialog .agent-plus-menu { width:100%; max-width:100%; box-shadow:none; }
+.agent-model-current { padding:var(--sp-2); display:flex; flex-direction:column; gap:var(--sp-1); }
+.agent-model-current small { color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-model-current code { color:var(--text-bright); font-size:var(--fs-sm); overflow-wrap:anywhere; user-select:text; }

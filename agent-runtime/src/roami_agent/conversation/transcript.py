@@ -254,7 +254,7 @@ class Conversations:
                 dict(e, payload=json.loads(e["payload_json"]))
                 for e in rows(
                     db,
-                    "SELECT e.*,COALESCE(m.branch_id,t.branch_id,k.origin_branch_id) AS branchId "
+                    "SELECT e.*,CASE WHEN k.origin_conversation_id=e.conversation_id THEN k.origin_branch_id ELSE COALESCE(m.branch_id,t.branch_id,k.origin_branch_id) END AS branchId "
                     "FROM events e LEFT JOIN messages m ON m.id=e.message_id LEFT JOIN turns t ON t.id=e.turn_id "
                     "LEFT JOIN tasks k ON k.id=e.task_id WHERE e.conversation_id=? AND e.id>? ORDER BY e.id LIMIT 100",
                     (cid, cursor),

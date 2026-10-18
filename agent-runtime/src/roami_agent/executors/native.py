@@ -3,12 +3,13 @@
 import asyncio
 import json
 
+from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.executors.workspace import hold_workspace
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
-from roami_agent.storage.database import event, row
+from roami_agent.storage.database import row
 
 
 class NativeExecutor:

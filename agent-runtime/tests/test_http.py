@@ -135,3 +135,98 @@ async def test_real_unix_http_stream_replays_persisted_events(store, tmp_path):
     finally:
         server.should_exit = True
         await running
+
+
+async def test_live_tool_sse_arrives_before_finish_and_unknown_survives_replay(store, tmp_path):
+    from roami_agent.protocol.errors import DomainError
+    from roami_agent.protocol.models import ModelEvent
+
+    release = asyncio.Event()
+
+    class Model:
+        model = "live-tool-fixture"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                yield ModelEvent("text", "Result remains unknown")
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "recall",
+                        "function": {"name": "memory_search", "arguments": '{"query":"fixture"}'},
+                    },
+                )
+
+    runtime = Runtime(store, Model())
+
+    async def recall(*args, **kwargs):
+        await release.wait()
+        raise DomainError("TOOL_OUTCOME_UNKNOWN")
+
+    runtime.memory.recall = recall
+    socket_path = tmp_path / "live-tools.sock"
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_app(runtime),
+            uds=str(socket_path),
+            log_level="error",
+            timeout_graceful_shutdown=2,
+        )
+    )
+    running = asyncio.create_task(server.serve())
+    try:
+        async with asyncio.timeout(5):
+            while not server.started:
+                await asyncio.sleep(0.01)
+        async with httpx.AsyncClient(
+            transport=httpx.AsyncHTTPTransport(uds=str(socket_path)),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "alice"},
+            timeout=5,
+        ) as client:
+            c = (await client.post("/v1/conversations", json={})).json()["data"]
+            sent = (
+                await client.post(
+                    f"/v1/conversations/{c['id']}/messages",
+                    json={"requestKey": "live", "text": "Recall fixture"},
+                )
+            ).json()["data"]
+            seen = []
+            async with client.stream(
+                "GET", f"/v1/conversations/{c['id']}/events?after={sent['cursor']}"
+            ) as response:
+                assert response.status_code == 200
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    item = json.loads(line[5:])
+                    if item["kind"] == "tool.started":
+                        assert not release.is_set()
+                        assert item["payload"]["activity"]["state"] == "running"
+                        seen.append(item)
+                        release.set()
+                    if item["kind"] == "tool.completed":
+                        seen.append(item)
+                        assert item["payload"]["activity"]["state"] == "unknown"
+                        break
+            assert len(seen) == 2 and seen[0]["id"] < seen[1]["id"]
+            historical = (await client.get(f"/v1/conversations/{c['id']}/messages")).json()["data"]
+            assert (
+                next(
+                    a
+                    for a in historical["activities"]
+                    if a["id"] == seen[1]["payload"]["activity"]["id"]
+                )
+                == seen[1]["payload"]["activity"]
+            )
+            replay = await runtime.conversations.events("alice", c["id"], seen[0]["id"] - 1)
+            assert [
+                e["payload"]["activity"]["state"]
+                for e in replay
+                if e["kind"] in {"tool.started", "tool.completed"}
+            ] == ["running", "unknown"]
+    finally:
+        release.set()
+        server.should_exit = True
+        await running

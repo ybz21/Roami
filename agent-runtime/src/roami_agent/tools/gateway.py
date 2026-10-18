@@ -6,11 +6,12 @@ import time
 
 import httpx
 
+from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.protocol.errors import DomainError, ToolCancellation
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
-from roami_agent.storage.database import event, row
+from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.transcript_repository import message
 
@@ -139,17 +140,23 @@ class ToolGateway:
                 or isinstance(exc, ToolCancellation)
                 and exc.input_stopped
             )
-            await self.db.call(
-                lambda db: db.execute(
+
+            def cancelled(db):
+                state = "cancelled" if stopped else "unknown"
+                db.execute(
                     "UPDATE tool_calls SET state=?,updated_ms=? WHERE id=?",
-                    (
-                        "cancelled" if stopped else "unknown",
-                        now_ms(),
-                        tool_id,
-                    ),
-                ),
-                write=True,
-            )
+                    (state, now_ms(), tool_id),
+                )
+                self.activity(
+                    db,
+                    turn,
+                    binding,
+                    "tool.completed",
+                    {"toolCallId": tool_id, "toolName": call["function"]["name"], "state": state},
+                )
+
+            await self.db.call(cancelled, write=True)
+            self.wakeup.set()
             raise
 
         memory_ids = []

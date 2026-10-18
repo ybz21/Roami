@@ -18,3 +18,9 @@
 .agent-activity-list p { margin:var(--sp-1) 0; }
 .agent-task-status { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border-left:2px solid var(--danger-border); font-size:var(--fs-sm); }
 :where(html[data-pointer="fine"]) .agent-activity-toggle:hover { color:var(--text-bright); }
+.agent-activity > time { display:block; font-size:var(--fs-meta); color:var(--text-dimmer); margin-bottom:var(--sp-2); }
+.agent-activity-name { display:flex; flex-direction:column; min-width:0; overflow-wrap:anywhere; }
+.agent-activity-name small { font-size:var(--fs-meta); color:var(--text-dimmer); }
+.agent-activity-details { padding:var(--sp-2) 0; border-top:1px solid var(--border-subtle); overflow-wrap:anywhere; }
+.agent-activity-details code,.agent-activity-details small { font-size:var(--fs-meta); }
+.agent-activity-summary { flex:none; }

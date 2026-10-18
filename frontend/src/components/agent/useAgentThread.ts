@@ -34,7 +34,7 @@ export function useAgentThread(cid: string, branch = '') {
     refreshRef.current = schedule
     acceptedRef.current = (receipt, text) => {
       if (!view || !receipt.messageId || view.messages.some((m) => m.id === receipt.messageId)) { schedule(); return }
-      view = { ...view, messages: [...view.messages, { id: receipt.messageId, branch_id: view.branchId, role: 'user', status: 'completed', seq: Math.max(0, ...view.messages.map((m) => m.seq)) + 1, turn_id: receipt.turnId, content: { text } }], turns: [...view.turns, { id: receipt.turnId, state: 'queued' }] }
+      view = { ...view, messages: [...view.messages, { id: receipt.messageId, branch_id: view.branchId, role: 'user', status: 'completed', seq: Math.max(0, ...view.messages.map((m) => m.seq)) + 1, created_ms: Date.now(), turn_id: receipt.turnId, content: { text } }], turns: [...view.turns, { id: receipt.turnId, state: 'queued' }] }
       publish()
     }
     const connect = async () => {

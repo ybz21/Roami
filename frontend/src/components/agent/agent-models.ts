@@ -13,3 +13,8 @@ export async function saveAgentModels(patch: unknown) {
   window.dispatchEvent(new Event(MODEL_SETTINGS_CHANGED))
   return data as AgentModelSettings
 }
+
+export function modelLabel(name: string): string {
+  const characters = Array.from(name)
+  return characters.length <= 16 ? name : characters.slice(0, 8).join('') + '…' + characters.slice(-7).join('')
+}
