@@ -11,6 +11,7 @@ class Tool:
     effect: str = "read"
     main: bool = False
     cancellation_stops_execution: bool = False
+    source: str = "builtin"
 
     def wire(self):
         return {

@@ -199,7 +199,9 @@ class MCPConnections:
                 except (DomainError, OSError):
                     raise DomainError("MCP_OUTCOME_UNKNOWN") from None
 
-            prepared.append(Tool(alias, description, schema, invoke, effect=effect))
+            prepared.append(
+                Tool(alias, description, schema, invoke, effect=effect, source="external")
+            )
             names[alias] = remote.name
         version = hashlib.sha256(encoded(sorted(names)).encode()).hexdigest()
         self._remove(connection)

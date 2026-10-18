@@ -139,6 +139,8 @@ class ToolDirectory:
                     "name": tool.name,
                     "description": tool.description,
                     "enabled": tool.name not in self.registry.disabled_tools,
+                    "source": tool.source,
+                    "mutable": tool.source == "external",
                 }
             )
         return [{"name": name, "commands": commands} for name, commands in sorted(groups.items())]

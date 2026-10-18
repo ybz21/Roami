@@ -2827,7 +2827,7 @@ const zhCN = {
   'agent.capabilities.note': '管理当前节点智能体的能力。',
   'agent.capabilities.skillsHint': '查看已加载技能的来源和内容，并控制智能体能否读取。内置技能随版本发布；外部技能由节点配置加载。停用停止新增读取，已进入对话的技能内容会保留。',
   'agent.capabilities.toolsHint': '基础四工具、能力搜索与编排统一管理；业务操作归入 Roami CLI，MCP 连接单独查看。',
-  'agent.capabilities.effectHint': '开关对当前节点生效并持久保存；后续调用立即校验，已经发出的操作继续执行。',
+  'agent.capabilities.effectHint': '内置能力只读且固定启用；仅外部接入项可以启停，停用不取消已发出的操作。',
   'agent.capabilities.failed': '加载或保存失败，请重试。',
   'agent.capabilities.search': '搜索名称或说明',
   'agent.capabilities.count': '{count} 项',
@@ -2905,6 +2905,7 @@ const zhCN = {
   'agent.capabilities.tab.cli': "CLI",
   'agent.capabilities.skillDescription.roami-dispatch': "管理 Roami 项目与会话：发现目标、向已有 Codex / Claude 会话发消息、新建后台任务与项目、跟踪和回报结果。",
   'agent.capabilities.skillDescription.web-research': "通过 Roami Chrome CLI 获取并核对网页内容，保留来源、采集时间和真实执行状态。",
+  'agent.capabilities.builtinFixed': '内置 · 固定启用',
 }
 
 export default zhCN

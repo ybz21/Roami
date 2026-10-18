@@ -64,21 +64,15 @@ async def test_search_skill_loading_and_disable_policy(store):
         for x in runtime.tools.directory.search("发消息", "cli", 10)["items"]
     )
     before = runtime.tools.directory.search("session_send", "cli", 10)
-    await runtime.capability_settings.save(
-        "local", {"kind": "tools", "name": "session_send", "enabled": False}
-    )
-    after = runtime.tools.directory.search("session_send", "cli", 10)
-    assert before["catalogVersion"] != after["catalogVersion"]
-    assert not any(x["name"] == "session_send" for x in after["items"])
-    with pytest.raises(DomainError, match="TOOL_DISABLED"):
-        await runtime.tools.invoke(
-            cli("session_send", {"sessionId": "never", "text": "never"}), "main", {}
-        )
-    await runtime.capability_settings.save(
-        "local", {"kind": "skills", "name": "roami-dispatch", "enabled": False}
-    )
-    with pytest.raises(DomainError, match="SKILL_DISABLED"):
-        await runtime.tools.invoke(call("read", {"path": skill["location"]}), "main", {})
+    for kind, name in (("tools", "session_send"), ("skills", "roami-dispatch")):
+        with pytest.raises(DomainError, match="BUILTIN_CAPABILITY_READ_ONLY"):
+            await runtime.capability_settings.save(
+                "local", {"kind": kind, "name": name, "enabled": False}
+            )
+    assert before == runtime.tools.directory.search("session_send", "cli", 10)
+    assert (await runtime.tools.invoke(call("read", {"path": skill["location"]}), "main", {}))[
+        "text"
+    ]
 
 
 async def test_main_foundations_preserve_file_hashes(store, tmp_path):

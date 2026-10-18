@@ -9,66 +9,86 @@ from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
+from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
 
 
-async def test_tool_policy_blocks_stale_calls_and_survives_recreation(store):
-    runtime = Runtime(store, ConversationModel())
+def external_settings():
+    return Settings(
+        http_tools={
+            "fixture": {
+                "url": "https://example.invalid",
+                "description": "External read-only fixture",
+            }
+        }
+    )
+
+
+async def test_external_tool_policy_blocks_stale_calls_and_survives_recreation(store):
+    runtime = Runtime(store, ConversationModel(), settings=external_settings())
     settings = runtime.capability_settings
-    await settings.save("local", {"kind": "tools", "name": "session_send", "enabled": False})
-    assert "session_send" not in {tool["function"]["name"] for tool in runtime.tools.catalog()}
+    await settings.save("local", {"kind": "tools", "name": "http_fixture", "enabled": False})
     with pytest.raises(DomainError, match="TOOL_DISABLED"):
         await runtime.tools.invoke(
-            {
-                "function": {
-                    "name": "session_send",
-                    "arguments": json.dumps({"sessionId": "existing", "text": "do not deliver"}),
-                }
-            },
-            "main",
-            {},
+            {"function": {"name": "http_fixture", "arguments": "{}"}}, "worker", {}
         )
-    with pytest.raises(DomainError, match="TOOL_DISABLED"):
-        await runtime.tools.invoke(
-            {
-                "function": {
-                    "name": "delegate",
-                    "arguments": json.dumps(
-                        {
-                            "goal": "Do not send",
-                            "target": {"kind": "session", "sessionId": "existing"},
-                        }
-                    ),
-                }
-            },
-            "main",
-            {},
-        )
-    recreated = Runtime(store, ConversationModel())
-    assert "session_send" in recreated.tools.disabled_tools
+    recreated = Runtime(store, ConversationModel(), settings=external_settings())
+    assert "http_fixture" in recreated.tools.disabled_tools
     assert os.stat(settings.path).st_mode & 0o777 == 0o600
     await recreated.capability_settings.save(
-        "local", {"kind": "tools", "name": "session_send", "enabled": True}
+        "local", {"kind": "tools", "name": "http_fixture", "enabled": True}
     )
-    assert "session_send" not in {tool["function"]["name"] for tool in recreated.tools.catalog()}
     assert any(
-        item["name"] == "session_send"
-        for item in recreated.tools.directory.search("session_send", "cli", 10)["items"]
+        item["name"] == "http_fixture"
+        for item in recreated.tools.directory.search("http_fixture", "cli", 10, "worker")["items"]
     )
 
 
-async def test_disabled_skill_cannot_be_read_through_existing_tool_call(store):
-    runtime = Runtime(store, ConversationModel())
+async def test_external_skill_can_be_disabled_and_reenabled(store, tmp_path):
+    root = tmp_path / "configured-skills"
+    path = root / "external-workflow" / "SKILL.md"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "---\nname: external-workflow\ndescription: External workflow\n---\nExternal content"
+    )
+    runtime = Runtime(store, ConversationModel(), settings=Settings(skill_roots=(root,)))
     await runtime.capability_settings.save(
-        "local", {"kind": "skills", "name": "roami-dispatch", "enabled": False}
+        "local", {"kind": "skills", "name": "external-workflow", "enabled": False}
     )
-    call = {"function": {"name": "skill_read", "arguments": '{"name":"roami-dispatch"}'}}
+    call = {"function": {"name": "read", "arguments": '{"path":"skill://external-workflow"}'}}
     with pytest.raises(DomainError, match="SKILL_DISABLED"):
         await runtime.tools.invoke(call, "main", {})
     await runtime.capability_settings.save(
-        "local", {"kind": "skills", "name": "roami-dispatch", "enabled": True}
+        "local", {"kind": "skills", "name": "external-workflow", "enabled": True}
     )
     assert (await runtime.tools.invoke(call, "main", {}))["version"]
+
+
+async def test_builtins_reject_both_enable_and_disable_and_old_disabled_config_is_ignored(store):
+    runtime = Runtime(store, ConversationModel(), settings=external_settings())
+    for kind, name in [
+        ("tools", tool["name"]) for tool in runtime.capability_settings.view("local")["tools"]
+    ] + [("tools", "session_send"), ("skills", "roami-dispatch"), ("skills", "web-research")]:
+        for enabled in (True, False):
+            with pytest.raises(DomainError, match="BUILTIN_CAPABILITY_READ_ONLY"):
+                await runtime.capability_settings.save(
+                    "local", {"kind": kind, "name": name, "enabled": enabled}
+                )
+    path = runtime.capability_settings.path
+    path.parent.mkdir(parents=True, mode=0o700)
+    path.write_text(
+        json.dumps(
+            {"tools": ["bash", "session_send", "http_fixture"], "skills": ["roami-dispatch"]}
+        )
+    )
+    path.chmod(0o600)
+    recreated = Runtime(store, ConversationModel(), settings=external_settings())
+    assert recreated.tools.disabled_tools == {"http_fixture"}
+    assert recreated.tools.disabled_skills == set()
+    assert all(
+        tool["enabled"] and not tool["mutable"]
+        for tool in recreated.capability_settings.view("local")["tools"]
+    )
 
 
 async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(store):
@@ -119,7 +139,7 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
 
 
 async def test_failed_persistence_does_not_change_runtime_policy(store, monkeypatch):
-    runtime = Runtime(store, ConversationModel())
+    runtime = Runtime(store, ConversationModel(), settings=external_settings())
 
     def reject(*args):
         raise OSError("write rejected")
@@ -127,9 +147,9 @@ async def test_failed_persistence_does_not_change_runtime_policy(store, monkeypa
     monkeypatch.setattr(os, "replace", reject)
     with pytest.raises(OSError):
         await runtime.capability_settings.save(
-            "local", {"kind": "tools", "name": "session_send", "enabled": False}
+            "local", {"kind": "tools", "name": "http_fixture", "enabled": False}
         )
-    assert "session_send" not in runtime.tools.disabled_tools
+    assert "http_fixture" not in runtime.tools.disabled_tools
     assert not runtime.capability_settings.path.exists()
 
 

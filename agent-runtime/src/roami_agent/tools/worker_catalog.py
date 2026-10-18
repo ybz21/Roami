@@ -41,6 +41,7 @@ def add_worker_tools(registry, settings, artifacts=None):
                 config.get("schema", object_schema({})),
                 request,
                 effect="read" if config.get("method", "GET") in {"GET", "HEAD"} else "write",
+                source="external",
             )
         )
 

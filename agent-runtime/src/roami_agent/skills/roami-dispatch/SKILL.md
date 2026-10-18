@@ -74,6 +74,6 @@ description: Manage Roami projects, discover full session membership, deliver me
 
 项目与专业会话仍通过既有 Go CLI 管理：`roami project ls/show/sessions`、`roami session ls/resolve`、`roami agent execution send-message/launch/status/cancel`。上面的上下文 CLI 能力复用这些适配器；Python 拥有 Main、记忆和后台任务，不另造项目或会话数据库。
 
-节点、模型、Skill、工具和 MCP 配置由设置页维护；专业 CLI 登录和套餐额度仍来自各自执行器。读配置不等于改配置。删除、归档项目或终止无关会话不属于自动派活的附带动作；未出现在实时能力目录中的管理入口不得伪造为已支持。
+节点、模型、Skill、工具和 MCP 配置由设置页维护；专业 CLI 登录和套餐额度仍来自各自执行器。内置工具、Skill、CLI 固定启用且只读，不能修改或启停；只有外部接入项允许管理。读配置不等于改配置。删除、归档项目或终止无关会话不属于自动派活的附带动作；未出现在实时能力目录中的管理入口不得伪造为已支持。
 
 记忆自动保存与召回；不要求用户每次说“记住”。已存偏好参与执行器选择，当前用户要求优先。不能仅凭助手说“已记下”认定已经写入长期记忆。

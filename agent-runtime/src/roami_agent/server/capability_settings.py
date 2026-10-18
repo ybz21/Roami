@@ -46,7 +46,19 @@ class CapabilitySettings:
                 raise DomainError("CAPABILITY_SETTINGS_INVALID", 503)
         self.apply()
 
+    def mutable(self, kind, name):
+        if kind == "skills":
+            return self.runtime.tools.skills[name]["source"] != "builtin"
+        return self.runtime.tools.registry[name].source == "external"
+
     def apply(self):
+        for kind, entries in (
+            ("tools", self.runtime.tools.registry),
+            ("skills", self.runtime.tools.skills),
+        ):
+            self.saved[kind] = [
+                name for name in self.saved[kind] if name not in entries or self.mutable(kind, name)
+            ]
         self.runtime.tools.disabled_tools = set(self.saved["tools"])
         self.runtime.tools.disabled_skills = set(self.saved["skills"])
 
@@ -65,13 +77,20 @@ class CapabilitySettings:
                     + (["worker"] if tool.name in WORKER_FOUNDATIONS else [])
                     + (["research"] if tool.name in RESEARCH_FOUNDATIONS else []),
                     "enabled": tool.name not in tools.disabled_tools,
+                    "source": tool.source,
+                    "mutable": tool.source == "external",
                 }
                 for tool in sorted(tools.registry.values(), key=lambda tool: tool.name)
                 if not tools.directory or tool.name in FOUNDATIONS
             ],
             "cli": tools.directory.groups() if tools.directory else [],
             "skills": [
-                {"name": name, **value, "enabled": name not in tools.disabled_skills}
+                {
+                    "name": name,
+                    **value,
+                    "enabled": name not in tools.disabled_skills,
+                    "mutable": value["source"] != "builtin",
+                }
                 for name, value in sorted(tools.skills.items())
             ],
             "mcp": [
@@ -108,6 +127,8 @@ class CapabilitySettings:
             )
             if patch["name"] not in names:
                 raise DomainError("CAPABILITY_NOT_FOUND", 404)
+            if not self.mutable(patch["kind"], patch["name"]):
+                raise DomainError("BUILTIN_CAPABILITY_READ_ONLY", 409)
             disabled = set(self.saved[patch["kind"]])
             if patch["enabled"]:
                 disabled.discard(patch["name"])

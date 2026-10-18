@@ -44,6 +44,6 @@ Codex / Claude Code 执行复用 Go Agent 参数注册表与应用层会话服�
 
 - 实际模型目录：Main 7（read / bash / edit / write / tool_search / delegate / ask_user）、原生 Worker 5、检索 Worker 3；旧操作只作内部与历史兼容，不再常驻模型 schema 或工具设置卡片。
 - Go CLI 新增 agent capability search / show / call；Python 共享目录与操作适配，复用既有项目、会话、浏览器、任务、记忆及提醒服务。bash 在记录 planned 前解析操作效果；保留原动作名称、来源与执行状态。
-- 设置合并成能力管理页，顶部工具 / MCP / Skill / CLI 四 Tab；旧链接兼容。CLI 能力启停与模型执行共用策略。Skill 详情渲染 Markdown，roami-dispatch 逐项说明实际操作、参数和状态。MCP 配置仍由节点文件加载，上传接口仍为预留。
+- 设置合并成能力管理页，顶部工具 / MCP / Skill / CLI 四 Tab；旧链接兼容。内置工具、Skill、CLI 固定启用且只读，仅外部能力允许启停；后端拒绝内置项修改，忽略旧配置中的内置禁用项。Skill 详情渲染 Markdown，roami-dispatch 逐项说明实际操作、参数和状态。MCP 配置仍由节点文件加载，上传接口仍为预留。
 - 代码检查：full gate 通过（Go、Python 498 项、类型 / i18n / hover / build），前端 Vitest 656 项通过；角色受限 schema 与新检索操作校验另有定向回归。
 - 真实提供方隔离验证：Main 实际收到 7 个 schema，检索 Worker 收到 3 个；搜索、读取技能、原生委派、Chrome CLI 观察、来源验证及原 Main 回报成功。一条无工作区 curl 尝试被拒绝后转入正确流程，不冒充全部调用零失败。生产部署及真机结果记录在本轮交付证明。

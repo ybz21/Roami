@@ -2818,7 +2818,7 @@ const enUS = {
   'agent.capabilities.note': 'Manage agent capabilities on this node.',
   'agent.capabilities.skillsHint': 'Inspect loaded skill sources and content, and control access. Built-in skills ship with Roami; external skills load from node configuration. Disabling stops new reads; content already in the conversation remains.',
   'agent.capabilities.toolsHint': 'Manage four core tools, discovery and orchestration. Business operations use Roami CLI; MCP connections are shown separately.',
-  'agent.capabilities.effectHint': 'Switches persist on this node and apply to subsequent calls. Operations already dispatched continue.',
+  'agent.capabilities.effectHint': 'Built-in capabilities are read-only and always enabled. Only external integrations can be toggled; disabling does not cancel actions already sent.',
   'agent.capabilities.failed': 'Could not load or save. Please retry.',
   'agent.capabilities.search': 'Search names or descriptions',
   'agent.capabilities.count': '{count} items',
@@ -2896,6 +2896,7 @@ const enUS = {
   'agent.capabilities.tab.cli': "CLI",
   'agent.capabilities.skillDescription.roami-dispatch': "Manage Roami projects and sessions: discover targets, message Codex / Claude, create background work and projects, and track results.",
   'agent.capabilities.skillDescription.web-research': "Retrieve and verify web content through Roami Chrome CLI, preserving sources, retrieval time and actual execution state.",
+  'agent.capabilities.builtinFixed': 'Built-in · always enabled',
 }
 
 export default enUS

@@ -7,7 +7,7 @@ vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
 vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t }) } })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
-const skill = { name: 'roami-dispatch', text: 'Dispatch through the CLI', version: 'abc123456789', source: 'builtin', enabled: true }
+const skill = { name: 'roami-dispatch', text: 'Dispatch through the CLI', version: 'abc123456789', source: 'configured', enabled: true, mutable: true }
 const catalog = { skills: [skill], tools: [], mcp: [] }
 it('persists a skill switch and retains the saved state after an API failure', async () => {
   vi.mocked(api).mockResolvedValueOnce({ data: catalog }).mockResolvedValueOnce({ data: { ...catalog, skills: [{ ...skill, enabled: false }] } }).mockRejectedValueOnce(new Error('offline'))
@@ -51,13 +51,14 @@ it('shows unknown MCP connection state and opens connection details', async () =
 
 it('shows seven tools and manages business operations in a separate CLI tab', async () => {
   const names = ['read', 'bash', 'edit', 'write', 'tool_search', 'delegate', 'ask_user']
-  const tools = names.map(name => ({ name, description: 'runtime description', schema: { type: 'object' }, effect: 'read', main: true, enabled: true }))
-  const data = { ...catalog, tools, cli: [{ name: 'sessions', commands: [{ name: 'session_send', description: 'Send to a session', enabled: true }] }] }
+  const tools = names.map(name => ({ name, description: 'runtime description', schema: { type: 'object' }, effect: 'read', main: true, enabled: true, mutable: false, source: 'builtin' }))
+  const data = { ...catalog, tools, cli: [{ name: 'sessions', commands: [{ name: 'session_send', description: 'Send to a session', enabled: true, mutable: false }, { name: 'http_external', description: 'External service', enabled: true, mutable: true }] }] }
   vi.mocked(api).mockResolvedValue({ data })
   const { container } = render(<AgentCapabilities kind="tools" />)
   await screen.findByText('tool_search')
   expect(screen.getAllByRole('tab')).toHaveLength(4)
-  expect(screen.getAllByRole('switch')).toHaveLength(7)
+  expect(screen.queryAllByRole('switch')).toHaveLength(0)
+  expect(screen.getAllByText('agent.capabilities.builtinFixed')).toHaveLength(7)
   expect(Array.from(container.querySelector('.agent-capability-grid')!.querySelectorAll('.agent-capability-heading strong')).map(node => node.textContent)).toEqual(names)
   expect(container.querySelector('.agent-capability-cli')).toBeNull()
   fireEvent.click(screen.getByRole('tab', { name: 'agent.capabilities.tab.cli' }))
@@ -65,5 +66,5 @@ it('shows seven tools and manages business operations in a separate CLI tab', as
   expect(container.querySelector('.agent-capability-card .agent-capability-heading')).toBeNull()
   fireEvent.click(screen.getByText('agent.capabilities.cliCommands'))
   fireEvent.click(screen.getByRole('switch'))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-settings', { kind: 'tools', name: 'session_send', enabled: false }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-settings', { kind: 'tools', name: 'http_external', enabled: false }))
 })
