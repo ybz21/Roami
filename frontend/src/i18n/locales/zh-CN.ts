@@ -2541,7 +2541,7 @@ const zhCN = {
   'agent.notifications': '消息',
   'agent.unread': '未读消息',
   'agent.noNotifications': '暂无未读消息',
-  'agent.tasks': '任务',
+  'agent.tasks': '后台任务',
   'agent.memory': '记忆',
   'agent.context': '上下文',
   'agent.overview': '概览',

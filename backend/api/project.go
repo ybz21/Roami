@@ -153,8 +153,9 @@ func (a *API) noteArchived(key string, e project.Entry, roamWts, sessions int) b
 }
 
 func (a *API) ProjectsList(c *gin.Context) {
+	sessionProject := c.Query("sessionProject")
 	projRespMu.Lock()
-	if projResp != nil && time.Since(projRespAt) < 5*time.Second {
+	if sessionProject == "" && projResp != nil && time.Since(projRespAt) < 5*time.Second {
 		resp := projResp
 		projRespMu.Unlock()
 		c.JSON(http.StatusOK, resp)
@@ -166,8 +167,13 @@ func (a *API) ProjectsList(c *gin.Context) {
 	defer cancel()
 
 	var sessions []sessListItem
-	if out, err := a.TT.Run("ls", "--json"); err == nil {
-		_ = json.Unmarshal([]byte(out), &sessions)
+	out, sessionErr := a.TT.Run("ls", "--json")
+	if sessionErr == nil {
+		sessionErr = json.Unmarshal([]byte(out), &sessions)
+	}
+	if sessionProject != "" && sessionErr != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "SESSION_OBSERVATION_FAILED"}})
+		return
 	}
 	ann := a.WT.Annotations(ctx)
 
@@ -230,7 +236,13 @@ func (a *API) ProjectsList(c *gin.Context) {
 		}
 		*top = append(*top, ps)
 	}
+	var selectedSessions []projectSession
+	selectedFound := false
 	finish := func(p *projectSummary, top []projectSession) {
+		if p.Key == sessionProject {
+			selectedFound = true
+			selectedSessions = append([]projectSession{}, top...)
+		}
 		summarizeSessions(p, top)
 		list = append(list, *p)
 	}
@@ -385,6 +397,15 @@ func (a *API) ProjectsList(c *gin.Context) {
 		return list[i].Name < list[j].Name
 	})
 
+	if sessionProject != "" {
+		if !selectedFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "PROJECT_NOT_FOUND"}})
+			return
+		}
+		sort.Slice(selectedSessions, func(i, j int) bool { return selectedSessions[i].Name < selectedSessions[j].Name })
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"projectId": sessionProject, "sessions": selectedSessions}})
+		return
+	}
 	resp := gin.H{"data": gin.H{"projects": list, "loose": loose}}
 	projRespMu.Lock()
 	projResp, projRespAt = resp, time.Now()

@@ -143,7 +143,9 @@ class TargetDirectory:
             "state": "live",
         }
 
-    async def search(self, kind, query="", *, offset=0, limit=10):
+    async def search(self, kind, query="", *, offset=0, limit=10, project_id=None):
+        if project_id and kind != "session":
+            raise DomainError("INVALID_TARGET_KIND")
         if kind == "project":
             payload = await self._query("project", "ls", "--json")
             try:
@@ -152,7 +154,32 @@ class TargetDirectory:
                 raise DomainError("INVALID_TARGET_RECEIPT") from exc
             project = True
         elif kind == "session":
-            entries = await self._query("session", "ls", "--live", "--json")
+            if project_id:
+                payload = await self._query("project", "sessions", project_id, "--json")
+                try:
+                    raw = payload["data"]["sessions"]
+                    if not isinstance(raw, list):
+                        raise DomainError("INVALID_TARGET_RECEIPT")
+                    entries = []
+                    for entry in raw:
+                        if not isinstance(entry, dict):
+                            raise DomainError("INVALID_TARGET_RECEIPT")
+                        if entry.get("state", "live") not in {"", "live", "dormant"}:
+                            raise DomainError("INVALID_TARGET_RECEIPT")
+                        if entry.get("state") == "dormant":
+                            continue
+                        name = self._text(entry, "name")
+                        entries.append(
+                            {
+                                "id": name,
+                                "label": entry.get("label") or name,
+                                "agent": entry.get("agent", ""),
+                            }
+                        )
+                except (KeyError, TypeError) as exc:
+                    raise DomainError("INVALID_TARGET_RECEIPT") from exc
+            else:
+                entries = await self._query("session", "ls", "--live", "--json")
             project = False
         else:
             raise DomainError("INVALID_TARGET_KIND")
@@ -162,6 +189,10 @@ class TargetDirectory:
         items = []
         for entry in entries:
             item = self._project(entry) if project else self._session(entry)
+            if project_id:
+                item["projectId"] = project_id
+                if entry.get("agent") in {"codex", "claude"}:
+                    item["executor"] = entry["agent"]
             identifier = item["projectId" if project else "sessionId"]
             if (
                 not query

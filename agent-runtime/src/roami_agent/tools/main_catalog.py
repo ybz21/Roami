@@ -81,11 +81,13 @@ def register_main_tools(registry, tasks, memory, targets):
     )
 
     async def target_search(args, binding):
+        scope = {"project_id": args["projectId"]} if args.get("projectId") else {}
         return await targets.search(
             args["kind"],
             args.get("query", ""),
             offset=args.get("offset", 0),
             limit=args.get("limit", 10),
+            **scope,
         )
 
     async def target_resolve(args, binding):
@@ -94,11 +96,12 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "target_search",
-            "Find projects or live sessions by literal name/ID, with bounded pages. Use one exact unique match directly; never guess among duplicate names. session_send appends to legacy sessions; tracked task continuation requires lifecycle callbacks.",
+            "Find projects or live sessions by literal name/ID, with bounded pages. For sessions in a project, supply the discovered projectId; this queries the full membership, not the top-three summary. Use one exact unique match directly; never guess among duplicate names. session_send appends to legacy sessions; tracked task continuation requires lifecycle callbacks.",
             object_schema(
                 {
                     "kind": {"type": "string", "enum": ["project", "session"]},
                     "query": {"type": "string", "maxLength": 200},
+                    "projectId": {"type": "string", "minLength": 1, "maxLength": 300},
                     "offset": {"type": "integer", "minimum": 0, "maximum": 10000},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 20},
                 },

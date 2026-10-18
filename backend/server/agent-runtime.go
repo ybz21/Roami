@@ -29,7 +29,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 	for _, route := range []struct{ method, path string }{
-		{"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
+		{"POST", "/agent/main-conversation"}, {"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
 		{"POST", "/agent/attachments"},
 		{"DELETE", "/agent/attachments/:attachment"},
 		{"GET", "/agent/model-settings"}, {"PUT", "/agent/model-settings"}, {"GET", "/agent/models"}, {"POST", "/agent/models"},

@@ -16,6 +16,49 @@ class Conversations:
     def __init__(self, database: Database):
         self.db = database
 
+    @staticmethod
+    def _new(db, owner, title):
+        cid, bid = identity(), identity()
+        db.execute("INSERT OR IGNORE INTO owner_versions(owner_id) VALUES(?)", (owner,))
+        db.execute(
+            "INSERT INTO conversations(id,owner_id,title,created_ms,updated_ms) VALUES(?,?,?,?,?)",
+            (cid, owner, title[:200], now_ms(), now_ms()),
+        )
+        db.execute(
+            "INSERT INTO branches(id,conversation_id,created_ms) VALUES(?,?,?)",
+            (bid, cid, now_ms()),
+        )
+        db.execute("UPDATE conversations SET active_branch_id=? WHERE id=?", (bid, cid))
+        db.execute(
+            "INSERT INTO channel_bindings(id,conversation_id,channel_kind,route_json,created_ms) VALUES(?,?,'im',?,?)",
+            ("agent.app:" + cid, cid, encoded({"kind": "app"}), now_ms()),
+        )
+        event(db, cid, "conversation.created", {"conversationId": cid, "branchId": bid})
+        return owned(db, owner, cid)
+
+    async def main(self, owner):
+        def write(db):
+            existing = row(
+                db,
+                "SELECT c.* FROM main_conversations m JOIN conversations c ON c.id=m.conversation_id WHERE m.owner_id=? AND c.deleted_ms IS NULL",
+                (owner,),
+            )
+            if existing:
+                return existing
+            legacy = row(
+                db,
+                "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) ORDER BY c.created_ms,c.id LIMIT 1",
+                (owner,),
+            )
+            conversation = legacy or self._new(db, owner, "New conversation")
+            db.execute(
+                "INSERT INTO main_conversations(owner_id,conversation_id,created_ms) VALUES(?,?,?) ON CONFLICT(owner_id) DO UPDATE SET conversation_id=excluded.conversation_id,created_ms=excluded.created_ms",
+                (owner, conversation["id"], now_ms()),
+            )
+            return conversation
+
+        return await self.db.call(write, write=True)
+
     async def create(self, owner: str, title="New conversation", *, request_key=None):
         if request_key is not None and (not request_key or len(request_key) > 200):
             raise DomainError("INVALID_REQUEST_KEY")
@@ -32,28 +75,13 @@ class Conversations:
                     if prior["payload_sha256"] != digest:
                         raise DomainError("REQUEST_KEY_CONFLICT", 409)
                     return owned(db, owner, prior["conversation_id"])
-            cid, bid = identity(), identity()
-            db.execute("INSERT OR IGNORE INTO owner_versions(owner_id) VALUES(?)", (owner,))
-            db.execute(
-                "INSERT INTO conversations(id,owner_id,title,created_ms,updated_ms) "
-                "VALUES(?,?,?,?,?)",
-                (cid, owner, title[:200], now_ms(), now_ms()),
-            )
-            db.execute(
-                "INSERT INTO branches(id,conversation_id,created_ms) VALUES(?,?,?)",
-                (bid, cid, now_ms()),
-            )
-            db.execute("UPDATE conversations SET active_branch_id=? WHERE id=?", (bid, cid))
-            db.execute(
-                "INSERT INTO channel_bindings(id,conversation_id,channel_kind,route_json,created_ms) VALUES(?,?,'im',?,?)",
-                ("agent.app:" + cid, cid, encoded({"kind": "app"}), now_ms()),
-            )
+            conversation = self._new(db, owner, title)
+            cid = conversation["id"]
             if request_key:
                 db.execute(
                     "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",
                     (identity(), owner, request_key, digest, cid, now_ms()),
                 )
-            event(db, cid, "conversation.created", {"conversationId": cid, "branchId": bid})
             return owned(db, owner, cid)
 
         return await self.db.call(write, write=True)

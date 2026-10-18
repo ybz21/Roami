@@ -1,10 +1,9 @@
-import hashlib
-
 import httpx
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.shell import register_shell
+from roami_agent.tools.skills import register_skills
 
 
 def add_worker_tools(registry, settings, artifacts=None):
@@ -45,29 +44,4 @@ def add_worker_tools(registry, settings, artifacts=None):
             )
         )
 
-    skills = {}
-    for root in settings.skill_roots:
-        if not root.is_dir():
-            continue
-        for path in root.glob("*/SKILL.md"):
-            resolved = path.resolve()
-            if root not in resolved.parents or resolved.stat().st_size > 64_000:
-                continue
-            text = resolved.read_text()
-            name = path.parent.name
-            if name in skills:
-                raise DomainError("DUPLICATE_SKILL")
-            skills[name] = {"text": text, "version": hashlib.sha256(text.encode()).hexdigest()}
-    if skills:
-
-        async def skill(args, binding):
-            return skills[args["name"]]
-
-        registry.add(
-            Tool(
-                "skill_read",
-                "Load a skill only when needed: " + ", ".join(skills),
-                object_schema({"name": {"type": "string", "enum": list(skills)}}, ["name"]),
-                skill,
-            )
-        )
+    register_skills(registry, settings)

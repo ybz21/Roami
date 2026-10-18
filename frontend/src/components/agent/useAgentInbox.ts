@@ -14,11 +14,11 @@ export function useAgentInbox(enabled: boolean, node: string | null) {
       if (busy) { again = true; return }
       busy = true
       const responses = await Promise.allSettled([
-        api('GET', '/agent/conversations', undefined, { signal: abort.signal }),
+        api('POST', '/agent/main-conversation', undefined, { signal: abort.signal }),
         api('GET', '/agent/notifications', undefined, { signal: abort.signal }),
       ])
       if (!stopped) setData((old) => ({
-        conversations: responses[0].status === 'fulfilled' ? responses[0].value.data : old.conversations,
+        conversations: responses[0].status === 'fulfilled' ? [responses[0].value.data] : old.conversations,
         notices: responses[1].status === 'fulfilled' ? responses[1].value.data.items : old.notices,
         unread: responses[1].status === 'fulfilled' ? responses[1].value.data.unread : old.unread,
         unavailable: responses[0].status === 'rejected',

@@ -60,3 +60,7 @@
 ## 2026-10-18 聊天图片预处理
 
 用户确认按 Pi 做图片预处理。已同步 [上下文与 Cache](technical/04-context-cache.html) 的图片专项；上版保存在 [修订快照](revisions/before-image-preprocessing/technical/04-context-cache.html)。浏览器上传前优化，Python 按模型限制兜底，合规原格式保留、透明白底 JPEG、EXIF 与编码体积控制，重试复用同一份文件。此项不代表其他工具图片协议已统一。
+
+## 2026-10-18 唯一 Main 与 CLI 派活
+
+用户确认只展示一个长期 Main，其他执行器会话作为后台任务。补充 [派活机制与唯一会话](technical/12-roami-dispatch.html)：内置技能、完整项目会话查询、已有会话直接投递、选择题、后台新建及真实状态回报。旧记录保留，不自动拼接上下文。

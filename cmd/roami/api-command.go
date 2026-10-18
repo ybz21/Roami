@@ -137,7 +137,7 @@ func runAPICommand(group string, args []string) int {
 		if group == "auth" {
 			fmt.Println("login|logout|status [--server URL] [--stdin] [--json]")
 		} else {
-			fmt.Println("ls|show|create|prefs|activity|remove [--server URL] [--json]")
+			fmt.Println("ls|show|sessions|create|prefs|activity|remove [--server URL] [--json]")
 		}
 		return 0
 	}
@@ -266,6 +266,11 @@ func runAPICommand(group string, args []string) int {
 	switch sub {
 	case "ls":
 		raw, err = a.request("GET", "/api/projects", nil)
+	case "sessions":
+		if target == "" {
+			return fail(fmt.Errorf("需要 project ID"))
+		}
+		raw, err = a.request("GET", "/api/projects?sessionProject="+url.QueryEscape(target), nil)
 	case "show":
 		if target == "" {
 			return fail(fmt.Errorf("需要 project ID"))

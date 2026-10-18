@@ -2532,7 +2532,7 @@ const enUS = {
   'agent.notifications': 'Messages',
   'agent.unread': 'Unread messages',
   'agent.noNotifications': 'No unread messages',
-  'agent.tasks': 'Tasks',
+  'agent.tasks': 'Background tasks',
   'agent.memory': 'Memory',
   'agent.context': 'Context',
   'agent.overview': 'Overview',

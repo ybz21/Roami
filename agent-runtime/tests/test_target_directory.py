@@ -275,3 +275,48 @@ async def test_cli_auth_error_is_actionable_without_exposing_response_details(mo
     monkeypatch.setattr(targets, "execute", execute)
     with pytest.raises(DomainError, match="^ROAMI_CLI_AUTH_REQUIRED$"):
         await TargetDirectory(Settings()).overview()
+
+
+async def test_project_sessions_use_complete_cli_membership_not_top_three(monkeypatch):
+    calls = []
+
+    async def execute(argv, **kwargs):
+        calls.append(argv)
+        return {
+            "exitCode": 0,
+            "stdout": json.dumps(
+                {
+                    "data": {
+                        "projectId": "p",
+                        "sessions": [
+                            {"name": f"session-{i}", "label": f"Task {i}", "agent": "codex"}
+                            for i in range(6)
+                        ]
+                        + [{"name": "sleeping", "state": "dormant"}],
+                    }
+                }
+            ),
+        }
+
+    monkeypatch.setattr(targets, "execute", execute)
+    result = await TargetDirectory(Settings()).search("session", project_id="p")
+    assert result["total"] == 6
+    assert result["items"][-1] == {
+        "kind": "session",
+        "sessionId": "session-5",
+        "label": "Task 5",
+        "state": "live",
+        "projectId": "p",
+        "executor": "codex",
+    }
+    assert calls == [["roami", "project", "sessions", "p", "--json"]]
+
+
+async def test_dispatch_skill_is_available_to_main_in_installed_package(store):
+    from test_runtime import ConversationModel
+
+    runtime = Runtime(store, ConversationModel())
+    catalog = runtime.tools.catalog(role="main")
+    assert any(tool["function"]["name"] == "skill_read" for tool in catalog)
+    loaded = await runtime.tools.registry["skill_read"].handler({"name": "roami-dispatch"}, {})
+    assert loaded["version"] and "project sessions" in loaded["text"]

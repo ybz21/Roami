@@ -104,7 +104,13 @@ async def test_question_is_a_durable_terminal_reply_and_selection_continues_chat
                     },
                 )
 
-    runtime = Runtime(store, Model())
+    class MemoryModel:
+        model = "memory-fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", '{"memories":[]}')
+
+    runtime = Runtime(store, Model(), memory_model=MemoryModel())
     try:
         await runtime.start()
         c = await runtime.conversations.create("alice")

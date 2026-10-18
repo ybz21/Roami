@@ -59,3 +59,18 @@ func TestProjectProvisionCLIAllowsNameWithoutExistingDirectory(t *testing.T) {
 		t.Fatalf("create exit=%d", code)
 	}
 }
+
+func TestProjectSessionsUsesCompleteMembershipQuery(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/projects" || r.URL.Query().Get("sessionProject") != "p & 1" {
+			t.Errorf("unexpected membership query: %s", r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"projectId":"p & 1","sessions":[{"name":"s4","label":"Fourth Codex","agent":"codex"}]}}`))
+	}))
+	defer server.Close()
+	t.Setenv("ROAMI_HOME", t.TempDir())
+	if code := runAPICommand("project", []string{"sessions", "p & 1", "--json", "--server", server.URL}); code != 0 {
+		t.Fatalf("sessions exit=%d", code)
+	}
+}

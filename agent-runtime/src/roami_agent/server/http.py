@@ -236,6 +236,10 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def delete_artifact(artifact_id: str, owner: Owner):
         return {"data": await runtime.artifacts.delete(owner, artifact_id)}
 
+    @app.post("/v1/main-conversation")
+    async def main_conversation(owner: Owner):
+        return {"data": await runtime.conversations.main(owner)}
+
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):
         return {

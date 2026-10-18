@@ -56,7 +56,9 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const draftKey = `roami.agent.draft.${node || 'local'}.${cid || 'new'}`
   const [draft, setDraft] = useAgentDraft(draftKey)
   const attachments = useAgentAttachments(draftKey)
-  const readOnly = !!thread.view && thread.view.branchId !== thread.view.conversation.active_branch_id
+  const mainCID = inbox.conversations[0]?.id
+  const historical = !!thread.view && (thread.view.branchId !== thread.view.conversation.active_branch_id || (!!mainCID && cid !== mainCID))
+  const readOnly = historical || !mainCID
   const running = thread.view?.turns.some((item) => item.state === 'running' || item.state === 'queued') || false
   const compact = thread.view?.compaction
   const compacting = compact?.state === 'queued' || compact?.state === 'running' || compact?.state === 'started'
@@ -68,13 +70,10 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   useVisibleAgentReads(!panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
   useEffect(() => {
-    if (cid) { try { localStorage.setItem(mirror, cid) } catch {} }
-    else if (inbox.conversations.length) {
-      let saved = ''
-      try { saved = localStorage.getItem(mirror) || '' } catch {}
-      select(inbox.conversations.some((c) => c.id === saved) ? saved : inbox.conversations[0].id)
-    }
-  }, [cid, mirror, inbox.conversations, select])
+    if (mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
+    if (cid === mainCID) { try { localStorage.setItem(mirror, cid) } catch {} }
+  }, [cid, mainCID, branch, focusMessage, mirror, select])
+
   useEffect(() => {
     stick.current = true; setError(''); setPanel(null); setSource(null); panelRequest.current++
     if (!sendingRef.current || pending.current?.cid !== cid) {
@@ -86,7 +85,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const changeDraft = (value: string) => { setDraft(value); try { localStorage.setItem(draftKey, value) } catch {} }
   const ensureConversation = async () => {
     if (cid) return cid
-    const { data } = await api('POST', '/agent/conversations', { requestKey: createKey })
+    const { data } = await api('POST', '/agent/main-conversation', { requestKey: createKey })
     if (activeCID.current === cid) {
       const destination = `roami.agent.draft.${node || 'local'}.${data.id}`
       attachments.transfer(destination)
@@ -192,7 +191,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
       <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     </div>
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
-    {readOnly && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(cid)}>{t('agent.currentConversation')}</button></div>}
+    {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
       <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
         <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq} answer={async text => await submit(text, false, true) === true} /> : <AgentActivity key={entry.id} items={[entry.activity]} onSession={onSession} />)}</div>
