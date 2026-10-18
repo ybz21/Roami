@@ -54,6 +54,27 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def invalid_payload(request, exc):
         return JSONResponse({"error": {"code": "INVALID_REQUEST"}}, status_code=422)
 
+    @app.get("/v1/capability-imports")
+    async def capability_imports(owner: Owner):
+        runtime.capability_settings.view(owner)
+        return {
+            "data": {
+                "available": False,
+                "maxBytes": 65536,
+                "skills": {"filename": "SKILL.md", "contentType": "text/markdown"},
+                "tools": {
+                    "filename": "tool.json",
+                    "contentType": "application/json",
+                    "declarativeOnly": True,
+                },
+            }
+        }
+
+    @app.post("/v1/capability-imports/{kind}")
+    async def import_capability(kind: Literal["skills", "tools"], owner: Owner):
+        runtime.capability_settings.view(owner)
+        raise DomainError("CAPABILITY_IMPORT_RESERVED", 501)
+
     @app.get("/v1/capability-settings")
     async def capabilities(owner: Owner):
         return {"data": runtime.capability_settings.view(owner)}

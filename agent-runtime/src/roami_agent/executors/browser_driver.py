@@ -136,7 +136,7 @@ class BrowserDriver:
             "--no-retry",
             "--no-focus",
             "--timeout",
-            "5000",
+            "15000",
         ]
         if self.config.get("endpoint"):
             argv += ["--cdp", self.config["endpoint"]]
@@ -610,7 +610,7 @@ class BrowserDriver:
                 or parsed.password
             ):
                 raise DomainError("BROWSER_URL_INVALID")
-            arguments += [args["url"]]
+            arguments += [args["url"], "--wait-until", "domcontentloaded"]
         result = await self._perform(
             scope,
             resource,

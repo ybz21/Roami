@@ -23,3 +23,23 @@ html[data-pointer="coarse"] .agent-settings-form .ant-input-affix-wrapper input 
 .agent-capability-servers h3 { font-size:var(--fs-body); color:var(--text-bright); }
 html[data-pointer="coarse"] .agent-capabilities > .ant-input-affix-wrapper,html[data-pointer="coarse"] .agent-capabilities .ant-btn { min-height:var(--tap); }
 .agent-capability-head .ant-switch::after { content:''; position:absolute; inset:calc(var(--sp-3) * -1) 0; }
+.agent-model-advanced summary { cursor:pointer; color:var(--accent); font-size:var(--fs-sm); min-height:var(--tap); display:flex; align-items:center; }
+.agent-model-advanced-fields { display:flex; flex-direction:column; gap:var(--sp-2); }
+.agent-capability-toolbar { display:flex; flex-wrap:wrap; gap:var(--sp-3); align-items:center; }
+.agent-capability-toolbar .ant-input-affix-wrapper { flex:1; min-width:calc(var(--sp-5) * 6); }
+.agent-capability-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-4); }
+html[data-size="compact"] .agent-capability-grid { grid-template-columns:minmax(0,1fr); }
+.agent-capability-card { display:flex; flex-direction:column; gap:var(--sp-3); padding:var(--sp-4); border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-container); min-width:0; }
+.agent-capability-cardtop { display:flex; align-items:center; gap:var(--sp-3); min-height:var(--tap); }
+.agent-capability-icon { display:flex; align-items:center; justify-content:center; width:calc(var(--sp-5) * 2); height:calc(var(--sp-5) * 2); flex-shrink:0; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-sm); }
+.agent-capability-heading { display:flex; flex:1; flex-direction:column; gap:var(--sp-1); min-width:0; }
+.agent-capability-heading strong { font-size:var(--fs-body); color:var(--text-bright); overflow-wrap:anywhere; }
+.agent-capability-description { margin:0; color:var(--text-dim); font-size:var(--fs-sm); line-height:1.6; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.agent-capability-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--sp-2); margin-top:auto; }
+.agent-capability-help summary { min-height:var(--tap); display:flex; align-items:center; cursor:pointer; color:var(--text-dim); font-size:var(--fs-sm); }
+.agent-capability-dialog .ant-modal-body { max-height:65dvh; overflow:auto; }
+.agent-capability-dialog pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-meta); }
+.agent-capability-card .ant-switch::after { content:''; position:absolute; inset:calc(var(--sp-3) * -1) 0; }
+html[data-pointer="coarse"] .agent-capability-card .tt-act,html[data-pointer="coarse"] .agent-capability-toolbar .ant-btn { min-height:var(--tap); }
+
+html[data-pointer="coarse"] .agent-capability-dialog .ant-input { min-height:var(--tap); }

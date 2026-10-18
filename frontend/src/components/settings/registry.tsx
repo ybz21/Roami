@@ -24,6 +24,7 @@ import { ClusterSettings } from '../cluster/ClusterSettings'
 import { StatusBarSettings } from './status-bar-settings'
 import { AgentSettings } from './agent-settings'
 import { AgentCapabilities } from './agent-capabilities'
+import { ProfessionalAgents } from './professional-agents'
 import { AccountActions } from './account-actions'
 
 export const MAX_ROWS = 6
@@ -267,7 +268,7 @@ export function buildSettings(deps: {
     },
     {
       id: 'agent.bin', name: t('set.pageBin'), parent: t('set.groupAgent'), scope: 'mine',
-      items: [claudeItem, codexItem, piItem, opencodeItem],
+      items: [{ id: 'professionalAgents', label: t('set.pageBin'), bare: true, control: { kind: 'custom', node: <ProfessionalAgents items={[claudeItem, codexItem, opencodeItem, piItem]} /> }, keywords: 'Claude Code Codex OpenCode Pi 用量 额度 路径 command 专业智能体' }],
     },
     {
       id: 'agent.new', name: t('set.pageNewSession'), parent: t('set.groupAgent'), scope: 'mine',

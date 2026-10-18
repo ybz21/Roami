@@ -61,6 +61,7 @@ from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
+from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 
 log = logging.getLogger(__name__)
@@ -168,6 +169,8 @@ class Runtime:
         self.desktop = DesktopDriver(database, self.settings, self.resources, self.artifacts)
         if self.desktop.config["enabled"]:
             register_computer_tools(self.tools, self.desktop)
+
+        register_research_tools(self.tools, self.tasks)
 
         self.context.request_context = lambda: request_context(
             self.settings, self.settings.main_instructions, self.tools.catalog("main")

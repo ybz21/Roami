@@ -25,6 +25,14 @@ def register_skills(registry, settings):
                 "text": text,
                 "version": hashlib.sha256(text.encode()).hexdigest(),
                 "source": "builtin" if root == builtin else "configured",
+                "description": next(
+                    (
+                        line.partition(":")[2].strip().strip("\"'")
+                        for line in text.splitlines()
+                        if line.startswith("description:")
+                    ),
+                    "",
+                ),
             }
     if skills:
 
@@ -37,7 +45,7 @@ def register_skills(registry, settings):
         registry.add(
             Tool(
                 "skill_read",
-                "Read a workflow skill when needed. roami-dispatch covers project membership, existing-session messages and new background work. Available: "
+                "Read a workflow skill when needed. roami-dispatch covers project/session routing; web-research covers current public information through Roami Chrome CLI. Available: "
                 + ", ".join(skills),
                 object_schema({"name": {"type": "string", "enum": list(skills)}}, ["name"]),
                 skill,

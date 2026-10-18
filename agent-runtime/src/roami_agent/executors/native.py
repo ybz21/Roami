@@ -29,6 +29,8 @@ class NativeExecutor:
 
     def requires_workspace(self, task):
         target = json.loads(task["intent_json"])["target"]
+        if target["kind"] == "new_session" and target.get("resourceOnly") is True:
+            return False
         return (
             target["kind"] != "new_session"
             or target.get("nodeId", "local") != "local"
@@ -48,7 +50,11 @@ class NativeExecutor:
 
         async def execute(prepared):
             text = await self.run_turn(
-                dict(prepared, executionRunId=run["id"]), "worker", task_id=task["id"]
+                dict(prepared, executionRunId=run["id"]),
+                "research"
+                if json.loads(task["intent_json"])["target"].get("resourceOnly") is True
+                else "worker",
+                task_id=task["id"],
             )
             uncertain = await self.db.call(
                 lambda db: row(

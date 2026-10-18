@@ -20,7 +20,8 @@ it('persists a skill switch and retains the saved state after an API failure', a
   fireEvent.click(toggle)
   await screen.findByRole('alert')
   expect(toggle.getAttribute('aria-checked')).toBe('false')
-  expect(screen.getByText('Dispatch through the CLI')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.capabilities.content' }))
+  expect(await screen.findByText('Dispatch through the CLI')).toBeTruthy()
 })
 it('shows a retry when the capability catalog cannot be loaded', async () => {
   vi.mocked(api).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: catalog })
@@ -28,4 +29,22 @@ it('shows a retry when the capability catalog cannot be loaded', async () => {
   await screen.findByRole('alert')
   fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
   expect(await screen.findByRole('switch')).toBeTruthy()
+})
+
+it('marks the upload entry as reserved without pretending to import files', async () => {
+  vi.mocked(api).mockResolvedValue({ data: catalog })
+  render(<AgentCapabilities kind="skills" />)
+  await screen.findByRole('switch')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.capabilities.import.skills' }))
+  expect(await screen.findByText('agent.capabilities.importReserved')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})
+
+it('shows unknown MCP connection state and opens connection details', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { ...catalog, mcp: [{ name: 'local-fixture', transport: 'stdio', state: 'unknown', tools: 0 }] } })
+  render(<AgentCapabilities kind="tools" />)
+  expect(await screen.findByText('local-fixture')).toBeTruthy()
+  expect(screen.getByText('agent.capabilities.mcp.unknown')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.capabilities.connectionDetails' }))
+  expect(await screen.findByRole('dialog')).toBeTruthy()
 })

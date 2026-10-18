@@ -1,7 +1,7 @@
 import { api } from '../../api'
 
 export type AgentModelRole = { baseUrl: string; model: string; keyConfigured: boolean; images: boolean; contextWindow?: number | null; configuredContextWindow?: number | null }
-export type AgentModelSettings = { main: AgentModelRole; worker: AgentModelRole }
+export type AgentModelSettings = { main: AgentModelRole; worker: AgentModelRole; connection?: { baseUrl: string; keyConfigured: boolean } }
 export const MODEL_SETTINGS_CHANGED = 'roami:agent-model-settings-changed'
 export const agentSettingsRoute = '#/settings/agent/runtime'
 export function modelFailure(error: any, t: (key: string) => string) {

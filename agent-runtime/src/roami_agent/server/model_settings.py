@@ -45,7 +45,7 @@ def read_saved(root):
         raise DomainError("MODEL_SETTINGS_PRIVATE_FILE_REQUIRED", 503)
     try:
         saved = json.loads(path.read_text())
-        if not isinstance(saved, dict) or set(saved) - {"main", "worker"}:
+        if not isinstance(saved, dict) or set(saved) - {"main", "worker", "connection"}:
             raise ValueError
         return saved
     except (ValueError, OSError):
@@ -53,6 +53,13 @@ def read_saved(root):
 
 
 def effective_settings(base, saved, *, credentials=True):
+    connection = saved.get("connection")
+    if connection is not None and (
+        not isinstance(connection, dict)
+        or set(connection) - {"baseUrl", "apiKey"}
+        or any(not isinstance(value, str) for value in connection.values())
+    ):
+        raise DomainError("INVALID_MODEL_CONFIG")
     routes = {}
     for role in ("main", "worker"):
         old = base.route(role)
@@ -70,11 +77,24 @@ def effective_settings(base, saved, *, credentials=True):
             for key in ("baseUrl", "model", "apiKey")
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
-        endpoint = model_endpoint(value.get("baseUrl", old.endpoint).strip())
+        endpoint = model_endpoint(
+            (
+                connection.get("baseUrl", base.route("main").endpoint)
+                if connection is not None
+                else value.get("baseUrl", old.endpoint)
+            ).strip()
+        )
         name = value.get("model", old.name).strip()
-        key_env = KEY_NAMES[role] if value.get("apiKey") else old.key_env
-        if credentials and value.get("apiKey"):
-            os.environ[key_env] = value["apiKey"]
+        key_value = connection.get("apiKey") if connection is not None else value.get("apiKey")
+        key_env = (
+            KEY_NAMES["main" if connection is not None else role]
+            if key_value
+            else base.route("main").key_env
+            if connection is not None
+            else old.key_env
+        )
+        if credentials and key_value:
+            os.environ[key_env] = key_value
         if (
             not name
             or len(name) > 200
@@ -137,7 +157,7 @@ class ModelSettings:
 
     def view(self, owner):
         self.owner(owner)
-        return {
+        result = {
             role: {
                 "baseUrl": self.runtime.settings.route(role).endpoint,
                 "model": self.runtime.settings.route(role).name,
@@ -148,12 +168,56 @@ class ModelSettings:
             }
             for role in ("main", "worker")
         }
+        result["connection"] = {
+            "baseUrl": result["main"]["baseUrl"],
+            "keyConfigured": result["main"]["keyConfigured"],
+        }
+        return result
 
     def merge(self, patch):
-        if not isinstance(patch, dict) or not patch or set(patch) - {"main", "worker"}:
+        if (
+            not isinstance(patch, dict)
+            or not patch
+            or set(patch) - {"main", "worker", "connection"}
+        ):
             raise DomainError("INVALID_MODEL_CONFIG")
         saved = {role: dict(value) for role, value in self.saved.items()}
+        if "connection" in patch:
+            changes = patch["connection"]
+            if not isinstance(changes, dict) or set(changes) - {"baseUrl", "apiKey"}:
+                raise DomainError("INVALID_MODEL_CONFIG")
+            connection = saved.setdefault(
+                "connection", {"baseUrl": self.runtime.settings.route("main").endpoint}
+            )
+            if not connection.get("apiKey") and saved.get("main", {}).get("apiKey"):
+                connection["apiKey"] = saved["main"]["apiKey"]
+            for name, value in changes.items():
+                if (
+                    not isinstance(value, str)
+                    or len(value) > (4096 if name == "apiKey" else 2000)
+                    or any(ord(c) < 32 for c in value)
+                ):
+                    raise DomainError("INVALID_MODEL_CONFIG")
+                if name == "apiKey" and not value.strip():
+                    continue
+                connection[name] = value.strip()
+            for role in ("main", "worker"):
+                item = saved.setdefault(role, {})
+                item.pop("apiKey", None)
+                item.pop("baseUrl", None)
+                if connection["baseUrl"].rstrip("/") != self.runtime.settings.route(
+                    role
+                ).endpoint.rstrip("/"):
+                    item["contextWindow"] = None
         for role, changes in patch.items():
+            if role == "connection":
+                continue
+            if (
+                "connection" in saved
+                and isinstance(changes, dict)
+                and set(changes) & {"baseUrl", "apiKey"}
+            ):
+                raise DomainError("INVALID_MODEL_CONFIG")
             if not isinstance(changes, dict) or set(changes) - {
                 "baseUrl",
                 "model",
@@ -215,10 +279,10 @@ class ModelSettings:
         async with self.lock:
             saved = self.merge(patch)
             for role, change in patch.items():
-                route = self.runtime.settings.route(role)
+                route = self.runtime.settings.route("main" if role == "connection" else role)
                 if (
                     change.get("baseUrl", route.endpoint).rstrip("/") != route.endpoint
-                    and self.runtime.settings.credentials(role)
+                    and self.runtime.settings.credentials("main" if role == "connection" else role)
                     and not change.get("apiKey")
                 ):
                     raise DomainError("MODEL_KEY_REQUIRED_FOR_ENDPOINT")
@@ -304,8 +368,8 @@ class ModelSettings:
         self.owner(owner)
         if role not in {"main", "worker"}:
             raise DomainError("INVALID_MODEL_CONFIG")
-        route = self.runtime.settings.route(role)
-        supplied = (patch or {}).get(role, {})
+        route = self.runtime.settings.route("main" if patch and "connection" in patch else role)
+        supplied = (patch or {}).get("connection", (patch or {}).get(role, {}))
         if patch:
             self.merge(patch)
             candidate = replace(
@@ -320,7 +384,9 @@ class ModelSettings:
             route = candidate
         if not route.endpoint:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
-        key = supplied.get("apiKey") or self.runtime.settings.credentials(role)
+        key = supplied.get("apiKey") or self.runtime.settings.credentials(
+            "main" if patch and "connection" in patch else role
+        )
         catalog = await fetch_catalog(route.endpoint, key)
         names = sorted(catalog)
         return {

@@ -268,3 +268,65 @@ async def test_invalid_context_window_rejected_without_mutation(store, window):
         )
     finally:
         await runtime.close()
+
+
+async def test_shared_connection_saves_one_key_and_preserves_it_on_model_switch(store, monkeypatch):
+    for name in KEY_NAMES.values():
+        monkeypatch.setenv(name, "")
+    runtime = Runtime(
+        store, Model(), settings=Settings(endpoint="http://127.0.0.1:1/v1", model="initial")
+    )
+    runtime.model_settings.factory = lambda settings, role: Model(settings.route(role).name)
+    try:
+        view = await runtime.model_settings.save(
+            "local",
+            {
+                "connection": {"baseUrl": "http://127.0.0.1:1/v1", "apiKey": FIXTURE_CREDENTIAL},
+                "main": {"model": "fast-main"},
+                "worker": {"model": "strong-worker"},
+            },
+        )
+        assert view["connection"]["keyConfigured"]
+        assert "apiKey" not in json.dumps(view)
+        saved = json.loads(settings_path(store.data_root).read_text())
+        assert saved["connection"]["apiKey"] == FIXTURE_CREDENTIAL
+        assert "apiKey" not in saved["main"] and "apiKey" not in saved["worker"]
+        loaded = load_model_settings(runtime.model_settings.base, store.data_root)
+        assert loaded.route("main").endpoint == loaded.route("worker").endpoint
+        assert loaded.route("main").key_env == loaded.route("worker").key_env
+        assert loaded.credentials("main") == loaded.credentials("worker") == FIXTURE_CREDENTIAL
+        await runtime.model_settings.save("local", {"main": {"model": "another-main"}})
+        assert runtime.settings.route("worker").name == "strong-worker"
+        assert runtime.settings.credentials("worker") == FIXTURE_CREDENTIAL
+    finally:
+        await runtime.close()
+
+
+async def test_shared_connection_migrates_legacy_main_key_without_copying_worker_key(
+    store, monkeypatch
+):
+    for name in KEY_NAMES.values():
+        monkeypatch.setenv(name, "")
+    runtime = Runtime(
+        store, Model(), settings=Settings(endpoint="http://127.0.0.1:1/v1", model="initial")
+    )
+    runtime.model_settings.factory = lambda settings, role: Model(settings.route(role).name)
+    try:
+        await runtime.model_settings.save(
+            "local", {"main": {"apiKey": FIXTURE_CREDENTIAL}, "worker": {"apiKey": HTTP_CREDENTIAL}}
+        )
+        await runtime.model_settings.save(
+            "local", {"connection": {"baseUrl": "http://127.0.0.1:1/v1"}}
+        )
+        assert (
+            runtime.settings.credentials("main")
+            == runtime.settings.credentials("worker")
+            == FIXTURE_CREDENTIAL
+        )
+        assert HTTP_CREDENTIAL not in settings_path(store.data_root).read_text()
+        with pytest.raises(DomainError, match="MODEL_KEY_REQUIRED_FOR_ENDPOINT"):
+            await runtime.model_settings.save(
+                "local", {"connection": {"baseUrl": "https://another.example/v1"}}
+            )
+    finally:
+        await runtime.close()

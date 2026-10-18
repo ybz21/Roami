@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session } from './driver.mjs'
+import { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait } from './driver.mjs'
 
 const fail = (code) => { throw new Error(code) }
 function page(id, broken = false) {
@@ -96,4 +96,11 @@ test('reusing a CDP port for another browser invalidates the cached connection',
   assert.equal(session.browserId, 'replacement')
   assert.equal(closed, 1)
   assert.deepEqual(connections, ['ws://fixture/devtools/browser/first', 'ws://fixture/devtools/browser/replacement'])
+})
+
+
+test('navigation preserves load default and accepts bounded DOM-ready observation', () => {
+  assert.equal(navigationWait({}), 'load')
+  assert.equal(navigationWait({ 'wait-until': 'domcontentloaded' }), 'domcontentloaded')
+  assert.throws(() => navigationWait({ 'wait-until': 'networkidle' }), /CHROME_NAVIGATION_WAIT_INVALID/)
 })

@@ -205,7 +205,7 @@ _setup() {
         _info "安装 playwright-core → ${CHROME_DIR}（首次, 不下载额外浏览器）"
         ( cd "$CHROME_DIR" \
             && { [ -f package.json ] || npm init -y >/dev/null 2>&1; } \
-            && npm i --no-audit --no-fund --loglevel=error playwright-core ) \
+            && npm i --no-audit --no-fund --loglevel=error playwright-core >&2 ) \
             || { _err "playwright-core 安装失败（可重试: chrome setup）"; return 1; }
     fi
     return 0
@@ -316,7 +316,7 @@ _help() {
 roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜像那台 Chrome）
 
   roami chrome setup                     安装/更新依赖 (node + playwright-core)
-  roami chrome goto <url>                打开网址
+  roami chrome goto <url> [--wait-until load|domcontentloaded|commit]  打开网址
   roami chrome click <选择器>            点击
   roami chrome fill  <选择器> <文本>     填表单（直接设值）
   roami chrome type  <选择器> <文本>     逐字键入

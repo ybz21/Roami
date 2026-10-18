@@ -7,6 +7,7 @@ import logging
 import httpx
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -337,6 +338,25 @@ class TaskDispatcher:
                     }
                 finally:
                     self.verifying.discard(task["id"])
+            elif (
+                run["executor_kind"] == "native"
+                and json.loads(task["intent_json"])["target"].get("resourceOnly") is True
+            ):
+                sources = await self.db.call(
+                    lambda db: retrieved_sources(db, task, run, result.get("summary", ""))
+                )
+                verified = bool(sources)
+                result["verification"] = {
+                    "kind": "browser_retrieval",
+                    "state": "retrieved" if verified else "missing",
+                    "sources": sources,
+                }
+                if not verified:
+                    result = {
+                        **result,
+                        "state": "failed",
+                        "errorCode": "WEB_RETRIEVAL_EVIDENCE_MISSING",
+                    }
             else:
                 # Native read-only answers can finish; writes require explicit acceptance.
                 continuation = json.loads(task["intent_json"]).get("continuation", {})

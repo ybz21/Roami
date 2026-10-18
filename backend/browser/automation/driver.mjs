@@ -189,6 +189,12 @@ async function allowInsecureTLS(ctx, page) {
 
 // ── 主动词分发：操作一条已连好的 CDP browser。daemon 与一次性冷启动路径共用 ─────────────
 
+function navigationWait(flags) {
+  const value = flags['wait-until'] || 'load'
+  if (!['load', 'domcontentloaded', 'commit'].includes(value)) throw new ChromeError('CHROME_NAVIGATION_WAIT_INVALID')
+  return value
+}
+
 async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) {
   const fail = (m) => { throw new ChromeError(m) }
   const to = timeoutMs
@@ -210,7 +216,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
   }
 
   switch (verb) {
-    case 'goto': { const p = await pickHere(); await allowInsecureTLS(ctx, p); await p.goto(pos[0], { waitUntil: 'load', timeout: to }); io.log({ url: p.url(), title: await p.title() }); break }
+    case 'goto': { const p = await pickHere(); await allowInsecureTLS(ctx, p); await p.goto(pos[0], { waitUntil: navigationWait(flags), timeout: to }); io.log({ url: p.url(), title: await p.title() }); break }
     case 'url': io.log((await pickHere()).url()); break
     case 'title': io.log(await (await pickHere()).title()); break
     case 'click': await (await pickHere()).click(pos[0], { timeout: to }); io.log('ok'); break
@@ -840,7 +846,7 @@ async function main() {
   process.exitCode = resp.code || 0
 }
 
-export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session }
+export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === SELF_PATH) {
   main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })

@@ -64,6 +64,30 @@ class Tasks:
         target = target or {"kind": "new_session"}
         if target.get("kind") not in {"project", "session", "new_session", "new_project"}:
             raise DomainError("INVALID_TASK_TARGET")
+        if "resourceOnly" in target and (
+            type(target["resourceOnly"]) is not bool
+            or target["resourceOnly"]
+            and (
+                executor != "native"
+                or from_message_id is not None
+                or target["kind"] != "new_session"
+                or target.get("nodeId", "local") != "local"
+                or any(
+                    target.get(name)
+                    for name in [
+                        "directory",
+                        "workspaceId",
+                        "projectId",
+                        "sessionId",
+                        "base",
+                        "remote",
+                        "name",
+                        "baseDir",
+                    ]
+                )
+            )
+        ):
+            raise DomainError("INVALID_RESOURCE_ONLY_TARGET")
         if executor in {"codex", "claude"} and target.get("kind") == "session":
             if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
