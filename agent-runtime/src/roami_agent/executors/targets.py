@@ -21,6 +21,12 @@ class TargetDirectory:
         except (OSError, TimeoutError) as exc:
             raise DomainError("TARGET_DISCOVERY_UNAVAILABLE") from exc
         if response["exitCode"]:
+            try:
+                error = json.loads(response.get("stdout", ""))["error"]["code"]
+            except (ValueError, TypeError, KeyError):
+                error = None
+            if error == "UNAUTHORIZED":
+                raise DomainError("ROAMI_CLI_AUTH_REQUIRED")
             code = response["stderr"].strip()
             raise DomainError(
                 code
@@ -36,6 +42,43 @@ class TargetDirectory:
             return json.loads(response["stdout"])
         except (ValueError, TypeError) as exc:
             raise DomainError("INVALID_TARGET_RECEIPT") from exc
+
+    async def overview(self):
+        payload = await self._query("project", "ls", "--json")
+        try:
+            projects, loose = payload["data"]["projects"], payload["data"]["loose"]
+        except (KeyError, TypeError) as exc:
+            raise DomainError("INVALID_TARGET_RECEIPT") from exc
+        if not isinstance(projects, list) or not isinstance(loose, list):
+            raise DomainError("INVALID_TARGET_RECEIPT")
+        total = dormant = archived = 0
+        for project in projects:
+            self._project(project)
+            count, sleeping = project.get("sessions"), project.get("dormant")
+            if type(count) is not int or type(sleeping) is not int or not 0 <= sleeping <= count:
+                raise DomainError("INVALID_TARGET_RECEIPT")
+            total += count
+            dormant += sleeping
+            archived += project.get("archived") is True
+        loose_dormant = 0
+        for session in loose:
+            if not isinstance(session, dict) or session.get("state", "live") not in {
+                "",
+                "live",
+                "dormant",
+            }:
+                raise DomainError("INVALID_TARGET_RECEIPT")
+            loose_dormant += session.get("state") == "dormant"
+        return {
+            "scope": "current_node",
+            "projects": len(projects),
+            "archivedProjects": archived,
+            "projectSessions": total,
+            "looseSessions": len(loose),
+            "sessions": total + len(loose),
+            "liveSessions": total - dormant + len(loose) - loose_dormant,
+            "dormantSessions": dormant + loose_dormant,
+        }
 
     @staticmethod
     def _text(entry, key):

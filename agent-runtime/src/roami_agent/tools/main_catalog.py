@@ -5,6 +5,21 @@ from roami_agent.protocol.tools import Tool, object_schema
 
 
 def register_main_tools(registry, tasks, memory, targets):
+    async def overview(args, binding):
+        return await targets.overview()
+
+    registry.add(
+        Tool(
+            "workspace_overview",
+            "Count projects and sessions on the current Roami node in one CLI call. "
+            "Includes project/loose and live/dormant session totals. Use for count or overview "
+            "questions; do not count truncated project top cards or page through target_search.",
+            object_schema({}),
+            overview,
+            main=True,
+        )
+    )
+
     async def target_search(args, binding):
         return await targets.search(
             args["kind"],

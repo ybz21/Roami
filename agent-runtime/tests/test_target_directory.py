@@ -190,3 +190,88 @@ async def test_main_routes_discovered_project_through_persisted_tool_result(stor
         assert results == 1
     finally:
         await runtime.close()
+
+
+async def test_overview_uses_full_cli_counts_and_distinguishes_dormant_and_loose(monkeypatch):
+    calls = []
+
+    async def execute(argv, **kwargs):
+        calls.append(argv)
+        return {
+            "exitCode": 0,
+            "stdout": json.dumps(
+                {
+                    "data": {
+                        "projects": [
+                            {
+                                "key": "one",
+                                "name": "One",
+                                "sessions": 8,
+                                "dormant": 2,
+                                "top": [{"tail": "private output"}],
+                            },
+                            {
+                                "key": "two",
+                                "name": "Two",
+                                "sessions": 0,
+                                "dormant": 0,
+                                "archived": True,
+                            },
+                        ],
+                        "loose": [{"state": "live"}, {"state": "dormant"}],
+                    }
+                }
+            ),
+        }
+
+    monkeypatch.setattr(targets, "execute", execute)
+    result = await TargetDirectory(Settings()).overview()
+    assert result == {
+        "scope": "current_node",
+        "projects": 2,
+        "archivedProjects": 1,
+        "projectSessions": 8,
+        "looseSessions": 2,
+        "sessions": 10,
+        "liveSessions": 7,
+        "dormantSessions": 3,
+    }
+    assert len(calls) == 1
+    assert "private output" not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"projects": [], "loose": None},
+        {"projects": [{"key": "id", "name": "Name", "sessions": 1, "dormant": 2}], "loose": []},
+        {"projects": [{"key": "id", "name": "Name", "sessions": True, "dormant": 0}], "loose": []},
+    ],
+)
+async def test_overview_rejects_incomplete_or_invalid_counts(monkeypatch, data):
+    async def execute(argv, **kwargs):
+        return {"exitCode": 0, "stdout": json.dumps({"data": data})}
+
+    monkeypatch.setattr(targets, "execute", execute)
+    with pytest.raises(DomainError, match="INVALID_TARGET_RECEIPT"):
+        await TargetDirectory(Settings()).overview()
+
+
+async def test_cli_auth_error_is_actionable_without_exposing_response_details(monkeypatch):
+    async def execute(argv, **kwargs):
+        return {
+            "exitCode": 1,
+            "stdout": json.dumps(
+                {
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "private login detail",
+                    }
+                }
+            ),
+            "stderr": "",
+        }
+
+    monkeypatch.setattr(targets, "execute", execute)
+    with pytest.raises(DomainError, match="^ROAMI_CLI_AUTH_REQUIRED$"):
+        await TargetDirectory(Settings()).overview()
