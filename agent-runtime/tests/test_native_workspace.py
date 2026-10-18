@@ -103,11 +103,10 @@ async def test_preparation_cancellation_or_forgotten_origin_never_reaches_worker
             )
             await runtime.memory.forget("alice", memory["id"])
             release.set()
-        expected = "cancelled" if action == "cancel" else "failed"
         await until(
             store,
             lambda db: row(
-                db, "SELECT id FROM tasks WHERE id=? AND state=?", (task["id"], expected)
+                db, "SELECT id FROM tasks WHERE id=? AND state='cancelled'", (task["id"],)
             ),
         )
         assert cleaned.is_set()

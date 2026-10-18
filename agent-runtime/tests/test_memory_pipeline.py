@@ -646,14 +646,17 @@ async def test_forgotten_task_origin_prevents_dispatch_and_redacts_completion(st
     )
     runtime.dispatch.native_executor = NeverRun()
     await runtime.dispatch.run(job)
+    await runtime.dispatch.cancel()
     verify = await store.call(
         lambda db: row(
             db, "SELECT * FROM jobs WHERE aggregate_id=? AND kind='task.verify'", (task["id"],)
         )
     )
     await runtime.dispatch.verify(verify)
-    failed = await store.call(lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],)))
-    assert failed["state"] == "failed"
+    cancelled = await store.call(
+        lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
+    )
+    assert cancelled["state"] == "cancelled"
     builder = PromptBuilder(store, runtime.context, runtime.settings)
     turn = await store.call(
         lambda db: dict(
@@ -805,7 +808,7 @@ async def test_forgotten_native_child_content_redacts_owning_task_and_model_stat
         assert omitted
         projected = await runtime.tasks.list("alice", conversation["id"], for_model=True)
         private = next(item for item in projected if item["id"] == task["id"])
-        assert private == {"id": task["id"], "state": "queued", "contextExcluded": True}
+        assert private == {"id": task["id"], "state": "cancelling", "contextExcluded": True}
         assert "private delegated goal" not in json.dumps(projected)
         assert "public separate goal" in json.dumps(projected)
         assert "private delegated goal" in json.dumps(await runtime.tasks.list("alice"))

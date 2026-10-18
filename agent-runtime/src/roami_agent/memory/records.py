@@ -13,8 +13,9 @@ from roami_agent.storage.transcript_repository import owned
 
 
 class Memories:
-    def __init__(self, database, timezone_name="UTC"):
+    def __init__(self, database, timezone_name="UTC", *, cancel_forgotten=None):
         self.db = database
+        self.cancel_forgotten = cancel_forgotten
         self.retrieval = MemorySearch(database)
         self.search = self.retrieval.search
         self.recall = self.retrieval.recall
@@ -293,6 +294,9 @@ class Memories:
                     "UNION SELECT m.id FROM messages m JOIN conversations c ON c.id=m.conversation_id "
                     "JOIN prompt_manifests p ON p.turn_id=m.turn_id JOIN json_each(p.parts_json,'$.sourceMessageIds') j "
                     "JOIN affected a ON a.id=j.value WHERE c.owner_id=? AND m.role IN ('assistant','tool') "
+                    "UNION SELECT m.id FROM messages m JOIN conversations c ON c.id=m.conversation_id "
+                    "JOIN json_each(m.content_json,'$.sourceMessageIds') j JOIN affected a ON a.id=j.value "
+                    "WHERE c.owner_id=? AND m.role='assistant' "
                     "UNION SELECT paired.id FROM messages original JOIN affected a ON a.id=original.id "
                     "JOIN messages paired ON paired.turn_id=original.turn_id "
                     "WHERE original.role IN ('assistant','tool') AND paired.role IN ('assistant','tool')) "
@@ -302,6 +306,7 @@ class Memories:
                         memory_id,
                         owner,
                         memory_id,
+                        owner,
                         owner,
                         owner,
                         owner,
@@ -327,6 +332,8 @@ class Memories:
                 (memory_id, memory_id),
             )
             if forget_sources:
+                if self.cancel_forgotten:
+                    self.cancel_forgotten(db, owner)
                 invalid = rows(
                     db,
                     "SELECT DISTINCT m.id,m.canonical_key FROM memory_records m JOIN memory_sources s ON s.memory_id=m.id LEFT JOIN events e ON e.id=s.event_id LEFT JOIN tasks t ON t.id=e.task_id WHERE m.owner_id=? AND m.state IN ('candidate','conflict') AND EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND (o.message_id=s.message_id OR o.message_id=t.origin_message_id))",

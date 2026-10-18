@@ -21,6 +21,21 @@ class Tasks:
         self.max_depth, self.max_children = max_depth, max_children
         self.revisions = TaskRevisions(database)
 
+    @staticmethod
+    def cancel_forgotten_in_transaction(db, owner):
+        affected = rows(
+            db,
+            "SELECT t.id FROM tasks t JOIN context_omissions o "
+            "ON o.owner_id=t.owner_id AND o.message_id=t.origin_message_id "
+            "WHERE t.owner_id=? AND t.state NOT IN "
+            "('succeeded','failed','cancelled','interrupted','cancelling')",
+            (owner,),
+        )
+        for task in affected:
+            current = row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
+            if current["state"] != "cancelling":
+                request_task_cancellation(db, owner, task["id"])
+
     async def create(
         self,
         owner,
@@ -75,6 +90,12 @@ class Tasks:
                 ):
                     raise DomainError("INVALID_TASK_SOURCE", 409)
                 assert_context_admitted(db, {"id": source_turn_id, "owner_id": owner})
+                if not row(
+                    db,
+                    "SELECT id FROM turns WHERE id=? AND state='running'",
+                    (source_turn_id,),
+                ):
+                    raise DomainError("TASK_TURN_INACTIVE", 409)
             launch_id = "task:" + owner + ":" + key
             attempt = row(db, "SELECT * FROM task_attempts WHERE launch_id=?", (launch_id,))
             if attempt:

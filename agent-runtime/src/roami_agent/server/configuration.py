@@ -59,6 +59,9 @@ class Settings:
     coding_directory: Path | None = None
     memory_timezone: str = "UTC"
     artifact_max_bytes: int = 64 * 1024 * 1024
+    proactive_enabled: bool = False
+    proactive_daily_budget: int = 3
+    proactive_timeout_seconds: int = 15
 
     @classmethod
     def load(cls, path: Path):
@@ -91,6 +94,9 @@ class Settings:
             computer=computer_config(tools.get("computer", {})),
             memory_timezone=raw.get("memory", {}).get("timezone", "UTC"),
             artifact_max_bytes=raw.get("artifacts", {}).get("max_bytes", 64 * 1024 * 1024),
+            proactive_enabled=raw.get("proactive", {}).get("enabled", False),
+            proactive_daily_budget=raw.get("proactive", {}).get("daily_budget", 3),
+            proactive_timeout_seconds=raw.get("proactive", {}).get("timeout_seconds", 15),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
             coding_directory=(
                 Path(runtime["coding_directory"]).expanduser().resolve()
@@ -107,6 +113,14 @@ class Settings:
         ]:
             if not isinstance(value, int) or not 1 <= value <= 1_000_000:
                 raise DomainError("INVALID_RUNTIME_CONFIG")
+        if (
+            type(result.proactive_enabled) is not bool
+            or type(result.proactive_daily_budget) is not int
+            or not 1 <= result.proactive_daily_budget <= 10
+            or type(result.proactive_timeout_seconds) is not int
+            or not 1 <= result.proactive_timeout_seconds <= 30
+        ):
+            raise DomainError("INVALID_PROACTIVE_CONFIG")
         if not 0 <= result.max_depth <= 16:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if (

@@ -7,6 +7,13 @@ from roami_agent.storage.database import row
 def assert_context_admitted(db, turn):
     if row(
         db,
+        "SELECT 1 FROM jobs WHERE kind='control.stop' "
+        "AND json_extract(payload_json,'$.turnId')=? LIMIT 1",
+        (turn["id"],),
+    ):
+        raise DomainError("TURN_INTERRUPTED", 409)
+    if row(
+        db,
         "SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND ("
         "o.message_id IN (SELECT id FROM messages WHERE turn_id=?) OR "
         "o.message_id IN (SELECT j.value FROM prompt_manifests p JOIN json_each(p.parts_json,'$.sourceMessageIds') j WHERE p.turn_id=?)) LIMIT 1",

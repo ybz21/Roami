@@ -38,6 +38,7 @@ from roami_agent.providers.chat_completions import ChatCompletions
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
+from roami_agent.replies.proactive_jobs import ProactiveJobs
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
@@ -74,11 +75,16 @@ class Runtime:
         self.worker_model = worker_model or model
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
+        self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
         self.files = WorkspaceFiles(self.settings)
         self.resources = ResourceLeases(database)
         self.controls = ResourceControls(database, self.resources)
-        self.memory = Memories(database, self.settings.memory_timezone)
+        self.memory = Memories(
+            database,
+            self.settings.memory_timezone,
+            cancel_forgotten=self.tasks.cancel_forgotten_in_transaction,
+        )
         self.memory_jobs = MemoryJobs(
             database,
             memory_model or self.worker_model,
@@ -92,8 +98,14 @@ class Runtime:
         )
         self.reminders = Reminders(database)
         self.deliveries = DeliveryOutbox(database, self.notification_policy)
+        self.proactive = ProactiveJobs(
+            database,
+            self.worker_model,
+            self.notification_policy,
+            daily_budget=self.settings.proactive_daily_budget,
+            timeout=self.settings.proactive_timeout_seconds,
+        )
         self.context = Context(database, model, input_budget=self.settings.input_budget)
-        self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
         self.tools = Tools()
         self.active = {}
         self.turn_tasks = {}
@@ -105,6 +117,7 @@ class Runtime:
         self.desktop_monitor = None
         self.control_monitor = None
         self.reminder_monitor = None
+        self.proactive_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         register_reminder_tools(
             self.tools, self.reminders, self.settings.memory_timezone, self.notification_policy
@@ -187,6 +200,8 @@ class Runtime:
         await self.memory_jobs.recover()
         await self.resources.recover()
         await self.dispatch.recover()
+        if self.settings.proactive_enabled:
+            await self.proactive.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):
             self.external_monitor = asyncio.create_task(self._monitor_external())
@@ -194,6 +209,8 @@ class Runtime:
         self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
         self.control_monitor = asyncio.create_task(self._monitor_controls())
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
+        if self.settings.proactive_enabled:
+            self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
 
     async def _monitor_reminders(self):
@@ -202,6 +219,14 @@ class Runtime:
                 await self.reminders.tick()
             except Exception:
                 log.exception("Reminder scheduling failed")
+            await asyncio.sleep(1)
+
+    async def _monitor_proactive(self):
+        while not self.stopping:
+            try:
+                await self.proactive.tick()
+            except Exception:
+                log.exception("Proactive evaluation failed")
             await asyncio.sleep(1)
 
     async def _monitor_browser(self):
@@ -262,6 +287,9 @@ class Runtime:
         if self.reminder_monitor:
             self.reminder_monitor.cancel()
             await asyncio.gather(self.reminder_monitor, return_exceptions=True)
+        if self.proactive_monitor:
+            self.proactive_monitor.cancel()
+            await asyncio.gather(self.proactive_monitor, return_exceptions=True)
         if self.browser_monitor:
             self.browser_monitor.cancel()
             await asyncio.gather(self.browser_monitor, return_exceptions=True)

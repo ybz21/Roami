@@ -56,6 +56,13 @@ timezone = "UTC" # IANA timezone for daily summaries
 [artifacts]
 max_bytes = 67108864 # per artifact, stored outside model context
 
+# Requires both this instance switch and the owner's suggestion preference.
+# Evaluates fresh task outcome events with the Worker model; no model polling.
+[proactive]
+enabled = false
+daily_budget = 3 # model evaluations per owner over 24 hours, including failures/silence
+timeout_seconds = 15 # separate background queue; no Main concurrency slot
+
 [tools]
 # This validates working directories; it is not an OS filesystem sandbox.
 shell_roots = []

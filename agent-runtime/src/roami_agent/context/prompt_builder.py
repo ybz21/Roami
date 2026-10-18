@@ -2,6 +2,7 @@
 
 import asyncio
 
+from roami_agent.context.task_evidence import completion_evidence
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
@@ -43,6 +44,9 @@ class PromptBuilder:
                         "summary": "The source information was forgotten; omit the task content from model context.",
                     },
                 }
+            completion = completion_evidence(
+                completion, budget=max(1024, min(6000, self.settings.input_budget // 3))
+            )
 
         async def build():
             plan = await self.context.project(

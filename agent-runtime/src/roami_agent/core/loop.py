@@ -129,7 +129,10 @@ class AgentLoop:
                     plan, prompt = await self.context.build(turn, instructions, catalog, completion)
                 raise DomainError("AGENT_STEP_LIMIT")
         except BaseException as exc:
-            state = "interrupted" if isinstance(exc, asyncio.CancelledError) else "failed"
+            interrupted = isinstance(exc, asyncio.CancelledError) or (
+                isinstance(exc, DomainError) and exc.code == "TURN_INTERRUPTED"
+            )
+            state = "interrupted" if interrupted else "failed"
             code = (
                 exc.code
                 if isinstance(exc, DomainError)
