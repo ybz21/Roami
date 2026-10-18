@@ -1,12 +1,15 @@
 """Context projection and automatic compaction before model admission."""
 
 import asyncio
+import logging
 
 from roami_agent.context.task_evidence import completion_evidence
 from roami_agent.context.token_estimate import request_context, request_tokens
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
+
+log = logging.getLogger(__name__)
 
 
 class PromptBuilder:
@@ -21,6 +24,53 @@ class PromptBuilder:
         if self.vision:
             return await self.vision.attach(turn, plan, prompt)
         return plan, prompt
+
+    def _configuration(self, turn, instructions, catalog):
+        workspace = turn.get("workspace")
+        if workspace:
+            instructions += (
+                "\nPrepared task workspace (trusted runtime binding): "
+                + encoded(workspace)
+                + ". Use this directory for project tools; preserve unrelated local changes."
+            )
+        return request_context(
+            self.settings,
+            instructions,
+            catalog,
+            "worker" if turn.get("executionRunId") else "main",
+        )
+
+    async def after_turn(self, turn, instructions, catalog):
+        try:
+            plan = await self.context.project(
+                turn["owner_id"],
+                turn["conversation_id"],
+                branch_id=turn["branch_id"],
+                through_turn=turn["id"],
+                request_context=self._configuration(turn, instructions, catalog),
+            )
+            if plan["estimatedTokens"] < self.settings.compaction_threshold:
+                return
+            await self.context.request(
+                turn["owner_id"],
+                turn["conversation_id"],
+                "auto-post:" + turn["id"],
+                automatic=True,
+                branch_id=turn["branch_id"],
+                target_tokens=max(
+                    0,
+                    self.settings.compaction_threshold
+                    - plan["instructionTokens"]
+                    - plan["toolTokens"],
+                ),
+            )
+        except (DomainError, OSError) as exc:
+            if isinstance(exc, DomainError) and exc.code == "COMPACTION_IN_PROGRESS":
+                return
+            log.warning(
+                "Post-turn compaction not queued: %s",
+                exc.code if isinstance(exc, DomainError) else "STORAGE_UNAVAILABLE",
+            )
 
     async def build(self, turn, instructions, catalog, completion):
         completion_source = None
@@ -53,25 +103,14 @@ class PromptBuilder:
             )
 
         async def build():
-            workspace = turn.get("workspace")
-            bound = (
-                "\nPrepared task workspace (trusted runtime binding): "
-                + encoded(workspace)
-                + ". Use this directory for project tools; preserve unrelated local changes."
-                if workspace
-                else ""
-            )
+            configuration = self._configuration(turn, instructions, catalog)
+            full_instructions = configuration["instructions"]
             plan = await self.context.project(
                 turn["owner_id"],
                 turn["conversation_id"],
                 branch_id=turn["branch_id"],
                 through_turn=turn["id"],
-                request_context=request_context(
-                    self.settings,
-                    instructions + bound,
-                    catalog,
-                    "worker" if turn.get("executionRunId") else "main",
-                ),
+                request_context=configuration,
             )
             if completion_source:
                 plan["taskEvidence"] = {
@@ -82,7 +121,7 @@ class PromptBuilder:
                 plan["sourceMessageIds"] = list(
                     dict.fromkeys([*plan.get("sourceMessageIds", []), completion_source])
                 )
-            prompt = [{"role": "system", "content": instructions + bound}] + plan["messages"]
+            prompt = [{"role": "system", "content": full_instructions}] + plan["messages"]
             if completion:
                 # Rebuilds keep evidence before the tool round it initiated.
                 prompt.insert(
@@ -95,17 +134,21 @@ class PromptBuilder:
                         + encoded(completion),
                     },
                 )
-            plain = [{"role": "system", "content": instructions + bound}] + plan["messages"]
+            plain = [{"role": "system", "content": full_instructions}] + plan["messages"]
             plan, prompt = await self._images(turn, plan, prompt)
             supplemental = max(0, request_tokens(prompt, catalog) - request_tokens(plain, catalog))
             return {**plan, "estimatedTokens": plan["estimatedTokens"] + supplemental}, prompt
 
         plan, prompt = await build()
-        if plan["estimatedTokens"] <= self.settings.context_input_budget:
+        if plan["estimatedTokens"] < self.settings.compaction_threshold:
             return plan, prompt
         try:
             job = await self.context.request(
-                turn["owner_id"], turn["conversation_id"], "auto:" + turn["id"], automatic=True
+                turn["owner_id"],
+                turn["conversation_id"],
+                "auto:" + turn["id"],
+                automatic=True,
+                branch_id=turn["branch_id"],
             )
         except DomainError as exc:
             if exc.code != "COMPACTION_IN_PROGRESS":
@@ -123,7 +166,7 @@ class PromptBuilder:
             await self.context.run(
                 job["id"],
                 safe_turn_id=turn["id"],
-                target_tokens=max(0, self.settings.context_input_budget - overhead),
+                target_tokens=max(0, self.settings.compaction_threshold - overhead),
             )
         except asyncio.CancelledError:
             await self.context.cancel(turn["owner_id"], turn["conversation_id"], job["id"])

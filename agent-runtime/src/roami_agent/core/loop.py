@@ -115,6 +115,7 @@ class AgentLoop:
                         }
                     )
                     if not calls:
+                        await self.context.after_turn(turn, instructions, catalog)
                         return text
                     for call in calls:
                         binding = {

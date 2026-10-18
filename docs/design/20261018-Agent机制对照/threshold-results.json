@@ -1,0 +1,12 @@
+{
+  "model": "deepseek-4.1-flash",
+  "inputBudget": 8800,
+  "compactionRatio": 0.75,
+  "triggerTokens": 6600,
+  "measuredTokensAfterReply": 6724,
+  "queuedAfterReply": true,
+  "noInlineSummary": true,
+  "tokensAfterCompaction": 2037,
+  "historyMessagesPreserved": 2,
+  "providerRequests": 2
+}

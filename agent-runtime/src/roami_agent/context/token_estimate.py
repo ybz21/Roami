@@ -49,6 +49,9 @@ def request_context(settings, instructions, catalog, role="main"):
         "inputBudget": settings.context_input_budget,
         "contextWindow": settings.context_window,
         "reserveTokens": settings.reserve_tokens,
+        "compactionThreshold": settings.compaction_threshold,
+        "compactionRatio": settings.compaction_ratio,
+        "capacityBasis": "model_window" if settings.context_window else "input_budget",
     }
 
 

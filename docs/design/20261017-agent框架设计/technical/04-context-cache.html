@@ -20,7 +20,7 @@ OpenAI:    inputTotal = usage.input_tokens
            cacheWrite = 当前模型存在时读取相应字段
 
 cost = uncached_input_cost + cache_read_cost + cache_write_cost + output_cost
-</pre><p>原始 usage 保留用于核对，缺失字段记 unknown。价格来自部署时的模型配置，不在内核写死；cache 写入成本和命中读取成本分开计算。只有相同场景的冷 / 热请求对比，才能评估收益。</p></section><section><h2>压缩的精确切点</h2><p>设输入预算 <code>B = min(modelContextWindow, configuredSoftCap) − outputReserve − safetyMargin</code>，预算包含 schema、图片估算和所有待发消息。Main 先以小窗口运行；超过阈值时后台挑已完成轮次前缀压缩，近期完整轮次与当前要求保持原文。</p><pre># 设计示例，不绑定具体模型的真实窗口
+</pre><p>原始 usage 保留用于核对，缺失字段记 unknown。价格来自部署时的模型配置，不在内核写死；cache 写入成本和命中读取成本分开计算。只有相同场景的冷 / 热请求对比，才能评估收益。</p></section><section><h2>压缩的精确切点</h2><p><strong>2026-10-18 用户确认：75% 自动压缩。</strong>以已配置模型上下文窗口 C 为容量；窗口未知时用配置的输入容量作为依据，并明确标注。触发线 T = min(floor(C × 0.75), 输入硬预算 B)，回复预留或其他硬限制要求更早时优先采用更早的线。请求前检查，回复完成后再用有效 usage 检查并排队后台压缩，不等待下一条用户输入。T 是软触发线；当前轮暂无安全切点但仍低于 B 时可继续，超过 B 时仍明确拒绝，不能丢弃当前问题或打断工具配对。</p><p>设输入预算 <code>B = min(modelContextWindow, configuredSoftCap) − outputReserve − safetyMargin</code>，预算包含 schema、图片估算和所有待发消息。Main 先以小窗口运行；超过阈值时后台挑已完成轮次前缀压缩，近期完整轮次与当前要求保持原文。</p><pre># 设计示例，不绑定具体模型的真实窗口
 softCap = 32k; outputReserve = 4k; safetyMargin = 4k
 inputBudget = 24k
 allocate = tools/system 3k + summary 2.5k + recent 12k

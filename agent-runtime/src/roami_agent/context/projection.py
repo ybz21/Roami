@@ -242,6 +242,9 @@ class Context:
                 "inputBudget": configuration.get("inputBudget", self.input_budget),
                 "contextWindow": configuration.get("contextWindow"),
                 "reserveTokens": configuration.get("reserveTokens"),
+                "compactionThreshold": configuration.get("compactionThreshold"),
+                "compactionRatio": configuration.get("compactionRatio"),
+                "capacityBasis": configuration.get("capacityBasis"),
                 "snapshotId": snapshot["id"] if snapshot else None,
                 "branchId": bid,
                 "memoryEpoch": epoch,
@@ -256,13 +259,25 @@ class Context:
 
         return await self.db.call(read)
 
-    async def request(self, owner, cid, request_key, focus="", *, automatic=False):
+    async def request(
+        self,
+        owner,
+        cid,
+        request_key,
+        focus="",
+        *,
+        automatic=False,
+        target_tokens=None,
+        branch_id=None,
+    ):
         if not request_key or len(focus) > 2000:
             raise DomainError("INVALID_COMPACTION")
         digest = hashlib.sha256(encoded(["compact", cid, focus]).encode()).hexdigest()
 
         def write(db):
             c = owned(db, owner, cid)
+            if branch_id is not None and branch_id != c["active_branch_id"]:
+                raise DomainError("COMPACTION_BRANCH_CHANGED", 409)
             old = row(
                 db,
                 "SELECT * FROM requests WHERE owner_id=? AND request_key=?",
@@ -297,6 +312,7 @@ class Context:
                 "focus": focus,
                 "automatic": automatic,
                 "state": "queued",
+                "targetTokens": target_tokens,
             }
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
@@ -343,6 +359,7 @@ class Context:
             if not job:
                 return None
             p = json.loads(job["payload_json"])
+            desired_tokens = target_tokens if target_tokens is not None else p.get("targetTokens")
             b = row(db, "SELECT * FROM branches WHERE id=?", (p["branchId"],))
             c = owned(db, p["ownerId"], p["conversationId"])
             if c["active_branch_id"] != b["id"]:
@@ -373,8 +390,8 @@ class Context:
                 and not json.loads(m["content_json"]).get("tool_calls")
             ]
             available = (
-                target_tokens
-                if target_tokens is not None
+                desired_tokens
+                if desired_tokens is not None
                 else min(self.input_budget, messages_tokens(model_messages(messages)))
             )
             retained = min(self.keep_recent_tokens, available // 2)
@@ -415,12 +432,12 @@ class Context:
                 (encoded(p), job_id),
             )
             event(db, c["id"], "context.compaction.started", {"operationId": job_id})
-            return p, b, source, epoch
+            return p, b, source, epoch, desired_tokens
 
         prepared = await self.db.call(prepare, write=True)
         if not prepared:
             return
-        payload, branch, source, epoch = prepared
+        payload, branch, source, epoch, target_tokens = prepared
         try:
             prompt = [
                 {

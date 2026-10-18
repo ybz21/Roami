@@ -1,5 +1,6 @@
 "Explicit runtime settings; credentials are resolved at the provider boundary."
 
+import math
 import os
 import tomllib
 from dataclasses import dataclass, field, replace
@@ -67,6 +68,7 @@ class Settings:
     context_window: int | None = None
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
+    compaction_ratio: float = 0.75
     timeout_seconds: int = 120
     shell_roots: tuple[Path, ...] = ()
     http_tools: dict = field(default_factory=dict)
@@ -111,6 +113,7 @@ class Settings:
             context_window=runtime.get("context_window"),
             reserve_tokens=runtime.get("reserve_tokens", 16_384),
             keep_recent_tokens=runtime.get("keep_recent_tokens", 20_000),
+            compaction_ratio=runtime.get("compaction_ratio", 0.75),
             timeout_seconds=runtime.get("timeout_seconds", 120),
             shell_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("shell_roots", [])),
             skill_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("skill_roots", [])),
@@ -169,6 +172,13 @@ class Settings:
             )
         ):
             raise DomainError("INVALID_RUNTIME_CONFIG")
+        if (
+            isinstance(result.compaction_ratio, bool)
+            or not isinstance(result.compaction_ratio, (int, float))
+            or not math.isfinite(result.compaction_ratio)
+            or not 0 < result.compaction_ratio < 1
+        ):
+            raise DomainError("INVALID_RUNTIME_CONFIG")
         if not 0 <= result.max_depth <= 16:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if (
@@ -211,6 +221,11 @@ class Settings:
         if self.context_window is None:
             return self.input_budget
         return min(self.input_budget, self.context_window - self.reserve_tokens)
+
+    @property
+    def compaction_threshold(self):
+        capacity = self.context_window or self.input_budget
+        return min(self.context_input_budget, max(1, math.floor(capacity * self.compaction_ratio)))
 
     def route(self, role="main"):
         if role != "main" and self.worker_route:

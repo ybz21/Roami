@@ -360,5 +360,8 @@ Usage is reused only for the same request configuration, unchanged source prefix
 input_budget = 24000
 reserve_tokens = 16384
 keep_recent_tokens = 20000
+compaction_ratio = 0.75
 # context_window = ...  # set only to a verified model window in tokens
 ```
+
+Automatic compaction has a soft trigger at `[runtime].compaction_ratio` (default `0.75`). For a known model window C, trigger at `min(floor(C * ratio), effectiveInputBudget)`; without a known window, C is the configured input cap and the API reports `capacityBasis="input_budget"`. Reply reserve and lower input caps take precedence. Requests check this threshold before inference; completed replies queue background compaction when their usage crosses it. Scheduling does not run a summary inline before returning the reply. No safe cut below the hard input cap is a skip, not an admission error; exceeding the hard cap remains an error. `/status` and context metadata expose the ratio, threshold and capacity basis.

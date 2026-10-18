@@ -11,6 +11,8 @@ class LoopSettings(Protocol):
 
 
 class ContextBuilder(Protocol):
+    async def after_turn(self, turn: dict, instructions: str, catalog: list) -> None: ...
+
     async def build(
         self, turn: dict, instructions: str, catalog: list, completion: dict | None
     ) -> tuple[dict, list]: ...
