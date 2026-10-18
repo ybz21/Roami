@@ -54,6 +54,23 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def invalid_payload(request, exc):
         return JSONResponse({"error": {"code": "INVALID_REQUEST"}}, status_code=422)
 
+    @app.get("/v1/capabilities")
+    async def capabilities(owner: Owner):
+        return {"data": runtime.capability_settings.view(owner)}
+
+    @app.put("/v1/capabilities")
+    async def save_capabilities(request: Request, owner: Owner):
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 4096:
+                raise DomainError("INVALID_CAPABILITY_CONFIG", 413)
+        try:
+            patch = json.loads(body)
+        except ValueError:
+            raise DomainError("INVALID_CAPABILITY_CONFIG") from None
+        return {"data": await runtime.capability_settings.save(owner, patch)}
+
     @app.get("/v1/model-settings")
     async def model_settings(owner: Owner):
         return {"data": runtime.model_settings.view(owner)}

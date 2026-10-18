@@ -130,6 +130,8 @@ def register_main_tools(registry, tasks, memory, targets):
     async def delegate(args, binding):
         target = args.get("target") or {}
         if target.get("kind") == "session" and not binding.get("taskId"):
+            if "session_send" in registry.disabled_tools:
+                raise DomainError("TOOL_DISABLED")
             if not target.get("sessionId"):
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if args.get("fromMessageId") or any(

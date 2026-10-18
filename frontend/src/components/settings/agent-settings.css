@@ -11,3 +11,15 @@
 .agent-settings-error { color:var(--danger); font-size:var(--fs-sm); }
 html[data-pointer="coarse"] .agent-settings-form .ant-input,html[data-pointer="coarse"] .agent-settings-form .ant-input-affix-wrapper,html[data-pointer="coarse"] .agent-settings-form .ant-btn { min-height:var(--tap); }
 html[data-pointer="coarse"] .agent-settings-form .ant-input-affix-wrapper input { min-height:0; }
+.agent-capabilities { display:flex; flex-direction:column; gap:var(--sp-4); max-width:calc(var(--sp-5) * 32); min-width:0; }
+.agent-capability-row { min-width:0; padding:var(--sp-4) 0; border-bottom:1px solid var(--border-subtle); }
+.agent-capability-head { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); }
+.agent-capability-head strong { overflow-wrap:anywhere; font-size:var(--fs-body); }
+.agent-capability-tags { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin:var(--sp-2) 0; }
+.agent-capability-tags .ant-tag { margin:0; }
+.agent-capability-row p { overflow-wrap:anywhere; }
+.agent-capability-row summary { cursor:pointer; display:flex; align-items:center; min-height:var(--tap); font-size:var(--fs-sm); color:var(--accent); }
+.agent-capability-row pre { margin:0; padding:var(--sp-3); white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-meta); background:var(--bg-container); border-radius:var(--r-xs); }
+.agent-capability-servers h3 { font-size:var(--fs-body); color:var(--text-bright); }
+html[data-pointer="coarse"] .agent-capabilities > .ant-input-affix-wrapper,html[data-pointer="coarse"] .agent-capabilities .ant-btn { min-height:var(--tap); }
+.agent-capability-head .ant-switch::after { content:''; position:absolute; inset:calc(var(--sp-3) * -1) 0; }

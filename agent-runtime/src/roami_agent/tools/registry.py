@@ -11,6 +11,9 @@ from roami_agent.protocol.tools import Tool
 class Tools:
     def __init__(self):
         self.registry: dict[str, Tool] = {}
+        self.disabled_tools: set[str] = set()
+        self.disabled_skills: set[str] = set()
+        self.skills: dict[str, dict] = {}
 
     def add(self, tool):
         if tool.name in self.registry:
@@ -19,11 +22,17 @@ class Tools:
         self.registry[tool.name] = tool
 
     def catalog(self, role="main"):
-        return [t.wire() for t in self.registry.values() if role != "main" or t.main]
+        return [
+            t.wire()
+            for t in self.registry.values()
+            if t.name not in self.disabled_tools and (role != "main" or t.main)
+        ]
 
     def validate(self, call, role):
         name = call["function"]["name"]
         tool = self.registry.get(name)
+        if name in self.disabled_tools:
+            raise DomainError("TOOL_DISABLED")
         if not tool or (role == "main" and not tool.main):
             raise DomainError("TOOL_UNAVAILABLE")
         try:

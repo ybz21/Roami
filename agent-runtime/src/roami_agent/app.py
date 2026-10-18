@@ -44,6 +44,7 @@ from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
+from roami_agent.server.capability_settings import CapabilitySettings
 from roami_agent.server.configuration import Settings
 from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, load_model_settings
 from roami_agent.storage.artifact_retention import ArtifactRetention
@@ -235,6 +236,7 @@ class Runtime:
             self.turn_tasks,
         )
         self.model_settings = ModelSettings(self, configured_provider)
+        self.capability_settings = CapabilitySettings(self)
 
     async def start(self):
         await self.model_settings.refresh_capacity()
