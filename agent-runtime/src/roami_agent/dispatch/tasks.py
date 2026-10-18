@@ -64,6 +64,8 @@ class Tasks:
         target = target or {"kind": "new_session"}
         if target.get("kind") not in {"project", "session", "new_session", "new_project"}:
             raise DomainError("INVALID_TASK_TARGET")
+        if target.get("kind") == "new_session" and "baseDir" in target:
+            raise DomainError("LOOSE_SESSION_USE_DIRECTORY")
         if "resourceOnly" in target and (
             type(target["resourceOnly"]) is not bool
             or target["resourceOnly"]

@@ -652,8 +652,6 @@
       ],
       "seconds": 64.98,
       "observedSourceUrls": [
-        "",
-        "about:blank",
         "http://127.0.0.1:33079/data.html",
         "http://127.0.0.1:33079/index.html"
       ]
@@ -795,8 +793,6 @@
       ],
       "seconds": 43.18,
       "observedSourceUrls": [
-        "",
-        "about:blank",
         "https://peps.python.org/pep-0020/"
       ]
     },
@@ -1146,7 +1142,7 @@
     {
       "id": "D10",
       "started": "2026-10-19T00:24:55+0800",
-      "status": "通过",
+      "status": "未通过",
       "receipt": {
         "kind": "message",
         "turnId": "e7a4ea9f5d8b47cdaffb4b92b1267053",
@@ -1191,7 +1187,9 @@
       "executorStates": [
         "succeeded"
       ],
-      "seconds": 19.59
+      "seconds": 19.59,
+      "reason": "复核发现实际工作目录为workspaces父目录，和用户指定claude-loose不一致。此前只核对返回标记，已补严目录断言。",
+      "previousCheckStatus": "通过"
     },
     {
       "id": "C01",
@@ -1434,8 +1432,6 @@
       ],
       "seconds": 87.15,
       "observedSourceUrls": [
-        "",
-        "about:blank",
         "http://127.0.0.1:44015/correction.html",
         "http://127.0.0.1:44015/index.html"
       ]
@@ -1902,15 +1898,408 @@
         "succeeded"
       ],
       "seconds": 53.95
+    },
+    {
+      "id": "D10",
+      "started": "2026-10-19T00:37:56+0800",
+      "status": "通过",
+      "conversationId": "4edd256b3aa643178e124e05c468d03b",
+      "receipt": {
+        "kind": "message",
+        "turnId": "24fe53f111844ec2a69206a98dbe64f0",
+        "requestId": "39552233aaba4a9ca5dbf16084d1487a",
+        "messageId": "5d0a6bc304574ce79c27a303775e2c99",
+        "cursor": 3
+      },
+      "textObservedWhileRunning": true,
+      "answer": "好的，我来新建该 Claude Code 散会话并下发这个最小任务。\n已创建新的 Claude Code 散会话（工作目录 /tmp/roami-acceptance-20261019-20261019-003739/workspaces/claude-loose），任务已入队，等待实际执行后会自动回报结果。\n执行结果回报如下：\n\n- **输出符合预期**：会话（2026-1019-0038-0008）实际执行后只回复了 `CLAUDE_ACCEPTANCE_OK`，退出码 0，未运行工具、未改文件，与任务要求一致。\n- **一条告警**：Claude Code 不识别模型 `deepseek-4.1-flash`，按默认 200k 上下文窗口处理。不影响本次结果，但如需消除告警，可更新 Claude Code 或按其文档为该自定义模型 ID 配置上下文窗口。\n- **状态**：外层任务状态为 `waiting_user`，即待人工确认/审阅，尚不算最终完成；执行器侧自报 `succeeded`。\n\n结论：验收输出正确，任务等待你确认收尾。",
+      "firstTextSeconds": 7.2,
+      "turns": [
+        "completed",
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "delegate",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [
+        {
+          "state": "waiting_user",
+          "intent": {
+            "executor": "claude",
+            "fromMessageId": null,
+            "goal": "只回复 CLAUDE_ACCEPTANCE_OK 这一行文本。不要运行任何工具，不要修改任何文件，不要做其他任何事情。",
+            "originMessageId": "5d0a6bc304574ce79c27a303775e2c99",
+            "parentTaskId": null,
+            "recordIntent": false,
+            "sourceAssistantMessageId": "1c7a2110bd3e41758ced18786eb1c746",
+            "sourceTurnId": "24fe53f111844ec2a69206a98dbe64f0",
+            "target": {
+              "directory": "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/claude-loose",
+              "kind": "new_session"
+            }
+          }
+        }
+      ],
+      "executorStates": [
+        "succeeded"
+      ],
+      "executorDirectories": [
+        "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/claude-loose"
+      ],
+      "seconds": 22.39
+    },
+    {
+      "id": "D07",
+      "started": "2026-10-19T00:37:56+0800",
+      "status": "通过",
+      "conversationId": "b814842c985a44fcbbe7b1d56b499281",
+      "receipt": {
+        "kind": "message",
+        "turnId": "e00a1cb287b142139ec4b183bc13eacf",
+        "requestId": "473a7b4f93d343cf83fed636dc3bf1c3",
+        "messageId": "4f2959e9722848f79177e13db1ca2a26",
+        "cursor": 4
+      },
+      "textObservedWhileRunning": true,
+      "answer": "收到，这就新建 Codex 散会话并派发该任务。\n任务已受理：新建 Codex 散会话已排队（id `63b37584f4f249bc917e120dc50cf4d5`，状态 queued），派发中，结果会自动返回，届时我再向你确认回复内容。\nCodex 回执如下：\n\n- **执行器声称**：succeeded，回复内容为 `CODEX_ACCEPTANCE_OK`（exitCode 0，会话 `2026-1019-0038-0007`），未运行工具、未改文件。\n- **外层状态**：`waiting_user`，即该任务目前处于待审阅状态，尚不算最终完成，需要你确认后收尾。\n\n另有一条无关紧要的模型刷新超时 ERROR，未影响任务执行。",
+      "firstTextSeconds": 6.29,
+      "turns": [
+        "completed",
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "delegate",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [
+        {
+          "state": "waiting_user",
+          "intent": {
+            "executor": "codex",
+            "fromMessageId": null,
+            "goal": "任务仅回复 CODEX_ACCEPTANCE_OK，不运行工具，不修改文件。",
+            "originMessageId": "4f2959e9722848f79177e13db1ca2a26",
+            "parentTaskId": null,
+            "recordIntent": false,
+            "sourceAssistantMessageId": "7d4d221c78424ec3b3ddbca57b9d0aff",
+            "sourceTurnId": "e00a1cb287b142139ec4b183bc13eacf",
+            "target": {
+              "directory": "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/codex-loose",
+              "kind": "new_session"
+            }
+          }
+        }
+      ],
+      "executorStates": [
+        "succeeded"
+      ],
+      "executorDirectories": [
+        "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/codex-loose"
+      ],
+      "seconds": 40.46
+    },
+    {
+      "id": "D03",
+      "started": "2026-10-19T00:40:09+0800",
+      "status": "通过",
+      "conversationId": "9a6af302d64f4a7ea57fee3f70d382c0",
+      "receipt": {
+        "kind": "message",
+        "turnId": "1bcb9170edf44c8792cfec2e9e99d24c",
+        "requestId": "24348693ba954b97b6b5ae5c0e9c3cb1",
+        "messageId": "adabdec3debb46a2aab9ef9f517914d9",
+        "cursor": 92
+      },
+      "textObservedWhileRunning": true,
+      "answer": "好的，我先查找该会话并直接发送。\n找到会话「验收一号」（live），现在直接发送。\n已发送 ✅\n\n- 会话：「验收一号」（2026-1019-0037-0001，live）\n- 内容：`ACCEPTANCE_DELIVERY_ONE`\n- 状态：已送达（delivered）",
+      "firstTextSeconds": 7.94,
+      "turns": [
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "target_search",
+          "state": "succeeded"
+        },
+        {
+          "name": "session_send",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [],
+      "exactRecipientAndTextVerified": true,
+      "seconds": 16.1
+    },
+    {
+      "id": "D04",
+      "started": "2026-10-19T00:40:09+0800",
+      "status": "通过",
+      "conversationId": "99a771f1b75645adb4d106f98a6b45f8",
+      "receipt": {
+        "kind": "message",
+        "turnId": "8175aa16bacb4e3a9c57590c3189c551",
+        "requestId": "68fcd465ef724709baa5ff314818ac8e",
+        "messageId": "f18b264205e84a07b49cd61f02e9b434",
+        "cursor": 93
+      },
+      "textObservedWhileRunning": true,
+      "answer": "我来先找到「派活验收项目」下的「验收四号」会话，然后发送消息。\n两个都找到了。确认一下该会话是否属于「派活验收项目」：\n再确认该项目下的会话成员：\n项目成员里「验收四号」的会话 ID 是 `acceptance-receiver-3`（另一个同名会话不属于该项目），现在发送消息：\n消息已发送 ✅\n\n- 目标：「派活验收项目」中的「验收四号」会话\n- 内容：`ACCEPTANCE_PROJECT_FOUR`\n- 状态：已送达（delivered）",
+      "firstTextSeconds": 8.41,
+      "turns": [
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "target_search",
+          "state": "succeeded"
+        },
+        {
+          "name": "target_search",
+          "state": "succeeded"
+        },
+        {
+          "name": "target_resolve",
+          "state": "succeeded"
+        },
+        {
+          "name": "target_search",
+          "state": "succeeded"
+        },
+        {
+          "name": "session_send",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [],
+      "exactRecipientAndTextVerified": true,
+      "seconds": 36.16
+    },
+    {
+      "id": "D07",
+      "started": "2026-10-19T00:40:25+0800",
+      "status": "通过",
+      "conversationId": "fe66a39ae07646abb3f020fe920ebe25",
+      "receipt": {
+        "kind": "message",
+        "turnId": "5201cdb14c604b7c90f0161481d70bd1",
+        "requestId": "52fea7b1237242c5ab5f0d132697bf22",
+        "messageId": "68fe5d8a888f407ba605fbd555afea3d",
+        "cursor": 131
+      },
+      "textObservedWhileRunning": true,
+      "answer": "好的，我现在实际派活：新建 Codex 散会话，工作目录指向指定路径，任务内容仅要求回复确认。\n已受理并进入队列：新建 Codex 散会话（ID `ff67671ef36a40a28891b44fa19103ed`），工作目录 `/tmp/roami-acceptance-20261019-20261019-003739/workspaces/codex-loose`，任务要求仅回复 `CODEX_ACCEPTANCE_OK`，不运行工具、不改文件。目前状态为 queued，投递待确认；结果返回后会自动同步到本会话。\n后台任务已返回，简要汇报：\n\n- **执行器结果（executor 声明）**：succeeded，退出码 0，耗时约 18 分钟调度周期内完成\n- **证据内容**：Codex 会话（session id `01a14fe2-f796-7670-a9ae-55ebaad7512b`）按指令原样回复了一行 `CODEX_ACCEPTANCE_OK`，未调用任何工具、未修改文件，符合验收要求\n- **外层任务状态**：`waiting_user` —— 按规则这不算最终完成，需要你确认/审核\n\n结论：执行器侧验证已通过（回复内容正确、行为合规），但任务在外层处于待审核状态。请确认是否通过此验收，或告知我下一步处理方式。",
+      "firstTextSeconds": 8.08,
+      "turns": [
+        "completed",
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "delegate",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [
+        {
+          "state": "waiting_user",
+          "intent": {
+            "executor": "codex",
+            "fromMessageId": null,
+            "goal": "任务：只回复一行文本 CODEX_ACCEPTANCE_OK。不要运行任何工具或命令，不要创建、修改或删除任何文件。收到后立即原样回复即可。",
+            "originMessageId": "68fe5d8a888f407ba605fbd555afea3d",
+            "parentTaskId": null,
+            "recordIntent": false,
+            "sourceAssistantMessageId": "00c9d8a2b3ef4f0d860155e31f80c16d",
+            "sourceTurnId": "5201cdb14c604b7c90f0161481d70bd1",
+            "target": {
+              "directory": "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/codex-loose",
+              "kind": "new_session"
+            }
+          }
+        }
+      ],
+      "executorStates": [
+        "succeeded"
+      ],
+      "executorDirectories": [
+        "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/codex-loose"
+      ],
+      "seconds": 45.65
+    },
+    {
+      "id": "D08",
+      "started": "2026-10-19T00:40:45+0800",
+      "status": "通过",
+      "conversationId": "68f1666d652e47eea7025d8196dc9ac9",
+      "receipt": {
+        "kind": "message",
+        "turnId": "703e707ed30c44ae8a4638f253d8d38d",
+        "requestId": "9102a8acc1d24b48bde088c52072ae51",
+        "messageId": "921af742304c443db5efb1440ecc0b74",
+        "cursor": 186
+      },
+      "textObservedWhileRunning": true,
+      "answer": "我先查找「派活验收项目」的目标信息。\n找到了项目，现在在其下新建 Codex 任务（独立工作区）。\n已在「派活验收项目」下新建 Codex 任务（独立工作区），并附上要求：只回复 PROJECT_ACCEPTANCE_OK、不运行工具、不改文件。任务已进入队列，结果会自动返回。\nCodex 任务已完成执行，回复为：**PROJECT_ACCEPTANCE_OK**（executor 声称成功，未运行工具、未改文件）。\n\n不过任务外层状态为 `waiting_user`，需要你确认验收。确认后该任务才算最终完成。",
+      "firstTextSeconds": 8.39,
+      "turns": [
+        "completed",
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "target_search",
+          "state": "succeeded"
+        },
+        {
+          "name": "delegate",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [
+        {
+          "state": "waiting_user",
+          "intent": {
+            "executor": "codex",
+            "fromMessageId": null,
+            "goal": "只回复 PROJECT_ACCEPTANCE_OK，不要运行任何工具，不要修改任何文件。",
+            "originMessageId": "921af742304c443db5efb1440ecc0b74",
+            "parentTaskId": null,
+            "recordIntent": false,
+            "sourceAssistantMessageId": "a7a2b0c8e2bc4e2ebc02937d86616482",
+            "sourceTurnId": "703e707ed30c44ae8a4638f253d8d38d",
+            "target": {
+              "kind": "project",
+              "projectId": "2026-1019-0037-xe0e"
+            }
+          }
+        }
+      ],
+      "executorStates": [
+        "succeeded"
+      ],
+      "executorDirectories": [
+        "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/existing-project/.worktrees/agent-ec69ca8865ff38ed536f40ec"
+      ],
+      "seconds": 38.17
+    },
+    {
+      "id": "D10",
+      "started": "2026-10-19T00:41:23+0800",
+      "status": "通过",
+      "conversationId": "affcfeafc2104cc497af0b484a0f5580",
+      "receipt": {
+        "kind": "message",
+        "turnId": "11012bf22ca4443282609da7e6b403ba",
+        "requestId": "5ac352c1733742538598fa6ba7f4d6d1",
+        "messageId": "6d052c0b474141bcac594606a0582bcc",
+        "cursor": 269
+      },
+      "textObservedWhileRunning": true,
+      "answer": "收到，我将新建一个 Claude Code 散会话并下发该验收任务。\n散会话已排队（会话 ID：`b8888e4eff6242f0890b02887a5f9c60`，状态：queued，投递待确认）。任务完成后结果会自动返回，届时我会回报实际输出。\n验收任务有结果，简要回报如下：\n\n- **执行器回报**：状态 `succeeded`，退出码 0，实际输出为 `CLAUDE_ACCEPTANCE_OK`，与预期一致。\n- **外层状态**：`waiting_user`，按规则属于**待复核**，不能视为完全完成——可能需要你在相关会话中确认后才能关闭。\n- **stderr 警告**（不影响本次结果）：Claude Code 无法识别模型 `deepseek-4.1-flash`，按 200k 上下文窗口处理；如需消除，可更新 Claude Code 或为该自定义模型 ID 配置正确的窗口大小。\n\n结论：输出内容符合验收要求，但整体任务停留在待复核状态，请确认是否还有后续动作需要处理。",
+      "firstTextSeconds": 3.35,
+      "turns": [
+        "completed",
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "delegate",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [
+        {
+          "state": "waiting_user",
+          "intent": {
+            "executor": "claude",
+            "fromMessageId": null,
+            "goal": "任务：只回复 CLAUDE_ACCEPTANCE_OK。不要运行任何工具，不要读取、创建或修改任何文件。完成后回报实际输出内容。",
+            "originMessageId": "6d052c0b474141bcac594606a0582bcc",
+            "parentTaskId": null,
+            "recordIntent": false,
+            "sourceAssistantMessageId": "16066520cc8b487b94439ad3061ecaa2",
+            "sourceTurnId": "11012bf22ca4443282609da7e6b403ba",
+            "target": {
+              "directory": "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/claude-loose",
+              "kind": "new_session"
+            }
+          }
+        }
+      ],
+      "executorStates": [
+        "succeeded"
+      ],
+      "executorDirectories": [
+        "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/claude-loose"
+      ],
+      "seconds": 16.46
+    },
+    {
+      "id": "D09",
+      "started": "2026-10-19T00:41:10+0800",
+      "status": "通过",
+      "conversationId": "1a2c5f8bcd2b45c5beb1450cdab47f22",
+      "receipt": {
+        "kind": "message",
+        "turnId": "bcae885121634194979575f8cae0ca6e",
+        "requestId": "22c3ae514f4846b4970b9d5b767c5ee1",
+        "messageId": "33c0b1998dad45d994210235b227b03a",
+        "cursor": 238
+      },
+      "textObservedWhileRunning": true,
+      "answer": "收到，正在创建新项目 acceptance-created 并委托给 Codex 执行。\n新项目 acceptance-created 已创建，任务已提交给 Codex 排队（接受确认，交付待完成）。完成后会自动返回结果。\nCodex 已按要求只回复 **NEW_PROJECT_ACCEPTANCE_OK**，未修改文件、未运行工具，验收通过。\n\n注意：该任务当前处于 waiting_user 状态，需要您复核确认后才能正式关闭。",
+      "firstTextSeconds": 7.0,
+      "turns": [
+        "completed",
+        "completed"
+      ],
+      "tools": [
+        {
+          "name": "delegate",
+          "state": "succeeded"
+        }
+      ],
+      "tasks": [
+        {
+          "state": "waiting_user",
+          "intent": {
+            "executor": "codex",
+            "fromMessageId": null,
+            "goal": "只回复 NEW_PROJECT_ACCEPTANCE_OK。不要修改任何文件，不要运行任何工具。这是一个验收测试。",
+            "originMessageId": "33c0b1998dad45d994210235b227b03a",
+            "parentTaskId": null,
+            "recordIntent": false,
+            "sourceAssistantMessageId": "5fccf409d879430ba9d8bed48986657c",
+            "sourceTurnId": "bcae885121634194979575f8cae0ca6e",
+            "target": {
+              "baseDir": "/tmp/roami-acceptance-20261019-20261019-003739/workspaces",
+              "kind": "new_project",
+              "name": "acceptance-created"
+            }
+          }
+        }
+      ],
+      "executorStates": [
+        "succeeded"
+      ],
+      "executorDirectories": [
+        "/tmp/roami-acceptance-20261019-20261019-003739/workspaces/acceptance-created"
+      ],
+      "seconds": 44.17
     }
   ],
-  "completedAt": "2026-10-19T00:30:16.091782+08:00",
+  "completedAt": "2026-10-19T00:43:03.621219+08:00",
   "models": {
     "main": "glm-5.3-flash",
     "nativeWorker": "rr/gpt-6.1-sol",
     "professionalExecutors": "真实安装的 Codex / Claude CLI，采用各自当前模型配置"
   },
-  "method": "60次真实模型/协议执行记录，33项最新功能检查通过；参考GAIA自编题，非官方GAIA成绩，不代表延迟及验收体验已全部达标。",
+  "method": "历次真实模型/协议执行记录；参考GAIA自编题，非官方GAIA成绩，不代表延迟及验收体验已全部达标。",
   "findings": [
     {
       "status": "已修正并回归",
@@ -1936,6 +2325,19 @@
       "status": "仍需观察",
       "title": "浏览器偶发错误与响应耗时",
       "detail": "早期一次BROWSER_DRIVER_PROTOCOL_INVALID未完成根因定位；新请求重测成功不能证明该偶发问题已消除。网页题当前完成耗时约43至87秒。官方来源回复使用UTC日期但未标时区，仍需改善时间表达。"
+    },
+    {
+      "status": "已修正并严格回归",
+      "title": "散任务工作目录参数混淆",
+      "detail": "复核发现原Claude用例只匹配回复标记时漏掉目录错误，已撤回原通过记录。new_session使用directory，baseDir仅用于new_project。任务接收及执行适配器均拒绝混淆字段；Codex/Claude实际目录、项目独立worktree、新项目目录、指定接收端的原样唯一消息均已重测通过。"
     }
-  ]
+  ],
+  "runCount": 68,
+  "verification": {
+    "pythonTests": 510,
+    "vitestTests": 661,
+    "vitestFiles": 91,
+    "qualityFull": "passed",
+    "isolation": "独立数据库、测试项目和tmux socket；未向生产会话发送测试消息"
+  }
 }

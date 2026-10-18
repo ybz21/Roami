@@ -16,6 +16,8 @@ from roami_agent.protocol.serialization import encoded
 @asynccontextmanager
 async def hold_workspace(settings, task, run, *, stopped=None):
     target = json.loads(task["intent_json"])["target"]
+    if target["kind"] == "new_session" and "baseDir" in target:
+        raise DomainError("LOOSE_SESSION_USE_DIRECTORY")
     if target["kind"] == "new_project":
         target = await provision_project(settings, task, run)
     if target.get("nodeId", "local") != "local":

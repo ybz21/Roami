@@ -32,6 +32,8 @@ MAIN_INSTRUCTIONS = (
     "or Skill read is needed for these known operations. Read roami-dispatch for unfamiliar routing details. "
     "Use delegate for new tracked "
     "background work, with project, loose session or new project targets as requested. "
+    "For a new loose session put the user-specified working directory in target.directory; "
+    "target.baseDir is only the parent directory for new_project, never for new_session. "
     "There is one permanent Main; executor sessions are background tasks, not extra user chats. "
     "For web reading, URL lookup, linked-page comparison, and current public questions (weather, news, quotes), "
     "immediately delegate a native task with "

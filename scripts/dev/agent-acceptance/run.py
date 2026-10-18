@@ -264,6 +264,16 @@ class Instance:
                 if delivery_marker
                 else 0
             )
+            receiver_index = 0 if case["id"] == "D03" else 3
+            receiver_file = self.root / f"received-{receiver_index}.jsonl"
+            prior_target_messages = (
+                sum(
+                    json.loads(line) == delivery_marker
+                    for line in receiver_file.read_text().splitlines()
+                )
+                if delivery_marker and receiver_file.exists()
+                else 0
+            )
             payload = {
                 "text": prompt,
                 "requestKey": case["id"] + "-message-" + str(time.time_ns()),
@@ -481,6 +491,13 @@ class Instance:
                 assert len(received) == prior_deliveries + 1, (
                     "Receiver did not get exactly one new message"
                 )
+                delivered_lines = [
+                    json.loads(line) for line in receiver_file.read_text().splitlines()
+                ]
+                assert delivered_lines.count(marker) == prior_target_messages + 1, (
+                    "Message did not arrive verbatim at the requested recipient"
+                )
+                result["exactRecipientAndTextVerified"] = True
             if check.get("taskSuccess"):
                 assert tasks and all(t["state"] == "succeeded" for t in tasks), (
                     "Background task did not succeed"
@@ -507,6 +524,30 @@ class Instance:
                     (tasks[0]["id"],),
                 )
                 result["executorStates"] = [a["state"] for a in attempts]
+                returned = [
+                    json.loads(a["result_json"]) for a in attempts if a["result_json"]
+                ]
+                directories = [
+                    a.get("workspace", {}).get("directory")
+                    for a in returned
+                    if isinstance(a.get("workspace"), dict)
+                ]
+                result["executorDirectories"] = directories
+                if case["id"] in ["D07", "D10"]:
+                    suffix = "codex-loose" if case["id"] == "D07" else "claude-loose"
+                    expected = str(self.root / "workspaces" / suffix)
+                    assert directories and directories[-1] == expected, (
+                        "Executor working directory differs from the user's request"
+                    )
+
+                if case["id"] == "D08":
+                    assert directories and Path(directories[-1]).is_relative_to(
+                        Path(self.state["projectDir"]) / ".worktrees"
+                    ), "Project task did not use an isolated project worktree"
+                if case["id"] == "D09":
+                    assert directories and directories[-1] == str(
+                        self.root / "workspaces/acceptance-created"
+                    ), "New project executor used a different directory"
                 assert any(
                     check["taskMarker"] in (a["result_json"] or "") for a in attempts
                 ), "No durable executor result marker"

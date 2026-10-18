@@ -247,7 +247,7 @@
       "id": "D03",
       "category": "派活 / 直接发消息",
       "prompt": "给已有会话「验收一号」发消息：ACCEPTANCE_DELIVERY_ONE。直接发送，不新建。",
-      "expected": "实际可靠投递一次，不重复确认，不创建任务；接收端拿到标记。",
+      "expected": "实际可靠投递一次，不重复确认，不创建任务；接收端拿到标记。指定接收端必须收到原样消息且本次恰好一次。",
       "check": {
         "delivery": "ACCEPTANCE_DELIVERY_ONE",
         "noTasks": true,
@@ -258,7 +258,7 @@
       "id": "D04",
       "category": "派活 / 项目内发消息",
       "prompt": "给「派活验收项目」的「验收四号」发消息：ACCEPTANCE_PROJECT_FOUR。",
-      "expected": "按项目归属查找完整会话并送达第四个目标，无额外确认。",
+      "expected": "按项目归属查找完整会话并送达第四个目标，无额外确认。指定接收端必须收到原样消息且本次恰好一次。",
       "check": {
         "delivery": "ACCEPTANCE_PROJECT_FOUR",
         "noTasks": true,
@@ -294,7 +294,7 @@
       "id": "D07",
       "category": "派活 / 新 Codex 散任务",
       "prompt": "新建一个 Codex 散会话，目录 {workspace}/codex-loose。任务仅回复 CODEX_ACCEPTANCE_OK，不运行工具，不修改文件。请实际派活并回报。",
-      "expected": "创建新后台任务并由真实Codex返回标记，Main收到回报。",
+      "expected": "创建新后台任务并由真实Codex返回标记，Main收到回报。实际工作目录必须为请求的codex-loose目录。",
       "check": {
         "executor": "codex",
         "target": "new_session",
@@ -328,7 +328,7 @@
       "id": "D10",
       "category": "派活 / 新 Claude 任务",
       "prompt": "新建一个 Claude Code 散会话，工作目录 {workspace}/claude-loose。任务只回复 CLAUDE_ACCEPTANCE_OK，不运行工具、不改文件，实际执行后回报。",
-      "expected": "真实Claude Code任务执行并回报标记。",
+      "expected": "真实Claude Code任务执行并回报标记。实际工作目录必须为请求的claude-loose目录，不允许退回父目录。",
       "check": {
         "executor": "claude",
         "target": "new_session",

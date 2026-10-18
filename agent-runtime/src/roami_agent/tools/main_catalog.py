@@ -264,7 +264,7 @@ def register_main_tools(registry, tasks, memory, targets):
                             },
                             ["kind"],
                         ),
-                        "description": "For an existing session use ONLY kind=session and exact sessionId (plus nodeId/label). Never add directory/workspaceId/base/remote. A projectId is descriptive context only and cannot override the exact session. kind=project + projectId prepares a worktree; workspaceId reuses it without base/remote/directory overrides. kind=new_project + name (+ absolute baseDir) creates a separate project. kind=new_session starts loose work. Reuse preserves local work.",
+                        "description": "For an existing session use ONLY kind=session and exact sessionId (plus nodeId/label). Never add directory/workspaceId/base/remote. A projectId is descriptive context only and cannot override the exact session. kind=project + projectId prepares a worktree; workspaceId reuses it without base/remote/directory overrides. kind=new_project + name (+ absolute baseDir) creates a separate project. kind=new_session starts loose work: use absolute directory for its working directory, NEVER baseDir (only new_project accepts baseDir). Reuse preserves local work.",
                     },
                     "fromMessageId": {"type": "string"},
                 },

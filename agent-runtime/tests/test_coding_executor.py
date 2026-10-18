@@ -322,3 +322,47 @@ async def test_session_preflight_rejection_is_distinct_from_submission_uncertain
     code = "SESSION_SUBMISSION_UNKNOWN"
     assert await executor.run(task, run) is None
     assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "unknown"
+
+
+@pytest.mark.parametrize("executor", ["native", "codex", "claude"])
+async def test_loose_task_rejects_project_parent_directory_before_recording_intent(store, executor):
+    from roami_agent.protocol.errors import DomainError
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    with pytest.raises(DomainError, match="LOOSE_SESSION_USE_DIRECTORY"):
+        await tasks.create(
+            "alice",
+            conversation["id"],
+            "work",
+            key="bad-directory",
+            executor=executor,
+            target={"kind": "new_session", "baseDir": "/requested/work"},
+            record_intent=True,
+        )
+    assert await store.call(lambda db: db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]) == 0
+    assert (
+        await store.call(lambda db: db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]) == 0
+    )
+
+
+@pytest.mark.parametrize("executor", ["native", "codex"])
+async def test_restored_loose_task_does_not_fall_back_when_directory_field_is_wrong(
+    store, executor
+):
+    import json
+
+    from roami_agent.executors.workspace import hold_workspace
+    from roami_agent.protocol.errors import DomainError
+
+    task = {
+        "intent_json": json.dumps({"target": {"kind": "new_session", "baseDir": "/requested/work"}})
+    }
+    settings = Settings(cli_bin="/must-not-launch", coding_directory="/wrong-default")
+    with pytest.raises(DomainError, match="LOOSE_SESSION_USE_DIRECTORY"):
+        if executor == "native":
+            async with hold_workspace(settings, task, {}):
+                pytest.fail("Invalid task reached the workspace")
+        else:
+            await CodingExecutor(store, settings).run(task, {})

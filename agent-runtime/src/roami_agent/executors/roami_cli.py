@@ -55,6 +55,8 @@ class CodingExecutor:
     async def run(self, task, run):
         spec = json.loads(task["intent_json"])
         target = spec["target"]
+        if target["kind"] == "new_session" and "baseDir" in target:
+            raise DomainError("LOOSE_SESSION_USE_DIRECTORY")
         if target["kind"] == "new_project":
             target = await provision_project(self.settings, task, run)
         if target["kind"] not in {"new_session", "project", "session"}:
