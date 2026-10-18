@@ -178,3 +178,38 @@ async def test_worker_tool_activity_reaches_origin_conversation_while_running(st
     finally:
         release.set()
         await runtime.close()
+
+
+async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
+    from roami_agent.tools.main_catalog import register_main_tools
+    from roami_agent.tools.registry import Tools
+
+    class TaskStore:
+        async def create(self, *args, **kwargs):
+            return {
+                "id": "accepted-task",
+                "state": "queued",
+                "intent_json": "large private goal",
+                "budget_json": "internal",
+            }
+
+    tools = Tools()
+    register_main_tools(tools, TaskStore(), None, None)
+    value = await tools.invoke(
+        {"id": "call", "function": {"name": "delegate", "arguments": json.dumps({"goal": "work"})}},
+        "main",
+        {
+            "owner": "alice",
+            "conversation": "conversation",
+            "turnId": "turn",
+            "toolCallId": "call",
+            "assistantMessageId": "assistant",
+            "originMessageId": "user",
+        },
+    )
+    assert value == {
+        "id": "accepted-task",
+        "state": "queued",
+        "acceptedOnly": True,
+        "delivery": "pending",
+    }

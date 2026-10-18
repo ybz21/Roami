@@ -118,4 +118,10 @@ html[data-pointer="coarse"] .agent-compose-options > .ant-input[type="date"],htm
 .agent-model-trigger > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .agent-model-trigger > svg,.agent-mode-trigger > svg { flex:none; }
 html[data-size="compact"] .agent-composer .agent-model-trigger { max-width:calc(var(--sp-5) * 7); padding-inline:var(--sp-2); }
+html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-composer { padding:var(--sp-1) var(--sp-3); }
+html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-compose-card form { display:flex; align-items:center; }
+html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-compose-card form > textarea { flex:1; min-width:0; width:0; }
+html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-compose-bar { flex:0 0 auto; padding:var(--sp-2) var(--sp-3); }
+html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-model-trigger { max-width:calc(var(--sp-5) * 4); }
+html[data-orient="landscape"]:is([data-size="compact"],[data-size="medium"]) .agent-jump-latest { left:auto; right:var(--sp-3); transform:none; }
 html[data-size="compact"] .agent-compose-bar .tt-cgrp { gap:var(--sp-1); }

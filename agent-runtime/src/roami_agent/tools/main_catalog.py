@@ -91,7 +91,7 @@ def register_main_tools(registry, tasks, memory, targets):
     )
 
     async def delegate(args, binding):
-        return await tasks.create(
+        task = await tasks.create(
             binding["owner"],
             binding["conversation"],
             args["goal"],
@@ -104,6 +104,12 @@ def register_main_tools(registry, tasks, memory, targets):
             from_message_id=args.get("fromMessageId"),
             origin_message_id=binding["originMessageId"],
         )
+        return {
+            "id": task["id"],
+            "state": task["state"],
+            "acceptedOnly": True,
+            "delivery": "pending" if task["state"] == "queued" else "unconfirmed",
+        }
 
     async def status(args, binding):
         return await tasks.list(binding["owner"], binding["conversation"], for_model=True)
@@ -177,7 +183,7 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "delegate",
-            "Delegate long work; returns a task immediately. Use fromMessageId only for a completed checkpoint Fork.",
+            "Delegate long work; returns an acceptance receipt immediately, with delivery still pending. Use fromMessageId only for a completed checkpoint Fork.",
             object_schema(
                 {
                     "goal": {"type": "string", "minLength": 1, "maxLength": 20000},
