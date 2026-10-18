@@ -1,4 +1,4 @@
-"""Model output contains proposals and source IDs; it cannot grant activation or scope."""
+"""Memory proposals need source and scope validation before activation."""
 
 from typing import Literal
 
@@ -11,6 +11,7 @@ class MemoryProposal(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     kind: Literal["fact", "decision", "preference", "summary"]
     sourceIds: list[str] = Field(min_length=1, max_length=16)
+    proposedScope: Literal["source", "user_preference"] = "source"
     evidenceQuote: str | None = Field(default=None, min_length=1, max_length=2000)
 
 

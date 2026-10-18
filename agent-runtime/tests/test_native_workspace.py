@@ -248,3 +248,145 @@ async def test_unknown_write_cannot_be_overridden_by_worker_summary_or_goal_veri
         assert json.loads(attempt["result_json"])["outcomeKnown"] is False
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("role", ["main", "worker"])
+async def test_multistep_turn_does_not_sum_individual_model_request_timeouts(store, role):
+    import asyncio
+    from dataclasses import replace
+
+    from test_runtime import ConversationModel, until
+
+    from roami_agent.app import Runtime
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.storage.database import row
+
+    class MultiStepWorker:
+        model = "multi-step-worker"
+
+        async def stream(self, messages, tools):
+            await asyncio.sleep(0.6)
+            if messages[-1]["role"] == "tool":
+                yield ModelEvent("text", "verified work")
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "load-workflow",
+                        "function": {
+                            "name": "read",
+                            "arguments": json.dumps({"path": "skill://web-research"}),
+                        },
+                    },
+                )
+
+    runtime = Runtime(
+        store,
+        MultiStepWorker() if role == "main" else ConversationModel(),
+        worker_model=MultiStepWorker(),
+        settings=replace(Settings(), timeout_seconds=1),
+    )
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        if role == "main":
+            receipt = await runtime.chat.submit(
+                "alice", conversation["id"], "multi-step-budget", "work"
+            )
+            await until(
+                store,
+                lambda db: row(
+                    db,
+                    "SELECT id FROM turns WHERE id=? AND state='completed'",
+                    (receipt["turnId"],),
+                ),
+            )
+        else:
+            task = await runtime.tasks.create(
+                "alice", conversation["id"], "work", key="multi-step-budget", record_intent=True
+            )
+            await until(
+                store,
+                lambda db: row(
+                    db, "SELECT id FROM tasks WHERE id=? AND state='succeeded'", (task["id"],)
+                ),
+            )
+    finally:
+        await runtime.close()
+
+
+async def test_native_task_carries_original_attachment_and_honors_artifact_deletion(store):
+    from test_runtime import ConversationModel
+
+    from roami_agent.app import Runtime
+    from roami_agent.storage.database import row
+
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        attachment = await runtime.attachments.upload(
+            "alice", "batches.csv", "batch-source", b"requests,successes\n1000,992\n2000,1970\n"
+        )
+        receipt = await runtime.chat.submit(
+            "alice",
+            conversation["id"],
+            "review-batches",
+            "Review the uploaded batches",
+            [attachment["id"]],
+        )
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Analyze the batches",
+            key="attachment-worker",
+            origin_message_id=receipt["messageId"],
+        )
+        child = await store.call(
+            lambda db: row(
+                db,
+                "SELECT b.conversation_id,b.id FROM branches b JOIN task_attempts a ON a.native_branch_id=b.id WHERE a.task_id=?",
+                (task["id"],),
+            )
+        )
+        plan = await runtime.context.project(
+            "alice", child["conversation_id"], branch_id=child["id"]
+        )
+        assert "1000,992" in json.dumps(plan)
+        assert plan["attachmentEvidence"][0]["artifactId"] == attachment["id"]
+        await runtime.artifacts.delete("alice", attachment["id"])
+        plan = await runtime.context.project(
+            "alice", child["conversation_id"], branch_id=child["id"]
+        )
+        assert not plan["attachmentEvidence"]
+        assert "1000,992" not in json.dumps(plan)
+    finally:
+        await runtime.close()
+
+
+async def test_native_task_deadline_still_cancels_before_late_effects():
+    import asyncio
+
+    from roami_agent.executors.native import NativeExecutor
+    from roami_agent.protocol.identity import now_ms
+
+    wrote = False
+
+    async def worker(turn, role, *, task_id):
+        nonlocal wrote
+        assert 0 <= turn["executionTimeoutSeconds"] <= 0.1
+        await asyncio.sleep(1)
+        wrote = True
+        return "late effect"
+
+    executor = NativeExecutor(worker)
+    task = {
+        "id": "deadline-task",
+        "owner_id": "alice",
+        "intent_json": json.dumps({"target": {"kind": "new_session"}}),
+        "budget_json": json.dumps({"deadlineMs": now_ms() + 30}),
+    }
+    with pytest.raises(TimeoutError):
+        await executor.run(
+            task, {"id": "run", "native_branch_id": "branch"}, turn={"branch_id": "branch"}
+        )
+    assert not wrote

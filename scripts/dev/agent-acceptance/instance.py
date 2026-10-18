@@ -17,6 +17,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from workflow_skills import install_workflow_skills
+
 REPO = Path(__file__).resolve().parents[3]
 
 
@@ -55,8 +57,10 @@ def start(args):
     namespace = "roami-acceptance-20261019-" + stamp
     root = Path("/tmp") / namespace
     root.mkdir(mode=0o700)
-    for directory in ["logs", "workspaces", "agents"]:
+    for directory in ["logs", "workspaces", "agents", "bin"]:
         (root / directory).mkdir(mode=0o700)
+    shutil.copy2(binary, root / "bin/roami")
+    binary = str(root / "bin/roami")
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
@@ -84,6 +88,8 @@ def start(args):
         ROAMI_DATA=str(root),
         ROAMI_CONFIG=str(root / "config.yaml"),
         ROAMI_AGENT_RUNTIME=str(REPO / "agent-runtime"),
+        ROAMI_AGENT_CLI=binary,
+        PATH=str(root / "bin") + os.pathsep + env.get("PATH", ""),
     )
     wrapper = root / "tmux"
     wrapper.write_text(
@@ -107,6 +113,10 @@ def start(args):
         if key in {"endpoint", "name", "key_env", "worker"}
     )
     settings += "\n[runtime]\ncoding_directory=" + json.dumps(str(root / "workspaces"))
+    skill_markers = {}
+    if args.document_skills:
+        skills_root, skill_markers = install_workflow_skills(root)
+        settings += "\n[tools]\nskill_roots=" + json.dumps([str(skills_root)]) + "\n"
     settings += (
         "\n[tools.browser]\nenabled=true\nendpoint="
         + json.dumps(args.cdp)
@@ -242,6 +252,8 @@ def start(args):
             "webPid": processes[1].pid,
             "projectId": registered["data"]["key"],
             "projectDir": str(project),
+            "skillMarkers": skill_markers,
+            "cliBin": binary,
         }
         args.state.write_text(json.dumps(state))
         args.state.chmod(0o600)
@@ -272,6 +284,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--stop", action="store_true")
+    parser.add_argument("--document-skills", action="store_true")
     parser.add_argument("--cli", default=str(REPO / "backend/dist/roami-linux-amd64"))
     parser.add_argument("--config-root", default="~/.roami")
     parser.add_argument("--cdp", default="http://127.0.0.1:9222")

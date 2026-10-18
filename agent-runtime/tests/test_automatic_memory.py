@@ -212,3 +212,145 @@ async def test_late_automatic_preference_cannot_override_newer_user_source(store
     current, late = await store.call(write, write=True)
     assert late["state"] == "conflict"
     assert (await Memories(store).get("alice", current["id"]))["body"] == "优先用 Codex"
+
+
+class UserScopePreferenceModel:
+    model = "user-scope-preference-fixture"
+
+    def __init__(self, scope="user_preference", direct=True):
+        self.scope, self.direct = scope, direct
+
+    async def stream(self, messages, tools):
+        source = next(
+            item for item in json.loads(messages[-1]["content"]) if item["role"] == "user"
+        )
+        quote = json.loads(source["content"])["text"]
+        yield ModelEvent(
+            "text",
+            json.dumps(
+                {
+                    "memories": [
+                        {
+                            "title": "用户报告偏好",
+                            "body": quote,
+                            "kind": "preference",
+                            "sourceIds": [source["id"]],
+                            "proposedScope": self.scope,
+                            **({"evidenceQuote": quote} if self.direct else {}),
+                        }
+                    ]
+                }
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "proposed_scope,direct",
+    [("source", True), ("user_preference", True), ("user_preference", False)],
+)
+async def test_personal_preference_scope_requires_direct_source_and_forgetting_invalidates_promotion(
+    store, proposed_scope, direct
+):
+    runtime = Runtime(
+        store, ConversationModel(), memory_model=UserScopePreferenceModel(proposed_scope, direct)
+    )
+    await runtime.start()
+    try:
+        first = await runtime.conversations.create("alice")
+        await runtime.chat.submit(
+            "alice",
+            first["id"],
+            "remember-personal",
+            "帮我记住：我的报告偏好编号是 oak-8372，默认简洁。",
+        )
+        await until(
+            store,
+            lambda db: row(db, "SELECT id FROM jobs WHERE kind='memory.extract' AND state='done'"),
+        )
+        records = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT * FROM memory_records WHERE owner_id='alice' AND conversation_id IS NULL AND state='active'",
+            )
+        )
+        assert bool(records) is (proposed_scope == "user_preference" and direct)
+        second = await runtime.conversations.create("alice")
+        receipt = await runtime.conversations.accept(
+            "alice", second["id"], "recall", "沿用我的报告偏好"
+        )
+        turn = await store.call(
+            lambda db: row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],))
+        )
+        turn["owner_id"] = "alice"
+        builder = PromptBuilder(store, runtime.context, runtime.settings, memory=runtime.memory)
+        plan, prompt = await builder.build(turn, "", [], None)
+        assert bool(plan["memoryEvidence"]) is bool(records)
+        if records:
+            assert "oak-8372" in json.dumps(prompt)
+            assert not await runtime.memory.search("bob", "oak-8372")
+            local = await store.call(
+                lambda db: row(
+                    db,
+                    "SELECT id FROM memory_records WHERE conversation_id=? AND state='active' ORDER BY created_ms LIMIT 1",
+                    (first["id"],),
+                )
+            )
+            await runtime.memory.delete("alice", local["id"])
+            plan, _ = await builder.build(turn, "", [], None)
+            assert not plan["memoryEvidence"]
+    finally:
+        await runtime.close()
+
+
+async def test_task_preference_cannot_be_promoted_to_user_scope(store):
+    runtime = Runtime(store, ConversationModel(), memory_model=UserScopePreferenceModel())
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "这个任务的报告用 local-scope-4821 格式",
+            key="scoped-preference",
+            record_intent=True,
+        )
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM memory_records WHERE task_id=? AND state='active'",
+                (task["id"],),
+            ),
+        )
+        assert not await store.call(
+            lambda db: row(
+                db, "SELECT id FROM memory_records WHERE conversation_id IS NULL AND state='active'"
+            )
+        )
+    finally:
+        await runtime.close()
+
+
+async def test_forgetting_user_preference_excludes_other_records_of_original_source(store):
+    runtime = Runtime(store, ConversationModel(), memory_model=UserScopePreferenceModel())
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        await runtime.chat.submit(
+            "alice", conversation["id"], "personal-source", "记住：我的偏好编号是 pine-3571"
+        )
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM memory_records WHERE conversation_id IS NULL AND state='active'"
+            ),
+        )
+        records = await runtime.memory.search("alice", "pine-3571")
+        global_record = next(item for item in records if item["conversation_id"] is None)
+        local_record = next(item for item in records if item["conversation_id"] is not None)
+        await runtime.memory.forget("alice", global_record["id"])
+        assert not await runtime.memory.search("alice", "pine-3571")
+        with pytest.raises(DomainError, match="MEMORY_SOURCE_NOT_FOUND"):
+            await runtime.memory.get("alice", local_record["id"])
+    finally:
+        await runtime.close()

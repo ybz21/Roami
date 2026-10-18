@@ -54,8 +54,17 @@ async function scene(page, session) {
         && rect.top < innerHeight && rect.left < innerWidth && style.visibility !== 'hidden' && style.display !== 'none'
     }
     const candidates = [...document.querySelectorAll('a,button,input,select,textarea,[role="button"],[contenteditable="true"]')].filter(visible)
+    const link = element => {
+      if (element.tagName !== 'A' || !element.getAttribute('href')) return {}
+      try {
+        const url = new URL(element.getAttribute('href'), document.baseURI)
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.href.length > 2400) return {}
+        return { href: url.href }
+      } catch { return {} }
+    }
     const controls = candidates.slice(0, 64).map(element => ({
         selector: selector(element), tag: element.tagName.toLowerCase(),
+        ...link(element),
         label: (element.getAttribute('aria-label') || element.getAttribute('placeholder') || '').slice(0, 160),
         text: (element.innerText || '').slice(0, 160),
         value: element.type === 'password' ? '[redacted]' : String(element.value ?? '').slice(0, 160),

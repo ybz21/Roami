@@ -232,6 +232,9 @@ async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
     )
     assert value == {
         "id": "accepted-task",
+        "taskId": "accepted-task",
+        "kind": "background_task",
+        "executor": "native",
         "state": "queued",
         "acceptedOnly": True,
         "delivery": "pending",

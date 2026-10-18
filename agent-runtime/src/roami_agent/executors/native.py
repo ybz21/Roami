@@ -50,7 +50,13 @@ class NativeExecutor:
 
         async def execute(prepared):
             text = await self.run_turn(
-                dict(prepared, executionRunId=run["id"]),
+                dict(
+                    prepared,
+                    executionRunId=run["id"],
+                    executionTimeoutSeconds=max(
+                        0, (json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000
+                    ),
+                ),
                 "research"
                 if json.loads(task["intent_json"])["target"].get("resourceOnly") is True
                 else "worker",

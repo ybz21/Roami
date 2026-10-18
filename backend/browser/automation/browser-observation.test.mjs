@@ -94,3 +94,31 @@ test('a stalled screenshot releases the observation queue without writing late e
     await assert.rejects(stat(path), error => error.code === 'ENOENT')
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test('read-only observations expose resolved navigation links without executable or credential URLs', async () => {
+  const { runInNewContext } = await import('node:vm')
+  const anchor = href => ({
+    id: 'link', tagName: 'A', innerText: 'Source', type: '',
+    getAttribute: name => name === 'href' ? href : null,
+    getBoundingClientRect: () => ({ width: 20, height: 20, top: 0, left: 0, bottom: 20, right: 20 }),
+  })
+  const anchors = ['../correction.html#final', 'https://docs.example/source', 'javascript:alert(1)', 'data:text/html,secret', 'https://user:password@example.com/private'].map(anchor)
+  const original = fixture().page
+  const page = { ...original, evaluate: async fn => runInNewContext('(' + fn.toString() + ')()', {
+    URL, CSS: { escape: value => value }, innerWidth: 800, innerHeight: 600,
+    devicePixelRatio: 1, scrollX: 0, scrollY: 0,
+    location: { href: 'https://example.com/reports/index.html' },
+    window: { getSelection: () => '' },
+    getComputedStyle: () => ({ visibility: 'visible', display: 'inline' }),
+    document: {
+      baseURI: 'https://example.com/reports/index.html', title: 'Sources',
+      documentElement: { outerHTML: '<body>Sources</body>' }, body: { innerText: 'Sources' },
+      querySelectorAll: selector => selector.startsWith('a,') ? anchors : [],
+      hasFocus: () => false,
+    },
+  }) }
+  const observed = await observePage(page)
+  assert.deepEqual(Array.from(observed.controls.slice(0, 2), item => item.href), ['https://example.com/correction.html#final', 'https://docs.example/source'])
+  assert(observed.controls.slice(2).every(item => !('href' in item)))
+  assert(!JSON.stringify(observed).includes('password'))
+})

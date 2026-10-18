@@ -43,13 +43,14 @@ class AgentLoop:
         model = self.model if role == "main" else self.worker_model
         phase = "context"
         try:
-            async with asyncio.timeout(self.settings.timeout_for(role)):
+            execution_deadline = asyncio.timeout(turn.get("executionTimeoutSeconds"))
+            async with execution_deadline:
                 instructions = (
                     self.settings.main_instructions
                     if role == "main"
                     else self.settings.worker_instructions
                 )
-                catalog = [] if completion else self.tools.catalog(role)
+                catalog = self.tools.catalog(role)
                 plan, prompt = await self.context.build(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 for step in range(self.settings.max_steps):
@@ -75,24 +76,25 @@ class AgentLoop:
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
                     first_delta = True
                     phase = "model"
-                    async for part in model.stream(prompt, catalog):
-                        if part.kind == "text":
-                            text += part.value
-                            buffer += part.value
-                            if len(text) > 100_000:
-                                raise DomainError("MODEL_OUTPUT_LIMIT")
-                            if (
-                                first_delta
-                                or len(buffer.encode()) >= 1024
-                                or self.clock() - flushed >= 0.1
-                            ):
-                                await self.journal.delta(turn, mid, text, buffer)
-                                buffer, flushed = "", self.clock()
-                                first_delta = False
-                        elif part.kind == "tool":
-                            calls.append(part.value)
-                        elif part.kind == "usage":
-                            usage = part.value
+                    async with asyncio.timeout(self.settings.timeout_for(role)):
+                        async for part in model.stream(prompt, catalog):
+                            if part.kind == "text":
+                                text += part.value
+                                buffer += part.value
+                                if len(text) > 100_000:
+                                    raise DomainError("MODEL_OUTPUT_LIMIT")
+                                if (
+                                    first_delta
+                                    or len(buffer.encode()) >= 1024
+                                    or self.clock() - flushed >= 0.1
+                                ):
+                                    await self.journal.delta(turn, mid, text, buffer)
+                                    buffer, flushed = "", self.clock()
+                                    first_delta = False
+                            elif part.kind == "tool":
+                                calls.append(part.value)
+                            elif part.kind == "usage":
+                                usage = part.value
                     phase = "tools"
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
@@ -157,12 +159,16 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
-                    catalog = [] if completion else self.tools.catalog(role)
+                    catalog = self.tools.catalog(role)
                     phase = "context"
                     plan, prompt = await self.context.build(turn, instructions, catalog, completion)
                 raise DomainError("AGENT_STEP_LIMIT")
         except TimeoutError as exc:
-            code = "MODEL_DEADLINE" if phase == "model" else "AGENT_TURN_DEADLINE"
+            code = (
+                "MODEL_DEADLINE"
+                if phase == "model" and not execution_deadline.expired()
+                else "AGENT_TURN_DEADLINE"
+            )
             await self.journal.fail(turn, "failed", code, completion=completion)
             raise DomainError(code, 504) from exc
         except BaseException as exc:

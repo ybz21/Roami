@@ -8,6 +8,15 @@ from roami_agent.retrieval.tokens import search_tokens
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.transcript_repository import owned
 
+FORGOTTEN_PROMOTED_PREFERENCE = (
+    "EXISTS (SELECT 1 FROM memory_edges p JOIN memory_records g ON g.id=p.derived_id "
+    "JOIN context_omissions o ON o.source_memory_id=g.id AND o.owner_id=r.owner_id "
+    "JOIN memory_sources s ON s.memory_id=r.id AND s.message_id=o.message_id "
+    "WHERE p.parent_id=r.id AND r.kind='preference' AND g.kind='preference' "
+    "AND g.owner_id=r.owner_id AND g.conversation_id IS NULL AND g.project_id IS NULL "
+    "AND g.task_id IS NULL)"
+)
+
 TOKENIZER_VERSION = "cjk-bigram-v2"
 RANKING_VERSION = "fts-scope-v1"
 
@@ -56,6 +65,7 @@ class MemorySearch:
                 "r.valid_from_ms<=?",
                 "(r.valid_until_ms IS NULL OR r.valid_until_ms>?)",
                 "(r.expires_ms IS NULL OR r.expires_ms>?)",
+                "NOT " + FORGOTTEN_PROMOTED_PREFERENCE,
                 (
                     "NOT EXISTS (SELECT 1 FROM memory_sources s LEFT JOIN artifacts a ON a.id=s.artifact_id "
                     "WHERE s.memory_id=r.id AND s.artifact_id IS NOT NULL "

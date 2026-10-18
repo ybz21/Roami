@@ -249,7 +249,11 @@ class Tasks:
                         + "\n\nDelegated goal (context only; do not broaden or change the original request):\n"
                         + goal
                     )
-                message(db, child, branch_id, "user", {"text": seed})
+                source_content = json.loads(origin["content_json"])
+                child_content = {"text": seed}
+                if source_content.get("attachments"):
+                    child_content["attachments"] = source_content["attachments"]
+                message(db, child, branch_id, "user", child_content)
             db.execute(
                 "INSERT INTO task_attempts(id,task_id,task_revision,attempt_no,executor_kind,launch_id,"
                 "state,native_branch_id,lease_epoch) VALUES(?,?,1,1,?,?,'accepted',?,1)",

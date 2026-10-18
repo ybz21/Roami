@@ -13,7 +13,8 @@
           "巴黎"
         ],
         "noTools": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G02",
@@ -25,7 +26,8 @@
           "174"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G03",
@@ -37,7 +39,8 @@
           "9000"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G04",
@@ -49,7 +52,8 @@
           "9:35"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G05",
@@ -61,7 +65,8 @@
           "2"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G06",
@@ -74,7 +79,8 @@
           "4.5"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G07",
@@ -86,7 +92,8 @@
           "240"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G08",
@@ -100,7 +107,8 @@
           "B"
         ],
         "noTasks": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G09",
@@ -118,7 +126,8 @@
       "attachment": {
         "name": "sales.csv",
         "text": "order,amount,status\nA1,30,paid\nA2,90,unpaid\nA3,50,paid\n"
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G10",
@@ -134,7 +143,8 @@
       "attachment": {
         "name": "stock.json",
         "text": "[{\"sku\":\"C1\",\"stock\":7,\"status\":\"active\"},{\"sku\":\"C2\",\"stock\":3,\"status\":\"active\"},{\"sku\":\"C3\",\"stock\":1,\"status\":\"inactive\"}]"
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G11",
@@ -151,13 +161,14 @@
       "attachment": {
         "name": "vision.png",
         "image": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "G12",
-      "category": "GAIA 风格 / 多步网页",
+      "category": "工具串联 / 浏览器跨页读取",
       "prompt": "打开 {fixture}/index.html，沿着“观测数据”链接读取数据，计算两个站点的平均降水量，给出站点名、平均值和来源链接。",
-      "expected": "北站与南站平均18毫米；读取第二页，给出真实来源。",
+      "expected": "北站与南站平均18毫米；读取第二页，给出真实来源。 链接文件名含每实例随机后缀，不在用户问题中给出；验证观测href、对应observationId、goto及目标页观测，不能靠猜路径通过。",
       "check": {
         "contains": [
           "18",
@@ -165,28 +176,30 @@
           "南站"
         ],
         "taskSuccess": true,
-        "browser": true
+        "browser": true,
+        "followLinkedPage": true
       },
       "fixture": true
     },
     {
       "id": "G13",
-      "category": "GAIA 风格 / 网页交叉核对",
+      "category": "工具串联 / 更正证据覆盖旧结果",
       "prompt": "核对 {fixture}/index.html 中会议安排与其“更正公告”链接，告诉我最终日期和地点，并给来源。",
-      "expected": "2026-10-22、B馆；以更正公告为准。",
+      "expected": "2026-10-22、B馆；以更正公告为准。 链接文件名含每实例随机后缀，不在用户问题中给出；验证观测href、对应observationId、goto及目标页观测，不能靠猜路径通过。",
       "check": {
         "contains": [
           "2026-10-22",
           "B"
         ],
         "taskSuccess": true,
-        "browser": true
+        "browser": true,
+        "followLinkedPage": true
       },
       "fixture": true
     },
     {
       "id": "G14",
-      "category": "GAIA 风格 / 公共来源检索",
+      "category": "工具检索 / 官方来源验证",
       "prompt": "请联网查 Python 官方 PEP 20，给出标题、作者姓氏、创建年份和官方链接。",
       "expected": "The Zen of Python；Peters；2004；https://peps.python.org/pep-0020/。",
       "check": {
@@ -214,7 +227,8 @@
           "未提供"
         ],
         "noTools": true
-      }
+      },
+      "baselineOnly": true
     },
     {
       "id": "D01",
@@ -353,7 +367,8 @@
       "check": {
         "contains": [
           "cedar-7284"
-        ]
+        ],
+        "memoryRecall": "cedar-7284"
       },
       "after": "M01"
     },
@@ -424,6 +439,171 @@
           "记录",
           "无法"
         ]
+      }
+    },
+    {
+      "id": "R01",
+      "category": "调研写作链路 / 公开搜索与技术对比",
+      "prompt": "搜索SQLite官方资料，面向单机应用比较WAL和rollback journal的读写并发，说明WAL的网络文件系统限制。写200至400字中文对比报告，有表格、建议、局限、来源。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R01，保存sqlite-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。",
+      "expected": "实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。",
+      "check": {},
+      "document": {
+        "name": "sqlite-report.html",
+        "contains": [
+          "WAL",
+          "rollback",
+          "并发",
+          "网络"
+        ],
+        "minSources": 2,
+        "sourceHosts": [
+          "www.sqlite.org"
+        ]
+      }
+    },
+    {
+      "id": "R02",
+      "category": "调研写作链路 / 检索后写示例并运行",
+      "prompt": "搜索Python 3.12官方tomllib文档，说明它何时加入标准库、能否写TOML。写说明文档，并在同目录创建demo.py，使用标准库从TOML解析整数927并打印，实际运行后将输出写入文档。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R02，保存tomllib-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。",
+      "expected": "实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。",
+      "check": {},
+      "document": {
+        "name": "tomllib-report.html",
+        "contains": [
+          "tomllib",
+          "3.11",
+          "927"
+        ],
+        "minSources": 1,
+        "sourceHosts": [
+          "docs.python.org"
+        ],
+        "runExample": true
+      }
+    },
+    {
+      "id": "R03",
+      "category": "调研写作链路 / 多来源检索和更正串联",
+      "prompt": "按service-review技能进行审查，再按report-writing技能成稿；先发现并读取这两个技能，并将前一个流程结果交给后一个。从 {fixture}/search.html 检索供应商资料，核对Alpha、Beta及价格更正。预算每月90元以内、可用性至少99.9%，写供应商对比和选型报告，表格应使用最终有效价格，引用原说明和更正公告。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R03，保存supplier-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。",
+      "expected": "实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。",
+      "check": {},
+      "document": {
+        "name": "supplier-report.html",
+        "contains": [
+          "Alpha",
+          "Beta",
+          "88",
+          "95",
+          "99.9"
+        ],
+        "minSources": 3,
+        "sourceSuffixes": [
+          "alpha.html",
+          "beta.html",
+          "price-update.html"
+        ],
+        "skills": [
+          "service-review",
+          "report-writing"
+        ]
+      }
+    },
+    {
+      "id": "R04",
+      "category": "调研写作链路 / 附件与网页规则合并分析",
+      "prompt": "按service-review技能进行审查，再按report-writing技能成稿；先发现并读取这两个技能，并将前一个流程结果交给后一个。读取附件batches.csv，并从 {fixture}/search.html 检索SLA验收规则。按规则核算总体成功率、是否达到合格线、还差多少成功次数；写一份带原始数据表、计算过程、结论和规则引用的中文报告。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R04，保存sla-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。",
+      "expected": "实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。",
+      "check": {},
+      "document": {
+        "name": "sla-report.html",
+        "contains": [
+          "98.73",
+          "99",
+          "8"
+        ],
+        "minSources": 1,
+        "sourceSuffixes": [
+          "sla.html"
+        ],
+        "skills": [
+          "service-review",
+          "report-writing"
+        ]
+      },
+      "attachment": {
+        "name": "batches.csv",
+        "text": "batch,requests,success\nA,1000,992\nB,2000,1970\n"
+      }
+    },
+    {
+      "id": "R05",
+      "category": "调研写作链路 / 原生调研转交Codex写作",
+      "prompt": "只核对两项事实：pathlib提供路径对象，os.path提供路径处理函数。先由原生后台任务读取Python官方pathlib与os.path页面确认这两项、返回来源，再交给Codex写200字左右的中文说明和一个路径拼接示例。不要扩展成API大全或继续追加研究。按report-writing技能成稿；保存到 {workspace}/R05/pathlib-report.html，写完实际读回核对，再在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签，不加script或自定义CSS。",
+      "expected": "实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。",
+      "check": {},
+      "document": {
+        "name": "pathlib-report.html",
+        "contains": [
+          "pathlib",
+          "os.path"
+        ],
+        "minSources": 2,
+        "sourceHosts": [
+          "docs.python.org"
+        ],
+        "handoff": true,
+        "skills": [
+          "report-writing"
+        ]
+      }
+    },
+    {
+      "id": "R06",
+      "category": "调研写作链路 / 来源缺失仍如实交付",
+      "prompt": "查阅 {fixture}/alpha.html ，同时核对 {fixture}/missing-budget.html 是否公布了预算数据。写一份中文证据简报，分别列出已核实信息、无法核实的信息、来源和下一步；不得编造缺失页面的预算。即使来源缺失也要保存文档。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R06，保存limits-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。",
+      "expected": "实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。",
+      "check": {},
+      "document": {
+        "name": "limits-report.html",
+        "contains": [
+          "Alpha",
+          "预算"
+        ],
+        "minSources": 1,
+        "sourceSuffixes": [
+          "alpha.html"
+        ]
+      }
+    },
+    {
+      "id": "R07",
+      "category": "智能体机制 / 记忆自动写入",
+      "prompt": "帮我记住：以后我的调研报告在交付校验段附上偏好口令「枫木-7391」，保持中文简洁。",
+      "expected": "有来源的active记忆落库；验证memory.remembered事件和原用户消息，不以助手口头承诺评分。",
+      "check": {
+        "memory": "枫木-7391"
+      },
+      "memoryMechanism": true
+    },
+    {
+      "id": "R08",
+      "category": "智能体机制 / 自动记忆召回到跨Skill产物",
+      "prompt": "沿用我保存的调研报告偏好，按service-review审查 {fixture}/search.html 中的供应商和价格更正，按report-writing成稿。实际保存到 {workspace}/R08/memory-report.html，读回核对，再交付文件链接。不要新建项目。HTML只用语义标签，不加script或CSS。",
+      "expected": "另一对话的prompt manifest实际引用先前记忆ID/版本，原文没有重给口令；两Skill凭证进入文档，报告包含记忆偏好及真实来源，且read回验和下载一致。",
+      "check": {},
+      "document": {
+        "name": "memory-report.html",
+        "contains": [
+          "枫木-7391",
+          "Alpha",
+          "88"
+        ],
+        "minSources": 2,
+        "skills": [
+          "service-review",
+          "report-writing"
+        ],
+        "memoryRecall": "枫木-7391"
       }
     }
   ]

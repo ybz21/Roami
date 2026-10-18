@@ -7,7 +7,7 @@ from roami_agent.memory.provenance import seed_dependencies
 from roami_agent.memory.writer import commit_memory, source_snapshot
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
-from roami_agent.retrieval.memory_search import MemorySearch
+from roami_agent.retrieval.memory_search import FORGOTTEN_PROMOTED_PREFERENCE, MemorySearch
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.transcript_repository import owned
 
@@ -71,6 +71,13 @@ class Memories:
             )
             if not memory:
                 raise DomainError("MEMORY_NOT_FOUND", 404)
+            if row(
+                db,
+                "SELECT 1 FROM memory_records r WHERE r.id=? AND r.owner_id=? AND "
+                + FORGOTTEN_PROMOTED_PREFERENCE,
+                (memory_id, owner),
+            ):
+                raise DomainError("MEMORY_SOURCE_NOT_FOUND", 404)
             if row(
                 db,
                 "SELECT 1 FROM memory_sources s LEFT JOIN artifacts a ON a.id=s.artifact_id "

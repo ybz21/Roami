@@ -361,6 +361,15 @@ async def test_completion_evidence_stays_before_its_tool_round_after_context_reb
             if tools and not any(tool["function"]["name"] == "ask_user" for tool in tools):
                 yield ModelEvent("text", "Worker evidence")
                 return
+            assert {tool["function"]["name"] for tool in tools} == {
+                "read",
+                "bash",
+                "edit",
+                "write",
+                "tool_search",
+                "delegate",
+                "ask_user",
+            }
             self.main_prompts.append(json.loads(json.dumps(messages)))
             if len(self.main_prompts) == 1:
                 yield ModelEvent(
@@ -464,5 +473,96 @@ async def test_outer_model_timeout_keeps_a_specific_deadline_error(store):
         events = await runtime.conversations.events("alice", conversation["id"])
         failed = [event for event in events if event["kind"] == "turn.failed"]
         assert len(failed) == 1 and failed[0]["payload"]["error"] == "MODEL_DEADLINE"
+    finally:
+        await runtime.close()
+
+
+async def test_completion_continues_next_stage_with_original_source_not_newer_input(store):
+    from roami_agent.storage.transcript_repository import message
+
+    class StagedModel:
+        model = "staged-main"
+
+        async def stream(self, messages, tools):
+            evidence = next(
+                (
+                    m["content"]
+                    for m in messages
+                    if m["content"].startswith("Background task result")
+                ),
+                "",
+            )
+            if "first-stage" in evidence and messages[-1]["role"] != "tool":
+                assert any(t["function"]["name"] == "delegate" for t in tools)
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "continue-writing",
+                        "function": {
+                            "name": "delegate",
+                            "arguments": json.dumps({"goal": "second-stage"}),
+                        },
+                    },
+                )
+            else:
+                yield ModelEvent("text", "Verified stage")
+
+    runtime = Runtime(
+        store, StagedModel(), worker_model=ConversationModel(), memory_model=ConversationModel()
+    )
+    try:
+        conversation = await runtime.conversations.create("alice")
+        first = await runtime.tasks.create(
+            "alice", conversation["id"], "first-stage", key="first-stage", record_intent=True
+        )
+        newer = await store.call(
+            lambda db: message(
+                db,
+                conversation["id"],
+                conversation["active_branch_id"],
+                "user",
+                {"text": "unrelated newer message"},
+            ),
+            write=True,
+        )
+        await runtime.start()
+        await until(
+            store,
+            lambda db: (
+                db.execute("SELECT COUNT(*) FROM tasks WHERE state='succeeded'").fetchone()[0] == 2
+            ),
+        )
+        await until(
+            store,
+            lambda db: (
+                db.execute(
+                    "SELECT COUNT(*) FROM turns WHERE conversation_id=? AND trigger_kind='completion' AND state='completed'",
+                    (conversation["id"],),
+                ).fetchone()[0]
+                == 2
+            ),
+        )
+        tasks = await runtime.tasks.list("alice", conversation["id"])
+        assert len(tasks) == 2
+        assert all(t["origin_message_id"] == first["origin_message_id"] for t in tasks)
+        assert newer != first["origin_message_id"]
+        from roami_agent.protocol.errors import DomainError
+
+        completion_turn = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM turns WHERE conversation_id=? AND trigger_kind='completion' LIMIT 1",
+                (conversation["id"],),
+            )
+        )
+        completion_turn["owner_id"] = "alice"
+        journal = runtime.loop.journal
+        assert (await journal.origin(completion_turn))["id"] == first["origin_message_id"]
+        memory = await runtime.memory.save(
+            "alice", "original-source", "first-stage", first["origin_message_id"]
+        )
+        await runtime.memory.forget("alice", memory["id"])
+        with pytest.raises(DomainError, match="CONTEXT_SOURCE_FORGOTTEN"):
+            await journal.origin(completion_turn)
     finally:
         await runtime.close()

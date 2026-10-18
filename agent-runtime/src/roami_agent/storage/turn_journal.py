@@ -1,6 +1,6 @@
 """Transactional assistant messages, streaming deltas and turn outcomes."""
 
-from roami_agent.protocol.errors import public_error_code
+from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
@@ -13,6 +13,24 @@ class TurnJournal:
         self.db = database
 
     async def origin(self, turn):
+        if turn.get("trigger_kind") == "completion":
+            origin = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT m.id FROM jobs j JOIN tasks t "
+                    "ON t.id=json_extract(j.payload_json,'$.completion.taskId') "
+                    "JOIN messages m ON m.id=t.origin_message_id "
+                    "WHERE j.aggregate_id=? AND j.kind='turn.run' AND t.owner_id=? "
+                    "AND t.origin_branch_id=? "
+                    "AND t.revision=json_extract(j.payload_json,'$.completion.taskRevision') "
+                    "AND NOT EXISTS(SELECT 1 FROM context_omissions o "
+                    "WHERE o.owner_id=t.owner_id AND o.message_id=m.id)",
+                    (turn["id"], turn["owner_id"], turn["branch_id"]),
+                )
+            )
+            if not origin:
+                raise DomainError("CONTEXT_SOURCE_FORGOTTEN", 409)
+            return origin
         return await self.db.call(
             lambda db: row(
                 db,

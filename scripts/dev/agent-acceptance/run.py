@@ -3,10 +3,12 @@
 
 import argparse
 import concurrent.futures
+import fcntl
 import html
 import http.cookiejar
 import http.server
 import json
+import secrets
 import shlex
 import sqlite3
 import subprocess
@@ -16,6 +18,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+from document_chains import (
+    execution_trace,
+    seed_document_sources,
+    validate_document_chain,
+    validate_link_navigation,
+    validate_memory_recall,
+    validate_memory_write,
+)
 
 REPO = Path(__file__).resolve().parents[3]
 REPORT = REPO / "docs/design/20261017-agent框架设计/reviews/20261019-e2e-cases"
@@ -28,35 +39,93 @@ def render():
         json.loads(results_path.read_text()) if results_path.exists() else {"runs": []}
     )
     latest = {r["id"]: r for r in results["runs"]}
-    rows = []
+    rows, baseline_rows = [], []
     for case in matrix["cases"]:
         result = latest.get(case["id"], {})
-        detail = result.get("reason", "") or result.get(
-            "answer", result.get("postCompactAnswer", "")
+        evidence = {
+            key: result[key]
+            for key in (
+                "agentMechanismProof",
+                "toolTimeline",
+                "handoffProof",
+                "professionalReadbackProof",
+                "navigationProof",
+                "attachmentTransferProof",
+                "memoryWriteProof",
+                "memoryRecallProof",
+                "userPreferenceScopeProof",
+                "documentProof",
+            )
+            if key in result
+        }
+        proof = (
+            "<details><summary>查看执行证据</summary><pre>"
+            + html.escape(json.dumps(evidence, ensure_ascii=False, indent=2))
+            + "</pre></details>"
+            if evidence
+            else ""
         )
-        rows.append(
+        artifact = result.get("documentProof", {}).get("fileUrl")
+        delivery = (
+            '<p><a href="'
+            + html.escape(artifact, quote=True)
+            + '">打开实际产物</a></p>'
+            if artifact
+            else ""
+        )
+        reply = result.get("answer", result.get("postCompactAnswer", ""))
+        detail_html = html.escape(result.get("reason", ""))
+        if reply:
+            detail_html += (
+                "<details><summary>查看实际回复</summary><pre>"
+                + html.escape(reply)
+                + "</pre></details>"
+            )
+        target_rows = baseline_rows if case.get("baselineOnly") else rows
+        target_rows.append(
             "<tr>"
             + "".join(
-                "<td>" + html.escape(str(value)) + "</td>"
-                for value in (
-                    case["id"],
-                    case["category"],
-                    case["prompt"],
-                    case["expected"]
-                    + (
-                        " 前置：" + case["precondition"]
-                        if case.get("precondition")
-                        else ""
-                    ),
-                    result.get("status", "待测"),
-                    result.get("seconds", ""),
-                    detail,
+                "<td>"
+                + (
+                    "<details><summary>用户问题</summary><p>"
+                    + html.escape(str(value))
+                    + "</p></details>"
+                    if index == 2
+                    else html.escape(str(value))
+                )
+                + "</td>"
+                for index, value in enumerate(
+                    (
+                        case["id"],
+                        case["category"],
+                        case["prompt"],
+                        case["expected"]
+                        + (
+                            " 前置：" + case["precondition"]
+                            if case.get("precondition")
+                            else ""
+                        ),
+                        result.get("status", "待测"),
+                        result.get("seconds", ""),
+                    )
                 )
             )
-            + "</tr>"
+            + "<td>"
+            + detail_html
+            + delivery
+            + proof
+            + "</td></tr>"
         )
-    passed = sum(r.get("status") == "通过" for r in latest.values())
-    page = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami 对话验收 · 20261019</title><link rel="stylesheet" href="../../technical/tech.css"></head><body><div class="shell"><header class="top"><span class="brand">Roami / Dialogue Acceptance</span><nav class="topnav"><a href="../../technical/index.html">技术设计</a><a href="cases.json">用例数据</a><a href="results.json">完整结果</a></nav></header><main class="scroll"><div class="wrap"><header class="tt-pagehead"><div class="eyebrow">2026-10-19 · REAL MODEL EVALUATION</div><h1>问答与派活验收</h1><p>参考 GAIA 能力维度自编题，覆盖问答、网页、附件、派活、记忆、命令和错误恢复；不是官方 GAIA 成绩。</p></header><section><h2>执行口径</h2><p>隔离数据库、独立 tmux socket、测试项目。使用当前真实主模型和后台模型、真实 Roami CLI 与浏览器。已有会话是专用终端接收器，只验证可靠投递；新建 Codex / Claude 任务使用真实专业智能体。没有触碰用户生产会话。每轮保留结果，不覆盖失败历史。</p><p>答案匹配是自动初筛；来源、派活回执、错误和耗时另查。单个用例通过不代表整体体验达标。压缩入队与压缩成功分开；模型调用失败不算通过。依据：<a href="https://arxiv.org/abs/2311.12983">GAIA 官方论文</a>、<a href="https://huggingface.co/datasets/gaia-benchmark/GAIA">官方数据集</a>。</p><p>RESULT_COUNT</p></section><section><h2>逐项预期与实际结果</h2><div class="tablewrap"><table><thead><tr><th>编号</th><th>类别</th><th>用户问题</th><th>预期与验收</th><th>最新状态</th><th>秒</th><th>实际结果 / 失败原因</th></tr></thead><tbody>ROWS</tbody></table></div></section></div></main></div></body></html>"""
+    agent_ids = {case["id"] for case in matrix["cases"] if not case.get("baselineOnly")}
+    agent_tested = {key: value for key, value in latest.items() if key in agent_ids}
+    agent_passed = sum(value.get("status") == "通过" for value in agent_tested.values())
+    executions = {
+        (item["id"], item.get("conversationId", item.get("started")))
+        for item in results["runs"]
+        if not item.get("auditOnly") or item.get("recoveredFromDatabase")
+    }
+    rechecks = sum(bool(item.get("auditOnly")) for item in results["runs"])
+    page = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami 对话验收 · 20261019</title><link rel="stylesheet" href="../../technical/tech.css"></head><body><div class="shell"><header class="top"><span class="brand">Roami / Agent Acceptance</span><nav class="topnav"><a href="../../technical/index.html">技术设计</a><a href="cases.json">用例数据</a><a href="results.json">完整结果</a></nav></header><main class="scroll"><div class="wrap"><header class="tt-pagehead"><div class="eyebrow">2026-10-19 · AGENT WORKFLOW EVALUATION</div><h1>智能体执行链验收</h1><p>主验收关注工具执行、按需组合Skill、自动记忆和跨任务产物交付；常识问答仅作模型基线，不计入智能体通过率。</p></header><section><h2>执行口径</h2><p>隔离数据库、独立 tmux socket、测试项目。使用当前真实主模型和后台模型、真实 Roami CLI 与浏览器。已有会话是专用终端接收器，只验证可靠投递；新建 Codex / Claude 任务使用真实专业智能体。没有触碰用户生产会话。每轮保留结果，不覆盖失败历史。</p><p>主验收以工具回执、Skill版本和凭证、消息来源、记忆写入与召回清单、产物读回及实际下载为证据，答案文字匹配只作辅助。单个用例通过不代表整体体验达标。压缩入队与压缩成功分开；模型调用失败不算通过。依据：<a href="https://arxiv.org/abs/2311.12983">GAIA 官方论文</a>、<a href="https://huggingface.co/datasets/gaia-benchmark/GAIA">官方数据集</a>。</p><p>RESULT_COUNT</p></section><section><h2>逐项预期与实际结果</h2><div class="tablewrap"><table><thead><tr><th>编号</th><th>类别</th><th>用户问题</th><th>预期与验收</th><th>最新状态</th><th>秒</th><th>实际结果 / 失败原因</th></tr></thead><tbody>ROWS</tbody></table></div></section></div></main></div></body></html>"""
     findings = "".join(
         "<li><b>"
         + html.escape(item["status"] + "：" + item["title"])
@@ -65,20 +134,26 @@ def render():
         + "</p></li>"
         for item in results.get("findings", [])
     )
-    replay = """<section><h2>问题、修复与验收边界</h2><ul>FINDINGS</ul></section><section><h2>复跑方式</h2><p>先构建本仓库CLI并准备可连接的测试Chrome CDP。配置来自节点私有配置文件，不把Key写进用例或版本库。使用Python环境：uv run --project agent-runtime python。</p><pre>python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --cli backend/dist/roami-linux-amd64 --cdp http://127.0.0.1:9222
+    replay = """<section><h2>问题、修复与验收边界</h2><details><summary>展开问题与边界</summary><ul>FINDINGS</ul></details></section><section><h2>复跑方式</h2><details><summary>展开复跑命令</summary><p>先构建本仓库CLI并准备可连接的测试Chrome CDP。配置来自节点私有配置文件，不把Key写进用例或版本库。使用Python环境：uv run --project agent-runtime python。</p><pre>python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --cli backend/dist/roami-linux-amd64 --cdp http://127.0.0.1:9222 --document-skills
 python scripts/dev/agent-acceptance/run.py --state /tmp/agent-acceptance-state.json
 python scripts/dev/agent-acceptance/run.py --state /tmp/agent-acceptance-state.json --only G12,D03,C03
-python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --stop</pre><p>只停止该私有实例的进程组和独立tmux socket，保留数据库、日志和报告用于溯源。只选M02复跑时，先确保M01已经在该实例执行。</p></section>""".replace(
+python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --stop</pre><p>只停止该私有实例的进程组和独立tmux socket，保留数据库、日志和报告用于溯源。文档链路的两个外部Skill为隔离测试夹具，不安装到生产。每个实例生成独立凭证，用于证明实际读取及跨流程传递。只选M02复跑时，先确保M01已经在该实例执行；R08依赖同实例先执行R07。</p></details></section>""".replace(
         "FINDINGS", findings
     )
     page = page.replace(
         "<section><h2>逐项预期与实际结果</h2>",
         replay + "<section><h2>逐项预期与实际结果</h2>",
     )
+    baseline = (
+        '<section><details><summary>模型辅助基线（不计入智能体验收）</summary><div class="tablewrap"><table><thead><tr><th>编号</th><th>类别</th><th>问题</th><th>预期</th><th>状态</th><th>秒</th><th>结果</th></tr></thead><tbody>'
+        + "".join(baseline_rows)
+        + "</tbody></table></div></details></section>"
+    )
+    page = page.replace("</div></main>", baseline + "</div></main>")
     (REPORT / "index.html").write_text(
         page.replace(
             "RESULT_COUNT",
-            f"共 {len(matrix['cases'])} 项，已测 {len(latest)} 项，最新通过 {passed} 项。",
+            f"智能体主验收 {len(agent_ids)} 项，已测 {len(agent_tested)} 项，通过 {agent_passed} 项；模型辅助基线 {len(matrix['cases']) - len(agent_ids)} 项。完整用例 {len(matrix['cases'])} 项，协议与对话用例执行 {len(executions)} 轮，另存复核 {rechecks} 条；复核不算新执行。",
         ).replace("<tbody>ROWS</tbody>", "<tbody>" + "".join(rows) + "</tbody>")
     )
 
@@ -100,11 +175,10 @@ class Instance:
         )
         if self.env.get("ROAMI_HOME") != str(self.root):
             raise ValueError("Instance environment does not match the isolated root")
-        self.binary = "/tmp/roami-dispatch-e2e-bin"
         self.lock = threading.Lock()
         self.memory_cid = None
 
-    def request(self, path, data=None, raw=None):
+    def request(self, path, data=None, raw=None, read_bytes=False):
         jar = http.cookiejar.CookieJar()
         for c in json.loads((self.root / "browser-cookies.json").read_text()):
             jar.set_cookie(
@@ -146,7 +220,7 @@ class Instance:
             },
         )
         with opener.open(request, timeout=25) as response:
-            return json.load(response)["data"]
+            return response.read() if read_bytes else json.load(response)["data"]
 
     def db(self, sql, args=()):
         connection = sqlite3.connect(
@@ -217,13 +291,27 @@ class Instance:
             (self.root / "workspaces" / name).mkdir(exist_ok=True)
         pages = self.root / "web-fixture"
         pages.mkdir(exist_ok=True)
-        (pages / "index.html").write_text(
-            '<!doctype html><meta charset="utf-8"><h1>验收观测站</h1><p>旧会议安排：2026-10-20，A馆。</p><a href="data.html">观测数据</a><a href="correction.html">更正公告</a>'
+        link_file = self.root / "web-fixture-links.json"
+        self.link_paths = (
+            json.loads(link_file.read_text())
+            if link_file.exists()
+            else {
+                "G12": "observations-" + secrets.token_hex(6) + ".html",
+                "G13": "update-" + secrets.token_hex(6) + ".html",
+            }
         )
-        (pages / "data.html").write_text(
+        link_file.write_text(json.dumps(self.link_paths))
+        (pages / "index.html").write_text(
+            '<!doctype html><meta charset="utf-8"><h1>验收观测站</h1><p>旧会议安排：2026-10-20，A馆。</p><a href="'
+            + self.link_paths["G12"]
+            + '">观测数据</a><a href="'
+            + self.link_paths["G13"]
+            + '">更正公告</a>'
+        )
+        (pages / self.link_paths["G12"]).write_text(
             '<!doctype html><meta charset="utf-8"><h1>观测数据</h1><p>北站降水12毫米，南站降水24毫米。统计口径：两站算术平均。</p>'
         )
-        (pages / "correction.html").write_text(
+        (pages / self.link_paths["G13"]).write_text(
             '<!doctype html><meta charset="utf-8"><h1>更正公告</h1><p>最终会议日期为2026-10-22，地点B馆。此前安排作废。</p>'
         )
         handler = lambda *args, **kwargs: http.server.SimpleHTTPRequestHandler(
@@ -232,6 +320,7 @@ class Instance:
         self.web = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=self.web.serve_forever, daemon=True).start()
         self.fixture_url = "http://127.0.0.1:" + str(self.web.server_port)
+        seed_document_sources(self)
 
     def run(self, case):
         start = time.monotonic()
@@ -249,6 +338,8 @@ class Instance:
                 },
             )["id"]
             result["conversationId"] = cid
+            if case.get("document"):
+                (self.root / "workspaces" / case["id"]).mkdir(exist_ok=True)
             prompt = (
                 case["prompt"]
                 .replace("{workspace}", str(self.root / "workspaces"))
@@ -392,13 +483,20 @@ class Instance:
                         raise AssertionError("Post-compaction chat did not complete")
                 result["status"] = "通过"
                 return result
-            deadline = time.monotonic() + 240
+            deadline = time.monotonic() + (600 if case.get("document") else 240)
             first_partial = None
             while time.monotonic() < deadline:
                 snapshot = self.request("/api/agent/conversations/" + cid + "/messages")
                 tasks = self.request("/api/agent/tasks?conversationId=" + cid)
                 turns = snapshot["turns"]
-                active = any(t["state"] in ["queued", "running"] for t in turns)
+                active = any(
+                    t["state"] in ["queued", "running"] for t in turns
+                ) or bool(
+                    self.db(
+                        "SELECT id FROM turns WHERE conversation_id=? AND state IN ('queued','running') LIMIT 1",
+                        (cid,),
+                    )
+                )
                 task_active = any(
                     t["state"] in ["queued", "preparing", "running", "verifying"]
                     for t in tasks
@@ -415,7 +513,7 @@ class Instance:
                     break
                 time.sleep(0.4)
             else:
-                raise AssertionError("Dialogue exceeded 240 seconds")
+                raise AssertionError("Dialogue exceeded the case deadline")
             answer = "\n".join(assistant)
             calls = self.db(
                 "SELECT tc.tool_name,tc.state,tc.arguments_json FROM tool_calls tc JOIN turns t ON t.id=tc.turn_id WHERE t.conversation_id=? ORDER BY tc.created_ms",
@@ -558,14 +656,37 @@ class Instance:
                 memories = self.db(
                     "SELECT * FROM memory_records WHERE owner_id='local' AND state='active'"
                 )
-                assert any(marker in json.dumps(m) for m in memories), (
-                    "No active durable memory"
-                )
+                assert any(
+                    marker in json.dumps(m, ensure_ascii=False) for m in memories
+                ), "No active durable memory"
                 result["storedMemoryVerified"] = True
+                if case.get("memoryMechanism") or case.get("chain") == "memory":
+                    deadline = time.monotonic() + 90
+                    while time.monotonic() < deadline:
+                        preferences = self.db(
+                            "SELECT id,revision FROM memory_records WHERE owner_id='local' AND state='active' AND kind='preference' AND conversation_id IS NULL AND body LIKE ?",
+                            ("%" + marker + "%",),
+                        )
+                        if preferences:
+                            result["userPreferenceScopeProof"] = preferences
+                            break
+                        time.sleep(0.4)
+                    else:
+                        raise AssertionError(
+                            "Personal preference was not promoted for automatic cross-conversation recall"
+                        )
+            if check.get("memoryRecall"):
+                validate_memory_recall(self, cid, check["memoryRecall"], result)
             if check.get("discovery"):
                 assert "tool_search" in names or "skill_read" in names, (
                     "No actual capability discovery"
                 )
+            if check.get("followLinkedPage"):
+                validate_link_navigation(self, case, cid, result)
+            if case.get("memoryMechanism"):
+                validate_memory_write(self, cid, check["memory"], result)
+            if case.get("document"):
+                validate_document_chain(self, case, cid, answer, result)
             result["status"] = "通过"
         except (
             AssertionError,
@@ -577,8 +698,18 @@ class Instance:
         ) as exc:
             result["reason"] = str(exc)[:1200]
         finally:
+            if result.get("conversationId"):
+                result["toolTimeline"] = execution_trace(self, result["conversationId"])
+                result["failureEvents"] = self.db(
+                    "SELECT kind,payload_json FROM events WHERE conversation_id=? AND kind IN ('turn.failed','turn.interrupted') ORDER BY id",
+                    (result["conversationId"],),
+                )
             result["seconds"] = round(time.monotonic() - start, 2)
-            with self.lock:
+            with (
+                self.lock,
+                open("/tmp/roami-agent-acceptance-results.lock", "w") as shared_lock,
+            ):
+                fcntl.flock(shared_lock, fcntl.LOCK_EX)
                 path = REPORT / "results.json"
                 saved = json.loads(path.read_text()) if path.exists() else {"runs": []}
                 saved["runs"].append(result)
@@ -612,11 +743,11 @@ def main():
     if args.only:
         cases = [c for c in cases if c["id"] in args.only.split(",")]
     try:
-        independent = [c for c in cases if c["id"] not in ["M01", "M02"]]
+        independent = [c for c in cases if c["id"] not in ["M01", "M02", "R07", "R08"]]
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             list(pool.map(instance.run, independent))
         for case in cases:
-            if case["id"] in ["M01", "M02"]:
+            if case["id"] in ["M01", "M02", "R07", "R08"]:
                 instance.run(case)
     finally:
         instance.web.shutdown()

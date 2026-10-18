@@ -436,7 +436,7 @@ async def test_computer_is_disabled_by_default_and_missing_display_is_explicit(s
         await runtime.close()
 
 
-async def test_model_deadline_with_unconfirmed_input_is_interrupted_not_retryable_failure(store):
+async def test_task_deadline_with_unconfirmed_input_is_interrupted_not_retryable_failure(store):
     from test_runtime import until
 
     adapter = DelayedDesktop(False)
@@ -451,7 +451,6 @@ async def test_model_deadline_with_unconfirmed_input_is_interrupted_not_retryabl
         ),
     )
     runtime.desktop.factory = lambda: adapter
-    await runtime.start()
     try:
         conversation = await runtime.conversations.create("alice")
         task = await runtime.tasks.create(
@@ -461,6 +460,16 @@ async def test_model_deadline_with_unconfirmed_input_is_interrupted_not_retryabl
             key="deadline-input",
             record_intent=True,
         )
+        from roami_agent.protocol.identity import now_ms
+
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET budget_json=json_set(budget_json,'$.deadlineMs',?) WHERE id=?",
+                (now_ms() + 1000, task["id"]),
+            ),
+            write=True,
+        )
+        await runtime.start()
         runtime.wakeup.set()
         assert await asyncio.to_thread(adapter.started.wait, 2)
         await until(

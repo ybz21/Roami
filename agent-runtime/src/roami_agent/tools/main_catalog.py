@@ -159,6 +159,9 @@ def register_main_tools(registry, tasks, memory, targets):
         )
         return {
             "id": task["id"],
+            "taskId": task["id"],
+            "kind": "background_task",
+            "executor": args.get("executor", "native"),
             "state": task["state"],
             "acceptedOnly": True,
             "delivery": "pending" if task["state"] == "queued" else "unconfirmed",
@@ -236,7 +239,7 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "delegate",
-            "Delegate long work to a project or new executor. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return queue acceptance with delivery pending. Use fromMessageId only for a completed checkpoint Fork.",
+            "Delegate long work to a project or new executor. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return background_task queue acceptance with a taskId and delivery pending. A taskId or native branch ID is not a sessionId: never use it with target.kind=session or search for it as a tmux session. Continue native work in a new native target with its requested directory. Use fromMessageId only for a completed checkpoint Fork.",
             object_schema(
                 {
                     "goal": {"type": "string", "minLength": 1, "maxLength": 20000},
