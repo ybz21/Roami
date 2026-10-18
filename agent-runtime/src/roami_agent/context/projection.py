@@ -277,7 +277,7 @@ class Context:
 
         return await self.db.call(write, write=True)
 
-    async def run(self, job_id, *, safe_turn_id=None):
+    async def run(self, job_id, *, safe_turn_id=None, target_bytes=None):
         def prepare(db):
             job = row(
                 db,
@@ -317,6 +317,14 @@ class Context:
                 and not json.loads(m["content_json"]).get("tool_calls")
             ]
             cut = boundaries[-self.keep_rounds - 1] if len(boundaries) > self.keep_rounds else 0
+            if target_bytes is not None:
+                # Reserve half the available history space for its summary.
+                for candidate in boundaries:
+                    if candidate < cut:
+                        continue
+                    cut = candidate
+                    if len(encoded(model_messages(messages[cut:])).encode()) <= target_bytes // 2:
+                        break
             source = messages[:cut]
             if not source:
                 p["state"] = "skipped"
@@ -356,7 +364,15 @@ class Context:
         payload, branch, source, epoch = prepared
         try:
             prompt = [
-                {"role": "system", "content": SUMMARY_PROMPT},
+                {
+                    "role": "system",
+                    "content": SUMMARY_PROMPT
+                    + (
+                        f" Keep the UTF-8 summary under {max(1, target_bytes // 2)} bytes."
+                        if target_bytes is not None
+                        else ""
+                    ),
+                },
                 {
                     "role": "user",
                     "content": encoded(

@@ -27,7 +27,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
   const close = (action: () => void) => { setOpen(false); action() }
   const choose = async (name: string) => { if (await models.choose(name)) setOpen(false) }
   const row = (label: string, icon: ReactNode, action: () => void, value?: string, blocked = false) => <button type="button" className="agent-plus-row" role="menuitem" disabled={blocked} onClick={action}>{icon}<span>{label}</span>{value && <small>{value}</small>}</button>
-  return <Dropdown trigger={['click']} placement="topLeft" open={open} onOpenChange={value => { if (value) measure(); setOpen(value); if (value) { setPage(modelTrigger ? 'models' : 'tools'); setQuery(''); if (modelTrigger) void models.load() } }} dropdownRender={() => <div className="agent-plus-menu" style={{ '--agent-menu-available': availableHeight === undefined ? undefined : availableHeight + 'px' } as CSSProperties} role="menu" aria-label={t('agent.composer.more')}>
+  return <Dropdown trigger={['click']} placement={modelTrigger ? "topRight" : "topLeft"} align={{ overflow: { adjustX: true, adjustY: true, shiftX: true } }} open={open} onOpenChange={value => { if (value) measure(); setOpen(value); if (value) { setPage(modelTrigger ? 'models' : 'tools'); setQuery(''); if (modelTrigger) void models.load() } }} dropdownRender={() => <div className="agent-plus-menu" style={{ '--agent-menu-available': availableHeight === undefined ? undefined : availableHeight + 'px' } as CSSProperties} role="menu" aria-label={t('agent.composer.more')}>
     {page === 'tools' ? <>
       {row(t('agent.composer.addFiles'), <PaperclipIcon size={18} />, () => close(onFiles))}
       <div className="agent-menu-divider" />

@@ -111,7 +111,14 @@ class PromptBuilder:
                 )
             )
         try:
-            await self.context.run(job["id"], safe_turn_id=turn["id"])
+            overhead = len(encoded([prompt, catalog]).encode()) - len(
+                encoded(plan["messages"]).encode()
+            )
+            await self.context.run(
+                job["id"],
+                safe_turn_id=turn["id"],
+                target_bytes=max(0, self.settings.input_budget - overhead),
+            )
         except asyncio.CancelledError:
             await self.context.cancel(turn["owner_id"], turn["conversation_id"], job["id"])
             raise

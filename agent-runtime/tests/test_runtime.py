@@ -289,6 +289,61 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
         await runtime.close()
 
 
+async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_over_budget(store):
+    from test_context_provider import completed_conversation
+
+    from roami_agent.context.projection import Context
+    from roami_agent.server.configuration import Settings
+
+    class CompactingModel(ConversationModel):
+        async def stream(self, messages, tools):
+            if messages[0]["content"].startswith("Summarize"):
+                yield ModelEvent("text", "Confirmed goals and pending work preserved.")
+            else:
+                async for item in super().stream(messages, tools):
+                    yield item
+
+    c = await completed_conversation(store)
+
+    def enlarge_recent(db):
+        for item in db.execute(
+            "SELECT id FROM messages WHERE conversation_id=? AND role='assistant' ORDER BY rowid DESC LIMIT 3",
+            (c["id"],),
+        ).fetchall():
+            db.execute(
+                "UPDATE messages SET content_json=? WHERE id=?",
+                (json.dumps({"text": "recent long tool report " * 400}), item["id"]),
+            )
+
+    await store.call(enlarge_recent, write=True)
+    model = CompactingModel()
+    context = Context(store, model)
+    job = await context.request("alice", c["id"], "previous-fixed-cut")
+    await context.run(job["id"])
+    before = (await context.project("alice", c["id"]))["snapshotId"]
+    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 24000
+    runtime = Runtime(store, model, settings=Settings(input_budget=24000))
+    await runtime.start()
+    try:
+        receipt = await runtime.chat.submit(
+            "alice", c["id"], "after-fixed-cut", "Please fix this screenshot layout."
+        )
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (receipt["turnId"],)
+            ),
+        )
+        plan = await context.project("alice", c["id"])
+        assert plan["snapshotId"] != before
+        assert plan["estimatedTokens"] < 24000
+        messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
+        assert len(messages) == 14
+        assert messages[-1]["content"]["text"] == "Answer: Please fix this screenshot layout."
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("with_snapshot", [False, True])
 async def test_completion_evidence_stays_before_its_tool_round_after_context_rebuild(
     store, with_snapshot

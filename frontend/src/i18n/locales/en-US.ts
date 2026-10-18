@@ -2565,7 +2565,7 @@ const enUS = {
   'agent.searchMemory': 'Search memories',
   'agent.noMemories': 'No matching memories',
   'agent.forget': 'Forget',
-  'agent.contextUsage': 'Context upper estimate: {used} / {budget} tokens',
+  'agent.contextUsage': 'History estimate: {used} / {budget} UTF-8 bytes (instructions and tools also use this budget)',
   'agent.contextHint': 'Start a conversation to inspect context and compaction summaries',
   'agent.compactNow': 'Compact current context',
   'agent.cancelCompact': 'Cancel compaction',
