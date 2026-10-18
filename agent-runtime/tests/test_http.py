@@ -96,6 +96,9 @@ async def test_real_unix_http_stream_replays_persisted_events(store, tmp_path):
             timeout=5,
         ) as client:
             c = (await client.post("/v1/conversations", json={})).json()["data"]
+            async with client.stream("GET", f"/v1/conversations/{c['id']}/events") as idle:
+                assert "no-transform" in idle.headers["cache-control"]
+                assert await asyncio.wait_for(anext(idle.aiter_lines()), 1) == ": connected"
             sent = (
                 await client.post(
                     f"/v1/conversations/{c['id']}/messages",

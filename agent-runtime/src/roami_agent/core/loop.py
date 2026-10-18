@@ -72,15 +72,21 @@ class AgentLoop:
                     )
                     mid = await self.journal.start(turn)
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
+                    first_delta = True
                     async for part in model.stream(prompt, catalog):
                         if part.kind == "text":
                             text += part.value
                             buffer += part.value
                             if len(text) > 100_000:
                                 raise DomainError("MODEL_OUTPUT_LIMIT")
-                            if len(buffer.encode()) >= 1024 or self.clock() - flushed >= 0.1:
+                            if (
+                                first_delta
+                                or len(buffer.encode()) >= 1024
+                                or self.clock() - flushed >= 0.1
+                            ):
                                 await self.journal.delta(turn, mid, text, buffer)
                                 buffer, flushed = "", self.clock()
+                                first_delta = False
                         elif part.kind == "tool":
                             calls.append(part.value)
                         elif part.kind == "usage":

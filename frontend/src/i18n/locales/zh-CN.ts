@@ -2729,6 +2729,7 @@ const zhCN = {
   'agent.models.newEndpointKey': "更换服务地址时，请填写新服务的 API Key",
   'agent.models.httpsRequired': "模型服务请使用 HTTPS；本机调试地址可使用 HTTP",
   'agent.models.failed': "模型服务请求失败，请检查地址、密钥和模型名称",
+  'agent.models.selectCurrent': '切换模型（当前：{name}）',
   'agent.models.search': "搜索或输入模型名称",
   'agent.models.use': "使用 {name}",
   'agent.models.manual': "也可以直接输入服务商提供的模型名称。",

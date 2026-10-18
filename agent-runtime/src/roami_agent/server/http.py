@@ -279,6 +279,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         async def stream():
             nonlocal cursor
             idle = 0
+            yield ": connected\n\n"
             while not await request.is_disconnected():
                 batch = await runtime.conversations.events(owner, cid, cursor)
                 for item in batch:
@@ -296,7 +297,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         return StreamingResponse(
             stream(),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
         )
 
     @app.get("/v1/conversations/{cid}/context")

@@ -207,7 +207,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
           {item.state === 'uploading' ? <Spin size="small" /> : <>{item.state === 'failed' && <button type="button" aria-label={t('agent.retry')} disabled={sending} onClick={() => { void attachments.retry(item) }}><RefreshIcon size={15} /></button>}<button type="button" aria-label={t('agent.composer.removeFile', { name: item.name })} disabled={sending} onClick={() => { void attachments.remove(item).catch(() => message.error(t('agent.requestFailed'))) }}><CloseIcon size={15} /></button></>}
         </div>)}</div>}
         <form onSubmit={event => { event.preventDefault(); void submit() }}>
-          <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: 8 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
+          <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: phone ? 5 : 8 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
             onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
             onKeyDown={event => {
               if (event.nativeEvent.isComposing) return
@@ -222,12 +222,13 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
           <div className="tt-cbar agent-compose-bar">
             <div className="tt-cgrp">
               <AgentComposerPlus models={models} disabled={readOnly || sending} canCompact={!!cid && !readOnly && !compacting && !running} onFiles={() => fileInput.current?.click()} onCompact={() => { void submit('/compact', false) }} onCommands={() => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) }} />
-              <div className="agent-send-modes" role="group" aria-label={t('agent.composer.mode')}>
+              {phone ? <Dropdown trigger={['click']} menu={{ selectedKeys: [target === 'direct' ? 'direct' : 'task'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => setTarget(key === 'direct' ? 'direct' : 'loose') }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target === 'direct' ? 'agent.composer.chatMode' : 'agent.composer.taskMode')}<ChevronDown size={14} /></button></Dropdown> : <div className="agent-send-modes" role="group" aria-label={t('agent.composer.mode')}>
                 <button type="button" className={`tt-pill${target === 'direct' ? ' on' : ''}`} aria-pressed={target === 'direct'} disabled={readOnly || sending} onClick={() => setTarget('direct')}>{t('agent.composer.chatMode')}</button>
                 <button type="button" className={`tt-pill${target !== 'direct' ? ' on' : ''}`} aria-pressed={target !== 'direct'} disabled={readOnly || sending || !!attachments.items.length} onClick={() => setTarget('loose')}>{t('agent.composer.taskMode')}</button>
-              </div>
+              </div>}
             </div>
             <div className="tt-cend">
+              <AgentComposerPlus models={models} modelTrigger disabled={readOnly || sending} canCompact={!!cid && !readOnly && !compacting && !running} onFiles={() => fileInput.current?.click()} onCompact={() => { void submit('/compact', false) }} onCommands={() => { setCommandsDismissed(false); setCommandsOpen(value => !value) }} />
               {running && <button type="button" className={draft.trim() || attachments.items.length ? 'tt-pill ico' : 'tt-send agent-stop'} aria-label={t('agent.stop')} onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) }}><StopIcon size={16} /></button>}
               {(!running || !!draft.trim() || !!attachments.items.length) && <button type="submit" className="tt-send" aria-label={t('agent.send')} disabled={sending || attachments.blocked || (!draft.trim() && !attachments.ids.length) || readOnly || (target !== 'direct' && draft.trim().length > 20000)}>{sending ? <Spin size="small" /> : <ArrowUp size={20} />}</button>}
             </div>
@@ -238,7 +239,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
           <Dropdown trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'codex', label: 'Codex', icon: <AgentLogo kind="codex" /> }, { key: 'claude', label: 'Claude Code', icon: <AgentLogo kind="claude" /> }], onClick: ({ key }) => setExecutor(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor as 'codex' | 'claude'} />{executor === 'codex' ? 'Codex' : 'Claude Code'}<ChevronDown /></button></Dropdown>
         </div>}
       </div>
-      <div className="agent-compose-footnote" role="status">{compacting ? t('agent.compacting') : running ? t('agent.responding') : attachments.items.length ? t('agent.composer.attachmentMode') : models.settings?.main.model || ''}</div>
+      {(compacting || attachments.items.length > 0) && <div className="agent-compose-footnote" role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</div>}
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}

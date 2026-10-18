@@ -268,7 +268,7 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
                     yield item
 
     c = await completed_conversation(store)
-    runtime = Runtime(store, CompactingModel(), settings=Settings(input_budget=8000))
+    runtime = Runtime(store, CompactingModel(), settings=Settings(input_budget=10000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(

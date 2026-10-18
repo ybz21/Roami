@@ -449,7 +449,12 @@ async def serve(args):
             bound.listen(128)
             bound.setblocking(False)
             server = uvicorn.Server(
-                uvicorn.Config(create_app(runtime), uds=str(args.socket), log_level="info")
+                uvicorn.Config(
+                    create_app(runtime),
+                    uds=str(args.socket),
+                    log_level="info",
+                    timeout_graceful_shutdown=3,
+                )
             )
             await server.serve(sockets=[bound])
     finally:
