@@ -17,11 +17,11 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution send-message --file - (delivery receipt only)\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
-	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" {
+	if sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -62,6 +62,26 @@ func runAgentExecution(args []string) int {
 	}
 	var status agentexecution.Status
 	switch sub {
+	case "send-message":
+		if *file == "" {
+			return fail(fmt.Errorf("--file is required"))
+		}
+		content, e := agentInput(*file, "")
+		if e != nil {
+			return fail(e)
+		}
+		var spec agentexecution.MessageSpec
+		if e = json.Unmarshal(content, &spec); e != nil {
+			return fail(e)
+		}
+		receipt, e := service.SendMessage(spec)
+		if e != nil {
+			return fail(e)
+		}
+		if e = json.NewEncoder(os.Stdout).Encode(receipt); e != nil {
+			return fail(e)
+		}
+		return 0
 	case "hook-config":
 		config, err := agentexecution.HookConfiguration(exe, *executor)
 		if err != nil {

@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -118,6 +119,7 @@ class Conversations:
                     (selected,),
                 ),
                 "snapshotCursor": cursor,
+                "activities": conversation_activity(db, cid, result),
             }
 
         return await self.db.call(read)

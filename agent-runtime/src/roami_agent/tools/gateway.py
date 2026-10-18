@@ -19,6 +19,25 @@ class ToolGateway:
     def __init__(self, database, tools, wakeup):
         self.db, self.tools, self.wakeup = database, tools, wakeup
 
+    @staticmethod
+    def activity(db, turn, binding, kind, payload):
+        event(db, turn["conversation_id"], kind, payload, turn_id=turn["id"])
+        task_id, seen = binding.get("taskId"), {turn["conversation_id"]}
+        for _ in range(4):
+            task = row(db, "SELECT * FROM tasks WHERE id=?", (task_id,)) if task_id else None
+            if not task:
+                break
+            if task["origin_conversation_id"] not in seen:
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task.activity",
+                    {**payload, "taskId": binding["taskId"]},
+                    task_id=task["id"],
+                )
+                seen.add(task["origin_conversation_id"])
+            task_id = task["parent_task_id"]
+
     async def invoke(self, turn, mid, call, role, binding):
         try:
             tool, args = self.tools.validate(call, role)
@@ -46,12 +65,23 @@ class ToolGateway:
 
         await self.db.call(plan, write=True)
         try:
-            await self.db.call(
-                lambda db: db.execute(
-                    "UPDATE tool_calls SET state='running' WHERE id=?", (tool_id,)
-                ),
-                write=True,
-            )
+
+            def start(db):
+                db.execute("UPDATE tool_calls SET state='running' WHERE id=?", (tool_id,))
+                self.activity(
+                    db,
+                    turn,
+                    binding,
+                    "tool.started",
+                    {
+                        "toolCallId": tool_id,
+                        "toolName": call["function"]["name"],
+                        "state": "running",
+                    },
+                )
+
+            await self.db.call(start, write=True)
+            self.wakeup.set()
 
             progress_count, last_progress = 0, float("-inf")
 
@@ -189,12 +219,16 @@ class ToolGateway:
                 "UPDATE tool_calls SET state=?,result_message_id=?,updated_ms=? WHERE id=?",
                 (committed_state, result_id, now_ms(), tool_id),
             )
-            event(
+            self.activity(
                 db,
-                turn["conversation_id"],
+                turn,
+                binding,
                 "tool.completed",
-                {"toolCallId": tool_id, "state": committed_state},
-                turn_id=turn["id"],
+                {
+                    "toolCallId": tool_id,
+                    "toolName": call["function"]["name"],
+                    "state": committed_state,
+                },
             )
             return committed_state, committed_value
 

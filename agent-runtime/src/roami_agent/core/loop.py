@@ -48,7 +48,7 @@ class AgentLoop:
                     if role == "main"
                     else self.settings.worker_instructions
                 )
-                catalog = self.tools.catalog(role)
+                catalog = [] if completion else self.tools.catalog(role)
                 plan, prompt = await self.context.build(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 for step in range(self.settings.max_steps):
@@ -131,7 +131,7 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
-                    catalog = self.tools.catalog(role)
+                    catalog = [] if completion else self.tools.catalog(role)
                     plan, prompt = await self.context.build(turn, instructions, catalog, completion)
                 raise DomainError("AGENT_STEP_LIMIT")
         except BaseException as exc:
@@ -146,7 +146,7 @@ class AgentLoop:
                 if state == "interrupted"
                 else "MODEL_ERROR"
             )
-            await self.journal.fail(turn, state, code)
+            await self.journal.fail(turn, state, code, completion=completion)
             raise
         finally:
             self.turn_tasks.pop(tid, None)

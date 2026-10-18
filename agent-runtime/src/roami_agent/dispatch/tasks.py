@@ -63,6 +63,11 @@ class Tasks:
         target = target or {"kind": "new_session"}
         if target.get("kind") not in {"project", "session", "new_session", "new_project"}:
             raise DomainError("INVALID_TASK_TARGET")
+        if executor in {"codex", "claude"} and target.get("kind") == "session":
+            if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
+                raise DomainError("CODING_SESSION_ID_REQUIRED")
+            if any(target.get(k) for k in ["directory", "workspaceId", "base", "remote"]):
+                raise DomainError("CODING_SESSION_TARGET_CONFLICT")
         spec = {
             "goal": goal,
             "target": target,

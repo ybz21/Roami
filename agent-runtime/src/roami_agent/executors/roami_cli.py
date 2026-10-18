@@ -83,10 +83,7 @@ class CodingExecutor:
         if target["kind"] == "session":
             if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
-            if any(
-                target.get(key)
-                for key in ["directory", "projectId", "workspaceId", "base", "remote"]
-            ):
+            if any(target.get(key) for key in ["directory", "workspaceId", "base", "remote"]):
                 raise DomainError("CODING_SESSION_TARGET_CONFLICT")
             launch["sessionId"] = target["sessionId"]
         elif target["kind"] == "project":

@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-18",
+  "mainModel": "deepseek-4.1-flash",
+  "realExecutors": [
+    "Codex",
+    "Claude Code"
+  ],
+  "total": 12,
+  "passed": 12,
+  "positive": 7,
+  "negative": 5,
+  "cases": [
+    {
+      "id": "new-codex-session",
+      "name": "新建 Codex 散会话",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 28966,
+      "evidence": "真实执行器报告包含随机编号；Main 收到结果，状态待核验。"
+    },
+    {
+      "id": "append-codex",
+      "name": "已有 Codex 会话追加消息",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 4456,
+      "evidence": "CLI 提交回执与 Codex 自身助手记录中的随机确认编号一致。"
+    },
+    {
+      "id": "append-claude",
+      "name": "已有 Claude Code 会话追加消息",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 5145,
+      "evidence": "CLI 提交回执与 Claude Code 自身助手记录中的随机确认编号一致。"
+    },
+    {
+      "id": "new-claude-session",
+      "name": "新建 Claude Code 散会话",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 10129,
+      "evidence": "真实执行器报告包含随机编号；Main 收到结果，状态待核验。"
+    },
+    {
+      "id": "git-project-without-remote",
+      "name": "Git 项目没有远程来源",
+      "kind": "negative",
+      "passed": true,
+      "elapsedMs": 13412,
+      "evidence": "REMOTE_REQUIRED；未创建会话或发送输入。配置本地 origin 后正向通过。"
+    },
+    {
+      "id": "new-project-and-task",
+      "name": "新建项目并派活",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 31145,
+      "evidence": "新项目登记、目录绑定与真实 Codex 执行报告相互对应。"
+    },
+    {
+      "id": "missing-session",
+      "name": "目标会话不存在",
+      "kind": "negative",
+      "passed": true,
+      "elapsedMs": 2845,
+      "evidence": "不向其他会话发送，也不擅自新建替代会话。"
+    },
+    {
+      "id": "existing-project-with-origin",
+      "name": "已有项目新建任务与工作区",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 31625,
+      "evidence": "基于 origin/main 创建独立 worktree；真实 Codex 结果回传，待核验。"
+    },
+    {
+      "id": "duplicate-session-label",
+      "name": "两个会话展示名相同",
+      "kind": "negative",
+      "passed": true,
+      "elapsedMs": 4385,
+      "evidence": "不猜测目标；要求用户确认。"
+    },
+    {
+      "id": "legacy-tracked-task-refused",
+      "name": "旧会话要求跟踪完成",
+      "kind": "negative",
+      "passed": true,
+      "elapsedMs": 9261,
+      "evidence": "SESSION_LIFECYCLE_UNAVAILABLE；页面显示未送达，普通追加消息仍可用。"
+    },
+    {
+      "id": "partial-send-unknown",
+      "name": "部分发送结果未知",
+      "kind": "negative",
+      "passed": true,
+      "elapsedMs": 3590,
+      "evidence": "发送途中故障后保留 unknown；相同键再查，paste 次数仍为 1。"
+    },
+    {
+      "id": "android-ui-live-send",
+      "name": "Android 输入框发送与实时链路",
+      "kind": "positive",
+      "passed": true,
+      "elapsedMs": 7911,
+      "evidence": "真机点击发送；通过 SSE 观察运行→提交，目标 Codex 记录也确认收到。"
+    }
+  ],
+  "limits": [
+    "发送提交不等于执行完成",
+    "旧会话的完整任务跟踪需要生命周期回调",
+    "异常用例通过表示正确拒绝或保留未知状态"
+  ]
+}

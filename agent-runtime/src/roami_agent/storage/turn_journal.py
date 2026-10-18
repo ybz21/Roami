@@ -1,5 +1,6 @@
 """Transactional assistant messages, streaming deltas and turn outcomes."""
 
+from roami_agent.protocol.errors import public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
@@ -139,7 +140,7 @@ class TurnJournal:
 
         await self.db.call(write, write=True)
 
-    async def fail(self, turn, state, code):
+    async def fail(self, turn, state, code, *, completion=None):
         def write(db):
             db.execute(
                 "UPDATE turns SET state=?,finished_ms=? WHERE id=? AND state='running'",
@@ -155,6 +156,58 @@ class TurnJournal:
                 "turn." + state,
                 {"turnId": turn["id"], "error": code},
                 turn_id=turn["id"],
+            )
+            if not completion or state == "interrupted":
+                return
+            task = row(
+                db,
+                "SELECT * FROM tasks WHERE id=? AND owner_id=?",
+                (completion.get("taskId"), turn["owner_id"]),
+            )
+            if (
+                not task
+                or task["revision"] != completion.get("taskRevision", 1)
+                or task["state"] != completion.get("state")
+                or task["origin_branch_id"] != turn["branch_id"]
+                or row(
+                    db,
+                    "SELECT 1 FROM context_omissions WHERE owner_id=? AND message_id=?",
+                    (turn["owner_id"], task["origin_message_id"]),
+                )
+                or row(
+                    db,
+                    "SELECT 1 FROM events WHERE event_key=?",
+                    ("completion.fallback:" + turn["id"],),
+                )
+            ):
+                return
+            fact = {
+                "taskId": task["id"],
+                "state": task["state"],
+                "reportError": public_error_code(code),
+                "errorCode": public_error_code(completion.get("result", {}).get("summary")),
+            }
+            mid = message(
+                db,
+                turn["conversation_id"],
+                turn["branch_id"],
+                "assistant",
+                {"source": "task", "taskStatus": fact},
+                turn_id=turn["id"],
+            )
+            event(
+                db,
+                turn["conversation_id"],
+                "message.completed",
+                {
+                    "messageId": mid,
+                    "source": "task",
+                    "taskId": task["id"],
+                    "taskRevision": task["revision"],
+                    "taskState": task["state"],
+                },
+                key="completion.fallback:" + turn["id"],
+                message_id=mid,
             )
 
         await self.db.call(write, write=True)

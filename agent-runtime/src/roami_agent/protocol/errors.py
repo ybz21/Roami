@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 
 class DomainError(Exception):
@@ -11,3 +12,9 @@ class ToolCancellation(asyncio.CancelledError):
     def __init__(self, *, input_stopped):
         super().__init__()
         self.input_stopped = input_stopped is True
+
+
+def public_error_code(value):
+    return (
+        value if isinstance(value, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,100}", value) else None
+    )

@@ -5,6 +5,32 @@ from roami_agent.protocol.tools import Tool, object_schema
 
 
 def register_main_tools(registry, tasks, memory, targets):
+    async def send_message(args, binding):
+        return await targets.send(
+            args["sessionId"], args["text"], binding["turnId"] + ":" + binding["toolCallId"]
+        )
+
+    registry.add(
+        Tool(
+            "session_send",
+            "Append the user's message or work instructions to one exact existing live session. "
+            "Works with legacy Codex/Claude sessions without lifecycle callbacks. Returns delivery only, "
+            "NOT task completion; executionTracked=false means results must be checked separately. "
+            "Use when the user explicitly asks to message or continue an existing session. Never guess a target. "
+            "For a new session/project or tracked task use delegate instead. Do not retry unknown outcomes.",
+            object_schema(
+                {
+                    "sessionId": {"type": "string", "minLength": 1, "maxLength": 300},
+                    "text": {"type": "string", "minLength": 1, "maxLength": 100000},
+                },
+                ["sessionId", "text"],
+            ),
+            send_message,
+            main=True,
+            effect="write",
+        )
+    )
+
     async def overview(args, binding):
         return await targets.overview()
 
@@ -34,7 +60,7 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "target_search",
-            "Find projects or live sessions by literal name/ID, with bounded pages. Use only when routing needs it. Never guess among duplicate names. Continuing a session requires lifecycle callbacks.",
+            "Find projects or live sessions by literal name/ID, with bounded pages. Use one exact unique match directly; never guess among duplicate names. session_send appends to legacy sessions; tracked task continuation requires lifecycle callbacks.",
             object_schema(
                 {
                     "kind": {"type": "string", "enum": ["project", "session"]},
@@ -178,7 +204,7 @@ def register_main_tools(registry, tasks, memory, targets):
                             },
                             ["kind"],
                         ),
-                        "description": "Use kind=session with the exact sessionId for an existing Codex/Claude session. kind=project + projectId prepares a worktree; workspaceId reuses it without base/remote/directory overrides. kind=new_project + name (+ absolute baseDir) creates a separate project. kind=new_session starts loose work. Reuse preserves local work.",
+                        "description": "For an existing session use ONLY kind=session and exact sessionId (plus nodeId/label). Never add directory/workspaceId/base/remote. A projectId is descriptive context only and cannot override the exact session. kind=project + projectId prepares a worktree; workspaceId reuses it without base/remote/directory overrides. kind=new_project + name (+ absolute baseDir) creates a separate project. kind=new_session starts loose work. Reuse preserves local work.",
                     },
                     "fromMessageId": {"type": "string"},
                 },

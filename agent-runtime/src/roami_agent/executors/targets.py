@@ -11,6 +11,42 @@ class TargetDirectory:
     def __init__(self, settings):
         self.settings = settings
 
+    async def send(self, session_id, text, key):
+        try:
+            response = await execute(
+                [self.settings.cli_bin, "agent", "execution", "send-message", "--file", "-"],
+                timeout=15,
+                excluded_env=self.settings.provider_key_environments(),
+                input_data=encoded({"key": key, "sessionId": session_id, "text": text}).encode(),
+            )
+        except (TimeoutError, OSError) as exc:
+            raise DomainError("TOOL_OUTCOME_UNKNOWN") from exc
+        if response["exitCode"]:
+            code = response.get("stderr", "").strip()
+            raise DomainError(
+                code
+                if code
+                in {
+                    "SESSION_TARGET_AMBIGUOUS",
+                    "SESSION_TARGET_NOT_FOUND",
+                    "SESSION_PANE_AMBIGUOUS",
+                    "MESSAGE_KEY_CONFLICT",
+                    "INVALID_SESSION_MESSAGE",
+                }
+                else "TOOL_OUTCOME_UNKNOWN"
+            )
+        try:
+            receipt = json.loads(response["stdout"])
+            if receipt["state"] != "delivered" or receipt["outcomeKnown"] is not True:
+                raise DomainError("TOOL_OUTCOME_UNKNOWN")
+            return {
+                "sessionId": receipt["session"],
+                "state": "delivered",
+                "executionTracked": False,
+            }
+        except (ValueError, TypeError, KeyError) as exc:
+            raise DomainError("TOOL_OUTCOME_UNKNOWN") from exc
+
     async def _query(self, *args):
         try:
             response = await execute(

@@ -28,3 +28,11 @@ describe('durable Agent events', () => {
     expect(projected.view.snapshotCursor).toBe(9)
   })
 })
+
+it('stops the running indicator immediately when a turn fails', () => {
+  const view = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'm', turnId: 't' } }).view
+  const failed = projectAgentEvent(view, { id: 3, kind: 'turn.failed', payload: { turnId: 't', error: 'CONTEXT_TOO_LARGE' } })
+  expect(failed.reload).toBe(true)
+  expect(failed.view.turns[0].state).toBe('failed')
+  expect(failed.view.messages[0].status).toBe('failed')
+})

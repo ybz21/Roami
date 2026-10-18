@@ -251,7 +251,7 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
         "Continue",
         key="session",
         executor=provider,
-        target={"kind": "session", "sessionId": "stable-session"},
+        target={"kind": "session", "sessionId": "stable-session", "projectId": "context-only"},
         record_intent=True,
     )
     run = await store.call(
