@@ -31,6 +31,7 @@ class PromptManifests:
                             "catalogHash": hashlib.sha256(encoded(catalog).encode()).hexdigest(),
                             "modelSettingsHash": plan.get("modelSettingsHash"),
                             "imageEvidence": plan.get("imageEvidence", []),
+                            "attachmentEvidence": plan.get("attachmentEvidence", []),
                             "imageError": plan.get("imageError"),
                             "taskEvidence": plan.get("taskEvidence"),
                         }

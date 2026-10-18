@@ -32,6 +32,16 @@ def assert_context_admitted(db, turn):
 
     if row(
         db,
+        "SELECT 1 FROM prompt_manifests p JOIN json_each(p.parts_json,'$.attachmentEvidence') attachment "
+        "LEFT JOIN artifacts a ON a.id=json_extract(attachment.value,'$.artifactId') "
+        "WHERE p.turn_id=? AND (a.id IS NULL OR a.deleted_ms IS NOT NULL OR a.owner_id!=? "
+        "OR EXISTS(SELECT 1 FROM memory_tombstones t WHERE t.owner_id=? AND t.source_fingerprint=a.sha256)) LIMIT 1",
+        (turn["id"], turn["owner_id"], turn["owner_id"]),
+    ):
+        raise DomainError("CONTEXT_SOURCE_FORGOTTEN", 409)
+
+    if row(
+        db,
         "SELECT 1 FROM prompt_manifests p LEFT JOIN tasks t ON t.id=json_extract(p.parts_json,'$.taskEvidence.taskId') "
         "WHERE p.turn_id=? AND json_type(p.parts_json,'$.taskEvidence')='object' "
         "AND (t.id IS NULL OR t.owner_id!=? OR t.revision!=json_extract(p.parts_json,'$.taskEvidence.revision') "

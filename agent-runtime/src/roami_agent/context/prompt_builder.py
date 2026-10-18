@@ -9,11 +9,14 @@ from roami_agent.storage.database import row
 
 
 class PromptBuilder:
-    def __init__(self, database, context, settings, *, vision=None):
+    def __init__(self, database, context, settings, *, vision=None, chat_images=None):
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
+        self.chat_images = chat_images
 
     async def _images(self, turn, plan, prompt):
+        if self.chat_images:
+            plan, prompt = await self.chat_images.attach(turn, plan, prompt)
         if self.vision:
             return await self.vision.attach(turn, plan, prompt)
         return plan, prompt

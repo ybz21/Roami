@@ -1,0 +1,13 @@
+.agent-settings-form { display:flex; flex-direction:column; gap:var(--sp-5); max-width:calc(var(--sp-5) * 28); width:100%; }
+.agent-settings-form fieldset { display:flex; flex-direction:column; gap:var(--sp-2); margin:0; padding:0 0 var(--sp-5); border:0; border-bottom:1px solid var(--border-subtle); min-width:0; }
+.agent-settings-form legend { color:var(--text-bright); font-size:var(--fs-body); font-weight:600; margin-bottom:var(--sp-2); }
+.agent-settings-form label { color:var(--text-bright); font-size:var(--fs-sm); margin-top:var(--sp-3); }
+.agent-settings-hint { margin:0; color:var(--text-dim); font-size:var(--fs-meta); line-height:1.6; }
+.agent-settings-model { display:flex; align-items:center; gap:var(--sp-2); min-width:0; }
+.agent-settings-model .ant-select { flex:1; min-width:0; }
+.agent-settings-switch { display:flex; align-items:center; justify-content:space-between; min-height:var(--tap); gap:var(--sp-3); }
+.agent-settings-save { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); }
+.agent-settings-save span { color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-settings-error { color:var(--danger); font-size:var(--fs-sm); }
+html[data-pointer="coarse"] .agent-settings-form .ant-input,html[data-pointer="coarse"] .agent-settings-form .ant-input-affix-wrapper,html[data-pointer="coarse"] .agent-settings-form .ant-btn { min-height:var(--tap); }
+html[data-pointer="coarse"] .agent-settings-form .ant-input-affix-wrapper input { min-height:0; }

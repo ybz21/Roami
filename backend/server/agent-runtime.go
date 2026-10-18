@@ -30,6 +30,9 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 	}
 	for _, route := range []struct{ method, path string }{
 		{"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
+		{"POST", "/agent/attachments"},
+		{"DELETE", "/agent/attachments/:attachment"},
+		{"GET", "/agent/model-settings"}, {"PUT", "/agent/model-settings"}, {"GET", "/agent/models"}, {"POST", "/agent/models"},
 		{"GET", "/agent/conversations/:cid/messages"}, {"POST", "/agent/conversations/:cid/messages"},
 		{"GET", "/agent/conversations/:cid/events"}, {"POST", "/agent/conversations/:cid/fork"},
 		{"GET", "/agent/conversations/:cid/context"}, {"GET", "/agent/conversations/:cid/context/snapshots/:snapshot"},

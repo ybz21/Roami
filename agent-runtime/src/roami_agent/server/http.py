@@ -6,8 +6,10 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
+from roami_agent.conversation.attachments import MAX_UPLOAD_BYTES
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import (
@@ -47,6 +49,58 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):
         return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_payload(request, exc):
+        return JSONResponse({"error": {"code": "INVALID_REQUEST"}}, status_code=422)
+
+    @app.get("/v1/model-settings")
+    async def model_settings(owner: Owner):
+        return {"data": runtime.model_settings.view(owner)}
+
+    @app.put("/v1/model-settings")
+    async def save_model_settings(request: Request, owner: Owner):
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 32_000:
+                raise DomainError("INVALID_MODEL_CONFIG", 413)
+        try:
+            patch = json.loads(body)
+        except ValueError:
+            raise DomainError("INVALID_MODEL_CONFIG") from None
+        return {"data": await runtime.model_settings.save(owner, patch)}
+
+    @app.get("/v1/models")
+    async def models(owner: Owner, role: Literal["main", "worker"] = "main"):
+        return {"data": await runtime.model_settings.models(owner, role)}
+
+    @app.post("/v1/models")
+    async def probe_models(request: Request, owner: Owner):
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 32_000:
+                raise DomainError("INVALID_MODEL_CONFIG", 413)
+        try:
+            patch = json.loads(body)
+        except ValueError:
+            raise DomainError("INVALID_MODEL_CONFIG") from None
+        if (
+            not isinstance(patch, dict)
+            or set(patch) - {"role", "configuration"}
+            or patch.get("role") not in {"main", "worker"}
+            or (
+                patch.get("configuration") is not None
+                and not isinstance(patch["configuration"], dict)
+            )
+        ):
+            raise DomainError("INVALID_MODEL_CONFIG")
+        return {
+            "data": await runtime.model_settings.models(
+                owner, patch["role"], patch.get("configuration")
+            )
+        }
 
     @app.get("/v1/notification-deliveries")
     async def notification_deliveries(owner: Owner):
@@ -119,6 +173,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "configured": bool(runtime.model.model),
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "commands": COMMANDS,
+                "images": runtime.settings.route("main").capabilities.get("images") is True,
                 "writerBacklog": runtime.db.pending,
             }
         }
@@ -139,6 +194,24 @@ def create_app(runtime, *, manage_lifecycle=True):
                 owner, task_id=taskId, message_id=messageId, limit=limit
             )
         }
+
+    @app.post("/v1/attachments", status_code=201)
+    async def upload_attachment(
+        request: Request,
+        owner: Owner,
+        filename: str = Query(min_length=1, max_length=180),
+        requestKey: str = Query(min_length=1, max_length=200),
+    ):
+        body = bytearray()
+        async for chunk in request.stream():
+            if len(body) + len(chunk) > min(MAX_UPLOAD_BYTES, runtime.artifacts.max_bytes):
+                raise DomainError("ATTACHMENT_SIZE_LIMIT", 413)
+            body.extend(chunk)
+        return {"data": await runtime.attachments.upload(owner, filename, requestKey, bytes(body))}
+
+    @app.delete("/v1/attachments/{aid}")
+    async def remove_attachment(aid: str, owner: Owner):
+        return {"data": await runtime.attachments.remove_draft(owner, aid)}
 
     @app.get("/v1/artifacts/{artifact_id}")
     async def artifact(artifact_id: str, owner: Owner):
@@ -177,7 +250,11 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/conversations/{cid}/messages", status_code=202)
     async def send(cid: str, body: SendMessage, owner: Owner):
-        return {"data": await runtime.chat.submit(owner, cid, body.requestKey, body.text)}
+        return {
+            "data": await runtime.chat.submit(
+                owner, cid, body.requestKey, body.text, body.attachmentIds
+            )
+        }
 
     @app.post("/v1/conversations/{cid}/fork")
     async def fork(cid: str, body: Fork, owner: Owner):

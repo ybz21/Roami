@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { App, Button, Input, Modal, Select, Spin } from 'antd'
+import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
-import { ArrowUp, BellIcon, ChecklistIcon, ClockIcon, NotebookIcon, PlusIcon, RefreshIcon, StopIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PencilIcon, RefreshIcon, StopIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
@@ -14,6 +14,10 @@ import { useAgentMessageFocus } from './useAgentMessageFocus'
 import { useVisibleAgentReads } from './useVisibleAgentReads'
 import type { AgentInboxState } from './useAgentInbox'
 import type { AgentMessage } from './agent-protocol'
+import AgentComposerPlus from './AgentComposerPlus'
+import AgentMessageView from './AgentMessageView'
+import { useAgentAttachments } from './useAgentAttachments'
+import { useAgentModels } from './useAgentModels'
 import './agent-chat.css'
 
 export function agentFailure(error: any, t: (key: string) => string) {
@@ -37,20 +41,26 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   const [source, setSource] = useState<AgentMessage | null>(null)
   const [memoryTitle, setMemoryTitle] = useState(''), [memoryBody, setMemoryBody] = useState('')
   const [error, setError] = useState('')
+  const [commandsDismissed, setCommandsDismissed] = useState(false)
+  const [commandsOpen, setCommandsOpen] = useState(false), [commandIndex, setCommandIndex] = useState(0)
+  const [jumpLatest, setJumpLatest] = useState(false), [dragging, setDragging] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const models = useAgentModels(node)
   const scroll = useRef<HTMLDivElement>(null), stick = useRef(true), sendingRef = useRef(false)
   const activeCID = useRef(cid); activeCID.current = cid
   const panelRequest = useRef(0)
-  const pending = useRef<{ text: string; target: string; executor: string; cid: string; key: string } | null>(null)
+  const pending = useRef<{ text: string; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
   const [creationVersion, setCreationVersion] = useState(0)
   const createKey = useMemo(newKey, [cid, node, creationVersion])
   const mirror = `roami.agent.last.${node || 'local'}`
   const draftKey = `roami.agent.draft.${node || 'local'}.${cid || 'new'}`
   const [draft, setDraft] = useAgentDraft(draftKey)
+  const attachments = useAgentAttachments(draftKey)
   const readOnly = !!thread.view && thread.view.branchId !== thread.view.conversation.active_branch_id
   const running = thread.view?.turns.some((item) => item.state === 'running' || item.state === 'queued') || false
   const compact = thread.view?.compaction
   const compacting = compact?.state === 'queued' || compact?.state === 'running' || compact?.state === 'started'
-  const visible = (thread.view?.messages || []).filter((m) => (m.role === 'user' || m.role === 'assistant') && (m.content.text || m.status === 'streaming'))
+  const visible = (thread.view?.messages || []).filter((m) => (m.role === 'user' || m.role === 'assistant') && (m.content.text || m.content.attachments?.length || m.status === 'streaming'))
   const eventIds = visible.map((m) => m.completedEventId || '').join(',')
   useVisibleAgentReads(!panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
@@ -74,7 +84,14 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
   const ensureConversation = async () => {
     if (cid) return cid
     const { data } = await api('POST', '/agent/conversations', { requestKey: createKey })
-    if (activeCID.current === cid) select(data.id)
+    if (activeCID.current === cid) {
+      const destination = `roami.agent.draft.${node || 'local'}.${data.id}`
+      attachments.transfer(destination)
+      setDraft(draft, destination)
+      try { localStorage.setItem(destination, draft); localStorage.removeItem(draftKey) } catch {}
+      if (pending.current?.scope === draftKey) pending.current.scope = destination
+      select(data.id)
+    }
     inbox.refresh(); return data.id as string
   }
   const loadPanel = useCallback(async () => {
@@ -95,11 +112,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
     const interval = panel === 'context' ? setInterval(() => { void loadPanel() }, 3000) : undefined
     return () => { stop = true; panelRequest.current++; clearTimeout(timer); clearInterval(interval) }
   }, [loadPanel, panel])
-  const submit = async (text = draft) => {
+  const submit = async (text = draft, consumeDraft = true) => {
+    const attachmentIds = consumeDraft ? attachments.ids : []
     const value = text.trim()
-    if (!value || sendingRef.current || readOnly || (target !== 'direct' && !value.startsWith('/') && value.length > 20000)) return
+    if ((!value && !attachmentIds.length) || (consumeDraft && attachments.blocked) || sendingRef.current || readOnly || (target !== 'direct' && !value.startsWith('/') && value.length > 20000)) return
     sendingRef.current = true; setSending(true); setError('')
-    if (!pending.current || pending.current.text !== value || pending.current.target !== target || pending.current.executor !== executor || (cid && pending.current.cid !== cid)) pending.current = { text: value, target, executor, cid, key: newKey() }
+    if (!pending.current || pending.current.text !== value || pending.current.target !== target || pending.current.executor !== executor || JSON.stringify(pending.current.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && pending.current.cid !== cid)) pending.current = { text: value, target, executor, cid, key: newKey(), attachmentIds, scope: draftKey }
     const request = pending.current
     try {
       const origin = await ensureConversation()
@@ -110,7 +128,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
           target: target === 'loose' ? { kind: 'new_session' } : { kind: 'project', projectId: target.slice(8) } })
         if (current()) { setTarget('direct'); setPanel('tasks') }
       } else {
-        const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: value })
+        const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: value, attachmentIds: request.attachmentIds })
+        if (request.attachmentIds.length) attachments.clear(request.scope)
         if (!current()) { inbox.refresh(); return }
         if (data.kind === 'ui_action') setPanel(data.action === 'tasks' ? 'tasks' : 'memory')
         else if (data.kind === 'commands') setPanel('context')
@@ -119,13 +138,13 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
       }
       if (!current()) { inbox.refresh(); return }
       if (pending.current === request) pending.current = null
-      changeDraft(''); thread.refresh(); inbox.refresh(); stick.current = true
-      try { localStorage.removeItem(`roami.agent.draft.${node || 'local'}.new`) } catch {}
+      if (consumeDraft) { setDraft('', request.scope); try { localStorage.removeItem(request.scope) } catch {} }; setCommandsOpen(false); thread.refresh(); inbox.refresh(); stick.current = true
+      if (consumeDraft) { try { localStorage.removeItem(`roami.agent.draft.${node || 'local'}.new`) } catch {} }
     } catch (reason) {
       const owner = request.cid || cid
       if (activeCID.current === owner || (!activeCID.current && !cid)) {
-        setDraft(value, `roami.agent.draft.${node || 'local'}.${owner || 'new'}`); setError(agentFailure(reason, t))
-        try { localStorage.setItem(`roami.agent.draft.${node || 'local'}.${owner || 'new'}`, value) } catch {}
+        if (consumeDraft) setDraft(value, `roami.agent.draft.${node || 'local'}.${owner || 'new'}`); setError(agentFailure(reason, t))
+        if (consumeDraft) { try { localStorage.setItem(`roami.agent.draft.${node || 'local'}.${owner || 'new'}`, value) } catch {} }
       }
     }
     finally { sendingRef.current = false; setSending(false) }
@@ -138,48 +157,91 @@ export default function AgentChat({ cid, branch, focusMessage = '', fresh, node,
     if (!source) return
     try { await api('POST', '/agent/memories', { title: memoryTitle, body: memoryBody, sourceMessageId: source.id, conversationId: cid }); setSource(null); message.success(t('agent.memorySaved')); void loadPanel() } catch (reason) { message.error(agentFailure(reason, t)) }
   }
-  const slash = draft.startsWith('/') && !draft.includes(' ') && !draft.includes('\n')
-    ? ['compact', 'status', 'tasks', 'memory', 'stop', 'help'].filter((name) => ('/' + name).startsWith(draft)) : []
+  const slash = !commandsDismissed && (commandsOpen || (draft.startsWith('/') && !draft.includes(' ') && !draft.includes('\n')))
+    ? ['compact', 'status', 'tasks', 'memory', 'stop', 'help'].filter(name => commandsOpen || ('/' + name).startsWith(draft)) : []
+  const addFiles = async (files: File[]) => {
+    if (sending || readOnly || !files.length) return
+    setTarget('direct')
+    if (!await attachments.add(files)) message.error(t('agent.composer.fileLimit'))
+  }
+  const openCommand = (name: string) => { setCommandsOpen(false); setCommandsDismissed(true); setCommandIndex(0); void submit('/' + name, false) }
+  const moreMenu = { items: [
+    { key: 'history', label: t('agent.history'), icon: <ClockIcon size={16} /> },
+    { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
+    { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
+    { key: 'context', label: t('agent.context'), icon: <ArchiveIcon size={16} /> },
+    { key: 'overview', label: t('agent.overview'), icon: <BotIcon size={16} /> },
+  ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else setPanel(key as 'history' | 'tasks' | 'memory' | 'context') } }
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const conversation = thread.view?.conversation
   const title = conversation ? conversationTitle(conversation, t('agent.new')) : t('agent.title')
   const reset = () => { changeDraft(''); pending.current = null; setCreationVersion((version) => version + 1); select('') }
 
-  return <section className="agent-chat" aria-label={t('agent.title')}>
-    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts"><button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button></div></header>
-    <div className="agent-toolbar">
-      <button type="button" className="tt-act" onClick={reset} aria-label={t('agent.new')}><PlusIcon /><span>{t('agent.new')}</span></button>
-      <button type="button" className="tt-act" onClick={() => setPanel('history')} aria-label={t('agent.history')}><ClockIcon /></button>
-      <button type="button" className="tt-act" onClick={() => setPanel('tasks')} aria-label={t('agent.tasks')}><ChecklistIcon /></button>
-      <button type="button" className="tt-act" onClick={() => setPanel('memory')} aria-label={t('agent.memory')}><NotebookIcon /></button>
-      <button type="button" className="tt-act" disabled={readOnly} onClick={() => setPanel('context')}>{t('agent.context')}</button>
-      <button type="button" className="tt-act agent-overview" onClick={onOverview}>{t('agent.overview')}</button>
+  return <section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
+    onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
+    onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
+    onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
+    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
+      <button type="button" className="tt-act" onClick={reset} aria-label={t('agent.new')}><PencilIcon size={18} /></button>
+      <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
+      <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
+    </div></header>
+    <div className="agent-mobile-actions">
+      <button type="button" className="agent-conversation-title" onClick={() => setPanel('history')} aria-label={t('agent.history')}>{title}<ChevronDown size={13} /></button>
+      <button type="button" className="tt-act" onClick={reset} aria-label={t('agent.new')}><PencilIcon size={18} /></button>
+      <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     </div>
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {readOnly && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(cid)}>{t('agent.currentConversation')}</button></div>}
-    <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80 }}>
-      <div className="agent-thread">{thread.loading && <Spin />}{visible.map((m) => <article key={m.id} data-message-id={m.id} data-notification-focus={m.id === focusMessage || undefined} className={`agent-message ${m.role}`}>
-        {m.role === 'assistant' && <div className="agent-author">Roami{m.status === 'streaming' && <Spin size="small" />}</div>}
-        {m.content.text && (m.role === 'user' ? <p className="agent-user-text">{m.content.text}</p> : <Markdown>{m.content.text}</Markdown>)}
-        {['failed', 'interrupted'].includes(m.status) && <small className="agent-muted">{t('agent.interrupted')}</small>}
-        {m.role === 'assistant' && m.status === 'completed' && m.content.text && !m.content.tool_calls?.length && <button type="button" className="tt-act agent-message-action" onClick={() => beginMemory(m)} aria-label={t('agent.remember')}><NotebookIcon />{t('agent.remember')}</button>}
-        {m.role === 'assistant' && m.completedEventId && <span className="agent-read-sentinel" data-event-id={m.completedEventId} aria-hidden />}
-      </article>)}</div>
+    <div className="agent-reading">
+      <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
+        <div className="agent-thread">{thread.loading && <Spin />}{visible.map(m => <AgentMessageView key={m.id} item={m} focused={m.id === focusMessage} remember={beginMemory} />)}</div>
+      </div>
+      {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>
     {error && <div className="agent-feedback error" role="alert">{error}</div>}
     <div className="agent-composer">
-      <div className="agent-compose-options"><Select aria-label={t('agent.destination')} value={target} disabled={readOnly || sending} onChange={setTarget} options={[{ value: 'direct', label: t('agent.automatic') }, { value: 'loose', label: t('agent.loose') }, ...projects.map((p) => ({ value: 'project:' + p.id, label: p.name }))]} />
-        {target !== 'direct' && <Select aria-label={t('agent.executor')} value={executor} onChange={setExecutor} options={[{ value: 'codex', label: 'Codex' }, { value: 'claude', label: 'Claude Code' }]} />}
-        <span className="agent-muted" role="status">{compacting ? t('agent.compacting') : running ? t('agent.responding') : ''}</span>
+      <div className="tt-composer agent-compose-card">
+        {!!attachments.items.length && <div className="agent-draft-files">{attachments.items.map(item => <div className={`agent-file-card is-${item.state}`} key={item.key}>
+          <FileTextIcon size={20} /><span>{item.name}<small>{t(item.state === 'uploading' ? 'agent.composer.uploading' : item.state === 'failed' ? 'agent.composer.uploadFailed' : item.reference?.previewState === 'unsupported' ? 'agent.composer.fileStoredOnly' : item.reference?.previewState === 'image' && !models.settings?.main.images ? 'agent.composer.imageUnavailable' : ['unavailable', 'encrypted', 'no_text'].includes(item.reference?.previewState || '') ? 'agent.composer.fileUnavailable' : 'agent.composer.fileReady')}</small></span>
+          {item.state === 'uploading' ? <Spin size="small" /> : <>{item.state === 'failed' && <button type="button" aria-label={t('agent.retry')} disabled={sending} onClick={() => { void attachments.retry(item) }}><RefreshIcon size={15} /></button>}<button type="button" aria-label={t('agent.composer.removeFile', { name: item.name })} disabled={sending} onClick={() => { void attachments.remove(item).catch(() => message.error(t('agent.requestFailed'))) }}><CloseIcon size={15} /></button></>}
+        </div>)}</div>}
+        <form onSubmit={event => { event.preventDefault(); void submit() }}>
+          <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: 8 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
+            onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
+            onKeyDown={event => {
+              if (event.nativeEvent.isComposing) return
+              if (slash.length && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+                if (event.key === 'Escape') { event.preventDefault(); setCommandsOpen(false); setCommandsDismissed(true); return }
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setCommandIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + slash.length) % slash.length); return }
+                if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (commandsOpen) openCommand(slash[commandIndex % slash.length]); else if (draft === '/' + slash[commandIndex % slash.length]) { void submit() } else { changeDraft('/' + slash[commandIndex % slash.length] + (slash[commandIndex % slash.length] === 'compact' ? ' ' : '')); setCommandsOpen(false) }; return }
+              }
+              if (!phone && event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit() }
+            }} />
+          {slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
+          <div className="tt-cbar agent-compose-bar">
+            <div className="tt-cgrp">
+              <AgentComposerPlus models={models} disabled={readOnly || sending} canCompact={!!cid && !readOnly && !compacting && !running} onFiles={() => fileInput.current?.click()} onCompact={() => { void submit('/compact', false) }} onCommands={() => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) }} />
+              <div className="agent-send-modes" role="group" aria-label={t('agent.composer.mode')}>
+                <button type="button" className={`tt-pill${target === 'direct' ? ' on' : ''}`} aria-pressed={target === 'direct'} disabled={readOnly || sending} onClick={() => setTarget('direct')}>{t('agent.composer.chatMode')}</button>
+                <button type="button" className={`tt-pill${target !== 'direct' ? ' on' : ''}`} aria-pressed={target !== 'direct'} disabled={readOnly || sending || !!attachments.items.length} onClick={() => setTarget('loose')}>{t('agent.composer.taskMode')}</button>
+              </div>
+            </div>
+            <div className="tt-cend">
+              {running && <button type="button" className={draft.trim() || attachments.items.length ? 'tt-pill ico' : 'tt-send agent-stop'} aria-label={t('agent.stop')} onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) }}><StopIcon size={16} /></button>}
+              {(!running || !!draft.trim() || !!attachments.items.length) && <button type="submit" className="tt-send" aria-label={t('agent.send')} disabled={sending || attachments.blocked || (!draft.trim() && !attachments.ids.length) || readOnly || (target !== 'direct' && draft.trim().length > 20000)}>{sending ? <Spin size="small" /> : <ArrowUp size={20} />}</button>}
+            </div>
+          </div>
+        </form>
+        {target !== 'direct' && <div className="agent-task-options">
+          <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
+          <Dropdown trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'codex', label: 'Codex', icon: <AgentLogo kind="codex" /> }, { key: 'claude', label: 'Claude Code', icon: <AgentLogo kind="claude" /> }], onClick: ({ key }) => setExecutor(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor as 'codex' | 'claude'} />{executor === 'codex' ? 'Codex' : 'Claude Code'}<ChevronDown /></button></Dropdown>
+        </div>}
       </div>
-      {slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name) => <button type="button" key={name} role="option" aria-selected={false} onClick={() => changeDraft('/' + name + (name === 'compact' ? ' ' : ''))}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
-      <form onSubmit={(event) => { event.preventDefault(); void submit() }}>
-        <Input.TextArea aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={(event) => changeDraft(event.target.value)} autoSize={{ minRows: 1, maxRows: 6 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
-          onKeyDown={(event) => { if (!phone && event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() } }} />
-        {running && <Button htmlType="button" aria-label={t('agent.stop')} icon={<StopIcon />} onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) }} />}
-        <Button type="primary" htmlType="submit" icon={<ArrowUp size={18} />} aria-label={t('agent.send')} loading={sending} disabled={!draft.trim() || readOnly || (target !== 'direct' && !draft.startsWith('/') && draft.trim().length > 20000)} />
-      </form>
+      <div className="agent-compose-footnote" role="status">{compacting ? t('agent.compacting') : running ? t('agent.responding') : attachments.items.length ? t('agent.composer.attachmentMode') : models.settings?.main.model || ''}</div>
+      <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
+    {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}
     <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>
       {panel === 'history' && <div className="agent-panel-list">{inbox.conversations.map((c) => <button className="agent-panel-row" type="button" data-conversation-id={c.id} key={c.id} onClick={() => { select(c.id); setPanel(null) }}>{conversationTitle(c, t('agent.new'))}{inbox.notices.some((n) => n.conversation_id === c.id) && <i className="agent-unread-dot" />}</button>)}</div>}
       {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}

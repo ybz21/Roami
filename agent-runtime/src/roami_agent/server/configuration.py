@@ -35,6 +35,7 @@ class Settings:
     endpoint: str = ""
     model: str = ""
     key_env: str = "ROAMI_AGENT_API_KEY"
+    extra_key_envs: tuple[str, ...] = ()
     worker_model: str = ""
     worker_route: ModelRoute | None = None
     model_retries: int = 2
@@ -195,4 +196,11 @@ class Settings:
         return os.environ.get(self.route(role).key_env, "")
 
     def provider_key_environments(self):
-        return {"ROAMI_AGENT_API_KEY", self.key_env, self.route("worker").key_env}
+        return {
+            *self.extra_key_envs,
+            "ROAMI_AGENT_API_KEY",
+            "ROAMI_AGENT_SAVED_MAIN_KEY",
+            "ROAMI_AGENT_SAVED_WORKER_KEY",
+            self.key_env,
+            self.route("worker").key_env,
+        }

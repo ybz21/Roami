@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from roami_agent.conversation.attachments import Attachments
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -121,10 +122,20 @@ class Conversations:
 
         return await self.db.call(read)
 
-    async def accept(self, owner, cid, request_key, text):
-        if not request_key or not text.strip() or len(text) > 100_000:
+    async def accept(self, owner, cid, request_key, text, attachment_ids=None):
+        attachment_ids = attachment_ids or []
+        if (
+            not request_key
+            or (not text.strip() and not attachment_ids)
+            or len(text) > 100_000
+            or len(attachment_ids) > 6
+            or len(set(attachment_ids)) != len(attachment_ids)
+        ):
             raise DomainError("INVALID_MESSAGE")
-        digest = hashlib.sha256(encoded({"conversation": cid, "text": text}).encode()).hexdigest()
+        payload = {"conversation": cid, "text": text}
+        if attachment_ids:
+            payload["attachmentIds"] = attachment_ids
+        digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
 
         def write(db):
             c = owned(db, owner, cid)
@@ -162,6 +173,12 @@ class Conversations:
             )
             db.execute("UPDATE requests SET turn_id=? WHERE id=?", (tid, rid))
             mid = message(db, cid, c["active_branch_id"], "user", {"text": text}, turn_id=tid)
+            if attachment_ids:
+                references = Attachments.bind(db, owner, mid, attachment_ids)
+                db.execute(
+                    "UPDATE messages SET content_json=? WHERE id=?",
+                    (encoded({"text": text, "attachments": references}), mid),
+                )
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms)"
                 " VALUES(?,'turn.run',?,?,?,'queued',?)",
@@ -178,7 +195,14 @@ class Conversations:
             )
             db.execute(
                 "UPDATE conversations SET title=CASE WHEN title='New conversation' THEN ? ELSE title END,updated_ms=? WHERE id=?",
-                (text.strip()[:80], now_ms(), cid),
+                (
+                    (
+                        text.strip()
+                        or (references[0]["name"] if attachment_ids else "New conversation")
+                    )[:80],
+                    now_ms(),
+                    cid,
+                ),
             )
             return {"turnId": tid, "requestId": rid, "messageId": mid, "cursor": cursor}
 

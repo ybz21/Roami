@@ -12,9 +12,11 @@ from pathlib import Path
 
 import uvicorn
 
+from roami_agent.context.chat_images import ChatImages
 from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
 from roami_agent.context.vision_inputs import VisionInputs
+from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.transcript import Conversations
@@ -42,6 +44,7 @@ from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
 from roami_agent.server.configuration import Settings
+from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, load_model_settings
 from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
@@ -74,12 +77,15 @@ class Runtime:
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
     ):
         self.db, self.model = database, model
-        self.settings = settings or Settings()
+        self.settings = RuntimeSettings(settings or Settings())
+        self.reconfiguring = False
+        self.memory_uses_worker = memory_model is None
         self.worker_model = worker_model or model
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
         self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
+        self.attachments = Attachments(database, self.artifacts)
         self.artifact_retention = ArtifactRetention(
             self.artifacts,
             grace_seconds=self.settings.artifact_gc_grace_seconds,
@@ -186,6 +192,7 @@ class Runtime:
                 database,
                 self.context,
                 self.settings,
+                chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts)
                 if self.settings.route("worker").capabilities.get("images") is True
                 else None,
@@ -218,6 +225,7 @@ class Runtime:
             self.wakeup,
             self.turn_tasks,
         )
+        self.model_settings = ModelSettings(self, configured_provider)
 
     async def start(self):
         await self.conversations.recover()
@@ -275,7 +283,8 @@ class Runtime:
     async def _monitor_proactive(self):
         while not self.stopping:
             try:
-                await self.proactive.tick()
+                if not self.reconfiguring:
+                    await self.proactive.tick()
             except Exception:
                 log.exception("Proactive evaluation failed")
             await asyncio.sleep(1)
@@ -283,7 +292,8 @@ class Runtime:
     async def _monitor_briefs(self):
         while not self.stopping:
             try:
-                await self.briefs.tick()
+                if not self.reconfiguring:
+                    await self.briefs.tick()
             except Exception:
                 log.exception("Daily brief scheduling failed")
             await asyncio.sleep(1)
@@ -376,6 +386,7 @@ class Runtime:
         await self.files.close()
         await self.artifact_retention.close()
         await self.artifacts.close()
+        await self.model_settings.close()
 
 
 def configured_provider(settings, role, *, client=None):
@@ -396,7 +407,7 @@ def configured_provider(settings, role, *, client=None):
 async def serve(args):
     from roami_agent.server.http import create_app
 
-    settings = Settings.load(args.config)
+    settings = load_model_settings(Settings.load(args.config), args.data_root)
     validate_servers(settings.mcp_servers)
     database = Database(args.database, args.data_root)
     await database.open()

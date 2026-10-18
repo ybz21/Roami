@@ -1,7 +1,7 @@
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
 export type AgentMessage = {
   id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string
-  content: { text?: string; tool_calls?: unknown[] }; completedEventId?: number
+  content: { text?: string; tool_calls?: unknown[]; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }

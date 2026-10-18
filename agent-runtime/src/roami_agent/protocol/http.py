@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,7 +14,10 @@ class CreateConversation(Payload):
 
 class SendMessage(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
-    text: str = Field(min_length=1, max_length=100_000)
+    text: str = Field(default="", max_length=100_000)
+    attachmentIds: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=list, max_length=6
+    )
 
 
 class Compact(Payload):

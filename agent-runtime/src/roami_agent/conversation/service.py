@@ -21,10 +21,12 @@ class ConversationService:
         )
         self.model, self.wakeup, self.turn_tasks = model, wakeup, turn_tasks
 
-    async def submit(self, owner, cid, request_key, text):
+    async def submit(self, owner, cid, request_key, text, attachment_ids=None):
         parts = text.strip().split(maxsplit=1)
         command, arguments = (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
         if text.strip().startswith("/") and "\n" not in text.strip():
+            if attachment_ids:
+                raise DomainError("ATTACHMENTS_WITH_COMMAND")
             name = command[1:]
             if name not in {c["name"] for c in COMMANDS}:
                 raise DomainError("UNKNOWN_COMMAND")
@@ -44,7 +46,7 @@ class ConversationService:
             return {"kind": "ui_action", "action": name, "conversationId": cid}
         if not self.model.model:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
-        result = await self.conversations.accept(owner, cid, request_key, text)
+        result = await self.conversations.accept(owner, cid, request_key, text, attachment_ids)
         self.wakeup.set()
         return {"kind": "message", **result}
 

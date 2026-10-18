@@ -56,6 +56,8 @@ class Scheduler:
             ).fetchone()[0]
         )
         for job in queued:
+            if getattr(self.settings, "updating", False):
+                return
             if job["id"] in self.active:
                 continue
             memory_job = job["kind"].startswith("memory.")

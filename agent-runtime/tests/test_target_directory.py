@@ -45,7 +45,14 @@ async def test_project_discovery_pages_stable_ids_and_discards_unrelated_fields(
     assert "private log" not in json.dumps(first)
     assert calls[0] == (
         ["/selected/roami", "project", "ls", "--json"],
-        {"timeout": 5, "excluded_env": {"ROAMI_AGENT_API_KEY"}},
+        {
+            "timeout": 5,
+            "excluded_env": {
+                "ROAMI_AGENT_API_KEY",
+                "ROAMI_AGENT_SAVED_MAIN_KEY",
+                "ROAMI_AGENT_SAVED_WORKER_KEY",
+            },
+        },
     )
 
 
