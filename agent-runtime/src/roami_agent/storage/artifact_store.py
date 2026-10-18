@@ -29,6 +29,10 @@ class ArtifactStore:
         self.capacity = asyncio.Semaphore(4)
         self.pending = set()
         self.closed = False
+        # Every store view must serialize publication with physical reclamation.
+        if not hasattr(database, "_artifact_mutations"):
+            database._artifact_mutations = asyncio.Lock()
+        self.mutations = database._artifact_mutations
 
     async def _io(self, function, *args):
         await self.capacity.acquire()
@@ -205,42 +209,43 @@ class ArtifactStore:
         except (TypeError, ValueError) as exc:
             raise DomainError("INVALID_ARTIFACT_METADATA") from exc
         await self.db.call(lambda db: self._scope(db, owner, task_id, message_id))
-        try:
-            digest, path = await self._io(self._write, body)
-        except OSError as exc:
-            raise DomainError("ARTIFACT_STORAGE_UNAVAILABLE", 503) from exc
-        if self.closed:
-            raise DomainError("ARTIFACT_STORE_CLOSED", 503)
+        async with self.mutations:
+            try:
+                digest, path = await self._io(self._write, body)
+            except OSError as exc:
+                raise DomainError("ARTIFACT_STORAGE_UNAVAILABLE", 503) from exc
+            if self.closed:
+                raise DomainError("ARTIFACT_STORE_CLOSED", 503)
 
-        def register(db):
-            self._scope(db, owner, task_id, message_id)
-            existing = row(
-                db,
-                "SELECT * FROM artifacts WHERE owner_id=? AND task_id IS ? AND message_id IS ? AND sha256=? AND mime_type=? AND name=? AND metadata_json=? AND deleted_ms IS NULL",
-                (owner, task_id, message_id, digest, mime_type.lower(), name, packed),
-            )
-            if existing:
-                return self.reference(existing)
-            aid = identity()
-            db.execute(
-                "INSERT INTO artifacts(id,owner_id,task_id,message_id,path,mime_type,sha256,size_bytes,created_ms,name,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    aid,
-                    owner,
-                    task_id,
-                    message_id,
-                    path,
-                    mime_type.lower(),
-                    digest,
-                    len(body),
-                    now_ms(),
-                    name,
-                    packed,
-                ),
-            )
-            return self.reference(row(db, "SELECT * FROM artifacts WHERE id=?", (aid,)))
+            def register(db):
+                self._scope(db, owner, task_id, message_id)
+                existing = row(
+                    db,
+                    "SELECT * FROM artifacts WHERE owner_id=? AND task_id IS ? AND message_id IS ? AND sha256=? AND mime_type=? AND name=? AND metadata_json=? AND deleted_ms IS NULL",
+                    (owner, task_id, message_id, digest, mime_type.lower(), name, packed),
+                )
+                if existing:
+                    return self.reference(existing)
+                aid = identity()
+                db.execute(
+                    "INSERT INTO artifacts(id,owner_id,task_id,message_id,path,mime_type,sha256,size_bytes,created_ms,name,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        aid,
+                        owner,
+                        task_id,
+                        message_id,
+                        path,
+                        mime_type.lower(),
+                        digest,
+                        len(body),
+                        now_ms(),
+                        name,
+                        packed,
+                    ),
+                )
+                return self.reference(row(db, "SELECT * FROM artifacts WHERE id=?", (aid,)))
 
-        return await self.db.call(register, write=True)
+            return await self.db.call(register, write=True)
 
     async def _owned(self, owner, artifact_id):
         item = await self.db.call(

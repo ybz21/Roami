@@ -220,3 +220,40 @@ func TestArtifactRestoreRecoversBeforeAndAfterFilePublication(t *testing.T) {
 		})
 	}
 }
+
+func TestArtifactBackupPreservesPurgedTombstonesInSchemaSix(t *testing.T) {
+	p, db, entry := artifactBackupInstance(t)
+	if _, err := db.Exec("ALTER TABLE artifacts ADD COLUMN purged_ms INTEGER"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("UPDATE artifacts SET purged_ms=2 WHERE deleted_ms IS NOT NULL"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("INSERT INTO schema_meta(version,name,applied_at) VALUES(6,'retention','fixture')"); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := p.BackupSet("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, _, err := ValidateBackup(backup)
+	if err != nil || len(manifest.Artifacts) != 1 || manifest.Artifacts[0] != entry {
+		t.Fatalf("retention backup: %+v %v", manifest, err)
+	}
+	target := emptyRestorePaths(t)
+	if err := target.RestoreSet(backup); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := sql.Open("sqlite", "file:"+filepath.Join(target.Database, "agents", "runtime.db")+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	var purged int
+	if err := restored.QueryRow("SELECT COUNT(*) FROM artifacts WHERE deleted_ms IS NOT NULL AND purged_ms=2").Scan(&purged); err != nil || purged != 1 {
+		t.Fatalf("lost purge audit: %d %v", purged, err)
+	}
+	if err := transferArtifact(target.Data, "", entry); err != nil {
+		t.Fatal(err)
+	}
+}

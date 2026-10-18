@@ -55,6 +55,8 @@ timezone = "UTC" # IANA timezone for daily summaries
 
 [artifacts]
 max_bytes = 67108864 # per artifact, stored outside model context
+gc_grace_seconds = 86400
+gc_interval_seconds = 300
 
 # Requires both this instance switch and the owner's suggestion preference.
 # Evaluates fresh task outcome events with the Worker model; no model polling.

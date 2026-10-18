@@ -59,6 +59,8 @@ class Settings:
     coding_directory: Path | None = None
     memory_timezone: str = "UTC"
     artifact_max_bytes: int = 64 * 1024 * 1024
+    artifact_gc_grace_seconds: int = 86400
+    artifact_gc_interval_seconds: int = 300
     proactive_enabled: bool = False
     proactive_daily_budget: int = 3
     proactive_timeout_seconds: int = 15
@@ -96,6 +98,8 @@ class Settings:
             computer=computer_config(tools.get("computer", {})),
             memory_timezone=raw.get("memory", {}).get("timezone", "UTC"),
             artifact_max_bytes=raw.get("artifacts", {}).get("max_bytes", 64 * 1024 * 1024),
+            artifact_gc_grace_seconds=raw.get("artifacts", {}).get("gc_grace_seconds", 86400),
+            artifact_gc_interval_seconds=raw.get("artifacts", {}).get("gc_interval_seconds", 300),
             proactive_enabled=raw.get("proactive", {}).get("enabled", False),
             proactive_daily_budget=raw.get("proactive", {}).get("daily_budget", 3),
             proactive_timeout_seconds=raw.get("proactive", {}).get("timeout_seconds", 15),
@@ -140,6 +144,16 @@ class Settings:
             or not 1 <= result.artifact_max_bytes <= 512 * 1024 * 1024
         ):
             raise DomainError("INVALID_ARTIFACT_CONFIG")
+        for value, minimum, maximum in [
+            (result.artifact_gc_grace_seconds, 3600, 365 * 86400),
+            (result.artifact_gc_interval_seconds, 10, 3600),
+        ]:
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or not minimum <= value <= maximum
+            ):
+                raise DomainError("INVALID_ARTIFACT_RETENTION_CONFIG")
         if bool(result.model) != bool(result.endpoint):
             raise DomainError("INVALID_MODEL_CONFIG")
         if (

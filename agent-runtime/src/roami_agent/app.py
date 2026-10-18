@@ -41,6 +41,7 @@ from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
 from roami_agent.server.configuration import Settings
+from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
 from roami_agent.storage.turn_journal import TurnJournal
@@ -78,6 +79,11 @@ class Runtime:
         self.conversations = Conversations(database)
         self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
+        self.artifact_retention = ArtifactRetention(
+            self.artifacts,
+            grace_seconds=self.settings.artifact_gc_grace_seconds,
+            interval_seconds=self.settings.artifact_gc_interval_seconds,
+        )
         self.files = WorkspaceFiles(self.settings)
         self.resources = ResourceLeases(database)
         self.controls = ResourceControls(database, self.resources)
@@ -126,6 +132,7 @@ class Runtime:
         self.reminder_monitor = None
         self.proactive_monitor = None
         self.brief_monitor = None
+        self.artifact_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         register_reminder_tools(
             self.tools,
@@ -223,9 +230,22 @@ class Runtime:
         self.control_monitor = asyncio.create_task(self._monitor_controls())
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
         self.brief_monitor = asyncio.create_task(self._monitor_briefs())
+        self.artifact_monitor = asyncio.create_task(self._monitor_artifacts())
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
+
+    async def _monitor_artifacts(self):
+        while not self.stopping:
+            await asyncio.sleep(self.artifact_retention.interval_seconds)
+            if self.stopping:
+                return
+            try:
+                summary = await self.artifact_retention.collect()
+                if summary["errors"]:
+                    log.warning("Artifact retention skipped unsafe or unavailable files")
+            except (DomainError, OSError):
+                log.exception("Artifact retention failed")
 
     async def _monitor_reminders(self):
         while not self.stopping:
@@ -321,6 +341,9 @@ class Runtime:
         if self.desktop_monitor:
             self.desktop_monitor.cancel()
             await asyncio.gather(self.desktop_monitor, return_exceptions=True)
+        if self.artifact_monitor:
+            self.artifact_monitor.cancel()
+            await asyncio.gather(self.artifact_monitor, return_exceptions=True)
         if self.control_monitor:
             self.control_monitor.cancel()
             await asyncio.gather(self.control_monitor, return_exceptions=True)
@@ -331,6 +354,7 @@ class Runtime:
         await self.mcp.close()
         await self.desktop.close()
         await self.files.close()
+        await self.artifact_retention.close()
         await self.artifacts.close()
 
 
