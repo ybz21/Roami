@@ -32,22 +32,34 @@ class Notifications:
         )
 
     @staticmethod
-    def publish_in_transaction(db, owner, cid, text, *, source, dedupe_key, priority="normal"):
+    def publish_in_transaction(
+        db, owner, cid, text, *, source, dedupe_key, priority="normal", branch_id=None
+    ):
         key = (
             "notice:"
             + hashlib.sha256(encoded([owner, cid, source, dedupe_key]).encode()).hexdigest()
         )
         digest = hashlib.sha256(encoded([text, priority]).encode()).hexdigest()
         conversation = owned(db, owner, cid)
+        if branch_id and not row(
+            db, "SELECT id FROM branches WHERE id=? AND conversation_id=?", (branch_id, cid)
+        ):
+            raise DomainError("BRANCH_NOT_FOUND", 404)
         old = row(db, "SELECT * FROM events WHERE event_key=?", (key,))
         if old:
             if json.loads(old["payload_json"])["digest"] != digest:
+                raise DomainError("NOTIFICATION_KEY_CONFLICT", 409)
+            if branch_id and not row(
+                db,
+                "SELECT id FROM messages WHERE id=? AND branch_id=?",
+                (old["message_id"], branch_id),
+            ):
                 raise DomainError("NOTIFICATION_KEY_CONFLICT", 409)
             return {"eventId": old["id"], "messageId": old["message_id"], "reused": True}
         mid = message(
             db,
             cid,
-            conversation["active_branch_id"],
+            branch_id or conversation["active_branch_id"],
             "assistant",
             {"text": text, "source": source, "proactive": True},
         )

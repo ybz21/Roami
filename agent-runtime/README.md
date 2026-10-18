@@ -175,13 +175,31 @@ The claim records source IDs, model identity, prompt fingerprint and usage in a 
 
 Automated checks cover opt-in, archive watermarks, owner budgets, silence/failure accounting, source/preference changes during generation, late recovery, provenance forgetting and an interactive Main while the background model is blocked. One isolated real-provider evaluation also passed using the private development fast route, produced a traced suggestion and recorded usage; it did not contact a real device or launch a coding agent.
 
+## Explicit daily briefs
+
+An explicitly requested daily brief reuses `reminder_create` with `kind="daily_brief"` and a local `dailyAt`. Main keeps the same tool names. The public `/v1/reminders` API and existing reminder panel list both kinds; the returned `brief:` ID also works with the existing cancellation endpoint. In the CLI:
+
+```sh
+roami agent reminder add --kind daily_brief --conversation ID --key KEY \
+  --text "Summarize yesterday's requests and verified task results" \
+  --daily-at 08:00 --timezone Asia/Shanghai
+```
+
+`dispatch/daily_briefs.py` stores schedules and generation claims in the existing job ledger. Each firing summarizes the previous local calendar day in the conversation and branch selected when the schedule was created. IANA timezone and daylight-saving behavior reuse the reminder clock. Restart coalesces missed days into the latest due day's brief; cancelled keys do not silently re-enable a schedule. A changed active branch does not move the brief to another branch.
+
+The source sample includes user requests, task admissions and terminal evidence. At most 64 source events enter consideration; UTF-8 excerpts and the full prompt have separate bounds (12,000 bytes per prompt). Partial coverage is explicit in the model instructions. Message IDs and source fingerprints are persisted, then rechecked before publishing. Complete source forgetting also removes dependent published briefs from future model context. Original events and reports remain unchanged.
+
+Generation uses the Worker provider with no tools and an independent background monitor. `[briefs].daily_budget` defaults to three evaluations per owner over 24 hours (maximum ten), and also limits active schedules. `timeout_seconds` defaults to 30 (maximum 60). Limits can delay a queued generation; failed/interrupted generations do not automatically replay. Model identity, prompt fingerprint, normalized usage and the last generation state are retained. Publication commits the message, event, outbox, provenance and job receipt together; a lost generation is fenced during recovery. Notification preference and quiet-hour handling use the ordinary reminder category.
+
+The reminder panel shows the last generation date and state in Chinese or English, refreshes while open, and opens the original branch or generated message. Desktop and compact touch-browser checks verify listing, navigation and cancellation through the real Go proxy. The real Go CLI/Python round trip and isolated real-provider Main scheduling and brief generation pass. The private fast route was used for these provider fixtures; the production Worker route was not changed or claimed verified by those fixtures. A post-integration five-question quick-answer sample was entirely correct (first-text P95 862ms, completed-turn P95 888ms), measured on the server without Go/browser/phone latency. Physical Android acceptance remains pending while the device is locked.
+
 ## Remaining work toward the full framework
 
 1. Physical Android acceptance of integrated chat, keyboard, touch navigation, safe areas and actual system notification delivery; additional executor target controls.
 2. Finish automatic lifecycle wiring for existing Codex sessions and a definitive completion adapter for Claude TUI continuation. Broaden resource recovery for unknown preparation outcomes; never blindly retry an ambiguous launch.
 3. Broaden late Native resource/workspace reconciliation for unknown effects, physical artifact retention and full layout-migration coverage. Browser/Computer drivers, durable leases and owner-scoped artifact references are implemented.
 4. Broaden legacy forgetting/re-learning recovery. Source forgetting requests cancellation of affected running task trees in the same transaction; actual stop still requires executor evidence. Provider cache controls, role routing, generation controls and pre-event retry boundaries are implemented.
-5. Add explicitly scheduled model-generated daily briefs. Event-driven suggestions now use a separate bounded background queue; explicit reminders, notification policy, App/Web Push adapters and their UI are implemented. Real-device delivery acceptance remains.
+5. Broaden proactive goal follow-up triggers beyond root-task outcomes. Event-driven suggestions and explicitly scheduled daily briefs are implemented with separate bounded background queues; real-device delivery acceptance remains.
 6. Broader end-to-end recovery, goal-specific verification cases, real-device acceptance and workload-level latency/cache/cost measurements. Current simple-answer latency samples are listed above; supplier prices and device delivery were not inferred.
 
 The design and product prototype remain in `docs/design/20261017-agent框架设计/`.

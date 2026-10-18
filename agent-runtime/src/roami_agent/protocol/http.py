@@ -89,6 +89,7 @@ class CreateReminder(Payload):
     afterSeconds: int | None = Field(default=None, ge=1, le=2_678_400, strict=True)
     dailyAt: str | None = Field(default=None, min_length=5, max_length=5)
     timezone: str = Field(default="UTC", min_length=1, max_length=100)
+    kind: Literal["reminder", "daily_brief"] = "reminder"
 
 
 class NotificationPreferences(Payload):

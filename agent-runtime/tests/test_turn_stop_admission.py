@@ -83,6 +83,16 @@ async def test_stop_receipt_fences_delegation_reminders_and_output_before_cancel
         with pytest.raises(DomainError, match="TURN_INTERRUPTED"):
             await runtime.journal.delta(turn, mid, "Partial late output", " late output")
         with pytest.raises(DomainError, match="TURN_INTERRUPTED"):
+            await runtime.briefs.create(
+                "alice",
+                conversation["id"],
+                "Late daily brief",
+                "late-brief",
+                daily_at="08:00",
+                source_turn_id=turn["id"],
+            )
+        assert await runtime.briefs.list("alice") == []
+        with pytest.raises(DomainError, match="TURN_INTERRUPTED"):
             await runtime.journal.finish(
                 turn, mid, "Late answer", [], None, 1, final=True, completion=None
             )

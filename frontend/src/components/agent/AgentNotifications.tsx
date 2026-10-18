@@ -11,7 +11,7 @@ export default function AgentNotifications({ open, close, inbox, select, node }:
   const { t, locale } = useI18n()
   const [panel, setPanel] = useState('messages')
   const dismiss = () => { setPanel('messages'); close() }
-  const choose = (cid: string) => { dismiss(); select(cid) }
+  const choose = (cid: string, branch?: string, message?: string) => { dismiss(); select(cid, branch, message) }
   return <Modal open={open} title={t('agent.notifications')} footer={null} onCancel={dismiss} destroyOnClose centered width="calc(var(--sp-5) * 28)" className="agent-notifications-dialog" wrapClassName="agent-notifications-wrap">
     <Tabs key={node || 'local'} activeKey={panel} onChange={setPanel} destroyInactiveTabPane items={[
       { key: 'messages', label: t('agent.notification.messages'), children: <div className="agent-notifications-body">

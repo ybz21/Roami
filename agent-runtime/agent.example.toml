@@ -63,6 +63,11 @@ enabled = false
 daily_budget = 3 # model evaluations per owner over 24 hours, including failures/silence
 timeout_seconds = 15 # separate background queue; no Main concurrency slot
 
+# Explicit daily briefs use the same reminder CLI/UI, with kind=daily_brief.
+[briefs]
+daily_budget = 3 # evaluations per owner over 24 hours; also bounds active schedules
+timeout_seconds = 30
+
 [tools]
 # This validates working directories; it is not an OS filesystem sandbox.
 shell_roots = []

@@ -62,6 +62,8 @@ class Settings:
     proactive_enabled: bool = False
     proactive_daily_budget: int = 3
     proactive_timeout_seconds: int = 15
+    brief_daily_budget: int = 3
+    brief_timeout_seconds: int = 30
 
     @classmethod
     def load(cls, path: Path):
@@ -97,6 +99,8 @@ class Settings:
             proactive_enabled=raw.get("proactive", {}).get("enabled", False),
             proactive_daily_budget=raw.get("proactive", {}).get("daily_budget", 3),
             proactive_timeout_seconds=raw.get("proactive", {}).get("timeout_seconds", 15),
+            brief_daily_budget=raw.get("briefs", {}).get("daily_budget", 3),
+            brief_timeout_seconds=raw.get("briefs", {}).get("timeout_seconds", 30),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
             coding_directory=(
                 Path(runtime["coding_directory"]).expanduser().resolve()
@@ -121,6 +125,13 @@ class Settings:
             or not 1 <= result.proactive_timeout_seconds <= 30
         ):
             raise DomainError("INVALID_PROACTIVE_CONFIG")
+        if (
+            type(result.brief_daily_budget) is not int
+            or not 1 <= result.brief_daily_budget <= 10
+            or type(result.brief_timeout_seconds) is not int
+            or not 1 <= result.brief_timeout_seconds <= 60
+        ):
+            raise DomainError("INVALID_BRIEF_CONFIG")
         if not 0 <= result.max_depth <= 16:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if (

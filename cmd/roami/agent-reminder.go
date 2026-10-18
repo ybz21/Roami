@@ -12,7 +12,7 @@ import (
 
 func runAgentReminder(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent reminder ls\nroami agent reminder add --conversation ID --key KEY --text TEXT --after-seconds N\nroami agent reminder add --conversation ID --key KEY --text TEXT --daily-at HH:MM --timezone IANA\nroami agent reminder add --conversation ID --key KEY --text TEXT --when-ms EPOCH_MS\nroami agent reminder cancel --id ID")
+		fmt.Println("roami agent reminder ls\nroami agent reminder add --conversation ID --key KEY --text TEXT --after-seconds N\nroami agent reminder add --conversation ID --key KEY --text TEXT --daily-at HH:MM --timezone IANA\nroami agent reminder add --conversation ID --key KEY --text TEXT --when-ms EPOCH_MS\nroami agent reminder add --kind daily_brief --conversation ID --key KEY --text TEXT --daily-at HH:MM --timezone IANA\nroami agent reminder cancel --id ID")
 		return 0
 	}
 	sub := args[0]
@@ -25,6 +25,7 @@ func runAgentReminder(args []string) int {
 	key := flags.String("key", "", "required stable request key")
 	text := flags.String("text", "", "reminder text")
 	file := flags.String("file", "", "reminder text file, or - for stdin")
+	kind := flags.String("kind", "reminder", "reminder or daily_brief (daily-at required)")
 	id := flags.String("id", "", "reminder ID")
 	after := flags.Int64("after-seconds", 0, "relative delay in seconds")
 	when := flags.Int64("when-ms", -1, "UTC epoch milliseconds")
@@ -37,6 +38,10 @@ func runAgentReminder(args []string) int {
 	method, path := "GET", "/v1/reminders"
 	var body any
 	if sub == "add" {
+		if (*kind != "reminder" && *kind != "daily_brief") || (*kind == "daily_brief" && (*daily == "" || *after != 0 || *when != -1)) {
+			fmt.Fprintln(os.Stderr, "--kind daily_brief requires --daily-at and excludes other schedules")
+			return 2
+		}
 		count := 0
 		for _, selected := range []bool{*after != 0, *when != -1, *daily != ""} {
 			if selected {
@@ -53,6 +58,9 @@ func runAgentReminder(args []string) int {
 			return 1
 		}
 		spec := map[string]any{"conversationId": *cid, "requestKey": *key, "text": string(content), "timezone": *timezone}
+		if *kind == "daily_brief" {
+			spec["kind"] = *kind
+		}
 		if *after != 0 {
 			spec["afterSeconds"] = *after
 		} else if *when != -1 {

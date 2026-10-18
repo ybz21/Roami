@@ -66,10 +66,24 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.get("/v1/reminders")
     async def reminders(owner: Owner):
-        return {"data": await runtime.reminders.list(owner)}
+        items = await runtime.reminders.list(owner) + await runtime.briefs.reminders(owner)
+        items.sort(key=lambda item: (not item["enabled"], -item["createdMs"]))
+        return {"data": items}
 
     @app.post("/v1/reminders")
     async def create_reminder(body: CreateReminder, owner: Owner):
+        if body.kind == "daily_brief":
+            if body.whenMs is not None or body.afterSeconds is not None:
+                raise DomainError("INVALID_BRIEF_SCHEDULE")
+            item = await runtime.briefs.create(
+                owner,
+                body.conversationId,
+                body.text,
+                body.requestKey,
+                daily_at=body.dailyAt,
+                timezone_name=body.timezone,
+            )
+            return {"data": dict(item, id="brief:" + item["id"], kind="daily_brief")}
         return {
             "data": await runtime.reminders.create(
                 owner,
@@ -85,6 +99,8 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.delete("/v1/reminders/{reminder_id}")
     async def cancel_reminder(reminder_id: str, owner: Owner):
+        if reminder_id.startswith("brief:"):
+            return {"data": await runtime.briefs.cancel(owner, reminder_id[6:])}
         return {"data": await runtime.reminders.cancel(owner, reminder_id)}
 
     @app.get("/v1/notification-preferences")

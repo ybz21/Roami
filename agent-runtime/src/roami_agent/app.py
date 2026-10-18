@@ -19,6 +19,7 @@ from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.core.loop import AgentLoop
+from roami_agent.dispatch.daily_briefs import DailyBriefs
 from roami_agent.dispatch.reminders import Reminders
 from roami_agent.dispatch.resource_controls import ResourceControls
 from roami_agent.dispatch.resource_leases import ResourceLeases
@@ -97,6 +98,12 @@ class Runtime:
             database, timezone_name=self.settings.memory_timezone
         )
         self.reminders = Reminders(database)
+        self.briefs = DailyBriefs(
+            database,
+            self.worker_model,
+            daily_budget=self.settings.brief_daily_budget,
+            timeout=self.settings.brief_timeout_seconds,
+        )
         self.deliveries = DeliveryOutbox(database, self.notification_policy)
         self.proactive = ProactiveJobs(
             database,
@@ -118,9 +125,14 @@ class Runtime:
         self.control_monitor = None
         self.reminder_monitor = None
         self.proactive_monitor = None
+        self.brief_monitor = None
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         register_reminder_tools(
-            self.tools, self.reminders, self.settings.memory_timezone, self.notification_policy
+            self.tools,
+            self.reminders,
+            self.settings.memory_timezone,
+            self.notification_policy,
+            self.briefs,
         )
         add_worker_tools(self.tools, self.settings, self.artifacts)
         register_file_tools(self.tools, self.files)
@@ -200,6 +212,7 @@ class Runtime:
         await self.memory_jobs.recover()
         await self.resources.recover()
         await self.dispatch.recover()
+        await self.briefs.recover()
         if self.settings.proactive_enabled:
             await self.proactive.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
@@ -209,6 +222,7 @@ class Runtime:
         self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
         self.control_monitor = asyncio.create_task(self._monitor_controls())
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
+        self.brief_monitor = asyncio.create_task(self._monitor_briefs())
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
@@ -227,6 +241,14 @@ class Runtime:
                 await self.proactive.tick()
             except Exception:
                 log.exception("Proactive evaluation failed")
+            await asyncio.sleep(1)
+
+    async def _monitor_briefs(self):
+        while not self.stopping:
+            try:
+                await self.briefs.tick()
+            except Exception:
+                log.exception("Daily brief scheduling failed")
             await asyncio.sleep(1)
 
     async def _monitor_browser(self):
@@ -290,6 +312,9 @@ class Runtime:
         if self.proactive_monitor:
             self.proactive_monitor.cancel()
             await asyncio.gather(self.proactive_monitor, return_exceptions=True)
+        if self.brief_monitor:
+            self.brief_monitor.cancel()
+            await asyncio.gather(self.brief_monitor, return_exceptions=True)
         if self.browser_monitor:
             self.browser_monitor.cancel()
             await asyncio.gather(self.browser_monitor, return_exceptions=True)

@@ -7,6 +7,7 @@ import shutil
 import socket
 import subprocess
 import tempfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -271,6 +272,29 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
             )
             assert (await cli("reminder", "ls"))["data"][0]["id"] == daily["data"]["id"]
             await cli("reminder", "cancel", "--id", daily["data"]["id"])
+            brief = await cli(
+                "reminder",
+                "add",
+                "--kind",
+                "daily_brief",
+                "--conversation",
+                cid,
+                "--key",
+                "daily-brief-cli",
+                "--text",
+                "Summarize yesterday's recorded work",
+                "--daily-at",
+                (datetime.now(UTC) + timedelta(minutes=5)).strftime("%H:%M"),
+                "--timezone",
+                "UTC",
+            )
+            assert brief["data"]["id"].startswith("brief:")
+            listed = (await cli("reminder", "ls"))["data"]
+            assert (
+                next(item for item in listed if item["id"] == brief["data"]["id"])["spec"]["kind"]
+                == "daily_brief"
+            )
+            await cli("reminder", "cancel", "--id", brief["data"]["id"])
             preferences = (await cli("notification-preferences", "get"))["data"]
             preferences["quietHours"] = {"start": "22:00", "end": "08:00"}
             settings_file = tmp_path / "notification-settings.json"
