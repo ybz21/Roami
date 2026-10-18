@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -32,31 +33,53 @@ func spawnOne(rt runtime.Runtime, group, name, taskType, payload string, ac Agen
 	if taskType == "agent" {
 		width = "220"
 	}
+	if taskType == "agent" {
+		prepared, prepareError := ac.PrepareInteractive(rt)
+		if prepareError != nil {
+			ui.Warn(w, "Codex lifecycle callbacks unavailable: %s", prepareError)
+		}
+		ac = prepared
+	}
 	sess, err := rt.CreateSession(runtime.CreateOpts{Label: label, Width: width, Height: "50"})
 	if err != nil {
 		return false, "", err
 	}
+	started := false
+	defer func() {
+		if !started {
+			_ = rt.Tmux("kill-session", "-t", "="+sess)
+			rt.CleanTaskMeta(sess)
+		}
+	}()
 	rt.InjectEnv(sess)
-	_ = rt.Tmux("pipe-pane", "-t", sess, "-o", "cat >> '"+rt.LogFile(sess)+"'")
+	_ = rt.Tmux("pipe-pane", "-t", "="+sess, "-o", "cat >> '"+rt.LogFile(sess)+"'")
 	_ = os.WriteFile(rt.LogFile(sess), nil, 0o644)
-	recordAgentSession(rt, sess, ac)
+	RecordAgentSession(rt, sess, ac)
 	if err := rt.WriteTaskMeta(sess, taskType, payload, ac.Workdir, label); err != nil {
 		return false, sess, err
 	}
 
 	runCmd := payload
 	if taskType == "agent" {
-		runCmd = ac.Command(payload)
+		promptFile := filepath.Join(rt.TaskMetaDir(sess), "prompt.txt")
+		if err := os.WriteFile(promptFile, []byte(payload), 0600); err != nil {
+			return false, sess, err
+		}
+		runCmd = ac.CommandFromPromptFile(promptFile)
+		if ac.Interactive {
+			runCmd = ac.InteractiveFromPromptFile(promptFile)
+		}
 	}
-	if err := rt.Tmux("send-keys", "-t", sess, runCmd, "C-m"); err != nil {
+	if err := rt.SendShellCommand("="+sess, runCmd); err != nil {
 		return false, sess, err
 	}
-	if taskType == "agent" && ac.Interactive {
+	if taskType == "agent" && ac.Interactive && ac.Kind == "claude" {
 		LaunchAutoconfirm(rt, sess)
 	}
 	if err := rt.GroupAddSession(group, sess); err != nil {
 		return false, sess, err
 	}
+	started = true
 	return true, sess, nil
 }
 
@@ -257,10 +280,10 @@ func truncate(s string, n int) string {
 	return s[:n]
 }
 
-// recordAgentSession 把这次启动的归属目录、仓库根与 agent 对话 id 落进台账。
+// RecordAgentSession 把这次启动的归属目录、仓库根与 agent 对话 id 落进台账。
 // 都是「现在不记，以后就永远算不出来」的东西：worktree 会被删、
 // transcript 会被同目录的别的会话盖过去。
-func recordAgentSession(rt runtime.Runtime, sess string, ac AgentConfig) {
+func RecordAgentSession(rt runtime.Runtime, sess string, ac AgentConfig) {
 	if sess == "" {
 		return
 	}
@@ -271,12 +294,11 @@ func recordAgentSession(rt runtime.Runtime, sess string, ac AgentConfig) {
 	// 不记的话这一列永远是空，「按类型分派」就是一段永远走不到的代码。
 	_ = meta.SetAgentKind(sess, ac.Kind)
 	// 对话 id 由**这一型自己**说怎么来：能在启动时指定的（claude 的 --session-id）
-	// 直接记我们指定的那个，关联由构造保证；指定不了的（codex）事后去认，
-	// 认不出就留空——宁可只恢复出壳，也别接回别人的对话。
+	// 直接记我们指定的那个；Codex 等可信生命周期回报，不用旧 rollout 猜新会话。
 	if a := agent.Get(ac.Kind); a != nil {
 		if a.PinsConversationID() {
 			_ = meta.SetAgentSession(sess, ac.SessionUUID)
-		} else if got := a.DetectConversationID(ac.Workdir); got != "" {
+		} else if got := observedConversationID(a, ac.Workdir); got != "" {
 			_ = meta.SetAgentSession(sess, got)
 		}
 	}
@@ -293,4 +315,11 @@ func repoRootOf(dir string) string {
 		return ""
 	}
 	return strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(string(out)), "/"), "/.git")
+}
+
+func observedConversationID(provider agent.Agent, directory string) string {
+	if provider.Kind() == "codex" {
+		return ""
+	}
+	return provider.DetectConversationID(directory)
 }

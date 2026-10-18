@@ -243,17 +243,10 @@ func (r Runtime) InjectEnv(sess string) {
 	_ = r.Tmux("send-keys", "-t", sess, "clear", "C-m")
 }
 
-// SendPromptSubmit pastes a (possibly multi-line) prompt into a session and
-// submits it. TUI agents (Claude/Codex) treat a trailing C-m inside send-keys
-// as an input newline rather than a submit, so a naive `send-keys text C-m`
-// only types the text without sending it. Instead we drop the text via a paste
-// buffer (no embedded submit) then press Enter separately; a second Enter after
-// a short delay reliably fires the submit even when the TUI is still ingesting
-// the paste. Mirrors the swarm sendPromptSubmit / _tmux_send_prompt_submit.
-// Set TTMUX_FORCE_PROMPT_SUBMIT=0 to skip the second Enter (e.g. plain shells).
 var promptSequence atomic.Uint64
 
-func (r Runtime) SendPromptSubmit(target, message string) error {
+// PasteInput loads through stdin and leaves submission to the caller.
+func (r Runtime) PasteInput(target, message string) error {
 	buffer := "roami-prompt-" + strconv.Itoa(os.Getpid()) + "-" + strconv.FormatUint(promptSequence.Add(1), 36)
 	ctx := r.Context
 	if ctx == nil {
@@ -276,6 +269,30 @@ func (r Runtime) SendPromptSubmit(target, message string) error {
 	if err := r.Tmux("paste-buffer", "-p", "-d", "-b", buffer, "-t", target); err != nil {
 		return err
 	}
+	return nil
+}
+
+// SendShellCommand submits once so a following TUI never receives an extra confirmation.
+func (r Runtime) SendShellCommand(target, command string) error {
+	if err := r.PasteInput(target, command); err != nil {
+		return err
+	}
+	return r.Tmux("send-keys", "-t", target, "Enter")
+}
+
+// SendPromptSubmit pastes a (possibly multi-line) prompt into a session and
+// submits it. TUI agents (Claude/Codex) treat a trailing C-m inside send-keys
+// as an input newline rather than a submit, so a naive `send-keys text C-m`
+// only types the text without sending it. Instead we drop the text via a paste
+// buffer (no embedded submit) then press Enter separately; a second Enter after
+// a short delay reliably fires the submit even when the TUI is still ingesting
+// the paste. Mirrors the swarm sendPromptSubmit / _tmux_send_prompt_submit.
+// Set TTMUX_FORCE_PROMPT_SUBMIT=0 to skip the second Enter (e.g. plain shells).
+func (r Runtime) SendPromptSubmit(target, message string) error {
+	if err := r.PasteInput(target, message); err != nil {
+		return err
+	}
+
 	if err := r.Tmux("send-keys", "-t", target, "Enter"); err != nil {
 		return err
 	}

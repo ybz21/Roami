@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ybz21/Roami/internal/agentlifecycle"
+	"github.com/ybz21/Roami/internal/sessionstore"
 	runtime "github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
@@ -227,7 +229,17 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			state.State = "idle"
 		}
 	}
-	return writeJSON(path, state)
+	if err := writeJSON(path, state); err != nil {
+		return err
+	}
+	if executor == "codex" {
+		meta := sessmeta.New(s.Runtime.HomeDir)
+		meta.DataDir = s.Runtime.DataDir
+		if row, ok := meta.Get(binding.Name); ok && row.AgentKind == executor {
+			return meta.SetAgentSession(binding.Name, event.ProviderID)
+		}
+	}
+	return nil
 }
 
 func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error) {
@@ -359,15 +371,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 
 // HookConfiguration only prints configuration; it never rewrites the user's hooks.
 func HookConfiguration(executable, executor string) (map[string]any, error) {
-	if executor != "codex" {
-		return nil, fmt.Errorf("SESSION_COMPLETION_ADAPTER_UNAVAILABLE")
-	}
-	command := quote(executable) + " agent execution event --executor codex --file -"
-	hooks := map[string]any{}
-	for _, event := range []string{"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStart", "Interrupt", "SessionEnd"} {
-		hooks[event] = []any{map[string]any{"hooks": []any{map[string]any{"type": "command", "command": command, "timeout": 5}}}}
-	}
-	return map[string]any{"hooks": hooks, "notify": []string{executable, "agent", "execution", "event", "--executor", "codex", "--notification"}}, nil
+	return agentlifecycle.HookConfiguration(executable, executor)
 }
 
 func DecodeSessionEvent(content []byte) (SessionEvent, error) {

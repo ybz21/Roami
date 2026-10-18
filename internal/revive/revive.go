@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/ybz21/Roami/internal/agent"
+	"github.com/ybz21/Roami/internal/cli/spawn"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -151,7 +152,16 @@ func Revive(rt runtime.Runtime, meta *sessmeta.Store, name string) (Result, erro
 		// 只把命令**填在命令行上**，不替人回车：接不接、什么时候接由人定——
 		// 一次点开十几个会话同时 resume 会把机器卡住，而且有的只是想看看目录
 		_ = meta.SetAgentSession(sess, uuid)
-		_ = rt.Tmux("send-keys", "-t", "="+sess+":", cmd)
+		if row.AgentKind == "codex" {
+			config := spawn.DefaultAgentConfig(dir)
+			config.Kind, config.Interactive = "codex", true
+			if prepared, err := config.PrepareInteractive(rt); err == nil {
+				cmd = prepared.ResumeInteractive(uuid)
+			}
+		}
+		if err := rt.PasteInput("="+sess+":", cmd); err != nil {
+			return res, err
+		}
 		res.Resumed = uuid
 	}
 	return res, nil

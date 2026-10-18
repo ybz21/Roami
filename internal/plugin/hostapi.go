@@ -198,6 +198,12 @@ func (h *HostAPI) agentSpawn(params json.RawMessage) (any, error) {
 		}
 		ac.Kind = req.Provider
 	}
+	ac.Interactive = req.Interactive
+	prepared, preparationError := ac.PrepareInteractive(rt)
+	if preparationError != nil {
+		h.audit("agent.lifecycle", req.SessionName, "unavailable", preparationError.Error())
+	}
+	ac = prepared
 	sess, err := rt.CreateSession(runtime.CreateOpts{Label: req.SessionName, Width: "220", Height: "50"})
 	if err != nil {
 		return nil, err
@@ -210,6 +216,7 @@ func (h *HostAPI) agentSpawn(params json.RawMessage) (any, error) {
 		return nil, err
 	}
 	rt.InjectEnv(sess)
+	spawn.RecordAgentSession(rt, sess, ac)
 	_ = os.WriteFile(rt.LogFile(sess), nil, 0o644)
 	_ = rt.Tmux("pipe-pane", "-t", sess, "-o", "cat >> '"+rt.LogFile(sess)+"'")
 	_ = rt.WriteTaskMeta(sess, "agent", "plugin:"+h.Plugin.Manifest.ID, workdir, req.SessionName)
@@ -220,9 +227,11 @@ func (h *HostAPI) agentSpawn(params json.RawMessage) (any, error) {
 	if req.Interactive {
 		launch = ac.InteractiveFromPromptFile(promptFile)
 		// 交互 TUI 首启会卡 trust-folder / bypass 确认,后台点掉
-		spawn.LaunchAutoconfirm(rt, sess)
+		if ac.Kind == "claude" {
+			spawn.LaunchAutoconfirm(rt, sess)
+		}
 	}
-	if err := rt.Tmux("send-keys", "-t", sess, launch+"; exit", "C-m"); err != nil {
+	if err := rt.SendShellCommand("="+sess, launch+"; exit"); err != nil {
 		// 半成品会话必须就地回收,否则留下一个永不退出的空 shell 会话
 		_ = rt.Tmux("kill-session", "-t", "="+sess)
 		rt.CleanTaskMeta(sess)

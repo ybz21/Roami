@@ -11,16 +11,17 @@ import (
 	"syscall"
 
 	"github.com/ybz21/Roami/internal/agentexecution"
+	"github.com/ybz21/Roami/internal/agentlifecycle"
 	runtime "github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution hook-config --executor codex\nroami agent execution event --executor codex --file -\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution hook-config --executor codex\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
-	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" {
+	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -28,6 +29,8 @@ func runAgentExecution(args []string) int {
 	file := fs.String("file", "", "execution spec, or - for stdin")
 	key := fs.String("key", "", "stable launch key")
 	executor := fs.String("executor", "", "lifecycle callback provider")
+	chain := fs.String("chain", "", "private original notifier argv")
+	tmuxBin := fs.String("tmux-bin", "", "callback tmux executable")
 	notification := fs.String("notification", "", "provider completion JSON argument")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
@@ -37,6 +40,13 @@ func runAgentExecution(args []string) int {
 		return 2
 	}
 	fail := func(err error) int { fmt.Fprintln(os.Stderr, err); return 1 }
+	var forwardError error
+	if sub == "notify" {
+		if *file != "" || *chain == "" || *notification == "" || *executor != "codex" {
+			return fail(fmt.Errorf("notify requires --executor codex, --chain and --notification"))
+		}
+		forwardError = agentlifecycle.ForwardNotification(context.Background(), runtime.New().DataDir, *chain, *notification, os.Stdout, os.Stderr)
+	}
 	release, err := instanceLease()
 	if err != nil {
 		return fail(err)
@@ -47,6 +57,9 @@ func runAgentExecution(args []string) int {
 		return fail(err)
 	}
 	service := agentexecution.Service{Runtime: runtime.New(), Executable: exe}
+	if *tmuxBin != "" {
+		service.Runtime.TmuxBin = *tmuxBin
+	}
 	var status agentexecution.Status
 	switch sub {
 	case "hook-config":
@@ -58,7 +71,7 @@ func runAgentExecution(args []string) int {
 			return fail(err)
 		}
 		return 0
-	case "event":
+	case "event", "notify":
 		if (*file == "") == (*notification == "") {
 			return fail(fmt.Errorf("event requires either --file or --notification"))
 		}
@@ -76,6 +89,9 @@ func runAgentExecution(args []string) int {
 				return 0
 			}
 			return fail(err)
+		}
+		if forwardError != nil {
+			return fail(forwardError)
 		}
 		// Hooks consume this output; never inject receipt JSON as developer context.
 		fmt.Println("{}")

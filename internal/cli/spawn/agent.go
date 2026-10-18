@@ -1,11 +1,16 @@
 package spawn
 
 import (
+	"context"
+	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/ybz21/Roami/internal/agent"
+	"github.com/ybz21/Roami/internal/agentlifecycle"
 	"github.com/ybz21/Roami/internal/id"
-	"strings"
+	metadb "github.com/ybz21/Roami/internal/storage"
+	runtime "github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 // AgentConfig captures the knobs lib/agent.sh exposed via AGENT_* env vars.
@@ -22,7 +27,8 @@ type AgentConfig struct {
 	// 不指定的话，「哪份 transcript 属于哪个会话」只能靠 cwd + 取最新文件猜，
 	// 而会话一死这个猜法就失准（同目录的别的会话会赢）。指定之后关联由构造保证，
 	// 台账把它记下来，M3 的「重开并接回原对话」才有依据。codex 没有对应参数，忽略。
-	SessionUUID string
+	SessionUUID   string
+	lifecycleArgs []string
 }
 
 // DefaultAgentConfig mirrors _agent_defaults.
@@ -97,11 +103,49 @@ func (c AgentConfig) prefix(interactive bool) string {
 			args = a.OneShotArgs(c.startOpts())
 		}
 	}
-	b := "cd '" + c.Workdir + "' && " + c.bin(a)
+	b := "cd " + shellQuote(c.Workdir) + " && " + c.bin(a)
 	if len(args) > 0 {
 		b += " " + strings.Join(args, " ")
 	}
+	if interactive {
+		for _, arg := range c.lifecycleArgs {
+			b += " " + shellQuote(arg)
+		}
+	}
 	return b
+}
+
+// PrepareInteractive keeps unsupported vendor versions usable without claiming continuation readiness.
+func (c AgentConfig) PrepareInteractive(rt runtime.Runtime) (AgentConfig, error) {
+	if !c.Interactive || c.resolve().Kind() != "codex" {
+		return c, nil
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return c, err
+	}
+	paths, err := metadb.ResolvePaths(rt.HomeDir, rt.DataDir)
+	if err != nil {
+		return c, err
+	}
+	ctx := rt.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	args, err := agentlifecycle.PrepareCodex(ctx, agentlifecycle.CodexOptions{
+		Binary: c.bin(c.resolve()), Executable: executable, Directory: c.Workdir,
+		HomeDir: paths.Home, DataDir: paths.Data, DatabaseDir: paths.Database, BackupDir: paths.Backup, TmuxBin: rt.TmuxBin,
+	})
+	if err != nil {
+		return c, err
+	}
+	c.lifecycleArgs = args
+	return c, nil
+}
+
+// ResumeInteractive preserves the original conversation while using scoped callbacks.
+func (c AgentConfig) ResumeInteractive(conversation string) string {
+	return c.prefix(true) + " resume " + shellQuote(conversation)
 }
 
 // Command builds the shell command line that launches the agent, mirroring
