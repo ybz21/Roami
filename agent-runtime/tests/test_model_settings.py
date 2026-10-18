@@ -330,3 +330,32 @@ async def test_shared_connection_migrates_legacy_main_key_without_copying_worker
             )
     finally:
         await runtime.close()
+
+
+async def test_shared_connection_catalog_cannot_retarget_main_key_via_worker_role(
+    store, monkeypatch
+):
+    from roami_agent.protocol.model_routes import ModelRoute
+
+    monkeypatch.setenv("ROAMI_FIXTURE_MAIN", FIXTURE_CREDENTIAL)
+    monkeypatch.delenv("ROAMI_FIXTURE_WORKER", raising=False)
+    runtime = Runtime(
+        store,
+        Model(),
+        settings=Settings(
+            endpoint="https://main.example/v1",
+            model="main",
+            key_env="ROAMI_FIXTURE_MAIN",
+            worker_route=ModelRoute(
+                "https://worker.example/v1", "worker", "ROAMI_FIXTURE_WORKER", 30
+            ),
+        ),
+    )
+    try:
+        with pytest.raises(DomainError, match="MODEL_KEY_REQUIRED_FOR_ENDPOINT"):
+            await runtime.model_settings.models(
+                "local", "worker", {"connection": {"baseUrl": "https://different.example/v1"}}
+            )
+        assert not settings_path(store.data_root).exists()
+    finally:
+        await runtime.close()

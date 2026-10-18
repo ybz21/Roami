@@ -377,7 +377,9 @@ class ModelSettings:
             )
             if (
                 candidate.endpoint != route.endpoint
-                and self.runtime.settings.credentials(role)
+                and self.runtime.settings.credentials(
+                    "main" if patch and "connection" in patch else role
+                )
                 and not supplied.get("apiKey")
             ):
                 raise DomainError("MODEL_KEY_REQUIRED_FOR_ENDPOINT")
