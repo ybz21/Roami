@@ -57,6 +57,8 @@ html[data-size="compact"] .agent-toolbar { padding-inline:var(--sp-2); gap:var(-
 html[data-size="compact"] .agent-messages { padding:var(--sp-4); }
 html[data-size="compact"] .agent-composer { padding:var(--sp-2) var(--sp-3) var(--sp-3); }
 html[data-size="compact"] .agent-toolbar > button:first-child span { display:none; }
+html[data-size="medium"] .tt-page-home { box-sizing:border-box; padding:0 0 var(--mobile-nav-offset); }
+html[data-size="medium"] .agent-pagehead { display:none; }
 .tt-nav-item .bd.danger { background:var(--danger); }
 html[data-pointer="coarse"] .agent-compose-options .ant-select { height:var(--tap); }
 html[data-pointer="coarse"] .agent-composer textarea { min-height:var(--tap); }
