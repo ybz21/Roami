@@ -49,11 +49,14 @@ type Receipt struct {
 }
 
 type Result struct {
-	State      string `json:"state"`
-	Summary    string `json:"summary"`
-	ExitCode   int    `json:"exitCode"`
-	Stderr     string `json:"stderr,omitempty"`
-	FinishedMS int64  `json:"finishedMs"`
+	InputStopped *bool  `json:"inputStopped,omitempty"`
+	OutcomeKnown *bool  `json:"outcomeKnown,omitempty"`
+	StopEvidence string `json:"stopEvidenceSha256,omitempty"`
+	State        string `json:"state"`
+	Summary      string `json:"summary"`
+	ExitCode     int    `json:"exitCode"`
+	Stderr       string `json:"stderr,omitempty"`
+	FinishedMS   int64  `json:"finishedMs"`
 }
 
 type Status struct {

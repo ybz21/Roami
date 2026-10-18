@@ -26,6 +26,7 @@ class Database:
         self.locks = []
         self.closed = False
         self.pending = 0
+        self.instance_paths = None
 
     async def open(self):
         try:
@@ -50,6 +51,7 @@ class Database:
             layout = json.loads((self.data_root / "storage-layout.json").read_text())
             if (self.data_root / "storage-migration.json").exists():
                 raise DomainError("STORAGE_RECOVERY_REQUIRED", 503)
+            self.instance_paths = dict(layout["paths"])
             db_root = Path(layout["paths"]["databaseRoot"])
             catalog = json.loads((db_root / "catalog.json").read_text())
             if catalog["instanceId"] != layout["instanceId"]:

@@ -17,11 +17,11 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
-	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" {
+	if sub != "launch" && sub != "status" && sub != "cancel" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -95,6 +95,26 @@ func runAgentExecution(args []string) int {
 		}
 		// Hooks consume this output; never inject receipt JSON as developer context.
 		fmt.Println("{}")
+		return 0
+	case "reconcile-native":
+		if *file == "" || *key == "" {
+			return fail(fmt.Errorf("reconcile-native requires --key and --file"))
+		}
+		content, err := agentInput(*file, "")
+		if err != nil {
+			return fail(err)
+		}
+		var proof agentexecution.NativeStopConfirmation
+		if err = json.Unmarshal(content, &proof); err != nil {
+			return fail(err)
+		}
+		result, err := service.ReconcileNative(context.Background(), *key, proof)
+		if err != nil {
+			return fail(err)
+		}
+		if err = json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			return fail(err)
+		}
 		return 0
 	case "hold":
 		if *file != "-" {

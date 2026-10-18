@@ -29,6 +29,7 @@ from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
 from roami_agent.executors.native import NativeExecutor
+from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.memory.jobs import MemoryJobs
@@ -133,6 +134,10 @@ class Runtime:
         self.proactive_monitor = None
         self.brief_monitor = None
         self.artifact_monitor = None
+        self.native_reconciliation_monitor = None
+        self.native_reconciliation = NativeWorkspaceReconciliation(
+            database, self.settings, resources=self.resources
+        )
         register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
         register_reminder_tools(
             self.tools,
@@ -231,9 +236,21 @@ class Runtime:
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
         self.brief_monitor = asyncio.create_task(self._monitor_briefs())
         self.artifact_monitor = asyncio.create_task(self._monitor_artifacts())
+        if self.db.managed:
+            self.native_reconciliation_monitor = asyncio.create_task(
+                self._monitor_native_reconciliation()
+            )
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
+
+    async def _monitor_native_reconciliation(self):
+        while not self.stopping:
+            try:
+                await self.native_reconciliation.tick()
+            except (DomainError, OSError, TimeoutError):
+                log.exception("Native workspace stop reconciliation failed")
+            await asyncio.sleep(2)
 
     async def _monitor_artifacts(self):
         while not self.stopping:
@@ -341,6 +358,9 @@ class Runtime:
         if self.desktop_monitor:
             self.desktop_monitor.cancel()
             await asyncio.gather(self.desktop_monitor, return_exceptions=True)
+        if self.native_reconciliation_monitor:
+            self.native_reconciliation_monitor.cancel()
+            await asyncio.gather(self.native_reconciliation_monitor, return_exceptions=True)
         if self.artifact_monitor:
             self.artifact_monitor.cancel()
             await asyncio.gather(self.artifact_monitor, return_exceptions=True)
