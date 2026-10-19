@@ -114,6 +114,24 @@ class TargetDirectory:
         except (ValueError, TypeError) as exc:
             raise DomainError("INVALID_TARGET_RECEIPT") from exc
 
+    async def executors(self, commands=None):
+        options = ["--commands", ",".join(commands)] if commands else []
+        catalog = await self._query("agent", "execution", "catalog", *options)
+        if (
+            not isinstance(catalog, dict)
+            or catalog.get("version") != 1
+            or not isinstance(catalog.get("candidates"), list)
+            or not all(
+                isinstance(c, dict)
+                and isinstance(c.get("kind"), str)
+                and type(c.get("installed")) is bool
+                and type(c.get("tracked")) is bool
+                for c in catalog["candidates"]
+            )
+        ):
+            raise DomainError("INVALID_EXECUTOR_CATALOG")
+        return catalog
+
     async def overview(self):
         payload = await self._query("project", "ls", "--json")
         try:
@@ -161,22 +179,29 @@ class TargetDirectory:
     def _project(self, entry):
         if not isinstance(entry, dict):
             raise DomainError("INVALID_TARGET_RECEIPT")
-        return {
+        result = {
             "kind": "project",
             "projectId": self._text(entry, "key"),
             "label": self._text(entry, "name")[:160],
             "archived": entry.get("archived") is True,
         }
+        if entry.get("defaultAgent") in {"codex", "claude", "native"}:
+            result["defaultExecutor"] = entry["defaultAgent"]
+        return result
 
     def _session(self, entry):
         if not isinstance(entry, dict):
             raise DomainError("INVALID_TARGET_RECEIPT")
-        return {
+        result = {
             "kind": "session",
             "sessionId": self._text(entry, "id"),
             "label": self._text(entry, "label")[:160],
             "state": "live",
         }
+        executor = entry.get("executor") or entry.get("agent")
+        if executor in {"codex", "claude", "opencode", "pi"}:
+            result["executor"] = executor
+        return result
 
     async def search(self, kind, query="", *, offset=0, limit=10, project_id=None):
         if project_id and kind != "session":

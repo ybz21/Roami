@@ -17,9 +17,19 @@ TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
 
 
 class Tasks:
-    def __init__(self, database, conversations, *, max_depth=2, max_children=3):
+    def __init__(
+        self,
+        database,
+        conversations,
+        *,
+        max_depth=2,
+        max_children=3,
+        max_turns=16,
+        timeout_seconds=600,
+    ):
         self.db, self.conversations = database, conversations
         self.max_depth, self.max_children = max_depth, max_children
+        self.max_turns, self.timeout_ms = max_turns, timeout_seconds * 1000
         self.revisions = TaskRevisions(database)
 
     @staticmethod
@@ -52,6 +62,7 @@ class Tasks:
         record_intent=False,
         source_turn_id=None,
         source_assistant_message_id=None,
+        routing_decision=None,
     ):
         if (
             not key
@@ -105,6 +116,8 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if routing_decision is not None:
+            spec["routingDecision"] = routing_decision
         if source_turn_id or source_assistant_message_id:
             spec.update(
                 sourceTurnId=source_turn_id,
@@ -208,12 +221,13 @@ class Tasks:
                     encoded(
                         {
                             "depth": depth,
-                            "maxTurns": 16,
+                            "maxTurns": self.max_turns,
                             "deadlineMs": min(
-                                now_ms() + 600_000, json.loads(parent["budget_json"])["deadlineMs"]
+                                now_ms() + self.timeout_ms,
+                                json.loads(parent["budget_json"])["deadlineMs"],
                             )
                             if parent
-                            else now_ms() + 600_000,
+                            else now_ms() + self.timeout_ms,
                         }
                     ),
                     now_ms(),

@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-19",
+  "scope": "compact queue strip above composer; automatic busy-time queue and explicit priority submission",
+  "runs": [
+    {
+      "passed": true,
+      "device": "desktop",
+      "provider": "isolated controlled SSE provider",
+      "backend": "actual Go/Python/SQLite/SSE",
+      "queueAboveComposer": true,
+      "automaticBusyQueue": true,
+      "priorityReplyBeforeOriginalProviderReleased": true,
+      "stableRequestKeys": true,
+      "retainedOtherDrafts": true,
+      "FIFO": true,
+      "reloadRestores": true,
+      "duplicateMessages": 0,
+      "noHorizontalOverflow": true,
+      "phoneFourTabs": false,
+      "routeDesignScenariosExecuted": 0
+    },
+    {
+      "passed": true,
+      "device": "Redmi Note 8 actual touch",
+      "provider": "isolated controlled SSE provider",
+      "backend": "actual Go/Python/SQLite/SSE",
+      "queueAboveComposer": true,
+      "automaticBusyQueue": true,
+      "priorityReplyBeforeOriginalProviderReleased": true,
+      "stableRequestKeys": true,
+      "retainedOtherDrafts": true,
+      "FIFO": true,
+      "reloadRestores": true,
+      "duplicateMessages": 0,
+      "noHorizontalOverflow": true,
+      "phoneFourTabs": true,
+      "routeDesignScenariosExecuted": 0
+    },
+    {
+      "passed": true,
+      "device": "english",
+      "provider": "isolated controlled SSE provider",
+      "backend": "actual Go/Python/SQLite/SSE",
+      "queueAboveComposer": true,
+      "automaticBusyQueue": true,
+      "priorityReplyBeforeOriginalProviderReleased": true,
+      "stableRequestKeys": true,
+      "retainedOtherDrafts": true,
+      "FIFO": true,
+      "reloadRestores": true,
+      "duplicateMessages": 0,
+      "noHorizontalOverflow": true,
+      "phoneFourTabs": false,
+      "routeDesignScenariosExecuted": 0
+    }
+  ],
+  "checks": {
+    "frontendTypecheck": true,
+    "i18nKeys": 2948,
+    "hoverAudit": true,
+    "vitestFiles": 96,
+    "vitestTestsPassed": 684,
+    "pythonTestsPassed": 574,
+    "fullQualityGate": "passed",
+    "productionBuild": "passed",
+    "fullQualityLog": "/tmp/roami-routing-full-quality-final.log"
+  },
+  "limitations": [
+    "Controlled local streaming provider, not provider model performance measurement.",
+    "Main preemption occurs at supported safe boundaries; does not cancel independent background tasks.",
+    "Queue is local to this device and browser, not a server-side delivery promise.",
+    "No /approvals protocol change; awaiting clarification."
+  ],
+  "screenshots": [
+    "/tmp/roami-routing-desktop.png",
+    "/tmp/roami-routing-phone.png",
+    "/tmp/roami-routing-english.png"
+  ],
+  "files": [
+    "frontend/src/components/agent/AgentChat.tsx",
+    "frontend/src/components/agent/AgentOutbox.tsx",
+    "frontend/src/components/agent/agent-chat.css",
+    "frontend/src/components/agent/useAgentOutbox.test.tsx",
+    "frontend/src/components/agent/agent-composer-queue.test.tsx",
+    "frontend/src/i18n/locales/zh-CN.ts",
+    "frontend/src/i18n/locales/en-US.ts"
+  ],
+  "deployment": "not deployed"
+}

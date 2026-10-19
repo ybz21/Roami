@@ -35,3 +35,7 @@ html[data-pointer="coarse"] .agent-activity-toggle,html[data-pointer="coarse"] .
 html[data-size="compact"] .agent-activity-toggle time { display:none; }
 
 .agent-activity-toggle .agent-activity-failure { margin:0; }
+
+.agent-routing-reason { margin:0 0 var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); overflow-wrap:anywhere; }
+.agent-routing-details { display:flex; flex-direction:column; gap:var(--sp-1); margin-block:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-routing-details p { margin:0; }

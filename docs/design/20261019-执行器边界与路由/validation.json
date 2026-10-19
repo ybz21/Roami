@@ -1,0 +1,59 @@
+{
+  "scope": "design_document_only",
+  "routeScenariosExecuted": 0,
+  "scenarioExpectations": 48,
+  "viewports": [
+    {
+      "width": 360,
+      "scrollWidth": 360,
+      "bodyHeight": 1000,
+      "screenHeight": 1000,
+      "size": "compact"
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "bodyHeight": 1000,
+      "screenHeight": 1000,
+      "size": "compact"
+    },
+    {
+      "width": 768,
+      "scrollWidth": 768,
+      "bodyHeight": 1000,
+      "screenHeight": 1000,
+      "size": "medium"
+    },
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "bodyHeight": 1000,
+      "screenHeight": 1000,
+      "size": "large"
+    }
+  ],
+  "android": {
+    "model": "Redmi Note 8",
+    "nativeTouch": true
+  },
+  "errors": [],
+  "passed": true,
+  "localLinksChecked": 62,
+  "linkCheckPassed": true,
+  "scenarioSchemaAndDocumentConsistency": true,
+  "designRevision": 3,
+  "documentReview": {
+    "rounds": 4,
+    "findings": 13,
+    "record": "review.md"
+  },
+  "screenshots": [
+    "/tmp/roami-routing-v3-desktop.png",
+    "/tmp/roami-routing-v3-phone.png",
+    "/tmp/roami-routing-v3-phone-cases.png"
+  ],
+  "runtimeChanges": false,
+  "i18nException": "Developer design document; future product strings require global i18n.",
+  "revisionScope": "Open task examples; qualitative complexity based on planning, uncertainty, coordination and verification, with request-specific routing explanation; no fixed task-class mapping or score threshold.",
+  "scenarioExecutionStatus": "48 expectations checked for consistency only; no route task execution claimed"
+}

@@ -4,7 +4,8 @@ export type AgentMessage = {
   id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number
   content: { question?: AgentQuestion; text?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
-export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; name: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
+export type AgentRoutingDecision = { version: number; policyVersion: string; action: string; executor: string; complexity: 'bounded' | 'complex'; complexityBasis: Record<string, string>; routingExplanation: string; reasonCode: string; capabilityVerification?: string }
+export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; routingDecision?: AgentRoutingDecision; name: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
 export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }

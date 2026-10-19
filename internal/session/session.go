@@ -88,6 +88,20 @@ func resolvedIdentity(row runtime.SessionRow) map[string]string {
 	return map[string]string{"name": row.Name, "label": row.DisplayLabel(), "id": row.ID(), "tmux_id": row.TmuxID}
 }
 
+func resolvedExecutorIdentity(rt runtime.Runtime, row runtime.SessionRow) map[string]string {
+	identity := resolvedIdentity(row)
+	if rt.HomeDir == "" || row.Name == "" {
+		return identity
+	}
+	store := sessmeta.New(rt.HomeDir)
+	store.DataDir = rt.DataDir
+	if saved, ok := store.Get(row.Name); ok && saved.AgentKind != "" {
+		identity["executor"] = saved.AgentKind
+		identity["executorSource"] = "session_registry"
+	}
+	return identity
+}
+
 func InfoJSON(rt runtime.Runtime, version string, exclude map[string]bool, w io.Writer) error {
 	sessions := 0
 	for _, name := range rt.Sessions() {
@@ -155,7 +169,7 @@ func Resolve(rt runtime.Runtime, args []string, w io.Writer) error {
 			return err
 		}
 		if has(args, "--json") {
-			return json.NewEncoder(w).Encode(resolvedIdentity(row))
+			return json.NewEncoder(w).Encode(resolvedExecutorIdentity(rt, row))
 		}
 		_, err = io.WriteString(w, row.Name+"\n")
 		return err
@@ -166,7 +180,7 @@ func Resolve(rt runtime.Runtime, args []string, w io.Writer) error {
 	}
 	if has(args, "--json") {
 		row := rt.SessionRow(name)
-		return json.NewEncoder(w).Encode(resolvedIdentity(row))
+		return json.NewEncoder(w).Encode(resolvedExecutorIdentity(rt, row))
 	}
 	_, err := io.WriteString(w, name+"\n")
 	return err

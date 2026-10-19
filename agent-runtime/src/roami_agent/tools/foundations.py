@@ -27,7 +27,9 @@ GROUPS = {
     "session_dispatch_status": "sessions",
     "task_status": "tasks",
     "task_cancel": "tasks",
+    "task_steer": "tasks",
     "capability_overview": "discovery",
+    "executor_catalog": "discovery",
 }
 
 
@@ -167,8 +169,8 @@ class ToolDirectory:
             )
             if any(item["name"] == "web-research" for item in result["suggestions"]):
                 result["hint"] += (
-                    " web-research is a Skill, not a web_research CLI command. For public lookups Main can directly delegate "
-                    "executor=native, target={kind:new_session,resourceOnly:true}, passing the user's goal."
+                    " web-research is a Skill, not a web_research CLI command. For bounded public lookups Main can directly delegate "
+                    "executor=native, target={kind:new_session,resourceOnly:true}, with routing complexity=bounded and a concrete basis. Complex investigations use a professional executor; task examples are open."
                 )
         return result
 

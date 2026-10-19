@@ -21,6 +21,7 @@ import { useAgentAttachments } from './useAgentAttachments'
 import { useAgentModels } from './useAgentModels'
 import { useAgentOutbox } from './useAgentOutbox'
 import AgentOutbox from './AgentOutbox'
+import AgentContextUsage from './AgentContextUsage'
 import './agent-chat.css'
 
 export function agentFailure(error: any, t: (key: string) => string) {
@@ -38,7 +39,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const thread = useAgentThread(cid, branch)
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
-  const [queueing, setQueueing] = useState(false)
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
   const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
@@ -92,7 +92,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     stick.current = true; setError(''); setPanel(null); setSource(null); panelRequest.current++
     if (!sendingRef.current || pending.current?.cid !== cid) {
       setTarget('direct')
-      setQueueing(false)
     }
   }, [draftKey])
   useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight }, [thread.view?.messages, thread.view?.activities, cid])
@@ -188,11 +187,11 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     if (!outbox.enqueue(draft.trim(), attachments.items.flatMap(item => item.reference ? [item.reference] : []))) { message.error(t('agent.outbox.storageFailed')); return }
     changeDraft(''); attachments.clear(); setCommandsOpen(false)
   }
-  const queueDraft = queueing && target === 'direct' && !draft.trim().startsWith('/')
+  const queueDraft = !!cid && target === 'direct' && !draft.trim().startsWith('/') && (running || compacting || outbox.items.length > 0)
   const sendDraft = () => { if (queueDraft) enqueue(); else void submit() }
   const composerActions = {
     models, node, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
-    canDelegate: !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: () => { setTarget('loose'); setQueueing(false) },
+    canDelegate: !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: () => setTarget('loose'),
     onCompact: () => { void submit('/compact', false) },
     onCommands: () => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) },
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
@@ -205,6 +204,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else setPanel(key as 'tasks' | 'memory' | 'context') } }
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const title = 'Roami'
+  const latestMessage = thread.view?.messages[thread.view.messages.length - 1]
   const latestUserSeq = Math.max(0, ...bodies.filter(m => m.role === 'user').map(m => m.seq))
 
   return <section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
@@ -228,7 +228,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     </div>
     {error && <div className="agent-feedback error" role="alert">{error}</div>}
     <div className="agent-composer">
-      <AgentOutbox key={draftKey} outbox={outbox} ready={outboxReady} />
+      <AgentOutbox key={draftKey} outbox={outbox} ready={outboxReady} running={running} />
       <div className="tt-composer agent-compose-card">
         {!!attachments.items.length && <div className="agent-draft-files">{attachments.items.map(item => <div className={`agent-file-card is-${item.state}`} key={item.key}>
           <FileTextIcon size={20} /><span>{item.name}<small>{t(item.state === 'uploading' ? item.processing ? 'agent.composer.imagePreparing' : 'agent.composer.uploading' : item.state === 'failed' ? item.preparationFailed ? 'agent.composer.imagePrepareFailed' : 'agent.composer.uploadFailed' : item.reference?.previewState === 'unsupported' ? 'agent.composer.fileStoredOnly' : item.reference?.previewState === 'image' && !models.settings?.main.images ? 'agent.composer.imageUnavailable' : ['unavailable', 'encrypted', 'no_text'].includes(item.reference?.previewState || '') ? 'agent.composer.fileUnavailable' : item.optimized ? 'agent.composer.imageOptimized' : 'agent.composer.fileReady')}</small></span>
@@ -247,10 +247,14 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
               if (!phone && event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendDraft() }
             }} />
           {slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
+          <div className="agent-compose-status">
+            <AgentContextUsage cid={historical ? '' : cid} node={node} model={`${models.settings?.main.model || ''}:${models.settings?.main.contextWindow || ''}`} revision={`${thread.view?.turns.map(turn => turn.id + ':' + turn.state).join(',')}:${latestMessage?.id}:${latestMessage?.status}:${compact?.state}`} active={running || compacting} onOpen={() => setPanel('context')} />
+            {(compacting || attachments.items.length > 0) && <span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span>}
+          </div>
           <div className="tt-cbar agent-compose-bar">
             <div className="tt-cgrp">
               <AgentComposerPlus {...composerActions} />
-              <Dropdown trigger={['click']} menu={{ selectedKeys: [target !== 'direct' ? 'task' : queueing ? 'queue' : 'direct'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'queue', label: t('agent.outbox.mode'), icon: <ClockIcon size={16} />, disabled: !cid }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => { setTarget(key === 'task' ? 'loose' : 'direct'); setQueueing(key === 'queue') } }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target !== 'direct' ? 'agent.composer.taskMode' : queueing ? 'agent.outbox.mode' : 'agent.composer.chatMode')}<ChevronDown size={14} /></button></Dropdown>
+              <Dropdown trigger={['click']} menu={{ selectedKeys: [target !== 'direct' ? 'task' : 'direct'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => setTarget(key === 'task' ? 'loose' : 'direct') }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target !== 'direct' ? 'agent.composer.taskMode' : 'agent.composer.chatMode')}<ChevronDown size={14} /></button></Dropdown>
             </div>
             <div className="tt-cend">
               <AgentComposerPlus {...composerActions} modelTrigger />
@@ -264,7 +268,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
           <Dropdown trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'codex', label: 'Codex', icon: <AgentLogo kind="codex" /> }, { key: 'claude', label: 'Claude Code', icon: <AgentLogo kind="claude" /> }], onClick: ({ key }) => setExecutor(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor as 'codex' | 'claude'} />{executor === 'codex' ? 'Codex' : 'Claude Code'}<ChevronDown /></button></Dropdown>
         </div>}
       </div>
-      {(compacting || attachments.items.length > 0) && <div className="agent-compose-footnote" role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</div>}
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}
@@ -273,7 +276,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
       {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
       {panel === 'tasks' && <AgentTasks key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox.refresh() }} />}
       {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID, sourceBranch, sourceMessage) => { setPanel(null); select(sourceCID, sourceBranch, sourceMessage) }} />}
-      {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? context.contextWindow ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.contextWindow }) : t('agent.contextUnknown', { used: context.estimatedTokens }) : t('agent.contextHint')}</p>{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
+      {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? context.contextWindow ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.contextWindow }) : t('agent.contextUnknown', { used: context.estimatedTokens }) : t('agent.contextHint')}</p>{context?.contextWindow && <p>{t('agent.contextMeter.threshold', { percent: Math.round((context.compactionRatio ?? 0.75) * 100) })}</p>}{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
         <Button disabled={!cid || readOnly || compacting || running} onClick={() => { void submit('/compact') }}>{t('agent.compactNow')}</Button>
         {compacting && compact && <Button onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/compactions/${encodeURIComponent(compact.operationId)}/cancel`) }}>{t('agent.cancelCompact')}</Button>}
         <div className="agent-command-list">{['compact', 'status', 'tasks', 'memory', 'stop', 'help'].map((name) => <button className="tt-act" type="button" key={name} onClick={() => { changeDraft('/' + name + (name === 'compact' ? ' ' : '')); setPanel(null) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>

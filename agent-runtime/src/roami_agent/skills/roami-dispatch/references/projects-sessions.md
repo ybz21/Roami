@@ -34,7 +34,7 @@
 | 新散任务 | `target:{kind:"new_session",directory:"已知绝对目录"}`, executor, goal | 不绑项目；只有确需代码且目录未知时才发现或询问 |
 | 新项目 | `target:{kind:"new_project",name:"名称",baseDir:"可选父目录"}`, executor, goal | 仅在用户要求新项目时创建，不用于逃避旧会话限制 |
 | 原生 Worker | `executor:"native"`，合法 project/new_session 目标，goal | 用后台模型执行，显式指定优先于历史偏好 |
-| 公开网页研究 | `executor:"native",target:{kind:"new_session",resourceOnly:true}`, goal | 无代码目录，仅浏览器导航与观察 |
+| 简单公开网页研究 | `executor:"native",target:{kind:"new_session",resourceOnly:true}`, goal | 无代码目录，仅浏览器导航与观察 |
 | 检查点 Fork | delegate 增加 fromMessageId | 只从已完成助手检查点派生；保留父任务、预算和原 Main 回报目标 |
 
 queued / preparing 不代表已给 Codex 投递，失败不静默创建第二个会话。专业 Agent 是否安装、可登录、用量可读是不同状态，不能把未知额度说成额度充足。

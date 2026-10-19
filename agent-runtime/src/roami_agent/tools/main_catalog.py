@@ -1,11 +1,12 @@
 """Short Main tools bound to conversation-scoped application services."""
 
+from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 
 
-def register_main_tools(registry, tasks, memory, targets):
+def register_main_tools(registry, tasks, memory, targets, router=None):
     async def send_message(args, binding):
         return await targets.send(
             args["sessionId"],
@@ -33,6 +34,31 @@ def register_main_tools(registry, tasks, memory, targets):
             send_message,
             main=True,
             effect="write",
+        )
+    )
+
+    async def executor_catalog(args, binding):
+        return await targets.executors(args.get("commands"))
+
+    registry.add(
+        Tool(
+            "executor_catalog",
+            "Discover local professional executors without starting them. Installation is not authentication, quota, or verification of specialized tools; unknown stays unknown.",
+            object_schema(
+                {
+                    "commands": {
+                        "type": "array",
+                        "maxItems": 24,
+                        "uniqueItems": True,
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,100}$",
+                        },
+                    }
+                }
+            ),
+            executor_catalog,
+            main=True,
         )
     )
 
@@ -149,6 +175,8 @@ def register_main_tools(registry, tasks, memory, targets):
     )
 
     async def delegate(args, binding):
+        decision = await router.decide(args, binding) if args.get("routing") and router else None
+        executor = decision["executor"] if decision else args.get("executor", "native")
         target = args.get("target") or {}
         if target.get("kind") == "session" and not binding.get("taskId"):
             if "session_send" in registry.disabled_tools:
@@ -159,13 +187,21 @@ def register_main_tools(registry, tasks, memory, targets):
                 target.get(k) for k in ["directory", "workspaceId", "base", "remote"]
             ):
                 raise DomainError("CODING_SESSION_TARGET_CONFLICT")
-            destination = await targets.resolve("session", target["sessionId"])
-            return await targets.send(
+            destination = (
+                decision["targetRef"]
+                if decision
+                else await targets.resolve("session", target["sessionId"])
+            )
+            result = await targets.send(
                 destination["sessionId"],
                 args["goal"],
                 binding["turnId"] + ":" + binding["toolCallId"],
                 binding=binding,
             )
+            if decision:
+                result["routingDecision"] = public_routing(decision)
+            return result
+        routing_args = {"routing_decision": decision} if decision else {}
         task = await tasks.create(
             binding["owner"],
             binding["conversation"],
@@ -174,19 +210,21 @@ def register_main_tools(registry, tasks, memory, targets):
             source_turn_id=binding["turnId"],
             source_assistant_message_id=binding["assistantMessageId"],
             parent_task_id=binding.get("taskId"),
-            executor=args.get("executor", "native"),
+            executor=executor,
             target=args.get("target"),
             from_message_id=args.get("fromMessageId"),
             origin_message_id=binding["originMessageId"],
+            **routing_args,
         )
         return {
             "id": task["id"],
             "taskId": task["id"],
             "kind": "background_task",
-            "executor": args.get("executor", "native"),
+            "executor": executor,
             "state": task["state"],
             "acceptedOnly": True,
             "delivery": "pending" if task["state"] == "queued" else "unconfirmed",
+            **({"routingDecision": public_routing(decision)} if decision else {}),
         }
 
     async def status(args, binding):
@@ -261,10 +299,11 @@ def register_main_tools(registry, tasks, memory, targets):
     registry.add(
         Tool(
             "delegate",
-            "Delegate long work to a project or new executor. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return background_task queue acceptance with a taskId and delivery pending. A taskId or native branch ID is not a sessionId: never use it with target.kind=session or search for it as a tmux session. Continue native work in a new native target with its requested directory. Use fromMessageId only for a completed checkpoint Fork.",
+            "Delegate work with routing={complexity:bounded|complex,complexityBasis:{dimension:request-specific fact},routingExplanation:concrete reason}. Task kinds are open; the host chooses native for bounded work and an available professional for complex work, unless a source-backed explicit executor overrides. No fixed category, score or step threshold. Omit executor to use project/preference/node selection; legacy requests without routing retain their original default. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return background_task queue acceptance with a taskId and delivery pending. A taskId or native branch ID is not a sessionId: never use it with target.kind=session or search for it as a tmux session. Continue known tracked work with the task_steer CLI capability and its actual revision; preserve the executor. Use fromMessageId only for a completed checkpoint Fork.",
             object_schema(
                 {
                     "goal": {"type": "string", "minLength": 1, "maxLength": 20000},
+                    "routing": routing_schema(),
                     "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
                     "target": {
                         **object_schema(
@@ -298,6 +337,35 @@ def register_main_tools(registry, tasks, memory, targets):
             delegate,
             effect="write",
             main=True,
+        )
+    )
+
+    async def steer_task(args, binding):
+        return await tasks.revisions.request(
+            binding["owner"],
+            args["taskId"],
+            args["text"],
+            args["revision"],
+            binding["turnId"] + ":" + binding["toolCallId"],
+            source_turn_id=binding["turnId"],
+            source_conversation_id=binding["conversation"],
+        )
+
+    registry.add(
+        Tool(
+            "task_steer",
+            "Continue a known tracked task with additional user requirements at its actual revision. Preserves its executor and source; waits for stop proof. This cannot switch executors or use a tmux sessionId. Queue acceptance is not completion.",
+            object_schema(
+                {
+                    "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
+                    "revision": {"type": "integer", "minimum": 1},
+                    "text": {"type": "string", "minLength": 1, "maxLength": 10000},
+                },
+                ["taskId", "revision", "text"],
+            ),
+            steer_task,
+            main=True,
+            effect="write",
         )
     )
 

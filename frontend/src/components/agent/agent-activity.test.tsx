@@ -73,3 +73,14 @@ it('reports unavailable historical details and allows a retry without claiming s
   await screen.findByText('agent.activity.noOutput')
   expect(screen.queryByText('agent.activity.state.succeeded')).toBeNull()
 })
+
+it('shows the concrete routing explanation while the group is collapsed and retains honest execution state', () => {
+  const routingDecision = { version: 1, policyVersion: 'complexity-v3', action: 'new_task', executor: 'codex', complexity: 'complex' as const, complexityBasis: { uncertainty: 'Sources disagree' }, routingExplanation: 'Investigate conflicting sources and revise the result after checks', reasonCode: 'complex_professional', capabilityVerification: 'not_verified' }
+  render(<AgentActivity items={[{ ...task('queued'), routingDecision }, { ...task('unknown'), id: 'tool:call', kind: 'tool', name: 'delegate', routingDecision }]} onSession={vi.fn()} />)
+  expect(screen.getByText(/Investigate conflicting sources/)).toBeTruthy()
+  expect(screen.getByText('agent.activity.problems 1')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button'))
+  document.querySelectorAll('[data-activity-id] .agent-activity-toggle').forEach(button => fireEvent.click(button))
+  expect(screen.getAllByText('Sources disagree')).toHaveLength(2)
+  expect(screen.getAllByText('agent.routing.capabilitiesUnverified')).toHaveLength(2)
+})

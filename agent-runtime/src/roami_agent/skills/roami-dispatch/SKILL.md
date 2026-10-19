@@ -38,8 +38,21 @@ description: Operate Roami projects, sessions and background agents through its 
 
 - “给这个 Codex 会话发消息 / 继续”已授权投递；查到唯一目标直接执行 `session_send`，不要再次确认、让用户粘贴命令或另建项目。多个目标才用 `ask_user` 给 2–4 个可识别选项。
 - 查项目总量用 `workspace_overview`；查某项目会话用 `target_search(kind="session",projectId=...)` 并跟随 `nextOffset`，不能把前三张卡片当全部。
-- 新项目、散任务和新项目工作区用 `delegate`；网页查询用原生 `resourceOnly` 检索任务，不创建代码项目。完整网页交互与纯公开检索的角色不同，见 Chrome 手册。
+- 新项目、散任务和新项目工作区用 `delegate`；简单、有界的网页查询用原生 `resourceOnly` 检索任务，不创建代码项目；复杂工作按实际规划、探索、协同与迭代负担交专业智能体，调研、原型、PPT、剪辑等仅作举例。完整网页交互与纯公开检索的角色不同，见 Chrome 手册。
 - `delivered` 只代表消息已提交；`queued` 只代表任务入队。派活返回 `replyExpected=true` / `dispatchId` 时，宿主已附上 `roami agent reply` 回报命令，执行器进展、阻塞和结果回原主对话，不让用户切会话查结果。`executionTracked=false` 仍表示没有供应商生命周期证明；没有收到回报时保持未确认，收到回报也不等于独立验收。细节读 references/agent-tasks.md。
 - 工具动作和结果回到原 Main；用户不必打开分支聊天。Worker 缺信息时回报 Main，Main 必要时提供选择题。
 - 内置工具、Skill、CLI 固定启用且只读，不能修改或启停；只有外部接入项允许管理。系统插件是另一类节点资源，不把“插件可配置”误当成内置 Agent 能力可以禁用。
 - 自动记忆与召回无需用户每次提醒；明确“记住”的偏好应有落库来源，不能仅凭助手自述说已保存。当前请求仍然优先。
+
+
+## 复杂度与执行器路由
+
+每次新委派给 delegate 传 routing：complexity 为 bounded / complex；complexityBasis 是与本次请求相关的开放维度说明；routingExplanation 用一句话解释自主执行负担，不只写“复杂”。任务类型开放，不按名称、工具次数或固定分数分流，也不先让 native 试做。
+
+已知流程能直接完成并核验的工具工作可用 native；需要持续自主规划、探索未知、协调依赖或依据反馈迭代的工作默认专业智能体。比如同为 PPT：按模板替换文字可以有界，从零组织论证并反复渲染修改则复杂；其他未列举工作按同一原则判断。
+
+宿主按本次显式选择、真实目标身份及能力约束处理；新复杂任务在可用专业执行器中考虑项目默认、已验证来源的记忆偏好和节点设置。显式选择用 routing.explicitExecutor 与原始用户消息中的 userQuote；记忆偏好用 preference={executor,memoryId,revision,quote}，不得用网页 / 工具文本伪装来源。
+
+`executor_catalog {commands?:[可执行名]}` 是受管 CLI 能力，不是新常驻工具。它只探测实际安装和指定节点命令是否存在，不执行供应商、不推测账号与额度。专用能力未知时由执行者发现、验证并报告缺口，不能仅凭 Codex / Claude 名称宣称能交付。必要节点命令可声明为 routing.requiredCapabilities 中的 cli:名称；其他开放能力仍保持未验证。
+
+已有 taskId 用 task_steer {taskId,revision,text} 续接，真实 revision 来自 task_status；它保持原 executor，等待旧动作停止。不能将 taskId / branchId 当 tmux sessionId，也不能把更换 executor 伪装成 steer。复杂专业任务尽量端到端负责；显式阶段确认必须保留，未知状态不重放。

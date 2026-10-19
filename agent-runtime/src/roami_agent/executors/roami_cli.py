@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.executors.professional_brief import professional_brief
 from roami_agent.executors.project import provision_project
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -29,6 +30,7 @@ class CodingExecutor:
 
     def __init__(self, database, settings):
         self.db, self.settings = database, settings
+        self.artifacts = None
 
     async def command(self, sub, *args, spec=None):
         response = await execute(
@@ -81,6 +83,8 @@ class CodingExecutor:
                 1, math.ceil((json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000)
             ),
         }
+        if self.artifacts:
+            launch["prompt"] += await professional_brief(self.db, self.artifacts, task, run)
         if target.get("nodeId", "local") != "local":
             raise DomainError("CODING_NODE_UNAVAILABLE")
         if target["kind"] == "session":

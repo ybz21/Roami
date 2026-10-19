@@ -27,6 +27,7 @@ from roami_agent.dispatch.daily_briefs import DailyBriefs
 from roami_agent.dispatch.reminders import Reminders
 from roami_agent.dispatch.resource_controls import ResourceControls
 from roami_agent.dispatch.resource_leases import ResourceLeases
+from roami_agent.dispatch.routing import TaskRouter
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.tasks import Tasks
@@ -90,8 +91,16 @@ class Runtime:
         self.worker_model = worker_model or model
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
-        self.tasks = Tasks(database, self.conversations, max_depth=self.settings.max_depth)
+        self.tasks = Tasks(
+            database,
+            self.conversations,
+            max_depth=self.settings.max_depth,
+            max_turns=self.settings.task_max_turns,
+            timeout_seconds=self.settings.task_timeout_seconds,
+        )
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
+        if isinstance(self.executor, CodingExecutor):
+            self.executor.artifacts = self.artifacts
         self.attachments = Attachments(database, self.artifacts)
         self.artifact_retention = ArtifactRetention(
             self.artifacts,
@@ -156,11 +165,13 @@ class Runtime:
             database, self.settings, resources=self.resources
         )
         self.session_dispatches = SessionDispatches(database, self.settings)
+        targets = TargetDirectory(self.settings, self.session_dispatches)
         register_main_tools(
             self.tools,
             self.tasks,
             self.memory,
-            TargetDirectory(self.settings, self.session_dispatches),
+            targets,
+            TaskRouter(database, targets, self.settings, self.memory),
         )
         register_reminder_tools(
             self.tools,

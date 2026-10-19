@@ -140,9 +140,9 @@ class ToolGateway:
             }:
                 value["recovery"] = (
                     "Main has no shell workspace for this operation. Do not retry shell commands, "
-                    "guess cwd or search projects to read a webpage. Use delegate executor=native "
+                    "guess cwd or search projects to read a webpage. For bounded public lookups use delegate executor=native "
                     "with the current user's goal. For web-only reading use "
-                    "target={kind:new_session,resourceOnly:true}; for file deliverables use "
+                    "target={kind:new_session,resourceOnly:true} with bounded routing; complex work goes to a professional executor with concrete routing evidence. For bounded file deliverables use "
                     "target={kind:new_session,directory:the_user_requested_directory}. "
                     "The worker loads the requested Skills and executes the task."
                 )

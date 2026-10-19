@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import public_error_code
 from roami_agent.storage.database import rows
 
@@ -77,6 +78,11 @@ def conversation_activity(db, cid, transcript):
                 "errorCode": public_error_code(report.get("summary"))
                 if task["state"] in {"failed", "interrupted"}
                 else None,
+                **(
+                    {"routingDecision": public_routing(spec["routingDecision"])}
+                    if spec.get("routingDecision")
+                    else {}
+                ),
                 "external": spec["executor"] in {"codex", "claude"},
                 "delivered": bool(attempt.get("session_id"))
                 and bool(
@@ -101,6 +107,14 @@ def conversation_activity(db, cid, transcript):
             + ") ORDER BY tc.created_ms DESC LIMIT 200",
             tuple(child_turns),
         )
+    routing = {
+        item["event_key"][8:]: json.loads(item["payload_json"])["decision"]
+        for item in rows(
+            db,
+            "SELECT event_key,payload_json FROM events WHERE conversation_id=? AND kind='routing.decided' ORDER BY id DESC LIMIT 200",
+            (cid,),
+        )
+    }
     for call in calls:
         task = child_turns.get(call["turn_id"])
         if not task and call["assistant_message_id"] not in visible:
@@ -125,6 +139,11 @@ def conversation_activity(db, cid, transcript):
             {
                 "id": "tool:" + call["id"],
                 "kind": "tool",
+                **(
+                    {"routingDecision": public_routing(routing[call["idempotency_key"]])}
+                    if call["idempotency_key"] in routing
+                    else {}
+                ),
                 "name": call["tool_name"],
                 "anchorMessageId": anchor(task) if task else call["assistant_message_id"],
                 "taskId": task["id"] if task else None,

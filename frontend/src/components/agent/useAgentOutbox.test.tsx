@@ -61,3 +61,26 @@ it('shows a reported service failure separately from a missing receipt and block
   await waitFor(() => expect(hook.result.current.items[0]?.state).toBe('failed'))
   expect(send).toHaveBeenCalledTimes(1)
 })
+
+it('sends only the selected queued intent immediately while Main is busy, retaining other drafts', async () => {
+  const send = vi.fn().mockResolvedValue(undefined)
+  const hook = renderHook(() => useAgentOutbox('priority', true, false, send))
+  act(() => { hook.result.current.enqueue('wait first', []); hook.result.current.enqueue('urgent second', []) })
+  const urgent = hook.result.current.items[1]
+  expect(send).not.toHaveBeenCalled()
+  act(() => hook.result.current.sendNow(urgent.id))
+  await waitFor(() => expect(hook.result.current.items.map(item => item.text)).toEqual(['wait first']))
+  expect(send).toHaveBeenCalledTimes(1)
+  expect(send).toHaveBeenCalledWith(urgent)
+})
+
+it('keeps a lost priority-send receipt unconfirmed and never releases the remaining queue automatically', async () => {
+  const send = vi.fn().mockRejectedValue(Error('receipt lost'))
+  const hook = renderHook(() => useAgentOutbox('priority-lost', true, false, send))
+  act(() => { hook.result.current.enqueue('urgent', []); hook.result.current.enqueue('later', []) })
+  const id = hook.result.current.items[0].id
+  act(() => hook.result.current.sendNow(id))
+  await waitFor(() => expect(hook.result.current.items[0].state).toBe('unconfirmed'))
+  expect(hook.result.current.items[1].state).toBe('waiting')
+  expect(send).toHaveBeenCalledTimes(1)
+})

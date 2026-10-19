@@ -53,6 +53,9 @@ class Tools:
             ):
                 continue
             wire = tool.wire()
+            if role == "main" and self.directory and tool.name == "delegate":
+                wire = deepcopy(wire)
+                wire["function"]["parameters"]["required"] = ["goal", "routing"]
             if role == "research":
                 wire = deepcopy(wire)
                 parameters = wire["function"]["parameters"]

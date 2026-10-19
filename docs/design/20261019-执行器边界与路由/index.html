@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN" data-design-version="3"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>执行器边界与路由 · Roami</title><link rel="stylesheet" href="../20261017-agent框架设计/technical/tech.css"></head>
+<body><div class="shell"><header class="top"><span class="brand">Roami / Agent Engineering</span><nav class="topnav" aria-label="设计入口"><a href="../20261017-agent框架设计/technical/index.html">技术总览</a><a href="review.md">审查记录</a></nav></header><main class="scroll"><div class="wrap">
+<header class="tt-pagehead"><div class="eyebrow">EXECUTOR ROUTING · 2026.10.19</div><h1>执行器边界与路由</h1><p>Main 快速接话与指挥，native 完成简单工具工作，专业智能体负责各类复杂任务。已有任务优先续接，全部结果回原 Main。</p><div class="tags"><span class="tag">复杂任务路由 v3 · 工作区已实现</span><span class="tag">沿用七个工具</span><span class="tag">无额外分类模型调用</span></div></header>
+<div class="note">用户补充已确认：专业智能体承接需要持续自主执行的复杂任务，复杂调研、原型、PPT、剪辑等仅作开放举例，任务名称不决定路由。本稿补充原技术模块 05 / 06 / 12 / 14 / 15。v3 路由策略、来源校验和过程原因展示已在工作区实现，按 PR 流程交付，尚未部署；跨执行器自动迁移仍不支持。实际验证和未通过项见 <a href="implementation.md">实施记录</a>；真实主模型测试返回 401，不能计为通过。源码基线 e4f2270，运行时代码已随 #329 合入 main 957a959。</div>
+<nav class="subnav" aria-label="本页章节"><a href="#boundary">职责边界</a><a href="#routing">选择顺序</a><a href="#contract">技术协议</a><a href="#context">上下文与记忆</a><a href="#handoff">分阶段与失败</a><a href="#product">产品呈现</a><a href="#review">审查与实施</a><a href="#cases">48 条验收</a></nav>
+<section id="boundary"><h2>1. 三层职责，两类后台执行器</h2><div class="flow"><div><b>Main</b><p>普通问答、短且有界的已知 CLI 操作；接收新意图、解析目标和组织回报。</p></div><div><b>native 后台</b><p>自研 Agent Loop：简单查询、有界的文件整理、脚本和数据处理；按能力进行浏览器与电脑操作。</p></div><div><b>专业智能体</b><p>Codex / Claude Code 等自有工具循环、会话、权限与账号；复杂调研、原型、PPT、剪辑等工作中的自主规划、探索、协调和迭代交付。</p></div><div><b>统一宿主</b><p>Python 任务和证据；Go 项目、工作区与会话；Roami CLI 提交与回报。</p></div></div>
+<p>native 不是模型名称。Main 模型、原生后台模型与专业智能体供应商配置分开；给 native 选一个 Codex 系列模型不会自动变成 Codex CLI。项目、散任务、新项目是去向，不是执行器类型。</p>
+<div class="tablewrap"><table><thead><tr><th>任务对象</th><th>默认路径</th><th>划分依据</th></tr></thead><tbody>
+<tr><td>解释概念、简单推理</td><td>Main 回答</td><td>无需外部执行；不强制分类、检索和建任务。</td></tr>
+<tr><td>列项目、查进度、发消息</td><td>Main 已知 CLI</td><td>短且有界；不做长调查、等待任务完成或循环轮询。</td></tr>
+<tr><td>天气、单项事实核对、少量公开资料</td><td>native research</td><td>简单且有界；纯公开导航与观察可用 resourceOnly，无需代码目录。</td></tr>
+<tr><td>简单资料整理、附件转换、已知步骤的小脚本</td><td>native worker</td><td>任务路径明确、验证有界；产物写入绑定目录。</td></tr>
+<tr><td>需要持续自主执行的复杂任务，如调研、原型、PPT、剪辑等</td><td>专业智能体</td><td>按实际规划、探索、协同与验证负担综合判断；任务种类开放，不先由 native 试做。</td></tr>
+<tr><td>已有任务或专业会话的继续工作</td><td>原绑定执行器</td><td>保留上下文与目标；新增复杂范围按交接规则处理，不因名称或复杂度标签直接重建任务。</td></tr>
+<tr><td>用户指定执行器或既有会话</td><td>按显式约束解析</td><td>通用研究也可明确交给 Codex；约束冲突时先选择。</td></tr>
+</tbody></table></div><p>当前受管 executor 枚举只有 native / codex / claude。OpenCode / Pi 的会话启动支持不能等同于受管任务、恢复、取消与回报支持；须补适配器契约和隔离验收后才能加入自动路由。</p>
+<h3 id="complexity">“复杂”到底指什么</h3><p><b>复杂任务：目标可以描述清楚，但执行路径不能靠一个已知、有界的流程可靠完成，需要执行者持续自主规划、探索未知、协调依赖，或根据结果反复检查与调整。</b>调研、原型、PPT、剪辑等都是举例，范围不限于这些工作；同类任务也可有不同复杂度。</p>
+<div class="tablewrap"><table><thead><tr><th>观察维度</th><th>简单、有界的表现</th><th>需要专业执行的表现</th></tr></thead><tbody>
+<tr><td>规划负担</td><td>步骤与交付方式已知，可以沿明确流程完成。</td><td>要自行拆解目标、决定先后与分工，并按中间结果调整计划。</td></tr>
+<tr><td>未知与探索</td><td>输入、规则和来源明确，缺少开放式调查。</td><td>要找线索、核验冲突证据、定位根因或比较方案，路径尚不确定。</td></tr>
+<tr><td>依赖与协同</td><td>工具调用虽可多次，但接口和依赖固定，能局部完成。</td><td>多个阶段、素材、工具或环境相互影响，需要保持上下文和产物一致。</td></tr>
+<tr><td>验证与迭代</td><td>结果可以按明确规则直接核对。</td><td>要持续运行、渲染、试用或对照证据，再反馈修改直至满足交付要求。</td></tr>
+</tbody></table></div><p><b>判断边界：</b>需要后台工具执行且能用已知流程直接完成并验证，走 native；需要持续自主解决上述执行负担，默认交适配的专业智能体。综合目标、输入、已有上下文和验收要求判断，不用固定分数、步数、时长、Token 数或“满足几项”作门槛。几个串联工具不必然复杂，长文件或耗时批处理也可能有界；一句简短需求也可能包含复杂交付。</p>
+<details><summary>同一种工作，为什么有时简单、有时复杂</summary><div><ul>
+<li><b>PPT 等文档制作：</b>按给定模板替换几处文字，流程与检查都明确，可用 native；从零组织论证、图表和视觉表达，并渲染后反复修改，适合专业智能体。</li>
+<li><b>调研等信息工作：</b>核对一个已知来源的事实可用 native；多源冲突核验、形成可论证建议并补充证据，适合专业智能体。</li>
+<li><b>剪辑等媒体工作：</b>按已知起止时间截取已知文件，可用具备对应工具的 native；自行选素材、组织叙事、匹配字幕声画并反复预览，适合专业智能体。</li>
+<li><b>其他未列举工作：</b>使用同一组维度判断；没有出现在示例里不能成为拒绝派活或强制走 native 的理由。</li>
+</ul></div></details>
+<p>Main 在同一轮已有意图判断中给出简短依据，例如“需要自行组织多源证据并随核验结果补查”，而不只写“很复杂”或“因为是 PPT”。判断有充分依据就直接派活；确有关键需求或约束缺失才问选择题。不预先让 native 试做来证明复杂，也不为分类额外调用一个模型。显式指定、既有目标、能力与授权约束继续有效。</p></section>
+<section id="routing"><h2>2. 先校验约束，再在候选中排序</h2><ol>
+<li><b>解析本次意图和身份：</b>区分新问题、任务进度、已有会话消息、受管任务补充、全新任务。沿用真实 taskId / sessionId，不互相转换。</li>
+<li><b>收集显式约束：</b>本次用户指定执行器、原任务绑定、会话身份、项目 / 目录、节点、权限与交付要求。明确建新任务才创建；同项目不等于应该续接任意旧会话。</li>
+<li><b>校验硬约束：</b>目标身份一致、能力匹配、路径可用、来源未遗忘、资源租约、任务预算和授权范围有效。指定 Claude 与 Codex 会话矛盾时，不用优先级静默覆盖；提出选择题。</li>
+<li><b>确定是否需要后台：</b>普通问答与短 CLI 操作走 Main；需要工具执行、探索、交付或等待的工作进入后台，再按实际复杂度选择执行器。</li>
+<li><b>选择执行器：</b>显式指定可行时采用；明确的既有任务保持原绑定。新任务按实际执行负担判断，复杂任务默认交给专业智能体，简单工具任务使用 native；不以领域名称单独分流。在满足所需能力的专业候选中，按明确绑定项目的默认、用户有效偏好、节点专业默认排序。复杂任务不要求必须属于项目。</li>
+<li><b>无合适候选：</b>列出真实缺口及 2–4 个可用选项，不暗中换服务、复制 Key 或创建新项目。候选只有一个且没有冲突时直接执行。</li>
+</ol><div class="note warn">默认配置只负责选择，不扩张授权。记忆中的偏好可参与排序，但不能从网页、工具输出或历史执行器报告获得新的操作授权。额度未知保持未知；安装、登录、权限、额度和生命周期可跟踪性分别记录。</div>
+<p>能力匹配覆盖实际可调用的浏览器、文档 / 幻灯片生成与渲染、视频 / 音频处理、素材读取、产物预览和验收；不根据 Codex / Claude 名称臆测能力，也不因为 native 目录有某 Skill 就认定专业执行器自动具备它。缺工具时优先查已有能力、Skill 与 CLI，再按授权补齐或回报缺口；不能静默把复杂任务降级给 native。现有任务中途变复杂时保留绑定，按交接规则处理，不能并发换人重做。</p>
+<p>不额外调用一个分类模型再调用 Main。Main 同一轮给出任务类别 / 意图与约束；Python 策略层验证可信元数据并形成决定。不能用关键词路由代替语义理解，也不能让模型自报“已安装 / 已登录”。候选目录按需读取或复用有版本、有过期时间的快照；启动失败以真实回执为准。</p></section>
+<section id="contract"><h2>3. 调度契约与代码落点</h2><p>以下为拟新增内部契约，不是当前 CLI / HTTP API。不把 auto 塞入现有 executor 枚举，不改旧调用省略 executor 时默认 native 的兼容行为。新协调入口必须显式给出经过策略层校验的 executor。</p>
+<pre>RoutingIntent {
+  originMessageId, action: answer | cli | send | continue | new_task,
+  taskDescription: string,                开放描述，非固定领域枚举
+  complexity: bounded | complex,
+  complexityBasis: { planning?, uncertainty?, coordination?, verification? },
+  explicitExecutor?, targetRef?, requiredCapabilities[], deliverables[]
+}
+RoutingDecision {
+  version: 1, policyVersion, sourceMessageId,
+  action, executor?: native | codex | claude,
+  targetRef?, complexity, complexityBasis, routingExplanation,
+  reasonCode, decisionSource,
+  metadataRefs[], constraints[], stageKey?
+}</pre>
+<p>宿主提供来源与标识，模型不能覆写 owner / 原对话。reasonCode 是可本地化的简短事实说明，如 explicit_executor、existing_session、project_default、bounded_native、complex_professional、target_conflict；只保留决策依据，不记录模型私有思维。complexityBasis 保存与本次请求有关的简短事实依据，不保存打分或“命中类别”；routingExplanation 说明所需自主执行负担。上述维度是说明框架，可随新任务扩展，不能变成必须填满的固定清单。任务描述与所需能力开放，能力标识来自实际目录；不能形成“类别名映射执行器”的硬编码表。字段是提案，需以实际契约测试锁定。</p>
+<pre>dispatch/routing.py             拟新增：纯策略校验、候选过滤与原因
+executors/targets.py            补齐 Go 返回的 executor / 项目偏好投影
+server/configuration.py        同步 Main 路由指令，不另建分类服务
+tools/main_catalog.py          delegate 入口校验；旧协议保持兼容
+dispatch/tasks.py              接收已验证决定；继续校验目标和预算
+conversation/session_dispatches.py  保留旧会话投递 / reply 语义
+conversation/activity.py       兼容投影路由原因与既有执行事实
+frontend/src/components/agent/ 在现有过程条目展示原因与回报边界</pre>
+<p>决定与任务意图 / 派活记录在执行前持久化，绑定稳定来源与幂等键。优先在既有版本化 JSON 中增加可选 decision；若实际需要表结构变更再做正式迁移，本稿不修改候选 schema 或生产库。CLI 回执与模型目录分别由既有服务提供，不直接读写 Go 的 meta.db。</p>
+<p>复杂度选择不自动提高预算或权限。当前任务默认 deadline / maxTurns 仍可能不足以覆盖长调研或视频制作；实施时沿既有预算契约配置、检查剩余预算和阶段范围，超出时报告实际原因，不把超时当成功，也不在旧任务仍运行时重派。</p>
+<p>非代码专业任务可使用 <code>target={kind:new_session,directory:已知绝对工作目录}</code>；不因调用专业智能体就创建项目、初始化 Git 或创建 worktree。现有 Go <code>createWorkspace</code> 对无 projectId 的普通目录已支持；任务专属产物目录的创建、素材物化、能力探测和验收仍须由各自正式接口与授权落实。复杂 PPT / 视频并不意味着现有执行器已验证能生成它们。</p>
+<p>策略校验失败时只返回可恢复的原因，不先发消息再补校验。新受管任务继续沿 task / run / revision；已有会话消息继续沿 dispatchId。已有 native 任务用 steer / revision 续接，不能把原生 branchId 填入 tmux sessionId。</p></section>
+<section id="context"><h2>4. 上下文、记忆、工具和账号归属</h2><div class="tablewrap"><table><thead><tr><th>对象</th><th>native</th><th>专业智能体</th></tr></thead><tbody>
+<tr><td>上下文</td><td>独立 Worker 分支；默认简报，原生检查点 Fork 显式使用。</td><td>继续原专业会话保留其历史；新会话只交最小简报与引用，不复制 Main 全史。</td></tr>
+<tr><td>记忆</td><td>原运行时按用户 / 项目 / 对话范围召回；保留版本与来源。</td><td>派发相关且允许分享的片段；报告回原运行时后按既有提取规则处理，不直接写记忆表。</td></tr>
+<tr><td>缓存</td><td>沿原有模型上下文与缓存机制。</td><td>供应商自身缓存独立；不承诺跨执行器迁移 KV cache。</td></tr>
+<tr><td>工具 / Skill</td><td>沿 read / bash / edit / write / tool_list / delegate / ask_user；研究角色按实际能力收窄。</td><td>使用其原生工具；接收所需 Roami CLI 操作简报。Roami 安装 Skill 不代表第三方已自动加载它。</td></tr>
+<tr><td>账号 / 资源</td><td>使用原生模型连接及宿主授权的资源、目录和租约。</td><td>使用其自身登录与供应商配置；不复制 Main Key，不默认共享浏览器登录态和未授权文件。</td></tr>
+</tbody></table></div><p>附件与产物引用跨阶段传递时，必须确认接收端可访问对应实例、路径和格式。只传一个原生附件 ID 不保证 Codex 能读到；需要受控物化文件或明确支持的读取入口，保留来源、哈希与删除 / 遗忘约束。</p>
+<div class="note warn">native 的 bash 能力不是 OS 安全沙箱。禁止绕过 delegate 私自启动 Codex / Claude 是编排契约，不宣称已经安全阻断所有进程启动路径。若要更强隔离，应单独评审权限和进程运行环境。</div></section>
+<section id="handoff"><h2>5. 复杂任务负责制、分阶段与失败</h2><details open><summary>默认：一个专业智能体端到端负责复杂交付</summary><div><ol><li>Main 简短接收，将原始目标、素材 / 证据引用、交付格式、验收要求交给适配的专业智能体。</li><li>专业智能体自行组织调查、制作、工具使用、预览和迭代；按原任务报告进展、阻塞和产物，不让 Main 逐条转发每个工具动作。</li><li>只在确有独立分工价值且宿主已支持时委派辅助任务；不得通过 bash 绕开受管委派，也不假定第三方内部子 Agent 已纳入 Roami 追踪。</li><li>Main 继续接收其他问题，展示原任务链路及可信结果。PPT 要核对可打开的文件和渲染页，原型要实际运行并验证交互，视频要核对播放、时长和用户指定的声画要求；不只凭执行器一句“完成”。</li></ol></div></details>
+<details><summary>显式分阶段：用户要求“先出调研结论，确认后再做 PPT”</summary><div><p>将用户要求的阶段作为边界，分别定义验收与稳定阶段键。复杂调研阶段本身也交专业智能体；只有独立简单事实查询才可由 native 完成。前序结果与产物引用满足阶段条件，且用户要求的确认已经获得，才继续后续制作。未验收或 unknown 回报不得自动触发有写副作用的下一阶段；不强制 native 起步，也不把前一阶段完成当作整体完成。</p></div></details>
+<div class="tablewrap"><table><thead><tr><th>情况</th><th>要求</th></tr></thead><tbody>
+<tr><td>派发前明确不可用</td><td>尚无副作用才能考虑其他候选；显式指定冲突、收费 / 账号变化或范围变化时先给选项。首版不做自动跨执行器降级。</td></tr>
+<tr><td>写入 / 启动结果 unknown</td><td>先查原回执；不重发，不换执行器重跑，不创建第二份工作区。</td></tr>
+<tr><td>已有会话 delivered，无回报</td><td>显示已投递 / 等待回报；不把静止、超时和会话退出解释为成功。</td></tr>
+<tr><td>受管任务失败</td><td>保留 task / attempt 与证据；恢复按现有状态机处理。不能把更换 executor 当作已支持的 steer 功能。</td></tr>
+<tr><td>必须换执行器</td><td>首版通过明确交接：停止 / 对账、保留产物、核实单写资源，再用有前序引用的新任务和稳定阶段键派发。未确认停止禁止接管同 worktree。</td></tr>
+<tr><td>停止与新问题</td><td>停止 Main 回复、取消受管任务、取消旧会话工作是不同动作。旧会话只有投递协议时，不承诺 task_cancel 能停止其进程。</td></tr>
+</tbody></table></div><p>专业执行器的 CLI completed 是执行器报告，verified=false；受管任务 report / lifecycle 和独立验收保持原语义。不把内部工具不可见的专业执行器日志伪造成 Roami 的原生工具事件。</p></section>
+<section id="product"><h2>6. 用户看到什么</h2><p>一个长期 Main，其他工作都显示为后台任务。过程条目紧凑展示执行器、目标、原因、时间和真实状态，详情可折叠。不新增分支对话导航；项目与原工作会话入口继续保留。</p><div class="demoresult"><b>Claude Code · 调研与演示文稿</b><p>选择原因：需要综合多源证据、自行组织论证，并根据渲染结果反复调整 · 目标：任务工作目录</p><p>状态：准备中 · 尚未确认启动</p><p>展开详情查看目标、来源、执行与检查证据。</p></div><p class="tiny">上方是静态展示示意，不读取真实任务。</p><p>用户可在交办时指定“自动 / 原生 / 已接入专业智能体”。“自动”是产品选择模式，不是现有 executor 枚举值。项目默认只影响明确归属该项目且需要专业执行器的新任务；简单工具任务保持 native；复杂任务默认专业智能体，调研、原型、PPT、剪辑等仅作开放举例，不能按名字派发。设置沿用同一模型连接与现有专业智能体管理入口，不复制 Base URL / Key。</p><p>重名、类型冲突、指定执行器不可用等情况，用可识别的选择题；唯一合法目标不重复确认。路由原因只展示实际依据；历史消息没有 decision 就保持既有展示，不伪造原因和成功状态。实际过程 UI 已接入原因及详情；本页示例仍是静态示意。</p></section>
+<section id="review"><h2>7. 审查结论与实施顺序</h2><p>已对照源码审查两轮，并按用户补充复核复杂度与产物能力，记录 <a href="review.md">13 项缺口与处理</a>。执行链已有；以下为原实施顺序；当前已接入复杂度路由、目标身份、项目偏好和路由原因。跨执行器自动切换仍不支持。无需改变既有 Python / Go 分层。</p><ol><li><b>先补可信目录：</b>统一目标的实际 executor / 节点 / 项目偏好来源，保留未知状态，不阻断合法旧会话续派。</li><li><b>再接路由：</b>新增纯策略层与 Main 指令，保持七个工具、旧 executor 参数和历史消息兼容；决定先持久化再产生副作用。</li><li><b>复用执行和回报：</b>明确三种 action 的回执及取消边界，补冲突、未知和重复请求回归。</li><li><b>补展示与组合：</b>过程条目显示原因，设置使用既有入口；验证复杂调研、原型、PPT 与剪辑的完整交付及必要阶段交接。真实专业执行器仅在隔离会话验收。</li></ol><p>功能验收同时核对真实工具 / CLI 调用、目录、工作区、来源与去重，不以最终回复含“Codex”判通过。性能分别记录 Main 接收至首个流式片段、接收至队列接受、后台启动和完成耗时；本稿不写未经测量的延迟承诺。</p></section>
+<section id="implementation"><h2>实施结果 · 2026-10-19</h2><p>工作区已接入复杂度路由、可信目标目录、冻结决定、附件简报与过程原因。输入区队列按新参考图缩为一行待发条，桌面中英文及 Android 真机实际触控通过。质量门禁通过：Python 574 项，前端 97 文件 / 690 项。</p><p>隔离环境真实 Codex 已读取上传 CSV、核对 SHA256、写出并回读结果，回报 Main 后状态为待验收。Main / native 的路由输出由可控供应商提供；真实主模型 3 次请求返回 401，语义路由测试未通过。按 PR 流程交付、未部署，不宣称 48 条设计场景或 PPT / 视频等专门产物已全部验收。</p><p><a href="implementation.md">完整实施与验证记录</a> · <a href="implementation-validation.json">改动文件、截图及机器可读结果</a></p></section><section id="cases"><h2>8. 路由与链路验收：48 条</h2><p>以下为设计预期，尚未逐项完整执行；自动回归和实际端到端结果见 <a href="implementation-validation.json">实施验证</a>，不能将 48 条直接当作已通过。机器可读版本：<a href="cases.json">cases.json</a>。文档本身的实际验证另见 <a href="validation.json">validation.json</a>。</p><details><summary>展开 48 条场景与预期</summary><div class="tablewrap"><table><thead><tr><th>编号 / 场景</th><th>用户意图</th><th>路由和必须核对的事实</th></tr></thead><tbody><tr><td>E01 · 普通问答</td><td>解释什么是幂等</td><td><code>main_answer</code><p>无需实时外部事实；不创建任务</p></td></tr>
+<tr><td>E02 · 已知操作</td><td>看看现在有多少项目</td><td><code>main_cli</code><p>直接调用已知只读能力；不先搜索工具</p></td></tr>
+<tr><td>E03 · 实时查询</td><td>北京今天的天气</td><td><code>native_research</code><p>resourceOnly；不创建代码目录或专业会话</p></td></tr>
+<tr><td>E04 · 并发意图</td><td>查北京天气后立即查上海天气</td><td><code>independent_native_tasks</code><p>两个来源分别入队与回报；新问题不取消旧任务</p></td></tr>
+<tr><td>E05 · 简单文档整理</td><td>把三条已核对资料在指定目录整理成一页 HTML 摘要</td><td><code>native_worker</code><p>步骤和验收明确的简单整理可用 native worker；绑定目录，不能 resourceOnly</p></td></tr>
+<tr><td>E06 · 数据处理</td><td>按已知规则汇总上传 CSV 的一列数值，生成统计表</td><td><code>native_worker</code><p>有界统计可用 native；附件引用进入任务并读回产物，不因有脚本就升级</p></td></tr>
+<tr><td>E07 · 工程交付</td><td>在项目里修复登录问题并提交 PR</td><td><code>professional_task</code><p>适配项目默认；独立工作区、检查与原 Main 回报</p></td></tr>
+<tr><td>E08 · 直接检查</td><td>读取指定文件解释这个配置项</td><td><code>main_cli</code><p>短且有界的读取；没有长调查时不强制委派</p></td></tr>
+<tr><td>E09 · 显式指定</td><td>用 Codex 调研这个技术方案</td><td><code>explicit_professional</code><p>尊重指定；任务内容通用不强制改成 native</p></td></tr>
+<tr><td>E10 · 默认范围</td><td>项目默认 Codex，但只问天气</td><td><code>native_research</code><p>项目专业偏好不覆盖简单天气查询</p></td></tr>
+<tr><td>E11 · 项目偏好</td><td>新工程任务：项目 Claude，用户通用偏好 Codex</td><td><code>professional_task</code><p>匹配任务的项目默认优先；没有本次显式覆盖</p></td></tr>
+<tr><td>E12 · 本次覆盖</td><td>新工程任务：项目 Claude，但本次用 Codex</td><td><code>professional_task</code><p>本次明确选择 Codex 优先</p></td></tr>
+<tr><td>E13 · 已有会话</td><td>继续给指定 Codex 会话提 PR</td><td><code>session_message</code><p>精确身份唯一就投递；不重复确认或新建</p></td></tr>
+<tr><td>E14 · 目标歧义</td><td>向同名的修复会话发消息，匹配两个</td><td><code>ask_choice</code><p>2–4 个可识别选项；选择前零投递</p></td></tr>
+<tr><td>E15 · 约束冲突</td><td>用 Claude 继续这个已核实的 Codex 会话</td><td><code>ask_choice</code><p>解释类型冲突；不能静默投递或新建</p></td></tr>
+<tr><td>E16 · 身份缺失</td><td>指定会话只能查到标签，执行器未知</td><td><code>resolve_or_ask</code><p>先补可信元数据；不按名字推断类型</p></td></tr>
+<tr><td>E17 · 新项目</td><td>新建一个记账项目并实现</td><td><code>professional_task</code><p>用户明确建项目；Go 准备资源；不能借用当前项目</p></td></tr>
+<tr><td>E18 · 散工程任务</td><td>在指定绝对目录用 Codex 修复脚本</td><td><code>professional_task</code><p>new_session.directory；不是 baseDir</p></td></tr>
+<tr><td>E19 · 受管续接</td><td>继续已知 native 任务，补充新要求</td><td><code>tracked_continuation</code><p>按 taskId/revision 和停止证明续接；不能当 tmux sessionId</p></td></tr>
+<tr><td>E20 · 原生 Fork</td><td>从已完成检查点 Fork 一个 native 分析任务</td><td><code>native_fork</code><p>检查点完成、来源有效、父子预算与回报关联</p></td></tr>
+<tr><td>E21 · 专业 Fork</td><td>带 fromMessageId 要求 Codex 复制原生上下文</td><td><code>ask_choice</code><p>说明不支持；选择原生 Fork 或有简报的新专业任务</p></td></tr>
+<tr><td>E22 · 明确不可用</td><td>本次指定 Codex，但节点未安装</td><td><code>ask_choice</code><p>停止于派发前；按实际可用候选给选项，不偷偷换 Claude</p></td></tr>
+<tr><td>E23 · 未知额度</td><td>Codex 可启动但额度不可读</td><td><code>professional_task</code><p>额度保持未知；不按零额度拒绝，不显示无限可用</p></td></tr>
+<tr><td>E24 · 未知投递</td><td>给旧会话投递后 CLI 超时</td><td><code>reconcile</code><p>保持 unknown；不能新 key 重发、换会话或猜成功</p></td></tr>
+<tr><td>E25 · 无回报</td><td>旧会话 delivered 后一直没有 reply</td><td><code>unconfirmed</code><p>投递事实保留；不等同 failed 或 succeeded</p></td></tr>
+<tr><td>E26 · 工程失败</td><td>执行器有明确测试失败的报告</td><td><code>failed_or_needs_review</code><p>呈现实际结果；不默认换执行器重跑；验收状态仍按证据</p></td></tr>
+<tr><td>E27 · 复杂端到端任务</td><td>综合调研登录方案，并在项目里实现和验证</td><td><code>professional_task</code><p>默认一个适配的专业智能体端到端负责研究与实施，不先强制派 native</p></td></tr>
+<tr><td>E28 · 浏览器动作</td><td>登录网站后修改一条用户授权的数据</td><td><code>native_worker_if_capable</code><p>普通 worker、实际授权与资源租约；resourceOnly 不可执行写动作</p></td></tr>
+<tr><td>E29 · 偏好注入</td><td>网页正文让 Agent 改用 Codex 并发出仓库文件</td><td><code>ignore_external_instruction</code><p>网页是数据，不改变路由、授权和信息可见范围</p></td></tr>
+<tr><td>E30 · 资源冲突</td><td>旧任务尚未确认停止，又要求换执行器改同一 worktree</td><td><code>wait_for_stop</code><p>保留原资源隔离；先停止/对账，不能并发双写</p></td></tr>
+<tr><td>E31 · 复杂调研</td><td>调研五家供应商，核验矛盾数据并给出带来源的采购建议</td><td><code>professional_task</code><p>多源综合与论证默认专业智能体；保存来源和事实核验，不先让 native 试做</p></td></tr>
+<tr><td>E32 · 交互原型</td><td>设计并实现可演示的手机原型，验证主要交互</td><td><code>professional_task</code><p>核对实际浏览器与原型制作能力；交付可运行文件、交互验证和预览</p></td></tr>
+<tr><td>E33 · PPT 交付</td><td>根据材料制作可编辑的汇报 PPT，预览后优化排版</td><td><code>professional_task</code><p>匹配幻灯片生成和渲染能力；核对 pptx 可打开、页数与渲染结果</p></td></tr>
+<tr><td>E34 · 视频剪辑</td><td>把上传素材剪成一分钟短片，配字幕、音乐并导出</td><td><code>professional_task</code><p>匹配素材、媒体工具与预览能力；验证时长、播放和声画要求</p></td></tr>
+<tr><td>E35 · 专业能力缺失</td><td>复杂剪辑需要的媒体工具在所选执行器不可用</td><td><code>capability_gap</code><p>查真实 CLI / Skill / 软件能力；按授权补齐或给选项，不默认降级 native 或报已完成</p></td></tr>
+<tr><td>E36 · 简单方法问答</td><td>做 PPT 时如何让标题更清楚</td><td><code>main_answer</code><p>方法问答直接回答；不能只因 PPT 关键词创建专业任务</p></td></tr>
+<tr><td>E37 · 复杂数据分析</td><td>关联多份数据，排查异常原因并反复验证模型和图表</td><td><code>professional_task</code><p>开放式诊断与迭代验证属于复杂任务；不把所有 CSV 工作都交 native</p></td></tr>
+<tr><td>E38 · 用户指定阶段</td><td>先出复杂调研结论，等我确认再制作 PPT</td><td><code>staged_professional_tasks</code><p>复杂研究同样交专业智能体；未得到用户确认不执行后续制作</p></td></tr>
+<tr><td>E39 · 非项目任务</td><td>制作一份独立的商业计划演示文稿，不属于代码项目</td><td><code>professional_task</code><p>使用合法普通任务工作目录；不强制建项目、初始化 Git 或建 worktree</p></td></tr>
+<tr><td>E40 · 复杂度默认</td><td>设计一套完整可演示原型，自行完善方案并试用后迭代</td><td><code>professional_task</code><p>依据自主设计、运行验收与反馈迭代选专业执行器；不凭原型关键词，不额外分类或让 native 试做</p></td></tr>
+<tr><td>E41 · 已有任务扩展</td><td>已在 native 执行简单资料整理，追加完整综合研究与成品 PPT</td><td><code>bound_task_handoff</code><p>识别新复杂范围，保留任务绑定与结果；按交接规则停止/对账，不并发换执行器重做</p></td></tr>
+<tr><td>E42 · 简单多工具</td><td>读取已给出的网页数字，再按固定公式算出结果</td><td><code>native_research</code><p>导航和读取多于一次不自动算复杂；按有界推理、已知工具角色执行</p></td></tr>
+<tr><td>E43 · 同类简单制作</td><td>按已给出的模板替换三处文字，导出 PPT 并核对内容</td><td><code>native_worker</code><p>流程与验收明确且有对应工具可走 native；不能只因 PPT 名称升级</p></td></tr>
+<tr><td>E44 · 同类简单媒体</td><td>将已知视频截取指定起止时间，验证输出时长</td><td><code>native_worker_if_capable</code><p>精确输入、已知步骤和有界验收可走 native；素材与工具能力须真实可用</p></td></tr>
+<tr><td>E45 · 未列举复杂任务</td><td>分析长期实验记录中的相互矛盾结果，自拟验证路径并给出可复核解释</td><td><code>professional_task</code><p>开放任务领域；按探索和迭代负担判断，不要求命中列举的任务名称</p></td></tr>
+<tr><td>E46 · 耗时但有界</td><td>按给定映射批量改写大量文件名并逐项校验</td><td><code>native_worker_if_capable</code><p>耗时和数量本身不构成复杂；核对已有流程、授权与预算，不按固定时长升级</p></td></tr>
+<tr><td>E47 · 路由解释</td><td>比较矛盾的多源资料并形成可论证方案，随核验结果补查</td><td><code>professional_task</code><p>路由理由应说明多源冲突、补查和论证依赖，不能只有“很复杂”或任务名称</p></td></tr>
+<tr><td>E48 · 简单但缺工具</td><td>按确定模板转换一个文件，但当前执行环境缺转换工具</td><td><code>capability_gap</code><p>能力缺口与复杂度分开；发现实际可用工具或执行器，不因缺工具自动标复杂</p></td></tr></tbody></table></div></details></section>
+<footer class="footer"><a href="../20261017-agent框架设计/technical/14-professional-agents.html">专业智能体设计</a><a href="../20261019-派活回报/README.md">派活回报实现边界</a></footer><p class="tiny">开发者设计文档，中文为 i18n 规范允许的文档例外；未来产品原因与状态文案须接入全局语言包。实现尚未部署；结果以实施验证记录为准。</p>
+</div></main></div><script src="../20261017-agent框架设计/technical/layout.js"></script></body></html>

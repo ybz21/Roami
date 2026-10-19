@@ -22,6 +22,7 @@ export default function AgentActivity({ items, onSession, conversationId, branch
   const { t } = useI18n(), [expanded, setExpanded] = useState(false)
   const steps = items.map(item => <ActivityStep key={item.id} item={item} onSession={onSession} conversationId={conversationId} branchId={branchId} />)
   if (items.length < 2) return <>{steps}</>
+  const routed = [...items].reverse().find(item => item.routingDecision)?.routingDecision
   const latest = items[items.length - 1], problems = items.filter(item => attention.has(activityState(item.state))).length
   return <section className="agent-activity-group" aria-label={t('agent.activity.title')}>
     <button type="button" className="agent-activity-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
@@ -29,6 +30,7 @@ export default function AgentActivity({ items, onSession, conversationId, branch
       {problems > 0 && <span className="agent-activity-failure">{t('agent.activity.problems', { count: problems })}</span>}
       <span className="agent-activity-summary">{items.some(item => active.has(item.state)) ? t('agent.activity.state.running') : problems ? t('agent.activity.needsAttention') : t('agent.activity.finished')}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
     </button>
+    {!expanded && routed && <p className="agent-routing-reason">{t('agent.routing.reason')}{t('agent.activity.separator')}{routed.routingExplanation}</p>}
     {expanded && <div className="agent-activity-group-steps">{steps}</div>}
   </section>
 }
@@ -46,9 +48,16 @@ function ActivityStep({ item, onSession, conversationId, branchId }: { item: Age
       <span className="agent-activity-name">{name}</span><time dateTime={new Date(item.startedMs).toISOString()}>{formatTime(item.startedMs)}</time><span className="agent-activity-summary">{state}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
     </button>
     {failed && <p className="agent-activity-failure" role="status">{state}{t('agent.activity.separator')}{status === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t)}</p>}
+    {item.routingDecision && <p className="agent-routing-reason">{t('agent.routing.reason')}{t('agent.activity.separator')}{item.routingDecision.routingExplanation}</p>}
     {expanded && <div className="agent-activity-details">
       <p className="agent-activity-reference">{t('agent.activity.startedAt', { time: formatTime(item.startedMs) })}{t('agent.activity.updatedAt', { time: formatTime(item.updatedMs) })}</p>
       {conversationId && <ActivityPayload conversationId={conversationId} branchId={branchId} item={item} />}
+      {item.routingDecision && <div className="agent-routing-details">
+        <p>{t('agent.routing.complexity')}{t('agent.activity.separator')}{t(item.routingDecision.complexity === 'complex' ? 'agent.routing.complex' : item.routingDecision.complexity === 'bounded' ? 'agent.routing.bounded' : 'agent.routing.unknown')}</p>
+        <p>{t('agent.routing.policy', { version: item.routingDecision.policyVersion })}</p>
+        {Object.entries(item.routingDecision.complexityBasis || {}).map(([key, value]) => <p key={key}>{value}</p>)}
+        {item.routingDecision.capabilityVerification && <p>{t('agent.routing.capabilitiesUnverified')}</p>}
+      </div>}
       {item.target && <code>{item.target}</code>}
       {item.errorCode && <p>{activityReason(item.errorCode, t)} <code>{item.errorCode}</code></p>}
       {item.taskId && <small className="agent-activity-reference">{t('agent.activity.taskId', { id: item.taskId })}</small>}

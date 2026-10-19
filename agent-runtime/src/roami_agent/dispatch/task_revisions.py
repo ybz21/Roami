@@ -7,6 +7,7 @@ from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.transcript_repository import message, owned
 
@@ -43,7 +44,17 @@ class TaskRevisions:
 
         return await self.db.call(read)
 
-    async def request(self, owner, task_id, text, expected_revision, key):
+    async def request(
+        self,
+        owner,
+        task_id,
+        text,
+        expected_revision,
+        key,
+        *,
+        source_turn_id=None,
+        source_conversation_id=None,
+    ):
         if (
             not isinstance(text, str)
             or not text.strip()
@@ -59,10 +70,21 @@ class TaskRevisions:
         spec = {"expectedRevision": expected_revision, "text": text}
 
         def write(db):
+            if source_turn_id:
+                source = row(
+                    db,
+                    "SELECT t.* FROM turns t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=? AND c.owner_id=? AND t.state='running'",
+                    (source_turn_id, owner),
+                )
+                if not source or source["conversation_id"] != source_conversation_id:
+                    raise DomainError("TASK_TURN_INACTIVE", 409)
+                assert_context_admitted(db, dict(source, owner_id=owner))
             task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
             if not task:
                 raise DomainError("TASK_NOT_FOUND", 404)
             owned(db, owner, task["origin_conversation_id"])
+            if source_conversation_id and task["origin_conversation_id"] != source_conversation_id:
+                raise DomainError("TASK_SOURCE_CONVERSATION_MISMATCH", 409)
             dedupe = "task.steer:" + owner + ":" + key
             previous = row(db, "SELECT * FROM jobs WHERE dedupe_key=?", (dedupe,))
             if previous:

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/ybz21/Roami/internal/agentexecution"
@@ -16,8 +17,27 @@ import (
 )
 
 func runAgentExecution(args []string) int {
+	if len(args) > 0 && args[0] == "catalog" {
+		flags := flag.NewFlagSet("execution catalog", flag.ContinueOnError)
+		commands := flags.String("commands", "", "comma-separated executable names to observe without running")
+		if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
+			return 2
+		}
+		catalog := agentexecution.DiscoverExecutors()
+		if *commands != "" {
+			if err := catalog.ProbeCommands(strings.Split(*commands, ",")); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 2
+			}
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(catalog); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution launch --file SPEC.json\nroami agent execution send-message --file - (delivery receipt only)\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution catalog (read-only installation and tracking discovery; auth/usage unknown)\nroami agent execution launch --file SPEC.json\nroami agent execution send-message --file - (delivery receipt only)\nroami agent execution status|cancel --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch creates a one-shot coding session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
