@@ -1,7 +1,7 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 UPGRADES = {
     2: "0002_artifact_metadata.sql",
     3: "0003_resource_controls.sql",
@@ -9,6 +9,7 @@ UPGRADES = {
     5: "0005_notification_delivery.sql",
     6: "0006_artifact_retention.sql",
     7: "0007_main_conversation.sql",
+    8: "0008_session_dispatches.sql",
 }
 
 

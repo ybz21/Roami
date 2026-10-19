@@ -2,7 +2,7 @@ export type AgentQuestion = { prompt: string; options: { label: string; descript
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
 export type AgentMessage = {
   id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number
-  content: { question?: AgentQuestion; text?: string; tool_calls?: unknown[]; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
+  content: { question?: AgentQuestion; text?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; name: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }

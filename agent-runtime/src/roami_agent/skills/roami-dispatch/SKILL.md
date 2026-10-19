@@ -39,7 +39,7 @@ description: Operate Roami projects, sessions and background agents through its 
 - “给这个 Codex 会话发消息 / 继续”已授权投递；查到唯一目标直接执行 `session_send`，不要再次确认、让用户粘贴命令或另建项目。多个目标才用 `ask_user` 给 2–4 个可识别选项。
 - 查项目总量用 `workspace_overview`；查某项目会话用 `target_search(kind="session",projectId=...)` 并跟随 `nextOffset`，不能把前三张卡片当全部。
 - 新项目、散任务和新项目工作区用 `delegate`；网页查询用原生 `resourceOnly` 检索任务，不创建代码项目。完整网页交互与纯公开检索的角色不同，见 Chrome 手册。
-- `delivered` 只代表消息已提交；`queued` 只代表任务入队；只有执行与验证通过才说完成。没有生命周期回调的旧会话会返回 `executionTracked=false`，不能声称会自动拿到完成结果。
+- `delivered` 只代表消息已提交；`queued` 只代表任务入队。派活返回 `replyExpected=true` / `dispatchId` 时，宿主已附上 `roami agent reply` 回报命令，执行器进展、阻塞和结果回原主对话，不让用户切会话查结果。`executionTracked=false` 仍表示没有供应商生命周期证明；没有收到回报时保持未确认，收到回报也不等于独立验收。细节读 references/agent-tasks.md。
 - 工具动作和结果回到原 Main；用户不必打开分支聊天。Worker 缺信息时回报 Main，Main 必要时提供选择题。
 - 内置工具、Skill、CLI 固定启用且只读，不能修改或启停；只有外部接入项允许管理。系统插件是另一类节点资源，不把“插件可配置”误当成内置 Agent 能力可以禁用。
 - 自动记忆与召回无需用户每次提醒；明确“记住”的偏好应有落库来源，不能仅凭助手自述说已保存。当前请求仍然优先。

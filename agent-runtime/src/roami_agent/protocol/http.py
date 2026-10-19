@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Payload(BaseModel):
@@ -56,6 +56,38 @@ class Proactive(Payload):
     source: str = Field(min_length=1, max_length=100)
     dedupeKey: str = Field(min_length=1, max_length=200)
     priority: Literal["normal", "attention"] = "normal"
+
+
+class SessionQuestionOption(Payload):
+    label: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=300)
+
+
+class SessionQuestion(Payload):
+    prompt: str = Field(min_length=1, max_length=1000)
+    options: list[SessionQuestionOption] = Field(min_length=2, max_length=4)
+
+
+class SessionReport(Payload):
+    key: str = Field(min_length=1, max_length=200)
+    status: Literal["progress", "blocked", "completed", "failed"]
+    summary: str = Field(min_length=1, max_length=8000)
+    question: SessionQuestion | None = None
+
+    @model_validator(mode="after")
+    def valid_report(self):
+        if not self.key.strip() or not self.summary.strip():
+            raise ValueError("empty report")
+        if self.question:
+            labels = [o.label.strip() for o in self.question.options]
+            if (
+                self.status != "blocked"
+                or not self.question.prompt.strip()
+                or any(not label for label in labels)
+                or len(set(labels)) != len(labels)
+            ):
+                raise ValueError("invalid report question")
+        return self
 
 
 class Confirm(Payload):

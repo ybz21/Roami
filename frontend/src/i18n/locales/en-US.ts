@@ -1,4 +1,11 @@
 const enUS = {
+  'agent.sessionReply.answer': 'Reply to background session {sessionId} (assignment {dispatchId}): {answer}',
+  'agent.sessionReply.progress': 'Background session progress',
+  'agent.sessionReply.blocked': 'Background session needs attention',
+  'agent.sessionReply.completed': 'Executor reported completion',
+  'agent.sessionReply.failed': 'Executor reported failure',
+  'agent.sessionReply.unknown': 'Report status unconfirmed',
+  'agent.sessionReply.unverified': 'Executor report; not independently verified',
   'activity.projectCommits': '{count} commits',
   'activity.dayTimeline': 'This day’s footprints',
   'activity.archivedCommit': 'Archived commit',

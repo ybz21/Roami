@@ -5,7 +5,23 @@
 - `task_status {}` 返回当前 Main 的任务投影。用户问进度时查一次；正常等回调，不忙轮询。
 - `task_cancel {taskId:ID}` 取消本用户委派任务。cancelling 不等于停止，不能据此撤回旧会话已收到的消息，更不能杀掉所有 tmux 会话。
 - 原 Main 自动接收工具开始 / 结束、执行、验收与结果。状态 planned/queued/preparing/running/verifying 表示不同阶段；failed/cancelled/unknown 分开，未知不标成功，不盲目重派。
-- `session_send` 只投递给旧专业会话。无生命周期回调时 executionTracked=false，投递成功不等于拿到最终结果。
+- `session_send` 投递到原专业会话并建立派活回报通道。返回 dispatchId / replyExpected=true，目标提示词自带实例隔离的 CLI 回报命令。executionTracked=false 仍表示缺少供应商生命周期证明；投递成功不等于完成。
+
+## 原会话回报闭环
+
+宿主先持久化 owner、原对话/分支、用户意图和目标会话，再提交提示词；不要求重启旧 Codex / Claude 或修改其 Hook 信任。执行器结束前将 UTF-8 JSON 写入文件并执行提示词附带的命令：
+
+```text
+roami agent reply --dispatch DISPATCH_ID --file RESULT.json
+```
+
+必须使用附带命令中的完整实例环境和真实 DISPATCH_ID，不自行填 Main ID、不用 session_send 回发到 Main，也不用另建会话。
+
+结果 JSON：`{"key":"final","status":"completed","summary":"实际结果、PR/文件链接、验证与限制"}`。失败用 failed；进展用 progress 和独立稳定 key；需要决策用 blocked 和独立 key，可附 `question:{prompt,options:[{label,description}]}`，2–4 个可识别选项。仅 completed / failed 为终态。CLI 出错保留结果文件，以相同 key / 同一 JSON 重试，不能重跑业务。收到 `messageId` / `eventId` 才说明 Main 已落盘；不等于手机系统推送已送达。
+
+主对话按原分支追加消息，经既有 SSE、未读和通知通道展示；回报直接入历史，不等待 Main 再调用模型重写。下一轮 Main 上下文含原目标和状态，内容按外部证据处理。`session_dispatch_status {dispatchId}` 查看投递状态、最近回报；未回报显示 unconfirmed，不通过终端静止、会话退出或超时猜成功，不自动重投未知写操作。
+
+这是执行器主动 CLI 回报协议，不能保证不遵守命令或已崩溃的旧执行器自动回报；这些仍保持未确认。不会把报告自动升级为独立验收完成，也不覆盖已有受跟踪任务的 report / lifecycle 协议。
 
 ## 运行时完整 CLI
 

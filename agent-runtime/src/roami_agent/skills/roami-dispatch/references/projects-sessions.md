@@ -13,7 +13,7 @@
 | 在项目找 Codex / Claude | 同上，加 query 名称关键词 | 同时核对 executor、项目、label、sessionId；不是只按显示名 |
 | 散会话 / 全节点查找 | `target_search {kind:"session",query:"关键词"}`，不带 projectId | 保留项目归属，逐页判断目标是否缺失 |
 | 严格解析会话 | `target_resolve {kind:"session",id:"名称、ID或label"}` | 歧义用选择题，不自动选第一个 |
-| 给已有会话发消息 / 继续 | `session_send {sessionId:"精确目标",text:"用户交办内容"}` | delivered 是提交成功，executionTracked=false 表示无完成回调 |
+| 给已有会话发消息 / 继续 | `session_send {sessionId:"精确目标",text:"用户交办内容"}` | delivered 是提交成功；replyExpected / dispatchId 关联 CLI 回报，executionTracked=false 表示无供应商生命周期证明 |
 
 先查询完整目标，再可靠投递：
 

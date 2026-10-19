@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "actualTransport": "Go CLI + tmux paste-buffer/Enter + Unix Socket + Python + SQLite + SSE",
+  "provider": "controlled streaming fixture, not real model",
+  "executor": "controlled tmux process, not production Codex",
+  "desktop": true,
+  "android": "Redmi Note 8",
+  "progressArrivedBeforeFinish": true,
+  "finalWithoutRefresh": true,
+  "reloadReadable": true,
+  "callbackDeduplicated": true,
+  "verifiedFalse": true,
+  "sourceBound": true,
+  "receivedSSE": [
+    200
+  ],
+  "testScope": "isolated Go/Python/CLI/tmux/SQLite/SSE/desktop/Android; controlled provider and executor",
+  "focusedPythonTests": 8,
+  "frontendTests": {
+    "files": 94,
+    "tests": 678,
+    "passed": true
+  },
+  "initialChecks": [
+    "Go restore schema compatibility required version 8 and a future-version fixture update; fixed and storage tests passed.",
+    "An existing Claude Stop quiescence test returned unknown once during the full parallel Go suite; the focused test passed three consecutive runs. No lifecycle production code changed; final full-suite result is recorded in PR.",
+    "Three legacy delegate tests asserted the prompt was unchanged; updated to require the original instructions followed by the callback and to verify the persisted origin and awaiting-report state."
+  ],
+  "fileInventoryCommand": "git show --stat --oneline HEAD",
+  "pythonTests": 544,
+  "i18nKeys": 2935
+}

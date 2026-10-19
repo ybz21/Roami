@@ -24,6 +24,7 @@ GROUPS = {
     "target_search": "sessions",
     "target_resolve": "sessions",
     "session_send": "sessions",
+    "session_dispatch_status": "sessions",
     "task_status": "tasks",
     "task_cancel": "tasks",
     "capability_overview": "discovery",

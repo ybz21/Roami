@@ -27,6 +27,7 @@ from roami_agent.protocol.http import (
     Report,
     SaveMemory,
     SendMessage,
+    SessionReport,
     SteerTask,
 )
 
@@ -613,6 +614,14 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.memory.evidence(owner, memory_id)}
 
     # Go never forwards /internal/*; local callers share the OS user's private socket.
+    @app.post("/internal/session-dispatches/{dispatch_id}/reply")
+    async def session_reply(dispatch_id: str, body: SessionReport, owner: Owner):
+        result = await runtime.session_dispatches.report(
+            owner, dispatch_id, body.model_dump(exclude_none=True)
+        )
+        runtime.wakeup.set()
+        return {"data": result}
+
     @app.post("/internal/report")
     async def report(body: Report, owner: Owner):
         result = await runtime.tasks.report(

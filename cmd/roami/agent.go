@@ -38,7 +38,7 @@ func runAgent(args []string) int {
 		return runAgentTrace(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|conversations|new|send|history|report|notify|steer|steering|control|reminder|notification-preferences|execution|capability|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		fmt.Println("roami agent setup|init|serve|status|conversations|new|send|history|report|reply|notify|steer|steering|control|reminder|notification-preferences|execution|capability|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
 		return 0
 	}
 	sub := args[0]
@@ -49,6 +49,7 @@ func runAgent(args []string) int {
 	file := fs.String("file", "", "message/result file, or - for stdin")
 	key := fs.String("key", "", "idempotency key")
 	task := fs.String("task", "", "task ID")
+	dispatch := fs.String("dispatch", "", "session assignment ID supplied with the task")
 	run := fs.String("run", "", "run ID")
 	operation := fs.String("operation", "", "steering operation ID")
 	revision := fs.Int("revision", 1, "task revision")
@@ -92,7 +93,7 @@ func runAgent(args []string) int {
 		}
 		return 0
 	}
-	if sub != "status" && sub != "conversations" && sub != "new" && sub != "send" && sub != "history" && sub != "report" && sub != "notify" && sub != "steer" && sub != "steering" {
+	if sub != "status" && sub != "conversations" && sub != "new" && sub != "send" && sub != "history" && sub != "report" && sub != "reply" && sub != "notify" && sub != "steer" && sub != "steering" {
 		fmt.Fprintf(os.Stderr, "unknown agent command %q\n", sub)
 		return 2
 	}
@@ -174,6 +175,19 @@ func runAgent(args []string) int {
 			return fail(err)
 		}
 		method, path, body = "POST", "/internal/report", map[string]any{"taskId": *task, "runId": *run, "revision": *revision, "result": result}
+	case "reply":
+		if *dispatch == "" || *file == "" || *conversation != "" || *text != "" || *task != "" || *run != "" || *key != "" {
+			return fail(fmt.Errorf("reply requires --dispatch and --file; routing and idempotency come from the assignment and result JSON"))
+		}
+		content, err := agentInput(*file, "")
+		if err != nil {
+			return fail(err)
+		}
+		var result map[string]any
+		if err = json.Unmarshal(content, &result); err != nil {
+			return fail(err)
+		}
+		method, path, body = "POST", "/internal/session-dispatches/"+url.PathEscape(*dispatch)+"/reply", result
 	}
 	raw, err := agentRequest(paths.Socket, method, path, body)
 	if len(raw) > 0 {

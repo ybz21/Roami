@@ -8,7 +8,10 @@ from roami_agent.protocol.tools import Tool, object_schema
 def register_main_tools(registry, tasks, memory, targets):
     async def send_message(args, binding):
         return await targets.send(
-            args["sessionId"], args["text"], binding["turnId"] + ":" + binding["toolCallId"]
+            args["sessionId"],
+            args["text"],
+            binding["turnId"] + ":" + binding["toolCallId"],
+            binding=binding,
         )
 
     registry.add(
@@ -16,7 +19,8 @@ def register_main_tools(registry, tasks, memory, targets):
             "session_send",
             "Append the user's message or work instructions to one exact existing live session. "
             "Works with legacy Codex/Claude sessions without lifecycle callbacks. Returns delivery only, "
-            "NOT task completion; executionTracked=false means results must be checked separately. "
+            "NOT task completion. replyExpected=true includes a durable dispatchId and a local CLI return channel for executor reports; "
+            "executionTracked=false means no provider lifecycle proof. Wait for the report in Main, never claim completion from delivery. "
             "Use immediately when the user asks to message, hand work to, or continue an existing session; the request authorizes sending, so do not ask again. Resolve the destination using available context or discovery, never guess among ambiguous matches. "
             "For a new session/project or tracked task use delegate instead. Do not retry unknown outcomes.",
             object_schema(
@@ -29,6 +33,23 @@ def register_main_tools(registry, tasks, memory, targets):
             send_message,
             main=True,
             effect="write",
+        )
+    )
+
+    async def dispatch_status(args, binding):
+        return await targets.dispatches.status(
+            binding["owner"], binding["conversation"], args["dispatchId"]
+        )
+
+    registry.add(
+        Tool(
+            "session_dispatch_status",
+            "Read a delivered session assignment and its executor reports by dispatchId in this conversation. Missing reports remain unconfirmed; reports are not independent verification.",
+            object_schema(
+                {"dispatchId": {"type": "string", "minLength": 1, "maxLength": 200}}, ["dispatchId"]
+            ),
+            dispatch_status,
+            main=True,
         )
     )
 
@@ -143,6 +164,7 @@ def register_main_tools(registry, tasks, memory, targets):
                 destination["sessionId"],
                 args["goal"],
                 binding["turnId"] + ":" + binding["toolCallId"],
+                binding=binding,
             )
         task = await tasks.create(
             binding["owner"],

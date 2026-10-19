@@ -10,7 +10,7 @@ from roami_agent.storage.database import row
 
 
 @pytest.mark.parametrize("executor", ["native", "codex", "claude"])
-async def test_main_existing_session_delegate_sends_without_callbacks_or_confirmation(
+async def test_main_existing_session_delegate_sends_without_provider_hooks_or_confirmation(
     store, monkeypatch, executor
 ):
     calls = []
@@ -24,7 +24,9 @@ async def test_main_existing_session_delegate_sends_without_callbacks_or_confirm
             }
         assert argv[1:4] == ["agent", "execution", "send-message"]
         spec = json.loads(kwargs["input_data"])
-        assert spec["sessionId"] == "stable-id" and spec["text"] == "Fix the layout"
+        assert spec["sessionId"] == "stable-id"
+        assert spec["text"].startswith("Fix the layout\n\n[Roami task return channel]")
+        assert "agent reply --dispatch " in spec["text"]
         return {
             "exitCode": 0,
             "stdout": json.dumps(
@@ -37,7 +39,7 @@ async def test_main_existing_session_delegate_sends_without_callbacks_or_confirm
 
         async def stream(self, messages, tools):
             if messages[-1]["role"] == "tool":
-                yield ModelEvent("text", "Message delivered; completion is not tracked")
+                yield ModelEvent("text", "Message delivered; awaiting executor CLI report")
             else:
                 yield ModelEvent(
                     "tool",
@@ -77,6 +79,9 @@ async def test_main_existing_session_delegate_sends_without_callbacks_or_confirm
         view = await runtime.conversations.messages("alice", c["id"])
         assert view["activities"][0]["state"] == "delivered"
         assert view["activities"][0]["target"] == "stable-id"
+        dispatch = await store.call(lambda db: row(db, "SELECT * FROM session_dispatches"))
+        assert dispatch["conversation_id"] == c["id"] and dispatch["session_id"] == "stable-id"
+        assert dispatch["delivery_state"] == "delivered" and dispatch["final_status"] is None
     finally:
         await runtime.close()
 

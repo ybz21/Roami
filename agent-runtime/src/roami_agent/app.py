@@ -20,6 +20,7 @@ from roami_agent.context.vision_inputs import VisionInputs
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
+from roami_agent.conversation.session_dispatches import SessionDispatches
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.core.loop import AgentLoop
 from roami_agent.dispatch.daily_briefs import DailyBriefs
@@ -154,7 +155,13 @@ class Runtime:
         self.native_reconciliation = NativeWorkspaceReconciliation(
             database, self.settings, resources=self.resources
         )
-        register_main_tools(self.tools, self.tasks, self.memory, TargetDirectory(self.settings))
+        self.session_dispatches = SessionDispatches(database, self.settings)
+        register_main_tools(
+            self.tools,
+            self.tasks,
+            self.memory,
+            TargetDirectory(self.settings, self.session_dispatches),
+        )
         register_reminder_tools(
             self.tools,
             self.reminders,

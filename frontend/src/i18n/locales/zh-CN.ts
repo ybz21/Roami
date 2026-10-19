@@ -1,4 +1,11 @@
 const zhCN = {
+  'agent.sessionReply.answer': '回复后台会话 {sessionId}（派活 {dispatchId}）：{answer}',
+  'agent.sessionReply.progress': '后台会话进展',
+  'agent.sessionReply.blocked': '后台会话等待处理',
+  'agent.sessionReply.completed': '执行器报告完成',
+  'agent.sessionReply.failed': '执行器报告失败',
+  'agent.sessionReply.unknown': '回报状态未确认',
+  'agent.sessionReply.unverified': '执行器回报，尚未经独立验收',
   'activity.projectCommits': '{count} 次提交',
   'activity.dayTimeline': '当天足迹',
   'activity.archivedCommit': '已归档提交',

@@ -8,10 +8,45 @@ from roami_agent.tools.process import execute
 
 
 class TargetDirectory:
-    def __init__(self, settings):
-        self.settings = settings
+    def __init__(self, settings, dispatches=None):
+        self.settings, self.dispatches = settings, dispatches
 
-    async def send(self, session_id, text, key):
+    async def send(self, session_id, text, key, *, binding=None):
+        dispatch = None
+        if self.dispatches and binding:
+            dispatch = await self.dispatches.prepare(session_id, text, key, binding)
+            if dispatch["delivery_state"] == "failed":
+                raise DomainError(json.loads(dispatch["delivery_receipt_json"])["errorCode"])
+            if dispatch["delivery_receipt_json"]:
+                return json.loads(dispatch["delivery_receipt_json"])
+            if dispatch["delivery_state"] in {"unknown", "failed"}:
+                raise DomainError("TOOL_OUTCOME_UNKNOWN")
+            text = dispatch["prompt"]
+        try:
+            result = await self._send(session_id, text, key)
+        except BaseException as exc:
+            if dispatch:
+                code = (
+                    exc.code
+                    if isinstance(exc, DomainError)
+                    and exc.code
+                    in {
+                        "SESSION_TARGET_AMBIGUOUS",
+                        "SESSION_TARGET_NOT_FOUND",
+                        "SESSION_PANE_AMBIGUOUS",
+                        "MESSAGE_KEY_CONFLICT",
+                        "INVALID_SESSION_MESSAGE",
+                    }
+                    else None
+                )
+                await self.dispatches.record_delivery(dispatch, error_code=code)
+            raise
+        if dispatch:
+            result.update(dispatchId=dispatch["id"], replyExpected=True, replyProtocol="roami-cli")
+            await self.dispatches.record_delivery(dispatch, result)
+        return result
+
+    async def _send(self, session_id, text, key):
         try:
             response = await execute(
                 [self.settings.cli_bin, "agent", "execution", "send-message", "--file", "-"],
