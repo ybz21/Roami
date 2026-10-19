@@ -1,3 +1,6 @@
+import { hubConfiguration, waitForClusterRecovery } from './cluster-recovery'
+import { useSettingsDraft } from '../settings/settings-draft'
+import { useSettingsRead } from '../settings/settings-read'
 // 设置 › 多机（设计稿 docs/design/cluster/settings.html）。
 //
 // 第一屏不给表单，先让人选身份——多机最容易卡住的地方是「我这台该配成什么」。
@@ -42,22 +45,16 @@ function HubSelfCard() {
   const { message, modal } = AntApp.useApp()
   const [self, setSelf] = useState<Cfg | null>(null)
   const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    fetch('/api/cluster/config', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((r) => setSelf(r?.data || null))
-      .catch(() => {})
-  }, [])
+  const readState = useSettingsRead(() => hubConfiguration().then(r => setSelf(r?.data || null)))
+  if (readState) return readState
   if (!self || self.mode !== 'hub') return null
   const backToNode = () => modal.confirm({
     title: t('cluster.hubToNodeTitle'),
     content: t('cluster.hubToNodeBody'),
     okText: t('cluster.hubToNodeOk'), cancelText: t('common.cancel'),
     onOk: async () => {
-      await fetch('/api/cluster/config', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'standard', hub: '', name: self.name, group: self.group, insecure: false }),
-      })
+      const result = await hubConfiguration('PUT', { mode: 'standard', hub: '', name: self.name, group: self.group, insecure: false })
+      setSelf(result.data)
       message.success(t('cluster.savedRestartHub'))
     },
   })
@@ -68,12 +65,10 @@ function HubSelfCard() {
         <HubPublicFields cfg={self} saving={busy} save={async (o) => {
           setBusy(true)
           try {
-            await fetch('/api/cluster/config', {
-              method: 'PUT', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mode: 'hub', hub: '', name: self.name, group: self.group, insecure: false, ...o }),
-            })
+            const result = await hubConfiguration('PUT', { mode: 'hub', hub: '', name: self.name, group: self.group, insecure: false, ...o })
+            setSelf({ ...self, ...o, ...result.data })
             message.success(t('cluster.savedRestartHub'))
-          } finally { setBusy(false) }
+          } catch (e: any) { message.error(e.message) } finally { setBusy(false) }
         }} />
         <div><Button onClick={backToNode}>{t('cluster.hubToNode')}</Button></div>
       </div>
@@ -95,9 +90,11 @@ function HubPublicFields({ cfg, save, saving }: {
   const { t } = useI18n()
   const [pub, setPub] = useState(cfg.publicUrl || '')
   const [ttl, setTtl] = useState(cfg.enrollTtlMin || 30)
+  const draftNotice = useSettingsDraft('hub-public:' + cfg.name, { pub, ttl }, { pub: cfg.publicUrl || '', ttl: cfg.enrollTtlMin || 30 }, value => { setPub(value.pub); setTtl(value.ttl) })
   const effective = pub || location.origin
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {draftNotice}
       <div className="tt-crow">
         <label className="tt-cf" style={{ flex: '2 1 320px' }}>
           <span>{t('cluster.publicUrl')}</span>
@@ -138,20 +135,24 @@ export function ClusterSettings() {
     { hub: '', token: '', name: '', group: '', insecure: false },
   )
   const [saving, setSaving] = useState(false)
+  const [baseline, setBaseline] = useState(form)
+  const draftNotice = useSettingsDraft('cluster-join', form, baseline, setForm, !!cfg)
 
   const load = () => api('GET', '/cluster/config').then((r) => {
     const c: Cfg = r?.data
     setCfg(c)
-    setForm({ hub: c.hub || '', token: '', name: c.name || '', group: c.group || '', insecure: !!c.insecure })
-  }).catch(() => {})
+    const next = { hub: c.hub || '', token: '', name: c.name || '', group: c.group || '', insecure: !!c.insecure }
+    setForm(next); setBaseline(next)
+  })
 
-  useEffect(() => { load() }, [])
+  const readState = useSettingsRead(load)
   // 接入状态是会自己变的（重连、掉线），停在旧值上比不显示更糟
   useEffect(() => {
     const id = window.setInterval(() => { api('GET', '/cluster/config').then((r) => setCfg(r?.data)).catch(() => {}) }, 5000)
     return () => window.clearInterval(id)
   }, [])
 
+  if (readState) return readState
   if (!cfg) return null
   const isHub = cfg.mode === 'hub'
 
@@ -181,16 +182,14 @@ export function ClusterSettings() {
     content: t('cluster.restartBody'),
     okText: t('cluster.restartNow'), cancelText: t('cluster.restartLater'),
     onOk: async () => {
-      await api('POST', '/cluster/restart').catch(() => {})
-      message.loading(t('cluster.restarting'), 6)
-      // 等它自己回来：/api/version 是免登录的，最轻
-      const t0 = Date.now()
-      const tick = window.setInterval(async () => {
-        try {
-          await fetch('/api/version', { cache: 'no-store' })
-          window.clearInterval(tick); location.reload()
-        } catch { if (Date.now() - t0 > 30000) window.clearInterval(tick) }
-      }, 1500)
+      try {
+        await api('POST', '/cluster/restart')
+      } catch (e: any) { message.error(t('cluster.restartFailed') + ' ' + e.message); throw e }
+      const hide = message.loading(t('cluster.restarting'), 0)
+      try { await waitForClusterRecovery(); location.reload() }
+      catch (e) { message.error(t('cluster.recoveryTimeout')); throw e }
+      finally { hide() }
+
     },
   })
 
@@ -214,6 +213,7 @@ export function ClusterSettings() {
   const st = cfg.state
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {draftNotice}
       <Card title={t('cluster.roleTitle')}>
         <div className="tt-modes">
           <button type="button" className={`tt-mode${!isHub ? ' on' : ''}`} onClick={() => switchMode('standard')}>

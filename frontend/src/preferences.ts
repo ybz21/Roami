@@ -220,18 +220,43 @@ export async function loadPreferences() {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let revision = 0
+let saveState: 'idle' | 'saving' | 'saved' | 'failed' = 'idle'
+let writeQueue: Promise<unknown> = Promise.resolve()
+let waiters: { revision: number; resolve: (saved: boolean) => void }[] = []
 
-export function savePreferences(partial: Partial<Preferences>) {
+export function flushPreferences(): Promise<boolean> {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  const snapshot = cache, version = revision
+  saveState = 'saving'; notify()
+  const write = writeQueue.then(async () => {
+    let ok = false
+    try { await api('PUT', '/preferences', snapshot); ok = true } catch { /* Keep the local draft for retry. */ }
+    if (version === revision) { saveState = ok ? 'saved' : 'failed'; notify() }
+    const completed = waiters.filter(w => w.revision <= version)
+    waiters = waiters.filter(w => w.revision > version)
+    completed.forEach(w => w.resolve(ok))
+    return ok
+  })
+  writeQueue = write
+  return write
+}
+
+export function savePreferences(partial: Partial<Preferences>): Promise<boolean> {
   cache = { ...cache, ...partial }
+  revision += 1
   if (partial.workspace) writeWorkspaceMirror(cache.workspace)
   if (partial.theme !== undefined || partial.locale !== undefined) writeLookMirror(cache)
+  saveState = 'saving'
   notify()
-  // debounce server writes to avoid rapid-fire PUTs
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    api('PUT', '/preferences', cache).catch(() => {})
-    saveTimer = null
-  }, 300)
+  saveTimer = setTimeout(() => { void flushPreferences() }, 300)
+  return new Promise(resolve => waiters.push({ revision, resolve }))
+}
+
+export function usePreferenceSaveState() {
+  return useSyncExternalStore(subscribe, () => saveState)
 }
 
 /** 只改工作区偏好的某几项，其余保留（savePreferences 会整块替换嵌套对象）。 */

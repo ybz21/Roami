@@ -1,9 +1,10 @@
+import { useSettingsRead } from './settings-read'
 // 状态条设置（20 设计 §05「用户看得见两类格的区别」）。
 //
 // 条上看不出哪几格是插件的——那是刻意的。但设置里必须看得出，不然你没法回答
 // 「这个 61°C 是谁报的、准不准、能不能关」。所以这一页按**来源**分组，
 // 插件那组还标出来自哪个插件、是随二进制走的内置还是用户装的第三方。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Space, Switch, Tag } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -18,13 +19,7 @@ export function StatusBarSettings() {
   const [prefs, setPrefs] = usePreferences()
   const [plugins, setPlugins] = useState<PluginRecord[]>([])
 
-  useEffect(() => {
-    let stop = false
-    api('GET', '/plugins')
-      .then((r) => { if (!stop) setPlugins(Array.isArray(r) ? r : r?.data || []) })
-      .catch(() => {})
-    return () => { stop = true }
-  }, [])
+  const readState = useSettingsRead(() => api('GET', '/plugins').then((r) => setPlugins(Array.isArray(r) ? r : r?.data || [])))
 
   const bar = prefs.statusBar
   const hidden = new Set(bar.hidden)
@@ -64,6 +59,7 @@ export function StatusBarSettings() {
     color: 'var(--text-dimmer)', fontWeight: 600, marginTop: 'var(--sp-3)',
   }
 
+  if (readState) return readState
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 460 }}>
       <Space align="center" wrap>

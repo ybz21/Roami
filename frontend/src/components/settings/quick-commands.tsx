@@ -13,7 +13,7 @@ export function QuickCommandsSettings() {
   const [cmds, setCmds] = useState<string[]>(prefs.quickCommands || [])
   const [draft, setDraft] = useState('')
   useEffect(() => { setCmds(prefs.quickCommands || []) }, [prefs.quickCommands])
-  const save = (next: string[]) => { setCmds(next); setPrefs({ quickCommands: next }); message.success(t('settings.saved')) }
+  const save = async (next: string[]) => { setCmds(next); if (await setPrefs({ quickCommands: next })) message.success(t('settings.saved')) }
   const add = () => { const v = draft.trim(); if (!v || cmds.includes(v)) return; save([...cmds, v]); setDraft('') }
   const remove = (i: number) => save(cmds.filter((_, j) => j !== i))
   return (

@@ -1,3 +1,4 @@
+import { useSettingsRead } from './settings-read'
 // Chrome(浏览器镜像)启动配置：模式 / 窗口尺寸 / 全屏 / 缩放 / profile(data-dir) / 可执行路径。
 // 持久化到后端 browser-config.json。
 //
@@ -11,23 +12,49 @@ import { useI18n } from '../../i18n'
 
 const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '' }
 
-export function BrowserSettings() {
-  const { message } = AntApp.useApp()
+export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (() => Promise<void>) | null) => void }) {
+  const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const [cfg, setCfg] = useState<any>(DEFAULTS)
+  const [pendingRestart, setPendingRestart] = useState(false)
+  const writes = useRef<Promise<unknown>>(Promise.resolve())
   const cfgRef = useRef(cfg)
   useEffect(() => { cfgRef.current = cfg }, [cfg])
-  useEffect(() => { api('GET', '/browser/config').then((r) => { if (r?.data) setCfg({ ...DEFAULTS, ...r.data }) }).catch(() => {}) }, [])
+  const readState = useSettingsRead(() => api('GET', '/browser/config').then((r) => { setCfg({ ...DEFAULTS, ...r.data }) }))
 
-  const persist = (next: any) => api('PUT', '/browser/config', next).catch((e: any) => message.error(e.message))
+  const persist = (next: any) => {
+    const write = writes.current.catch(() => {}).then(() => api('PUT', '/browser/config', next))
+    writes.current = write
+    return write.then(() => setPendingRestart(true))
+  }
+  useEffect(() => {
+    onRestartReady?.(readState ? null : () => new Promise<void>(resolve => {
+      modal.confirm({
+        title: t('settings.browserRelaunch'), content: t('settings.browserRestartConfirm'),
+        onCancel: () => resolve(),
+        onOk: async () => {
+          try {
+            await persist(cfgRef.current)
+            const r = await api('POST', '/browser/relaunch')
+            if (r?.data?.attached) message.warning(t('settings.browserAttached'))
+            else { setPendingRestart(false); message.success(t('settings.browserRelaunched')) }
+            resolve()
+          } catch (e: any) { message.error(e.message); throw e }
+        },
+      })
+    }))
+    return () => onRestartReady?.(null)
+  }, [!!readState, onRestartReady, t])
   // 输入框：只改本地状态，失焦才写——每敲一个字发一次 PUT 既吵又会打乱光标
   const edit = (k: string, v: any) => setCfg((c: any) => { const n = { ...c, [k]: v }; cfgRef.current = n; return n })
-  const commit = () => persist(cfgRef.current)
-  const set = (k: string, v: any) => { const n = { ...cfgRef.current, [k]: v }; cfgRef.current = n; setCfg(n); persist(n) }
+  const commit = () => { void persist(cfgRef.current).catch((e: any) => message.error(e.message)) }
+  const set = (k: string, v: any) => { const n = { ...cfgRef.current, [k]: v }; cfgRef.current = n; setCfg(n); void persist(n).catch((e: any) => message.error(e.message)) }
 
   const dim = { color: 'var(--text-dim)', fontSize: 'var(--fs-meta)' }
+  if (readState) return readState
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      {pendingRestart && <span role="status">{t('settings.browserPendingRestart')}</span>}
       <Space align="center" wrap>
         <span>{t('settings.browserMode')}</span>
         <Segmented

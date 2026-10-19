@@ -1,3 +1,4 @@
+import { useSettingsDraft } from './settings-draft'
 import { useEffect, useRef, useState } from 'react'
 import { App, Button, Input, Select, Spin, Switch } from 'antd'
 import { api } from '../../api'
@@ -52,9 +53,11 @@ function AgentSettingsForm() {
     try { hydrate(await saveAgentModels(modelConfiguration(draft))); message.success(t('agent.models.saved')) }
     catch (e) { setError(modelFailure(e, t)) } finally { setSaving(false) }
   }
+  const draftNotice = useSettingsDraft('agent-models', draft, saved ? settingsDraft(saved) : null, setDraft, !!draft && !!saved)
   if (!draft) return error ? <div role="alert"><p>{error}</p><Button onClick={() => setVersion(v => v + 1)}>{t('agent.retry')}</Button></div> : <Spin />
   const dirty = !!saved && JSON.stringify(modelConfiguration(draft)) !== JSON.stringify(modelConfiguration(settingsDraft(saved)))
   return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void save() }}>
+    {draftNotice}
     <fieldset className="agent-settings-connection" disabled={saving}>
       <legend>{t('agent.models.connection')}</legend><p className="agent-settings-hint">{t('agent.models.connectionHint')}</p>
       <div className="agent-settings-connection-fields">

@@ -1,4 +1,22 @@
 const zhCN = {
+  'cluster.restartFailed': '重启请求失败，配置已保存。请重试。',
+  'cluster.recoveryTimeout': '配置已保存，但等待服务恢复超时。请检查服务状态后刷新，或稍后重试。',
+
+  'settings.draftKept': '尚未保存。草稿暂存在当前标签页，返回此表单可恢复；关闭或刷新前请保存。',
+  'settings.draftRestored': '已恢复未保存的草稿。关闭或刷新前请保存。',
+
+  'settings.browserRestartConfirm': '将先保存当前配置，再重启 Chrome。当前镜像会话会断开，是否继续？',
+  'settings.browserPendingRestart': '配置已保存，重启 Chrome 后生效。',
+
+  'twoFactor.reauthHint': '输入当前登录口令或有效动态码以继续。',
+  'twoFactor.reauthFailed': '验证失败，请检查口令或动态码；多次失败后需稍后再试。',
+
+  'settings.readFailed': '无法读取设置；状态未知。请重试后再修改。',
+
+  'settings.preference.saving': '正在同步设置…',
+  'settings.preference.saved': '设置已同步',
+  'settings.preference.failed': '设置尚未同步，仅在当前页面生效。请重试。',
+
   'agent.sessionReply.answer': '回复后台会话 {sessionId}（派活 {dispatchId}）：{answer}',
   'agent.sessionReply.progress': '后台会话进展',
   'agent.sessionReply.blocked': '后台会话等待处理',

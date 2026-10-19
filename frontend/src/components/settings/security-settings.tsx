@@ -1,7 +1,8 @@
+import { useSettingsRead } from './settings-read'
 // 安全：登录口令 / 两步验证 / 自签证书。
 // 三块都写在这台机器上（config.yaml 与本机 CA），跟人无关——换台机器就是另一份。
-import { useEffect, useState } from 'react'
-import { App as AntApp, Button, Form, Input, Modal, Popconfirm, Space, Tag } from 'antd'
+import { useState } from 'react'
+import { App as AntApp, Button, Form, Input, Modal, Space, Tag } from 'antd'
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -48,9 +49,12 @@ export function TwoFactorSettings() {
   const [code, setCode] = useState('')
   const [qr, setQr] = useState<{ uri: string; secret: string } | null>(null) // 查看当前二维码
   const [busy, setBusy] = useState(false)
+  const [sensitive, setSensitive] = useState<'qr' | 'disable' | null>(null)
+  const [credential, setCredential] = useState('')
+  const [reauthError, setReauthError] = useState('')
 
-  const refresh = () => api('GET', '/pubconfig').then((r) => setEnabled(!!r?.data?.totp)).catch(() => setEnabled(false))
-  useEffect(() => { refresh() }, [])
+  const refresh = () => api('GET', '/pubconfig').then((r) => setEnabled(!!r?.data?.totp))
+  const readState = useSettingsRead(refresh)
 
   const startSetup = async () => {
     try { const r = await api('GET', '/2fa/gen'); setSetup({ uri: r.data.uri, secret: r.data.secret }); setCode(''); setQr(null) }
@@ -63,18 +67,28 @@ export function TwoFactorSettings() {
     catch (e: any) { message.error(/BAD_CODE/.test(e.message) ? t('twoFactor.badCode') : e.message) }
     finally { setBusy(false) }
   }
-  const disable = async () => {
-    try { await api('POST', '/2fa/disable'); message.success(t('twoFactor.disabled')); setQr(null); refresh() }
-    catch (e: any) { message.error(e.message) }
+  const authenticate = async () => {
+    if (!sensitive || busy || !credential) return
+    setBusy(true); setReauthError('')
+    try {
+      const r = await api('POST', sensitive === 'qr' ? '/2fa/qr' : '/2fa/disable', { password: credential, code: credential })
+      if (sensitive === 'qr' && r.data?.enabled) setQr({ uri: r.data.uri, secret: r.data.secret })
+      else { message.success(t('twoFactor.disabled')); setQr(null); await refresh() }
+      setSensitive(null); setCredential('')
+    } catch { setReauthError(t('twoFactor.reauthFailed')) }
+    finally { setBusy(false) }
   }
-  const showCurrent = async () => {
-    try { const r = await api('GET', '/2fa/qr'); if (r.data?.enabled) setQr({ uri: r.data.uri, secret: r.data.secret }) }
-    catch (e: any) { message.error(e.message) }
-  }
+  const requestSensitive = (action: 'qr' | 'disable') => { setQr(null); setCredential(''); setReauthError(''); setSensitive(action) }
   const copy = (s: string) => { try { navigator.clipboard?.writeText(s) } catch {}; message.success(t('common.copied')) }
 
+  if (readState) return readState
   return (
     <>
+      <Modal open={!!sensitive} title={t(sensitive === 'disable' ? 'twoFactor.disableConfirm' : 'twoFactor.showQr')} confirmLoading={busy} okButtonProps={{ disabled: !credential, danger: sensitive === 'disable' }} onOk={authenticate} onCancel={() => { if (!busy) { setSensitive(null); setCredential('') } }}>
+        <p>{t('twoFactor.reauthHint')}</p>
+        <Input.Password autoComplete="current-password" aria-label={t('twoFactor.reauthHint')} value={credential} onChange={e => setCredential(e.target.value)} onPressEnter={authenticate} />
+        {reauthError && <p role="alert">{reauthError}</p>}
+      </Modal>
       <Tag color={enabled ? 'green' : 'default'} style={{ marginBottom: 'var(--sp-2)' }}>
         {enabled === null ? '…' : enabled ? t('twoFactor.on') : t('twoFactor.off')}
       </Tag>
@@ -87,8 +101,8 @@ export function TwoFactorSettings() {
           <Space>
             {enabled
               ? <>
-                  <Button onClick={showCurrent}>{t('twoFactor.showQr')}</Button>
-                  <Popconfirm title={t('twoFactor.disableConfirm')} onConfirm={disable}><Button danger>{t('twoFactor.disable')}</Button></Popconfirm>
+                  <Button disabled={busy} onClick={() => requestSensitive('qr')}>{t('twoFactor.showQr')}</Button>
+                  <Button danger disabled={busy} onClick={() => requestSensitive('disable')}>{t('twoFactor.disable')}</Button>
                 </>
               : <Button type="primary" onClick={startSetup}>{t('twoFactor.enable')}</Button>}
           </Space>
@@ -121,7 +135,7 @@ export function TwoFactorSettings() {
           <div style={{ padding: 16, background: 'var(--bg-base)', borderRadius: 'var(--r-sm)', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ background: '#fff', padding: 10, borderRadius: 'var(--r-sm)' }}><QRCodeSVG value={qr.uri} size={168} /></div>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 12, marginBottom: 4 }}>{t('twoFactor.addDevice')}</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 12, marginBottom: 4 }}>{t('twoFactor.addDevice')}</div><Button onClick={() => setQr(null)}>{t('common.close')}</Button>
               <Space.Compact style={{ width: '100%' }}><Input readOnly value={qr.secret} /><Button onClick={() => copy(qr.secret)}>{t('common.copy')}</Button></Space.Compact>
             </div>
           </div>

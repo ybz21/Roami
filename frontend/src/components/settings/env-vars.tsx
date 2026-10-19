@@ -1,6 +1,7 @@
+import { useSettingsRead } from './settings-read'
 // 全局环境变量：注入**新开**会话的 KV。已经开着的会话拿不到，要按页头那颗「推送到会话」
 // 才补发一次 export（见 registry 的页级动作）。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { App as AntApp, Button, Empty, Input, List, Popconfirm, Space } from 'antd'
 import { PlusIcon } from '../../icons'
 import { api } from '../../api'
@@ -14,8 +15,8 @@ export function EnvVarsSettings() {
   const [list, setList] = useState<any[]>([])
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
-  const load = () => api('GET', '/env').then(setList).catch(() => {})
-  useEffect(() => { load() }, [])
+  const load = () => api('GET', '/env').then(setList)
+  const readState = useSettingsRead(load)
   const add = () => {
     let key = '', value = ''
     modal.confirm({
@@ -37,6 +38,7 @@ export function EnvVarsSettings() {
     try { await api('DELETE', '/env/' + encodeURIComponent(key)); message.success(t('file.deleted')); load() }
     catch (e: any) { message.error(e.message) }
   }
+  if (readState) return readState
   return (
     <Space direction="vertical" size="small" style={{ width: '100%' }}>
       <Button onClick={add} icon={<PlusIcon />}>{t('env.add')}</Button>

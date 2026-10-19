@@ -320,7 +320,7 @@ func New(cfg Config) *gin.Engine {
 
 		g.POST("/password", a.ChangePassword) // 设置页改密（校验旧口令）→ /api/password
 
-		g.GET("/2fa/qr", a.TOTPQR)            // 当前状态 + 密钥二维码
+		g.POST("/2fa/qr", a.TOTPQR)           // 当前状态 + 密钥二维码
 		g.GET("/2fa/gen", a.TOTPGen)          // 生成新密钥（开启前扫码用）
 		g.POST("/2fa/enable", a.TOTPEnable)   // 确认动态码后开启
 		g.POST("/2fa/disable", a.TOTPDisable) // 关闭

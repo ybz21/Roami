@@ -4,7 +4,10 @@
 // 多机之后这条才有分量：偏好存在服务端，切到另一台机器读的是那台的值，
 // 于是界面当着面换一副样子。这里钉死的是——**本地存过就以本地为准**，
 // 服务端那份只在这台浏览器还没表过态时作数。
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+beforeEach(() => { vi.useFakeTimers(); getMock.mockReset(); getMock.mockResolvedValue({ data: {} }); localStorage.clear() })
+afterEach(() => { vi.clearAllTimers(); vi.useRealTimers() })
 
 const getMock = vi.fn()
 vi.mock('./api', () => ({
@@ -57,4 +60,29 @@ describe('观感项本地优先', () => {
     prefs.savePreferences({ claudeCommand: 'cc' })
     expect(localStorage.getItem('ttmux.look')).toBeNull()
   })
+})
+
+it('SET-01 reports failure, retains the draft, and retries with a real receipt', async () => {
+  const prefs = await freshModule()
+  getMock.mockRejectedValueOnce(new Error('HTTP 500')).mockResolvedValue({ data: 'ok' })
+  const saved = prefs.savePreferences({ quickCommands: ['echo test'] })
+  expect(await prefs.flushPreferences()).toBe(false)
+  expect(await saved).toBe(false)
+  expect(prefs.getPreferences().quickCommands).toEqual(['echo test'])
+  expect(await prefs.flushPreferences()).toBe(true)
+  expect(getMock).toHaveBeenLastCalledWith('PUT', '/preferences', expect.objectContaining({ quickCommands: ['echo test'] }))
+})
+it('SET-01 serializes writes so an older request cannot replace the latest draft', async () => {
+  const prefs = await freshModule()
+  let finish!: () => void
+  getMock.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve })).mockResolvedValue({})
+  const first = prefs.savePreferences({ quickCommands: ['first'] })
+  const firstWrite = prefs.flushPreferences()
+  await Promise.resolve()
+  const second = prefs.savePreferences({ quickCommands: ['second'] })
+  const secondWrite = prefs.flushPreferences()
+  expect(getMock).toHaveBeenCalledTimes(1)
+  finish()
+  await Promise.all([first, second, firstWrite, secondWrite])
+  expect(getMock).toHaveBeenLastCalledWith('PUT', '/preferences', expect.objectContaining({ quickCommands: ['second'] }))
 })

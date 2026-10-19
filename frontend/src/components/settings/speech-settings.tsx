@@ -1,6 +1,8 @@
+import { useSettingsDraft } from './settings-draft'
+import { useSettingsRead } from './settings-read'
 // 语音输入(ASR)配置：选服务商并填密钥，持久化到后端 speech-config.json。
 // 密钥只在服务端落盘，不下发到浏览器。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { App as AntApp, Button, Input, Select, Space } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -33,17 +35,21 @@ export function SpeechSettings() {
   const { t } = useI18n()
   const [cfg, setCfg] = useState<any>(() => normalizeSpeech(null))
   const [saving, setSaving] = useState(false)
-  useEffect(() => { api('GET', '/speech/config').then((r) => setCfg(normalizeSpeech(r?.data))).catch(() => {}) }, [])
+  const [baseline, setBaseline] = useState(cfg)
+  const readState = useSettingsRead(() => api('GET', '/speech/config').then((r) => { const next = normalizeSpeech(r?.data); setCfg(next); setBaseline(next) }))
+  const draftNotice = useSettingsDraft('speech', cfg, baseline, setCfg, !readState)
   const setOpenAI = (k: string, v: string) => setCfg((c: any) => ({ ...c, openai: { ...c.openai, [k]: v } }))
   const setVolc = (k: string, v: string) => setCfg((c: any) => ({ ...c, volcano: { ...c.volcano, [k]: v } }))
   const save = async () => {
     setSaving(true)
-    try { await api('PUT', '/speech/config', cfg); message.success(t('settings.speechSaved')) }
+    try { await api('PUT', '/speech/config', cfg); setBaseline(cfg); message.success(t('settings.speechSaved')) }
     catch (e: any) { message.error(e.message) }
     finally { setSaving(false) }
   }
+  if (readState) return readState
   return (
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        {draftNotice}
         <Space align="center" wrap>
           <Select
             value={cfg.provider || ''}

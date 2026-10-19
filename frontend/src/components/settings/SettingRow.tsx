@@ -17,13 +17,13 @@ function Hi({ text, q }: { text: string; q: string }) {
 }
 
 /** 文本控件：失焦提交，不给「保存」按钮——一页里五个保存按钮是五次犹豫 */
-function TextControl({ get, set, placeholder }: { get: () => string; set: (v: string) => void; placeholder?: string }) {
+export function TextControl({ get, set, placeholder, label }: { get: () => string; set: (v: string) => void; placeholder?: string; label?: string }) {
   const stored = get()
   const [draft, setDraft] = useState(stored)
   useEffect(() => { setDraft(stored) }, [stored])
   return (
     <Input
-      value={draft} placeholder={placeholder} style={{ maxWidth: 300 }}
+      aria-label={label} value={draft} placeholder={placeholder} style={{ maxWidth: 300 }}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { if (draft !== stored) set(draft) }}
       onPressEnter={(e) => (e.target as HTMLInputElement).blur()}
@@ -44,7 +44,7 @@ export function SettingRow({ item, q = '' }: { item: SettingItem; q?: string }) 
   if (c.kind === 'switch') control = <Switch checked={c.get()} onChange={c.set} aria-label={item.label} />
   else if (c.kind === 'segment') control = <Segmented value={c.get()} onChange={(v) => c.set(String(v))} options={c.options} />
   else if (c.kind === 'select') control = <Select value={c.get()} onChange={c.set} options={c.options} style={{ width: 160 }} aria-label={item.label} />
-  else if (c.kind === 'text') control = <TextControl get={c.get} set={c.set} placeholder={c.placeholder} />
+  else if (c.kind === 'text') control = <TextControl label={item.label} get={c.get} set={c.set} placeholder={c.placeholder} />
 
   return (
     <div className="tt-set-row">

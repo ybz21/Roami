@@ -11,7 +11,7 @@ import { App as AntApp, Button, Modal } from 'antd'
 import { AppLaunchIcon, CloseIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { usePreferences, saveWorkspace, getPreferences } from '../../preferences'
+import { usePreferences, saveWorkspace, getPreferences, usePreferenceSaveState, flushPreferences } from '../../preferences'
 import { useThemeMode } from '../../theme'
 import { api } from '../../api'
 import { useClusterNodes, useCurrentNodeId } from '../cluster/node-url'
@@ -84,6 +84,8 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const { message, modal } = AntApp.useApp()
   const { mode, setMode } = useThemeMode()
   const [prefs, setPrefs] = usePreferences()
+  const saveState = usePreferenceSaveState()
+  const saveStatus = saveState === 'idle' ? null : <div role={saveState === 'failed' ? 'alert' : 'status'} className="tt-set-save-state">{t('settings.preference.' + saveState)}{saveState === 'failed' && <Button onClick={() => { void flushPreferences() }}>{t('agent.retry')}</Button>}</div>
   const { size } = useLayout()
   const compact = size === 'compact'
   const nodes = useClusterNodes()
@@ -104,14 +106,16 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     return () => cancelAnimationFrame(frame)
   }, [compact, mobileSearchOpen, searchNonce])
 
+  const browserRestart = useRef<(() => Promise<void>) | null>(null)
+  const registerBrowserRestart = useRef((run: (() => Promise<void>) | null) => { browserRestart.current = run }).current
   const nodeLabel = nodes.find((n) => n.id === nodeId)?.name || ''
   const model = useMemo(() => buildSettings({
     t, theme: mode, setTheme: setMode, locale, setLocale, prefs, setPrefs,
     setWorkspace: saveWorkspace, nodeLabel, isHub: false, onLogout,
+    onBrowserReady: registerBrowserRestart,
     onBrowserRestart: async () => {
-      const r = await api('POST', '/browser/relaunch')
-      if (r?.data?.attached) message.warning(t('settings.browserAttached'))
-      else message.success(t('settings.browserRelaunched'))
+      if (!browserRestart.current) throw new Error(t('settings.readFailed'))
+      await browserRestart.current()
     },
     onEnvPush: async () => { await api('POST', '/env/push'); message.success(t('env.pushed')) },
   }), [t, mode, locale, prefs, nodeLabel, onLogout])
@@ -204,6 +208,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     const openSub = sub ? model.pages[routed] : null
     return (
       <div className="tt-set">
+        {saveStatus}
         {(mobileSearchOpen || q) && <div className="tt-set-mobile-head">
           <MobilePageSearch inputRef={searchRef} value={q} onChange={setQ}
             placeholder={t('set.searchPlaceholder')} resultCount={query ? t('set.hitCount', { n: totalHits }) : undefined}
@@ -250,6 +255,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const page = model.pages[current]
   return (
     <div className="tt-set">
+        {saveStatus}
       {head}
       <div className="tt-set-body">
         <div className="tt-set-tree">

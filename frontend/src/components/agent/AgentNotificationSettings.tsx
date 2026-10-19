@@ -1,3 +1,4 @@
+import { useSettingsDraft } from '../settings/settings-draft'
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input, InputNumber, Spin, Switch } from 'antd'
 import { api } from '../../api'
@@ -11,13 +12,15 @@ export default function AgentNotificationSettings() {
   const { t } = useI18n()
   const [settings, setSettings] = useState<Settings | null>(null), [failed, setFailed] = useState(false), [saving, setSaving] = useState(false), [saved, setSaved] = useState(false)
   const [version, setVersion] = useState(0)
+  const [baseline, setBaseline] = useState<Settings | null>(null)
+  const draftNotice = useSettingsDraft('notifications', settings, baseline, setSettings, !!settings && !!baseline)
   const alive = useRef(true), savingRef = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => {
     let cancelled = false
     const abort = new AbortController(), timer = setTimeout(() => abort.abort(), 10000)
     void api('GET', '/agent/notification-preferences', undefined, { signal: abort.signal })
-      .then((result) => { if (!cancelled) { setSettings(result.data); setFailed(false) } })
+      .then((result) => { if (!cancelled) { setSettings(result.data); setBaseline(result.data); setFailed(false) } })
       .catch(() => { if (!cancelled) setFailed(true) })
       .finally(() => clearTimeout(timer))
     return () => { cancelled = true; clearTimeout(timer); abort.abort() }
@@ -26,12 +29,13 @@ export default function AgentNotificationSettings() {
   const save = async () => {
     if (!settings || savingRef.current) return
     savingRef.current = true; setSaving(true); setSaved(false); setFailed(false)
-    try { await api('PUT', '/agent/notification-preferences', { settings }); if (alive.current) setSaved(true) }
+    try { await api('PUT', '/agent/notification-preferences', { settings }); if (alive.current) { setSaved(true); setBaseline(settings) } }
     catch { if (alive.current) setFailed(true) }
     finally { savingRef.current = false; if (alive.current) setSaving(false) }
   }
   return <div className="agent-notifications-body agent-notification-settings">
     <p className="agent-muted">{t('agent.notification.settingsHint')}</p>
+    {draftNotice}
     {!settings && !failed && <Spin />}
     {failed && <p role="alert">{t('agent.notification.settingsFailed')}<button type="button" className="tt-act" onClick={() => setVersion((value) => value + 1)}>{t('agent.retry')}</button></p>}
     {settings && <fieldset disabled={saving}>

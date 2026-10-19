@@ -317,8 +317,42 @@ func (a *Auth) setCookie(c *gin.Context) {
 	c.SetCookie(CookieName, a.issue(), int(a.ttl.Seconds()), "/", "", secure, true)
 }
 
+// requireReauthentication checks a fresh credential even for an authenticated session.
+func (a *Auth) requireReauthentication(c *gin.Context) bool {
+	var body struct {
+		Password string `json:"password"`
+		Code     string `json:"code"`
+	}
+	if c.ShouldBindJSON(&body) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
+		return false
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if time.Now().Before(a.lockedUntil) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": gin.H{"code": "LOCKED"}})
+		return false
+	}
+	pwOK := a.password != "" && subtle.ConstantTimeCompare([]byte(body.Password), []byte(a.password)) == 1
+	codeOK := a.totpOn && a.totpSecret != "" && verifyTOTP(a.totpSecret, body.Code)
+	if !pwOK && !codeOK {
+		a.fails++
+		if a.fails >= a.lockAfter {
+			a.lockedUntil = time.Now().Add(time.Duration(a.lockSecs) * time.Second)
+			a.fails = 0
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"code": "REAUTH_REQUIRED"}})
+		return false
+	}
+	a.fails = 0
+	return true
+}
+
 // TOTPQR 受保护端点：返回当前状态与已配置密钥的 otpauth 链接（供再次扫码加设备）。
 func (a *Auth) TOTPQR(c *gin.Context) {
+	if !a.requireReauthentication(c) {
+		return
+	}
 	a.mu.Lock()
 	on, s := a.totpOn && a.totpSecret != "", a.totpSecret
 	a.mu.Unlock()
@@ -345,6 +379,10 @@ func (a *Auth) TOTPGen(c *gin.Context) {
 
 // TOTPEnable 受保护端点：用密钥 + 一个有效动态码确认后，启用两步验证并持久化（无需重启）。
 func (a *Auth) TOTPEnable(c *gin.Context) {
+	if a.TOTPEnabled() {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "TOTP_ALREADY_ENABLED"}})
+		return
+	}
 	var b struct {
 		Secret string `json:"secret"`
 		Code   string `json:"code"`
@@ -367,6 +405,9 @@ func (a *Auth) TOTPEnable(c *gin.Context) {
 
 // TOTPDisable 受保护端点：关闭两步验证并持久化。
 func (a *Auth) TOTPDisable(c *gin.Context) {
+	if !a.requireReauthentication(c) {
+		return
+	}
 	a.mu.Lock()
 	a.totpOn = false
 	a.mu.Unlock()
