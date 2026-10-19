@@ -543,6 +543,41 @@ def create_app(runtime, *, manage_lifecycle=True):
             )
         }
 
+    @app.get("/v1/memories/catalog")
+    async def memory_catalog(
+        owner: Owner,
+        query: str = Query("", max_length=1000),
+        state: Literal["active", "candidate", "conflict"] = "active",
+        conversationId: str | None = None,
+        projectId: str | None = None,
+        taskId: str | None = None,
+        dayKey: str | None = None,
+        timezone: str | None = None,
+        kind: Literal["fact", "decision", "preference", "summary"] | None = None,
+        personalOnly: bool = False,
+        limit: int = Query(20, ge=1, le=100),
+        offset: int = Query(0, ge=0),
+    ):
+        if dayKey:
+            timezone = timezone or runtime.memory.daily.timezone
+            await runtime.memory.daily.refresh(owner, dayKey, timezone)
+        return {
+            "data": await runtime.memory.catalog.list(
+                owner,
+                query=query,
+                state=state,
+                conversation_id=conversationId,
+                project_id=projectId,
+                task_id=taskId,
+                day_key=dayKey,
+                timezone=timezone,
+                kind=kind,
+                personal_only=personalOnly,
+                limit=limit,
+                offset=offset,
+            )
+        }
+
     @app.get("/v1/memories/{memory_id}")
     async def get_memory(memory_id: str, owner: Owner):
         return {"data": await runtime.memory.get(owner, memory_id)}

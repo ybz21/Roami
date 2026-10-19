@@ -1,0 +1,22 @@
+.agent-memory { min-width:0; color:var(--text-bright); }
+.agent-memory:not(.agent-memory-full) { max-height:calc(100dvh - var(--tap) * 5); overflow:auto; }
+.agent-memory-entry { display:flex; justify-content:flex-end; margin-bottom:var(--sp-3); }
+.agent-memory-filters { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-3); }
+.agent-memory-filters .ant-select { min-width:calc(var(--sp-5) * 5); max-width:100%; }
+.agent-memory-filters .ant-input { width:auto; max-width:100%; }
+.agent-memory-list { display:flex; flex-direction:column; gap:var(--sp-3); margin-top:var(--sp-3); }
+.agent-memory-card { display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-4); border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-container); overflow-wrap:anywhere; }
+.agent-memory-card > p { margin:0; white-space:pre-wrap; }
+.agent-memory-meta,.agent-memory-scopes { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-memory-meta time { margin-inline-start:auto; }
+.agent-memory-tag { padding:var(--sp-1) var(--sp-2); border-radius:var(--r-pill); background:var(--bg-elevated); }
+.agent-memory-tag[data-state="candidate"],.agent-memory-tag[data-state="conflict"] { color:var(--warn); background:var(--warn-soft); }
+.agent-memory-scopes > span { overflow-wrap:anywhere; }
+.agent-memory-actions,.agent-memory-pagination { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); }
+.agent-memory-pagination { margin-top:var(--sp-4); }
+.agent-memory-pagination > span { margin-inline-end:auto; color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-memory .agent-muted { color:var(--text-dim); }
+.agent-memory-counts { display:flex; flex-wrap:wrap; gap:var(--sp-2) var(--sp-4); font-size:var(--fs-sm); color:var(--text-dim); }
+.agent-memory-counts strong { color:var(--text-bright); }
+html[data-size="compact"] .agent-memory-filters > .ant-select { flex:1; }
+html[data-pointer="coarse"] .agent-memory .ant-btn,html[data-pointer="coarse"] .agent-memory .ant-input,html[data-pointer="coarse"] .agent-memory .ant-select { min-height:var(--tap); }

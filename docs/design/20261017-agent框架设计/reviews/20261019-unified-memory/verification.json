@@ -1,0 +1,43 @@
+{
+  "verifiedAt": "2026-10-19T01:42:40.826925+00:00",
+  "fixture": "isolated runtime; 23 active records, 1 candidate; no model turns or tool calls",
+  "quality": {
+    "python": 533,
+    "frontendVitest": 663,
+    "frontendFiles": 91,
+    "fullGate": "passed",
+    "i18nKeys": 2881
+  },
+  "desktop": {
+    "device": "desktop",
+    "passed": true,
+    "actions": [
+      "Settings entry, 23 records across scopes, 20 records on first page, safe layout",
+      "Real page scroll, document stays fixed, next/previous page",
+      "Personal filter, original-source dialog, exact historical branch/message navigation",
+      "Search, candidate filter",
+      "Existing chat memory menu links to the unified page"
+    ]
+  },
+  "android": {
+    "device": "Android Redmi Note 8",
+    "passed": true,
+    "actions": [
+      "Settings entry, 23 records across scopes, 20 records on first page, safe layout",
+      "Real page scroll, document stays fixed, next/previous page",
+      "Personal filter, original-source dialog, exact historical branch/message navigation",
+      "Search, candidate filter",
+      "Secondary-page back and all four bottom tabs via Android touch",
+      "Existing chat memory menu links to the unified page"
+    ]
+  },
+  "english": "passed",
+  "candidateConfirmationAndDeletion": {
+    "passed": true,
+    "durableRecordStates": [
+      "superseded",
+      "deleted"
+    ]
+  },
+  "productionWritesDuringAcceptance": false
+}

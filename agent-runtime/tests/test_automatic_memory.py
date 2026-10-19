@@ -350,6 +350,7 @@ async def test_forgetting_user_preference_excludes_other_records_of_original_sou
         local_record = next(item for item in records if item["conversation_id"] is not None)
         await runtime.memory.forget("alice", global_record["id"])
         assert not await runtime.memory.search("alice", "pine-3571")
+        assert (await runtime.memory.catalog.list("alice", query="pine-3571"))["total"] == 0
         with pytest.raises(DomainError, match="MEMORY_SOURCE_NOT_FOUND"):
             await runtime.memory.get("alice", local_record["id"])
     finally:

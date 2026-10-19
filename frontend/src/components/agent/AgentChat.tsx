@@ -29,7 +29,7 @@ const newKey = () => crypto.randomUUID()
 
 export default function AgentChat({ cid, branch, focusMessage = '', node, inbox, inboxOpen, select, notifications, projects, onSession, onOverview }: {
   cid: string; branch: string; focusMessage?: string; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
-  select: (cid: string, branch?: string) => void; notifications: () => void
+  select: (cid: string, branch?: string, message?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
 }) {
   const { t } = useI18n(), { phone, landscape } = useLayout(), { message } = App.useApp()
@@ -246,7 +246,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
 
       {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
       {panel === 'tasks' && <AgentTasks key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox.refresh() }} />}
-      {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID) => { setPanel(null); select(sourceCID) }} />}
+      {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID, sourceBranch, sourceMessage) => { setPanel(null); select(sourceCID, sourceBranch, sourceMessage) }} />}
       {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? context.contextWindow ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.contextWindow }) : t('agent.contextUnknown', { used: context.estimatedTokens }) : t('agent.contextHint')}</p>{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
         <Button disabled={!cid || readOnly || compacting || running} onClick={() => { void submit('/compact') }}>{t('agent.compactNow')}</Button>
         {compacting && compact && <Button onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/compactions/${encodeURIComponent(compact.operationId)}/cancel`) }}>{t('agent.cancelCompact')}</Button>}

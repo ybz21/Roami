@@ -108,8 +108,6 @@ html[data-orient="landscape"][data-keyboard="open"] .agent-mobile-actions,html[d
 .tt-nav-item .bd.danger { background:var(--danger); }
 html[data-pointer="coarse"] .agent-compose-options .ant-select { height:var(--tap); }
 html[data-pointer="coarse"] .agent-panel-list .ant-btn,html[data-pointer="coarse"] .agent-context .ant-btn { min-height:var(--tap); }
-.agent-memory-counts { display:flex; flex-wrap:wrap; gap:var(--sp-2) var(--sp-4); font-size:var(--fs-sm); color:var(--text-dim); }
-.agent-memory-counts strong { color:var(--text-bright); }
 html[data-pointer="coarse"] .agent-compose-options > .ant-input[type="date"],html[data-pointer="coarse"] .agent-memory-search .ant-input,html[data-pointer="coarse"] .agent-memory-search .ant-input-search-button { min-height:var(--tap); }
 .agent-message[data-notification-focus="true"] { background:var(--accent-soft); border-radius:var(--r-xs); padding:var(--sp-2); }
 

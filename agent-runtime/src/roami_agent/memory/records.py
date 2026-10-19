@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.memory.catalog import MemoryCatalog
 from roami_agent.memory.daily import DailyMemories
 from roami_agent.memory.provenance import seed_dependencies
 from roami_agent.memory.writer import commit_memory, source_snapshot
@@ -16,6 +17,7 @@ class Memories:
     def __init__(self, database, timezone_name="UTC", *, cancel_forgotten=None):
         self.db = database
         self.cancel_forgotten = cancel_forgotten
+        self.catalog = MemoryCatalog(database)
         self.retrieval = MemorySearch(database)
         self.search = self.retrieval.search
         self.recall = self.retrieval.recall
@@ -181,8 +183,18 @@ class Memories:
                             "sourceKey": ref["source_key"],
                             "sha256": ref["source_sha256"],
                             "unchanged": source["sha256"] == ref["source_sha256"],
-                            "conversationId": record["conversation_id"]
-                            or source["conversation_id"],
+                            "conversationId": source["conversation_id"]
+                            or record["conversation_id"],
+                            "branchId": source.get("branch_id")
+                            or (
+                                row(
+                                    db,
+                                    "SELECT active_branch_id FROM conversations WHERE id=? AND owner_id=?",
+                                    (source["conversation_id"] or record["conversation_id"], owner),
+                                )
+                                or {}
+                            ).get("active_branch_id"),
+                            "messageId": source.get("message_id"),
                             "text": str(text)[:4000],
                             "kind": source.get("kind", "message"),
                             "createdMs": source["created_ms"],
