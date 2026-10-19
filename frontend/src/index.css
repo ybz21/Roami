@@ -3367,7 +3367,7 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
 .tt-set-pane .ptitle .grow { flex: 1; }
 .tt-set-pane .ptitle h2 { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
 .tt-set-pane .pnote { margin: 0 0 var(--sp-2); font-size: var(--fs-meta); color: var(--text-dim); max-width: 74ch; }
-.tt-set-pane .rows { flex: 1; min-height: 0; overflow: hidden; padding-right: var(--sp-4); }
+.tt-set-pane .rows { flex: 1; min-height: 0; overflow: auto; padding-right: var(--sp-4); }
 .tt-set-pane.scroll .rows { overflow: auto; }
 .tt-set-empty { padding: 48px 10px; color: var(--text-dimmer); font-size: var(--fs-sm); }
 .tt-set-resulthead { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-3) 0 2px; }

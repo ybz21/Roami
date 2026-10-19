@@ -5,7 +5,7 @@
 // （registry 的 MAX_ROWS 在 dev 下会喊），收益是每一页都有地址：#/settings/node/browser
 // 可以直接发给别人，也可以被「去设置里打开它」的按钮直跳。
 //
-// 唯一允许滚的是搜索结果页：它天然跨类、条数不可控。
+// 页头固定，各页内容独立滚动。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { App as AntApp, Button, Modal } from 'antd'
 import { AppLaunchIcon, CloseIcon, SearchIcon } from '../../icons'
@@ -293,10 +293,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           })}
         </div>
         {query ? results : (
-          // 带自定义块的页（多机、手机、安全…）是表单不是设置行，长度不由我们决定——允许自己滚，
-          // 否则超出的部分会被 overflow:hidden 直接裁掉、够不着。
-          // 纯设置行拼出来的页仍然不滚：装不下就是这一类该拆（registry 的 MAX_ROWS 会喊）。
-          <div className={`tt-set-pane${page.items.some((it) => it.control.kind === 'custom') ? ' scroll' : ''}`}>
+          <div className="tt-set-pane scroll">
             <PaneHead page={page} model={model} />
             <div className="rows">{page.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>
           </div>
