@@ -252,8 +252,17 @@ func (s Service) Status(key string) (Status, error) {
 	}
 	// Query success matters: a transport failure is not proof that an agent stopped.
 	out, err := s.Runtime.TmuxOutput("list-sessions", "-F", "#{session_name}\t#{ROAMI_AGENT_LAUNCH}")
-	if err != nil && !runtime.NoServer(out) {
-		return status, fmt.Errorf("EXECUTION_OBSERVATION_FAILED: %w", err)
+	if err != nil {
+		// The runner can persist its result and exit while tmux is being queried.
+		if resultErr := readJSON(filepath.Join(dir, "result.json"), &result); resultErr == nil {
+			status.State, status.Result = result.State, &result
+			return status, nil
+		} else if !errors.Is(resultErr, os.ErrNotExist) {
+			return status, resultErr
+		}
+		if !runtime.NoServer(out) {
+			return status, fmt.Errorf("EXECUTION_OBSERVATION_FAILED: %w", err)
+		}
 	}
 	for _, line := range strings.Split(out, "\n") {
 		name, hash, ok := strings.Cut(line, "\t")

@@ -82,6 +82,27 @@ func TestObservationFailureDoesNotClaimAgentStopped(t *testing.T) {
 	}
 }
 
+func TestStatusKeepsDurableCancellationWhenTmuxExitsDuringObservation(t *testing.T) {
+	s := testService(t)
+	dir, _ := s.directory("cancel-race")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(dir, "receipt.json"), Receipt{State: "launched", Session: "finishing"}); err != nil {
+		t.Fatal(err)
+	}
+	tmux := filepath.Join(dir, "tmux")
+	script := "#!/bin/sh\nprintf '%s' " + quote(`{"state":"cancelled","summary":"","exitCode":-1,"finishedMs":1}`) + " > " + quote(filepath.Join(dir, "result.json")) + "\nexit 1\n"
+	if err := os.WriteFile(tmux, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	s.Runtime.TmuxBin = tmux
+	status, err := s.Status("cancel-race")
+	if err != nil || status.State != "cancelled" || status.Result == nil || status.Result.State != "cancelled" {
+		t.Fatalf("durable cancellation lost during tmux shutdown: %+v, %v", status, err)
+	}
+}
+
 func TestRunnerBoundsOutputAndKeepsNonzeroExit(t *testing.T) {
 	s := testService(t)
 	dir, _ := s.directory("bounded")
