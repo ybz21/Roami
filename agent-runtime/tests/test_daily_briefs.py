@@ -318,7 +318,15 @@ async def test_brief_generation_does_not_block_main_and_shutdown_records_unknown
         )
         assert not model.release.is_set()
         view = await runtime.conversations.messages("alice", conversation["id"])
-        assert view["messages"][-1]["content"]["text"] == "Answer: quick question"
+        # The fixture's older intake may resume and append a streaming message after this reply.
+        replies = [
+            message
+            for message in view["messages"]
+            if message["turn_id"] == receipt["turnId"]
+            and message["role"] == "assistant"
+            and message["status"] == "completed"
+        ]
+        assert len(replies) == 1 and replies[0]["content"]["text"] == "Answer: quick question"
     finally:
         await runtime.close()
     last = (await briefs.list("alice"))[0]["lastGeneration"]
