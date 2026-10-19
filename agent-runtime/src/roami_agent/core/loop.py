@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 from contextlib import asynccontextmanager
+from itertools import count
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -104,7 +105,7 @@ class AgentLoop:
                 plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
-                for step in range(offset, self.settings.max_steps):
+                for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
                     provider_key = getattr(model, "provider_key", "unidentified")
@@ -258,7 +259,6 @@ class AgentLoop:
                     catalog = self.tools.catalog(role)
                     phase = "context"
                     plan, prompt = await self.build_context(turn, instructions, catalog, completion)
-                raise DomainError("AGENT_STEP_LIMIT")
         except TimeoutError as exc:
             code = (
                 "MODEL_DEADLINE"

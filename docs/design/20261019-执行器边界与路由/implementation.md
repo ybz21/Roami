@@ -13,7 +13,7 @@
 - 路由原因进入既有 SSE 过程消息和历史投影，收起时可见，展开查看依据、策略版本及能力未独立验证提示。无路由字段的历史消息保持原展示。
 - Main 仍使用七个核心工具；执行器发现与续派通过已有 CLI capability 通道使用，不扩张默认模型工具列表。
 
-节点可在 `agent.toml` 的 `[runtime]` 设置 `professional_executor`、`task_timeout_seconds` 和 `task_max_turns`。预算默认仍为 600 秒 / 16 轮；这是执行预算，不参与复杂度判定，复杂任务应按实际工作另行配置。
+节点可在 `agent.toml` 的 `[runtime]` 设置 `professional_executor`、`task_timeout_seconds` 和 `task_max_turns`。native 预算默认 600 秒 / 16 轮；专业任务时限独立配置 `professional_task_timeout_seconds`，默认 3600 秒，续接沿用任务已记录的时限。这是执行预算，不参与复杂度判定。详见 [失败收敛与交付](../20261017-agent框架设计/technical/19-task-delivery.html)。
 
 ## 输入区队列
 

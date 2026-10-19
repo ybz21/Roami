@@ -31,7 +31,7 @@ it('recovers from a malformed saved panel preference', () => {
 it.each(['activity', 'reminders'])('migrates the removed %s tab without changing the collapsed preference', tab => {
  localStorage.setItem('roami.agent.workspace.local', JSON.stringify({ open: false, tab }))
  const page = renderHook(() => useAgentWorkspace(null))
- expect(page.result.current.tab).toBe('tasks')
+ expect(page.result.current.tab).toBe(tab === 'reminders' ? 'messages' : 'tasks')
  expect(page.result.current.open).toBe(false)
 })
 it('opens tasks by default and retains a saved memory tab', () => {

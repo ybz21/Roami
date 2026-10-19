@@ -96,18 +96,18 @@ class Notifications:
             )
         return {"eventId": cursor, "messageId": mid, "reused": False}
 
-    async def list(self, owner):
+    async def list(self, owner, *, include_read=False):
         def read(db):
             return rows(
                 db,
                 "SELECT e.id,e.conversation_id,e.message_id,m.branch_id,e.payload_json,e.created_ms,"
-                "c.title,m.content_json FROM events e JOIN conversations c ON c.id=e.conversation_id "
+                "c.title,m.content_json,(e.id<=COALESCE(r.event_cursor,0)) AS read FROM events e JOIN conversations c ON c.id=e.conversation_id "
                 "JOIN messages m ON m.id=e.message_id LEFT JOIN conversation_reads r "
                 "ON r.conversation_id=c.id AND r.owner_id=c.owner_id WHERE c.owner_id=? "
                 "AND c.deleted_ms IS NULL AND m.deleted_ms IS NULL AND e.kind='message.completed' "
                 "AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) "
-                "AND e.id>COALESCE(r.event_cursor,0) ORDER BY e.id DESC LIMIT 200",
-                (owner,),
+                "AND (? OR e.id>COALESCE(r.event_cursor,0)) ORDER BY e.id DESC LIMIT 200",
+                (owner, include_read),
             )
 
         return await self.db.call(read)

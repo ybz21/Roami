@@ -65,7 +65,7 @@ class CodingExecutor:
             raise DomainError("CODING_TARGET_ADAPTER_NOT_IMPLEMENTED")
         if spec.get("fromMessageId"):
             raise DomainError("CODING_CHECKPOINT_FORK_NOT_IMPLEMENTED")
-        if json.loads(task["budget_json"])["deadlineMs"] <= now_ms():
+        if (deadline := json.loads(task["budget_json"]).get("deadlineMs")) and deadline <= now_ms():
             raise DomainError("TASK_BUDGET_EXCEEDED")
         launch = {
             "key": run["launch_id"],
@@ -81,7 +81,9 @@ class CodingExecutor:
             + spec["goal"],
             "timeoutSeconds": max(
                 1, math.ceil((json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000)
-            ),
+            )
+            if json.loads(task["budget_json"]).get("deadlineMs")
+            else 0,
         }
         if self.artifacts:
             launch["prompt"] += await professional_brief(self.db, self.artifacts, task, run)
@@ -288,7 +290,8 @@ class CodingExecutor:
                 await self.record(task, run, {"state": "unknown"})
             if (
                 task["state"] != "interrupted"
-                and json.loads(task["budget_json"])["deadlineMs"] <= now_ms()
+                and (deadline := json.loads(task["budget_json"]).get("deadlineMs"))
+                and deadline <= now_ms()
             ):
                 await self.cancel(task, run)
                 expired.append((task, run))

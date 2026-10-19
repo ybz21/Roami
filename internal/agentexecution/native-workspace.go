@@ -12,7 +12,7 @@ import (
 
 // HoldNative prepares through Go and keeps the shared writer lease until explicit stop confirmation.
 func (s Service) HoldNative(ctx context.Context, spec Spec, input *json.Decoder, output io.Writer) error {
-	if spec.Executor != "native" || spec.SessionID != "" || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 || (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) || (spec.ProjectID != "" && spec.Directory != "") || (spec.ProjectID == "" && (spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "")) || (spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != "")) {
+	if spec.Executor != "native" || spec.SessionID != "" || spec.TimeoutSeconds < 0 || spec.TimeoutSeconds > 86400 || (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) || (spec.ProjectID != "" && spec.Directory != "") || (spec.ProjectID == "" && (spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "")) || (spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != "")) {
 		return fmt.Errorf("INVALID_NATIVE_WORKSPACE_SPEC")
 	}
 	dir, err := s.directory(spec.Key)
@@ -33,10 +33,10 @@ func (s Service) HoldNative(ctx context.Context, spec Spec, input *json.Decoder,
 	if err = writeJSON(filepath.Join(dir, "spec.json"), spec); err != nil {
 		return err
 	}
-	deadline := time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second)
-	ctx, cancel := context.WithDeadline(ctx, deadline)
+	deadline := executionDeadline(spec.TimeoutSeconds)
+	ctx, cancel := executionContext(ctx, deadline)
 	defer cancel()
-	receipt := Receipt{State: "preparing", DeadlineMS: deadline.UnixMilli()}
+	receipt := Receipt{State: "preparing", DeadlineMS: deadline}
 	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return err
 	}

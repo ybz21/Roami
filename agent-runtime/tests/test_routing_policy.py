@@ -343,7 +343,10 @@ async def test_node_cli_availability_is_observed_without_claiming_specialist_del
 
 async def test_non_code_task_uses_a_loose_directory_and_configured_budget(store):
     settings = Settings(
-        coding_directory=store.data_root, task_timeout_seconds=1234, task_max_turns=30
+        coding_directory=store.data_root,
+        task_timeout_seconds=1234,
+        professional_task_timeout_seconds=1234,
+        task_max_turns=30,
     )
     runtime, _, _, tools, binding = await setup(store, settings=settings)
     try:
@@ -356,8 +359,8 @@ async def test_non_code_task_uses_a_loose_directory_and_configured_budget(store)
         intent = json.loads(task["intent_json"])
         assert intent["target"] == args["target"] and intent["executor"] == "claude"
         budget = json.loads(task["budget_json"])
-        assert budget["maxTurns"] == 30
-        assert 1233000 <= budget["deadlineMs"] - task["created_ms"] <= 1235000
+        assert budget["maxTurns"] == 0
+        assert budget["deadlineMs"] == 0
     finally:
         await runtime.close()
 

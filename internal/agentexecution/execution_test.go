@@ -147,3 +147,50 @@ func TestRunnerBoundsOutputAndKeepsNonzeroExit(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDeadlineRetainsPartialOutputForInspection(t *testing.T) {
+	s := testService(t)
+	dir, _ := s.directory("deadline-evidence")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(dir, "codex")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nprintf 'partial deliverable evidence'\nprintf 'diagnostic' >&2\nsleep 5\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	spec := Spec{Key: "deadline-evidence", Executor: "codex", Directory: dir, Prompt: "work", TimeoutSeconds: 1}
+	if err := writeJSON(filepath.Join(dir, "spec.json"), spec); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(dir, "receipt.json"), Receipt{State: "running"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Run(context.Background(), spec.Key, io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.Status(spec.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Result == nil || status.Result.State != "failed" || status.Result.Summary != "EXECUTION_DEADLINE_OR_INTERRUPTION" || status.Result.Output != "partial deliverable evidence" || status.Result.Stderr != "diagnostic" {
+		t.Fatalf("lost deadline evidence: %+v", status.Result)
+	}
+}
+
+func TestUnlimitedExecutionContextRemainsCancellable(t *testing.T) {
+	if executionDeadline(0) != 0 {
+		t.Fatal("zero must not become an immediate deadline")
+	}
+	parent, stop := context.WithCancel(context.Background())
+	ctx, cancel := executionContext(parent, 0)
+	defer cancel()
+	if _, ok := ctx.Deadline(); ok {
+		t.Fatal("unexpected task-wide deadline")
+	}
+	stop()
+	<-ctx.Done()
+	if ctx.Err() != context.Canceled {
+		t.Fatal(ctx.Err())
+	}
+}

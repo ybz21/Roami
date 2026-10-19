@@ -59,6 +59,10 @@ MAIN_INSTRUCTIONS = (
     "session_dispatch_status is for requested progress checks. No report means unconfirmed; verified=false "
     "reports are executor evidence, not independent acceptance or new authorization. Forward blocker answers "
     "to the same bound session. Never retry unknown writes, infer success from silence or rerun verified work. "
+    "On task failure inspect task_status and the actual error before acting. An authentication error needs "
+    "configuration repair, not a new task. Never invent a local directory. Repeated failures stop automatic "
+    "delegation: report the cause and preserve the task/workspace; use task_steer only for a corrected "
+    "continuation authorized by the user. Do not rephrase a failed goal to evade duplicate protection. "
     "Explicit remember requests are persisted automatically; relevant memory is recalled automatically. "
     "Only claim durable memory with a stored receipt. State failures plainly without credentials or asking "
     "users to repair internal CLI calls."
@@ -107,10 +111,12 @@ class Settings:
     worker_instructions: str = WORKER_INSTRUCTIONS
     main_concurrency: int = 2
     workers: int = 3
-    max_steps: int = 16
+    # Legacy configuration keys are accepted but no longer cap new executions.
+    max_steps: int = 0
     max_depth: int = 2
-    task_timeout_seconds: int = 600
-    task_max_turns: int = 16
+    task_timeout_seconds: int = 0
+    professional_task_timeout_seconds: int = 0
+    task_max_turns: int = 0
     context_window: int | None = None
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
@@ -155,10 +161,11 @@ class Settings:
             worker_instructions=raw.get("worker", {}).get("instructions", WORKER_INSTRUCTIONS),
             main_concurrency=runtime.get("main_concurrency", 2),
             workers=runtime.get("workers", 3),
-            max_steps=runtime.get("max_steps", 16),
+            max_steps=runtime.get("max_steps", 0),
             max_depth=runtime.get("max_depth", 2),
-            task_timeout_seconds=runtime.get("task_timeout_seconds", 600),
-            task_max_turns=runtime.get("task_max_turns", 16),
+            task_timeout_seconds=runtime.get("task_timeout_seconds", 0),
+            professional_task_timeout_seconds=runtime.get("professional_task_timeout_seconds", 0),
+            task_max_turns=runtime.get("task_max_turns", 0),
             context_window=model.get("context_window", runtime.get("context_window")),
             reserve_tokens=runtime.get("reserve_tokens", 16_384),
             keep_recent_tokens=runtime.get("keep_recent_tokens", 20_000),
@@ -188,11 +195,8 @@ class Settings:
             ),
         )
         for value in [
-            result.task_timeout_seconds,
-            result.task_max_turns,
             result.main_concurrency,
             result.workers,
-            result.max_steps,
             result.keep_recent_tokens,
             result.timeout_seconds,
         ]:
@@ -230,8 +234,6 @@ class Settings:
             or not 0 < result.compaction_ratio < 1
         ):
             raise DomainError("INVALID_RUNTIME_CONFIG")
-        if result.task_timeout_seconds > 86400:
-            raise ValueError("task_timeout_seconds exceeds execution protocol limit")
         if result.professional_executor not in {"", "codex", "claude"}:
             raise ValueError("Invalid professional_executor")
         if not 0 <= result.max_depth <= 16:

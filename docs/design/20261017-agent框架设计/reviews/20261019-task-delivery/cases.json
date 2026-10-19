@@ -1,0 +1,247 @@
+{
+  "suite": "task-delivery-production-failures-20261019",
+  "method": "Agent fault-injection regression, not model knowledge or live-model score",
+  "source": "2026-10-19 PPT repeated failures and settings-review report delivery",
+  "cases": [
+    {
+      "id": "B01",
+      "title": "queued 时重复委派",
+      "prompt": "相同请求、相同目标、不同工具调用 ID 再派一次。",
+      "expected": "保持一个 taskId，不新增执行。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_duplicate_tool_call_reuses_task[B01]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B02",
+      "title": "running 时重复委派",
+      "prompt": "相同请求、相同目标、不同工具调用 ID 再派一次。",
+      "expected": "保持一个 taskId，不新增执行。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_duplicate_tool_call_reuses_task[B02]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B03",
+      "title": "failed 时重复委派",
+      "prompt": "相同请求、相同目标、不同工具调用 ID 再派一次。",
+      "expected": "保持一个 taskId，不新增执行。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_duplicate_tool_call_reuses_task[B03]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B04",
+      "title": "修正任务不受失败次数限制",
+      "prompt": "两次已知失败后提交已修正的独立目标。",
+      "expected": "不按固定次数拒绝；相同目标仍复用 taskId，未确认结果与未修复鉴权问题仍拦截。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B04_known_failures_have_no_fixed_retry_count",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B05",
+      "title": "未知操作不重放",
+      "prompt": "写操作结果未知后尝试重建任务。",
+      "expected": "立即拦截，不宣称失败已确认或已成功。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B05_unknown_outcome_blocks_new_launch_immediately",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B06",
+      "title": "失败证据回主智能体",
+      "prompt": "已有失败证据且一个操作结果未确认，再请求新派活。",
+      "expected": "返回阻塞状态和已有任务证据，不自动重放未知写入。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B06_failure_tool_receipt_returns_evidence_without_new_task",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B07",
+      "title": "独立目标仍可并行",
+      "prompt": "同一请求查询北京与上海天气。",
+      "expected": "不同目标分别接收，不误去重。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B07_independent_tasks_in_one_request_are_allowed",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B08",
+      "title": "原生任务无总时限",
+      "prompt": "创建原生任务。",
+      "expected": "deadlineMs、maxTurns 均为 0，无固定总时限。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_executor_has_no_total_deadline[B08]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B09",
+      "title": "Codex 任务无总时限",
+      "prompt": "创建 Codex 任务。",
+      "expected": "deadlineMs、maxTurns 均为 0，无固定总时限。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_executor_has_no_total_deadline[B09]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B10",
+      "title": "Claude 任务无总时限",
+      "prompt": "创建 Claude 任务。",
+      "expected": "deadlineMs、maxTurns 均为 0，无固定总时限。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_executor_has_no_total_deadline[B10]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B11",
+      "title": "相对产物路径",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "工作区内 report.md 可留存。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B11]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B12",
+      "title": "绝对产物路径",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "工作区内绝对文件路径可留存。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B12]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B13",
+      "title": "已有 raw 文件链接",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "解析 /api/file/raw?path= 并留存。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B13]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B14",
+      "title": "文件已删除",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "明确不可用，不制造空文件。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B14]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B15",
+      "title": "工作区外文件",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "拒绝读取。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B15]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B16",
+      "title": "目录穿越",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "拒绝 ../ 路径。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B16]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B17",
+      "title": "隐藏文件",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "拒绝隐藏路径。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B17]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B18",
+      "title": "符号链接",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "拒绝链接文件，不跟到工作区外。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B18]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B19",
+      "title": "超限文件",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "拒绝超限内容。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B19]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B20",
+      "title": "目录冒充文件",
+      "prompt": "处理执行器报告中的结果文件引用。",
+      "expected": "拒绝目录。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_output_retention_boundary[B20]",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B21",
+      "title": "过期会话与持久产物",
+      "prompt": "会话已结束，下载报告，再删除原文件并跨 owner 访问。",
+      "expected": "历史补齐一次、原文件删除后仍能下载原内容、其他 owner 返回 404。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B21_archived_report_backfills_download_and_survives_workspace_removal",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B22",
+      "title": "删除产物不复活",
+      "prompt": "用户删掉留存文件后刷新历史任务。",
+      "expected": "不重新导入，明确不可用。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B22_deleted_artifact_is_not_reimported",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B23",
+      "title": "新请求不继承旧失败",
+      "prompt": "旧请求两次失败后发起全新独立请求。",
+      "expected": "新的用户来源可以接收任务。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B23_fresh_user_request_does_not_inherit_previous_failure_gate",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B24",
+      "title": "缺失产物不改变结论",
+      "prompt": "waiting_user 的结果链接文件不存在。",
+      "expected": "保留 waiting_user；delivery.unavailable 如实记录。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B24_missing_output_is_reported_without_changing_task_state",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B25",
+      "title": "鉴权错误按原因收敛",
+      "prompt": "执行器返回 MODEL_HTTP_401 后模型改写目标重派。",
+      "expected": "第一次鉴权失败即返回检查证据，不累计固定失败次数；保留原任务。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B25_main_completion_loop_cannot_keep_creating_failed_tasks",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B26",
+      "title": "旧配置不限制新任务",
+      "prompt": "旧配置仍记录专业任务时限。",
+      "expected": "新任务不使用旧的次数和总时长上限。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B26_legacy_config_does_not_limit_new_tasks",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B27",
+      "title": "报告不能伪造可信工作区",
+      "prompt": "执行器报告自行填写 workspace.directory，尝试导入其他目录的文件。",
+      "expected": "只有 executor 持久化的 workspace 绑定可用于导入；仅报告字段不构成授权。",
+      "automation": "agent-runtime/tests/test_task_delivery_benchmark.py::test_B27_report_cannot_forge_a_workspace_to_import_files",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B28",
+      "title": "超过旧轮数继续执行",
+      "prompt": "超过旧轮数继续执行",
+      "expected": "旧 max_steps=1 时仍完成 20 次工具调用并回复。",
+      "automation": "agent-runtime/tests/test_unlimited_execution.py::test_main_continues_past_legacy_step_limit",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B29",
+      "title": "统计不等于配额",
+      "prompt": "统计不等于配额",
+      "expected": "25 次计数成功，显式取消仍有效。",
+      "automation": "agent-runtime/tests/test_unlimited_execution.py::test_unlimited_task_accounting_and_explicit_cancellation",
+      "scope": "isolated runtime fault injection"
+    },
+    {
+      "id": "B30",
+      "title": "已读消息保留历史",
+      "prompt": "已读消息保留历史",
+      "expected": "标记已读后历史仍可查询，其他用户不可读取。",
+      "automation": "agent-runtime/tests/test_unlimited_execution.py::test_notification_history_survives_read_cursor",
+      "scope": "isolated runtime fault injection"
+    }
+  ]
+}

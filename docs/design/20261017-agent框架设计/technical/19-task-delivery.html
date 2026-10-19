@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>失败收敛与任务交付 · Roami</title><link rel="stylesheet" href="tech.css"></head>
+<body><div class="shell"><header class="top"><span class="brand">Roami / Agent Engineering</span><nav class="topnav"><a href="index.html">技术总览</a><a href="../reviews/20261019-task-delivery/README.md">Benchmark</a></nav></header><main class="scroll"><div class="wrap">
+<header class="tt-pagehead"><div class="eyebrow">2026.10.19 · 生产失败回归</div><h1>失败收敛与任务交付</h1><p>任务身份、执行会话、执行记录、产物四者独立。失败先查证据，结束后仍可查看与下载。</p></header>
+<section><h2>22:00 新要求优先：持续执行不设次数与总时长硬上限</h2><p>用户最新要求取消连续调用次数和任务总执行时长限制，同时不以固定失败次数代替错误诊断。下文的 16 轮、600 / 3600 秒与两次失败门槛保留为上一轮实现记录，后续设计以 <a href="../../20261019-桌面智能体工作台/messages-layout.md">消息布局与持续执行修订</a> 为准。本轮已实现修订：新任务不设总轮数与总时限，以下早期预算说明仅供溯源。实现与验收见 <a href="../../20261019-桌面智能体工作台/implementation.md">当前实现记录</a>。</p></section><section><h2>今天的实际问题</h2><table><thead><tr><th>证据</th><th>原因</th><th>修复</th></tr></thead><tbody>
+<tr><td>PPT 请求多次重建任务</td><td>幂等键只覆盖单次工具调用；后续工具调用换 key 即新建。目录失败、native 步数耗尽、未知结果、模型 401、deadline 被混在一起重派。</td><td>同来源、相同目标和工作内容返回原 taskId；同请求两次失败后阻止新建。未知执行结果立即阻止重派。Main 拿到已有状态和检查原因的指示。</td></tr>
+<tr><td>Codex 约十分钟中断</td><td>专业任务和 native 共用 600 秒时限；续接也固定重置成 600 秒。</td><td>专业时限独立配置，默认 3600 秒；native 保留 600 秒。预算记录 timeoutMs，续接按该预算更新；父任务总 deadline 仍优先。</td></tr>
+<tr><td>已完成报告无法打开</td><td>按钮打开已经退出的 tmux；Markdown 报告被当纯文本。</td><td>未结束任务保留会话入口；结束后显示留存执行记录。结果渲染 Markdown，产物超链可以预览或下载。</td></tr>
+</tbody></table><p>两次 native unknown 的旧记录中，分别留有 browser_open 与 browser_act 的 unknown 操作；后续对账只证明输入已停止，不证明 PPT 已生成。16 步失败记录中也有失败的 bash / 浏览器操作，不应将它归因于网络不可用或简单重复研究。401 的历史记录证明当时模型鉴权失败，不证明当前密钥仍不可用；本修复不擅自修改用户的连接配置。超时记录说明 deadline 或中断，不把未知现场视为已停止或成功。</p></section>
+<section><h2>委派与重试协议</h2><pre>Main → 路由评估 → 同来源任务检查 → 接受 / 返回原任务 / blocked
+   → 后台准备真实目录 → native 或专业执行器 → 结果核验 → 原主对话回报
+   → 产物留存 → 工作会话可以退出</pre><p>复杂度继续依据实际规划、探索、依赖协调与反馈迭代负担判断，不按 PPT 等任务名写死。复杂任务交专业执行器，安装状态不等于登录、额度或交付能力已验证。已有会话发消息继续走 Roami CLI，不受新任务创建规则替代。</p><p>防重复范围是 owner + conversation + originMessageId；Main 换工具调用 ID、换 turn、改写目标或改执行器不能绕过同来源失败预算。完全相同的 goal / target 复用既有任务；不同的独立目标在没有触发失败门槛时仍可并行。用户新的消息有新的来源，不继承之前请求的失败预算。子任务沿用深度、并发与父预算规则。</p><p>该保护故意在同一请求两次失败后收敛，可能暂缓同一请求中其他尚未启动的目标。Main 应说明已失败的具体工作和未执行范围，不把它们标成完成。修正后通过 task_steer 续接原任务，核对 revision 与停止证明，保留工作区和执行器；不自动切换执行器。不删除旧失败记录。</p><p>兼容边界：旧 HTTP / CLI 创建协议和未带 routing 的既有调用仍可用；当前 Main 指令要求每次新委派提供语义路由评估。失败门槛在服务层强制执行，不只依赖模型遵守提示词。</p></section>
+<section><h2>执行记录与产物</h2><p>taskId 是用户工作的稳定身份；runId 是某次版本执行；sessionId 是临时工作入口。CLI 结束不等于任务验收通过，waiting_user 仍等待用户核验。执行记录保留开始、结束、状态、退出码及有界输出尾部，明确不是完整专业智能体对话。历史只存错误码的记录无法补造已经丢失的 stdout。</p><p>TaskDeliverables 在接收结果时保存工作区内显式 Markdown 产物链接；打开历史任务时按原证据补齐同样的派生索引。不是扫描整个工作区。实际文件复制进既有 owner 隔离、内容寻址的 ArtifactStore；保存 SHA256、原名称、MIME、runId 和 sourcePath。工作区以后被清理仍可下载已留存文件。GET 只补齐既有报告的派生缓存，不创建执行任务或调用模型。</p><p>只接受已绑定工作区内允许的输出格式，拒绝越界、隐藏路径、符号链接、目录、超限文件；每次最多新增 12 项，新增总内容不超过 artifact_max_bytes。按 owner 查询与下载，用户删除的产物不自动复活。不存在或无法留存的文件显示 unavailable，不承诺下载成功，不改变任务的原始结果状态。</p><p>报告链接可以点击展开 Markdown / 文本 / 常见图片，支持下载。富预览默认限 1 MiB；PDF、Office、音视频等保留下载，HTML 不在主对话执行。HTML 的相对资源不在本轮自动打包；需要自包含文件或另行交付资源包。仅提及路径但未链接的旧报告不能可靠推断为产物。</p></section>
+<section><h2>代码归属与接口</h2><pre>dispatch/tasks.py                 Main 创建防重、失败门槛、预算、任务读取
+storage/task_deliverables.py       从结果提取引用、安全读取、历史补齐
+storage/artifact_store.py          原有内容寻址、owner 校验、防止删除后复活
+executors/professional_brief.py     要求真实产物路径与核验，不假报成功
+internal/agentexecution/           deadline 后保留有界部分输出
+frontend/.../TaskOutput.tsx        结果、日志、产物预览
+GET /v1/tasks/:id                  attempts + delivery.artifacts / unavailable
+GET /v1/artifacts/:id/content      已有鉴权下载，attachment + nosniff + sandbox</pre><p>不新增数据库表或另一套文件服务器，Go 保持统一鉴权与转发。专业时限使用 agent.toml 的 [runtime].professional_task_timeout_seconds，1–86400 秒；旧任务续接兼容已有预算，不偷偷扩大历史授权时限。</p></section>
+<section><h2>验收口径</h2><p>失败注入 Benchmark 检查任务数量、调用链与状态，不用常识题代替 Agent 能力。覆盖单请求防重、失败预算、未知操作、独立请求、专业预算、产物越权与留存、过期会话、Markdown 超链和下载。确定性测试不冒充真实模型评测；真机和浏览器结果分别记录，未跑项不填通过。</p></section>
+</div></main></div><script src="layout.js"></script></body></html>

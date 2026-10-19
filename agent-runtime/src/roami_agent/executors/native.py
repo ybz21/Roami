@@ -48,14 +48,15 @@ class NativeExecutor:
         if turn is None or turn["branch_id"] != run["native_branch_id"]:
             raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
 
+        deadline = json.loads(task["budget_json"]).get("deadlineMs")
+        remaining = max(0, (deadline - now_ms()) / 1000) if deadline else None
+
         async def execute(prepared):
             text = await self.run_turn(
                 dict(
                     prepared,
                     executionRunId=run["id"],
-                    executionTimeoutSeconds=max(
-                        0, (json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000
-                    ),
+                    executionTimeoutSeconds=remaining,
                 ),
                 "research"
                 if json.loads(task["intent_json"])["target"].get("resourceOnly") is True
@@ -126,8 +127,7 @@ class NativeExecutor:
                     result["artifactsTruncated"] = len(references) > 4
             return result
 
-        remaining = (json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000
-        async with asyncio.timeout(max(0, remaining)):
+        async with asyncio.timeout(remaining):
             if not self.requires_workspace(task):
                 return await execute(turn)
 

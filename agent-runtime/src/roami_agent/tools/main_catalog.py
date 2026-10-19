@@ -1,5 +1,7 @@
 """Short Main tools bound to conversation-scoped application services."""
 
+import json
+
 from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
@@ -202,29 +204,55 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 result["routingDecision"] = public_routing(decision)
             return result
         routing_args = {"routing_decision": decision} if decision else {}
-        task = await tasks.create(
-            binding["owner"],
-            binding["conversation"],
-            args["goal"],
-            key=binding["turnId"] + ":" + binding["toolCallId"],
-            source_turn_id=binding["turnId"],
-            source_assistant_message_id=binding["assistantMessageId"],
-            parent_task_id=binding.get("taskId"),
-            executor=executor,
-            target=args.get("target"),
-            from_message_id=args.get("fromMessageId"),
-            origin_message_id=binding["originMessageId"],
-            **routing_args,
-        )
+        try:
+            task = await tasks.create(
+                binding["owner"],
+                binding["conversation"],
+                args["goal"],
+                key=binding["turnId"] + ":" + binding["toolCallId"],
+                source_turn_id=binding["turnId"],
+                source_assistant_message_id=binding["assistantMessageId"],
+                parent_task_id=binding.get("taskId"),
+                executor=executor,
+                target=args.get("target"),
+                from_message_id=args.get("fromMessageId"),
+                origin_message_id=binding["originMessageId"],
+                **routing_args,
+            )
+        except DomainError as exc:
+            if exc.code != "TASK_FAILURE_REVIEW_REQUIRED":
+                raise
+            previous = await tasks.list(binding["owner"], binding["conversation"], for_model=True)
+            evidence = [
+                {
+                    "taskId": item["id"],
+                    "state": item["state"],
+                    "revision": item["revision"],
+                    "latestAttempt": item.get("latestAttempt"),
+                }
+                for item in previous
+                if item.get("origin_message_id") == binding["originMessageId"]
+            ][:3]
+            return {
+                "code": exc.code,
+                "acceptedOnly": False,
+                "state": "blocked",
+                "tasks": evidence,
+                "nextAction": "Inspect failure evidence and existing workspace. Do not create another task, "
+                "change executor, or retry unknown writes automatically. Explain the blocker to the user; "
+                "a corrected continuation must use task_steer on the existing task after user direction.",
+            }
+        stored_decision = json.loads(task["intent_json"]).get("routingDecision")
         return {
             "id": task["id"],
             "taskId": task["id"],
             "kind": "background_task",
-            "executor": executor,
+            "executor": json.loads(task["intent_json"])["executor"],
             "state": task["state"],
-            "acceptedOnly": True,
+            "acceptedOnly": task["state"]
+            not in {"failed", "interrupted", "cancelled", "succeeded"},
             "delivery": "pending" if task["state"] == "queued" else "unconfirmed",
-            **({"routingDecision": public_routing(decision)} if decision else {}),
+            **({"routingDecision": public_routing(stored_decision)} if stored_decision else {}),
         }
 
     async def status(args, binding):

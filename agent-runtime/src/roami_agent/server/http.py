@@ -430,10 +430,10 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.notifications.mark_read(owner, cid, body.eventId)}
 
     @app.get("/v1/notifications")
-    async def notifications(owner: Owner):
+    async def notifications(owner: Owner, includeRead: bool = False):
         return {
             "data": {
-                "items": await runtime.notifications.list(owner),
+                "items": await runtime.notifications.list(owner, include_read=includeRead),
                 "unread": await runtime.notifications.unread(owner),
             }
         }

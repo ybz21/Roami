@@ -43,9 +43,8 @@ class ResourceLeases:
             (run_id, task_id, task["revision"], task_id, task["revision"]),
         ):
             raise DomainError("RESOURCE_TASK_NOT_FOUND", 404)
-        if (
-            task["state"] not in {"preparing", "running"}
-            or json.loads(task["budget_json"])["deadlineMs"] <= now_ms()
+        if task["state"] not in {"preparing", "running"} or (
+            (deadline := json.loads(task["budget_json"]).get("deadlineMs")) and deadline <= now_ms()
         ):
             raise DomainError("RESOURCE_TASK_INACTIVE", 409)
         return task
@@ -146,7 +145,10 @@ class ResourceLeases:
             elif item["state"] != "idle" or item["owner_task_id"]:
                 raise DomainError("RESOURCE_BUSY", 409)
             epoch = item["lease_epoch"] + 1
-            deadline = min(now_ms() + self.lease_ms, json.loads(task["budget_json"])["deadlineMs"])
+            deadline = min(
+                now_ms() + self.lease_ms,
+                json.loads(task["budget_json"]).get("deadlineMs") or now_ms() + self.lease_ms,
+            )
             db.execute(
                 "UPDATE resources SET owner_id=?,owner_task_id=?,owner_run_id=?,state='held',lease_epoch=?,lease_until_ms=?,created_by_task=? WHERE id=?",
                 (

@@ -7,6 +7,7 @@ import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
 import { taskExecutor, taskGoal } from './agent-task-protocol'
 import { useAgentTask } from './useAgentTask'
+import { TaskResult, TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
 import './agent-tasks.css'
 
 const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
@@ -99,6 +100,12 @@ function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: strin
   const controlSafe = snapshot.controls.version >= controlFence.current && !snapshot.controls.failed && !busy
   const controls = controlSafe ? snapshot.controls.value : null
   const latest = detail?.attempts[0], steering = detail?.steering
+  const artifacts = [...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()]
+  const ended = !!latest?.finishedMs || terminal.has(task?.state || '')
+  const previewArtifact = (artifactId: string) => {
+    setPreview(artifactId)
+    requestAnimationFrame(() => document.getElementById('task-artifact-' + artifactId)?.scrollIntoView?.({ block: 'nearest' }))
+  }
   const stopping = steering?.state === 'stopping'
   const goal = task ? taskGoal(task) : ''
   const mutate = async (name: string, path: string, body: unknown = {}) => {
@@ -130,13 +137,24 @@ function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: strin
       {steering?.text && <p className={fullGoal ? 'agent-task-requirements' : 'agent-task-requirements clipped'}><b>{t('agent.task.latestRequirements')}</b>{steering.text}</p>}
       {task.latestAttempt?.workspace && <code className="agent-task-workspace">{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}
       <div className="agent-task-actions">
-        {task.latestAttempt?.sessionId && <Button onClick={() => onSession(task.latestAttempt!.sessionId!)}>{t('agent.openSession')}</Button>}
+        {!ended && task.latestAttempt?.sessionId && <Button onClick={() => onSession(task.latestAttempt!.sessionId!)}>{t('agent.openSession')}</Button>}
+        {ended && <Button onClick={() => setHistory(!history)}>{t('agent.task.viewRecord')}</Button>}
         {task.parent_task_id && <Button onClick={() => select(task.parent_task_id!)}>{t('agent.task.parent')}</Button>}
         {(!terminal.has(task.state) || stopping) && <Button danger disabled={!!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
       </div>
       {steering && ['stopping', 'blocked', 'cancelled'].includes(steering.state) && <p className="agent-task-note" role="status">{steering.state === 'blocked' ? failure(steering.errorCode, t) : t('agent.task.steering.' + steering.state)}</p>}
       {error && <p className="agent-task-note error" role="alert">{error}</p>}
-      {typeof latest?.result?.summary === 'string' && latest.result.summary && <section className="agent-task-section"><h4>{t('agent.task.result')}</h4><p className="agent-task-result">{latest.result.summary}</p></section>}
+      <section className="agent-task-section"><h4>{t('agent.task.artifacts')}</h4>
+        {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}
+        {!snapshot.artifacts.value && !snapshot.artifacts.failed && <Spin size="small" />}
+        {artifacts.length === 0 && snapshot.artifacts.value && <p className="agent-muted">{t('agent.task.noArtifacts')}</p>}
+        {!!detail?.delivery?.unavailable.length && <p className="agent-task-note" role="status">{t('agent.task.outputsUnavailable')}<small>{detail.delivery.unavailable.map(item => item.sourcePath).join(' · ')}</small></p>}
+        {artifacts.map((artifact) => <div className="agent-task-artifact" id={'task-artifact-' + artifact.id} key={artifact.id}><span>{artifact.name}<small className="agent-muted">{t('agent.task.artifactBytes', { n: artifact.sizeBytes.toLocaleString(locale) })}{artifact.createdMs && <time>{new Date(artifact.createdMs).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}</time>}</small></span><div className="agent-task-actions">
+          {canPreviewArtifact(artifact) && <button type="button" className="tt-act" aria-label={t('agent.task.previewNamed', { name: artifact.name })} onClick={() => setPreview(preview === artifact.id ? '' : artifact.id)}>{t('agent.task.preview')}</button>}
+          <a className="tt-act" href={nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')} download={artifact.name}>{t('agent.task.download')}</a>
+        </div>{preview === artifact.id && <TaskArtifactPreview artifact={artifact} />}</div>)}
+      </section>
+      {latest?.result && <section className="agent-task-section"><h4>{t('agent.task.result')}</h4>{ended && <p className="agent-muted">{t('agent.task.archivedRecord')}</p>}<TaskResult attempt={latest} artifacts={artifacts} onPreview={previewArtifact} /></section>}
       {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || snapshot.detail.failed} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.accept')}</Button><Button disabled={!!busy || snapshot.detail.failed} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
       {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskGoal(child)}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
       <section className="agent-task-section"><h4>{t('agent.task.control')}</h4>
@@ -155,18 +173,9 @@ function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: strin
         })}
         {controls?.actions.some((action) => action.state === 'unknown' && action.outcomeKnown !== true) && <p className="agent-task-note">{t('agent.task.reconcile')}</p>}
       </section>
-      <section className="agent-task-section"><h4>{t('agent.task.artifacts')}</h4>
-        {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}
-        {!snapshot.artifacts.value && !snapshot.artifacts.failed && <Spin size="small" />}
-        {snapshot.artifacts.value?.length === 0 && <p className="agent-muted">{t('agent.task.noArtifacts')}</p>}
-        {snapshot.artifacts.value?.map((artifact) => <div className="agent-task-artifact" key={artifact.id}><span>{artifact.name}<small className="agent-muted">{t('agent.task.artifactBytes', { n: artifact.sizeBytes.toLocaleString(locale) })}{artifact.createdMs && <time>{new Date(artifact.createdMs).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}</time>}</small></span><div className="agent-task-actions">
-          {artifact.mimeType === 'image/png' && artifact.sizeBytes <= 2 * 1024 * 1024 && <button type="button" className="tt-act" aria-label={t('agent.task.previewNamed', { name: artifact.name })} onClick={() => setPreview(preview === artifact.id ? '' : artifact.id)}>{t('agent.task.preview')}</button>}
-          <a className="tt-act" href={nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')} download={artifact.name}>{t('agent.task.download')}</a>
-        </div>{preview === artifact.id && <img className="agent-task-preview" src={nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')} alt={artifact.name} />}</div>)}
-      </section>
       <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || snapshot.detail.failed} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
       <section className="agent-task-section"><button type="button" className="tt-act agent-task-disclosure" aria-expanded={history} onClick={() => setHistory(!history)}><ChevronRight />{t('agent.task.history')}</button>
-        {history && detail?.attempts.map((attempt) => <div className="agent-task-attempt" key={attempt.id}><b>{t('agent.task.revision', { n: attempt.revision })}</b><span>{t('agent.state.' + attempt.state)}</span>{attempt.finishedMs && <time>{new Date(attempt.finishedMs).toLocaleString(locale)}</time>}{attempt.id !== latest?.id && typeof attempt.result?.summary === 'string' && attempt.result.summary && <p className="agent-task-result">{attempt.result.summary}</p>}</div>)}
+        {history && detail?.attempts.map((attempt) => <div className="agent-task-attempt" key={attempt.id}><b>{t('agent.task.revision', { n: attempt.revision })}</b><span>{t('agent.state.' + attempt.state)}</span>{attempt.finishedMs && <time>{new Date(attempt.finishedMs).toLocaleString(locale)}</time>}<div className="agent-task-attempt-record"><TaskResult attempt={attempt} artifacts={artifacts} onPreview={previewArtifact} /></div></div>)}
         {history && detail?.attemptsTruncated && <small className="agent-muted">{t('agent.task.moreHistory')}</small>}
       </section>
     </>}

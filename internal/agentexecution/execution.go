@@ -56,6 +56,7 @@ type Result struct {
 	Summary      string `json:"summary"`
 	ExitCode     int    `json:"exitCode"`
 	Stderr       string `json:"stderr,omitempty"`
+	Output       string `json:"output,omitempty"`
 	FinishedMS   int64  `json:"finishedMs"`
 }
 
@@ -147,7 +148,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		(spec.ProjectID != "" && spec.Directory != "") ||
 		(spec.ProjectID == "" && (spec.Base != "" || spec.Remote != "" || spec.WorkspaceID != "")) ||
 		(spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != ""))
-	if invalidTarget || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
+	if invalidTarget || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 0 || spec.TimeoutSeconds > 86400 {
 		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
 	}
 	if err = os.MkdirAll(dir, 0700); err != nil {
@@ -176,13 +177,13 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if err = writeJSON(filepath.Join(dir, "spec.json"), spec); err != nil {
 		return Status{}, err
 	}
-	receipt := Receipt{State: "preparing", DeadlineMS: time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second).UnixMilli()}
+	receipt := Receipt{State: "preparing", DeadlineMS: executionDeadline(spec.TimeoutSeconds)}
 	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return Status{}, err
 	}
 	hash := filepath.Base(dir)
 	prepareDeadline := time.Now().Add(120 * time.Second)
-	if taskDeadline := time.UnixMilli(receipt.DeadlineMS); taskDeadline.Before(prepareDeadline) {
+	if taskDeadline := time.UnixMilli(receipt.DeadlineMS); receipt.DeadlineMS != 0 && taskDeadline.Before(prepareDeadline) {
 		prepareDeadline = taskDeadline
 	}
 	prepareCtx, cancel := context.WithDeadline(ctx, prepareDeadline)
@@ -347,7 +348,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if a == nil {
 		return fmt.Errorf("INVALID_EXECUTOR")
 	}
-	args := a.OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission, MaxTurns: "16"})
+	args := a.OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission, MaxTurns: ""})
 	if promptArg, ok := a.(interface{ OneShotPromptArg() bool }); ok && promptArg.OneShotPromptArg() {
 		args = append(args, spec.Prompt)
 	}
@@ -367,11 +368,11 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 		return writeJSON(filepath.Join(dir, "result.json"), Result{State: "failed", Summary: workspaceLeaseCode(err), ExitCode: -1, FinishedMS: time.Now().UnixMilli()})
 	}
 	defer workspaceUnlock()
-	deadline := time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second)
-	if receipt.DeadlineMS != 0 {
-		deadline = time.UnixMilli(receipt.DeadlineMS)
+	deadline := receipt.DeadlineMS
+	if deadline == 0 {
+		deadline = executionDeadline(spec.TimeoutSeconds)
 	}
-	runCtx, cancel := context.WithDeadline(ctx, deadline)
+	runCtx, cancel := executionContext(ctx, deadline)
 	defer cancel()
 	cmd := exec.CommandContext(runCtx, a.Bin(), args...)
 	cmd.Dir = directory
@@ -425,6 +426,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	}
 	if runCtx.Err() != nil {
 		result.State = "failed"
+		result.Output = output.String()
 		result.Summary = "EXECUTION_DEADLINE_OR_INTERRUPTION"
 		if _, e := os.Stat(filepath.Join(dir, "cancel.json")); e == nil {
 			result.State = "cancelled"
@@ -461,4 +463,18 @@ func truncate(s string, n int) string {
 		return string(r[:n])
 	}
 	return s
+}
+
+// Zero denotes no task-wide deadline; cancellation remains owned by the caller.
+func executionDeadline(seconds int) int64 {
+	if seconds == 0 {
+		return 0
+	}
+	return time.Now().Add(time.Duration(seconds) * time.Second).UnixMilli()
+}
+func executionContext(ctx context.Context, deadline int64) (context.Context, context.CancelFunc) {
+	if deadline == 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithDeadline(ctx, time.UnixMilli(deadline))
 }

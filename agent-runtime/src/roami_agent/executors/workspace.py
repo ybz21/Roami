@@ -31,7 +31,9 @@ async def hold_workspace(settings, task, run, *, stopped=None):
         "executor": "native",
         "timeoutSeconds": max(
             1, math.ceil((json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000)
-        ),
+        )
+        if json.loads(task["budget_json"]).get("deadlineMs")
+        else 0,
     }
     if target["kind"] == "project":
         if not target.get("projectId") or target.get("directory"):
@@ -65,7 +67,7 @@ async def hold_workspace(settings, task, run, *, stopped=None):
     try:
         process.stdin.write((encoded(spec) + "\n").encode())
         await process.stdin.drain()
-        async with asyncio.timeout(min(125, spec["timeoutSeconds"])):
+        async with asyncio.timeout(min(125, spec["timeoutSeconds"] or 125)):
             line = await process.stdout.readline()
         try:
             receipt = json.loads(line)

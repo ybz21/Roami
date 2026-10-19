@@ -15,7 +15,7 @@ export function useAgentInbox(enabled: boolean, node: string | null) {
       busy = true
       const responses = await Promise.allSettled([
         api('POST', '/agent/main-conversation', undefined, { signal: abort.signal }),
-        api('GET', '/agent/notifications', undefined, { signal: abort.signal }),
+        api('GET', '/agent/notifications?includeRead=true', undefined, { signal: abort.signal }),
       ])
       if (!stopped) setData((old) => ({
         conversations: responses[0].status === 'fulfilled' ? [responses[0].value.data] : old.conversations,

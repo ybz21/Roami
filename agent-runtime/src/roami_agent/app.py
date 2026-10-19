@@ -53,6 +53,7 @@ from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, lo
 from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
+from roami_agent.storage.task_deliverables import TaskDeliverables
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
 from roami_agent.tools.artifacts import register_artifact_tools
@@ -95,10 +96,9 @@ class Runtime:
             database,
             self.conversations,
             max_depth=self.settings.max_depth,
-            max_turns=self.settings.task_max_turns,
-            timeout_seconds=self.settings.task_timeout_seconds,
         )
         self.artifacts = ArtifactStore(database, max_bytes=self.settings.artifact_max_bytes)
+        self.tasks.deliverables = TaskDeliverables(self.artifacts)
         if isinstance(self.executor, CodingExecutor):
             self.executor.artifacts = self.artifacts
         self.attachments = Attachments(database, self.artifacts)

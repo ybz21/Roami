@@ -41,7 +41,9 @@ class TaskDispatcher:
             while current:
                 budget = json.loads(current["budget_json"])
                 budget["usedSteps"] = budget.get("usedSteps", 0) + 1
-                if budget["usedSteps"] > budget["maxTurns"] or now_ms() >= budget["deadlineMs"]:
+                if (budget.get("maxTurns") and budget["usedSteps"] > budget["maxTurns"]) or (
+                    budget.get("deadlineMs") and now_ms() >= budget["deadlineMs"]
+                ):
                     raise DomainError("TASK_BUDGET_EXCEEDED")
                 if current["state"] == "cancelling":
                     raise DomainError("TASK_CANCELLING")

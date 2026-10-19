@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "scope": "desktop prototype only",
+  "viewports": [
+    1280,
+    1600,
+    1920
+  ],
+  "tabOrder": [
+    "tasks",
+    "messages",
+    "memory"
+  ],
+  "messagesAndRemindersMerged": true,
+  "futureRemindersVisible": true,
+  "chatAlwaysVisible": true,
+  "messageClickKeepsMessagesTab": true,
+  "explicitTaskNavigation": true,
+  "readDoesNotCancelReminder": true,
+  "cancelReminderConfirmation": true,
+  "settingsMovedToSettingsPage": true,
+  "noLeftMessagesEntry": true,
+  "collapseRestoresSelectedTab": true,
+  "darkAndLight": true,
+  "productionApiWrites": 0,
+  "pageErrors": [],
+  "productCodeChanged": false,
+  "unlimitedExecutionRuntimeImplemented": false
+}

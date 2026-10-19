@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import AgentTasks from './AgentTasks'
 import { api } from '../../api'
 
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), locale: 'en-US' }) }))
 vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => '/n/selected/api' + path }))
@@ -166,4 +167,69 @@ it('shows a chronological compact list with reported summaries and unknown times
  expect(rows[2].querySelector('time')).toBeNull()
  expect(screen.getByText('agent.workspace.timeUnknown')).toBeTruthy()
  expect(page.container.querySelector('.agent-task-list-group')).toBeNull()
+})
+
+it('opens retained execution records after completion instead of a dead tmux session', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    const value: any = detail('one')
+    value.task.latestAttempt = { sessionId: 'expired-session', state: 'succeeded' }
+    value.attempts[0].finishedMs = 1000
+    return { data: value }
+  })
+  const session = vi.fn()
+  render(<AgentTasks cid="conversation" onSession={session} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.task.viewRecord' }))
+  expect(screen.queryByRole('button', { name: 'agent.openSession' })).toBeNull()
+  expect(session).not.toHaveBeenCalled()
+  expect(screen.getByText('agent.task.archivedRecord')).toBeTruthy()
+})
+
+it('keeps a live task linked to its exact working session', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    const value: any = detail('one')
+    value.task.state = 'running'
+    value.task.latestAttempt = { sessionId: 'live-session', state: 'running' }
+    return { data: value }
+  })
+  const session = vi.fn()
+  render(<AgentTasks cid="conversation" onSession={session} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.openSession' }))
+  expect(session).toHaveBeenCalledWith('live-session')
+})
+
+it('shows a backfilled report immediately with a retained download and text preview', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), delivery: { artifacts: [{ id: 'report', name: 'review.md', mimeType: 'text/markdown', sizeBytes: 64, metadata: { sourcePath: '/work/review.md' } }], unavailable: [] } } }
+  })
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  await screen.findByText('review.md')
+  expect(screen.getByRole('button', { name: 'agent.task.previewNamed review.md' })).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'agent.task.download' }).getAttribute('href')).toBe('/n/selected/api/agent/artifacts/report/content')
+})
+
+it('renders historical result metadata with unsupported summary types without crashing', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    const value: any = detail('one')
+    value.attempts[0].result = { summary: { legacy: true }, stderr: 42 }
+    return { data: value }
+  })
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  await screen.findByText('agent.task.result')
+  expect(screen.queryByText('[object Object]')).toBeNull()
 })

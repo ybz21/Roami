@@ -1,0 +1,40 @@
+const workspace = document.getElementById('workspace')
+const home = document.getElementById('home-view'), messages = document.getElementById('messages-view'), other = document.getElementById('other-view')
+const rail = document.getElementById('right-rail'), content = document.getElementById('rail-content')
+let railOpen = true, filter = 'all', selectedTab = 'tasks'
+const notices = [
+  { id:'report', title:'设置评审报告已生成', summary:'Codex 已完成评审并留存报告，包含分类、导航与交互建议，等待你核验。', type:'待核验', project:'Roami', time:'21:46', day:'今天', read:false, icon:'file', task:'review' },
+  { id:'failure', title:'PPT 任务需要先核对失败原因', summary:'上次操作结果未确认，已保留工作区和执行记录。先检查已有进展，再接续原任务。', type:'需要关注', project:'Swarm', time:'21:32', day:'今天', read:false, icon:'tasks', task:'recovery' },
+  { id:'reminder', title:'今天的项目进展已整理', summary:'两个项目有新进展，任务交付与失败恢复的 benchmark 已补齐。', type:'主动提醒', project:'全部项目', time:'21:15', day:'今天', read:false, icon:'bell', task:null },
+  { id:'done', title:'消息流验证完成', summary:'工具执行的中间状态已记录，可以在原对话查看完整过程。', type:'任务进展', project:'Roami', time:'昨天 19:24', day:'昨天', read:true, icon:'check', task:'stream' },
+]
+const tasks = {
+  review:{ title:'设置评审与报告交付', summary:'已完成产品评审，报告包含分类、导航和交互建议。', state:'waiting', status:'待核验', executor:'Codex', time:'21:46', artifact:'settings-review.md' },
+  recovery:{ title:'任务交付与失败恢复', summary:'先核对失败证据，复用已有工作区继续处理。', state:'waiting', status:'需要关注', executor:'Codex', time:'21:32', artifact:'task-delivery-benchmark.html' },
+  stream:{ title:'过程消息流验证', summary:'已验证工具状态与执行结果的流式呈现。', state:'done', status:'已完成', executor:'Claude Code', time:'昨天', artifact:'validation.md' },
+}
+function make(tag,text='',className='') { const n=document.createElement(tag);n.textContent=text;if(className)n.className=className;return n }
+function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),use=document.createElementNS('http://www.w3.org/2000/svg','use');svg.setAttribute('aria-hidden','true');use.setAttribute('href','navigation-icons.svg#'+name);svg.append(use);return svg}
+function toast(text){const n=document.getElementById('toast');n.textContent=text;n.hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.hidden=true,2400)}
+function updateBadge(){const unread=notices.filter(n=>!n.read).length;document.getElementById('unread').textContent=String(unread);document.getElementById('unread').hidden=!unread;document.getElementById('filter-count').textContent=String(unread)}
+function route(name){const isHome=name==='home',isMessages=name==='messages';workspace.dataset.route=isHome?'home':isMessages?'messages':'other';home.hidden=!isHome;messages.hidden=!isMessages;other.hidden=isHome||isMessages;rail.hidden=!railOpen;document.getElementById('expand-rail').hidden=railOpen;document.querySelectorAll('[data-go]').forEach(b=>{if(b.dataset.go===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});document.querySelectorAll('[data-demo]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.demo===name)));if(isMessages)renderMessages()}
+function setRail(open){railOpen=open;workspace.dataset.rail=open?'open':'closed';rail.hidden=!open;document.getElementById('expand-rail').hidden=open}
+function renderMessages(){updateBadge();const list=document.getElementById('message-list');list.replaceChildren();let day='';const visible=notices.filter(n=>filter==='all'||!n.read);if(!visible.length)list.append(make('p','没有未读消息','empty'));for(const n of visible){if(n.day!==day){list.append(make('h2',n.day));day=n.day}const row=make('button','','notice');row.type='button';row.dataset.id=n.id;row.dataset.read=String(n.read);const mark=make('span','','notice-icon');mark.append(icon(n.icon));const copy=make('span','','notice-copy'),title=make('span','','notice-title');title.append(make('b',n.title));if(!n.read)title.append(make('span','','unread-dot'));copy.append(title,make('span',n.summary,'summary'),make('small',n.type+' · '+n.project));row.append(mark,copy,make('time',n.time));row.onclick=()=>openNotice(n);list.append(row)}}
+function openNotice(n){n.read=true;updateBadge();route('home');const focus=document.getElementById('focused-message');focus.hidden=false;document.getElementById('focused-title').textContent=n.title;document.getElementById('focused-body').textContent=n.summary;const taskButton=document.getElementById('focused-task');taskButton.hidden=!n.task;taskButton.onclick=()=>openTask(n.task);if(n.task)openTask(n.task);focus.scrollIntoView({block:'nearest'})}
+function taskList(){content.replaceChildren(make('small','当前对话的后台任务'),make('h2','今天'));for(const [id,t] of Object.entries(tasks)){const row=make('button','','task-record');row.type='button';row.dataset.state=t.state;row.append(icon(t.state==='done'?'check':'clock'));const copy=make('span');copy.append(make('b',t.title),make('p',t.summary));const meta=make('small');meta.append(make('span',t.status,'status '+t.state),document.createTextNode(t.executor+' · '+t.time));copy.append(meta);row.append(copy);row.onclick=()=>openTask(id);content.append(row)}}
+function openTask(id){route('home');setRail(true);selectTab('tasks',false);const t=tasks[id];content.replaceChildren();const detail=make('section','','rail-detail');const back=make('button','返回任务列表','text-button');back.type='button';back.onclick=taskList;detail.append(back,make('h3',t.title),make('span',t.status,'status '+t.state),make('p',t.summary),make('h3','执行记录'),make('p','输出、工具状态与产物归入原任务，结束工作会话后仍可查看。'),make('h3','产物'));const file=make('button',t.artifact,'text-button');file.type='button';file.onclick=()=>toast('原型产物示意：正式界面支持预览与下载');detail.append(file,make('small','示例数据，不代表真实执行结果'));content.append(detail)}
+function selectTab(name,render=true){selectedTab=name;document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===name)));if(!render)return;if(name==='tasks')taskList();else{content.replaceChildren(make('small','统一记忆'),make('h2','已保存'));for(const [title,body]of[['交付偏好','先验证，再提交 PR。'],['执行习惯','主智能体快速响应，复杂工作委派专业智能体。']]){const r=make('div','','task-record');r.append(icon('memory'));const text=make('span');text.append(make('b',title),make('p',body));r.append(text);content.append(r)}}}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const name=b.dataset.go;route(name);if(!['home','messages'].includes(name)){other.replaceChildren(make('h1',b.textContent.trim()),make('p','入口与项目会话树保留。本设计稿仅演示首页、消息与右侧工作台。'))}})
+document.querySelectorAll('[data-demo]').forEach(b=>b.onclick=()=>route(b.dataset.demo))
+document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));renderMessages()})
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab))
+document.getElementById('read-all').onclick=()=>{notices.forEach(n=>n.read=true);renderMessages()}
+document.getElementById('collapse-rail').onclick=()=>setRail(false)
+document.getElementById('expand-rail').onclick=()=>setRail(true)
+document.getElementById('receipt').onclick=()=>openTask('recovery')
+document.getElementById('rules').onclick=()=>document.getElementById('design-notes').showModal()
+document.getElementById('close-notes').onclick=()=>document.getElementById('design-notes').close()
+document.getElementById('notification-settings').onclick=()=>{route('settings');other.replaceChildren(make('h1','通知设置'),make('p','通知偏好、定时提醒、投递记录保留在设置页管理；不再占据消息列表的多层弹窗。'));const back=make('button','返回消息','text-button');back.type='button';back.onclick=()=>route('messages');other.append(back)}
+let light=false
+document.getElementById('theme').onclick=async()=>{light=!light;const tokens=await fetch('navigation-theme.json').then(r=>r.json());for(const[k,v]of Object.entries(tokens[light?'light':'dark']))document.documentElement.style.setProperty(k,v);document.documentElement.style.colorScheme=light?'light':'dark';document.getElementById('theme').textContent=light?'切换深色':'切换浅色'}
+updateBadge();selectTab('tasks');route('home')

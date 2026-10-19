@@ -184,7 +184,9 @@ class TaskRevisions:
                 or parent["revision"] != generation
             ):
                 return "PARENT_TASK_NOT_RUNNING"
-            if json.loads(parent["budget_json"])["deadlineMs"] <= now_ms():
+            if (
+                deadline := json.loads(parent["budget_json"]).get("deadlineMs")
+            ) and deadline <= now_ms():
                 return "TASK_BUDGET_EXCEEDED"
         tree = "WITH RECURSIVE tree(id) AS (SELECT ? UNION SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) "
         if row(
@@ -316,14 +318,7 @@ class TaskRevisions:
                     )
                 revision, rid = task["revision"] + 1, identity()
                 budget = json.loads(task["budget_json"])
-                budget.update(usedSteps=0, deadlineMs=now_ms() + 600000)
-                if task["parent_task_id"]:
-                    parent = row(
-                        db, "SELECT budget_json FROM tasks WHERE id=?", (task["parent_task_id"],)
-                    )
-                    budget["deadlineMs"] = min(
-                        budget["deadlineMs"], json.loads(parent["budget_json"])["deadlineMs"]
-                    )
+                budget.update(usedSteps=0, maxTurns=0, timeoutMs=0, deadlineMs=0)
                 if run["native_branch_id"]:
                     branch = row(
                         db,

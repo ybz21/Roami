@@ -219,6 +219,13 @@ class ArtifactStore:
 
             def register(db):
                 self._scope(db, owner, task_id, message_id)
+                if (metadata or {}).get("kind") == "deliverable" and row(
+                    db,
+                    "SELECT id FROM artifacts WHERE owner_id=? AND task_id IS ? "
+                    "AND metadata_json=? AND deleted_ms IS NOT NULL LIMIT 1",
+                    (owner, task_id, packed),
+                ):
+                    raise DomainError("ARTIFACT_OUTPUT_REMOVED", 409)
                 existing = row(
                     db,
                     "SELECT * FROM artifacts WHERE owner_id=? AND task_id IS ? AND message_id IS ? AND sha256=? AND mime_type=? AND name=? AND metadata_json=? AND deleted_ms IS NULL",

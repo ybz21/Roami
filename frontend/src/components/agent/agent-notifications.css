@@ -19,3 +19,10 @@ html[data-pointer="coarse"] .agent-notification-settings .ant-btn { position:rel
 html[data-pointer="coarse"] .agent-notification-settings .ant-btn::after { content:''; position:absolute; inset:calc(-1 * var(--sp-2)); }
 
 .agent-notification-settings .agent-field { margin-bottom:0; }
+.agent-inbox-toolbar { display:flex; justify-content:space-between; gap:var(--sp-2); flex-wrap:wrap; }
+.agent-inbox-toolbar [role="group"] { display:flex; gap:var(--sp-1); }
+.agent-inbox-toolbar [aria-pressed="true"] { color:var(--accent); background:var(--accent-soft); }
+.agent-inbox h3 { font-size:var(--fs-sm); font-weight:500; margin:var(--sp-2) 0; }
+.agent-inbox .agent-notice[data-unread="true"] { border-inline-start:2px solid var(--accent); }
+.agent-inbox .agent-notice { width:100%; text-align:left; overflow-wrap:anywhere; }
+.agent-inbox .agent-notifications-body { max-height:none; overflow:visible; }

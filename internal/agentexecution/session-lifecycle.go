@@ -273,7 +273,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 }
 
 func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error) {
-	if (spec.Executor != "codex" && spec.Executor != "claude") || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 1 || spec.TimeoutSeconds > 86400 {
+	if (spec.Executor != "codex" && spec.Executor != "claude") || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 0 || spec.TimeoutSeconds > 86400 {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)
@@ -346,7 +346,7 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	if err = writeJSON(filepath.Join(dir, "spec.json"), spec); err != nil {
 		return Status{}, err
 	}
-	receipt := Receipt{State: "submitting", Session: binding.ID, Workspace: &workspace, Binding: &binding, DeadlineMS: time.Now().Add(time.Duration(spec.TimeoutSeconds) * time.Second).UnixMilli()}
+	receipt := Receipt{State: "submitting", Session: binding.ID, Workspace: &workspace, Binding: &binding, DeadlineMS: executionDeadline(spec.TimeoutSeconds)}
 	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return Status{}, err
 	}
@@ -393,7 +393,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if _, err := os.Stat(filepath.Join(dir, "cancel.json")); err == nil {
 		status.State = "cancelling"
 	}
-	if time.Now().UnixMilli() >= status.DeadlineMS {
+	if status.DeadlineMS != 0 && time.Now().UnixMilli() >= status.DeadlineMS {
 		status.State = "unknown"
 	}
 	return status, nil

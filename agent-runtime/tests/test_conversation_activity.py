@@ -212,7 +212,7 @@ async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
             return {
                 "id": "accepted-task",
                 "state": "queued",
-                "intent_json": "large private goal",
+                "intent_json": json.dumps({"goal": "large private goal", "executor": "native"}),
                 "budget_json": "internal",
             }
 

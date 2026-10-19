@@ -24,13 +24,11 @@ class Tasks:
         *,
         max_depth=2,
         max_children=3,
-        max_turns=16,
-        timeout_seconds=600,
     ):
         self.db, self.conversations = database, conversations
         self.max_depth, self.max_children = max_depth, max_children
-        self.max_turns, self.timeout_ms = max_turns, timeout_seconds * 1000
         self.revisions = TaskRevisions(database)
+        self.deliverables = None
 
     @staticmethod
     def cancel_forgotten_in_transaction(db, owner):
@@ -188,6 +186,45 @@ class Tasks:
                 event(db, cid, "task.intent", {"messageId": mid}, message_id=mid)
             if not origin:
                 raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
+            if source_turn_id and not parent_task_id:
+                previous = rows(
+                    db,
+                    "SELECT * FROM tasks WHERE owner_id=? AND origin_conversation_id=? "
+                    "AND origin_message_id=? AND parent_task_id IS NULL ORDER BY created_ms DESC",
+                    (owner, cid, origin["id"]),
+                )
+                for existing in previous:
+                    intent = json.loads(existing["intent_json"])
+                    if (
+                        intent.get("goal", "").strip() == goal.strip()
+                        and intent.get("target") == target
+                    ):
+                        # A new tool-call ID must not duplicate an already admitted assignment.
+                        return existing
+                unknown = any(
+                    row(
+                        db,
+                        "SELECT id FROM task_attempts WHERE task_id=? AND "
+                        "(state='unknown' OR json_extract(result_json,'$.outcomeKnown')=0) LIMIT 1",
+                        (t["id"],),
+                    )
+                    for t in previous
+                )
+                unresolved_setup = any(
+                    json.loads(t["intent_json"]).get("target") == target
+                    and t["state"] == "failed"
+                    and row(
+                        db,
+                        "SELECT id FROM task_attempts WHERE task_id=? AND "
+                        "json_extract(result_json,'$.summary') IN "
+                        "('MODEL_HTTP_401','NATIVE_WORKSPACE_UNAVAILABLE','PROJECT_PROVISION_UNAVAILABLE') "
+                        "ORDER BY task_revision DESC,attempt_no DESC LIMIT 1",
+                        (t["id"],),
+                    )
+                    for t in previous
+                )
+                if unknown or unresolved_setup:
+                    raise DomainError("TASK_FAILURE_REVIEW_REQUIRED", 409)
             fork_point = None
             if from_message_id:
                 fork_point = next((m for m in transcript if m["id"] == from_message_id), None)
@@ -221,13 +258,11 @@ class Tasks:
                     encoded(
                         {
                             "depth": depth,
-                            "maxTurns": self.max_turns,
-                            "deadlineMs": min(
-                                now_ms() + self.timeout_ms,
-                                json.loads(parent["budget_json"])["deadlineMs"],
-                            )
+                            "maxTurns": 0,
+                            "timeoutMs": 0,
+                            "deadlineMs": json.loads(parent["budget_json"]).get("deadlineMs", 0)
                             if parent
-                            else now_ms() + self.timeout_ms,
+                            else 0,
                         }
                     ),
                     now_ms(),
@@ -347,7 +382,10 @@ class Tasks:
                 "childrenTruncated": len(children) > 100,
             }
 
-        return await self.db.call(read)
+        detail = await self.db.call(read)
+        if self.deliverables:
+            detail["delivery"] = await self.deliverables.collect(owner, detail)
+        return detail
 
     async def list(self, owner, cid=None, *, for_model=False):
         def read(db):
@@ -424,7 +462,10 @@ class Tasks:
                 )
             return row(db, "SELECT * FROM tasks WHERE id=?", (task_id,))
 
-        return await self.db.call(write, write=True)
+        result_task = await self.db.call(write, write=True)
+        if self.deliverables:
+            await self.get(owner, task_id)
+        return result_task
 
     async def cancel(self, owner, task_id):
         def write(db):
