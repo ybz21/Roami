@@ -4,8 +4,7 @@
 .agent-pagehead { padding:var(--sp-3) var(--sp-5); margin:0; flex:none; align-items:center; }
 .agent-pagehead h2 { font-size:var(--fs-body); max-width:calc(var(--sp-5) * 24); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .agent-pagehead .acts { gap:var(--sp-2); }
-.agent-pagehead .tt-act,.agent-mobile-actions .tt-act { display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); border-color:transparent; background:transparent; }
-.agent-mobile-actions { display:none; }
+.agent-pagehead .tt-act { display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); border-color:transparent; background:transparent; }
 .agent-conversation-title { flex:1; min-width:0; display:flex; align-items:center; gap:var(--sp-2); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; min-height:var(--tap); border:0; padding:0; background:transparent; color:var(--text-dim); font-size:var(--fs-sm); text-align:left; cursor:pointer; }
 .agent-reading { display:flex; position:relative; flex:1; min-height:0; min-width:0; }
 .agent-messages { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4) var(--sp-5); }
@@ -99,13 +98,18 @@ html[data-pointer="coarse"] .agent-message-action { width:calc(var(--tap) - var(
 html[data-pointer="coarse"] .agent-message-action::after { content:''; position:absolute; inset:calc(-1 * var(--sp-1)); }
 html[data-pointer="coarse"] .agent-file-card button::after { content:''; position:absolute; inset:calc(-1 * var(--sp-3)); }
 html[data-size="compact"] .agent-pagehead,html[data-size="medium"] .agent-pagehead { display:none; }
-html[data-size="compact"] .agent-mobile-actions,html[data-size="medium"] .agent-mobile-actions { display:flex; align-items:center; gap:var(--sp-1); padding-inline:var(--sp-4); flex:none; }
-html[data-size="compact"] .agent-messages { padding-inline:var(--sp-4); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-page.tt-page-home { padding:0; }
+html:is([data-size="compact"],[data-size="medium"]) .agent-messages { padding:var(--sp-4) max(var(--sp-4),var(--safe-r)) var(--sp-3) max(var(--sp-4),var(--safe-l)); }
 html[data-size="compact"] .agent-message.user { max-width:95%; }
-html[data-size="compact"] .agent-composer { padding:var(--sp-2) var(--sp-3) var(--sp-1); }
-html[data-size="medium"] .tt-page-home { box-sizing:border-box; padding:0 0 var(--mobile-nav-offset); }
+html:is([data-size="compact"],[data-size="medium"]) .agent-composer { padding:var(--sp-2) max(var(--sp-4),var(--safe-r)) var(--sp-2) max(var(--sp-4),var(--safe-l)); }
+html:is([data-size="compact"],[data-size="medium"]) .agent-compose-card.tt-composer { border-color:var(--border); background:var(--bg-container); }
+html:is([data-size="compact"],[data-size="medium"]) .agent-compose-card.tt-composer:focus-within { border-color:var(--accent-border); }
+html:is([data-size="compact"],[data-size="medium"]) .agent-compose-card.tt-composer textarea { padding:var(--sp-3) var(--sp-4) var(--sp-2) !important; }
+html:is([data-size="compact"],[data-size="medium"]) .agent-compose-card textarea::placeholder { color:var(--text-dim); }
+html:is([data-size="compact"],[data-size="medium"]) .agent-compose-bar.tt-cbar { padding:var(--sp-1) var(--sp-2) var(--sp-2); }
+html[data-size="medium"] .tt-page.tt-page-home { box-sizing:border-box; padding-bottom:var(--mobile-nav-offset); }
 html[data-orient="landscape"] .agent-messages { padding-block:var(--sp-1); }
-html[data-orient="landscape"][data-keyboard="open"] .agent-mobile-actions,html[data-orient="landscape"][data-keyboard="open"] .agent-compose-footnote { display:none; }
+html[data-orient="landscape"][data-keyboard="open"] .agent-compose-footnote { display:none; }
 .tt-nav-item .bd.danger { background:var(--danger); }
 html[data-pointer="coarse"] .agent-compose-options .ant-select { height:var(--tap); }
 html[data-pointer="coarse"] .agent-panel-list .ant-btn,html[data-pointer="coarse"] .agent-context .ant-btn { min-height:var(--tap); }
@@ -132,7 +136,6 @@ html[data-size="compact"] .agent-compose-bar .tt-cgrp { gap:var(--sp-1); }
 .agent-model-current small { color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-model-current code { color:var(--text-bright); font-size:var(--fs-body); font-family:inherit; overflow-wrap:anywhere; user-select:text; }
 
-.agent-mobile-actions { justify-content:flex-end; }
 .agent-question { display:flex; flex-direction:column; gap:var(--sp-2); margin-block:var(--sp-3); }
 .agent-question > p { margin:0; }
 .agent-question-option { display:flex; flex-direction:column; gap:var(--sp-1); min-height:var(--tap); padding:var(--sp-3); border:1px solid var(--border-subtle); border-radius:var(--r-sm); background:var(--bg-elevated); color:var(--text-bright); text-align:left; font-size:var(--fs-body); cursor:pointer; }

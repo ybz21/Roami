@@ -271,6 +271,7 @@ export default function App() {
   const [reveal, setReveal] = useState<{ path: string; line: number; nonce: number } | undefined>()
   const [searchNonce, setSearchNonce] = useState(0)
   const [mobileSearchNonce, setMobileSearchNonce] = useState(0)
+  const [mobileActionsHost, setMobileActionsHost] = useState<HTMLSpanElement | null>(null)
   const curFile = activeFile
   const curFileTab = curFile ? fileTabs.find((f) => f.path === curFile) : undefined
   // 当前任务：文件标签 → 它记的任务；会话标签 → 它的 worktree；什么都没开 → 没有
@@ -1040,7 +1041,7 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    home: <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} />,
+    home: <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />,
     activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
@@ -1236,7 +1237,8 @@ export default function App() {
         </button>
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
-          <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={() => { agentInbox.refresh(); setAgentInboxOpen(true) }}><BellIcon />{!!agentInbox.unread && <span className="agent-badge">{agentInbox.unread > 99 ? '99+' : agentInbox.unread}</span>}</button>
+          {tab === 'home' && <span ref={setMobileActionsHost} className="tt-mobile-page-actions" />}
+          <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={() => { agentInbox.refresh(); setAgentInboxOpen(true) }}><BellIcon size={20} />{!!agentInbox.unread && <span className="agent-badge">{agentInbox.unread > 99 ? '99+' : agentInbox.unread}</span>}</button>
           {mobilePrimary && mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
             onClick={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}><PlusIcon size={20} /></button>}
           <button type="button" className="tt-mobile-topbar-icon"
