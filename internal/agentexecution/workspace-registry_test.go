@@ -1,17 +1,101 @@
 package agentexecution
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ybz21/Roami/backend/project"
 	"github.com/ybz21/Roami/internal/gitcontext"
 )
+
+func TestWorkspaceReuseAfterBranchRenamePreservesProgress(t *testing.T) {
+	s := testService(t)
+	ctx := context.Background()
+	repo := t.TempDir()
+	git := func(directory string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", directory}, args...)...)
+		cmd.Env = append(gitcontext.ForDirectory(os.Environ()), "GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	git(repo, "init", "-b", "main")
+	git(repo, "commit", "--allow-empty", "-m", "initial")
+	directory := filepath.Join(t.TempDir(), "task")
+	git(repo, "worktree", "add", "-b", "agent/task", directory)
+	db, err := s.platform(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID, _ := project.NewStore(s.Runtime.DataDir, db).Add(repo, "fixture")
+	cmd := exec.Command("git", "-C", directory, "rev-parse", "HEAD")
+	cmd.Env = gitcontext.ForDirectory(os.Environ())
+	oid, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := s.rememberWorkspace(Workspace{ProjectID: projectID, Directory: directory, Branch: "agent/task", StartOID: strings.TrimSpace(string(oid))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(directory, "branch", "-m", "fix/intermediate")
+	git(directory, "branch", "-m", "fix/task")
+	git(directory, "commit", "--allow-empty", "-m", "progress")
+	proof := filepath.Join(directory, "unfinished.txt")
+	if err = os.WriteFile(proof, []byte("keep this work"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	spec := Spec{ProjectID: projectID, WorkspaceID: workspace.ID}
+	for range 2 {
+		reused, err := s.reuseWorkspace(ctx, spec)
+		if err != nil || reused.Branch != "fix/task" || reused.ID != workspace.ID || reused.StartOID != workspace.StartOID {
+			t.Fatalf("renamed workspace: %+v %v", reused, err)
+		}
+	}
+	if body, err := os.ReadFile(proof); err != nil || string(body) != "keep this work" {
+		t.Fatalf("lost work: %s %v", body, err)
+	}
+	git(directory, "switch", "-c", "unrelated-checkout")
+	if _, err = s.reuseWorkspace(ctx, spec); err == nil || err.Error() != "WORKSPACE_STALE" {
+		t.Fatalf("checkout switch accepted: %v", err)
+	}
+	git(directory, "branch", "-D", "fix/task")
+	if _, err = s.reuseWorkspace(ctx, spec); err == nil || err.Error() != "WORKSPACE_STALE" {
+		t.Fatalf("checkout switch with deleted old branch accepted: %v", err)
+	}
+	if err = os.RemoveAll(directory); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.reuseWorkspace(ctx, spec); err == nil || err.Error() != "WORKSPACE_STALE" {
+		t.Fatalf("missing workspace accepted: %v", err)
+	}
+	if err = os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	git(directory, "init", "-b", "fix/task")
+	if _, err = s.reuseWorkspace(ctx, spec); err == nil || err.Error() != "WORKSPACE_STALE" {
+		t.Fatalf("replacement repo accepted: %v", err)
+	}
+}
+
+func TestNativeWorkspacePreparationReturnsStructuredError(t *testing.T) {
+	s := testService(t)
+	var output bytes.Buffer
+	err := s.HoldNative(context.Background(), Spec{Key: "missing-workspace", Executor: "native", ProjectID: "missing"}, json.NewDecoder(strings.NewReader("")), &output)
+	var frame map[string]string
+	if err == nil || json.Unmarshal(output.Bytes(), &frame) != nil || frame["errorCode"] != "UNKNOWN_PROJECT" || frame["state"] != "failed" {
+		t.Fatalf("lost preparation error: %s %v", output.String(), err)
+	}
+}
 
 func TestDirectoryWorkspaceIdentityScopeAndStaleReuse(t *testing.T) {
 	s := testService(t)

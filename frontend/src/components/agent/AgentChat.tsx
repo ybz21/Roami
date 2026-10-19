@@ -8,6 +8,7 @@ import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
 import AgentTasks from './AgentTasks'
+import { taskFailureKey } from './task-failure'
 import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
 import './agent-workspace.css'
@@ -28,6 +29,8 @@ import './agent-chat.css'
 
 export function agentFailure(error: any, t: (key: string) => string) {
   const code = error?.apiError?.code || error?.message
+  const reason = typeof code === 'string' ? taskFailureKey(code) : undefined
+  if (reason) return t(reason)
   return t(code === 'MODEL_NOT_CONFIGURED' ? 'agent.modelMissing' : code === 'BRANCH_BUSY' || code === 'COMPACTION_IN_PROGRESS' ? 'agent.busy' : code === 'NOT_ENOUGH_HISTORY' ? 'agent.compactSkipped' : 'agent.requestFailed')
 }
 const newKey = () => crypto.randomUUID()

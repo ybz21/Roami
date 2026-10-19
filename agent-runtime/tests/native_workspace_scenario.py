@@ -207,6 +207,7 @@ async def main():
                 replay["projectId"] == project
                 and (directory / "native-proof.txt").read_text() == "native"
             )
+            (directory.parent / "elsewhere").mkdir()
             conflict = await runtime.tasks.create(
                 owner,
                 c["id"],

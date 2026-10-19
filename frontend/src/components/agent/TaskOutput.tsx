@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import Markdown from '../markdown/Markdown'
 import type { TaskArtifact, TaskAttempt } from './agent-task-protocol'
+import { taskFailureKey } from './task-failure'
 
 export function taskOutputHref(href: string, artifacts: TaskArtifact[]): string {
   const output = artifacts.find(item => item.metadata?.sourcePath === href)
@@ -17,9 +18,9 @@ export function TaskResult({ attempt, artifacts, onPreview }: { attempt: TaskAtt
   const code = typeof attempt.result?.summary === 'string' ? attempt.result.summary : ''
   const stderr = typeof attempt.result?.stderr === 'string' ? attempt.result.stderr : ''
   const output = typeof attempt.result?.output === 'string' ? attempt.result.output : ''
-  const reason = code === 'MODEL_HTTP_401' ? 'authentication' : ['MODEL_DEADLINE', 'EXECUTION_DEADLINE_OR_INTERRUPTION', 'TASK_BUDGET_EXCEEDED'].includes(code) ? 'deadline' : ['AGENT_STEP_LIMIT'].includes(code) ? 'steps' : ['NATIVE_WORKSPACE_UNAVAILABLE', 'PROJECT_PROVISION_UNAVAILABLE'].includes(code) ? 'workspace' : code.includes('OUTCOME_UNKNOWN') ? 'unknown' : ''
+  const reason = attempt.state === 'failed' || attempt.state === 'interrupted' || attempt.result?.outcomeKnown === false ? taskFailureKey(code) : undefined
   return <>
-    {reason && <p className="agent-task-note" role="status">{t('agent.task.failure.' + reason)}</p>}
+    {reason && <p className="agent-task-note" role="status">{t(reason)}</p>}
     {attempt.startedMs && <small className="agent-muted">{t('agent.task.startedAt', { time: new Date(attempt.startedMs).toLocaleString(locale) })}</small>}
     {attempt.finishedMs && <small className="agent-muted">{t('agent.task.finishedAt', { time: new Date(attempt.finishedMs).toLocaleString(locale) })}</small>}
     {attempt.result?.outcomeKnown === false && <p className="agent-task-note" role="status">{t('agent.task.outcomeUnknown')}</p>}

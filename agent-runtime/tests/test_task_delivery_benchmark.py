@@ -311,7 +311,22 @@ async def test_B24_missing_output_is_reported_without_changing_task_state(store,
         await runtime.close()
 
 
-async def test_B25_main_completion_loop_cannot_keep_creating_failed_tasks(store):
+@pytest.mark.parametrize(
+    "code",
+    [
+        "MODEL_HTTP_401",
+        "MODEL_HTTP_403",
+        "NATIVE_WORKSPACE_UNAVAILABLE",
+        "PROJECT_PROVISION_UNAVAILABLE",
+        "WORKSPACE_STALE",
+        "UNKNOWN_WORKSPACE",
+        "INVALID_EXECUTION_DIRECTORY",
+        "EXECUTION_DIRECTORY_UNAVAILABLE",
+        "UNKNOWN_PROJECT",
+        "WORKSPACE_BUSY",
+    ],
+)
+async def test_B25_main_completion_loop_cannot_keep_creating_failed_tasks(store, code):
     from test_runtime import until
 
     from roami_agent.app import Runtime
@@ -350,7 +365,7 @@ async def test_B25_main_completion_loop_cannot_keep_creating_failed_tasks(store)
 
     class Executor:
         async def run(self, task, run):
-            return {"state": "failed", "summary": "MODEL_HTTP_401"}
+            return {"state": "failed", "summary": code}
 
     runtime = Runtime(store, Model(), executor=Executor())
     await runtime.start()

@@ -8,6 +8,7 @@ import type { AgentTask } from './agent-protocol'
 import { taskExecutor, taskGoal } from './agent-task-protocol'
 import { useAgentTask } from './useAgentTask'
 import { TaskResult, TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
+import { taskFailureKey } from './task-failure'
 import './agent-tasks.css'
 
 const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
@@ -18,6 +19,8 @@ function failure(code: string | undefined, t: (key: string) => string) {
   if (code === 'TASK_REVISION_CHANGED' || code === 'TASK_RESULT_SUPERSEDED' || code === 'TASK_STEER_PENDING') return t('agent.task.changed')
   if (code === 'TASK_SOURCE_FORGOTTEN' || code === 'CONTEXT_SOURCE_FORGOTTEN') return t('agent.task.forgotten')
   if (code === 'PARENT_TASK_NOT_RUNNING') return t('agent.task.parentStopped')
+  const reason = taskFailureKey(code || '')
+  if (reason) return t(reason)
   return t('agent.requestFailed')
 }
 
@@ -77,11 +80,12 @@ function TaskRow({ task, compact, select }: { task: AgentTask; compact: boolean;
   const time = taskTime(task) ? new Date(taskTime(task)) : null
   const name = executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''
   const revision = task.revision > 1 ? t('agent.task.revision', { n: task.revision }) : ''
+  const failureKey = ['failed', 'interrupted'].includes(state) ? taskFailureKey(task.latestAttempt?.summary || '') : undefined
   return <button type="button" className={`agent-task-link${compact ? ' agent-task-card' : ''}`} data-state={state} onClick={() => select(task.id)}>
     {compact && <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>}
     <span className="agent-task-row-copy">
       <b>{taskGoal(task)}</b>
-      {compact && <span className="agent-task-row-summary">{task.latestAttempt?.summary || t(state === 'waiting_user' ? 'agent.workspace.waitingHint' : 'agent.workspace.taskSummary.' + (['failed', 'unknown', 'succeeded'].includes(state) ? state : 'progress'))}</span>}
+      {(compact || failureKey) && <span className="agent-task-row-summary">{failureKey ? t(failureKey) : task.latestAttempt?.summary || t(state === 'waiting_user' ? 'agent.workspace.waitingHint' : 'agent.workspace.taskSummary.' + (['failed', 'unknown', 'succeeded'].includes(state) ? state : 'progress'))}</span>}
       {!compact && <small>{t('agent.state.' + state)}{revision}</small>}
       {(compact || executor || time) && <small className={compact ? 'agent-task-card-meta' : undefined}>{compact && <span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>}{executor && <span>{compact && (executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />)}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, compact ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>}{compact && revision && <small>{revision}</small>}
     </span>{!compact && <ChevronRight />}

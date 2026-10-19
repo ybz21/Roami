@@ -1,6 +1,7 @@
 "Durable delegation, native child branches and revision-bound executor reports."
 
 import json
+from pathlib import Path
 
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
@@ -149,6 +150,21 @@ class Tasks:
                 if stored_spec != spec or task["origin_conversation_id"] != cid:
                     raise DomainError("TASK_KEY_CONFLICT", 409)
                 return task
+            path_key = {"new_session": "directory", "new_project": "baseDir"}.get(target["kind"])
+            if path_key and path_key in target:
+                directory = target[path_key]
+                if (
+                    not isinstance(directory, str)
+                    or not directory
+                    or not Path(directory).is_absolute()
+                ):
+                    raise DomainError("INVALID_EXECUTION_DIRECTORY")
+                try:
+                    available = Path(directory).is_dir()
+                except (OSError, ValueError):
+                    available = False
+                if not available:
+                    raise DomainError("EXECUTION_DIRECTORY_UNAVAILABLE")
             parent, depth = None, 0
             if parent_task_id:
                 parent = row(
@@ -217,7 +233,12 @@ class Tasks:
                         db,
                         "SELECT id FROM task_attempts WHERE task_id=? AND "
                         "json_extract(result_json,'$.summary') IN "
-                        "('MODEL_HTTP_401','NATIVE_WORKSPACE_UNAVAILABLE','PROJECT_PROVISION_UNAVAILABLE') "
+                        "('MODEL_HTTP_401','MODEL_HTTP_403','NATIVE_WORKSPACE_UNAVAILABLE',"
+                        "'PROJECT_PROVISION_UNAVAILABLE','WORKSPACE_STALE','UNKNOWN_WORKSPACE',"
+                        "'WORKSPACE_PROJECT_MISMATCH','WORKSPACE_PREPARATION_FAILED',"
+                        "'UNKNOWN_PROJECT','PROJECT_CATALOG_UNAVAILABLE','PROJECT_HAS_NO_GIT',"
+                        "'INVALID_PROJECT_DIRECTORY','INVALID_WORKSPACE_TARGET','WORKSPACE_BUSY',"
+                        "'INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') "
                         "ORDER BY task_revision DESC,attempt_no DESC LIMIT 1",
                         (t["id"],),
                     )

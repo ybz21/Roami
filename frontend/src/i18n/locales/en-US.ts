@@ -3094,6 +3094,8 @@ const enUS = {
   'agent.task.failure.deadline': 'Execution reached its deadline or was interrupted. Inspect logs and existing outputs before continuing the original task.',
   'agent.task.failure.steps': 'Execution reached its step limit. Inspect existing progress before repeating work.',
   'agent.task.failure.workspace': 'Task workspace is unavailable. Check the actual project and directory before retrying.',
+  'agent.task.failure.directory': 'The working directory is missing or inaccessible. Check its actual absolute path on the current node before submitting the task.',
+  'agent.task.failure.workspaceBusy': 'Another task is using this workspace. Wait for it to finish before continuing the original task.',
   'agent.task.failure.unknown': 'The previous operation has an unconfirmed outcome. Reconcile its state before retrying.',
   'agent.workspace.messages': 'Messages',
   'agent.notification.all': 'All',

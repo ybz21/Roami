@@ -20,6 +20,28 @@ const detail = (id: string, children: any[] = [], revision = 1) => ({ task: task
 const controls = (resources: any[] = []) => ({ resources, actions: [], actionsTruncated: false, resourcesTruncated: false })
 const artifact = (id: string) => ({ id, name: id + '.png', mimeType: 'image/png', sizeBytes: 1024 })
 
+it.each([
+  ['WORKSPACE_STALE', 'workspace'], ['MODEL_HTTP_401', 'authentication'],
+  ['UNKNOWN_PROJECT', 'workspace'],
+  ['EXECUTION_DIRECTORY_UNAVAILABLE', 'directory'], ['WORKSPACE_BUSY', 'workspaceBusy'],
+  ['EXECUTION_DEADLINE_OR_INTERRUPTION', 'deadline'], ['NATIVE_WORKSPACE_RELEASE_UNKNOWN', 'unknown'],
+].flatMap(([code, reason]) => [true, false].map(compact => [code, reason, compact] as const)))('explains %s in the task list and detail while retaining diagnostic evidence', async (code, reason, compact) => {
+  const failed = { ...task('one'), state: 'failed', latestAttempt: { state: 'failed', summary: code } }
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [failed] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: failed, attempts: [{ id: 'attempt-one', revision: 1, state: 'failed', result: { summary: code } }] } }
+  })
+  render(<AgentTasks compact={compact} cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByText('agent.task.failure.' + reason)
+  expect(screen.queryByText(code)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /Goal one/ }))
+  await screen.findByText('agent.task.failure.' + reason)
+  await screen.findByText(code)
+  expect(screen.getByRole('button', { name: 'agent.task.continue' })).toBeTruthy()
+})
+
 it('shows main task data when an auxiliary request fails and keeps downloads on the selected node', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path.includes('?conversationId=')) return { data: [task('one')] }

@@ -44,10 +44,12 @@ func (s Service) HoldNative(ctx context.Context, spec Spec, input *json.Decoder,
 	workspace, err := s.prepareWorkspace(prepareCtx, spec, filepath.Base(dir))
 	prepareCancel()
 	if err != nil {
+		_ = json.NewEncoder(output).Encode(map[string]string{"state": "failed", "errorCode": preparationCode(err)})
 		return err
 	}
 	lease, err := s.claimWorkspace(ctx, workspace.Directory, spec.Key)
 	if err != nil {
+		_ = json.NewEncoder(output).Encode(map[string]string{"state": "failed", "errorCode": workspaceLeaseCode(err)})
 		return err
 	}
 	defer lease()

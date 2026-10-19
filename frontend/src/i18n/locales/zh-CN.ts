@@ -3103,6 +3103,8 @@ const zhCN = {
   'agent.task.failure.deadline': '执行达到时限或被中断。先检查日志和已有产物，再续接原任务。',
   'agent.task.failure.steps': '达到执行步数上限。先检查已有进展，避免从头重复执行。',
   'agent.task.failure.workspace': '任务工作区不可用。请核对真实项目和目录，不能猜测路径重试。',
+  'agent.task.failure.directory': '工作目录不存在或不可访问。请核对当前节点上的真实绝对路径，再提交任务。',
+  'agent.task.failure.workspaceBusy': '工作区正被另一个任务使用。请等待它结束，再续接原任务。',
   'agent.task.failure.unknown': '上次操作的结果尚未确认。需先核对现场，不能按失败自动重跑。',
   'agent.workspace.messages': '消息',
   'agent.notification.all': '全部',

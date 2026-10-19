@@ -108,6 +108,10 @@ func (s Service) reuseWorkspace(ctx context.Context, spec Spec) (Workspace, erro
 		if candidate.Branch == workspace.Branch {
 			return workspace, nil
 		}
+		if candidate.Branch != "" && worktree.BranchWasRenamed(ctx, directory, workspace.Branch, candidate.Branch, workspace.StartOID) {
+			workspace.Branch = candidate.Branch
+			return s.rememberWorkspace(workspace)
+		}
 		if workspace.Branch == "" && workspace.StartOID == "" && candidate.IsMain && repo.Root == directory {
 			workspace.Branch, workspace.Base = candidate.Branch, candidate.Base
 			if strings.Trim(candidate.Head, "0") != "" {

@@ -8,7 +8,7 @@ import signal
 from contextlib import asynccontextmanager
 
 from roami_agent.executors.project import provision_project
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 
@@ -71,6 +71,9 @@ async def hold_workspace(settings, task, run, *, stopped=None):
             line = await process.stdout.readline()
         try:
             receipt = json.loads(line)
+            if isinstance(receipt, dict) and receipt.get("state") == "failed":
+                code = public_error_code(receipt.get("errorCode"))
+                raise DomainError(code or "NATIVE_WORKSPACE_UNAVAILABLE")
             workspace = receipt["workspace"]
             if (
                 receipt["state"] != "native_running"
