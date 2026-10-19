@@ -100,7 +100,7 @@ class Tools:
                 raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
         if (
             role == "research"
-            and tool.name != "tool_search"
+            and tool.name != "tool_list"
             and not research_call_allowed(tool.name, args)
         ):
             raise DomainError("TOOL_UNAVAILABLE")

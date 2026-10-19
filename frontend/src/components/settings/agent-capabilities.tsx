@@ -14,7 +14,7 @@ type CliGroup = { name: string; commands: { name: string; description: string; e
 type CapabilityTab = 'tools' | 'mcp' | 'skills' | 'cli'
 const capabilityTabs: CapabilityTab[] = ['tools', 'mcp', 'skills', 'cli']
 type Catalog = { skills: Skill[]; tools: Tool[]; mcp: Server[]; cli?: CliGroup[] }
-const foundations = new Set(['read', 'bash', 'edit', 'write', 'tool_search', 'delegate', 'ask_user'])
+const foundations = new Set(['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user'])
 export function AgentCapabilities({ kind }: { kind?: CapabilityTab }) {
   const node = useCurrentNodeId()
   return <CapabilityManager key={node || 'local'} initialTab={kind} />

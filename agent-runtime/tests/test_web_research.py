@@ -51,7 +51,7 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
                 assert "Original user request" in seed
                 assert "Check the latest stock quote\n\nDelegated goal" in seed
                 assert "Check the latest stock quote with sources and time" in seed
-                name, args = "tool_search", {"query": "web-research"}
+                name, args = "tool_list", {"query": "web-research"}
             elif self.step == 2:
                 name, args = "read", {"path": "skill://web-research"}
             elif self.step == 3:
@@ -69,10 +69,10 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
                 {
                     "id": f"read-{self.step}",
                     "function": {
-                        "name": name if name in {"read", "tool_search"} else "bash",
+                        "name": name if name in {"read", "tool_list"} else "bash",
                         "arguments": json.dumps(
                             args
-                            if name in {"read", "tool_search"}
+                            if name in {"read", "tool_list"}
                             else {
                                 "argv": [
                                     "roami",
@@ -159,8 +159,8 @@ async def test_disabled_browser_is_discovered_and_never_blindly_enqueued(store):
 async def test_research_catalog_and_invocation_deny_non_navigation_tools(store):
     runtime = Runtime(store, MemoryModel(), settings=Settings(browser={"enabled": True}))
     catalog = runtime.tools.catalog("research")
-    assert {tool["function"]["name"] for tool in catalog} == {"read", "bash", "tool_search"}
-    commands = runtime.tools.directory.search("browser", "cli", 10, "research")["items"]
+    assert {tool["function"]["name"] for tool in catalog} == {"read", "bash", "tool_list"}
+    commands = runtime.tools.directory.list("browser", "cli", 10, "research")["items"]
     assert {item["name"] for item in commands} == {"browser_open", "browser_observe", "browser_act"}
     action = next(item for item in commands if item["name"] == "browser_act")
     assert action["inputSchema"]["properties"]["kind"]["enum"] == ["goto"]

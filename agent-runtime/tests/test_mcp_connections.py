@@ -309,7 +309,7 @@ async def test_worker_discovers_calls_and_records_mcp_outcomes(
         )
         hashes = [json.loads(manifest["parts_json"])["catalogHash"] for manifest in manifests]
         assert len(set(hashes)) == 1
-        discovered = runtime.tools.directory.search(remote, "cli", 10, "worker")
+        discovered = runtime.tools.directory.list(remote, "mcp", 10, "worker")
         assert any("_" + remote + "_" in item["name"] for item in discovered["items"]) == (
             expected != "interrupted"
         )

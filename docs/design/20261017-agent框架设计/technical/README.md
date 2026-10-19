@@ -12,4 +12,4 @@
 
 - [主动联系与未读消息](11-proactive-messaging.html)：触发、统一回复、右上角红圈、已读水位、免打扰与 App 推送边界。
 
-- [基础四工具与 tool_search](15-tool-discovery.html)：2026-10-18 用户确认保留 read / bash / edit / write，增加 Skill / CLI 搜索；另有 delegate / ask_user，Main 总计 7 个。包含自动记忆与召回修订。
+- [基础四工具与 tool_list](15-tool-discovery.html)：2026-10-18 用户确认保留 read / bash / edit / write，增加 Skill / CLI 搜索；另有 delegate / ask_user，Main 总计 7 个。包含自动记忆与召回修订。

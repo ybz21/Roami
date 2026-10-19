@@ -15,9 +15,9 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.process import execute
 
-FOUNDATIONS = ("read", "bash", "edit", "write", "tool_search", "delegate", "ask_user")
+FOUNDATIONS = ("read", "bash", "edit", "write", "tool_list", "delegate", "ask_user")
 WORKER_FOUNDATIONS = set(FOUNDATIONS) - {"ask_user", "delegate"}
-RESEARCH_FOUNDATIONS = {"read", "bash", "tool_search"}
+RESEARCH_FOUNDATIONS = {"read", "bash", "tool_list"}
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 GROUPS = {
     "workspace_overview": "sessions",
@@ -48,7 +48,8 @@ class ToolDirectory:
             )
         ]
 
-    def search(self, query="", kind="all", limit=5, role="main"):
+    def list(self, query="", kind="all", limit=10, role="main", offset=0):
+        limit, offset = min(max(limit, 1), 20), max(offset, 0)
         entries = []
         if "read" not in self.registry.disabled_tools:
             for name, value in self.registry.skills.items():
@@ -81,8 +82,8 @@ class ToolDirectory:
                         schema["properties"].pop("targetId", None)
                 entries.append(
                     {
-                        "id": "cli:" + tool.name,
-                        "kind": "cli",
+                        "id": ("mcp:" if tool.name.startswith("mcp_") else "cli:") + tool.name,
+                        "kind": "mcp" if tool.name.startswith("mcp_") else "cli",
                         "name": tool.name,
                         "description": tool.description,
                         "argv": [
@@ -146,8 +147,15 @@ class ToolDirectory:
             selected = []
         result = {
             "catalogVersion": version,
-            "items": [item for _, _, item in selected[:limit]],
-            "truncated": len(selected) > limit,
+            "items": [item for _, _, item in selected[offset : offset + limit]],
+            "total": len(selected),
+            "offset": offset,
+            "nextOffset": offset + limit if offset + limit < len(selected) else None,
+            "totals": {
+                category: sum(item["kind"] == category for item in entries)
+                for category in ("mcp", "skill", "cli")
+            },
+            "truncated": offset + limit < len(selected),
         }
         if not selected and alternatives:
             result["suggestions"] = [item for _, _, item in alternatives[:3]]
@@ -265,12 +273,13 @@ def register_foundations(registry, settings):
     directory = ToolDirectory(registry, settings)
     registry.directory = directory
 
-    async def search(args, binding):
-        return directory.search(
-            args["query"],
+    async def list_tools(args, binding):
+        return directory.list(
+            args.get("query", ""),
             args.get("kind", "all"),
-            args.get("limit", 5),
+            args.get("limit", 10),
             binding.get("role", "main"),
+            args.get("offset", 0),
         )
 
     async def bash(args, binding):
@@ -303,17 +312,17 @@ def register_foundations(registry, settings):
 
     registry.add(
         Tool(
-            "tool_search",
-            "Search available Skills and Roami CLI operations. Returns skill:// paths for read, or exact bash argv and input schemas. Search by intent or name; known commands can run directly. This does not search user history or the web.",
+            "tool_list",
+            "List available MCP, Skills and CLI capabilities by category. Optionally filter by intent or name and page with offset. Returns skill:// locations for read, or exact bash argv and input schemas. Known operations can run directly. This lists capabilities, not user history or web results.",
             object_schema(
                 {
                     "query": {"type": "string", "maxLength": 1000},
-                    "kind": {"enum": ["all", "skill", "cli"]},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                    "kind": {"enum": ["all", "mcp", "skill", "cli"]},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                    "offset": {"type": "integer", "minimum": 0},
                 },
-                ["query"],
             ),
-            search,
+            list_tools,
             main=True,
         )
     )
@@ -367,7 +376,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "bash",
-            "Execute Roami CLI argv discovered by tool_search, or shell commands in a prepared workspace. For Roami business actions use ['roami','agent','capability','call',NAME,'--input',JSON]. Registered read/write effects and receipts are enforced by runtime. General shell needs cwd inside allowed roots; no implicit code workspace is created.",
+            "Execute Roami CLI argv discovered by tool_list, or shell commands in a prepared workspace. For Roami business actions use ['roami','agent','capability','call',NAME,'--input',JSON]. Registered read/write effects and receipts are enforced by runtime. General shell needs cwd inside allowed roots; no implicit code workspace is created.",
             schema,
             bash,
             main=True,

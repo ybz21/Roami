@@ -24,12 +24,14 @@ export function useAgentModels(node: string | null) {
     try { const { data } = await api('GET', '/agent/models'); if (currentNode.current === requestedNode) setModels(data.models) }
     catch (e) { if (currentNode.current === requestedNode) setError(e) } finally { if (currentNode.current === requestedNode) setLoading(false) }
   }
-  const choose = async (model: string) => {
-    if (busy || !model.trim()) return false
+  const configure = async (change: { model?: string; reasoningEffort?: string | null }) => {
+    if (busy) return false
     const requestedNode = node
     setBusy(true); setError(null)
-    try { const saved = await saveAgentModels({ main: { model: model.trim() } }); if (currentNode.current !== requestedNode) return false; setSettings(saved); return true }
+    try { const saved = await saveAgentModels({ main: change }); if (currentNode.current !== requestedNode) return false; setSettings(saved); return true }
     catch (e) { if (currentNode.current === requestedNode) setError(e); return false } finally { if (currentNode.current === requestedNode) setBusy(false) }
   }
-  return { settings, models, loading, busy, error, load, choose }
+  const choose = (model: string) => model.trim() ? configure({ model: model.trim() }) : Promise.resolve(false)
+  const setEffort = (effort: string) => configure({ reasoningEffort: effort === 'default' ? null : effort })
+  return { settings, models, loading, busy, error, load, choose, setEffort }
 }

@@ -13,6 +13,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
 from roami_agent.providers.model_catalog import fetch_catalog
+from roami_agent.providers.reasoning_effort import reasoning_efforts, with_reasoning_effort
 
 KEY_NAMES = {"main": "ROAMI_AGENT_SAVED_MAIN_KEY", "worker": "ROAMI_AGENT_SAVED_WORKER_KEY"}
 
@@ -70,6 +71,7 @@ def effective_settings(base, saved, *, credentials=True):
             "apiKey",
             "images",
             "contextWindow",
+            "reasoningEffort",
         }:
             raise DomainError("INVALID_MODEL_CONFIG")
         if any(
@@ -119,7 +121,9 @@ def effective_settings(base, saved, *, credentials=True):
             old.max_retries,
             capabilities,
             old.cache,
-            old.parameters,
+            with_reasoning_effort(old.parameters, name, value["reasoningEffort"])
+            if "reasoningEffort" in value
+            else old.parameters,
             window,
             old.image_limits if (endpoint, name) == (old.endpoint, old.name) else {},
         )
@@ -132,6 +136,7 @@ def effective_settings(base, saved, *, credentials=True):
         model_capabilities=main.capabilities,
         context_window=main.context_window,
         image_limits=main.image_limits,
+        model_parameters=main.parameters,
         worker_route=worker,
         extra_key_envs=tuple(sorted(base.provider_key_environments())),
     )
@@ -165,6 +170,10 @@ class ModelSettings:
                 "images": self.runtime.settings.route(role).capabilities.get("images") is True,
                 "contextWindow": self.runtime.settings.route(role).context_window,
                 "configuredContextWindow": self.saved.get(role, {}).get("contextWindow"),
+                "reasoningEffort": self.runtime.settings.route(role).parameters.get(
+                    "reasoning_effort"
+                ),
+                "reasoningEfforts": reasoning_efforts(self.runtime.settings.route(role).name),
             }
             for role in ("main", "worker")
         }
@@ -209,6 +218,7 @@ class ModelSettings:
                     role
                 ).endpoint.rstrip("/"):
                     item["contextWindow"] = None
+                    item["reasoningEffort"] = None
         for role, changes in patch.items():
             if role == "connection":
                 continue
@@ -224,6 +234,7 @@ class ModelSettings:
                 "apiKey",
                 "images",
                 "contextWindow",
+                "reasoningEffort",
             }:
                 raise DomainError("INVALID_MODEL_CONFIG")
             item = saved.setdefault(role, {})
@@ -236,8 +247,11 @@ class ModelSettings:
             ].strip().rstrip("/") != current.endpoint.rstrip("/")
             if model_changed or endpoint_changed:
                 item["contextWindow"] = None
+                item["reasoningEffort"] = None
             for key, value in changes.items():
-                if key == "contextWindow":
+                if key == "reasoningEffort":
+                    with_reasoning_effort({}, changes.get("model", current.name), value)
+                elif key == "contextWindow":
                     if value is not None and (
                         type(value) is not int or not 1 <= value <= 100_000_000
                     ):
@@ -395,6 +409,7 @@ class ModelSettings:
             "models": names[:200],
             "truncated": len(names) > 200,
             "contextWindows": {name: catalog[name] for name in names[:200] if catalog[name]},
+            "reasoningEfforts": {name: reasoning_efforts(name) for name in names[:200]},
         }
 
     async def resolve_capacity(self, settings):

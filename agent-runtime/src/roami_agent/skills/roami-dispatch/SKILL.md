@@ -21,7 +21,7 @@ description: Operate Roami projects, sessions and background agents through its 
 
 ## 入口、权限与真实可用性
 
-- **Main / 原生 Worker 的受管操作**：`tool_search(query="意图或操作名",kind="cli")` 返回真实 `argv`、`inputSchema`、`effect`，交给 `bash` 执行。Skill 用 `kind="skill"` 搜索，再用 `read` 加载。已知且仍有效的命令不必重复搜索。
+- **Main / 原生 Worker 的受管操作**：`tool_list(query="意图或操作名",kind="cli")` 返回真实 `argv`、`inputSchema`、`effect`，交给 `bash` 执行。Skill 用 `kind="skill"` 搜索，再用 `read` 加载。已知且仍有效的命令不必重复搜索。
 - **专业 Agent / 普通终端的完整 CLI**：`roami help`、`roami project help`、`roami session help`、`roami agent help`、`roami chrome help`。`chrome` 是 `roami chrome` 的兼容入口。具体 flags 以当前节点帮助为准。
 - 两者不是同一个权限范围：当前宿主直接允许的原始 Roami 命令只有项目 ls/show/sessions、会话 ls/resolve 与少量帮助；其他操作使用已注册能力或委派具备 CLI 环境的专业 Agent。**文档列出命令不代表当前角色可以直接执行它**。不能通过 Shell 包装绕过 USE_REGISTERED_CLI_CAPABILITY、资源租约或检索角色限制。
 - 已有项目和会话使用 Go 台账；Main、记忆、任务生命周期使用 Python 服务。不要另建数据库或手写 HTTP 替代现有 CLI。

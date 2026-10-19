@@ -1,0 +1,78 @@
+{
+  "desktop": {
+    "passed": true,
+    "device": "desktop",
+    "choices": [
+      "default",
+      "low",
+      "high",
+      "max"
+    ],
+    "mainAndWorkerIndependent": true,
+    "reloadPersists": true,
+    "defaultClearsOverride": true,
+    "panelAligned": true,
+    "toolListOnly": true,
+    "browserCliVisible": true
+  },
+  "android": {
+    "passed": true,
+    "device": "Android Redmi Note 8 touch",
+    "choices": [
+      "default",
+      "low",
+      "high",
+      "max"
+    ],
+    "mainAndWorkerIndependent": true,
+    "reloadPersists": true,
+    "defaultClearsOverride": true,
+    "panelAligned": true,
+    "toolListOnly": true,
+    "browserCliVisible": true
+  },
+  "cli": {
+    "passed": true,
+    "noArgumentsList": true,
+    "skillPagesHaveDistinctRecords": true,
+    "browserCliOperations": [
+      "browser_open",
+      "browser_observe",
+      "browser_act"
+    ],
+    "mcpItems": 0,
+    "removedCommandExit": 2,
+    "noLegacyCommand": true
+  },
+  "actualProvider": {
+    "state": "completed",
+    "actualReply": true,
+    "listWorkflow": {
+      "state": "completed",
+      "commandsExplained": true
+    },
+    "effort": "high",
+    "provider": "configured GLM-5.3-Flash gateway",
+    "seconds": 36.84,
+    "actualTools": [
+      {
+        "name": "tool_list",
+        "state": "succeeded"
+      },
+      {
+        "name": "skill_read",
+        "state": "succeeded"
+      },
+      {
+        "name": "skill_read",
+        "state": "succeeded"
+      }
+    ],
+    "queryFreeSkillList": true,
+    "createdTasks": 0
+  },
+  "englishMenu": true,
+  "pythonTests": 536,
+  "frontendTests": 665,
+  "noArgumentsModelTool": true
+}

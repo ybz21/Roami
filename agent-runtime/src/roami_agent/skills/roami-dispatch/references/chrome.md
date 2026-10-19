@@ -8,7 +8,7 @@ Main 快速确认需求并委派。公开联网查询使用 `delegate(executor="
 
 需要网页交互时使用有工作区的普通原生任务，或用户指定的 Codex / Claude 等专业 Agent；普通 Worker 可发现 browser_act 的 click/fill/type/press/goto。不要让检索角色反复重试被禁止的交互，也不要为了只读查询创建项目。
 
-通过 `tool_search(query="browser",kind="cli")` 发现并运行以下能力，参数以返回 schema 为准：
+通过 `tool_list(query="browser",kind="cli")` 发现并运行以下能力，参数以返回 schema 为准：
 
 | 能力 | 输入 | 输出 / 后续动作 |
 | --- | --- | --- |

@@ -17,5 +17,5 @@ it('shows one connection and saves separate role models with the existing shared
   expect(screen.getAllByLabelText('agent.models.baseUrl')).toHaveLength(1)
   expect(screen.getAllByLabelText('agent.models.apiKey')).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { connection: { baseUrl: role.baseUrl }, main: { model: 'fast', images: false, contextWindow: null }, worker: { model: 'strong', images: false, contextWindow: null } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { connection: { baseUrl: role.baseUrl }, main: { model: 'fast', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
 })

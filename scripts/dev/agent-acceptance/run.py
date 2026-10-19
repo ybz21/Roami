@@ -682,7 +682,7 @@ class Instance:
             if check.get("memoryRecall"):
                 validate_memory_recall(self, cid, check["memoryRecall"], result)
             if check.get("discovery"):
-                assert "tool_search" in names or "skill_read" in names, (
+                assert "tool_list" in names or "skill_read" in names, (
                     "No actual capability discovery"
                 )
             if check.get("followLinkedPage"):

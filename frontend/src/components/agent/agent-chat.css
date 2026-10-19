@@ -138,3 +138,5 @@ html[data-size="compact"] .agent-compose-bar .tt-cgrp { gap:var(--sp-1); }
 .agent-question-option small { color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-question-option:disabled { cursor:default; color:var(--text-dim); }
 :where(html[data-pointer="fine"]) .agent-question-option:not(:disabled):hover { border-color:var(--accent-border); background:var(--accent-soft); }
+
+.agent-model-trigger .agent-reasoning-label { flex:none; font-size:var(--fs-meta); color:var(--text-dim); white-space:nowrap; }

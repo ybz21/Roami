@@ -40,7 +40,7 @@ async def test_external_tool_policy_blocks_stale_calls_and_survives_recreation(s
     )
     assert any(
         item["name"] == "http_fixture"
-        for item in recreated.tools.directory.search("http_fixture", "cli", 10, "worker")["items"]
+        for item in recreated.tools.directory.list("http_fixture", "cli", 10, "worker")["items"]
     )
 
 
@@ -110,7 +110,7 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
             "bash",
             "edit",
             "write",
-            "tool_search",
+            "tool_list",
             "delegate",
             "ask_user",
         }

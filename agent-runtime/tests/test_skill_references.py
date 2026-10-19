@@ -21,7 +21,7 @@ async def test_reference_is_loaded_on_demand_and_changes_catalog_version(store, 
     document = references / "commands.md"
     document.write_text("First reference")
     runtime = Runtime(store, ConversationModel(), settings=Settings(skill_roots=(root,)))
-    initial = runtime.tools.directory.search("cli-guide", "skill")["catalogVersion"]
+    initial = runtime.tools.directory.list("cli-guide", "skill")["catalogVersion"]
     overview = await runtime.tools.invoke(read("skill://cli-guide"), "main", {})
     assert "First reference" not in overview["text"]
     result = await runtime.tools.invoke(
@@ -31,7 +31,7 @@ async def test_reference_is_loaded_on_demand_and_changes_catalog_version(store, 
     assert result["skillVersion"] == overview["version"]
     document.write_text("Updated reference")
     recreated = Runtime(store, ConversationModel(), settings=Settings(skill_roots=(root,)))
-    assert initial != recreated.tools.directory.search("cli-guide", "skill")["catalogVersion"]
+    assert initial != recreated.tools.directory.list("cli-guide", "skill")["catalogVersion"]
     await runtime.capability_settings.save(
         "local", {"kind": "skills", "name": "cli-guide", "enabled": False}
     )
@@ -62,7 +62,7 @@ async def test_reference_cannot_escape_skill_or_bypass_research_profile(store, t
         )
     assert any(
         item["name"] == "roami-dispatch"
-        for item in runtime.tools.directory.search("截图", "skill")["items"]
+        for item in runtime.tools.directory.list("截图", "skill")["items"]
     )
     assert (
         "roami chrome"

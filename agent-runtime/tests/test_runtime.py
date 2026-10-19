@@ -372,7 +372,7 @@ async def test_completion_evidence_stays_before_its_tool_round_after_context_reb
                 "bash",
                 "edit",
                 "write",
-                "tool_search",
+                "tool_list",
                 "delegate",
                 "ask_user",
             }

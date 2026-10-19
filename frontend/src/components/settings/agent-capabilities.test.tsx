@@ -51,12 +51,12 @@ it('shows unknown MCP connection state and opens connection details', async () =
 })
 
 it('shows seven tools and manages business operations in a separate CLI tab', async () => {
-  const names = ['read', 'bash', 'edit', 'write', 'tool_search', 'delegate', 'ask_user']
+  const names = ['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user']
   const tools = names.map(name => ({ name, description: 'runtime description', schema: { type: 'object' }, effect: 'read', main: true, enabled: true, mutable: false, source: 'builtin' }))
   const data = { ...catalog, tools, cli: [{ name: 'sessions', commands: [{ name: 'session_send', description: 'Send to a session', enabled: true, mutable: false }, { name: 'http_external', description: 'External service', enabled: true, mutable: true }] }] }
   vi.mocked(api).mockResolvedValue({ data })
   const { container } = render(<AgentCapabilities kind="tools" />)
-  await screen.findByText('tool_search')
+  await screen.findByText('tool_list')
   expect(screen.getAllByRole('tab')).toHaveLength(4)
   expect(screen.queryAllByRole('switch')).toHaveLength(0)
   expect(screen.getAllByText('agent.capabilities.builtinFixed')).toHaveLength(7)

@@ -123,6 +123,10 @@ async def test_provider_discovery_uses_secret_server_side_and_blocks_redirect(st
             "models": ["model-a", "model-b"],
             "truncated": False,
             "contextWindows": {},
+            "reasoningEfforts": {
+                name: ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+                for name in ("model-a", "model-b")
+            },
         }
         assert seen == ["Bearer catalog-private-key"]
         with pytest.raises(DomainError, match="MODEL_KEY_REQUIRED_FOR_ENDPOINT"):
@@ -357,5 +361,103 @@ async def test_shared_connection_catalog_cannot_retarget_main_key_via_worker_rol
                 "local", "worker", {"connection": {"baseUrl": "https://different.example/v1"}}
             )
         assert not settings_path(store.data_root).exists()
+    finally:
+        await runtime.close()
+
+
+async def test_reasoning_effort_saves_reloads_and_reaches_requests_independently(store):
+    from roami_agent.app import configured_provider
+    from roami_agent.protocol.model_routes import ModelRoute
+
+    settings = Settings(
+        endpoint="https://provider.invalid/v1",
+        model="glm-5.3-flash",
+        model_parameters={"reasoning_effort": "low", "max_tokens": 300},
+        worker_route=ModelRoute(
+            "https://provider.invalid/v1",
+            "rr/gpt-6.1-sol",
+            "KEY",
+            30,
+            parameters={"reasoning_effort": "high"},
+        ),
+    )
+    requests = []
+
+    def respond(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            text='data: {"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+        )
+
+    runtime = Runtime(store, Model(), settings=settings)
+    runtime.model_settings.factory = lambda configured, role: configured_provider(
+        configured, role, client=httpx.AsyncClient(transport=httpx.MockTransport(respond))
+    )
+    try:
+        result = await runtime.model_settings.save("local", {"main": {"reasoningEffort": "high"}})
+        assert result["main"]["reasoningEffort"] == "high"
+        assert result["main"]["reasoningEfforts"] == ["low", "high", "max"]
+        assert result["worker"]["reasoningEffort"] == "high"
+        restored = load_model_settings(settings, store.data_root)
+        assert restored.route().parameters == {"reasoning_effort": "high", "max_tokens": 300}
+        _ = [
+            event
+            async for event in runtime.model.stream([{"role": "user", "content": "Question"}], [])
+        ]
+        assert requests[-1]["reasoning_effort"] == "high"
+        await runtime.model_settings.save("local", {"worker": {"reasoningEffort": "max"}})
+        assert runtime.settings.route().parameters["reasoning_effort"] == "high"
+        assert runtime.settings.route("worker").parameters["reasoning_effort"] == "max"
+        _ = [
+            event
+            async for event in runtime.worker_model.stream(
+                [{"role": "user", "content": "Question"}], []
+            )
+        ]
+        assert requests[-1]["reasoning_effort"] == "max"
+        result = await runtime.model_settings.save("local", {"main": {"reasoningEffort": None}})
+        assert result["main"]["reasoningEffort"] is None
+        _ = [
+            event
+            async for event in runtime.model.stream([{"role": "user", "content": "Question"}], [])
+        ]
+        assert "reasoning_effort" not in requests[-1] and requests[-1]["max_tokens"] == 300
+        assert (
+            "reasoning_effort"
+            not in load_model_settings(settings, store.data_root).route().parameters
+        )
+        assert (
+            json.loads(settings_path(store.data_root).read_text())["main"]["reasoningEffort"]
+            is None
+        )
+    finally:
+        await runtime.close()
+
+
+async def test_reasoning_effort_model_change_resets_and_rejects_unsupported_or_malformed(store):
+    runtime = Runtime(
+        store,
+        Model(),
+        settings=Settings(
+            endpoint="http://127.0.0.1:1/v1",
+            model="glm-5.3-flash",
+            model_parameters={"reasoning_effort": "low"},
+        ),
+    )
+    runtime.model_settings.factory = lambda configured, role: Model(configured.route(role).name)
+    try:
+        for value in ("medium", "bad", {}, True):
+            with pytest.raises(DomainError, match="MODEL_REASONING_UNSUPPORTED"):
+                await runtime.model_settings.save("local", {"main": {"reasoningEffort": value}})
+        assert not settings_path(store.data_root).exists()
+        await runtime.model_settings.save("local", {"main": {"reasoningEffort": "max"}})
+        result = await runtime.model_settings.save("local", {"main": {"model": "rr/gpt-6.1-sol"}})
+        assert result["main"]["reasoningEffort"] is None
+        assert result["main"]["reasoningEfforts"] == ["low", "medium", "high", "xhigh", "max"]
+        await runtime.model_settings.save(
+            "local", {"main": {"model": "glm-5.3-flash", "reasoningEffort": "high"}}
+        )
+        assert runtime.settings.route().parameters["reasoning_effort"] == "high"
     finally:
         await runtime.close()

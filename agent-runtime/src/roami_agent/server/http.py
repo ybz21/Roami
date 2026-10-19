@@ -79,10 +79,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def tool_directory(
         owner: Owner,
         query: str = Query(default="", max_length=1000),
-        kind: Literal["all", "skill", "cli"] = "all",
+        kind: Literal["all", "mcp", "skill", "cli"] = "all",
+        limit: int = Query(10, ge=1, le=20),
+        offset: int = Query(0, ge=0),
     ):
         runtime.capability_settings.view(owner)
-        return {"data": runtime.tools.directory.search(query, kind, 10)}
+        return {"data": runtime.tools.directory.list(query, kind, limit, "worker", offset=offset)}
 
     @app.get("/v1/traces")
     async def execution_trace(
@@ -102,7 +104,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.capability_settings.view(owner)
         found = [
             item
-            for item in runtime.tools.directory.search(name, "cli", 10, "worker")["items"]
+            for item in runtime.tools.directory.list(name, "all", 20, "worker")["items"]
             if item["name"] == name
         ]
         if not found:
