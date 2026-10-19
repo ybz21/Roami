@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Button, Input, Spin } from 'antd'
 import { api } from '../../api'
-import { ChevronLeft, ChevronRight, RefreshIcon } from '../../icons'
+import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, ChevronLeft, ChevronRight, RefreshIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
@@ -20,10 +20,10 @@ function failure(code: string | undefined, t: (key: string) => string) {
   return t('agent.requestFailed')
 }
 
-type Props = { cid: string; onSession: (id: string) => void; onChanged: () => void; selectedTask?: string; onSelectTask?: (id: string) => void }
+type Props = { cid: string; onSession: (id: string) => void; onChanged: () => void; compact?: boolean; selectedTask?: string; onSelectTask?: (id: string) => void }
 
-export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask }: Props) {
-  const { t, locale } = useI18n()
+export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask, compact = false }: Props) {
+  const { t } = useI18n()
   const [tasks, setTasks] = useState<AgentTask[]>([]), [localSelected, setLocalSelected] = useState('')
   const selected = selectedTask ?? localSelected
   const setSelected = (id: string) => { if (onSelectTask) onSelectTask(id); else setLocalSelected(id) }
@@ -40,21 +40,51 @@ export default function AgentTasks({ cid, onSession, onChanged, selectedTask, on
   }, [cid, selected, version])
   useEffect(() => { const timer = setInterval(() => { if (document.visibilityState === 'visible') setVersion((value) => value + 1) }, 3000); return () => clearInterval(timer) }, [])
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
-  return <div className="agent-tasks">
+  return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
     {selected ? <TaskInspector key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
-      <div className="agent-task-section-head"><span className="agent-muted">{t('agent.task.listHint')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
+      <div className="agent-task-section-head"><span className="agent-muted">{t(compact ? 'agent.workspace.taskScope' : 'agent.task.listHint')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
-      {!loading && !failed && !tasks.length && <p className="agent-muted">{t('agent.noTasks')}</p>}
-      {(['attention', 'active', 'recent'] as const).map(group => {
+      {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong><p>{t('agent.workspace.taskEmptyHint')}</p></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
+      {compact ? <TaskTimeline tasks={roots} select={setSelected} /> : (['attention', 'active', 'recent'] as const).map(group => {
         const current = roots.filter(task => (['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(task.state) ? 'active' : ['succeeded', 'cancelled'].includes(task.state) ? 'recent' : 'attention') === group)
           .sort((a, b) => (b.updated_ms || b.created_ms || 0) - (a.updated_ms || a.created_ms || 0))
         if (!current.length) return null
-        return <section className="agent-task-list-group" key={group}><h4>{t('agent.workspace.taskGroup.' + group)}<span>{current.length}</span></h4>{current.map(task => { const executor = taskExecutor(task); const time = typeof task.updated_ms === 'number' && Number.isFinite(task.updated_ms) && task.updated_ms > 0 ? new Date(task.updated_ms) : null; return <button type="button" className="agent-task-link" key={task.id} onClick={() => setSelected(task.id)}>
-          <span><b>{taskGoal(task)}</b><small>{t('agent.state.' + (['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'))}{task.revision > 1 && t('agent.task.revision', { n: task.revision })}</small>{(executor || time) && <small>{executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>}</span><ChevronRight />
-        </button> })}</section>
+        return <section className="agent-task-list-group" key={group}><h4>{t('agent.workspace.taskGroup.' + group)}<span>{current.length}</span></h4>{current.map(task => <TaskRow key={task.id} task={task} compact={compact} select={setSelected} />)}</section>
       })}
     </>}
   </div>
+}
+
+function taskTime(task: AgentTask) {
+  return [task.updated_ms, task.created_ms].find(time => typeof time === 'number' && Number.isFinite(time) && time > 0) || 0
+}
+function TaskTimeline({ tasks, select }: { tasks: AgentTask[]; select: (id: string) => void }) {
+  const { t, locale } = useI18n(), now = new Date(), yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const sorted = [...tasks].sort((a, b) => taskTime(b) - taskTime(a) || a.id.localeCompare(b.id))
+  let previous = ''
+  return <div className="agent-task-timeline">{sorted.map(task => {
+    const date = taskTime(task) ? new Date(taskTime(task)) : null, day = date?.toDateString() || 'unknown'
+    const heading = day !== previous; previous = day
+    return <Fragment key={task.id}>{heading && <h4>{!date ? t('agent.workspace.timeUnknown') : day === now.toDateString() ? t('agent.workspace.today') : day === yesterday.toDateString() ? t('agent.workspace.yesterday') : new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date)}</h4>}<TaskRow task={task} compact select={select} /></Fragment>
+  })}</div>
+}
+
+function TaskRow({ task, compact, select }: { task: AgentTask; compact: boolean; select: (id: string) => void }) {
+  const { t, locale } = useI18n(), executor = taskExecutor(task)
+  const state = ['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'
+  const time = taskTime(task) ? new Date(taskTime(task)) : null
+  const name = executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''
+  const revision = task.revision > 1 ? t('agent.task.revision', { n: task.revision }) : ''
+  return <button type="button" className={`agent-task-link${compact ? ' agent-task-card' : ''}`} data-state={state} onClick={() => select(task.id)}>
+    {compact && <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>}
+    <span className="agent-task-row-copy">
+      <b>{taskGoal(task)}</b>
+      {compact && <span className="agent-task-row-summary">{task.latestAttempt?.summary || t(state === 'waiting_user' ? 'agent.workspace.waitingHint' : 'agent.workspace.taskSummary.' + (['failed', 'unknown', 'succeeded'].includes(state) ? state : 'progress'))}</span>}
+      {!compact && <small>{t('agent.state.' + state)}{revision}</small>}
+      {(compact || executor || time) && <small className={compact ? 'agent-task-card-meta' : undefined}>{compact && <span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>}{executor && <span>{compact && (executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />)}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, compact ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>}{compact && revision && <small>{revision}</small>}
+    </span>{!compact && <ChevronRight />}
+  </button>
 }
 
 function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: string; onBack: () => void; select: (id: string) => void; onSession: (id: string) => void; onChanged: () => void }) {
@@ -95,7 +125,7 @@ function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: strin
     {snapshot.detail.failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {task && <>
       <div className="agent-task-heading"><h3 className={fullGoal ? '' : 'agent-task-goal'}>{goal}</h3><span className="agent-task-state" data-state={task.state}>{t('agent.state.' + task.state)}</span></div>
-      {(goal.length > 300 || (steering?.text?.length || 0) > 300) && <button type="button" className="tt-act" aria-expanded={fullGoal} onClick={() => setFullGoal(!fullGoal)}>{t(fullGoal ? 'agent.task.hideGoal' : 'agent.task.showGoal')}</button>}
+      {(goal.length > 80 || (steering?.text?.length || 0) > 80) && <button type="button" className="tt-act" aria-expanded={fullGoal} onClick={() => setFullGoal(!fullGoal)}>{t(fullGoal ? 'agent.task.hideGoal' : 'agent.task.showGoal')}</button>}
       <p className="agent-muted">{t('agent.task.revision', { n: task.revision })}</p>
       {steering?.text && <p className={fullGoal ? 'agent-task-requirements' : 'agent-task-requirements clipped'}><b>{t('agent.task.latestRequirements')}</b>{steering.text}</p>}
       {task.latestAttempt?.workspace && <code className="agent-task-workspace">{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}

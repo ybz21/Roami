@@ -1,11 +1,11 @@
 import { useState } from 'react'
 
-export type WorkspaceTab = 'activity' | 'tasks' | 'reminders' | 'memory'
+export type WorkspaceTab = 'tasks' | 'memory'
 type Workspace = { open: boolean; tab: WorkspaceTab }
-const tabs = new Set(['activity', 'tasks', 'reminders', 'memory'])
+const tabs = new Set(['tasks', 'memory'])
 function storedWorkspace(key: string): Workspace {
-  try { const value = JSON.parse(localStorage.getItem(key) || 'null'); if (typeof value?.open === 'boolean' && tabs.has(value.tab)) return value } catch {}
-  return { open: true, tab: 'activity' }
+  try { const value = JSON.parse(localStorage.getItem(key) || 'null'); if (typeof value?.open === 'boolean') { const tab = value.tab === 'activity' || value.tab === 'reminders' ? 'tasks' : value.tab; if (tabs.has(tab)) return { open: value.open, tab } } } catch {}
+  return { open: true, tab: 'tasks' }
 }
 export function useAgentWorkspace(node: string | null) {
   const key = `roami.agent.workspace.${node || 'local'}`

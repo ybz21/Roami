@@ -1,67 +1,221 @@
 {
-  "passed": true,
-  "scope": "desktop only",
-  "viewports": [
-    1600,
-    1280,
-    1920,
-    1100
-  ],
-  "actualBackend": "Go/Python/SQLite/SSE",
-  "controlledProvider": true,
-  "realRoamiCliExecution": true,
-  "controlledCliDelay": true,
-  "liveStateTransition": true,
-  "unknownVisible": true,
-  "taskHistoryFixtures": true,
-  "taskDetailsDoNotBlockChat": true,
-  "reminderRealApi": true,
-  "memoryRealApi": true,
-  "inputOutputOnDemand": true,
-  "collapseRestoresOnReload": true,
-  "slashCommandsUseRail": true,
-  "narrowDesktopKeepsDialog": true,
-  "english": true,
-  "horizontalOverflow": false,
-  "date": "2026-10-19",
-  "frontend": {
-    "typecheck": "passed",
-    "i18nKeys": 3009,
-    "hover": "passed",
-    "vitestFiles": 98,
-    "vitestTests": 703,
-    "build": "passed",
-    "warnings": "现有大块产物与动态/静态混合导入警告"
-  },
-  "qualityFull": {
-    "go": "passed",
-    "pythonTests": 575,
-    "ruff": "passed",
-    "result": "passed"
-  },
-  "report": {
-    "items": 24,
-    "priorityCounts": [
-      10,
-      9,
-      5
+  "designRevision": "2026-10-19 任务入口合并",
+  "scope": "本轮按 Muse 复刻桌面任务 / 记忆展示列表；不含头像，不改变委派与工具执行协议",
+  "prototypeValidation": {
+    "status": "passed",
+    "viewport": {
+      "width": 1600,
+      "height": 1100
+    },
+    "checks": [
+      "默认任务入口，移除独立动态标签",
+      "一任务一条目，关注 / 执行中 / 近期结束分组",
+      "详情内展开工具过程与输入输出，并展示子 Agent / 产物",
+      "详情返回列表",
+      "聊天回执在收起后打开并定位任务详情",
+      "本期只有任务与记忆入口，审批和定时仍列在后续规划",
+      "24 项清单筛选 10 / 9 / 5",
+      "示例消息发送",
+      "无页面脚本错误、文档横向或纵向溢出"
     ],
-    "filtersAndDemoInteractions": "passed"
+    "screenshots": [
+      "/tmp/roami-workspace-report-revised.png",
+      "/tmp/roami-workspace-report-tasks-revised.png",
+      "/tmp/roami-workspace-report-task-details-revised.png"
+    ],
+    "productRuntimeTested": false
   },
-  "fixtureBoundary": "受控模型响应；CLI 确实运行 project ls --json，隔离 CLI 加 2 秒延迟用于观测进行中状态，不用于性能结论。终态任务与未知工具结果是绑定隔离用户/来源的 SQLite 展示夹具；记忆和提醒由真实 API 写入。未启动真实 Codex/Claude 任务。",
-  "scopeLimits": [
-    "手机版按用户前序要求本轮不 review",
-    "未接入 Gmail 等外部账号",
-    "P1 九项与需确认五项尚未实施",
-    "旧框架 goal 为系统暂停状态，无法通过工具恢复或创建替代目标"
+  "pendingImplementation": [
+    "任务详情内聚合实际关联的工具输入 / 输出",
+    "聊天任务回执直接定位右侧详情",
+    "审批绑定协议等待确认；定时仍可通过原通知入口访问"
   ],
-  "screenshots": {
-    "after": "/tmp/roami-workspace-after-desktop.png",
-    "tasks": "/tmp/roami-workspace-tasks-desktop.png",
-    "detail-chat": "/tmp/roami-workspace-detail-chat-desktop.png",
-    "schedule": "/tmp/roami-workspace-schedule-desktop.png",
-    "memory": "/tmp/roami-workspace-memory-desktop.png",
-    "tool-details": "/tmp/roami-workspace-tool-details-desktop.png",
-    "english": "/tmp/roami-workspace-english-desktop.png"
+  "implementationBaseline": {
+    "commit": "fc57a07",
+    "notice": "以下为上一版独立动态 / 任务标签的历史验收，不能视作本次设计已经实现。",
+    "results": {
+      "passed": true,
+      "scope": "desktop only",
+      "viewports": [
+        1600,
+        1280,
+        1920,
+        1100
+      ],
+      "actualBackend": "Go/Python/SQLite/SSE",
+      "controlledProvider": true,
+      "realRoamiCliExecution": true,
+      "controlledCliDelay": true,
+      "liveStateTransition": true,
+      "unknownVisible": true,
+      "taskHistoryFixtures": true,
+      "taskDetailsDoNotBlockChat": true,
+      "reminderRealApi": true,
+      "memoryRealApi": true,
+      "inputOutputOnDemand": true,
+      "collapseRestoresOnReload": true,
+      "slashCommandsUseRail": true,
+      "narrowDesktopKeepsDialog": true,
+      "english": true,
+      "horizontalOverflow": false,
+      "date": "2026-10-19",
+      "frontend": {
+        "typecheck": "passed",
+        "i18nKeys": 3009,
+        "hover": "passed",
+        "vitestFiles": 98,
+        "vitestTests": 703,
+        "build": "passed",
+        "warnings": "现有大块产物与动态/静态混合导入警告"
+      },
+      "qualityFull": {
+        "go": "passed",
+        "pythonTests": 575,
+        "ruff": "passed",
+        "result": "passed"
+      },
+      "report": {
+        "items": 24,
+        "priorityCounts": [
+          10,
+          9,
+          5
+        ],
+        "filtersAndDemoInteractions": "passed"
+      },
+      "fixtureBoundary": "受控模型响应；CLI 确实运行 project ls --json，隔离 CLI 加 2 秒延迟用于观测进行中状态，不用于性能结论。终态任务与未知工具结果是绑定隔离用户/来源的 SQLite 展示夹具；记忆和提醒由真实 API 写入。未启动真实 Codex/Claude 任务。",
+      "scopeLimits": [
+        "手机版按用户前序要求本轮不 review",
+        "未接入 Gmail 等外部账号",
+        "P1 九项与需确认五项尚未实施",
+        "旧框架 goal 为系统暂停状态，无法通过工具恢复或创建替代目标"
+      ],
+      "screenshots": {
+        "after": "/tmp/roami-workspace-after-desktop.png",
+        "tasks": "/tmp/roami-workspace-tasks-desktop.png",
+        "detail-chat": "/tmp/roami-workspace-detail-chat-desktop.png",
+        "schedule": "/tmp/roami-workspace-schedule-desktop.png",
+        "memory": "/tmp/roami-workspace-memory-desktop.png",
+        "tool-details": "/tmp/roami-workspace-tool-details-desktop.png",
+        "english": "/tmp/roami-workspace-english-desktop.png"
+      }
+    }
+  },
+  "previousTaskMemoryImplementation": {
+    "acceptance": {
+      "passed": true,
+      "scope": "desktop only",
+      "defaultExpanded": true,
+      "taskAndMemoryOnly": true,
+      "viewports": [
+        1600,
+        1280,
+        1920,
+        1100
+      ],
+      "actualBackend": "Go/Python/SQLite/SSE",
+      "controlledProvider": true,
+      "terminalTasks": "isolated owner-bound SQLite fixtures, no professional agent execution",
+      "realMemoryApi": true,
+      "memorySearchAndSources": true,
+      "emptyMemoryPaginationHidden": true,
+      "taskDetailsDoNotBlockChat": true,
+      "collapseRestoresOnReload": true,
+      "legacyActivityMigratesToTasks": true,
+      "slashCommandsUseRail": true,
+      "narrowDesktopKeepsDialog": true,
+      "english": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    "frontend": {
+      "typecheck": "passed",
+      "i18nKeys": 2999,
+      "hover": "passed",
+      "testFiles": 98,
+      "tests": 704,
+      "build": "passed"
+    },
+    "changedComponents": [
+      "AgentChat",
+      "AgentWorkspaceRail",
+      "useAgentWorkspace",
+      "AgentTasks",
+      "AgentMemory",
+      "agent-workspace.css"
+    ],
+    "removedComponent": "AgentWorkspaceActivity",
+    "screenshots": {
+      "tasks": "/tmp/roami-task-memory-tasks-desktop.png",
+      "memory": "/tmp/roami-task-memory-memory-desktop.png",
+      "details": "/tmp/roami-task-memory-detail-desktop.png",
+      "englishMemory": "/tmp/roami-task-memory-english-memory-desktop.png"
+    },
+    "limitations": [
+      "任务终态使用隔离用户绑定的展示夹具；没有执行真实 Codex / Claude 任务",
+      "任务工具聚合、聊天回执直达详情尚待后续",
+      "手机版按用户前序要求本轮不 review",
+      "未部署到生产服务"
+    ]
+  },
+  "currentImplementation": {
+    "acceptance": {
+      "passed": true,
+      "scope": "desktop only",
+      "museListLayout": true,
+      "noAvatar": true,
+      "realBoundedTaskSummary": true,
+      "lightAndDarkThemes": true,
+      "filtersOnDemand": true,
+      "defaultExpanded": true,
+      "taskAndMemoryOnly": true,
+      "viewports": [
+        1600,
+        1280,
+        1920,
+        1100
+      ],
+      "actualBackend": "Go/Python/SQLite/SSE",
+      "controlledProvider": true,
+      "terminalTasks": "isolated owner-bound SQLite fixtures, no professional agent execution",
+      "realMemoryApi": true,
+      "memorySearchAndSources": true,
+      "emptyMemoryPaginationHidden": true,
+      "taskDetailsDoNotBlockChat": true,
+      "collapseRestoresOnReload": true,
+      "legacyActivityMigratesToTasks": true,
+      "slashCommandsUseRail": true,
+      "narrowDesktopKeepsDialog": true,
+      "english": true,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    "frontend": {
+      "typecheck": "passed",
+      "i18nKeys": 3010,
+      "hover": "passed",
+      "testFiles": 98,
+      "tests": 706,
+      "build": "passed"
+    },
+    "python": {
+      "ruff": "passed",
+      "tests": 576,
+      "boundedCurrentRevisionOwnerScopedSummary": "passed"
+    },
+    "design": "按日期分组、浅底圆角图标、标题 / 摘要 / 时间，去掉独立卡片框；记忆筛选按需展开，保留所有原操作。",
+    "summaryContract": "latestAttempt.summary 仅从当前任务版本的已落库报告提取文本，最多 240 个字符；非文本 / 旧版本不显示，不额外调用模型。",
+    "screenshots": {
+      "tasksLight": "/tmp/roami-muse-lists-tasks-light-panel.png",
+      "memoryLight": "/tmp/roami-muse-lists-memory-light-panel.png",
+      "tasksDark": "/tmp/roami-muse-lists-tasks-desktop.png",
+      "memoryDark": "/tmp/roami-muse-lists-memory-desktop.png"
+    },
+    "limitations": [
+      "截图任务终态来自隔离展示夹具，并未运行真实 Codex / Claude 任务",
+      "只验收桌面；手机沿用前序暂不 review 的范围",
+      "未接入头像；任务级工具聚合和审批仍待后续",
+      "未部署到生产服务"
+    ]
   }
 }

@@ -100,3 +100,23 @@ it('keeps reusable memories separate from daily counts and resets the server pag
   expect(params.get('category')).toBe('activity'); expect(params.get('offset')).toBe('0')
   expect(screen.getAllByText('agent.memoryCountUnknown')).toHaveLength(4)
 })
+
+it('keeps compact memory filters accessible on demand and retains an active filter when collapsed', async () => {
+ vi.mocked(api).mockImplementation(async (_method, path) => {
+  if (path === '/agent/status') return { data: { memoryTimezone: 'UTC' } }
+  if (path.startsWith('/agent/tasks')) return { data: [] }
+  return { data: { items: [{ id: 'memory', title: 'Remembered preference', body: 'Use concise replies', state: 'active', kind: 'preference', source_count: 1 }], total: 1 } }
+ })
+ render(<AgentMemory compact defaultGroup="all" cid="conversation" projects={[]} select={vi.fn()} />)
+ await screen.findByText('Remembered preference')
+ const filters = screen.getByRole('button', { name: 'agent.workspace.filters' })
+ expect(filters.getAttribute('aria-expanded')).toBe('false')
+ expect(screen.getByLabelText('agent.memoryGroup').closest('[hidden]')).toBeTruthy()
+ fireEvent.click(filters)
+ fireEvent.change(screen.getByLabelText('agent.memoryGroup'), { target: { value: 'preference' } })
+ await waitFor(() => expect(vi.mocked(api).mock.calls.some(call => call[1].includes('kind=preference'))).toBe(true))
+ fireEvent.click(filters)
+ expect(filters.getAttribute('aria-expanded')).toBe('false')
+ expect(filters.getAttribute('data-active')).toBe('true')
+ expect(screen.getByRole('button', { name: 'agent.memorySources' })).toBeTruthy()
+})

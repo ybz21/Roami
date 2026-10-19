@@ -10,7 +10,7 @@ export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
 export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
 export type AgentNotice = { id: number; message_id?: string; conversation_id: string; branch_id: string; title: string; content_json: string; created_ms: number }
-export type AgentTask = { id: string; state: string; revision: number; parent_task_id?: string | null; intent_json: string; created_ms?: number; updated_ms?: number; latestAttempt?: { sessionId?: string; executorKind?: string; workspace?: { directory: string; branch?: string }; state: string } | null }
+export type AgentTask = { id: string; state: string; revision: number; parent_task_id?: string | null; intent_json: string; created_ms?: number; updated_ms?: number; latestAttempt?: { sessionId?: string; executorKind?: string; summary?: string | null; workspace?: { directory: string; branch?: string }; state: string } | null }
 
 export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { view: AgentSnapshot; reload: boolean } {
   if (event.id <= view.snapshotCursor) return { view, reload: false }

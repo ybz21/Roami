@@ -1,5 +1,7 @@
 """Authenticated task detail retains execution evidence without exposing another owner's data."""
 
+import json
+
 import httpx
 from test_resource_leases import controller, setup
 from test_runtime import ConversationModel
@@ -154,5 +156,47 @@ async def test_acceptance_rejects_stale_revision_attempt_and_pending_continuatio
                     lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
                 )
             )["state"] == "waiting_user"
+    finally:
+        await runtime.close()
+
+
+async def test_task_list_summary_is_bounded_current_revision_and_owner_scoped(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task, run = await task_run(runtime, conversation, "Summary goal")
+        await runtime.db.call(
+            lambda db: db.execute(
+                "UPDATE task_attempts SET result_json=? WHERE id=?",
+                (json.dumps({"summary": "结论" * 500}), run["id"]),
+            ),
+            write=True,
+        )
+        listed = await runtime.tasks.list("alice", conversation["id"])
+        assert listed[0]["latestAttempt"]["summary"] == "结论" * 120
+        assert await runtime.tasks.list("bob") == []
+        await runtime.db.call(
+            lambda db: db.execute("UPDATE tasks SET revision=2 WHERE id=?", (task["id"],)),
+            write=True,
+        )
+        assert (await runtime.tasks.get("alice", task["id"]))["task"]["latestAttempt"][
+            "summary"
+        ] is None
+        await runtime.db.call(
+            lambda db: db.execute("UPDATE tasks SET revision=1 WHERE id=?", (task["id"],)),
+            write=True,
+        )
+        for malformed in [
+            json.dumps({"summary": True}),
+            json.dumps({"summary": {"unexpected": True}}),
+            json.dumps({"summary": None}),
+        ]:
+            await runtime.db.call(
+                lambda db, malformed=malformed: db.execute(
+                    "UPDATE task_attempts SET result_json=? WHERE id=?", (malformed, run["id"])
+                ),
+                write=True,
+            )
+            assert (await runtime.tasks.list("alice"))[0]["latestAttempt"]["summary"] is None
     finally:
         await runtime.close()

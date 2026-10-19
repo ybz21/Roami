@@ -13,25 +13,25 @@
       "priority": "P0",
       "title": "可收起的桌面工作台",
       "dependency": "已有接口",
-      "proposal": "右侧独立区域，聊天和输入持续可用；宽屏显示，较窄窗口沿用原入口。",
+      "proposal": "桌面右侧首次默认展开，用户可收起并记住状态；本期只显示任务和记忆两个入口，聊天输入持续可用。",
       "referenceTime": "2:43",
       "status": "已实现并验证"
     },
     {
       "id": "R02",
       "priority": "P0",
-      "title": "按时间组织执行动态",
-      "dependency": "已有 SSE",
-      "proposal": "最近 200 条活动按更新时间分组；原聊天中的发生顺序保持。",
+      "title": "按任务组织执行动态",
+      "dependency": "已有任务列表与 SSE",
+      "proposal": "动态与任务合并为任务入口；一条记录对应一个后台任务，展示名称、进度、结果摘要、执行器与时间。工具调用、命令和子 Agent 在所属任务详情展开；普通问答与未归属任务的过程保留在主对话。",
       "referenceTime": "2:43",
-      "status": "已实现并验证"
+      "status": "任务入口已合并；任务级工具聚合待实现"
     },
     {
       "id": "R03",
       "priority": "P0",
-      "title": "待处理任务优先",
+      "title": "时间分组与真实任务状态",
       "dependency": "已有任务列表",
-      "proposal": "需要关注、执行中、近期结束分组，保留失败和待验收的区别。",
+      "proposal": "桌面按更新时间倒序分今天 / 昨天 / 日期；每条对应真实后台任务，状态保留失败、未知、待验收的区别。窄桌面原弹窗仍保留原分组。",
       "referenceTime": "2:43",
       "status": "已实现并验证"
     },
@@ -48,26 +48,26 @@
       "id": "R05",
       "priority": "P0",
       "title": "任务入口统一",
-      "dependency": "已有斜线命令",
-      "proposal": "菜单、/tasks、/memory 和活动条目使用同一工作台。",
+      "dependency": "已有斜线命令与任务标识",
+      "proposal": "菜单、/tasks、聊天回执都进入同一任务入口；回执有 taskId 时直接定位详情。取消独立动态标签，/memory 仍进入记忆。",
       "referenceTime": "2:43",
-      "status": "已实现并验证"
+      "status": "菜单与斜线入口已统一；回执定位待实现"
     },
     {
       "id": "R06",
       "priority": "P0",
-      "title": "工具输入输出按需查看",
-      "dependency": "已有详情接口",
-      "proposal": "列表只展示动作与状态，展开时才读取有界输入输出。",
+      "title": "任务内部按需查看执行过程",
+      "dependency": "已有详情接口；需核对工具与任务的关联",
+      "proposal": "任务详情内折叠展示工具调用、命令、子 Agent、输入输出和产物；仅使用实际关联记录，不将独立工具调用伪造成后台任务。",
       "referenceTime": "1:07",
-      "status": "已实现并验证"
+      "status": "设计已更新，待实现"
     },
     {
       "id": "R07",
       "priority": "P0",
       "title": "统一记忆就近可查",
       "dependency": "已有记忆目录",
-      "proposal": "侧栏查看真实保存内容和来源；不将目录冒充本轮召回证据。",
+      "proposal": "记忆使用与任务一致的列表排版，保留搜索、按需展开的筛选、来源与内容展开；不将记忆目录冒充本轮召回证据。",
       "referenceTime": "5:16",
       "status": "已实现并验证"
     },
@@ -78,14 +78,14 @@
       "dependency": "已有提醒接口",
       "proposal": "显示已存在的提醒、时区与下次运行时间，复用取消和来源跳转。",
       "referenceTime": "4:30",
-      "status": "已实现并验证"
+      "status": "现有通知入口保留；独立标签暂缓"
     },
     {
       "id": "R09",
       "priority": "P0",
-      "title": "侧栏状态记住",
+      "title": "保存并迁移侧栏状态",
       "dependency": "浏览器本地状态",
-      "proposal": "节点分别保存展开状态和标签，首屏直接恢复。",
+      "proposal": "节点分别保存展开状态和标签，首次默认展开任务；旧 activity / reminders 标签映射到 tasks，保留已保存的收起状态与 memory 标签。",
       "referenceTime": "2:43",
       "status": "已实现并验证"
     },
@@ -193,9 +193,9 @@
       "priority": "需确认",
       "title": "动作预览与授权卡",
       "dependency": "新增审批绑定协议",
-      "proposal": "对用户要求确认的动作展示目标和参数摘要，决定需绑定 task / revision / 幂等键。",
+      "proposal": "审批入口集中展示真正待决定的动作与目标、参数摘要，决定需绑定 task / revision / 幂等键；已授权的常规 CLI 派活不重复确认，任务待验收仍属于任务状态。",
       "referenceTime": "4:21",
-      "status": "等待决策"
+      "status": "等待协议决策，示意占位"
     },
     {
       "id": "R22",
@@ -224,5 +224,19 @@
       "referenceTime": "0:30",
       "status": "等待决策"
     }
-  ]
+  ],
+  "designRevision": {
+    "date": "2026-10-19",
+    "decision": "用户要求按 Muse 复刻展示列表；先不制作头像，保留任务与记忆双入口。",
+    "navigation": [
+      "任务",
+      "记忆"
+    ],
+    "implementationBaseline": "fc57a07",
+    "scope": "桌面列表复刻：时间分组、浅底图标、标题 / 报告摘要 / 时间；无独立卡片框，记忆筛选按需展开。未改动已批准的 Agent 框架架构。",
+    "futureNavigation": [
+      "审批（待协议确认）",
+      "定时（仍可从原通知入口访问）"
+    ]
+  }
 }
