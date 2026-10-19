@@ -558,6 +558,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         timezone: str | None = None,
         kind: Literal["fact", "decision", "preference", "summary"] | None = None,
         personalOnly: bool = False,
+        category: Literal["all", "knowledge", "activity"] = "all",
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
     ):
@@ -576,6 +577,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 timezone=timezone,
                 kind=kind,
                 personal_only=personalOnly,
+                category=category,
                 limit=limit,
                 offset=offset,
             )

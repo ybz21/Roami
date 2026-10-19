@@ -24,11 +24,14 @@ class MemoryCatalog:
         timezone=None,
         kind=None,
         personal_only=False,
+        category="all",
         limit=20,
         offset=0,
     ):
         if state not in {"active", "candidate", "conflict"}:
             raise DomainError("INVALID_MEMORY_STATE")
+        if category not in {"all", "knowledge", "activity"}:
+            raise DomainError("INVALID_MEMORY_CATEGORY")
         limit, offset = min(max(limit, 1), 100), max(offset, 0)
 
         def read(db):
@@ -46,6 +49,10 @@ class MemoryCatalog:
                 if value is not None:
                     conditions.append(f"r.{column}=?")
                     args.append(value)
+            if category != "all":
+                conditions.append(
+                    "r.day_key IS " + ("NOT NULL" if category == "activity" else "NULL")
+                )
             if personal_only:
                 conditions.extend(
                     f"r.{column} IS NULL"
@@ -81,13 +88,18 @@ class MemoryCatalog:
             total = row(db, "SELECT COUNT(*) AS total FROM memory_records r WHERE " + where, args)[
                 "total"
             ]
+            ordering = (
+                "r.day_key DESC,r.updated_ms DESC,r.id"
+                if category == "activity"
+                else "r.updated_ms DESC,r.id"
+            )
             items = rows(
                 db,
                 "SELECT r.*,c.title AS conversation_title,json_extract(t.intent_json,'$.goal') AS task_title,"
                 "(SELECT COUNT(*) FROM memory_sources s WHERE s.memory_id=r.id) AS source_count "
                 "FROM memory_records r LEFT JOIN conversations c ON c.id=r.conversation_id AND c.owner_id=r.owner_id "
                 "LEFT JOIN tasks t ON t.id=r.task_id AND t.owner_id=r.owner_id "
-                "WHERE " + where + " ORDER BY r.updated_ms DESC,r.id LIMIT ? OFFSET ?",
+                "WHERE " + where + " ORDER BY " + ordering + " LIMIT ? OFFSET ?",
                 (*args, limit, offset),
             )
             return {"items": items, "total": total, "offset": offset, "limit": limit}

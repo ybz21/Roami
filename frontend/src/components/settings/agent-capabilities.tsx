@@ -12,7 +12,7 @@ type Tool = { name: string; description: string; schema: unknown; effect: string
 type Server = { name: string; transport: string; state: string; tools: number }
 type CliGroup = { name: string; commands: { name: string; description: string; enabled: boolean; mutable?: boolean; source?: string }[] }
 type CapabilityTab = 'tools' | 'mcp' | 'skills' | 'cli'
-const capabilityTabs: CapabilityTab[] = ['tools', 'mcp', 'skills', 'cli']
+const capabilityTabs: CapabilityTab[] = ['skills', 'cli', 'mcp', 'tools']
 type Catalog = { skills: Skill[]; tools: Tool[]; mcp: Server[]; cli?: CliGroup[] }
 const foundations = new Set(['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user'])
 export function AgentCapabilities({ kind }: { kind?: CapabilityTab }) {
@@ -22,7 +22,7 @@ export function AgentCapabilities({ kind }: { kind?: CapabilityTab }) {
 function CapabilityManager({ initialTab }: { initialTab?: CapabilityTab }) {
   const { t } = useI18n()
   const legacyTab = location.hash.split('/').pop() as CapabilityTab
-  const requested = initialTab || (capabilityTabs.includes(legacyTab) ? legacyTab : 'tools')
+  const requested = initialTab || (capabilityTabs.includes(legacyTab) ? legacyTab : 'skills')
   const [active, setActive] = useState<CapabilityTab>(requested)
   useEffect(() => setActive(requested), [requested])
   return <div className="agent-capability-manager"><Tabs activeKey={active} onChange={key => setActive(key as CapabilityTab)} destroyInactiveTabPane items={capabilityTabs.map(tab => ({ key: tab, label: t(`agent.capabilities.tab.${tab}`), children: <CapabilityList kind={tab} /> }))} /></div>

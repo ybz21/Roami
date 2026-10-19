@@ -57,7 +57,7 @@ it('shows seven tools and manages business operations in a separate CLI tab', as
   vi.mocked(api).mockResolvedValue({ data })
   const { container } = render(<AgentCapabilities kind="tools" />)
   await screen.findByText('tool_list')
-  expect(screen.getAllByRole('tab')).toHaveLength(4)
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['skills', 'cli', 'mcp', 'tools'].map(tab => 'agent.capabilities.tab.' + tab))
   expect(screen.queryAllByRole('switch')).toHaveLength(0)
   expect(screen.getAllByText('agent.capabilities.builtinFixed')).toHaveLength(7)
   expect(Array.from(container.querySelector('.agent-capability-grid')!.querySelectorAll('.agent-capability-heading strong')).map(node => node.textContent)).toEqual(names)

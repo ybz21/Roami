@@ -10,7 +10,9 @@ vi.mock('../markdown/Markdown', () => ({ default: ({ children }: any) => <div>{c
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: { error: vi.fn() }, modal: { confirm: vi.fn() } }) },
   Button: ({ children, loading: _loading, danger: _danger, ...props }: any) => <button {...props}>{children}</button>,
-  Input: { Search: (props: any) => <input {...props} /> },
+  Input: Object.assign((props: any) => <input {...props} />, { Search: (props: any) => <input {...props} /> }),
+  Dropdown: ({ children }: any) => children,
+  Tabs: ({ items, activeKey, onChange }: any) => <div role="tablist">{items.map((item: any) => <button type="button" role="tab" key={item.key} aria-selected={item.key === activeKey} onClick={() => onChange(item.key)}>{item.label}</button>)}</div>,
   Modal: ({ open, children }: any) => open ? <div role="dialog">{children}</div> : null,
   Select: ({ options, onChange, ...props }: any) => <select {...props} onChange={(e) => onChange(e.target.value)}>{options.map((option: any) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
   Spin: () => <span role="progressbar" />,
@@ -76,4 +78,25 @@ it('opens the exact source message of a personal memory and keeps the management
   await screen.findByText('Original user preference')
   fireEvent.click(screen.getByText('agent.memoryOpenSource'))
   expect(select).toHaveBeenCalledWith('source-conversation', 'source-branch', 'source-message')
+})
+
+it('keeps reusable memories separate from daily counts and resets the server page when switching views', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/status') return { data: { memoryTimezone: 'UTC' } }
+    const daily = new URLSearchParams(path.split('?')[1]).get('category') === 'activity'
+    return { data: { items: daily ? [{ id: 'daily', title: 'Daily counters', body: JSON.stringify({ scopeKey: 'unassigned', counts: { userTurns: 31, tasksCreated: 6 } }), state: 'active', kind: 'summary', day_key: '2026-10-18', source_count: 4 }] : [{ id: 'preference', title: 'Writing preference', body: 'Use concise replies', state: 'active', kind: 'preference', source_count: 1 }], total: daily ? 1 : 21 } }
+  })
+  render(<AgentMemory fullPage projects={[]} select={vi.fn()} />)
+  await screen.findByText('Writing preference')
+  expect(vi.mocked(api).mock.calls.filter(call => call[1].includes('/catalog?')).pop()![1]).toContain('category=knowledge')
+  expect(screen.queryByText('Daily counters')).toBeNull()
+  fireEvent.click(screen.getByText('agent.memoryNext'))
+  await waitFor(() => expect(vi.mocked(api).mock.calls.slice(-1)[0]![1]).toContain('offset=20'))
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.memoryView.activity' }))
+  await screen.findByText('31')
+  expect(screen.queryByText('Writing preference')).toBeNull()
+  expect(screen.getByText('2026-10-18')).toBeTruthy()
+  const params = new URLSearchParams(vi.mocked(api).mock.calls.slice(-1)[0]![1].split('?')[1])
+  expect(params.get('category')).toBe('activity'); expect(params.get('offset')).toBe('0')
+  expect(screen.getAllByText('agent.memoryCountUnknown')).toHaveLength(4)
 })

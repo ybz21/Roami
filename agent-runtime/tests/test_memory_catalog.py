@@ -157,3 +157,43 @@ async def test_catalog_task_filter_exposes_the_human_readable_goal(store):
     assert result["total"] == 1
     assert result["items"][0]["id"] == saved["id"]
     assert result["items"][0]["task_title"] == "检查统一记忆"
+
+
+async def test_catalog_categories_filter_before_counting_pagination_and_http(store):
+    memory = Memories(store)
+    _, receipt, _ = await source(store)
+    facts = []
+    for index in range(2):
+        facts.append(
+            await memory.save("alice", f"Fact {index}", "Remember this", receipt["messageId"])
+        )
+    daily = []
+    for day in ["2026-10-18", "2026-10-17"]:
+        daily.append(
+            await memory.save(
+                "alice",
+                "Daily",
+                '{"counts":{"userTurns":3}}',
+                receipt["messageId"],
+                kind="summary",
+                day_key=day,
+            )
+        )
+    assert (await memory.catalog.list("alice"))["total"] == 4
+    knowledge = await memory.catalog.list("alice", category="knowledge", limit=1, offset=1)
+    assert knowledge["total"] == 2 and len(knowledge["items"]) == 1
+    assert knowledge["items"][0]["id"] in {item["id"] for item in facts}
+    activity = await memory.catalog.list("alice", category="activity")
+    assert [item["id"] for item in activity["items"]] == [item["id"] for item in daily]
+    assert (await memory.catalog.list("bob", category="knowledge"))["total"] == 0
+    runtime = Runtime(store, ConversationModel())
+    try:
+        transport = httpx.ASGITransport(app=create_app(runtime))
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test", headers={"X-Roami-Owner": "alice"}
+        ) as client:
+            response = await client.get("/v1/memories/catalog?category=knowledge&limit=1")
+            assert response.json()["data"]["total"] == 2
+            assert (await client.get("/v1/memories/catalog?category=invalid")).status_code == 422
+    finally:
+        await runtime.close()

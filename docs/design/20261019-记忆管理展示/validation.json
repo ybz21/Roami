@@ -1,0 +1,73 @@
+{
+  "passed": true,
+  "environment": "isolated real Go/Python/SQLite; seeded source-backed records through real APIs",
+  "knowledgeCount": 4,
+  "activityGroupedByDate": true,
+  "sourceOpened": true,
+  "destructiveActionsInMenu": true,
+  "search": true,
+  "capabilityOrder": [
+    "Skill",
+    "CLI",
+    "MCP",
+    "工具"
+  ],
+  "defaultCapability": "Skill",
+  "phone": "Redmi Note 8 actual touch",
+  "phoneFourTabs": true,
+  "horizontalOverflow": false,
+  "date": "2026-10-19",
+  "checks": {
+    "focusedMemoryPythonTests": 5,
+    "frontendFiles": 97,
+    "frontendTests": 691,
+    "typecheck": "passed",
+    "i18nKeys": 2972,
+    "hover": "passed",
+    "build": "passed",
+    "fullQualityGate": "passed",
+    "pythonTests": 575,
+    "fullQualityLog": "/tmp/roami-pr-final-quality.log",
+    "frontendLog": "/tmp/roami-memory-vitest.log",
+    "finalFrontendBuildLog": "/tmp/roami-memory-build.log"
+  },
+  "screenshots": [
+    "/tmp/roami-memory-after-phone.png",
+    "/tmp/roami-memory-before-desktop.png",
+    "/tmp/roami-memory-actions-desktop.png",
+    "/tmp/roami-memory-source-desktop.png",
+    "/tmp/roami-memory-source-phone.png",
+    "/tmp/roami-memory-actions-phone.png",
+    "/tmp/roami-memory-activity-desktop.png",
+    "/tmp/roami-memory-after-desktop.png",
+    "/tmp/roami-memory-english-desktop.png",
+    "/tmp/roami-memory-activity-phone.png",
+    "/tmp/roami-memory-before-phone.png",
+    "/tmp/roami-capabilities-order-desktop.png",
+    "/tmp/roami-capabilities-order-phone.png"
+  ],
+  "deployment": "not deployed",
+  "files": [
+    "agent-runtime/src/roami_agent/memory/catalog.py",
+    "agent-runtime/src/roami_agent/server/http.py",
+    "agent-runtime/tests/test_memory_catalog.py",
+    "docs/design/20261017-agent框架设计/README.md",
+    "docs/design/20261019-记忆管理展示/README.md",
+    "docs/design/20261019-记忆管理展示/index.html",
+    "docs/design/20261019-记忆管理展示/validation.json",
+    "frontend/src/components/agent/AgentMemory.tsx",
+    "frontend/src/components/agent/AgentMemoryCard.tsx",
+    "frontend/src/components/agent/agent-memory.css",
+    "frontend/src/components/agent/agent-memory.test.tsx",
+    "frontend/src/components/settings/agent-capabilities.test.tsx",
+    "frontend/src/components/settings/agent-capabilities.tsx",
+    "frontend/src/i18n/locales/en-US.ts",
+    "frontend/src/i18n/locales/zh-CN.ts"
+  ],
+  "finalLayout": "Removed duplicate mobile explanation; source-backed content is visible earlier.",
+  "cleanup": {
+    "productionMemoriesModified": false,
+    "isolatedInstanceStopped": true,
+    "addedPhoneReverseRemoved": true
+  }
+}
