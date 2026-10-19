@@ -2,12 +2,15 @@ import { agentTimeline, groupAgentTimeline } from './agent-timeline'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
-import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, RefreshIcon, StopIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PanelRightIcon, RefreshIcon, StopIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
 import AgentTasks from './AgentTasks'
+import AgentWorkspaceRail from './AgentWorkspaceRail'
+import { useAgentWorkspace } from './useAgentWorkspace'
+import './agent-workspace.css'
 import { useAgentThread } from './useAgentThread'
 import { useAgentDraft } from './useAgentDraft'
 import { useAgentMessageFocus } from './useAgentMessageFocus'
@@ -34,11 +37,18 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   select: (cid: string, branch?: string, message?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
 }) {
-  const { t } = useI18n(), { phone, landscape } = useLayout(), { message } = App.useApp()
+  const { t } = useI18n(), { phone, landscape, size } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch)
+  const workspace = useAgentWorkspace(node), wide = size === 'large'
+  const [workspaceTask, setWorkspaceTask] = useState('')
+  const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
+  const showPanel = (next: 'tasks' | 'memory' | 'context') => {
+    if (wide && next !== 'context') { workspace.change({ open: true, tab: next }); setWorkspaceTask(''); setPanel(null) }
+    else setPanel(next)
+  }
   const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
   const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
   const [source, setSource] = useState<AgentMessage | null>(null)
@@ -88,7 +98,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   }, [cid, mainCID, branch, focusMessage, mirror, select])
 
   useEffect(() => {
-    stick.current = true; setError(''); setPanel(null); setSource(null); panelRequest.current++
+    stick.current = true; setError(''); setWorkspaceTask(''); setPanel(null); setSource(null); panelRequest.current++
     if (!sendingRef.current || pending.current?.cid !== cid) {
       setTarget('direct')
     }
@@ -142,14 +152,14 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
       if (destination !== 'direct' && !value.startsWith('/')) {
         await api('POST', '/agent/tasks', { conversationId: origin, goal: value, requestKey: request.key, executor,
           target: destination === 'loose' ? { kind: 'new_session' } : { kind: 'project', projectId: destination.slice(8) } })
-        if (current()) { setTarget('direct'); setPanel('tasks') }
+        if (current()) { setTarget('direct'); showPanel('tasks') }
       } else {
         const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: value, attachmentIds: request.attachmentIds })
         if (request.attachmentIds.length) attachments.clear(request.scope)
         if (!current()) { inbox.refresh(); return }
-        if (data.kind === 'ui_action') setPanel(data.action === 'tasks' ? 'tasks' : 'memory')
-        else if (data.kind === 'commands') setPanel('context')
-        else if (data.kind === 'status' || data.kind === 'compaction') setPanel('context')
+        if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
+        else if (data.kind === 'commands') showPanel('context')
+        else if (data.kind === 'status' || data.kind === 'compaction') showPanel('context')
         else if (data.kind === 'message' && origin === cid) thread.accepted(data, value)
       }
       if (!current()) { inbox.refresh(); return }
@@ -190,7 +200,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const sendDraft = () => { if (queueDraft) enqueue(); else void submit() }
   const composerActions = {
     contextUsage: { cid: historical ? '' : cid, model: `${models.settings?.main.model || ''}:${models.settings?.main.contextWindow || ''}`, revision: `${thread.view?.turns.map(turn => turn.id + ':' + turn.state).join(',')}:${thread.view?.messages[thread.view.messages.length - 1]?.id}:${thread.view?.messages[thread.view.messages.length - 1]?.status}:${compact?.state}`, active: running || compacting },
-    onContext: () => setPanel('context'),
+    onContext: () => showPanel('context'),
     models, node, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
     canDelegate: !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: () => setTarget('loose'),
     onCompact: () => { void submit('/compact', false) },
@@ -202,16 +212,17 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     { key: 'context', label: t('agent.context'), icon: <ArchiveIcon size={16} /> },
     { key: 'overview', label: t('agent.overview'), icon: <BotIcon size={16} /> },
-  ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else setPanel(key as 'tasks' | 'memory' | 'context') } }
+  ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else showPanel(key as 'tasks' | 'memory' | 'context') } }
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const title = 'Roami'
   const latestUserSeq = Math.max(0, ...bodies.filter(m => m.role === 'user').map(m => m.seq))
 
-  return <section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
+  return <div className="agent-workspace"><section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
     <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
+      {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: !workspace.open })}><PanelRightIcon size={18} />{t('agent.workspace.title')}</button>}
       <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
       <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
     </div></header>
@@ -284,4 +295,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
+  {wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} branch={thread.view?.branchId || branch} activities={activity} connected={thread.connected} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  </div>
 }

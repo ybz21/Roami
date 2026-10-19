@@ -33,6 +33,6 @@ export function useAgentTask(id: string) {
     ]).finally(() => { clearTimeout(timeout); if (!cancelled) pending.current = false })
     return () => { cancelled = true; clearTimeout(timeout); controller.abort(); pending.current = false }
   }, [id, version])
-  useEffect(() => { const timer = setInterval(() => { if (!pending.current) refresh() }, 3000); return () => clearInterval(timer) }, [refresh])
+  useEffect(() => { const timer = setInterval(() => { if (!pending.current && document.visibilityState === 'visible') refresh() }, 3000); return () => clearInterval(timer) }, [refresh])
   return { detail, controls, artifacts, version, refresh }
 }

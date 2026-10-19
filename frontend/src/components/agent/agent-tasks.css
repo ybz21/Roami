@@ -41,3 +41,7 @@ html[data-pointer="coarse"] .agent-tasks .tt-act::after { content:''; position:a
 .agent-task-requirements b { display:block; font-weight:500; color:var(--text-dim); margin-bottom:var(--sp-1); }
 .agent-task-requirements.clipped { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
 .agent-task-artifact small { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+
+.agent-task-list-group h4 { display:flex; align-items:center; gap:var(--sp-2); margin:var(--sp-3) 0 var(--sp-1); color:var(--text-dim); font-size:var(--fs-sm); font-weight:500; }
+.agent-task-list-group h4 > span { color:var(--text-dimmer); font-size:var(--fs-meta); }
+.agent-task-link time { margin-left:var(--sp-2); }

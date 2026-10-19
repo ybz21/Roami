@@ -14,10 +14,10 @@ function today(timezone: string) {
   return ['year', 'month', 'day'].map((name) => parts.find((part) => part.type === name)?.value).join('-')
 }
 
-export default function AgentMemory({ cid = '', projects, select, fullPage = false }: { cid?: string; fullPage?: boolean; projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void }) {
+export default function AgentMemory({ cid = '', projects, select, fullPage = false, defaultGroup }: { cid?: string; fullPage?: boolean; defaultGroup?: Group; projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void }) {
   const { t, locale } = useI18n(), { message, modal } = App.useApp()
   const [category, setCategory] = useState<'knowledge' | 'activity'>('knowledge')
-  const [group, setGroup] = useState<Group>(cid ? 'conversation' : 'all'), [state, setState] = useState('active')
+  const [group, setGroup] = useState<Group>(defaultGroup || (cid ? 'conversation' : 'all')), [state, setState] = useState('active')
   const [page, setPage] = useState(0), [total, setTotal] = useState(0)
   const [query, setQuery] = useState(''), [project, setProject] = useState(''), [task, setTask] = useState('')
   const [date, setDate] = useState(''), [timezone, setTimezone] = useState('')

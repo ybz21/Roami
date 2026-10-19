@@ -13,3 +13,10 @@ export type TaskControls = { resources: TaskResource[]; resourcesTruncated: bool
 export function taskGoal(task: AgentTask): string {
   try { const intent = JSON.parse(task.intent_json); const goal = intent.initialIntent?.goal || intent.goal; return typeof goal === 'string' ? goal : task.id } catch { return task.id }
 }
+
+export function taskExecutor(task: AgentTask): 'native' | 'codex' | 'claude' | null {
+  const kind = task.latestAttempt?.executorKind
+  if (kind === 'native' || kind === 'codex' || kind === 'claude') return kind
+  if (kind !== 'cli') return null
+  try { const executor = JSON.parse(task.intent_json).executor; return executor === 'codex' || executor === 'claude' ? executor : null } catch { return null }
+}

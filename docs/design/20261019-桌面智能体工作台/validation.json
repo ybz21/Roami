@@ -1,0 +1,67 @@
+{
+  "passed": true,
+  "scope": "desktop only",
+  "viewports": [
+    1600,
+    1280,
+    1920,
+    1100
+  ],
+  "actualBackend": "Go/Python/SQLite/SSE",
+  "controlledProvider": true,
+  "realRoamiCliExecution": true,
+  "controlledCliDelay": true,
+  "liveStateTransition": true,
+  "unknownVisible": true,
+  "taskHistoryFixtures": true,
+  "taskDetailsDoNotBlockChat": true,
+  "reminderRealApi": true,
+  "memoryRealApi": true,
+  "inputOutputOnDemand": true,
+  "collapseRestoresOnReload": true,
+  "slashCommandsUseRail": true,
+  "narrowDesktopKeepsDialog": true,
+  "english": true,
+  "horizontalOverflow": false,
+  "date": "2026-10-19",
+  "frontend": {
+    "typecheck": "passed",
+    "i18nKeys": 3009,
+    "hover": "passed",
+    "vitestFiles": 98,
+    "vitestTests": 703,
+    "build": "passed",
+    "warnings": "现有大块产物与动态/静态混合导入警告"
+  },
+  "qualityFull": {
+    "go": "passed",
+    "pythonTests": 575,
+    "ruff": "passed",
+    "result": "passed"
+  },
+  "report": {
+    "items": 24,
+    "priorityCounts": [
+      10,
+      9,
+      5
+    ],
+    "filtersAndDemoInteractions": "passed"
+  },
+  "fixtureBoundary": "受控模型响应；CLI 确实运行 project ls --json，隔离 CLI 加 2 秒延迟用于观测进行中状态，不用于性能结论。终态任务与未知工具结果是绑定隔离用户/来源的 SQLite 展示夹具；记忆和提醒由真实 API 写入。未启动真实 Codex/Claude 任务。",
+  "scopeLimits": [
+    "手机版按用户前序要求本轮不 review",
+    "未接入 Gmail 等外部账号",
+    "P1 九项与需确认五项尚未实施",
+    "旧框架 goal 为系统暂停状态，无法通过工具恢复或创建替代目标"
+  ],
+  "screenshots": {
+    "after": "/tmp/roami-workspace-after-desktop.png",
+    "tasks": "/tmp/roami-workspace-tasks-desktop.png",
+    "detail-chat": "/tmp/roami-workspace-detail-chat-desktop.png",
+    "schedule": "/tmp/roami-workspace-schedule-desktop.png",
+    "memory": "/tmp/roami-workspace-memory-desktop.png",
+    "tool-details": "/tmp/roami-workspace-tool-details-desktop.png",
+    "english": "/tmp/roami-workspace-english-desktop.png"
+  }
+}

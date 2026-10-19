@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, RefreshIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
-import { taskGoal } from './agent-task-protocol'
+import { taskExecutor, taskGoal } from './agent-task-protocol'
 import { useAgentTask } from './useAgentTask'
 import './agent-tasks.css'
 
@@ -20,11 +20,13 @@ function failure(code: string | undefined, t: (key: string) => string) {
   return t('agent.requestFailed')
 }
 
-type Props = { cid: string; onSession: (id: string) => void; onChanged: () => void }
+type Props = { cid: string; onSession: (id: string) => void; onChanged: () => void; selectedTask?: string; onSelectTask?: (id: string) => void }
 
-export default function AgentTasks({ cid, onSession, onChanged }: Props) {
-  const { t } = useI18n()
-  const [tasks, setTasks] = useState<AgentTask[]>([]), [selected, setSelected] = useState('')
+export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask }: Props) {
+  const { t, locale } = useI18n()
+  const [tasks, setTasks] = useState<AgentTask[]>([]), [localSelected, setLocalSelected] = useState('')
+  const selected = selectedTask ?? localSelected
+  const setSelected = (id: string) => { if (onSelectTask) onSelectTask(id); else setLocalSelected(id) }
   const [failed, setFailed] = useState(false), [loading, setLoading] = useState(true), [version, setVersion] = useState(0)
   useEffect(() => {
     if (!cid || selected) { setLoading(false); return }
@@ -36,15 +38,21 @@ export default function AgentTasks({ cid, onSession, onChanged }: Props) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true; controller.abort() }
   }, [cid, selected, version])
-  useEffect(() => { const timer = setInterval(() => setVersion((value) => value + 1), 3000); return () => clearInterval(timer) }, [])
+  useEffect(() => { const timer = setInterval(() => { if (document.visibilityState === 'visible') setVersion((value) => value + 1) }, 3000); return () => clearInterval(timer) }, [])
+  const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   return <div className="agent-tasks">
     {selected ? <TaskInspector key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
       <div className="agent-task-section-head"><span className="agent-muted">{t('agent.task.listHint')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
       {!loading && !failed && !tasks.length && <p className="agent-muted">{t('agent.noTasks')}</p>}
-      {tasks.filter((task) => !task.parent_task_id || !tasks.some((parent) => parent.id === task.parent_task_id)).map((task) => <button type="button" className="agent-task-link" key={task.id} onClick={() => setSelected(task.id)}>
-        <span><b>{taskGoal(task)}</b><small>{t('agent.state.' + task.state)}{task.revision > 1 && t('agent.task.revision', { n: task.revision })}</small></span><ChevronRight />
-      </button>)}
+      {(['attention', 'active', 'recent'] as const).map(group => {
+        const current = roots.filter(task => (['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(task.state) ? 'active' : ['succeeded', 'cancelled'].includes(task.state) ? 'recent' : 'attention') === group)
+          .sort((a, b) => (b.updated_ms || b.created_ms || 0) - (a.updated_ms || a.created_ms || 0))
+        if (!current.length) return null
+        return <section className="agent-task-list-group" key={group}><h4>{t('agent.workspace.taskGroup.' + group)}<span>{current.length}</span></h4>{current.map(task => { const executor = taskExecutor(task); const time = typeof task.updated_ms === 'number' && Number.isFinite(task.updated_ms) && task.updated_ms > 0 ? new Date(task.updated_ms) : null; return <button type="button" className="agent-task-link" key={task.id} onClick={() => setSelected(task.id)}>
+          <span><b>{taskGoal(task)}</b><small>{t('agent.state.' + (['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'))}{task.revision > 1 && t('agent.task.revision', { n: task.revision })}</small>{(executor || time) && <small>{executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>}</span><ChevronRight />
+        </button> })}</section>
+      })}
     </>}
   </div>
 }

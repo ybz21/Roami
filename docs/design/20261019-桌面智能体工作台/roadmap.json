@@ -1,0 +1,228 @@
+{
+  "reference": {
+    "title": "How to Use Meta Muse",
+    "author": "Kevin Stratvert",
+    "url": "https://www.youtube.com/watch?v=xBSLmwVTsRc",
+    "durationSeconds": 478,
+    "reviewed": "完整字幕及关键操作帧；视频仅作交互参考，不代表对演示服务端能力的独立验证。"
+  },
+  "scope": "桌面优先；首批复用既有接口，新的鉴权与审批契约需确认。",
+  "items": [
+    {
+      "id": "R01",
+      "priority": "P0",
+      "title": "可收起的桌面工作台",
+      "dependency": "已有接口",
+      "proposal": "右侧独立区域，聊天和输入持续可用；宽屏显示，较窄窗口沿用原入口。",
+      "referenceTime": "2:43",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R02",
+      "priority": "P0",
+      "title": "按时间组织执行动态",
+      "dependency": "已有 SSE",
+      "proposal": "最近 200 条活动按更新时间分组；原聊天中的发生顺序保持。",
+      "referenceTime": "2:43",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R03",
+      "priority": "P0",
+      "title": "待处理任务优先",
+      "dependency": "已有任务列表",
+      "proposal": "需要关注、执行中、近期结束分组，保留失败和待验收的区别。",
+      "referenceTime": "2:43",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R04",
+      "priority": "P0",
+      "title": "任务详情就地打开",
+      "dependency": "已有任务详情",
+      "proposal": "在侧栏查看结果、继续要求、子任务及产物，不用弹窗挡住聊天。",
+      "referenceTime": "2:43",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R05",
+      "priority": "P0",
+      "title": "任务入口统一",
+      "dependency": "已有斜线命令",
+      "proposal": "菜单、/tasks、/memory 和活动条目使用同一工作台。",
+      "referenceTime": "2:43",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R06",
+      "priority": "P0",
+      "title": "工具输入输出按需查看",
+      "dependency": "已有详情接口",
+      "proposal": "列表只展示动作与状态，展开时才读取有界输入输出。",
+      "referenceTime": "1:07",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R07",
+      "priority": "P0",
+      "title": "统一记忆就近可查",
+      "dependency": "已有记忆目录",
+      "proposal": "侧栏查看真实保存内容和来源；不将目录冒充本轮召回证据。",
+      "referenceTime": "5:16",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R08",
+      "priority": "P0",
+      "title": "定时提醒集中管理",
+      "dependency": "已有提醒接口",
+      "proposal": "显示已存在的提醒、时区与下次运行时间，复用取消和来源跳转。",
+      "referenceTime": "4:30",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R09",
+      "priority": "P0",
+      "title": "侧栏状态记住",
+      "dependency": "浏览器本地状态",
+      "proposal": "节点分别保存展开状态和标签，首屏直接恢复。",
+      "referenceTime": "2:43",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R10",
+      "priority": "P0",
+      "title": "真实状态与连接层级",
+      "dependency": "已有状态协议",
+      "proposal": "已委派、待确认、失败、未知单独显示；消息流连通仅说明流连接。",
+      "referenceTime": "4:21",
+      "status": "已实现并验证"
+    },
+    {
+      "id": "R11",
+      "priority": "P1",
+      "title": "回复中的任务回执卡",
+      "dependency": "少量前端工作",
+      "proposal": "主回复内给简短任务回执和明确的查看入口，展示实际报告摘要。",
+      "referenceTime": "4:30",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R12",
+      "priority": "P1",
+      "title": "自动记忆写入反馈",
+      "dependency": "需要可见写入事件",
+      "proposal": "告诉用户刚记住什么、适用范围与来源；只在真实落库后提示。",
+      "referenceTime": "5:16",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R13",
+      "priority": "P1",
+      "title": "输入区附件体验",
+      "dependency": "已有附件协议",
+      "proposal": "统一文件托盘、上传状态、图片预览与错误重试，保留本地图片压缩。",
+      "referenceTime": "5:53",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R14",
+      "priority": "P1",
+      "title": "成果列表与预览",
+      "dependency": "已有单任务产物接口",
+      "proposal": "按任务汇总真实文件，支持预览、下载与打开专业会话。",
+      "referenceTime": "5:53",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R15",
+      "priority": "P1",
+      "title": "能力示例与任务模板",
+      "dependency": "需要整理可用能力",
+      "proposal": "单独提供可执行示例，选择后先填草稿；不在常年主对话反复展示引导。",
+      "referenceTime": "6:29",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R16",
+      "priority": "P1",
+      "title": "任务、记忆、文件联合搜索",
+      "dependency": "需要确定查询覆盖范围",
+      "proposal": "区分当前会话与全局，完整检索需服务端分页或索引，不能拿最近 200 条充当全量。",
+      "referenceTime": "6:29",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R17",
+      "priority": "P1",
+      "title": "连接器式能力目录",
+      "dependency": "已有 Skill / CLI / MCP 目录",
+      "proposal": "说明能干什么、来源、安装与可用状态，沿用内置不可启停的约束。",
+      "referenceTime": "2:53",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R18",
+      "priority": "P1",
+      "title": "执行链耗时视图",
+      "dependency": "已有 trace 与时间戳",
+      "proposal": "区分排队、模型等待、工具执行与委派等待，缺失的耗时标记未知。",
+      "referenceTime": "1:07",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R19",
+      "priority": "P1",
+      "title": "模型与执行器用量",
+      "dependency": "需要核对供应商数据",
+      "proposal": "展示实际 token / 配额 / 余额来源；无价格或无官方用量时不估成已知。",
+      "referenceTime": "7:12",
+      "status": "建议下一批"
+    },
+    {
+      "id": "R20",
+      "priority": "需确认",
+      "title": "条件监控与主动提醒",
+      "dependency": "新增条件状态与去重协议",
+      "proposal": "在原定时机制上定义检查条件、触发通知与冷却，不能只靠文本描述承诺监控。",
+      "referenceTime": "4:30",
+      "status": "等待决策"
+    },
+    {
+      "id": "R21",
+      "priority": "需确认",
+      "title": "动作预览与授权卡",
+      "dependency": "新增审批绑定协议",
+      "proposal": "对用户要求确认的动作展示目标和参数摘要，决定需绑定 task / revision / 幂等键。",
+      "referenceTime": "4:21",
+      "status": "等待决策"
+    },
+    {
+      "id": "R22",
+      "priority": "需确认",
+      "title": "外部账号连接",
+      "dependency": "新增 OAuth / 密钥存储边界",
+      "proposal": "Gmail、Calendar 等需要定义账号权限、撤销和私有存储，不自动接入用户账号。",
+      "referenceTime": "2:53",
+      "status": "等待决策"
+    },
+    {
+      "id": "R23",
+      "priority": "需确认",
+      "title": "助手个性化资料",
+      "dependency": "产品偏好决策",
+      "proposal": "昵称和形象可选，先确认是否纳入本轮；执行器身份与权限不能由外观替代。",
+      "referenceTime": "0:55",
+      "status": "等待决策"
+    },
+    {
+      "id": "R24",
+      "priority": "需确认",
+      "title": "跨设备待发队列",
+      "dependency": "新增服务端队列协议",
+      "proposal": "当前草稿队列仍属于浏览器；跨设备与关闭页面后代发需服务端幂等和调度。",
+      "referenceTime": "0:30",
+      "status": "等待决策"
+    }
+  ]
+}
