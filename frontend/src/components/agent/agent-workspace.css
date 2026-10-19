@@ -7,8 +7,8 @@
 .agent-workspace-rail > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-list { gap:var(--sp-5); }
 .agent-workspace-rail > .ant-tabs > .ant-tabs-nav .ant-tabs-tab { margin:0; padding:var(--sp-4) 0; font-size:var(--fs-body); }
 .agent-workspace-tab { display:inline-flex; align-items:center; gap:var(--sp-2); }
-.agent-workspace-toolbar { display:flex; align-items:center; gap:var(--sp-3); }
-.agent-workspace-connection { flex:none; width:var(--sp-2); height:var(--sp-2); border-radius:var(--r-pill); background:var(--warn); }
+.agent-workspace-toolbar { display:flex; align-items:center; gap:var(--sp-1); margin-left:var(--sp-2); }
+.agent-workspace-connection { flex:none; width:var(--sp-2); height:var(--sp-2); margin-inline:var(--sp-1); border-radius:var(--r-pill); background:var(--warn); }
 .agent-workspace-connection[data-connected="true"] { background:var(--ok); }
 .agent-workspace-rail .tt-act { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); }
 .agent-workspace-toolbar > .tt-act { position:relative; min-height:calc(var(--tap) - var(--sp-2)); min-width:calc(var(--tap) - var(--sp-2)); padding:var(--sp-1); border-color:transparent; color:var(--text-dim); }

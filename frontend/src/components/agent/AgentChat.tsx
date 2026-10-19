@@ -208,11 +208,17 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
   }
   const moreMenu = { items: [
-    { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
-    { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
+    ...(!wide ? [
+      { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
+      { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
+    ] : []),
     { key: 'context', label: t('agent.context'), icon: <ArchiveIcon size={16} /> },
     { key: 'overview', label: t('agent.overview'), icon: <BotIcon size={16} /> },
   ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else showPanel(key as 'tasks' | 'memory' | 'context') } }
+  const conversationActions = <>
+    <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
+    <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
+  </>
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const title = 'Roami'
   const latestUserSeq = Math.max(0, ...bodies.filter(m => m.role === 'user').map(m => m.seq))
@@ -221,11 +227,10 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
-    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
-      {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: !workspace.open })}><PanelRightIcon size={18} />{t('agent.workspace.title')}</button>}
-      <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
-      <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
-    </div></header>
+    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div>{(!wide || !workspace.open) && <div className="acts">
+      {conversationActions}
+      {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
+    </div>}</header>
     <div className="agent-mobile-actions">
       <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     </div>
@@ -295,6 +300,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
-  {wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  {wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={conversationActions} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
   </div>
 }

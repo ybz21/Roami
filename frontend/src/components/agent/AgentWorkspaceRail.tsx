@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react'
 import { Tabs } from 'antd'
-import { ChecklistIcon, CloseIcon, NotebookIcon } from '../../icons'
+import { ChecklistIcon, NotebookIcon, PanelRightIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import AgentTasks from './AgentTasks'
 import AgentMemory from './AgentMemory'
 import type { WorkspaceTab } from './useAgentWorkspace'
 import './agent-workspace.css'
 
-export default function AgentWorkspaceRail({ cid, connected, tab, task, change, close, onTask, onSession, onChanged, projects, select }: {
+export default function AgentWorkspaceRail({ cid, connected, actions, tab, task, change, close, onTask, onSession, onChanged, projects, select }: {
   cid: string; connected: boolean; tab: WorkspaceTab; task: string
+  actions?: ReactNode
   change: (tab: WorkspaceTab) => void; close: () => void; onTask: (id: string) => void; onSession: (id: string) => void; onChanged: () => void
   projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void
 }) {
@@ -17,7 +18,8 @@ export default function AgentWorkspaceRail({ cid, connected, tab, task, change, 
   return <aside className="agent-workspace-rail" aria-label={t('agent.workspace.title')}>
     <Tabs activeKey={tab} onChange={key => change(key as WorkspaceTab)} tabBarExtraContent={{ right: <div className="agent-workspace-toolbar">
       <span className="agent-workspace-connection" data-connected={connected} role="img" aria-label={t(connected ? 'agent.workspace.connected' : 'agent.workspace.reconnecting')} title={t(connected ? 'agent.workspace.connected' : 'agent.workspace.reconnecting')} />
-      <button type="button" className="tt-act" aria-label={t('agent.workspace.close')} onClick={close}><CloseIcon size={16} /></button>
+      {actions}
+      <button type="button" className="tt-act" aria-label={t('agent.workspace.close')} title={t('agent.workspace.close')} onClick={close}><PanelRightIcon size={18} /></button>
     </div> }} destroyInactiveTabPane items={[
       { key: 'tasks', label: label('tasks', <ChecklistIcon size={15} />), children: <AgentTasks compact cid={cid} selectedTask={task} onSelectTask={onTask} onSession={onSession} onChanged={onChanged} /> },
       { key: 'memory', label: label('memory', <NotebookIcon size={15} />), children: <AgentMemory compact cid={cid} defaultGroup="all" projects={projects} select={select} /> },
