@@ -1,0 +1,143 @@
+{
+  "desktopWorkflow": {
+    "passed": true,
+    "device": "desktop",
+    "atomicModelAndEffort": true,
+    "cancelDoesNotSave": true,
+    "fullNameVisible": true,
+    "skillsOnlyDraftUntilSend": true,
+    "skillReadExecuted": true,
+    "queueEditRemovePauseReload": true,
+    "queueSequentialNoDuplicate": true,
+    "mainDispatchMode": "immediate remains available",
+    "queueScope": "current device/browser; pauses away from conversation",
+    "provider": "controlled local streaming provider",
+    "events": [
+      {
+        "marker": "QUEUE_BLOCK",
+        "phase": "start",
+        "ms": 1792380345273,
+        "effort": "low"
+      },
+      {
+        "marker": "QUEUE_BLOCK",
+        "phase": "end",
+        "ms": 1792380347242
+      },
+      {
+        "marker": "QUEUE_B_EDITED",
+        "phase": "start",
+        "ms": 1792380347597,
+        "effort": "low"
+      },
+      {
+        "marker": "QUEUE_B_EDITED",
+        "phase": "end",
+        "ms": 1792380347677
+      },
+      {
+        "marker": "QUEUE_C",
+        "phase": "start",
+        "ms": 1792380347828,
+        "effort": "low"
+      },
+      {
+        "marker": "QUEUE_C",
+        "phase": "end",
+        "ms": 1792380347908
+      }
+    ]
+  },
+  "androidWorkflow": {
+    "passed": true,
+    "device": "Redmi Note 8 actual touch",
+    "atomicModelAndEffort": true,
+    "cancelDoesNotSave": true,
+    "fullNameVisible": true,
+    "skillsOnlyDraftUntilSend": true,
+    "skillReadExecuted": true,
+    "queueEditRemovePauseReload": true,
+    "queueSequentialNoDuplicate": true,
+    "mainDispatchMode": "immediate remains available",
+    "queueScope": "current device/browser; pauses away from conversation",
+    "provider": "controlled local streaming provider",
+    "events": [
+      {
+        "marker": "QUEUE_BLOCK",
+        "phase": "start",
+        "ms": 1792380475433,
+        "effort": "low"
+      },
+      {
+        "marker": "QUEUE_BLOCK",
+        "phase": "end",
+        "ms": 1792380491382
+      },
+      {
+        "marker": "QUEUE_B_EDITED",
+        "phase": "start",
+        "ms": 1792380492703,
+        "effort": "low"
+      },
+      {
+        "marker": "QUEUE_B_EDITED",
+        "phase": "end",
+        "ms": 1792380492784
+      },
+      {
+        "marker": "QUEUE_C",
+        "phase": "start",
+        "ms": 1792380492889,
+        "effort": "low"
+      },
+      {
+        "marker": "QUEUE_C",
+        "phase": "end",
+        "ms": 1792380492969
+      }
+    ]
+  },
+  "desktopCatalog": {
+    "passed": true,
+    "device": "desktop",
+    "actualConfiguredCatalog": true,
+    "catalogSize": 12,
+    "panelAligned": true,
+    "phoneFooter44px": false,
+    "phoneNativeListScroll": false,
+    "capabilityNavigation": true,
+    "phoneFourTabs": false,
+    "noAgentConfigurationOrChatWrites": true
+  },
+  "androidCatalog": {
+    "passed": true,
+    "device": "Android real touch",
+    "actualConfiguredCatalog": true,
+    "catalogSize": 12,
+    "panelAligned": true,
+    "phoneFooter44px": true,
+    "phoneNativeListScroll": true,
+    "capabilityNavigation": true,
+    "phoneFourTabs": true,
+    "noAgentConfigurationOrChatWrites": true
+  },
+  "englishCatalog": {
+    "passed": true,
+    "device": "desktop English",
+    "actualConfiguredCatalog": true,
+    "catalogSize": 12,
+    "panelAligned": true,
+    "phoneFooter44px": false,
+    "phoneNativeListScroll": false,
+    "capabilityNavigation": true,
+    "phoneFourTabs": false,
+    "noAgentConfigurationOrChatWrites": true
+  },
+  "pythonTests": 536,
+  "frontendTests": 671,
+  "frontendFiles": 93,
+  "i18nKeys": 2928,
+  "serverQueue": false,
+  "queueControl": "composer mode selector; default immediate chat",
+  "desktopEnterQueues": true
+}

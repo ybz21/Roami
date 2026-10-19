@@ -2,7 +2,7 @@ import { agentTimeline, groupAgentTimeline } from './agent-timeline'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
-import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, RefreshIcon, StopIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, BellIcon, BotIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, RefreshIcon, StopIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
@@ -19,6 +19,8 @@ import AgentMessageView from './AgentMessageView'
 import AgentActivity from './AgentActivity'
 import { useAgentAttachments } from './useAgentAttachments'
 import { useAgentModels } from './useAgentModels'
+import { useAgentOutbox } from './useAgentOutbox'
+import AgentOutbox from './AgentOutbox'
 import './agent-chat.css'
 
 export function agentFailure(error: any, t: (key: string) => string) {
@@ -36,6 +38,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const thread = useAgentThread(cid, branch)
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
+  const [queueing, setQueueing] = useState(false)
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
   const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
@@ -55,6 +58,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const mirror = `roami.agent.last.${node || 'local'}`
   const draftKey = `roami.agent.draft.${node || 'local'}.${cid || 'new'}`
   const [draft, setDraft] = useAgentDraft(draftKey)
+  const activeScope = useRef(draftKey); activeScope.current = draftKey
+  const draftRef = useRef(draft); draftRef.current = draft
   const attachments = useAgentAttachments(draftKey)
   const mainCID = inbox.conversations[0]?.id
   const historical = !!thread.view && (thread.view.branchId !== thread.view.conversation.active_branch_id || (!!mainCID && cid !== mainCID))
@@ -62,6 +67,14 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const running = thread.view?.turns.some((item) => item.state === 'running' || item.state === 'queued') || false
   const compact = thread.view?.compaction
   const compacting = compact?.state === 'queued' || compact?.state === 'running' || compact?.state === 'started'
+  const outboxReady = !readOnly && !sending && !compacting && thread.connected && thread.view?.conversation.id === cid
+  const outbox = useAgentOutbox(draftKey, outboxReady, !running, async item => {
+    const owner = draftKey, origin = cid
+    const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: item.id, text: item.text, attachmentIds: item.attachments.map(file => file.id) })
+    if (activeScope.current !== owner) return
+    if (data.kind === 'message') thread.accepted(data, item.text)
+    thread.refresh(); inbox.refresh()
+  })
   const activity = thread.view?.activities || []
   const bodies = (thread.view?.messages || []).filter(m => (m.role === 'user' || m.role === 'assistant'))
   const timeline = groupAgentTimeline(agentTimeline(bodies, activity))
@@ -78,19 +91,20 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     stick.current = true; setError(''); setPanel(null); setSource(null); panelRequest.current++
     if (!sendingRef.current || pending.current?.cid !== cid) {
       setTarget('direct')
+      setQueueing(false)
     }
   }, [draftKey])
   useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight }, [thread.view?.messages, thread.view?.activities, cid])
   useAgentMessageFocus(scroll, cid, branch, focusMessage, visible.map((item) => item.id).join(','), stick)
-  const changeDraft = (value: string) => { setDraft(value); try { localStorage.setItem(draftKey, value) } catch {} }
+  const changeDraft = (value: string) => { draftRef.current = value; setDraft(value); try { localStorage.setItem(draftKey, value) } catch {} }
   const ensureConversation = async () => {
     if (cid) return cid
     const { data } = await api('POST', '/agent/main-conversation', { requestKey: createKey })
     if (activeCID.current === cid) {
       const destination = `roami.agent.draft.${node || 'local'}.${data.id}`
       attachments.transfer(destination)
-      setDraft(draft, destination)
-      try { localStorage.setItem(destination, draft); localStorage.removeItem(draftKey) } catch {}
+      setDraft(draftRef.current, destination)
+      try { localStorage.setItem(destination, draftRef.current); localStorage.removeItem(draftKey) } catch {}
       if (pending.current?.scope === draftKey) pending.current.scope = destination
       select(data.id)
     }
@@ -141,14 +155,13 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
       }
       if (!current()) { inbox.refresh(); return }
       if (pending.current === request) pending.current = null
-      if (consumeDraft) { setDraft('', request.scope); try { localStorage.removeItem(request.scope) } catch {} }; setCommandsOpen(false); thread.refresh(); inbox.refresh(); stick.current = true
+      if (consumeDraft && draftRef.current.trim() === value) { setDraft('', request.scope); try { localStorage.removeItem(request.scope) } catch {} }; setCommandsOpen(false); thread.refresh(); inbox.refresh(); stick.current = true
       if (consumeDraft) { try { localStorage.removeItem(`roami.agent.draft.${node || 'local'}.new`) } catch {} }
       return true
     } catch (reason) {
       const owner = request.cid || cid
       if (activeCID.current === owner || (!activeCID.current && !cid)) {
-        if (consumeDraft) setDraft(value, `roami.agent.draft.${node || 'local'}.${owner || 'new'}`); setError(agentFailure(reason, t))
-        if (consumeDraft) { try { localStorage.setItem(`roami.agent.draft.${node || 'local'}.${owner || 'new'}`, value) } catch {} }
+        setError(agentFailure(reason, t))
       }
     }
     finally { sendingRef.current = false; setSending(false) }
@@ -169,6 +182,20 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     if (!await attachments.add(files)) message.error(t('agent.composer.fileLimit'))
   }
   const openCommand = (name: string) => { setCommandsOpen(false); setCommandsDismissed(true); setCommandIndex(0); void submit('/' + name, false) }
+  const enqueue = () => {
+    if (readOnly || sendingRef.current || attachments.blocked || target !== 'direct' || !cid || (!draft.trim() && !attachments.ids.length)) return
+    if (!outbox.enqueue(draft.trim(), attachments.items.flatMap(item => item.reference ? [item.reference] : []))) { message.error(t('agent.outbox.storageFailed')); return }
+    changeDraft(''); attachments.clear(); setCommandsOpen(false)
+  }
+  const queueDraft = queueing && target === 'direct' && !draft.trim().startsWith('/')
+  const sendDraft = () => { if (queueDraft) enqueue(); else void submit() }
+  const composerActions = {
+    models, node, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
+    canDelegate: !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: () => { setTarget('loose'); setQueueing(false) },
+    onCompact: () => { void submit('/compact', false) },
+    onCommands: () => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) },
+    onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
+  }
   const moreMenu = { items: [
     { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
     { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
@@ -200,12 +227,13 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     </div>
     {error && <div className="agent-feedback error" role="alert">{error}</div>}
     <div className="agent-composer">
+      <AgentOutbox key={draftKey} outbox={outbox} ready={outboxReady} />
       <div className="tt-composer agent-compose-card">
         {!!attachments.items.length && <div className="agent-draft-files">{attachments.items.map(item => <div className={`agent-file-card is-${item.state}`} key={item.key}>
           <FileTextIcon size={20} /><span>{item.name}<small>{t(item.state === 'uploading' ? item.processing ? 'agent.composer.imagePreparing' : 'agent.composer.uploading' : item.state === 'failed' ? item.preparationFailed ? 'agent.composer.imagePrepareFailed' : 'agent.composer.uploadFailed' : item.reference?.previewState === 'unsupported' ? 'agent.composer.fileStoredOnly' : item.reference?.previewState === 'image' && !models.settings?.main.images ? 'agent.composer.imageUnavailable' : ['unavailable', 'encrypted', 'no_text'].includes(item.reference?.previewState || '') ? 'agent.composer.fileUnavailable' : item.optimized ? 'agent.composer.imageOptimized' : 'agent.composer.fileReady')}</small></span>
           {item.state === 'uploading' ? <Spin size="small" /> : <>{item.state === 'failed' && <button type="button" aria-label={t('agent.retry')} disabled={sending} onClick={() => { void attachments.retry(item) }}><RefreshIcon size={15} /></button>}<button type="button" aria-label={t('agent.composer.removeFile', { name: item.name })} disabled={sending} onClick={() => { void attachments.remove(item).catch(() => message.error(t('agent.requestFailed'))) }}><CloseIcon size={15} /></button></>}
         </div>)}</div>}
-        <form onSubmit={event => { event.preventDefault(); void submit() }}>
+        <form onSubmit={event => { event.preventDefault(); sendDraft() }}>
           <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: !phone ? 8 : landscape ? 1 : 5 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
             onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
             onKeyDown={event => {
@@ -215,21 +243,18 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setCommandIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + slash.length) % slash.length); return }
                 if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (commandsOpen) openCommand(slash[commandIndex % slash.length]); else if (draft === '/' + slash[commandIndex % slash.length]) { void submit() } else { changeDraft('/' + slash[commandIndex % slash.length] + (slash[commandIndex % slash.length] === 'compact' ? ' ' : '')); setCommandsOpen(false) }; return }
               }
-              if (!phone && event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit() }
+              if (!phone && event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendDraft() }
             }} />
           {slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
           <div className="tt-cbar agent-compose-bar">
             <div className="tt-cgrp">
-              <AgentComposerPlus models={models} disabled={readOnly || sending} canCompact={!!cid && !readOnly && !compacting && !running} onFiles={() => fileInput.current?.click()} onCompact={() => { void submit('/compact', false) }} onCommands={() => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) }} />
-              {phone ? <Dropdown trigger={['click']} menu={{ selectedKeys: [target === 'direct' ? 'direct' : 'task'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => setTarget(key === 'direct' ? 'direct' : 'loose') }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target === 'direct' ? 'agent.composer.chatMode' : 'agent.composer.taskMode')}<ChevronDown size={14} /></button></Dropdown> : <div className="agent-send-modes" role="group" aria-label={t('agent.composer.mode')}>
-                <button type="button" className={`tt-pill${target === 'direct' ? ' on' : ''}`} aria-pressed={target === 'direct'} disabled={readOnly || sending} onClick={() => setTarget('direct')}>{t('agent.composer.chatMode')}</button>
-                <button type="button" className={`tt-pill${target !== 'direct' ? ' on' : ''}`} aria-pressed={target !== 'direct'} disabled={readOnly || sending || !!attachments.items.length} onClick={() => setTarget('loose')}>{t('agent.composer.taskMode')}</button>
-              </div>}
+              <AgentComposerPlus {...composerActions} />
+              <Dropdown trigger={['click']} menu={{ selectedKeys: [target !== 'direct' ? 'task' : queueing ? 'queue' : 'direct'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'queue', label: t('agent.outbox.mode'), icon: <ClockIcon size={16} />, disabled: !cid }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => { setTarget(key === 'task' ? 'loose' : 'direct'); setQueueing(key === 'queue') } }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target !== 'direct' ? 'agent.composer.taskMode' : queueing ? 'agent.outbox.mode' : 'agent.composer.chatMode')}<ChevronDown size={14} /></button></Dropdown>
             </div>
             <div className="tt-cend">
-              <AgentComposerPlus models={models} modelTrigger disabled={readOnly || sending} canCompact={!!cid && !readOnly && !compacting && !running} onFiles={() => fileInput.current?.click()} onCompact={() => { void submit('/compact', false) }} onCommands={() => { setCommandsDismissed(false); setCommandsOpen(value => !value) }} />
+              <AgentComposerPlus {...composerActions} modelTrigger />
               {running && <button type="button" className={draft.trim() || attachments.items.length ? 'tt-pill ico' : 'tt-send agent-stop'} aria-label={t('agent.stop')} onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) }}><StopIcon size={16} /></button>}
-              {(!running || !!draft.trim() || !!attachments.items.length) && <button type="submit" className="tt-send" aria-label={t('agent.send')} disabled={sending || attachments.blocked || (!draft.trim() && !attachments.ids.length) || readOnly || (target !== 'direct' && draft.trim().length > 20000)}>{sending ? <Spin size="small" /> : <ArrowUp size={20} />}</button>}
+              {(!running || !!draft.trim() || !!attachments.items.length) && <button type="submit" className="tt-send" aria-label={t(queueDraft ? 'agent.outbox.add' : 'agent.send')} disabled={sending || attachments.blocked || (!draft.trim() && !attachments.ids.length) || readOnly || (target !== 'direct' && draft.trim().length > 20000)}>{sending ? <Spin size="small" /> : queueDraft ? <ClockIcon size={20} /> : <ArrowUp size={20} />}</button>}
             </div>
           </div>
         </form>
