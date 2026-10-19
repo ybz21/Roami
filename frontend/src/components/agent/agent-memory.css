@@ -37,3 +37,6 @@ html[data-size="compact"] .agent-memory-filters > .ant-select { flex:1; }
 html[data-pointer="coarse"] .agent-memory .ant-btn,html[data-pointer="coarse"] .agent-memory .ant-input,html[data-pointer="coarse"] .agent-memory .ant-select { min-height:var(--tap); }
 html[data-pointer="coarse"] .agent-memory .tt-act { position:relative; }
 html[data-pointer="coarse"] .agent-memory .tt-act::after { content:''; position:absolute; inset:calc(-1 * var(--sp-1)); }
+
+.agent-memory-counts > .has-count[data-kind="tasksFailed"] strong { color:var(--danger); }
+.agent-memory-counts > .has-count[data-kind="tasksInterrupted"] strong { color:var(--warn); }

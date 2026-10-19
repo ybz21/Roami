@@ -189,6 +189,7 @@ html[data-size="compact"] .agent-outbox-marker { min-width:var(--sp-5); }
 .agent-compose-status { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); min-width:0; color:var(--text-dim); font-size:var(--fs-meta); padding:0 var(--sp-3); }
 .agent-compose-status:empty { display:none; }
 .agent-compose-status > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.agent-chat .agent-context-meter { flex:none; max-width:100%; min-width:0; min-height:calc(var(--tap) - var(--sp-4)); padding:0 var(--sp-1); font-size:var(--fs-meta); color:var(--text-dim); border-color:transparent; font-variant-numeric:tabular-nums; position:relative; }
-.agent-context-meter > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.agent-chat .agent-context-meter.is-near-limit,.agent-chat .agent-context-meter.is-stale { color:var(--warn); }
+
+.agent-context-meter.is-near-limit small,.agent-context-meter.is-stale small { color:var(--warn); }
+
+html[data-pointer="coarse"] .agent-outbox .tt-act { min-width:calc(var(--tap) - var(--sp-2)); padding-inline:var(--sp-1); }

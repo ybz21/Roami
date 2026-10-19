@@ -5,11 +5,13 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { agentSettingsRoute, modelFailure, modelLabel } from './agent-models'
 import { genericReasoningEfforts, reasoningChoices, reasoningValue } from './agent-reasoning'
+import AgentContextUsage from './AgentContextUsage'
 import type { useAgentModels } from './useAgentModels'
 
 type SkillChoice = { name: string; description?: string; enabled: boolean }
 
-export default function AgentComposerPlus({ models, disabled, canCompact, onFiles, onCompact, onCommands, onSkill, onTask, canDelegate = false, node = null, modelTrigger = false }: {
+export default function AgentComposerPlus({ models, disabled, canCompact, onFiles, onCompact, onCommands, onSkill, onTask, canDelegate = false, node = null, modelTrigger = false, contextUsage, onContext }: {
+  contextUsage?: { cid: string; model: string; revision: string; active: boolean }; onContext?: () => void
   models: ReturnType<typeof useAgentModels>; disabled: boolean; canCompact: boolean
   onFiles: () => void; onCompact: () => void; onCommands: () => void; modelTrigger?: boolean
   onSkill?: (name: string) => void; onTask?: () => void; canDelegate?: boolean; node?: string | null
@@ -64,6 +66,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
     <Modal open={open} onCancel={() => setOpen(false)} footer={null} title={null} closable={false} destroyOnClose maskClosable keyboard width={geometry?.width} className="agent-composer-dialog" wrapClassName="agent-composer-dialog-wrap" style={{ left: geometry?.left, bottom: geometry?.bottom, top: 'auto', margin: 0, padding: 0 }} afterClose={() => trigger.current?.focus({ preventScroll: true })}>
     <div className="agent-plus-menu" style={{ '--agent-menu-available': geometry ? geometry.height + 'px' : undefined } as CSSProperties} role="menu" aria-label={t(page === 'models' ? 'agent.composer.model' : 'agent.composer.more')}>
     {page === 'tools' ? <>
+      {contextUsage?.cid && onContext && <><AgentContextUsage {...contextUsage} node={node} menuItem onOpen={() => close(onContext)} />{row(t('agent.compactNow'), <ArchiveIcon size={20} />, () => close(onCompact), t('agent.composer.compactHint'), !canCompact)}<div className="agent-menu-divider" /></>}
       <p className="agent-menu-section">{t('agent.composer.addSection')}</p>
       {row(t('agent.composer.addFiles'), <PaperclipIcon size={20} />, () => close(onFiles), t('agent.composer.filesHint'))}
       {onTask && row(t('agent.composer.taskMode'), <FolderIcon size={20} />, () => close(onTask), t('agent.composer.taskHint'), !canDelegate)}
@@ -74,7 +77,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
         {skills.map(skill => row(skill.name, <FileTextIcon size={20} />, () => close(() => onSkill?.(skill.name)), ['roami-dispatch', 'web-research'].includes(skill.name) ? t('agent.capabilities.skillDescription.' + skill.name) : skill.description || t('agent.composer.skillHint')))}
       </>}
       <p className="agent-menu-section">{t('agent.composer.conversationSection')}</p>
-      {row(t('agent.compactNow'), <ArchiveIcon size={20} />, () => close(onCompact), t('agent.composer.compactHint'), !canCompact)}
+      {(!contextUsage?.cid || !onContext) && row(t('agent.compactNow'), <ArchiveIcon size={20} />, () => close(onCompact), t('agent.composer.compactHint'), !canCompact)}
       {row(t('agent.commands'), <CodeIcon size={20} />, () => close(onCommands), t('agent.composer.commandsHint'))}
       {row(t('agent.composer.manageSkills'), <GearIcon size={20} />, () => close(() => { location.hash = '#/settings/agent/skills' }), t('agent.composer.manageHint'))}
     </> : <>

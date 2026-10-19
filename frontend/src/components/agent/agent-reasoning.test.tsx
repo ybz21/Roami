@@ -67,3 +67,14 @@ it('lists only enabled installed skills and selects into the draft without execu
   expect(pick).toHaveBeenCalledWith('installed')
   expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
 })
+
+it('loads context only inside the plus menu and closes that menu before opening details', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { estimatedTokens: 12400, contextWindow: 128000 } })
+  const open = vi.fn(), models = { settings: { main: role, worker: role }, efforts: {}, models: [], load: vi.fn() } as any
+  render(<div className="agent-compose-card"><AgentComposerPlus models={models} disabled={false} canCompact onFiles={vi.fn()} onCompact={vi.fn()} onCommands={vi.fn()} onContext={open} contextUsage={{ cid: 'main', model: role.model, revision: 'one', active: false }} /></div>)
+  expect(vi.mocked(api).mock.calls.some(call => call[1].endsWith('/context'))).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'agent.composer.more' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'agent.contextMeter.known' }))
+  expect(open).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('dialog')).toBeNull()
+})

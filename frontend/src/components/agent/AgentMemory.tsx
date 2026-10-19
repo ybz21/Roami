@@ -24,6 +24,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
   const [tasks, setTasks] = useState<{ id: string; intent_json: string }[]>([]), [items, setItems] = useState<Memory[]>([])
   const [loading, setLoading] = useState(false), [failed, setFailed] = useState(false), [version, setVersion] = useState(0)
   const [busy, setBusy] = useState(''), busyRef = useRef(false)
+  const [evidenceTitle, setEvidenceTitle] = useState('')
   const [evidence, setEvidence] = useState<Evidence[] | null>(null), [sourceLoading, setSourceLoading] = useState(false), sourceRequest = useRef(0)
   useEffect(() => {
     const abort = new AbortController()
@@ -58,7 +59,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
   }
   const sources = async (item: Memory) => {
     const version = ++sourceRequest.current
-    setEvidence([]); setSourceLoading(true)
+    setEvidenceTitle(item.title); setEvidence([]); setSourceLoading(true)
     try { const { data } = await api('GET', '/agent/memories/' + encodeURIComponent(item.id) + '/sources'); if (version === sourceRequest.current) setEvidence(data) }
     catch { if (version === sourceRequest.current) { setEvidence(null); message.error(t('agent.requestFailed')) } }
     finally { if (version === sourceRequest.current) setSourceLoading(false) }
@@ -74,7 +75,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
       {category === 'knowledge' && group === 'task' && <Select aria-label={t('agent.memoryGroup.task')} value={task || undefined} placeholder={t('agent.chooseTask')} onChange={(value) => { setTask(value); setPage(0) }} options={tasks.map((task) => ({ value: task.id, label: JSON.parse(task.intent_json).goal }))} />}
       {category === 'activity' && <><Input type="date" aria-label={t('agent.memoryDate')} value={date} disabled={!timezone} onChange={(e) => { setDate(e.target.value); setPage(0) }} /><button type="button" className="tt-act" disabled={!timezone} onClick={() => { setDate(today(timezone)); setPage(0) }}>{t('agent.memoryToday')}</button>{date && <button type="button" className="tt-act" onClick={() => { setDate(''); setPage(0) }}>{t('agent.memoryAllDates')}</button>}<span className="agent-muted">{timezone}</span></>}
     </div>
-    <Input.Search className="agent-memory-search" aria-label={t('agent.searchMemory')} placeholder={t('agent.searchMemory')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0) }} maxLength={1000} />
+    <Input.Search allowClear className="agent-memory-search" aria-label={t('agent.searchMemory')} placeholder={t('agent.searchMemory')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0) }} maxLength={1000} />
     {loading && <Spin size="small" />}{failed && <p role="alert">{t('agent.requestFailed')} <Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button></p>}
     <div className="agent-memory-results-label" role="status">{!loading && !failed && t('agent.memoryTotal', { count: new Intl.NumberFormat(locale).format(total) })}</div>
     <div className="agent-memory-list" aria-busy={loading}>{!items.length && !loading && !failed && <div className="agent-memory-empty"><strong>{t(category === 'knowledge' ? 'agent.noMemories' : 'agent.memoryNoActivity')}</strong><p>{t(category === 'knowledge' ? 'agent.memoryEmptyHint' : 'agent.memoryActivityEmptyHint')}</p></div>}{items.map((item, index) => <Fragment key={item.id}>
@@ -82,7 +83,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
       <AgentMemoryCard item={item} projects={projects} timezone={timezone} busy={!!busy} sources={() => { void sources(item) }} mutate={action => { if (action === 'delete') void mutate(item, 'DELETE', '?forgetSources=false'); else void mutate(item, 'POST', '/confirm', { accepted: action === 'confirm' }) }} forget={() => modal.confirm({ title: t('agent.memoryForgetTitle'), content: t('agent.memoryForgetBody'), okText: t('agent.memoryForget'), cancelText: t('common.cancel'), onOk: () => mutate(item, 'DELETE', '?forgetSources=true') })} />
     </Fragment>)}</div>
     {!loading && !failed && <div className="agent-memory-pagination"><span>{t('agent.memoryPage', { page: page + 1 })}</span><Button disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t('agent.memoryPrevious')}</Button><Button disabled={(page + 1) * 20 >= total} onClick={() => setPage(value => value + 1)}>{t('agent.memoryNext')}</Button></div>}
-    <Modal destroyOnClose open={evidence !== null} title={t('agent.memorySources')} footer={null} onCancel={() => { sourceRequest.current++; setEvidence(null); setSourceLoading(false) }}>
+    <Modal destroyOnClose open={evidence !== null} title={t('agent.memorySourcesFor', { title: evidenceTitle })} footer={null} onCancel={() => { sourceRequest.current++; setEvidence(null); setSourceLoading(false) }}>
       {sourceLoading && <Spin size="small" />}<div className="agent-memory agent-memory-evidence">{evidence?.map((source) => <article className="agent-memory-card" key={source.sourceKey}>{source.available === false ? <p>{t('agent.memorySourceMissing')}</p> : <>{source.kind && <b>{t('agent.memorySource.' + source.kind)}</b>}{source.createdMs && <time className="agent-muted">{new Date(source.createdMs).toLocaleString(locale, { timeZone: timezone || 'UTC' })}</time>}<Markdown>{source.text || ''}</Markdown>{source.unchanged === false && <p className="agent-muted">{t('agent.memorySourceChanged')}</p>}{source.conversationId && <Button onClick={() => select(source.conversationId!, source.branchId, source.messageId)}>{t('agent.memoryOpenSource')}</Button>}</>}</article>)}</div>
     </Modal>
   </div>

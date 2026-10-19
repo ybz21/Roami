@@ -21,7 +21,6 @@ import { useAgentAttachments } from './useAgentAttachments'
 import { useAgentModels } from './useAgentModels'
 import { useAgentOutbox } from './useAgentOutbox'
 import AgentOutbox from './AgentOutbox'
-import AgentContextUsage from './AgentContextUsage'
 import './agent-chat.css'
 
 export function agentFailure(error: any, t: (key: string) => string) {
@@ -190,6 +189,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const queueDraft = !!cid && target === 'direct' && !draft.trim().startsWith('/') && (running || compacting || outbox.items.length > 0)
   const sendDraft = () => { if (queueDraft) enqueue(); else void submit() }
   const composerActions = {
+    contextUsage: { cid: historical ? '' : cid, model: `${models.settings?.main.model || ''}:${models.settings?.main.contextWindow || ''}`, revision: `${thread.view?.turns.map(turn => turn.id + ':' + turn.state).join(',')}:${thread.view?.messages[thread.view.messages.length - 1]?.id}:${thread.view?.messages[thread.view.messages.length - 1]?.status}:${compact?.state}`, active: running || compacting },
+    onContext: () => setPanel('context'),
     models, node, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
     canDelegate: !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: () => setTarget('loose'),
     onCompact: () => { void submit('/compact', false) },
@@ -204,7 +205,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   ], onClick: ({ key }: { key: string }) => { if (key === 'overview') onOverview(); else setPanel(key as 'tasks' | 'memory' | 'context') } }
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const title = 'Roami'
-  const latestMessage = thread.view?.messages[thread.view.messages.length - 1]
   const latestUserSeq = Math.max(0, ...bodies.filter(m => m.role === 'user').map(m => m.seq))
 
   return <section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
@@ -247,14 +247,11 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
               if (!phone && event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendDraft() }
             }} />
           {slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
-          <div className="agent-compose-status">
-            <AgentContextUsage cid={historical ? '' : cid} node={node} model={`${models.settings?.main.model || ''}:${models.settings?.main.contextWindow || ''}`} revision={`${thread.view?.turns.map(turn => turn.id + ':' + turn.state).join(',')}:${latestMessage?.id}:${latestMessage?.status}:${compact?.state}`} active={running || compacting} onOpen={() => setPanel('context')} />
-            {(compacting || attachments.items.length > 0) && <span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span>}
-          </div>
+          {(compacting || attachments.items.length > 0) && <div className="agent-compose-status"><span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span></div>}
           <div className="tt-cbar agent-compose-bar">
             <div className="tt-cgrp">
               <AgentComposerPlus {...composerActions} />
-              <Dropdown trigger={['click']} menu={{ selectedKeys: [target !== 'direct' ? 'task' : 'direct'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => setTarget(key === 'task' ? 'loose' : 'direct') }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target !== 'direct' ? 'agent.composer.taskMode' : 'agent.composer.chatMode')}<ChevronDown size={14} /></button></Dropdown>
+              {target !== 'direct' && <Dropdown trigger={['click']} menu={{ selectedKeys: [target !== 'direct' ? 'task' : 'direct'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => setTarget(key === 'task' ? 'loose' : 'direct') }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target !== 'direct' ? 'agent.composer.taskMode' : 'agent.composer.chatMode')}<ChevronDown size={14} /></button></Dropdown>}
             </div>
             <div className="tt-cend">
               <AgentComposerPlus {...composerActions} modelTrigger />
