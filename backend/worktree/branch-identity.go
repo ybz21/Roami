@@ -39,3 +39,47 @@ func BranchWasRenamed(ctx context.Context, directory, previous, current, startOI
 	}
 	return false
 }
+
+// BranchCreatedForTask requires matching branch-birth and checkout reflog records.
+func BranchCreatedForTask(ctx context.Context, directory, previous, current, startOID string) bool {
+	if previous == "" || current == "" || startOID == "" {
+		return false
+	}
+	if _, err := git(ctx, directory, "merge-base", "--is-ancestor", startOID, "refs/heads/"+current); err != nil {
+		return false
+	}
+	read := func(ref string) (string, error) {
+		return git(ctx, directory, "reflog", "show", "--max-count=256", "--date=raw", "--format=%H%x09%gD%x09%gs", ref)
+	}
+	branchLog, err := read("refs/heads/" + current)
+	if err != nil {
+		return false
+	}
+	birth := ""
+	for _, line := range strings.Split(branchLog, "\n") {
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) == 3 && strings.HasPrefix(fields[2], "branch: Created from ") {
+			_, date, ok := strings.Cut(fields[1], "@{")
+			if ok {
+				birth = fields[0] + "\t" + date
+			}
+		}
+	}
+	if birth == "" {
+		return false
+	}
+	headLog, err := read("HEAD")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(headLog, "\n") {
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) == 3 && fields[2] == "checkout: moving from "+previous+" to "+current {
+			_, date, ok := strings.Cut(fields[1], "@{")
+			if ok && fields[0]+"\t"+date == birth {
+				return true
+			}
+		}
+	}
+	return false
+}

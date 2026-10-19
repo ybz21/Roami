@@ -108,7 +108,7 @@ func (s Service) reuseWorkspace(ctx context.Context, spec Spec) (Workspace, erro
 		if candidate.Branch == workspace.Branch {
 			return workspace, nil
 		}
-		if candidate.Branch != "" && worktree.BranchWasRenamed(ctx, directory, workspace.Branch, candidate.Branch, workspace.StartOID) {
+		if candidate.Branch != "" && (worktree.BranchWasRenamed(ctx, directory, workspace.Branch, candidate.Branch, workspace.StartOID) || worktree.BranchCreatedForTask(ctx, directory, workspace.Branch, candidate.Branch, workspace.StartOID)) {
 			workspace.Branch = candidate.Branch
 			return s.rememberWorkspace(workspace)
 		}

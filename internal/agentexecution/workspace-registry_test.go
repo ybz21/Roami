@@ -16,7 +16,7 @@ import (
 	"github.com/ybz21/Roami/internal/gitcontext"
 )
 
-func TestWorkspaceReuseAfterBranchRenamePreservesProgress(t *testing.T) {
+func TestWorkspaceReuseAfterTaskBranchCreationAndRenamePreservesProgress(t *testing.T) {
 	s := testService(t)
 	ctx := context.Background()
 	repo := t.TempDir()
@@ -47,6 +47,12 @@ func TestWorkspaceReuseAfterBranchRenamePreservesProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	spec := Spec{ProjectID: projectID, WorkspaceID: workspace.ID}
+	git(directory, "switch", "-c", "feat/task", workspace.StartOID)
+	created, err := s.reuseWorkspace(ctx, spec)
+	if err != nil || created.Branch != "feat/task" || created.ID != workspace.ID {
+		t.Fatalf("task branch created in original workspace: %+v %v", created, err)
+	}
 	git(directory, "branch", "-m", "fix/intermediate")
 	git(directory, "branch", "-m", "fix/task")
 	git(directory, "commit", "--allow-empty", "-m", "progress")
@@ -54,7 +60,6 @@ func TestWorkspaceReuseAfterBranchRenamePreservesProgress(t *testing.T) {
 	if err = os.WriteFile(proof, []byte("keep this work"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	spec := Spec{ProjectID: projectID, WorkspaceID: workspace.ID}
 	for range 2 {
 		reused, err := s.reuseWorkspace(ctx, spec)
 		if err != nil || reused.Branch != "fix/task" || reused.ID != workspace.ID || reused.StartOID != workspace.StartOID {
@@ -64,7 +69,7 @@ func TestWorkspaceReuseAfterBranchRenamePreservesProgress(t *testing.T) {
 	if body, err := os.ReadFile(proof); err != nil || string(body) != "keep this work" {
 		t.Fatalf("lost work: %s %v", body, err)
 	}
-	git(directory, "switch", "-c", "unrelated-checkout")
+	git(directory, "switch", "--ignore-other-worktrees", "main")
 	if _, err = s.reuseWorkspace(ctx, spec); err == nil || err.Error() != "WORKSPACE_STALE" {
 		t.Fatalf("checkout switch accepted: %v", err)
 	}
