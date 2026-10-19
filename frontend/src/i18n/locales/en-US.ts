@@ -2826,7 +2826,7 @@ const enUS = {
   'agent.reasoning.roleLabel': '{role} thinking effort',
   'agent.reasoning.unsupported': 'This model does not support that thinking effort. Choose another level or Default.',
   'agent.models.settings': 'Models & connections',
-  'agent.models.settingsNote': "Configure the model services for chat and background tasks. Switch the chat model from the composer’s plus menu.",
+  'agent.models.settingsNote': "Configure the shared model service and models for the main conversation and built-in background tasks.",
   'agent.models.notConfigured': "Not configured",
   'agent.models.busy': "The agent is working. Switch models or save settings after the current work finishes.",
   'agent.models.newEndpointKey': "Enter the new service’s API key when changing its URL.",
@@ -2840,7 +2840,7 @@ const enUS = {
   'agent.models.role.main': "Main agent",
   'agent.models.role.worker': "Background agent",
   'agent.models.roleHint.main': "Handles everyday chat and requests. Prefer a model that responds quickly.",
-  'agent.models.roleHint.worker': "Handles delegated work, memory and briefs. Choose a more capable model if needed.",
+  'agent.models.roleHint.worker': "For built-in background tasks, memory, and briefs. Manage Codex and Claude Code under Professional agents.",
   'agent.models.baseUrl': "Base URL",
   'agent.models.apiKey': "API key",
   'agent.models.keyKept': "Configured; leave blank to keep the key",
@@ -3021,6 +3021,13 @@ const enUS = {
   'agent.activity.startedAt': 'Started {time}',
   'agent.activity.modelTimeout': 'The model response timed out; this task did not complete.',
   'agent.activity.turnTimeout': 'The execution turn timed out. Review the steps already completed.',
+  'agent.models.catalogReady': '{count} models available',
+  'agent.models.catalogHint': 'Open a model selector to fetch the list. Testing does not save changes.',
+  'agent.models.selectPlaceholder': 'Select or search models',
+  'agent.models.catalogEmpty': 'Type a model name from your provider',
+  'agent.models.unsaved': 'Unsaved changes',
+  'agent.models.savedState': 'Saved',
+  'agent.models.discard': 'Discard changes',
 }
 
 export default enUS

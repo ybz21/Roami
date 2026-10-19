@@ -2835,7 +2835,7 @@ const zhCN = {
   'agent.reasoning.roleLabel': '{role}思考强度',
   'agent.reasoning.unsupported': '当前模型不支持此思考强度，请选择其他档位或模型默认。',
   'agent.models.settings': "模型与连接",
-  'agent.models.settingsNote': "配置对话与后台任务使用的模型服务。聊天框的加号菜单可快速切换对话模型。",
+  'agent.models.settingsNote': "统一配置模型服务，以及主对话与内置后台任务使用的模型。",
   'agent.models.notConfigured': "未配置",
   'agent.models.busy': "智能体正在处理任务，请等当前处理结束后再切换模型或保存配置",
   'agent.models.newEndpointKey': "更换服务地址时，请填写新服务的 API Key",
@@ -2849,7 +2849,7 @@ const zhCN = {
   'agent.models.role.main': "主智能体",
   'agent.models.role.worker': "后台智能体",
   'agent.models.roleHint.main': "用于日常聊天和意图理解，优先选择响应快的模型。",
-  'agent.models.roleHint.worker': "用于委派任务、记忆整理和简报，可选择能力更强的模型。",
+  'agent.models.roleHint.worker': "用于内置后台任务、记忆整理和简报。Codex、Claude Code 请在“专业智能体”中管理。",
   'agent.models.baseUrl': "Base URL",
   'agent.models.apiKey': "API Key",
   'agent.models.keyKept': "已配置，留空保留原密钥",
@@ -3030,6 +3030,13 @@ const zhCN = {
   'agent.activity.startedAt': '开始于 {time}',
   'agent.activity.modelTimeout': '模型响应超时，本次未完成。',
   'agent.activity.turnTimeout': '执行回合超时，请查看已完成的步骤。',
+  'agent.models.catalogReady': '已获取 {count} 个模型',
+  'agent.models.catalogHint': '展开模型下拉框时获取列表；测试不会保存配置。',
+  'agent.models.selectPlaceholder': '选择或搜索模型',
+  'agent.models.catalogEmpty': '输入服务商提供的模型名称',
+  'agent.models.unsaved': '有未保存的更改',
+  'agent.models.savedState': '已保存',
+  'agent.models.discard': '还原更改',
 }
 
 export default zhCN
