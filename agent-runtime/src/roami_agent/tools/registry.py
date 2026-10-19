@@ -56,6 +56,7 @@ class Tools:
             if role == "main" and self.directory and tool.name == "delegate":
                 wire = deepcopy(wire)
                 wire["function"]["parameters"]["required"] = ["goal", "routing"]
+                wire["function"]["parameters"]["properties"].pop("executor", None)
             if role == "research":
                 wire = deepcopy(wire)
                 parameters = wire["function"]["parameters"]

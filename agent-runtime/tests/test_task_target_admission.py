@@ -10,6 +10,22 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 
 
+async def test_resource_only_empty_optional_directory_is_not_a_workspace_request(store):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        target = {"kind": "new_session", "resourceOnly": True, "directory": ""}
+        first = await admit(runtime, binding, "查询济南天气，不写文件", "weather", target=target)
+        replay = await admit(runtime, binding, "查询济南天气，不写文件", "weather", target=target)
+        assert replay["id"] == first["id"]
+        assert json.loads(first["intent_json"])["target"] == {
+            "kind": "new_session",
+            "resourceOnly": True,
+        }
+        assert target["directory"] == ""
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("kind,key", [("new_session", "directory"), ("new_project", "baseDir")])
 @pytest.mark.parametrize("path", ["missing", "relative", "file", "empty"])
 async def test_invalid_local_path_never_creates_a_task(store, tmp_path, kind, key, path):

@@ -23,7 +23,11 @@ def routing_schema():
                 "additionalProperties": text,
             },
             "routingExplanation": text,
-            "explicitExecutor": {"type": "string", "enum": sorted(EXECUTORS)},
+            "explicitExecutor": {
+                "type": ["string", "null"],
+                "enum": [None, *sorted(EXECUTORS)],
+                "description": "Required on every assessment: the user's explicitly requested executor, or null only when the user made no executor choice. Never put the choice only in goal or routingExplanation.",
+            },
             "userQuote": text,
             "preference": object_schema(
                 {
@@ -41,7 +45,7 @@ def routing_schema():
                 "items": {"type": "string", "minLength": 1, "maxLength": 160},
             },
         },
-        ["complexity", "complexityBasis", "routingExplanation"],
+        ["complexity", "complexityBasis", "routingExplanation", "explicitExecutor"],
     )
 
 
@@ -101,6 +105,8 @@ class TaskRouter:
         if previous:
             return previous
         explicit = assessment.get("explicitExecutor")
+        if assessment.get("userQuote") and not explicit:
+            raise DomainError("ROUTING_EXECUTOR_INTENT_REQUIRED")
         if explicit and (
             not assessment.get("userQuote", "").strip()
             or assessment["userQuote"] not in json.loads(origin["content_json"]).get("text", "")
@@ -204,6 +210,9 @@ class TaskRouter:
                 ):
                     raise DomainError("ROUTING_DIRECTORY_REQUIRED")
             decision.update(action="new_task", executor=selected, reasonCode=reason)
+
+        if args.get("executor") and args["executor"] != decision["executor"]:
+            raise DomainError("ROUTING_EXECUTOR_CONFLICT", 409)
 
         def persist(db):
             # A second admission closes the gap while CLI metadata was in flight.

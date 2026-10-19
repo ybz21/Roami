@@ -59,6 +59,7 @@ def request(complexity="complex", **overrides):
     return {
         "goal": "Independently investigate and verify a deliverable",
         "routing": {
+            "explicitExecutor": None,
             "complexity": complexity,
             "complexityBasis": {"open_dimension": "Evidence changes the next investigation step"},
             "routingExplanation": "Sources disagree and need investigation with repeated verification",
@@ -91,6 +92,25 @@ async def setup(store, *, user="Please investigate", settings=None):
     registry = Tools()
     register_main_tools(registry, runtime.tasks, runtime.memory, targets, router)
     return runtime, targets, router, registry, binding
+
+
+@pytest.mark.parametrize("missing", [True, False])
+async def test_executor_intent_cannot_be_omitted_or_left_only_in_a_quote(store, missing):
+    runtime, _, _, tools, binding = await setup(store, user="Use Claude Code")
+    try:
+        args = request(userQuote="Use Claude Code")
+        if missing:
+            args["routing"].pop("explicitExecutor")
+        with pytest.raises(
+            DomainError,
+            match="INVALID_TOOL_ARGUMENTS" if missing else "ROUTING_EXECUTOR_INTENT_REQUIRED",
+        ):
+            await tools.invoke(
+                {"function": {"name": "delegate", "arguments": json.dumps(args)}}, "main", binding
+            )
+        assert not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.parametrize(

@@ -72,6 +72,12 @@ class Tasks:
         ):
             raise DomainError("INVALID_TASK")
         target = target or {"kind": "new_session"}
+        if (
+            target.get("kind") == "new_session"
+            and target.get("resourceOnly") is True
+            and target.get("directory") == ""
+        ):
+            target = {key: value for key, value in target.items() if key != "directory"}
         if target.get("kind") not in {"project", "session", "new_session", "new_project"}:
             raise DomainError("INVALID_TASK_TARGET")
         if target.get("kind") == "new_session" and "baseDir" in target:
@@ -150,6 +156,54 @@ class Tasks:
                 if stored_spec != spec or task["origin_conversation_id"] != cid:
                     raise DomainError("TASK_KEY_CONFLICT", 409)
                 return task
+            if source_turn_id:
+                for rejection in rows(
+                    db,
+                    "SELECT x.arguments_json,m.content_json FROM tool_calls x "
+                    "JOIN messages m ON m.id=x.result_message_id WHERE x.turn_id=? "
+                    "AND x.tool_name IN ('delegate','session_send') AND x.state='failed'",
+                    (source_turn_id,),
+                ):
+                    rejected_result = json.loads(json.loads(rejection["content_json"])["text"])
+                    error = rejected_result.get("error")
+                    if error == "TASK_SESSION_BINDING_REQUIRED":
+                        raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
+                    if error in {"ROUTING_EXECUTOR_CONFLICT", "ROUTING_EXPLICIT_UNAVAILABLE"}:
+                        rejected_args = json.loads(rejection["arguments_json"])
+                        requested = (rejected_args.get("routing") or {}).get(
+                            "explicitExecutor"
+                        ) or rejected_args.get("executor")
+                        if requested and executor != requested:
+                            raise DomainError("ROUTING_EXECUTOR_CONFLICT", 409)
+                rejected = row(
+                    db,
+                    "SELECT x.id FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                    "WHERE x.turn_id=? AND x.tool_name='delegate' AND x.state='failed' AND "
+                    "CASE WHEN json_valid(json_extract(m.content_json,'$.text')) THEN "
+                    "json_extract(json_extract(m.content_json,'$.text'),'$.error') END "
+                    "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') LIMIT 1",
+                    (source_turn_id,),
+                )
+                if rejected:
+                    raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
+                for steering in rows(
+                    db,
+                    "SELECT arguments_json FROM tool_calls WHERE turn_id=? "
+                    "AND tool_name='task_steer' AND state='succeeded'",
+                    (source_turn_id,),
+                ):
+                    previous_id = json.loads(steering["arguments_json"])["taskId"]
+                    previous = row(
+                        db,
+                        "SELECT intent_json FROM tasks WHERE id=? AND owner_id=?",
+                        (previous_id, owner),
+                    )
+                    old_target = json.loads(previous["intent_json"])["target"] if previous else {}
+                    if previous_id in goal or any(
+                        target.get(key) and target.get(key) == old_target.get(key)
+                        for key in ("projectId", "sessionId", "directory")
+                    ):
+                        raise DomainError("TASK_CONTINUATION_ALREADY_REQUESTED", 409)
             path_key = {"new_session": "directory", "new_project": "baseDir"}.get(target["kind"])
             if path_key and path_key in target:
                 directory = target[path_key]
@@ -350,13 +404,24 @@ class Tasks:
     def _view(db, task):
         task["latestAttempt"] = row(
             db,
-            "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind,"
+            "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind,result_json AS inspectionResultJson,"
             "CASE WHEN task_revision=? AND json_valid(result_json) THEN CASE "
             "WHEN json_type(result_json,'$.summary')='text' THEN substr(json_extract(result_json,'$.summary'),1,240) END END AS summary "
             "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
             (task["revision"], task["id"]),
         )
         if task["latestAttempt"]:
+            result_json = task["latestAttempt"].pop("inspectionResultJson")
+            result = json.loads(result_json) if result_json else {}
+            task["latestAttempt"]["outcomeKnown"] = result.get(
+                "outcomeKnown", False if task["latestAttempt"]["state"] == "unknown" else None
+            )
+            task["latestAttempt"]["stopConfirmed"] = (
+                task["latestAttempt"]["state"] in {"succeeded", "failed", "cancelled"}
+                and bool(result)
+                and result.get("outcomeKnown") is not False
+                and result.get("inputStopped") is not False
+            )
             preparation = row(
                 db,
                 "SELECT payload_json FROM events WHERE event_key=?",

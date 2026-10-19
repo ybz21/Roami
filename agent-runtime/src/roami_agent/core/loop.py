@@ -199,10 +199,12 @@ class AgentLoop:
                     if not calls:
                         await self.context.after_turn(turn, instructions, catalog)
                         return text
-                    handed_off = role == "main" and all(
-                        call["function"]["name"] == "delegate" for call in calls
-                    )
+                    handed_off = role == "main"
                     for call in calls:
+                        try:
+                            operation = self.tools.validate(call, role)[0].name
+                        except (DomainError, KeyError, TypeError):
+                            operation = None
                         binding = {
                             "owner": owner,
                             "conversation": cid,
@@ -216,6 +218,7 @@ class AgentLoop:
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
                         handed_off = (
                             handed_off
+                            and operation in {"delegate", "task_steer"}
                             and isinstance(value, dict)
                             and value.get("acceptedOnly") is True
                         )

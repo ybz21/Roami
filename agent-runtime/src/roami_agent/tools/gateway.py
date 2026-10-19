@@ -153,6 +153,38 @@ class ToolGateway:
             )
             if state == "unknown":
                 value.update(outcomeKnown=False, retryable=False)
+            if role == "main" and value["error"] in {
+                "INVALID_EXECUTION_DIRECTORY",
+                "EXECUTION_DIRECTORY_UNAVAILABLE",
+                "TASK_TARGET_REVIEW_REQUIRED",
+            }:
+                value["recovery"] = (
+                    "The destination was rejected before task acceptance. Stop delegation for this turn. "
+                    "Do not remove the directory, switch targets or invent a replacement to bypass the error. "
+                    "Explain the rejected path and ask the user for a corrected existing destination."
+                )
+            if role == "main" and value["error"] == "TASK_CONTINUATION_ALREADY_REQUESTED":
+                value["recovery"] = (
+                    "Continuation is already queued on the original task. End this turn; do not poll or create a replacement task."
+                )
+            if role == "main" and value["error"] in {
+                "ROUTING_EXECUTOR_CONFLICT",
+                "ROUTING_EXPLICIT_UNAVAILABLE",
+                "ROUTING_EXECUTOR_INTENT_REQUIRED",
+            }:
+                value["recovery"] = (
+                    "Do not change or drop the rejected executor choice to bypass this error. "
+                    "For a user-requested executor use routing.explicitExecutor with an exact userQuote; "
+                    "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching."
+                )
+            if role == "main" and value["error"] in {
+                "TASK_SESSION_BINDING_REQUIRED",
+                "TASK_OUTCOME_UNRESOLVED",
+            }:
+                value["recovery"] = (
+                    "The original execution is unresolved. Do not message guessed sessions based on project membership "
+                    "or create a replacement task. Report the unresolved state and wait for actual stop evidence."
+                )
         except asyncio.CancelledError as exc:
             stopped = tool and (
                 tool.cancellation_stops_execution

@@ -6,10 +6,36 @@ from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.storage.database import row
 
 
 def register_main_tools(registry, tasks, memory, targets, router=None):
+    async def assert_session_inspection(session_id, binding):
+        inspected = await tasks.db.call(
+            lambda db: row(
+                db,
+                "SELECT m.content_json FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                "WHERE x.turn_id=? AND x.tool_name='task_status' AND x.state='succeeded' "
+                "ORDER BY x.rowid DESC LIMIT 1",
+                (binding["turnId"],),
+            )
+        )
+        if not inspected:
+            return
+        snapshot = json.loads(json.loads(inspected["content_json"])["text"])
+        unresolved = [
+            task
+            for task in snapshot
+            if (task.get("latestAttempt") or {}).get("outcomeKnown") is False
+            or (task.get("latestAttempt") or {}).get("state") == "unknown"
+        ]
+        if unresolved and not any(
+            session_id == (task.get("latestAttempt") or {}).get("sessionId") for task in unresolved
+        ):
+            raise DomainError("TASK_SESSION_BINDING_REQUIRED", 409)
+
     async def send_message(args, binding):
+        await assert_session_inspection(args["sessionId"], binding)
         return await targets.send(
             args["sessionId"],
             args["text"],
@@ -194,6 +220,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 if decision
                 else await targets.resolve("session", target["sessionId"])
             )
+            await assert_session_inspection(destination["sessionId"], binding)
             result = await targets.send(
                 destination["sessionId"],
                 args["goal"],
@@ -369,7 +396,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def steer_task(args, binding):
-        return await tasks.revisions.request(
+        receipt = await tasks.revisions.request(
             binding["owner"],
             args["taskId"],
             args["text"],
@@ -378,6 +405,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             source_turn_id=binding["turnId"],
             source_conversation_id=binding["conversation"],
         )
+        return {
+            **receipt,
+            "acceptedOnly": receipt["state"] in {"stopping", "applied"},
+            "kind": "task_continuation",
+        }
 
     registry.add(
         Tool(
