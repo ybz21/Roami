@@ -3,6 +3,8 @@
 ## 受管任务状态
 
 - `task_status {}` 返回当前 Main 的任务投影。用户问进度时查一次；正常等回调，不忙轮询。
+- 受管原任务续作用 `task_steer {taskId:ID,revision:实际版本,text:"追加要求"}`，保留原执行器和工作区。接受回执只表示排队，收到后结束本轮，不另建替代任务。
+- `latestAttempt.outcomeKnown=false` 或 `stopConfirmed=false` 不证明已停止；续作须等待真实停止证据。不要把同项目的 live 会话猜成原任务会话，只有 attempt 中的实际 sessionId 才能建立绑定。
 - `task_cancel {taskId:ID}` 取消本用户委派任务。cancelling 不等于停止，不能据此撤回旧会话已收到的消息，更不能杀掉所有 tmux 会话。
 - 原 Main 自动接收工具开始 / 结束、执行、验收与结果。状态 planned/queued/preparing/running/verifying 表示不同阶段；failed/cancelled/unknown 分开，未知不标成功，不盲目重派。
 - `session_send` 投递到原专业会话并建立派活回报通道。返回 dispatchId / replyExpected=true，目标提示词自带实例隔离的 CLI 回报命令。executionTracked=false 仍表示缺少供应商生命周期证明；投递成功不等于完成。

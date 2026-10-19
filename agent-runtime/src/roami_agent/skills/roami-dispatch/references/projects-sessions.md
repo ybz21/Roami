@@ -27,17 +27,21 @@
 
 使用模型的 `delegate`，不是把新会话命令拼进旧会话投递。
 
+每次 `delegate` 都带 `routing:{complexity:"bounded",complexityBasis:{维度:"具体事实"},routingExplanation:"本次执行负担",explicitExecutor:null}`；复杂工作把 complexity 改为 `complex`。用户指定执行器时，把 `explicitExecutor` 改成 `native` / `codex` / `claude`，同时提供原始用户消息中的准确 `userQuote`；没有指定则用 `null` 并省略 `userQuote`。选择不能只写进 goal、说明或引文，不再填写顶层 executor。依据实际自主探索与验证负担判断复杂度，不按文件类型或任务名称分流。
+
 | 场景 | 参数 | 行为 |
 | --- | --- | --- |
-| 项目新任务 | `executor:"codex"` 或 `"claude"`, `target:{kind:"project",projectId:ID}`, goal | 后台准备项目工作区 |
+| 项目新任务 | `target:{kind:"project",projectId:ID}`, goal, routing | 复杂任务选择可用专业执行器；后台准备项目工作区 |
 | 复用工作区 | 上述 target 增加 workspaceId | 不覆盖 directory/base/remote，不 fetch/reset 本地改动 |
-| 新散任务 | `target:{kind:"new_session",directory:"已知绝对目录"}`, executor, goal | 不绑项目；只有确需代码且目录未知时才发现或询问 |
-| 新项目 | `target:{kind:"new_project",name:"名称",baseDir:"可选父目录"}`, executor, goal | 仅在用户要求新项目时创建，不用于逃避旧会话限制 |
-| 原生 Worker | `executor:"native"`，合法 project/new_session 目标，goal | 用后台模型执行，显式指定优先于历史偏好 |
-| 简单公开网页研究 | `executor:"native",target:{kind:"new_session",resourceOnly:true}`, goal | 无代码目录，仅浏览器导航与观察 |
+| 新散任务 | `target:{kind:"new_session",directory:"已知绝对目录"}`, goal, routing | 不绑项目；需要文件时必须使用正确的本机目录 |
+| 新项目 | `target:{kind:"new_project",name:"名称",baseDir:"可选父目录"}`, goal, routing | 仅在用户要求新项目时创建，不用于逃避旧会话限制 |
+| 原生 Worker | bounded routing，合法 project/new_session 目标，goal | 用后台模型执行，显式指定优先于历史偏好 |
+| 简单公开网页研究 | `target:{kind:"new_session",resourceOnly:true}`, goal, bounded routing | 无代码目录，仅浏览器导航与观察 |
 | 检查点 Fork | delegate 增加 fromMessageId | 只从已完成助手检查点派生；保留父任务、预算和原 Main 回报目标 |
 
 queued / preparing 不代表已给 Codex 投递，失败不静默创建第二个会话。专业 Agent 是否安装、可登录、用量可读是不同状态，不能把未知额度说成额度充足。
+
+目录被拒后停止本轮委派，向用户说明并等待正确目录，不删除目录参数或改目标绕过。指定执行器不可用时说明或询问，不更换执行器或去同项目的其他会话投递。
 
 ## 完整 Go CLI：供专业 Agent / 终端使用
 
