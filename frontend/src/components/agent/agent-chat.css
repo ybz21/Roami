@@ -44,6 +44,9 @@
 .agent-file-card.is-failed small { color:var(--danger); }
 .agent-file-card button { display:inline-flex; align-items:center; justify-content:center; position:relative; width:var(--sp-5); height:var(--sp-5); flex:none; border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-dim); padding:0; cursor:pointer; }
 .agent-message-files { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-2); }
+.agent-image-attachment { display:inline-flex; max-width:100%; }
+.agent-image-thumb { display:inline-flex; max-width:100%; border:1px solid var(--border-subtle); border-radius:var(--r-sm); background:var(--bg-base); padding:var(--sp-1); cursor:pointer; }
+.agent-image-thumb img { display:block; max-width:100%; width:min(240px, 100%); height:auto; max-height:320px; object-fit:cover; border-radius:calc(var(--r-sm) - 1px); }
 .agent-jump-latest { position:absolute; bottom:var(--sp-3); left:50%; transform:translateX(-50%); width:var(--tap); height:var(--tap); border:1px solid var(--border); border-radius:var(--r-pill); color:var(--text-bright); background:var(--bg-elevated); display:grid; place-items:center; cursor:pointer; }
 .agent-drop-zone { position:absolute; inset:var(--sp-3); z-index:var(--z-popup); display:flex; align-items:center; justify-content:center; gap:var(--sp-3); border:2px dashed var(--accent-border); border-radius:var(--r-card); background:var(--accent-soft); color:var(--accent); pointer-events:none; font-size:var(--fs-lg); }
 .agent-slash { position:absolute; bottom:calc(100% + var(--sp-2)); left:0; right:0; z-index:var(--z-popup); display:flex; flex-direction:column; border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-elevated); padding:var(--sp-1); max-height:min(calc(var(--tap) * 6), 40dvh); overflow:auto; box-shadow:var(--elevated-shadow); }
