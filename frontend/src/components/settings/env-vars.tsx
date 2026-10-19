@@ -7,8 +7,34 @@ import { PlusIcon } from '../../icons'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 
-export function pushEnvToSessions(): Promise<void> {
-  return api('POST', '/env/push').then(() => undefined)
+export function useEnvPush() {
+  const { message, modal } = AntApp.useApp()
+  const { t } = useI18n()
+  return async () => {
+    const preview = await api('GET', '/env/push')
+    if (!preview.sessions.length) { message.info(t('env.noSessions')); return }
+    if (!preview.keys.length) { message.info(t('env.noVariables')); return }
+    return new Promise<void>(resolve => {
+      modal.confirm({
+        title: t('env.pushToSessions'),
+        content: <><p>{t('env.pushConfirm', { count: preview.sessions.length })}</p><p style={{ overflowWrap: 'anywhere' }}>{preview.keys.join(', ')}</p></>,
+        okText: t('env.pushToSessions'), cancelText: t('common.cancel'), onCancel: () => resolve(),
+        onOk: async () => {
+          try {
+            const result = await api('POST', '/env/push')
+            if (!result.sessions.length) message.info(t('env.noSessions'))
+            else if (!result.keys.length) message.info(t('env.noVariables'))
+            else {
+              const receipt = t('env.pushResult', result)
+              if (result.failed) message.warning(receipt)
+              else message.success(receipt)
+            }
+            resolve()
+          } catch (e: any) { message.error(e.message); throw e }
+        },
+      })
+    })
+  }
 }
 
 export function EnvVarsSettings() {

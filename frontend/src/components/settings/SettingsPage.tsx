@@ -13,11 +13,11 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { usePreferences, saveWorkspace, getPreferences, usePreferenceSaveState, flushPreferences } from '../../preferences'
 import { useThemeMode } from '../../theme'
-import { api } from '../../api'
 import { useClusterNodes, useCurrentNodeId } from '../cluster/node-url'
 import MobileSubPage from '../MobileSubPage'
 import MobilePageSearch from '../mobile/MobilePageSearch'
 import { SettingRow } from './SettingRow'
+import { useEnvPush } from './env-vars'
 import { buildSettings, itemText, rowCount, type SettingsModel, type SettingsPageDef } from './registry'
 
 const DEFAULT_PAGE = 'common'
@@ -84,6 +84,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const { message, modal } = AntApp.useApp()
   const { mode, setMode } = useThemeMode()
   const [prefs, setPrefs] = usePreferences()
+  const pushEnv = useEnvPush()
   const saveState = usePreferenceSaveState()
   const saveStatus = saveState === 'idle' ? null : <div role={saveState === 'failed' ? 'alert' : 'status'} className="tt-set-save-state">{t('settings.preference.' + saveState)}{saveState === 'failed' && <Button onClick={() => { void flushPreferences() }}>{t('agent.retry')}</Button>}</div>
   const { size } = useLayout()
@@ -117,7 +118,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
       if (!browserRestart.current) throw new Error(t('settings.readFailed'))
       await browserRestart.current()
     },
-    onEnvPush: async () => { await api('POST', '/env/push'); message.success(t('env.pushed')) },
+    onEnvPush: pushEnv,
   }), [t, mode, locale, prefs, nodeLabel, onLogout])
 
   const routed = pageFromRoute(sub || '')
@@ -208,7 +209,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     const openSub = sub ? model.pages[routed] : null
     return (
       <div className="tt-set">
-        {saveStatus}
+        {!openSub && saveStatus}
         {(mobileSearchOpen || q) && <div className="tt-set-mobile-head">
           <MobilePageSearch inputRef={searchRef} value={q} onChange={setQ}
             placeholder={t('set.searchPlaceholder')} resultCount={query ? t('set.hitCount', { n: totalHits }) : undefined}
@@ -244,6 +245,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
               <PaneHead page={openSub} model={model} compact />
+              {saveStatus}
               <div className="rows">{openSub.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>
             </div>
           </MobileSubPage>

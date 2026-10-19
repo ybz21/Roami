@@ -502,9 +502,10 @@ func (a *API) Spawn(c *gin.Context) {
 }
 
 // Env
-func (a *API) Env(c *gin.Context)       { a.json(c, "env", "--json") }
-func (a *API) EnvDelete(c *gin.Context) { a.text(c, "env", "rm", c.Param("key")) }
-func (a *API) EnvPush(c *gin.Context)   { a.text(c, "env", "push") }
+func (a *API) Env(c *gin.Context)            { a.json(c, "env", "--json") }
+func (a *API) EnvDelete(c *gin.Context)      { a.text(c, "env", "rm", c.Param("key")) }
+func (a *API) EnvPushPreview(c *gin.Context) { a.json(c, "env", "push", "--preview", "--json") }
+func (a *API) EnvPush(c *gin.Context)        { a.json(c, "env", "push", "--json") }
 func (a *API) EnvSet(c *gin.Context) {
 	var b struct {
 		Key   string `json:"key"`

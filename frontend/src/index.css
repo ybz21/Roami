@@ -3302,6 +3302,8 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
    右边只画选中的那一类，页内不滚——一页装不下就是这一类该拆（registry 的 MAX_ROWS
    在 dev 下会喊）。唯一允许滚的是搜索结果页 .tt-set-pane.scroll，它跨类、条数不可控。 */
 .tt-set { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tt-set-save-state { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) var(--pad-page); font-size: var(--fs-meta); color: var(--text-dim); }
+.tt-set-save-state[role="alert"] { color: var(--danger); background: var(--danger-soft); }
 .tt-set-head { flex: 0 0 auto; padding: var(--sp-3) var(--pad-page); border-bottom: 1px solid var(--border-subtle); }
 /* 页名 + 搜索 + JSON 一行（与会话页同一套：.tt-pagename 在手机档自动隐藏） */
 .tt-set-headrow { display: flex; align-items: center; gap: var(--sp-2); }

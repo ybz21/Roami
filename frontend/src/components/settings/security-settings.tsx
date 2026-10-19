@@ -63,7 +63,7 @@ export function TwoFactorSettings() {
   const confirmEnable = async () => {
     if (!setup) return
     setBusy(true)
-    try { await api('POST', '/2fa/enable', { secret: setup.secret, code: code.trim() }); message.success(t('twoFactor.enabled')); setSetup(null); refresh() }
+    try { await api('POST', '/2fa/enable', { secret: setup.secret, code: code.trim() }); message.success(t('twoFactor.enabled')); setSetup(null); setEnabled(true) }
     catch (e: any) { message.error(/BAD_CODE/.test(e.message) ? t('twoFactor.badCode') : e.message) }
     finally { setBusy(false) }
   }
@@ -73,13 +73,19 @@ export function TwoFactorSettings() {
     try {
       const r = await api('POST', sensitive === 'qr' ? '/2fa/qr' : '/2fa/disable', { password: credential, code: credential })
       if (sensitive === 'qr' && r.data?.enabled) setQr({ uri: r.data.uri, secret: r.data.secret })
-      else { message.success(t('twoFactor.disabled')); setQr(null); await refresh() }
+      else { message.success(t('twoFactor.disabled')); setQr(null); setEnabled(false) }
       setSensitive(null); setCredential('')
     } catch { setReauthError(t('twoFactor.reauthFailed')) }
     finally { setBusy(false) }
   }
   const requestSensitive = (action: 'qr' | 'disable') => { setQr(null); setCredential(''); setReauthError(''); setSensitive(action) }
-  const copy = (s: string) => { try { navigator.clipboard?.writeText(s) } catch {}; message.success(t('common.copied')) }
+  const copy = async (s: string) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('CLIPBOARD_UNAVAILABLE')
+      await navigator.clipboard.writeText(s)
+      message.success(t('common.copied'))
+    } catch { message.error(t('twoFactor.copyFailed')) }
+  }
 
   if (readState) return readState
   return (

@@ -227,21 +227,25 @@ func (r Runtime) SetGlobalEnv() {
 }
 
 // InjectEnv injects the env file into a live session (mirrors _inject_env).
-func (r Runtime) InjectEnv(sess string) {
+func (r Runtime) InjectEnv(sess string) error {
 	target := "=" + strings.TrimPrefix(sess, "=")
 	lines := r.EnvPairs()
 	if len(lines) == 0 {
-		return
+		return nil
 	}
 	for _, line := range lines {
 		key, val, ok := strings.Cut(line, "=")
 		if !ok {
 			continue
 		}
-		_ = r.Tmux("set-environment", "-t", target, key, val)
-		_ = r.Tmux("send-keys", "-t", target, "export "+line, "C-m")
+		if err := r.Tmux("set-environment", "-t", target, key, val); err != nil {
+			return err
+		}
+		if err := r.Tmux("send-keys", "-t", target, "export "+line, "C-m"); err != nil {
+			return err
+		}
 	}
-	_ = r.Tmux("send-keys", "-t", target, "clear", "C-m")
+	return r.Tmux("send-keys", "-t", target, "clear", "C-m")
 }
 
 var promptSequence atomic.Uint64

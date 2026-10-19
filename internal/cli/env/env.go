@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/ybz21/Roami/internal/terminalui"
@@ -46,6 +47,9 @@ func Run(rt runtime.Runtime, args []string, w io.Writer) error {
 	case "clear":
 		return Clear(rt, w)
 	case "push":
+		if slices.Contains(args, "--json") {
+			return PushJSON(rt, w, slices.Contains(args, "--preview"))
+		}
 		return Push(rt, w)
 	default:
 		if strings.Contains(subcmd, "=") {
@@ -147,10 +151,44 @@ func Push(rt runtime.Runtime, w io.Writer) error {
 		return nil
 	}
 	for _, sess := range sessions {
-		rt.InjectEnv(sess)
+		if err := rt.InjectEnv(sess); err != nil {
+			return fmt.Errorf("environment push failed for %s", sess)
+		}
 		ui.Ok(w, "已推送到 %s", ui.Bold(sess))
 	}
 	return nil
+}
+
+type pushResult struct {
+	Sessions []string `json:"sessions"`
+	Keys     []string `json:"keys"`
+	Success  int      `json:"success"`
+	Failed   int      `json:"failed"`
+	Skipped  int      `json:"skipped"`
+}
+
+// Preview and receipts contain names and counts, never environment values.
+func PushJSON(rt runtime.Runtime, w io.Writer, preview bool) error {
+	result := pushResult{Sessions: append([]string{}, rt.Sessions()...), Keys: []string{}}
+	for _, pair := range rt.EnvPairs() {
+		if key, _, ok := strings.Cut(pair, "="); ok {
+			result.Keys = append(result.Keys, key)
+		}
+	}
+	slices.Sort(result.Keys)
+	result.Keys = slices.Compact(result.Keys)
+	if !preview {
+		for _, sess := range result.Sessions {
+			if len(result.Keys) == 0 {
+				result.Skipped++
+			} else if rt.InjectEnv(sess) != nil {
+				result.Failed++
+			} else {
+				result.Success++
+			}
+		}
+	}
+	return json.NewEncoder(w).Encode(result)
 }
 
 func readEnvLines(rt runtime.Runtime) []string {

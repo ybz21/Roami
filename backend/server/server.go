@@ -311,6 +311,7 @@ func New(cfg Config) *gin.Engine {
 		g.PUT("/env", h.EnvSet)
 		g.DELETE("/env/:key", h.EnvDelete)
 		g.POST("/env/push", h.EnvPush)
+		g.GET("/env/push", h.EnvPushPreview)
 
 		g.GET("/speech/config", h.GetSpeechConfig)       // 语音识别(ASR)服务商配置
 		g.PUT("/speech/config", h.SetSpeechConfig)       //
