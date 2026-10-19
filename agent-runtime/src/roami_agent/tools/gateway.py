@@ -5,6 +5,7 @@ import math
 import time
 
 import httpx
+from jsonschema import ValidationError
 
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.protocol.errors import DomainError, ToolCancellation
@@ -134,6 +135,17 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            validation = exc.__cause__
+            if (
+                isinstance(validation, ValidationError)
+                and validation.validator == "required"
+                and isinstance(validation.instance, dict)
+            ):
+                value["missingFields"] = [
+                    ".".join([*map(str, validation.absolute_path), key])
+                    for key in validation.validator_value
+                    if key not in validation.instance
+                ]
             if role == "main" and value["error"] in {
                 "WORKSPACE_REQUIRED",
                 "WORKSPACE_OUTSIDE_CONFIGURED_ROOTS",
@@ -170,12 +182,34 @@ class ToolGateway:
             if role == "main" and value["error"] in {
                 "ROUTING_EXECUTOR_CONFLICT",
                 "ROUTING_EXPLICIT_UNAVAILABLE",
-                "ROUTING_EXECUTOR_INTENT_REQUIRED",
             }:
                 value["recovery"] = (
                     "Do not change or drop the rejected executor choice to bypass this error. "
                     "For a user-requested executor use routing.explicitExecutor with an exact userQuote; "
                     "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching."
+                )
+            if role == "main" and value["error"] == "ROUTING_EXECUTOR_INTENT_REQUIRED":
+                value["recovery"] = (
+                    "This is a tool-argument inconsistency, not a missing user decision. If the user did not "
+                    "choose an executor, keep routing.explicitExecutor=null and omit routing.userQuote; "
+                    "automatic routing uses existing defaults. Otherwise set the user's actual executor "
+                    "with its exact source quote. Correct the arguments; do not ask the user to repair them."
+                )
+            if (
+                role == "main"
+                and value["error"] == "INVALID_TOOL_ARGUMENTS"
+                and call["function"]["name"] == "delegate"
+            ):
+                value["recovery"] = (
+                    (
+                        "Missing required fields: " + ", ".join(value["missingFields"]) + ". "
+                        if value.get("missingFields")
+                        else ""
+                    )
+                    + "delegate requires goal and routing with complexity, complexityBasis, routingExplanation "
+                    "and explicitExecutor. Use explicitExecutor=null and omit userQuote when the user made "
+                    "no executor choice; otherwise include the exact source quote. Omit top-level executor. "
+                    "Correct arguments within the user's scope; never create test/probe tasks or ask the user to fix internal parameters."
                 )
             if role == "main" and value["error"] in {
                 "TASK_SESSION_BINDING_REQUIRED",

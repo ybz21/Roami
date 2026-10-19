@@ -8,6 +8,7 @@ No Worker or real coding session is started. Credentials are never exported.
 import argparse
 import asyncio
 import json
+import re
 import time
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -240,6 +241,42 @@ CASES = [
         "rapid",
     ),
     ("Q14", "1 加 1 等于几？只回答数字。", "直接回答 2，不派任务。", "direct"),
+    (
+        "Q15",
+        "查一下济南今天的天气，告诉我温度和降雨情况。",
+        "未说明文件要求的简单查询默认只读 Native，不额外写文件或创建项目。",
+        "weather",
+    ),
+    (
+        "Q16",
+        "在已有 Swarm 项目里自主研究无人机集群的国内外发展路线，多来源核对关键数据，比较不同技术方案，反复验证并调整结论，给出系统分析和最终建议。",
+        "未说明文件要求的复杂任务交专业执行器，明确要求在 Swarm 工作区保存成果并返回文件链接。",
+        "complex_default_file",
+    ),
+    (
+        "Q17",
+        "在已有 Swarm 项目里自主研究无人机集群的国内外发展路线，多来源核对关键数据，比较不同技术方案，反复验证并调整结论。只在聊天里给我系统分析和最终建议，禁止创建或修改任何文件。",
+        "复杂任务仍交专业执行器，保留用户明确的禁止写文件要求。",
+        "complex_chat_only",
+    ),
+    (
+        "Q18",
+        "用两句话解释什么是 Git worktree。",
+        "未说明文件要求的简单问答直接回复，不建任务或写文件。",
+        "direct_explanation",
+    ),
+    (
+        "Q19",
+        "工作目录是 {directory}。请自主调研无人机集群的技术路线，比较国内外不同方案，多来源交叉核对数据，反复验证并调整结论，给出完整分析和建议。",
+        "未说明文件要求的复杂散任务使用准确目录，明确保存成果；不强制 Git 项目。",
+        "complex_default_directory",
+    ),
+    (
+        "Q20",
+        "把这段话整理成三条要点：明天上午十点开项目评审会，请提前看需求稿，会上先确认范围再讨论风险，结论由负责人汇总后发给大家。",
+        "未说明文件要求的简单整理直接在聊天回复，不建任务或额外写文件。",
+        "direct_explanation",
+    ),
 ]
 
 
@@ -367,6 +404,47 @@ async def run_case(provider, settings, output, number, case):
                 and plans[0]["executor"] == "native"
                 and plans[0]["target"].get("directory") == str(directory)
                 and not plans[0]["target"].get("resourceOnly")
+            )
+        elif kind in {
+            "complex_default_file",
+            "complex_default_directory",
+            "complex_chat_only",
+        }:
+            plan = plans[0] if len(plans) == 1 else {}
+            destination = plan.get("target", {})
+            goal = plan.get("goal", "")
+            passed = plan.get("executor") == "codex" and not destination.get(
+                "resourceOnly"
+            )
+            if kind == "complex_default_directory":
+                passed = (
+                    passed
+                    and destination.get("kind") == "new_session"
+                    and destination.get("directory") == str(directory)
+                )
+            else:
+                passed = passed and destination.get("projectId") == "proj-swarm"
+            if kind == "complex_chat_only":
+                passed = passed and bool(
+                    re.search(
+                        r"(不|禁止).{0,15}(写|保存|创建|修改).{0,10}文件|只.{0,8}聊天",
+                        goal,
+                    )
+                )
+            else:
+                passed = passed and bool(
+                    re.search(
+                        r"保存|写入|落盘|(?:输出|交付|生成|产出|持久).{0,30}(?:文件|\.md)|(?:目录|工作区|/[^\s]+).{0,40}(?:输出|产出|生成).{0,30}(?:报告|文档)|写.{0,15}报告|save|persist",
+                        goal,
+                        re.IGNORECASE,
+                    )
+                )
+        elif kind == "direct_explanation":
+            passed = (
+                not plans
+                and not targets.sends
+                and bool("".join(answers).strip())
+                and not {"file_write", "file_patch"}.intersection(operations)
             )
         elif kind == "missing":
             passed = (

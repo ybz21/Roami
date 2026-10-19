@@ -28,7 +28,10 @@ def routing_schema():
                 "enum": [None, *sorted(EXECUTORS)],
                 "description": "Required on every assessment: the user's explicitly requested executor, or null only when the user made no executor choice. Never put the choice only in goal or routingExplanation.",
             },
-            "userQuote": text,
+            "userQuote": {
+                **text,
+                "description": "Exact source quote for a non-null explicitExecutor only. Omit when explicitExecutor is null; this is not a general task quote.",
+            },
             "preference": object_schema(
                 {
                     "executor": {"type": "string", "enum": sorted(EXECUTORS)},

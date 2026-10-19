@@ -133,6 +133,65 @@ async def test_unknown_run_cannot_be_assigned_to_an_unbound_session_or_replaced(
         await runtime.close()
 
 
+async def test_automatic_executor_quote_mismatch_can_be_corrected_without_a_user_choice(store):
+    runtime, targets, _, tools, binding = await setup(store)
+    targets.project_default = "codex"
+    runtime.gateway.tools = tools
+    try:
+        turn = await active_turn(store, binding)
+        args = request(userQuote="Please investigate")
+        args["target"] = {"kind": "project", "projectId": "p"}
+        rejected = await runtime.gateway.invoke(
+            turn, binding["assistantMessageId"], call("quote", "delegate", args), "main", binding
+        )
+        assert rejected["error"] == "ROUTING_EXECUTOR_INTENT_REQUIRED"
+        assert "omit routing.userQuote" in rejected["recovery"]
+        assert not await runtime.tasks.list("alice")
+        args["routing"].pop("userQuote")
+        binding["toolCallId"] = "corrected"
+        corrected = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call("corrected", "delegate", args),
+            "main",
+            binding,
+        )
+        assert corrected["acceptedOnly"] is True
+        assert corrected["executor"] == "codex"
+        assert len(await runtime.tasks.list("alice")) == 1
+    finally:
+        await runtime.close()
+
+
+async def test_missing_executor_field_reports_its_path_and_accepts_a_corrected_request(store):
+    runtime, _, _, tools, binding = await setup(store)
+    runtime.gateway.tools = tools
+    try:
+        turn = await active_turn(store, binding)
+        args = request()
+        args["routing"].pop("explicitExecutor")
+        rejected = await runtime.gateway.invoke(
+            turn, binding["assistantMessageId"], call("missing", "delegate", args), "main", binding
+        )
+        assert rejected["error"] == "INVALID_TOOL_ARGUMENTS"
+        assert rejected["missingFields"] == ["routing.explicitExecutor"]
+        assert rejected["recovery"].startswith("Missing required fields: routing.explicitExecutor.")
+        assert not await runtime.tasks.list("alice")
+        args["routing"]["explicitExecutor"] = None
+        binding["toolCallId"] = "corrected"
+        corrected = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call("corrected", "delegate", args),
+            "main",
+            binding,
+        )
+        assert corrected["acceptedOnly"] is True
+        assert len(await runtime.tasks.list("alice")) == 1
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize(
     "fallback",
     [
