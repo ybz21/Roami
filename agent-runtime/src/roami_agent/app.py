@@ -37,6 +37,7 @@ from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
+from roami_agent.observability.execution_traces import ExecutionTraces
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.chat_completions import ChatCompletions
@@ -184,6 +185,7 @@ class Runtime:
         self.gateway = ToolGateway(database, self.tools, self.wakeup)
         self.cli_commands = CLICommands(database, self.tools, self.journal)
         self.manifests = PromptManifests(database)
+        self.traces = ExecutionTraces(database)
         self.dispatch = TaskDispatcher(
             database,
             self.tasks,
@@ -242,6 +244,7 @@ class Runtime:
             model,
             self.wakeup,
             self.turn_tasks,
+            self.loop.preempt,
         )
         self.model_settings = ModelSettings(self, configured_provider)
         self.capability_settings = CapabilitySettings(self)

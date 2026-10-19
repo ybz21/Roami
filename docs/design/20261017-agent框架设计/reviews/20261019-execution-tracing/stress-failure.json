@@ -1,0 +1,91 @@
+{
+  "status": "failed",
+  "case": "repeat_previous",
+  "reason": "Explicitly continuing the earlier lookup can still duplicate delegation or omit the exact fresh credentials in Main replies; basic independent questions passed separately",
+  "root": "/tmp/roami-acceptance-20261019-20261019-075926",
+  "turns": [
+    {
+      "id": "646a380759cf4f8f819b57cc812e1ca5",
+      "trigger_kind": "completion",
+      "state": "completed",
+      "created_ms": 1792368163104,
+      "finished_ms": 1792368168732
+    },
+    {
+      "id": "07f3eff589654d23840b9a77044c7c44",
+      "trigger_kind": "completion",
+      "state": "completed",
+      "created_ms": 1792368139189,
+      "finished_ms": 1792368143532
+    },
+    {
+      "id": "a0b8ffadd905499092c7aee08134b8fd",
+      "trigger_kind": "completion",
+      "state": "completed",
+      "created_ms": 1792368093096,
+      "finished_ms": 1792368120137
+    },
+    {
+      "id": "040a8f7d1dea49b59b10ad6950066633",
+      "trigger_kind": "user",
+      "state": "completed",
+      "created_ms": 1792368075482,
+      "finished_ms": 1792368084636
+    },
+    {
+      "id": "cf9a9e9fd7de42b28b7f7a8b270ee242",
+      "trigger_kind": "user",
+      "state": "completed",
+      "created_ms": 1792368075352,
+      "finished_ms": 1792368102938
+    },
+    {
+      "id": "f85c916a05924e44b948bcee39b989ed",
+      "trigger_kind": "user",
+      "state": "interrupted",
+      "created_ms": 1792368037327,
+      "finished_ms": 1792368037479
+    },
+    {
+      "id": "8774e113472a479bb8c607a5b1dae981",
+      "trigger_kind": "completion",
+      "state": "completed",
+      "created_ms": 1792368032656,
+      "finished_ms": 1792368037144
+    },
+    {
+      "id": "3b40129cf8194c9783d58c5de8926aa7",
+      "trigger_kind": "completion",
+      "state": "completed",
+      "created_ms": 1792368026363,
+      "finished_ms": 1792368028073
+    }
+  ],
+  "tasks": [
+    {
+      "id": "8683b0915e0e4a7a8bf2379b738158df",
+      "state": "succeeded",
+      "origin_message_id": "45d8d2d06f524c03b62d4e8f51780bff"
+    },
+    {
+      "id": "17dba2cf36974abaa27a52c1adbb6388",
+      "state": "succeeded",
+      "origin_message_id": "45d8d2d06f524c03b62d4e8f51780bff"
+    },
+    {
+      "id": "2d2ba46db976437cbe1efcb8bfa2b582",
+      "state": "interrupted",
+      "origin_message_id": "45d8d2d06f524c03b62d4e8f51780bff"
+    },
+    {
+      "id": "b4909af89e994ddb8e053539547c476e",
+      "state": "waiting_user",
+      "origin_message_id": "2c5b569bec004ffbb9b441a07bc2014e"
+    },
+    {
+      "id": "e10519b29a6749139517add49a988ca3",
+      "state": "succeeded",
+      "origin_message_id": "bc0f879ca7024027b1a8ce2bcf46b3e5"
+    }
+  ]
+}

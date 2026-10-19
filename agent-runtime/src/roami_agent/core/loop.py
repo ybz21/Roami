@@ -2,8 +2,10 @@
 
 import asyncio
 import hashlib
+from contextlib import asynccontextmanager
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.models import Model
 from roami_agent.protocol.ports import (
     ContextBuilder,
@@ -36,6 +38,52 @@ class AgentLoop:
         self.manifests, self.charge_task, self.turn_tasks = manifests, charge_task, turn_tasks
         self.clock = clock
         self.gateway = gateway
+        self.preemptible = set()
+
+    def preempt(self, turn_id):
+        handle = self.turn_tasks.get(turn_id)
+        if turn_id in self.preemptible and handle and not handle.done():
+            handle.cancel("NEW_USER_INTENT")
+
+    async def build_context(self, turn, instructions, catalog, completion):
+        started, wall = self.clock(), now_ms()
+        plan, prompt = await self.context.build(turn, instructions, catalog, completion)
+        if turn.get("resumed"):
+            prompt.append(
+                {
+                    "role": "user",
+                    "content": "Resume this original request after another user intent briefly took priority. "
+                    "That newer request is handled separately. Complete this request, preserving persisted "
+                    "tool results and existing background tasks; do not repeat writes or duplicate delegation.",
+                }
+            )
+        return dict(
+            plan,
+            timing={"contextStartedMs": wall, "contextDurationMs": (self.clock() - started) * 1000},
+        ), prompt
+
+    @asynccontextmanager
+    async def measured_request(self, turn, attempt, timing, role):
+        started = self.clock()
+        timing = dict(timing, modelStartedMs=now_ms(), state="running", providerEvents=[])
+        await self.manifests.timing(turn, attempt, timing)
+        try:
+            async with asyncio.timeout(self.settings.timeout_for(role)):
+                yield timing, started
+            timing["state"] = "succeeded"
+        except BaseException as exc:
+            timing["state"] = "interrupted" if isinstance(exc, asyncio.CancelledError) else "failed"
+            timing["errorCode"] = (
+                "NEW_USER_INTENT"
+                if isinstance(exc, asyncio.CancelledError) and exc.args == ("NEW_USER_INTENT",)
+                else exc.code
+                if isinstance(exc, DomainError)
+                else type(exc).__name__
+            )
+            raise
+        finally:
+            timing.update(modelFinishedMs=now_ms(), modelDurationMs=(self.clock() - started) * 1000)
+            await self.manifests.timing(turn, attempt, timing)
 
     async def run(self, turn, role, *, task_id=None, completion=None):
         tid, cid, owner = (turn[k] for k in ["id", "conversation_id", "owner_id"])
@@ -51,9 +99,12 @@ class AgentLoop:
                     else self.settings.worker_instructions
                 )
                 catalog = self.tools.catalog(role)
-                plan, prompt = await self.context.build(turn, instructions, catalog, completion)
+                if role == "main" and await self.journal.defer(turn, only_if_pending=True):
+                    return None
+                plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
-                for step in range(self.settings.max_steps):
+                offset = await self.journal.attempt_offset(turn)
+                for step in range(offset, self.settings.max_steps):
                     if task_id:
                         await self.charge_task(task_id)
                     provider_key = getattr(model, "provider_key", "unidentified")
@@ -76,8 +127,28 @@ class AgentLoop:
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
                     first_delta = True
                     phase = "model"
-                    async with asyncio.timeout(self.settings.timeout_for(role)):
+                    if role == "main":
+                        self.preemptible.add(tid)
+                    async with self.measured_request(turn, step + 1, plan["timing"], role) as (
+                        timing,
+                        model_started,
+                    ):
                         async for part in model.stream(prompt, catalog):
+                            elapsed = (self.clock() - model_started) * 1000
+                            if part.kind == "telemetry":
+                                if len(timing["providerEvents"]) < 16:
+                                    timing["providerEvents"].append(
+                                        dict(part.value, elapsedMs=elapsed)
+                                    )
+                                    if part.value.get("phase") in {
+                                        "headers",
+                                        "first_delta",
+                                        "retry",
+                                    }:
+                                        await self.manifests.timing(turn, step + 1, timing)
+                            elif part.kind == "text" and part.value and "firstTextMs" not in timing:
+                                timing["firstTextMs"] = elapsed
+                                await self.manifests.timing(turn, step + 1, timing)
                             if part.kind == "text":
                                 text += part.value
                                 buffer += part.value
@@ -95,6 +166,7 @@ class AgentLoop:
                                 calls.append(part.value)
                             elif part.kind == "usage":
                                 usage = part.value
+                    self.preemptible.discard(tid)
                     phase = "tools"
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
@@ -126,6 +198,9 @@ class AgentLoop:
                     if not calls:
                         await self.context.after_turn(turn, instructions, catalog)
                         return text
+                    handed_off = role == "main" and all(
+                        call["function"]["name"] == "delegate" for call in calls
+                    )
                     for call in calls:
                         binding = {
                             "owner": owner,
@@ -138,6 +213,11 @@ class AgentLoop:
                             "workspace": turn.get("workspace"),
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
+                        handed_off = (
+                            handed_off
+                            and isinstance(value, dict)
+                            and value.get("acceptedOnly") is True
+                        )
                         if (
                             call["function"]["name"] == "ask_user"
                             and isinstance(value, dict)
@@ -159,9 +239,25 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
+                    if handed_off:
+                        # The durable task card is the receipt; a second model call delays new intents.
+                        await self.journal.finish(
+                            turn,
+                            mid,
+                            text,
+                            calls,
+                            usage,
+                            step + 1,
+                            final=True,
+                            completion=completion,
+                        )
+                        await self.context.after_turn(turn, instructions, catalog)
+                        return text
+                    if role == "main" and await self.journal.defer(turn, only_if_pending=True):
+                        return None
                     catalog = self.tools.catalog(role)
                     phase = "context"
-                    plan, prompt = await self.context.build(turn, instructions, catalog, completion)
+                    plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 raise DomainError("AGENT_STEP_LIMIT")
         except TimeoutError as exc:
             code = (
@@ -172,6 +268,12 @@ class AgentLoop:
             await self.journal.fail(turn, "failed", code, completion=completion)
             raise DomainError(code, 504) from exc
         except BaseException as exc:
+            if (
+                isinstance(exc, asyncio.CancelledError)
+                and exc.args == ("NEW_USER_INTENT",)
+                and await self.journal.defer(turn)
+            ):
+                return None
             interrupted = isinstance(exc, asyncio.CancelledError) or (
                 isinstance(exc, DomainError) and exc.code == "TURN_INTERRUPTED"
             )
@@ -186,4 +288,5 @@ class AgentLoop:
             await self.journal.fail(turn, state, code, completion=completion)
             raise
         finally:
+            self.preemptible.discard(tid)
             self.turn_tasks.pop(tid, None)

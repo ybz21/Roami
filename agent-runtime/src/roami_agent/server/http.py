@@ -84,6 +84,19 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.capability_settings.view(owner)
         return {"data": runtime.tools.directory.search(query, kind, 10)}
 
+    @app.get("/v1/traces")
+    async def execution_trace(
+        owner: Owner,
+        turn_id: str | None = Query(default=None, alias="turnId", max_length=200),
+        task_id: str | None = Query(default=None, alias="taskId", max_length=200),
+        format: Literal["json", "chrome"] = "json",
+    ):
+        return {
+            "data": await runtime.traces.get(
+                owner, turn_id=turn_id, task_id=task_id, chrome=format == "chrome"
+            )
+        }
+
     @app.get("/v1/tool-directory/{name}")
     async def tool_operation(name: str, owner: Owner):
         runtime.capability_settings.view(owner)

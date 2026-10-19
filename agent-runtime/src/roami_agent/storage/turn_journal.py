@@ -12,6 +12,57 @@ class TurnJournal:
     def __init__(self, database):
         self.db = database
 
+    async def attempt_offset(self, turn):
+        return await self.db.call(
+            lambda db: db.execute(
+                "SELECT COALESCE(MAX(attempt_no),0) FROM prompt_manifests WHERE turn_id=?",
+                (turn["id"],),
+            ).fetchone()[0]
+        )
+
+    async def defer(self, turn, *, only_if_pending=False):
+        def write(db):
+            assert_context_admitted(db, turn)
+            if only_if_pending and not row(
+                db,
+                "SELECT u.id FROM turns u JOIN jobs j ON j.aggregate_id=u.id AND j.kind='turn.run' "
+                "WHERE u.branch_id=? AND u.id!=? AND u.state='queued' AND u.trigger_kind='user' "
+                "AND COALESCE(json_extract(j.payload_json,'$.deferred'),0)=0 LIMIT 1",
+                (turn["branch_id"], turn["id"]),
+            ):
+                return False
+            job = row(
+                db,
+                "SELECT id FROM jobs WHERE kind='turn.run' AND aggregate_id=? AND state='running'",
+                (turn["id"],),
+            )
+            if not job or not row(
+                db, "SELECT id FROM turns WHERE id=? AND state='running'", (turn["id"],)
+            ):
+                return False
+            db.execute(
+                "UPDATE messages SET status='interrupted' WHERE turn_id=? AND status='streaming'",
+                (turn["id"],),
+            )
+            db.execute("UPDATE turns SET state='queued' WHERE id=?", (turn["id"],))
+            db.execute(
+                "UPDATE jobs SET state='queued',payload_json=json_set(payload_json,'$.deferred',1) WHERE id=?",
+                (job["id"],),
+            )
+            event(
+                db,
+                turn["conversation_id"],
+                "turn.deferred",
+                {"turnId": turn["id"], "reason": "NEW_USER_INTENT"},
+                turn_id=turn["id"],
+            )
+            return True
+
+        try:
+            return await self.db.call(write, write=True)
+        except DomainError:
+            return False
+
     async def origin(self, turn):
         if turn.get("trigger_kind") == "completion":
             origin = await self.db.call(

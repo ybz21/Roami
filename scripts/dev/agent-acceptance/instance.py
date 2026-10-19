@@ -112,6 +112,31 @@ def start(args):
         for key, value in model.items()
         if key in {"endpoint", "name", "key_env", "worker"}
     )
+    parameters = dict(model.get("parameters", {}))
+    if args.main_reasoning_effort:
+        parameters["reasoning_effort"] = args.main_reasoning_effort
+    if parameters:
+        settings += (
+            "\n[model.parameters]\n"
+            + "\n".join(
+                key + "=" + json.dumps(value) for key, value in parameters.items()
+            )
+            + "\n"
+        )
+    if args.main_reasoning_effort:
+        worker_parameters = model.get("parameters", {})
+        settings += (
+            "\n[worker.model]\nname="
+            + json.dumps(model.get("worker") or model["name"])
+            + "\n[worker.model.parameters]\n"
+        )
+        settings += (
+            "\n".join(
+                key + "=" + json.dumps(value)
+                for key, value in worker_parameters.items()
+            )
+            + "\n"
+        )
     settings += "\n[runtime]\ncoding_directory=" + json.dumps(str(root / "workspaces"))
     skill_markers = {}
     if args.document_skills:
@@ -288,6 +313,7 @@ def main():
     parser.add_argument("--cli", default=str(REPO / "backend/dist/roami-linux-amd64"))
     parser.add_argument("--config-root", default="~/.roami")
     parser.add_argument("--cdp", default="http://127.0.0.1:9222")
+    parser.add_argument("--main-reasoning-effort", choices=["low", "high", "max"])
     args = parser.parse_args()
     if args.stop:
         stop(args.state)

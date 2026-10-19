@@ -1,0 +1,622 @@
+{
+  "schemaVersion": 1,
+  "traceId": "7caa898efa78477e81ccfb1c3389dbc0",
+  "requestId": "72935fafbd2a41b7b4ea33f3087c9be8",
+  "rootTurnId": "7caa898efa78477e81ccfb1c3389dbc0",
+  "observedAtMs": 1792368187057,
+  "startedMs": 1792367996531,
+  "finishedMs": 1792368037144,
+  "summary": {
+    "durationMs": 40613,
+    "firstCommittedTextMs": 23776,
+    "active": false,
+    "hasFailures": true,
+    "hasUnknown": false,
+    "taskStates": {
+      "b4909af89e994ddb8e053539547c476e": "waiting_user"
+    },
+    "modelCalls": 7,
+    "toolCalls": 4,
+    "durationSumsMayOverlap": true
+  },
+  "spans": [
+    {
+      "spanId": "trace:7caa898efa78477e81ccfb1c3389dbc0",
+      "parentSpanId": null,
+      "name": "agent.execution",
+      "startedMs": 1792367996531,
+      "finishedMs": 1792368037144,
+      "durationMs": 40613,
+      "state": "settled",
+      "attributes": {}
+    },
+    {
+      "spanId": "turn-queue:7caa898efa78477e81ccfb1c3389dbc0",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "turn.queue",
+      "startedMs": 1792367996531,
+      "finishedMs": 1792367996546,
+      "durationMs": 15,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "measured"
+      }
+    },
+    {
+      "spanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "parentSpanId": "trace:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "agent.main",
+      "startedMs": 1792367996531,
+      "finishedMs": 1792368022820,
+      "durationMs": 26289,
+      "state": "completed",
+      "attributes": {
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "requestId": "72935fafbd2a41b7b4ea33f3087c9be8",
+        "conversationId": "22a0986ce0c3482b95c6732fe1cba332",
+        "linkedRunId": null
+      }
+    },
+    {
+      "spanId": "context:9d3aed4849c6420bbdef95fead440b07",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "context.build",
+      "startedMs": 1792367996546,
+      "finishedMs": 1792367996553.0913,
+      "durationMs": 7.09130859375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:9d3aed4849c6420bbdef95fead440b07",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "model.request",
+      "startedMs": 1792367996561,
+      "finishedMs": 1792367996672,
+      "durationMs": 111,
+      "state": "interrupted",
+      "attributes": {
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 110.97778799012303,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 3.0866870656609535,
+            "phase": "request"
+          }
+        ],
+        "requestAttempts": null,
+        "errorCode": "NEW_USER_INTENT",
+        "tokens": {
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "deferred:5",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "turn.rescheduled",
+      "startedMs": 1792367996676,
+      "finishedMs": 1792368006665,
+      "durationMs": 9989,
+      "state": "resumed",
+      "attributes": {
+        "reason": "NEW_USER_INTENT"
+      }
+    },
+    {
+      "spanId": "context:ead67b2efbcc43d88074a3dbb1f3c98c",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "context.build",
+      "startedMs": 1792368006665,
+      "finishedMs": 1792368006678.9028,
+      "durationMs": 13.90283203125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:ead67b2efbcc43d88074a3dbb1f3c98c",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "model.request",
+      "startedMs": 1792368006693,
+      "finishedMs": 1792368011013,
+      "durationMs": 4320,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 2,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 4320.430686231703,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 5.951973143965006,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 4070.9273270331323,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 4074.1173732094467,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2747,
+          "outputTokens": 28,
+          "cacheReadTokens": 2560,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:ab69aaf5cfc7473eaed1a8e9be640310",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "tool.bash",
+      "startedMs": 1792368011026,
+      "finishedMs": 1792368011037,
+      "durationMs": 11,
+      "state": "failed",
+      "attributes": {
+        "toolCallId": "ab69aaf5cfc7473eaed1a8e9be640310",
+        "toolName": "bash",
+        "effect": "write",
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "causedBySpanId": "model:ead67b2efbcc43d88074a3dbb1f3c98c"
+      }
+    },
+    {
+      "spanId": "context:8820aa9d49c04a6b8cac8ffae4fd357d",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "context.build",
+      "startedMs": 1792368011043,
+      "finishedMs": 1792368011049.2913,
+      "durationMs": 6.291259765625,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:8820aa9d49c04a6b8cac8ffae4fd357d",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "model.request",
+      "startedMs": 1792368011063,
+      "finishedMs": 1792368017644,
+      "durationMs": 6581,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 3,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 6580.847823992372,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 5.163185298442841,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3999.770373106003,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 4003.0330079607666,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2871,
+          "outputTokens": 110,
+          "cacheReadTokens": 2688,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:2da4487794574f8cb269b565144affc4",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "tool.delegate",
+      "startedMs": 1792368017654,
+      "finishedMs": 1792368017661,
+      "durationMs": 7,
+      "state": "failed",
+      "attributes": {
+        "toolCallId": "2da4487794574f8cb269b565144affc4",
+        "toolName": "delegate",
+        "effect": "write",
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "causedBySpanId": "model:8820aa9d49c04a6b8cac8ffae4fd357d"
+      }
+    },
+    {
+      "spanId": "context:298f630110f6440c88b87e73b5ed22f9",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "context.build",
+      "startedMs": 1792368017665,
+      "finishedMs": 1792368017677.9727,
+      "durationMs": 12.97265625,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:298f630110f6440c88b87e73b5ed22f9",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "model.request",
+      "startedMs": 1792368017685,
+      "finishedMs": 1792368022780,
+      "durationMs": 5095,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 4,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 5094.720168970525,
+        "firstTextMs": 2612.1765389107168,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 3.147501964122057,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 1778.1504751183093,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 1786.8685200810432,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2993,
+          "outputTokens": 160,
+          "cacheReadTokens": 2816,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:992db5b8389846f7bf61553291394237",
+      "parentSpanId": "turn:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "tool.delegate",
+      "startedMs": 1792368022799,
+      "finishedMs": 1792368022816,
+      "durationMs": 17,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "992db5b8389846f7bf61553291394237",
+        "toolName": "delegate",
+        "effect": "write",
+        "turnId": "7caa898efa78477e81ccfb1c3389dbc0",
+        "causedBySpanId": "model:298f630110f6440c88b87e73b5ed22f9"
+      }
+    },
+    {
+      "spanId": "task-queue:50eb6cb4f31c436ba28bbcd5eac7f398",
+      "parentSpanId": "trace:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "task.queue",
+      "startedMs": 1792368022809,
+      "finishedMs": 1792368022825,
+      "durationMs": 16,
+      "state": "completed",
+      "attributes": {
+        "taskId": "b4909af89e994ddb8e053539547c476e"
+      }
+    },
+    {
+      "spanId": "prepare:50eb6cb4f31c436ba28bbcd5eac7f398",
+      "parentSpanId": "run:50eb6cb4f31c436ba28bbcd5eac7f398",
+      "name": "executor.prepare",
+      "startedMs": 1792368022825,
+      "finishedMs": 1792368022901,
+      "durationMs": 76,
+      "state": "completed",
+      "attributes": {
+        "runId": "50eb6cb4f31c436ba28bbcd5eac7f398"
+      }
+    },
+    {
+      "spanId": "run:50eb6cb4f31c436ba28bbcd5eac7f398",
+      "parentSpanId": "trace:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "executor.native",
+      "startedMs": 1792368022825,
+      "finishedMs": 1792368032646,
+      "durationMs": 9821,
+      "state": "succeeded",
+      "attributes": {
+        "taskId": "b4909af89e994ddb8e053539547c476e",
+        "runId": "50eb6cb4f31c436ba28bbcd5eac7f398",
+        "taskState": "waiting_user",
+        "revision": 1,
+        "observationUnit": "native_run",
+        "internalStepsObservable": true,
+        "sourceTurnId": "7caa898efa78477e81ccfb1c3389dbc0"
+      }
+    },
+    {
+      "spanId": "turn-queue:058462290d0a4a8c961a4ad5ae69d453",
+      "parentSpanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "name": "worker.prepare",
+      "startedMs": 1792368022825,
+      "finishedMs": 1792368022904,
+      "durationMs": 79,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "measured"
+      }
+    },
+    {
+      "spanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "parentSpanId": "run:50eb6cb4f31c436ba28bbcd5eac7f398",
+      "name": "agent.worker",
+      "startedMs": 1792368022825,
+      "finishedMs": 1792368032633,
+      "durationMs": 9808,
+      "state": "completed",
+      "attributes": {
+        "turnId": "058462290d0a4a8c961a4ad5ae69d453",
+        "requestId": null,
+        "conversationId": "bf27d121706a4ffe8f57ed531666dbdf",
+        "linkedRunId": null
+      }
+    },
+    {
+      "spanId": "context:18aad344db3e4fc39b0b0163aaa29b9b",
+      "parentSpanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "name": "context.build",
+      "startedMs": 1792368022904,
+      "finishedMs": 1792368022907.8372,
+      "durationMs": 3.837158203125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:18aad344db3e4fc39b0b0163aaa29b9b",
+      "parentSpanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "name": "model.request",
+      "startedMs": 1792368022917,
+      "finishedMs": 1792368028267,
+      "durationMs": 5350,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "058462290d0a4a8c961a4ad5ae69d453",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 5349.26407597959,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.948407083749771,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2991.9563960283995,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2995.614235755056,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 1156,
+          "outputTokens": 57,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:daaeaab60ae84ca3a0340bf6f18e2c8b",
+      "parentSpanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "name": "tool.bash",
+      "startedMs": 1792368028280,
+      "finishedMs": 1792368028298,
+      "durationMs": 18,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "daaeaab60ae84ca3a0340bf6f18e2c8b",
+        "toolName": "bash",
+        "effect": "write",
+        "turnId": "058462290d0a4a8c961a4ad5ae69d453",
+        "causedBySpanId": "model:18aad344db3e4fc39b0b0163aaa29b9b"
+      }
+    },
+    {
+      "spanId": "context:bc60d1b3f8144aec92289713cfc8d363",
+      "parentSpanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "name": "context.build",
+      "startedMs": 1792368028301,
+      "finishedMs": 1792368028302.5188,
+      "durationMs": 1.518798828125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:bc60d1b3f8144aec92289713cfc8d363",
+      "parentSpanId": "turn:058462290d0a4a8c961a4ad5ae69d453",
+      "name": "model.request",
+      "startedMs": 1792368028319,
+      "finishedMs": 1792368032626,
+      "durationMs": 4307,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "058462290d0a4a8c961a4ad5ae69d453",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 2,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 4307.011241093278,
+        "firstTextMs": 3716.894106939435,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.7485210448503494,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3704.5474811457098,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3712.891105096787,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 1296,
+          "outputTokens": 46,
+          "cacheReadTokens": 1024,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "verify:50eb6cb4f31c436ba28bbcd5eac7f398",
+      "parentSpanId": "trace:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "task.verification_and_queue",
+      "startedMs": 1792368032646,
+      "finishedMs": 1792368032657,
+      "durationMs": 11,
+      "state": "completed",
+      "attributes": {
+        "runId": "50eb6cb4f31c436ba28bbcd5eac7f398",
+        "taskState": "waiting_user"
+      }
+    },
+    {
+      "spanId": "turn-queue:8774e113472a479bb8c607a5b1dae981",
+      "parentSpanId": "turn:8774e113472a479bb8c607a5b1dae981",
+      "name": "turn.queue",
+      "startedMs": 1792368032656,
+      "finishedMs": 1792368032672,
+      "durationMs": 16,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "measured"
+      }
+    },
+    {
+      "spanId": "turn:8774e113472a479bb8c607a5b1dae981",
+      "parentSpanId": "trace:7caa898efa78477e81ccfb1c3389dbc0",
+      "name": "agent.report",
+      "startedMs": 1792368032656,
+      "finishedMs": 1792368037144,
+      "durationMs": 4488,
+      "state": "completed",
+      "attributes": {
+        "turnId": "8774e113472a479bb8c607a5b1dae981",
+        "requestId": null,
+        "conversationId": "22a0986ce0c3482b95c6732fe1cba332",
+        "linkedRunId": "50eb6cb4f31c436ba28bbcd5eac7f398"
+      }
+    },
+    {
+      "spanId": "context:5113483f8bbd4a5d9ed1d08562c8be57",
+      "parentSpanId": "turn:8774e113472a479bb8c607a5b1dae981",
+      "name": "context.build",
+      "startedMs": 1792368032672,
+      "finishedMs": 1792368032674.4001,
+      "durationMs": 2.400146484375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:5113483f8bbd4a5d9ed1d08562c8be57",
+      "parentSpanId": "turn:8774e113472a479bb8c607a5b1dae981",
+      "name": "model.request",
+      "startedMs": 1792368032679,
+      "finishedMs": 1792368037137,
+      "durationMs": 4458,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "8774e113472a479bb8c607a5b1dae981",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 4458.557426929474,
+        "firstTextMs": 3993.1972310878336,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 1.9901720806956291,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3930.5946677923203,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3989.518546964973,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3775,
+          "outputTokens": 44,
+          "cacheReadTokens": 2560,
+          "cacheWriteTokens": null
+        }
+      }
+    }
+  ],
+  "coverage": {
+    "start": "python_turn_admission",
+    "end": "committed_main_reply",
+    "browserPaint": false,
+    "goIngress": false,
+    "externalAgentInternals": false,
+    "contentIncluded": false
+  }
+}

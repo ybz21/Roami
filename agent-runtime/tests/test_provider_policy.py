@@ -75,7 +75,12 @@ async def test_visible_partial_output_is_never_retried_after_transport_failure()
         with pytest.raises(DomainError, match="^MODEL_TRANSPORT_FAILED$"):
             async for part in model.stream([], []):
                 parts.append(part)
-        assert calls == 1 and [part.value for part in parts] == ["partial"]
+        assert calls == 1 and [part.value for part in parts if part.kind == "text"] == ["partial"]
+        assert [part.value["phase"] for part in parts if part.kind == "telemetry"] == [
+            "request",
+            "headers",
+            "first_delta",
+        ]
     finally:
         await model.close()
 

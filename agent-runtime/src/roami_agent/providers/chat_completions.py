@@ -82,9 +82,10 @@ class ChatCompletions:
         try:
             async with asyncio.timeout(self.timeout):
                 for attempt in range(self.max_retries + 1):
+                    yield ModelEvent("telemetry", {"phase": "request", "attempt": attempt + 1})
                     try:
                         async for event in self._stream_once(messages, tools, attempt):
-                            emitted = True
+                            emitted = emitted or event.kind != "telemetry"
                             yield event
                         return
                     except RetryableResponse as exc:
@@ -101,6 +102,15 @@ class ChatCompletions:
                         raise DomainError(code, 502)
                     if delay >= deadline - time.monotonic():
                         raise DomainError("MODEL_RETRY_DEADLINE", 502)
+                    yield ModelEvent(
+                        "telemetry",
+                        {
+                            "phase": "retry",
+                            "attempt": attempt + 1,
+                            "errorCode": code,
+                            "delayMs": delay * 1000,
+                        },
+                    )
                     await self.sleep(delay)
         except TimeoutError as exc:
             raise DomainError("MODEL_DEADLINE", 502) from exc
@@ -167,6 +177,8 @@ class ChatCompletions:
             if response.status_code >= 400:
                 # Provider bodies can contain echoed prompts and credentials; do not relay them.
                 raise DomainError("MODEL_HTTP_" + str(response.status_code), 502)
+            yield ModelEvent("telemetry", {"phase": "headers", "attempt": attempt + 1})
+            first_delta = True
             lines = response.aiter_lines()
             async for line in lines:
                 if len(line) > 1_000_000:
@@ -200,6 +212,13 @@ class ChatCompletions:
                         delta.get("content") is not None and not isinstance(delta["content"], str)
                     ):
                         raise DomainError("MODEL_STREAM_INVALID", 502)
+                    if first_delta and any(
+                        delta.get(key) for key in ("content", "reasoning_content", "tool_calls")
+                    ):
+                        yield ModelEvent(
+                            "telemetry", {"phase": "first_delta", "attempt": attempt + 1}
+                        )
+                        first_delta = False
                     if delta.get("content"):
                         yield ModelEvent("text", delta["content"])
                     parts = delta.get("tool_calls") or []

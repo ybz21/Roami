@@ -590,6 +590,7 @@ async function probeAlive(sockPath) {
 }
 
 async function handleConnection(conn, session) {
+  if (conn.destroyed) return // A queued liveness probe may have disconnected before its turn.
   // 看门狗兜底：内存紧张期间 Chrome/driver 被杀死后，playwright 客户端内部的重连逻辑可能
   // 陷入不带退避的忙等（不依赖那段代码自己配合退出，直接从外面强杀整个 daemon 进程更可靠）。
   // 下条命令的 daemonRequest() 连不上旧 socket 会自动重新拉起一个新 daemon，不需要人工介入。
@@ -846,7 +847,7 @@ async function main() {
   process.exitCode = resp.code || 0
 }
 
-export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait }
+export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait, handleConnection }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === SELF_PATH) {
   main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })

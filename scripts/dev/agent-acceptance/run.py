@@ -14,6 +14,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -328,6 +329,9 @@ class Instance:
             "id": case["id"],
             "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             "status": "未通过",
+            "mainParameters": tomllib.loads((self.root / "agent.toml").read_text())
+            .get("model", {})
+            .get("parameters", {}),
         }
         try:
             cid = self.request(

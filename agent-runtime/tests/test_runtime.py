@@ -115,7 +115,7 @@ class GatedModel:
             yield ModelEvent("text", "second answer")
 
 
-async def test_queued_turn_context_preserves_previous_reply_without_future_input(store):
+async def test_next_turn_context_preserves_completed_reply_without_future_input(store):
     class EmptyMemoryModel:
         model = "memory-fixture"
 
@@ -127,10 +127,16 @@ async def test_queued_turn_context_preserves_previous_reply_without_future_input
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
-        await runtime.chat.submit("alice", c["id"], "one", "first question")
+        first = await runtime.chat.submit("alice", c["id"], "one", "first question")
         await model.entered.wait()
-        second = await runtime.chat.submit("alice", c["id"], "two", "second question")
         model.release.set()
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (first["turnId"],)
+            ),
+        )
+        second = await runtime.chat.submit("alice", c["id"], "two", "second question")
         await until(
             store,
             lambda db: row(
@@ -492,7 +498,13 @@ async def test_completion_continues_next_stage_with_original_source_not_newer_in
                 ),
                 "",
             )
-            if "first-stage" in evidence and messages[-1]["role"] != "tool":
+            executor_evidence = (
+                json.loads(evidence.split("Executor evidence: ", 1)[-1]) if evidence else {}
+            )
+            if (
+                "first-stage" in executor_evidence.get("result", {}).get("summary", "")
+                and messages[-1]["role"] != "tool"
+            ):
                 assert any(t["function"]["name"] == "delegate" for t in tools)
                 yield ModelEvent(
                     "tool",

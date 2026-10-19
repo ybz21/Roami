@@ -7,12 +7,14 @@ from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import row
+from roami_agent.storage.database import event, row
 from roami_agent.storage.transcript_repository import owned
 
 
 class ConversationService:
-    def __init__(self, database, conversations, context, tasks, model, wakeup, turn_tasks):
+    def __init__(
+        self, database, conversations, context, tasks, model, wakeup, turn_tasks, preempt=None
+    ):
         self.db, self.conversations, self.context, self.tasks = (
             database,
             conversations,
@@ -20,6 +22,7 @@ class ConversationService:
             tasks,
         )
         self.model, self.wakeup, self.turn_tasks = model, wakeup, turn_tasks
+        self.preempt = preempt
 
     async def submit(self, owner, cid, request_key, text, attachment_ids=None):
         parts = text.strip().split(maxsplit=1)
@@ -47,6 +50,17 @@ class ConversationService:
         if not self.model.model:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         result = await self.conversations.accept(owner, cid, request_key, text, attachment_ids)
+        if self.preempt and not result.get("reused"):
+            running = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT id FROM turns WHERE branch_id=(SELECT branch_id FROM turns WHERE id=?) "
+                    "AND state='running' AND id!=?",
+                    (result["turnId"], result["turnId"]),
+                )
+            )
+            if running:
+                self.preempt(running["id"])
         self.wakeup.set()
         return {"kind": "message", **result}
 
@@ -82,10 +96,27 @@ class ConversationService:
                 return json.loads(receipt["payload_json"])
             turn = row(
                 db,
-                "SELECT id FROM turns WHERE branch_id=? AND state='running'",
+                "SELECT id,state FROM turns WHERE branch_id=? AND state IN ('running','queued') "
+                "ORDER BY CASE state WHEN 'running' THEN 0 ELSE 1 END,created_ms LIMIT 1",
                 (c["active_branch_id"],),
             )
             result = {"kind": "interrupt", "turnId": turn["id"] if turn else None}
+            if turn and turn["state"] == "queued":
+                db.execute(
+                    "UPDATE turns SET state='interrupted',finished_ms=? WHERE id=?",
+                    (now_ms(), turn["id"]),
+                )
+                db.execute(
+                    "UPDATE jobs SET state='done' WHERE kind='turn.run' AND aggregate_id=? AND state='queued'",
+                    (turn["id"],),
+                )
+                event(
+                    db,
+                    cid,
+                    "turn.interrupted",
+                    {"turnId": turn["id"], "error": "TURN_INTERRUPTED"},
+                    turn_id=turn["id"],
+                )
             rid = identity()
             db.execute(
                 "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",

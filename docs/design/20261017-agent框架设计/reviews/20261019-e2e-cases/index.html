@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami 对话验收 · 20261019</title><link rel="stylesheet" href="../../technical/tech.css"></head><body><div class="shell"><header class="top"><span class="brand">Roami / Agent Acceptance</span><nav class="topnav"><a href="../../technical/index.html">技术设计</a><a href="cases.json">用例数据</a><a href="results.json">完整结果</a></nav></header><main class="scroll"><div class="wrap"><header class="tt-pagehead"><div class="eyebrow">2026-10-19 · AGENT WORKFLOW EVALUATION</div><h1>智能体执行链验收</h1><p>主验收关注工具执行、按需组合Skill、自动记忆和跨任务产物交付；常识问答仅作模型基线，不计入智能体通过率。</p></header><section><h2>执行口径</h2><p>隔离数据库、独立 tmux socket、测试项目。使用当前真实主模型和后台模型、真实 Roami CLI 与浏览器。已有会话是专用终端接收器，只验证可靠投递；新建 Codex / Claude 任务使用真实专业智能体。没有触碰用户生产会话。每轮保留结果，不覆盖失败历史。</p><p>主验收以工具回执、Skill版本和凭证、消息来源、记忆写入与召回清单、产物读回及实际下载为证据，答案文字匹配只作辅助。单个用例通过不代表整体体验达标。压缩入队与压缩成功分开；模型调用失败不算通过。依据：<a href="https://arxiv.org/abs/2311.12983">GAIA 官方论文</a>、<a href="https://huggingface.co/datasets/gaia-benchmark/GAIA">官方数据集</a>。</p><p>智能体主验收 29 项，已测 29 项，通过 29 项；模型辅助基线 12 项。完整用例 41 项，协议与对话用例执行 120 轮，另存复核 8 条；复核不算新执行。</p></section><section><h2>问题、修复与验收边界</h2><details><summary>展开问题与边界</summary><ul><li><b>已修正并回归：网页路由和问题转述</b><p>网页读取不再先尝试curl或寻找代码工作区；resourceOnly后台任务保存用户原始问题，避免主模型改写统计口径。G12重测计算出18毫米，G13核对更正公告，G14读取官方PEP页面。</p></li><li><b>已优化并实测：常见派活直接调用已知CLI</b><p>已知统计、目标查询、解析、投递输入随Main指令提供。D01 17.29→9.19秒；D02 106.18→24.87秒；D03 28.51→10.95秒；D04 33.38→25.31秒。单次对照，非稳定性或延迟SLA结论。</p></li><li><b>测试前置已补齐：脚本和隔离环境问题</b><p>修正不存在的SQL字段、压缩请求键冲突、私有agents目录权限；项目工作区测试补本地bare origin/main；用长历史产生真实压缩快照，并继续聊天取回spruce-9042。保留最初失败记录。</p></li><li><b>仍需改进：任务验收体验</b><p>写作和专业任务可先交付已有文件并标注待验收；外层仍按现有策略保留waiting_user，本轮没有改变验收状态机。功能通过不代表已完成自动验收。</p></li><li><b>仍需观察：浏览器偶发错误与响应耗时</b><p>早期一次BROWSER_DRIVER_PROTOCOL_INVALID未完成根因定位；新请求重测成功不能证明该偶发问题已消除。网页题当前完成耗时约43至87秒。官方来源回复使用UTC日期但未标时区，仍需改善时间表达。</p></li><li><b>已修正并严格回归：散任务工作目录参数混淆</b><p>复核发现原Claude用例只匹配回复标记时漏掉目录错误，已撤回原通过记录。new_session使用directory，baseDir仅用于new_project。任务接收及执行适配器均拒绝混淆字段；Codex/Claude实际目录、项目独立worktree、新项目目录、指定接收端的原样唯一消息均已重测通过。</p></li><li><b>验收口径已调整：智能体验收与模型基线分开</b><p>29项主验收检查实际工具回执、目标目录、任务来源、Skill版本与随机凭证、自动记忆写入与召回、文件读回和实际下载。12项常识/推理题仅作模型基线，不计入智能体通过率。外部service-review与report-writing仅为隔离测试夹具，不安装到生产。</p></li><li><b>已修复并通过回归：完成回调可继续执行后续阶段</b><p>旧回调轮次向模型提供空工具目录，只能口头描述下一步。现提供原有角色工具，绑定原任务用户消息，避免误用期间新收到的消息；两阶段回归验证恰好创建两项任务、回调完成且来源一致。委派回执明确background_task/taskId，防止当成tmux sessionId。</p></li><li><b>已修复并通过R04：附件进入受委派Worker上下文</b><p>原先只复制委派文本，上传CSV没有带入子上下文。现保留原始附件引用，继续按owner、删除和遗忘规则读取；R04核到原附件ID进入Worker prompt manifest，结合网页规则、两份Skill成稿，读回文件SHA256与下载一致。</p></li><li><b>已修复并通过回归：模型请求超时与任务总预算分离</b><p>旧代码把所有模型/工具步骤累计放进单次模型请求的120秒时限。现每次模型调用单独计时，Worker整轮仍受任务deadline限制，Main保留步数上限；回归覆盖多步累计超过单次时限仍完成、单次请求超时、任务到期及未确认输入保持interrupted。</p></li><li><b>已修复并通过随机链接用例：浏览器观测遗漏真实链接地址</b><p>只读研究Worker不能点击，但旧观测只有链接文字没有href，导致猜测路径、反复搜索或退回Shell。观测现附带实际解析后的HTTP(S) href，过滤可执行协议及带凭据链接。G12/G13使用每实例随机文件名，核验来源observationId、观测href、goto与目标页面，均已通过；无新增工具或点击权限。</p></li><li><b>已修正，保留失败与复核：验收程序误判与记录完整性</b><p>修正对话/任务分两次取快照遗漏刚入队回调的竞态、中文JSON转义导致的记忆匹配失败、事件表排序字段错误及CLI版本未明确绑定。已完成但未写入报告的执行从隔离数据库恢复并标记recoveredFromDatabase/auditOnly；复核不计新执行，保留原始失败。新实例固定使用独立副本CLI与隔离PATH。</p></li><li><b>仍需优化：长链路完成耗时</b><p>两Skill供应商报告本轮206秒，附件加网页规则报告218.15秒；这是功能与证据通过，不代表达到Main快问快答或总体延迟目标。新模型、不同负载与重复运行仍需单独评估，不能用单次通过宣称性能达标。</p></li><li><b>已修复并通过真实链路：用户长期偏好的跨对话范围</b><p>M02复跑发现记录active但绑定原对话，自动召回清单为空。提取模型现可建议user_preference，仅在用户原文引用校验通过且无项目/任务绑定时接受。保留原始来源、范围晋升依赖及遗忘约束，独立事实不因同来源被误删。M02新对话自动召回3.63秒，R08在未重给口令的另一对话中经两Skill成稿，114.64秒；prompt manifest记录记忆ID/版本。</p></li><li><b>已单独核验，不伪造原生工具事件：专业智能体的证据边界</b><p>R05核到原生来源URL进入真实Codex目标；执行日志含成功的Python read_text读回校验，发布diff的Git blob与下载文件字节一致。专业Skill通过未给入prompt的每实例随机凭证核验传递，版本是夹具文件快照，method明确标为isolated_file_receipt_transfer。专业内部工具尚非完整结构化消息流；8KB诊断尾部与原生tool_calls分别记录，不冒充原生Skill API调用。</p></li></ul></details></section><section><h2>复跑方式</h2><details><summary>展开复跑命令</summary><p>先构建本仓库CLI并准备可连接的测试Chrome CDP。配置来自节点私有配置文件，不把Key写进用例或版本库。使用Python环境：uv run --project agent-runtime python。</p><pre>python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --cli backend/dist/roami-linux-amd64 --cdp http://127.0.0.1:9222 --document-skills
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami 对话验收 · 20261019</title><link rel="stylesheet" href="../../technical/tech.css"></head><body><div class="shell"><header class="top"><span class="brand">Roami / Agent Acceptance</span><nav class="topnav"><a href="../../technical/index.html">技术设计</a><a href="cases.json">用例数据</a><a href="results.json">完整结果</a></nav></header><main class="scroll"><div class="wrap"><header class="tt-pagehead"><div class="eyebrow">2026-10-19 · AGENT WORKFLOW EVALUATION</div><h1>智能体执行链验收</h1><p>主验收关注工具执行、按需组合Skill、自动记忆和跨任务产物交付；常识问答仅作模型基线，不计入智能体通过率。</p></header><section><h2>执行口径</h2><p>隔离数据库、独立 tmux socket、测试项目。使用当前真实主模型和后台模型、真实 Roami CLI 与浏览器。已有会话是专用终端接收器，只验证可靠投递；新建 Codex / Claude 任务使用真实专业智能体。没有触碰用户生产会话。每轮保留结果，不覆盖失败历史。</p><p>主验收以工具回执、Skill版本和凭证、消息来源、记忆写入与召回清单、产物读回及实际下载为证据，答案文字匹配只作辅助。单个用例通过不代表整体体验达标。压缩入队与压缩成功分开；模型调用失败不算通过。依据：<a href="https://arxiv.org/abs/2311.12983">GAIA 官方论文</a>、<a href="https://huggingface.co/datasets/gaia-benchmark/GAIA">官方数据集</a>。</p><p>智能体主验收 29 项，已测 29 项，通过 29 项；模型辅助基线 12 项。完整用例 41 项，协议与对话用例执行 128 轮，另存复核 8 条；复核不算新执行。</p></section><section><h2>问题、修复与验收边界</h2><details><summary>展开问题与边界</summary><ul><li><b>已修正并回归：网页路由和问题转述</b><p>网页读取不再先尝试curl或寻找代码工作区；resourceOnly后台任务保存用户原始问题，避免主模型改写统计口径。G12重测计算出18毫米，G13核对更正公告，G14读取官方PEP页面。</p></li><li><b>已优化并实测：常见派活直接调用已知CLI</b><p>已知统计、目标查询、解析、投递输入随Main指令提供。D01 17.29→9.19秒；D02 106.18→24.87秒；D03 28.51→10.95秒；D04 33.38→25.31秒。单次对照，非稳定性或延迟SLA结论。</p></li><li><b>测试前置已补齐：脚本和隔离环境问题</b><p>修正不存在的SQL字段、压缩请求键冲突、私有agents目录权限；项目工作区测试补本地bare origin/main；用长历史产生真实压缩快照，并继续聊天取回spruce-9042。保留最初失败记录。</p></li><li><b>仍需改进：任务验收体验</b><p>写作和专业任务可先交付已有文件并标注待验收；外层仍按现有策略保留waiting_user，本轮没有改变验收状态机。功能通过不代表已完成自动验收。</p></li><li><b>仍需观察：浏览器偶发错误与响应耗时</b><p>早期一次BROWSER_DRIVER_PROTOCOL_INVALID未完成根因定位；新请求重测成功不能证明该偶发问题已消除。网页题当前完成耗时约43至87秒。官方来源回复使用UTC日期但未标时区，仍需改善时间表达。</p></li><li><b>已修正并严格回归：散任务工作目录参数混淆</b><p>复核发现原Claude用例只匹配回复标记时漏掉目录错误，已撤回原通过记录。new_session使用directory，baseDir仅用于new_project。任务接收及执行适配器均拒绝混淆字段；Codex/Claude实际目录、项目独立worktree、新项目目录、指定接收端的原样唯一消息均已重测通过。</p></li><li><b>验收口径已调整：智能体验收与模型基线分开</b><p>29项主验收检查实际工具回执、目标目录、任务来源、Skill版本与随机凭证、自动记忆写入与召回、文件读回和实际下载。12项常识/推理题仅作模型基线，不计入智能体通过率。外部service-review与report-writing仅为隔离测试夹具，不安装到生产。</p></li><li><b>已修复并通过回归：完成回调可继续执行后续阶段</b><p>旧回调轮次向模型提供空工具目录，只能口头描述下一步。现提供原有角色工具，绑定原任务用户消息，避免误用期间新收到的消息；两阶段回归验证恰好创建两项任务、回调完成且来源一致。委派回执明确background_task/taskId，防止当成tmux sessionId。</p></li><li><b>已修复并通过R04：附件进入受委派Worker上下文</b><p>原先只复制委派文本，上传CSV没有带入子上下文。现保留原始附件引用，继续按owner、删除和遗忘规则读取；R04核到原附件ID进入Worker prompt manifest，结合网页规则、两份Skill成稿，读回文件SHA256与下载一致。</p></li><li><b>已修复并通过回归：模型请求超时与任务总预算分离</b><p>旧代码把所有模型/工具步骤累计放进单次模型请求的120秒时限。现每次模型调用单独计时，Worker整轮仍受任务deadline限制，Main保留步数上限；回归覆盖多步累计超过单次时限仍完成、单次请求超时、任务到期及未确认输入保持interrupted。</p></li><li><b>已修复并通过随机链接用例：浏览器观测遗漏真实链接地址</b><p>只读研究Worker不能点击，但旧观测只有链接文字没有href，导致猜测路径、反复搜索或退回Shell。观测现附带实际解析后的HTTP(S) href，过滤可执行协议及带凭据链接。G12/G13使用每实例随机文件名，核验来源observationId、观测href、goto与目标页面，均已通过；无新增工具或点击权限。</p></li><li><b>已修正，保留失败与复核：验收程序误判与记录完整性</b><p>修正对话/任务分两次取快照遗漏刚入队回调的竞态、中文JSON转义导致的记忆匹配失败、事件表排序字段错误及CLI版本未明确绑定。已完成但未写入报告的执行从隔离数据库恢复并标记recoveredFromDatabase/auditOnly；复核不计新执行，保留原始失败。新实例固定使用独立副本CLI与隔离PATH。</p></li><li><b>仍需优化：长链路完成耗时</b><p>两Skill供应商报告本轮206秒，附件加网页规则报告218.15秒；这是功能与证据通过，不代表达到Main快问快答或总体延迟目标。新模型、不同负载与重复运行仍需单独评估，不能用单次通过宣称性能达标。</p></li><li><b>已修复并通过真实链路：用户长期偏好的跨对话范围</b><p>M02复跑发现记录active但绑定原对话，自动召回清单为空。提取模型现可建议user_preference，仅在用户原文引用校验通过且无项目/任务绑定时接受。保留原始来源、范围晋升依赖及遗忘约束，独立事实不因同来源被误删。M02新对话自动召回3.63秒，R08在未重给口令的另一对话中经两Skill成稿，114.64秒；prompt manifest记录记忆ID/版本。</p></li><li><b>已单独核验，不伪造原生工具事件：专业智能体的证据边界</b><p>R05核到原生来源URL进入真实Codex目标；执行日志含成功的Python read_text读回校验，发布diff的Git blob与下载文件字节一致。专业Skill通过未给入prompt的每实例随机凭证核验传递，版本是夹具文件快照，method明确标为isolated_file_receipt_transfer。专业内部工具尚非完整结构化消息流；8KB诊断尾部与原生tool_calls分别记录，不冒充原生Skill API调用。</p></li></ul></details></section><section><h2>复跑方式</h2><details><summary>展开复跑命令</summary><p>先构建本仓库CLI并准备可连接的测试Chrome CDP。配置来自节点私有配置文件，不把Key写进用例或版本库。使用Python环境：uv run --project agent-runtime python。</p><pre>python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --cli backend/dist/roami-linux-amd64 --cdp http://127.0.0.1:9222 --document-skills
 python scripts/dev/agent-acceptance/run.py --state /tmp/agent-acceptance-state.json
 python scripts/dev/agent-acceptance/run.py --state /tmp/agent-acceptance-state.json --only G12,D03,C03
 python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-state.json --stop</pre><p>只停止该私有实例的进程组和独立tmux socket，保留数据库、日志和报告用于溯源。文档链路的两个外部Skill为隔离测试夹具，不安装到生产。每个实例生成独立凭证，用于证明实际读取及跨流程传递。只选M02复跑时，先确保M01已经在该实例执行；R08依赖同实例先执行R07。</p></details></section><section><h2>逐项预期与实际结果</h2><div class="tablewrap"><table><thead><tr><th>编号</th><th>类别</th><th>用户问题</th><th>预期与验收</th><th>最新状态</th><th>秒</th><th>实际结果 / 失败原因</th></tr></thead><tbody><tr><td>G12</td><td>工具串联 / 浏览器跨页读取</td><td><details><summary>用户问题</summary><p>打开 {fixture}/index.html，沿着“观测数据”链接读取数据，计算两个站点的平均降水量，给出站点名、平均值和来源链接。</p></details></td><td>北站与南站平均18毫米；读取第二页，给出真实来源。 链接文件名含每实例随机后缀，不在用户问题中给出；验证观测href、对应observationId、goto及目标页观测，不能靠猜路径通过。</td><td>通过</td><td>74.26</td><td><details><summary>查看实际回复</summary><pre>我先派一个后台任务打开该页面、沿“观测数据”链接读取数据并计算平均降水量。
@@ -205,21 +205,28 @@ python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-st
       &quot;endedMs&quot;: 1792345033989
     }
   ]
-}</pre></details></td></tr><tr><td>D03</td><td>派活 / 直接发消息</td><td><details><summary>用户问题</summary><p>给已有会话「验收一号」发消息：ACCEPTANCE_DELIVERY_ONE。直接发送，不新建。</p></details></td><td>实际可靠投递一次，不重复确认，不创建任务；接收端拿到标记。指定接收端必须收到原样消息且本次恰好一次。</td><td>通过</td><td>6.34</td><td><details><summary>查看实际回复</summary><pre>我来查找「验收一号」会话并直接发送。
-找到会话，立即发送。
-已发送到「验收一号」（状态：delivered），未新建会话。</pre></details><details><summary>查看执行证据</summary><pre>{
+}</pre></details></td></tr><tr><td>D03</td><td>派活 / 直接发消息</td><td><details><summary>用户问题</summary><p>给已有会话「验收一号」发消息：ACCEPTANCE_DELIVERY_ONE。直接发送，不新建。</p></details></td><td>实际可靠投递一次，不重复确认，不创建任务；接收端拿到标记。指定接收端必须收到原样消息且本次恰好一次。</td><td>通过</td><td>18.92</td><td><details><summary>查看实际回复</summary><pre>
+
+
+已发送：消息 ACCEPTANCE_DELIVERY_ONE 已直接送达现有会话「验收一号」（状态：delivered），未新建会话。</pre></details><details><summary>查看执行证据</summary><pre>{
   &quot;toolTimeline&quot;: [
+    {
+      &quot;tool&quot;: &quot;bash&quot;,
+      &quot;state&quot;: &quot;failed&quot;,
+      &quot;startedMs&quot;: 1792368081556,
+      &quot;endedMs&quot;: 1792368081562
+    },
     {
       &quot;tool&quot;: &quot;target_search&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345032069,
-      &quot;endedMs&quot;: 1792345032104
+      &quot;startedMs&quot;: 1792368085972,
+      &quot;endedMs&quot;: 1792368086006
     },
     {
       &quot;tool&quot;: &quot;session_send&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345033654,
-      &quot;endedMs&quot;: 1792345033768
+      &quot;startedMs&quot;: 1792368090370,
+      &quot;endedMs&quot;: 1792368090486
     }
   ]
 }</pre></details></td></tr><tr><td>D04</td><td>派活 / 项目内发消息</td><td><details><summary>用户问题</summary><p>给「派活验收项目」的「验收四号」发消息：ACCEPTANCE_PROJECT_FOUR。</p></details></td><td>按项目归属查找完整会话并送达第四个目标，无额外确认。指定接收端必须收到原样消息且本次恰好一次。</td><td>通过</td><td>21.55</td><td><details><summary>查看实际回复</summary><pre>我先查找「派活验收项目」中的「验收四号」会话，找到后立即发送。
@@ -259,20 +266,27 @@ python scripts/dev/agent-acceptance/instance.py --state /tmp/agent-acceptance-st
       &quot;endedMs&quot;: 1792345055395
     }
   ]
-}</pre></details></td></tr><tr><td>D05</td><td>派活 / 目标歧义</td><td><details><summary>用户问题</summary><p>给「重复验收」发消息：请继续。不要猜测目标，不要新建。</p></details></td><td>ask_user给2至4个可识别选项；未选择前不投递。</td><td>通过</td><td>7.6</td><td><details><summary>查看实际回复</summary><pre>我来查找名为「重复验收」的会话，确认后立即发送。
-搜索到两个同名的活跃会话「重复验收」，无法确定该发哪一个，需要您选择：</pre></details><details><summary>查看执行证据</summary><pre>{
+}</pre></details></td></tr><tr><td>D05</td><td>派活 / 目标歧义</td><td><details><summary>用户问题</summary><p>给「重复验收」发消息：请继续。不要猜测目标，不要新建。</p></details></td><td>ask_user给2至4个可识别选项；未选择前不投递。</td><td>通过</td><td>21.59</td><td><details><summary>查看实际回复</summary><pre>
+
+找到两个同名会话，需要你选一个：</pre></details><details><summary>查看执行证据</summary><pre>{
   &quot;toolTimeline&quot;: [
+    {
+      &quot;tool&quot;: &quot;bash&quot;,
+      &quot;state&quot;: &quot;failed&quot;,
+      &quot;startedMs&quot;: 1792368087522,
+      &quot;endedMs&quot;: 1792368087530
+    },
     {
       &quot;tool&quot;: &quot;target_search&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345042056,
-      &quot;endedMs&quot;: 1792345042093
+      &quot;startedMs&quot;: 1792368091954,
+      &quot;endedMs&quot;: 1792368091997
     },
     {
       &quot;tool&quot;: &quot;ask_user&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345045103,
-      &quot;endedMs&quot;: 1792345045108
+      &quot;startedMs&quot;: 1792368098029,
+      &quot;endedMs&quot;: 1792368098035
     }
   ]
 }</pre></details></td></tr><tr><td>D06</td><td>派活 / 不存在目标</td><td><details><summary>用户问题</summary><p>给不存在的会话 acceptance-no-such-session 发消息：继续。不要新建或换目标。</p></details></td><td>精确查询或发送入口的目标校验确认不存在；明确报错，没有错误投递或隐式新建。</td><td>通过</td><td>9.22</td><td><details><summary>查看实际回复</summary><pre>我先尝试解析该会话 ID，确认它是否存在。
@@ -365,23 +379,23 @@ Claude Code 散会话已实际执行完成，结果符合验收要求：
       &quot;endedMs&quot;: 1792345141103
     }
   ]
-}</pre></details></td></tr><tr><td>M01</td><td>记忆 / 自动落库</td><td><details><summary>用户问题</summary><p>帮我记下：我的测试偏好编号是 cedar-7284，回答默认简洁。</p></details></td><td>接收事务自动保存有原文来源的active记忆，不能只口头记住。</td><td>通过</td><td>12.26</td><td><details><summary>查看实际回复</summary><pre>已记下：测试偏好编号 cedar-7284，回答默认简洁。该偏好已有存储记录（id: 7fa50db9495c4aa8b3d065edaed100d2），会自动生效。</pre></details><details><summary>查看执行证据</summary><pre>{
+}</pre></details></td></tr><tr><td>M01</td><td>记忆 / 自动落库</td><td><details><summary>用户问题</summary><p>帮我记下：我的测试偏好编号是 cedar-7284，回答默认简洁。</p></details></td><td>接收事务自动保存有原文来源的active记忆，不能只口头记住。</td><td>通过</td><td>22.06</td><td><details><summary>查看实际回复</summary><pre>这条偏好已自动保存到记忆中：测试偏好编号 cedar-7284，回答默认简洁。无需重复操作。</pre></details><details><summary>查看执行证据</summary><pre>{
   &quot;toolTimeline&quot;: [],
   &quot;userPreferenceScopeProof&quot;: [
     {
-      &quot;id&quot;: &quot;1ba83541412248588b223ef568a39434&quot;,
+      &quot;id&quot;: &quot;caf8aa870fa04a32837b6a0a3e5d2c46&quot;,
       &quot;revision&quot;: 1
     }
   ]
-}</pre></details></td></tr><tr><td>M02</td><td>记忆 / 跨对话召回</td><td><details><summary>用户问题</summary><p>我之前让你记下的测试偏好编号是什么？</p></details></td><td>在另一测试对话自动召回cedar-7284，无需用户重新提供。</td><td>通过</td><td>3.63</td><td><details><summary>查看实际回复</summary><pre>您的测试偏好编号是 **cedar-7284**。</pre></details><details><summary>查看执行证据</summary><pre>{
+}</pre></details></td></tr><tr><td>M02</td><td>记忆 / 跨对话召回</td><td><details><summary>用户问题</summary><p>我之前让你记下的测试偏好编号是什么？</p></details></td><td>在另一测试对话自动召回cedar-7284，无需用户重新提供。</td><td>通过</td><td>1.81</td><td><details><summary>查看实际回复</summary><pre>你的测试偏好编号是 **cedar-7284**。</pre></details><details><summary>查看执行证据</summary><pre>{
   &quot;toolTimeline&quot;: [],
   &quot;memoryRecallProof&quot;: [
     {
-      &quot;memoryId&quot;: &quot;1a7eb38f38b440818c4968e4f4a86fea&quot;,
+      &quot;memoryId&quot;: &quot;b3cc7ff1f04a40e5a50d985667c6f649&quot;,
       &quot;revision&quot;: 1
     },
     {
-      &quot;memoryId&quot;: &quot;1ba83541412248588b223ef568a39434&quot;,
+      &quot;memoryId&quot;: &quot;caf8aa870fa04a32837b6a0a3e5d2c46&quot;,
       &quot;revision&quot;: 1
     }
   ]
@@ -389,7 +403,7 @@ Claude Code 散会话已实际执行完成，结果符合验收要求：
   &quot;toolTimeline&quot;: []
 }</pre></details></td></tr><tr><td>C02</td><td>命令 / 上下文状态</td><td><details><summary>用户问题</summary><p>/status</p></details></td><td>返回模型及token预估上下文，非字节容量。</td><td>通过</td><td>0.04</td><td><details><summary>查看执行证据</summary><pre>{
   &quot;toolTimeline&quot;: []
-}</pre></details></td></tr><tr><td>C03</td><td>命令 / 手动压缩</td><td><details><summary>用户问题</summary><p>/compact 保留用户偏好和待办</p></details></td><td>压缩作业入队并产生明确终态，压缩后可继续聊天。 前置：同一对话先提交100条历史测试记录并完成一轮回复，再手动压缩，验证产生真实上下文快照。</td><td>通过</td><td>19.56</td><td><details><summary>查看实际回复</summary><pre>spruce-9042</pre></details><details><summary>查看执行证据</summary><pre>{
+}</pre></details></td></tr><tr><td>C03</td><td>命令 / 手动压缩</td><td><details><summary>用户问题</summary><p>/compact 保留用户偏好和待办</p></details></td><td>压缩作业入队并产生明确终态，压缩后可继续聊天。 前置：同一对话先提交100条历史测试记录并完成一轮回复，再手动压缩，验证产生真实上下文快照。</td><td>通过</td><td>12.85</td><td><details><summary>查看实际回复</summary><pre>spruce-9042</pre></details><details><summary>查看执行证据</summary><pre>{
   &quot;toolTimeline&quot;: []
 }</pre></details></td></tr><tr><td>E01</td><td>能力发现 / 已下线名称</td><td><details><summary>用户问题</summary><p>查一下 web_research 这个能力现在应该怎么用，只查能力，不要真的联网执行。</p></details></td><td>真实web-research Skill或明确建议，不反复搜索旧命令、不误命中overview。</td><td>通过</td><td>14.6</td><td><details><summary>查看实际回复</summary><pre>
 搜索到了 web-research 技能条目，现在只读取它的定义（不联网执行）：
@@ -1047,42 +1061,21 @@ roami chrome record stop --target TARGET_ID
     ],
     &quot;authenticatedDownloadMatches&quot;: true
   }
-}</pre></details></td></tr><tr><td>R03</td><td>调研写作链路 / 多来源检索和更正串联</td><td><details><summary>用户问题</summary><p>按service-review技能进行审查，再按report-writing技能成稿；先发现并读取这两个技能，并将前一个流程结果交给后一个。从 {fixture}/search.html 检索供应商资料，核对Alpha、Beta及价格更正。预算每月90元以内、可用性至少99.9%，写供应商对比和选型报告，表格应使用最终有效价格，引用原说明和更正公告。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R03，保存supplier-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。</p></details></td><td>实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。</td><td>通过</td><td>206.0</td><td><details><summary>查看实际回复</summary><pre>我先按要求查找并读取 service-review 和 report-writing 两个技能，再安排实际检索与写作。
-两个技能都已找到，现在读取它们的内容。
-两个技能均已加载：service-review（凭证 `SERVICE_REVIEW_1eb8eccf`，负责检索核验 Alpha/Beta 及价格更正，标记事实/推断/待核实）和 report-writing（凭证 `REPORT_WRITING_e68a3c96`，要求正文含资料来源、核验边界、交付校验，写后必须 read 读回核对）。现在把完整流程交给绑定指定目录的后台执行器实际执行。
-任务已接受并进入队列（后台任务 `a172707c5af54284a606959a7fb80e0c`），将按 service-review → report-writing 两阶段实际执行检索、核验与写作，完成后自动返回结果和可打开的文件链接，届时我会读回核对后再交付。
-两个技能流程已全部实际执行完毕（service-review 检索核验 → report-writing 成稿，执行器已用 read 读回核对），报告已保存待你验收。
+}</pre></details></td></tr><tr><td>R03</td><td>调研写作链路 / 多来源检索和更正串联</td><td><details><summary>用户问题</summary><p>按service-review技能进行审查，再按report-writing技能成稿；先发现并读取这两个技能，并将前一个流程结果交给后一个。从 {fixture}/search.html 检索供应商资料，核对Alpha、Beta及价格更正。预算每月90元以内、可用性至少99.9%，写供应商对比和选型报告，表格应使用最终有效价格，引用原说明和更正公告。 请实际完成检索和文档写作，不能只在聊天里列计划。使用目录 {workspace}/R03，保存supplier-report.html，并在本对话交付可打开的文件链接。不要新建项目。HTML使用语义标签（标题、段落、表格及其子标签、链接），不使用script或自定义CSS。 写完后使用read实际读回核对内容和来源再交付。</p></details></td><td>实际检索、核对来源，整合成完整文档；文件存在，内容正确，引用能对上真实观察记录，链接能打开。</td><td>通过</td><td>153.29</td><td><details><summary>查看实际回复</summary><pre>
 
-## 核验结论
+已读取两个技能；现在委派实际检索与写作工作到指定目录。
+任务已完成，报告已保存并读回核对。
 
-| 供应商 | 最终有效月价 | 声明可用性 | 约束判断（≤90元/月，≥99.9%） | 推荐 |
-|---|---:|---:|---|---|
-| Alpha | **88元/月**（自 2026-10-15 起，更正公告覆盖原 80 元价格） | 99.9% | 两项均满足 | **推荐** |
-| Beta | **95元/月**（按已取得资料） | 99.95% | 可用性满足，超预算 5 元/月 | 当前预算下不推荐 |
+**审查结论**
+- **Alpha**：最终有效价格 **88元/月**（2026-10-15起，更正公告覆盖原80元说明）；可用性99.9% → ✅ 满足预算（余量2元）与可用性要求
+- **Beta**：**95元/月**（未发现更正公告）；可用性99.95% → ✅ 可用性达标，❌ 超预算5元
+- **建议选型：Alpha**
 
-**核验边界**：索引及已读页面未提供 Beta 的更正公告，不能据此断言索引外不存在更正，Beta 价格适用日期待核实；两家可用性均为资料声明值，未取得实测批次数据。报告中已按【事实/推断/待核实】分别标注。
+**交付文件**
+[打开 supplier-report.html](/api/file/serve/tmp/roami-acceptance-20261019-20261019-075053/workspaces/R03/supplier-report.html)
+路径：`/tmp/roami-acceptance-20261019-20261019-075053/workspaces/R03/supplier-report.html`
 
-## 实际读取的来源（报告内均含链接）
-
-1. [检索索引](http://127.0.0.1:41325/search.html)
-2. [Alpha 原说明](http://127.0.0.1:41325/alpha.html)
-3. [Alpha 价格更正公告](http://127.0.0.1:41325/price-update.html)
-4. [Beta 原说明](http://127.0.0.1:41325/beta.html)
-5. [SLA 验收规则](http://127.0.0.1:41325/sla.html)
-
-## 读回核对结果（执行器 read 读回确认）
-
-- 两个流程凭证 `SERVICE_REVIEW_1eb8eccf`、`REPORT_WRITING_e68a3c96` 均在&quot;交付校验&quot;段，并说明了实际加载与结果传递；
-- 对比表使用最终有效价格（Alpha 88 元、Beta 95 元），并引用原说明与更正公告；
-- 来源链接与实际读取 URL 一致；含资料来源、核验边界与来源局限说明；
-- 语义 HTML 标签（标题/段落/表格及子标签/链接），无 `script`、无自定义 CSS 或 `style` 属性。
-
-## 交付文件
-
-**[打开 supplier-report.html](/api/file/raw?path=%2Ftmp%2Froami-acceptance-20261019-20261019-013502%2Fworkspaces%2FR03%2Fsupplier-report.html)**
-绝对路径：`/tmp/roami-acceptance-20261019-20261019-013502/workspaces/R03/supplier-report.html`
-
-如需调整（例如补充 Beta 更正说明、改推荐结论），告诉我即可在原会话继续。</pre></details><p><a href="/api/file/raw?path=%2Ftmp%2Froami-acceptance-20261019-20261019-013502%2Fworkspaces%2FR03%2Fsupplier-report.html">打开实际产物</a></p><details><summary>查看执行证据</summary><pre>{
+文档已按 service-review → report-writing 流程执行，读回核对确认：表格使用最终有效价格，引用了原始说明与更正公告链接，纯语义HTML（无script/自定义CSS），并含交付校验凭证 `SERVICE_REVIEW_0b268b2b` 与 `REPORT_WRITING_34384a03`。可用性为资料声明值，报告中已注明为推断/待核实边界。</pre></details><p><a href="/api/file/serve/tmp/roami-acceptance-20261019-20261019-075053/workspaces/R03/supplier-report.html">打开实际产物</a></p><details><summary>查看执行证据</summary><pre>{
   &quot;agentMechanismProof&quot;: {
     &quot;toolKinds&quot;: [
       &quot;browser_act&quot;,
@@ -1095,108 +1088,108 @@ roami chrome record stop --target TARGET_ID
     ],
     &quot;skillVersions&quot;: {
       &quot;service-review&quot;: {
-        &quot;version&quot;: &quot;a8fb8c4376509a9a55d12b404158beddac1708c5ae453b543729db6d8bd883ac&quot;,
-        &quot;at&quot;: 1792345012284
+        &quot;version&quot;: &quot;c29f074bd95ae89a0665fbd6d9d6052d49bf7e859d1c292543bf00b6cda64f5a&quot;,
+        &quot;at&quot;: 1792367551238
       },
       &quot;report-writing&quot;: {
-        &quot;version&quot;: &quot;0be0b8c5f4303f2ca2c7b6b16f77697d27f1851e36f0f7108e62f4ae9d44d352&quot;,
-        &quot;at&quot;: 1792345066592
+        &quot;version&quot;: &quot;03f7dd6f0f14a2ed498a33442b6f0cd1d794aea0386be9dd518a6a5d1370d755&quot;,
+        &quot;at&quot;: 1792367551253
       },
       &quot;web-research&quot;: {
         &quot;version&quot;: &quot;9dedf308f85ad24b681e7b5f78f7d76256cd44b802cfea2addf5a94d40ec1bae&quot;,
-        &quot;at&quot;: 1792345014407
+        &quot;at&quot;: 1792367551266
       }
     },
     &quot;orderedCalls&quot;: [
       {
         &quot;tool&quot;: &quot;tool_search&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792344974121,
-        &quot;endedMs&quot;: 1792344974131
+        &quot;startedMs&quot;: 1792367529023,
+        &quot;endedMs&quot;: 1792367529032
       },
       {
-        &quot;tool&quot;: &quot;tool_search&quot;,
-        &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792344974135,
-        &quot;endedMs&quot;: 1792344974143
-      },
-      {
-        &quot;tool&quot;: &quot;skill_read&quot;,
-        &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792344975655,
-        &quot;endedMs&quot;: 1792344975663
+        &quot;tool&quot;: &quot;bash&quot;,
+        &quot;state&quot;: &quot;failed&quot;,
+        &quot;startedMs&quot;: 1792367529036,
+        &quot;endedMs&quot;: 1792367529044
       },
       {
         &quot;tool&quot;: &quot;skill_read&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792344975666,
-        &quot;endedMs&quot;: 1792344975673
+        &quot;startedMs&quot;: 1792367533237,
+        &quot;endedMs&quot;: 1792367533245
+      },
+      {
+        &quot;tool&quot;: &quot;skill_read&quot;,
+        &quot;state&quot;: &quot;succeeded&quot;,
+        &quot;startedMs&quot;: 1792367533250,
+        &quot;endedMs&quot;: 1792367533259
       },
       {
         &quot;tool&quot;: &quot;delegate&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345009486,
-        &quot;endedMs&quot;: 1792345009504
+        &quot;startedMs&quot;: 1792367547887,
+        &quot;endedMs&quot;: 1792367547911
       },
       {
         &quot;tool&quot;: &quot;skill_read&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345012284,
-        &quot;endedMs&quot;: 1792345012294
+        &quot;startedMs&quot;: 1792367551238,
+        &quot;endedMs&quot;: 1792367551247
       },
       {
         &quot;tool&quot;: &quot;skill_read&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345014407,
-        &quot;endedMs&quot;: 1792345014415
+        &quot;startedMs&quot;: 1792367551253,
+        &quot;endedMs&quot;: 1792367551261
+      },
+      {
+        &quot;tool&quot;: &quot;skill_read&quot;,
+        &quot;state&quot;: &quot;succeeded&quot;,
+        &quot;startedMs&quot;: 1792367551266,
+        &quot;endedMs&quot;: 1792367551277
       },
       {
         &quot;tool&quot;: &quot;browser_open&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345019685,
-        &quot;endedMs&quot;: 1792345032471
+        &quot;startedMs&quot;: 1792367555413,
+        &quot;endedMs&quot;: 1792367582423
       },
       {
         &quot;tool&quot;: &quot;browser_act&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345035472,
-        &quot;endedMs&quot;: 1792345040997
+        &quot;startedMs&quot;: 1792367585405,
+        &quot;endedMs&quot;: 1792367598332
       },
       {
         &quot;tool&quot;: &quot;browser_act&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345044811,
-        &quot;endedMs&quot;: 1792345045375
+        &quot;startedMs&quot;: 1792367601335,
+        &quot;endedMs&quot;: 1792367601906
       },
       {
         &quot;tool&quot;: &quot;browser_act&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345048429,
-        &quot;endedMs&quot;: 1792345053911
+        &quot;startedMs&quot;: 1792367604909,
+        &quot;endedMs&quot;: 1792367605507
       },
       {
         &quot;tool&quot;: &quot;browser_act&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345057383,
-        &quot;endedMs&quot;: 1792345057902
-      },
-      {
-        &quot;tool&quot;: &quot;skill_read&quot;,
-        &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345066592,
-        &quot;endedMs&quot;: 1792345066599
+        &quot;startedMs&quot;: 1792367609131,
+        &quot;endedMs&quot;: 1792367614903
       },
       {
         &quot;tool&quot;: &quot;file_write&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345105971,
-        &quot;endedMs&quot;: 1792345105985
+        &quot;startedMs&quot;: 1792367648528,
+        &quot;endedMs&quot;: 1792367648548
       },
       {
         &quot;tool&quot;: &quot;file_read&quot;,
         &quot;state&quot;: &quot;succeeded&quot;,
-        &quot;startedMs&quot;: 1792345109801,
-        &quot;endedMs&quot;: 1792345109812
+        &quot;startedMs&quot;: 1792367651666,
+        &quot;endedMs&quot;: 1792367651673
       }
     ],
     &quot;agentReadBackVerified&quot;: true
@@ -1205,111 +1198,111 @@ roami chrome record stop --target TARGET_ID
     {
       &quot;tool&quot;: &quot;tool_search&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792344974121,
-      &quot;endedMs&quot;: 1792344974131
+      &quot;startedMs&quot;: 1792367529023,
+      &quot;endedMs&quot;: 1792367529032
     },
     {
-      &quot;tool&quot;: &quot;tool_search&quot;,
-      &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792344974135,
-      &quot;endedMs&quot;: 1792344974143
-    },
-    {
-      &quot;tool&quot;: &quot;skill_read&quot;,
-      &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792344975655,
-      &quot;endedMs&quot;: 1792344975663
+      &quot;tool&quot;: &quot;bash&quot;,
+      &quot;state&quot;: &quot;failed&quot;,
+      &quot;startedMs&quot;: 1792367529036,
+      &quot;endedMs&quot;: 1792367529044
     },
     {
       &quot;tool&quot;: &quot;skill_read&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792344975666,
-      &quot;endedMs&quot;: 1792344975673
+      &quot;startedMs&quot;: 1792367533237,
+      &quot;endedMs&quot;: 1792367533245
+    },
+    {
+      &quot;tool&quot;: &quot;skill_read&quot;,
+      &quot;state&quot;: &quot;succeeded&quot;,
+      &quot;startedMs&quot;: 1792367533250,
+      &quot;endedMs&quot;: 1792367533259
     },
     {
       &quot;tool&quot;: &quot;delegate&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345009486,
-      &quot;endedMs&quot;: 1792345009504
+      &quot;startedMs&quot;: 1792367547887,
+      &quot;endedMs&quot;: 1792367547911
     },
     {
       &quot;tool&quot;: &quot;skill_read&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345012284,
-      &quot;endedMs&quot;: 1792345012294
+      &quot;startedMs&quot;: 1792367551238,
+      &quot;endedMs&quot;: 1792367551247
     },
     {
       &quot;tool&quot;: &quot;skill_read&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345014407,
-      &quot;endedMs&quot;: 1792345014415
+      &quot;startedMs&quot;: 1792367551253,
+      &quot;endedMs&quot;: 1792367551261
+    },
+    {
+      &quot;tool&quot;: &quot;skill_read&quot;,
+      &quot;state&quot;: &quot;succeeded&quot;,
+      &quot;startedMs&quot;: 1792367551266,
+      &quot;endedMs&quot;: 1792367551277
     },
     {
       &quot;tool&quot;: &quot;browser_open&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345019685,
-      &quot;endedMs&quot;: 1792345032471
+      &quot;startedMs&quot;: 1792367555413,
+      &quot;endedMs&quot;: 1792367582423
     },
     {
       &quot;tool&quot;: &quot;browser_act&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345035472,
-      &quot;endedMs&quot;: 1792345040997
+      &quot;startedMs&quot;: 1792367585405,
+      &quot;endedMs&quot;: 1792367598332
     },
     {
       &quot;tool&quot;: &quot;browser_act&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345044811,
-      &quot;endedMs&quot;: 1792345045375
+      &quot;startedMs&quot;: 1792367601335,
+      &quot;endedMs&quot;: 1792367601906
     },
     {
       &quot;tool&quot;: &quot;browser_act&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345048429,
-      &quot;endedMs&quot;: 1792345053911
+      &quot;startedMs&quot;: 1792367604909,
+      &quot;endedMs&quot;: 1792367605507
     },
     {
       &quot;tool&quot;: &quot;browser_act&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345057383,
-      &quot;endedMs&quot;: 1792345057902
-    },
-    {
-      &quot;tool&quot;: &quot;skill_read&quot;,
-      &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345066592,
-      &quot;endedMs&quot;: 1792345066599
+      &quot;startedMs&quot;: 1792367609131,
+      &quot;endedMs&quot;: 1792367614903
     },
     {
       &quot;tool&quot;: &quot;file_write&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345105971,
-      &quot;endedMs&quot;: 1792345105985
+      &quot;startedMs&quot;: 1792367648528,
+      &quot;endedMs&quot;: 1792367648548
     },
     {
       &quot;tool&quot;: &quot;file_read&quot;,
       &quot;state&quot;: &quot;succeeded&quot;,
-      &quot;startedMs&quot;: 1792345109801,
-      &quot;endedMs&quot;: 1792345109812
+      &quot;startedMs&quot;: 1792367651666,
+      &quot;endedMs&quot;: 1792367651673
     }
   ],
   &quot;documentProof&quot;: {
-    &quot;path&quot;: &quot;/tmp/roami-acceptance-20261019-20261019-013502/workspaces/R03/supplier-report.html&quot;,
-    &quot;fileUrl&quot;: &quot;/api/file/raw?path=%2Ftmp%2Froami-acceptance-20261019-20261019-013502%2Fworkspaces%2FR03%2Fsupplier-report.html&quot;,
-    &quot;sha256&quot;: &quot;e0bdb0d05f69912bcc815f4b77c91adeb737ebf7285128a2f0bde8265dd9def0&quot;,
+    &quot;path&quot;: &quot;/tmp/roami-acceptance-20261019-20261019-075053/workspaces/R03/supplier-report.html&quot;,
+    &quot;fileUrl&quot;: &quot;/api/file/serve/tmp/roami-acceptance-20261019-20261019-075053/workspaces/R03/supplier-report.html&quot;,
+    &quot;sha256&quot;: &quot;f154e123d86f0ab21f12509a0a376cf0ee2b50cd6949a0fef5b8df988996b548&quot;,
     &quot;verifiedSources&quot;: [
-      &quot;http://127.0.0.1:41325/alpha.html&quot;,
-      &quot;http://127.0.0.1:41325/beta.html&quot;,
-      &quot;http://127.0.0.1:41325/price-update.html&quot;,
-      &quot;http://127.0.0.1:41325/search.html&quot;,
-      &quot;http://127.0.0.1:41325/sla.html&quot;
+      &quot;http://127.0.0.1:36103/alpha.html&quot;,
+      &quot;http://127.0.0.1:36103/beta.html&quot;,
+      &quot;http://127.0.0.1:36103/price-update.html&quot;,
+      &quot;http://127.0.0.1:36103/search.html&quot;,
+      &quot;http://127.0.0.1:36103/sla.html&quot;
     ],
     &quot;observedUrls&quot;: [
-      &quot;http://127.0.0.1:41325/alpha.html&quot;,
-      &quot;http://127.0.0.1:41325/beta.html&quot;,
-      &quot;http://127.0.0.1:41325/price-update.html&quot;,
-      &quot;http://127.0.0.1:41325/search.html&quot;,
-      &quot;http://127.0.0.1:41325/sla.html&quot;
+      &quot;http://127.0.0.1:36103/alpha.html&quot;,
+      &quot;http://127.0.0.1:36103/beta.html&quot;,
+      &quot;http://127.0.0.1:36103/price-update.html&quot;,
+      &quot;http://127.0.0.1:36103/search.html&quot;,
+      &quot;http://127.0.0.1:36103/sla.html&quot;
     ],
     &quot;authenticatedDownloadMatches&quot;: true
   }

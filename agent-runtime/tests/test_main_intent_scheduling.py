@@ -1,0 +1,203 @@
+"""New intents preempt model waits, preserve earlier work and stop at safe boundaries."""
+
+import asyncio
+import json
+
+from test_runtime import ConversationModel, until
+
+from roami_agent.app import Runtime
+from roami_agent.protocol.models import ModelEvent
+from roami_agent.storage.database import row
+
+
+async def completed(store, turn_id):
+    await until(
+        store,
+        lambda db: row(db, "SELECT id FROM turns WHERE id=? AND state='completed'", (turn_id,)),
+    )
+
+
+async def test_new_question_answers_before_slow_original_and_original_resumes(store):
+    entered, blocked = asyncio.Event(), asyncio.Event()
+    original_calls = 0
+
+    class Questions:
+        model = "intent-scheduling"
+
+        async def stream(self, messages, tools):
+            nonlocal original_calls
+            resumed = "Resume this original request" in str(messages[-1]["content"])
+            if resumed:
+                assert "上海" not in str(messages)
+                yield ModelEvent("text", "北京：已恢复回答")
+            elif messages[-1]["content"] == "北京天气":
+                original_calls += 1
+                entered.set()
+                await blocked.wait()
+            else:
+                assert not any(m["role"] == "user" and m["content"] == "北京天气" for m in messages)
+                assert any(
+                    m["role"] == "assistant" and "independent request" in m["content"]
+                    for m in messages
+                )
+                yield ModelEvent("text", "上海：快速回答")
+
+    runtime = Runtime(store, Questions())
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        first = await runtime.chat.submit("alice", conversation["id"], "beijing", "北京天气")
+        await asyncio.wait_for(entered.wait(), 2)
+        second = await runtime.chat.submit("alice", conversation["id"], "shanghai", "上海天气")
+        await completed(store, second["turnId"])
+        await completed(store, first["turnId"])
+        assert not blocked.is_set() and original_calls == 1
+        messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
+        answers = [
+            m["content"]["text"]
+            for m in messages
+            if m["role"] == "assistant" and m["status"] == "completed"
+        ]
+        assert answers == ["上海：快速回答", "北京：已恢复回答"]
+        trace = await runtime.traces.get("alice", turn_id=first["turnId"])
+        assert len([s for s in trace["spans"] if s["name"] == "model.request"]) == 2
+        assert any(s["state"] == "interrupted" for s in trace["spans"])
+        waits = [s for s in trace["spans"] if s["name"] == "turn.rescheduled"]
+        assert len(waits) == 1 and waits[0]["state"] == "resumed" and waits[0]["durationMs"] >= 0
+    finally:
+        await runtime.close()
+
+
+async def test_busy_tools_finish_once_then_new_question_runs_before_continuation(store):
+    started, release = asyncio.Event(), asyncio.Event()
+    effects = []
+
+    class ToolModel:
+        model = "write-boundary"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["content"] == "write once":
+                yield ModelEvent(
+                    "tool", {"id": "write", "function": {"name": "write_probe", "arguments": "{}"}}
+                )
+            elif messages[-1]["content"] == "quick question":
+                yield ModelEvent("text", "Quick answer")
+            else:
+                assert "persisted write" in str(messages)
+                assert "quick question" not in str(messages)
+                yield ModelEvent("text", "Write result delivered")
+
+    from roami_agent.protocol.tools import Tool, object_schema
+
+    async def write(args, binding):
+        effects.append("write")
+        started.set()
+        await release.wait()
+        return {"summary": "persisted write"}
+
+    runtime = Runtime(store, ToolModel())
+    runtime.tools.add(
+        Tool(
+            "write_probe",
+            "Test write boundary",
+            object_schema({}),
+            write,
+            effect="write",
+            main=True,
+        )
+    )
+    await runtime.start()
+    try:
+        c = await runtime.conversations.create("alice")
+        first = await runtime.chat.submit("alice", c["id"], "write", "write once")
+        await asyncio.wait_for(started.wait(), 2)
+        second = await runtime.chat.submit("alice", c["id"], "quick", "quick question")
+        await asyncio.sleep(0)
+        assert effects == ["write"]
+        release.set()
+        await completed(store, second["turnId"])
+        await completed(store, first["turnId"])
+        assert effects == ["write"]
+    finally:
+        release.set()
+        await runtime.close()
+
+
+async def test_two_background_questions_do_not_need_an_extra_main_model_round(store):
+    release = asyncio.Event()
+
+    class Main:
+        model = "fast-dispatch"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["role"] == "tool":
+                raise AssertionError("Do not spend a model request acknowledging accepted work")
+            if str(messages[-1]["content"]).startswith("Background task result"):
+                yield ModelEvent("text", "Result: " + str(messages[-1]["content"]))
+            else:
+                goal = messages[-1]["content"]
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": goal,
+                        "function": {"name": "delegate", "arguments": json.dumps({"goal": goal})},
+                    },
+                )
+
+    class Worker:
+        model = "background"
+
+        async def stream(self, messages, tools):
+            await release.wait()
+            yield ModelEvent("text", "Worker completed " + messages[-1]["content"])
+
+    runtime = Runtime(store, Main(), worker_model=Worker())
+    await runtime.start()
+    try:
+        c = await runtime.conversations.create("alice")
+        first = await runtime.chat.submit("alice", c["id"], "beijing", "北京天气")
+        await completed(store, first["turnId"])
+        second = await runtime.chat.submit("alice", c["id"], "shanghai", "上海天气")
+        await completed(store, second["turnId"])
+        tasks = await runtime.tasks.list("alice", c["id"])
+        assert len(tasks) == 2 and not release.is_set()
+        assert {json.loads(t["intent_json"])["goal"] for t in tasks} == {"北京天气", "上海天气"}
+        release.set()
+        await until(
+            store,
+            lambda db: (
+                db.execute(
+                    "SELECT COUNT(*) FROM turns WHERE trigger_kind='completion' AND state='completed'"
+                ).fetchone()[0]
+                == 2
+            ),
+        )
+        assert all(t["state"] == "succeeded" for t in await runtime.tasks.list("alice", c["id"]))
+    finally:
+        release.set()
+        await runtime.close()
+
+
+async def test_stop_cancels_a_queued_reply_without_starting_it_or_other_work(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        c = await runtime.conversations.create("alice")
+        first = await runtime.chat.submit("alice", c["id"], "one", "queued question")
+        receipt = await runtime.chat.interrupt("alice", c["id"], "stop")
+        assert receipt["turnId"] == first["turnId"]
+        await runtime.start()
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='interrupted'", (first["turnId"],)
+            ),
+        )
+        assert (await runtime.chat.interrupt("alice", c["id"], "stop")) == receipt
+        assert (
+            await store.call(
+                lambda db: db.execute("SELECT COUNT(*) FROM prompt_manifests").fetchone()[0]
+            )
+            == 0
+        )
+    finally:
+        await runtime.close()

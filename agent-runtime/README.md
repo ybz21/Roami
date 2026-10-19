@@ -14,6 +14,12 @@ uv run pytest -q
 
 Dependencies are pinned in `uv.lock`. Tests use temporary databases and injected model/HTTP transports; they never start a real coding Agent or use a live model account. The cross-language test builds the actual Go CLI, registers the Agent database, starts Python through that CLI, streams from a local HTTP model fixture, reads the durable answer, posts a proactive message and verifies maintenance-lock exclusion. The root quality gate runs these checks too. A separate integration test starts actual Go runners in an isolated tmux server with substitute `codex`/`claude` executables, verifying multiline input, literal shell characters, replay/conflict handling, cancellation, nonzero exits and interrupted-launch reconciliation.
 
+## Execution traces
+
+`roami agent trace --turn TURN_ID` (or `--task TASK_ID`) joins Main, Native/CLI execution and result reporting. `--format chrome` writes a trace-event JSON file usable by local Perfetto/Chrome viewers. The authenticated HTTP equivalent is `GET /api/agent/traces?turnId=ID`.
+
+Traces contain timing/status/usage metadata, not message bodies or tool arguments. New calls distinguish response headers, first provider delta, first text and retries. Legacy timing is explicitly inferred; unknown outcomes and usage stay unknown. Current coverage begins at Python admission and ends at committed Main reply, excluding client paint and opaque external-Agent internals. See [research and verification](../docs/design/20261017-agent框架设计/reviews/20261019-execution-tracing/README.md).
+
 ## Run in an isolated instance
 
 From the repository root:

@@ -1,0 +1,1120 @@
+{
+  "schemaVersion": 1,
+  "traceId": "e8582b1996364cdab17ee9b12d7bec7a",
+  "requestId": "641ea97338214c538302167eb0cf6de5",
+  "rootTurnId": "e8582b1996364cdab17ee9b12d7bec7a",
+  "observedAtMs": 1792368187051,
+  "startedMs": 1792367523296,
+  "finishedMs": 1792367676305,
+  "summary": {
+    "durationMs": 153009,
+    "firstCommittedTextMs": 14560,
+    "active": false,
+    "hasFailures": true,
+    "hasUnknown": false,
+    "taskStates": {
+      "a57d938f6b3142dfb3d4fd4e461da957": "waiting_user"
+    },
+    "modelCalls": 13,
+    "toolCalls": 15,
+    "durationSumsMayOverlap": true
+  },
+  "spans": [
+    {
+      "spanId": "trace:e8582b1996364cdab17ee9b12d7bec7a",
+      "parentSpanId": null,
+      "name": "agent.execution",
+      "startedMs": 1792367523296,
+      "finishedMs": 1792367676305,
+      "durationMs": 153009,
+      "state": "settled",
+      "attributes": {}
+    },
+    {
+      "spanId": "turn-queue:e8582b1996364cdab17ee9b12d7bec7a",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "turn.queue",
+      "startedMs": 1792367523296,
+      "finishedMs": 1792367523309,
+      "durationMs": 13,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "measured"
+      }
+    },
+    {
+      "spanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "parentSpanId": "trace:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "agent.main",
+      "startedMs": 1792367523296,
+      "finishedMs": 1792367547919,
+      "durationMs": 24623,
+      "state": "completed",
+      "attributes": {
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "requestId": "641ea97338214c538302167eb0cf6de5",
+        "conversationId": "93f0b62feef24a69a9f1ddcfba815b2d",
+        "linkedRunId": null
+      }
+    },
+    {
+      "spanId": "context:d0b0723dfbc94d86a28ae475c21ec61e",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "context.build",
+      "startedMs": 1792367523309,
+      "finishedMs": 1792367523311.1533,
+      "durationMs": 2.1533203125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:d0b0723dfbc94d86a28ae475c21ec61e",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "model.request",
+      "startedMs": 1792367523318,
+      "finishedMs": 1792367529009,
+      "durationMs": 5691,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 5691.30642991513,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 3.019522875547409,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 4176.66728887707,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 4185.499402228743,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2862,
+          "outputTokens": 86,
+          "cacheReadTokens": 2560,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:e12ae87a7c7b44d0b53608b685d131a5",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "tool.tool_search",
+      "startedMs": 1792367529023,
+      "finishedMs": 1792367529032,
+      "durationMs": 9,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "e12ae87a7c7b44d0b53608b685d131a5",
+        "toolName": "tool_search",
+        "effect": "read",
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "causedBySpanId": "model:d0b0723dfbc94d86a28ae475c21ec61e"
+      }
+    },
+    {
+      "spanId": "tool:5c14f66cea474dbdaa958e38bd948a22",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "tool.bash",
+      "startedMs": 1792367529036,
+      "finishedMs": 1792367529044,
+      "durationMs": 8,
+      "state": "failed",
+      "attributes": {
+        "toolCallId": "5c14f66cea474dbdaa958e38bd948a22",
+        "toolName": "bash",
+        "effect": "write",
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "causedBySpanId": "model:d0b0723dfbc94d86a28ae475c21ec61e"
+      }
+    },
+    {
+      "spanId": "context:395c393d9c814ed1bd01c4b60f77ecd2",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "context.build",
+      "startedMs": 1792367529048,
+      "finishedMs": 1792367529052.246,
+      "durationMs": 4.24609375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:395c393d9c814ed1bd01c4b60f77ecd2",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "model.request",
+      "startedMs": 1792367529059,
+      "finishedMs": 1792367533230,
+      "durationMs": 4171,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 2,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 4171.434949152172,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 3.041241317987442,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3897.5396379828453,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3906.2683572992682,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3283,
+          "outputTokens": 26,
+          "cacheReadTokens": 2816,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:6b1e4aa30c65481ca5d88ff1211ebd44",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "tool.skill_read",
+      "startedMs": 1792367533237,
+      "finishedMs": 1792367533245,
+      "durationMs": 8,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "6b1e4aa30c65481ca5d88ff1211ebd44",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "causedBySpanId": "model:395c393d9c814ed1bd01c4b60f77ecd2"
+      }
+    },
+    {
+      "spanId": "tool:29916dd571b742b597521f04c94721ee",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "tool.skill_read",
+      "startedMs": 1792367533250,
+      "finishedMs": 1792367533259,
+      "durationMs": 9,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "29916dd571b742b597521f04c94721ee",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "causedBySpanId": "model:395c393d9c814ed1bd01c4b60f77ecd2"
+      }
+    },
+    {
+      "spanId": "context:9c65c7ad386b49b091fa716ca308f8a6",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "context.build",
+      "startedMs": 1792367533263,
+      "finishedMs": 1792367533269.8552,
+      "durationMs": 6.855224609375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:9c65c7ad386b49b091fa716ca308f8a6",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "model.request",
+      "startedMs": 1792367533279,
+      "finishedMs": 1792367547868,
+      "durationMs": 14589,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 3,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 14588.97387702018,
+        "firstTextMs": 4569.1442410461605,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.946407999843359,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3943.6284489929676,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3952.143588103354,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3720,
+          "outputTokens": 496,
+          "cacheReadTokens": 3264,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:56955afdb6794f65b7985abd0e99a7f2",
+      "parentSpanId": "turn:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "tool.delegate",
+      "startedMs": 1792367547887,
+      "finishedMs": 1792367547911,
+      "durationMs": 24,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "56955afdb6794f65b7985abd0e99a7f2",
+        "toolName": "delegate",
+        "effect": "write",
+        "turnId": "e8582b1996364cdab17ee9b12d7bec7a",
+        "causedBySpanId": "model:9c65c7ad386b49b091fa716ca308f8a6"
+      }
+    },
+    {
+      "spanId": "task-queue:c44c9c58161946fd9149e0271c294b75",
+      "parentSpanId": "trace:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "task.queue",
+      "startedMs": 1792367547904,
+      "finishedMs": 1792367547927,
+      "durationMs": 23,
+      "state": "completed",
+      "attributes": {
+        "taskId": "a57d938f6b3142dfb3d4fd4e461da957"
+      }
+    },
+    {
+      "spanId": "prepare:c44c9c58161946fd9149e0271c294b75",
+      "parentSpanId": "run:c44c9c58161946fd9149e0271c294b75",
+      "name": "executor.prepare",
+      "startedMs": 1792367547927,
+      "finishedMs": 1792367547996,
+      "durationMs": 69,
+      "state": "completed",
+      "attributes": {
+        "runId": "c44c9c58161946fd9149e0271c294b75"
+      }
+    },
+    {
+      "spanId": "run:c44c9c58161946fd9149e0271c294b75",
+      "parentSpanId": "trace:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "executor.native",
+      "startedMs": 1792367547927,
+      "finishedMs": 1792367660545,
+      "durationMs": 112618,
+      "state": "succeeded",
+      "attributes": {
+        "taskId": "a57d938f6b3142dfb3d4fd4e461da957",
+        "runId": "c44c9c58161946fd9149e0271c294b75",
+        "taskState": "waiting_user",
+        "revision": 1,
+        "observationUnit": "native_run",
+        "internalStepsObservable": true,
+        "sourceTurnId": "e8582b1996364cdab17ee9b12d7bec7a"
+      }
+    },
+    {
+      "spanId": "turn-queue:b3760dda270a43ec8185d7629b650ddf",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "worker.prepare",
+      "startedMs": 1792367547928,
+      "finishedMs": 1792367547999,
+      "durationMs": 71,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "measured"
+      }
+    },
+    {
+      "spanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "parentSpanId": "run:c44c9c58161946fd9149e0271c294b75",
+      "name": "agent.worker",
+      "startedMs": 1792367547928,
+      "finishedMs": 1792367660529,
+      "durationMs": 112601,
+      "state": "completed",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "requestId": null,
+        "conversationId": "d0c6363d75dd42a9b3ab3614b4faa223",
+        "linkedRunId": null
+      }
+    },
+    {
+      "spanId": "context:0342d1c359ed4e3bb454b93e347ee0c1",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367547999,
+      "finishedMs": 1792367547999.8794,
+      "durationMs": 0.87939453125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:0342d1c359ed4e3bb454b93e347ee0c1",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367548009,
+      "finishedMs": 1792367551228,
+      "durationMs": 3219,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 3218.9566888846457,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.9904060065746307,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3129.8893787898123,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3139.8628097958863,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 1538,
+          "outputTokens": 69,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:f326f21e300c40fb9606374ec25e0b89",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.skill_read",
+      "startedMs": 1792367551238,
+      "finishedMs": 1792367551247,
+      "durationMs": 9,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "f326f21e300c40fb9606374ec25e0b89",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:0342d1c359ed4e3bb454b93e347ee0c1"
+      }
+    },
+    {
+      "spanId": "tool:692f652464194548b787df9fcb8ff739",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.skill_read",
+      "startedMs": 1792367551253,
+      "finishedMs": 1792367551261,
+      "durationMs": 8,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "692f652464194548b787df9fcb8ff739",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:0342d1c359ed4e3bb454b93e347ee0c1"
+      }
+    },
+    {
+      "spanId": "tool:7098f84d80b54649a7876a75f3923097",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.skill_read",
+      "startedMs": 1792367551266,
+      "finishedMs": 1792367551277,
+      "durationMs": 11,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "7098f84d80b54649a7876a75f3923097",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:0342d1c359ed4e3bb454b93e347ee0c1"
+      }
+    },
+    {
+      "spanId": "context:74cdb9c851b949569f9e77826d1939c5",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367551282,
+      "finishedMs": 1792367551284.1555,
+      "durationMs": 2.155517578125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:74cdb9c851b949569f9e77826d1939c5",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367551301,
+      "finishedMs": 1792367555407,
+      "durationMs": 4106,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 2,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 4105.626301839948,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 4.708397667855024,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3515.1728466153145,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 3523.137591779232,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2741,
+          "outputTokens": 53,
+          "cacheReadTokens": 1408,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:1c25180702c74fef86e905e51a7323f7",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.browser_open",
+      "startedMs": 1792367555413,
+      "finishedMs": 1792367582423,
+      "durationMs": 27010,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "1c25180702c74fef86e905e51a7323f7",
+        "toolName": "browser_open",
+        "effect": "write",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:74cdb9c851b949569f9e77826d1939c5"
+      }
+    },
+    {
+      "spanId": "context:31e7f28d0f7e499b8ed4cc7eed9322c4",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367582427,
+      "finishedMs": 1792367582428.5667,
+      "durationMs": 1.566650390625,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:31e7f28d0f7e499b8ed4cc7eed9322c4",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367582439,
+      "finishedMs": 1792367585396,
+      "durationMs": 2957,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 3,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 2957.5308738276362,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.013427671045065,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2167.871480807662,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2175.3583340905607,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3265,
+          "outputTokens": 79,
+          "cacheReadTokens": 2560,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:f45dce2e4a8d49719a6692dc235285a8",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.browser_act",
+      "startedMs": 1792367585405,
+      "finishedMs": 1792367598332,
+      "durationMs": 12927,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "f45dce2e4a8d49719a6692dc235285a8",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:31e7f28d0f7e499b8ed4cc7eed9322c4"
+      }
+    },
+    {
+      "spanId": "context:7bf2667fc02e4243a9964b6c97922a0d",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367598337,
+      "finishedMs": 1792367598339.9373,
+      "durationMs": 2.937255859375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:7bf2667fc02e4243a9964b6c97922a0d",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367598351,
+      "finishedMs": 1792367601273,
+      "durationMs": 2922,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 4,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 2921.2230779230595,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.046578098088503,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2079.4372227974236,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2087.667614221573,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3684,
+          "outputTokens": 84,
+          "cacheReadTokens": 3072,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:9bb2b3c1fd854c3dbde5177fb5899288",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.browser_act",
+      "startedMs": 1792367601335,
+      "finishedMs": 1792367601906,
+      "durationMs": 571,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "9bb2b3c1fd854c3dbde5177fb5899288",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:7bf2667fc02e4243a9964b6c97922a0d"
+      }
+    },
+    {
+      "spanId": "context:e59d44ba256c422b98e1e1e8b33874c2",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367601910,
+      "finishedMs": 1792367601912.0942,
+      "durationMs": 2.09423828125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:e59d44ba256c422b98e1e1e8b33874c2",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367601921,
+      "finishedMs": 1792367604896,
+      "durationMs": 2975,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 5,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 2974.3777411058545,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.2352091036736965,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2146.9115312211215,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2154.4379661791027,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 4329,
+          "outputTokens": 79,
+          "cacheReadTokens": 3584,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:bb9bcc83ee134a88917cdcb5d1e1dbe2",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.browser_act",
+      "startedMs": 1792367604909,
+      "finishedMs": 1792367605507,
+      "durationMs": 598,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "bb9bcc83ee134a88917cdcb5d1e1dbe2",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:e59d44ba256c422b98e1e1e8b33874c2"
+      }
+    },
+    {
+      "spanId": "context:2ba7d0755cbe436c9a3ea1e093665fe0",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367605512,
+      "finishedMs": 1792367605515.4766,
+      "durationMs": 3.4765625,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:2ba7d0755cbe436c9a3ea1e093665fe0",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367605527,
+      "finishedMs": 1792367609118,
+      "durationMs": 3591,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 6,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 3590.988032054156,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 3.050053957849741,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2783.972783945501,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2792.291859164834,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 4937,
+          "outputTokens": 98,
+          "cacheReadTokens": 4224,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:8bfeeccd1bc84555a6cca4f2ba38c5db",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.browser_act",
+      "startedMs": 1792367609131,
+      "finishedMs": 1792367614903,
+      "durationMs": 5772,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "8bfeeccd1bc84555a6cca4f2ba38c5db",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:2ba7d0755cbe436c9a3ea1e093665fe0"
+      }
+    },
+    {
+      "spanId": "context:8466d8d1e5954b0eb17fceb8d3382a24",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367614908,
+      "finishedMs": 1792367614912.1372,
+      "durationMs": 4.13720703125,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:8466d8d1e5954b0eb17fceb8d3382a24",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367614925,
+      "finishedMs": 1792367648510,
+      "durationMs": 33585,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 7,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 33585.40556393564,
+        "firstTextMs": 2689.0790248289704,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.8679901733994484,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2676.618754863739,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2685.5509891174734,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 5314,
+          "outputTokens": 2189,
+          "cacheReadTokens": 4736,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:791b45adbf864059837d654b745f5565",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.file_write",
+      "startedMs": 1792367648528,
+      "finishedMs": 1792367648548,
+      "durationMs": 20,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "791b45adbf864059837d654b745f5565",
+        "toolName": "file_write",
+        "effect": "write",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:8466d8d1e5954b0eb17fceb8d3382a24"
+      }
+    },
+    {
+      "spanId": "context:f6d932c7f234417ba25aab52ec72bff2",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367648555,
+      "finishedMs": 1792367648560.443,
+      "durationMs": 5.443115234375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:f6d932c7f234417ba25aab52ec72bff2",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367648571,
+      "finishedMs": 1792367651656,
+      "durationMs": 3085,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 8,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 3084.319105837494,
+        "firstTextMs": null,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.0088478922843933,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2665.333488956094,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2673.650006763637,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 7538,
+          "outputTokens": 43,
+          "cacheReadTokens": 5120,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:50a1d674b4c342629dd9dc92607e0064",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "tool.file_read",
+      "startedMs": 1792367651666,
+      "finishedMs": 1792367651673,
+      "durationMs": 7,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "50a1d674b4c342629dd9dc92607e0064",
+        "toolName": "file_read",
+        "effect": "read",
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "causedBySpanId": "model:f6d932c7f234417ba25aab52ec72bff2"
+      }
+    },
+    {
+      "spanId": "context:a52da28a3219472cabce8e7ff601ec6d",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "context.build",
+      "startedMs": 1792367651679,
+      "finishedMs": 1792367651683.4456,
+      "durationMs": 4.445556640625,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:a52da28a3219472cabce8e7ff601ec6d",
+      "parentSpanId": "turn:b3760dda270a43ec8185d7629b650ddf",
+      "name": "model.request",
+      "startedMs": 1792367651691,
+      "finishedMs": 1792367660522,
+      "durationMs": 8831,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "b3760dda270a43ec8185d7629b650ddf",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 9,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 8831.074687186629,
+        "firstTextMs": 2839.9626282043755,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 3.8783461786806583,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2834.1799462214112,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 2837.196259293705,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 9678,
+          "outputTokens": 429,
+          "cacheReadTokens": 7424,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "verify:c44c9c58161946fd9149e0271c294b75",
+      "parentSpanId": "trace:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "task.verification_and_queue",
+      "startedMs": 1792367660546,
+      "finishedMs": 1792367660556,
+      "durationMs": 10,
+      "state": "completed",
+      "attributes": {
+        "runId": "c44c9c58161946fd9149e0271c294b75",
+        "taskState": "waiting_user"
+      }
+    },
+    {
+      "spanId": "turn-queue:bf4802f7a2e1413594f0058cf2de1a3b",
+      "parentSpanId": "turn:bf4802f7a2e1413594f0058cf2de1a3b",
+      "name": "turn.queue",
+      "startedMs": 1792367660555,
+      "finishedMs": 1792367660565,
+      "durationMs": 10,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "measured"
+      }
+    },
+    {
+      "spanId": "turn:bf4802f7a2e1413594f0058cf2de1a3b",
+      "parentSpanId": "trace:e8582b1996364cdab17ee9b12d7bec7a",
+      "name": "agent.report",
+      "startedMs": 1792367660555,
+      "finishedMs": 1792367676305,
+      "durationMs": 15750,
+      "state": "completed",
+      "attributes": {
+        "turnId": "bf4802f7a2e1413594f0058cf2de1a3b",
+        "requestId": null,
+        "conversationId": "93f0b62feef24a69a9f1ddcfba815b2d",
+        "linkedRunId": "c44c9c58161946fd9149e0271c294b75"
+      }
+    },
+    {
+      "spanId": "context:69471e96ef654c098ab75ebc169881ff",
+      "parentSpanId": "turn:bf4802f7a2e1413594f0058cf2de1a3b",
+      "name": "context.build",
+      "startedMs": 1792367660565,
+      "finishedMs": 1792367660567.869,
+      "durationMs": 2.868896484375,
+      "state": "completed",
+      "attributes": {}
+    },
+    {
+      "spanId": "model:69471e96ef654c098ab75ebc169881ff",
+      "parentSpanId": "turn:bf4802f7a2e1413594f0058cf2de1a3b",
+      "name": "model.request",
+      "startedMs": 1792367660573,
+      "finishedMs": 1792367676299,
+      "durationMs": 15726,
+      "state": "succeeded",
+      "attributes": {
+        "turnId": "bf4802f7a2e1413594f0058cf2de1a3b",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "measured",
+        "elapsedMs": 15725.806972943246,
+        "firstTextMs": 10517.231517005712,
+        "providerEvents": [
+          {
+            "attempt": 1,
+            "elapsedMs": 2.020153682678938,
+            "phase": "request"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 10505.204416811466,
+            "phase": "headers"
+          },
+          {
+            "attempt": 1,
+            "elapsedMs": 10513.854720629752,
+            "phase": "first_delta"
+          }
+        ],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 5119,
+          "outputTokens": 297,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": null
+        }
+      }
+    }
+  ],
+  "coverage": {
+    "start": "python_turn_admission",
+    "end": "committed_main_reply",
+    "browserPaint": false,
+    "goIngress": false,
+    "externalAgentInternals": false,
+    "contentIncluded": false
+  }
+}

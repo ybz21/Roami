@@ -1,7 +1,10 @@
 import hashlib
+import logging
 
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+
+log = logging.getLogger(__name__)
 
 
 class PromptManifests:
@@ -38,6 +41,7 @@ class PromptManifests:
                             "imageError": plan.get("imageError"),
                             "taskEvidence": plan.get("taskEvidence"),
                             "memoryEvidence": plan.get("memoryEvidence", []),
+                            "timing": plan.get("timing"),
                         }
                     ),
                     now_ms(),
@@ -45,3 +49,16 @@ class PromptManifests:
             ),
             write=True,
         )
+
+    async def timing(self, turn, attempt, timing):
+        try:
+            await self.db.call(
+                lambda db: db.execute(
+                    "UPDATE prompt_manifests SET parts_json=json_set(parts_json,'$.timing',json(?)) "
+                    "WHERE turn_id=? AND attempt_no=?",
+                    (encoded(timing), turn["id"], attempt),
+                ),
+                write=True,
+            )
+        except Exception:  # noqa: BLE001 - Diagnostics must not change the execution outcome.
+            log.warning("Model timing could not be recorded")

@@ -1,0 +1,866 @@
+{
+  "schemaVersion": 1,
+  "traceId": "aa632aa503cf4050a4546dd4f95e8987",
+  "requestId": "e8084cf8d3f34269bec12a19ce47f3e0",
+  "rootTurnId": "aa632aa503cf4050a4546dd4f95e8987",
+  "observedAtMs": 1792368187040,
+  "startedMs": 1792344946130,
+  "finishedMs": 1792345151859,
+  "summary": {
+    "durationMs": 205729,
+    "firstCommittedTextMs": 27123,
+    "active": false,
+    "hasFailures": false,
+    "hasUnknown": false,
+    "taskStates": {
+      "a172707c5af54284a606959a7fb80e0c": "waiting_user"
+    },
+    "modelCalls": 16,
+    "toolCalls": 15,
+    "durationSumsMayOverlap": true
+  },
+  "spans": [
+    {
+      "spanId": "trace:aa632aa503cf4050a4546dd4f95e8987",
+      "parentSpanId": null,
+      "name": "agent.execution",
+      "startedMs": 1792344946130,
+      "finishedMs": 1792345151859,
+      "durationMs": 205729,
+      "state": "settled",
+      "attributes": {}
+    },
+    {
+      "spanId": "turn-queue:aa632aa503cf4050a4546dd4f95e8987",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "turn.admission_and_context",
+      "startedMs": 1792344946130,
+      "finishedMs": 1792344946156,
+      "durationMs": 26,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "message_lifecycle"
+      }
+    },
+    {
+      "spanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "parentSpanId": "trace:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "agent.main",
+      "startedMs": 1792344946130,
+      "finishedMs": 1792345012328,
+      "durationMs": 66198,
+      "state": "completed",
+      "attributes": {
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "requestId": "e8084cf8d3f34269bec12a19ce47f3e0",
+        "conversationId": "b6be36240b2a4f57bec15ec2fb264a8e",
+        "linkedRunId": null
+      }
+    },
+    {
+      "spanId": "model:5cbbd0c8f62f4db48380af5153a1f0ba",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "model.request",
+      "startedMs": 1792344946156,
+      "finishedMs": 1792344974118,
+      "durationMs": 27962,
+      "state": "completed",
+      "attributes": {
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2759,
+          "outputTokens": 1585,
+          "cacheReadTokens": 2496,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:3f31575ad12c4279ac0841e0162796d4",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "tool.tool_search",
+      "startedMs": 1792344974121,
+      "finishedMs": 1792344974131,
+      "durationMs": 10,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "3f31575ad12c4279ac0841e0162796d4",
+        "toolName": "tool_search",
+        "effect": "read",
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "causedBySpanId": "model:5cbbd0c8f62f4db48380af5153a1f0ba"
+      }
+    },
+    {
+      "spanId": "tool:9ec721d108834cb0aa4934cf3d6f39b0",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "tool.tool_search",
+      "startedMs": 1792344974135,
+      "finishedMs": 1792344974143,
+      "durationMs": 8,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "9ec721d108834cb0aa4934cf3d6f39b0",
+        "toolName": "tool_search",
+        "effect": "read",
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "causedBySpanId": "model:5cbbd0c8f62f4db48380af5153a1f0ba"
+      }
+    },
+    {
+      "spanId": "model:85cd95068f0a4a67984c354cccb22072",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "model.request",
+      "startedMs": 1792344974151,
+      "finishedMs": 1792344975645,
+      "durationMs": 1494,
+      "state": "completed",
+      "attributes": {
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 2,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3323,
+          "outputTokens": 47,
+          "cacheReadTokens": 2560,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:8b8834d3a80149bb963507e1f2bd4838",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "tool.skill_read",
+      "startedMs": 1792344975655,
+      "finishedMs": 1792344975663,
+      "durationMs": 8,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "8b8834d3a80149bb963507e1f2bd4838",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "causedBySpanId": "model:85cd95068f0a4a67984c354cccb22072"
+      }
+    },
+    {
+      "spanId": "tool:5436fdf5b3bf45dba030580e6c4cfbdf",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "tool.skill_read",
+      "startedMs": 1792344975666,
+      "finishedMs": 1792344975673,
+      "durationMs": 7,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "5436fdf5b3bf45dba030580e6c4cfbdf",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "causedBySpanId": "model:85cd95068f0a4a67984c354cccb22072"
+      }
+    },
+    {
+      "spanId": "model:8febd3c55ccc43668504b87b83203d49",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "model.request",
+      "startedMs": 1792344975681,
+      "finishedMs": 1792345009482,
+      "durationMs": 33801,
+      "state": "completed",
+      "attributes": {
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 3,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3765,
+          "outputTokens": 2101,
+          "cacheReadTokens": 3264,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:e0512f97da7d4047bdff5ae23f560411",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "tool.delegate",
+      "startedMs": 1792345009486,
+      "finishedMs": 1792345009504,
+      "durationMs": 18,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "e0512f97da7d4047bdff5ae23f560411",
+        "toolName": "delegate",
+        "effect": "write",
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "causedBySpanId": "model:8febd3c55ccc43668504b87b83203d49"
+      }
+    },
+    {
+      "spanId": "task-queue:6cf9bc29cd684b8999e093aa8d262bb6",
+      "parentSpanId": "trace:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "task.queue",
+      "startedMs": 1792345009498,
+      "finishedMs": 1792345009513,
+      "durationMs": 15,
+      "state": "completed",
+      "attributes": {
+        "taskId": "a172707c5af54284a606959a7fb80e0c"
+      }
+    },
+    {
+      "spanId": "prepare:6cf9bc29cd684b8999e093aa8d262bb6",
+      "parentSpanId": "run:6cf9bc29cd684b8999e093aa8d262bb6",
+      "name": "executor.prepare",
+      "startedMs": 1792345009513,
+      "finishedMs": 1792345009593,
+      "durationMs": 80,
+      "state": "completed",
+      "attributes": {
+        "runId": "6cf9bc29cd684b8999e093aa8d262bb6"
+      }
+    },
+    {
+      "spanId": "run:6cf9bc29cd684b8999e093aa8d262bb6",
+      "parentSpanId": "trace:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "executor.native",
+      "startedMs": 1792345009513,
+      "finishedMs": 1792345119783,
+      "durationMs": 110270,
+      "state": "succeeded",
+      "attributes": {
+        "taskId": "a172707c5af54284a606959a7fb80e0c",
+        "runId": "6cf9bc29cd684b8999e093aa8d262bb6",
+        "taskState": "waiting_user",
+        "revision": 1,
+        "observationUnit": "native_run",
+        "internalStepsObservable": true,
+        "sourceTurnId": "aa632aa503cf4050a4546dd4f95e8987"
+      }
+    },
+    {
+      "spanId": "turn-queue:ef78e16e84a54fdc9c18dc5050db4397",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "worker.prepare",
+      "startedMs": 1792345009513,
+      "finishedMs": 1792345009607,
+      "durationMs": 94,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "message_lifecycle"
+      }
+    },
+    {
+      "spanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "parentSpanId": "run:6cf9bc29cd684b8999e093aa8d262bb6",
+      "name": "agent.worker",
+      "startedMs": 1792345009513,
+      "finishedMs": 1792345119764,
+      "durationMs": 110251,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "requestId": null,
+        "conversationId": "d5b57a86bd7041f4a5843e6bdd3073f7",
+        "linkedRunId": null
+      }
+    },
+    {
+      "spanId": "model:727600591296457796bbbf832371090a",
+      "parentSpanId": "turn:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "model.request",
+      "startedMs": 1792345009530,
+      "finishedMs": 1792345012329,
+      "durationMs": 2799,
+      "state": "completed",
+      "attributes": {
+        "turnId": "aa632aa503cf4050a4546dd4f95e8987",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 4,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 4744,
+          "outputTokens": 121,
+          "cacheReadTokens": 3712,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "model:8332d93b04db4772b979604712115299",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345009607,
+      "finishedMs": 1792345012278,
+      "durationMs": 2671,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 1896,
+          "outputTokens": 20,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:6273818d9d7542f1a4c8a71a62270f3b",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.skill_read",
+      "startedMs": 1792345012284,
+      "finishedMs": 1792345012294,
+      "durationMs": 10,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "6273818d9d7542f1a4c8a71a62270f3b",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:8332d93b04db4772b979604712115299"
+      }
+    },
+    {
+      "spanId": "model:b2dfbfbff9f44a44b1f937be76281fb4",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345012316,
+      "finishedMs": 1792345014402,
+      "durationMs": 2086,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 2,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2154,
+          "outputTokens": 21,
+          "cacheReadTokens": 1792,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:b486770b0e224b919391b5ecc569f0dc",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.skill_read",
+      "startedMs": 1792345014407,
+      "finishedMs": 1792345014415,
+      "durationMs": 8,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "b486770b0e224b919391b5ecc569f0dc",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:b2dfbfbff9f44a44b1f937be76281fb4"
+      }
+    },
+    {
+      "spanId": "model:57f5758740a44705a47c93370f2ab566",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345014426,
+      "finishedMs": 1792345019681,
+      "durationMs": 5255,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 3,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 2856,
+          "outputTokens": 53,
+          "cacheReadTokens": 2048,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:d48ec4d193c94a5f844630613ae84e2d",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.browser_open",
+      "startedMs": 1792345019685,
+      "finishedMs": 1792345032471,
+      "durationMs": 12786,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "d48ec4d193c94a5f844630613ae84e2d",
+        "toolName": "browser_open",
+        "effect": "write",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:57f5758740a44705a47c93370f2ab566"
+      }
+    },
+    {
+      "spanId": "model:612f2981b18b410d986a3bc6e3beb8ce",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345032486,
+      "finishedMs": 1792345035468,
+      "durationMs": 2982,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 4,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3380,
+          "outputTokens": 86,
+          "cacheReadTokens": 2816,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:3695497da319420788e1eee15d869c3a",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.browser_act",
+      "startedMs": 1792345035472,
+      "finishedMs": 1792345040997,
+      "durationMs": 5525,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "3695497da319420788e1eee15d869c3a",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:612f2981b18b410d986a3bc6e3beb8ce"
+      }
+    },
+    {
+      "spanId": "model:5a346ab9ef714e8d8ec3a9867f337e42",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345041006,
+      "finishedMs": 1792345044803,
+      "durationMs": 3797,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 5,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 3796,
+          "outputTokens": 82,
+          "cacheReadTokens": 3328,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:4cfb11bb70ba44d3965c9c552410896d",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.browser_act",
+      "startedMs": 1792345044811,
+      "finishedMs": 1792345045375,
+      "durationMs": 564,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "4cfb11bb70ba44d3965c9c552410896d",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:5a346ab9ef714e8d8ec3a9867f337e42"
+      }
+    },
+    {
+      "spanId": "model:b9784c6edabb4c6aa8c0e68361a6b401",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345045383,
+      "finishedMs": 1792345048421,
+      "durationMs": 3038,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 6,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 4448,
+          "outputTokens": 82,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:f963ed8f80904eb489560fe48393b3e0",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.browser_act",
+      "startedMs": 1792345048429,
+      "finishedMs": 1792345053911,
+      "durationMs": 5482,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "f963ed8f80904eb489560fe48393b3e0",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:b9784c6edabb4c6aa8c0e68361a6b401"
+      }
+    },
+    {
+      "spanId": "model:a8f9bfdcea39423a8d7d32642f0c3d96",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345053921,
+      "finishedMs": 1792345057380,
+      "durationMs": 3459,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 7,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 4794,
+          "outputTokens": 80,
+          "cacheReadTokens": 4352,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:a8af4dc1ba964883bc77b6bc911537ef",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.browser_act",
+      "startedMs": 1792345057383,
+      "finishedMs": 1792345057902,
+      "durationMs": 519,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "a8af4dc1ba964883bc77b6bc911537ef",
+        "toolName": "browser_act",
+        "effect": "write",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:a8f9bfdcea39423a8d7d32642f0c3d96"
+      }
+    },
+    {
+      "spanId": "model:8ee047c207a144f5b0b68398b54cb306",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345057914,
+      "finishedMs": 1792345066589,
+      "durationMs": 8675,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 8,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 5440,
+          "outputTokens": 414,
+          "cacheReadTokens": 4736,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:9b1e7b84bbd349949ce5aa4f004f93a8",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.skill_read",
+      "startedMs": 1792345066592,
+      "finishedMs": 1792345066599,
+      "durationMs": 7,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "9b1e7b84bbd349949ce5aa4f004f93a8",
+        "toolName": "skill_read",
+        "effect": "read",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:8ee047c207a144f5b0b68398b54cb306"
+      }
+    },
+    {
+      "spanId": "model:d94d248b205c418899e7a41a3e70edb0",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345066611,
+      "finishedMs": 1792345105967,
+      "durationMs": 39356,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 9,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 6052,
+          "outputTokens": 2176,
+          "cacheReadTokens": 3712,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:9e13a19480574d589b61604e55d972cf",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.file_write",
+      "startedMs": 1792345105971,
+      "finishedMs": 1792345105985,
+      "durationMs": 14,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "9e13a19480574d589b61604e55d972cf",
+        "toolName": "file_write",
+        "effect": "write",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:d94d248b205c418899e7a41a3e70edb0"
+      }
+    },
+    {
+      "spanId": "model:e0e9dae167bd46318121d15ce02f1e4e",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345105993,
+      "finishedMs": 1792345109791,
+      "durationMs": 3798,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 10,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 8293,
+          "outputTokens": 43,
+          "cacheReadTokens": 8064,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "tool:6ca7ae72361c459581745d7f8e37ad53",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "tool.file_read",
+      "startedMs": 1792345109801,
+      "finishedMs": 1792345109812,
+      "durationMs": 11,
+      "state": "succeeded",
+      "attributes": {
+        "toolCallId": "6ca7ae72361c459581745d7f8e37ad53",
+        "toolName": "file_read",
+        "effect": "read",
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "causedBySpanId": "model:e0e9dae167bd46318121d15ce02f1e4e"
+      }
+    },
+    {
+      "spanId": "model:190cba9621164e6d8c007ebca62585d6",
+      "parentSpanId": "turn:ef78e16e84a54fdc9c18dc5050db4397",
+      "name": "model.request",
+      "startedMs": 1792345109829,
+      "finishedMs": 1792345119764,
+      "durationMs": 9935,
+      "state": "completed",
+      "attributes": {
+        "turnId": "ef78e16e84a54fdc9c18dc5050db4397",
+        "model": "rr/gpt-6.1-sol",
+        "role": "worker",
+        "attempt": 11,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 10544,
+          "outputTokens": 554,
+          "cacheReadTokens": 8192,
+          "cacheWriteTokens": null
+        }
+      }
+    },
+    {
+      "spanId": "verify:6cf9bc29cd684b8999e093aa8d262bb6",
+      "parentSpanId": "trace:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "task.verification_and_queue",
+      "startedMs": 1792345119786,
+      "finishedMs": 1792345119798,
+      "durationMs": 12,
+      "state": "completed",
+      "attributes": {
+        "runId": "6cf9bc29cd684b8999e093aa8d262bb6",
+        "taskState": "waiting_user"
+      }
+    },
+    {
+      "spanId": "turn-queue:977fd6d703224cf799ba84afb9a21bc0",
+      "parentSpanId": "turn:977fd6d703224cf799ba84afb9a21bc0",
+      "name": "turn.admission_and_context",
+      "startedMs": 1792345119797,
+      "finishedMs": 1792345119815,
+      "durationMs": 18,
+      "state": "completed",
+      "attributes": {
+        "timingSource": "message_lifecycle"
+      }
+    },
+    {
+      "spanId": "turn:977fd6d703224cf799ba84afb9a21bc0",
+      "parentSpanId": "trace:aa632aa503cf4050a4546dd4f95e8987",
+      "name": "agent.report",
+      "startedMs": 1792345119797,
+      "finishedMs": 1792345151859,
+      "durationMs": 32062,
+      "state": "completed",
+      "attributes": {
+        "turnId": "977fd6d703224cf799ba84afb9a21bc0",
+        "requestId": null,
+        "conversationId": "b6be36240b2a4f57bec15ec2fb264a8e",
+        "linkedRunId": "6cf9bc29cd684b8999e093aa8d262bb6"
+      }
+    },
+    {
+      "spanId": "model:cdaf30f5e38443fb8e408269b3ede9b2",
+      "parentSpanId": "turn:977fd6d703224cf799ba84afb9a21bc0",
+      "name": "model.request",
+      "startedMs": 1792345119815,
+      "finishedMs": 1792345151859,
+      "durationMs": 32044,
+      "state": "completed",
+      "attributes": {
+        "turnId": "977fd6d703224cf799ba84afb9a21bc0",
+        "model": "glm-5.3-flash",
+        "role": "main",
+        "attempt": 1,
+        "observationUnit": "request",
+        "timingSource": "message_lifecycle",
+        "elapsedMs": null,
+        "firstTextMs": null,
+        "providerEvents": [],
+        "requestAttempts": 1,
+        "errorCode": null,
+        "tokens": {
+          "inputTokens": 6093,
+          "outputTokens": 2136,
+          "cacheReadTokens": 2496,
+          "cacheWriteTokens": null
+        }
+      }
+    }
+  ],
+  "coverage": {
+    "start": "python_turn_admission",
+    "end": "committed_main_reply",
+    "browserPaint": false,
+    "goIngress": false,
+    "externalAgentInternals": false,
+    "contentIncluded": false
+  }
+}

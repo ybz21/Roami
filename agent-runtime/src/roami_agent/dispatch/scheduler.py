@@ -45,7 +45,8 @@ class Scheduler:
                 "LEFT JOIN task_attempts a ON j.kind='task.run' AND a.id=json_extract(j.payload_json,'$.runId') "
                 "LEFT JOIN branches b ON b.id=a.native_branch_id "
                 "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','task.run','task.verify','memory.daily','memory.extract') "
-                "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'turn.run' THEN 0 WHEN 'task.run' THEN 1 WHEN 'task.verify' THEN 2 WHEN 'context.compact' THEN 3 WHEN 'memory.daily' THEN 4 ELSE 5 END,j.rowid LIMIT 100",
+                "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'turn.run' THEN 0 WHEN 'task.run' THEN 1 WHEN 'task.verify' THEN 2 WHEN 'context.compact' THEN 3 WHEN 'memory.daily' THEN 4 ELSE 5 END,"
+                "CASE WHEN j.kind='turn.run' AND t.trigger_kind='user' AND COALESCE(json_extract(j.payload_json,'$.deferred'),0)=0 THEN 0 ELSE 1 END,j.rowid LIMIT 100",
                 (now_ms(),),
             )
         )

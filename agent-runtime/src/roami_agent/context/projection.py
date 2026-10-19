@@ -17,7 +17,7 @@ from roami_agent.conversation.attachments import context_attachments
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, row
+from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.transcript_repository import history, owned
 
 SUMMARY_PROMPT = (
@@ -182,6 +182,37 @@ class Context:
                 else:
                     snapshot = None
             entries = model_entries(remaining)
+            pending = (
+                {
+                    r["id"]
+                    for r in rows(
+                        db,
+                        "SELECT id FROM turns WHERE branch_id=? AND state IN ('queued','running') AND id!=?",
+                        (bid, through_turn),
+                    )
+                }
+                if through_turn
+                else set()
+            )
+            if pending:
+                separate, described = [], set()
+                for entry in entries:
+                    previous = entry["turnId"]
+                    if previous not in pending:
+                        separate.append(entry)
+                    elif previous not in described and entry["message"]["role"] == "user":
+                        described.add(previous)
+                        separate.append(
+                            dict(
+                                entry,
+                                message={
+                                    "role": "assistant",
+                                    "content": "Earlier independent request is queued and will resume automatically. Reference only; do not execute it again in this turn: "
+                                    + encoded(entry["message"]["content"]),
+                                },
+                            )
+                        )
+                entries = separate
             plan = prefix + [entry["message"] for entry in entries]
             current_turn_start = next(
                 (
@@ -202,6 +233,8 @@ class Context:
                 (bid, epoch, snapshot["id"] if snapshot else None),
             )
             for manifest in manifests:
+                if pending:
+                    break
                 parts = json.loads(manifest["parts_json"])
                 used = provider_tokens(json.loads(manifest["usage_json"]))
                 if (

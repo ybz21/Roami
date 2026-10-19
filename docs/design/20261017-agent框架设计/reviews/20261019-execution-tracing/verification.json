@@ -1,0 +1,43 @@
+{
+  "basic": {
+    "status": "passed",
+    "secondAcceptSeconds": 0.03,
+    "bothAnswersSeconds": 40.75,
+    "mainParameters": {
+      "reasoning_effort": "low"
+    },
+    "workerParameters": {},
+    "taskOrigins": [
+      "bc0f879ca7024027b1a8ce2bcf46b3e5",
+      "2c5b569bec004ffbb9b441a07bc2014e"
+    ],
+    "tasks": [
+      {
+        "id": "b4909af89e994ddb8e053539547c476e",
+        "state": "waiting_user"
+      },
+      {
+        "id": "e10519b29a6749139517add49a988ca3",
+        "state": "succeeded"
+      }
+    ],
+    "stop": {
+      "receipt": {
+        "kind": "interrupt",
+        "turnId": "f85c916a05924e44b948bcee39b989ed"
+      },
+      "seconds": 0.153
+    }
+  },
+  "reportComparison": {
+    "beforeSeconds": 205.729,
+    "afterSeconds": 153.009
+  },
+  "limitations": [
+    "R03 对照同时包含代码和 Main 推理强度变化，不是单因素实验。",
+    "R03 最新验证发生在待处理请求上下文改进之前；连续提问单独验证了该改进。",
+    "完整 trace 起于 Python 接收、止于回复落库，未覆盖 Go 入口和客户端绘制。",
+    "当前简单问题两项合计约 41 秒，尚未达到 P95 首段有效回答 2 秒目标。",
+    "原待验收策略未改变；误走常规工作区的只读查询仍可能显示 waiting_user。"
+  ]
+}
