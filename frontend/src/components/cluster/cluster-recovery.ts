@@ -1,4 +1,7 @@
+import { nodeApi } from './node-url'
+
 export async function waitForClusterRecovery(timeoutMs = 30000, intervalMs = 1500) {
+  const probe = nodeApi('/cluster/config')
   const abort = new AbortController()
   const timeout = setTimeout(() => abort.abort(), timeoutMs)
   try {
@@ -10,7 +13,7 @@ export async function waitForClusterRecovery(timeoutMs = 30000, intervalMs = 150
       })
       if (abort.signal.aborted) break
       try {
-        const response = await fetch('/api/version', { cache: 'no-store', signal: abort.signal })
+        const response = await fetch(probe, { cache: 'no-store', signal: abort.signal })
         if (response.ok) return
       } catch { /* Recovery can include refused connections. */ }
     }
