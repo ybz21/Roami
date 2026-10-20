@@ -85,3 +85,12 @@ async def test_main_delivery_only_normalizes_current_owned_undeleted_artifacts(s
         assert all(item["id"] not in text for item in [other, unrelated, deleted])
     finally:
         await runtime.close()
+
+
+def test_a_bare_download_url_is_not_duplicated_or_reformatted():
+    prose = "Ready: " + URL
+    payload = json.dumps({"downloadUrl": URL})
+    assert deliverable_links(prose, REFS) == prose
+    assert deliverable_links(payload, REFS) == payload
+    outside = "https://example.com" + URL
+    assert deliverable_links(outside, REFS).endswith(f"[report.txt]({URL})")

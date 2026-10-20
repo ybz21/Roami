@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 LINK = re.compile(r"\[([^\]\n]*)\]\(([^)\n]+)\)")
 ARTIFACT_URL = re.compile(r"/api/agent/artifacts/[^/]+/content")
+BARE_ARTIFACT_URL = re.compile(r"(?<![\w/])(/api/agent/artifacts/[^/\s)\"'<>]+/content)(?![\w/])")
 
 
 def deliverable_links(text, references):
@@ -29,6 +30,7 @@ def deliverable_links(text, references):
 
     text = LINK.sub(replace, text)
     linked = {match[2] for match in LINK.finditer(text)}
+    linked.update(match[1] for match in BARE_ARTIFACT_URL.finditer(text))
     missing = []
     for item in references:
         url = "/api/agent/artifacts/" + item["id"] + "/content"
