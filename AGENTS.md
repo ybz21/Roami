@@ -40,6 +40,9 @@ history, and technical details in the detail view or an explicit disclosure. Kee
 warnings, recovery actions, field labels, and accessible names. Do not replace visible clutter
 with tooltip-only instructions on touch devices. Keep primary destinations such as Home tasks
 visible and directly reachable; overflow menus hold secondary actions such as debug and memory.
+Task lists show a short topic; keep full instructions in details. Task details put the verified
+outcome and usable deliverables before requirements and execution records. Executor claims never
+override task or verification state.
 
 Use existing automatic updates and mobile pull-to-refresh instead of a permanent refresh button
 or a toolbar devoted to it. Desktop pages use browser refresh/F5; keep explicit recovery actions

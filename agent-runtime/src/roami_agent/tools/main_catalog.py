@@ -237,6 +237,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 binding["conversation"],
                 args["goal"],
                 key=binding["turnId"] + ":" + binding["toolCallId"],
+                **({"title": args["title"]} if "title" in args else {}),
                 source_turn_id=binding["turnId"],
                 source_assistant_message_id=binding["assistantMessageId"],
                 parent_task_id=binding.get("taskId"),
@@ -357,10 +358,21 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "delegate",
-            "Delegate work with routing={explicitExecutor:native|codex|claude|null,complexity:bounded|complex,complexityBasis:{dimension:fact},routingExplanation:reason}. Task kinds are open; the host chooses native for bounded work and an available professional for complex work, unless a source-backed explicit executor overrides. Omit executor to use project/preference/node selection; legacy requests without routing retain their original default. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return background_task queue acceptance with a taskId and delivery pending. A taskId or native branch ID is not a sessionId: never use it with target.kind=session or search for it as a tmux session. Continue known tracked work with the task_steer CLI capability and its actual revision; preserve the executor. Use fromMessageId only for a completed checkpoint Fork.",
+            "Delegate with routing={explicitExecutor:native|codex|claude|null,complexity:bounded|complex,complexityBasis:{dimension:fact},routingExplanation:reason}. "
+            "Task kinds are open. Host selects native for bounded work and an available professional for complex work; source-backed explicit executors win. "
+            "Omit executor for configured project/preference/node selection; requests without routing retain legacy defaults. "
+            "Main session targets send directly, including legacy sessions without callbacks: delivery only. "
+            "Other targets return queued background_task/taskId, not completion. Task/native-branch IDs are not session IDs. "
+            "Continue tracked work with task_steer at its actual revision, preserving executor. fromMessageId forks completed checkpoints only.",
             object_schema(
                 {
                     "goal": {"type": "string", "minLength": 1},
+                    "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "description": "Short topic; keep full requirements, paths and steps in goal.",
+                    },
                     "requestComplete": {
                         "type": "boolean",
                         "description": "All parts of this request are handled/delegated; false or omitted continues Main.",

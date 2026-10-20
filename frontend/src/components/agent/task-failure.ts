@@ -1,4 +1,7 @@
 const reasons: Record<string, string> = {
+  BROWSER_DRIVER_UNAVAILABLE: 'browser', BROWSER_DRIVER_PROTOCOL_INVALID: 'browser',
+  WEB_RETRIEVAL_EVIDENCE_MISSING: 'retrieval',
+  TOOL_ARGUMENT_REPAIR_STALLED: 'toolProgress',
   MODEL_HTTP_401: 'authentication', MODEL_HTTP_403: 'authentication',
   MODEL_DEADLINE: 'deadline', EXECUTION_DEADLINE_OR_INTERRUPTION: 'deadline', TASK_BUDGET_EXCEEDED: 'deadline',
   AGENT_STEP_LIMIT: 'steps',
@@ -10,7 +13,8 @@ const reasons: Record<string, string> = {
   WORKSPACE_BUSY: 'workspaceBusy',
 }
 
-export function taskFailureKey(code: string): string | undefined {
+export function taskFailureKey(code: unknown): string | undefined {
+  if (typeof code !== 'string') return undefined
   const reason = reasons[code] || (code.includes('OUTCOME_UNKNOWN') || code.includes('RELEASE_UNKNOWN') ? 'unknown' : '')
   return reason ? 'agent.task.failure.' + reason : undefined
 }

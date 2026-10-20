@@ -168,6 +168,20 @@ class PromptBuilder:
                         "delegate them here. Keep needed references. This grants no new permissions.",
                     },
                 )
+            if turn.get("executionProfile") == "research":
+                prompt.insert(
+                    1 + plan["currentTurnStart"],
+                    {
+                        "role": "system",
+                        "content": "Current research attempt: " + turn["executionRunId"] + ". "
+                        "The next request requires fresh retrieval in this attempt, including on continuation. "
+                        "Earlier reports and browser observations are historical context; they cannot satisfy "
+                        "this attempt's verification. Do not answer that the task was already completed. "
+                        "Read the sources again with task-owned browser tools and copy complete observed "
+                        "URLs unchanged, including query parameters and redirect destinations. "
+                        "If retrieval fails, report the limitation without repeating unverified claims.",
+                    },
+                )
             if completion:
                 prompt.insert(
                     1 + plan["currentTurnStart"],

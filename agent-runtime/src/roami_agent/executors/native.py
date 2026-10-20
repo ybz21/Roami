@@ -52,16 +52,21 @@ class NativeExecutor:
         deadline = json.loads(task["budget_json"]).get("deadlineMs")
         remaining = max(0, (deadline - now_ms()) / 1000) if deadline else None
 
+        profile = (
+            "research"
+            if json.loads(task["intent_json"])["target"].get("resourceOnly") is True
+            else "worker"
+        )
+
         async def execute(prepared):
             text = await self.run_turn(
                 dict(
                     prepared,
                     executionRunId=run["id"],
+                    executionProfile=profile,
                     executionTimeoutSeconds=remaining,
                 ),
-                "research"
-                if json.loads(task["intent_json"])["target"].get("resourceOnly") is True
-                else "worker",
+                profile,
                 task_id=task["id"],
             )
             uncertain = await self.db.call(

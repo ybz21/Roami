@@ -62,6 +62,7 @@ class Tasks:
         source_turn_id=None,
         source_assistant_message_id=None,
         routing_decision=None,
+        title=None,
     ):
         if (
             not key
@@ -70,6 +71,10 @@ class Tasks:
             or executor not in {"native", "codex", "claude"}
         ):
             raise DomainError("INVALID_TASK")
+        if title is not None:
+            if not isinstance(title, str) or not title.strip() or len(title) > 80:
+                raise DomainError("INVALID_TASK")
+            title = " ".join(title.split())
         target = target or {"kind": "new_session"}
         if (
             target.get("kind") == "new_session"
@@ -120,6 +125,8 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if title is not None:
+            spec["title"] = title
         if routing_decision is not None:
             spec["routingDecision"] = routing_decision
         if source_turn_id or source_assistant_message_id:
@@ -450,7 +457,24 @@ class Tasks:
                 "SELECT * FROM tasks WHERE parent_task_id=? AND owner_id=? ORDER BY created_ms DESC LIMIT 101",
                 (task_id, owner),
             )
+            verdict = row(
+                db,
+                "SELECT payload_json FROM events WHERE task_id=? "
+                "AND kind IN ('task.succeeded','task.failed','task.waiting_user','task.cancelled','task.interrupted') "
+                "ORDER BY id DESC LIMIT 1",
+                (task_id,),
+            )
+            payload = json.loads(verdict["payload_json"]) if verdict else {}
+            outcome = None
+            if (
+                payload.get("taskRevision") == task["revision"]
+                and attempts
+                and payload.get("runId") == attempts[0]["id"]
+            ):
+                result = payload.get("result", {})
+                outcome = {"state": task["state"], "errorCode": result.get("errorCode")}
             return {
+                "outcome": outcome,
                 "task": self._view(db, task),
                 "steering": self.revisions._receipt(steering)
                 if (

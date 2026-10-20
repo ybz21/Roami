@@ -22,6 +22,7 @@ const controls = (resources: any[] = []) => ({ resources, actions: [], actionsTr
 const artifact = (id: string) => ({ id, name: id + '.png', mimeType: 'image/png', sizeBytes: 1024 })
 
 it.each([
+  ['BROWSER_DRIVER_UNAVAILABLE', 'browser'], ['TOOL_ARGUMENT_REPAIR_STALLED', 'toolProgress'],
   ['WORKSPACE_STALE', 'workspace'], ['MODEL_HTTP_401', 'authentication'],
   ['UNKNOWN_PROJECT', 'workspace'],
   ['EXECUTION_DIRECTORY_UNAVAILABLE', 'directory'], ['WORKSPACE_BUSY', 'workspaceBusy'],
@@ -40,6 +41,8 @@ it.each([
   expect(screen.queryByText(code)).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: /Goal one/ }))
   await screen.findByText('agent.task.failure.' + reason)
+  expect(screen.queryByText(code)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
   await screen.findByText(code)
   expect(screen.getByRole('button', { name: 'agent.task.continue' })).toBeTruthy()
 })
@@ -245,18 +248,20 @@ it('shows a backfilled report immediately with a retained download and text prev
   expect(screen.getByRole('link', { name: 'agent.task.download' }).getAttribute('href')).toBe('/n/selected/api/agent/artifacts/report/content')
 })
 
-it('renders historical result metadata with unsupported summary types without crashing', async () => {
+it.each(['succeeded', 'failed'])('renders historical %s results with unsupported summary types without crashing', async state => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path.includes('?conversationId=')) return { data: [task('one')] }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     const value: any = detail('one')
+    value.task.state = state
     value.attempts[0].result = { summary: { legacy: true }, stderr: 42 }
     return { data: value }
   })
   render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
-  await screen.findByText('agent.task.result')
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.task.viewRecord' }))
+  await screen.findByText('agent.task.archivedRecord')
   expect(screen.queryByText('[object Object]')).toBeNull()
 })
 
@@ -276,4 +281,40 @@ it('shows a cached task result on reopening but waits for fresh detail before co
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'POST')).toBe(false)
   await act(async () => { finish({ data: detail('one', [], 2) }); await pending })
   await waitFor(() => expect((screen.getByRole('button', { name: 'agent.task.continue' }) as HTMLButtonElement).disabled).toBe(false))
+})
+
+
+it('keeps failure authoritative when the executor claims success and reports a PR', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    const value = detail('one')
+    value.task.state = 'failed'
+    value.attempts[0].state = 'failed'
+    value.attempts[0].result.summary = 'Everything succeeded! https://github.com/ybz21/Roami/pull/336'
+    return { data: value }
+  })
+  render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByText('agent.task.incomplete')
+  expect(screen.getByText('agent.state.failed')).toBeTruthy()
+  expect(screen.queryByText(/Everything succeeded!/)).toBeNull()
+  expect(screen.getByText('agent.task.reportedLinks')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'agent.task.openPullRequest 336' }).getAttribute('href')).toBe('https://github.com/ybz21/Roami/pull/336')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
+  await screen.findByText(/Everything succeeded!/)
+})
+
+it('shows the verifier reason before the original executor report', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    const value = detail('one')
+    value.task.state = 'failed'
+    return { data: { ...value, outcome: { state: 'failed', errorCode: 'WEB_RETRIEVAL_EVIDENCE_MISSING' } } }
+  })
+  render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByText('agent.task.failure.retrieval')
+  expect(screen.queryByText('Result one')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
+  await screen.findByText('Result one')
 })
