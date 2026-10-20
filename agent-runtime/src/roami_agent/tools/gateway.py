@@ -8,7 +8,7 @@ import httpx
 from jsonschema import ValidationError
 
 from roami_agent.conversation.activity_events import activity_event as event
-from roami_agent.protocol.errors import DomainError, ToolCancellation
+from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
@@ -68,6 +68,7 @@ class ToolGateway:
             )
 
         await self.db.call(plan, write=True)
+        preflight_error = None
         try:
 
             def start(db):
@@ -136,6 +137,14 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if isinstance(exc, ToolPreflightError):
+                preflight_error = exc
+                value.update(
+                    executionStarted=False,
+                    retryable=False,
+                    recovery="Browser readiness failed before any browser action. End this attempt and "
+                    "report the dependency failure to Main; do not retry different URLs or probe shell commands.",
+                )
             if isinstance(exc, ToolArgumentsError):
                 value["argumentIssues"] = exc.issues
                 value["issuesTruncated"] = exc.truncated
@@ -422,4 +431,6 @@ class ToolGateway:
         self.wakeup.set()
         if state == "unknown":
             raise DomainError("TOOL_OUTCOME_UNKNOWN")
+        if preflight_error is not None:
+            raise preflight_error
         return value

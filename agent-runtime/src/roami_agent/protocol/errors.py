@@ -8,6 +8,10 @@ class DomainError(Exception):
         super().__init__(code)
 
 
+class ToolPreflightError(DomainError):
+    """An unavailable dependency prevents starting the tool action."""
+
+
 class ToolCancellation(asyncio.CancelledError):
     def __init__(self, *, input_stopped):
         super().__init__()

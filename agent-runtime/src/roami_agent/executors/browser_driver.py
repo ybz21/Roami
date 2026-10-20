@@ -19,7 +19,7 @@ from roami_agent.executors.input_cancellation import (
     passive_cancel_boundary,
 )
 from roami_agent.protocol.browser import browser_config
-from roami_agent.protocol.errors import DomainError, ToolCancellation
+from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, rows
@@ -261,7 +261,11 @@ class BrowserDriver:
         return view
 
     async def capabilities(self):
-        result = await self._cli("capabilities")
+        try:
+            result = await self._cli("capabilities")
+        except (DomainError, OSError, TimeoutError) as exc:
+            code = exc.code if isinstance(exc, DomainError) else "BROWSER_DRIVER_UNAVAILABLE"
+            raise ToolPreflightError(code, 503) from exc
         features = result.get("features") if isinstance(result, dict) else None
         if (
             not isinstance(features, list)
@@ -275,7 +279,7 @@ class BrowserDriver:
             or not isinstance(result.get("browserId"), str)
             or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", result["browserId"])
         ):
-            raise DomainError("BROWSER_DRIVER_UNAVAILABLE", 503)
+            raise ToolPreflightError("BROWSER_DRIVER_UNAVAILABLE", 503)
         return result
 
     @staticmethod

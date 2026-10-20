@@ -8,7 +8,7 @@ import httpx
 
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.web_evidence import retrieved_sources
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ToolPreflightError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
@@ -202,6 +202,8 @@ class TaskDispatcher:
                 "state": "failed",
                 "summary": exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED",
             }
+            if isinstance(exc, ToolPreflightError):
+                result.update(errorCode=exc.code, executionStarted=False, retryable=False)
             pending = (
                 await self.db.call(
                     lambda db: row(
