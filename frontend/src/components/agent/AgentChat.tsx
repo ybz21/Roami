@@ -37,8 +37,8 @@ export function agentFailure(error: any, t: (key: string) => string) {
 }
 const newKey = () => crypto.randomUUID()
 
-export default function AgentChat({ cid, branch, focusMessage = '', node, inbox, inboxOpen, select, notifications, projects, onSession, mobileActionsHost }: {
-  cid: string; branch: string; focusMessage?: string; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
+export default function AgentChat({ cid, branch, focusMessage = '', inactive = false, node, inbox, inboxOpen, select, notifications, projects, onSession, mobileActionsHost }: {
+  cid: string; branch: string; focusMessage?: string; inactive?: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
   select: (cid: string, branch?: string, message?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
   mobileActionsHost?: HTMLElement | null
@@ -97,12 +97,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const timeline = groupAgentTimeline(agentTimeline(bodies, activity))
   const visible = bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming')
   const eventIds = visible.map((m) => m.completedEventId || '').join(',')
-  useVisibleAgentReads(!panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
+  useVisibleAgentReads(!inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
   useEffect(() => {
-    if (mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
+    if (!inactive && mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
     if (cid === mainCID) { try { localStorage.setItem(mirror, cid) } catch {} }
-  }, [cid, mainCID, branch, focusMessage, mirror, select])
+  }, [cid, mainCID, branch, focusMessage, mirror, select, inactive])
 
   useEffect(() => {
     stick.current = true; setError(''); setWorkspaceTask(''); setPanel(null); setSource(null); panelRequest.current++
