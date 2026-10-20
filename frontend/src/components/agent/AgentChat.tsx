@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
+import { openAgentPage } from './agent-page-route'
 import AgentTasks from './AgentTasks'
 import { taskFailureKey } from './task-failure'
 import AgentWorkspaceRail from './AgentWorkspaceRail'
@@ -51,6 +52,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const showPanel = (next: 'tasks' | 'memory' | 'context') => {
+    if (phone && next !== 'context') { openAgentPage(next); return }
     if (wide && next !== 'context') { workspace.change({ open: true, tab: next }); setWorkspaceTask(''); setPanel(null) }
     else setPanel(next)
   }
@@ -236,8 +238,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', node, inbox,
     </div>}</header>
     {phone && mobileActionsHost && createPortal(
       <>
-        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.tasks')} aria-haspopup="dialog" onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>
-        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.memory')} aria-haspopup="dialog" onClick={() => showPanel('memory')}><NotebookIcon size={20} /></button>
+        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.tasks')} onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>
+        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.memory')} onClick={() => showPanel('memory')}><NotebookIcon size={20} /></button>
       </>, mobileActionsHost)}
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}

@@ -24,9 +24,9 @@ function failure(code: string | undefined, t: (key: string) => string) {
   return t('agent.requestFailed')
 }
 
-type Props = { cid: string; onSession: (id: string) => void; onChanged: () => void; compact?: boolean; selectedTask?: string; onSelectTask?: (id: string) => void }
+type Props = { cid: string; onSession: (id: string) => void; onChanged: () => void; compact?: boolean; hideBack?: boolean; selectedTask?: string; onSelectTask?: (id: string) => void }
 
-export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask, compact = false }: Props) {
+export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask, compact = false, hideBack = false }: Props) {
   const { t } = useI18n()
   const [tasks, setTasks] = useState<AgentTask[]>([]), [localSelected, setLocalSelected] = useState('')
   const selected = selectedTask ?? localSelected
@@ -45,7 +45,7 @@ export default function AgentTasks({ cid, onSession, onChanged, selectedTask, on
   useEffect(() => { const timer = setInterval(() => { if (document.visibilityState === 'visible') setVersion((value) => value + 1) }, 3000); return () => clearInterval(timer) }, [])
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
-    {selected ? <TaskInspector key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
+    {selected ? <TaskInspector hideBack={hideBack} key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
       <div className="agent-task-section-head"><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
       {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
@@ -88,7 +88,7 @@ function TaskRow({ task, compact, select }: { task: AgentTask; compact: boolean;
   </button>
 }
 
-function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: string; onBack: () => void; select: (id: string) => void; onSession: (id: string) => void; onChanged: () => void }) {
+function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: { id: string; hideBack?: boolean; onBack: () => void; select: (id: string) => void; onSession: (id: string) => void; onChanged: () => void }) {
   const { t, locale } = useI18n()
   const snapshot = useAgentTask(id)
   const [busy, setBusy] = useState(''), [error, setError] = useState(''), [draft, setDraft] = useState('')
@@ -127,7 +127,7 @@ function TaskInspector({ id, onBack, select, onSession, onChanged }: { id: strin
     }
   }
   return <>
-    <div className="agent-task-section-head"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft />{t('agent.tasks')}</button><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => snapshot.refresh()}><RefreshIcon /></button></div>
+    <div className="agent-task-section-head">{!hideBack && <button type="button" className="tt-act" onClick={onBack}><ChevronLeft />{t('agent.tasks')}</button>}<button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => snapshot.refresh()}><RefreshIcon /></button></div>
     {!task && !snapshot.detail.failed && <Spin />}
     {snapshot.detail.failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {task && <>

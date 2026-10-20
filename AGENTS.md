@@ -30,6 +30,9 @@ with tooltip-only instructions on touch devices.
 ## Mobile Material UI
 
 All compact Web pages follow [`docs/development/mobile-material-ui.md`](docs/development/mobile-material-ui.md).
+Open content-heavy views such as memories, background tasks, and notifications as full-screen
+secondary pages on phones, using `MobileSubPage` or a dedicated route with one return bar and
+one scroll container. Reserve dialogs for short confirmations and focused actions.
 Keep the top app bar and bottom navigation consistent across routes; put Home, Projects, Tools,
 and Settings in the bottom bar. Open Notifications from the top bar and Home summary. A page must not repeat its
 route title below the top bar. Secondary pages use one equal-height return bar and one scroll container; URL-backed pages must not also push overlay history. Use the existing design tokens for Material surfaces, type, space,

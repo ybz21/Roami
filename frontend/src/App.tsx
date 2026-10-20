@@ -92,6 +92,8 @@ import { BellIcon, ChevronLeft, CloudIcon, LogoutIcon, MoreIcon, PlusIcon, Searc
 import { lazyRetry } from './components/lazy-retry'
 import { useAgentInbox } from './components/agent/useAgentInbox'
 import AgentNotifications from './components/agent/AgentNotifications'
+import { openAgentPage, readAgentPage } from './components/agent/agent-page-route'
+const AgentHomePage = lazyRetry(() => import('./components/agent/AgentHomePage'))
 import './components/agent/agent-chat.css'
 const AgentChat = lazyRetry(() => import('./components/agent/AgentChat'))
 
@@ -174,6 +176,7 @@ export default function App() {
     location.hash = '#/' + next + (params ? '?' + params : '')
   }, [])
   const [route, setRoute] = useState(() => normalizeRoute(location.hash.replace(/^#\/?/, '') || 'home'))
+  const agentPage = readAgentPage(route)
   const agentParts = route.split('/')
   const agentCID = agentParts[0] === 'home' && agentParts[1] && agentParts[1] !== 'new' ? decodeURIComponent(agentParts[1]) : ''
   const agentBranch = agentParts[0] === 'home' && agentParts[2] ? decodeURIComponent(agentParts[2]) : ''
@@ -1041,7 +1044,7 @@ export default function App() {
       onInstall={() => go('install')} fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined} />,
     hub: <HubPage />,
     plugins: <PluginsPanel initialId={pluginSub || undefined} />,
-    home: <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />,
+    home: agentPage ? <AgentHomePage key={`${curNodeId || 'local'}:${agentPage.view}:${agentPage.origin}`} page={agentPage} inbox={agentInbox} projects={treeSrc.projects.map(p => ({ id: p.key, name: p.name }))} select={selectAgent} onSession={openTerm} onChanged={agentInbox.refresh} /> : <AgentChat cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={() => { agentInbox.refresh(); if (isMobile) openAgentPage('notifications'); else setAgentInboxOpen(true) }} projects={treeSrc.projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />,
     activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={(p) => { setMobileProject({ name: p.name, dir: p.dir, at: Date.now() }); go('projects') }}
     />,
@@ -1238,7 +1241,7 @@ export default function App() {
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
           {tab === 'home' && <span ref={setMobileActionsHost} className="tt-mobile-page-actions" />}
-          <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={() => { agentInbox.refresh(); setAgentInboxOpen(true) }}><BellIcon size={20} />{!!agentInbox.unread && <span className="agent-badge">{agentInbox.unread > 99 ? '99+' : agentInbox.unread}</span>}</button>
+          <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={() => { agentInbox.refresh(); if (isMobile) openAgentPage('notifications'); else setAgentInboxOpen(true) }}><BellIcon size={20} />{!!agentInbox.unread && <span className="agent-badge">{agentInbox.unread > 99 ? '99+' : agentInbox.unread}</span>}</button>
           {mobilePrimary && mobileNavRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
             onClick={() => { const d = treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) }}><PlusIcon size={20} /></button>}
           <button type="button" className="tt-mobile-topbar-icon"

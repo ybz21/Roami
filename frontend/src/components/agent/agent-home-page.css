@@ -1,0 +1,2 @@
+.agent-mobile-page { flex:1; min-height:0; min-width:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4); }
+.agent-mobile-page > .agent-tasks,.agent-mobile-page > .agent-memory:not(.agent-memory-full),.agent-mobile-page > .agent-notifications-body { max-height:none; overflow:visible; padding-right:0; }
