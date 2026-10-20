@@ -443,7 +443,7 @@ async def run_case(provider, settings, output, number, case):
             if kind == "complex_chat_only":
                 passed = passed and bool(
                     re.search(
-                        r"(不|禁止).{0,15}(写|保存|创建|修改).{0,10}文件|只.{0,8}聊天",
+                        r"(不|禁止|严禁|不得).{0,15}(写|保存|创建|修改).{0,10}文件|只.{0,8}聊天",
                         goal,
                     )
                 )
