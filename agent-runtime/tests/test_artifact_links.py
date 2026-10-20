@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from roami_agent.app import Runtime
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.replies.artifact_links import deliverable_links
@@ -87,10 +89,112 @@ async def test_main_delivery_only_normalizes_current_owned_undeleted_artifacts(s
         await runtime.close()
 
 
-def test_a_bare_download_url_is_not_duplicated_or_reformatted():
+def test_bare_prose_is_clickable_without_duplication_and_json_stays_structured():
     prose = "Ready: " + URL
     payload = json.dumps({"downloadUrl": URL})
-    assert deliverable_links(prose, REFS) == prose
+    assert deliverable_links(prose, REFS) == f"Ready: [report.txt]({URL})"
     assert deliverable_links(payload, REFS) == payload
     outside = "https://example.com" + URL
     assert deliverable_links(outside, REFS).endswith(f"[report.txt]({URL})")
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:3000",
+        "https://127.0.0.1:13579",
+        "http://[::1]:3000",
+        "//localhost:3000",
+        "HTTP://LOCALHOST.:3000",
+        "http://127.9.8.7",
+    ],
+)
+@pytest.mark.parametrize("markdown", [False, True])
+def test_loopback_download_origins_use_the_persisted_relative_reference(origin, markdown):
+    url = origin + URL
+    text = f"[report.txt]({url})" if markdown else "截图下载：" + url
+    delivered = deliverable_links(text, REFS)
+    assert delivered == (f"[report.txt]({URL})" if markdown else f"截图下载：[report.txt]({URL})")
+    assert delivered.count(URL) == 1
+
+
+@pytest.mark.parametrize("origin", ["https://localhost.evil.example", "https://[2001:db8::1]"])
+def test_external_artifact_paths_are_preserved_without_hiding_owned_delivery(origin):
+    outside = origin + URL
+    delivered = deliverable_links(outside, REFS)
+    assert delivered == outside + f"\n\n[report.txt]({URL})"
+
+
+def test_unknown_loopback_and_bare_artifact_ids_cannot_be_delivered():
+    for url in [
+        "http://localhost:3000/api/agent/artifacts/foreign/content",
+        "/api/agent/artifacts/foreign/content",
+    ]:
+        delivered = deliverable_links("下载：" + url, REFS)
+        assert "foreign" not in delivered and "localhost" not in delivered
+        assert URL in delivered
+    encoded = "http://localhost:3000/api/file/raw?path=%2Fapi%2Fagent%2Fartifacts%2Fowned%2Fcontent"
+    assert deliverable_links(f"[report.txt]({encoded})", REFS) == f"[report.txt]({URL})"
+
+
+@pytest.mark.parametrize("markdown", [False, True])
+@pytest.mark.parametrize("origin", ["", "http://localhost:3000"])
+async def test_main_delivery_has_one_clickable_readable_owned_url(store, markdown, origin):
+    reference = None
+
+    class Report:
+        model = "loopback-capture-handoff"
+
+        async def stream(self, messages, tools):
+            url = origin + reference["downloadUrl"]
+            yield ModelEvent("text", f"[截图]({url})" if markdown else "截图下载：" + url)
+
+    runtime = Runtime(store, Report())
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", c["id"], "截一张网页给我", key="capture", record_intent=True
+        )
+        run = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+        )
+        reference = await runtime.artifacts.put(
+            "alice", b"image-bytes", name="capture.png", mime_type="image/png", task_id=task["id"]
+        )
+        await runtime.dispatch.complete(
+            task,
+            run,
+            {"state": "succeeded", "summary": "截图完成", "artifactRefs": [reference]},
+            "succeeded",
+        )
+        job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId')=?",
+                (task["id"],),
+            )
+        )
+        turn = await runtime.mailbox.claim(job)
+        await runtime.loop.run(
+            turn, "main", completion=json.loads(job["payload_json"])["completion"]
+        )
+        messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
+        text = messages[-1]["content"]["text"]
+        assert "localhost" not in text
+        assert text.count(reference["downloadUrl"]) == 1
+        assert f"]({reference['downloadUrl']})" in text
+        assert (await runtime.artifacts.read("alice", reference["id"]))[1] == b"image-bytes"
+    finally:
+        await runtime.close()
+
+
+def test_loopback_download_in_json_remains_a_relative_string():
+    payload = json.dumps({"downloadUrl": "http://localhost:3000" + URL})
+    delivered = deliverable_links(payload, REFS)
+    assert json.loads(delivered) == {"downloadUrl": URL}
+
+
+@pytest.mark.parametrize("punctuation", [".", "。", "！"])
+def test_bare_loopback_download_remains_clickable_before_sentence_punctuation(punctuation):
+    text = "下载：http://localhost:3000" + URL + punctuation
+    assert deliverable_links(text, REFS) == f"下载：[report.txt]({URL})" + punctuation

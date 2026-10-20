@@ -13,11 +13,13 @@ Main 快速确认需求并委派。公开联网查询使用 `delegate(executor="
 | 能力 | 输入 | 输出 / 后续动作 |
 | --- | --- | --- |
 | browser_open | `{url:"https://目标"}` | 获取任务资源及首份观察；已有 resourceId 但观察失败，继续 observe，不再创建替代标签 |
-| browser_observe | `{resourceId:"返回的ID"}` | 最新 observationId、DOM 控件、截图证据、截断标记 |
+| browser_observe | `{resourceId:"返回的ID"}` | 最新 observationId、DOM 控件、已保存 PNG 的 artifactRefs.downloadUrl、截断标记 |
 | browser_act | `{observationId:"最新ID",kind:"click",selector:"实际观察到的选择器"}` | 基于最新页面执行单步；页面变化后重新观察 |
 | browser_act | kind=fill/type，附 selector、text | 填充 / 逐字输入；fill 是直接设值，type 是逐字键入 |
 | browser_act | kind=press，附 key（如 Enter） | 按键；不要凭模型猜焦点或旧 selector |
 | browser_act | kind=goto，附 url | 导航；研究角色仅开放此 action |
+
+用户明确要截图时，核对观察中的页面 URL / 内容后直接返回 artifactRefs 的真实 downloadUrl；PNG 已持久化，无需再用 write、通用 Shell 或另找工作区。普通查询不附这些内部截图。
 
 参数例子：先搜索拿到真实 argv，然后把 JSON input 替换成 `{ "resourceId": "实际资源ID" }` 执行观察。运行时绑定任务、租约、操作 ID 与证据，不手写这些内部身份。出现人工接管、场景冲突、未知副作用时停止输入并回报；未知点击不能靠重开标签或换 operation-id 再试。
 
