@@ -139,6 +139,24 @@ class ToolGateway:
             if isinstance(exc, ToolArgumentsError):
                 value["argumentIssues"] = exc.issues
                 value["issuesTruncated"] = exc.truncated
+            if tool is None and value["error"] == "TOOL_DISABLED":
+                value["recovery"] = (
+                    "This call was rejected before execution because the capability is disabled. "
+                    "Do not repeat it or bypass the disabled capability; report the limitation."
+                )
+            elif tool is None and value["error"] in {"TOOL_UNAVAILABLE", "INVALID_CLI_ARGUMENTS"}:
+                value["recovery"] = (
+                    "This call was rejected before execution. "
+                    + (
+                        "Research has no standalone shell: do not probe with echo, curl or Python. "
+                        "Use tool_list(kind=cli,query=browser) for registered browser operations. "
+                        if role == "research"
+                        else "Use tool_list to find a registered operation available in this role. "
+                    )
+                    + "Use argv=[roami,agent,capability,call,NAME,--input,JSON] with serialized "
+                    "JSON input and real returned resource/observation IDs. Correct the intended "
+                    "call instead of repeating the rejected command."
+                )
             validation = exc.__cause__
             if (
                 isinstance(validation, ValidationError)

@@ -109,7 +109,7 @@ class AgentLoop:
                 plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
-                seen_argument_failures = set()
+                seen_rejections = set()
                 for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
@@ -210,7 +210,7 @@ class AgentLoop:
                         return text
                     handed_off = role == "main"
                     request_complete = False
-                    argument_failures = set()
+                    rejections = set()
                     for call in calls:
                         try:
                             operation = self.tools.validate(call, role)[0].name
@@ -230,16 +230,23 @@ class AgentLoop:
                         if (
                             operation is None
                             and isinstance(value, dict)
-                            and value.get("error") == "INVALID_TOOL_ARGUMENTS"
+                            and value.get("error")
+                            in {
+                                "INVALID_TOOL_ARGUMENTS",
+                                "INVALID_CLI_ARGUMENTS",
+                                "TOOL_UNAVAILABLE",
+                                "TOOL_DISABLED",
+                            }
                         ):
                             rejected_arguments = call["function"].get("arguments", "")
                             try:
                                 rejected_arguments = json.loads(rejected_arguments)
                             except (ValueError, TypeError):
                                 pass
-                            argument_failures.add(
+                            rejections.add(
                                 (
                                     call["function"]["name"],
+                                    value["error"],
                                     encoded(value.get("argumentIssues")),
                                     hashlib.sha256(
                                         encoded(rejected_arguments).encode()
@@ -276,9 +283,9 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
-                    if argument_failures & seen_argument_failures:
+                    if rejections & seen_rejections:
                         raise DomainError("TOOL_ARGUMENT_REPAIR_STALLED", 502)
-                    seen_argument_failures.update(argument_failures)
+                    seen_rejections.update(rejections)
                     if handed_off and request_complete:
                         # The durable task card is the receipt; a second model call delays new intents.
                         await self.journal.finish(

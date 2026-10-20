@@ -7,7 +7,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.research import RESEARCH_TOOLS, research_call_allowed
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
-from roami_agent.protocol.tools import Tool
+from roami_agent.protocol.tools import Tool, object_schema
 
 
 class Tools:
@@ -61,7 +61,16 @@ class Tools:
             if role == "research":
                 wire = deepcopy(wire)
                 parameters = wire["function"]["parameters"]
-                if tool.name == "browser_act":
+                if tool.name == "bash" and self.directory:
+                    wire["function"]["description"] = (
+                        "Call registered browser operations only: argv=[roami,agent,capability,call,"
+                        "NAME,--input,JSON]. Discover browser_open/browser_observe/browser_act "
+                        "with tool_list. Research has no standalone shell, echo, curl or Python."
+                    )
+                    wire["function"]["parameters"] = object_schema(
+                        {"argv": parameters["properties"]["argv"]}, ["argv"]
+                    )
+                elif tool.name == "browser_act":
                     parameters["properties"]["kind"]["enum"] = ["goto"]
                     parameters["required"] = ["observationId", "kind", "url"]
                 elif tool.name == "browser_open":
