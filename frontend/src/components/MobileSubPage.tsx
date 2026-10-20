@@ -53,7 +53,7 @@ export default function MobileSubPage({ title, onBack, action, search, dialogLab
   const node = (
     <div ref={rootRef} role={dialogLabel ? 'dialog' : undefined} aria-modal={dialogLabel ? true : undefined} aria-label={dialogLabel} data-mobile-refresh-root={keepBottomNav ? '' : undefined} style={{
       position: 'fixed', inset: 0,
-      bottom: keepBottomNav ? 'var(--mobile-nav-offset, calc(var(--mobile-nav-h) + var(--safe-b)))' : 0,
+      bottom: keepBottomNav ? 'var(--mobile-nav-offset, calc(var(--mobile-nav-h, 0px) + var(--safe-b)))' : 0,
       background: 'var(--bg-base)',
       zIndex: `var(${layer === 'session' ? '--z-session-sub' : '--z-subpage'})` as unknown as number,
       display: 'flex', flexDirection: 'column',
