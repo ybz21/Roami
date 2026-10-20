@@ -207,6 +207,16 @@ authority, it just no longer moves the layout under the user a beat after load.
 
 # Gates
 
+## Refresh Budgets
+
+Session state consumers reuse `useAgentKinds` / `useSessionOverview` rather than polling each
+session. New polls pause when hidden, share in-flight requests, and back off after errors; use
+`pollWhileVisible` for page-owned polling. Stable data keeps its reference — a new list object
+must not restart an immediate request loop. Expensive repository counts refresh separately from
+fast session state. Measure production builds before and after; request reduction is not a CPU
+or memory reduction claim. Evidence and the next steps live in
+[`docs/design/20261020-会话刷新负载/README.md`](docs/design/20261020-会话刷新负载/README.md).
+
 ## Quality
 
 - Run `scripts/dev/quality/check.sh quick` before committing local changes.

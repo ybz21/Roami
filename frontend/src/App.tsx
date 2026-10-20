@@ -15,7 +15,7 @@ import {
 } from 'antd'
 import type { MenuProps } from 'antd'
 import { api, setUnauthorizedHandler } from './api'
-import type { OverviewItem } from './session-overview'
+import { useSessionOverview } from './session-overview'
 import Term, { TermHandle, TermStatus } from './components/terminal/Terminal'
 import ClaudeChat from './components/chat/ClaudeChat'
 import CodexChat from './components/chat/CodexChat'
@@ -156,7 +156,6 @@ function sameProbe(a: any, b: any): boolean {
 }
 
 export default function App() {
-  const agentKinds = useAgentKinds()
   // 多机：底座那枚按钮 + 账户菜单顶部的机器列表。单机时两者都为空，界面与今天一致。
   // **必须在任何提前 return 之前**——这个组件下面有 `if (!authed) return <Login/>` 这类分支，
   // 放到后面就是条件调用 hook，登录成功那一帧 hook 数量变化，React 直接抛 #310（踩过）。
@@ -167,6 +166,7 @@ export default function App() {
   const hubHealth = useHubHealth()
 
   const [authed, setAuthed] = useState<boolean | null>(null)
+  const agentKinds = useAgentKinds(authed === true)
   const agentInbox = useAgentInbox(authed === true, curNodeId)
   const [agentInboxOpen, setAgentInboxOpen] = useState(false)
   const selectAgent = useCallback((cid: string, branch?: string, message?: string) => {
@@ -441,7 +441,9 @@ export default function App() {
   }, [])
   const [fontSize, setFontSize] = useState(13)
   const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
-  const [activityMap, setActivityMap] = useState<Record<string, { running: boolean; waiting: boolean }>>({})
+  const sessionOverview = useSessionOverview(authed === true && terms.length > 0)
+  const activityMap = useMemo(() => Object.fromEntries(sessionOverview.value.map(item =>
+    [item.name, { running: item.running, waiting: item.waiting }])), [sessionOverview.value])
   const termRefs = useRef<Record<string, TermHandle | null>>({})
   // Claude Code / Codex 检测（针对已打开的终端）+ 每个标签的「对话/终端」视图切换
   const [claudeMap, setClaudeMap] = useState<Record<string, ClaudeInfo>>({})
@@ -489,6 +491,7 @@ export default function App() {
   const gitDirRef = useRef(gitDir)
   gitDirRef.current = gitDir
   const loadGit = async () => {
+    if (document.hidden) return
     const dir = gitDirRef.current
     if (!dir) { setGit(null); return }
     try {
@@ -513,6 +516,7 @@ export default function App() {
     if (!authed) return
     let stop = false
     const load = async () => {
+      if (stop || document.hidden) return
       try {
         const prP = api('GET', '/projects')
         const anP = api('GET', '/sessions/annotations').catch(() => null)
@@ -684,25 +688,28 @@ export default function App() {
   useEffect(() => {
     if (!authed) return
     let stop = false
-    const load = () => api('GET', '/sessions').then((list) => {
-      if (stop) return
-      const byId: Record<string, string> = {}
-      const byName: Record<string, string> = {}
-      const labels: Record<string, string> = {}
-      const names: { name: string; label?: string; lastActivity?: number; agent?: AgentKind }[] = []
-      for (const s of Array.isArray(list) ? list : []) {
-        // 基础设施会话（_ttmux-plugind / _ttmux-im）不进任何人看的列表：树、标签、⌘K、计数
-        if (s?.name && isInfraSession(s.name)) continue
-        if (s?.id && s?.name) { byId[s.id] = s.name; byName[s.name] = s.id }
-        if (s?.name && s?.label) labels[s.name] = s.label
-        if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined })
-      }
-      setSessIds({ byId, byName })
-      setSessListLoaded(true)
-      // 内容没变就不换引用：树是按它 memo 的，5s 一次的空翻新会让整棵树白重算
-      setSessList((cur) => (cur.length === names.length && cur.every((x, i) => x.name === names[i].name && x.label === names[i].label && x.lastActivity === names[i].lastActivity && x.agent === names[i].agent) ? cur : names))
-      setSessionLabels(labels) // 展示名（@roam_name）：界面显示「名字（id）」，handle 仍是会话名
-    }).catch(() => { if (!stop) setSessIds((m) => m || { byId: {}, byName: {} }) }) // 拉不到也要放行还原，别把标签卡在空白
+    const load = () => {
+      if (stop || document.hidden) return Promise.resolve()
+      return api('GET', '/sessions').then((list) => {
+        if (stop) return
+        const byId: Record<string, string> = {}
+        const byName: Record<string, string> = {}
+        const labels: Record<string, string> = {}
+        const names: { name: string; label?: string; lastActivity?: number; agent?: AgentKind }[] = []
+        for (const s of Array.isArray(list) ? list : []) {
+          // 基础设施会话（_ttmux-plugind / _ttmux-im）不进任何人看的列表：树、标签、⌘K、计数
+          if (s?.name && isInfraSession(s.name)) continue
+          if (s?.id && s?.name) { byId[s.id] = s.name; byName[s.name] = s.id }
+          if (s?.name && s?.label) labels[s.name] = s.label
+          if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined })
+        }
+        setSessIds({ byId, byName })
+        setSessListLoaded(true)
+        // 内容没变就不换引用：树是按它 memo 的，5s 一次的空翻新会让整棵树白重算
+        setSessList((cur) => (cur.length === names.length && cur.every((x, i) => x.name === names[i].name && x.label === names[i].label && x.lastActivity === names[i].lastActivity && x.agent === names[i].agent) ? cur : names))
+        setSessionLabels(labels) // 展示名（@roam_name）：界面显示「名字（id）」，handle 仍是会话名
+      }).catch(() => { if (!stop) setSessIds((m) => m || { byId: {}, byName: {} }) }) // 拉不到也要放行还原，别把标签卡在空白
+    }
     sessReload.current = load
     load()
     const t = setInterval(load, 5000)
@@ -781,39 +788,28 @@ export default function App() {
   useEffect(() => {
     if (!authed || terms.length === 0) return
     let stop = false
-    const check = () => terms.forEach(async (n) => {
-      try {
-        const r = await api('GET', `/sessions/${encodeURIComponent(n)}/claude`)
-        if (stop) return
-        setClaudeMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
-        // 第一次探到 Claude 在跑就进对话视图：这是 Claude 会话的常态，终端是切过去看的那一面
-        if (r.data?.running) setClaudeView((v) => (n in v ? v : { ...v, [n]: true }))
-      } catch {}
-      try {
-        const r = await api('GET', `/sessions/${encodeURIComponent(n)}/codex`)
-        if (stop) return
-        setCodexMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
-        if (isMobile && r.data?.running) setCodexView((v) => (n in v ? v : { ...v, [n]: true }))
-      } catch {}
-    })
+    const check = () => {
+      if (document.hidden) return
+      terms.forEach(async (n) => {
+        try {
+          const r = await api('GET', `/sessions/${encodeURIComponent(n)}/claude`)
+          if (stop) return
+          setClaudeMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
+          // 第一次探到 Claude 在跑就进对话视图：这是 Claude 会话的常态，终端是切过去看的那一面
+          if (r.data?.running) setClaudeView((v) => (n in v ? v : { ...v, [n]: true }))
+        } catch {}
+        try {
+          const r = await api('GET', `/sessions/${encodeURIComponent(n)}/codex`)
+          if (stop) return
+          setCodexMap((m) => (sameProbe(m[n], r.data) ? m : { ...m, [n]: r.data }))
+          if (isMobile && r.data?.running) setCodexView((v) => (n in v ? v : { ...v, [n]: true }))
+        } catch {}
+      })
+    }
     check()
     const t = setInterval(check, 5000)
     return () => { stop = true; clearInterval(t) }
   }, [authed, terms, isMobile])
-
-  useEffect(() => {
-    if (!authed || terms.length === 0) return
-    let stop = false
-    const check = () => api('GET', '/sessions/overview').then((r) => {
-      if (stop) return
-      const next: Record<string, { running: boolean; waiting: boolean }> = {}
-      for (const item of (r.data?.items || []) as OverviewItem[]) next[item.name] = { running: item.running, waiting: item.waiting }
-      setActivityMap(next)
-    }).catch(() => { if (!stop) setActivityMap({}) })
-    void check()
-    const timer = setInterval(check, 5000)
-    return () => { stop = true; clearInterval(timer) }
-  }, [authed, terms.length])
 
   // 通用传输 Phase 1a：登录后且用户偏好开 P2P → 建会话级常驻 control PC（左边栏全局状态）。
   // 偏好关闭 / 登出即拆链。P2P 是否真正可用由 transport 内部拉 /api/p2p/config 决定。

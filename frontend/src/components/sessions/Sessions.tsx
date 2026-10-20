@@ -1,6 +1,6 @@
 import { agentName, useAgentKinds } from '../../agent-kind'
 // ── 会话（可新建/指定目录 / 进终端 / 关闭） ──
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { RaceComparePanel, RaceCreateModal } from '../swarm/Race'
 import WorktreePanel from '../git/WorktreePanel'
 import { api } from '../../api'
@@ -10,7 +10,8 @@ import { useI18n } from '../../i18n'
 import { SessionHistory } from './SessionHistory'
 import { useLayout } from '../../layout'
 import { MemBar } from './session-memory'
-import { detectPrompt } from '../prompt'
+import { useSessionOverview } from '../../session-overview'
+import { pollWhileVisible } from '../../visible-poll'
 import { sessionLabel, setSessionLabels } from './session-label'
 import { SESSION_MIME } from '../shell/session-drop'
 import { currentNodeId } from '../cluster/node-url'
@@ -29,9 +30,8 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const { phone: isPhone } = useLayout()
   const [list, setList] = useState<any[]>([])
   const agentKinds = useAgentKinds()
-  const [cc, setCc] = useState<Record<string, boolean>>({})
-  const [cx, setCx] = useState<Record<string, boolean>>({})
-  const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
+  const overview = useSessionOverview()
+  const needsInput = useMemo(() => Object.fromEntries(overview.value.map(item => [item.name, item.waiting])), [overview.value])
   const [swarmMap, setSwarmMap] = useState<Record<string, { swarm: string; role: string }>>({})
   const [newOpen, setNewOpen] = useState(false)
   const [wtOpen, setWtOpen] = useState(false)
@@ -49,88 +49,45 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   // tree=1：拿 parent 投影树后拍平（节点字段与平铺一致 + parent），W2 父子分组用
-  const load = () => api('GET', '/sessions?tree=1').then((roots) => {
+  const load = (signal?: AbortSignal) => api('GET', '/sessions?tree=1', undefined, { signal }).then((roots) => {
+    if (signal?.aborted) return
     const flat: any[] = []
     const walk = (nodes: any[]) => { for (const n of nodes || []) { flat.push(n); walk(n.children) } }
     walk(Array.isArray(roots) ? roots : [])
     setList(flat)
     setSessionLabels(Object.fromEntries(flat.filter((s) => s?.name && s?.label).map((s) => [s.name, s.label])))
-  }).catch(() => {})
-  useEffect(() => { load(); const t = setInterval(load, 3000); return () => clearInterval(t) }, [])
+  }).catch(error => { if (signal) throw error })
+  useEffect(() => pollWhileVisible(load, 3000).stop, [])
   useEffect(() => {
-    let stop = false
-    const loadAnn = () => api('GET', '/sessions/annotations')
-      .then((r) => { if (!stop) setWtAnn(r?.data || {}) }).catch(() => {})
-    loadAnn()
-    const t = setInterval(loadAnn, 8000)
-    return () => { stop = true; clearInterval(t) }
+    return pollWhileVisible(signal => api('GET', '/sessions/annotations', undefined, { signal })
+      .then((r) => { if (!signal.aborted) setWtAnn(r?.data || {}) }), 8000).stop
   }, [])
   useEffect(() => {
-    let stop = false
-    const loadRaces = () => api('GET', '/races')
-      .then((r) => { if (!stop) setRaces(Array.isArray(r?.data) ? r.data : []) }).catch(() => {})
-    loadRaces()
-    const t = setInterval(loadRaces, 8000)
-    return () => { stop = true; clearInterval(t) }
+    return pollWhileVisible(signal => api('GET', '/races', undefined, { signal })
+      .then((r) => { if (!signal.aborted) setRaces(Array.isArray(r?.data) ? r.data : []) }), 8000).stop
   }, [])
   const reloadRaces = () => api('GET', '/races').then((r) => setRaces(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
   // 拉取蜂群拓扑：哪些会话其实是蜂群的指挥/成员。会话页和蜂群页看到的是同一批 tmux 会话，
   // 这里据成员的真实 session 名(非前缀猜测)打标，并据此拦住「关闭」误把成员当完成解锁下游。
   useEffect(() => {
-    let stop = false
-    const loadSwarms = async () => {
-      try {
-        const swarms = await api('GET', '/swarms')
-        if (!Array.isArray(swarms)) return
-        const map: Record<string, { swarm: string; role: string }> = {}
-        await Promise.all(swarms.map(async (sw: any) => {
-          try {
-            const st = await api('GET', `/swarms/${encodeURIComponent(sw.name)}`)
-            if (st?.supervisor) map[st.supervisor] = { swarm: sw.name, role: 'leader' }
-            for (const m of (st?.members || [])) {
-              if (m?.session) map[m.session] = { swarm: sw.name, role: m.role === 'leader' || m.role === 'master' ? 'leader' : 'member' }
-            }
-          } catch {}
-        }))
-        if (!stop) setSwarmMap(map)
-      } catch {}
-    }
-    loadSwarms()
-    const t = setInterval(loadSwarms, 8000)
-    return () => { stop = true; clearInterval(t) }
-  }, [])
-  // 标注哪些会话在跑 Claude Code
-  useEffect(() => {
-    let stop = false
-    const check = () => list.forEach(async (s: any) => {
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/claude`); if (!stop) setCc((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/codex`); if (!stop) setCx((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
-    })
-    if (list.length) check()
-    const t = setInterval(() => { if (list.length) check() }, 5000)
-    return () => { stop = true; clearInterval(t) }
-  }, [list])
-  // 识别卡在人类决策/审批点的会话，列表上给出醒目标识，方便及时介入。
-  useEffect(() => {
-    if (!list.length) { setNeedsInput({}); return }
-    let stop = false
-    const checkPrompts = async () => {
-      const entries = await Promise.all(list.map(async (s: any) => {
+    return pollWhileVisible(async signal => {
+      const swarms = await api('GET', '/swarms', undefined, { signal })
+      if (!Array.isArray(swarms)) return
+      const map: Record<string, { swarm: string; role: string }> = {}
+      await Promise.all(swarms.map(async (sw: any) => {
         try {
-          const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/capture?lines=50`)
-          return [s.name, !!detectPrompt(r.data || '')] as const
-        } catch {
-          return [s.name, false] as const
-        }
+          const st = await api('GET', `/swarms/${encodeURIComponent(sw.name)}`, undefined, { signal })
+          if (st?.supervisor) map[st.supervisor] = { swarm: sw.name, role: 'leader' }
+          for (const m of (st?.members || [])) {
+            if (m?.session) map[m.session] = { swarm: sw.name, role: m.role === 'leader' || m.role === 'master' ? 'leader' : 'member' }
+          }
+        } catch {}
       }))
-      if (!stop) setNeedsInput(Object.fromEntries(entries))
-    }
-    checkPrompts()
-    const t = setInterval(checkPrompts, 4000)
-    return () => { stop = true; clearInterval(t) }
-  }, [list])
+      if (!signal.aborted) setSwarmMap(map)
+    }, 8000).stop
+  }, [])
   // W7 关闭分流（非 worktree 确认后结束；worktree 有东西三选一；同 worktree 还有别人只关自己）和左树同一份
-  const closer = useSessionCloser(closeTerm, load)
+  const closer = useSessionCloser(closeTerm, () => { void load().catch(() => {}) })
   const goSwarm = (sw: string) => { location.hash = '#/swarm/' + encodeURIComponent(sw) }
   // ── 筛选 / 搜索 ──
   const [q, setQ] = useState('')
@@ -143,11 +100,11 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     if (f === 'waiting') return !!needsInput[s.name]
     if (isSwarm(s)) return false
     switch (f) {
-      case 'claude': return !!cc[s.name]
-      case 'codex': return !!cx[s.name]
+      case 'claude': return agentKinds[s.name] === 'claude'
+      case 'codex': return agentKinds[s.name] === 'codex'
       case 'opencode': return agentKinds[s.name] === 'opencode'
       case 'pi': return agentKinds[s.name] === 'pi'
-      case 'idle': return !agentKinds[s.name] && !cc[s.name] && !cx[s.name]
+      case 'idle': return !agentKinds[s.name]
       default: return true
     }
   }
@@ -178,21 +135,21 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const repoOf = (name: string) => { const a = wtAnn[name]; return a?.primary?.linked ? a.primary.repo as string : '' }
   // 分组仓库的 worktree 全貌(总数/孤儿)：让会话页感知还有没挂会话的 worktree
   const [repoWt, setRepoWt] = useState<Record<string, { total: number; orphans: number }>>({})
+  const repoKeys = Array.from(new Set(Object.values(wtAnn)
+    .map((a: any) => (a?.primary?.linked ? a.primary.repo as string : ''))
+    .filter(Boolean))).sort().join('\n')
   useEffect(() => {
-    const repos = Array.from(new Set(Object.values(wtAnn)
-      .map((a: any) => (a?.primary?.linked ? a.primary.repo as string : ''))
-      .filter(Boolean)))
+    const repos = repoKeys.split('\n').filter(Boolean)
     if (!repos.length) { setRepoWt({}); return }
-    let stop = false
-    Promise.all(repos.map(async (r) => {
-      try {
-        const res = await api('GET', `/git/worktrees?dir=${encodeURIComponent(r)}`)
+    return pollWhileVisible(async signal => {
+      const entries = await Promise.all(repos.map(async (r) => {
+        const res = await api('GET', `/git/worktrees?dir=${encodeURIComponent(r)}`, undefined, { signal })
         const wts = (Array.isArray(res?.data) ? res.data : []).filter((w: any) => !w.isMain && !w.prunable)
         return [r, { total: wts.length, orphans: wts.filter((w: any) => !(w.sessions || []).length).length }] as const
-      } catch { return [r, { total: 0, orphans: 0 }] as const }
-    })).then((es) => { if (!stop) setRepoWt(Object.fromEntries(es)) })
-    return () => { stop = true }
-  }, [wtAnn])
+      }))
+      if (!signal.aborted) setRepoWt(Object.fromEntries(entries))
+    }, 30_000).stop
+  }, [repoKeys])
   // 竞赛成员映射：竞赛分组优先于仓库分组（同一批会话不重复聚组）
   const raceOf: Record<string, any> = {}
   for (const rc of races) {
@@ -388,7 +345,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
               const indent = !!en.indent
               const sw = swarmMap[s.name]
               const connected = s.attached == 1
-              const agent = agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : null)
+              const agent = agentKinds[s.name] || null
               const waiting = !!needsInput[s.name]
               // 休眠：机器重启带走了 tmux 那一半，台账还认得它，点开即恢复。
               // 它没有进程，所以 attached/agent/待输入这些运行时判断都不适用。
