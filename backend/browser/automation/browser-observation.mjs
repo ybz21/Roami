@@ -70,7 +70,7 @@ async function scene(page, session) {
         value: element.type === 'password' ? '[redacted]' : String(element.value ?? '').slice(0, 160),
         disabled: !!element.disabled,
       }))
-    const values = [...document.querySelectorAll('input,textarea,select,[contenteditable="true"]')].map(element => [element.isContentEditable ? element.innerHTML : element.value, element.checked])
+    const values = [...document.querySelectorAll('input,textarea,select,[contenteditable]:not([contenteditable="false"])')].map(element => [element.isContentEditable ? element.innerHTML : element.value, element.checked])
     if (values.reduce((size, item) => size + (item[0]?.length || 0), html.length) > 2_000_000) return { oversized: true }
     return {
       html, values, controls, controlsTruncated: candidates.length > 64, scope: 'main_frame', iframeCount: document.querySelectorAll('iframe,frame').length, url: location.href, title: document.title.slice(0, 300),
