@@ -14,6 +14,11 @@ def routing_schema():
     text = {"type": "string", "minLength": 1, "maxLength": 600}
     return object_schema(
         {
+            "explicitExecutor": {
+                "type": ["string", "null"],
+                "enum": [None, *sorted(EXECUTORS)],
+                "description": "Required on every assessment: the user's explicitly requested executor, or null only when the user made no executor choice. Never put the choice only in goal or routingExplanation.",
+            },
             "taskDescription": {**text, "maxLength": 1000},
             "complexity": {
                 "type": "string",
@@ -30,11 +35,6 @@ def routing_schema():
                 "additionalProperties": text,
             },
             "routingExplanation": text,
-            "explicitExecutor": {
-                "type": ["string", "null"],
-                "enum": [None, *sorted(EXECUTORS)],
-                "description": "Required on every assessment: the user's explicitly requested executor, or null only when the user made no executor choice. Never put the choice only in goal or routingExplanation.",
-            },
             "userQuote": {
                 **text,
                 "description": "Exact source quote for a non-null explicitExecutor only. Omit when explicitExecutor is null; this is not a general task quote.",
@@ -55,7 +55,7 @@ def routing_schema():
                 "items": {"type": "string", "minLength": 1, "maxLength": 160},
             },
         },
-        ["complexity", "complexityBasis", "routingExplanation", "explicitExecutor"],
+        ["explicitExecutor", "complexity", "complexityBasis", "routingExplanation"],
     )
 
 

@@ -29,7 +29,7 @@ MAIN_INSTRUCTIONS = (
     "target_resolve {kind,id}; session_send {sessionId,text}; executor_catalog {}; task_status {}; "
     "task_steer {taskId,revision,text,requestComplete?}. These calls need no shell workspace or discovery. "
     "Overview gives counts; paginate project membership. Search the user's project name, not the bug/task "
-    "description. Use a unique exact name match directly; other names do not create ambiguity. Resolve IDs. "
+    "description. Search named targets before asking for names/IDs; use a unique exact match directly. Resolve IDs. "
     "The user asking to send/continue an existing session authorizes delivery; do it without repeated "
     "confirmation, manual paste or a new project. Genuine ambiguities need ask_user with 2-4 recognizable "
     "choices, recommended first. Continue tracked tasks with task_steer at their actual revision; preserve "
