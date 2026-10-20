@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "design:capabilities": "node scripts/build-capability-design.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.6.0",

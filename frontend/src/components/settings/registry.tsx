@@ -25,7 +25,6 @@ import { StatusBarSettings } from './status-bar-settings'
 import { AgentMemorySettings } from './agent-memory-settings'
 import { AgentMessageSettings } from './agent-message-settings'
 import { AgentSettings } from './agent-settings'
-import { AgentCapabilities } from './agent-capabilities'
 import { ProfessionalAgents } from './professional-agents'
 import { AccountActions } from './account-actions'
 
@@ -203,7 +202,6 @@ export function buildSettings(deps: {
     { id: 'agent.messages', name: t('agent.notification.settings'), parent: t('set.groupAgent'), scope: 'node', items: [{ id: 'agentMessages', label: t('agent.notification.settings'), bare: true, control: { kind: 'custom', node: <AgentMessageSettings /> }, keywords: 'notifications reminders delivery quiet hours 通知 消息 免打扰 提醒 投递' }] },
     { id: 'agent.runtime', name: t('agent.models.settings'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <AgentSettings /> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
     { id: 'agent.memory', name: t('agent.memoryCenter'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
-    { id: 'agent.capabilities', name: t('agent.capabilities.title'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentCapabilities', label: t('agent.capabilities.title'), bare: true, control: { kind: 'custom', node: <AgentCapabilities /> }, keywords: 'Agent Skills Tools MCP CLI 技能 工具 能力 启用 停用' }] },
     {
       id: 'common', name: t('set.pageCommon'), scope: 'mine', note: t('set.pageCommonNote'),
       items: [
@@ -375,7 +373,7 @@ export function buildSettings(deps: {
     { kind: 'section', title: t('set.secMine'), note: '' },
     { kind: 'leaf', page: 'common' },
     { kind: 'parent', id: 'ui', title: t('set.groupUi'), kids: ['ui.look', 'ui.layout', 'ui.keys', 'ui.keys.more', 'ui.status'] },
-    { kind: 'parent', id: 'agent', title: t('set.groupAgent'), kids: ['agent.runtime', 'agent.messages', 'agent.memory', 'agent.capabilities', 'agent.bin', 'agent.new'] },
+    { kind: 'parent', id: 'agent', title: t('set.groupAgent'), kids: ['agent.runtime', 'agent.messages', 'agent.memory', 'agent.bin', 'agent.new'] },
     // 这一段的页直接摊平：段标题已经写了「这台机器」，再套一层同名的父节点是把同一件事说两遍
     { kind: 'section', title: deps.nodeLabel ? t('set.secNode', { node: deps.nodeLabel }) : t('set.groupNode'), note: '' },
     ...(['node.browser', 'node.phone', 'node.speech', 'node.p2p', 'node.env', 'sec'].map((page) => ({ kind: 'leaf', page } as TreeNode))),

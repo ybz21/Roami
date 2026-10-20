@@ -29,7 +29,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 	for _, route := range []struct{ method, path string }{
-		{"GET", "/agent/capability-imports"}, {"POST", "/agent/capability-imports/:kind"}, {"GET", "/agent/capability-settings"}, {"PUT", "/agent/capability-settings"}, {"POST", "/agent/main-conversation"}, {"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
+		{"PUT", "/agent/capability-imports/:kind/:name"}, {"DELETE", "/agent/capability-imports/:kind/:name"}, {"POST", "/agent/capability-imports/mcp/:name/connect"}, {"GET", "/agent/capability-imports"}, {"POST", "/agent/capability-imports/:kind"}, {"GET", "/agent/capability-settings"}, {"PUT", "/agent/capability-settings"}, {"POST", "/agent/main-conversation"}, {"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
 		{"POST", "/agent/attachments"},
 		{"GET", "/agent/traces"},
 		{"GET", "/agent/conversations/:cid/debug"}, {"GET", "/agent/conversations/:cid/debug/trace"},

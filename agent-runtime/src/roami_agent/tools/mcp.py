@@ -133,14 +133,18 @@ class MCPConnections:
         self.registry = registry
         self.connections = {name: Connection(name, config) for name, config in configs.items()}
         self.closed = False
-        if configs:
-            registry.add(
+        self.register_discovery()
+
+    def register_discovery(self):
+        self.registry.registry.pop("mcp_discover", None)
+        if self.connections:
+            self.registry.add(
                 Tool(
                     "mcp_discover",
                     "Discover or refresh configured MCP tools before use. Servers: "
-                    + ", ".join(configs),
+                    + ", ".join(self.connections),
                     object_schema(
-                        {"server": {"type": "string", "enum": list(configs)}}, ["server"]
+                        {"server": {"type": "string", "enum": list(self.connections)}}, ["server"]
                     ),
                     self.discover,
                 )

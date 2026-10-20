@@ -547,21 +547,7 @@ html[data-pointer="coarse"] .tt-nav-item::after {
 }
 .tt-nav.rail .tt-nav-search { justify-content: center; width: 36px; margin: 0 auto var(--sp-2); padding: 0; border-radius: var(--r-xs); }
 
-/* ── 插件页：一整块，不是两张卡片（跟会话工作区/镜像页同一套语言）──
-   原来是两张 antd Card：圆角、投影、比页面亮一档的底，中间 16px 缝。五个页面里只有这一页
-   长这样。这里把卡片外观收平——直角、无边框、无投影、底色跟页面一致，两栏之间只留 1px 线。 */
-.tt-plugins { gap: 0; }
-.tt-plugins .ant-card {
-  border: 0; border-radius: 0; background: transparent; box-shadow: none;
-}
-.tt-plugins .ant-card-head {
-  border-radius: 0; background: transparent;
-  border-bottom: 1px solid var(--border-subtle);
-}
-/* 左栏靠一条竖线跟右栏断句；两栏同底，不再一亮一暗 */
-.tt-plugins > .tt-plugins-list { border-right: 1px solid var(--border-subtle); }
 .tt-filebrowser-title { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
-.tt-plugins-detail > .ant-card > .ant-card-body { padding-inline: var(--sp-4); }
 
 /* ── 右栏三面板（22 设计 §3.4）：活动条 + 作用域头 + 文件 / Git / Worktree ── */
 .tt-ins { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
@@ -1355,10 +1341,8 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
 .tt-page-files,
 .tt-page-phone,
 .tt-page-browser,
-/* 插件页也满高：不给的话它只有 min-height，里面那块 height:100% 落到 auto 上，
-   于是左右两栏的高度由内容决定——列表下面一空，中间那条竖线就断在半路（截图里它到
-   最后一个插件就没了）。线要到底，列就得先到底。 */
-.tt-page-plugins,
+/* 能力页和设置页各自管理内部滚动。 */
+.tt-page-capabilities,
 /* 设置页自己管滚动：搜索框与分类树必须钉住，只有内容区可以动 */
 .tt-page-settings {
   height: 100%;
@@ -1372,7 +1356,7 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
 .tt-page-phone,
 .tt-page-browser,
 .tt-page-files,
-.tt-page-plugins,
+.tt-page-capabilities,
 /* 项目页与设置页同样满幅：五页外框这才真的是一套。留白不再由页面容器给，
    而是各自的内容段自己带（.prj-head/.prj-tabs/.prj-layout、.tt-set-head/.tt-set-pane）——
    这样 sticky 头和分割线能一路铺到边，跟文件/插件页的那条竖线是同一种做法。 */
@@ -1380,16 +1364,14 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
 .tt-page-settings { padding: 0; }
 .tt-page-phone.tt-page-mobile,
 .tt-page-browser.tt-page-mobile,
-.tt-page-files.tt-page-mobile,
-.tt-page-plugins.tt-page-mobile { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+.tt-page-files.tt-page-mobile { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 .tt-page-phone.tt-page-mobile.has-dock,
 .tt-page-browser.tt-page-mobile.has-dock,
-.tt-page-files.tt-page-mobile.has-dock,
-.tt-page-plugins.tt-page-mobile.has-dock { padding-bottom: calc(126px + env(safe-area-inset-bottom)); }
+.tt-page-files.tt-page-mobile.has-dock { padding-bottom: calc(126px + env(safe-area-inset-bottom)); }
 .tt-page-files > *,
 .tt-page-phone > *,
 .tt-page-browser > *,
-.tt-page-plugins > *,
+.tt-page-capabilities > *,
 .tt-page-settings > * {
   height: 100%;
   min-height: 0;

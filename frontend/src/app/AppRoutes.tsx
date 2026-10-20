@@ -12,7 +12,7 @@ import { type TreeSrc } from '../components/shell/task-tree-snapshot'
 import { useI18n } from '../i18n'
 import type { AppRoute } from './useAppRoute'
 import type { TaskWorkspace } from './useTaskWorkspace'
-const PluginsPanel = lazyRetry(() => import('../components/plugins/PluginsPanel'))
+const CapabilitiesPage = lazyRetry(() => import('../components/capabilities/CapabilitiesPage'))
 const MobileSessions = lazyRetry(() => import('../components/mobile/MobileSessions'))
 const MobileHome = lazyRetry(() => import('../components/mobile/MobileHome'))
 const InstallPage = lazyRetry(() => import('../components/install/InstallPage'))
@@ -70,7 +70,7 @@ export default function AppRoutes({ routing, isMobile, active, projects, actions
     settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout} searchNonce={mobileSearchNonce}
       onInstall={() => go('install')} fullscreen={fullscreen} />,
     hub: <HubPage />,
-    plugins: <PluginsPanel initialId={pluginSub || undefined} />,
+    capabilities: <CapabilitiesPage sub={pluginSub} onNav={go} />,
     home: <>
       {(!agentPage || agentParts[0] === 'home') && <AgentChat inactive={!!agentPage} cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={agent.notifications} projects={projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />}
       {agentPage && <AgentHomePage key={`${curNodeId || 'local'}:${agentPage.view}:${agentPage.origin}`} page={agentPage} node={curNodeId} inbox={agentInbox} projects={projects.map(p => ({ id: p.key, name: p.name }))} select={selectAgent} onSession={openTerm} onChanged={agentInbox.refresh} />}

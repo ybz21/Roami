@@ -66,6 +66,7 @@ class CapabilitySettings:
         ModelSettings.owner(owner)
         tools = self.runtime.tools
         return {
+            "managed": self.runtime.capability_imports.saved,
             "tools": [
                 {
                     "name": tool.name,
@@ -103,6 +104,7 @@ class CapabilitySettings:
                     if connection.failures
                     else "not_connected",
                     "tools": len(connection.names),
+                    "toolNames": sorted(connection.names),
                 }
                 for name, connection in sorted(self.runtime.mcp.connections.items())
             ],

@@ -132,7 +132,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const canvasNode = (
     <Content ref={canvasRef} className="tt-canvas" data-cq={CQ_PAGES.has(tab) ? 'on' : undefined} style={{
       flex: 1, minWidth: 0, minHeight: 0, height: '100%', padding: 0,
-      overflow: tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
+      overflow: tab === 'capabilities' || tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
     }}>{pageNode}</Content>
   )
   const dockNode = (
@@ -175,7 +175,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   })
   const onStatusAction = (a: StatusAction) => {
     if (a.kind === 'route') location.hash = a.id
-    else if (a.kind === 'pluginView') location.hash = '#/plugins/' + encodeURIComponent(a.id)
+    else if (a.kind === 'pluginView') location.hash = '#/capabilities/plugins/' + encodeURIComponent(a.id)
   }
 
   return (

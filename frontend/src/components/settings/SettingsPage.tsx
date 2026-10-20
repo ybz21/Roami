@@ -23,7 +23,7 @@ import { buildSettings, itemText, rowCount, type SettingsModel, type SettingsPag
 const DEFAULT_PAGE = 'common'
 
 /** 路由片段 ↔ 页 id：URL 里用 /，id 里用 . */
-export function pageFromRoute(sub: string): string { return /^agent\/(skills|tools|mcp|cli)$/.test(sub) ? 'agent.capabilities' : sub.replace(/\//g, '.') }
+export function pageFromRoute(sub: string): string { return sub.replace(/\//g, '.') }
 export function routeFromPage(id: string): string { return id.replace(/\./g, '/') }
 
 function Chevron({ open }: { open: boolean }) {

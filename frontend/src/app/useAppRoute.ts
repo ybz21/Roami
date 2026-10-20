@@ -12,7 +12,7 @@ export function useAppRoute() {
   const tab = route.split('/')[0]                                  // 基础页（swarm/leave → swarm）
   const swarmSub = tab === 'swarm' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的蜂群
   const projectSub = tab === 'projects' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的项目
-  const pluginSub = tab === 'plugins' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的插件（状态条点进来）
+  const pluginSub = tab === 'capabilities' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的插件（状态条点进来）
   const inboxSub = tab === 'inbox' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 从推送通知点进来要开的会话
   const settingsSub = tab === 'settings' && route.includes('/') ? route.slice(route.indexOf('/') + 1) : '' // 设置的哪一类（node/browser）
   const go = (k: string) => {

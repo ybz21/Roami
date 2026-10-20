@@ -384,3 +384,6 @@ html[data-keyboard="open"] .tt-bottomnav { display: none; }
 .tt-bottomnav-btn:focus-visible,
 .tt-mobile-action:focus-visible,
 .tt-mobile-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+html[data-size="compact"] .tt-page-capabilities,
+html[data-size="medium"] .tt-page-capabilities { padding: 0; }

@@ -1,11 +1,8 @@
-// 插件统一管理/配置页(VS Code 扩展页式):左侧插件列表,右侧详情
-// (配置表单按 manifest.configFields 自动渲染 / 命令 / 审计)。
-// 数据全部走 backend 薄封装 REST(roami plugin ... --json),前端不感知 plugind。
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { nodeApi } from '../cluster/node-url'
 import {
   Alert, Button, Card, Checkbox, Descriptions, Divider, Empty, Form, Input, List, Modal, Popconfirm, Select,
-  Space, Spin, Switch, Table, Tabs, Tag, Tooltip, Typography, Upload, message,
+  Space, Spin, Switch, Table, Tabs, Tag, Typography, Upload, message,
 } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -14,6 +11,9 @@ import CronPanel from './CronPanel'
 import KeepalivePanel from './KeepalivePanel'
 import MobileSubPage from '../MobileSubPage'
 import { useLayout } from '../../layout'
+import { pollWhileVisible } from '../../visible-poll'
+import { GearIcon, PlugIcon, SearchIcon, UploadIcon } from '../../icons'
+import './plugins.css'
 
 // 有宿主侧内置面板的插件(v1 插件无自定义前端,面板由宿主按 id 挂载)
 const HOST_MONITOR_ID = 'roam.host-monitor'
@@ -66,111 +66,102 @@ function lt(text: LocaleText, locale: string): string {
   return text[locale] || text['zh-CN'] || Object.values(text)[0] || ''
 }
 
-export default function PluginsPanel({ initialId }: { initialId?: string } = {}) {
+export default function PluginsPanel({ initialId, onSelect }: { initialId?: string; onSelect?: (id: string) => void } = {}) {
   const { t, locale } = useI18n()
+  const { phone } = useLayout()
   const [plugins, setPlugins] = useState<RegisteredPlugin[]>([])
-  const [daemon, setDaemon] = useState<Record<string, any> | null>(null)
+  const [daemon, setDaemon] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
-  // 深链选中：状态条上点某一格进来时带着插件 id（#/plugins/<id>）。
-  // 从前点进来只到列表页第一项，你还得自己在左边找一遍——而你刚刚点的就是它。
+  const [error, setError] = useState(false)
+  const [query, setQuery] = useState('')
+  const [saving, setSaving] = useState('')
   const [selected, setSelected] = useState(initialId || '')
+  const [detailTab, setDetailTab] = useState<string>()
   const [installOpen, setInstallOpen] = useState(false)
-  // 手机(窄屏)走两级导航：一级整页插件列表，点某项后详情以全屏二级页(MobileSubPage)展开。
-  const { phone: isMobile } = useLayout()
-  const [mobileDetail, setMobileDetail] = useState(false)
 
   const reload = useCallback(async () => {
+    setError(false)
     try {
-      const [list, st] = await Promise.all([api('GET', '/plugins'), api('GET', '/plugin/status')])
-      const rows: RegisteredPlugin[] = list || []
-      setPlugins(rows)
-      setDaemon(st?.daemon || null)
-      setSelected((cur) => cur || initialId || rows[0]?.manifest.id || '')
-    } catch (e: any) {
-      message.error(e.message)
+      const rows: RegisteredPlugin[] = await api('GET', '/plugins')
+      setPlugins(rows || [])
+    } catch {
+      setError(true)
     } finally {
       setLoading(false)
     }
   }, [])
-  useEffect(() => { reload() }, [reload])
+  useEffect(() => { void reload() }, [reload])
   useEffect(() => {
-    const timer = setInterval(() => {
-      api('GET', '/plugin/status').then((st) => setDaemon(st?.daemon || null)).catch(() => {})
+    const poll = pollWhileVisible(async signal => {
+      const status = await api('GET', '/plugin/status', undefined, { signal })
+      if (!signal.aborted) setDaemon(!!status?.daemon)
     }, 5000)
-    return () => clearInterval(timer)
+    return poll.stop
   }, [])
+  useEffect(() => { setSelected(initialId || '') }, [initialId])
 
-  const current = useMemo(() => plugins.find((p) => p.manifest.id === selected), [plugins, selected])
-
+  const current = useMemo(() => plugins.find(p => p.manifest.id === selected), [plugins, selected])
+  const name = (p: RegisteredPlugin) => lt(p.manifest.displayName, locale) || p.manifest.name
+  const filtered = plugins.filter(p => `${name(p)} ${p.manifest.id} ${lt(p.manifest.description, locale)}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const open = (id: string, tab?: string) => {
+    setDetailTab(tab)
+    setSelected(id)
+    onSelect?.(id)
+  }
+  const close = () => { setSelected(''); onSelect?.('') }
   const toggle = async (p: RegisteredPlugin, enabled: boolean) => {
+    if (saving) return
+    setSaving(p.manifest.id)
     try {
       await api('POST', `/plugins/${encodeURIComponent(p.manifest.id)}/${enabled ? 'enable' : 'disable'}`)
+      setPlugins(rows => rows.map(row => row.manifest.id === p.manifest.id ? { ...row, enabled } : row))
       message.success(t(enabled ? 'plugins.enabled' : 'plugins.disabled'))
-      reload()
     } catch (e: any) {
       message.error(e.message)
+    } finally {
+      setSaving('')
     }
   }
-
-  if (loading) return <div style={{ padding: 48, textAlign: 'center' }}><Spin /></div>
+  const detail = current && <PluginDetail key={`${current.manifest.id}/${detailTab || ''}`} plugin={current} initialTab={detailTab} locale={locale} t={t}
+    onChanged={() => { close(); void reload() }} />
 
   return (
-    // 两栏贴在一起、共用同一张底：这一页从前是「两张浮在页面上的卡片」，圆角 + 16px 缝 +
-    // 比页面亮一档的底，和会话工作区/镜像页那种「一整块，靠 1px 线断句」完全不是一套语言。
-    // 卡片本身留着（antd 的头/体布局还用得上），外观由 .tt-plugins 收平，见 index.css。
-    <div className="tt-plugins" style={{ display: 'flex', height: '100%', minHeight: 0 }}>
-      <Card size="small" className="tt-plugins-list" style={isMobile ? { flex: 1, minWidth: 0, overflow: 'auto' } : { width: 280, flex: '0 0 280px', overflow: 'auto' }} title={isMobile ? undefined : t('plugins.title')}
-        extra={<Space size={4}>
-          <Button size="small" type="primary" onClick={() => setInstallOpen(true)}>{t('plugins.install')}</Button>
-          <Tooltip title={t('plugins.marketSoon')}>
-            <Button size="small" disabled>{t('plugins.market')}</Button>
-          </Tooltip>
-        </Space>}>
-        {!daemon && <Alert type="warning" showIcon style={{ marginBottom: 'var(--sp-2)' }} message={t('plugins.daemonStopped')} />}
-        <List
-          dataSource={plugins}
-          renderItem={(p) => (
-            <List.Item
-              onClick={() => { setSelected(p.manifest.id); if (isMobile) setMobileDetail(true) }}
-              // 直角、通栏：一列 8px 圆角的小块贴在一整块底上，读起来像卡片里又摞了一叠卡片
-              style={{
-                cursor: 'pointer', borderRadius: 0, padding: '8px 10px',
-                background: !isMobile && p.manifest.id === selected ? 'var(--sel-bg)' : undefined,
-                boxShadow: !isMobile && p.manifest.id === selected ? 'inset 2px 0 0 var(--accent)' : undefined,
-              }}
-              actions={[<Switch key="sw" size="small" checked={p.enabled}
-                onClick={(v, e) => { e.stopPropagation(); toggle(p, v) }} />]}
-            >
-              <List.Item.Meta
-                title={<Space size={6}>{lt(p.manifest.displayName, locale) || p.manifest.name}
-                  <Tag style={{ marginInlineStart: 0 }}>{p.manifest.version}</Tag></Space>}
-                description={<Typography.Text type="secondary" ellipsis={{ tooltip: true }} style={{ fontSize: 12 }}>
-                  {lt(p.manifest.description, locale)}</Typography.Text>}
-              />
-            </List.Item>
-          )}
-        />
-      </Card>
-      {!isMobile && (
-        <div className="tt-plugins-detail" style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
-          {current
-            ? <PluginDetail key={current.manifest.id} plugin={current} locale={locale} t={t}
-                onChanged={() => { setSelected(''); reload() }} />
-            : <Empty style={{ marginTop: 64 }} />}
+    <section className="tt-capability-catalog tt-plugin-catalog" data-kind="plugins">
+      <div className="tt-capability-toolbar">
+        <Input prefix={<SearchIcon size={16} />} aria-label={t('plugins.search')} placeholder={t('plugins.search')}
+          value={query} onChange={event => setQuery(event.target.value)} allowClear />
+        <div className="tt-capability-toolbar-actions">
+          <Button type="primary" icon={<UploadIcon size={16} />} onClick={() => setInstallOpen(true)}>{t('plugins.install')}</Button>
         </div>
-      )}
-      {isMobile && mobileDetail && current && (
-        <MobileSubPage title={lt(current.manifest.displayName, locale) || current.manifest.name}
-          onBack={() => setMobileDetail(false)}>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12 }}>
-            <PluginDetail key={current.manifest.id} plugin={current} locale={locale} t={t}
-              onChanged={() => { setMobileDetail(false); setSelected(''); reload() }} />
-          </div>
-        </MobileSubPage>
-      )}
+      </div>
+      {daemon === false && <Alert className="tt-plugin-alert" type="warning" showIcon message={t('plugins.daemonStopped')} />}
+      {error && <Alert className="tt-plugin-alert" type="error" showIcon message={t('plugins.loadFailed')}
+        action={<Button onClick={() => { void reload() }}>{t('agent.retry')}</Button>} />}
+      {loading ? <div className="tt-plugin-loading"><Spin /></div>
+        : !filtered.length ? !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t(query.trim() ? 'plugins.noResults' : 'plugins.empty')} />
+          : <div className="tt-capability-list">
+            {filtered.map(plugin => <article className="tt-capability-row" key={plugin.manifest.id} aria-label={name(plugin)}>
+              <div className="tt-capability-cardhead">
+                <span className="tt-capability-icon"><PlugIcon size={22} /></span>
+                <span className="tt-capability-source">{t('capabilities.source.' + ((plugin.manifest.runtime?.kind || 'builtin') === 'builtin' ? 'builtin' : 'managed'))}</span>
+                <div className="tt-capability-state"><Switch size="small" aria-label={t('agent.capabilities.enable', { name: name(plugin) })}
+                  checked={plugin.enabled} disabled={!!saving} loading={saving === plugin.manifest.id} onChange={enabled => { void toggle(plugin, enabled) }} /></div>
+              </div>
+              <div className="tt-plugin-cardname"><button type="button" className="tt-capability-open" onClick={() => open(plugin.manifest.id)}><strong>{name(plugin)}</strong></button><span>{plugin.manifest.version}</span></div>
+              <p className="tt-capability-description">{lt(plugin.manifest.description, locale)}</p>
+              <div className="tt-capability-cardfooter">
+                <button type="button" className="tt-act" onClick={() => open(plugin.manifest.id)}>{t('plugins.details')}</button>
+                {!!plugin.manifest.contributes?.configFields?.length && <button type="button" className="tt-act" onClick={() => open(plugin.manifest.id, 'config')}><GearIcon size={14} />{t('plugins.tabConfig')}</button>}
+              </div>
+            </article>)}
+          </div>}
+      {phone ? current && <MobileSubPage title={name(current)} onBack={close} manageHistory={!onSelect} search={false}>
+        <div className="tt-capability-detail-scroll">{detail}</div>
+      </MobileSubPage> : <Modal open={!!current} title={current ? name(current) : ''} onCancel={close} footer={null}
+        width="var(--content-form)" className="tt-capability-modal tt-plugin-detail-modal" destroyOnClose>{detail}</Modal>}
       <InstallModal open={installOpen} locale={locale} t={t} onClose={() => setInstallOpen(false)}
-        onDone={() => { setInstallOpen(false); reload() }} />
-    </div>
+        onDone={() => { setInstallOpen(false); void reload() }} />
+    </section>
   )
 }
 
@@ -202,10 +193,8 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
     }
   }
 
-  const finish = (data: any) => {
+  const finish = () => {
     message.success(t('plugins.installedOk'))
-    const text = typeof data?.data === 'string' ? data.data : ''
-    if (text) Modal.info({ title: t('plugins.installTitle'), width: 560, content: <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{text}</pre> })
     setPath('')
     onDone()
   }
@@ -218,7 +207,7 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
       const r = await fetch(nodeApi('/plugin/install'), { method: 'POST', body: form })
       const data = await r.json().catch(() => null)
       if (!r.ok) throw new Error(data?.error?.message || data?.error?.code || 'HTTP ' + r.status)
-      finish(data)
+      finish()
     } catch (e: any) {
       message.error(e.message)
     } finally {
@@ -230,7 +219,8 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
     if (!path.trim()) return
     setBusy(true)
     try {
-      finish(await api('POST', '/plugin/install', { path: path.trim() }))
+      await api('POST', '/plugin/install', { path: path.trim() })
+      finish()
     } catch (e: any) {
       message.error(e.message)
     } finally {
@@ -241,12 +231,12 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
   return (
     <Modal open={open} onCancel={onClose} footer={null} title={t('plugins.installTitle')} destroyOnClose>
       <Spin spinning={busy}>
-        <Upload.Dragger accept=".tgz,.tar.gz" showUploadList={false} disabled={busy}
+        <Upload.Dragger className="tt-capability-dropzone" accept=".tgz,.tar.gz" showUploadList={false} disabled={busy}
           beforeUpload={(f) => { uploadPkg(f as unknown as File); return false }}>
-          <p style={{ margin: '12px 0 4px' }}>{t('plugins.uploadHint')}</p>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>{t('plugins.uploadSub')}</Typography.Text>
+          <div className="tt-capability-drop-content"><span className="tt-capability-upload-icon"><UploadIcon size={24} /></span>
+            <strong>{t('plugins.uploadHint')}</strong><span>{t('plugins.uploadSub')}</span></div>
         </Upload.Dragger>
-        <Divider plain style={{ fontSize: 12 }}>{t('plugins.orLocalPath')}</Divider>
+        <Divider plain style={{ fontSize: 'var(--fs-meta)' }}>{t('plugins.orLocalPath')}</Divider>
         <Space.Compact style={{ width: '100%' }}>
           <Input placeholder={t('plugins.pathPlaceholder')} value={path}
             onChange={(e) => setPath(e.target.value)} onPressEnter={installPath} />
@@ -254,7 +244,7 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
         </Space.Compact>
         {removed.length > 0 && (
           <>
-            <Divider plain style={{ fontSize: 12 }}>{t('plugins.restoreBuiltin')}</Divider>
+            <Divider plain style={{ fontSize: 'var(--fs-meta)' }}>{t('plugins.restoreBuiltin')}</Divider>
             <List size="small" dataSource={removed}
               renderItem={(p) => (
                 <List.Item actions={[
@@ -262,7 +252,7 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
                 ]}>
                   <List.Item.Meta
                     title={lt(p.manifest.displayName, locale) || p.manifest.name}
-                    description={<Typography.Text type="secondary" ellipsis={{ tooltip: true }} style={{ fontSize: 12 }}>
+                    description={<Typography.Text type="secondary" ellipsis={{ tooltip: true }} style={{ fontSize: 'var(--fs-meta)' }}>
                       {lt(p.manifest.description, locale)}</Typography.Text>}
                   />
                 </List.Item>
@@ -274,8 +264,8 @@ function InstallModal({ open, onClose, onDone, locale, t }: {
   )
 }
 
-function PluginDetail({ plugin, locale, t, onChanged }: {
-  plugin: RegisteredPlugin; locale: string; onChanged: () => void
+function PluginDetail({ plugin, initialTab, locale, t, onChanged }: {
+  plugin: RegisteredPlugin; initialTab?: string; locale: string; onChanged: () => void
   t: (k: string, vars?: Record<string, string | number>) => string
 }) {
   const m = plugin.manifest
@@ -292,11 +282,10 @@ function PluginDetail({ plugin, locale, t, onChanged }: {
     }
   }
   return (
-    <Card size="small"
-      title={<Space>{lt(m.displayName, locale) || m.name}
-        {!plugin.enabled && <Tag>{t('plugins.stateDisabled')}</Tag>}
-        <Tag>{m.runtime?.kind || 'builtin'}</Tag></Space>}
-      extra={(
+    <div className="tt-plugin-detail">
+      <div className="tt-plugin-detail-meta">
+        <Space wrap><Tag>{t(plugin.enabled ? 'plugins.stateEnabled' : 'plugins.stateDisabled')}</Tag>
+          <Tag>{m.version}</Tag><Typography.Text type="secondary">{m.id}</Typography.Text></Space>
         <Popconfirm
           title={m.runtime?.kind === 'builtin' ? t('plugins.uninstallConfirmBuiltin') : t('plugins.uninstallConfirm')}
           description={
@@ -309,12 +298,11 @@ function PluginDetail({ plugin, locale, t, onChanged }: {
         >
           <Button size="small" danger>{t('plugins.uninstall')}</Button>
         </Popconfirm>
-      )}
-    >
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+      </div>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 'var(--sp-3)' }}>
         {lt(m.description, locale)}
       </Typography.Paragraph>
-      <Tabs
+      <Tabs defaultActiveKey={initialTab}
         items={[
           ...(m.id === HOST_MONITOR_ID ? [{
             key: 'monitor', label: t('plugins.monitor.tab'),
@@ -350,7 +338,7 @@ function PluginDetail({ plugin, locale, t, onChanged }: {
           { key: 'audit', label: t('plugins.tabAudit'), children: <AuditTable pluginId={m.id} t={t} /> },
         ]}
       />
-    </Card>
+    </div>
   )
 }
 
@@ -361,12 +349,20 @@ function ConfigForm({ pluginId, fields, groups, locale, t }: {
   const [form] = Form.useForm()
   const [initial, setInitial] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    api('GET', `/plugins/${encodeURIComponent(pluginId)}/config`)
-      .then((cfg) => { setInitial(cfg || {}); form.setFieldsValue(cfg || {}) })
-      .catch((e) => message.error(e.message))
-  }, [pluginId, form])
+    const abort = new AbortController()
+    setLoadState('loading')
+    void api('GET', `/plugins/${encodeURIComponent(pluginId)}/config`, undefined, { signal: abort.signal })
+      .then(cfg => {
+        if (abort.signal.aborted) return
+        setInitial(cfg || {}); form.setFieldsValue(cfg || {}); setLoadState('ready')
+      })
+      .catch(() => { if (!abort.signal.aborted) setLoadState('error') })
+    return () => abort.abort()
+  }, [pluginId, form, attempt])
 
   const save = async () => {
     const values: Record<string, string> = form.getFieldsValue()
@@ -391,6 +387,10 @@ function ConfigForm({ pluginId, fields, groups, locale, t }: {
     }
   }
 
+  if (loadState === 'loading') return <Spin />
+  if (loadState === 'error') return <Alert type="error" showIcon message={t('plugins.configLoadFailed')}
+    action={<Button onClick={() => setAttempt(value => value + 1)}>{t('agent.retry')}</Button>} />
+
   const renderField = (f: ConfigField) => (
     <Form.Item key={f.key} name={f.key}
       label={lt(f.title, locale) || f.key}
@@ -408,7 +408,7 @@ function ConfigForm({ pluginId, fields, groups, locale, t }: {
   const grouped = groups.filter((g) => fields.some((f) => f.group === g.key))
   const ungrouped = fields.filter((f) => !f.group || !grouped.some((g) => g.key === f.group))
   return (
-    <Form form={form} layout="vertical" style={{ maxWidth: 560 }}>
+    <Form form={form} layout="vertical" disabled={saving} style={{ maxWidth: 560 }}>
       {ungrouped.map(renderField)}
       {grouped.map((g, i) => (
         <div key={g.key}>
@@ -416,7 +416,7 @@ function ConfigForm({ pluginId, fields, groups, locale, t }: {
             <Typography.Text strong>{lt(g.title, locale) || g.key}</Typography.Text>
           </Divider>
           {lt(g.description, locale) && (
-            <Typography.Paragraph type="secondary" style={{ whiteSpace: 'pre-line', fontSize: 13, marginBottom: 16 }}>
+            <Typography.Paragraph type="secondary" style={{ whiteSpace: 'pre-line', fontSize: 'var(--fs-sm)', marginBottom: 'var(--sp-4)' }}>
               {lt(g.description, locale)}
             </Typography.Paragraph>
           )}
@@ -468,7 +468,7 @@ function CommandList({ pluginId, commands, enabled, locale, t }: {
       />
       {result && (
         <Card size="small" title={<Typography.Text code>{result.id}</Typography.Text>}>
-          <pre style={{ margin: 0, maxHeight: 320, overflow: 'auto', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+          <pre style={{ margin: 0, maxHeight: 320, overflow: 'auto', fontSize: 'var(--fs-meta)', whiteSpace: 'pre-wrap' }}>
             {JSON.stringify(result.data, null, 2)}
           </pre>
         </Card>

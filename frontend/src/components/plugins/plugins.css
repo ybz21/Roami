@@ -1,0 +1,11 @@
+.tt-plugin-cardname { display:flex; align-items:baseline; gap:var(--sp-2); min-width:0; }
+.tt-plugin-cardname .tt-capability-open { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tt-plugin-cardname > span { flex-shrink:0; color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-plugin-alert { max-width:var(--content-overview); margin:0 auto var(--sp-4); }
+.tt-plugin-loading { display:flex; justify-content:center; padding:var(--sp-5); }
+.tt-plugin-detail { min-width:0; overflow-wrap:anywhere; }
+.tt-plugin-detail-meta { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--sp-3); margin-bottom:var(--sp-4); }
+.tt-plugin-detail .ant-tabs-nav { margin-bottom:var(--sp-4); }
+.tt-plugin-detail .ant-card { background:var(--bg-container); border-radius:var(--r-card); }
+html[data-pointer="coarse"] .tt-plugin-detail .ant-btn { min-height:var(--tap); }
+html[data-pointer="coarse"] .tt-plugin-detail .ant-tabs-tab { min-height:var(--tap); }

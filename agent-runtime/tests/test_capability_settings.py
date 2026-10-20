@@ -153,22 +153,19 @@ async def test_failed_persistence_does_not_change_runtime_policy(store, monkeypa
     assert not runtime.capability_settings.path.exists()
 
 
-async def test_reserved_import_contract_cannot_accept_or_execute_uploaded_files(store):
+async def test_import_contract_accepts_only_valid_authenticated_payloads(store):
     runtime = Runtime(store, ConversationModel())
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
         base_url="http://agent",
         headers={"X-Roami-Owner": "local"},
     ) as client:
-        response = await client.get("/v1/capability-imports")
-        assert response.json()["data"]["available"] is False
-        for kind in ["skills", "tools"]:
-            response = await client.post(
-                "/v1/capability-imports/" + kind, content=b"untrusted bytes"
-            )
-            assert response.status_code == 501
-            assert response.json()["error"]["code"] == "CAPABILITY_IMPORT_RESERVED"
+        assert (await client.get("/v1/capability-imports")).json()["data"]["available"] is True
+        for kind in ["skills", "cli", "mcp"]:
+            assert (
+                await client.post("/v1/capability-imports/" + kind, content=b"untrusted bytes")
+            ).status_code == 400
         assert (
             await client.post("/v1/capability-imports/skills", headers={"X-Roami-Owner": "other"})
         ).status_code == 403
-        assert not runtime.capability_settings.path.exists()
+        assert not runtime.capability_imports.path.exists()

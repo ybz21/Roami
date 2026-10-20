@@ -238,8 +238,8 @@ func config(env plugin.Env, args []string, out io.Writer) error {
 	default:
 		masked := map[string]string{}
 		for k, v := range cfg {
-			if isSecretKey(p.Manifest, k) && len(v) > 8 {
-				v = v[:8] + "…"
+			if isSecretKey(p.Manifest, k) && v != "" {
+				v = "********"
 			}
 			masked[k] = v
 		}
@@ -248,6 +248,11 @@ func config(env plugin.Env, args []string, out io.Writer) error {
 }
 
 func isSecretKey(m plugin.Manifest, key string) bool {
+	for _, field := range m.Contributes.ConfigFields {
+		if field.Key == key && field.Secret {
+			return true
+		}
+	}
 	for _, s := range m.Permissions.Secrets {
 		if s == key {
 			return true

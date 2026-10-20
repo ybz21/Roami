@@ -30,6 +30,7 @@ from roami_agent.protocol.http import (
     SessionReport,
     SteerTask,
 )
+from roami_agent.server.model_settings import ModelSettings
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
 
@@ -58,23 +59,58 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/capability-imports")
     async def capability_imports(owner: Owner):
         runtime.capability_settings.view(owner)
-        return {
-            "data": {
-                "available": False,
-                "maxBytes": 65536,
-                "skills": {"filename": "SKILL.md", "contentType": "text/markdown"},
-                "tools": {
-                    "filename": "tool.json",
-                    "contentType": "application/json",
-                    "declarativeOnly": True,
-                },
-            }
-        }
+        return {"data": {"available": True, "maxBytes": 65536, "kinds": ["skills", "cli", "mcp"]}}
+
+    async def capability_payload(request):
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 65536:
+                raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
+        try:
+            return json.loads(body)
+        except (ValueError, RecursionError):
+            raise DomainError("INVALID_CAPABILITY_IMPORT") from None
 
     @app.post("/v1/capability-imports/{kind}")
-    async def import_capability(kind: Literal["skills", "tools"], owner: Owner):
-        runtime.capability_settings.view(owner)
-        raise DomainError("CAPABILITY_IMPORT_RESERVED", 501)
+    async def import_capability(
+        kind: Literal["skills", "cli", "mcp"], request: Request, owner: Owner
+    ):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_imports.save(
+                owner, kind, await capability_payload(request)
+            )
+        }
+
+    @app.put("/v1/capability-imports/{kind}/{name}")
+    async def edit_capability(
+        kind: Literal["skills", "cli", "mcp"], name: str, request: Request, owner: Owner
+    ):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_imports.save(
+                owner, kind, await capability_payload(request), name
+            )
+        }
+
+    @app.delete("/v1/capability-imports/{kind}/{name}")
+    async def remove_capability(kind: Literal["skills", "cli", "mcp"], name: str, owner: Owner):
+        return {"data": await runtime.capability_imports.save(owner, kind, None, name, remove=True)}
+
+    @app.post("/v1/capability-imports/mcp/{name}/connect")
+    async def connect_capability(name: str, owner: Owner):
+        ModelSettings.owner(owner)
+        async with runtime.capability_imports.lock:
+            if name not in runtime.mcp.connections:
+                raise DomainError("CAPABILITY_NOT_FOUND", 404)
+            try:
+                async with asyncio.timeout(30):
+                    await runtime.mcp.discover({"server": name}, {})
+            except TimeoutError:
+                raise DomainError("MCP_TIMEOUT", 504) from None
+            runtime.capability_settings.apply()
+            return {"data": runtime.capability_settings.view(owner)}
 
     @app.get("/v1/tool-directory")
     async def tool_directory(

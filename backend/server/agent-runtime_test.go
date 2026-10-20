@@ -34,6 +34,19 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 			t.Errorf("control %s bypassed auth: %d", action, recorder.Code)
 		}
 	}
+	for _, request := range []struct{ method, path string }{
+		{"POST", "/api/agent/capability-imports/skills"},
+		{"PUT", "/api/agent/capability-imports/cli/fixture"},
+		{"DELETE", "/api/agent/capability-imports/mcp/fixture"},
+		{"POST", "/api/agent/capability-imports/mcp/fixture/connect"},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(request.method, request.path, nil))
+		if recorder.Code != http.StatusUnauthorized {
+			t.Errorf("capability import bypassed auth: %s %s: %d", request.method, request.path, recorder.Code)
+		}
+	}
+
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/tasks/probe/steer", nil))
 	if recorder.Code != http.StatusUnauthorized {

@@ -67,7 +67,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
       <p className="agent-menu-section">{t('agent.composer.conversationSection')}</p>
       {(!contextUsage?.cid || !onContext) && row(t('agent.compactNow'), <ArchiveIcon size={20} />, () => close(onCompact), t('agent.composer.compactHint'), !canCompact)}
       {row(t('agent.commands'), <CodeIcon size={20} />, () => close(onCommands), t('agent.composer.commandsHint'))}
-      {row(t('agent.composer.manageSkills'), <GearIcon size={20} />, () => close(() => { location.hash = '#/settings/agent/skills' }), t('agent.composer.manageHint'))}
+      {row(t('agent.composer.manageSkills'), <GearIcon size={20} />, () => close(() => { location.hash = '#/capabilities/skills' }), t('agent.composer.manageHint'))}
     </div></Modal>
   </>
 }

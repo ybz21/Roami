@@ -5,6 +5,9 @@
 // 旧链接兼容：/#/env → /#/settings，/#/overview → /#/projects（概览并进项目页，18 设计）
 export function normalizeRoute(raw: string): string {
   const route = raw.split('?')[0]
+  if (route === 'plugins') return 'capabilities/plugins'
+  if (route.startsWith('plugins/')) return 'capabilities/plugins/' + route.slice(8)
+  if (/^settings\/agent\/(capabilities|skills|mcp|cli|tools)$/.test(route)) return 'capabilities/' + (route.split('/')[2] === 'capabilities' ? 'skills' : route.split('/')[2])
   if (route === 'env' || route.startsWith('env/')) return 'settings' + route.slice(3)
   if (route === 'overview' || route.startsWith('overview/')) return 'projects'
   if (route === 'inbox') return 'projects'
