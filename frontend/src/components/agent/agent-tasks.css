@@ -59,4 +59,3 @@ html[data-pointer="coarse"] .agent-tasks .tt-act::after { content:''; position:a
 .agent-task-card-meta > span { display:inline-flex; align-items:center; gap:var(--sp-1); }
 .agent-task-card-meta .agent-task-state { padding:0; background:transparent; }
 .agent-task-card-meta time { margin:0; font-variant-numeric:tabular-nums; }
-.agent-task-section-head > .tt-act:only-child { margin-left:auto; }

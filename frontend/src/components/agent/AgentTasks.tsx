@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Button, Input, Spin } from 'antd'
 import { api } from '../../api'
-import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, ChevronLeft, ChevronRight, RefreshIcon } from '../../icons'
+import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, ChevronLeft, ChevronRight } from '../../icons'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
@@ -46,7 +46,6 @@ export default function AgentTasks({ cid, onSession, onChanged, selectedTask, on
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
     {selected ? <TaskInspector hideBack={hideBack} key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
-      <div className="agent-task-section-head"><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
       {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
       {compact ? <TaskTimeline tasks={roots} select={setSelected} /> : (['attention', 'active', 'recent'] as const).map(group => {
@@ -127,7 +126,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
     }
   }
   return <>
-    <div className="agent-task-section-head">{!hideBack && <button type="button" className="tt-act" onClick={onBack}><ChevronLeft />{t('agent.tasks')}</button>}<button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => snapshot.refresh()}><RefreshIcon /></button></div>
+    {!hideBack && <div className="agent-task-section-head"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft />{t('agent.tasks')}</button></div>}
     {!task && !snapshot.detail.failed && <Spin />}
     {snapshot.detail.failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {task && <>

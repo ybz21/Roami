@@ -13,7 +13,7 @@ vi.mock('antd', () => ({
   Input: { TextArea: ({ autoSize: _auto, ...props }: any) => <textarea {...props} /> },
   Spin: () => <span role="progressbar" />,
 }))
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks() })
 
 const task = (id: string, parent?: string, revision = 1) => ({ id, parent_task_id: parent, revision, state: 'succeeded', intent_json: JSON.stringify({ goal: 'Goal ' + id }) })
 const detail = (id: string, children: any[] = [], revision = 1) => ({ task: task(id, undefined, revision), attempts: [{ id: 'attempt-' + id, revision, state: 'succeeded', result: { summary: 'Result ' + id } }], children, attemptsTruncated: false, childrenTruncated: false })
@@ -80,6 +80,7 @@ it('ignores an old task artifact response after opening a child, even if transpo
 })
 
 it('waits for server-confirmed handoff and invalidates old readiness immediately when returning control', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   const resource = { id: 'resource', kind: 'browser', state: 'paused', controlReleased: true, canPause: false, canResume: false, takeoverReady: false, browserId: 'browser-instance', targetId: 'exact-tab' }
   let ready = false, resumed = false, finish!: (value: any) => void
   const pending = new Promise((resolve) => { finish = resolve })
@@ -95,7 +96,7 @@ it('waits for server-confirmed handoff and invalidates old readiness immediately
   await screen.findByText('agent.task.waitForStop')
   expect(screen.queryByRole('link', { name: 'agent.task.openBrowser' })).toBeNull()
   ready = true
-  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
   const link = await screen.findByRole('link', { name: 'agent.task.openBrowser' })
   expect(link.getAttribute('href')).toBe('#/browser/task/browser-instance/exact-tab')
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.returnControl' }))

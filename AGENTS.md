@@ -27,6 +27,10 @@ history, and technical details in the detail view or an explicit disclosure. Kee
 warnings, recovery actions, field labels, and accessible names. Do not replace visible clutter
 with tooltip-only instructions on touch devices.
 
+Use existing automatic updates and mobile pull-to-refresh instead of a permanent refresh button
+or a toolbar devoted to it. Desktop pages use browser refresh/F5; keep explicit recovery actions
+where an error requires them.
+
 ## Mobile Material UI
 
 All compact Web pages follow [`docs/development/mobile-material-ui.md`](docs/development/mobile-material-ui.md).
