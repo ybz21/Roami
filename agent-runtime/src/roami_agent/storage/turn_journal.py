@@ -1,5 +1,6 @@
 """Transactional assistant messages, streaming deltas and turn outcomes."""
 
+from roami_agent.context.task_evidence import completion_for_reply
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -143,7 +144,9 @@ class TurnJournal:
         def write(db):
             assert_context_admitted(db, turn)
             delivery = text
-            references = (completion or {}).get("result", {}).get("artifactRefs", [])
+            references = (
+                completion_for_reply(completion or {}).get("result", {}).get("artifactRefs", [])
+            )
             if final and isinstance(references, list):
                 identifiers = [
                     item["id"]

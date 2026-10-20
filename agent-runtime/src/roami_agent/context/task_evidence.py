@@ -4,7 +4,23 @@ from roami_agent.context.token_estimate import text_tokens
 from roami_agent.protocol.serialization import encoded
 
 
+def completion_for_reply(completion):
+    result = completion.get("result", {})
+    if not isinstance(result, dict) or result.get("errorCode") != "WEB_RETRIEVAL_EVIDENCE_MISSING":
+        return completion
+    return {
+        **completion,
+        "result": {
+            "state": "failed",
+            "errorCode": "WEB_RETRIEVAL_EVIDENCE_MISSING",
+            "verification": {"kind": "browser_retrieval", "state": "missing"},
+            "candidateWithheld": True,
+        },
+    }
+
+
 def completion_evidence(completion, *, budget):
+    completion = completion_for_reply(completion)
     if text_tokens(encoded(completion)) <= budget:
         return completion
     result = completion.get("result", {})

@@ -117,7 +117,7 @@ class NativeExecutor:
                 if delivery["unavailable"]:
                     result["unavailableOutputs"] = delivery["unavailable"]
                 references = await self.artifacts.for_attempt(
-                    task["owner_id"], task["id"], run["id"]
+                    task["owner_id"], task["id"], run["id"], reported_text=text
                 )
                 references = list(
                     {item["id"]: item for item in [*delivery["artifacts"], *references]}.values()

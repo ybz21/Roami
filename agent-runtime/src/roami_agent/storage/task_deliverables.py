@@ -150,7 +150,11 @@ class TaskDeliverables:
                 and (item["tool_name"] == "file_write" or item["path"] in result.get("summary", ""))
             ]
             for source in dict.fromkeys(sources):
-                if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", source) or source.startswith("#"):
+                if (
+                    any(item["downloadUrl"] == source for item in stored)
+                    or re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", source)
+                    or source.startswith("#")
+                ):
                     continue
                 metadata = {"runId": attempt["id"], "sourcePath": source, "kind": "deliverable"}
                 existing = next((a for a in stored if a.get("metadata") == metadata), None)

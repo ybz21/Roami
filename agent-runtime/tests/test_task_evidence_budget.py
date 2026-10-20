@@ -154,3 +154,67 @@ def test_large_reference_metadata_cannot_expand_completion_budget():
     assert excerpt["result"]["outcomeKnown"] is False
     assert excerpt["result"]["artifactRefsCount"] == 4
     assert excerpt["resultRef"]["taskId"] == "task-1"
+
+
+async def test_failed_web_verification_never_hands_candidate_facts_or_files_to_main(store):
+    class Report(ConversationModel):
+        def __init__(self):
+            self.prompts = []
+
+        async def stream(self, messages, tools):
+            self.prompts.append(messages)
+            yield ModelEvent("text", "暂时无法核实天气信息。")
+
+    model = Report()
+    runtime = Runtime(store, model)
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            c["id"],
+            "查看济南天气",
+            key="weather",
+            target={"kind": "new_session", "resourceOnly": True},
+            record_intent=True,
+        )
+        run = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+        )
+        artifact = await runtime.artifacts.put(
+            "alice", b"capture", name="observation.png", mime_type="image/png", task_id=task["id"]
+        )
+        report = {
+            "state": "succeeded",
+            "summary": "UNVERIFIED_WEATHER_29_DEGREES",
+            "artifactRefs": [artifact],
+        }
+        await runtime.tasks.report("alice", task["id"], run["id"], 1, report)
+        job = await store.call(
+            lambda db: row(
+                db, "SELECT * FROM jobs WHERE kind='task.verify' AND aggregate_id=?", (task["id"],)
+            )
+        )
+        await runtime.dispatch.verify(job)
+        job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId')=?",
+                (task["id"],),
+            )
+        )
+        turn = await runtime.mailbox.claim(job)
+        await runtime.loop.run(
+            turn, "main", completion=json.loads(job["payload_json"])["completion"]
+        )
+        prompt = encoded(model.prompts)
+        assert "WEB_RETRIEVAL_EVIDENCE_MISSING" in prompt
+        assert report["summary"] not in prompt
+        assert artifact["downloadUrl"] not in prompt
+        messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
+        assert messages[-1]["content"]["text"] == "暂时无法核实天气信息。"
+        retained = await store.call(
+            lambda db: row(db, "SELECT result_json FROM task_attempts WHERE id=?", (run["id"],))
+        )
+        assert json.loads(retained["result_json"]) == report
+    finally:
+        await runtime.close()

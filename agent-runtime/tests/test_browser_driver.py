@@ -240,11 +240,7 @@ async def test_native_worker_uses_real_task_scope_and_verifies_independent_brows
                 db, "SELECT result_json FROM task_attempts WHERE task_id=?", (task["id"],)
             )
         )
-        assert len(json.loads(result["result_json"])["artifactRefs"]) == 4
-        assert all(
-            item["downloadUrl"].startswith("/api/agent/artifacts/")
-            for item in json.loads(result["result_json"])["artifactRefs"]
-        )
+        assert not json.loads(result["result_json"]).get("artifactRefs")
         actions = await store.call(
             lambda db: rows(db, "SELECT * FROM resource_actions WHERE task_id=?", (task["id"],))
         )
