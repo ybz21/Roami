@@ -105,6 +105,19 @@ async def test_debug_http_owner_branch_scope_and_forgotten_preview(store):
             headers = {"X-Roami-Owner": "alice"}
             response = await client.get(endpoint, headers=headers)
             assert response.status_code == 200
+            for minutes in (15, 60, 1440):
+                window = await client.get(
+                    endpoint,
+                    headers=headers,
+                    params={"minutes": minutes, "includeContext": "true", "limit": 30},
+                )
+                assert window.status_code == 200, window.text
+                assert window.json()["data"]["windowMinutes"] == minutes
+                assert "context" in window.json()["data"]
+            for minutes in ("", "invalid", "60.0", "true", "0", "16", "1441"):
+                assert (
+                    await client.get(endpoint, headers=headers, params={"minutes": minutes})
+                ).status_code == 422
             assert response.json()["data"]["requests"]["items"][0]["preview"] is None
             assert "forgotten secret" not in response.text
             assert (await client.get(endpoint, headers={"X-Roami-Owner": "bob"})).status_code == 404
