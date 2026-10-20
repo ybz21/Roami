@@ -58,7 +58,6 @@ class TaskRevisions:
         if (
             not isinstance(text, str)
             or not text.strip()
-            or len(text) > 10000
             or not isinstance(key, str)
             or not key
             or len(key) > 200
@@ -110,10 +109,23 @@ class TaskRevisions:
                 (owner, task["origin_message_id"]),
             ):
                 raise DomainError("TASK_SOURCE_FORGOTTEN", 409)
+            if task["state"] in STABLE:
+                run = row(
+                    db,
+                    "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=? ORDER BY attempt_no DESC LIMIT 1",
+                    (task_id, task["revision"]),
+                )
+                result = json.loads(run["result_json"]) if run and run["result_json"] else {}
+                if (
+                    result.get("outcomeKnown") is False
+                    or result.get("inputStopped") is False
+                    or run
+                    and run["state"] == "unknown"
+                    and (run["executor_kind"] == "cli" or task["target_json"])
+                ):
+                    raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
             intent = json.loads(task["intent_json"])
             goal = intent["goal"] + "\n\nAdditional user requirements:\n" + text
-            if len(goal) > 20000:
-                raise DomainError("TASK_GOAL_LIMIT", 409)
             operation = identity()
             mid = message(
                 db,

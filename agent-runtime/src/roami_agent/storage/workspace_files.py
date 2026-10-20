@@ -1,4 +1,4 @@
-"""Bounded workspace file I/O with source hashes and durable atomic publication."""
+"""Workspace file I/O with source hashes and durable atomic publication."""
 
 import asyncio
 import base64
@@ -13,8 +13,6 @@ from roami_agent.protocol.identity import identity
 
 
 class WorkspaceFiles:
-    max_bytes = 4 * 1024 * 1024
-
     def __init__(self, settings):
         self.settings = settings
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="agent-files")
@@ -89,11 +87,9 @@ class WorkspaceFiles:
         descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
         with os.fdopen(descriptor, "rb") as file:
             info = os.fstat(file.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > self.max_bytes:
+            if not stat.S_ISREG(info.st_mode):
                 raise DomainError("FILE_TYPE_OR_SIZE_UNSUPPORTED")
-            body = file.read(self.max_bytes + 1)
-            if len(body) > self.max_bytes:
-                raise DomainError("FILE_TYPE_OR_SIZE_UNSUPPORTED")
+            body = file.read()
             after = os.fstat(file.fileno())
             if (info.st_size, info.st_mtime_ns, info.st_ctime_ns) != (
                 after.st_size,
@@ -106,10 +102,27 @@ class WorkspaceFiles:
     def _read_page(self, location, offset, limit):
         parent, name = self._parent(location)
         try:
-            body, _ = self._read(parent, name)
+            descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            with os.fdopen(descriptor, "rb") as file:
+                before = os.fstat(file.fileno())
+                if not stat.S_ISREG(before.st_mode):
+                    raise DomainError("FILE_TYPE_OR_SIZE_UNSUPPORTED")
+                page, digestor, size = bytearray(), hashlib.sha256(), 0
+                while chunk := file.read(64 * 1024):
+                    start = max(0, offset - size)
+                    end = max(0, offset + limit - size)
+                    page.extend(chunk[start:end])
+                    digestor.update(chunk)
+                    size += len(chunk)
+                after = os.fstat(file.fileno())
+                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                ) or size != before.st_size:
+                    raise DomainError("FILE_CHANGED", 409)
         finally:
             os.close(parent)
-        page = body[offset : offset + limit]
         try:
             text, encoding = page.decode("utf-8"), "utf-8"
         except UnicodeDecodeError:
@@ -119,9 +132,9 @@ class WorkspaceFiles:
             "encoding": encoding,
             "offsetBytes": offset,
             "readBytes": len(page),
-            "sizeBytes": len(body),
-            "sha256": hashlib.sha256(body).hexdigest(),
-            "nextOffset": offset + len(page) if offset + len(page) < len(body) else None,
+            "sizeBytes": size,
+            "sha256": digestor.hexdigest(),
+            "nextOffset": offset + len(page) if offset + len(page) < size else None,
         }
 
     def _modify(self, location, expected, content, replacement):
@@ -147,8 +160,6 @@ class WorkspaceFiles:
                 body = old.replace(content, replacement, 1).encode()
             else:
                 body = content.encode()
-            if len(body) > self.max_bytes:
-                raise DomainError("FILE_TYPE_OR_SIZE_UNSUPPORTED")
             descriptor = os.open(
                 temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent
             )

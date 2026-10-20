@@ -35,7 +35,7 @@ async def provision_project(settings, task, run):
     ]
     if target.get("baseDir"):
         argv.extend(["--base-dir", target["baseDir"]])
-    result = await execute(argv, timeout=35, excluded_env=settings.provider_key_environments())
+    result = await execute(argv, excluded_env=settings.provider_key_environments())
     try:
         payload = json.loads(result["stdout"])
         if not isinstance(payload, dict):

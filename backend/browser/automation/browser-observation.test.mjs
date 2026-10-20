@@ -122,3 +122,15 @@ test('read-only observations expose resolved navigation links without executable
   assert(observed.controls.slice(2).every(item => !('href' in item)))
   assert(!JSON.stringify(observed).includes('password'))
 })
+
+test('zero observation timeout waits for a delayed valid scene', async () => {
+  const { page, detached } = fixture()
+  const evaluate = page.evaluate
+  page.evaluate = async () => {
+    await new Promise(resolve => setTimeout(resolve, 30))
+    return evaluate()
+  }
+  const observed = await observePage(page, undefined, { timeoutMs: 0 })
+  assert.equal(observed.domText, 'Fixture')
+  assert.equal(detached(), 1)
+})

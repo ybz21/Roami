@@ -238,7 +238,7 @@ async def test_publication_sync_failure_is_unknown_and_does_not_revert_or_retry(
     assert not list(tmp_path.glob(".roami-write-*"))
 
 
-async def test_size_limit_and_symlinked_write_leave_targets_intact(files, tmp_path):
+async def test_large_file_pages_preserve_symlink_protection(files, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     outside = tmp_path / "outside.txt"
@@ -255,6 +255,9 @@ async def test_size_limit_and_symlinked_write_leave_targets_intact(files, tmp_pa
         )
     assert outside.read_text() == "original" and (workspace / "link").is_symlink()
     with (workspace / "large").open("wb") as file:
-        file.truncate(files.max_bytes + 1)
-    with pytest.raises(DomainError, match="FILE_TYPE_OR_SIZE_UNSUPPORTED"):
-        await files.read({"path": "large", "limit": 1}, bound(workspace))
+        file.truncate(5 * 1024 * 1024)
+    observed = await files.read(
+        {"path": "large", "offset": 4 * 1024 * 1024, "limit": 1}, bound(workspace)
+    )
+    assert observed["data"] == "\0" and observed["sizeBytes"] == 5 * 1024 * 1024
+    assert observed["readBytes"] == 1 and observed["nextOffset"] == 4 * 1024 * 1024 + 1

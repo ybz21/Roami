@@ -10,6 +10,7 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
+from roami_agent.storage.task_deliverables import TaskDeliverables
 
 
 class NativeExecutor:
@@ -106,8 +107,20 @@ class NativeExecutor:
                         exc.code if isinstance(exc, DomainError) else "ARTIFACT_STORAGE_UNAVAILABLE"
                     )
             if self.artifacts:
+                delivery = await TaskDeliverables(self.artifacts).collect(
+                    task["owner_id"],
+                    {
+                        "task": task,
+                        "attempts": [{"id": run["id"], "finishedMs": now_ms(), "result": result}],
+                    },
+                )
+                if delivery["unavailable"]:
+                    result["unavailableOutputs"] = delivery["unavailable"]
                 references = await self.artifacts.for_attempt(
                     task["owner_id"], task["id"], run["id"]
+                )
+                references = list(
+                    {item["id"]: item for item in [*delivery["artifacts"], *references]}.values()
                 )
                 if references:
                     result["artifactRefs"] = [

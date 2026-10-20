@@ -22,8 +22,6 @@ class MCPResults:
             return result
         if not self.artifacts or not binding.get("owner"):
             raise DomainError("MCP_ARTIFACT_STORE_REQUIRED")
-        if len(parts) > 32:
-            raise DomainError("MCP_ARTIFACT_COUNT_LIMIT")
         references, content, budget = [], [], 4000
 
         async def save(body, mime, name, kind, index):
@@ -58,7 +56,10 @@ class MCPResults:
             resource = part.get("resource", {}) if kind == "resource" else part
             data = resource.get("data") if kind in {"image", "audio"} else resource.get("blob")
             if data is not None:
-                if len(data) > ((self.artifacts.max_bytes + 2) // 3) * 4:
+                if (
+                    self.artifacts.max_bytes
+                    and len(data) > ((self.artifacts.max_bytes + 2) // 3) * 4
+                ):
                     raise DomainError("ARTIFACT_SIZE_LIMIT", 413)
                 try:
                     body = base64.b64decode(data, validate=True)

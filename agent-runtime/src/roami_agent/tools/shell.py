@@ -1,6 +1,8 @@
 """Shell argv execution within the trusted task workspace or configured roots."""
 
+import codecs
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
@@ -26,44 +28,49 @@ def register_shell(registry, settings, artifacts=None):
             return await execute(
                 args["argv"],
                 cwd=cwd,
-                timeout=min(args.get("timeout", 60), 60),
+                timeout=args.get("timeout") or None,
                 excluded_env=settings.provider_key_environments(),
             )
-        result = await execute(
-            args["argv"],
-            cwd=cwd,
-            timeout=min(args.get("timeout", 60), 60),
-            max_bytes=min(artifacts.max_bytes, 2 * 1024 * 1024),
-            raw_output=True,
-            excluded_env=settings.provider_key_environments(),
-        )
-        references = []
-        for stream in ["stdout", "stderr"]:
-            body = result[stream]
-            try:
-                text = body.decode("utf-8")
-                binary = "\0" in text
-            except UnicodeDecodeError:
-                text, binary = "", True
-            if len(body) > 16000 or binary:
+        with TemporaryDirectory(prefix=".shell-output-", dir=artifacts.data_root) as directory:
+            result = await execute(
+                args["argv"],
+                cwd=cwd,
+                timeout=args.get("timeout") or None,
+                excluded_env=settings.provider_key_environments(),
+                output_directory=directory,
+            )
+            references = []
+            for stream in ["stdout", "stderr"]:
+                path = result[stream]
+                size = path.stat().st_size
+                with path.open("rb") as file:
+                    preview = file.read(16000)
                 try:
-                    reference = await artifacts.put(
-                        binding["owner"],
-                        body,
-                        mime_type="application/octet-stream" if binary else "text/plain",
-                        name="shell-" + stream + (".bin" if binary else ".txt"),
-                        task_id=binding.get("taskId"),
-                        message_id=binding.get("assistantMessageId"),
-                        metadata={"source": "shell", "stream": stream},
+                    text = codecs.getincrementaldecoder("utf-8")().decode(
+                        preview, final=size <= 16000
                     )
-                except (DomainError, OSError):
-                    raise DomainError("TOOL_OUTCOME_UNKNOWN") from None
-                references.append(reference)
-                text = "" if binary else body[:4000].decode(errors="ignore")
-            result[stream] = text
-        if references:
-            result.update(artifactRefs=references, outputExternalized=True)
-        return result
+                    binary = "\0" in text
+                except UnicodeDecodeError:
+                    text, binary = "", True
+                if size > 16000 or binary:
+                    try:
+                        reference = await artifacts.put_file(
+                            binding["owner"],
+                            path,
+                            mime_type="application/octet-stream" if binary else "text/plain",
+                            name="shell-" + stream + (".bin" if binary else ".txt"),
+                            task_id=binding.get("taskId"),
+                            message_id=binding.get("assistantMessageId"),
+                            metadata={"source": "shell", "stream": stream},
+                        )
+                    except (DomainError, OSError):
+                        raise DomainError("TOOL_OUTCOME_UNKNOWN") from None
+                    references.append(reference)
+                    text = "" if binary else preview[:4000].decode(errors="ignore")
+                result[stream] = text
+            if references:
+                result.update(artifactRefs=references, outputExternalized=True)
+            return result
 
     registry.add(
         Tool(
@@ -75,10 +82,9 @@ def register_shell(registry, settings, artifacts=None):
                         "type": "array",
                         "items": {"type": "string"},
                         "minItems": 1,
-                        "maxItems": 100,
                     },
                     "cwd": {"type": "string"},
-                    "timeout": {"type": "integer", "minimum": 1, "maximum": 60},
+                    "timeout": {"type": "integer", "minimum": 0},
                 },
                 ["argv"],
             ),

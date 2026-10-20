@@ -15,7 +15,14 @@ def routing_schema():
     return object_schema(
         {
             "taskDescription": {**text, "maxLength": 1000},
-            "complexity": {"type": "string", "enum": ["bounded", "complex"]},
+            "complexity": {
+                "type": "string",
+                "enum": ["bounded", "complex"],
+                "description": "Execution burden: "
+                "complex requires autonomous planning, exploring unknowns, coordinating dependencies "
+                "or feedback-driven revision. bounded requires a procedure known BEFORE work, not just a known symptom or narrow goal. "
+                "Must agree with complexityBasis/routingExplanation. Finite deliverables can be complex.",
+            },
             "complexityBasis": {
                 "type": "object",
                 "minProperties": 1,
@@ -116,6 +123,10 @@ class TaskRouter:
         ):
             raise DomainError("ROUTING_EXPLICIT_SOURCE_REQUIRED")
         target = args.get("target") or {"kind": "new_session"}
+        if target["kind"] == "project" and not target.get("projectId"):
+            raise DomainError("CODING_PROJECT_ID_REQUIRED")
+        if target["kind"] == "session" and not target.get("sessionId"):
+            raise DomainError("CODING_SESSION_ID_REQUIRED")
         decision = {
             "version": 1,
             "policyVersion": "complexity-v3",

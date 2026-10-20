@@ -13,7 +13,7 @@ def register_file_tools(registry, files):
             object_schema(
                 {
                     "path": path,
-                    "offset": {"type": "integer", "minimum": 0, "maximum": files.max_bytes},
+                    "offset": {"type": "integer", "minimum": 0},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 16000},
                 },
                 ["path"],
@@ -29,7 +29,7 @@ def register_file_tools(registry, files):
                 {
                     "path": path,
                     "expectedSha256": {"anyOf": [digest, {"type": "null"}]},
-                    "content": {"type": "string", "maxLength": 64000},
+                    "content": {"type": "string"},
                 },
                 ["path", "expectedSha256", "content"],
             ),
@@ -45,8 +45,8 @@ def register_file_tools(registry, files):
                 {
                     "path": path,
                     "expectedSha256": digest,
-                    "oldText": {"type": "string", "minLength": 1, "maxLength": 64000},
-                    "newText": {"type": "string", "maxLength": 64000},
+                    "oldText": {"type": "string", "minLength": 1},
+                    "newText": {"type": "string"},
                 },
                 ["path", "expectedSha256", "oldText", "newText"],
             ),

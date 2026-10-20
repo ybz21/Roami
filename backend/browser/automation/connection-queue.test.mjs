@@ -43,3 +43,15 @@ test('a disconnected queued probe cannot block the next browser command', { time
     server.close()
   }
 })
+
+test('zero command timeout also disables the client transport deadline', async () => {
+  const { daemonRequestWithRetry } = await import('./driver.mjs')
+  let called = 0
+  const result = await daemonRequestWithRetry(['title', '--timeout', '0', '--no-retry'], 0, 'title', async (_argv, timeoutSeconds) => {
+    called++
+    assert.equal(timeoutSeconds, 0)
+    return { resp: { code: 0, stdout: 'late title' }, sentBeforeFailure: false }
+  })
+  assert.equal(called, 1)
+  assert.equal(result.stdout, 'late title')
+})

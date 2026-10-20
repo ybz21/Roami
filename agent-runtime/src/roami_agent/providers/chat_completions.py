@@ -33,7 +33,7 @@ class ChatCompletions:
         model: str,
         api_key: str = "",
         *,
-        timeout: float = 90,
+        timeout: float = 0,
         client: httpx.AsyncClient | None = None,
         max_retries: int = 2,
         capabilities: dict | None = None,
@@ -50,7 +50,7 @@ class ChatCompletions:
             or not isinstance(timeout, (int, float))
             or isinstance(timeout, bool)
             or not math.isfinite(timeout)
-            or timeout <= 0
+            or timeout < 0
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
         self.capabilities, self.cache = request_policy(capabilities, cache)
@@ -58,9 +58,9 @@ class ChatCompletions:
         self.provider_key, self.settings_hash = request_identity(
             self.endpoint, model, self.capabilities, self.cache, self.parameters
         )
-        self.timeout, self.max_retries, self.sleep = timeout, max_retries, sleep
+        self.timeout, self.max_retries, self.sleep = timeout or None, max_retries, sleep
         self.client = client or httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout, connect=10), follow_redirects=False
+            timeout=httpx.Timeout(self.timeout, connect=10), follow_redirects=False
         )
 
     async def stream(self, messages, tools):
@@ -77,7 +77,7 @@ class ChatCompletions:
             for message in messages
         ):
             raise DomainError("MODEL_IMAGES_UNSUPPORTED")
-        deadline = time.monotonic() + self.timeout
+        deadline = time.monotonic() + self.timeout if self.timeout else None
         emitted = False
         try:
             async with asyncio.timeout(self.timeout):
@@ -100,7 +100,7 @@ class ChatCompletions:
                         code, delay = "MODEL_TRANSPORT_FAILED", retry_delay(None, attempt)
                     if emitted or attempt >= self.max_retries:
                         raise DomainError(code, 502)
-                    if delay >= deadline - time.monotonic():
+                    if deadline is not None and delay >= deadline - time.monotonic():
                         raise DomainError("MODEL_RETRY_DEADLINE", 502)
                     yield ModelEvent(
                         "telemetry",
@@ -229,12 +229,10 @@ class ChatCompletions:
                             not isinstance(part, dict)
                             or not isinstance(part.get("index"), int)
                             or isinstance(part["index"], bool)
-                            or not 0 <= part["index"] < 16
+                            or part["index"] < 0
                         ):
                             raise DomainError("MODEL_STREAM_INVALID", 502)
                         key = part["index"]
-                        if key not in calls and len(calls) >= 16:
-                            raise DomainError("TOOL_CALL_LIMIT", 502)
                         call = calls.setdefault(
                             key,
                             {
@@ -258,8 +256,6 @@ class ChatCompletions:
                             call["function"][field] += function.get(field, "")
                         if len(call["id"]) > 256 or len(call["function"]["name"]) > 200:
                             raise DomainError("MODEL_TOOL_CALL_INVALID", 502)
-                        if len(call["function"]["arguments"]) > 100_000:
-                            raise DomainError("TOOL_ARGUMENTS_TOO_LARGE", 502)
                     reason = choice.get("finish_reason")
                     if reason:
                         if not isinstance(reason, str):
@@ -278,7 +274,7 @@ class ChatCompletions:
                 call = calls[index]
                 if not call["id"] or not call["function"]["name"]:
                     raise DomainError("MODEL_TOOL_CALL_INCOMPLETE", 502)
-                json.loads(call["function"]["arguments"])
+                # Argument errors belong to tool receipts, so the model can correct them.
                 yield ModelEvent("tool", call)
 
     @staticmethod

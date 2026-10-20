@@ -97,8 +97,6 @@ class SessionDispatches:
                 "do not rerun the work just because its report failed. Include no credentials. "
                 "If the CLI fails, retain the result file and state that Main has not acknowledged it.\n"
             )
-            if len(prompt.encode()) > 100000:
-                raise DomainError("INVALID_SESSION_MESSAGE")
             db.execute(
                 "INSERT INTO session_dispatches(id,owner_id,request_key,request_digest,conversation_id,branch_id,turn_id,origin_message_id,session_id,prompt,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (

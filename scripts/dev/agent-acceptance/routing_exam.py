@@ -16,12 +16,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from dotenv import load_dotenv
+
 from roami_agent.app import Runtime, configured_provider
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
 from roami_agent.server.model_settings import load_model_settings
-from roami_agent.storage.database import Database, row, rows
+from roami_agent.storage.database import Database, rows
 
 
 class QuietMemory:
@@ -42,8 +43,6 @@ class MeasuredMain:
 
     async def stream(self, messages, tools):
         self.calls += 1
-        if self.calls > 12:
-            raise DomainError("ACCEPTANCE_REQUEST_LIMIT")
         async for event in self.provider.stream(messages, tools):
             yield event
 
@@ -347,17 +346,28 @@ async def run_case(provider, settings, output, number, case):
             await runtime.conversations.accept("exam", cid, f"user-{i}", text)
             for i, text in enumerate(questions)
         ]
-        for _ in range(8):
-            job = await database.call(
-                lambda db: row(
-                    db,
-                    "SELECT j.* FROM jobs j JOIN turns t ON t.id=j.aggregate_id WHERE j.kind='turn.run' AND j.state='queued' AND t.state='queued' ORDER BY COALESCE(json_extract(j.payload_json,'$.deferred'),0),j.rowid LIMIT 1",
+        await runtime.start()
+        async with asyncio.timeout(600):
+            while True:
+                current = await database.call(
+                    lambda db: rows(
+                        db, "SELECT state FROM turns WHERE trigger_kind='user'"
+                    )
                 )
+                if current and all(
+                    t["state"] in {"completed", "waiting_user", "failed", "interrupted"}
+                    for t in current
+                ):
+                    break
+                await asyncio.sleep(0.05)
+        assert (
+            await database.call(
+                lambda db: db.execute(
+                    "SELECT COUNT(*) FROM jobs WHERE kind='task.run' AND state='running'"
+                ).fetchone()[0]
             )
-            if not job:
-                break
-            async with asyncio.timeout(180):
-                await runtime.scheduler._job(job)
+            == 0
+        )
         continuation = None
         if kind in {"unknown", "continue"}:
             await runtime.tasks.revisions.advance()
@@ -380,6 +390,12 @@ async def run_case(provider, settings, output, number, case):
             lambda db: rows(
                 db,
                 "SELECT state FROM turns WHERE trigger_kind='user' ORDER BY created_ms",
+            )
+        )
+        failures = await database.call(
+            lambda db: rows(
+                db,
+                "SELECT payload_json FROM events WHERE kind='turn.failed' ORDER BY id",
             )
         )
         plans = [json.loads(t["intent_json"]) for t in created]
@@ -550,6 +566,7 @@ async def run_case(provider, settings, output, number, case):
                 for t in tools
             ],
             "turns": turns,
+            "failureEvents": [json.loads(e["payload_json"]) for e in failures],
         }
     except Exception as exc:  # noqa: BLE001 — preserve the other samples after a failure
         error = exc.code if isinstance(exc, DomainError) else type(exc).__name__
@@ -613,6 +630,9 @@ async def main():
         coding_directory=None,
         cli_bin="/nonexistent/routing-exam-cli",
         professional_executor="codex",
+        workers=0,
+        timeout_seconds=0,
+        max_depth=0,
         context_window=base.context_window or 200000,
     )
     provider = configured_provider(settings, "main")
@@ -640,7 +660,7 @@ async def main():
     report = {
         "createdAt": datetime.now(UTC).isoformat(),
         "model": provider.model,
-        "method": "真实配置 Main + 当前生产工具/路由/SQLite 入队链路；项目和执行器目录为受控夹具；不运行 Worker、不启动真实 coding 会话；无生产任务数据写入。",
+        "method": "真实配置 Main + 生产 Scheduler/mailbox/工具/路由/SQLite；仅在测试夹具将 Worker 槽位设0暂停执行副作用；项目和执行器目录为受控夹具；不启动真实 coding 会话；无生产数据写入。600秒仅为测试看门狗，不限制产品执行时长或工具次数。",
         "rounds": args.rounds,
         "passed": sum(r["passed"] for r in results),
         "total": len(results),

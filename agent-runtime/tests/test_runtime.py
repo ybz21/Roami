@@ -24,7 +24,9 @@ class ConversationModel:
                     "type": "function",
                     "function": {
                         "name": "delegate",
-                        "arguments": json.dumps({"goal": "Research the topic"}),
+                        "arguments": json.dumps(
+                            {"goal": "Research the topic", "requestComplete": True}
+                        ),
                     },
                 },
             )

@@ -136,7 +136,7 @@ class BrowserDriver:
             "--no-retry",
             "--no-focus",
             "--timeout",
-            "15000",
+            "0",
         ]
         if self.config.get("endpoint"):
             argv += ["--cdp", self.config["endpoint"]]
@@ -157,7 +157,7 @@ class BrowserDriver:
             TTMUX_CHROME_SOCK=str(self.socket_root / (self.instance + ".sock")),
             TTMUX_CHROME_DAEMON_LOG=str(self.socket_root / (self.instance + ".log")),
         )
-        answer = await self.runner(argv, env=env, timeout=20, max_bytes=512_000)
+        answer = await self.runner(argv, env=env, timeout=None)
         if answer["exitCode"]:
             match = re.search(r"\b(CHROME_[A-Z_]{1,80})\b", answer.get("stderr", ""))
             raise DomainError(match[1] if match else "BROWSER_DRIVER_UNAVAILABLE", 503)
@@ -192,10 +192,14 @@ class BrowserDriver:
         descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         with os.fdopen(descriptor, "rb") as file:
             info = os.fstat(file.fileno())
-            if not stat.S_ISREG(info.st_mode) or not 24 <= info.st_size <= max_bytes:
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_size < 24
+                or (max_bytes and info.st_size > max_bytes)
+            ):
                 raise DomainError("BROWSER_SCREENSHOT_INVALID", 503)
-            body = file.read(max_bytes + 1)
-            if len(body) > max_bytes:
+            body = file.read(max_bytes + 1 if max_bytes else -1)
+            if max_bytes and len(body) > max_bytes:
                 raise DomainError("BROWSER_SCREENSHOT_INVALID", 503)
             return body
 

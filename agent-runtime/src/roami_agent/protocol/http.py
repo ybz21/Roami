@@ -36,7 +36,7 @@ class Fork(Payload):
 class CreateTask(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     conversationId: str
-    goal: str = Field(min_length=1, max_length=20_000)
+    goal: str = Field(min_length=1)
     executor: Literal["native", "codex", "claude"] = "native"
     target: dict | None = None
     fromMessageId: str | None = None
@@ -113,13 +113,13 @@ class SaveMemory(Payload):
 class SteerTask(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     revision: int = Field(ge=1)
-    text: str = Field(min_length=1, max_length=10000)
+    text: str = Field(min_length=1)
 
 
 class CreateReminder(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     conversationId: str
-    text: str = Field(min_length=1, max_length=10000)
+    text: str = Field(min_length=1)
     whenMs: int | None = Field(default=None, ge=0, le=8_000_000_000_000, strict=True)
     afterSeconds: int | None = Field(default=None, ge=1, le=2_678_400, strict=True)
     dailyAt: str | None = Field(default=None, min_length=5, max_length=5)

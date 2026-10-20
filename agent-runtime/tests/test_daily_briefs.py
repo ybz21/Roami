@@ -381,8 +381,8 @@ async def test_schedule_capacity_is_owner_scoped_and_cancel_releases_it(store):
         "daily_budget=0",
         "daily_budget=11",
         "timeout_seconds=false",
-        "timeout_seconds=0",
-        "timeout_seconds=61",
+        "timeout_seconds=-1",
+        'timeout_seconds="61"',
     ],
 )
 def test_invalid_brief_configuration_is_rejected(tmp_path, configuration):

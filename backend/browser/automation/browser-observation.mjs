@@ -98,14 +98,13 @@ export async function observePage(page, screenshotPath, { timeoutMs = 5000 } = {
   const session = await page.context().newCDPSession(page)
   let timer
   const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('CHROME_OBSERVATION_TIMEOUT')), timeoutMs)
+    if (timeoutMs) timer = setTimeout(() => reject(new Error('CHROME_OBSERVATION_TIMEOUT')), timeoutMs)
   })
   const bounded = operation => Promise.race([operation, deadline])
   try {
     const before = await bounded(scene(page, session))
     if (!screenshotPath) return before
     const screenshot = await bounded(session.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false }))
-    if (screenshot.data.length > 90_000_000) throw new Error('CHROME_SCREENSHOT_LIMIT')
     const body = Buffer.from(screenshot.data, 'base64'), size = pngDimensions(body)
     const after = await bounded(scene(page, session))
     if (after.signature !== before.signature) throw new Error('CHROME_SCENE_CHANGED')

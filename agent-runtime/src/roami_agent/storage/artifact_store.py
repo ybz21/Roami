@@ -8,6 +8,7 @@ import re
 import stat
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -15,12 +16,8 @@ from roami_agent.storage.database import row, rows
 
 
 class ArtifactStore:
-    def __init__(self, database, *, max_bytes=64 * 1024 * 1024):
-        if (
-            not isinstance(max_bytes, int)
-            or isinstance(max_bytes, bool)
-            or not 1 <= max_bytes <= 512 * 1024 * 1024
-        ):
+    def __init__(self, database, *, max_bytes=0):
+        if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
             raise DomainError("INVALID_ARTIFACT_CONFIG")
         self.db = database
         self.data_root = database.data_root.resolve()
@@ -77,7 +74,7 @@ class ArtifactStore:
         finally:
             os.close(descriptor)
 
-    def _read(self, digest, expected_size, include_body=True):
+    def _read(self, digest, expected_size, include_body=True, offset=0, limit=None):
         path = self._path(digest)
         try:
             descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -88,16 +85,22 @@ class ArtifactStore:
             if (
                 not stat.S_ISREG(info.st_mode)
                 or info.st_size != expected_size
-                or info.st_size > self.max_bytes
+                or (self.max_bytes and info.st_size > self.max_bytes)
             ):
                 raise DomainError("ARTIFACT_INTEGRITY_FAILED", 503)
             body, digestor, size = bytearray(), hashlib.sha256(), 0
             while chunk := file.read(64 * 1024):
                 size += len(chunk)
                 if include_body:
-                    body.extend(chunk)
+                    start = max(0, offset - (size - len(chunk)))
+                    end = (
+                        len(chunk)
+                        if limit is None
+                        else max(0, offset + limit - (size - len(chunk)))
+                    )
+                    body.extend(chunk[start:end])
                 digestor.update(chunk)
-                if size > self.max_bytes:
+                if self.max_bytes and size > self.max_bytes:
                     raise DomainError("ARTIFACT_INTEGRITY_FAILED", 503)
             if size != expected_size or digestor.hexdigest() != digest:
                 raise DomainError("ARTIFACT_INTEGRITY_FAILED", 503)
@@ -121,6 +124,50 @@ class ArtifactStore:
             return digest, str(path.relative_to(self.data_root))
         finally:
             os.unlink(temporary)
+
+    def _write_file(self, source):
+        descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, "rb") as file:
+            before = os.fstat(file.fileno())
+            if not stat.S_ISREG(before.st_mode):
+                raise DomainError("ARTIFACT_FILE_INVALID")
+            if self.max_bytes and before.st_size > self.max_bytes:
+                raise DomainError("ARTIFACT_SIZE_LIMIT", 413)
+            digestor, size = hashlib.sha256(), 0
+            while chunk := file.read(64 * 1024):
+                size += len(chunk)
+                if self.max_bytes and size > self.max_bytes:
+                    raise DomainError("ARTIFACT_SIZE_LIMIT", 413)
+                digestor.update(chunk)
+            digest = digestor.hexdigest()
+            path = self._path(digest, create=True)
+            descriptor, temporary = tempfile.mkstemp(prefix=".artifact-", dir=path.parent)
+            try:
+                file.seek(0)
+                copied = hashlib.sha256()
+                with os.fdopen(descriptor, "wb") as output:
+                    while chunk := file.read(64 * 1024):
+                        output.write(chunk)
+                        copied.update(chunk)
+                    output.flush()
+                    os.fchmod(output.fileno(), 0o400)
+                    os.fsync(output.fileno())
+                after = os.fstat(file.fileno())
+                if (
+                    (before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+                    != (after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+                    or size != before.st_size
+                    or copied.hexdigest() != digest
+                ):
+                    raise DomainError("ARTIFACT_SOURCE_CHANGED", 409)
+                try:
+                    os.link(temporary, path, follow_symlinks=False)
+                except FileExistsError:
+                    self._read(digest, size, False)
+                self._sync_directory(path.parent)
+                return digest, str(path.relative_to(self.data_root)), size
+            finally:
+                os.unlink(temporary)
 
     @staticmethod
     def _scope(db, owner, task_id, message_id):
@@ -163,7 +210,15 @@ class ArtifactStore:
             "downloadUrl": "/api/agent/artifacts/" + item["id"] + "/content",
         }
 
-    async def put(
+    async def put(self, owner, body, **options):
+        if not isinstance(body, bytes):
+            raise DomainError("ARTIFACT_SIZE_LIMIT", 413)
+        return await self._publish(owner, body, **options)
+
+    async def put_file(self, owner, path, **options):
+        return await self._publish(owner, Path(path), **options)
+
+    async def _publish(
         self,
         owner,
         body,
@@ -181,7 +236,7 @@ class ArtifactStore:
             for value in [task_id, message_id]
         ):
             raise DomainError("INVALID_ARTIFACT_SCOPE")
-        if not isinstance(body, bytes) or len(body) > self.max_bytes:
+        if isinstance(body, bytes) and self.max_bytes and len(body) > self.max_bytes:
             raise DomainError("ARTIFACT_SIZE_LIMIT", 413)
         if not isinstance(mime_type, str) or not re.fullmatch(
             r"[a-zA-Z0-9.+-]+/[a-zA-Z0-9.+-]+", mime_type
@@ -211,7 +266,11 @@ class ArtifactStore:
         await self.db.call(lambda db: self._scope(db, owner, task_id, message_id))
         async with self.mutations:
             try:
-                digest, path = await self._io(self._write, body)
+                if isinstance(body, bytes):
+                    digest, path = await self._io(self._write, body)
+                    size = len(body)
+                else:
+                    digest, path, size = await self._io(self._write_file, body)
             except OSError as exc:
                 raise DomainError("ARTIFACT_STORAGE_UNAVAILABLE", 503) from exc
             if self.closed:
@@ -244,7 +303,7 @@ class ArtifactStore:
                         path,
                         mime_type.lower(),
                         digest,
-                        len(body),
+                        size,
                         now_ms(),
                         name,
                         packed,
@@ -274,6 +333,17 @@ class ArtifactStore:
         self._validate_path(item)
         try:
             body = await self._io(self._read, item["sha256"], item["size_bytes"])
+        except OSError as exc:
+            raise DomainError("ARTIFACT_FILE_MISSING", 503) from exc
+        return self.reference(item), body
+
+    async def read_page(self, owner, artifact_id, offset, limit):
+        item = await self._owned(owner, artifact_id)
+        self._validate_path(item)
+        try:
+            body = await self._io(
+                self._read, item["sha256"], item["size_bytes"], True, offset, limit
+            )
         except OSError as exc:
             raise DomainError("ARTIFACT_FILE_MISSING", 503) from exc
         return self.reference(item), body

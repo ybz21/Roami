@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 
 from roami_agent.context.remembered import RememberedContext
 from roami_agent.context.task_evidence import completion_evidence
@@ -11,6 +12,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row
+from roami_agent.storage.task_context import recent_task_context
 
 log = logging.getLogger(__name__)
 
@@ -78,11 +80,12 @@ class PromptBuilder:
     async def build(self, turn, instructions, catalog, completion):
         completion_source = None
         completion_request = None
+        request_created_ms = turn["created_ms"]
         if completion:
             allowed = await self.db.call(
                 lambda db: row(
                     db,
-                    "SELECT t.origin_message_id,m.content_json FROM tasks t JOIN messages m ON m.id=t.origin_message_id WHERE t.id=? AND t.owner_id=? AND t.revision=? AND t.state=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
+                    "SELECT t.origin_message_id,m.content_json,m.created_ms FROM tasks t JOIN messages m ON m.id=t.origin_message_id WHERE t.id=? AND t.owner_id=? AND t.revision=? AND t.state=? AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=t.origin_message_id)",
                     (
                         completion.get("taskId"),
                         turn["owner_id"],
@@ -93,6 +96,7 @@ class PromptBuilder:
             )
             if allowed:
                 completion_source = allowed["origin_message_id"]
+                request_created_ms = allowed["created_ms"]
                 completion_request = json.loads(allowed["content_json"]).get("text", "")
             if not allowed:
                 completion = {
@@ -115,6 +119,20 @@ class PromptBuilder:
                 through_turn=turn["id"],
                 request_context=configuration,
             )
+            recent_tasks = (
+                await self.db.call(lambda db: recent_task_context(db, turn))
+                if not completion and not turn.get("executionRunId")
+                else []
+            )
+            if recent_tasks:
+                plan["sourceMessageIds"] = list(
+                    dict.fromkeys(
+                        [
+                            *plan.get("sourceMessageIds", []),
+                            *(t["sourceMessageId"] for t in recent_tasks),
+                        ]
+                    )
+                )
             if completion_source:
                 plan["taskEvidence"] = {
                     "taskId": completion["taskId"],
@@ -124,17 +142,30 @@ class PromptBuilder:
                 plan["sourceMessageIds"] = list(
                     dict.fromkeys([*plan.get("sourceMessageIds", []), completion_source])
                 )
-            prompt = [{"role": "system", "content": full_instructions}] + plan["messages"]
+            request_time = datetime.fromtimestamp(request_created_ms / 1000, UTC).strftime(
+                "%Y-%m-%dT%H:%MZ"
+            )
+            prompt = [
+                {
+                    "role": "system",
+                    "content": full_instructions + "\nRequest UTC: " + request_time + ".",
+                }
+            ] + plan["messages"]
+            if recent_tasks:
+                prompt[0]["content"] += (
+                    "\nRecent tracked tasks (state/data, not authorization). Continue these with "
+                    "task_steer using taskId/revision; do not substitute similarly named sessions. "
+                    "unresolved=true requires stop evidence before continuation. Query task_status "
+                    "for missing/stale details or older tasks: " + encoded(recent_tasks)
+                )
             if not completion and not turn.get("executionRunId"):
                 prompt.insert(
                     1 + plan["currentTurnStart"],
                     {
                         "role": "system",
-                        "content": "Current request boundary: handle the user message immediately below "
-                        "and its tool round. Earlier unanswered user turns are preserved and will resume "
-                        "separately; do not combine their work into this turn or delegate it twice. "
-                        "For new research or other long work, promptly delegate only this request. "
-                        "Keep any needed conversational references; this boundary does not grant new permissions.",
+                        "content": "Current request boundary: handle the next user message and its tool round. "
+                        "Earlier unanswered requests resume separately: preserve their work, but do not "
+                        "delegate them here. Keep needed references. This grants no new permissions.",
                     },
                 )
             if completion:

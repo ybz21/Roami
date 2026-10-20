@@ -11,6 +11,7 @@ from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.protocol.errors import DomainError, ToolCancellation
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.protocol.tool_arguments import ToolArgumentsError
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
@@ -135,6 +136,9 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if isinstance(exc, ToolArgumentsError):
+                value["argumentIssues"] = exc.issues
+                value["issuesTruncated"] = exc.truncated
             validation = exc.__cause__
             if (
                 isinstance(validation, ValidationError)
@@ -188,6 +192,30 @@ class ToolGateway:
                     "For a user-requested executor use routing.explicitExecutor with an exact userQuote; "
                     "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching."
                 )
+            if role == "main" and value["error"] == "ROUTING_EXPLICIT_SOURCE_REQUIRED":
+                value["recovery"] = (
+                    "Executor metadata is not a new user executor choice. If continuing a tracked task "
+                    "found by task_status, use task_steer with that taskId/revision; do not search for "
+                    "a similarly named session or switch to session_send. For a genuinely new dispatch, "
+                    "use an exact quote only when the user actually specified an executor; otherwise "
+                    "set explicitExecutor=null and omit userQuote."
+                )
+            if role == "main" and value["error"] == "INVALID_RESOURCE_ONLY_TARGET":
+                value["recovery"] = (
+                    "resourceOnly is a web/navigation-only profile and cannot include a directory, "
+                    "project or workspace. For public lookup/chat-only work, KEEP resourceOnly=true "
+                    "and remove directory/workspace fields; do not drop read-only scope to repair arguments. "
+                    "Use a regular Native workspace only for actual filesystem work authorized by the user."
+                )
+            if role == "main" and value["error"] in {
+                "CODING_PROJECT_ID_REQUIRED",
+                "CODING_SESSION_ID_REQUIRED",
+            }:
+                value["recovery"] = (
+                    "An existing target requires its actual projectId/sessionId. Resolve the unique "
+                    "target with target_search, then retry with that ID. Do not invent an ID or "
+                    "switch to a different target/profile to repair the missing field."
+                )
             if role == "main" and value["error"] == "ROUTING_EXECUTOR_INTENT_REQUIRED":
                 value["recovery"] = (
                     "This is a tool-argument inconsistency, not a missing user decision. If the user did not "
@@ -218,7 +246,7 @@ class ToolGateway:
                         }
                     )
                     + ". Substitute the intended operation and its input, within the user's scope. "
-                    "These registered calls need no shell workspace; fix the arguments without asking the user."
+                    "These calls need no shell workspace. Repair the same intended operation and preserve task identity; do not replace task_status/task_steer with similarly named session discovery. Do not ask the user to fix arguments."
                 )
             if (
                 role == "main"

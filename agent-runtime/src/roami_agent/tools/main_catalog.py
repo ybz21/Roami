@@ -55,7 +55,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             object_schema(
                 {
                     "sessionId": {"type": "string", "minLength": 1, "maxLength": 300},
-                    "text": {"type": "string", "minLength": 1, "maxLength": 100000},
+                    "text": {"type": "string", "minLength": 1},
                 },
                 ["sessionId", "text"],
             ),
@@ -279,6 +279,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "acceptedOnly": task["state"]
             not in {"failed", "interrupted", "cancelled", "succeeded"},
             "delivery": "pending" if task["state"] == "queued" else "unconfirmed",
+            **({"requestComplete": args["requestComplete"]} if "requestComplete" in args else {}),
             **({"routingDecision": public_routing(stored_decision)} if stored_decision else {}),
         }
 
@@ -359,7 +360,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "Delegate work with routing={complexity:bounded|complex,complexityBasis:{dimension:request-specific fact},routingExplanation:concrete reason}. Task kinds are open; the host chooses native for bounded work and an available professional for complex work, unless a source-backed explicit executor overrides. No fixed category, score or step threshold. Omit executor to use project/preference/node selection; legacy requests without routing retain their original default. An existing session target on Main automatically uses direct message delivery, including legacy Codex/Claude sessions without lifecycle callbacks; this proves delivery only. Other targets return background_task queue acceptance with a taskId and delivery pending. A taskId or native branch ID is not a sessionId: never use it with target.kind=session or search for it as a tmux session. Continue known tracked work with the task_steer CLI capability and its actual revision; preserve the executor. Use fromMessageId only for a completed checkpoint Fork.",
             object_schema(
                 {
-                    "goal": {"type": "string", "minLength": 1, "maxLength": 20000},
+                    "goal": {"type": "string", "minLength": 1},
+                    "requestComplete": {
+                        "type": "boolean",
+                        "description": "All parts of this request are handled/delegated; false or omitted continues Main.",
+                    },
                     "routing": routing_schema(),
                     "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
                     "target": {
@@ -411,6 +416,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             **receipt,
             "acceptedOnly": receipt["state"] in {"stopping", "applied"},
             "kind": "task_continuation",
+            **({"requestComplete": args["requestComplete"]} if "requestComplete" in args else {}),
         }
 
     registry.add(
@@ -421,7 +427,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 {
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
                     "revision": {"type": "integer", "minimum": 1},
-                    "text": {"type": "string", "minLength": 1, "maxLength": 10000},
+                    "requestComplete": {"type": "boolean"},
+                    "text": {"type": "string", "minLength": 1},
                 },
                 ["taskId", "revision", "text"],
             ),

@@ -194,3 +194,22 @@ func TestUnlimitedExecutionContextRemainsCancellable(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 }
+
+func TestExecutionTimeoutIsOptionalAndCanExceedOneDay(t *testing.T) {
+	if executionDeadline(0) != 0 || !validExecutionTimeout(0) || validExecutionTimeout(-1) {
+		t.Fatal("invalid optional execution timeout")
+	}
+	seconds := 3 * 24 * 60 * 60
+	if !validExecutionTimeout(seconds) {
+		t.Fatal("a three-day task is a valid explicit deadline")
+	}
+	deadline := executionDeadline(seconds)
+	if deadline <= time.Now().Add(71*time.Hour).UnixMilli() {
+		t.Fatal("explicit deadline was truncated")
+	}
+	ctx, cancel := executionContext(context.Background(), 0)
+	defer cancel()
+	if _, bounded := ctx.Deadline(); bounded {
+		t.Fatal("default execution has no deadline")
+	}
+}

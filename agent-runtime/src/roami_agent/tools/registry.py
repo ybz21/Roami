@@ -1,4 +1,3 @@
-import asyncio
 import json
 from copy import deepcopy
 
@@ -7,12 +6,14 @@ from jsonschema import Draft202012Validator, ValidationError
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.research import RESEARCH_TOOLS, research_call_allowed
 from roami_agent.protocol.serialization import encoded
+from roami_agent.protocol.tool_arguments import validate_tool_arguments
 from roami_agent.protocol.tools import Tool
 
 
 class Tools:
-    def __init__(self):
+    def __init__(self, artifacts=None):
         self.registry: dict[str, Tool] = {}
+        self.artifacts = artifacts
         self.disabled_tools: set[str] = set()
         self.disabled_skills: set[str] = set()
         self.skills: dict[str, dict] = {}
@@ -91,7 +92,7 @@ class Tools:
             raise DomainError("TOOL_UNAVAILABLE")
         try:
             args = json.loads(call["function"]["arguments"])
-            Draft202012Validator(tool.schema).validate(args)
+            validate_tool_arguments(tool.schema, args)
         except (ValueError, ValidationError) as exc:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
         if self.directory:
@@ -99,7 +100,7 @@ class Tools:
             if tool.name in self.disabled_tools:
                 raise DomainError("TOOL_DISABLED")
             try:
-                Draft202012Validator(tool.schema).validate(args)
+                validate_tool_arguments(tool.schema, args)
             except ValidationError as exc:
                 raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
         if (
@@ -112,8 +113,29 @@ class Tools:
 
     async def invoke(self, call, role, binding):
         tool, args = self.validate(call, role)
-        async with asyncio.timeout(60):
-            value = await tool.handler(args, dict(binding, role=role))
-        if len(encoded(value).encode()) > 128_000:
-            raise DomainError("TOOL_OUTPUT_LIMIT")
-        return value
+        value = await tool.handler(args, dict(binding, role=role))
+        body = encoded(value).encode()
+        if len(body) <= 128_000 or self.artifacts is None:
+            return value
+        reference = await self.artifacts.put(
+            binding["owner"],
+            body,
+            mime_type="application/json",
+            name="tool-result.json",
+            task_id=binding.get("taskId"),
+            message_id=binding.get("assistantMessageId"),
+            metadata={"source": "tool_result", "toolName": tool.name},
+        )
+        essential = {
+            key: item
+            for key, item in (value.items() if isinstance(value, dict) else ())
+            if key in {"exitCode", "state", "error", "acceptedOnly", "kind", "taskId", "id"}
+            and isinstance(item, (bool, int, float, str, type(None)))
+            and len(encoded(item)) <= 1000
+        }
+        return {
+            **essential,
+            "preview": body[:4000].decode(errors="ignore"),
+            "artifactRefs": [reference],
+            "outputExternalized": True,
+        }

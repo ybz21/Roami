@@ -7,11 +7,10 @@ import shlex
 from copy import deepcopy
 from dataclasses import replace
 
-from jsonschema import Draft202012Validator, ValidationError
-
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.research import research_call_allowed
 from roami_agent.protocol.serialization import encoded
+from roami_agent.protocol.tool_arguments import validate_tool_arguments
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.process import execute
 
@@ -263,10 +262,7 @@ class ToolDirectory:
         original = self.registry.registry.get(name)
         if not original or name in self.registry.disabled_tools:
             raise DomainError("TOOL_DISABLED" if original else "TOOL_UNAVAILABLE")
-        try:
-            Draft202012Validator(original.schema).validate(args)
-        except ValidationError:
-            raise DomainError("INVALID_TOOL_ARGUMENTS") from None
+        validate_tool_arguments(original.schema, args)
         if role == "research" and not research_call_allowed(name, args):
             raise DomainError("TOOL_UNAVAILABLE")
         return original, args
@@ -302,7 +298,7 @@ def register_foundations(registry, settings):
                 raise DomainError("USE_REGISTERED_CLI_CAPABILITY")
             result = await execute(
                 [settings.cli_bin, *argv[1:]],
-                timeout=min(args.get("timeout", 15), 30),
+                timeout=args.get("timeout") or None,
                 excluded_env=settings.provider_key_environments(),
             )
             return result
@@ -360,16 +356,15 @@ def register_foundations(registry, settings):
     )
     argv_schema = {
         "type": "array",
-        "items": {"type": "string", "maxLength": 100000},
+        "items": {"type": "string"},
         "minItems": 1,
-        "maxItems": 100,
     }
     schema = object_schema(
         {
             "argv": argv_schema,
             "command": {"type": "string", "minLength": 1, "maxLength": 100000},
             "cwd": {"type": "string"},
-            "timeout": {"type": "integer", "minimum": 1, "maximum": 60},
+            "timeout": {"type": "integer", "minimum": 0},
         }
     )
     schema["oneOf"] = [

@@ -66,11 +66,11 @@ def validate_servers(configs):
                 isinstance(k, str) and isinstance(v, str) and k and v for k, v in mapping.items()
             ):
                 raise DomainError("INVALID_MCP_CONFIG")
-        timeout = config.get("timeout_seconds", 30)
+        timeout = config.get("timeout_seconds", 0)
         if (
             isinstance(timeout, bool)
             or not isinstance(timeout, (int, float))
-            or not 1 <= timeout <= 45
+            or not 0 <= timeout < float("inf")
         ):
             raise DomainError("INVALID_MCP_CONFIG")
         if "key_env" in config and (
@@ -247,7 +247,7 @@ class MCPConnections:
     async def _request(self, connection, operation, args):
         request = Request(operation, args, asyncio.get_running_loop().create_future())
         try:
-            async with asyncio.timeout(connection.config.get("timeout_seconds", 30)):
+            async with asyncio.timeout(connection.config.get("timeout_seconds", 0) or None):
                 await self._ensure(connection)
                 try:
                     connection.queue.put_nowait(request)
@@ -309,7 +309,11 @@ class MCPConnections:
                             "Bearer " + self._environment({"key": config["key_env"]})["key"]
                         )
                     client = await stack.enter_async_context(
-                        httpx.AsyncClient(headers=headers, timeout=10, follow_redirects=False)
+                        httpx.AsyncClient(
+                            headers=headers,
+                            timeout=httpx.Timeout(None, connect=10),
+                            follow_redirects=False,
+                        )
                     )
                     streams = await stack.enter_async_context(
                         streamable_http_client(config["url"], http_client=client)
@@ -327,7 +331,9 @@ class MCPConnections:
                     ClientSession(
                         streams[0],
                         TrackedStream(streams[1], connection),
-                        read_timeout_seconds=timedelta(seconds=config.get("timeout_seconds", 30)),
+                        read_timeout_seconds=timedelta(seconds=config["timeout_seconds"])
+                        if config.get("timeout_seconds")
+                        else None,
                         message_handler=changed,
                     )
                 )

@@ -31,7 +31,7 @@ max_retries = 2 # only transient failures before any event; 0 disables retries
 # endpoint = "https://worker-provider.example/v1"
 # name = "verified-vision-model"
 # key_env = "ROAMI_WORKER_API_KEY"
-# timeout_seconds = 120
+# timeout_seconds = 0 # no model deadline
 # max_retries = 2
 # [worker.model.parameters]
 # reasoning_effort = "high"
@@ -43,10 +43,10 @@ max_retries = 2 # only transient failures before any event; 0 disables retries
 [runtime]
 main_concurrency = 2
 workers = 3
-max_steps = 16
-max_depth = 2
+max_steps = 0 # legacy, not an execution ceiling
+max_depth = 0 # unlimited nesting
 input_budget = 24000
-timeout_seconds = 120
+timeout_seconds = 0 # no model deadline
 # cli_bin = "/absolute/path/to/roami" # defaults to the Go launcher binary
 # coding_directory = "/absolute/path/for/loose-coding-tasks"
 
@@ -54,7 +54,7 @@ timeout_seconds = 120
 timezone = "UTC" # IANA timezone for daily summaries
 
 [artifacts]
-max_bytes = 67108864 # per artifact, stored outside model context
+max_bytes = 0 # unlimited evidence; stored outside model context
 gc_grace_seconds = 86400
 gc_interval_seconds = 300
 
@@ -63,12 +63,12 @@ gc_interval_seconds = 300
 [proactive]
 enabled = false
 daily_budget = 3 # model evaluations per owner over 24 hours, including failures/silence
-timeout_seconds = 15 # separate background queue; no Main concurrency slot
+timeout_seconds = 0 # separate background queue; no generation deadline
 
 # Explicit daily briefs use the same reminder CLI/UI, with kind=daily_brief.
 [briefs]
 daily_budget = 3 # evaluations per owner over 24 hours; also bounds active schedules
-timeout_seconds = 30
+timeout_seconds = 0 # no request deadline
 
 [tools]
 # This validates working directories; it is not an OS filesystem sandbox.
@@ -80,7 +80,7 @@ skill_roots = []
 # transport = "stdio"
 # command = "python"
 # args = ["/absolute/path/to/mcp_server.py"]
-# timeout_seconds = 30
+# timeout_seconds = 0 # no request deadline
 # read_only = ["search"] # unlisted tools conservatively count as writes
 # [tools.mcp.docs.env_env]
 # SERVICE_API_KEY = "DOCS_API_KEY" # child variable -> runtime environment variable

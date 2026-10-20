@@ -23,8 +23,8 @@ class Tasks:
         database,
         conversations,
         *,
-        max_depth=2,
-        max_children=3,
+        max_depth=0,
+        max_children=0,
     ):
         self.db, self.conversations = database, conversations
         self.max_depth, self.max_children = max_depth, max_children
@@ -67,7 +67,6 @@ class Tasks:
             not key
             or len(key) > 200
             or not goal.strip()
-            or len(goal) > 20_000
             or executor not in {"native", "codex", "claude"}
         ):
             raise DomainError("INVALID_TASK")
@@ -228,7 +227,7 @@ class Tasks:
                     raise DomainError("PARENT_TASK_NOT_RUNNING", 409)
                 depth = json.loads(parent["budget_json"])["depth"] + 1
                 spec["parentTaskRevision"] = parent["revision"]
-            if depth > self.max_depth:
+            if self.max_depth and depth > self.max_depth:
                 raise DomainError("TASK_DEPTH_EXCEEDED", 409)
             if parent:
                 active = db.execute(
@@ -236,7 +235,7 @@ class Tasks:
                     "('succeeded','failed','cancelled','interrupted')",
                     (parent["id"],),
                 ).fetchone()[0]
-                if active >= self.max_children:
+                if self.max_children and active >= self.max_children:
                     raise DomainError("TASK_CONCURRENCY_EXCEEDED", 409)
             transcript = history(db, c["active_branch_id"])
             origin = next(
@@ -491,10 +490,7 @@ class Tasks:
         return await self.db.call(read)
 
     async def report(self, owner, task_id, run_id, revision, result):
-        if (
-            result.get("state") not in {"succeeded", "failed", "cancelled"}
-            or len(encoded(result)) > 100_000
-        ):
+        if result.get("state") not in {"succeeded", "failed", "cancelled"}:
             raise DomainError("INVALID_TASK_RESULT")
 
         def write(db):

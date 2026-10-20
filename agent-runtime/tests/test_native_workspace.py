@@ -9,6 +9,127 @@ from roami_agent.tools.registry import Tools
 from roami_agent.tools.shell import register_shell
 
 
+@pytest.mark.parametrize("method", ["write", "shell", "shell-only"])
+async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
+    store, tmp_path, method
+):
+    from contextlib import asynccontextmanager
+
+    from test_runtime import until
+
+    from roami_agent.app import Runtime
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.storage.database import row
+
+    workspace = tmp_path / "work with spaces"
+    workspace.mkdir()
+
+    class Main:
+        model = "bare-main-report"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", "文件已保存。")
+
+    class Worker:
+        model = "bare-worker-report"
+
+        async def stream(self, messages, tools):
+            observed = sum(m["role"] == "tool" for m in messages)
+            if method in {"shell", "shell-only"} and observed == 0:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "save",
+                        "function": {
+                            "name": "bash",
+                            "arguments": json.dumps(
+                                {
+                                    "argv": [
+                                        sys.executable,
+                                        "-c",
+                                        "from pathlib import Path; Path('summary.txt').write_text('验收完成')",
+                                    ]
+                                }
+                            ),
+                        },
+                    },
+                )
+            elif method == "shell" and observed == 1:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "readback",
+                        "function": {
+                            "name": "read",
+                            "arguments": json.dumps({"path": "summary.txt"}),
+                        },
+                    },
+                )
+            elif observed:
+                yield ModelEvent(
+                    "text",
+                    f"验收完成，文件 {workspace / 'summary.txt'} 已保存。"
+                    if method == "shell-only"
+                    else "验收完成，文件 summary.txt 已保存。",
+                )
+            else:
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "save",
+                        "function": {
+                            "name": "write",
+                            "arguments": json.dumps(
+                                {
+                                    "path": "summary.txt",
+                                    "expectedSha256": None,
+                                    "content": "验收完成",
+                                }
+                            ),
+                        },
+                    },
+                )
+
+    @asynccontextmanager
+    async def prepare(*args, **kwargs):
+        yield {"workspaceId": "fixture", "directory": str(workspace)}
+
+    runtime = Runtime(store, Main(), worker_model=Worker(), memory_model=Main())
+    runtime.dispatch.native_executor.workspace_factory = prepare
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Save summary.txt",
+            key="save",
+            target={"kind": "new_session", "directory": str(workspace)},
+            record_intent=True,
+        )
+        runtime.wakeup.set()
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM turns WHERE conversation_id=? AND trigger_kind='completion' AND state='completed'",
+                (conversation["id"],),
+            ),
+        )
+        references = await runtime.artifacts.list("alice", task_id=task["id"])
+        assert len(references) == 1 and references[0]["name"] == "summary.txt"
+        messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
+        assert references[0]["downloadUrl"] in messages[-1]["content"]["text"]
+        (workspace / "summary.txt").unlink()
+        assert (await runtime.artifacts.read("alice", references[0]["id"]))[
+            1
+        ].decode() == "验收完成"
+        with pytest.raises(DomainError, match="ARTIFACT_NOT_FOUND"):
+            await runtime.artifacts.read("bob", references[0]["id"])
+    finally:
+        await runtime.close()
+
+
 async def test_bound_shell_uses_workspace_default_and_relative_paths_and_rejects_other_roots(
     tmp_path,
     monkeypatch,

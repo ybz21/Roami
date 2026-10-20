@@ -129,7 +129,7 @@ class Attachments:
             or name in {".", ".."}
         ):
             raise DomainError("INVALID_ATTACHMENT")
-        if len(body) > min(MAX_UPLOAD_BYTES, self.artifacts.max_bytes):
+        if len(body) > min(MAX_UPLOAD_BYTES, self.artifacts.max_bytes or MAX_UPLOAD_BYTES):
             raise DomainError("ATTACHMENT_SIZE_LIMIT", 413)
         async with self.uploads:
             old = await self.db.call(

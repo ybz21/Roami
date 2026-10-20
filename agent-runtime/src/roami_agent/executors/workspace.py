@@ -67,7 +67,7 @@ async def hold_workspace(settings, task, run, *, stopped=None):
     try:
         process.stdin.write((encoded(spec) + "\n").encode())
         await process.stdin.drain()
-        async with asyncio.timeout(min(125, spec["timeoutSeconds"] or 125)):
+        async with asyncio.timeout(spec["timeoutSeconds"] or None):
             line = await process.stdout.readline()
         try:
             receipt = json.loads(line)

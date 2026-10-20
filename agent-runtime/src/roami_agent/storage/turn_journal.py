@@ -69,11 +69,11 @@ class TurnJournal:
             origin = await self.db.call(
                 lambda db: row(
                     db,
-                    "SELECT m.id FROM jobs j JOIN tasks t "
+                    "SELECT m.id,json_extract(m.content_json,'$.text') AS text FROM jobs j JOIN tasks t "
                     "ON t.id=json_extract(j.payload_json,'$.completion.taskId') "
                     "JOIN messages m ON m.id=t.origin_message_id "
                     "WHERE j.aggregate_id=? AND j.kind='turn.run' AND t.owner_id=? "
-                    "AND t.origin_branch_id=? "
+                    "AND t.origin_branch_id=? AND m.deleted_ms IS NULL "
                     "AND t.revision=json_extract(j.payload_json,'$.completion.taskRevision') "
                     "AND NOT EXISTS(SELECT 1 FROM context_omissions o "
                     "WHERE o.owner_id=t.owner_id AND o.message_id=m.id)",
@@ -86,7 +86,7 @@ class TurnJournal:
         return await self.db.call(
             lambda db: row(
                 db,
-                "SELECT id FROM messages WHERE turn_id=? AND role='user' ORDER BY seq LIMIT 1",
+                "SELECT id,json_extract(content_json,'$.text') AS text FROM messages WHERE turn_id=? AND role='user' AND deleted_ms IS NULL ORDER BY seq LIMIT 1",
                 (turn["id"],),
             )
         )

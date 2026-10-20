@@ -73,10 +73,15 @@ const resolveDevice = (flags, fail) => {
   if (flags.mobile) return DEVICES.iphone
   return null
 }
-const withTimeout = (promise, ms, label) => Promise.race([
-  promise,
-  new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)),
-])
+const withTimeout = async (promise, ms, label) => {
+  if (!ms) return promise
+  let timer
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
+    })])
+  } finally { clearTimeout(timer) }
+}
 const settleMs = (flags) => num(flags.wait || flags.settle, 0)
 const chromeExecutable = () => {
   const candidates = [
@@ -91,10 +96,8 @@ const chromeExecutable = () => {
   return candidates.find((p) => existsSync(p))
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-// record stop 的真实耗时是 ffmpeg 编码时间（见 runFFmpeg 的 60s 内部超时），跟 --timeout 这个
-// "元素等待多久"语义的旗标没关系——两端(daemon 看门狗、client socket 超时)都得按这个下限算，
-// 否则长录制会在 ffmpeg 还没编完时就被看门狗当成"卡死"强杀。
-const effectiveTimeoutMs = (verb, timeoutMs) => verb === 'record' ? Math.max(timeoutMs, 60000) : timeoutMs
+// Explicit zero disables operation and encoding deadlines; transport connection probes stay bounded.
+const effectiveTimeoutMs = (verb, timeoutMs) => timeoutMs === 0 ? 0 : verb === 'record' ? Math.max(timeoutMs, 60000) : timeoutMs
 
 // 选中目标标签后把它前置（真实 CDP Target.activateTarget，不只是选中）——Web 镜像面板的
 // 「前台标签跟随」（见 backend/browser/screencast.go 的 /json 顺序兜底）靠的正是标签被前置
@@ -166,7 +169,7 @@ async function freshScreenshot(flags, pos, timeoutMs, io) {
     const p = await context.newPage()
     await p.goto(target, { waitUntil: flags.waitUntil || 'domcontentloaded', timeout: to })
     if (settleMs(flags) > 0) await p.waitForTimeout(settleMs(flags))
-    await withTimeout(p.screenshot({ path: f, fullPage: !!flags.full, type, quality, timeout: to }), to + 1000, 'fresh screenshot')
+    await withTimeout(p.screenshot({ path: f, fullPage: !!flags.full, type, quality, timeout: to }), to ? to + 1000 : 0, 'fresh screenshot')
     io.log(f)
     await fresh.close()
   } catch (e) {
@@ -208,7 +211,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
     if (flags['expected-scene'] != null) {
       if (!/^[a-f0-9]{64}$/.test(flags['expected-scene'])) fail('CHROME_SCENE_INVALID')
       selected = await pickPage(pages, flags, fail)
-      const current = await observePage(selected)
+      const current = await observePage(selected, undefined, { timeoutMs: to })
       if (current.signature !== flags['expected-scene']) fail('CHROME_SCENE_CHANGED')
       if (!flags['no-focus']) await selected.bringToFront().catch(() => {})
     } else selected = flags['no-focus'] ? await pickPage(pages, flags, fail) : await pick(pages, flags, fail)
@@ -283,7 +286,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
         await withTimeout(cdpScreenshot(), to, 'fast screenshot')
       } else {
         try {
-          await withTimeout(p.screenshot({ path: f, fullPage: !!flags.full, clip, type, quality, timeout: to }), to + 1000, 'screenshot')
+          await withTimeout(p.screenshot({ path: f, fullPage: !!flags.full, clip, type, quality, timeout: to }), to ? to + 1000 : 0, 'screenshot')
         } catch (e) {
           await withTimeout(cdpScreenshot(), to, 'fallback screenshot')
         }
@@ -293,7 +296,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
     }
     case 'pdf': { const f = pos[0] || 'page.pdf'; await (await pickHere()).pdf({ path: f }); io.log(f); break }
     case 'capabilities': io.log({ version: 'roami-browser-v1', browserId: browserId, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene'] }); break
-    case 'observe': io.log(await observePage(await pickHere(), flags.screenshot)); break
+    case 'observe': io.log(await observePage(await pickHere(), flags.screenshot, { timeoutMs: to })); break
     case 'tabs': io.log(await Promise.all(pages.map(async (pg, i) => ({ i, targetId: await targetIdentity(pg).catch(() => null), title: await pg.title().catch(() => ''), url: pg.url() })))); break
     case 'new': {
       if (flags['no-focus'] && !pos[0]) {
@@ -386,7 +389,7 @@ class Recorder {
     }
     if (sub === 'stop') {
       if (!this.active) fail('当前没有在录制')
-      const outPath = await this._stop(fail)
+      const outPath = await this._stop(fail, num(flags.timeout, 15000))
       io.log({ recording: false, path: outPath })
       return
     }
@@ -420,7 +423,7 @@ class Recorder {
     this.frames.push({ file, ts: Date.now() })
     await this.cs.send('Page.screencastFrameAck', { sessionId: frame.sessionId }).catch(() => {})
   }
-  async _stop(fail) {
+  async _stop(fail, timeoutMs = 0) {
     this.active = false
     const cs = this.cs
     const frames = this.frames
@@ -458,7 +461,7 @@ class Recorder {
 
     const finalOut = join(tmpDir, 'out.mp4')
     const vf = `scale=${RECORD_WIDTH}:${RECORD_HEIGHT}:force_original_aspect_ratio=decrease,pad=${RECORD_WIDTH}:${RECORD_HEIGHT}:(ow-iw)/2:(oh-ih)/2,format=yuv420p`
-    await runFFmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-vf', vf, '-vsync', 'vfr', '-movflags', '+faststart', finalOut], fail)
+    await runFFmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-vf', vf, '-vsync', 'vfr', '-movflags', '+faststart', finalOut], fail, timeoutMs)
 
     await mkdir(dirname(outPath), { recursive: true }).catch(() => {})
     // 原子写入：先落到目标同目录的临时文件（ffmpeg 输出在系统临时目录，与 outPath 大概率不同
@@ -480,7 +483,7 @@ function resolveRecordPath(raw, fail) {
   return p
 }
 
-function runFFmpeg(args, fail) {
+function runFFmpeg(args, fail, timeoutMs) {
   return new Promise((resolvePromise, reject) => {
     let proc
     try {
@@ -492,7 +495,7 @@ function runFFmpeg(args, fail) {
     let stderr = ''
     proc.stderr.on('data', (c) => { stderr += c.toString('utf8'); if (stderr.length > 8192) stderr = stderr.slice(-8192) })
     proc.on('error', (e) => reject(new ChromeError('ffmpeg 启动失败（是否已安装？）: ' + e.message)))
-    const watchdog = setTimeout(() => { proc.kill('SIGKILL') }, 60000)
+    const watchdog = timeoutMs ? setTimeout(() => { proc.kill('SIGKILL') }, Math.max(timeoutMs, 60000)) : null
     proc.on('close', (code) => {
       clearTimeout(watchdog)
       if (code === 0) resolvePromise()
@@ -623,12 +626,12 @@ async function handleConnection(conn, session) {
   if (req.cwd && existsSync(req.cwd)) { try { process.chdir(req.cwd) } catch {} }
   const { verb, flags, pos } = parseArgs(argv)
   const timeoutMs = num(flags.timeout, 15000)
-  const timeoutS = effectiveTimeoutMs(verb, timeoutMs) / 1000 + 30
+  const timeoutS = timeoutMs === 0 ? 0 : effectiveTimeoutMs(verb, timeoutMs) / 1000 + 30
   conn.setTimeout(timeoutS * 1000)
   const io = makeIO()
   let code = 0
   let stderr = ''
-  const watchdog = setTimeout(() => { process.exit(1) }, timeoutS * 1000)
+  const watchdog = timeoutS ? setTimeout(() => { process.exit(1) }, timeoutS * 1000) : null
   try {
     if (flags['operation-id']) {
       if (!operationBound || !OPERATION_VERBS.has(verb)) throw new ChromeError('CHROME_OPERATION_UNSUPPORTED')
@@ -773,7 +776,7 @@ async function daemonRequest(argv, timeoutS) {
 // 陪等一整个完整预算——重试如果每次都用完整预算，最坏情况会从单次调用的 ~50s 叠加到 3 次共
 // ~150s，对 agent 来说是明显的可感知卡顿。重试专用超时给一个较短的固定上限。
 async function daemonRequestWithRetry(argv, timeoutMs, verb, request = daemonRequest, pause = sleep) {
-  const fullTimeoutS = effectiveTimeoutMs(verb, timeoutMs) / 1000 + 35
+  const fullTimeoutS = timeoutMs === 0 ? 0 : effectiveTimeoutMs(verb, timeoutMs) / 1000 + 35
   const retryTimeoutS = Math.min(fullTimeoutS, 20)
   const flags = parseArgs(argv).flags
   const attempts = flags['no-retry'] || flags['operation-id'] ? 1 : 3

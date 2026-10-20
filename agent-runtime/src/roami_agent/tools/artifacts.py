@@ -22,16 +22,16 @@ def register_artifact_tools(registry, artifacts):
         ):
             await artifacts.verified_path(owner, aid)
             return {"artifact": reference, "textAvailable": False}
-        reference, body = await artifacts.read(owner, aid)
         offset, limit = args.get("offset", 0), args.get("limit", 8000)
-        excerpt = body[offset : offset + limit]
+        reference, excerpt = await artifacts.read_page(owner, aid, offset, limit)
+        size = reference["sizeBytes"]
         return {
             "artifact": reference,
             "textAvailable": True,
             "text": excerpt.decode("utf-8", errors="replace"),
             "offset": offset,
-            "nextOffset": min(len(body), offset + len(excerpt)),
-            "hasMore": offset + len(excerpt) < len(body),
+            "nextOffset": min(size, offset + len(excerpt)),
+            "hasMore": offset + len(excerpt) < size,
         }
 
     registry.add(
@@ -41,7 +41,7 @@ def register_artifact_tools(registry, artifacts):
             object_schema(
                 {
                     "id": {"type": "string", "minLength": 1, "maxLength": 200},
-                    "offset": {"type": "integer", "minimum": 0, "maximum": 536870912},
+                    "offset": {"type": "integer", "minimum": 0},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 16000},
                 },
                 ["id"],

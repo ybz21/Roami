@@ -22,7 +22,7 @@ CURSOR_KEY = "proactive.scan:v1"
 
 
 class ProactiveJobs:
-    def __init__(self, database, model, policy, *, daily_budget=3, timeout=15, clock=now_ms):
+    def __init__(self, database, model, policy, *, daily_budget=3, timeout=None, clock=now_ms):
         self.db, self.model, self.policy = database, model, policy
         self.daily_budget, self.timeout, self.clock = daily_budget, timeout, clock
         self.lock = asyncio.Lock()
@@ -195,7 +195,7 @@ class ProactiveJobs:
     async def _generate(self, job, source, prompt):
         try:
             output, usage = "", None
-            async with asyncio.timeout(self.timeout):
+            async with asyncio.timeout(self.timeout or None):
                 async for part in self.model.stream(prompt, []):
                     if part.kind == "text":
                         output += part.value

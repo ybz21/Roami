@@ -28,6 +28,7 @@ async def test_new_question_answers_before_slow_original_and_original_resumes(st
             nonlocal original_calls
             resumed = "Resume this original request" in str(messages[-1]["content"])
             if resumed:
+                assert "北京天气" in messages[-1]["content"]
                 assert "上海" not in str(messages)
                 yield ModelEvent("text", "北京：已恢复回答")
             elif messages[-1]["content"] == "北京天气":
@@ -140,7 +141,10 @@ async def test_two_background_questions_do_not_need_an_extra_main_model_round(st
                     "tool",
                     {
                         "id": goal,
-                        "function": {"name": "delegate", "arguments": json.dumps({"goal": goal})},
+                        "function": {
+                            "name": "delegate",
+                            "arguments": json.dumps({"goal": goal, "requestComplete": True}),
+                        },
                     },
                 )
 
@@ -199,5 +203,43 @@ async def test_stop_cancels_a_queued_reply_without_starting_it_or_other_work(sto
             )
             == 0
         )
+    finally:
+        await runtime.close()
+
+
+async def test_partial_handoff_keeps_working_until_all_requested_parts_are_dispatched(store):
+    class Main:
+        model = "compound-request"
+
+        async def stream(self, messages, tools):
+            goals = [
+                json.loads(m["content"]).get("taskId") for m in messages if m["role"] == "tool"
+            ]
+            index = len(goals)
+            assert index < 2, "The final receipt must not cost another model call"
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": f"part-{index}",
+                    "function": {
+                        "name": "delegate",
+                        "arguments": json.dumps(
+                            {"goal": f"Part {index}", "requestComplete": index == 1}
+                        ),
+                    },
+                },
+            )
+
+    from roami_agent.server.configuration import Settings
+
+    runtime = Runtime(store, Main(), settings=Settings(workers=0))
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        receipt = await runtime.chat.submit("alice", conversation["id"], "both", "Do both parts")
+        await completed(store, receipt["turnId"])
+        tasks = await runtime.tasks.list("alice", conversation["id"])
+        assert {json.loads(t["intent_json"])["goal"] for t in tasks} == {"Part 0", "Part 1"}
+        assert {t["origin_message_id"] for t in tasks} == {receipt["messageId"]}
     finally:
         await runtime.close()

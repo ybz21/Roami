@@ -201,12 +201,9 @@ async def test_unknown_outcome_blocks_steering_without_replaying_or_replacing_ev
             "interrupted",
             unknown=True,
         )
-        operation = await runtime.tasks.revisions.request(
-            "alice", task["id"], "continue", 1, "continue"
-        )
+        with pytest.raises(DomainError, match="TASK_OUTCOME_UNRESOLVED"):
+            await runtime.tasks.revisions.request("alice", task["id"], "continue", 1, "continue")
         await runtime.tasks.revisions.advance()
-        receipt = await runtime.tasks.revisions.get("alice", task["id"], operation["operationId"])
-        assert receipt["state"] == "blocked" and receipt["errorCode"] == "TASK_OUTCOME_UNRESOLVED"
         assert (
             await store.call(
                 lambda db: db.execute(

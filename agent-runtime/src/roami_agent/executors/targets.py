@@ -50,7 +50,7 @@ class TargetDirectory:
         try:
             response = await execute(
                 [self.settings.cli_bin, "agent", "execution", "send-message", "--file", "-"],
-                timeout=15,
+                timeout=None,
                 excluded_env=self.settings.provider_key_environments(),
                 input_data=encoded({"key": key, "sessionId": session_id, "text": text}).encode(),
             )

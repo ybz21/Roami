@@ -383,8 +383,8 @@ async def test_blocked_background_evaluation_does_not_occupy_main_slot(store):
         "daily_budget=0",
         "daily_budget=11",
         "timeout_seconds=false",
-        "timeout_seconds=0",
-        "timeout_seconds=31",
+        "timeout_seconds=-1",
+        'timeout_seconds="31"',
     ],
 )
 def test_invalid_proactive_configuration_is_rejected(tmp_path, configuration):

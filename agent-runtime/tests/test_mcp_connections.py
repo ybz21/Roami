@@ -211,7 +211,7 @@ async def test_streamable_http_initialization_authentication_and_call(monkeypatc
         {"transport": "streamable_http", "url": "http://example.com/mcp"},
         {"transport": "streamable_http", "url": "https://user:secret@example.com/mcp"},
         {"transport": "streamable_http", "url": "https://example.com/mcp?token=secret"},
-        {"command": "a", "timeout_seconds": 0},
+        {"command": "a", "timeout_seconds": -1},
         {"command": "a", "env_env": {"KEY": 1}},
     ],
 )

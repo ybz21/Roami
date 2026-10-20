@@ -293,7 +293,9 @@ def create_app(runtime, *, manage_lifecycle=True):
     ):
         body = bytearray()
         async for chunk in request.stream():
-            if len(body) + len(chunk) > min(MAX_UPLOAD_BYTES, runtime.artifacts.max_bytes):
+            if len(body) + len(chunk) > min(
+                MAX_UPLOAD_BYTES, runtime.artifacts.max_bytes or MAX_UPLOAD_BYTES
+            ):
                 raise DomainError("ATTACHMENT_SIZE_LIMIT", 413)
             body.extend(chunk)
         return {"data": await runtime.attachments.upload(owner, filename, requestKey, bytes(body))}

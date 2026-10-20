@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -148,7 +149,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		(spec.ProjectID != "" && spec.Directory != "") ||
 		(spec.ProjectID == "" && (spec.Base != "" || spec.Remote != "" || spec.WorkspaceID != "")) ||
 		(spec.WorkspaceID != "" && (spec.Base != "" || spec.Remote != ""))
-	if invalidTarget || strings.TrimSpace(spec.Prompt) == "" || len(spec.Prompt) > 100000 || spec.TimeoutSeconds < 0 || spec.TimeoutSeconds > 86400 {
+	if invalidTarget || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
 		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
 	}
 	if err = os.MkdirAll(dir, 0700); err != nil {
@@ -182,11 +183,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		return Status{}, err
 	}
 	hash := filepath.Base(dir)
-	prepareDeadline := time.Now().Add(120 * time.Second)
-	if taskDeadline := time.UnixMilli(receipt.DeadlineMS); receipt.DeadlineMS != 0 && taskDeadline.Before(prepareDeadline) {
-		prepareDeadline = taskDeadline
-	}
-	prepareCtx, cancel := context.WithDeadline(ctx, prepareDeadline)
+	prepareCtx, cancel := executionContext(ctx, receipt.DeadlineMS)
 	workspace, prepErr := s.prepareWorkspace(prepareCtx, spec, hash)
 	cancel()
 	if prepErr != nil {
@@ -466,6 +463,10 @@ func truncate(s string, n int) string {
 }
 
 // Zero denotes no task-wide deadline; cancellation remains owned by the caller.
+func validExecutionTimeout(seconds int) bool {
+	return seconds >= 0 && int64(seconds) <= math.MaxInt64/int64(time.Second)
+}
+
 func executionDeadline(seconds int) int64 {
 	if seconds == 0 {
 		return 0

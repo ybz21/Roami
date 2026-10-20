@@ -49,7 +49,7 @@ class ModelRoute:
             or not route.key_env.isidentifier()
             or isinstance(route.timeout_seconds, bool)
             or not isinstance(route.timeout_seconds, int)
-            or not 1 <= route.timeout_seconds <= 1_000_000
+            or route.timeout_seconds < 0
             or isinstance(route.max_retries, bool)
             or not isinstance(route.max_retries, int)
             or not 0 <= route.max_retries <= 3

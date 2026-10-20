@@ -18,7 +18,7 @@ MAIN_INSTRUCTIONS = (
     "You are the user's one permanent Roami coordinator. Answer simple questions directly and briefly. "
     "For external work, dispatch as soon as the goal and safe target are clear; do not research the "
     "worker workflow or write a long plan first. Keep any acknowledgement to one short sentence; "
-    "the accepted task card is the receipt. Dispatch promptly, then end the turn; never wait or poll for completion. "
+    "the task card is the receipt. Batch independent parts; do not omit later parts. Set requestComplete=true on the last delegate/task_steer only after the whole request is handled or delegated, then end without polling. "
     "Independent questions are independent intents; a new one does not cancel existing background work. "
     "Core tools: read, bash, edit, write, tool_list, delegate, ask_user. Use known capabilities directly; "
     "tool_list is for unfamiliar MCP/Skill/CLI operations. Read skill://roami-dispatch for unfamiliar workflows; "
@@ -27,7 +27,7 @@ MAIN_INSTRUCTIONS = (
     "Run known Roami calls with bash argv [roami,agent,capability,call,NAME,--input,JSON]: "
     "workspace_overview {}; target_search {kind:project|session,query?,projectId?,offset?,limit?}; "
     "target_resolve {kind,id}; session_send {sessionId,text}; executor_catalog {}; task_status {}; "
-    "task_steer {taskId,revision,text}. These calls need no shell workspace or discovery. "
+    "task_steer {taskId,revision,text,requestComplete?}. These calls need no shell workspace or discovery. "
     "Overview gives counts; paginate search for project membership. Use a unique exact project "
     "name match directly; other project names do not create ambiguity. Resolve real IDs. "
     "The user asking to send/continue an existing session authorizes delivery; do it without repeated "
@@ -36,7 +36,7 @@ MAIN_INSTRUCTIONS = (
     "their executor. taskId/native branchId is not a tmux sessionId. "
     "An interrupted task is not stop proof: outcomeKnown=false or stopConfirmed=false remains unresolved. "
     "A task_steer receipt in stopping state is queued while waiting for stop proof, not a failed dispatch. "
-    "End the turn after that receipt; never poll and create a replacement task. "
+    "Never poll or create a replacement task. "
     "Every new delegate call includes routing={complexity:bounded|complex,complexityBasis:{dimension:fact},"
     "routingExplanation:concrete reason in the user language,explicitExecutor:native|codex|claude|null}. "
     "Always fill explicitExecutor: use the user's requested executor, or null only when no executor was specified. "
@@ -132,7 +132,7 @@ class Settings:
     workers: int = 3
     # Legacy configuration keys are accepted but no longer cap new executions.
     max_steps: int = 0
-    max_depth: int = 2
+    max_depth: int = 0
     task_timeout_seconds: int = 0
     professional_task_timeout_seconds: int = 0
     task_max_turns: int = 0
@@ -140,7 +140,7 @@ class Settings:
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
     compaction_ratio: float = 0.75
-    timeout_seconds: int = 120
+    timeout_seconds: int = 0
     shell_roots: tuple[Path, ...] = ()
     http_tools: dict = field(default_factory=dict)
     skill_roots: tuple[Path, ...] = ()
@@ -151,14 +151,14 @@ class Settings:
     professional_executor: str = ""
     coding_directory: Path | None = None
     memory_timezone: str = "UTC"
-    artifact_max_bytes: int = 64 * 1024 * 1024
+    artifact_max_bytes: int = 0
     artifact_gc_grace_seconds: int = 86400
     artifact_gc_interval_seconds: int = 300
     proactive_enabled: bool = False
     proactive_daily_budget: int = 3
-    proactive_timeout_seconds: int = 15
+    proactive_timeout_seconds: int = 0
     brief_daily_budget: int = 3
-    brief_timeout_seconds: int = 30
+    brief_timeout_seconds: int = 0
 
     @classmethod
     def load(cls, path: Path):
@@ -181,7 +181,7 @@ class Settings:
             main_concurrency=runtime.get("main_concurrency", 2),
             workers=runtime.get("workers", 3),
             max_steps=runtime.get("max_steps", 0),
-            max_depth=runtime.get("max_depth", 2),
+            max_depth=runtime.get("max_depth", 0),
             task_timeout_seconds=runtime.get("task_timeout_seconds", 0),
             professional_task_timeout_seconds=runtime.get("professional_task_timeout_seconds", 0),
             task_max_turns=runtime.get("task_max_turns", 0),
@@ -189,7 +189,7 @@ class Settings:
             reserve_tokens=runtime.get("reserve_tokens", 16_384),
             keep_recent_tokens=runtime.get("keep_recent_tokens", 20_000),
             compaction_ratio=runtime.get("compaction_ratio", 0.75),
-            timeout_seconds=runtime.get("timeout_seconds", 120),
+            timeout_seconds=runtime.get("timeout_seconds", 0),
             shell_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("shell_roots", [])),
             skill_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("skill_roots", [])),
             http_tools=tools.get("http", {}),
@@ -197,14 +197,14 @@ class Settings:
             browser=browser_config(tools.get("browser", {})),
             computer=computer_config(tools.get("computer", {})),
             memory_timezone=raw.get("memory", {}).get("timezone", "UTC"),
-            artifact_max_bytes=raw.get("artifacts", {}).get("max_bytes", 64 * 1024 * 1024),
+            artifact_max_bytes=raw.get("artifacts", {}).get("max_bytes", 0),
             artifact_gc_grace_seconds=raw.get("artifacts", {}).get("gc_grace_seconds", 86400),
             artifact_gc_interval_seconds=raw.get("artifacts", {}).get("gc_interval_seconds", 300),
             proactive_enabled=raw.get("proactive", {}).get("enabled", False),
             proactive_daily_budget=raw.get("proactive", {}).get("daily_budget", 3),
-            proactive_timeout_seconds=raw.get("proactive", {}).get("timeout_seconds", 15),
+            proactive_timeout_seconds=raw.get("proactive", {}).get("timeout_seconds", 0),
             brief_daily_budget=raw.get("briefs", {}).get("daily_budget", 3),
-            brief_timeout_seconds=raw.get("briefs", {}).get("timeout_seconds", 30),
+            brief_timeout_seconds=raw.get("briefs", {}).get("timeout_seconds", 0),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
             professional_executor=runtime.get("professional_executor", ""),
             coding_directory=(
@@ -217,7 +217,6 @@ class Settings:
             result.main_concurrency,
             result.workers,
             result.keep_recent_tokens,
-            result.timeout_seconds,
         ]:
             if not isinstance(value, int) or not 1 <= value <= 1_000_000:
                 raise DomainError("INVALID_RUNTIME_CONFIG")
@@ -226,14 +225,14 @@ class Settings:
             or type(result.proactive_daily_budget) is not int
             or not 1 <= result.proactive_daily_budget <= 10
             or type(result.proactive_timeout_seconds) is not int
-            or not 1 <= result.proactive_timeout_seconds <= 30
+            or result.proactive_timeout_seconds < 0
         ):
             raise DomainError("INVALID_PROACTIVE_CONFIG")
         if (
             type(result.brief_daily_budget) is not int
             or not 1 <= result.brief_daily_budget <= 10
             or type(result.brief_timeout_seconds) is not int
-            or not 1 <= result.brief_timeout_seconds <= 60
+            or result.brief_timeout_seconds < 0
         ):
             raise DomainError("INVALID_BRIEF_CONFIG")
         if (
@@ -255,12 +254,15 @@ class Settings:
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if result.professional_executor not in {"", "codex", "claude"}:
             raise ValueError("Invalid professional_executor")
-        if not 0 <= result.max_depth <= 16:
+        if any(
+            type(value) is not int or value < 0
+            for value in (result.max_depth, result.timeout_seconds)
+        ):
             raise DomainError("INVALID_RUNTIME_CONFIG")
         if (
             not isinstance(result.artifact_max_bytes, int)
             or isinstance(result.artifact_max_bytes, bool)
-            or not 1 <= result.artifact_max_bytes <= 512 * 1024 * 1024
+            or result.artifact_max_bytes < 0
         ):
             raise DomainError("INVALID_ARTIFACT_CONFIG")
         for value, minimum, maximum in [

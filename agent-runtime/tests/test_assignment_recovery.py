@@ -272,7 +272,7 @@ async def test_rejected_destination_cannot_be_removed_or_replaced_until_a_new_us
         await runtime.close()
 
 
-async def test_unknown_continuation_ends_main_turn_and_remains_blocked_until_stop_proof(store):
+async def test_unknown_continuation_returns_immediate_block_without_accepting_or_polling(store):
     class Main:
         model = "continuation-handoff"
         task_id = None
@@ -280,7 +280,15 @@ async def test_unknown_continuation_ends_main_turn_and_remains_blocked_until_sto
 
         async def stream(self, messages, tools):
             self.calls += 1
-            assert self.calls == 1, "Main must not poll or redelegate after accepted steering"
+            if self.calls == 2:
+                assert json.loads(messages[-1]["content"])["error"] == "TASK_OUTCOME_UNRESOLVED"
+                yield ModelEvent(
+                    "text", "The previous execution is unconfirmed; continuation is blocked."
+                )
+                return
+            assert self.calls == 1, (
+                "Main must not poll or redelegate after the blocked continuation"
+            )
             yield ModelEvent(
                 "tool",
                 call(
@@ -338,14 +346,13 @@ async def test_unknown_continuation_ends_main_turn_and_remains_blocked_until_sto
         )
         turn = await runtime.mailbox.claim(job)
         await runtime.loop.run(turn, "main")
-        assert model.calls == 1
+        assert model.calls == 2
         await runtime.tasks.revisions.advance()
         detail = await runtime.tasks.get("alice", task["id"])
         assert detail["task"]["revision"] == 1
         assert detail["task"]["latestAttempt"]["outcomeKnown"] is False
         assert detail["task"]["latestAttempt"]["stopConfirmed"] is False
-        assert detail["steering"]["state"] == "blocked"
-        assert detail["steering"]["errorCode"] == "TASK_OUTCOME_UNRESOLVED"
+        assert detail["steering"] is None
         assert len(await runtime.tasks.list("alice")) == 1
     finally:
         await runtime.close()

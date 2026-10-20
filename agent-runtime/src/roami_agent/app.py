@@ -146,7 +146,7 @@ class Runtime:
             model,
             keep_recent_tokens=self.settings.keep_recent_tokens,
         )
-        self.tools = Tools()
+        self.tools = Tools(self.artifacts)
         self.active = {}
         self.turn_tasks = {}
         self.wakeup = asyncio.Event()

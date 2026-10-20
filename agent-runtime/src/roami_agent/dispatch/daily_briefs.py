@@ -27,7 +27,7 @@ INSTRUCTIONS = (
 
 
 class DailyBriefs:
-    def __init__(self, database, model, *, daily_budget=3, timeout=30, clock=now_ms):
+    def __init__(self, database, model, *, daily_budget=3, timeout=None, clock=now_ms):
         self.db, self.model, self.clock = database, model, clock
         self.daily_budget, self.timeout = daily_budget, timeout
         self.lock = asyncio.Lock()
@@ -372,7 +372,7 @@ class DailyBriefs:
     async def _generate(self, job, payload, prompt):
         try:
             text, usage = "", None
-            async with asyncio.timeout(self.timeout):
+            async with asyncio.timeout(self.timeout or None):
                 async for part in self.model.stream(prompt, []):
                     if part.kind == "tool":
                         raise DomainError("BRIEF_TOOLS_FORBIDDEN")

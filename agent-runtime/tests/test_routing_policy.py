@@ -94,6 +94,22 @@ async def setup(store, *, user="Please investigate", settings=None):
     return runtime, targets, router, registry, binding
 
 
+@pytest.mark.parametrize(
+    "kind,code",
+    [("project", "CODING_PROJECT_ID_REQUIRED"), ("session", "CODING_SESSION_ID_REQUIRED")],
+)
+async def test_missing_target_identity_is_recoverable_before_dispatch(store, kind, code):
+    runtime, targets, router, _, binding = await setup(store)
+    try:
+        args = request()
+        args["target"] = {"kind": kind}
+        with pytest.raises(DomainError, match=code):
+            await router.decide(args, binding)
+        assert not targets.sends and not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("missing", [True, False])
 async def test_executor_intent_cannot_be_omitted_or_left_only_in_a_quote(store, missing):
     runtime, _, _, tools, binding = await setup(store, user="Use Claude Code")

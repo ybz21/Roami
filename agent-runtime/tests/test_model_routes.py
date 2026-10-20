@@ -98,7 +98,7 @@ def test_legacy_worker_model_inherits_route_but_explicit_worker_defaults_to_own_
 @pytest.mark.parametrize(
     "worker",
     [
-        "timeout_seconds=0",
+        "timeout_seconds=-1",
         "timeout_seconds=true",
         "max_retries=4",
         'key_env="BAD-NAME"',

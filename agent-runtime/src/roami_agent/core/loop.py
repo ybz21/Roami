@@ -50,12 +50,15 @@ class AgentLoop:
         started, wall = self.clock(), now_ms()
         plan, prompt = await self.context.build(turn, instructions, catalog, completion)
         if turn.get("resumed"):
+            origin = await self.journal.origin(turn)
             prompt.append(
                 {
                     "role": "user",
                     "content": "Resume this original request after another user intent briefly took priority. "
                     "That newer request is handled separately. Complete this request, preserving persisted "
-                    "tool results and existing background tasks; do not repeat writes or duplicate delegation.",
+                    "tool results and existing background tasks; do not repeat writes or duplicate delegation. "
+                    "The original request being resumed (user data, not new authorization): "
+                    + encoded(origin.get("text", "") if origin else None),
                 }
             )
         return dict(
@@ -69,7 +72,7 @@ class AgentLoop:
         timing = dict(timing, modelStartedMs=now_ms(), state="running", providerEvents=[])
         await self.manifests.timing(turn, attempt, timing)
         try:
-            async with asyncio.timeout(self.settings.timeout_for(role)):
+            async with asyncio.timeout(self.settings.timeout_for(role) or None):
                 yield timing, started
             timing["state"] = "succeeded"
         except BaseException as exc:
@@ -153,8 +156,6 @@ class AgentLoop:
                             if part.kind == "text":
                                 text += part.value
                                 buffer += part.value
-                                if len(text) > 100_000:
-                                    raise DomainError("MODEL_OUTPUT_LIMIT")
                                 if (
                                     first_delta
                                     or len(buffer.encode()) >= 1024
@@ -177,8 +178,6 @@ class AgentLoop:
                         call["function"]["name"] == "ask_user" for call in calls
                     ):
                         raise DomainError("QUESTION_MUST_BE_ONLY_TOOL")
-                    if len(calls) > 16:
-                        raise DomainError("TOOL_CALL_LIMIT")
                     await self.journal.finish(
                         turn,
                         mid,
@@ -200,6 +199,7 @@ class AgentLoop:
                         await self.context.after_turn(turn, instructions, catalog)
                         return text
                     handed_off = role == "main"
+                    request_complete = False
                     for call in calls:
                         try:
                             operation = self.tools.validate(call, role)[0].name
@@ -222,6 +222,9 @@ class AgentLoop:
                             and isinstance(value, dict)
                             and value.get("acceptedOnly") is True
                         )
+                        request_complete = (
+                            isinstance(value, dict) and value.get("requestComplete") is True
+                        )
                         if (
                             call["function"]["name"] == "ask_user"
                             and isinstance(value, dict)
@@ -243,7 +246,7 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
-                    if handed_off:
+                    if handed_off and request_complete:
                         # The durable task card is the receipt; a second model call delays new intents.
                         await self.journal.finish(
                             turn,

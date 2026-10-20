@@ -27,7 +27,7 @@ class TaskDispatcher:
         wakeup,
         active,
         *,
-        verification_timeout=15,
+        verification_timeout=None,
     ):
         self.db, self.tasks, self.executor, self.verifier = database, tasks, executor, verifier
         self.native_executor, self.wakeup, self.active = native_executor, wakeup, active
