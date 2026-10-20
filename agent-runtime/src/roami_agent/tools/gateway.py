@@ -260,8 +260,10 @@ class ToolGateway:
                         else ""
                     )
                     + "delegate requires goal and routing with complexity, complexityBasis, routingExplanation "
-                    "and explicitExecutor. Use explicitExecutor=null and omit userQuote when the user made "
-                    "no executor choice; otherwise include the exact source quote. Omit top-level executor. "
+                    'and explicitExecutor. With no user executor choice, merge {"explicitExecutor":null} '
+                    "INSIDE routing and delete routing.userQuote; null must be an actual JSON null. "
+                    "When the user chose an executor, use that choice and its exact source quote instead. "
+                    "Omit top-level executor and unrecognized fields such as taskDescription. "
                     "Correct arguments within the user's scope; never create test/probe tasks or ask the user to fix internal parameters."
                 )
             if role == "main" and value["error"] == "TASK_STEER_USER_REQUEST_REQUIRED":

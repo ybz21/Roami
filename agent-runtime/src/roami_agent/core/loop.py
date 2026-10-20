@@ -108,6 +108,7 @@ class AgentLoop:
                 plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
+                previous_argument_failures = set()
                 for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
@@ -200,6 +201,7 @@ class AgentLoop:
                         return text
                     handed_off = role == "main"
                     request_complete = False
+                    argument_failures = set()
                     for call in calls:
                         try:
                             operation = self.tools.validate(call, role)[0].name
@@ -216,6 +218,14 @@ class AgentLoop:
                             "workspace": turn.get("workspace"),
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
+                        if (
+                            operation is None
+                            and isinstance(value, dict)
+                            and value.get("error") == "INVALID_TOOL_ARGUMENTS"
+                        ):
+                            argument_failures.add(
+                                (call["function"]["name"], encoded(value.get("argumentIssues")))
+                            )
                         handed_off = (
                             handed_off
                             and operation in {"delegate", "task_steer"}
@@ -246,6 +256,9 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
+                    if argument_failures & previous_argument_failures:
+                        raise DomainError("TOOL_ARGUMENT_REPAIR_STALLED", 502)
+                    previous_argument_failures = argument_failures
                     if handed_off and request_complete:
                         # The durable task card is the receipt; a second model call delays new intents.
                         await self.journal.finish(
