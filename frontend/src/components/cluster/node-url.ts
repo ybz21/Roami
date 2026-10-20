@@ -101,12 +101,12 @@ function isHubLocal(path: string): boolean {
  * 包括 <img src>、<iframe src>、<a download>、window.open 这些加不了 header 的，
  * 这也正是身份走路径而不走 header 的原因。认证类路径除外，见 HUB_LOCAL。
  */
-export function nodePath(path: string): string {
-  if (!nodeId) return path
+export function nodePath(path: string, originNode: string | null = nodeId): string {
+  if (!originNode) return path
   // path 形如 /api/login；这里比的是去掉 /api 之后的那一段
   const rel = path.startsWith('/api') ? path.slice(4) : path
   if (isHubLocal(rel)) return path
-  return `/n/${encodeURIComponent(nodeId)}${path}`
+  return `/n/${encodeURIComponent(originNode)}${path}`
 }
 
 /** `/api/...` 的简写；传的 p 以 / 开头，如 nodeApi('/sessions')。 */
