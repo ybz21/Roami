@@ -65,6 +65,7 @@ export interface SettingsPageDef {
   /** 父级名字，面包屑用；叶子页没有父级时为空 */
   parent?: string
   scope: Scope
+  hideScope?: boolean
   note?: string
   items: SettingItem[]
   /** 页级动作：管整页而不是某一项，摆在标题右边 */
@@ -272,7 +273,7 @@ export function buildSettings(deps: {
       }],
     },
     {
-      id: 'agent.bin', name: t('set.pageBin'), parent: t('set.groupAgent'), scope: 'mine',
+      id: 'agent.bin', name: t('set.pageBin'), parent: t('set.groupAgent'), scope: 'node', hideScope: true,
       items: [{ id: 'professionalAgents', label: t('set.pageBin'), bare: true, control: { kind: 'custom', node: <ProfessionalAgents items={[claudeItem, codexItem, opencodeItem, piItem]} /> }, keywords: 'Claude Code Codex OpenCode Pi 用量 额度 路径 command 专业智能体' }],
     },
     {

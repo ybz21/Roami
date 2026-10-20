@@ -49,13 +49,14 @@ function PaneHead({ page, model, compact }: { page: SettingsPageDef; model: Sett
       : t('set.scopeMine')
   const act = page.action
   void model
+  if (compact && page.hideScope && !act && !page.note) return null
   return (
     <>
       {/* 手机上子页顶栏已经写了页名，这里不再写第二遍 */}
       {!compact && page.parent && <div className="crumb">{`${page.parent} · ${page.name}`}</div>}
       <div className="ptitle">
         {!compact && <h2>{page.name}</h2>}
-        <span className={`tt-set-badge${page.scope === 'node' ? ' node' : ''}`}>{where}</span>
+        {!page.hideScope && <span className={`tt-set-badge${page.scope === 'node' ? ' node' : ''}`}>{where}</span>}
         {act && (
           <>
             <span className="grow" />

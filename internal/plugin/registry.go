@@ -12,6 +12,10 @@ func RegisterBuiltinManifest(m Manifest) {
 // SyncBuiltins upserts all registered builtin manifests into the registry.
 func SyncBuiltins(s *Store) error {
 	s.migrateRenamedBuiltins()
+	// Agent discovery is now part of native agent settings.
+	if err := s.Remove("roam.agent-discovery"); err != nil {
+		return err
+	}
 	for _, m := range builtinManifests {
 		if err := m.Validate(); err != nil {
 			return err

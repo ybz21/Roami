@@ -24,6 +24,22 @@ func testStore(t *testing.T) *Store {
 	return s
 }
 
+func TestSyncBuiltinsRetiresAgentDiscovery(t *testing.T) {
+	s := testStore(t)
+	old := Manifest{ManifestVersion: 1, ID: "roam.agent-discovery", Publisher: "roam", Name: "agent-discovery", Version: "0.1.0", Runtime: Runtime{Kind: "builtin"}}
+	if err := s.SyncBuiltin(old); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := SyncBuiltins(s); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Get(old.ID); err == nil {
+			t.Fatal("retired plugin is still registered")
+		}
+	}
+}
+
 // FindCommand 的归属解析:id 限定形式(<id>:<cmd>)只按全 id 精确匹配,
 // 不回退短名——否则短名恰好撞上限定串的插件(如短名 evil 声明
 // evil.host-monitor.stats)会接走伪造 id(evil.host-monitor)的调用。

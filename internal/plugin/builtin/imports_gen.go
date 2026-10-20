@@ -2,7 +2,6 @@
 package builtin
 
 import (
-	_ "github.com/ybz21/Roami/plugins/agentdiscovery"
 	_ "github.com/ybz21/Roami/plugins/cron"
 	_ "github.com/ybz21/Roami/plugins/hostmonitor"
 	_ "github.com/ybz21/Roami/plugins/im"

@@ -1,19 +1,17 @@
-package agentdiscovery
+package agentinventory
 
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
-type quota struct {
+type AgentQuota struct {
+	Reason     string        `json:"reason,omitempty"`
 	Remaining  *float64      `json:"remainingPercent,omitempty"`
 	WindowMin  int           `json:"windowMinutes,omitempty"`
 	ResetsAt   int64         `json:"resetsAt,omitempty"`
@@ -29,68 +27,9 @@ type quotaWindow struct {
 	ResetsAt  int64   `json:"resetsAt,omitempty"`
 }
 
-type entry struct {
-	Kind      string `json:"kind"`
-	Installed bool   `json:"installed"`
-	Quota     quota  `json:"quota"`
-}
-
-var packages = map[string]string{
-	"claude":   "@anthropic-ai/claude-code",
-	"codex":    "@openai/codex",
-	"pi":       "@earendil-works/pi-coding-agent",
-	"opencode": "opencode-ai",
-}
-
-func Activate(*sdk.Ctx) sdk.Plugin {
-	return sdk.Plugin{Commands: map[string]sdk.CommandHandler{"scan": scan, "install": install}}
-}
-
-func scan(ctx *sdk.Ctx, _ map[string]string) (any, error) {
-	providers, err := ctx.AgentProviders()
-	if err != nil {
-		return nil, err
-	}
-	rows := make([]entry, 0, len(providers))
-	kinds := make([]string, 0, len(providers))
-	for kind := range providers {
-		kinds = append(kinds, kind)
-	}
-	sort.Strings(kinds)
-	for _, kind := range kinds {
-		installed := providers[kind]
-		q := quota{State: "unknown"}
-		if installed && kind == "codex" {
-			q = codexQuota()
-		}
-		rows = append(rows, entry{Kind: kind, Installed: installed, Quota: q})
-	}
-	return map[string]any{"agents": rows}, nil
-}
-
-func install(ctx *sdk.Ctx, args map[string]string) (any, error) {
-	kind := strings.TrimSpace(args["kind"])
-	pkg, ok := packages[kind]
-	if !ok {
-		return nil, fmt.Errorf("unsupported agent: %s", kind)
-	}
-	argv := []string{"npm", "install", "-g", pkg}
-	if kind == "pi" {
-		argv = []string{"npm", "install", "-g", "--ignore-scripts", pkg}
-	}
-	result, err := ctx.CommandExec(argv, 300)
-	if err != nil {
-		return nil, err
-	}
-	if result.Exit != 0 {
-		return nil, fmt.Errorf("installation failed (exit %d): %s", result.Exit, result.Output)
-	}
-	return map[string]any{"kind": kind, "installed": true}, nil
-}
-
 // Codex writes rate-limit snapshots into local session events. A stale snapshot is not a live quota.
-func codexQuota() quota {
-	unknown := quota{State: "unknown"}
+func codexQuota() AgentQuota {
+	unknown := AgentQuota{State: "unknown"}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return unknown
@@ -126,8 +65,8 @@ func codexQuota() quota {
 	return unknown
 }
 
-func quotaFromFile(path string) quota {
-	unknown := quota{State: "unknown"}
+func quotaFromFile(path string) AgentQuota {
+	unknown := AgentQuota{State: "unknown"}
 	f, err := os.Open(path)
 	if err != nil {
 		return unknown
@@ -144,7 +83,7 @@ func quotaFromFile(path string) quota {
 	}
 	s := bufio.NewScanner(reader)
 	s.Buffer(make([]byte, 4096), 2<<20)
-	var found quota = unknown
+	var found AgentQuota = unknown
 	for s.Scan() {
 		if !strings.Contains(s.Text(), `"rate_limits"`) {
 			continue
@@ -188,7 +127,7 @@ func quotaFromFile(path string) quota {
 			continue
 		}
 		remaining := windows[0].Remaining
-		found = quota{Remaining: &remaining, WindowMin: windows[0].WindowMin, ResetsAt: windows[0].ResetsAt, ObservedAt: event.Timestamp, Source: "Codex local session", State: "available", Windows: windows}
+		found = AgentQuota{Remaining: &remaining, WindowMin: windows[0].WindowMin, ResetsAt: windows[0].ResetsAt, ObservedAt: event.Timestamp, Source: "Codex local session", State: "available", Windows: windows}
 	}
 	return found
 }

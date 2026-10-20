@@ -1,4 +1,4 @@
-package agentdiscovery
+package agentinventory
 
 import (
 	"fmt"

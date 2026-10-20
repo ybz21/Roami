@@ -113,6 +113,8 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/me", h.Me)
 		g.GET("/info", h.Info)
 		g.GET("/agent/capabilities", h.AgentCapabilities)
+		g.GET("/agent/professional", h.ProfessionalAgents)
+		g.POST("/agent/professional/:kind/install", h.InstallProfessionalAgent)
 
 		g.GET("/fs", h.FS)
 		g.GET("/files", h.Files)            // 文件侧栏：列目录

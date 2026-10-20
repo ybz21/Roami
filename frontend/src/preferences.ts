@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { api } from './api'
 
 export interface Preferences {
+  agentBalanceRefreshSeconds?: number
   theme: 'dark' | 'light'
   claudeThemeSync: boolean // 切 Roami 主题时把 Claude Code 的主题（~/.claude/settings.json）一起切，服务端做
   locale: string
