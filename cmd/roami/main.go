@@ -159,6 +159,7 @@ func main() {
 	//   - standard（默认）：现在的单机 Roami；若配了 cluster.broker，则额外出站注册进云端。
 	// standard 下**本机监听口照常对外**——上云和局域网直连是两条并行的入口，不是二选一。
 	var r *gin.Engine
+	stopBrowserRecovery := func() {}
 	if conf.Cluster.Mode == "hub" {
 		log.Printf("以「中心」模式启动（只做入口 + 机器注册表 + 控制台，不跑本机业务）")
 		r = server.NewHub(cfg)
@@ -179,6 +180,7 @@ func main() {
 		}
 		cfg.NodeClient = cl
 		r = server.New(cfg)
+		stopBrowserRecovery = browser.StartRecovery(context.Background())
 		go maintainPluginDaemon(context.Background(), bin, 15*time.Second)
 		if cl != nil {
 			cl.Handler = r // 业务 Handler 不变，隧道请求经内部主体放行本地鉴权
@@ -192,6 +194,7 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sig
+		stopBrowserRecovery()
 		browser.Shutdown()
 		os.Exit(0)
 	}()

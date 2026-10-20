@@ -35,12 +35,20 @@ Chrome 的画面实时投到网页 `<img>` 上。历史上「画面抖动 / 忽�
 7. **坐标换算使用图片真实布局盒**。显示盒可能高于 stage 并被居中裁切，不能用 stage 高度代替
    `<img>` 的 `clientWidth/clientHeight`，否则移动端工具栏显隐后点击和触摸会整体偏移。
 
+## 连接与恢复
+
+「已连接」以 JPEG 实际加载成功为准。前端只允许一帧正在加载，保留最新待显示帧，显示后才 ACK；旧 Blob URL 在新帧加载后释放。断线或首帧超时自动重连，静态页面收到心跳即可保持连接。
+
+后端先验证页面能响应 CDP，再开始推流，并持续探测渲染器。页面停止响应时返回 `BROWSER_PAGE_UNRESPONSIVE`；普通浏览器页可显式重新打开当前地址，任务固定目标不自动替换。视口调整后请求补帧，背压等待后发送最新帧。
+
+Linux 无头 Chrome 的默认隔离 profile `/tmp/ttmux-chrome` 使用 `--password-store=basic`，避免等待不可见的桌面钥匙环解锁窗口而停在空白页。自定义 profile 保持宿主机密码存储配置。Go 后端与 CLI launcher 的启动参数须一致。
+
 ## 视口自愈（对付外部会话践踏）
 
 CDP 的 `setDeviceMetricsOverride` 作用于**渲染器**、最后写入者赢，且写入会话退出后覆盖仍卡在
 渲染器上（见 `cdp-device-metrics-session-scoped` 教训）。共享 Chrome 上还有别的消费者：
 
-- `chrome-cli screenshot --viewport WxH` 会 `setViewportSize()` 改共享 tab 的设备指标，**截完不恢复**；
+- CLI 的尺寸、设备或整页截图会临时改变共享 tab 的设备指标，截图后恢复；截图执行期间仍可能与镜像重叠；
 - agent / DevTools / 其它镜像连接同理。
 
 任何外部写入都会把镜像的视口踩掉 → 布局重排 → 用户看到「点了一下内容突然变大/变小」。
@@ -70,3 +78,11 @@ CDP 的 `setDeviceMetricsOverride` 作用于**渲染器**、最后写入者赢�
 静态页改视口后不重绘、不产新帧，验证必须用**持续重绘的动态页**。前端左上角调试 HUD
 （stage / vp / inner / dpr / frame）可实时观察各层数值：`frame` 变而 `vp` 不变 = 有人踩视口；
 `stage` 高抖而画面稳 = 显示解耦生效。
+
+## 本机 Chrome 恢复
+
+设置页的「重启 Chrome」也接管 CLI 或旧后端启动的本机实例：按回环 CDP 端口精确识别 Chrome 主进程，优先发送 `Browser.close`，超时才对该进程发送终止信号；不杀外部进程组。重启串行执行，确认浏览器身份已变化后才返回成功。远程 CDP 不支持本机重启，端口上的未知程序也不会被终止。DevTools 代理随当前 CDP 地址更新。
+
+`autoRecover` 默认开启，可在设置页即时关闭。后端每 5 秒检查已使用过的浏览器，两次连续失败后重启；自动重启间隔至少一分钟。只有所有用户标签都无响应时才重启整台 Chrome，单个卡住的标签使用镜像中的「重新打开此页」。后台探测并发最多 4 个、总时限 5 秒，不会为探测新建标签。
+
+标签地址写入数据目录的 `browser-recovery.json`（0600，绑定 profile），崩溃或后端重启后复用原 profile 并恢复地址；Chrome 已恢复的同址标签不会重复创建。仅恢复 URL，未提交表单等页面内存状态不会保留。服务退出先停止监护，再回收自身启动的 Chrome。

@@ -17,12 +17,13 @@ import (
 
 // Config 是可在 UI 里调的 Chrome 启动项。字符串空 / Fullscreen 为 nil = 未设，回落到 env/默认。
 type Config struct {
-	Headless   string `json:"headless"`   // "auto"(按有无显示器自动) | "on"(强制无头) | "off"(强制有头)
-	WindowSize string `json:"windowSize"` // headless 初始窗口，如 "1920,1080"
-	Fullscreen *bool  `json:"fullscreen"` // headful 是否全屏启动(--start-fullscreen)
-	Scale      string `json:"scale"`      // --force-device-scale-factor
-	Profile    string `json:"profile"`    // --user-data-dir（用户数据目录）
-	Bin        string `json:"bin"`        // chrome 可执行路径（空=自动探测）
+	Headless    string `json:"headless"`   // "auto"(按有无显示器自动) | "on"(强制无头) | "off"(强制有头)
+	WindowSize  string `json:"windowSize"` // headless 初始窗口，如 "1920,1080"
+	Fullscreen  *bool  `json:"fullscreen"` // headful 是否全屏启动(--start-fullscreen)
+	Scale       string `json:"scale"`      // --force-device-scale-factor
+	Profile     string `json:"profile"`    // --user-data-dir（用户数据目录）
+	AutoRecover *bool  `json:"autoRecover"`
+	Bin         string `json:"bin"` // chrome 可执行路径（空=自动探测）
 }
 
 var cfgStore struct {
@@ -44,7 +45,7 @@ func InitConfig(dataDir string) {
 	// 恢复上次用的端口：重启后端后优先在该端口找仍存活的 Chrome（attach 而非另起）。
 	if !cdpFixed {
 		if p := recordedPort(); p > 0 {
-			CDPBase = "http://127.0.0.1:" + strconv.Itoa(p)
+			setCDPAddress("http://127.0.0.1:" + strconv.Itoa(p))
 		}
 	}
 }
@@ -93,8 +94,8 @@ func loadConfig() Config {
 // saveConfig 原子写回。
 func saveConfig(c Config) error {
 	cfgStore.mu.Lock()
+	defer cfgStore.mu.Unlock()
 	f := cfgStore.file
-	cfgStore.mu.Unlock()
 	if f == "" {
 		return os.ErrInvalid
 	}
@@ -141,13 +142,18 @@ func effectiveConfig() Config {
 	} else if os.Getenv("TTMUX_CHROME_FULLSCREEN") == "0" {
 		fs = false
 	}
+	recover := true
+	if c.AutoRecover != nil {
+		recover = *c.AutoRecover
+	}
 	return Config{
-		Headless:   pick(normalizeHeadless(c.Headless), "", "auto"),
-		WindowSize: pick(c.WindowSize, os.Getenv("TTMUX_CHROME_WINDOW"), "1920,1080"),
-		Fullscreen: &fs,
-		Scale:      pick(c.Scale, os.Getenv("TTMUX_CHROME_SCALE"), "2"),
-		Profile:    pick(c.Profile, os.Getenv("TTMUX_CHROME_PROFILE"), "/tmp/ttmux-chrome"),
-		Bin:        pick(c.Bin, os.Getenv("CHROME_BIN"), ""),
+		AutoRecover: &recover,
+		Headless:    pick(normalizeHeadless(c.Headless), "", "auto"),
+		WindowSize:  pick(c.WindowSize, os.Getenv("TTMUX_CHROME_WINDOW"), "1920,1080"),
+		Fullscreen:  &fs,
+		Scale:       pick(c.Scale, os.Getenv("TTMUX_CHROME_SCALE"), "2"),
+		Profile:     pick(c.Profile, os.Getenv("TTMUX_CHROME_PROFILE"), "/tmp/ttmux-chrome"),
+		Bin:         pick(c.Bin, os.Getenv("CHROME_BIN"), ""),
 	}
 }
 
@@ -161,12 +167,15 @@ func Health(c *gin.Context) {
 	statusMu.Lock()
 	e := lastErr
 	statusMu.Unlock()
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"alive": alive(), "cdp": CDPBase, "error": e}})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"alive": alive(), "cdp": cdpAddress(), "error": e, "restarting": restarting.Load(), "canRestart": localCDP(), "autoRecover": *effectiveConfig().AutoRecover}})
 }
 
 // SetConfig 整体覆盖保存配置（不立即重启 Chrome；调 /browser/relaunch 才换上新参数）。
 func SetConfig(c *gin.Context) {
-	if cfgStore.file == "" {
+	cfgStore.mu.Lock()
+	initialized := cfgStore.file != ""
+	cfgStore.mu.Unlock()
+	if !initialized {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "NO_STORE"}})
 		return
 	}
@@ -183,20 +192,13 @@ func SetConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true}})
 }
 
-// Relaunch 重启本进程拉起的 Chrome，让新配置生效。若当前附着的是外部 Chrome（非本进程拉起），
-// 杀不动它 → 端口仍活，无法换参，回报 attached 让前端提示用户手动关闭那台。
+// Relaunch also adopts a local Chrome launched by the CLI or an earlier server.
 func Relaunch(c *gin.Context) {
-	procMu.Lock()
-	own := chrome != nil && chrome.Process != nil
-	procMu.Unlock()
-	Shutdown() // 杀掉本进程拉起的 Chrome（外部 Chrome 为空操作）
-	if !own && alive() {
-		c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": false, "attached": true}})
+	result, err := restartChrome(nil)
+	if err != nil {
+		setLastErr(err.Error())
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "RELAUNCH_FAILED", "message": err.Error()}})
 		return
 	}
-	if err := ensureChrome(); err != nil { // 端口已死 → 按新配置重新拉起
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "RELAUNCH_FAILED", "message": err.Error()}})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true}})
+	c.JSON(http.StatusOK, gin.H{"data": result})
 }

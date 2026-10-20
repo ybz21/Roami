@@ -28,11 +28,11 @@ const cdpPrefix = "/api/browser/cdp"
 var devtoolsProxy = newDevtoolsProxy()
 
 func newDevtoolsProxy() *httputil.ReverseProxy {
-	u, _ := url.Parse(CDPBase) // http://127.0.0.1:9222
+	u, _ := url.Parse(cdpAddress()) // http://127.0.0.1:9222
 	p := httputil.NewSingleHostReverseProxy(u)
-	base := p.Director
 	p.Director = func(req *http.Request) {
-		base(req) // 置好 scheme/host，并把入站 path 拼到 target.Path（这里为空）
+		u, _ := url.Parse(cdpAddress())
+		req.URL.Scheme, req.URL.Host = u.Scheme, u.Host
 		// Chrome 调试端口有 DNS-rebind 防护：Host 必须是 IP/localhost，否则 500。
 		req.Host = u.Host
 		// 去 Origin：Chrome 的 remote-allow-origins 校验仅在带 Origin 时生效；

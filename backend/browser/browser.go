@@ -31,6 +31,7 @@ import (
 // CDPBase 是 Chrome 远程调试根地址。默认 127.0.0.1:9222；端口被占时会自动换一个空闲端口并记录复用。
 // 设了环境变量 TTMUX_CHROME_CDP 则固定用它（不自动换端口）。
 var (
+	cdpMu    sync.RWMutex
 	cdpFixed = os.Getenv("TTMUX_CHROME_CDP") != ""
 	CDPBase  = envOr("TTMUX_CHROME_CDP", "http://127.0.0.1:9222")
 )
@@ -54,9 +55,13 @@ func setLastErr(s string) { statusMu.Lock(); lastErr = s; statusMu.Unlock() }
 // /browser/tabs 轮询和 ensureChrome 的等待循环里都调，一挂就是整条请求链卡死。
 var cdpHTTP = &http.Client{Timeout: 3 * time.Second}
 
+func cdpAddress() string { cdpMu.RLock(); defer cdpMu.RUnlock(); return CDPBase }
+
+func setCDPAddress(address string) { cdpMu.Lock(); CDPBase = address; cdpMu.Unlock() }
+
 // cdpPort 解析 CDPBase 里的端口；解析失败回落 9222。
 func cdpPort() int {
-	if u, err := url.Parse(CDPBase); err == nil {
+	if u, err := url.Parse(cdpAddress()); err == nil {
 		if _, p, err := net.SplitHostPort(u.Host); err == nil {
 			if n, err := strconv.Atoi(p); err == nil {
 				return n
@@ -68,7 +73,7 @@ func cdpPort() int {
 
 // setCDPPort 切到新端口并持久化记录（下次启动优先复用，避免反复换端口开多个 Chrome）。
 func setCDPPort(port int) {
-	CDPBase = fmt.Sprintf("http://127.0.0.1:%d", port)
+	setCDPAddress(fmt.Sprintf("http://127.0.0.1:%d", port))
 	recordPort(port)
 }
 
@@ -139,6 +144,13 @@ func ensureChrome() error {
 	}
 	launchMu.Lock()
 	defer launchMu.Unlock()
+	return ensureChromeLocked()
+}
+
+func ensureChromeLocked() error {
+	if !localCDP() {
+		return fmt.Errorf("remote Chrome must be restarted on its host")
+	}
 	if alive() { // 双检：等锁期间别的协程可能已拉起就绪
 		return nil
 	}
@@ -155,7 +167,7 @@ func ensureChrome() error {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-		err := fmt.Errorf("Chrome 启动中或上次未就绪，调试端口 %s 暂未就绪", CDPBase)
+		err := fmt.Errorf("Chrome 启动中或上次未就绪，调试端口 %s 暂未就绪", cdpAddress())
 		setLastErr(err.Error())
 		return err
 	}
@@ -172,6 +184,9 @@ func ensureChrome() error {
 			setLastErr("")
 			return nil
 		}
+	}
+	if currentChromePID() > 0 {
+		return fmt.Errorf("Chrome is not responding; waiting for recovery or a manual restart")
 	}
 
 	// 端口选择：当前端口被别的进程占着（且不是可用 Chrome，否则上面 alive 已 attach）→ 换一个空闲端口，
@@ -208,6 +223,10 @@ func ensureChrome() error {
 		(cfg.Headless != "off" && runtime.GOOS != "darwin" && (isWSL() || os.Getenv("DISPLAY") == ""))
 	if headless { // screencast 在无头下同样可用
 		args = append(args, "--headless=new", "--window-size="+cfg.WindowSize)
+		if runtime.GOOS == "linux" && cfg.Profile == "/tmp/ttmux-chrome" {
+			// The default isolated profile must not wait for an invisible desktop keyring prompt.
+			args = append(args, "--password-store=basic")
+		}
 	} else if cfg.Fullscreen != nil && *cfg.Fullscreen { // 有头：全屏启动，画面铺满宿主屏幕
 		args = append(args, "--start-fullscreen")
 	}
@@ -244,6 +263,11 @@ func ensureChrome() error {
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); { // 最多等 5s（含探活自身耗时）
 		if alive() {
 			setLastErr("") // 就绪：清掉上次错误
+			if *cfg.AutoRecover {
+				if _, err := restoreTabs(savedRecoveryURLs()); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -256,7 +280,7 @@ func ensureChrome() error {
 	if exited {
 		e = fmt.Errorf("Chrome 启动后随即退出（常见：profile %q 被你平时的 Chrome 占用，或可执行路径/参数有误）", cfg.Profile)
 	} else {
-		e = fmt.Errorf("Chrome 调试端口 %s 未就绪（启动较慢或端口被防火墙拦）", CDPBase)
+		e = fmt.Errorf("Chrome 调试端口 %s 未就绪（启动较慢或端口被防火墙拦）", cdpAddress())
 	}
 	setLastErr(e.Error())
 	return e
@@ -279,7 +303,7 @@ func Shutdown() {
 }
 
 func alive() bool {
-	resp, err := cdpHTTP.Get(CDPBase + "/json/version")
+	resp, err := cdpHTTP.Get(cdpAddress() + "/json/version")
 	if err != nil {
 		return false
 	}
@@ -337,7 +361,7 @@ func parseProfilePort(psOut, profile string) int {
 // browserUA 取这台 Chrome 的原生 User-Agent（/json/version 的 "User-Agent" 字段）。
 // 用于手机模式切回桌面时复位 UA——CDP 没有 clearUserAgentOverride，只能再 set 回默认值。
 func browserUA() string {
-	resp, err := cdpHTTP.Get(CDPBase + "/json/version")
+	resp, err := cdpHTTP.Get(cdpAddress() + "/json/version")
 	if err != nil {
 		return ""
 	}
@@ -376,7 +400,7 @@ func isUserTab(t target) bool {
 // rawTargets 是 /json 的原样结果：什么都不过滤。
 // 「这个 id 还在不在」必须问它——问 listPages 的话，被过滤掉的目标看起来永远是「已经关了」。
 func rawTargets() []target {
-	resp, err := cdpHTTP.Get(CDPBase + "/json")
+	resp, err := cdpHTTP.Get(cdpAddress() + "/json")
 	if err != nil {
 		return nil
 	}
@@ -429,12 +453,12 @@ func targetWS(id string) (string, error) {
 
 // newTab 新建一个标签页（Chrome ≥111 要求 PUT /json/new），返回新标签 id。
 func newTab(rawURL string) (string, error) {
-	u := CDPBase + "/json/new"
+	u := cdpAddress() + "/json/new"
 	if rawURL != "" {
-		u += "?" + rawURL
+		u += "?" + url.QueryEscape(rawURL)
 	}
 	req, _ := http.NewRequest(http.MethodPut, u, nil)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := cdpHTTP.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -461,7 +485,7 @@ var ErrNotClosable = errors.New("这一页是 Chrome 的浏览器界面（不是
 // 不能只看 /json/close 的回复：它对关不掉的目标也回 200 "Target is closing"，
 // 于是前端以为关成功，下一次 3 秒轮询那一行又回来了——用户看到的就是「这标签关不掉」。
 func closeTab(id string) error {
-	resp, err := cdpHTTP.Get(CDPBase + "/json/close/" + id)
+	resp, err := cdpHTTP.Get(cdpAddress() + "/json/close/" + id)
 	if err != nil {
 		return err
 	}
@@ -515,7 +539,7 @@ func frontSnapshot() (string, uint64) {
 
 // activateTab 把指定标签页在 Chrome 里前置（让 agent 的前台焦点与正在镜像的一致）。
 func activateTab(id string) error {
-	resp, err := cdpHTTP.Get(CDPBase + "/json/activate/" + id)
+	resp, err := cdpHTTP.Get(cdpAddress() + "/json/activate/" + id)
 	if err != nil {
 		return err
 	}
@@ -577,8 +601,20 @@ func tabReload(id string) error {
 
 func tabNavigate(id, url string) error {
 	return withTab(id, func(c *cdp) error {
-		_, err := c.call("Page.navigate", map[string]any{"url": url})
-		return err
+		result, err := c.call("Page.navigate", map[string]any{"url": url})
+		if err != nil {
+			return err
+		}
+		var navigation struct {
+			ErrorText string `json:"errorText"`
+		}
+		if err := json.Unmarshal(result, &navigation); err != nil {
+			return err
+		}
+		if navigation.ErrorText != "" {
+			return fmt.Errorf("%s", navigation.ErrorText)
+		}
+		return nil
 	})
 }
 

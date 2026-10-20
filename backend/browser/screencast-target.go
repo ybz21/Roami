@@ -10,7 +10,7 @@ import (
 )
 
 func currentBrowserIdentity() (string, error) {
-	response, err := cdpHTTP.Get(CDPBase + "/json/version")
+	response, err := cdpHTTP.Get(cdpAddress() + "/json/version")
 	if err != nil {
 		return "", fmt.Errorf("BROWSER_RESOURCE_CHANGED")
 	}

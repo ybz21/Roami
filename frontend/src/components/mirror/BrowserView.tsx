@@ -18,6 +18,7 @@ import {
   fmtRate, IconBtn, MirrorChrome, MirrorMenu, Omnibox, StatusChip, StreamControl, useFullscreen, useShelf, type Quality,
 } from './mirror'
 import { TabSheet, TabStrip, type TabInfo } from './browser-tabs'
+import { connectBrowserStream } from './browser-stream'
 
 // 清晰度档位与手机页共用（mirror.tsx 的 QUALITY_OPTS），这里只有存盘的 key 不同
 const QKEY = 'ttmux.browser.quality'
@@ -247,6 +248,17 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   }
   const closeTab = (id: string) => closeTabs([id])
 
+  const reopenTab = async () => {
+    const previous = target
+    const address = tabs.find(tab => tab.id === previous)?.url
+    try {
+      const result = await api('POST', '/browser/tabs', { url: address && address !== 'about:blank' ? address : smartUrl(url || home) })
+      if (!result?.data?.id) return
+      switchTab(result.data.id)
+      await closeTab(previous)
+    } catch (error: any) { message.error(error.message) }
+  }
+
   // 地址栏跟随当前标签页真实 URL（聚焦编辑时不覆盖；about:blank 显示为空）
   useEffect(() => {
     if (addrFocused.current) return
@@ -344,7 +356,9 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // control / target 变化才重连；画质切换【不重连】(连上后发 quality 消息，见下面 changeQuality)，
   // 设备/尺寸切换也不重连(发 emulate 消息)。重连会重设 device metrics、首帧畸形 → 画面跳/页面忽大小。
   useEffect(() => {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    if (!imgRef.current) return
+    setConnected(false)
+    setHealthMsg('')
     const params = new URLSearchParams()
     if (control) params.set('control', '1')
     if (quality === 'auto') params.set('auto', '1') // 仅首连/换 target 时用来定初始档；之后靠消息切
@@ -355,35 +369,28 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     // 到原 /api/browser/stream WS（frpUrl），行为与迁移前逐字节一致。p2p 分支把 query 里的
     // params 经 init 握手带给后端（原本靠 WS query 传）。
     const frpUrl = nodeWs(`/browser/stream?${params}`)
-    const tp = connect('screencast', { frpUrl, initParams: Object.fromEntries(params) })
+    const tp = connectBrowserStream(imgRef.current,
+      () => connect('screencast', { frpUrl, initParams: Object.fromEntries(params) }),
+      ({ w, h, bytes }) => {
+        setConnected(true)
+        setHealthMsg('')
+        sizeRef.current = { w, h }
+        setFrame(frame => frame.w === w && frame.h === h ? frame : { w, h })
+        bytesRef.current += bytes
+        framesRef.current++
+      })
     tpRef.current = tp
     lastEmuRef.current = '' // 新连接：后端会话尚无视口覆盖，onopen 必须强制发一次 emulate
-    let objURL: string | null = null
     // 连上（frp=WS open / p2p=DataChannel open）即同步当前设备/尺寸，语义等价迁移前 ws.onopen。
-    tp.onopen = () => { setConnected(true); setHealthMsg(''); sendEmulate(true) }
+    tp.onopen = () => { setConnected(false); sendEmulate(true) }
     tp.onmessage = (data) => {
-      // 二进制 = 一帧：[w:u16][h:u16][seq:u16][jpeg...]；显示后回 ack 归还信用
-      if (typeof data !== 'string') {
-        if (!imgRef.current) return
-        const buf = data as ArrayBuffer
-        const dv = new DataView(buf)
-        const w = dv.getUint16(0, true), h = dv.getUint16(2, true), seq = dv.getUint16(4, true)
-        sizeRef.current = { w: w || 1280, h: h || 800 }
-        // 尺寸变了才 setState（每帧都设会把整棵树重渲染成一秒几十次）
-        setFrame((f) => (f.w === sizeRef.current.w && f.h === sizeRef.current.h ? f : { ...sizeRef.current }))
-        bytesRef.current += buf.byteLength
-        framesRef.current++
-        if (objURL) URL.revokeObjectURL(objURL)
-        objURL = URL.createObjectURL(new Blob([new Uint8Array(buf, 6)], { type: 'image/jpeg' }))
-        imgRef.current.src = objURL
-        tp.send(JSON.stringify({ type: 'ack', n: seq }))
-        return
-      }
+      if (typeof data !== 'string') return
       const msg = JSON.parse(data)
       if (msg.type === 'error') {
-        const reason = msg.msg === 'BROWSER_RESOURCE_CHANGED' ? t('agent.task.browserChanged') : msg.msg === 'BROWSER_TARGET_UNAVAILABLE' ? t('agent.task.tabUnavailable') : msg.msg
-        message.error(reason)
-        if (expectedBrowser) { setHealthMsg(reason); setConnected(false); imgRef.current?.removeAttribute('src') }
+        const reason = msg.msg === 'BROWSER_RESOURCE_CHANGED' ? t('agent.task.browserChanged') : msg.msg === 'BROWSER_TARGET_UNAVAILABLE' ? t('agent.task.tabUnavailable') : msg.msg === 'BROWSER_PAGE_UNRESPONSIVE' ? t('browser.pageUnresponsive') : msg.msg
+        setHealthMsg(reason)
+        setConnected(false)
+        if (expectedBrowser && (msg.msg === 'BROWSER_RESOURCE_CHANGED' || msg.msg === 'BROWSER_TARGET_UNAVAILABLE')) tp.close()
         return
       }
       if (msg.type === 'pong') { setLatency(Math.round(performance.now() - msg.t)); return }
@@ -418,10 +425,12 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       setBw(bytesRef.current); setFps(framesRef.current)
       bytesRef.current = 0; framesRef.current = 0
     }, 1000)
+    const visible = () => { if (document.visibilityState === 'visible') send({ type: 'refresh' }) }
+    document.addEventListener('visibilitychange', visible)
     return () => {
       clearInterval(ping); clearInterval(meter)
-      if (objURL) URL.revokeObjectURL(objURL)
-      tp.onmessage = () => {}; tp.onclose = () => {} // 卸载后忽略在途回调
+      document.removeEventListener('visibilitychange', visible)
+      tp.onopen = () => {}; tp.onmessage = () => {}; tp.onclose = () => {}
       tp.close()
       if (tpRef.current === tp) tpRef.current = null
     }
@@ -847,16 +856,19 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
             <span key={p.id} className="bv-ripple" style={{ left: p.x, top: p.y }} />
           ))}
           {/* 连不上且后端报了原因：覆盖一层提示，省得用户对着黑屏猜 */}
-          {!connected && healthMsg && (
+          {!connected && (
             <div style={{
               position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: 24, pointerEvents: 'none',
+              padding: 'var(--sp-5)', pointerEvents: 'none',
             }}>
               <div style={{
-                maxWidth: 520, padding: 'var(--sp-3) var(--sp-4)', borderRadius: 'var(--r-sm)', background: 'rgba(0,0,0,.72)',
-                border: '1px solid var(--danger-border)', color: 'var(--danger)', fontSize: 'var(--fs-sm)', lineHeight: 1.6, textAlign: 'center',
+                maxWidth: '100%', padding: 'var(--sp-3) var(--sp-4)', borderRadius: 'var(--r-sm)', background: 'var(--bg-container)',
+                color: healthMsg ? 'var(--danger)' : 'var(--text-dim)', fontSize: 'var(--fs-sm)', textAlign: 'center', pointerEvents: 'auto',
               }}>
-                {t('browser.launchFailed')}<br />{healthMsg}
+                {healthMsg || t('browser.waitingFrame')}
+                {healthMsg === t('browser.pageUnresponsive') && !expectedBrowser && (
+                  <div style={{ marginTop: 'var(--sp-3)' }}><button type="button" className="tt-act" onClick={reopenTab}>{t('browser.reopenTab')}</button></div>
+                )}
               </div>
             </div>
           )}

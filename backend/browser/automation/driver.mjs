@@ -162,7 +162,7 @@ async function freshScreenshot(flags, pos, timeoutMs, io) {
     fresh = await chromium.launch({ ...launch, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'], timeout: to })
     const context = await fresh.newContext({
       viewport: vp,
-      ignoreHTTPSErrors: true, // 同 allowInsecureTLS：自签 HTTPS（含 ttmux 自己）不该停在拦截页
+      ignoreHTTPSErrors: true, // 同 withInsecureTLS：自签 HTTPS（含 ttmux 自己）不该停在拦截页
       deviceScaleFactor: num(flags.scale, device ? device.scale : 1),
       ...(device ? { userAgent: device.ua, isMobile: true, hasTouch: true } : {}),
     })
@@ -182,12 +182,77 @@ async function freshScreenshot(flags, pos, timeoutMs, io) {
 // 拦截页上，连自己的 Web UI 都驱动不了。按 CDP 逐标签放行（Security 域是会话级的），而不是给
 // Chrome 加启动开关——那台 Chrome 可能是后端起的，启动开关这时根本轮不到我们加，
 // 而且它一加就是整个浏览器全站放行，把镜像里的正常上网也一起松掉了。
-async function allowInsecureTLS(ctx, page) {
+async function withInsecureTLS(ctx, page, action) {
+  let session
   try {
-    const s = await ctx.newCDPSession(page)
-    await s.send('Security.enable') // 少这一句 setIgnoreCertificateErrors 会静默无效（返回 {} 但照拦）
-    await s.send('Security.setIgnoreCertificateErrors', { ignore: true })
+    session = await ctx.newCDPSession(page)
+    await session.send('Security.enable') // 少这一句 setIgnoreCertificateErrors 会静默无效（返回 {} 但照拦）
+    await session.send('Security.setIgnoreCertificateErrors', { ignore: true })
   } catch {} // 老版本 Chrome 不支持就算了，导航照走（顶多停在拦截页）
+  try { return await action() } finally { await session?.detach().catch(() => {}) }
+}
+
+const screenshotSessions = new WeakMap()
+
+async function cdpScreenshot(page, flags, file, timeoutMs) {
+  const device = resolveDevice(flags, message => { throw new ChromeError(message) })
+  const viewport = device || parseViewport(flags.viewport)
+  let session = screenshotSessions.get(page)
+  if (!session) {
+    session = await page.context().newCDPSession(page)
+    // Full-page capture also overrides metrics; retain one owner per live page.
+    screenshotSessions.set(page, session)
+    page.once('close', () => {
+      screenshotSessions.delete(page)
+      session.detach().catch(() => {})
+    })
+  }
+  let original
+  try {
+    if (viewport || flags.full) {
+      const { result } = await session.send('Runtime.evaluate', {
+        expression: `({width:innerWidth,height:innerHeight,deviceScaleFactor:devicePixelRatio,
+          screenWidth:screen.width,screenHeight:screen.height,userAgent:navigator.userAgent,
+          touchPoints:navigator.maxTouchPoints,mobile:/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)})`,
+        returnByValue: true,
+      })
+      original = result.value
+    }
+    if (viewport) {
+      await session.send('Emulation.setDeviceMetricsOverride', {
+        width: viewport.width, height: viewport.height,
+        deviceScaleFactor: device ? num(flags.scale, device.scale) : original.deviceScaleFactor,
+        mobile: !!device, screenWidth: viewport.width, screenHeight: viewport.height,
+      })
+      if (device) {
+        await session.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+        await session.send('Emulation.setUserAgentOverride', { userAgent: device.ua })
+      }
+    }
+    if (settleMs(flags) > 0) await page.waitForTimeout(settleMs(flags))
+    const params = { format: imageType(file), fromSurface: true, captureBeyondViewport: !!flags.full }
+    if (params.format === 'jpeg') params.quality = num(flags.quality, 85)
+    const clip = parseClip(flags.clip)
+    if (clip) params.clip = { ...clip, scale: 1 }
+    else if (flags.full) {
+      const metrics = await session.send('Page.getLayoutMetrics')
+      const size = metrics.cssContentSize || metrics.contentSize
+      params.clip = { x: 0, y: 0, width: Math.ceil(size.width), height: Math.ceil(size.height), scale: 1 }
+    }
+    const out = await withTimeout(session.send('Page.captureScreenshot', params), timeoutMs, 'CDP screenshot')
+    await writeFile(file, Buffer.from(out.data, 'base64'))
+  } finally {
+    if (original) {
+      // Restore the rendered viewport, including overrides owned by a live mirror connection.
+      const { userAgent, touchPoints, ...metrics } = original
+      if (metrics.mobile) { metrics.width = metrics.screenWidth; metrics.height = metrics.screenHeight }
+      await session.send('Emulation.setDeviceMetricsOverride', metrics).catch(() => {})
+      if (device) {
+        await session.send('Emulation.setTouchEmulationEnabled', { enabled: touchPoints > 0, ...(touchPoints > 0 ? { maxTouchPoints: touchPoints } : {}) }).catch(() => {})
+        await session.send('Emulation.setUserAgentOverride', { userAgent }).catch(() => {})
+      }
+    }
+  }
 }
 
 // ── 主动词分发：操作一条已连好的 CDP browser。daemon 与一次性冷启动路径共用 ─────────────
@@ -219,7 +284,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
   }
 
   switch (verb) {
-    case 'goto': { const p = await pickHere(); await allowInsecureTLS(ctx, p); await p.goto(pos[0], { waitUntil: navigationWait(flags), timeout: to }); io.log({ url: p.url(), title: await p.title() }); break }
+    case 'goto': { const p = await pickHere(); await withInsecureTLS(ctx, p, () => p.goto(pos[0], { waitUntil: navigationWait(flags), timeout: to })); io.log({ url: p.url(), title: await p.title() }); break }
     case 'url': io.log((await pickHere()).url()); break
     case 'title': io.log(await (await pickHere()).title()); break
     case 'click': await (await pickHere()).click(pos[0], { timeout: to }); io.log('ok'); break
@@ -234,61 +299,17 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
     case 'screenshot': case 'shot': {
       const f = pos[0] || 'screenshot.png'
       const p = await pickHere()
-      const device = resolveDevice(flags, fail)
-      const vp = parseViewport(flags.viewport) || (device ? { width: device.width, height: device.height } : null)
-      const clip = parseClip(flags.clip)
-      if (vp) await p.setViewportSize(vp)
-      if (settle() > 0) await p.waitForTimeout(settle())
-      const type = imageType(f)
-      const quality = type === 'jpeg' ? num(flags.quality, 85) : undefined
-      // 手机模式：设备指标/UA/触摸覆盖 + 截图必须同一 CDP 会话（覆盖随会话失效），
-      // 故走专用 CDP 截图，截完清掉覆盖，不污染共享 Chrome 的后续使用与 Web 镜像。
-      if (device) {
-        const s = await ctx.newCDPSession(p)
-        await s.send('Emulation.setDeviceMetricsOverride', {
-          width: device.width, height: device.height,
-          deviceScaleFactor: num(flags.scale, device.scale), mobile: true,
-          screenWidth: device.width, screenHeight: device.height,
-        })
-        await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }).catch(() => {})
-        await s.send('Emulation.setUserAgentOverride', { userAgent: device.ua }).catch(() => {})
-        if (settle() > 0) await p.waitForTimeout(settle())
-        const params = { format: type, fromSurface: true, captureBeyondViewport: !!flags.full }
-        if (quality !== undefined) params.quality = quality
-        if (clip) {
-          params.clip = { ...clip, scale: 1 }
-        } else if (flags.full) {
-          const metrics = await s.send('Page.getLayoutMetrics')
-          const size = metrics.cssContentSize || metrics.contentSize
-          params.clip = { x: 0, y: 0, width: Math.ceil(size.width), height: Math.ceil(size.height), scale: 1 }
-        }
-        const out = await withTimeout(s.send('Page.captureScreenshot', params), to, 'device screenshot')
-        await writeFile(f, Buffer.from(out.data, 'base64'))
-        await s.send('Emulation.clearDeviceMetricsOverride').catch(() => {})
-        io.log(f)
-        break
-      }
-      const cdpScreenshot = async () => {
-        const cdpSession = await ctx.newCDPSession(p)
-        const params = { format: type, fromSurface: true, captureBeyondViewport: !!flags.full }
-        if (quality !== undefined) params.quality = quality
-        if (clip) {
-          params.clip = { ...clip, scale: 1 }
-        } else if (flags.full) {
-          const metrics = await cdpSession.send('Page.getLayoutMetrics')
-          const size = metrics.cssContentSize || metrics.contentSize
-          params.clip = { x: 0, y: 0, width: Math.ceil(size.width), height: Math.ceil(size.height), scale: 1 }
-        }
-        const out = await cdpSession.send('Page.captureScreenshot', params)
-        await writeFile(f, Buffer.from(out.data, 'base64'))
-      }
-      if (flags.fast) {
-        await withTimeout(cdpScreenshot(), to, 'fast screenshot')
+      const sized = !!(flags.viewport || flags.device || flags.mobile)
+      if (flags.fast || sized) {
+        await cdpScreenshot(p, flags, f, to)
       } else {
+        if (settle() > 0) await p.waitForTimeout(settle())
+        const type = imageType(f)
+        const quality = type === 'jpeg' ? num(flags.quality, 85) : undefined
         try {
-          await withTimeout(p.screenshot({ path: f, fullPage: !!flags.full, clip, type, quality, timeout: to }), to ? to + 1000 : 0, 'screenshot')
-        } catch (e) {
-          await withTimeout(cdpScreenshot(), to, 'fallback screenshot')
+          await withTimeout(p.screenshot({ path: f, fullPage: !!flags.full, clip: parseClip(flags.clip), type, quality, timeout: to }), to ? to + 1000 : 0, 'screenshot')
+        } catch {
+          await cdpScreenshot(p, flags, f, to)
         }
       }
       io.log(f)
@@ -308,7 +329,12 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
         break
       }
       const np = await ctx.newPage()
-      if (pos[0]) { await allowInsecureTLS(ctx, np); await np.goto(pos[0], { waitUntil: 'load', timeout: to }) }
+      try {
+        if (pos[0]) await withInsecureTLS(ctx, np, () => np.goto(pos[0], { waitUntil: 'load', timeout: to }))
+      } catch (error) {
+        await np.close().catch(() => {})
+        throw error
+      }
       if (!flags['no-focus']) await np.bringToFront().catch(() => {})
       io.log({ i: userPages(ctx.pages()).indexOf(np), targetId: await targetIdentity(np), url: np.url() })
       break
@@ -850,7 +876,7 @@ async function main() {
   process.exitCode = resp.code || 0
 }
 
-export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait, handleConnection }
+export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait, handleConnection, cdpScreenshot, withInsecureTLS }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === SELF_PATH) {
   main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })

@@ -39,11 +39,12 @@ func NewTab(c *gin.Context) {
 	if body.URL == "" {
 		body.URL = "about:blank"
 	}
-	if _, err := newTab(body.URL); err != nil {
+	id, err := newTab(body.URL)
+	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"message": err.Error()}})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true}})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true, "id": id}})
 }
 
 // CloseTab 关闭指定标签页。

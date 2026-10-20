@@ -10,12 +10,14 @@ import { App as AntApp, Input, Segmented, Space, Switch } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 
-const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '' }
+const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '', autoRecover: true }
 
 export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (() => Promise<void>) | null) => void }) {
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const [cfg, setCfg] = useState<any>(DEFAULTS)
+  const [health, setHealth] = useState<{ alive: boolean; restarting?: boolean } | null>(null)
+  const [restartBusy, setRestartBusy] = useState(false)
   const [pendingRestart, setPendingRestart] = useState(false)
   const writes = useRef<Promise<unknown>>(Promise.resolve())
   const cfgRef = useRef(cfg)
@@ -28,23 +30,52 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
     return write.then(() => setPendingRestart(true))
   }
   useEffect(() => {
-    onRestartReady?.(readState ? null : () => new Promise<void>(resolve => {
+    onRestartReady?.(readState ? null : () => new Promise<void>((resolve, reject) => {
       modal.confirm({
         title: t('settings.browserRelaunch'), content: t('settings.browserRestartConfirm'),
         onCancel: () => resolve(),
         onOk: async () => {
+          setRestartBusy(true)
           try {
             await persist(cfgRef.current)
             const r = await api('POST', '/browser/relaunch')
-            if (r?.data?.attached) message.warning(t('settings.browserAttached'))
-            else { setPendingRestart(false); message.success(t('settings.browserRelaunched')) }
+            if (r?.data?.ok !== true) throw new Error(t('settings.browserRestartFailed'))
+            setHealth({ alive: true })
+            setPendingRestart(false); message.success(t('settings.browserRelaunched'))
             resolve()
-          } catch (e: any) { message.error(e.message); throw e }
+          } catch (e: any) {
+            const error = e.apiError?.code === 'RELAUNCH_FAILED' ? new Error(t('settings.browserRestartFailed')) : e
+            reject(error); throw error
+          } finally { setRestartBusy(false) }
         },
       })
     }))
     return () => onRestartReady?.(null)
   }, [!!readState, onRestartReady, t])
+  useEffect(() => {
+    let disposed = false
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async () => {
+      try {
+        const response = await api('GET', '/browser/health')
+        if (!disposed) setHealth(response.data)
+      } catch { if (!disposed) setHealth(null) }
+      if (!disposed) timer = setTimeout(() => { void poll() }, 5000)
+    }
+    void poll()
+    return () => { disposed = true; clearTimeout(timer) }
+  }, [])
+  const setRecovery = (value: boolean) => {
+    const previous = cfgRef.current
+    const next = { ...previous, autoRecover: value }
+    cfgRef.current = next; setCfg(next)
+    const write = writes.current.catch(() => {}).then(() => api('PUT', '/browser/config', next))
+    writes.current = write
+    void write.catch((e: any) => {
+      if (cfgRef.current === next) { cfgRef.current = previous; setCfg(previous) }
+      message.error(e.message)
+    })
+  }
   // 输入框：只改本地状态，失焦才写——每敲一个字发一次 PUT 既吵又会打乱光标
   const edit = (k: string, v: any) => setCfg((c: any) => { const n = { ...c, [k]: v }; cfgRef.current = n; return n })
   const commit = () => { void persist(cfgRef.current).catch((e: any) => message.error(e.message)) }
@@ -54,10 +85,17 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
   if (readState) return readState
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <span role="status">{t(restartBusy || health?.restarting ? 'settings.browserRestarting' : health?.alive ? 'settings.browserRunning' : health ? 'settings.browserStopped' : 'settings.browserHealthUnknown')}</span>
+      <Space align="center" wrap>
+        <Switch aria-label={t('settings.browserAutoRecover')} checked={!!cfg.autoRecover} disabled={restartBusy} onChange={setRecovery} />
+        <span>{t('settings.browserAutoRecover')}</span>
+        <span style={dim}>{t('settings.browserAutoRecoverHelp')}</span>
+      </Space>
       {pendingRestart && <span role="status">{t('settings.browserPendingRestart')}</span>}
       <Space align="center" wrap>
         <span>{t('settings.browserMode')}</span>
         <Segmented
+          disabled={restartBusy}
           value={cfg.headless || 'auto'}
           onChange={(v) => set('headless', v)}
           options={[
@@ -69,19 +107,19 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
         <span style={dim}>{t('settings.browserModeHelp')}</span>
       </Space>
       <Space direction="vertical" size="small" style={{ width: '100%', maxWidth: 560 }}>
-        <Input addonBefore={t('settings.browserWindow')} value={cfg.windowSize} placeholder={t('settings.browserWindowPlaceholder')}
+        <Input disabled={restartBusy} addonBefore={t('settings.browserWindow')} value={cfg.windowSize} placeholder={t('settings.browserWindowPlaceholder')}
           onChange={(e) => edit('windowSize', e.target.value)} onBlur={commit} onPressEnter={commit} />
         <Space align="center">
-          <Switch checked={!!cfg.fullscreen} onChange={(v) => set('fullscreen', v)} />
+          <Switch disabled={restartBusy} checked={!!cfg.fullscreen} onChange={(v) => set('fullscreen', v)} />
           <span>{t('settings.browserFullscreen')}</span>
           <span style={dim}>{t('settings.browserFullscreenHelp')}</span>
         </Space>
-        <Input addonBefore={t('settings.browserScale')} value={cfg.scale} placeholder={t('settings.browserScalePlaceholder')}
+        <Input disabled={restartBusy} addonBefore={t('settings.browserScale')} value={cfg.scale} placeholder={t('settings.browserScalePlaceholder')}
           onChange={(e) => edit('scale', e.target.value)} onBlur={commit} onPressEnter={commit} />
-        <Input addonBefore={t('settings.browserProfile')} value={cfg.profile} placeholder={t('settings.browserProfilePlaceholder')}
+        <Input disabled={restartBusy} addonBefore={t('settings.browserProfile')} value={cfg.profile} placeholder={t('settings.browserProfilePlaceholder')}
           onChange={(e) => edit('profile', e.target.value)} onBlur={commit} onPressEnter={commit} />
         <span style={dim}>{t('settings.browserProfileHelp')}</span>
-        <Input addonBefore={t('settings.browserBin')} value={cfg.bin} placeholder={t('common.optional')}
+        <Input disabled={restartBusy} addonBefore={t('settings.browserBin')} value={cfg.bin} placeholder={t('common.optional')}
           onChange={(e) => edit('bin', e.target.value)} onBlur={commit} onPressEnter={commit} />
       </Space>
     </Space>

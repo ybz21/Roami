@@ -35,6 +35,12 @@ roami chrome fill '#title' 'example' --target <targetId> --no-retry
 
 `go test ./backend/browser/automation` 会运行 Node 原生契约测试。真实浏览器验证使用独立 profile/CDP/socket，不操作用户浏览器。
 
+## 资源回收与截图视口
+
+导航临时开启的 TLS CDP 会话在导航成功或失败后释放；新建标签导航失败时关闭本次创建的标签，避免重试积累空页。
+
+CDP 截图每个标签复用一个会话，关标签时释放。尺寸、设备和整页截图会在 `finally` 中恢复渲染视口、DPR 和屏幕尺寸；设备截图同时恢复 UA 与触摸状态。不能在恢复后直接断开这个会话：真实 Chrome 会再次重置 DPR，影响仍在观看的镜像。普通 Playwright 截图失败后的 CDP 降级也遵循同一回收规则。
+
 ## 持久化动作回执
 
 自动化动作可带 `--operation-id <32位小写十六进制ID> --receipt-root <私有绝对目录>`。CLI 先持久化接收记录，再向 daemon 提交一次。相同 ID / 参数返回已有回执，参数变化拒绝；daemon 使用持久化独占执行标记，进程死亡也不会重新执行。`eval`、`record`、`--fresh` 不支持此模式，以免把跨调用的后台行为误认成一次已停止的动作。

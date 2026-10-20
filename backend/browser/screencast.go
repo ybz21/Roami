@@ -141,6 +141,9 @@ var ladder = []lvl{
 
 const autoStart = 2 // 自适应初始档（标清，快速起步再按链路上探）
 
+var rendererProbeInterval = 3 * time.Second
+var rendererProbeTimeout = 9 * time.Second
+
 // cursorScript 注入被镜像页：画一个跟随指针的光点，点击时在光点处绽放涟漪。
 // 无论输入来自用户接管（Input.dispatchMouseEvent）还是 agent 经 chrome-cli/CDP 操作，
 // 都会触发页面自身的 mousemove/mousedown 监听 → 观看端由此看清「谁在哪里点/在哪」，
@@ -274,6 +277,11 @@ func runScreencast(sink frameSink, opts scOptions) {
 	}
 	defer back.Close()
 	conn := &cdp{ws: back}
+	if _, err := conn.call("Runtime.evaluate", map[string]any{"expression": "document.readyState", "returnByValue": true}); err != nil {
+		_ = sink.writeText(map[string]any{"type": "error", "msg": "BROWSER_PAGE_UNRESPONSIVE"})
+		return
+	}
+	_ = back.SetReadDeadline(time.Time{})
 	control := opts.control
 	auto := opts.auto
 	defaultUA := browserUA() // 浏览器原生 UA，切回桌面时用它复位（CDP 没有 clearUserAgentOverride）
@@ -307,6 +315,8 @@ func runScreencast(sink frameSink, opts scOptions) {
 		lastClickX, lastClickY float64
 		lastClickBtn           string
 		clickStreak            int
+		probeID                int
+		probeAt                time.Time
 	)
 
 	// 初始档：auto 用阶梯，手动用前端给的 q（分辨率给足，质量听用户）
@@ -583,6 +593,9 @@ func runScreencast(sink frameSink, opts scOptions) {
 				// 非帧消息：可能是「复制选区」的 Runtime.evaluate 回包，按 id 匹配后转发给前端
 				if msg.ID != 0 {
 					mu.Lock()
+					if msg.ID == probeID {
+						probeID = 0
+					}
 					hit := copyReqID != 0 && msg.ID == copyReqID
 					if hit {
 						copyReqID = 0
@@ -607,7 +620,6 @@ func runScreencast(sink frameSink, opts scOptions) {
 			} else {
 				w, h = frameW, frameH
 			}
-			lastStreamMs = nowMs()
 			// 视口自愈：帧的真实视口偏离本会话期望（容差 ±2px）→ 有外部会话踩了覆盖，防抖重设抢回。
 			// 异常帧不能继续交给前端，否则即使下一帧恢复，用户仍会看到一次布局/纵横比跳变。
 			mismatched := expW > 0 && w > 0 && (absInt(w-expW) > 2 || absInt(h-expH) > 2)
@@ -617,12 +629,41 @@ func runScreencast(sink frameSink, opts scOptions) {
 				heal = reassert
 			}
 			if !mismatched {
+				lastStreamMs = nowMs()
 				pending = &pend{b64: msg.Params.Data, w: w, h: h}
 				cond.Signal()
 			}
 			mu.Unlock()
 			if heal != nil {
 				heal() // 锁外发 CDP（conn 自带写锁），避免网络 IO 占着状态锁
+			}
+		}
+	}()
+	probeInterval, probeTimeout := rendererProbeInterval, rendererProbeTimeout
+	go func() {
+		tick := time.NewTicker(probeInterval)
+		defer tick.Stop()
+		for {
+			select {
+			case <-watchDone:
+				return
+			case <-tick.C:
+			}
+			mu.Lock()
+			if closed {
+				mu.Unlock()
+				return
+			}
+			unresponsive := probeID != 0 && time.Since(probeAt) >= probeTimeout
+			if probeID == 0 {
+				probeID = conn.sendID("Runtime.evaluate", map[string]any{"expression": "document.readyState", "returnByValue": true})
+				probeAt = time.Now()
+			}
+			mu.Unlock()
+			if unresponsive {
+				_ = sink.writeText(map[string]any{"type": "error", "msg": "BROWSER_PAGE_UNRESPONSIVE"})
+				shutdown()
+				return
 			}
 		}
 	}()
@@ -639,8 +680,6 @@ func runScreencast(sink frameSink, opts scOptions) {
 				mu.Unlock()
 				return
 			}
-			p := pending
-			pending = nil
 			mu.Unlock()
 
 			seq, ok := sink.awaitSlot()
@@ -650,6 +689,10 @@ func runScreencast(sink frameSink, opts scOptions) {
 			if !ok {
 				continue // 背压：本轮丢帧（DC 水位过高），不解码不发送
 			}
+			mu.Lock()
+			p := pending
+			pending = nil
+			mu.Unlock()
 
 			raw, derr := base64.StdEncoding.DecodeString(p.b64)
 			if derr != nil {
@@ -809,6 +852,7 @@ func runScreencast(sink frameSink, opts scOptions) {
 			if needReload { // UA 已先于此设好，reload 的首个请求即带新 UA → 服务端出对应版本
 				conn.send("Page.reload", nil)
 			}
+			scheduleForceFrame()
 			return
 		case "quality": // 切画质：同一连接现场改档，【不重连】。
 			// 重连会重设 device metrics，其后的首帧是「视口还没稳」的畸形帧，object-fit 一

@@ -293,6 +293,9 @@ _launch_browser() {
     if _headless_wanted; then
         mode=无头
         args+=(--headless=new --window-size="$CFG_WINDOW")
+        if [ "$(uname -s)" = "Linux" ] && [ "$CFG_PROFILE" = "/tmp/ttmux-chrome" ]; then
+            args+=(--password-store=basic)
+        fi
     elif [ "$CFG_FULLSCREEN" = "1" ]; then
         args+=(--start-fullscreen)
     fi

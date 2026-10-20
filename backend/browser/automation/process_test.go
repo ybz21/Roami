@@ -19,7 +19,7 @@ func TestStableTargetSelectionAndSingleAttempt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	output, err := exec.Command("node", "--test", "target-selection.test.mjs", "operation-receipts.test.mjs", "browser-observation.test.mjs").CombinedOutput()
+	output, err := exec.Command("node", "--test", "target-selection.test.mjs", "operation-receipts.test.mjs", "browser-observation.test.mjs", "connection-queue.test.mjs", "screenshot-lifecycle.test.mjs").CombinedOutput()
 	if err != nil {
 		t.Fatalf("Chrome contract tests: %v\n%s", err, output)
 	}
