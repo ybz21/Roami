@@ -59,4 +59,4 @@ status / cancel 不连接或启动 Chrome；目录必须为当前用户私有。
 
 `observe --target <id>` 返回有界主框架文本、可见控件、viewport/DPR、时间与场景签名。原始 DOM、用于签名的完整输入集合和焦点细节不回传；可见控件值受长度上限约束，密码控件的值隐藏。超出输出预算的控件明确标记截断，跨 iframe 的内容不冒充主框架观察。可选 `--screenshot <新文件.png>` 返回图片尺寸和 viewport 到像素的比例；截图前后场景不同则丢弃混合观察。
 
-动作带 `--expected-browser <browserId> --expected-scene <signature>` 时，先验证实例和页面状态再输入。焦点检查发生在前置标签之前，避免先抢回焦点再漏掉人工切换。导航、表单值、选区、viewport/缩放、焦点或 DOM 变化会使旧观察失效。此模式使用新的内部版本动词，旧 daemon 不会忽略校验选项后继续动作。动作返回仍需再次观察和任务验收，不等于用户目标完成。
+动作带 `--expected-browser <browserId> --expected-scene <signature>` 时，先验证实例和页面状态再输入。焦点检查发生在前置标签之前，避免先抢回焦点再漏掉人工切换。表单值、选区、viewport/缩放、焦点或 DOM 变化会使完整页面签名失效。`observe` 另返回 `navigationSignature`：仅 `goto` 可使用它，校验浏览器、标签、文档、URL、输入内容、焦点和选区，允许广告或正文自动更新；点击、输入等动作仍必须使用完整 `signature`。此模式使用新的内部版本动词，旧 daemon 不会忽略校验选项后继续动作。动作返回仍需再次观察和任务验收，不等于用户目标完成。

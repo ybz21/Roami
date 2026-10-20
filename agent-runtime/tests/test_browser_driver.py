@@ -187,7 +187,7 @@ class BrowserModel:
         )
 
 
-async def native_browser(store, fixture, *, workers=1):
+async def native_browser(store, fixture, *, workers=1, runner=None):
     model = BrowserModel()
 
     async def verify(task, result):
@@ -200,7 +200,7 @@ async def native_browser(store, fixture, *, workers=1):
         settings=Settings(browser={"enabled": True}, workers=workers),
         verifier=verify,
     )
-    runtime.browser.runner = fixture
+    runtime.browser.runner = runner or fixture
 
     async def receipt_reader(operation_id):
         return fixture.receipts[operation_id]
@@ -219,14 +219,36 @@ async def native_browser(store, fixture, *, workers=1):
     return runtime, conversation, task
 
 
+@pytest.mark.parametrize("navigation_guard", [False, True])
 async def test_native_worker_uses_real_task_scope_and_verifies_independent_browser_state(
-    store, monkeypatch
+    store, monkeypatch, navigation_guard
 ):
     from test_runtime import until
 
     monkeypatch.setenv("ROAMI_AGENT_API_KEY", "must-not-inherit")
     fixture = BrowserFixture()
-    runtime, conversation, task = await native_browser(store, fixture)
+    if navigation_guard:
+        original_scene = fixture.scene
+        original_run = fixture.__call__
+
+        def scene():
+            return {**original_scene(), "navigationSignature": "b" * 64}
+
+        async def run(argv, **options):
+            verb, flags, _ = fixture.arguments(argv)
+            if verb == "goto":
+                assert flags["--expected-scene"] == "b" * 64
+                argv = list(argv)
+                argv[argv.index("--expected-scene") + 1] = original_scene()["signature"]
+            elif verb in {"fill", "click"}:
+                assert flags["--expected-scene"] == original_scene()["signature"]
+            return await original_run(argv, **options)
+
+        fixture.scene = scene
+        runner = run
+    else:
+        runner = fixture
+    runtime, conversation, task = await native_browser(store, fixture, runner=runner)
     try:
         await until(
             store,
@@ -414,6 +436,8 @@ async def test_late_browser_receipt_releases_control_without_promoting_interrupt
     [
         lambda body: body.update(controls="invalid"),
         lambda body: body.update(signature="invalid"),
+        lambda body: body.update(navigationSignature=None),
+        lambda body: body.update(navigationSignature="invalid"),
         lambda body: body["screenshot"].update(scaleX=float("nan")),
         lambda body: body["screenshot"].update(width=True),
         lambda body: body["screenshot"].update(path="/foreign/file.png"),

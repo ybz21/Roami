@@ -70,7 +70,7 @@ async function scene(page, session) {
         value: element.type === 'password' ? '[redacted]' : String(element.value ?? '').slice(0, 160),
         disabled: !!element.disabled,
       }))
-    const values = [...document.querySelectorAll('input,textarea,select')].map(element => [element.value, element.checked])
+    const values = [...document.querySelectorAll('input,textarea,select,[contenteditable="true"]')].map(element => [element.isContentEditable ? element.innerHTML : element.value, element.checked])
     if (values.reduce((size, item) => size + (item[0]?.length || 0), html.length) > 2_000_000) return { oversized: true }
     return {
       html, values, controls, controlsTruncated: candidates.length > 64, scope: 'main_frame', iframeCount: document.querySelectorAll('iframe,frame').length, url: location.href, title: document.title.slice(0, 300),
@@ -78,6 +78,7 @@ async function scene(page, session) {
       viewportSize: { width: innerWidth, height: innerHeight }, deviceScale: devicePixelRatio,
       scroll: { x: scrollX, y: scrollY }, focused: {
         html: document.activeElement?.outerHTML?.slice(0, 1000),
+        identity: [document.activeElement?.tagName, document.activeElement?.id, document.activeElement?.name, document.activeElement?.type],
         start: document.activeElement?.selectionStart, end: document.activeElement?.selectionEnd,
         hasFocus: document.hasFocus(), selection: window.getSelection()?.toString().slice(0, 1000),
       },
@@ -85,13 +86,16 @@ async function scene(page, session) {
   })
   if (document.oversized) throw new Error('CHROME_SCENE_LIMIT')
   const signature = createHash('sha256').update(JSON.stringify({ loader: frameTree.frame.loaderId, frame: frameTree.frame.id, ...document })).digest('hex')
+  const navigationFocus = { ...document.focused }
+  delete navigationFocus.html
+  const navigationSignature = createHash('sha256').update(JSON.stringify({ kind: 'navigation', loader: frameTree.frame.loaderId, frame: frameTree.frame.id, url: document.url, values: document.values, focused: navigationFocus })).digest('hex')
   const { html, values, focused, ...observation } = document
   if (observation.url.length > 2400) { observation.url = observation.url.slice(0, 2400); observation.urlTruncated = true }
   while (Buffer.byteLength(JSON.stringify(observation)) > 48_000 && observation.controls.length) {
     observation.controls.pop(); observation.controlsTruncated = true
   }
   if (Buffer.byteLength(JSON.stringify(observation)) > 48_000) throw new Error('CHROME_SCENE_LIMIT')
-  return { ...observation, signature, capturedMs: Date.now() }
+  return { ...observation, signature, navigationSignature, capturedMs: Date.now() }
 }
 
 export async function observePage(page, screenshotPath, { timeoutMs = 5000 } = {}) {

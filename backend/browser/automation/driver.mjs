@@ -277,7 +277,8 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
       if (!/^[a-f0-9]{64}$/.test(flags['expected-scene'])) fail('CHROME_SCENE_INVALID')
       selected = await pickPage(pages, flags, fail)
       const current = await observePage(selected, undefined, { timeoutMs: to })
-      if (current.signature !== flags['expected-scene']) fail('CHROME_SCENE_CHANGED')
+      const expected = flags['expected-scene']
+      if (current.signature !== expected && !(verb === 'goto' && current.navigationSignature === expected)) fail('CHROME_SCENE_CHANGED')
       if (!flags['no-focus']) await selected.bringToFront().catch(() => {})
     } else selected = flags['no-focus'] ? await pickPage(pages, flags, fail) : await pick(pages, flags, fail)
     return selected

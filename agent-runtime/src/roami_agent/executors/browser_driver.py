@@ -214,6 +214,13 @@ class BrowserDriver:
         if (
             not isinstance(body.get("signature"), str)
             or not re.fullmatch(r"[a-f0-9]{64}", body["signature"])
+            or (
+                "navigationSignature" in body
+                and (
+                    not isinstance(body["navigationSignature"], str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", body["navigationSignature"])
+                )
+            )
             or not all(isinstance(body.get(key), str) for key in ("url", "title", "domText"))
             or not isinstance(body.get("controls"), list)
             or len(body["controls"]) > 64
@@ -635,7 +642,9 @@ class BrowserDriver:
             choice,
             arguments,
             browser_id=browser_id,
-            signature=body["signature"],
+            signature=body.get("navigationSignature", body["signature"])
+            if choice == "goto"
+            else body["signature"],
             phase=phase,
         )
         try:
