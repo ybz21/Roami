@@ -126,7 +126,9 @@ class BrowserDriver:
             if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
                 raise DomainError("BROWSER_PRIVATE_DIRECTORY_INVALID", 503)
 
-    async def _cli(self, verb, *args, operation_id=None, browser_id=None, signature=None):
+    async def _cli(
+        self, verb, *args, operation_id=None, browser_id=None, signature=None, capture_wait_ms=0
+    ):
         await asyncio.to_thread(self._directories)
         argv = [
             self.settings.cli_bin,
@@ -136,7 +138,7 @@ class BrowserDriver:
             "--no-retry",
             "--no-focus",
             "--timeout",
-            "0",
+            str(capture_wait_ms),
         ]
         if self.config.get("endpoint"):
             argv += ["--cdp", self.config["endpoint"]]
@@ -541,6 +543,8 @@ class BrowserDriver:
                     "--screenshot",
                     str(path),
                     browser_id=browser_id,
+                    # Optional frames must release the observer queue so DOM evidence can continue.
+                    capture_wait_ms=5000,
                 )
             except DomainError as exc:
                 if exc.code not in {"CHROME_OBSERVATION_TIMEOUT", "CHROME_SCENE_CHANGED"}:

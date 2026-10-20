@@ -338,8 +338,11 @@ async def test_unavailable_background_screenshot_keeps_fresh_dom_and_never_repea
     runtime, _, task = await native_browser(store, fixture)
 
     async def runner(argv, **options):
+        assert options["timeout"] is None
         if argv[2] == "observe" and "--screenshot" in argv:
-            raise DomainError("CHROME_OBSERVATION_TIMEOUT", 503)
+            assert argv[argv.index("--timeout") + 1] == "5000"
+            return {"exitCode": 1, "stdout": "", "stderr": "CHROME_OBSERVATION_TIMEOUT"}
+        assert argv[argv.index("--timeout") + 1] == "0"
         return await fixture(argv, **options)
 
     runtime.browser.runner = runner
