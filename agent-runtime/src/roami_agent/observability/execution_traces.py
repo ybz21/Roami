@@ -28,7 +28,7 @@ def origin_turn(db, owner, turn_id=None, task_id=None):
             seen.add("task:" + task_id)
             source = row(
                 db,
-                "SELECT m.turn_id,t.id,t.created_ms,t.origin_conversation_id,t.parent_task_id FROM tasks t "
+                "SELECT m.turn_id,t.id,t.created_ms,t.origin_conversation_id,t.origin_branch_id,t.parent_task_id FROM tasks t "
                 "JOIN messages m ON m.id=t.origin_message_id "
                 "JOIN conversations c ON c.id=t.origin_conversation_id "
                 "WHERE t.id=? AND t.owner_id=? AND c.deleted_ms IS NULL",
@@ -45,6 +45,8 @@ def origin_turn(db, owner, turn_id=None, task_id=None):
                     "node_kind": "task",
                     "request_id": None,
                     "created_ms": source["created_ms"],
+                    "conversation_id": source["origin_conversation_id"],
+                    "branch_id": source["origin_branch_id"],
                 }
             turn_id, task_id = source["turn_id"], None
         turn = row(
@@ -277,6 +279,8 @@ def read_trace(db, owner, *, turn_id=None, task_id=None, chrome=False):
                 requestAttempts=usage.get("requestAttempts"),
                 errorCode=timing.get("errorCode"),
                 tokens=tokens,
+                context=parts.get("modelContext"),
+                limits=parts.get("requestLimits"),
             )
             if "contextStartedMs" in timing:
                 context_start = timing["contextStartedMs"]

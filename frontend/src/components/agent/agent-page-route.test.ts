@@ -4,7 +4,7 @@ import { agentPagePath, backAgentPage, openAgentPage, readAgentPage } from './ag
 
 afterEach(() => { vi.restoreAllMocks(); history.replaceState(null, '', '#/home') })
 
-it.each(['tasks', 'memory', 'notifications'] as const)('restores the %s page with its exact source conversation after refresh', view => {
+it.each(['tasks', 'memory', 'notifications', 'debug'] as const)('restores the %s page with its exact source conversation after refresh', view => {
   const origin = 'home/conversation/branch/source-message'
   expect(readAgentPage(agentPagePath(view, origin))).toEqual({ view, origin, task: '' })
 })
@@ -48,4 +48,17 @@ it('uses native history for both detail-to-list and list-to-conversation returns
   history.replaceState({ roamiAgentPageFrom: '#/home/c?terms=s1' }, '', '#/' + agentPagePath('tasks', 'home/c'))
   backAgentPage({ view: 'tasks', origin: 'home/c', task: '' })
   expect(back).toHaveBeenCalledTimes(2)
+})
+
+it('keeps debug selection on a scoped URL and replaces selection without another back entry', () => {
+  const origin = 'home/conversation/branch'
+  const list = '#/' + agentPagePath('debug', origin)
+  history.replaceState({ roamiAgentPageFrom: list }, '', '#/' + agentPagePath('debug', origin, 'turn:first'))
+  const before = history.length
+  openAgentPage('debug', 'task:second')
+  expect(history.length).toBe(before)
+  expect(readAgentPage(location.hash.slice(2))).toEqual({ view: 'debug', origin, task: 'task:second' })
+  const back = vi.spyOn(history, 'back').mockImplementation(() => {})
+  backAgentPage({ view: 'debug', origin, task: 'task:second' })
+  expect(back).toHaveBeenCalledOnce()
 })

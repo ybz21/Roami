@@ -4,11 +4,13 @@ import MobileSubPage from '../MobileSubPage'
 import AgentMemory from './AgentMemory'
 import AgentTasks from './AgentTasks'
 import AgentInbox from './AgentInbox'
+import AgentDebug from './AgentDebug'
 import { backAgentPage, openAgentPage, type AgentPageRoute } from './agent-page-route'
 import type { AgentInboxState } from './useAgentInbox'
 import './agent-home-page.css'
 
-export default function AgentHomePage({ page, inbox, projects, select, onSession, onChanged }: {
+export default function AgentHomePage({ page, node, inbox, projects, select, onSession, onChanged }: {
+  node: string | null
   page: AgentPageRoute; inbox: AgentInboxState; projects: { id: string; name: string }[]
   select: (cid: string, branch?: string, message?: string) => void
   onSession: (id: string) => void; onChanged: () => void
@@ -24,6 +26,7 @@ export default function AgentHomePage({ page, inbox, projects, select, onSession
       {page.view === 'tasks' && <AgentTasks cid={cid} hideBack selectedTask={page.task} onSelectTask={id => { if (id) { if (!page.task) listScroll.current = scroll.current?.scrollTop || 0; openAgentPage('tasks', id) } else backAgentPage(page) }} onSession={onSession} onChanged={onChanged} />}
       {page.view === 'memory' && <AgentMemory cid={cid} projects={projects} select={select} />}
       {page.view === 'notifications' && <AgentInbox inbox={inbox} select={select} />}
+      {page.view === 'debug' && <AgentDebug cid={cid} branch={parts[2] ? decodeURIComponent(parts[2]) : ''} node={node} selected={page.task} onSelect={value => openAgentPage('debug', value)} />}
     </section>
   </MobileSubPage>
 }

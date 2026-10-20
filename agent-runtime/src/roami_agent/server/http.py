@@ -112,6 +112,52 @@ def create_app(runtime, *, manage_lifecycle=True):
             raise DomainError("CAPABILITY_NOT_FOUND", 404)
         return {"data": found[0]}
 
+    @app.get("/v1/conversations/{cid}/debug")
+    async def execution_debug(
+        cid: str,
+        owner: Owner,
+        branch: str | None = Query(default=None, max_length=200),
+        minutes: Literal[15, 60, 1440] = 60,
+        offset: int = Query(0, ge=0),
+        queue_offset: int = Query(0, alias="queueOffset", ge=0),
+        task_offset: int = Query(0, alias="taskOffset", ge=0),
+        limit: int = Query(50, ge=1, le=200),
+        include_context: bool = Query(False, alias="includeContext"),
+    ):
+        return {
+            "data": await runtime.debug.snapshot(
+                owner,
+                cid,
+                branch_id=branch,
+                minutes=minutes,
+                offset=offset,
+                queue_offset=queue_offset,
+                task_offset=task_offset,
+                limit=limit,
+                include_context=include_context,
+            )
+        }
+
+    @app.get("/v1/conversations/{cid}/debug/trace")
+    async def scoped_execution_trace(
+        cid: str,
+        owner: Owner,
+        branch: str | None = Query(default=None, max_length=200),
+        turn_id: str | None = Query(default=None, alias="turnId", max_length=200),
+        task_id: str | None = Query(default=None, alias="taskId", max_length=200),
+        format: Literal["json", "chrome"] = "json",
+    ):
+        return {
+            "data": await runtime.debug.trace(
+                owner,
+                cid,
+                branch_id=branch,
+                turn_id=turn_id,
+                task_id=task_id,
+                chrome=format == "chrome",
+            )
+        }
+
     @app.post("/v1/tool-directory/{name}/call")
     async def call_operation(name: str, request: Request, owner: Owner):
 
@@ -400,8 +446,10 @@ def create_app(runtime, *, manage_lifecycle=True):
         )
 
     @app.get("/v1/conversations/{cid}/context")
-    async def context(cid: str, owner: Owner):
-        result = await runtime.context.project(owner, cid)
+    async def context(
+        cid: str, owner: Owner, branch: str | None = Query(default=None, max_length=200)
+    ):
+        result = await runtime.context.project(owner, cid, branch_id=branch)
         return {
             "data": {
                 "model": runtime.model.model,

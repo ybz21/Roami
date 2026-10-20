@@ -39,6 +39,7 @@ from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
+from roami_agent.observability.execution_debug import ExecutionDebug
 from roami_agent.observability.execution_traces import ExecutionTraces
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
@@ -204,6 +205,7 @@ class Runtime:
         self.cli_commands = CLICommands(database, self.tools, self.journal)
         self.manifests = PromptManifests(database)
         self.traces = ExecutionTraces(database)
+        self.debug = ExecutionDebug(database, self.context, self.settings, self.traces)
         self.dispatch = TaskDispatcher(
             database,
             self.tasks,

@@ -1,0 +1,24 @@
+.agent-debug { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; max-width:100%; }
+.agent-debug h3 { margin:var(--sp-2) 0 0; font-size:var(--fs-sm); font-weight:500; }
+.agent-debug small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-debug p { margin:0; }
+.agent-debug code { overflow-wrap:anywhere; font-size:var(--fs-meta); }
+.agent-debug-muted,.agent-debug-guide { color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-debug-guide summary { cursor:pointer; min-height:var(--tap); display:flex; align-items:center; }
+.agent-debug-guide p { margin-bottom:var(--sp-2); }
+.agent-debug-toolbar,.agent-debug-pagination { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); flex-wrap:wrap; }
+.agent-debug-row { display:flex; justify-content:space-between; gap:var(--sp-3); width:100%; border:0; border-bottom:1px solid var(--border-subtle); background:transparent; color:var(--text-bright); text-align:start; padding:var(--sp-3) 0; min-height:var(--tap); font:inherit; }
+button.agent-debug-row { cursor:pointer; }
+.agent-debug-row > :first-child { min-width:0; overflow-wrap:anywhere; }
+.agent-debug-row > :last-child { flex-shrink:0; text-align:end; }
+.agent-debug-row strong { font-size:var(--fs-body); font-weight:500; }
+:where(html[data-pointer="fine"]) button.agent-debug-row:hover { background:var(--bg-container); }
+.agent-debug-values { margin:0; font-size:var(--fs-meta); }
+.agent-debug-values > div { display:flex; justify-content:space-between; gap:var(--sp-3); padding:var(--sp-2) 0; border-bottom:1px solid var(--border-subtle); }
+.agent-debug-values dt { color:var(--text-dim); overflow-wrap:anywhere; }
+.agent-debug-values dd { margin:0; text-align:end; overflow-wrap:anywhere; min-width:0; }
+.agent-debug-spans,.agent-debug-spans ul { margin:0; padding:0; list-style:none; }
+.agent-debug-spans ul { padding-inline-start:var(--sp-4); }
+.agent-debug-spans summary { min-height:var(--tap); padding:var(--sp-2) 0; cursor:pointer; overflow-wrap:anywhere; }
+.agent-debug-spans summary > span:last-child { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-debug-span-detail { padding:var(--sp-2); background:var(--bg-container); border-radius:var(--r-xs); }

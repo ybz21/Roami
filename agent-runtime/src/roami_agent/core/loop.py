@@ -123,7 +123,15 @@ class AgentLoop:
                         step + 1,
                         model.model,
                         wire_hash,
-                        dict(plan, providerKey=provider_key, modelSettingsHash=settings_hash),
+                        dict(
+                            plan,
+                            providerKey=provider_key,
+                            modelSettingsHash=settings_hash,
+                            requestLimits={
+                                "modelTimeoutSeconds": self.settings.timeout_for(role),
+                                "executionTimeoutSeconds": turn.get("executionTimeoutSeconds"),
+                            },
+                        ),
                         catalog,
                         role,
                     )

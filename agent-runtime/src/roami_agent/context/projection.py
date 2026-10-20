@@ -295,6 +295,7 @@ class Context:
                 "capacityBasis": configuration.get("capacityBasis"),
                 "snapshotId": snapshot["id"] if snapshot else None,
                 "branchId": bid,
+                "branchEpoch": b["epoch"],
                 "memoryEpoch": epoch,
                 "sourceMessageIds": [item["id"] for item in messages],
                 "currentTurnStart": current_turn_start,

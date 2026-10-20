@@ -1,6 +1,7 @@
 import hashlib
 import logging
 
+from roami_agent.observability.execution_debug import CONTEXT_FIELDS
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 
@@ -33,6 +34,8 @@ class PromptManifests:
                             "requestBasis": plan.get("requestBasis"),
                             "historyFingerprint": plan.get("historyFingerprint"),
                             "estimatedTokens": plan.get("estimatedTokens"),
+                            "modelContext": {key: plan.get(key) for key in CONTEXT_FIELDS},
+                            "requestLimits": plan.get("requestLimits"),
                             "sourceMessageIds": plan.get("sourceMessageIds", []),
                             "catalogHash": hashlib.sha256(encoded(catalog).encode()).hexdigest(),
                             "modelSettingsHash": plan.get("modelSettingsHash"),

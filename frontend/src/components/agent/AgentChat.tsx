@@ -220,11 +220,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
   }
   const moreMenu = { items: [
+    { key: 'debug', label: t('agent.debug'), icon: <CodeIcon size={16} /> },
     ...(!wide ? [
       { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     ] : []),
-  ], onClick: ({ key }: { key: string }) => { showPanel(key as 'tasks' | 'memory') } }
+  ], onClick: ({ key }: { key: string }) => { if (key === 'debug') openAgentPage('debug'); else showPanel(key as 'tasks' | 'memory') } }
   const conversationActions = <>
     <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
@@ -237,14 +238,13 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
-    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div>{(!wide || !workspace.open) && <div className="acts">
-      {!wide && !phone && conversationActions}
-      {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
-    </div>}</header>
+    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
+      {!phone && conversationActions}
+      {wide && !workspace.open && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
+    </div></header>
     {phone && mobileActionsHost && createPortal(
       <>
-        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.tasks')} onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>
-        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.memory')} onClick={() => showPanel('memory')}><NotebookIcon size={20} /></button>
+        <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={20} /></button></Dropdown>
       </>, mobileActionsHost)}
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}

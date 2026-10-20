@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentAttachment } from './useAgentAttachments'
+import { publishOutboxDebug } from './agent-outbox-debug'
 
 export type OutboxMessage = { id: string; text: string; attachments: AgentAttachment[]; state: 'waiting' | 'sending' | 'unconfirmed' | 'failed' }
 type OutboxState = { items: OutboxMessage[]; paused: boolean }
@@ -20,6 +21,7 @@ export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, sen
   const flight = useRef<{ scope: string; id: string } | null>(null)
   const mounted = useRef(true)
   const current = snapshots.current[scope] ||= read(scope)
+  useEffect(() => { publishOutboxDebug(scope, current, flight.current?.scope === scope ? flight.current.id : '') }, [scope, current, version])
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => { setStorageFailed(false); setForced('') }, [scope])
   useEffect(() => {
@@ -32,6 +34,7 @@ export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, sen
     try { if (next.items.length || next.paused) localStorage.setItem(prefix + owner, JSON.stringify(next)); else localStorage.removeItem(prefix + owner) }
     catch { if (mounted.current && active.current === owner) setStorageFailed(true); return false }
     snapshots.current[owner] = next
+    publishOutboxDebug(owner, next, flight.current?.scope === owner ? flight.current.id : '')
     if (mounted.current) { if (active.current === owner) setStorageFailed(false); setVersion(value => value + 1) }
     return true
   }
@@ -44,7 +47,7 @@ export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, sen
     if (!change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: 'sending' } : item) }))) return
     flight.current = { scope: owner, id }; setForced('')
     // A stable request ID makes a lost receipt safe to retry after refresh.
-    void sender.current(selected).then(() => { change(owner, value => ({ ...value, items: value.items.filter(item => item.id !== id) })) }).catch(reason => { change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: reason?.apiError ? 'failed' : 'unconfirmed' } : item) })) }).finally(() => { flight.current = null; if (mounted.current) setVersion(value => value + 1) })
+    void sender.current(selected).then(() => { change(owner, value => ({ ...value, items: value.items.filter(item => item.id !== id) })) }).catch(reason => { change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: reason?.apiError ? 'failed' : 'unconfirmed' } : item) })) }).finally(() => { flight.current = null; publishOutboxDebug(owner, snapshots.current[owner] || read(owner)); if (mounted.current) setVersion(value => value + 1) })
   }, [scope, ready, idle, current, forced, storageFailed, version])
   const locked = (id: string) => flight.current?.scope === scope && flight.current.id === id
   return {
