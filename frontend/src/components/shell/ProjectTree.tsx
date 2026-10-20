@@ -281,7 +281,6 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
               <>
                 {live.map((x) => taskRows(x, p.name))}
                 {showIdle.has(p.key) && idle.map((x) => idleCard(x))}
-                {!live.length && !showIdle.has(p.key) && <div className="tt-tree-empty">{t('tree.noTasks')}</div>}
               </>
             )}
           </div>
