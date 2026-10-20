@@ -26,7 +26,25 @@ def validate_tool_arguments(schema, arguments):
             ]
         elif error.validator == "additionalProperties":
             issue["allowedFields"] = list(error.schema.get("properties", {}))
-        elif error.validator in {"type", "enum", "minLength", "maxLength", "minimum", "maximum"}:
+        elif error.validator in {"anyOf", "oneOf"}:
+            issue["expectedAlternatives"] = [
+                {
+                    key: option[key]
+                    for key in ("type", "pattern", "minLength", "maxLength", "required")
+                    if key in option
+                }
+                for option in error.validator_value[:8]
+                if isinstance(option, dict)
+            ]
+        elif error.validator in {
+            "type",
+            "enum",
+            "pattern",
+            "minLength",
+            "maxLength",
+            "minimum",
+            "maximum",
+        }:
             issue["expected"] = error.validator_value
         issues.append(issue)
     raise ToolArgumentsError(issues, len(errors) > 12) from errors[0]

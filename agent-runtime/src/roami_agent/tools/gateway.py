@@ -266,6 +266,20 @@ class ToolGateway:
                     "Omit top-level executor and unrecognized fields such as taskDescription. "
                     "Correct arguments within the user's scope; never create test/probe tasks or ask the user to fix internal parameters."
                 )
+            if (
+                role == "main"
+                and not binding.get("workspace")
+                and value["error"] == "INVALID_TOOL_ARGUMENTS"
+                and call["function"]["name"] in {"write", "edit", "file_write", "file_patch"}
+            ):
+                value["recovery"] = (
+                    "Main has no bound file workspace for this turn. Dispatch the original file work "
+                    "in the user's verified directory; for bounded work without an explicit executor "
+                    "choice use a regular native worker with target.kind=new_session and target.directory. "
+                    "Do not use resourceOnly for file writes. Preserve explicit executor choices; complex "
+                    "work stays with a professional. Keep the exact requested file and read-back scope; "
+                    "never guess hashes, substitute paths or create an unrelated project."
+                )
             if role == "main" and value["error"] == "TASK_STEER_USER_REQUEST_REQUIRED":
                 value["recovery"] = (
                     "A completion report is not a new user continuation request. Do not steer or retry "

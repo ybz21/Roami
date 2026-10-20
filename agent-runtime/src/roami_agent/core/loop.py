@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import json
 from contextlib import asynccontextmanager
 from itertools import count
 
@@ -108,7 +109,7 @@ class AgentLoop:
                 plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
-                previous_argument_failures = set()
+                seen_argument_failures = set()
                 for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
@@ -223,8 +224,19 @@ class AgentLoop:
                             and isinstance(value, dict)
                             and value.get("error") == "INVALID_TOOL_ARGUMENTS"
                         ):
+                            rejected_arguments = call["function"].get("arguments", "")
+                            try:
+                                rejected_arguments = json.loads(rejected_arguments)
+                            except (ValueError, TypeError):
+                                pass
                             argument_failures.add(
-                                (call["function"]["name"], encoded(value.get("argumentIssues")))
+                                (
+                                    call["function"]["name"],
+                                    encoded(value.get("argumentIssues")),
+                                    hashlib.sha256(
+                                        encoded(rejected_arguments).encode()
+                                    ).hexdigest(),
+                                )
                             )
                         handed_off = (
                             handed_off
@@ -256,9 +268,9 @@ class AgentLoop:
                         prompt.append(
                             {"role": "tool", "tool_call_id": call["id"], "content": encoded(value)}
                         )
-                    if argument_failures & previous_argument_failures:
+                    if argument_failures & seen_argument_failures:
                         raise DomainError("TOOL_ARGUMENT_REPAIR_STALLED", 502)
-                    previous_argument_failures = argument_failures
+                    seen_argument_failures.update(argument_failures)
                     if handed_off and request_complete:
                         # The durable task card is the receipt; a second model call delays new intents.
                         await self.journal.finish(

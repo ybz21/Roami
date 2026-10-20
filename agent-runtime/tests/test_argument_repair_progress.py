@@ -7,8 +7,20 @@ import pytest
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
+from roami_agent.protocol.tool_arguments import ToolArgumentsError, validate_tool_arguments
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.storage.database import row
+
+
+def test_nullable_hash_diagnostic_explains_schema_alternatives_without_input_values():
+    alternatives = [{"type": "string", "pattern": "^[a-f0-9]{64}$"}, {"type": "null"}]
+    schema = object_schema({"expectedSha256": {"anyOf": alternatives}})
+    with pytest.raises(ToolArgumentsError) as error:
+        validate_tool_arguments(schema, {"expectedSha256": "private-invalid-hash"})
+    assert error.value.issues == [
+        {"path": ["expectedSha256"], "rule": "anyOf", "expectedAlternatives": alternatives}
+    ]
+    assert "private-invalid-hash" not in json.dumps(error.value.issues)
 
 
 class ArgumentModel:
@@ -87,6 +99,17 @@ async def test_repeated_schema_failure_stops_after_guided_repair_without_side_ef
 
 async def test_changing_schema_issues_and_parallel_calls_can_be_repaired(store):
     model = ArgumentModel([[{}, {}], [{"a": 1}], [{"a": 1, "b": 2}]])
+    runtime, effects = Runtime(store, model), []
+    register_probe(runtime, effects)
+    try:
+        assert await runtime.loop.run(await claimed_turn(runtime), "main") == "Done"
+        assert model.calls == 4 and effects == [{"a": 1, "b": 2}]
+    finally:
+        await runtime.close()
+
+
+async def test_changed_arguments_with_the_same_schema_issue_can_continue_repair(store):
+    model = ArgumentModel([[{"a": "first", "b": 2}], [{"a": "second", "b": 2}], [{"a": 1, "b": 2}]])
     runtime, effects = Runtime(store, model), []
     register_probe(runtime, effects)
     try:
