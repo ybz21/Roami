@@ -38,7 +38,8 @@ explanations. Use one short empty-state message; hide zero-result counters and p
 there is only one page. Lists show identity and essential status; put full errors, revision
 history, and technical details in the detail view or an explicit disclosure. Keep necessary
 warnings, recovery actions, field labels, and accessible names. Do not replace visible clutter
-with tooltip-only instructions on touch devices.
+with tooltip-only instructions on touch devices. Keep primary destinations such as Home tasks
+visible and directly reachable; overflow menus hold secondary actions such as debug and memory.
 
 Use existing automatic updates and mobile pull-to-refresh instead of a permanent refresh button
 or a toolbar devoted to it. Desktop pages use browser refresh/F5; keep explicit recovery actions

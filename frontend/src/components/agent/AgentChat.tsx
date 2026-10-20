@@ -222,11 +222,11 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const moreMenu = { items: [
     { key: 'debug', label: t('agent.debug'), icon: <CodeIcon size={16} /> },
     ...(!wide ? [
-      { key: 'tasks', label: t('agent.tasks'), icon: <ChecklistIcon size={16} /> },
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     ] : []),
   ], onClick: ({ key }: { key: string }) => { if (key === 'debug') openAgentPage('debug'); else showPanel(key as 'tasks' | 'memory') } }
   const conversationActions = <>
+    <button type="button" className="tt-act" onClick={() => showPanel('tasks')}><ChecklistIcon size={18} />{t('agent.workspace.tasks')}</button>
     <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
   </>
@@ -244,6 +244,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     </div></header>
     {phone && mobileActionsHost && createPortal(
       <>
+        <button type="button" className="tt-mobile-topbar-icon agent-tasks-entry" onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /><span>{t('agent.workspace.tasks')}</span></button>
         <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={20} /></button></Dropdown>
       </>, mobileActionsHost)}
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
