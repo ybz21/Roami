@@ -1,6 +1,7 @@
 """Scoped, read-only diagnostics keep queue state separate from history windows."""
 
 import json
+from dataclasses import replace
 
 import httpx
 from test_runtime import ConversationModel, until
@@ -8,8 +9,34 @@ from test_task_cancellation import task_run
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.identity import now_ms
+from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
+
+
+async def test_current_context_keeps_model_and_capacity_from_one_configuration(store, monkeypatch):
+    runtime = Runtime(
+        store, ConversationModel(), settings=Settings(model="old", context_window=200000)
+    )
+    try:
+        c = await runtime.conversations.create("alice")
+        project = runtime.context.project
+
+        async def switch_model(*args, **kwargs):
+            runtime.settings.current = replace(
+                runtime.settings.current, model="new", context_window=100000
+            )
+            return await project(*args, **kwargs)
+
+        monkeypatch.setattr(runtime.context, "project", switch_model)
+        snapshot = await runtime.debug.snapshot("alice", c["id"], include_context=True)
+        assert snapshot["context"]["model"] == "old"
+        assert snapshot["context"]["contextWindow"] == 200000
+        snapshot = await runtime.debug.snapshot("alice", c["id"], include_context=True)
+        assert snapshot["context"]["model"] == "new"
+        assert snapshot["context"]["contextWindow"] == 100000
+    finally:
+        await runtime.close()
 
 
 async def test_debug_old_queue_and_off_page_running_task_remain_visible(store, monkeypatch):

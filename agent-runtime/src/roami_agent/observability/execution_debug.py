@@ -147,9 +147,12 @@ class ExecutionDebug:
 
         result = await self.db.call(read)
         if include_context:
-            projected = await self.context.project(owner, cid, branch_id=result["branchId"])
+            configuration = self.context.request_context()
+            projected = await self.context.project(
+                owner, cid, branch_id=result["branchId"], request_context=configuration
+            )
             result["context"] = {key: projected.get(key) for key in CONTEXT_FIELDS}
-            result["context"]["model"] = self.settings.route("main").name
+            result["context"]["model"] = configuration["route"].get("name")
         return result
 
     async def trace(self, owner, cid, *, branch_id=None, turn_id=None, task_id=None, chrome=False):
