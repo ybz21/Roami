@@ -4,7 +4,7 @@
 .agent-workspace-rail > .ant-tabs { flex:1; min-height:0; }
 .agent-workspace-rail > .ant-tabs > .ant-tabs-nav { flex:none; min-height:calc(var(--sp-5) * 2); margin:0; padding-inline:var(--sp-4); }
 .agent-workspace-rail > .ant-tabs > .ant-tabs-nav::before { border-color:var(--border-subtle); }
-.agent-workspace-rail > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-list { gap:var(--sp-5); }
+.agent-workspace-rail > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-list { gap:var(--sp-4); }
 .agent-workspace-rail > .ant-tabs > .ant-tabs-nav .ant-tabs-tab { margin:0; padding:var(--sp-4) 0; font-size:var(--fs-body); }
 .agent-workspace-tab { display:inline-flex; align-items:center; gap:var(--sp-2); }
 .agent-workspace-toolbar { display:flex; align-items:center; gap:var(--sp-1); margin-left:var(--sp-2); }

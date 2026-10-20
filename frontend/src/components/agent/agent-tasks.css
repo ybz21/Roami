@@ -65,3 +65,6 @@ html[data-pointer="coarse"] .agent-tasks .tt-act::after { content:''; position:a
 .agent-task-delivery-link { align-self:flex-start; }
 
 .agent-task-requirements[open] > summary > svg { transform:rotate(90deg); }
+
+.agent-task-description { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-body); }
+.agent-task-description.clipped { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }

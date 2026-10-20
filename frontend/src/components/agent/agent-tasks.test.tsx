@@ -318,3 +318,33 @@ it('shows the verifier reason before the original executor report', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
   await screen.findByText('Result one')
 })
+
+it('separates the name, expandable task details and collapsed current agent instructions', async () => {
+  const original = 'Original task details.\n' + 'Retain this full requirement. '.repeat(20)
+  const sent = 'Actual current instructions, including the applied continuation.'
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('agent-task-description') ? 300 : 0 })
+  const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('agent-task-description') ? 60 : 0 })
+  try {
+    vi.mocked(api).mockImplementation(async (_method, path) => {
+      if (path.endsWith('/resources')) return { data: controls() }
+      if (path.startsWith('/agent/artifacts')) return { data: [] }
+      const value = detail('one')
+      value.task.intent_json = JSON.stringify({ initialIntent: { title: 'Short task name', goal: original }, goal: sent })
+      return { data: value }
+    })
+    const page = render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+    await screen.findByRole('heading', { name: 'Short task name' })
+    const expand = await screen.findByRole('button', { name: 'agent.task.expandContent' })
+    expect(expand.getAttribute('aria-expanded')).toBe('false')
+    expect(page.container.querySelector('.agent-task-description')?.textContent).toBe(original)
+    const instructions = page.container.querySelector('details.agent-task-requirements') as HTMLDetailsElement
+    expect(instructions.open).toBe(false)
+    expect(instructions.querySelector('p')?.textContent).toBe(sent)
+    fireEvent.click(expand)
+    expect(screen.getByRole('button', { name: 'agent.task.collapseContent' }).getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'agent.task.collapseContent' }))
+    expect(screen.getByRole('button', { name: 'agent.task.expandContent' }).getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(screen.getByText('agent.task.instructions'))
+    expect(instructions.open).toBe(true)
+  } finally { scroll.mockRestore(); height.mockRestore() }
+})

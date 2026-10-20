@@ -225,10 +225,13 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     ] : []),
   ], onClick: ({ key }: { key: string }) => { if (key === 'debug') openAgentPage('debug'); else showPanel(key as 'tasks' | 'memory') } }
-  const conversationActions = <>
-    <button type="button" className="tt-act" onClick={() => showPanel('tasks')}><ChecklistIcon size={18} />{t('agent.workspace.tasks')}</button>
+  const secondaryActions = <>
     <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
+  </>
+  const conversationActions = <>
+    <button type="button" className="tt-act" onClick={() => showPanel('tasks')}><ChecklistIcon size={18} />{t('agent.workspace.tasks')}</button>
+    {secondaryActions}
   </>
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const title = 'Roami'
@@ -239,12 +242,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
     <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
-      {!phone && conversationActions}
+      {!phone && !(wide && workspace.open) && conversationActions}
       {wide && !workspace.open && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
     </div></header>
     {phone && mobileActionsHost && createPortal(
       <>
-        <button type="button" className="tt-mobile-topbar-icon agent-tasks-entry" onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /><span>{t('agent.workspace.tasks')}</span></button>
+        <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.workspace.tasks')} onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>
         <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={20} /></button></Dropdown>
       </>, mobileActionsHost)}
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
@@ -313,6 +316,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
-  {wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  {wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
   </div>
 }

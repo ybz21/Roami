@@ -1,10 +1,12 @@
 import { expect, it } from 'vitest'
 import type { AgentTask } from './agent-protocol'
 import { taskTopic } from './task-topic'
+import { taskInstructions } from './agent-task-protocol'
 import { taskOutcome, taskReportLinks } from './task-outcome'
 
 const task = (intent: unknown) => ({ id: 'internal-id', intent_json: JSON.stringify(intent) } as AgentTask)
 it('keeps the topic separate from requirements and preserves it after continuation', () => {
+  expect(taskInstructions(task({ initialIntent: { goal: 'Original' }, goal: 'Current full instructions' }))).toBe('Current full instructions')
   expect(taskTopic(task({ title: '修复图片预览', goal: 'Detailed requirements' }))).toBe('修复图片预览')
   expect(taskTopic(task({ title: 'Changed', initialIntent: { title: '制作无人机集群 PPT', goal: 'Original' }, goal: 'Additional steps' }))).toBe('制作无人机集群 PPT')
   expect(taskTopic(task({ goal: '在 /home/ai/codes/swarm 下制作《无人机集群（UAV Swarm）发展》PPT 并交付 .pptx。前序进展：很多细节' }))).toBe('制作《无人机集群发展》PPT')

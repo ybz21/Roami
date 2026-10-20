@@ -14,6 +14,10 @@ export function taskGoal(task: AgentTask): string {
   try { const intent = JSON.parse(task.intent_json); const goal = intent.initialIntent?.goal || intent.goal; return typeof goal === 'string' ? goal : task.id } catch { return task.id }
 }
 
+export function taskInstructions(task: AgentTask): string {
+  try { const goal = JSON.parse(task.intent_json).goal; return typeof goal === 'string' ? goal : '' } catch { return '' }
+}
+
 export function taskExecutor(task: AgentTask): 'native' | 'codex' | 'claude' | null {
   const kind = task.latestAttempt?.executorKind
   if (kind === 'native' || kind === 'codex' || kind === 'claude') return kind

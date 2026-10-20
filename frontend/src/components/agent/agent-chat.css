@@ -180,5 +180,3 @@ html[data-size="compact"] .agent-outbox-marker { min-width:var(--sp-5); }
 .agent-context-meter.is-near-limit small,.agent-context-meter.is-stale small { color:var(--warn); }
 
 html[data-pointer="coarse"] .agent-outbox .tt-act { min-width:calc(var(--tap) - var(--sp-2)); padding-inline:var(--sp-1); }
-
-.tt-mobile-topbar-icon.agent-tasks-entry { display: flex; flex-basis: auto; width: auto; min-width: var(--tap); gap: var(--sp-1); padding-inline: var(--sp-2); color: var(--text-bright); font-size: var(--fs-body); white-space: nowrap; }
