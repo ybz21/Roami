@@ -17,6 +17,16 @@ size, radius, or spacing step when a documented one already covers the role. Fro
 follows [`docs/design/web/04-frontend.md`](docs/design/web/04-frontend.md) unless a newer pattern
 already exists in code.
 
+## Keep UI Minimal
+
+UI must be concise. Show the content, current state, and actions needed for the next decision.
+Remove repeated titles, obvious instructions, generic introductions, and redundant empty-state
+explanations. Use one short empty-state message; hide zero-result counters and pagination when
+there is only one page. Lists show identity and essential status; put full errors, revision
+history, and technical details in the detail view or an explicit disclosure. Keep necessary
+warnings, recovery actions, field labels, and accessible names. Do not replace visible clutter
+with tooltip-only instructions on touch devices.
+
 ## Mobile Material UI
 
 All compact Web pages follow [`docs/development/mobile-material-ui.md`](docs/development/mobile-material-ui.md).
@@ -37,8 +47,8 @@ exactly one blue and one green site-wide, and antd's `darkAlgorithm` derives its
 the seed, so a copied hex is always a step off what antd draws next to it. No off-ramp font sizes
 (10.5 / 11.5 / 12.5), and nothing below 12px outside eyebrow/badge text.
 
-Top-level pages use `.tt-pagehead` (eyebrow + title + one line) for their header. Don't hand-roll
-a title row per page.
+Top-level pages use `.tt-pagehead` for their header; eyebrow and description are optional and
+must add information beyond the title. Don't hand-roll a title row per page.
 
 ## Clickable Things Are Buttons
 

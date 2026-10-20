@@ -34,7 +34,6 @@ export default function AgentNotificationSettings() {
     finally { savingRef.current = false; if (alive.current) setSaving(false) }
   }
   return <div className="agent-notifications-body agent-notification-settings">
-    <p className="agent-muted">{t('agent.notification.settingsHint')}</p>
     {draftNotice}
     {!settings && !failed && <Spin />}
     {failed && <p role="alert">{t('agent.notification.settingsFailed')}<button type="button" className="tt-act" onClick={() => setVersion((value) => value + 1)}>{t('agent.retry')}</button></p>}

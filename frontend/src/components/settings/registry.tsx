@@ -200,9 +200,9 @@ export function buildSettings(deps: {
 
   const pages: SettingsPageDef[] = [
     { id: 'agent.messages', name: t('agent.notification.settings'), parent: t('set.groupAgent'), scope: 'node', items: [{ id: 'agentMessages', label: t('agent.notification.settings'), bare: true, control: { kind: 'custom', node: <AgentMessageSettings /> }, keywords: 'notifications reminders delivery quiet hours 通知 消息 免打扰 提醒 投递' }] },
-    { id: 'agent.runtime', name: t('agent.models.settings'), parent: t('set.groupAgent'), scope: 'node', note: t('agent.models.settingsNote'), items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <AgentSettings /> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
-    { id: 'agent.memory', name: t('agent.memoryCenter'), parent: t('set.groupAgent'), scope: 'node', note: t('agent.memoryCenterNote'), items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
-    { id: 'agent.capabilities', name: t('agent.capabilities.title'), parent: t('set.groupAgent'), scope: 'node', note: t('agent.capabilities.note'), items: [{ id: 'agentCapabilities', label: t('agent.capabilities.title'), bare: true, control: { kind: 'custom', node: <AgentCapabilities /> }, keywords: 'Agent Skills Tools MCP CLI 技能 工具 能力 启用 停用' }] },
+    { id: 'agent.runtime', name: t('agent.models.settings'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <AgentSettings /> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
+    { id: 'agent.memory', name: t('agent.memoryCenter'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
+    { id: 'agent.capabilities', name: t('agent.capabilities.title'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentCapabilities', label: t('agent.capabilities.title'), bare: true, control: { kind: 'custom', node: <AgentCapabilities /> }, keywords: 'Agent Skills Tools MCP CLI 技能 工具 能力 启用 停用' }] },
     {
       id: 'common', name: t('set.pageCommon'), scope: 'mine', note: t('set.pageCommonNote'),
       items: [

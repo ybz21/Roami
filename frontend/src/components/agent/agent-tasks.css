@@ -54,3 +54,9 @@ html[data-pointer="coarse"] .agent-tasks .tt-act::after { content:''; position:a
 .agent-task-note small { display:block; overflow-wrap:anywhere; }
 .agent-task-frame { width:100%; min-height:calc(var(--sp-5) * 20); border:1px solid var(--border-subtle); border-radius:var(--r-sm); background:var(--bg-base); }
 .agent-task-artifact { overflow-wrap:anywhere; }
+
+.agent-task-link .agent-task-card-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); margin-top:var(--sp-1); }
+.agent-task-card-meta > span { display:inline-flex; align-items:center; gap:var(--sp-1); }
+.agent-task-card-meta .agent-task-state { padding:0; background:transparent; }
+.agent-task-card-meta time { margin:0; font-variant-numeric:tabular-nums; }
+.agent-task-section-head > .tt-act:only-child { margin-left:auto; }

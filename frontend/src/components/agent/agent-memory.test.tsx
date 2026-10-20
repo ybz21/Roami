@@ -10,9 +10,9 @@ vi.mock('../markdown/Markdown', () => ({ default: ({ children }: any) => <div>{c
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: { error: vi.fn() }, modal: { confirm: vi.fn() } }) },
   Button: ({ children, loading: _loading, danger: _danger, ...props }: any) => <button {...props}>{children}</button>,
-  Input: Object.assign((props: any) => <input {...props} />, { Search: (props: any) => <input {...props} /> }),
+  Input: Object.assign(({ prefix: _prefix, allowClear: _clear, ...props }: any) => <input {...props} />, { Search: (props: any) => <input {...props} /> }),
   Dropdown: ({ children }: any) => children,
-  Tabs: ({ items, activeKey, onChange }: any) => <div role="tablist">{items.map((item: any) => <button type="button" role="tab" key={item.key} aria-selected={item.key === activeKey} onClick={() => onChange(item.key)}>{item.label}</button>)}</div>,
+  Tabs: ({ items, activeKey, onChange, tabBarExtraContent }: any) => <div role="tablist">{items.map((item: any) => <button type="button" role="tab" key={item.key} aria-selected={item.key === activeKey} onClick={() => onChange(item.key)}>{item.label}</button>)}{tabBarExtraContent}</div>,
   Modal: ({ open, children }: any) => open ? <div role="dialog">{children}</div> : null,
   Select: ({ options, onChange, ...props }: any) => <select {...props} onChange={(e) => onChange(e.target.value)}>{options.map((option: any) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
   Spin: () => <span role="progressbar" />,
@@ -119,4 +119,21 @@ it('keeps compact memory filters accessible on demand and retains an active filt
  expect(filters.getAttribute('aria-expanded')).toBe('false')
  expect(filters.getAttribute('data-active')).toBe('true')
  expect(screen.getByRole('button', { name: 'agent.memorySources' })).toBeTruthy()
+})
+
+
+it.each([false, true])('shows one empty message without a zero count or dead pagination (compact=%s)', async compact => {
+ vi.mocked(api).mockImplementation(async (_method, path) => path === '/agent/status' ? { data: { memoryTimezone: 'UTC' } } : { data: { items: [], total: 0 } })
+ render(<AgentMemory compact={compact} projects={[]} select={vi.fn()} />)
+ await screen.findByText('agent.noMemories')
+ expect(screen.queryByText('agent.memoryTotal')).toBeNull()
+ expect(screen.queryByText('agent.memoryEmptyHint')).toBeNull()
+ expect(screen.queryByText('agent.memoryPage')).toBeNull()
+ expect(screen.queryByRole('button', { name: 'agent.memoryNext' })).toBeNull()
+ expect(screen.queryByRole('button', { name: 'agent.memoryPrevious' })).toBeNull()
+ if (!compact) {
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.memoryView.activity' }))
+  await screen.findByText('agent.memoryNoActivity')
+  expect(screen.queryByText('agent.memoryActivityEmptyHint')).toBeNull()
+ }
 })

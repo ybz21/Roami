@@ -32,7 +32,6 @@ export default function AgentReminders({ select }: { select: (cid: string, branc
     finally { pending.current = false; if (alive.current) setBusy('') }
   }
   return <div className="agent-notifications-body">
-    <p className="agent-muted">{t('agent.notification.remindersHint')}</p>
     {!items && !failed && <Spin />}
     {failed && <p role="alert">{t('agent.requestFailed')}<button type="button" className="tt-act" onClick={() => setVersion((value) => value + 1)}>{t('agent.retry')}</button></p>}
     {items?.length === 0 && <p className="agent-muted">{t('agent.notification.noReminders')}</p>}

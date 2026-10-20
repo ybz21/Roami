@@ -25,7 +25,7 @@ it.each([
   ['UNKNOWN_PROJECT', 'workspace'],
   ['EXECUTION_DIRECTORY_UNAVAILABLE', 'directory'], ['WORKSPACE_BUSY', 'workspaceBusy'],
   ['EXECUTION_DEADLINE_OR_INTERRUPTION', 'deadline'], ['NATIVE_WORKSPACE_RELEASE_UNKNOWN', 'unknown'],
-].flatMap(([code, reason]) => [true, false].map(compact => [code, reason, compact] as const)))('explains %s in the task list and detail while retaining diagnostic evidence', async (code, reason, compact) => {
+].flatMap(([code, reason]) => [true, false].map(compact => [code, reason, compact] as const)))('keeps %s diagnostics in detail and a concise status in the list', async (code, reason, compact) => {
   const failed = { ...task('one'), state: 'failed', latestAttempt: { state: 'failed', summary: code } }
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path.includes('?conversationId=')) return { data: [failed] }
@@ -34,7 +34,8 @@ it.each([
     return { data: { ...detail('one'), task: failed, attempts: [{ id: 'attempt-one', revision: 1, state: 'failed', result: { summary: code } }] } }
   })
   render(<AgentTasks compact={compact} cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
-  await screen.findByText('agent.task.failure.' + reason)
+  await screen.findByText('agent.state.failed')
+  expect(screen.queryByText('agent.task.failure.' + reason)).toBeNull()
   expect(screen.queryByText(code)).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: /Goal one/ }))
   await screen.findByText('agent.task.failure.' + reason)
@@ -177,11 +178,12 @@ it('keeps compact task cards truthful and selects the exact task without a modal
  expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-it('shows a chronological compact list with reported summaries and unknown timestamps', async () => {
+it('shows a chronological compact list with essential status and unknown timestamps', async () => {
  const now = Date.now()
  vi.mocked(api).mockResolvedValue({ data: [{ ...task('older'), updated_ms: now - 1000 }, { ...task('newer'), state: 'failed', updated_ms: now, latestAttempt: { state: 'succeeded', summary: 'Actual executor report' } }, { ...task('undated'), updated_ms: 0 }] })
  const page = render(<AgentTasks compact cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
- await screen.findByText('Actual executor report')
+ await screen.findByText('Goal newer')
+ expect(screen.queryByText('Actual executor report')).toBeNull()
  const rows = page.container.querySelectorAll('.agent-task-card')
  expect(rows[0].textContent).toContain('Goal newer')
  expect(rows[0].getAttribute('data-state')).toBe('failed')

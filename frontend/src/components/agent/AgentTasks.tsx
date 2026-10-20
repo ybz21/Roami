@@ -46,9 +46,9 @@ export default function AgentTasks({ cid, onSession, onChanged, selectedTask, on
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
     {selected ? <TaskInspector key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
-      <div className="agent-task-section-head"><span className="agent-muted">{t(compact ? 'agent.workspace.taskScope' : 'agent.task.listHint')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
+      <div className="agent-task-section-head"><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => setVersion((value) => value + 1)}><RefreshIcon /></button></div>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
-      {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong><p>{t('agent.workspace.taskEmptyHint')}</p></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
+      {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
       {compact ? <TaskTimeline tasks={roots} select={setSelected} /> : (['attention', 'active', 'recent'] as const).map(group => {
         const current = roots.filter(task => (['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(task.state) ? 'active' : ['succeeded', 'cancelled'].includes(task.state) ? 'recent' : 'attention') === group)
           .sort((a, b) => (b.updated_ms || b.created_ms || 0) - (a.updated_ms || a.created_ms || 0))
@@ -79,15 +79,11 @@ function TaskRow({ task, compact, select }: { task: AgentTask; compact: boolean;
   const state = ['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'
   const time = taskTime(task) ? new Date(taskTime(task)) : null
   const name = executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''
-  const revision = task.revision > 1 ? t('agent.task.revision', { n: task.revision }) : ''
-  const failureKey = ['failed', 'interrupted'].includes(state) ? taskFailureKey(task.latestAttempt?.summary || '') : undefined
   return <button type="button" className={`agent-task-link${compact ? ' agent-task-card' : ''}`} data-state={state} onClick={() => select(task.id)}>
     {compact && <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>}
     <span className="agent-task-row-copy">
       <b>{taskGoal(task)}</b>
-      {(compact || failureKey) && <span className="agent-task-row-summary">{failureKey ? t(failureKey) : task.latestAttempt?.summary || t(state === 'waiting_user' ? 'agent.workspace.waitingHint' : 'agent.workspace.taskSummary.' + (['failed', 'unknown', 'succeeded'].includes(state) ? state : 'progress'))}</span>}
-      {!compact && <small>{t('agent.state.' + state)}{revision}</small>}
-      {(compact || executor || time) && <small className={compact ? 'agent-task-card-meta' : undefined}>{compact && <span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>}{executor && <span>{compact && (executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />)}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, compact ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>}{compact && revision && <small>{revision}</small>}
+      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{compact && (executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />)}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, compact ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>
     </span>{!compact && <ChevronRight />}
   </button>
 }
