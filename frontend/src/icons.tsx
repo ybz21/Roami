@@ -137,6 +137,7 @@ export const GitIcon = ({ size = 17 }: P) => line(<><circle cx="6" cy="6" r="2.2
 export const WorktreeIcon = ({ size = 17 }: P) => line(<><circle cx="12" cy="4.8" r="2.2" /><circle cx="7" cy="19.2" r="2.2" /><circle cx="17" cy="19.2" r="2.2" /><path d="M12 7v2.6" /><path d="M12 9.6a4.4 4.4 0 0 0-5 4.4v3" /><path d="M12 9.6a4.4 4.4 0 0 1 5 4.4v3" /></>, size)
 /** 右栏开关：标签条右端，亮着 = 右栏开着（22 设计 §3.3） */
 export const PanelRightIcon = ({ size = 15 }: P) => line(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" /></>, size, 1.7)
+export const PanelLeftIcon = ({ size = 15 }: P) => line(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></>, size, 1.7)
 export const TerminalIcon = ({ size = 13 }: P) => line(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 9 3 3-3 3" /><path d="M13 15h4" /></>, size)
 export const ReadIcon = ({ size = 13 }: P) => line(
   <><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 15.5Z" /><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5Z" /></>, size)

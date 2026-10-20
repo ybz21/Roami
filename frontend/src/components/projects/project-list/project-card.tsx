@@ -15,7 +15,6 @@ import { sessionLabel } from '../../sessions/session-label'
 import { AgentLogo, ChevronRight, CloseIcon, FlagIcon, StarIcon, SwarmIcon } from '../../../icons'
 import { agentName } from '../../../agent-kind'
 import { BranchIcon } from '../../git/parts'
-import { icoOf } from './project-model'
 import type { Proj, ProjSwarm } from './project-model'
 
 const Go = () => <span className="prj-goi"><ChevronRight size={12} /></span>
@@ -33,7 +32,6 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
   const { t } = useI18n()
   const { coarse } = useLayout()
   const { message } = AntApp.useApp()
-  const [fg, bg] = icoOf(p.key)
   const rows = p.top || []
   const projSwarms = swarms.filter((sw) => sw.projKey === p.key)
   const open = () => { location.hash = '#/projects/' + encodeURIComponent(p.key) }
@@ -70,7 +68,7 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
       }}
       style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
       <div className="hd">
-        <span className="prj-cico" style={{ color: fg, background: bg }} aria-hidden>{(p.name[0] || '?').toUpperCase()}</span>
+        <span className="prj-cico" aria-hidden>{(p.name[0] || '?').toUpperCase()}</span>
         <span className="nm">
           <b title={p.name}>{p.name}</b>
           <span className="prj-mono" title={p.dir}>{p.dir}</span>
@@ -89,9 +87,9 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
       <div className="prj-cstat">
         <span><b>{p.sessions}</b> {t('project.tasks')}</span>
         {p.git && <>·<span><b>{p.worktrees}</b> worktree</span></>}
-        {p.races > 0 && <Tag color="gold" style={{ margin: 0 }}>{t('project.race', { count: p.races })}</Tag>}
+        {p.races > 0 && <Tag style={{ margin: 0 }}>{t('project.race', { count: p.races })}</Tag>}
         {/* 「可清理」是零损失的一键动作，不进「需要你」，留在这里当状态标就够 */}
-        {p.cleanable > 0 && <Tag color="success" style={{ margin: 0 }}>{t('project.cleanableCount', { count: p.cleanable })}</Tag>}
+        {p.cleanable > 0 && <Tag style={{ margin: 0 }}>{t('project.cleanableCount', { count: p.cleanable })}</Tag>}
       </div>
 
       {rows.length > 0 && (
@@ -137,9 +135,8 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
 }
 
 export const CARD_CSS = `
-/* 卡片列固定在 ≥320：更窄的话右侧一开终端就塌成一条极窄列表（14 §6.1）。
-   align-items:start —— 默认 stretch 会把整行卡片拉到最高那张的高度。 */
-.prj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--sp-4);align-items:start}
+/* 同一行卡片等高，会话与收尾数量变化不再打散卡片底边。 */
+.prj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--sp-4);align-items:stretch}
 
 .prj-card{min-width:0;background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:var(--r-card);
   padding:var(--sp-3) var(--sp-3) var(--sp-2);cursor:pointer;display:flex;flex-direction:column;gap:var(--sp-1);
@@ -156,11 +153,11 @@ export const CARD_CSS = `
 
 .prj-card .hd{display:flex;align-items:center;gap:var(--sp-2)}
 .prj-cico{width:28px;height:28px;flex:0 0 auto;display:grid;place-items:center;border-radius:var(--r-sm);
-  font-size:12px;font-weight:800}
+  font-size:var(--fs-meta);font-weight:800;color:var(--text-dim);background:var(--sel-bg)}
 .prj-card .nm{min-width:0;flex:1 1 auto}
 .prj-card .nm b{display:block;font-size:var(--fs-body);color:var(--text-bright);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prj-card .nm span{display:block;margin-top:2px;font-size:var(--fs-micro);line-height:1.3;color:var(--text-dimmer);
+.prj-card .nm span{display:block;margin-top:var(--sp-1);font-size:var(--fs-meta);line-height:1.3;color:var(--text-dimmer);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* 次要操作 hover 才出现，但键盘走到时同样要看得见——否则纯键盘用户够不着（14 §6.1） */
@@ -185,8 +182,8 @@ html[data-pointer="coarse"] .prj-cacts{gap:var(--sp-3)}
   font-size:var(--fs-meta);color:var(--text-dim)}
 .prj-cstat b{color:var(--text-bright)}
 
-.prj-crows{display:flex;flex-direction:column;gap:1px;margin-top:var(--sp-1);padding:5px 4px;
-  border-radius:var(--r-sm);background:var(--bg-term);border:1px solid var(--border-subtle)}
+.prj-crows{display:flex;flex-direction:column;gap:var(--sp-1);margin-top:var(--sp-1);padding-top:var(--sp-2);
+  border-top:1px solid var(--border-subtle)}
 .prj-crow{display:flex;align-items:center;gap:var(--sp-2);min-height:30px;padding:var(--sp-1) var(--sp-2);
   border-radius:var(--r-xs);font-size:var(--fs-sm);color:var(--text-bright);cursor:pointer;transition:background .14s}
 :where(html[data-pointer="fine"]) .prj-crow:hover{background:var(--list-hover)}
@@ -204,8 +201,8 @@ html[data-pointer="coarse"] .prj-crow{min-height:44px}
 
 .prj-cfoot{display:flex;align-items:center;gap:var(--sp-2);min-height:28px;margin-top:var(--sp-1);
   padding:var(--sp-1) var(--sp-2);border-radius:var(--r-xs);font-size:var(--fs-meta);
-  border:1px solid var(--swarm-border);background:var(--swarm-soft);color:var(--swarm)}
-.prj-cfoot.w{border-color:var(--warn-border);background:var(--warn-soft);color:var(--warn)}
+  border-top:1px solid var(--border-subtle);color:var(--text-dim)}
+.prj-cfoot.w > svg{color:var(--warn)}
 .prj-cfoot b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prj-cfoot .dim{color:var(--text-dimmer);flex:0 0 auto}
 .prj-cfoot button{margin-left:auto;flex:0 0 auto;border:0;background:none;color:inherit;

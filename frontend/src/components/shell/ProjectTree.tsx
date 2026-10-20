@@ -14,7 +14,6 @@ import { useI18n } from '../../i18n'
 import type { AgentKind } from '../../agent-kind'
 
 import { AgentLogo, ArchiveIcon, ChevronDown, CloseIcon, HomeIcon, MoreIcon, OpenInIcon, PencilIcon, PlusIcon, TerminalIcon, TrashIcon, WorktreeIcon } from '../../icons'
-import { icoOf } from '../projects/project-list/project-model'
 import { isLooseTask, taskKeyOf, type TaskKey } from '../sessions/task-key'
 import type { TaskTree, TreeSession, TreeTask } from './task-tree'
 
@@ -254,14 +253,13 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
         const idle = p.tasks.filter((x) => x.sessions.length === 0)
         return (
           <div key={p.key} className="tt-tree-proj">
-            {/* 项目的身份就是项目卡上那枚按名字取色的首字母圆标（icoOf），不另画图标 */}
             {/* 项目行右端照 Orca：[…] 菜单 · [+] 开任务 · [˅] 折叠，都是看得见的按钮，不靠右键 */}
             {/* 点整行 = 展开/收起，不是跳项目主页：树是拿来找会话的，找会话的动作应该就地发生，
                 点一下却整页换掉，回头还得再点回来。去主页留在「…」菜单第一项。
                 展开状态跟任务卡共用同一份 localStorage（roam.tree.closed），刷新/重开都还在。 */}
             <button type="button" className={`tt-nav-item tt-tree-row proj${open ? '' : ' closed'}`} title={p.dir}
               aria-expanded={open} onClick={() => toggle(p.key)}>
-              <span className="ic"><span className="av" style={{ color: icoOf(p.key)[0], background: icoOf(p.key)[1] }}>{p.name.slice(0, 1).toUpperCase()}</span></span>
+              <span className="ic"><span className="av">{p.name.slice(0, 1).toUpperCase()}</span></span>
               <span className="nm">{p.name}</span>
               {p.needs > 0 && <span className="bd">{p.needs}</span>}
               <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: [

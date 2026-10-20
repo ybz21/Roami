@@ -57,16 +57,3 @@ export function runningCount(p: Proj): number {
 export function waitingSessions(p: Proj): ProjSession[] {
   return p.needs || (p.top || []).filter((s) => s.waiting)
 }
-
-// 项目图标底色：按 key 取一个稳定色，卡片多了才能一眼分辨是哪个项目
-const ICO = [
-  ['#9ccaff', 'rgba(31,111,235,.13)'], ['#c7a5ff', 'rgba(163,113,247,.13)'],
-  ['#76d18a', 'rgba(63,185,80,.13)'], ['#f0ba5d', 'rgba(210,153,34,.13)'],
-  ['#72d5de', 'rgba(57,197,207,.13)'], ['#f29089', 'rgba(248,81,73,.11)'],
-] as const
-
-export function icoOf(name: string): readonly [string, string] {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return ICO[h % ICO.length]
-}

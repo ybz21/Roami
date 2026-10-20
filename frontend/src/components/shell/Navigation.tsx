@@ -12,7 +12,7 @@
 import { Dropdown, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import type { ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, SearchIcon } from '../../icons'
+import { PanelLeftIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 
 export type NavEntry = {
@@ -41,7 +41,7 @@ export function Navigation({
   active: string
   groups: NavGroup[]
   onGo: (key: string) => void
-  /** 设置：是页面，但摆在底部——它跟「概览/项目」不是一类事（14 §4.4） */
+  /** 设置接在主导航末尾。 */
   settings: NavEntry
   /** 多机（连了中心）时给：顶部出现机器切换器；单机传 null，那一块整个不渲染 */
   node: { name: string; mark: ReactNode; dot: string; latency: string } | null
@@ -69,9 +69,15 @@ export function Navigation({
   return (
     <div className={`tt-nav${rail ? ' rail' : ''}`}>
       <div className="tt-nav-brand">
-        {/* 轨态下标是唯一的品牌元素，得由它报名字；展开时旁边就写着 Roami，再念一遍是重复 */}
-        <img src="/logo-mark.svg" width={26} height={26} alt={rail ? 'Roami' : ''} aria-hidden={rail ? undefined : true} />
+        <img src="/logo-mark.svg" width={26} height={26} alt="" aria-hidden />
         {!rail && <strong className="wd">Roami</strong>}
+        <div className="tt-nav-brand-actions">
+          <button type="button" className="tt-nav-icon tt-nav-toggle" onClick={onToggleRail}
+            title={t(rail ? 'common.expand' : 'common.collapse')}
+            aria-label={t(rail ? 'common.expand' : 'common.collapse')} aria-expanded={!rail}>
+            <PanelLeftIcon size={18} />
+          </button>
+        </div>
       </div>
 
       {/* 搜索：顶栏 Command Center 撤了（22 设计 §3.5），这一行是桌面上唯一看得见的入口 */}
@@ -91,16 +97,14 @@ export function Navigation({
             {g.items.map(item)}
           </div>
         ))}
+        {item(settings)}
       </div>
 
       {/* 树不进轨：轨态只有图标，树没有图标形态 */}
       {tree && !rail && <div className="tt-nav-tree">{tree}</div>}
 
-      <div className="tt-nav-foot">
-        {/* 机器切换器摆在这一组的第一位：底下这几样都是「上下文与账户」，
-            而它是其中作用域最大的一个——切它，上面整列页面看的都换一台机器。
-            单机（没连中心）时整块不渲染，侧栏与今天逐像素一致。 */}
-        {node && (
+      {node && (
+        <div className="tt-nav-foot">
           <Dropdown menu={{ items: nodeMenu }} trigger={['click']} placement={rail ? 'topLeft' : 'top'}>
             <button type="button" className={`tt-nav-node${hubAlarm ? ' alarm' : ''}`}
               title={hubAlarm ? `${node.name} · ${hubAlarm}` : `${node.name} · ${node.latency}`}
@@ -114,20 +118,8 @@ export function Navigation({
               {!rail && <span className="dots">{chevronDown}</span>}
             </button>
           </Dropdown>
-        )}
-        {/* 终端开关不在这儿了：顶栏 Command Center 已经有一枚（还带数量），
-            外加 ⌘J。侧栏这枚是同一个动作的第三个入口，占的还是最贵的那一格。 */}
-        {/* 设置摆在这儿而不是账户菜单里：它是一整页，且是这列里唯一天天要开的一页——
-            藏在下拉里等于每次进设置都多点一下。菜单里那条随之删掉，一个入口就够。 */}
-        {item(settings)}
-        {/* 「当前设备」那枚账户菜单没了（22 设计 §3.2 拍板）：关于 / 主题本来就在设置页，
-            全屏 / 退出并进设置 › 外观。脚只剩 设置 / 收起。 */}
-        <button type="button" className="tt-nav-collapse" onClick={onToggleRail}
-          title={rail ? t('common.expand') : t('common.collapse')}>
-          <span className="ic">{rail ? chevronRight : chevronLeft}</span>
-          {!rail && <span className="nm">{t('common.collapse')}</span>}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -137,6 +129,4 @@ const svg = (children: ReactNode) => <svg viewBox="0 0 24 24" width={18} height=
 // 主机图标而不是姓名首字母：这里代表的是"你连着的这台机器"，不是一个人。
 // 尺寸跟导航项同为 18：整列图标要落在同一条竖线、同一个视觉重量上。
 const chevronDown = <svg viewBox="0 0 24 24" width={14} height={14} {...stroke}><polyline points="6 9 12 15 18 9" /></svg>
-const chevronLeft = <ChevronLeft size={18} />
-const chevronRight = <ChevronRight size={18} />
 

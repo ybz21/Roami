@@ -315,6 +315,7 @@ html[data-pointer="coarse"] .tt-rail-btn::after {
    容器留白在 .tt-nav 上，这里用负 margin 把分割线还原成整栏宽。 */
 .tt-nav-brand {
   display: flex; align-items: center; gap: var(--sp-2);
+  box-sizing: border-box;
   height: var(--topbar-h); flex: 0 0 var(--topbar-h);
   margin: 0 -8px var(--sp-2); padding: 0 var(--sp-3);
   border-bottom: 1px solid var(--border-subtle);
@@ -322,6 +323,20 @@ html[data-pointer="coarse"] .tt-rail-btn::after {
 .tt-nav.rail .tt-nav-brand { justify-content: center; margin: 0 0 var(--sp-2); padding: 0; }
 /* 标是透明底的，别再给它圆角和投影——那是当年方形底板留下的两笔 */
 .tt-nav-brand img { flex: 0 0 auto; }
+.tt-nav-brand-actions { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.tt-nav-icon {
+  position: relative; flex: 0 0 auto;
+  display: grid; place-items: center; width: var(--ctl-h); height: var(--ctl-h); padding: 0;
+  border: 0; border-radius: var(--r-xs); background: transparent; color: var(--text-dim); cursor: pointer;
+}
+:where(html[data-pointer="fine"]) .tt-nav-icon:hover { background: var(--list-hover); color: var(--text-bright); }
+.tt-nav-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tt-nav.rail .tt-nav-brand img { display: none; }
+.tt-nav.rail .tt-nav-brand-actions { margin: 0; }
+html[data-pointer="coarse"] .tt-nav-icon::after {
+  content: ""; position: absolute; width: max(var(--tap), calc(100% + var(--sp-2))); height: var(--tap);
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+}
 /* 只有标 + 名，没有标语。
    标语（ANYWHERE · ANYTIME）是 10px——比 --fs-micro 还小一档，掉在字号阶梯外面；
    它也不承载信息：这一栏是导航，用户已经在应用里了，不需要再被介绍一遍产品。
@@ -345,7 +360,7 @@ html[data-pointer="coarse"] .tt-rail-btn::after {
   color: var(--text-dimmer); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .1em;
 }
 
-.tt-nav-item, .tt-nav-collapse {
+.tt-nav-item {
   position: relative; display: flex; align-items: center; gap: 11px; width: 100%;
   min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
   background: none; color: var(--text-dim); font-size: var(--fs-body); text-align: left;
@@ -353,17 +368,16 @@ html[data-pointer="coarse"] .tt-rail-btn::after {
 }
 /* 轨态每项 36 高、铺满整轨、不带圆角：一条 48 宽的轨里再切圆角，悬停块两边各剩 6px
    黑边，读起来像一排小卡片而不是一列导航 */
-.tt-nav.rail .tt-nav-item,
-.tt-nav.rail .tt-nav-collapse {
+.tt-nav.rail .tt-nav-item {
   justify-content: center; min-height: 36px; padding: 0; border-radius: 0;
 }
-:where(html[data-pointer="fine"]) .tt-nav-item:hover, :where(html[data-pointer="fine"]) .tt-nav-collapse:hover { background: var(--list-hover); color: var(--text-bright); }
+:where(html[data-pointer="fine"]) .tt-nav-item:hover { background: var(--list-hover); color: var(--text-bright); }
 /* 图标槽：导航项 / 终端开关 / 账户 / 收起 用同一个 20px 方槽，图标才在一条竖线上。
    账户那枚以前是「蓝底圆角块」，在一列裸图标里自成一格——同一列里不要两种图标语言。 */
-.tt-nav-item .ic, .tt-nav-collapse .ic {
+.tt-nav-item .ic {
   flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center;
 }
-.tt-nav-item .nm, .tt-nav-collapse .nm {
+.tt-nav-item .nm {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* ── 设置 › 多机：模式二选一 + 接入状态 + 两条入口 ───────────────── */
@@ -507,8 +521,7 @@ html[data-pointer="coarse"] .tt-devrow.acts > .tt-mode { padding-bottom: 58px; }
 }
 
 /* 粗指针：视觉仍是 36 高，命中区用伪元素补到 44——直接把行画高会把这一列拉长一截 */
-html[data-pointer="coarse"] .tt-nav-item::after,
-html[data-pointer="coarse"] .tt-nav-collapse::after {
+html[data-pointer="coarse"] .tt-nav-item::after {
   content: ""; position: absolute; left: 0; right: 0; top: 50%;
   transform: translateY(-50%); height: 44px;
 }
@@ -602,8 +615,8 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 /* 搜索：实底 + 32 高的假输入框，点了开 ⌘K 面板。与底同色只描一圈边的话没人看得出这里能搜 */
 .tt-tree-head .gl { flex: 1; padding-left: 10px; color: var(--text-dimmer); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .1em; }
 .tt-tree-head .tt-act { color: var(--text-dimmer); }
-/* 项目行的首字母圆标：项目卡那枚（icoOf 取色）缩到 20，住在图标槽里 */
-.tt-tree-row .av { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/1 var(--mono); }
+/* 项目标保持中性，让颜色只承担状态含义。 */
+.tt-tree-row .av { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 700 var(--fs-micro)/1 var(--mono); color: var(--text-dim); background: var(--sel-bg); }
 .tt-tree-proj + .tt-tree-proj { margin-top: 4px; }
 .tt-tree-proj.loose { margin-top: 10px; }
 .tt-tree-proj .gl { padding: 0 10px; margin-bottom: var(--sp-1); color: var(--text-dimmer); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .1em; }
@@ -1392,13 +1405,15 @@ html[data-pointer="coarse"] .tt-srow .acts { opacity: 1; }
   height: calc(100% - 2 * var(--sp-2));
   min-height: calc(100% - 2 * var(--sp-2));
 }
-.tt-page-browser.tt-page-card {
+.tt-page-browser.tt-page-card,
+.tt-page-projects.tt-page-card {
   margin: 0;
   width: 100%;
   height: 100%;
   min-height: 100%;
   border: 0;
   border-radius: 0;
+  background: var(--bg-base);
 }
 .tt-page .ant-space-vertical {
   align-items: stretch;
@@ -1551,9 +1566,10 @@ html[data-size="compact"] .ant-form-item-control-input-content > .ant-picker { w
 /* 标签条外壳：左侧「收起」固定，标签区独立横滚，两侧溢出给渐隐（14 §7.1） */
 .tt-tabs-wrap {
   position: relative; display: flex; align-items: center; min-width: 0;
+  box-sizing: border-box; height: var(--topbar-h); flex: 0 0 var(--topbar-h);
   background: var(--bg-base); border-bottom: 1px solid var(--border-subtle);
 }
-.tt-tabs-wrap > .tt-tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.tt-tabs-wrap > .tt-tabs { flex: 1 1 auto; min-width: 0; height: 100%; border-bottom: 0; }
 .tt-tabs-lead { flex: 0 0 auto; display: flex; align-items: center; padding: 0 0 0 8px; }
 /* 两端的翻页钮 + 右端的「全部标签」清单：只在溢出时出现（fadeL/fadeR 决定挂不挂）。
    渐隐只是暗示「这边还有」，没有横向滚轮的鼠标照样够不着——这几枚是能点的那一版。
@@ -1584,7 +1600,7 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
 .tt-tab {
   position: relative;
   display: inline-flex; align-items: center; gap: 7px; min-width: 132px; max-width: 220px;
-  height: 34px; padding: 0 6px 0 10px;
+  height: 100%; padding: 0 6px 0 10px;
   border: 0; border-right: 1px solid var(--border-subtle); border-radius: 0; background: transparent;
   color: var(--text-dim); font-size: var(--fs-meta); line-height: 1; white-space: nowrap; cursor: pointer;
   transition: background .12s, color .12s;

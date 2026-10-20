@@ -75,7 +75,13 @@ const PRJ_CSS = `
 .prj-wrap{max-width:880px;margin:0;padding:0 0 32px}
 /* 概览并进来之后这一页带右轨：1180 是没有右轨时定的，减掉 320 只剩一列半 */
 .prj-wrap-wide{width:100%;min-width:0;margin:0;padding:0 0 var(--sp-5);
-  display:flex;flex-direction:column;gap:var(--sp-3)}
+  display:flex;flex-direction:column;gap:var(--sp-4)}
+.prj-wrap-wide > .prj-head{position:static;min-height:0;margin:0;padding:var(--sp-4) var(--pad-page);border:0}
+.prj-wrap-wide > .prj-needbar,
+.prj-wrap-wide > .prj-needs,
+.prj-wrap-wide > .prj-sect{margin-inline:var(--pad-page);width:auto}
+.prj-wrap-wide > .prj-subbar{margin:0;padding:var(--sp-2) var(--pad-page);border-bottom:1px solid var(--border-subtle)}
+.prj-feed > .prj-sect:first-child{margin-top:0}
 /* 栅格与右轨。阈值一律看 Canvas 容器，不看 viewport——终端坞开合只改 Canvas 宽度 */
 .prj-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4);align-items:start;
   padding-inline:var(--pad-page)}
@@ -85,9 +91,9 @@ const PRJ_CSS = `
 .prj-live .prj-sect{margin:0 0 var(--sp-2)}
 .prj-live-list{display:flex;gap:var(--sp-2);overflow-x:auto;scrollbar-width:thin;padding-bottom:var(--sp-1)}
 .prj-live-item{min-width:260px;max-width:380px;flex:1 0 260px;display:flex;align-items:center;gap:var(--sp-3);
-  padding:var(--sp-3);border:1px solid var(--ok-border);border-radius:var(--r-card);background:var(--bg-container);
+  padding:var(--sp-3);border:1px solid var(--border-subtle);border-radius:var(--r-card);background:var(--bg-container);
   color:var(--text-bright);text-align:left;cursor:pointer}
-:where(html[data-pointer="fine"]) .prj-live-item:hover{border-color:var(--ok);background:var(--list-hover)}
+:where(html[data-pointer="fine"]) .prj-live-item:hover{border-color:var(--border);background:var(--list-hover)}
 .prj-live-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .prj-live-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:var(--sp-1)}
 .prj-live-copy b{font-size:var(--fs-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -183,11 +189,11 @@ html[data-size="compact"] .prj-subbar .prj-search{display:none}
 html[data-size="compact"] .prj-subbar.searching .prj-search{display:block;flex:1 1 auto}
 html[data-size="compact"] .prj-subbar.searching .prj-filters,
 html[data-size="compact"] .prj-subbar.searching .prj-iconbtn.find{display:none}
-.prj-chip{display:inline-flex;align-items:center;gap:var(--sp-2);height:28px;padding:0 var(--sp-3);border-radius:var(--r-pill);
-  border:1px solid var(--border);background:transparent;color:var(--text-dim);font-size:12px;
+.prj-chip{display:inline-flex;align-items:center;gap:var(--sp-2);height:var(--ctl-h);padding:0 var(--sp-3);border-radius:var(--r-pill);
+  border:1px solid var(--border);background:transparent;color:var(--text-dim);font-size:var(--fs-meta);
   cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s,background .15s}
-:where(html[data-pointer="fine"]) .prj-chip:hover{color:var(--text-bright);border-color:#8b949e}
-.prj-chip.on{color:var(--accent);border-color:var(--accent-border);background:var(--accent-soft)}
+:where(html[data-pointer="fine"]) .prj-chip:hover{color:var(--text-bright);border-color:var(--text-dim)}
+.prj-chip.on{color:var(--accent);border-color:var(--accent-border);background:var(--sel-bg)}
 .prj-chip .n{font-family:ui-monospace,monospace;font-size:var(--fs-micro);color:var(--text-dimmer)}
 .prj-chip.on .n{color:var(--accent)}
 
@@ -579,7 +585,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
         <Input allowClear size="small" value={q}
           onChange={(e) => { const v = e.target.value; setQ(v); if (v.trim() && filter !== 'all') setFilter('all') }}
           ref={searchRef} className="prj-search" onBlur={() => { if (!q) setSearching(false) }}
-          placeholder={t('project.searchPlaceholder')} style={{ width: isPhone ? undefined : 200 }} />
+          placeholder={t('project.searchPlaceholder')} style={{ width: isPhone ? undefined : 200, minHeight: 'var(--ctl-h)' }} />
         <Dropdown trigger={['click']} menu={{
           selectable: true, selectedKeys: [sortBy],
           items: SORTS.map((k) => ({ key: k, label: t(`project.sort.${k}`) })),
