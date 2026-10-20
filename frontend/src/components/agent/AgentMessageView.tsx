@@ -1,5 +1,5 @@
 import AgentQuestion from './AgentQuestion'
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { App, Image } from 'antd'
 import { CheckIcon, CopyIcon, FileTextIcon, NotebookIcon } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -36,7 +36,7 @@ function AgentImageAttachment({ file }: { file: Attachment }) {
   </span>
 }
 
-export default function AgentMessageView({ item, focused, remember, canAnswer = false, answer }: { item: AgentMessage; focused: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
+function AgentMessageView({ item, focused, remember, canAnswer = false, answer }: { item: AgentMessage; focused: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
   const { t, locale } = useI18n(), { message } = App.useApp(), [copied, setCopied] = useState(false)
   const assistant = item.role === 'assistant'
   const report = item.content.sessionReply
@@ -59,3 +59,5 @@ export default function AgentMessageView({ item, focused, remember, canAnswer = 
     {assistant && item.completedEventId && <span className="agent-read-sentinel" data-event-id={item.completedEventId} aria-hidden />}
   </article>
 }
+
+export default memo(AgentMessageView)

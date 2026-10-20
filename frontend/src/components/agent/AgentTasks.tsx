@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Spin } from 'antd'
 import { api } from '../../api'
 import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, ChevronLeft, ChevronRight } from '../../icons'
@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
 import { taskExecutor, taskGoal } from './agent-task-protocol'
+import { useAgentData } from './useAgentData'
 import { useAgentTask } from './useAgentTask'
 import { TaskResult, TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
 import { taskFailureKey } from './task-failure'
@@ -28,24 +29,14 @@ type Props = { cid: string; onSession: (id: string) => void; onChanged: () => vo
 
 export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask, compact = false, hideBack = false }: Props) {
   const { t } = useI18n()
-  const [tasks, setTasks] = useState<AgentTask[]>([]), [localSelected, setLocalSelected] = useState('')
+  const [localSelected, setLocalSelected] = useState('')
   const selected = selectedTask ?? localSelected
   const setSelected = (id: string) => { if (onSelectTask) onSelectTask(id); else setLocalSelected(id) }
-  const [failed, setFailed] = useState(false), [loading, setLoading] = useState(true), [version, setVersion] = useState(0)
-  useEffect(() => {
-    if (!cid || selected) { setLoading(false); return }
-    let cancelled = false
-    const controller = new AbortController()
-    void api('GET', '/agent/tasks?conversationId=' + encodeURIComponent(cid), undefined, { signal: controller.signal })
-      .then((result) => { if (!cancelled) { setTasks(result.data); setFailed(false) } })
-      .catch(() => { if (!cancelled) setFailed(true) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true; controller.abort() }
-  }, [cid, selected, version])
-  useEffect(() => { const timer = setInterval(() => { if (document.visibilityState === 'visible') setVersion((value) => value + 1) }, 3000); return () => clearInterval(timer) }, [])
+  const list = useAgentData<AgentTask[]>(cid ? '/agent/tasks?conversationId=' + encodeURIComponent(cid) : null, 3000, 3000, 'GET', !selected)
+  const tasks = list.value || [], { loading, failed } = list
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
-    {selected ? <TaskInspector hideBack={hideBack} key={selected} id={selected} onBack={() => { setSelected(''); setVersion((value) => value + 1) }} select={setSelected} onSession={onSession} onChanged={onChanged} /> : <>
+    {selected ? <TaskInspector hideBack={hideBack} key={selected} id={selected} onBack={() => { setSelected(''); list.refresh() }} select={setSelected} onSession={onSession} onChanged={() => { list.refresh(); onChanged() }} /> : <>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
       {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
       {compact ? <TaskTimeline tasks={roots} select={setSelected} /> : (['attention', 'active', 'recent'] as const).map(group => {
@@ -96,19 +87,20 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const detail = snapshot.detail.value, task = detail?.task
-  const controlSafe = snapshot.controls.version >= controlFence.current && !snapshot.controls.failed && !busy
+  const detailSafe = snapshot.detail.version >= controlFence.current && !snapshot.detail.failed
+  const controlSafe = detailSafe && snapshot.controls.version >= controlFence.current && !snapshot.controls.failed && !busy
   const controls = controlSafe ? snapshot.controls.value : null
   const latest = detail?.attempts[0], steering = detail?.steering
-  const artifacts = [...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()]
+  const artifacts = useMemo(() => [...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()], [snapshot.artifacts.value, detail?.delivery?.artifacts])
   const ended = !!latest?.finishedMs || terminal.has(task?.state || '')
-  const previewArtifact = (artifactId: string) => {
+  const previewArtifact = useCallback((artifactId: string) => {
     setPreview(artifactId)
     requestAnimationFrame(() => document.getElementById('task-artifact-' + artifactId)?.scrollIntoView?.({ block: 'nearest' }))
-  }
+  }, [])
   const stopping = steering?.state === 'stopping'
   const goal = task ? taskGoal(task) : ''
   const mutate = async (name: string, path: string, body: unknown = {}) => {
-    if (busyRef.current) return
+    if (busyRef.current || !detailSafe) return
     busyRef.current = true
     setBusy(name); setError('')
     try { await api('POST', path, body); if (alive.current) onChanged() }
@@ -139,7 +131,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
         {!ended && task.latestAttempt?.sessionId && <Button onClick={() => onSession(task.latestAttempt!.sessionId!)}>{t('agent.openSession')}</Button>}
         {ended && <Button onClick={() => setHistory(!history)}>{t('agent.task.viewRecord')}</Button>}
         {task.parent_task_id && <Button onClick={() => select(task.parent_task_id!)}>{t('agent.task.parent')}</Button>}
-        {(!terminal.has(task.state) || stopping) && <Button danger disabled={!!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
+        {(!terminal.has(task.state) || stopping) && <Button danger disabled={!detailSafe || !!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
       </div>
       {steering && ['stopping', 'blocked', 'cancelled'].includes(steering.state) && <p className="agent-task-note" role="status">{steering.state === 'blocked' ? failure(steering.errorCode, t) : t('agent.task.steering.' + steering.state)}</p>}
       {error && <p className="agent-task-note error" role="alert">{error}</p>}
@@ -154,7 +146,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
         </div>{preview === artifact.id && <TaskArtifactPreview artifact={artifact} />}</div>)}
       </section>
       {latest?.result && <section className="agent-task-section"><h4>{t('agent.task.result')}</h4>{ended && <p className="agent-muted">{t('agent.task.archivedRecord')}</p>}<TaskResult attempt={latest} artifacts={artifacts} onPreview={previewArtifact} /></section>}
-      {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || snapshot.detail.failed} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.accept')}</Button><Button disabled={!!busy || snapshot.detail.failed} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
+      {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.accept')}</Button><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
       {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskGoal(child)}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
       <section className="agent-task-section"><h4>{t('agent.task.control')}</h4>
         {snapshot.controls.failed && <p role="alert">{t('agent.task.controlUnavailable')}</p>}
@@ -172,7 +164,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
         })}
         {controls?.actions.some((action) => action.state === 'unknown' && action.outcomeKnown !== true) && <p className="agent-task-note">{t('agent.task.reconcile')}</p>}
       </section>
-      <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || snapshot.detail.failed} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
+      <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || !detailSafe} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
       <section className="agent-task-section"><button type="button" className="tt-act agent-task-disclosure" aria-expanded={history} onClick={() => setHistory(!history)}><ChevronRight />{t('agent.task.history')}</button>
         {history && detail?.attempts.map((attempt) => <div className="agent-task-attempt" key={attempt.id}><b>{t('agent.task.revision', { n: attempt.revision })}</b><span>{t('agent.state.' + attempt.state)}</span>{attempt.finishedMs && <time>{new Date(attempt.finishedMs).toLocaleString(locale)}</time>}<div className="agent-task-attempt-record"><TaskResult attempt={attempt} artifacts={artifacts} onPreview={previewArtifact} /></div></div>)}
         {history && detail?.attemptsTruncated && <small className="agent-muted">{t('agent.task.moreHistory')}</small>}

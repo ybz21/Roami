@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import AgentTasks from './AgentTasks'
+import { clearAgentDataCache } from './agent-data-cache'
 import { api } from '../../api'
 
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
@@ -13,7 +14,7 @@ vi.mock('antd', () => ({
   Input: { TextArea: ({ autoSize: _auto, ...props }: any) => <textarea {...props} /> },
   Spin: () => <span role="progressbar" />,
 }))
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks() })
+afterEach(() => { clearAgentDataCache(); cleanup(); vi.useRealTimers(); vi.resetAllMocks() })
 
 const task = (id: string, parent?: string, revision = 1) => ({ id, parent_task_id: parent, revision, state: 'succeeded', intent_json: JSON.stringify({ goal: 'Goal ' + id }) })
 const detail = (id: string, children: any[] = [], revision = 1) => ({ task: task(id, undefined, revision), attempts: [{ id: 'attempt-' + id, revision, state: 'succeeded', result: { summary: 'Result ' + id } }], children, attemptsTruncated: false, childrenTruncated: false })
@@ -257,4 +258,22 @@ it('renders historical result metadata with unsupported summary types without cr
   fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
   await screen.findByText('agent.task.result')
   expect(screen.queryByText('[object Object]')).toBeNull()
+})
+
+it('shows a cached task result on reopening but waits for fresh detail before continuing', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/resources') ? controls() : path.startsWith('/agent/artifacts') ? [] : detail('one') }))
+  const first = render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByText('Result one')
+  first.unmount()
+  let finish!: (value: any) => void
+  const pending = new Promise(resolve => { finish = resolve })
+  vi.mocked(api).mockImplementation(async (_method, path) => path.endsWith('/resources') ? { data: controls() } : path.startsWith('/agent/artifacts') ? { data: [] } : pending)
+  render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  expect(screen.getByText('Result one')).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Continue with the new requirements' } })
+  expect((screen.getByRole('button', { name: 'agent.task.continue' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
+  expect(vi.mocked(api).mock.calls.some(call => call[0] === 'POST')).toBe(false)
+  await act(async () => { finish({ data: detail('one', [], 2) }); await pending })
+  await waitFor(() => expect((screen.getByRole('button', { name: 'agent.task.continue' }) as HTMLButtonElement).disabled).toBe(false))
 })

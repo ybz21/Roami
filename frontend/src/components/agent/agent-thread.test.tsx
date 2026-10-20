@@ -2,10 +2,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useAgentThread } from './useAgentThread'
+import { agentDataKey, clearAgentDataCache, peekAgentData, storeAgentData } from './agent-data-cache'
 import { api, openEventStream } from '../../api'
 
 vi.mock('../../api', () => ({ api: vi.fn(), openEventStream: vi.fn() }))
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { clearAgentDataCache(); vi.restoreAllMocks(); vi.resetAllMocks() })
 const snapshot = (id: string) => ({ conversation: { id, title: id, active_branch_id: id }, branchId: id, messages: [], turns: [], snapshotCursor: 1 })
 
 it('ignores a late snapshot from the previously selected conversation and aborts its stream', async () => {
@@ -45,4 +46,22 @@ it('publishes live tool transitions without waiting for another history response
   expect(hook.result.current.view?.activities).toHaveLength(1)
   expect(vi.mocked(api).mock.calls.length).toBe(reads)
   hook.unmount()
+})
+
+it('renders warm history immediately and replays missed stream events from its cursor', async () => {
+  storeAgentData(agentDataKey('/agent/conversations/warm/messages'), snapshot('warm'))
+  let stream!: ReadableStreamDefaultController<Uint8Array>
+  vi.mocked(openEventStream).mockImplementation(async (_path, signal) => new Response(new ReadableStream({
+    start(controller) { stream = controller; signal.addEventListener('abort', () => controller.close(), { once: true }) },
+  })))
+  const hook = renderHook(() => useAgentThread('warm'))
+  expect(hook.result.current.view?.conversation.id).toBe('warm')
+  expect(hook.result.current.loading).toBe(false)
+  await waitFor(() => expect(hook.result.current.connected).toBe(true))
+  expect(openEventStream).toHaveBeenLastCalledWith('/agent/conversations/warm/events?after=1', expect.anything())
+  expect(api).not.toHaveBeenCalled()
+  await act(async () => stream.enqueue(new TextEncoder().encode('data: ' + JSON.stringify({ id: 2, branchId: 'warm', kind: 'message.started', payload: { messageId: 'new-message', turnId: 'turn' } }) + '\n\n')))
+  await waitFor(() => expect(hook.result.current.view?.messages[0].id).toBe('new-message'))
+  hook.unmount()
+  expect(peekAgentData<any>(agentDataKey('/agent/conversations/warm/messages'))?.snapshotCursor).toBe(2)
 })

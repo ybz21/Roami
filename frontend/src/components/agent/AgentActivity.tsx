@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { api } from '../../api'
 import { BotIcon, ChevronDown, ChevronRight, ClockIcon, TerminalIcon } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -18,7 +18,7 @@ const knownStates = new Set([...active, ...attention, 'succeeded', 'cancelled', 
 export function activityState(state: string) { return knownStates.has(state) ? state : 'unknown' }
 
 type ActivityProps = { items: AgentActivityItem[]; onSession: (id: string) => void; conversationId?: string; branchId?: string }
-export default function AgentActivity({ items, onSession, conversationId, branchId }: ActivityProps) {
+function AgentActivity({ items, onSession, conversationId, branchId }: ActivityProps) {
   const { t } = useI18n(), [expanded, setExpanded] = useState(false)
   const steps = items.map(item => <ActivityStep key={item.id} item={item} onSession={onSession} conversationId={conversationId} branchId={branchId} />)
   if (items.length < 2) return <>{steps}</>
@@ -83,3 +83,5 @@ function ActivityPayload({ conversationId, branchId, item }: { conversationId: s
   if (!detail) return <p role="status">{t('agent.activity.loadingDetails')}</p>
   return <div className="agent-activity-payloads">{(['input', 'output'] as const).map(kind => <details key={kind} open={kind === 'output'}><summary>{t(`agent.activity.${kind}`)}</summary>{detail[kind] ? <><pre>{detail[kind]!.text}</pre>{detail[kind]!.truncated && <p>{t('agent.activity.previewTruncated')}</p>}</> : <p>{t('agent.activity.noOutput')}</p>}</details>)}</div>
 }
+
+export default memo(AgentActivity)

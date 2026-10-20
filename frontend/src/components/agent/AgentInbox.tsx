@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import AgentReminders from './AgentReminders'
@@ -23,7 +24,10 @@ export default function AgentInbox({ inbox, select }: { inbox: AgentInboxState; 
     </div><button type="button" className="tt-act" disabled={busy || !inbox.unread} onClick={() => { void markAll() }}>{t('agent.notification.readAll')}</button></div>
     {failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {!unreadOnly && <section><h3>{t('agent.notification.reminders')}</h3><AgentReminders select={select} /></section>}
-    <section className="agent-panel-list"><h3>{t('agent.notification.messages')}</h3>{!notices.length && <p className="agent-muted">{t('agent.noNotifications')}</p>}
+    <section className="agent-panel-list"><h3>{t('agent.notification.messages')}</h3>
+      {inbox.notificationsLoading && <Spin />}
+      {inbox.notificationsFailed && <p role="alert">{t('agent.requestFailed')}<button type="button" className="tt-act" onClick={inbox.refresh}>{t('agent.retry')}</button></p>}
+      {!inbox.notificationsLoading && !inbox.notificationsFailed && !notices.length && <p className="agent-muted">{t('agent.noNotifications')}</p>}
       {notices.map(n => {
         let text = ''
         try { const value = JSON.parse(n.content_json).text; text = typeof value === 'string' ? value : '' } catch { /* Preserve navigation for legacy records. */ }

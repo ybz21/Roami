@@ -39,3 +39,11 @@ it('exposes a failed read acknowledgement without claiming success', async () =>
   fireEvent.click(screen.getByRole('button', { name: 'agent.notification.readAll' }))
   expect(await screen.findByRole('alert')).toBeTruthy()
 })
+
+it('does not report an empty inbox while the first response is pending or failed', () => {
+  const page = render(<AgentInbox inbox={{ ...inbox(), notices: [], notificationsLoading: true }} select={vi.fn()} />)
+  expect(screen.queryByText('agent.noNotifications')).toBeNull()
+  page.rerender(<AgentInbox inbox={{ ...inbox(), notices: [], notificationsFailed: true }} select={vi.fn()} />)
+  expect(screen.getByRole('alert')).toBeTruthy()
+  expect(screen.queryByText('agent.noNotifications')).toBeNull()
+})

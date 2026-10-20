@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import Markdown from '../markdown/Markdown'
@@ -13,7 +13,7 @@ export function taskOutputHref(href: string, artifacts: TaskArtifact[]): string 
   return href
 }
 
-export function TaskResult({ attempt, artifacts, onPreview }: { attempt: TaskAttempt; artifacts: TaskArtifact[]; onPreview?: (id: string) => void }) {
+function TaskResultBody({ attempt, artifacts, onPreview }: { attempt: TaskAttempt; artifacts: TaskArtifact[]; onPreview?: (id: string) => void }) {
   const { t, locale } = useI18n()
   const code = typeof attempt.result?.summary === 'string' ? attempt.result.summary : ''
   const stderr = typeof attempt.result?.stderr === 'string' ? attempt.result.stderr : ''
@@ -32,6 +32,8 @@ export function TaskResult({ attempt, artifacts, onPreview }: { attempt: TaskAtt
     {typeof attempt.result?.exitCode === 'number' && <small className="agent-muted">{t('agent.task.exitCode', { code: attempt.result.exitCode })}</small>}
   </>
 }
+
+export const TaskResult = memo(TaskResultBody)
 
 export function TaskArtifactPreview({ artifact }: { artifact: TaskArtifact }) {
   const { t } = useI18n()
