@@ -174,7 +174,7 @@ CASES = [
     (
         "Q03",
         "用 Codex 修复已有 Roami 项目的设置保存问题，定位根因、修改代码、跑测试并提交 PR。",
-        "遵守用户明确的 Codex 选择，绑定 Roami 项目。",
+        "显式 Codex 选择覆盖项目默认 Claude，绑定 Roami 项目。",
         "explicit",
     ),
     (
@@ -292,6 +292,9 @@ async def run_case(provider, settings, output, number, case):
         else question.format(directory=directory)
     )
     targets = ExamTargets({"codex"} if kind == "unavailable" else {"codex", "claude"})
+    if kind == "explicit":
+        # A conflicting default prevents an automatic choice from accidentally passing.
+        targets.projects[0]["defaultExecutor"] = "claude"
     database = Database(root / "runtime.db", root, managed=False)
     await database.open()
     counted = MeasuredMain(provider)
@@ -415,6 +418,10 @@ async def run_case(provider, settings, output, number, case):
                 and plans[0]["target"].get("projectId")
                 == ("proj-swarm" if kind == "complex" else "proj-roami")
             )
+            if kind == "explicit":
+                passed = passed and (
+                    plans[0].get("routingDecision", {}).get("reasonCode") == "explicit_executor"
+                )
         elif kind == "file":
             passed = (
                 len(plans) == 1
