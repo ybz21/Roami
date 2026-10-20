@@ -202,7 +202,7 @@ html[data-pointer="coarse"] .prj-crow{min-height:44px}
 .prj-cfoot{display:flex;align-items:center;gap:var(--sp-2);min-height:28px;margin-top:var(--sp-1);
   padding:var(--sp-1) var(--sp-2);border-radius:var(--r-xs);font-size:var(--fs-meta);
   border-top:1px solid var(--border-subtle);color:var(--text-dim)}
-.prj-cfoot.w > svg{color:var(--warn)}
+.prj-cfoot.w > svg,.prj-cfoot.w button{color:var(--accent)}
 .prj-cfoot b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prj-cfoot .dim{color:var(--text-dimmer);flex:0 0 auto}
 .prj-cfoot button{margin-left:auto;flex:0 0 auto;border:0;background:none;color:inherit;

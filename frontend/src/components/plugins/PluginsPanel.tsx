@@ -126,9 +126,7 @@ export default function PluginsPanel({ initialId }: { initialId?: string } = {})
             <Button size="small" disabled>{t('plugins.market')}</Button>
           </Tooltip>
         </Space>}>
-        {daemon
-          ? <Alert type="success" showIcon style={{ marginBottom: 8 }} message={t('plugins.daemonRunning')} />
-          : <Alert type="warning" showIcon style={{ marginBottom: 8 }} message={t('plugins.daemonStopped')} />}
+        {!daemon && <Alert type="warning" showIcon style={{ marginBottom: 'var(--sp-2)' }} message={t('plugins.daemonStopped')} />}
         <List
           dataSource={plugins}
           renderItem={(p) => (
@@ -296,7 +294,7 @@ function PluginDetail({ plugin, locale, t, onChanged }: {
   return (
     <Card size="small"
       title={<Space>{lt(m.displayName, locale) || m.name}
-        <Tag color={plugin.enabled ? 'green' : undefined}>{t(plugin.enabled ? 'plugins.stateEnabled' : 'plugins.stateDisabled')}</Tag>
+        {!plugin.enabled && <Tag>{t('plugins.stateDisabled')}</Tag>}
         <Tag>{m.runtime?.kind || 'builtin'}</Tag></Space>}
       extra={(
         <Popconfirm

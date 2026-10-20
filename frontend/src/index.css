@@ -505,12 +505,11 @@ html[data-pointer="coarse"] .tt-devrow.acts > .tt-mode { padding-bottom: 58px; }
    选中于是只剩两件事——图标点亮成 accent、栏最左边一条 accent 线。 */
 .tt-nav.rail .tt-nav-item.on { background: none; color: var(--accent); }
 .tt-nav.rail .tt-nav-item.on::before { height: 18px; }
-/* 角标只有一种形状与分量（淡底 + 同色字），颜色只用来分语义：
-   琥珀＝需要你处理，蓝＝计数。一个实心蓝圆点混在一列淡底胶囊里会读成「更重要」 */
+/* 普通计数用蓝色，避免待收尾数量被读成警告。 */
 .tt-nav-item .bd {
   margin-left: auto; flex: 0 0 auto; min-width: 20px; height: 20px; padding: 0 6px;
   display: grid; place-items: center; border-radius: var(--r-pill);
-  background: rgba(210, 153, 34, .18); color: #e3b341;
+  background: var(--accent-soft); color: var(--accent);
   font: 600 var(--fs-micro)/1 ui-monospace, monospace;
 }
 .tt-nav-item .bd.blue { background: var(--accent-soft); color: var(--accent); }
@@ -632,10 +631,10 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-tree .dot.run { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .tt-tree .dot.wait { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .tt-tree .dot.fin { background: var(--swarm); }
-/* 任务卡（参照 Orca 侧栏）：一张卡 = 名字 / 分支 / 「N 个会话」头 / 会话行；卡之间留 4px，当前任务的卡描一圈 */
-.tt-tree-task { margin: 3px 6px 3px 12px; padding: 3px 0 4px; border-radius: var(--r-sm); background: var(--bg-container); border: 1px solid var(--border-subtle); }
-.tt-tree-task.on { border-color: var(--accent-border); }
-.tt-tree-task.idle { opacity: .72; border-style: dashed; }
+/* 会话沿用侧栏底色，避免每个任务再套一张卡片。 */
+.tt-tree-task { margin: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3); padding: 0; border: 0; border-radius: 0; background: transparent; }
+.tt-tree-task.idle { opacity: .72; }
+.tt-tree .tt-tree-row.on { background: transparent; color: var(--text-bright); }
 /* 项目行右端的 […] [+]：一直看得见（淡），悬停亮 */
 .tt-tree-row.proj .act { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
 .tt-tree-row.proj .nm + .act, .tt-tree-row.proj .bd + .act { margin-left: auto; }

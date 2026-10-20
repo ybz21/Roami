@@ -49,7 +49,7 @@ function dot(o: { running?: boolean; waiting?: boolean; unfinished?: boolean }, 
 export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask, onSession, onAddProject, onRename, onRenameTask, onNewTask, onKill, onFinishTask, onNewInTask, onRemoveProject }: {
   tree: TaskTree
   activeTask: TaskKey | null
-  /** 当前标签是哪个会话：它所在的会话行再铺一层底 */
+  /** 当前会话用文字和选中线标识。 */
   activeSession: string | null
   onProject: (key: string) => void
   onTask: (key: TaskKey) => void

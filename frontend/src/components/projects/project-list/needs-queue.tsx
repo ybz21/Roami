@@ -95,7 +95,7 @@ export function WorkbenchHead({ stats, lastAt, onNew, onSummaryClick, phone }: {
           <div className="prj-sum">
             {item(stats.running, '', t('overview.sumRunning'), 'running')}
             {item(stats.waiting, 'a', t('overview.sumWaiting'), 'needs')}
-            {item(stats.unfinished, 'a', t('overview.sumUnfinished'), 'needs')}
+            {item(stats.unfinished, 'info', t('overview.sumUnfinished'), 'needs')}
             {item(stats.swarms, 'p', t('overview.sumSwarms'), 'needs')}
           </div>
         )}
@@ -133,7 +133,7 @@ export function NeedsQueue({ cards, collapsed, onViewAll }: {
   if (collapsed && !open) {
     return (
       <button type="button" className="prj-needbar" onClick={() => setOpen(true)}>
-        <i className="prj-sd a" />
+        <i className={`prj-sd ${counts.waiting > 0 ? 'a' : 'info'}`} />
         <b>{t('overview.followUp')} {cards.length}</b>
         <span className="sub">{parts}</span>
         <span className="sp" />
@@ -159,7 +159,7 @@ export function NeedsQueue({ cards, collapsed, onViewAll }: {
       </div>
       <div className="prj-needs">
         {cards.slice(0, 3).map((c, i) => (
-          <article key={c.key} className={`prj-need prj-in${c.kind === 'swarm' ? ' p' : ''}`}
+          <article key={c.key} className={`prj-need prj-in${c.kind === 'swarm' ? ' p' : c.kind === 'unfinished' ? ' info' : ''}`}
             role="button" tabIndex={0} style={{ animationDelay: `${80 + i * 40}ms` }}
             onClick={c.go}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.go() } }}>
@@ -195,6 +195,7 @@ export const NEEDS_CSS = `
 /* 状态点：画出来的，不是打出来的（● 会跟着字体走） */
 .prj-sd{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 auto;display:block}
 .prj-sd.a{background:var(--warn)}.prj-sd.p{background:var(--swarm)}
+.prj-sd.info{background:var(--accent)}
 
 /* 行动卡：一屏最多三张，不让黄框把项目卡挤到首屏以下 */
 .prj-needs{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-3)}
@@ -204,8 +205,10 @@ export const NEEDS_CSS = `
 :where(html[data-pointer="fine"]) .prj-need:hover{border-color:var(--warn);transform:translateY(-1px)}
 .prj-need:focus-visible{outline:1px solid var(--accent-border);outline-offset:2px}
 :where(html[data-pointer="fine"]) .prj-need.p:hover{border-color:var(--swarm)}
+:where(html[data-pointer="fine"]) .prj-need.info:hover{border-color:var(--accent)}
 .prj-need .ty{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-meta);font-weight:600;color:var(--warn)}
 .prj-need.p .ty{color:var(--swarm)}
+.prj-need.info .ty{color:var(--accent)}
 .prj-need .ty .pj{color:var(--text-dimmer);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prj-need h4{margin:var(--sp-2) 0 var(--sp-1);font-size:var(--fs-body);color:var(--text-bright);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
