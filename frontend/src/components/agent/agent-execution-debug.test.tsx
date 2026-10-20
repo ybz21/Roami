@@ -11,6 +11,13 @@ vi.mock('./useAgentData', () => ({ useAgentData: (path: string) => ({ value: pat
 
 afterEach(cleanup)
 
+it('shows the unavailable service instead of empty controls before a Main identity exists', () => {
+  render(<AgentDebug cid="" branch="" node={null} selected="" unavailable onSelect={vi.fn()} />)
+  expect(screen.getByRole('status').textContent).toBe('agent.unavailable')
+  expect(screen.queryByRole('combobox')).toBeNull()
+  expect(screen.queryByText('agent.debug.empty')).toBeNull()
+})
+
 it('bounds the initial trace DOM and only mounts model metadata after disclosure', () => {
   render(<AgentDebug cid="conversation" branch="branch" node={null} selected="turn:request" onSelect={vi.fn()} />)
   const rows = () => document.querySelectorAll('.agent-debug-spans > li').length
