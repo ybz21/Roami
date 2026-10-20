@@ -43,11 +43,31 @@ def completion_evidence(completion, *, budget):
     )
     if artifact_ids:
         detail["artifactIds"] = artifact_ids
+    references = (
+        [
+            {
+                "id": item["id"],
+                "name": item.get("name", "")[:160],
+                "downloadUrl": item["downloadUrl"],
+            }
+            for item in result.get("artifactRefs", [])[:4]
+            if isinstance(item, dict)
+            and item.get("id") in artifact_ids
+            and isinstance(item.get("name", ""), str)
+            and isinstance(item.get("downloadUrl"), str)
+            and len(item["downloadUrl"]) <= 2048
+        ]
+        if isinstance(result.get("artifactRefs"), list)
+        else []
+    )
+    if references:
+        detail["artifactRefs"] = references
     summary = result.get("summary", "")
     summary = summary if isinstance(summary, str) else ""
     for limit in [3000, 1500, 750, 300, 100, 0]:
         projection["result"] = dict(detail, summary=summary[:limit])
         if text_tokens(encoded(projection)) <= budget:
             return projection
+    projection["result"].pop("artifactRefs", None)
     projection["result"].pop("artifactIds", None)
     return projection

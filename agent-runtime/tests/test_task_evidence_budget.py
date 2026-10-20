@@ -106,3 +106,51 @@ async def test_long_report_generates_main_reply_while_full_attempt_evidence_is_r
         assert view["messages"][-1]["content"]["text"] == "The result is ready for review."
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("budget", [1024, 6000])
+async def test_large_report_keeps_download_links_in_main_context(store, budget):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        artifact = await runtime.artifacts.put(
+            "alice", b"Verified report", mime_type="text/plain", name="report.txt"
+        )
+        completion = {
+            "taskId": "report-task",
+            "state": "waiting_user",
+            "result": {
+                "state": "succeeded",
+                "summary": "Detailed execution log. " * 20000,
+                "artifactRefs": [artifact],
+            },
+        }
+        excerpt = completion_evidence(completion, budget=budget)
+        assert text_tokens(encoded(excerpt)) <= budget
+        assert excerpt["state"] == "waiting_user"
+        assert excerpt["result"]["artifactRefs"] == [
+            {"id": artifact["id"], "name": "report.txt", "downloadUrl": artifact["downloadUrl"]}
+        ]
+        assert excerpt["resultRef"]["taskId"] == "report-task"
+        assert completion["result"]["summary"].endswith("Detailed execution log. ")
+    finally:
+        await runtime.close()
+
+
+def test_large_reference_metadata_cannot_expand_completion_budget():
+    completion = {
+        "taskId": "task-1",
+        "state": "interrupted",
+        "result": {
+            "outcomeKnown": False,
+            "summary": "x" * 20000,
+            "artifactRefs": [
+                {"id": str(index), "name": "report" * 2000, "downloadUrl": "/" + "中" * 2000}
+                for index in range(4)
+            ],
+        },
+    }
+    excerpt = completion_evidence(completion, budget=1024)
+    assert text_tokens(encoded(excerpt)) <= 1024
+    assert excerpt["result"]["outcomeKnown"] is False
+    assert excerpt["result"]["artifactRefsCount"] == 4
+    assert excerpt["resultRef"]["taskId"] == "task-1"

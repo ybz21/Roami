@@ -266,3 +266,88 @@ async def test_tool_list_lists_categories_pages_and_removes_old_entry(store):
         assert response.status_code == 200 and response.json()["data"]["offset"] == 1
         assert (await client.get("/v1/tool-directory?limit=21")).status_code == 422
         assert (await client.get("/v1/tool-directory?offset=-1")).status_code == 422
+
+
+async def test_malformed_cli_arguments_have_an_executable_recovery_example(store):
+    class Repair:
+        model = "cli-recovery"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                yield ModelEvent("tool", call("bash", {"argv": ["roami", {}]}))
+            elif self.calls == 2:
+                failure = json.loads(messages[-1]["content"])
+                assert failure["error"] == "INVALID_TOOL_ARGUMENTS"
+                arguments, _ = json.JSONDecoder().raw_decode(
+                    failure["recovery"].split("Example: ", 1)[1]
+                )
+                assert all(isinstance(value, str) for value in arguments["argv"])
+                wire = call("bash", arguments)
+                wire["id"] = "repaired"
+                yield ModelEvent("tool", wire)
+            else:
+                assert json.loads(messages[-1]["content"]) == []
+                yield ModelEvent("text", "No existing tasks.")
+
+    model = Repair()
+    runtime = Runtime(store, model)
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        receipt = await runtime.chat.submit("alice", conversation["id"], "cli", "Check tasks")
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (receipt["turnId"],)
+            ),
+        )
+        view = await runtime.conversations.messages("alice", conversation["id"])
+        assert view["messages"][-1]["content"]["text"] == "No existing tasks."
+        assert model.calls == 3
+        assert await runtime.tasks.list("alice") == []
+    finally:
+        await runtime.close()
+
+
+async def test_exact_task_status_filters_before_page_limit_and_preserves_scope(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", conversation["id"], "Old task", key="old", record_intent=True
+        )
+        for number in range(201):
+            await runtime.tasks.create(
+                "alice",
+                conversation["id"],
+                f"New task {number}",
+                key=f"new-{number}",
+                record_intent=True,
+            )
+        assert (
+            await store.call(lambda db: db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0])
+            == 202
+        )
+        assert task["id"] not in {
+            item["id"] for item in await runtime.tasks.list("alice", conversation["id"])
+        }
+        binding = {"owner": "alice", "conversation": conversation["id"]}
+        status = await runtime.tools.invoke(
+            cli("task_status", {"taskId": task["id"]}), "main", binding
+        )
+        assert [item["id"] for item in status] == [task["id"]]
+        other = await runtime.conversations.create("alice")
+        foreign = await runtime.conversations.create("bob")
+        for owner, cid in [("alice", other["id"]), ("bob", foreign["id"])]:
+            assert (
+                await runtime.tools.invoke(
+                    cli("task_status", {"taskId": task["id"]}),
+                    "main",
+                    {"owner": owner, "conversation": cid},
+                )
+                == []
+            )
+    finally:
+        await runtime.close()

@@ -349,7 +349,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
             "#!/bin/sh\n"
             + f"printf '%s\\n' {shlex.quote(kind)} >> {shlex.quote(str(calls))}\n"
             + 'prompt=$(cat)\ncase "$prompt" in\n'
-            + "  slow*) sleep 30;;\n"
+            + "  slow*|*'slow delegated task'*) sleep 30;;\n"
             + '  fail*) printf "intentional stderr" >&2; exit 7;;\n'
             + 'esac\nprintf "Answer: %s" "$prompt"\n'
         )
@@ -438,7 +438,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
                 yield ModelEvent("text", "Coding result received in its original conversation.")
 
         async def verifier(task, result):
-            return result["exitCode"] == 0 and result["summary"] == "Answer: resume delegated task"
+            return result["exitCode"] == 0 and result["summary"].endswith("resume delegated task")
 
         def runtime():
             return Runtime(

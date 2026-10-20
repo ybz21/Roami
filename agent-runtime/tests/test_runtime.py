@@ -499,7 +499,9 @@ async def test_completion_continues_next_stage_with_original_source_not_newer_in
                 "",
             )
             executor_evidence = (
-                json.loads(evidence.split("Executor evidence: ", 1)[-1]) if evidence else {}
+                json.JSONDecoder().raw_decode(evidence.split("Executor evidence: ", 1)[-1])[0]
+                if evidence
+                else {}
             )
             if (
                 "first-stage" in executor_evidence.get("result", {}).get("summary", "")

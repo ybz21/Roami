@@ -10,6 +10,7 @@ from roami_agent.executors.project import provision_project
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row, rows
 from roami_agent.tools.process import execute
 
@@ -85,6 +86,9 @@ class CodingExecutor:
             if json.loads(task["budget_json"]).get("deadlineMs")
             else 0,
         }
+        launch["prompt"] = (
+            "Roami final handoff: " + DELIVERY_INSTRUCTIONS + "\n\nTask:\n" + launch["prompt"]
+        )
         if self.artifacts:
             launch["prompt"] += await professional_brief(self.db, self.artifacts, task, run)
         if target.get("nodeId", "local") != "local":

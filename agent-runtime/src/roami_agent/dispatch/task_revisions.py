@@ -79,6 +79,8 @@ class TaskRevisions:
                 if not source or source["conversation_id"] != source_conversation_id:
                     raise DomainError("TASK_TURN_INACTIVE", 409)
                 assert_context_admitted(db, dict(source, owner_id=owner))
+                if source["trigger_kind"] == "completion":
+                    raise DomainError("TASK_STEER_USER_REQUEST_REQUIRED", 409)
             task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
             if not task:
                 raise DomainError("TASK_NOT_FOUND", 404)

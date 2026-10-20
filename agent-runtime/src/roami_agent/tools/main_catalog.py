@@ -283,7 +283,9 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         }
 
     async def status(args, binding):
-        return await tasks.list(binding["owner"], binding["conversation"], for_model=True)
+        return await tasks.list(
+            binding["owner"], binding["conversation"], for_model=True, task_id=args.get("taskId")
+        )
 
     async def recall(args, binding):
         day = args.get("scope") == "day"
@@ -445,7 +447,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         )
     )
     registry.add(
-        Tool("task_status", "Read delegated task status.", object_schema({}), status, main=True)
+        Tool(
+            "task_status",
+            "Read delegated task status in this conversation. Optionally filter by an exact taskId.",
+            object_schema({"taskId": {"type": "string", "minLength": 1, "maxLength": 200}}),
+            status,
+            main=True,
+        )
     )
     registry.add(
         Tool(

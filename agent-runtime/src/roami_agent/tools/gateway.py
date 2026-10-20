@@ -198,6 +198,31 @@ class ToolGateway:
             if (
                 role == "main"
                 and value["error"] == "INVALID_TOOL_ARGUMENTS"
+                and call["function"]["name"] == "bash"
+            ):
+                value["recovery"] = (
+                    "bash accepts argv as an array of strings, or command as a string. "
+                    "For registered Roami calls, the final --input argument is serialized JSON text, "
+                    "not a nested object. Example: "
+                    + encoded(
+                        {
+                            "argv": [
+                                "roami",
+                                "agent",
+                                "capability",
+                                "call",
+                                "task_status",
+                                "--input",
+                                "{}",
+                            ]
+                        }
+                    )
+                    + ". Substitute the intended operation and its input, within the user's scope. "
+                    "These registered calls need no shell workspace; fix the arguments without asking the user."
+                )
+            if (
+                role == "main"
+                and value["error"] == "INVALID_TOOL_ARGUMENTS"
                 and call["function"]["name"] == "delegate"
             ):
                 value["recovery"] = (
@@ -210,6 +235,13 @@ class ToolGateway:
                     "and explicitExecutor. Use explicitExecutor=null and omit userQuote when the user made "
                     "no executor choice; otherwise include the exact source quote. Omit top-level executor. "
                     "Correct arguments within the user's scope; never create test/probe tasks or ask the user to fix internal parameters."
+                )
+            if role == "main" and value["error"] == "TASK_STEER_USER_REQUEST_REQUIRED":
+                value["recovery"] = (
+                    "A completion report is not a new user continuation request. Do not steer or retry "
+                    "the task, create a replacement, or claim a retry happened. Briefly report the actual "
+                    "outcome and necessary recovery action. A later explicit user request can continue "
+                    "the original task through task_steer."
                 )
             if role == "main" and value["error"] in {
                 "TASK_SESSION_BINDING_REQUIRED",

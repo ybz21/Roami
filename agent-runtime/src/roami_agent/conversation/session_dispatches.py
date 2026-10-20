@@ -10,6 +10,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import SessionReport
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.replies.notifications import Notifications
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
@@ -85,7 +86,9 @@ class SessionDispatches:
                 "report the actual result to Main using this local CLI; replying only in this session does not notify Main. "
                 "Write a UTF-8 JSON result file, then run:\n"
                 + self.reply_command(did)
-                + "\nReplace RESULT.json with the file you wrote. Format: "
+                + "\nReplace RESULT.json with the file you wrote. The summary is shown directly in Main. "
+                + DELIVERY_INSTRUCTIONS
+                + " Format: "
                 '{"key":"final","status":"completed","summary":"Concise result in the user language, actual links/files, checks and limits"}. '
                 "Use status=failed on failure; never report completed for unfinished work. "
                 "For progress or a blocker, use a distinct stable key and status=progress or blocked; "

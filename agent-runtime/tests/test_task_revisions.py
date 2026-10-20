@@ -524,3 +524,78 @@ async def test_waiting_for_acceptance_is_not_discarded_when_verifier_becomes_una
         assert current["state"] == "waiting_user"
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("state", ["succeeded", "failed", "waiting_user"])
+async def test_completion_cannot_invent_user_steering_but_a_new_user_request_can(store, state):
+    from test_runtime import ConversationModel
+
+    from roami_agent.app import Runtime
+
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", conversation["id"], "Create report", key="handoff", record_intent=True
+        )
+        run = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+        )
+        await runtime.dispatch.complete(
+            task, run, {"state": "succeeded", "summary": "Existing evidence"}, state
+        )
+        job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId')=?",
+                (task["id"],),
+            )
+        )
+        turn = await runtime.mailbox.claim(job)
+        before = await store.call(
+            lambda db: db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        )
+        with pytest.raises(DomainError, match="TASK_STEER_USER_REQUEST_REQUIRED"):
+            await runtime.tasks.revisions.request(
+                "alice",
+                task["id"],
+                "Try again without new user input",
+                1,
+                "callback",
+                source_turn_id=turn["id"],
+                source_conversation_id=conversation["id"],
+            )
+        assert (
+            await store.call(lambda db: db.execute("SELECT COUNT(*) FROM messages").fetchone()[0])
+            == before
+        )
+        assert not await store.call(
+            lambda db: row(db, "SELECT id FROM jobs WHERE kind='task.steer'")
+        )
+        await runtime.loop.run(
+            turn, "main", completion=json.loads(job["payload_json"])["completion"]
+        )
+        receipt = await runtime.conversations.accept(
+            "alice", conversation["id"], "continue", "Continue the original task and fix the error."
+        )
+        user_job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?",
+                (receipt["turnId"],),
+            )
+        )
+        user_turn = await runtime.mailbox.claim(user_job)
+        continuation = await runtime.tasks.revisions.request(
+            "alice",
+            task["id"],
+            "Fix the error",
+            1,
+            "user",
+            source_turn_id=user_turn["id"],
+            source_conversation_id=conversation["id"],
+        )
+        assert continuation["taskId"] == task["id"]
+        assert continuation["state"] == "stopping"
+    finally:
+        await runtime.close()

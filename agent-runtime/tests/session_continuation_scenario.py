@@ -57,6 +57,9 @@ async def main():
     await database.call(preparing, write=True)
     assert await executor.run(task, attempt) is None
     prompt = (root / "prompt").read_text()
+    from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
+
+    assert DELIVERY_INSTRUCTIONS in prompt
     assert prompt.endswith(json.loads(task["intent_json"])["goal"])
 
     async def event(payload, *, notification=False):

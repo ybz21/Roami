@@ -3,6 +3,7 @@
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.replies.artifact_links import deliverable_links
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.transcript_repository import message
@@ -141,7 +142,26 @@ class TurnJournal:
     ):
         def write(db):
             assert_context_admitted(db, turn)
-            content = {"text": text, **({"tool_calls": calls} if calls else {})}
+            delivery = text
+            references = (completion or {}).get("result", {}).get("artifactRefs", [])
+            if final and isinstance(references, list):
+                identifiers = [
+                    item["id"]
+                    for item in references[:4]
+                    if isinstance(item, dict) and isinstance(item.get("id"), str)
+                ]
+                if identifiers:
+                    retained = rows(
+                        db,
+                        "SELECT id,name FROM artifacts WHERE owner_id=? AND task_id=? "
+                        "AND deleted_ms IS NULL AND id IN ("
+                        + ",".join("?" for _ in identifiers)
+                        + ") "
+                        "ORDER BY created_ms,id",
+                        (turn["owner_id"], completion["taskId"], *identifiers),
+                    )
+                    delivery = deliverable_links(text, retained)
+            content = {"text": delivery, **({"tool_calls": calls} if calls else {})}
             if question:
                 content["question"] = question
             if completion:
