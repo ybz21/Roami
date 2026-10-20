@@ -291,7 +291,7 @@ export default function PhoneView() {
 
   return (
     // 背景色写在根上：全屏时这一块就是整块屏幕。position:relative 给 getPopupContainer 当基准。
-    <div ref={rootRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
+    <div ref={rootRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-base)' }}>
       {/* 浮层挂进这一块而不是 document.body：全屏时只有全屏元素的子树会被画出来，
           挂 body 上的菜单在全屏下看不见也点不着（浏览器页那边踩过，见 BrowserView）。 */}
       <ConfigProvider getPopupContainer={() => rootRef.current || document.body}>
@@ -360,7 +360,7 @@ export default function PhoneView() {
           onTouchStart={(e) => { const t0 = e.touches[0]; if (t0) onDown(t0.clientX, t0.clientY) }}
           onTouchEnd={(e) => { const t0 = e.changedTouches[0]; if (t0) onUp(t0.clientX, t0.clientY) }}
           style={{
-            flex: 1, minHeight: 0, background: '#000', overflow: 'hidden', position: 'relative',
+            flex: 1, minHeight: 0, background: 'var(--bg-base)', overflow: 'hidden', position: 'relative',
             display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none', touchAction: 'none',
           }}
         >

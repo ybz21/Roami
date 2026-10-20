@@ -402,7 +402,7 @@ export default function FileWorkspace({
     return (
       <div style={{ flex: `${grow} 1 0`, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}
         onClick={() => setFocus(g)}>
-        <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-container)' }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-base)' }}>
           <div data-drop-group={g} ref={(el) => { tabStripRef.current[g] = el }} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'stretch', overflowX: 'auto' }}
             onDragOver={(e) => { if (dragHasPayload(e)) { e.preventDefault(); setDropHint(g) } }}
             onDragLeave={() => setDropHint((h) => (h === g ? null : h))}

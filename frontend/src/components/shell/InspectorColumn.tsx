@@ -113,7 +113,7 @@ export function InspectorColumn({ width, bounds, overlay, onResize, onReset, col
           boxShadow: '-12px 0 32px rgba(1,4,9,.45)',
           borderLeft: '1px solid var(--border-subtle)',
           display: 'flex', flexDirection: 'column', minWidth: 0,
-          background: 'var(--bg-container)',
+          background: 'var(--bg-base)',
           animation: 'ttDockIn .2s cubic-bezier(.2,.85,.3,1)',
         } : {
           // 面板内部按**这一列的宽度**分栏（Git 的「列表 ｜ diff」）：容器查询要挂在这里，
@@ -123,7 +123,7 @@ export function InspectorColumn({ width, bounds, overlay, onResize, onReset, col
           width: inline ? width : 0,
           minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
-          background: 'var(--bg-container)',
+          background: 'var(--bg-base)',
           borderLeft: inline ? '1px solid var(--border-subtle)' : undefined,
           transition: active ? 'none' : 'flex-basis .2s, width .2s',
         }}

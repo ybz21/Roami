@@ -190,17 +190,15 @@ function buildTheme(mode: ThemeMode) {
       wireframe: false,
     },
     components: {
-      Layout: dark
-        ? { siderBg: t.bgBase, headerBg: t.bgContainer, bodyBg: t.bgBase }
-        : { siderBg: t.bgContainer, headerBg: t.bgContainer, bodyBg: t.bgLayout },
+      Layout: { siderBg: t.bgBase, headerBg: t.bgBase, bodyBg: t.bgBase },
       Menu: dark ? {
         darkItemBg: 'transparent', darkItemSelectedBg: 'rgba(88,166,255,0.16)',
         darkItemSelectedColor: THEME_TOKENS.dark.css['--accent'], darkItemHoverBg: 'rgba(255,255,255,0.04)',
-        itemBorderRadius: 8, itemHeight: 42, itemMarginInline: 8,
+        itemBorderRadius: 10, itemHeight: 42, itemMarginInline: 8,
       } : {
         itemBg: 'transparent', itemSelectedBg: 'rgba(31,111,235,0.10)',
         itemSelectedColor: THEME_TOKENS.light.css['--accent-solid'], itemHoverBg: 'rgba(31,111,235,0.06)',
-        itemBorderRadius: 8, itemHeight: 42, itemMarginInline: 8,
+        itemBorderRadius: 10, itemHeight: 42, itemMarginInline: 8,
       },
       Card: { borderRadiusLG: 14, paddingLG: 18, headerFontSize: 15 },
       Button: { fontWeight: 500, primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' },

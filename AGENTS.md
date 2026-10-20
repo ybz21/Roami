@@ -10,7 +10,9 @@ tool-specific copy — two copies drift, and then the two agents work from diffe
 # Design System
 
 All Web UI work — layout, color, typography, spacing, component selection, UX behavior — must
-follow [`docs/development/ui-design-system.md`](docs/development/ui-design-system.md). Use the
+follow the [Roami UI design specification](docs/development/ui-design-system.md). Read it before
+designing or changing a screen: it defines dark/light colors, layout, dimensions, responsive
+classes, desktop workspace behavior, and phone navigation and input rules. Use the
 tokens it defines (`--fs-*` type, `--r-*` radius, `--sp-*` spacing, `--accent*` / `--ok*` accents)
 and the existing antd/component patterns in `frontend/src/`. Don't invent a new color value, font
 size, radius, or spacing step when a documented one already covers the role. Frontend structure
@@ -19,7 +21,18 @@ already exists in code.
 
 ## Keep UI Minimal
 
+Page shells and adjacent layout modules use `--bg-base`, square edges, and no enclosing border,
+shadow, or outer card margin. Separate adjacent modules with one `1px solid var(--border-subtle)`
+line, owned by one side. This applies to every route, including Home, Files, Browser, Phone,
+Projects, Plugins, and Settings. Reserve `--bg-container` and `--r-card` for independent content
+cards and composers; controls use `--r-xs` / `--r-sm`, popups use the documented surface tokens.
+Never wrap a whole page in a rounded card or use a different background to distinguish sibling
+panes. Remote images, documents, and terminal canvases keep their content-specific colors.
+
 UI must be concise. Show the content, current state, and actions needed for the next decision.
+Use short, familiar wording: brief action verbs for buttons, direct labels, and one sentence for
+routine hints. Keep implementation terms and logs in details; explain errors with a clear next
+step. Preserve user input and choices instead of making users repeat work.
 Remove repeated titles, obvious instructions, generic introductions, and redundant empty-state
 explanations. Use one short empty-state message; hide zero-result counters and pagination when
 there is only one page. Lists show identity and essential status; put full errors, revision
@@ -38,7 +51,8 @@ Open content-heavy views such as memories, background tasks, and notifications a
 secondary pages on phones, using `MobileSubPage` or a dedicated route with one return bar and
 one scroll container. Reserve dialogs for short confirmations and focused actions.
 Keep the top app bar and bottom navigation consistent across routes; put Home, Projects, Tools,
-and Settings in the bottom bar. Open Notifications from the top bar and Home summary. A page must not repeat its
+and Settings in the bottom bar. Open messages from the top bar; Home's pending-work summary
+opens Projects. A page must not repeat its
 route title below the top bar. Secondary pages use one equal-height return bar and one scroll container; URL-backed pages must not also push overlay history. Use the existing design tokens for Material surfaces, type, space,
 and state. Verify both bars, safe areas, page scrolling, and a real touch navigation pass on an
 Android phone before calling mobile UI done.

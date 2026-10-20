@@ -1060,9 +1060,7 @@ export default function App() {
   const lazyFallback = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><Spin /></div>
   // 任务视图（#/w）时 Canvas 归零，页面不用画；#/w 不在 pages 里，退回项目页
   const page = <Suspense fallback={lazyFallback}>{taskView ? null : (pages[tab] || pages.projects)}</Suspense>
-  // browser 全幅(自带工具栏铺满)；phone 与概览/会话一致走 tt-page（同 16px 留白 + 满高，见 tt-page-phone）。
-  // 浏览器页与会话一样从标签条下沿直接开始；其他页面仍使用自己的容器布局。
-  const pageNode = <div className={`tt-page tt-page-${tab}${hasSider ? ' tt-page-card' : ''}${isMobile ? ' tt-page-mobile' : ''}${isMobile && terms.length ? ' has-dock' : ''}`}>{page}</div>
+  const pageNode = <div className={`tt-page tt-page-${tab}${isMobile ? ' tt-page-mobile' : ''}${isMobile && terms.length ? ' has-dock' : ''}`}>{page}</div>
   // Canvas 与 Dock 各包一层：两者在 Page / Split / Focus 三态间只改宽度，不改挂载
   // ⌘K 面板的**本地**条目：页面导航 + 已打开的会话——这两样数据就在内存里，打字即出。
   // 项目 / 全部会话 / 项目文件走后端 /search（见 shell/palette），不在这里凑。

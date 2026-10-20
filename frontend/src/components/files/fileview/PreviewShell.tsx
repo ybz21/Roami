@@ -13,7 +13,7 @@ export function PreviewShell({ path, title, truncated, inline, children }: {
 }) {
   const { t } = useI18n()
   return (
-    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)', overflow: 'hidden', background: 'var(--bg-base)', height: inline ? '100%' : undefined, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ border: inline ? 0 : '1px solid var(--border-subtle)', borderRadius: inline ? 0 : 'var(--r-card)', overflow: 'hidden', background: inline ? 'var(--bg-base)' : 'var(--bg-container)', height: inline ? '100%' : undefined, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-dim)', fontSize: 12 }}>
         <FileTypeIcon name={path} />
         <span>{title}</span>

@@ -36,6 +36,7 @@
 
 ## 相关
 
+- [Roami UI 设计规范](./development/ui-design-system.md) — 配色、布局、尺寸、手机与桌面规则（强制）；[手机 Material 细则](./development/mobile-material-ui.md)
 - 根 [README](../README.md) ｜ [README.zh-CN](../README.zh-CN.md)
 - CLI 源码说明 [`cli/ttmux-cli/README.md`](../cli/ttmux-cli/README.md) — `ttmux` 主命令
 - 浏览器自动化 CLI [`cli/chrome-cli/README.md`](../cli/chrome-cli/README.md) — `chrome`（Playwright over CDP）

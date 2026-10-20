@@ -827,7 +827,7 @@ export default function FileBrowser({
   }, [cur, data?.entries, data?.parent, dir, pathDraft])
 
   const browserPane = (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, width: '100%', background: 'var(--bg-container)', borderLeft: '1px solid var(--border-subtle)', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, width: '100%', background: 'var(--bg-base)', position: 'relative', overflow: 'hidden' }}>
       <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border-subtle)' }}>
         {chrome !== 'tree' && (
           <div className="tt-filebrowser-title">

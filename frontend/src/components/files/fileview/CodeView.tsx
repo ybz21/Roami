@@ -20,7 +20,7 @@ export function CodeView({ stateKey, value, language, dark, readOnly, tabbed, he
   revealLine?: { line: number; nonce: number }
 }) {
   return (
-    <div style={{ height, border: tabbed ? 'none' : '1px solid var(--border-subtle)', borderRadius: tabbed ? 0 : 8, overflow: 'hidden' }}>
+    <div style={{ height, border: tabbed ? 0 : '1px solid var(--border-subtle)', borderRadius: tabbed ? 0 : 'var(--r-card)', overflow: 'hidden' }}>
       <Suspense fallback={<div style={{ height: '100%', display: 'grid', placeItems: 'center' }}><Spin /></div>}>
         <CodeEditor stateKey={stateKey} value={value} language={language} dark={dark} readOnly={readOnly} onChange={onChange} onSave={onSave} revealLine={revealLine} />
       </Suspense>

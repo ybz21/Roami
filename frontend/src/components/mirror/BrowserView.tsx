@@ -731,7 +731,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   return (
     // 背景色写在根上：全屏时这一块就是整块屏幕，缺省背景会在工具行外露出一圈白。
     // position: relative 给下面 getPopupContainer 当定位基准。
-    <div ref={rootRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
+    <div ref={rootRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-base)' }}>
       {/* 浮层（⋯ 菜单/标签/设备下拉/画质气泡）挂进这一块，而不是 document.body：全屏时只有
           全屏元素的子树会被画出来，挂 body 上的浮层在全屏下**看不见也点不着**——实测点了
           「全屏」再开 ⋯ 菜单，菜单在 DOM 里、屏幕上没有，连「退出全屏」都够不着。 */}
@@ -801,7 +801,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
           style={{
-            flex: 1, minHeight: 0, background: '#000', overflow: 'hidden', position: 'relative',
+            flex: 1, minHeight: 0, background: 'var(--bg-base)', overflow: 'hidden', position: 'relative',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: control ? 'default' : 'not-allowed', outline: 'none', touchAction: 'none',
           }}
