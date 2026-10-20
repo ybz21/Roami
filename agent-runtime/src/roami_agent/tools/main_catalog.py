@@ -390,7 +390,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                             },
                             ["kind"],
                         ),
-                        "description": "For an existing session use ONLY kind=session and exact sessionId (plus nodeId/label). Never add directory/workspaceId/base/remote. A projectId is descriptive context only and cannot override the exact session. kind=project + discovered projectId prepares a worktree; workspaceId reuses it without base/remote/directory overrides. kind=new_project + name (+ existing absolute baseDir) creates a separate project. kind=new_session starts loose work: use an existing absolute directory, NEVER baseDir (only new_project accepts baseDir). Never invent paths or assume another machine's home directory. Prefer target_search for the actual project; if the destination is missing, ask for it before delegating. Reuse preserves local work.",
+                        "description": "Existing session: kind=session, exact sessionId (+nodeId/label); no directory/workspaceId/base/remote; projectId cannot override the session. Existing project: kind=project, discovered projectId; workspaceId reuses work without base/remote/directory overrides. Loose work: kind=new_session, directory=actual absolute work directory, NEVER baseDir. File output does not authorize a new project. Use kind=new_project, name (+existing absolute baseDir) ONLY when the user requests a new project. Resolve actual project IDs; ask for missing destinations, never invent paths. Reuse preserves local work.",
                     },
                     "fromMessageId": {"type": "string"},
                 },

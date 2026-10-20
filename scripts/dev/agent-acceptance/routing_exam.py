@@ -3,6 +3,7 @@
 Run from agent-runtime with uv run --frozen python
 ../scripts/dev/agent-acceptance/routing_exam.py --live --output /tmp/routing-exam.
 No Worker or real coding session is started. Credentials are never exported.
+Default-delivery questions omit output instructions; explicit instructions are controls.
 """
 
 import argparse
@@ -160,8 +161,8 @@ class ExamTargets:
 CASES = [
     (
         "Q01",
-        "查一下济南今天的天气，只要温度和是否下雨，不写文件。",
-        "简单公开查询只派 Native，使用 resourceOnly，不创建项目。",
+        "查看济南天气",
+        "自然提问未说明交付格式；默认只读 Native，在聊天回复，不额外写文件或建项目。",
         "weather",
     ),
     (
@@ -226,7 +227,7 @@ CASES = [
     ),
     (
         "Q12",
-        "两件独立的事：一是查济南今天会不会下雨，不保存文件；二是在已有 Roami 项目自主排查设置保存丢失，探索根因、改代码并反复跑测试。分别处理，互不取消。",
+        "两件独立的事：一是查看济南天气；二是在已有 Roami 项目自主排查设置保存丢失，探索根因、改代码并反复跑测试。分别处理，互不取消。",
         "两个独立任务：天气 Native，只读；代码修复专业执行器，绑定 Roami。",
         "two",
     ),
@@ -234,7 +235,7 @@ CASES = [
         "Q13",
         [
             "在已有 Roami 项目独立排查设置保存丢失，探索根因、修复并反复运行测试。",
-            "另外查济南今天会不会下雨，只回答天气，不写文件。",
+            "另外查看济南天气。",
         ],
         "快速连问分别绑定各自消息，保留两个任务，不重复交办。",
         "rapid",
@@ -242,7 +243,7 @@ CASES = [
     ("Q14", "1 加 1 等于几？只回答数字。", "直接回答 2，不派任务。", "direct"),
     (
         "Q15",
-        "查一下济南今天的天气，告诉我温度和降雨情况。",
+        "济南今天会下雨吗？",
         "未说明文件要求的简单查询默认只读 Native，不额外写文件或创建项目。",
         "weather",
     ),
