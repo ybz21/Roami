@@ -2839,6 +2839,8 @@ const enUS = {
   'agent.composer.attachmentMode': "Attachments are sent in this conversation",
   'agent.reasoning.title': 'Thinking effort',
   'agent.reasoning.trigger': 'Model: {name}, thinking effort: {effort}',
+  'agent.models.trigger': 'Model: {name}',
+  'agent.reasoning.picker': 'Thinking mode: {effort}',
   'agent.reasoning.default': 'Default',
   'agent.reasoning.none': 'None',
   'agent.reasoning.minimal': 'Minimal',

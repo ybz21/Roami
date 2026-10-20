@@ -5,7 +5,9 @@ import { MODEL_SETTINGS_CHANGED, saveAgentModels, type AgentModelSettings } from
 export function useAgentModels(node: string | null) {
   const currentNode = useRef(node)
   const loadedNode = useRef(node)
-  currentNode.current = node
+  const epoch = useRef(0), loadingRef = useRef(false), savingRef = useRef(false)
+  const settingsRevision = useRef(0)
+  if (currentNode.current !== node) { currentNode.current = node; epoch.current++; loadingRef.current = false; savingRef.current = false }
   const [settings, setSettings] = useState<AgentModelSettings | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [efforts, setEfforts] = useState<Record<string, string[]>>({})
@@ -15,24 +17,29 @@ export function useAgentModels(node: string | null) {
   useEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
   useEffect(() => {
     const abort = new AbortController()
+    const revision = settingsRevision.current
     if (loadedNode.current !== node) { setSettings(null); setModels([]); setEfforts({}); setError(null); setLoading(false); setBusy(false); loadedNode.current = node }
-    void api('GET', '/agent/model-settings', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setSettings(data) }).catch(() => {})
+    void api('GET', '/agent/model-settings', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted && revision === settingsRevision.current) setSettings(data) }).catch(e => { if (!abort.signal.aborted && revision === settingsRevision.current) setError(e) })
     return () => abort.abort()
   }, [node, version])
   const load = async () => {
-    if (loading) return
-    const requestedNode = node
+    if (loadingRef.current) return
+    const requestedEpoch = epoch.current
+    loadingRef.current = true
     setLoading(true); setError(null)
-    try { const { data } = await api('GET', '/agent/models'); if (currentNode.current === requestedNode) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) } }
-    catch (e) { if (currentNode.current === requestedNode) setError(e) } finally { if (currentNode.current === requestedNode) setLoading(false) }
+    if (!settings) refresh()
+    try { const { data } = await api('GET', '/agent/models'); if (epoch.current === requestedEpoch) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) } }
+    catch (e) { if (epoch.current === requestedEpoch) setError(e) } finally { if (epoch.current === requestedEpoch) { loadingRef.current = false; setLoading(false) } }
   }
   const configure = async (change: { model?: string; reasoningEffort?: string | null }) => {
-    if (busy) return false
-    const requestedNode = node
+    if (savingRef.current) return false
+    const requestedEpoch = epoch.current
+    savingRef.current = true
+    settingsRevision.current++
     setBusy(true); setError(null)
-    try { const saved = await saveAgentModels({ main: change }); if (currentNode.current !== requestedNode) return false; setSettings(saved); return true }
-    catch (e) { if (currentNode.current === requestedNode) setError(e); return false } finally { if (currentNode.current === requestedNode) setBusy(false) }
+    try { const saved = await saveAgentModels({ main: change }); if (epoch.current !== requestedEpoch) return false; setSettings(saved); return true }
+    catch (e) { if (epoch.current === requestedEpoch) setError(e); return false } finally { if (epoch.current === requestedEpoch) { savingRef.current = false; setBusy(false) } }
   }
   const apply = (model: string, effort: string) => model.trim() ? configure({ model: model.trim(), reasoningEffort: effort === 'default' ? null : effort }) : Promise.resolve(false)
-  return { settings, models, efforts, loading, busy, error, load, apply }
+  return { settings, models, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
 }

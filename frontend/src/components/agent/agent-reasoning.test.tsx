@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, cleanup, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, cleanup, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import AgentComposerPlus from './AgentComposerPlus'
 import { useAgentModels } from './useAgentModels'
 import { api } from '../../api'
 
+const layout = vi.hoisted(() => ({ phone: false }))
+vi.mock('../../layout', () => ({ useLayout: () => layout }))
+vi.mock('../MobileSubPage', () => ({ default: ({ title, children, onBack, action }: any) => <section aria-label={title}><button onClick={onBack}>common.back</button>{action && <button onClick={action.onClick}>{action.label}</button>}{children}</section> }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('antd', () => ({ Modal: ({ open, children }: any) => open ? <div role="dialog">{children}</div> : null, Input: (props: any) => <input {...props} />, Spin: () => null }))
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+vi.mock('antd', async () => { const { forwardRef } = await import('react'); return { Modal: ({ open, children, title }: any) => open ? <div role="dialog">{title}{children}</div> : null, Input: forwardRef(({ prefix: _prefix, allowClear: _clear, ...props }: any, ref: any) => <input ref={ref} {...props} />), Spin: () => null } })
+afterEach(() => { cleanup(); layout.phone = false; vi.resetAllMocks() })
 const role = { model: 'glm-5.3-flash', baseUrl: '', keyConfigured: true, images: false, reasoningEffort: 'low', reasoningEfforts: ['low', 'high', 'max'] }
 function Composer({ onSkill }: { onSkill?: (name: string) => void }) {
   const models = useAgentModels(null)
@@ -18,44 +21,99 @@ function configure() {
   let selected = { ...role, reasoningEffort: 'low' as string | null }
   vi.mocked(api).mockImplementation(async (method, path, data) => {
     if (path === '/agent/models') return { data: { models: [role.model, 'gpt-6.1-sol'], reasoningEfforts: { 'gpt-6.1-sol': ['low', 'medium', 'high'] } } }
-    if (method === 'PUT') selected = { ...selected, model: data.main.model, reasoningEffort: data.main.reasoningEffort }
+    if (method === 'PUT') selected = { ...selected, model: data.main.model, reasoningEffort: data.main.reasoningEffort, reasoningEfforts: data.main.model === 'gpt-6.1-sol' ? ['low', 'medium', 'high'] : role.reasoningEfforts }
     return { data: { main: selected, worker: role } }
   })
 }
-it('stages model and effort together and applies once; cancelling never saves', async () => {
+it('switches models in one tap, resets effort atomically, and picks effort separately', async () => {
   configure(); render(<Composer />)
   await screen.findByText('agent.reasoning.low')
-  fireEvent.click(screen.getByRole('button', { expanded: false }))
-  await screen.findByRole('menuitemradio', { name: 'gpt-6.1-sol' })
-  fireEvent.click(screen.getByRole('menuitemradio', { name: 'gpt-6.1-sol' }))
-  expect((screen.getByRole('radio', { name: 'agent.reasoning.default' }) as HTMLInputElement).checked).toBe(true)
-  fireEvent.click(screen.getByRole('radio', { name: 'agent.reasoning.medium' }))
-  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
-  fireEvent.click(screen.getByRole('button', { name: 'agent.composer.applyModel' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  fireEvent.click(await screen.findByRole('option', { name: 'gpt-6.1-sol' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { main: { model: 'gpt-6.1-sol', reasoningEffort: null } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.reasoning.picker' }))
+  expect(screen.getByRole('menuitemradio', { name: 'agent.reasoning.default' }).getAttribute('aria-checked')).toBe('true')
+  fireEvent.click(screen.getByRole('menuitemradio', { name: 'agent.reasoning.medium' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { main: { model: 'gpt-6.1-sol', reasoningEffort: 'medium' } })
-  await screen.findByText('agent.reasoning.medium')
-  fireEvent.click(screen.getByRole('button', { expanded: false }))
-  fireEvent.click(screen.getByRole('radio', { name: 'agent.reasoning.default' }))
-  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
-  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(1)
+  expect(screen.getByText('agent.reasoning.medium')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(2)
 })
-it('clears the override to default and preserves the staged choice after a rejected save', async () => {
-  configure(); const view = render(<Composer />)
-  await screen.findByText('agent.reasoning.low'); fireEvent.click(screen.getByRole('button', { expanded: false }))
-  fireEvent.click(screen.getByRole('radio', { name: 'agent.reasoning.default' })); fireEvent.click(screen.getByRole('button', { name: 'agent.composer.applyModel' }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { main: { model: role.model, reasoningEffort: null } })
-  view.unmount(); configure(); vi.mocked(api).mockImplementation(async (method, path) => {
-    if (method === 'PUT') throw { apiError: { code: 'MODEL_CONFIGURATION_BUSY' } }
-    return path === '/agent/models' ? { data: { models: [role.model] } } : { data: { main: role, worker: role } }
-  }); render(<Composer />)
-  await screen.findByText('agent.reasoning.low'); fireEvent.click(screen.getByRole('button', { expanded: false }))
-  fireEvent.click(screen.getByRole('radio', { name: 'agent.reasoning.high' })); fireEvent.click(screen.getByRole('button', { name: 'agent.composer.applyModel' }))
+
+it('closing model search or choosing the current model makes no write', async () => {
+  configure(); render(<Composer />); await screen.findByText('agent.reasoning.low')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  await screen.findByRole('option', { name: 'gpt-6.1-sol' })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'custom/model-name' } })
+  fireEvent.click(screen.getByRole('button', { name: 'common.close' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  fireEvent.click(await screen.findByRole('option', { name: role.model }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
+})
+
+it('keeps the confirmed effort when saving fails and retries the same choice', async () => {
+  configure(); const modelApi = vi.mocked(api).getMockImplementation()!; let reject = true
+  vi.mocked(api).mockImplementation((method, path, ...rest) => {
+    if (method === 'PUT' && reject) return Promise.reject({ apiError: { code: 'MODEL_CONFIGURATION_BUSY' } })
+    return modelApi(method, path, ...rest)
+  })
+  render(<Composer />); await screen.findByText('agent.reasoning.low')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.reasoning.picker' }))
+  fireEvent.click(screen.getByRole('menuitemradio', { name: 'agent.reasoning.high' }))
   await screen.findByRole('alert')
-  expect((screen.getByRole('radio', { name: 'agent.reasoning.high' }) as HTMLInputElement).checked).toBe(true)
-  expect(screen.getByText('agent.reasoning.low', { selector: '.agent-reasoning-label' })).toBeTruthy()
+  expect(screen.getByRole('menuitemradio', { name: 'agent.reasoning.low' }).getAttribute('aria-checked')).toBe('true')
+  expect(screen.getByRole('menuitemradio', { name: 'agent.reasoning.high' }).getAttribute('aria-checked')).toBe('false')
+  reject = false; fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(screen.getByText('agent.reasoning.high')).toBeTruthy()
+  const writes = vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')
+  expect(writes).toHaveLength(2); expect(writes[0]).toEqual(writes[1])
 })
+
+it('writes once on rapid taps and can close while that selection saves', async () => {
+  configure(); const modelApi = vi.mocked(api).getMockImplementation()!
+  let finish!: () => void
+  const pending = new Promise<void>(resolve => { finish = resolve })
+  vi.mocked(api).mockImplementation(async (method, path, ...rest) => { if (method === 'PUT') await pending; return modelApi(method, path, ...rest) })
+  render(<Composer />); await screen.findByText('agent.reasoning.low')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  const option = await screen.findByRole('option', { name: 'gpt-6.1-sol' })
+  fireEvent.click(option); fireEvent.click(option)
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'common.close' }))
+  await act(async () => { finish(); await pending })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'agent.models.trigger' }).textContent).toContain('gpt-6.1-sol'))
+})
+
+it('opens a full mobile model page, pins the current model, and returns without saving', async () => {
+  layout.phone = true; configure(); render(<Composer />)
+  await screen.findByText('agent.reasoning.low')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  await screen.findByRole('option', { name: 'gpt-6.1-sol' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getAllByRole('option')[0].getAttribute('aria-selected')).toBe('true')
+  fireEvent.click(screen.getByRole('button', { name: 'common.back' }))
+  expect(screen.queryByRole('option')).toBeNull()
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
+})
+
+it('ignores stale saves and lists after switching away from a node and back', async () => {
+  let finishSave!: (value: any) => void, finishLoad!: (value: any) => void
+  const save = new Promise<any>(resolve => { finishSave = resolve }), load = new Promise<any>(resolve => { finishLoad = resolve })
+  vi.mocked(api).mockImplementation(async (method, path) => method === 'PUT' ? save : path === '/agent/models' ? load : { data: { main: role, worker: role } })
+  const view = renderHook(({ node }) => useAgentModels(node), { initialProps: { node: 'A' } })
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
+  let saved!: Promise<boolean>
+  act(() => { saved = view.result.current.apply('stale-model', 'high'); void view.result.current.load() })
+  view.rerender({ node: 'B' }); view.rerender({ node: 'A' })
+  await act(async () => { finishSave({ data: { main: { ...role, model: 'stale-model' }, worker: role } }); finishLoad({ data: { models: ['stale-model'] } }); await save; await load })
+  expect(await saved).toBe(false)
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
+  expect(view.result.current.models).not.toContain('stale-model')
+})
+
 it('lists only enabled installed skills and selects into the draft without executing', async () => {
   const pick = vi.fn(); configure()
   const modelApi = vi.mocked(api).getMockImplementation()!
@@ -77,4 +135,40 @@ it('loads context only inside the plus menu and closes that menu before opening 
   fireEvent.click(await screen.findByRole('menuitem', { name: 'agent.contextMeter.known' }))
   expect(open).toHaveBeenCalledOnce()
   expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it('ignores settings reads started before a new selection while that selection saves', async () => {
+  let finishRead!: (value: any) => void, finishSave!: () => void, hold = false
+  const older = new Promise<any>(resolve => { finishRead = resolve }), saving = new Promise<void>(resolve => { finishSave = resolve })
+  let selected = role
+  vi.mocked(api).mockImplementation(async (method) => {
+    if (method === 'PUT') { await saving; selected = { ...role, model: 'new-model' }; return { data: { main: selected, worker: role } } }
+    if (hold) { hold = false; return older }
+    return { data: { main: selected, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null))
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
+  hold = true
+  act(() => { window.dispatchEvent(new Event('roami:agent-model-settings-changed')) })
+  let saved!: Promise<boolean>
+  act(() => { saved = view.result.current.apply('new-model', 'default') })
+  await act(async () => { finishRead({ data: { main: { ...role, model: 'stale-read' }, worker: role } }); await older })
+  expect(view.result.current.settings?.main.model).toBe(role.model)
+  await act(async () => { finishSave(); await saved })
+  expect(view.result.current.settings?.main.model).toBe('new-model')
+})
+
+it('retries the settings read when the initial settings request failed', async () => {
+  let fail = true
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/models') return { data: { models: [role.model] } }
+    if (fail) throw new Error('offline')
+    return { data: { main: role, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null))
+  await waitFor(() => expect(view.result.current.error).toBeTruthy())
+  fail = false
+  await act(async () => { await view.result.current.load() })
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
+  expect(view.result.current.error).toBeNull()
 })

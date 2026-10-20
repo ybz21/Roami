@@ -11,7 +11,7 @@
 //   ③ **接管返回键**：安卓物理返回应该收掉这一层，而不是把整个路由退掉。
 // 层级：--z-subpage(90) 盖过底栏(50)；从会话全屏(100)里唤起时传 layer="session"
 // 换成 --z-session-sub(110)，否则 portal 之后不再嵌套在会话那个层叠上下文里，会被盖住。
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '../i18n'
 import { useEdgeSwipe } from './shell/edge-swipe'
@@ -19,10 +19,12 @@ import { useBackDismiss } from './shell/useBackDismiss'
 import { openPalette } from './shell/palette'
 import { ChevronLeft, SearchIcon } from '../icons'
 
-export default function MobileSubPage({ title, onBack, action, manageHistory = true, layer = 'page', keepBottomNav = false, children }: {
+export default function MobileSubPage({ title, onBack, action, search, dialogLabel, manageHistory = true, layer = 'page', keepBottomNav = false, children }: {
   title?: ReactNode
   onBack: () => void
   action?: { label: string; icon: ReactNode; onClick: () => void }
+  search?: false | { label: string; onClick: () => void }
+  dialogLabel?: string
   manageHistory?: boolean
   /** 'session' = 从会话全屏覆盖层里唤起（Git / 文件） */
   layer?: 'page' | 'session'
@@ -33,9 +35,23 @@ export default function MobileSubPage({ title, onBack, action, manageHistory = t
   useBackDismiss(manageHistory, onBack)
   const rootRef = useRef<HTMLDivElement>(null)
   useEdgeSwipe(rootRef, { onBack })
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root || !dialogLabel) return
+    root.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const items = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]')]
+      const first = items[0], last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    root.addEventListener('keydown', trap)
+    return () => root.removeEventListener('keydown', trap)
+  }, [dialogLabel])
 
   const node = (
-    <div ref={rootRef} data-mobile-refresh-root={keepBottomNav ? '' : undefined} style={{
+    <div ref={rootRef} role={dialogLabel ? 'dialog' : undefined} aria-modal={dialogLabel ? true : undefined} aria-label={dialogLabel} data-mobile-refresh-root={keepBottomNav ? '' : undefined} style={{
       position: 'fixed', inset: 0,
       bottom: keepBottomNav ? 'var(--mobile-nav-offset, calc(var(--mobile-nav-h) + var(--safe-b)))' : 0,
       background: 'var(--bg-base)',
@@ -53,9 +69,9 @@ export default function MobileSubPage({ title, onBack, action, manageHistory = t
           </button>
           <strong>{title}</strong>
           {action && <button type="button" onClick={action.onClick} aria-label={action.label}>{action.icon}</button>}
-          <button type="button" onClick={openPalette} aria-label={t('workspace.search')}>
+          {search !== false && <button type="button" onClick={search?.onClick || openPalette} aria-label={search?.label || t('workspace.search')}>
             <SearchIcon size={20} />
-          </button>
+          </button>}
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

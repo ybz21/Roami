@@ -2848,6 +2848,8 @@ const zhCN = {
   'agent.composer.attachmentMode': "附件将在当前对话中发送",
   'agent.reasoning.title': '思考强度',
   'agent.reasoning.trigger': '模型：{name}，思考强度：{effort}',
+  'agent.models.trigger': '模型：{name}',
+  'agent.reasoning.picker': '思考模式：{effort}',
   'agent.reasoning.default': '模型默认',
   'agent.reasoning.none': '不思考',
   'agent.reasoning.minimal': '极轻量',
