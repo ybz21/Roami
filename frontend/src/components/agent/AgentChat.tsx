@@ -15,6 +15,7 @@ import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
 import './agent-workspace.css'
 import { useAgentThread } from './useAgentThread'
+import { useAgentHistory } from './useAgentHistory'
 import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentDraft } from './useAgentDraft'
 import { useAgentMessageFocus } from './useAgentMessageFocus'
@@ -96,7 +97,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const settledDispatches = useMemo(() => new Set(bodies.filter(m => ['completed', 'failed'].includes(m.content.sessionReply?.status || '')).map(m => m.content.sessionReply!.dispatchId)), [bodies])
   const timeline = useMemo(() => groupAgentTimeline(agentTimeline(bodies, thread.view?.activities || [])), [bodies, thread.view?.activities])
   const visible = useMemo(() => bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming'), [bodies])
-  const eventIds = useMemo(() => visible.map(m => m.completedEventId || '').join(','), [visible])
+  const history = useAgentHistory(`${node || 'local'}:${cid}:${branch}:${thread.view?.branchId || ''}`, timeline, focusMessage, scroll)
+  const eventIds = history.entries.map(entry => entry.message?.completedEventId || '').join(',')
   useVisibleAgentReads(!inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
   useEffect(() => {
@@ -247,8 +249,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
-      <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
-        <div className="agent-thread">{thread.loading && <Spin />}{timeline.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <AgentActivity key={entry.id} items={entry.activities} conversationId={thread.view?.conversation.id} branchId={thread.view?.branchId} onSession={onSession} />)}</div>
+      <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current); history.expand() } }}>
+        <div className="agent-thread">{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <AgentActivity key={entry.id} items={entry.activities} conversationId={thread.view?.conversation.id} branchId={thread.view?.branchId} onSession={onSession} />)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>
