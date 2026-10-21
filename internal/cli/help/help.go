@@ -25,8 +25,8 @@ func Show(version string, w io.Writer) {
 	fmt.Fprintf(w, "    %s %s   新建会话\n", g("new"), d("[名称]"))
 	fmt.Fprintf(w, "    %s %s   附加会话 %s\n", g("a"), d("[名称]"), d("(无参数交互选择)"))
 	fmt.Fprintf(w, "    %s %s   分离会话\n", g("d"), d("[名称]"))
-	fmt.Fprintf(w, "    %s %s   关闭会话 %s\n", g("kill"), d("[名称] [--cascade]"), d("(默认孤儿收养子会话)"))
-	fmt.Fprintf(w, "    %s            关闭所有会话\n", g("killall"))
+	fmt.Fprintf(w, "    %s %s   关闭会话 %s\n", g("kill"), d("<会话> [--cascade]"), d("(默认孤儿收养子会话)"))
+	fmt.Fprintf(w, "    %s %s  发送具名按键或单个字母数字\n", g("keys"), d("<会话> <按键...>"))
 	fmt.Fprintf(w, "    %s %s  重命名会话\n\n", g("rename"), d("<旧名> <新名>"))
 
 	fmt.Fprintf(w, "  %s %s\n", b("子会话"), m("(subSession — 平坦 tmux 会话 + parent 关系)"))
@@ -56,10 +56,10 @@ func Show(version string, w io.Writer) {
 		g("env set"), d("<K=V>"), g("env rm"), d("<KEY>"), g("env clear"), g("env push"))
 
 	fmt.Fprintf(w, "  %s\n", b("其他"))
-	fmt.Fprintf(w, "    %s 服务器信息   %s 重载 tmux.conf   %s 安装补全   %s 显示帮助\n",
-		g("info"), g("source"), g("completion"), g("help"))
+	fmt.Fprintf(w, "    %s 服务器信息   %s 安装补全   %s 显示帮助\n",
+		g("info"), g("completion"), g("help"))
 	fmt.Fprintf(w, "    %s %s  台账库：状态 / 迁移 / 备份\n\n",
 		g("roami db"), d("status|migrate|backup [--json]"))
 
-	fmt.Fprintf(w, "  %s\n\n", d("未识别的命令会直接转发给 tmux"))
+	fmt.Fprintf(w, "  %s\n\n", d("仅支持上列业务命令；不转发原生 tmux 命令"))
 }

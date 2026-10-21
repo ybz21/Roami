@@ -5,7 +5,7 @@
 # 一行安装（推荐）：
 #   curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
 #
-# roami 是自包含二进制（内嵌前端 + ttmux CLI），目标机无需 go/node/npm。
+# roami 是自包含二进制（内嵌前端与会话核心），目标机无需 go/node/npm。
 # 配置与数据都在 ~/.roami/（首次启动自动生成 config.yaml）。首次打开网页设置登录口令。
 #
 # 环境开关：
@@ -156,7 +156,7 @@ install_binary() {
   die "无法安装 roami：下载失败且非源码环境（需 clone 仓库 + go/npm，或先发布 release）"
 }
 
-# ── tmux（会话基座）：roami 内嵌 ttmux，但会话/蜂群仍需宿主机的 tmux ─────
+# ── tmux（会话基座）：roami 内置会话核心，但会话/蜂群仍需宿主机的 tmux ─────
 ensure_tmux() {
   command -v tmux >/dev/null && { info "tmux 已就绪"; return 0; }
   local sudo=""; [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null && sudo=sudo
@@ -253,11 +253,22 @@ ensure_kvm() {
 # 已经存在同名**真文件**（旧版二进制）时也换成软链——留着两个二进制只会让人不知道跑的是哪个。
 link_legacy_name() {
   local dest="$1" legacy
-  for legacy in roam ttmux chrome; do
+  local here retirement
+  here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
+  retirement="${here}/scripts/install/retire-session-entries.sh"
+  if [ ! -f "$retirement" ]; then
+    retirement="$(mktemp)"
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${ROAMI_INSTALL_BRANCH:-main}/scripts/install/retire-session-entries.sh" -o "$retirement" || die "无法加载旧入口迁移脚本"
+  fi
+  source "$retirement"
+  retire_roami_session_entries "$BIN_DIR"
+  [ "$retirement" = "${here}/scripts/install/retire-session-entries.sh" ] || rm -f "$retirement"
+  for legacy in roam chrome; do
     ln -sfn "$dest" "${BIN_DIR}/${legacy}"
   done
   mkdir -p "${HOME}/.local/share/bash-completion/completions"
   "$dest" completion > "${HOME}/.local/share/bash-completion/completions/roami"
+  "$dest" session completion
 }
 
 

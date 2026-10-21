@@ -5,7 +5,7 @@ cc-swarm 为每个被管理的 session 维护一个记忆文件，持久化跨�
 ## 存储位置
 
 ```
-~/.local/share/ttmux/cc-swarm/
+~/.roami/cc-swarm/
   cc-oauth.md
   cc-回测.md
   cc-数据.md

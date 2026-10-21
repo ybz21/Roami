@@ -7,12 +7,10 @@ description: >
   所有决策由 AI 做，不靠脚本模式匹配。
 user-invocable: true
 allowed-tools:
-  - Bash(ttmux *)
-  - Bash(chrome *)
-  - Bash(tmux *)
+  - Bash(roami session *)
+  - Bash(roami chrome *)
   - Bash(sleep *)
   - Bash(ps *)
-  - Bash(pkill *)
   - Bash(mkdir *)
   - Bash(cat *)
   - Read
@@ -51,10 +49,10 @@ cc-swarm 同时是 **包工头** 和 **监护人**：
 
 | CLI | 用处 |
 |-----|------|
-| **`ttmux`** | 会话 / 任务 / 蜂群编排：建群、加成员、广场（`swarm say` / `swarm feed`）、看板（`swarm task …`）、`swarm done` / `activate` / `collect`。完整用法见 **ttmux** skill。 |
-| **`chrome`** | 浏览器自动化（Playwright over CDP）：`goto` / `click` / `fill` / `text` / `eval` / `screenshot` / `tabs` …。**验收 Web 类成果时用它真跑一遍**（打开页面、点按钮、读文本断言），比只读代码可靠。用法 `roami chrome help`。 |
+| **`roami session`** | 会话 / 任务 / 蜂群编排：建群、加成员、广场（`swarm say` / `swarm feed`）、看板（`swarm task …`）、`swarm done` / `activate` / `collect`。完整用法见 **roami-session** skill。 |
+| **`roami chrome`** | 浏览器自动化（Playwright over CDP）：`goto` / `click` / `fill` / `text` / `eval` / `screenshot` / `tabs` …。**验收 Web 类成果时用它真跑一遍**（打开页面、点按钮、读文本断言），比只读代码可靠。用法 `roami chrome help`。 |
 
-派活给成员时，对 Web 任务可在描述里点名："完成后用 `chrome` 自检页面（打开、点按钮、断言文本）"。
+派活给成员时，对 Web 任务可在描述里点名："完成后用 `roami chrome` 自检页面（打开、点按钮、断言文本）"。
 
 **拆任务 / 组班子时读 `dev-roles` skill**：它讲软件开发该分成哪几个角色、每个角色的 scope（负责什么 / 产出什么 / 边界）、按项目规模怎么选角色、角色怎么协作。据它决定给每个成员定哪个 `--subrole` 和 `--duty`，别一律无差别 member。
 
@@ -166,7 +164,7 @@ cc-swarm 的参数决定它从生命周期的哪一步进入：
 | 状态 | AI 如何识别 | 决策 |
 |------|------------|------|
 | 等审批 | 看到权限选择菜单（Yes/No） | → approve 流程 |
-| 待发命令 | prompt `❯` 后有文字但没发 | → `tmux send-keys Enter` |
+| 待发命令 | prompt `❯` 后有文字但没发 | → `roami session keys <会话ID> Enter` |
 | 在提问 | Claude 问了用户一个问题 | → 理解问题，回复合适指令 |
 | 在评分 | 出现 "How is Claude doing" 评分提示 | → 发 `0` dismiss |
 | 执行中 | 正在写代码/读文件/跑命令 | → 跳过不干预 |

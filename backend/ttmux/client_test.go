@@ -44,3 +44,12 @@ func TestLocalNativeTmuxHonorsContext(t *testing.T) {
 		t.Fatal("native command ignored context")
 	}
 }
+
+func TestAdapterRejectsGlobalTmuxOperations(t *testing.T) {
+	c := localClient(t, "echo should-not-run\n")
+	for _, command := range []string{"kill-server", "killall", "kill-session", "source-file", "run-shell"} {
+		if output, err := c.Run(command); err == nil || strings.Contains(output, "should-not-run") {
+			t.Fatalf("operation %s reached tmux: %q %v", command, output, err)
+		}
+	}
+}

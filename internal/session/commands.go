@@ -125,12 +125,17 @@ func New(rt runtime.Runtime, args []string, w io.Writer) error {
 		case "--no-reuse": // 允许重名：不复用同展示名的既有会话，一律新建
 			reuse = false
 		default:
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("unknown new-session option %q", args[i])
+			}
 			pos = append(pos, args[i])
 		}
 	}
+	if len(pos) > 1 {
+		return fmt.Errorf("usage: roami session new [label] [--dir path] [--size WxH] [--detach] [--json]")
+	}
 	if len(pos) > 0 {
 		opt.Label = pos[0]
-		opt.Extra = pos[1:]
 	}
 	result, err := Create(rt, opt, reuse)
 	if err != nil {
@@ -307,29 +312,6 @@ func Kill(rt runtime.Runtime, exclude map[string]bool, args []string, w io.Write
 		return err
 	}
 	ui.Ok(w, "会话 %s 已关闭", ui.Bold(shown))
-	return nil
-}
-
-// KillAll kills every non-swarm session after confirmation.
-func KillAll(rt runtime.Runtime, exclude map[string]bool, w io.Writer) error {
-	var names []string
-	for _, s := range rt.Sessions() {
-		if !exclude[s] {
-			names = append(names, s)
-		}
-	}
-	if len(names) == 0 {
-		ui.Info(w, "没有活跃会话")
-		return nil
-	}
-	if !ui.Confirm(fmt.Sprintf("确定关闭全部 %d 个会话?", len(names))) {
-		ui.Info(w, "已取消")
-		return nil
-	}
-	for _, s := range names {
-		_ = rt.Tmux("kill-session", "-t", "="+s)
-	}
-	ui.Ok(w, "所有普通会话已关闭")
 	return nil
 }
 

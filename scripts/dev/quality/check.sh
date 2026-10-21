@@ -32,6 +32,7 @@ tracked_source_files() {
 section "CLI entry audit"
 node scripts/dev/quality/cli-entry-audit.mjs
 bash scripts/dev/selftest/install-storage-preflight.sh
+bash scripts/dev/selftest/retired-session-entries.sh
 
 section "Shell syntax"
 shell_files="$(git ls-files '*.sh' 'scripts/*.sh')"

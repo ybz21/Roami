@@ -26,16 +26,26 @@ func TestSchemaMatchesRealCLI(t *testing.T) {
 		t.Skip("找不到 CLI 源码")
 	}
 	tmp := t.TempDir()
-	bin := filepath.Join(tmp, "ttmux")
+	bin := filepath.Join(tmp, "roami")
 	build := exec.Command("go", "build", "-o", bin, "./cmd/roami")
 	build.Dir = src
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Skipf("编译 CLI 失败（环境问题，跳过）: %s", out)
 	}
 
-	home := filepath.Join(tmp, "roam")
-	real := exec.Command(bin, "db", "migrate", "--json")
-	real.Env = append(os.Environ(), "ROAM_HOME="+home, "ROAM_DATA="+home)
+	home := filepath.Join(tmp, "roami-home")
+	for _, prefix := range []string{"ROAMI", "ROAM", "TTMUX"} {
+		for _, suffix := range []string{"HOME", "DATA", "CONFIG", "DATABASE_DIR", "BACKUP_DIR"} {
+			t.Setenv(prefix+"_"+suffix, "")
+		}
+	}
+	t.Setenv("ROAMI_HOME", home)
+	t.Setenv("ROAMI_DATA", home)
+	t.Setenv("ROAMI_DATABASE_DIR", filepath.Join(home, "database"))
+	t.Setenv("ROAMI_BACKUP_DIR", filepath.Join(home, "backups"))
+	t.Setenv("ROAMI_CONFIG", filepath.Join(home, "config.yaml"))
+	real := exec.Command(bin, "session", "db", "migrate", "--json")
+	real.Env = os.Environ()
 	if out, err := real.CombinedOutput(); err != nil {
 		t.Fatalf("roami db status 失败: %s", out)
 	}

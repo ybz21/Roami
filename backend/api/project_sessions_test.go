@@ -14,7 +14,7 @@ import (
 func TestProjectMembershipIncludesSessionsBeyondTopThree(t *testing.T) {
 	_, tmp, tmux := e2eSetup(t)
 	repo := e2eRepo(t, tmp)
-	h := New(ttmux.New(filepath.Join(tmp, "ttmux-e2e")), "", tmp, "")
+	h := New(ttmux.New(filepath.Join(tmp, "roami-e2e")), "", tmp, "")
 	id := h.Projects.Touch(repo)
 	for i := 0; i < 6; i++ {
 		tmux("new-session", "-d", "-s", fmt.Sprintf("member-%d", i), "-c", repo)

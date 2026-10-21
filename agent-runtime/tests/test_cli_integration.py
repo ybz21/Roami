@@ -369,6 +369,9 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
     env.update(
         ROAMI_HOME=str(tmp_path / "home"),
         ROAMI_DATA=str(tmp_path / "home"),
+        ROAMI_DATABASE_DIR=str(tmp_path / "home/database"),
+        ROAMI_BACKUP_DIR=str(tmp_path / "home/backups"),
+        ROAMI_CONFIG=str(tmp_path / "home/config.yaml"),
         TMUX_BIN=str(wrapper),
         PATH=str(binary_dir) + os.pathsep + os.environ["PATH"],
     )

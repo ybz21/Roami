@@ -47,7 +47,9 @@ func Run(rt runtime.Runtime, version string, run Runner) error {
 		case "3":
 			_ = m.run([]string{"a"})
 		case "4":
-			_ = m.run([]string{"kill"})
+			if target, ok := m.pickSession("关闭会话"); ok {
+				_ = m.run([]string{"kill", target})
+			}
 			m.pause()
 		case "5":
 			m.swarmMenu()
@@ -78,7 +80,7 @@ func Run(rt runtime.Runtime, version string, run Runner) error {
 func (m *menu) header(version string) {
 	clear()
 	p := ui.P()
-	fmt.Printf("\n  %s %s  %s\n", ui.Bold("ttmux"), ui.Dim("v"+version), ui.Dim("— 交互模式 (q 退出)"))
+	fmt.Printf("\n  %s %s  %s\n", ui.Bold("roami session"), ui.Dim("v"+version), ui.Dim("— 交互模式 (q 退出)"))
 	fmt.Printf("  %s%s%s\n", p.Dim, strings.Repeat("─", 44), p.Reset)
 	swarms, _ := m.st.ListSwarms()
 	fmt.Printf("  %s会话: %s%s%d%s%s  蜂群: %s%s%d%s\n\n",

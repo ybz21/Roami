@@ -12,13 +12,14 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # 仓库 skills/ 目录
 DEST="${1:-${HOME}/.claude/skills}"
+source "${SRC}/../scripts/install/retire-session-entries.sh"
 
 # 目标技能目录：Claude + (存在则) Codex。两者都用目录形式 <名>/SKILL.md，
 # 扁平 <名>.md 不被 Claude Code v2.1+ 识别（会报「Unknown command: /<名>」）。
 TARGETS=("$DEST")
 [[ -d "${HOME}/.codex" ]] && TARGETS+=("${HOME}/.codex/skills")
 
-# 子文档拼接顺序；与 scripts/install/install-ttmux.sh 的 GitHub 下载分支保持一致。
+# 子文档拼接顺序；与 scripts/install/install-roami.sh 的 GitHub 下载分支保持一致。
 CC_SWARM_DOCS="intake decompose spawn patrol approve test-push review concurrency integrate memory"
 DEV_ROLES_DOCS="plaza board chrome pm architect frontend backend fullstack qa designer reviewer devops docs"
 
@@ -40,12 +41,13 @@ tmp_dr="$(mktemp)"; merge_skill "$tmp_dr" dev-roles $DEV_ROLES_DOCS
 
 for d in "${TARGETS[@]}"; do
     mkdir -p "$d"
-    rm -f "${d}/ttmux.md" "${d}/cc-swarm.md"   # 清掉历史遗留的扁平文件
+    rm -f "${d}/cc-swarm.md"   # 清掉历史遗留的扁平文件
     # roami session skill：单文件（chrome CLI 不单独建技能，由 cc-swarm 的 CLI 列表引用）
-    if [[ -f "${SRC}/ttmux/SKILL.md" ]]; then
-        mkdir -p "${d}/ttmux"
-        cp "${SRC}/ttmux/SKILL.md" "${d}/ttmux/SKILL.md"
+    if [[ -f "${SRC}/roami-session/SKILL.md" ]]; then
+        mkdir -p "${d}/roami-session"
+        cp "${SRC}/roami-session/SKILL.md" "${d}/roami-session/SKILL.md"
     fi
+    retire_roami_session_skill "$d"
     # cc-swarm skill
     if [[ -s "$tmp_cc" ]]; then
         mkdir -p "${d}/cc-swarm"
@@ -63,6 +65,6 @@ for d in "${TARGETS[@]}"; do
         cp "${SRC}/babysit-pr/wait-codex-review.sh" "${d}/babysit-pr/wait-codex-review.sh"
         chmod +x "${d}/babysit-pr/wait-codex-review.sh"
     fi
-    echo "✔ skills 已同步到 ${d} (ttmux, cc-swarm, dev-roles, babysit-pr)"
+    echo "✔ skills 已同步到 ${d} (roami-session, cc-swarm, dev-roles, babysit-pr)"
 done
 rm -f "$tmp_cc" "$tmp_dr"

@@ -44,7 +44,7 @@ Do you want to allow access to /some/path?
 理解它要做什么
   ↓
 判断是否安全合理
-  ├── 安全 → tmux send-keys -t <session> Enter
+  ├── 安全 → roami session keys <session> Enter
   ├── 不确定 → 读更多上下文再判断
   └── 危险 → 不批，通知用户
 ```
@@ -52,7 +52,7 @@ Do you want to allow access to /some/path?
 ## 批准方式
 
 ```bash
-tmux send-keys -t <session> Enter
+roami session keys <session> Enter
 ```
 
 Enter 键选择默认选项（通常是 Yes）。
@@ -74,7 +74,7 @@ Enter 键选择默认选项（通常是 Yes）。
 
 ```bash
 # 发送 "2" 选择第二个选项
-tmux send-keys -t <session> 2
+roami session keys <session> 2
 ```
 
 但只在确认 session 的工作方向正确时才这样做。
@@ -90,7 +90,7 @@ How is Claude doing this session? (optional)
 ```
 直接发 `0` dismiss：
 ```bash
-tmux send-keys -t <session> 0
+roami session keys <session> 0
 ```
 
 ### 待发命令
@@ -100,5 +100,5 @@ prompt `❯` 后有文字但没按 Enter。这通常是：
 
 判断文字内容合理后：
 ```bash
-tmux send-keys -t <session> Enter
+roami session keys <session> Enter
 ```

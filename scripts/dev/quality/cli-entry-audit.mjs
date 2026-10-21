@@ -6,10 +6,13 @@ const failures = [];
 for (const file of files) {
   if (!existsSync(file)) continue;
   if (!/^(backend|internal|pkg|plugins|cmd|scripts|tests|skills|frontend\/src|\.github)\//.test(file)) continue;
-  if (!/\.(go|ts|tsx|sh|yml|yaml|md|tmpl)$/.test(file)) continue;
+  if (!/\.(go|ts|tsx|sh|py|yml|yaml|md|tmpl)$/.test(file)) continue;
   const lines = readFileSync(file, 'utf8').split('\n');
   for (const [index, line] of lines.entries()) {
     if (/^\s*(#|\/\/)/.test(line)) continue;
+    if (/^(skills|backend\/api\/prompts)\//.test(file) && /Bash\((?:ttmux|tmux) \*\)/.test(line)) failures.push(`${file}:${index + 1}: unmanaged session command permission`);
+    if (!file.includes('test') && /(?<![\w/-])tmux\s+kill-server\b/.test(line)) failures.push(`${file}:${index + 1}: tmux cleanup must use recorded isolated instance`);
+    if (/TMUX_TMPDIR=.*\bkill-server\b/.test(line)) failures.push(`${file}:${index + 1}: a temporary directory does not identify a cleanup target`);
     if (/"(?:ttmux-web\/|ttmux-cli-go\/|roam-plugins\/)/.test(line)) failures.push(`${file}:${index + 1}: obsolete Go import`);
     if (/^(scripts|tests|\.github)\//.test(file) && /(?:cli\/ttmux-cli-go|backend\/go\.(?:mod|sum)|cli\/chrome-cli\/)/.test(line)) failures.push(`${file}:${index + 1}: removed build path`);
     if (/^(scripts|skills|backend\/api\/prompts|plugins\/README)/.test(file) && /(?<![\w/-])ttmux (?:swarm|plugin|capture|send|ls|new|rename|db)\b/.test(line)) failures.push(`${file}:${index + 1}: old CLI call in maintained instructions or scripts`);

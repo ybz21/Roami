@@ -12,43 +12,34 @@ import (
 	"github.com/ybz21/Roami/internal/terminalui"
 )
 
-const script = `_ttmux_completions() {
-    local cur prev cmds
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-    cmds="ls new fork children parent a attach d detach kill killall rename nw lw kw sp split kp send info source help capture status completion swarm db"
-
-    case "$prev" in
-        ttmux)
-            COMPREPLY=($(compgen -W "$cmds" -- "$cur"))
-            return ;;
-        a|attach|kill|rename|send|d|detach|capture|status)
-            local sessions
-            sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null)
-            COMPREPLY=($(compgen -W "$sessions" -- "$cur"))
-            return ;;
-        db)
-            COMPREPLY=($(compgen -W "status migrate backup set-home" -- "$cur"))
-            return ;;
-        swarm)
-            COMPREPLY=($(compgen -W "new add ls status activate collect migrate adopt done say listen feed watch board task sql archive rm" -- "$cur"))
-            return ;;
-        adopt|activate|done|archive|status|collect|say|listen|feed|watch|sql|add|board)
-            local swarms
-            swarms=$(sqlite3 ~/.roami/meta.db "SELECT name FROM swarms;" 2>/dev/null)
-            COMPREPLY=($(compgen -W "$swarms" -- "$cur"))
-            return ;;
-        sp|split)
-            COMPREPLY=($(compgen -W "-h -v" -- "$cur"))
-            return ;;
-        kw)
-            local windows
-            windows=$(tmux list-windows -F '#{window_index}' 2>/dev/null)
-            COMPREPLY=($(compgen -W "$windows" -- "$cur"))
-            return ;;
+// Script completes only the public Roami command vocabulary.
+const Script = `_roami_complete() {
+    local cur="${COMP_WORDS[COMP_CWORD]}" prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local words="session chrome project agent db server auth plugin help version completion"
+    case "${COMP_WORDS[1]}" in
+        session)
+            words="ls new attach detach kill rename send keys capture fork children parent swarm env info nw lw kw sp split kp db help"
+            case "$prev" in
+                attach|detach|kill|rename|send|keys|capture|children)
+                    local sessions
+                    sessions=$(roami session ls --live --json 2>/dev/null | grep -o '"name":"[^"]*"' | sed 's/"name":"//;s/"$//')
+                    COMPREPLY=($(compgen -W "$sessions" -- "$cur"))
+                    return ;;
+            esac
+            case "${COMP_WORDS[2]}" in
+                swarm) words="new add ls status activate done say feed listen watch board task adopt archive rm sql" ;;
+                db) words="status migrate backup history restore revive set-home link-agent" ;;
+                env) words="set rm clear push" ;;
+            esac ;;
+        chrome) words="tabs goto click fill text eval screenshot record setup help" ;;
+        agent) words="setup init serve status conversations new send history report notify execution" ;;
+        project) words="ls show sessions create prefs activity remove" ;;
+        db) words="status migrate backup" ;;
+        auth) words="login logout status" ;;
     esac
+    COMPREPLY=($(compgen -W "$words" -- "$cur"))
 }
-complete -F _ttmux_completions ttmux
+complete -F _roami_complete roami
 `
 
 // Install writes the completion script and wires it into ~/.bashrc.
@@ -61,16 +52,32 @@ func Install(w io.Writer) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "ttmux"), []byte(script), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "roami"), []byte(Script), 0o644); err != nil {
 		return err
 	}
 	bashrc := filepath.Join(home, ".bashrc")
-	if !contains(bashrc, "bash_completion.d/ttmux") {
+	data, err := os.ReadFile(bashrc)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	var lines []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "# ttmux tab 补全" || strings.TrimSpace(line) == "[[ -f ~/.bash_completion.d/ttmux ]] && source ~/.bash_completion.d/ttmux" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if cleaned := strings.Join(lines, "\n"); cleaned != string(data) {
+		if err := os.WriteFile(bashrc, []byte(cleaned), 0600); err != nil {
+			return err
+		}
+	}
+	if !contains(bashrc, "bash_completion.d/roami") {
 		f, err := os.OpenFile(bashrc, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			return err
 		}
-		_, _ = f.WriteString("\n# ttmux tab 补全\n[[ -f ~/.bash_completion.d/ttmux ]] && source ~/.bash_completion.d/ttmux\n")
+		_, _ = f.WriteString("\n# Roami tab 补全\n[[ -f ~/.bash_completion.d/roami ]] && source ~/.bash_completion.d/roami\n")
 		_ = f.Close()
 	}
 	ui.Ok(w, "Tab 补全已安装")

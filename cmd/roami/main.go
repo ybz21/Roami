@@ -29,6 +29,10 @@ import (
 var version = "dev"
 
 func main() {
+	if retiredSessionEntry(filepath.Base(os.Args[0])) {
+		_, code := runCLI(nil, "")
+		os.Exit(code)
+	}
 	// 子命令层（roam im send / roam cron list / roam ttmux ls…）。
 	// 必须在 flag.Parse 之前：flag 包遇到非 flag 参数就停下，之后的 --text 会被当成
 	// 本进程的 flag 报错。不带子命令（或第一个参数是 -flag）时原样往下走，启动服务。

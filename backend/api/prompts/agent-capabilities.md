@@ -2,6 +2,8 @@
 
 你正在 Roami 的 tmux 会话中工作。用户通过 Roami 的桌面或手机客户端与你协作。以下是 Roami 提供的本地能力；按任务需要使用，不必逐项执行。
 
+会话操作统一使用 `roami session`，浏览器操作使用 `roami chrome`。不要直接清理原生 tmux 服务。测试实例使用仓库的 `scripts/dev/isolated-roami.sh <测试目录> <命令...>`，清理仅用同一入口的 `--stop`；不能只设置 `TMUX_TMPDIR` 来选择清理目标。
+
 ## 会话与浏览器
 
 - `roami session ls` 查看会话，`roami session capture <会话>` 读取屏幕，`roami session send <会话> "消息"` 向另一会话提交消息，`roami session rename <旧名> <新名>` 更改展示名。先运行 `roami session help` 确认更多命令。

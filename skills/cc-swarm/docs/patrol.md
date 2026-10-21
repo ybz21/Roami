@@ -96,7 +96,7 @@ roami session capture <session> --lines 40
 
 按优先级：
 1. **等审批的** → 先处理，不然会卡住整个 session
-2. **有待发命令的** → prompt 里有用户（或上轮 cc-swarm）输入的文字但没按 Enter，帮它发 `tmux send-keys -t <session> Enter`
+2. **有待发命令的** → prompt 里有用户（或上轮 cc-swarm）输入的文字但没按 Enter，帮它发 `roami session keys <session> Enter`
 3. **在提问的** → 回答问题，解除阻塞
 4. **出错的** → 诊断修复
 5. **已完成的** → 安排下一步（测试/review/commit）；蜂群作用域下，确认完成后 `roami session swarm done <名> <成员>` 打标，解锁等它的下游
@@ -118,7 +118,7 @@ cc-swarm 的默认运行方式是 **持续循环巡检**，不是跑一次就停
 
 ```
 初始化:
-  mkdir -p ~/.local/share/ttmux/cc-swarm
+  mkdir -p ~/.roami/cc-swarm
   读取所有已有记忆文件，恢复上下文
 
 循环:

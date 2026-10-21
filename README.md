@@ -306,7 +306,7 @@ agents. This is not the main entry point for most users; start from the Web
 console in most cases.
 
 `roami` is the single entry point. Plugin commands are grouped by plugin name
-(any unique prefix works), and anything else is forwarded to `ttmux`:
+(any unique prefix works). Session operations use `roami session`; unknown session commands are rejected:
 
 ```bash
 roami help                        # what is installed and how to reach it
@@ -314,15 +314,15 @@ roami cron list                   # scheduled tasks
 roami im send --text "done"       # message yourself through the IM bridge
 roami host stats                  # host resource snapshot
 roami session ls                  # sessions — integrated core
-roami session swarm ls              # explicit passthrough when a name collides
+roami session swarm ls              # session and swarm operations
 roami -addr 0.0.0.0:13579         # no subcommand: start the web console (unchanged)
 ```
 
 Underneath:
 
-- `ttmux`: manages persistent sessions, background tasks, agent workers, swarms,
+- `roami session`: manages persistent sessions, background tasks, agent workers, swarms,
   and machine-readable state.
-- `chrome`: drives Chrome on the development machine for UI debugging,
+- `roami chrome`: drives Chrome on the development machine for UI debugging,
   screenshots, form flows, and automated validation.
 
 Plugins extend the console itself — `roam.host-monitor` contributes the resource
@@ -373,7 +373,7 @@ TTMUX_WEB_PASSWORD=dev go run ./cmd/roami server
 CLI smoke test:
 
 ```bash
-TTMUX=./ttmux bash tests/test_ttmux.sh
+ROAMI_BIN=/tmp/roami bash tests/test-session-cli.sh
 ```
 
 Agent-facing rules for this repository (design system, i18n, quality gates) live

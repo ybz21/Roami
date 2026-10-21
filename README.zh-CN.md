@@ -290,7 +290,7 @@ TTMUX_WEB_PASSWORD=dev go run ./cmd/roami server
 CLI smoke test：
 
 ```bash
-TTMUX=./ttmux bash tests/test_ttmux.sh
+ROAMI_BIN=/tmp/roami bash tests/test-session-cli.sh
 ```
 
 给 Agent 的仓库规则（设计系统、i18n、质量门禁）都在

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/ybz21/Roami/internal/session"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -347,17 +348,6 @@ func (a *API) Capture(c *gin.Context) {
 	a.text(c, "capture", a.sessionTarget(c), "--lines", c.DefaultQuery("lines", "200"))
 }
 
-// 允许注入的具名按键（其余只允许单个字母/数字）。用于在专业渲染模式下响应 TUI 选择框。
-// C-c 是「强制中断」那一档：Esc 只回到 TUI 的输入行，卡在工具里的子进程（长跑的 bash、
-// 收不到响应的请求）压根没收到信号，得靠 ^C 才停得下来。
-var allowedKeys = map[string]bool{
-	"Up": true, "Down": true, "Left": true, "Right": true,
-	"Enter": true, "Escape": true, "Tab": true, "Space": true, "BSpace": true,
-	"C-c": true,
-	// BTab = Shift+Tab：Claude/Codex 用它轮换权限/审批模式，对话页的「+」菜单要发这一枚
-	"BTab": true,
-}
-
 // Keys POST /sessions/:name/keys —— 向会话注入原始按键（不追加回车）。
 // body: {"keys":["Down","Enter"]} 或 {"keys":["2"]}；经白名单校验后 tmux send-keys。
 // 之所以单列一个端点：/tasks/_/send 只能发「文本+回车」，无法发方向键/裸数字/Esc，
@@ -374,12 +364,7 @@ func (a *API) Keys(c *gin.Context) {
 	// =name: 精确匹配（send-keys 的 pane 目标对裸 =name 报 can't find pane）；走 ttmux 转发尊重 TMUX_BIN
 	args := []string{"send-keys", "-t", "=" + name + ":"}
 	for _, k := range b.Keys {
-		ok := allowedKeys[k]
-		if !ok && len(k) == 1 {
-			ch := k[0]
-			ok = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
-		}
-		if !ok {
+		if !session.ValidKey(k) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_KEY", "message": k}})
 			return
 		}

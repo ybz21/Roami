@@ -6,7 +6,6 @@ import http.cookiejar
 import json
 import os
 import secrets
-import shlex
 import shutil
 import signal
 import socket
@@ -29,6 +28,8 @@ def stop(state_path):
         "namespace"
     ].startswith("roami-acceptance-20261019-"):
         raise ValueError("Not an acceptance instance")
+    launcher = ["bash", str(REPO / "scripts/dev/isolated-roami.sh"), str(root)]
+    subprocess.run([*launcher, "--verify"], check=True, capture_output=True)
     for key in ["webPid", "agentPid"]:
         pid = state[key]
         try:
@@ -42,18 +43,14 @@ def stop(state_path):
             pass
         except FileNotFoundError:
             pass
-    subprocess.run(
-        ["/usr/bin/tmux", "-L", state["namespace"], "kill-server"],
-        check=False,
-        capture_output=True,
-    )
+    subprocess.run([*launcher, "--stop"], check=True, capture_output=True)
     print("Stopped only the isolated acceptance process groups and tmux socket")
 
 
 def start(args):
     binary = str(Path(args.cli).resolve())
     source = Path(args.config_root).expanduser().resolve()
-    stamp = time.strftime("%Y%m%d-%H%M%S")
+    stamp = time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(4)
     namespace = "roami-acceptance-20261019-" + stamp
     root = Path("/tmp") / namespace
     root.mkdir(mode=0o700)
@@ -70,6 +67,7 @@ def start(args):
         key: value
         for key, value in os.environ.items()
         if not key.startswith(("ROAMI_", "ROAM_", "TTMUX_", "GIT_"))
+        and key not in {"TMUX", "TMUX_PANE", "TMUX_BIN", "TMUX_TMPDIR"}
     }
     names = {
         model.get("key_env", "ROAMI_AGENT_API_KEY"),
@@ -91,12 +89,7 @@ def start(args):
         ROAMI_AGENT_CLI=binary,
         PATH=str(root / "bin") + os.pathsep + env.get("PATH", ""),
     )
-    wrapper = root / "tmux"
-    wrapper.write_text(
-        "#!/bin/sh\nexec /usr/bin/tmux -L " + shlex.quote(namespace) + ' "$@"\n'
-    )
-    wrapper.chmod(0o700)
-    env["TMUX_BIN"] = str(wrapper)
+    launcher = ["bash", str(REPO / "scripts/dev/isolated-roami.sh"), str(root)]
     password = secrets.token_urlsafe(24)
     config = root / "config.yaml"
     config.write_text(
@@ -155,7 +148,7 @@ def start(args):
 
     def cli(*argv, data=None):
         result = subprocess.run(
-            [binary, *argv],
+            [*launcher, binary, *argv],
             env=env,
             input=data,
             text=True,
@@ -171,14 +164,14 @@ def start(args):
             else result.stdout
         )
 
-    cli("agent", "init", "--runtime-dir", str(REPO / "agent-runtime"))
     processes = []
     try:
+        cli("agent", "init", "--runtime-dir", str(REPO / "agent-runtime"))
         for name, argv in [("agent", ["agent", "serve"]), ("web", ["server"])]:
             with (root / "logs" / (name + ".log")).open("wb") as log:
                 processes.append(
                     subprocess.Popen(
-                        [binary, *argv],
+                        [*launcher, binary, *argv],
                         env=env,
                         stdout=log,
                         stderr=log,
@@ -301,7 +294,11 @@ def start(args):
         print("Acceptance instance ready; private state:", args.state)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
         for process in processes:
-            os.killpg(process.pid, signal.SIGTERM)
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        subprocess.run([*launcher, "--stop"], check=False, capture_output=True)
         raise
 
 

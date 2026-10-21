@@ -69,7 +69,7 @@
 把拆分结果写进蜂群记忆：
 
 ```
-~/.local/share/ttmux/cc-swarm/_tasks.md
+~/.roami/cc-swarm/_tasks.md
 ```
 
 格式：

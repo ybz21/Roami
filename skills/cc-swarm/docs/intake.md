@@ -39,7 +39,7 @@ roami session ls                 # 已有哪些会话？是否已有人在做相
 把目标固化成一份 markdown 规格，存到蜂群记忆里：
 
 ```
-~/.local/share/ttmux/cc-swarm/_spec.md
+~/.roami/cc-swarm/_spec.md
 ```
 
 格式：

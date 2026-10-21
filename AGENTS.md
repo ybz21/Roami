@@ -197,6 +197,18 @@ the existing helpers instead of shelling out fresh:
 - **`send-keys` has a length limit.** Large prompts go to a file and in over stdin; if the send
   fails, kill the session you just created rather than leaking an empty one.
 
+## Session CLI and Test Isolation
+
+Use `roami session` for session operations and `roami chrome` for browser automation. The old
+`ttmux` entry is retired. Public session commands do not forward native tmux commands or expose
+global shutdown. Close only the explicitly identified session or task resources.
+
+Run development instances through `scripts/dev/isolated-roami.sh <test-directory> <command...>`
+and clean up their tmux server through the same entry with `--stop`. The launcher records a private
+socket and verifies its server identity before cleanup. Setting only `TMUX_TMPDIR` does not isolate
+an inherited `TMUX` target. Never use the user's live tmux server as a test fixture or cleanup target.
+The session-isolation regression uses two disposable servers and proves the other server survives.
+
 ## Agent Panes Are Not Ours
 
 Claude Code and Codex render their own alternate-screen TUIs inside our panes. Anything that

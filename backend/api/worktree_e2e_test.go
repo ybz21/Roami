@@ -60,7 +60,7 @@ func e2eSetup(t *testing.T) (*gin.Engine, string, func(...string) string) {
 	t.Cleanup(func() { _ = exec.Command("tmux", "-L", sock, "kill-server").Run() })
 
 	// 构建被测 CLI
-	bin := filepath.Join(tmp, "ttmux-e2e")
+	bin := filepath.Join(tmp, "roami-e2e")
 	root, _ := filepath.Abs("../..")
 	// -buildvcs=false：从 git 钩子里跑测试时会继承 GIT_DIR，go 的 VCS 标记
 	// 会因此认错仓库直接失败；这里只是造个临时二进制，版本戳没意义。

@@ -1,8 +1,7 @@
 name: release
 
 # Build and publish prebuilt artifacts so `curl | bash` installs can download them:
-#   - roami-<os>-<arch>   单一自包含二进制（内嵌前端 + ttmux CLI），下载即用
-#   - ttmux-<os>-<arch>  独立 CLI 二进制（install.sh 源码构建失败时的回退）
+#   - roami-<os>-<arch>   单一自包含二进制（内嵌前端与会话核心），下载即用
 #   - chrome             chrome-cli（架构无关）
 on:
   push:
@@ -36,7 +35,7 @@ jobs:
           npm ci
           npm run build
 
-      - name: Build roami single binaries (frontend + ttmux embedded)
+      - name: Build roami single binaries (frontend and session core)
         env:
           ROAMI_BUILD_VERSION: ${{ github.ref_name }}
         run: |
@@ -46,14 +45,9 @@ jobs:
             SKIP_FRONTEND=1 GOOS=$os GOARCH=$arch bash scripts/build/build-roami.sh
           done
 
-      - name: Build compatibility entry assets
+      - name: Build browser compatibility asset
         run: |
           mkdir -p dist
-          for binary in backend/dist/roami-*; do
-            target=${binary##*/roami-}
-            cp "$binary" "dist/ttmux-$target"
-          done
-          CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -ldflags "-X main.version=${{ github.ref_name }}" -o dist/ttmux-freebsd-amd64 ./cmd/roami
           bash scripts/build/build-chrome.sh dist/chrome
 
       - name: Publish release assets

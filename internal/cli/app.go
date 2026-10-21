@@ -47,6 +47,9 @@ func (a App) Run(args []string) error {
 		help.Show(version, a.out)
 		return nil
 	}
+	if len(args) > 0 && !sessionCommand(args[0]) {
+		return fmt.Errorf("unknown session command %q; use roami session help", args[0])
+	}
 	a.migrateSessionsToID()
 	if len(args) == 0 {
 		return interactive.Run(a.rt, version, a.Run)
@@ -74,7 +77,7 @@ func (a App) Run(args []string) error {
 		return completion.Install(out)
 
 	case "-v", "--version":
-		fmt.Fprintf(out, "ttmux v%s\n", version)
+		fmt.Fprintf(out, "roami session v%s\n", version)
 		return nil
 
 	// ── session management (native) ──
@@ -110,8 +113,6 @@ func (a App) Run(args []string) error {
 		return session.Detach(a.rt, rest, out)
 	case "kill":
 		return session.KillTree(a.rt, a.meta(), a.swarmSessions(), rest, out)
-	case "killall":
-		return session.KillAll(a.rt, a.swarmSessions(), out)
 	case "rename":
 		// 改名 = 改展示名，tmux 会话名(id)不动 → meta 外键/路径全都不用跟着搬。
 		// 但名字本身要**同时**写 tmux 的 @roam_name 和台账的 label：
@@ -122,8 +123,8 @@ func (a App) Run(args []string) error {
 		return session.Resolve(a.rt, rest, out)
 	case "send":
 		return session.Send(a.rt, a.swarmSessions(), rest, out)
-	case "source":
-		return session.Source(a.rt, out)
+	case "keys":
+		return session.Keys(a.rt, rest, out)
 
 	// ── windows / panes (native) ──
 	case "nw":
@@ -156,14 +157,14 @@ func (a App) Run(args []string) error {
 	case "swarm":
 		return swarmcommand.Run(a.rt, rest, out)
 
-	// ── plugins(default 分支透传 tmux,必须显式注册)──
+	// ── plugins ──
 	case "db":
 		return dbcmd.Run(a.rt, rest, out)
 	case "plugin":
 		return plugincmd.Run(a.rt, rest, out)
 
 	default:
-		return a.rt.Tmux(append([]string{cmd}, rest...)...)
+		return fmt.Errorf("unknown session command %q; use roami session help", cmd)
 	}
 }
 
@@ -256,3 +257,13 @@ func has(args []string, want string) bool {
 }
 
 func (a App) WithContext(ctx context.Context) App { a.rt.Context = ctx; return a }
+
+func sessionCommand(command string) bool {
+	switch command {
+	case "__autoconfirm", "_plugin-host", "help", "-h", "--help", "-i", "--interactive", "completion", "-v", "--version",
+		"ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "resolve", "send", "keys",
+		"nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm", "db", "plugin":
+		return true
+	}
+	return false
+}

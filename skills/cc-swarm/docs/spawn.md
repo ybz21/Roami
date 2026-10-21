@@ -21,10 +21,10 @@
 子任务的 prompt 通常较长、含特殊字符，直接拼到命令行会被引号坑。先落盘：
 
 ```bash
-mkdir -p ~/.local/share/ttmux/cc-swarm/tasks
+mkdir -p ~/.roami/cc-swarm/tasks
 ```
 
-用 Write 把每个子任务的完整指令写到 `~/.local/share/ttmux/cc-swarm/tasks/<name>.md`。
+用 Write 把每个子任务的完整指令写到 `~/.roami/cc-swarm/tasks/<name>.md`。
 内容应包含（**给子会话的，不是给 cc-swarm 的**）：
 
 ```markdown
@@ -55,7 +55,7 @@ mkdir -p ~/.local/share/ttmux/cc-swarm/tasks
 ```bash
 roami session new cc-auth
 # 注入环境后启动交互式 claude，并把任务文件作为初始 prompt 带入
-roami session send cc-auth "claude \"\$(cat ~/.local/share/ttmux/cc-swarm/tasks/auth.md)\""
+roami session send cc-auth "claude \"\$(cat ~/.roami/cc-swarm/tasks/auth.md)\""
 ```
 
 `claude "<prompt>"` 会启动交互式会话并把 `<prompt>` 作为第一条消息。

@@ -303,16 +303,14 @@ func KillTree(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool,
 			pos = append(pos, a)
 		}
 	}
-	var target string
-	if len(pos) >= 1 {
-		target = rt.Resolve(pos[0])
-	} else {
-		t, err := PickSession(rt, exclude, "关闭会话", w)
-		if err != nil {
-			return err
-		}
-		target = t
+	if len(pos) != 1 {
+		return fmt.Errorf("usage: roami session kill <session> [--cascade] [--yes]")
 	}
+	row, err := rt.ResolveStrict(pos[0])
+	if err != nil {
+		return err
+	}
+	target := row.Name
 	if !rt.HasSession(target) {
 		ui.Err(w, "会话 %s 不存在", ui.Bold(target))
 		return fmt.Errorf("session not found: %s", target)

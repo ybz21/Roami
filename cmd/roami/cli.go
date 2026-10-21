@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ybz21/Roami/backend/browser/automation"
 	"github.com/ybz21/Roami/internal/cli"
+	"github.com/ybz21/Roami/internal/cli/completion"
 	"github.com/ybz21/Roami/internal/plugin"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 	"os"
@@ -116,8 +117,9 @@ func runSessionEngine(args []string) int {
 // runCLI 处理子命令。返回 false 表示「这不是子命令」，main 照旧启动服务。
 func runCLI(args []string, _ string) (handled bool, code int) {
 	base := filepath.Base(os.Args[0])
-	if base == "ttmux" || (strings.HasPrefix(base, "ttmux-") && base != "ttmux-web") {
-		return true, runSession(args)
+	if retiredSessionEntry(base) {
+		fmt.Fprintln(os.Stderr, "ttmux entry retired; use roami session <command>")
+		return true, 2
 	}
 	if base == "chrome" {
 		return true, runChrome(args)
@@ -130,7 +132,7 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 	case "help", "commands", "-h", "--help":
 		if len(rest) > 0 {
 			switch rest[0] {
-			case "session", "ttmux":
+			case "session":
 				return true, runSession([]string{"help"})
 			case "chrome":
 				return true, runChrome([]string{"help"})
@@ -150,8 +152,11 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 	case "version", "--version", "-v":
 		fmt.Println("roami " + displayVersion())
 		return true, 0
-	case "session", "ttmux":
+	case "session":
 		return true, runSession(rest)
+	case "ttmux":
+		fmt.Fprintln(os.Stderr, "ttmux entry retired; use roami session <command>")
+		return true, 2
 	case "agent":
 		return true, runAgent(rest)
 	case "db":
@@ -199,7 +204,7 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 
 func legacySessionCommand(word string) bool {
 	switch word {
-	case "ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "killall", "rename", "resolve", "send", "source", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm":
+	case "ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "resolve", "send", "keys", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm":
 		return true
 	}
 	return false
@@ -216,21 +221,7 @@ func runChrome(args []string) int {
 	return 0
 }
 
-const completionScript = `_roami_complete() {
- local cur="${COMP_WORDS[COMP_CWORD]}"
- local words="session chrome project agent db server auth plugin help version completion"
- case "${COMP_WORDS[1]}" in
- session) words="ls new attach detach kill rename send capture fork children parent swarm env info" ;;
- chrome) words="tabs goto click fill text eval screenshot record setup help" ;;
- agent) words="setup init serve status conversations new send history report notify execution" ;;
- project) words="ls show sessions create prefs activity remove" ;;
- db) words="status migrate backup" ;;
- auth) words="login logout status" ;;
- esac
- COMPREPLY=($(compgen -W "$words" -- "$cur"))
-}
-complete -F _roami_complete roami
-`
+const completionScript = completion.Script
 
 func forward(bin string, args []string) int {
 	cmd := exec.Command(bin, args...)
@@ -280,4 +271,8 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+func retiredSessionEntry(base string) bool {
+	return base == "ttmux" || strings.HasPrefix(base, "ttmux-") && base != "ttmux-web"
 }

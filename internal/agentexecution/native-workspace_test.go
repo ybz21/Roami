@@ -110,7 +110,7 @@ func TestNativeProjectThroughRealPythonAndGoCLI(t *testing.T) {
 				currentDirectory = filepath.Join(t.TempDir(), "New native project")
 			}
 			command := exec.Command("uv", "run", "--frozen", "--directory", filepath.Join(repository, "agent-runtime"), "python", "tests/native_workspace_scenario.py", binary, s.Runtime.HomeDir, projectID, currentDirectory)
-			command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "GIT_DIR=/foreign/repository", "GIT_INDEX_FILE=/foreign/index", "ROAMI_SERVER="+server.URL, "ROAMI_FIXTURE_PROJECT_MODE="+mode)
+			command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "ROAMI_DATABASE_DIR="+filepath.Join(s.Runtime.DataDir, "database"), "ROAMI_BACKUP_DIR="+filepath.Join(s.Runtime.DataDir, "backups"), "ROAMI_CONFIG="+filepath.Join(s.Runtime.HomeDir, "config.yaml"), "GIT_DIR=/foreign/repository", "GIT_INDEX_FILE=/foreign/index", "ROAMI_SERVER="+server.URL, "ROAMI_FIXTURE_PROJECT_MODE="+mode)
 			output, err := command.CombinedOutput()
 			if err != nil {
 				t.Fatalf("native project integration: %v\n%s", err, output)

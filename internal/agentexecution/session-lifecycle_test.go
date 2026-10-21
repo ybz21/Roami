@@ -269,7 +269,7 @@ func TestSessionContinuationThroughRealPythonAndGoCLI(t *testing.T) {
 				seedClaudeSession(t, s, binding)
 			}
 			command := exec.Command("uv", "run", "--frozen", "--directory", filepath.Join(repository, "agent-runtime"), "python", "tests/session_continuation_scenario.py", binary, s.Runtime.DataDir, binding.ID, provider)
-			command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "TMUX_BIN="+s.Runtime.TmuxBin)
+			command.Env = append(os.Environ(), "ROAMI_HOME="+s.Runtime.HomeDir, "ROAMI_DATA="+s.Runtime.DataDir, "ROAMI_DATABASE_DIR="+filepath.Join(s.Runtime.DataDir, "database"), "ROAMI_BACKUP_DIR="+filepath.Join(s.Runtime.DataDir, "backups"), "ROAMI_CONFIG="+filepath.Join(s.Runtime.HomeDir, "config.yaml"), "TMUX_BIN="+s.Runtime.TmuxBin)
 			output, err := command.CombinedOutput()
 			if err != nil || !strings.Contains(string(output), "session continuation scenario passed") {
 				t.Fatalf("continuation integration: %v\n%s", err, output)

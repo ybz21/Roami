@@ -120,9 +120,9 @@ if [ "$DEV" = 1 ] && [ -d scripts/install ]; then
   source scripts/install/lib/common.sh
   source scripts/install/lib/platform.sh
   source scripts/install/lib/github.sh
-  source scripts/install/install-ttmux.sh
+  source scripts/install/install-roami.sh
   source scripts/install/install-chrome.sh
-  module_ttmux
+  module_roami
   module_chrome
 fi
 
