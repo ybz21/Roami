@@ -109,3 +109,25 @@ test('closing during selected-target initialization does not deliver messages af
   await readiness
   assert.deepEqual(f.delivered, [])
 })
+
+test('switching targets retains and reuses page connections until the browser changes', async () => {
+  let current = 'first-browser', closed = 0
+  const opened = []
+  const session = new Session({
+    discover: async () => ({ id: current, websocketUrl: 'ws://fixture/' + current }),
+    connect: async (_url, targetId) => {
+      opened.push(targetId)
+      return { isConnected: () => true, close: async () => { closed++ } }
+    },
+  })
+  try {
+    const first = await session.browserFor('http://fixture', 'first-page')
+    await session.browserFor('http://fixture', 'second-page')
+    assert.equal(closed, 0)
+    assert.equal(await session.browserFor('http://fixture', 'first-page'), first)
+    assert.deepEqual(opened, ['first-page', 'second-page'])
+    current = 'replacement-browser'
+    assert.notEqual(await session.browserFor('http://fixture', 'first-page'), first)
+    assert.equal(closed, 2)
+  } finally { await session.close() }
+})

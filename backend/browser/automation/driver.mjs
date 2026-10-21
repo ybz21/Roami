@@ -22,7 +22,7 @@ import { discoverBrowser, observePage } from './browser-observation.mjs'
 import { ScopedCDP, connectTarget, selectTarget } from './scoped-cdp.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
-const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v1'
+const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v2'
 const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli.log'
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
@@ -531,25 +531,32 @@ class Session {
     this.controlUrl = ''
     this.targetId = ''
     this.recordingBrowser = null
+    this.connections = new Map()
   }
   async browserFor(cdp, targetId = '') {
     const discovered = await this.discover(cdp)
-    // 换了地址就得重连：daemon 常驻、缓存的是「上一条命令那台」的连接，而目标端口是会变的
-    // （后端 9222 被占时会换端口）。不比对就会把命令继续发给旧的那台。
-    if (this.browser && (!this.browser.isConnected() || this.cdp !== cdp || this.browserId !== discovered.id || this.targetId !== targetId)) {
-      if (this.browser !== this.recordingBrowser) { try { await this.browser.close() } catch {} }
-      this.browser = null
+    for (const [key, cached] of this.connections) {
+      if (!cached.browser.isConnected() || cached.cdp !== cdp || cached.browserId !== discovered.id) {
+        if (cached.browser === this.recordingBrowser && cached.browser.isConnected()) continue
+        this.connections.delete(key)
+        try { await cached.browser.close() } catch {}
+      }
     }
-    if (!this.browser) {
+    const key = JSON.stringify([cdp, discovered.id, targetId])
+    let cached = this.connections.get(key)
+    if (!cached) {
       try {
-        this.browser = await this.connect(discovered.websocketUrl, targetId)
-        this.cdp = cdp
-        this.browserId = discovered.id
-        this.targetId = targetId
+        const browser = await this.connect(discovered.websocketUrl, targetId)
+        cached = { browser, cdp, browserId: discovered.id, targetId }
+        this.connections.set(key, cached)
       } catch (e) {
         throw new ChromeError('连不上 Chrome (' + cdp + '): ' + e.message)
       }
     }
+    this.browser = cached.browser
+    this.cdp = cdp
+    this.browserId = discovered.id
+    this.targetId = targetId
     return this.browser
   }
   async run(verb, flags, pos, timeoutMs, io) {
@@ -557,7 +564,6 @@ class Session {
     const fail = message => { throw new ChromeError(message) }
     if (verb === 'record' && pos[0] !== 'start') {
       await this.recorder.handle(this.recordingBrowser, flags, pos, fail, io)
-      if (!this.recorder.isActive() && this.recordingBrowser !== this.browser) await this.recordingBrowser?.close().catch(() => {})
       if (!this.recorder.isActive()) this.recordingBrowser = null
       return
     }
@@ -579,6 +585,13 @@ class Session {
     const listTargets = async () => (await control.request('Target.getTargets')).targetInfos
       .filter(t => t.type === 'page' && userPages([{ url: () => t.url }]).length)
     const targets = await listTargets()
+    const liveTargets = new Set(targets.map(t => t.targetId))
+    for (const [key, cached] of this.connections) {
+      if (cached.cdp === cdp && cached.browserId === discovered.id && !liveTargets.has(cached.targetId) && cached.browser !== this.recordingBrowser) {
+        this.connections.delete(key)
+        try { await cached.browser.close() } catch {}
+      }
+    }
     if (verb === 'tabs') { io.log(targets.map((t, i) => ({ i, targetId: t.targetId, title: t.title, url: t.url }))); return }
     let created
     if (verb === 'new') {
@@ -620,9 +633,11 @@ class Session {
     if (this.recorder.isActive()) {
       await this.recorder._stop(() => { throw new ChromeError('') }).catch(() => {})
     }
-    try { await this.recordingBrowser?.close() } catch {}
+    const browsers = new Set([...this.connections.values()].map(entry => entry.browser))
+    if (this.recordingBrowser) browsers.add(this.recordingBrowser)
+    await Promise.allSettled([...browsers].map(browser => browser.close()))
+    this.connections.clear()
     this.recordingBrowser = null
-    try { await this.browser?.close() } catch {} // 仅断连接，不杀共享 Chrome
     this.browser = null
     this.controlSocket?.close()
     this.controlSocket = null
