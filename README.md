@@ -315,6 +315,7 @@ roami im send --text "done"       # message yourself through the IM bridge
 roami host stats                  # host resource snapshot
 roami session ls                  # sessions — integrated core
 roami session swarm ls              # session and swarm operations
+roami adb devices -l              # connected Android devices
 roami -addr 0.0.0.0:13579         # no subcommand: start the web console (unchanged)
 ```
 
@@ -324,6 +325,8 @@ Underneath:
   and machine-readable state.
 - `roami chrome`: drives Chrome on the development machine for UI debugging,
   screenshots, form flows, and automated validation.
+- `roami adb`: forwards native ADB commands for Android screenshots, touch input,
+  app operations, file transfer, and device debugging; requires system ADB.
 
 Plugins extend the console itself — `roam.host-monitor` contributes the resource
 monitor, `roam.cron` adds scheduled prompts with its own configuration panel.
@@ -332,7 +335,7 @@ group with no extra wiring.
 
 Command details are intentionally not expanded on the home page, so the README
 does not become a tool manual. When needed, see
-**[docs/install/](docs/install/)**, `roami help`, `roami session help`, and `roami chrome help`.
+**[docs/install/](docs/install/)**, `roami help`, `roami session help`, `roami chrome help`, and `roami adb help`.
 
 ## Development And Contribution
 

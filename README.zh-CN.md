@@ -243,14 +243,15 @@ cluster:
 Roami 也提供命令行入口，方便脚本、自动化流程和 AI Agent 调用。这里不是普通用户的
 主入口；大多数时候你可以先从 Web 控制台开始。
 
-- `ttmux`：管理持久会话、后台任务、Agent worker、swarm 和机器可读状态。
-- `chrome`：驱动开发机上的 Chrome，用于 UI 调试、截图、表单操作和自动化验收。
+- `roami session`：管理持久会话、后台任务、Agent worker、swarm 和机器可读状态。
+- `roami chrome`：驱动开发机上的 Chrome，用于 UI 调试、截图、表单操作和自动化验收。
+- `roami adb`：转发系统 ADB，用于 Android 截图、触控、App 操作、文件传输和设备调试；需已安装 ADB。
 
 插件则扩展控制台本身——`roam.host-monitor` 提供资源监控面板，`roam.cron` 提供定时
 prompt 并自带配置面板。
 
 命令细节不放在首页展开，避免 README 变成工具手册。需要时请看
-**[docs/install/](docs/install/)**、`roami session help` 和 `roami chrome help`。
+**[docs/install/](docs/install/)**、`roami session help`、`roami chrome help` 和 `roami adb help`。
 
 ## 开发与贡献
 

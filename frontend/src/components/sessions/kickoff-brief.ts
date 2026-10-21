@@ -1,8 +1,6 @@
 // 开工简报：新会话里 agent 收到的第一条消息 =「开工前先做几件事」+ 任务本体。
 //
-// 从前 NewSessionModal 和 TaskComposer 各拼一份，逐字重复，于是一起漏了同一样东西：
-// 简报说「做完再开始下面的任务」，可下面紧跟的就是用户原话，**没有「任务：」标题**。
-// 前面几步一长，agent 很容易把需求读成最后一步的续文。现在两边都走这里。
+// 用一级任务标题分开能力说明和用户任务，避免被读成前面步骤的续文。
 
 import { api } from '../../api'
 import { nodeApi } from '../cluster/node-url'
@@ -26,16 +24,18 @@ export function briefPreamble(where: BriefWhere, sess: string, autoReview: boole
 }
 
 export async function loadAgentCapabilities(): Promise<string> {
+  const fileBase = nodeApi('/file')
   const fileRawBase = nodeApi('/file/raw')
   const fileServeBase = nodeApi('/file/serve')
   const response = await api('GET', '/agent/capabilities')
-  return String(response.data?.content || '').split('{{FILE_RAW_BASE}}').join(fileRawBase)
+  return String(response.data?.content || '').split('{{FILE_BASE}}').join(fileBase)
+    .split('{{FILE_RAW_BASE}}').join(fileRawBase)
     .split('{{FILE_SERVE_BASE}}').join(fileServeBase).trim()
 }
 
 export function taskWithCapabilities(task: string, t: T, capabilities: string): string {
   const guide = capabilities.trim()
-  return `${guide ? `${guide}\n\n` : ''}${t('session.wt.briefTask')}\n${task.trim()}`
+  return `${guide ? `${guide}\n\n` : ''}${t('session.wt.briefTask')}\n\n${task.trim()}`
 }
 
 /** 完整简报：前言、能力说明、任务原文。任务为空返回空串。 */

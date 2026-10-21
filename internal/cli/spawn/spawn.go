@@ -52,7 +52,7 @@ func spawnOne(rt runtime.Runtime, group, name, taskType, payload string, ac Agen
 		}
 	}()
 	rt.InjectEnv(sess)
-	_ = rt.Tmux("pipe-pane", "-t", "="+sess, "-o", "cat >> '"+rt.LogFile(sess)+"'")
+	_ = rt.Tmux("pipe-pane", "-t", "="+sess+":", "-o", "cat >> '"+rt.LogFile(sess)+"'")
 	_ = os.WriteFile(rt.LogFile(sess), nil, 0o644)
 	RecordAgentSession(rt, sess, ac)
 	if err := rt.WriteTaskMeta(sess, taskType, payload, ac.Workdir, label); err != nil {
@@ -70,7 +70,7 @@ func spawnOne(rt runtime.Runtime, group, name, taskType, payload string, ac Agen
 			runCmd = ac.InteractiveFromPromptFile(promptFile)
 		}
 	}
-	if err := rt.SendShellCommand("="+sess, runCmd); err != nil {
+	if err := rt.SendShellCommand("="+sess+":", runCmd); err != nil {
 		return false, sess, err
 	}
 	if taskType == "agent" && ac.Interactive && ac.Kind == "claude" {
