@@ -11,7 +11,7 @@ vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => '/n/' + node 
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('./AgentChat', () => ({ default: () => null }))
 vi.mock('./AgentHomePage', () => ({ default: () => null }))
-afterEach(() => { cleanup(); clearAgentDataCache(); vi.restoreAllMocks(); vi.resetAllMocks(); node = 'one' })
+afterEach(() => { vi.useRealTimers(); cleanup(); clearAgentDataCache(); vi.restoreAllMocks(); vi.resetAllMocks(); node = 'one' })
 const deferred = () => { let resolve!: (value: any) => void; const promise = new Promise(resolveValue => { resolve = resolveValue }); return { promise, resolve } }
 
 it('shares an in-flight prefetch with mounted readers and reuses a fresh response', async () => {
@@ -128,4 +128,26 @@ it('publishes the main conversation and preloads messages/tasks before slow noti
   act(() => hook.result.current.refresh())
   await waitFor(() => expect(vi.mocked(api).mock.calls.filter(call => call[1].includes('/notifications'))).toHaveLength(2))
   expect(vi.mocked(api).mock.calls.filter(call => call[1] === '/agent/main-conversation')).toHaveLength(1)
+})
+
+
+it('backs off failed visible record reads and retries immediately on an explicit recovery', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  vi.mocked(api).mockRejectedValue(new Error('offline'))
+  const hook = renderHook(() => useAgentData<string[]>('/task/records', 0, 1000))
+  await act(async () => {})
+  expect(hook.result.current.failed).toBe(true)
+  expect(api).toHaveBeenCalledTimes(1)
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+  expect(api).toHaveBeenCalledTimes(1)
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+  expect(api).toHaveBeenCalledTimes(2)
+  await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+  expect(api).toHaveBeenCalledTimes(2)
+  vi.mocked(api).mockResolvedValue({ data: ['recovered'] })
+  await act(async () => hook.result.current.refresh())
+  expect(hook.result.current.value).toEqual(['recovered'])
+  expect(hook.result.current.failed).toBe(false)
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+  expect(api).toHaveBeenCalledTimes(4)
 })
