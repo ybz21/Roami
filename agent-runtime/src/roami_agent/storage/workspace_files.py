@@ -212,11 +212,13 @@ class WorkspaceFiles:
             raise DomainError("FILE_ACCESS_FAILED") from None
 
     async def write(self, args, binding):
+        # Some providers quote JSON null; this alias keeps the same exclusive-create fence.
+        expected = None if args["expectedSha256"] == "null" else args["expectedSha256"]
         try:
             return await self._io(
                 self._modify,
                 self.location(args["path"], binding),
-                args["expectedSha256"],
+                expected,
                 args["content"],
                 None,
             )

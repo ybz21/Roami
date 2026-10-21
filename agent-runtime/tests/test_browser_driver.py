@@ -607,3 +607,101 @@ def test_malformed_driver_acknowledgements_cannot_prove_inputs_stopped(state, st
 def test_browser_configuration_rejects_implicit_or_unbounded_access(config):
     with pytest.raises(DomainError, match="INVALID_BROWSER_CONFIG"):
         browser_config(config)
+
+
+@pytest.mark.parametrize("resource_only,stopped", [(True, True), (True, False), (False, True)])
+async def test_only_stopped_research_navigation_returns_fresh_scene_without_replaying_input(
+    store, resource_only, stopped
+):
+    from test_runtime import ConversationModel, until
+
+    class ResearchModel:
+        model = "stopped-navigation-research"
+
+        def __init__(self):
+            self.steps = 0
+
+        async def stream(self, messages, tools):
+            self.steps += 1
+            if self.steps == 1:
+                name, args = "browser_open", {}
+            else:
+                value = json.loads(messages[-1]["content"])
+                if self.steps == 3:
+                    assert value["navigationRecoveryAvailable"] is True
+                    assert value["action"]["state"] == "unknown"
+                    assert value["action"]["outcomeKnown"] is False
+                    assert value["action"]["inputStopped"] is True
+                if self.steps == 4:
+                    assert value["observation"]["url"] == "https://fixture.example/alternate"
+                    yield ModelEvent("text", "Retrieved https://fixture.example/alternate")
+                    return
+                name, args = (
+                    "browser_act",
+                    {
+                        "observationId": value["observation"]["id"],
+                        "kind": "goto",
+                        "url": "https://fixture.example/pricing"
+                        if self.steps == 2
+                        else "https://fixture.example/alternate",
+                    },
+                )
+            yield ModelEvent(
+                "tool",
+                {"id": str(self.steps), "function": {"name": name, "arguments": encoded(args)}},
+            )
+
+    fixture, model = BrowserFixture(), ResearchModel()
+    fixture.stop_known = False
+    navigation_count = 0
+
+    async def runner(argv, **options):
+        nonlocal navigation_count
+        result = await fixture(argv, **options)
+        verb, flags, _ = fixture.arguments(argv)
+        if verb == "goto":
+            assert flags["--timeout"] == ("15000" if resource_only else "0")
+            navigation_count += 1
+            if navigation_count == 1:
+                receipt = fixture.receipts[flags["--operation-id"]]
+                receipt.update(state="unknown", inputStopped=stopped, outcomeKnown=False)
+                result["stdout"] = encoded(receipt)
+        return result
+
+    runtime = Runtime(
+        store, ConversationModel(), worker_model=model, settings=Settings(browser={"enabled": True})
+    )
+    runtime.browser.runner = runner
+    await runtime.start()
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            c["id"],
+            "Check source",
+            key="lookup",
+            target={"kind": "new_session", **({"resourceOnly": True} if resource_only else {})},
+            record_intent=True,
+        )
+        runtime.wakeup.set()
+        state = "succeeded" if resource_only and stopped else "interrupted"
+        await until(
+            store,
+            lambda db: row(db, "SELECT id FROM tasks WHERE id=? AND state=?", (task["id"], state)),
+        )
+        assert fixture.writes == (
+            ["new", "goto", "goto"] if state == "succeeded" else ["new", "goto"]
+        )
+        assert await store.call(
+            lambda db: row(
+                db,
+                "SELECT id FROM resource_actions WHERE task_id=? AND state='unknown'",
+                (task["id"],),
+            )
+        )
+        if state == "succeeded":
+            assert not await store.call(
+                lambda db: row(db, "SELECT id FROM resources WHERE owner_task_id=?", (task["id"],))
+            )
+    finally:
+        await runtime.close()

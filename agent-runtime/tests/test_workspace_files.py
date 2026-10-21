@@ -27,10 +27,11 @@ def bound(tmp_path):
     return {"taskId": "task", "workspace": {"directory": str(tmp_path)}}
 
 
-async def test_write_patch_read_and_conflicts_preserve_actual_file(files, tmp_path):
+@pytest.mark.parametrize("create_hash", [None, "null"])
+async def test_write_patch_read_and_conflicts_preserve_actual_file(files, tmp_path, create_hash):
     binding = bound(tmp_path)
     created = await files.write(
-        {"path": "answer.txt", "expectedSha256": None, "content": "First answer\n"}, binding
+        {"path": "answer.txt", "expectedSha256": create_hash, "content": "First answer\n"}, binding
     )
     path = tmp_path / "answer.txt"
     path.chmod(0o750)
@@ -54,7 +55,7 @@ async def test_write_patch_read_and_conflicts_preserve_actual_file(files, tmp_pa
         )
     with pytest.raises(DomainError, match="FILE_CHANGED"):
         await files.write(
-            {"path": "answer.txt", "expectedSha256": None, "content": "Lost update"}, binding
+            {"path": "answer.txt", "expectedSha256": create_hash, "content": "Lost update"}, binding
         )
     assert path.read_text() == "Final answer\n"
     assert not list(tmp_path.glob(".roami-write-*"))
@@ -112,6 +113,28 @@ async def test_changed_source_during_temp_file_publication_is_rechecked(
             {"path": "answer.txt", "expectedSha256": digest, "content": "Agent edit"}, binding
         )
     assert path.read_text() == "Human edit"
+    assert not list(tmp_path.glob(".roami-write-*"))
+
+
+@pytest.mark.parametrize("create_hash", [None, "null"])
+async def test_exclusive_creation_never_overwrites_a_file_created_during_publish(
+    files, tmp_path, monkeypatch, create_hash
+):
+    path = tmp_path / "answer.txt"
+    fsync = os.fsync
+
+    def create_before_commit(descriptor):
+        if not path.exists():
+            path.write_text("Human created this file")
+        fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", create_before_commit)
+    with pytest.raises(DomainError, match="FILE_CHANGED"):
+        await files.write(
+            {"path": "answer.txt", "expectedSha256": create_hash, "content": "Overwrite"},
+            bound(tmp_path),
+        )
+    assert path.read_text() == "Human created this file"
     assert not list(tmp_path.glob(".roami-write-*"))
 
 

@@ -127,7 +127,7 @@ class BrowserDriver:
                 raise DomainError("BROWSER_PRIVATE_DIRECTORY_INVALID", 503)
 
     async def _cli(
-        self, verb, *args, operation_id=None, browser_id=None, signature=None, capture_wait_ms=0
+        self, verb, *args, operation_id=None, browser_id=None, signature=None, readiness_wait_ms=0
     ):
         await asyncio.to_thread(self._directories)
         argv = [
@@ -138,7 +138,7 @@ class BrowserDriver:
             "--no-retry",
             "--no-focus",
             "--timeout",
-            str(capture_wait_ms),
+            str(readiness_wait_ms),
         ]
         if self.config.get("endpoint"):
             argv += ["--cdp", self.config["endpoint"]]
@@ -374,6 +374,16 @@ class BrowserDriver:
         await self.resources.finish(scope["owner"], action["id"], state, result)
         return state, result
 
+    @staticmethod
+    def _stopped_research_navigation(binding, verb, receipt):
+        return (
+            binding.get("role") == "research"
+            and verb == "goto"
+            and receipt is not None
+            and receipt["state"] == "unknown"
+            and receipt["inputStopped"] is True
+        )
+
     async def _perform(
         self,
         scope,
@@ -412,6 +422,9 @@ class BrowserDriver:
                     operation_id=action["id"],
                     browser_id=browser_id,
                     signature=signature,
+                    readiness_wait_ms=15_000
+                    if binding.get("role") == "research" and verb == "goto"
+                    else 0,
                 ),
                 action["id"],
             )
@@ -440,10 +453,14 @@ class BrowserDriver:
                 raise ToolCancellation(
                     input_stopped=bool(receipt and receipt["inputStopped"])
                 ) from None
-            if not receipt or receipt["state"] not in {"succeeded", "failed", "cancelled"}:
+            if (
+                not receipt or receipt["state"] not in {"succeeded", "failed", "cancelled"}
+            ) and not self._stopped_research_navigation(binding, verb, receipt):
                 raise DomainError("TOOL_OUTCOME_UNKNOWN") from None
         state, result = await self._complete(scope, action, receipt)
         if state == "unknown":
+            if self._stopped_research_navigation(binding, verb, receipt):
+                return result
             raise DomainError("TOOL_OUTCOME_UNKNOWN")
         if state != "succeeded":
             raise DomainError(receipt.get("errorCode") or "BROWSER_ACTION_FAILED", 409)
@@ -562,7 +579,7 @@ class BrowserDriver:
                     str(path),
                     browser_id=browser_id,
                     # Optional frames must release the observer queue so DOM evidence can continue.
-                    capture_wait_ms=5000,
+                    readiness_wait_ms=5000,
                 )
             except DomainError as exc:
                 if exc.code not in {"CHROME_OBSERVATION_TIMEOUT", "CHROME_SCENE_CHANGED"}:
@@ -658,17 +675,29 @@ class BrowserDriver:
             else body["signature"],
             phase=phase,
         )
+        action = {"operationId": result["operationId"], "state": "succeeded"}
+        recovery = {}
+        if result["driverState"] == "unknown":
+            action.update(state="unknown", inputStopped=True, outcomeKnown=False)
+            recovery = {
+                "navigationRecoveryAvailable": True,
+                "recovery": "Navigation input has stopped, but its original outcome remains unknown. "
+                "Read the current observation before choosing an accessible source in the same tab. "
+                "Do not replay form submissions or assert facts without fresh retrieval evidence.",
+            }
         try:
             after = await self.observe({"resourceId": resource["id"]}, binding)
             return {
                 **after,
-                "action": {"operationId": result["operationId"], "state": "succeeded"},
+                **recovery,
+                "action": action,
                 "needsVerification": True,
             }
         except (DomainError, OSError, KeyError):
             return {
                 "resourceId": resource["id"],
-                "action": {"operationId": result["operationId"], "state": "succeeded"},
+                **recovery,
+                "action": action,
                 "needsVerification": True,
                 "error": "BROWSER_OBSERVATION_UNAVAILABLE",
             }

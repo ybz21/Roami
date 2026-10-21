@@ -6,6 +6,7 @@ from pathlib import Path
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.conversation.activity_payloads import activity_payload
+from roami_agent.dispatch.navigation_recovery import stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_revisions import TaskRevisions
 from roami_agent.protocol.errors import DomainError
@@ -430,6 +431,22 @@ class Tasks:
                 and result.get("outcomeKnown") is not False
                 and result.get("inputStopped") is not False
             )
+            if task["latestAttempt"]["state"] == "unknown":
+                run = row(
+                    db,
+                    "SELECT * FROM task_attempts WHERE id=?",
+                    (task["latestAttempt"]["runId"],),
+                )
+                task["latestAttempt"]["navigationRecoveryAvailable"] = bool(
+                    stopped_navigation(db, task, run)
+                )
+                if task["latestAttempt"]["navigationRecoveryAvailable"]:
+                    task["latestAttempt"]["recovery"] = (
+                        "This outcome is unknown; previous assistant success claims are not verification. "
+                        "For a new user lookup request, continue this original task with task_steer "
+                        "at its current revision and retrieve sources again. Status, old reports and "
+                        "remembered quotas are not fresh lookup evidence."
+                    )
             preparation = row(
                 db,
                 "SELECT payload_json FROM events WHERE event_key=?",

@@ -354,7 +354,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "write",
-            "Atomically write a workspace file after checking expectedSha256; null creates a new file. Never overwrite unrelated changes.",
+            "Atomically write a workspace file. New file: prefer expectedSha256 as JSON null (unquoted). Existing file: use the exact sha256 returned by read. Never overwrite unrelated changes.",
             registry.registry["file_write"].schema,
             resolved_only,
             main=True,
