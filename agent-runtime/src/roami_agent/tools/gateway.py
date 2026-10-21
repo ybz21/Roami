@@ -8,7 +8,12 @@ import httpx
 from jsonschema import ValidationError
 
 from roami_agent.conversation.activity_events import activity_event as event
-from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
+from roami_agent.protocol.errors import (
+    DomainError,
+    ToolCancellation,
+    ToolFinalizationRequired,
+    ToolPreflightError,
+)
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
@@ -71,6 +76,8 @@ class ToolGateway:
         await self.db.call(plan, write=True)
         preflight_error = None
         try:
+            if binding.get("finalizing"):
+                raise DomainError("TOOL_FINALIZING_READ_ONLY", 409)
             if role == "main" and tool and tool.effect == "write":
                 callback = await self.db.call(
                     lambda db: row(
@@ -84,9 +91,9 @@ class ToolGateway:
                     import json
 
                     completion = json.loads(callback["payload_json"]).get("completion", {})
-                    if (
-                        completion.get("state") == "cancelled"
-                        or (completion.get("result") or {}).get("retryable") is False
+                    if completion.get("state") == "cancelled" or (
+                        completion.get("state") in {"failed", "interrupted"}
+                        and (completion.get("result") or {}).get("retryable") is False
                     ):
                         raise DomainError("TASK_COMPLETION_RESTART_FORBIDDEN", 409)
 
@@ -187,6 +194,12 @@ class ToolGateway:
                     recovery="This tool call failed readiness before its browser action. Earlier calls in this attempt may have executed; preserve their results and sources. End this attempt and "
                     "report the dependency failure to Main; do not retry different URLs or probe shell commands.",
                 )
+                if isinstance(exc, ToolFinalizationRequired):
+                    preflight_error = None
+                    value.update(
+                        finalizeFromEvidence=True,
+                        recovery="No further tools are permitted in this attempt. Finish now using only sources already read in this attempt: give verified partial findings and explicitly name unconfirmed items. Do not fabricate missing facts or retry/delegate. If nothing was verified, say so plainly.",
+                    )
             if (
                 role == "research"
                 and not isinstance(exc, ToolPreflightError)
@@ -455,7 +468,9 @@ class ToolGateway:
                 if operation_name == "task_reply":
                     committed_value = {
                         "reply": task_progress(
-                            committed_value, args["language"], single=bool(args.get("taskId"))
+                            committed_value,
+                            args.get("language", "zh"),
+                            single=bool(args.get("taskId")),
                         ),
                         "tasks": committed_value,
                     }

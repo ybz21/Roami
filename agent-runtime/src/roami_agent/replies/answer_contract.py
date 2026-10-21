@@ -7,13 +7,13 @@ from roami_agent.replies.task_progress import request_language
 
 
 def validate_answer(args, source):
-    mode, text = args["mode"], args["text"]
+    mode, text = args.get("mode", "brief"), args["text"]
     quote = args.get("scopeQuote")
     if mode != "brief":
         if not quote or quote not in source:
             raise DomainError("REPLY_SCOPE_QUOTE_REQUIRED", 409)
         return text
-    language = request_language(source, args["language"], args.get("languageQuote"))
+    language = request_language(source, args.get("language", "zh"), args.get("languageQuote"))
     has_han = any("\u3400" <= char <= "\u9fff" for char in text)
     prose = re.sub(r"\[[^\]]*\]\([^)]*\)|(?:https?://|/api/)\S+|`[^`]*`", "", text)
     first_letter = next((char for char in prose if char.isalpha()), "")

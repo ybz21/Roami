@@ -19,7 +19,12 @@ from roami_agent.executors.input_cancellation import (
     passive_cancel_boundary,
 )
 from roami_agent.protocol.browser import browser_config
-from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
+from roami_agent.protocol.errors import (
+    DomainError,
+    ToolCancellation,
+    ToolFinalizationRequired,
+    ToolPreflightError,
+)
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row, rows
@@ -515,7 +520,7 @@ class BrowserDriver:
         if await self.db.call(
             lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (key,))
         ):
-            raise ToolPreflightError("BROWSER_SOURCE_UNAVAILABLE", 409)
+            raise ToolFinalizationRequired("BROWSER_SOURCE_UNAVAILABLE", 409)
         await self.db.call(
             lambda db: event(
                 db,
@@ -612,7 +617,7 @@ class BrowserDriver:
                     if await self.db.call(
                         lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (budget_key,))
                     ):
-                        raise ToolPreflightError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
+                        raise ToolFinalizationRequired("BROWSER_TAB_BUDGET_EXCEEDED", 409)
                     await self.db.call(
                         lambda db: event(
                             db,

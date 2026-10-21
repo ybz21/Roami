@@ -104,9 +104,13 @@ async def test_rejected_answer_is_not_published_and_correction_ends_without_rewr
 
 @pytest.mark.parametrize(
     "state,result",
-    [("cancelled", {"state": "cancelled"}), ("failed", {"state": "failed", "retryable": False})],
+    [
+        ("cancelled", {"state": "cancelled"}),
+        ("failed", {"state": "failed", "retryable": False}),
+        ("succeeded", {"state": "succeeded", "retryable": False}),
+    ],
 )
-async def test_cancelled_or_non_retryable_callback_cannot_start_replacement_work(
+async def test_stopped_callback_cannot_restart_but_success_can_continue_authorized_stages(
     store, state, result
 ):
     effects, rounds = [], 0
@@ -121,10 +125,11 @@ async def test_cancelled_or_non_retryable_callback_cannot_start_replacement_work
                 yield ModelEvent("tool", call("mutate", {}))
             else:
                 assert rounds == 2
-                assert (
-                    json.loads(messages[-1]["content"])["error"]
-                    == "TASK_COMPLETION_RESTART_FORBIDDEN"
-                )
+                outcome = json.loads(messages[-1]["content"])
+                if state == "succeeded":
+                    assert outcome == {"ok": True}
+                else:
+                    assert outcome["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN"
                 yield ModelEvent(
                     "tool",
                     call("reply", {"text": "任务已停止。", "mode": "brief", "language": "zh"}),
@@ -159,7 +164,7 @@ async def test_cancelled_or_non_retryable_callback_cannot_start_replacement_work
         await runtime.loop.run(
             turn, "main", completion=json.loads(job["payload_json"])["completion"]
         )
-        assert effects == [] and rounds == 2
+        assert effects == ([True] if state == "succeeded" else []) and rounds == 2
         assert len(await runtime.tasks.list("alice", c["id"])) == 1
     finally:
         await runtime.close()

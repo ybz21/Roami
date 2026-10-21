@@ -47,7 +47,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "scopeQuote": {"type": "string", "minLength": 1},
                     "languageQuote": {"type": "string", "minLength": 1},
                 },
-                ["text", "mode", "language"],
+                ["text"],
             ),
             reply,
             main=True,
@@ -448,7 +448,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         items = await status(args, binding)
         language = request_language(
             await reply_source(binding),
-            args["language"],
+            args.get("language", "zh"),
             args.get("languageQuote"),
         )
         return [dict(item, replyLanguage=language) for item in items]
@@ -471,7 +471,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "description": "Only for an explicit request to reply in a different language, copy the user's exact language instruction.",
                     },
                 },
-                ["language"],
+                [],
             ),
             progress_reply,
             main=True,

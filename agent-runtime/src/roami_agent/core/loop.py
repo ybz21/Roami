@@ -110,6 +110,7 @@ class AgentLoop:
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
                 seen_rejections = set()
+                finalizing = False
                 for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
@@ -182,6 +183,8 @@ class AgentLoop:
                     phase = "tools"
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
+                    if finalizing and calls:
+                        raise DomainError("TOOL_FINALIZATION_STALLED", 502)
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
                     if len(calls) > 1 and any(
@@ -227,8 +230,11 @@ class AgentLoop:
                             "originMessageId": origin["id"] if origin else None,
                             "toolCallId": call["id"],
                             "workspace": turn.get("workspace"),
+                            "finalizing": finalizing,
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
+                        if isinstance(value, dict) and value.get("finalizeFromEvidence") is True:
+                            finalizing = True
                         if (
                             role == "main"
                             and operation in {"task_reply", "reply"}
@@ -355,6 +361,22 @@ class AgentLoop:
                     catalog = self.tools.catalog(role)
                     phase = "context"
                     plan, prompt = await self.build_context(turn, instructions, catalog, completion)
+                    if finalizing:
+                        catalog = []
+                        plan = dict(
+                            plan,
+                            historyView="finalization",
+                            requestBasis=hashlib.sha256(
+                                encoded([plan.get("requestBasis"), "finalization"]).encode()
+                            ).hexdigest(),
+                        )
+                        prompt.insert(
+                            1 + plan["currentTurnStart"],
+                            {
+                                "role": "system",
+                                "content": "This attempt is closing after an unchanged blocker. No further tools or inputs are allowed. Report only findings verified from sources already read in this attempt, with their URLs and limitations. Mark everything else unconfirmed. Do not invent missing facts or restart work.",
+                            },
+                        )
         except TimeoutError as exc:
             code = (
                 "MODEL_DEADLINE"
