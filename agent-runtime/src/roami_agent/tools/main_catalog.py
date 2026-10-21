@@ -6,11 +6,79 @@ from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.replies.answer_contract import validate_answer
+from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
 from roami_agent.storage.task_handoff import accepted_handoffs
+from roami_agent.storage.task_request import task_user_request
 
 
 def register_main_tools(registry, tasks, memory, targets, router=None):
+    async def reply_source(binding):
+        source = await tasks.db.call(
+            lambda db: row(
+                db,
+                "SELECT m.* FROM messages m JOIN conversations c ON c.id=m.conversation_id "
+                "WHERE m.turn_id=? AND c.owner_id=? AND c.deleted_ms IS NULL AND m.role='user' AND m.deleted_ms IS NULL "
+                "UNION ALL SELECT m.* FROM jobs j JOIN tasks t ON t.id=json_extract(j.payload_json,'$.completion.taskId') "
+                "JOIN messages m ON m.id=t.origin_message_id WHERE j.kind='turn.run' AND j.aggregate_id=? AND t.owner_id=? LIMIT 1",
+                (binding["turnId"], binding["owner"], binding["turnId"], binding["owner"]),
+            )
+        )
+        source = await tasks.db.call(lambda db: task_user_request(db, source)) if source else None
+        return json.loads(source["content_json"]).get("text", "") if source else ""
+
+    async def reply(args, binding):
+        return {"reply": validate_answer(args, await reply_source(binding))}
+
+    registry.add(
+        Tool(
+            "reply",
+            "Deliver the final answer and end this turn, without an extra model request. Call alone, no text preamble. "
+            "Use brief for ordinary concise answers, detailed for explicitly requested full/detail content, debug for explicitly requested raw fields/records. "
+            "detailed/debug require scopeQuote copied exactly from the original user's request. Keep requested quotes and content intact. "
+            "Brief rejects boilerplate offers, internal status fields and a Chinese answer to an English request; correct the answer if rejected. "
+            "Use task_reply for pure progress or routine file handoffs. Use ask_user for a missing decision.",
+            object_schema(
+                {
+                    "text": {"type": "string", "minLength": 1},
+                    "mode": {"type": "string", "enum": ["brief", "detailed", "debug"]},
+                    "language": {"type": "string", "enum": ["zh", "en"]},
+                    "scopeQuote": {"type": "string", "minLength": 1},
+                    "languageQuote": {"type": "string", "minLength": 1},
+                },
+                ["text", "mode", "language"],
+            ),
+            reply,
+            main=True,
+        )
+    )
+
+    async def conversation_history(args, binding):
+        turn = await tasks.db.call(
+            lambda db: row(
+                db,
+                "SELECT t.id FROM turns t JOIN conversations c ON c.id=t.conversation_id "
+                "WHERE t.id=? AND c.id=? AND c.owner_id=? AND c.deleted_ms IS NULL",
+                (binding["turnId"], binding["conversation"], binding["owner"]),
+            )
+        )
+        if not turn:
+            raise DomainError("CONVERSATION_NOT_FOUND", 404)
+        return {"historyView": "full", "restoredForCurrentTurn": True}
+
+    registry.add(
+        Tool(
+            "conversation_history",
+            "Restore this conversation's earlier assistant and tool records for this turn when a reference, "
+            "decision, exact quote or result is missing. No extra model rewrite or mutation. Forgotten "
+            "content stays excluded. Do not read history for a self-contained question.",
+            object_schema({}),
+            conversation_history,
+            main=True,
+        )
+    )
+
     async def assert_session_inspection(session_id, binding):
         inspected = await tasks.db.call(
             lambda db: row(
@@ -376,6 +444,40 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
 
         return await tasks.db.call(annotate)
 
+    async def progress_reply(args, binding):
+        items = await status(args, binding)
+        language = request_language(
+            await reply_source(binding),
+            args["language"],
+            args.get("languageQuote"),
+        )
+        return [dict(item, replyLanguage=language) for item in items]
+
+    registry.add(
+        Tool(
+            "task_reply",
+            "Answer a question asking ONLY whether a task is finished/running, or whether any tasks are running. "
+            "Use this instead of composing a status answer from history. Reads actual task state and delivers "
+            "one short answer in the user's language, ending this turn without another model call. Call alone without a text preamble. "
+            "Use taskId for a particular task; omit it only for an all-tasks running overview. "
+            "For detailed results, explanations, raw/debug fields, mixed requests or other languages use task_status instead.",
+            object_schema(
+                {
+                    "taskId": {"type": "string", "minLength": 1},
+                    "language": {"type": "string", "enum": ["zh", "en"]},
+                    "languageQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Only for an explicit request to reply in a different language, copy the user's exact language instruction.",
+                    },
+                },
+                ["language"],
+            ),
+            progress_reply,
+            main=True,
+        )
+    )
+
     async def recall(args, binding):
         day = args.get("scope") == "day"
         day_key = args.get("dayKey")
@@ -568,7 +670,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
                     "includeResult": {
                         "type": "boolean",
-                        "description": "Return the full current-revision executor report for an explicit result/recap request; default false for progress. Use true also when earlier conversation references are needed; it restores full history.",
+                        "description": "Return the full current-revision executor report for an explicit result/recap or raw/debug-field request; default false for progress. Use true also when earlier conversation references are needed; it restores full history. Missing fields remain unknown; never infer stop/verification flags from succeeded alone.",
                     },
                 }
             ),

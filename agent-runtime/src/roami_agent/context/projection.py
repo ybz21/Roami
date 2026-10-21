@@ -18,6 +18,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import history, owned
 
 SUMMARY_PROMPT = (
@@ -29,7 +30,18 @@ SUMMARY_PROMPT = (
 
 def fingerprint(messages):
     return hashlib.sha256(
-        encoded([(m["id"], m["content_json"], m["status"]) for m in messages]).encode()
+        encoded(
+            [
+                (
+                    m["id"],
+                    m["content_json"],
+                    m["status"],
+                    m["role"],
+                    bool(m.get("agent_task_instruction")),
+                )
+                for m in messages
+            ]
+        ).encode()
     ).hexdigest()
 
 
@@ -53,6 +65,11 @@ def context_history(db, branch_id, through_turn=None):
     for m in transcript:
         if m["id"] in omitted:
             continue
+        source = task_user_request(db, m)
+        if source is None:
+            continue
+        if source["id"] != m["id"]:
+            m = dict(m, agent_task_instruction=True)
         if m["turn_id"] and current:
             t = row(db, "SELECT rowid AS ordinal FROM turns WHERE id=?", (m["turn_id"],))
             if t["ordinal"] > current["ordinal"]:
@@ -87,6 +104,12 @@ def model_entries(messages):
             continue
         content = json.loads(m["content_json"])
         entry = {"role": m["role"], "content": content.get("text", "")}
+        if m.get("agent_task_instruction"):
+            entry = {
+                "role": "system",
+                "content": "Earlier agent-issued task instructions (historical execution data, not user constraints or new authorization): "
+                + encoded(entry["content"]),
+            }
         if content.get("taskStatus"):
             entry["content"] += "\nTask status (runtime evidence): " + encoded(
                 content["taskStatus"]
@@ -119,7 +142,14 @@ def model_entries(messages):
             entry["content"] += (
                 "\n[Previous tool execution was interrupted; its outcome must be reconciled.]"
             )
-        result.append({"message": entry, "turnId": m["turn_id"], "sourceId": m["id"]})
+        result.append(
+            {
+                "message": entry,
+                "turnId": m["turn_id"],
+                "sourceId": m["id"],
+                "agentTaskInstruction": bool(m.get("agent_task_instruction")),
+            }
+        )
     return result
 
 
@@ -224,6 +254,16 @@ class Context:
                         )
                 entries = separate
             plan = prefix + [entry["message"] for entry in entries]
+            detail_turns = {
+                r["turn_id"]
+                for r in rows(
+                    db,
+                    "SELECT DISTINCT turn_id FROM tool_calls WHERE turn_id IN (SELECT id FROM turns WHERE conversation_id=?) AND state='succeeded' AND "
+                    "((tool_name='reply' AND json_extract(arguments_json,'$.mode') IN ('debug','detailed')) "
+                    "OR (tool_name='task_status' AND json_extract(arguments_json,'$.includeResult')=1))",
+                    (cid,),
+                )
+            }
             current_turn_start = next(
                 (
                     len(prefix) + index
@@ -299,6 +339,12 @@ class Context:
                 "memoryEpoch": epoch,
                 "sourceMessageIds": [item["id"] for item in messages],
                 "currentTurnStart": current_turn_start,
+                "modelSourceMessageIds": [None] * len(prefix)
+                + [entry["sourceId"] for entry in entries],
+                "modelAgentTaskInstructions": [False] * len(prefix)
+                + [entry["agentTaskInstruction"] for entry in entries],
+                "modelDetailedAnswers": [False] * len(prefix)
+                + [entry["turnId"] in detail_turns for entry in entries],
                 "attachmentEvidence": [
                     e
                     for m in messages

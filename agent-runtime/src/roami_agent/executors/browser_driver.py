@@ -22,7 +22,7 @@ from roami_agent.protocol.browser import browser_config
 from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, rows
+from roami_agent.storage.database import event, row, rows
 from roami_agent.tools.process import execute
 
 
@@ -560,7 +560,8 @@ class BrowserDriver:
             try:
                 owned = await self.resources.owned(scope)
                 if (
-                    sum(":target:" in item["resource_key"] for item in owned)
+                    self.config["max_tabs"] > 0
+                    and sum(":target:" in item["resource_key"] for item in owned)
                     >= self.config["max_tabs"]
                 ):
                     raise DomainError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
@@ -628,6 +629,18 @@ class BrowserDriver:
         resource = await self.resources.resource(scope, args["resourceId"])
         browser_id, target_id = self._target(resource)
         resource = await self._claim(scope, resource["resource_key"], binding=binding)
+        failure_key = (
+            "browser-observation-failed:"
+            + hashlib.sha256(
+                encoded(
+                    [scope["taskId"], scope["runId"], resource["id"], resource["scene_epoch"]]
+                ).encode()
+            ).hexdigest()
+        )
+        if binding.get("role") == "research" and await self.db.call(
+            lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (failure_key,))
+        ):
+            raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
         path = self.captures / (identity() + ".png")
         try:
             try:
@@ -692,6 +705,29 @@ class BrowserDriver:
                 body,
             )
             return {"observation": self._view(observed), "artifactRefs": [artifact]}
+        except DomainError as exc:
+            if binding.get("role") == "research" and exc.code in {
+                "BROWSER_DRIVER_UNAVAILABLE",
+                "CHROME_OBSERVATION_TIMEOUT",
+                "CHROME_TARGET_NOT_FOUND",
+            }:
+                await self.db.call(
+                    lambda db, code=exc.code: event(
+                        db,
+                        binding["conversation"],
+                        "resource.observation_failed",
+                        {
+                            "resourceId": resource["id"],
+                            "sceneEpoch": resource["scene_epoch"],
+                            "error": code,
+                        },
+                        key=failure_key,
+                        task_id=scope["taskId"],
+                        turn_id=binding.get("turnId"),
+                    ),
+                    write=True,
+                )
+            raise
         finally:
             await asyncio.to_thread(path.unlink, missing_ok=True)
 

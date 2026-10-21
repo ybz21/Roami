@@ -12,6 +12,7 @@ from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPrefl
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
+from roami_agent.replies.task_progress import task_progress
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
@@ -137,6 +138,17 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] in {
+                "REPLY_BOILERPLATE",
+                "REPLY_INTERNAL_FIELDS",
+                "REPLY_LANGUAGE_MISMATCH",
+                "REPLY_SCOPE_QUOTE_REQUIRED",
+            }:
+                value["recovery"] = (
+                    "The answer was not delivered. Correct this reply: omit optional offers and machine fields in brief mode, "
+                    "use the original user's language, and preserve requested details/raw records with an exact scopeQuote. "
+                    "Do not repeat work or create tasks. Send the corrected answer with reply."
+                )
             if isinstance(exc, ToolPreflightError):
                 preflight_error = exc
                 value.update(
@@ -408,8 +420,15 @@ class ToolGateway:
 
         def finish(db):
             committed_value, committed_state, committed_memories = value, state, memory_ids
-            if state == "succeeded" and operation_name == "task_status":
+            if state == "succeeded" and operation_name in {"task_status", "task_reply"}:
                 committed_value = model_task_projection(db, binding["owner"], value)
+                if operation_name == "task_reply":
+                    committed_value = {
+                        "reply": task_progress(
+                            committed_value, args["language"], single=bool(args.get("taskId"))
+                        ),
+                        "tasks": committed_value,
+                    }
             if state == "succeeded" and operation_name == "artifact_read":
                 source = row(
                     db,

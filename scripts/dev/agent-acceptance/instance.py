@@ -138,7 +138,7 @@ def start(args):
     settings += (
         "\n[tools.browser]\nenabled=true\nendpoint="
         + json.dumps(args.cdp)
-        + "\nexisting_tabs=false\nmax_tabs=3\n"
+        + "\nexisting_tabs=false\nmax_tabs=0\n"
     )
     (root / "agent.toml").write_text(settings)
     saved = source / "agents/model-settings.json"

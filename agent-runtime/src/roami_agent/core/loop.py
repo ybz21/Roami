@@ -185,7 +185,8 @@ class AgentLoop:
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
                     if len(calls) > 1 and any(
-                        call["function"]["name"] == "ask_user" for call in calls
+                        call["function"]["name"] in {"ask_user", "task_reply", "reply"}
+                        for call in calls
                     ):
                         raise DomainError("QUESTION_MUST_BE_ONLY_TOOL")
                     await self.journal.finish(
@@ -229,7 +230,28 @@ class AgentLoop:
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
                         if (
-                            operation is None
+                            role == "main"
+                            and operation in {"task_reply", "reply"}
+                            and isinstance(value, dict)
+                            and isinstance(value.get("reply"), str)
+                        ):
+                            reply = value["reply"]
+                            reply_id = await self.journal.start(turn)
+                            await self.journal.delta(turn, reply_id, reply, reply)
+                            await self.journal.finish(
+                                turn,
+                                reply_id,
+                                reply,
+                                [],
+                                usage,
+                                step + 1,
+                                final=True,
+                                completion=completion,
+                            )
+                            await self.context.after_turn(turn, instructions, catalog)
+                            return reply
+                        if (
+                            (operation is None or operation == "reply")
                             and isinstance(value, dict)
                             and value.get("error")
                             in {
@@ -237,6 +259,10 @@ class AgentLoop:
                                 "INVALID_CLI_ARGUMENTS",
                                 "TOOL_UNAVAILABLE",
                                 "TOOL_DISABLED",
+                                "REPLY_BOILERPLATE",
+                                "REPLY_INTERNAL_FIELDS",
+                                "REPLY_LANGUAGE_MISMATCH",
+                                "REPLY_SCOPE_QUOTE_REQUIRED",
                             }
                         ):
                             rejected_arguments = call["function"].get("arguments", "")

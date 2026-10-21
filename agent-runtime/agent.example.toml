@@ -97,7 +97,7 @@ skill_roots = []
 # [tools.browser]
 # enabled = true
 # existing_tabs = false # default: new task-owned background tabs only
-# max_tabs = 3 # per active task, 1..6
+# max_tabs = 0 # per active task; 0 (default) means unlimited, positive integers opt into a budget
 # endpoint = "http://127.0.0.1:9222" # omit to follow Roami's configured Chrome
 
 # Requires images = true on the effective Worker route.

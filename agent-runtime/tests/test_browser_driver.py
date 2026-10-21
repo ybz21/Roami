@@ -599,14 +599,143 @@ def test_malformed_driver_acknowledgements_cannot_prove_inputs_stopped(state, st
     [
         {"enabled": "yes"},
         {"max_tabs": True},
-        {"max_tabs": 100},
+        {"max_tabs": -1},
+        {"max_tabs": 1.5},
         {"existing_tabs": 1},
         {"unknown": True},
     ],
 )
-def test_browser_configuration_rejects_implicit_or_unbounded_access(config):
+def test_browser_configuration_rejects_invalid_values(config):
     with pytest.raises(DomainError, match="INVALID_BROWSER_CONFIG"):
         browser_config(config)
+
+
+@pytest.mark.parametrize("budget", [0, 1, 7, 100])
+def test_browser_budget_is_optional_and_has_no_fixed_ceiling(budget):
+    assert browser_config({"max_tabs": budget})["max_tabs"] == budget
+    assert browser_config({"enabled": True})["max_tabs"] == 0
+
+
+async def test_unlimited_tabs_and_durable_observation_failure_do_not_weaken_ownership(store):
+    from test_runtime import ConversationModel, until
+
+    fixture, failed, target_count, observations = BrowserFixture(), False, 0, 0
+
+    async def runner(argv, **options):
+        nonlocal target_count, observations
+        verb, flags, _ = fixture.arguments(argv)
+        if verb == "observe":
+            observations += 1
+            if failed:
+                raise DomainError("BROWSER_DRIVER_UNAVAILABLE", 503)
+        result = await fixture(argv, **options)
+        if verb == "new":
+            target_count += 1
+            receipt = fixture.receipts[flags["--operation-id"]]
+            receipt["result"]["stdout"] = encoded({"targetId": "target-" + str(target_count)})
+            result["stdout"] = encoded(receipt)
+        return result
+
+    class Worker:
+        model = "browser-recovery"
+
+        async def stream(self, messages, tools):
+            nonlocal failed
+            attempt = await store.call(
+                lambda db: row(db, "SELECT * FROM task_attempts WHERE state='running'")
+            )
+            turn = await store.call(
+                lambda db: row(
+                    db,
+                    "SELECT * FROM turns WHERE branch_id=? AND state='running'",
+                    (attempt["native_branch_id"],),
+                )
+            )
+            binding = {
+                "owner": "alice",
+                "conversation": turn["conversation_id"],
+                "turnId": turn["id"],
+                "taskId": attempt["task_id"],
+                "runId": attempt["id"],
+                "role": "research",
+                "toolCallId": "setup",
+            }
+            opened = [
+                await runtime.browser.open({}, dict(binding, toolCallId=str(i))) for i in range(5)
+            ]
+            assert target_count == 5
+            resource_id = opened[0]["observation"]["resourceId"]
+            runtime.browser.config["max_tabs"] = 5
+            with pytest.raises(DomainError, match="BROWSER_TAB_BUDGET_EXCEEDED"):
+                await runtime.browser.open({}, binding)
+            runtime.browser.config["max_tabs"] = 0
+            failed = True
+            with pytest.raises(DomainError, match="BROWSER_DRIVER_UNAVAILABLE"):
+                await runtime.browser.observe({"resourceId": resource_id}, binding)
+            count = observations
+            # A restarted driver must retain the same failed-scene fence.
+            runtime.browser = BrowserDriver(
+                store, runtime.settings, runtime.resources, runtime.artifacts, runner=runner
+            )
+            with pytest.raises(DomainError, match="BROWSER_SOURCE_UNAVAILABLE"):
+                await runtime.browser.observe({"resourceId": resource_id}, binding)
+            assert observations == count
+            with pytest.raises(DomainError, match="RESOURCE_TASK_NOT_FOUND"):
+                await runtime.browser.observe(
+                    {"resourceId": resource_id}, dict(binding, owner="mallory")
+                )
+            failed = False
+            assert await runtime.browser.open({}, dict(binding, toolCallId="alternate"))
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE resources SET scene_epoch=scene_epoch+1 WHERE id=?", (resource_id,)
+                ),
+                write=True,
+            )
+            assert await runtime.browser.observe({"resourceId": resource_id}, binding)
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE resources SET state='paused' WHERE id=?", (resource_id,)
+                ),
+                write=True,
+            )
+            with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
+                await runtime.browser.observe({"resourceId": resource_id}, binding)
+            yield ModelEvent("text", "Available source read; unavailable source omitted.")
+
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        worker_model=Worker(),
+        settings=Settings(browser={"enabled": True}),
+    )
+    runtime.browser.runner = runner
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            c["id"],
+            "Read public sources",
+            key="research",
+            target={"kind": "new_session", "resourceOnly": True},
+            record_intent=True,
+        )
+        await runtime.start()
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM task_attempts WHERE task_id=? AND finished_ms IS NOT NULL",
+                (task["id"],),
+            ),
+        )
+        assert target_count == 6
+        failures = await store.call(
+            lambda db: rows(db, "SELECT * FROM events WHERE kind='resource.observation_failed'")
+        )
+        assert len(failures) == 1
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.parametrize("resource_only,stopped", [(True, True), (True, False), (False, True)])
