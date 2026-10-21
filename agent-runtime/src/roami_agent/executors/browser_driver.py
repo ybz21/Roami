@@ -60,9 +60,46 @@ class BrowserDriver:
             if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > 256_000:
                 raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
             try:
-                return json.load(file)
+                receipt = json.load(file)
             except (ValueError, TypeError):
                 raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503) from None
+        receipt = self._receipt(receipt, operation_id)
+        if not isinstance(receipt, dict) or receipt.get("state") not in {"accepted", "running"}:
+            return receipt
+        try:
+            descriptor = os.open(
+                self.receipts / (operation_id + ".lock"),
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            )
+            with os.fdopen(descriptor, "rb") as lock:
+                info = os.fstat(lock.fileno())
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or info.st_uid != os.getuid()
+                    or info.st_mode & 0o077
+                    or info.st_size > 32
+                ):
+                    return receipt
+                owner = lock.read(32)
+            if not re.fullmatch(rb"[1-9][0-9]{0,9}", owner):
+                return receipt
+            pid = int(owner)
+            if pid > 2**31 - 1:
+                return receipt
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            # Process exit proves input stopped, never that a submitted action succeeded.
+            return {
+                **receipt,
+                "state": "unknown",
+                "inputStopped": True,
+                "outcomeKnown": False,
+                "errorCode": "CHROME_OPERATION_DRIVER_EXITED",
+                "stopEvidence": {"kind": "driver_process_exited", "pid": pid},
+            }
+        except OSError:
+            pass
+        return receipt
 
     async def _stored_receipt(self, operation_id):
         return await asyncio.to_thread(self._read_receipt_file, operation_id)
@@ -358,6 +395,7 @@ class BrowserDriver:
             "driverState": receipt["state"],
             "error": receipt.get("errorCode"),
             "output": receipt.get("result", {}).get("stdout", ""),
+            **({"stopEvidence": receipt["stopEvidence"]} if receipt.get("stopEvidence") else {}),
         }
 
     async def _complete(self, scope, action, receipt):
@@ -436,6 +474,13 @@ class BrowserDriver:
                     )
             except (DomainError, OSError, TimeoutError, asyncio.CancelledError):
                 receipt = None
+            if receipt and not receipt["inputStopped"]:
+                try:
+                    current = self._receipt(await self.receipt_reader(action["id"]), action["id"])
+                    if current["inputStopped"]:
+                        receipt = current
+                except (DomainError, OSError, TimeoutError):
+                    pass
             if receipt:
                 await self._complete(scope, action, receipt)
             else:

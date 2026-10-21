@@ -705,3 +705,74 @@ async def test_only_stopped_research_navigation_returns_fresh_scene_without_repl
             )
     finally:
         await runtime.close()
+
+
+async def test_dead_receipt_owner_proves_only_input_stop_and_preserves_original_receipt(store):
+    import sys
+
+    from test_runtime import ConversationModel
+
+    runtime = Runtime(store, ConversationModel())
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)"
+    )
+    try:
+        runtime.browser._directories()
+        operation_id = "c" * 32
+        receipt = {
+            "version": 1,
+            "id": operation_id,
+            "payloadHash": "a" * 64,
+            "state": "running",
+            "inputStopped": False,
+            "outcomeKnown": False,
+        }
+        path = runtime.browser.receipts / (operation_id + ".json")
+        path.touch(mode=0o600)
+        path.write_text(encoded(receipt))
+        lock = path.with_suffix(".lock")
+        lock.touch(mode=0o600)
+        lock.write_text(str(process.pid))
+        assert await runtime.browser._stored_receipt(operation_id) == receipt
+        process.terminate()
+        await process.wait()
+        proof = await runtime.browser._stored_receipt(operation_id)
+        assert proof["state"] == "unknown" and proof["inputStopped"] is True
+        assert proof["outcomeKnown"] is False
+        assert proof["stopEvidence"] == {"kind": "driver_process_exited", "pid": process.pid}
+        assert json.loads(path.read_text()) == receipt
+    finally:
+        if process.returncode is None:
+            process.terminate()
+            await process.wait()
+        await runtime.close()
+
+
+@pytest.mark.parametrize("owner", [None, "", "not-a-pid", "0", "999999999999999", "symlink"])
+async def test_missing_or_invalid_process_claim_never_proves_input_stop(store, owner):
+    from test_runtime import ConversationModel
+
+    runtime = Runtime(store, ConversationModel())
+    try:
+        runtime.browser._directories()
+        operation_id = "c" * 32
+        receipt = {
+            "version": 1,
+            "id": operation_id,
+            "payloadHash": "a" * 64,
+            "state": "running",
+            "inputStopped": False,
+            "outcomeKnown": False,
+        }
+        path = runtime.browser.receipts / (operation_id + ".json")
+        path.touch(mode=0o600)
+        path.write_text(encoded(receipt))
+        lock = path.with_suffix(".lock")
+        if owner == "symlink":
+            lock.symlink_to(path)
+        elif owner is not None:
+            lock.touch(mode=0o600)
+            lock.write_text(owner)
+        assert await runtime.browser._stored_receipt(operation_id) == receipt
+    finally:
+        await runtime.close()
