@@ -290,7 +290,9 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         )
 
         def annotate(db):
-            turn = row(db, "SELECT created_ms FROM turns WHERE id=?", (binding.get("turnId"),))
+            turn = row(
+                db, "SELECT created_ms,trigger_kind FROM turns WHERE id=?", (binding.get("turnId"),)
+            )
             for item in items:
                 if item.get("contextExcluded") or not item.get("intent_json"):
                     continue
@@ -306,16 +308,23 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "AND length(trim(json_extract(body_json,'$.domText')))>0",
                     (item["id"], attempt["runId"]),
                 )["latest"]
+                completion_report = bool(turn and turn["trigger_kind"] == "completion")
+                fresh = bool(turn and captured and captured >= turn["created_ms"])
                 attempt["retrievalEvidence"] = {
                     "lastRetrievedMs": captured,
-                    "freshForCurrentRequest": bool(
-                        turn and captured and captured >= turn["created_ms"]
-                    ),
+                    "freshForCurrentRequest": None if completion_report else fresh,
+                    "forCompletionReport": completion_report,
                     "recovery": (
-                        "This task is already accepted and still pending. Its completion report will arrive automatically. "
+                        "This is a completion callback, not a new lookup request or new authorization. "
+                        "Report the committed task state and source evidence; do not steer or retry from this callback."
+                        if completion_report
+                        else "This task is already accepted and still pending. Its completion report will arrive automatically. "
                         "Do not poll status or steer it again for this same request. Handle any other requested parts, then end this turn."
                         if item["state"]
                         not in {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}
+                        else "This attempt is no longer running and has source evidence captured after the current request. "
+                        "Report its actual state, verified results and remaining limitations. Do not poll or rerun it for this same request."
+                        if fresh
                         else "This is stored task status, not a fresh lookup. For a new lookup request, "
                         "continue this task with task_steer at its current revision and retrieve sources again. "
                         "Cached facts may answer an explicit recap/status request only; never present them as new retrieval."

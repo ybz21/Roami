@@ -277,3 +277,63 @@ async def test_status_marks_old_research_as_cached_and_does_not_repeat_continuat
         assert "Old pricing table" in json.dumps(await runtime.tasks.list("alice"))
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("completion_report", [False, True])
+async def test_current_evidence_and_completion_callbacks_never_request_another_lookup(
+    store, completion_report
+):
+    from test_resource_leases import setup
+
+    from roami_agent.protocol.serialization import encoded
+
+    leases, lease, _, task_id, run_id = await setup(store)
+    runtime = Runtime(store, MemoryModel())
+    try:
+        task = await store.call(lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task_id,)))
+        intent = json.loads(task["intent_json"])
+        intent["target"] = {"kind": "new_session", "resourceOnly": True}
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET intent_json=? WHERE id=?", (encoded(intent), task_id)
+            ),
+            write=True,
+        )
+        receipt = await runtime.conversations.accept(
+            "alice", task["origin_conversation_id"], "current", "查看济南天气"
+        )
+        await leases.observe(
+            "alice",
+            lease["id"],
+            task_id,
+            run_id,
+            lease["lease_epoch"],
+            "b" * 64,
+            {"url": "https://example.org/weather", "domText": "Current weather evidence"},
+        )
+
+        def ended(db):
+            db.execute("UPDATE tasks SET state='failed' WHERE id=?", (task_id,))
+            if completion_report:
+                db.execute(
+                    "UPDATE turns SET trigger_kind='completion' WHERE id=?", (receipt["turnId"],)
+                )
+
+        await store.call(ended, write=True)
+        snapshot = await runtime.tools.registry["task_status"].handler(
+            {"taskId": task_id},
+            {
+                "owner": "alice",
+                "conversation": task["origin_conversation_id"],
+                "turnId": receipt["turnId"],
+            },
+        )
+        evidence = snapshot[0]["latestAttempt"]["retrievalEvidence"]
+        assert evidence["freshForCurrentRequest"] is (None if completion_report else True)
+        assert evidence["forCompletionReport"] is completion_report
+        assert "continue this task with task_steer" not in evidence["recovery"]
+        assert (
+            "not a new lookup request" if completion_report else "Do not poll or rerun"
+        ) in evidence["recovery"]
+    finally:
+        await runtime.close()
