@@ -1,3 +1,4 @@
+import type { RegisteredAgent } from '../src/agent-registry'
 import type { Catalog } from '../src/components/capabilities/CapabilityCatalog'
 import type { ManagedEntry, ManagedKind } from '../src/components/capabilities/capability-format'
 
@@ -19,6 +20,8 @@ const plugins = [
 const removedPlugins: typeof plugins = []
 const uploadedTemplate = structuredClone(plugins[1])
 const config: Record<string, string> = { destination: 'Roami' }
+const professionalAgents: RegisteredAgent[] = ['claude', 'codex', 'opencode', 'pi'].map(kind => ({ kind, installed: kind !== 'opencode', binary: kind !== 'opencode' ? '/usr/bin/' + kind : undefined, authentication: kind === 'claude' ? 'required' : 'unknown', quota: kind === 'codex' ? { state: 'available', windows: [{ remainingPercent: 65, windowMinutes: 300, resetsAt: Math.floor(Date.now() / 1000) + 3600 }] } : { state: 'unknown', reason: kind === 'claude' ? 'login_required' : 'provider_managed' } }))
+const preferences: Record<string, unknown> = { _migrated: true, claudeCommand: 'claude', codexCommand: 'codex', opencodeCommand: 'opencode', piCommand: 'pi' }
 const foundations = ['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user']
 export function catalog(): Catalog {
   return {
@@ -76,7 +79,15 @@ export function installPrototypeApi() {
       if (plugin && ['enable', 'disable'].includes(operation)) plugin.enabled = operation === 'enable'
       return response([])
     }
-    if (path === '/preferences') return response({ data: {} })
+    if (path === '/agent/professional') return response({ agents: professionalAgents })
+    if (path.startsWith('/agent/professional/')) {
+      const [kind, operation] = path.slice('/agent/professional/'.length).split('/')
+      const agent = professionalAgents.find(agent => agent.kind === kind)
+      if (!agent) return response({ error: { code: 'INVALID_AGENT_KIND' } }, 400)
+      if (operation === 'install') { agent.installed = true; agent.binary = '/usr/bin/' + kind; return response({ installed: true }) }
+      return response({ agent: { ...agent, version: kind + ' 1.2.3', versionState: 'available' } })
+    }
+    if (path === '/preferences') { if (method === 'PUT') Object.assign(preferences, body); return response({ data: preferences }) }
     if (path === '/plugin/install') {
       const file = init?.body instanceof FormData ? init.body.get('file') : null
       const name = file instanceof File ? file.name : 'uploaded-plugin'

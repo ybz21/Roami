@@ -94,3 +94,5 @@ html[data-pointer="coarse"] .tt-capability-remote-tool .ant-switch::after { cont
 html[data-size="compact"] .tt-capability-save-note { display:none; }
 html[data-pointer="coarse"] .tt-capability-cardfooter .tt-act { min-height:var(--tap); }
 html[data-pointer="coarse"] .tt-capability-writing-head .ant-segmented-item-label { min-height:var(--tap); }
+
+.tt-capability-alert { max-width:var(--content-overview); margin:0 auto var(--sp-4); }

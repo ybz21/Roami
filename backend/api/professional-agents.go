@@ -27,3 +27,12 @@ func (a *API) InstallProfessionalAgent(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"installed": true})
 }
+
+func (a *API) CheckProfessionalAgent(c *gin.Context) {
+	row, err := agentinventory.CheckProfessionalAgent(c.Request.Context(), c.Param("kind"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "INVALID_AGENT_KIND"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"agent": row})
+}

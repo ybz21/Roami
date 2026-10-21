@@ -1,8 +1,12 @@
 package agentinventory
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestProfessionalInstallArgs(t *testing.T) {
@@ -21,5 +25,55 @@ func TestProfessionalInstallArgs(t *testing.T) {
 		if _, err := ProfessionalInstallArgs(kind); err == nil {
 			t.Fatalf("accepted unsupported kind %q", kind)
 		}
+	}
+}
+
+func TestVersionChecksAreExplicitAndDoNotImplyAuthentication(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "version-ran")
+	path := filepath.Join(dir, "codex")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'codex-cli 1.2.3\\n'\nprintf ran > '"+marker+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	rows := DiscoverProfessionalAgents(context.Background())
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("automatic discovery started a CLI")
+	}
+	for _, row := range rows {
+		if row.Kind == "codex" && (!row.Installed || row.Authentication != "unknown" || row.Binary != path) {
+			t.Fatal("installation was treated as sign-in")
+		}
+	}
+	row, err := CheckProfessionalAgent(context.Background(), "codex")
+	if err != nil || row.Version != "codex-cli 1.2.3" || row.VersionState != "available" || row.Authentication != "unknown" {
+		t.Fatalf("unexpected explicit check: %+v, %v", row, err)
+	}
+	if _, err := CheckProfessionalAgent(context.Background(), "codex;exit"); err == nil {
+		t.Fatal("accepted an arbitrary command")
+	}
+}
+
+func TestVersionProbeIsBoundedAndKeepsMissingToolsDistinct(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "slow")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexec /bin/sleep 10\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	if version := probeProfessionalVersion(ctx, path); version != "" || time.Since(started) > time.Second {
+		t.Fatal("version probe did not respect cancellation")
+	}
+	t.Setenv("PATH", dir)
+	row, err := CheckProfessionalAgent(context.Background(), "codex")
+	if err != nil || row.Installed || row.Version != "" {
+		t.Fatalf("missing tool: %+v, %v", row, err)
+	}
+	output := &versionOutput{}
+	_, _ = output.Write(make([]byte, 10000))
+	if len(output.text) != 4096 {
+		t.Fatal("version output was not bounded")
 	}
 }

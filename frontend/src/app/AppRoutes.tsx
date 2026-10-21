@@ -70,7 +70,7 @@ export default function AppRoutes({ routing, isMobile, active, projects, actions
     settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout} searchNonce={mobileSearchNonce}
       onInstall={() => go('install')} fullscreen={fullscreen} />,
     hub: <HubPage />,
-    capabilities: <CapabilitiesPage sub={pluginSub} onNav={go} />,
+    capabilities: <CapabilitiesPage sub={pluginSub} onNav={go} onLaunchAgent={kind => newTerminalAt(kind, '')} />,
     home: <>
       {(!agentPage || agentParts[0] === 'home') && <AgentChat inactive={!!agentPage} cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={agent.notifications} projects={projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />}
       {agentPage && <AgentHomePage key={`${curNodeId || 'local'}:${agentPage.view}:${agentPage.origin}`} page={agentPage} node={curNodeId} inbox={agentInbox} projects={projects.map(p => ({ id: p.key, name: p.name }))} select={selectAgent} onSession={openTerm} onChanged={agentInbox.refresh} />}

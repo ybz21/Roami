@@ -3,6 +3,10 @@ import { api } from './api'
 export type RegisteredAgent = {
   kind: string
   installed: boolean
+  binary?: string
+  version?: string
+  versionState?: 'available' | 'unavailable'
+  authentication?: 'unknown' | 'required' | 'expired'
   quota: {
     state: 'available' | 'unknown'
     reason?: 'provider_managed' | 'login_required' | 'login_expired' | 'no_snapshot' | 'request_failed' | 'rate_limited'
@@ -22,4 +26,9 @@ export async function discoverAgents(signal?: AbortSignal): Promise<RegisteredAg
 
 export async function installAgent(kind: string): Promise<void> {
   await api('POST', `/agent/professional/${encodeURIComponent(kind)}/install`)
+}
+
+export async function checkAgent(kind: string): Promise<RegisteredAgent> {
+  const result = await api('POST', `/agent/professional/${encodeURIComponent(kind)}/check`)
+  return result.agent
 }

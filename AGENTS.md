@@ -285,9 +285,9 @@ PR 的图抹了）。
     <p>原型使用隔离的示例数据，可操作上传、新建、编辑和保存；不访问真实业务接口。</p>
   </div>
   <h3>信息架构与页面</h3>
-  <p>导航中的“插件”升级为“能力”。页面设插件、Skill、MCP、CLI、基础工具五个 Tab。
-    设置中的 Agent 能力管理整体迁入；模型、运行时、消息、记忆、专业 Agent 配置仍归设置。
-    旧插件深链和 settings/agent 下的 skills、cli、mcp、tools、capabilities 深链映射到新页面。</p>
+  <p>导航中的“插件”升级为“能力”。页面设 Agent、插件、Skill、MCP、CLI、基础工具六个 Tab，默认打开 Agent。
+    设置中的 Agent 能力管理整体迁入；内置 Agent 的模型、运行时、消息、记忆配置仍归设置；Claude Code、Codex、OpenCode、Pi 的管理迁入 Agent Tab。
+    旧 settings/agent/bin 及其 Agent 深链映射到 capabilities/agents；旧插件深链和 settings/agent 下的 skills、cli、mcp、tools、capabilities 深链映射到新页面。</p>
   <p>桌面使用统一页头、分类 Tab 与搜索目录。插件与其他分类统一采用独立能力卡片，展示图标、名称、来源、
     简短描述和真实状态；查看与编辑在卡片底部直接可见。详细指令、参数与配置按需打开。页面壳与相邻模块同底、直角，以单条细线分隔。
     手机从“工具”进入能力，保留首页、项目、工具、设置四个主入口；长详情、创建和导入使用全屏二级页，
@@ -295,6 +295,7 @@ PR 的图抹了）。
     编辑表单的保存栏位于字段滚动区外，键盘留白只由 MobileSubPage 处理。</p>
   <h3>创建、导入与配置</h3>
   <ul>
+    <li>Agent：Claude Code、Codex、OpenCode、Pi 使用品牌卡片，展示安装、登录确认状态与可用额度。安装和更新沿用已有白名单接口；“检查”显式读取版本和程序位置，自动刷新不执行 CLI。管理详情可保存启动命令（包括模型参数），打开已有会话终端完成登录与模型选择。安装成功不代表已登录；没有可靠证据时显示“登录待确认”。</li>
     <li>插件：卡片展示来源、名称、版本、描述与启停开关，提供“查看详情”和“配置”入口；桌面按需打开详情弹窗，手机使用全屏二级页。配置入口直接进入表单；保留插件包上传、本地目录安装、内置插件恢复、命令、权限与审计。旧深链直接打开对应详情，返回沿用 URL 历史。</li>
     <li>Skill：点击“创建 Skill”填写名称、描述与 Markdown 指令，可从发布检查模板开始并切换预览；点击“上传文件”选择或拖入 SKILL.md，也可粘贴内容。读取后先解析名称与描述，进入可编辑确认页，再点“确认导入”。</li>
     <li>MCP：点击“添加 MCP”选择远程服务地址或本地程序；也可上传单个配置或 mcpServers JSON，解析后编辑确认。
@@ -310,6 +311,7 @@ PR 的图抹了）。
 
   <h2 id="capability-user-stories">2. 用户故事</h2>
   <ol>
+    <li>作为专业 Agent 用户，我能在能力页找到 Claude Code 和 Codex，安装或更新、检查版本、保存启动命令，并进入终端完成登录和模型选择。旧设置链接继续有效，保存失败保留输入，偏好加载完成前不会用默认命令覆盖已有配置。</li>
     <li>作为已有插件用户，我从“能力 / 插件”继续配置定时任务，旧状态条链接仍能选中原插件。</li>
     <li>作为 Agent 用户，我不用在设置和插件页之间寻找工具；分类地址可以分享、刷新，并跟随浏览器返回。</li>
     <li>作为流程维护者，我上传 SKILL.md，确认名称和内容后保存；立即可在目录找到，重启后仍存在。
@@ -324,6 +326,9 @@ PR 的图抹了）。
   <h3>代码架构</h3>
   <pre>frontend/src/components/capabilities/
   CapabilitiesPage.tsx    页面壳、URL 分类与插件面板整合
+  AgentCatalog.tsx        Agent 卡片、按需检查、URL 详情、启动命令和会话入口
+  AgentBalance.tsx        额度窗口与过期快照处理
+  agents.css              品牌、状态、额度与管理表单布局
   CapabilityCatalog.tsx   目录查询、过滤、启停与详情
   CapabilityEditor.tsx    创建、文件导入、校验及保存
   capability-format.ts   SKILL.md / JSON 的输入解析
@@ -331,6 +336,10 @@ PR 的图抹了）。
 frontend/src/components/plugins/
   PluginsPanel.tsx        插件卡片、URL 详情、安装与清单驱动配置
   plugins.css             插件身份、详情布局；卡片复用能力目录样式
+internal/agentinventory/
+  professional.go         默认 CLI 安装发现、显式有界版本探测、已有安装白名单
+backend/api/
+  professional-agents.go  已有状态 / 安装和新增检查接口
 internal/cli/plugin/
   plugin.go               按字段声明与权限声明完整打码插件秘密配置
 agent-runtime/src/roami_agent/server/
@@ -350,6 +359,7 @@ agent-runtime/src/roami_agent/tools/
     临时文件写入、fsync 后原子 replace；落盘成功后更新内存，失败保持原目录。启动时验证并恢复托管项。
     注册和移除串行化，与启停策略共享互斥；MCP 存在正在执行或排队请求时拒绝改配和移除，避免截断调用。</p>
   <p>插件沿用已有 /plugins 与 /plugin 接口，通过 Go 网关访问插件管理器，不重复登记为 Skill。目录只加载身份和状态，按需打开详情才读取配置；配置表单由 manifest 字段生成，秘密字段按 manifest.configFields.secret 或 permissions.secrets 完整打码，表单只提交用户改动项。配置读取失败时阻止编辑并提供重试，安装成功后返回目录，不再另开命令日志弹窗。卡片打开详情写入分类 URL，手机详情不额外压入 overlay history。</p>
+  <p>Agent 目录复用 /agent/professional 和节点偏好。页面仅一个可见性控制的轮询，错误退避且保留最近快照；安装、版本检查按需执行。版本检查只允许运行已注册 Agent 的默认程序和固定 --version 参数，3 秒超时、输出上限 4 KiB。新窗口不会自动启动 CLI，也不会把本地凭证返回给前端。专业 CLI 的 Skill / MCP 配置继续由各自管理，不声称 Roami 托管能力已自动绑定到它们。</p>
   <h3>接口与边界</h3>
   <ul>
     <li>GET /api/agent/capability-settings：目录、来源、可变标记、托管配置与 MCP 状态。</li>
@@ -377,7 +387,7 @@ agent-runtime/src/roami_agent/tools/
     编辑：卡片底部直接显示“编辑”，预填现有配置，名称固定，点击“保存更改”提交。</p>
   <h3>验收记录 · 2026-10-21</h3>
   <ul>
-    <li>仓库 quick / full 质量门禁通过；Go 测试通过。最终前端 120 个测试文件、838 个用例通过，Agent 运行时 744 个用例通过。</li>
+    <li>仓库 quick / full 质量门禁通过；Go 测试通过。最终前端 120 个测试文件、843 个用例通过，Agent 运行时 744 个用例通过。</li>
     <li>真实 SKILL.md 文件上传通过，兼容折叠描述与超过 20 位的 Skill 名称；重名失败保留输入。
     </li>
     <li>typecheck、i18n:check、hover:check、生产构建通过。构建仍有现有大块体积提示，不影响本次交付。</li>
@@ -388,6 +398,7 @@ agent-runtime/src/roami_agent/tools/
     <li>本轮原型在桌面和 Android 上均验证模板新建、卡片编辑、真实文件上传后修改并保存、MCP 新建，以及 HTML 内章节 / 视口 / 主题 / 语言切换。</li>
     <li>插件卡片在桌面与 Redmi Note 8 上完成搜索、启停、配置保存后重新打开、插件包上传、卸载与内置恢复；7 个新增交互测试覆盖配置失败保留输入、秘密掩码不回写和 URL 详情返回。</li>
     <li>当前工作树构建的 Go 服务和 Python 运行时完成真实插件包上传、密码字段打码与配置保存、exec 插件命令执行、Skill 文件导入与编辑、CLI 注册和启停、MCP 本地进程发现 6 个工具；使用独立数据目录和 tmux 服务。</li>
+    <li>Agent 页通过桌面与 Redmi Note 8 真机触控验收：版本检查、命令保存及刷新恢复、旧地址迁移、返回、更新确认和打开终端。真实 Go / Python / tmux 链路运行在隔离实例，CLI 与 npm 使用固定测试程序，验证保存的模型参数确实进入新终端，不安装或更新本机现有 Agent。</li>
     <li>所有截图与临时验收脚本位于 /tmp，不进入主分支；当前开发代码位于 feat/capabilities-hub。</li>
   </ul>
 </section>

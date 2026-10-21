@@ -25,7 +25,6 @@ import { StatusBarSettings } from './status-bar-settings'
 import { AgentMemorySettings } from './agent-memory-settings'
 import { AgentMessageSettings } from './agent-message-settings'
 import { AgentSettings } from './agent-settings'
-import { ProfessionalAgents } from './professional-agents'
 import { AccountActions } from './account-actions'
 
 export const MAX_ROWS = 6
@@ -143,38 +142,6 @@ export function buildSettings(deps: {
       options: [{ value: 'zh-CN', label: '中文' }, { value: 'en-US', label: 'English' }],
     },
   }
-  const claudeItem: SettingItem = {
-    id: 'claudeCommand', label: t('set.claudeCmd'), desc: t('set.claudeCmdHelp'), key: 'claudeCommand',
-    control: {
-      kind: 'text', placeholder: 'claude',
-      get: () => prefs.claudeCommand || '',
-      set: (v) => deps.setPrefs({ claudeCommand: v.trim() || 'claude' }),
-    },
-  }
-  const codexItem: SettingItem = {
-    id: 'codexCommand', label: t('set.codexCmd'), desc: t('set.codexCmdHelp'), key: 'codexCommand',
-    control: {
-      kind: 'text', placeholder: 'codex',
-      get: () => prefs.codexCommand || '',
-      set: (v) => deps.setPrefs({ codexCommand: v.trim() || 'codex' }),
-    },
-  }
-  const piItem: SettingItem = {
-    id: 'piCommand', label: t('set.piCmd'), desc: t('set.piCmdHelp'), key: 'piCommand',
-    control: {
-      kind: 'text', placeholder: 'pi',
-      get: () => prefs.piCommand || '',
-      set: (v) => deps.setPrefs({ piCommand: v.trim() || 'pi' }),
-    },
-  }
-  const opencodeItem: SettingItem = {
-    id: 'opencodeCommand', label: t('set.opencodeCmd'), desc: t('set.opencodeCmdHelp'), key: 'opencodeCommand',
-    control: {
-      kind: 'text', placeholder: 'opencode',
-      get: () => prefs.opencodeCommand || '',
-      set: (v) => deps.setPrefs({ opencodeCommand: v.trim() || 'opencode' }),
-    },
-  }
   const promptPopupItem: SettingItem = {
     id: 'promptPopupOff', label: t('settings.promptPopupDefault'), desc: t('settings.promptPopupDefaultHelp'), key: 'promptPopupOff',
     control: { kind: 'switch', get: () => !prefs.promptPopupOff, set: (on) => deps.setPrefs({ promptPopupOff: !on }) },
@@ -207,7 +174,6 @@ export function buildSettings(deps: {
       items: [
         { ...themeItem, from: `${t('set.groupUi')} · ${t('set.pageLook')}` },
         { ...localeItem, from: `${t('set.groupUi')} · ${t('set.pageLook')}` },
-        { ...claudeItem, from: `${t('set.groupAgent')} · ${t('set.pageBin')}` },
         { ...promptPopupItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
         { ...pushItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
         { ...voiceItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
@@ -269,10 +235,6 @@ export function buildSettings(deps: {
         keywords: '状态条 status bar cpu 内存 memory 插件 plugin 主机 host',
         control: { kind: 'custom', node: <StatusBarSettings /> },
       }],
-    },
-    {
-      id: 'agent.bin', name: t('set.pageBin'), parent: t('set.groupAgent'), scope: 'node', hideScope: true,
-      items: [{ id: 'professionalAgents', label: t('set.pageBin'), bare: true, control: { kind: 'custom', node: <ProfessionalAgents items={[claudeItem, codexItem, opencodeItem, piItem]} /> }, keywords: 'Claude Code Codex OpenCode Pi 用量 额度 路径 command 专业智能体' }],
     },
     {
       id: 'agent.new', name: t('set.pageNewSession'), parent: t('set.groupAgent'), scope: 'mine',
@@ -373,7 +335,7 @@ export function buildSettings(deps: {
     { kind: 'section', title: t('set.secMine'), note: '' },
     { kind: 'leaf', page: 'common' },
     { kind: 'parent', id: 'ui', title: t('set.groupUi'), kids: ['ui.look', 'ui.layout', 'ui.keys', 'ui.keys.more', 'ui.status'] },
-    { kind: 'parent', id: 'agent', title: t('set.groupAgent'), kids: ['agent.runtime', 'agent.messages', 'agent.memory', 'agent.bin', 'agent.new'] },
+    { kind: 'parent', id: 'agent', title: t('set.groupAgent'), kids: ['agent.runtime', 'agent.messages', 'agent.memory', 'agent.new'] },
     // 这一段的页直接摊平：段标题已经写了「这台机器」，再套一层同名的父节点是把同一件事说两遍
     { kind: 'section', title: deps.nodeLabel ? t('set.secNode', { node: deps.nodeLabel }) : t('set.groupNode'), note: '' },
     ...(['node.browser', 'node.phone', 'node.speech', 'node.p2p', 'node.env', 'sec'].map((page) => ({ kind: 'leaf', page } as TreeNode))),

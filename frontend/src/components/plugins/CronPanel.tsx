@@ -559,7 +559,7 @@ function JobModal({ open, job, existing, t, pluginId, onClose, onSaved, submit }
             if (getFieldValue('action') === 'agent') return (
               <>
                 <Form.Item name="provider" label={t('cron.fieldProvider')} extra={agentsError
-                  ? <a href="#/settings/agent/bin">{t('agentDiscovery.unavailable')}</a> : undefined}>
+                  ? <a href="#/capabilities/agents">{t('agentDiscovery.unavailable')}</a> : undefined}>
                   <Select allowClear loading={agentsLoading} placeholder={t('cron.providerAuto')}
                     options={agents.map((agent) => ({
                       value: agent.kind,

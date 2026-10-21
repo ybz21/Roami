@@ -43,3 +43,8 @@ it('migrates plugin and settings capability links without losing their selection
   for (const kind of ['skills', 'mcp', 'cli', 'tools']) expect(normalizeRoute('settings/agent/' + kind)).toBe('capabilities/' + kind)
   expect(normalizeRoute('settings/agent/capabilities')).toBe('capabilities/skills')
 })
+
+it('moves professional agent links into capabilities and preserves the selected agent', () => {
+  expect(normalizeRoute('settings/agent/bin')).toBe('capabilities/agents')
+  expect(normalizeRoute('settings/agent/bin/codex')).toBe('capabilities/agents/codex')
+})
