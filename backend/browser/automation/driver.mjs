@@ -22,7 +22,7 @@ import { discoverBrowser, observePage } from './browser-observation.mjs'
 import { ScopedCDP, connectTarget, selectTarget } from './scoped-cdp.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
-const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v2'
+const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v3'
 const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli.log'
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
@@ -36,7 +36,7 @@ function parseArgs(argv) {
   const rest = argv.slice(1)
   const flags = {}
   const pos = []
-  const booleanFlags = new Set(['full', 'fast', 'fresh', 'mobile', 'no-retry', 'no-focus'])
+  const booleanFlags = new Set(['full', 'fast', 'fresh', 'mobile', 'no-retry', 'no-focus', 'no-start', 'only-if-background'])
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i]
     if (a.startsWith('--')) {
@@ -328,7 +328,12 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
     }
     case 'pdf': { const f = pos[0] || 'page.pdf'; await (await pickHere()).pdf({ path: f }); io.log(f); break }
     case 'observe': io.log(await observePage(await pickHere(), flags.screenshot, { timeoutMs: to })); break
-    case 'close': await (await pickHere()).close(); io.log('ok'); break
+    case 'close': {
+      if (flags['only-if-background'] && (!flags.target || !flags['no-focus'])) fail('CHROME_TARGET_SELECTION_CONFLICT')
+      const page = await pickHere()
+      if (flags['only-if-background'] && await withTimeout(page.evaluate(() => document.visibilityState === 'visible' || document.hasFocus()), to, 'background close check')) fail('CHROME_TARGET_IN_USE')
+      await page.close(); io.log('ok'); break
+    }
     default: fail('未知命令: ' + verb)
   }
 }
@@ -579,7 +584,7 @@ class Session {
     const control = this.controlSocket
     if (verb === 'capabilities') {
       await control.request('Browser.getVersion')
-      io.log({ version: 'roami-browser-v1', browserId: discovered.id, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene'] })
+      io.log({ version: 'roami-browser-v1', browserId: discovered.id, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close'] })
       return
     }
     const listTargets = async () => (await control.request('Target.getTargets')).targetInfos

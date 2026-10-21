@@ -56,7 +56,7 @@ class BrowserFixture:
         while index < len(argv):
             value = argv[index]
             if value.startswith("--"):
-                if value in {"--no-retry", "--no-focus"}:
+                if value in {"--no-retry", "--no-focus", "--no-start", "--only-if-background"}:
                     flags[value] = True
                 else:
                     index += 1
@@ -81,6 +81,8 @@ class BrowserFixture:
                     "expected_scene",
                 ],
             }
+        elif verb == "tabs":
+            output = [{"targetId": "target-fixture"}] if "new" in self.writes else []
         elif verb in {"operation-cancel", "operation-status"}:
             output = self.receipts[operation_id]
             if self.stop_known and verb == "operation-cancel":
@@ -488,7 +490,9 @@ async def test_unavailable_background_screenshot_keeps_fresh_dom_and_never_repea
         if argv[2] == "observe" and "--screenshot" in argv:
             assert argv[argv.index("--timeout") + 1] == "5000"
             return {"exitCode": 1, "stdout": "", "stderr": "CHROME_OBSERVATION_TIMEOUT"}
-        assert argv[argv.index("--timeout") + 1] == ("5000" if argv[2] == "observe" else "0")
+        assert argv[argv.index("--timeout") + 1] == (
+            "5000" if argv[2] == "observe" else "3000" if argv[2] == "tabs" else "0"
+        )
         return await fixture(argv, **options)
 
     runtime.browser.runner = runner

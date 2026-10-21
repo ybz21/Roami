@@ -304,7 +304,7 @@ async def test_schema_seven_upgrades_without_rewriting_main_history(tmp_path, mo
             await database.call(
                 lambda db: db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
             )
-            == 8
+            == migrations.SCHEMA_VERSION
         )
         assert (await prepare(runtime, binding))["origin_message_id"] == binding["originMessageId"]
     finally:

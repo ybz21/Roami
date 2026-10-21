@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from roami_agent.executors.browser_tabs import BrowserTabs
 from roami_agent.executors.input_cancellation import (
     input_started,
     input_stopped,
@@ -44,6 +45,7 @@ class BrowserDriver:
         self.instance = hashlib.sha256(str(self.root).encode()).hexdigest()[:24]
         self.reconcile_cursor = ""
         self.receipt_reader = receipt_reader or self._stored_receipt
+        self.tabs = BrowserTabs(self)
 
     def _read_receipt_file(self, operation_id):
         if not re.fullmatch(r"[a-f0-9]{32}", operation_id):
@@ -155,6 +157,8 @@ class BrowserDriver:
                     )
             except (DomainError, OSError, TimeoutError):
                 continue
+
+        await self.tabs.sweep()
 
     def _directories(self):
         for path in [self.socket_root, self.root / "agents", self.receipts, self.captures]:
@@ -306,9 +310,9 @@ class BrowserDriver:
             raise DomainError("BROWSER_OBSERVATION_LIMIT", 503)
         return view
 
-    async def capabilities(self):
+    async def capabilities(self, *, no_start=False):
         try:
-            result = await self._cli("capabilities")
+            result = await self._cli("capabilities", *(["--no-start"] if no_start else []))
         except (DomainError, OSError, TimeoutError) as exc:
             code = exc.code if isinstance(exc, DomainError) else "BROWSER_DRIVER_UNAVAILABLE"
             raise ToolPreflightError(code, 503) from exc
@@ -529,71 +533,72 @@ class BrowserDriver:
                 for action in stopped
             ):
                 raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
-        capabilities = await self.capabilities()
-        browser_id = capabilities["browserId"]
-        target_id = args.get("targetId")
-        if target_id:
-            if not self.config.get("existing_tabs", False):
-                raise DomainError("BROWSER_TARGET_SCOPE_REQUIRED", 409)
-            if args.get("url"):
-                raise DomainError("BROWSER_TARGET_OPTIONS_CONFLICT")
-        else:
-            url = args.get("url", "about:blank")
-            parsed = urlsplit(url)
-            if url != "about:blank" and (
-                parsed.scheme not in {"http", "https"}
-                or not parsed.hostname
-                or parsed.username
-                or parsed.password
-            ):
-                raise DomainError("BROWSER_URL_INVALID")
-            lease = await self._claim(scope, "browser:" + browser_id + ":context", binding=binding)
-            observed = await self.resources.observe(
-                scope["owner"],
-                lease["id"],
-                scope["taskId"],
-                scope["runId"],
-                lease["lease_epoch"],
-                hashlib.sha256(browser_id.encode()).hexdigest(),
-                {"browserId": browser_id},
-            )
-            try:
-                owned = await self.resources.owned(scope)
-                if (
-                    sum(":target:" in item["resource_key"] for item in owned)
-                    >= self.config["max_tabs"]
+        async with self.tabs.lock:
+            capabilities = await self.capabilities()
+            browser_id = capabilities["browserId"]
+            target_id = args.get("targetId")
+            if target_id:
+                if not self.config.get("existing_tabs", False):
+                    raise DomainError("BROWSER_TARGET_SCOPE_REQUIRED", 409)
+                if args.get("url"):
+                    raise DomainError("BROWSER_TARGET_OPTIONS_CONFLICT")
+            else:
+                url = args.get("url", "about:blank")
+                parsed = urlsplit(url)
+                if url != "about:blank" and (
+                    parsed.scheme not in {"http", "https"}
+                    or not parsed.hostname
+                    or parsed.username
+                    or parsed.password
                 ):
-                    raise DomainError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
-                result = await self._perform(
-                    scope,
-                    lease,
-                    observed,
-                    binding,
-                    "new",
-                    [],
-                    browser_id=browser_id,
-                    phase="create",
+                    raise DomainError("BROWSER_URL_INVALID")
+                lease = await self._claim(
+                    scope, "browser:" + browser_id + ":context", binding=binding
                 )
-                target_id = json.loads(result["output"])["targetId"]
-            finally:
+                observed = await self.resources.observe(
+                    scope["owner"],
+                    lease["id"],
+                    scope["taskId"],
+                    scope["runId"],
+                    lease["lease_epoch"],
+                    hashlib.sha256(browser_id.encode()).hexdigest(),
+                    {"browserId": browser_id},
+                )
                 try:
-                    await self.resources.release(
-                        scope["owner"],
-                        lease["id"],
-                        scope["taskId"],
-                        scope["runId"],
-                        lease["lease_epoch"],
+                    await self.tabs.make_room(capabilities)
+                    result = await self._perform(
+                        scope,
+                        lease,
+                        observed,
+                        binding,
+                        "new",
+                        [],
+                        browser_id=browser_id,
+                        phase="create",
                     )
-                except DomainError:
-                    pass
-        if not isinstance(target_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", target_id):
-            raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
-        lease = await self._claim(
-            scope,
-            "browser:" + browser_id + ":target:" + target_id,
-            created=not args.get("targetId"),
-            binding=binding,
-        )
+                    target_id = json.loads(result["output"])["targetId"]
+                    await self.tabs.track(scope["owner"], browser_id, target_id)
+                finally:
+                    try:
+                        await self.resources.release(
+                            scope["owner"],
+                            lease["id"],
+                            scope["taskId"],
+                            scope["runId"],
+                            lease["lease_epoch"],
+                        )
+                    except DomainError:
+                        pass
+            if not isinstance(target_id, str) or not re.fullmatch(
+                r"[A-Za-z0-9_-]{1,128}", target_id
+            ):
+                raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
+            lease = await self._claim(
+                scope,
+                "browser:" + browser_id + ":target:" + target_id,
+                created=not args.get("targetId"),
+                binding=binding,
+            )
         try:
             opened = await self.observe({"resourceId": lease["id"]}, binding)
         except (DomainError, OSError):

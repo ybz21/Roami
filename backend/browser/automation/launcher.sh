@@ -354,6 +354,8 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
 
   通用选项: --target <稳定ID> | --tab <序号> | --url <子串>  选目标标签页（默认第一个）
             --no-retry（仅执行一次，未知结果不重放）
+            --no-start（只连接已有 Chrome，不自动启动）
+            close --target <id> --no-focus --only-if-background（只回收后台页）
             --operation-id <32位ID> --receipt-root <私有目录>（持久化动作回执）
             --expected-browser <实例ID> --expected-scene <观察签名>（动作前验证）
             --timeout <ms>（默认 15000）  --cdp <地址>
@@ -397,7 +399,11 @@ else
     # 根 chrome 是单文件分发；每次执行刷新内嵌 driver，确保升级后的 CLI 立即生效。
     _write_driver
 fi
-if [ "$fresh_screenshot" -eq 0 ]; then
+no_start=0
+for arg in "$@"; do
+    [ "$arg" != "--no-start" ] || no_start=1
+done
+if [ "$fresh_screenshot" -eq 0 ] && [ "$no_start" -eq 0 ]; then
     _ensure_browser || exit 1
 fi
 # 目标地址逐条命令显式传下去：常驻 daemon 是先起先得，它进程里的 env 还是当初拉起它那次的，

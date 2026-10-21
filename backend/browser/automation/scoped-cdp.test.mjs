@@ -131,3 +131,34 @@ test('switching targets retains and reuses page connections until the browser ch
     assert.equal(closed, 2)
   } finally { await session.close() }
 })
+
+test('background-only recycling preserves foreground pages and closes only its stable target', async () => {
+  const closed = [], fronts = []
+  let foreground = true
+  const context = { pages: () => [page], newCDPSession: async () => ({
+    send: async () => ({ targetInfo: { targetId: 'owned' } }), detach: async () => {},
+  }) }
+  const page = { context: () => context, url: () => 'https://owned.test',
+    evaluate: async () => foreground, close: async () => closed.push('owned'),
+    bringToFront: async () => fronts.push('owned'),
+  }
+  const browser = { contexts: () => [context], isConnected: () => true, close: async () => {} }
+  const session = new Session({
+    discover: async () => ({ id: 'browser', websocketUrl: 'ws://fixture' }),
+    connect: async () => browser,
+    control: async () => ({ close: () => {}, request: async () => ({ targetInfos: [
+      { type: 'page', targetId: 'user', url: 'https://user.test' },
+      { type: 'page', targetId: 'owned', url: 'https://owned.test' },
+    ] }) }),
+  })
+  const flags = { target: 'owned', 'no-focus': true, 'only-if-background': true, 'expected-browser': 'browser' }
+  try {
+    await assert.rejects(session.run('close', flags, [], 1000, { log: () => {} }), /CHROME_TARGET_IN_USE/)
+    assert.deepEqual(closed, [])
+    foreground = false
+    await session.run('close', flags, [], 1000, { log: () => {} })
+    assert.deepEqual(closed, ['owned'])
+    assert.deepEqual(fronts, [])
+    await assert.rejects(session.run('close', { ...flags, 'no-focus': false }, [], 1000, { log: () => {} }), /CHROME_TARGET_SELECTION_CONFLICT/)
+  } finally { await session.close() }
+})

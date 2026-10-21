@@ -161,6 +161,10 @@ class ResourceLeases:
                     item["id"],
                 ),
             )
+            db.execute(
+                "UPDATE browser_tabs SET last_used_ms=?,idle_since_ms=NULL WHERE resource_id=? AND state='open'",
+                (now_ms(), item["id"]),
+            )
             return row(db, "SELECT * FROM resources WHERE id=?", (item["id"],))
 
         return await self.db.call(write, write=True)
@@ -312,6 +316,12 @@ class ResourceLeases:
     async def pause(self, owner, resource_id):
         def write(db):
             self._owned(db, owner, resource_id)
+            if row(
+                db,
+                "SELECT resource_id FROM browser_tabs WHERE resource_id=? AND state='closing'",
+                (resource_id,),
+            ):
+                raise DomainError("RESOURCE_BUSY", 409)
             state = "pausing" if self._pending(db, resource_id) else "paused"
             db.execute("UPDATE resources SET state=? WHERE id=?", (state, resource_id))
             return {"id": resource_id, "state": state}
@@ -335,6 +345,10 @@ class ResourceLeases:
                 "UPDATE resources SET state=?,owner_task_id=CASE WHEN ?='paused' THEN owner_task_id ELSE NULL END,owner_run_id=CASE WHEN ?='paused' THEN owner_run_id ELSE NULL END,lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
                 (state, state, state, resource_id),
             )
+            db.execute(
+                "UPDATE browser_tabs SET idle_since_ms=? WHERE resource_id=? AND state='open'",
+                (now_ms() if state == "idle" else None, resource_id),
+            )
             return {"id": resource_id, "state": state}
 
         return await self.db.call(write, write=True)
@@ -351,6 +365,10 @@ class ResourceLeases:
             db.execute(
                 "UPDATE resources SET state='idle',owner_task_id=NULL,owner_run_id=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
                 (resource_id,),
+            )
+            db.execute(
+                "UPDATE browser_tabs SET idle_since_ms=? WHERE resource_id=? AND state='open'",
+                (now_ms(), resource_id),
             )
             return {"id": resource_id, "state": "idle"}
 
@@ -464,6 +482,10 @@ class ResourceLeases:
                 db.execute(
                     "UPDATE resources SET state=?,owner_task_id=CASE WHEN ?='paused' THEN owner_task_id ELSE NULL END,owner_run_id=CASE WHEN ?='paused' THEN owner_run_id ELSE NULL END,lease_until_ms=NULL,lease_epoch=lease_epoch+1 WHERE id=?",
                     (state, state, state, item["id"]),
+                )
+                db.execute(
+                    "UPDATE browser_tabs SET idle_since_ms=? WHERE resource_id=? AND state='open'",
+                    (now_ms() if state == "idle" else None, item["id"]),
                 )
 
         await self.db.call(write, write=True)

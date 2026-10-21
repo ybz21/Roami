@@ -72,3 +72,11 @@ status / cancel 不连接或启动 Chrome；目录必须为当前用户私有。
 `observe --target <id>` 返回有界主框架文本、可见控件、viewport/DPR、时间与场景签名。原始 DOM、用于签名的完整输入集合和焦点细节不回传；可见控件值受长度上限约束，密码控件的值隐藏。超出输出预算的控件明确标记截断，跨 iframe 的内容不冒充主框架观察。可选 `--screenshot <新文件.png>` 返回图片尺寸和 viewport 到像素的比例；截图前后场景不同则丢弃混合观察。
 
 动作带 `--expected-browser <browserId> --expected-scene <signature>` 时，先验证实例和页面状态再输入。焦点检查发生在前置标签之前，避免先抢回焦点再漏掉人工切换。表单值、选区、viewport/缩放、焦点或 DOM 变化会使完整页面签名失效。`observe` 另返回 `navigationSignature`：仅 `goto` 可使用它，校验浏览器、标签、文档、URL、输入内容、焦点和选区，允许广告或正文自动更新；点击、输入等动作仍必须使用完整 `signature`。此模式使用新的内部版本动词，旧 daemon 不会忽略校验选项后继续动作。动作返回仍需再次观察和任务验收，不等于用户目标完成。
+
+### Agent 标签池
+
+原生 Agent 创建的标签页按浏览器实例共用容量，`tools.browser.max_tabs` 默认 20，允许 1..20；旧配置中的显式值仍保留，升级到 20 页时同步将已有 `max_tabs = 3` 改为 `max_tabs = 20`。用户自行打开或仅借用的页面不计入回收池。
+
+任务释放控制权后，页面默认保留 600 秒；`idle_timeout_seconds` 可配置为 30..86400 秒。后台每 30 秒检查一次，每轮最多尝试回收 3 页。创建新页遇满额时优先回收最早空闲页面。活动租约、人工接管、未知动作和前台页面受保护；无安全候选时返回 `BROWSER_TAB_BUDGET_EXCEEDED`，不抢占其他任务。
+
+关闭使用持久 `operationId`、精确 `browserId` / `targetId` 及 `--only-if-background --no-focus`。关闭未知时只核对原回执与 target 是否仍存在，不重新发送关闭。回收命令带 `--no-start`，浏览器关闭后不会被后台回收拉起。数据库保存成功创建的来源证明、空闲时间与关闭回执；升级时仅从成功创建回执补登记仍存在的页面，不按 URL 或标签序号猜所有权。
