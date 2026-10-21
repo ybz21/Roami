@@ -527,11 +527,22 @@ class BrowserDriver:
                 "error": "BROWSER_OBSERVATION_UNAVAILABLE",
             }
         if not args.get("targetId") and url != "about:blank":
-            return await self.act(
-                {"observationId": opened["observation"]["id"], "kind": "goto", "url": url},
-                binding,
-                phase="navigate",
-            )
+            try:
+                return await self.act(
+                    {"observationId": opened["observation"]["id"], "kind": "goto", "url": url},
+                    binding,
+                    phase="navigate",
+                )
+            except DomainError as exc:
+                if not exc.code.startswith("CHROME_NAVIGATION_"):
+                    raise
+                # Keep the newly owned tab addressable after failed initial navigation.
+                return {
+                    "resourceId": lease["id"],
+                    "opened": True,
+                    "navigationFailed": True,
+                    "error": exc.code,
+                }
         return opened
 
     @passive_cancel_boundary

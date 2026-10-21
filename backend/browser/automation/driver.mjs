@@ -263,6 +263,15 @@ function navigationWait(flags) {
   return value
 }
 
+async function navigate(page, url, options) {
+  try { return await page.goto(url, options) } catch (error) {
+    // A rejected network request is known; cancellation or a lost CDP connection is not.
+    const failure = /^page\.goto: net::ERR_(NAME_NOT_RESOLVED|CONNECTION_TIMED_OUT|CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|NETWORK_CHANGED|PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED|EMPTY_RESPONSE|SSL_PROTOCOL_ERROR|CERT_AUTHORITY_INVALID|CERT_DATE_INVALID) at /.exec(error.message)
+    if (failure) throw new ChromeError('CHROME_NAVIGATION_' + failure[1])
+    throw error
+  }
+}
+
 async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) {
   const fail = (m) => { throw new ChromeError(m) }
   const to = timeoutMs
@@ -285,7 +294,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
   }
 
   switch (verb) {
-    case 'goto': { const p = await pickHere(); await withInsecureTLS(ctx, p, () => p.goto(pos[0], { waitUntil: navigationWait(flags), timeout: to })); io.log({ url: p.url(), title: await p.title() }); break }
+    case 'goto': { const p = await pickHere(); await withInsecureTLS(ctx, p, () => navigate(p, pos[0], { waitUntil: navigationWait(flags), timeout: to })); io.log({ url: p.url(), title: await p.title() }); break }
     case 'url': io.log((await pickHere()).url()); break
     case 'title': io.log(await (await pickHere()).title()); break
     case 'click': await (await pickHere()).click(pos[0], { timeout: to }); io.log('ok'); break

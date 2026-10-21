@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { observePage } from './browser-observation.mjs'
 import { Session } from './driver.mjs'
+import { OperationReceipts } from './operation-receipts.mjs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 function fixture() {
   const state = { html: '<body>news</body>', values: [['draft', false]], focused: { html: '<body>news</body>', identity: ['BODY'], hasFocus: false }, url: 'https://example.com/news', loader: 'document' }
@@ -45,3 +49,39 @@ test('legacy exact scene navigation remains supported', async () => {
   await f.run('goto', before.signature)
   assert.equal(f.moves.length, 1)
 })
+
+for (const reason of ['CONNECTION_TIMED_OUT', 'CONNECTION_REFUSED', 'NAME_NOT_RESOLVED', 'EMPTY_RESPONSE']) {
+  test('a rejected navigation records ' + reason + ' and the same tab remains usable', async () => {
+    const f = fixture(), before = await observePage(f.page), root = await mkdtemp(join(tmpdir(), 'roami-navigation-'))
+    const receipts = new OperationReceipts(root), id = 'b'.repeat(32), original = f.page.goto
+    try {
+      f.page.goto = async () => { throw new Error('page.goto: net::ERR_' + reason + ' at https://example.com/source\nCall log:') }
+      const pending = await receipts.begin(id, ['goto', 'https://example.com/source'])
+      const result = await receipts.execute(id, pending.record.payloadHash, () => f.run('goto', before.navigationSignature))
+      assert.equal(result.state, 'failed'); assert.equal(result.outcomeKnown, true); assert.equal(result.inputStopped, true)
+      assert.equal(result.errorCode, 'CHROME_NAVIGATION_' + reason)
+      f.page.goto = original
+      await f.run('goto', before.navigationSignature)
+      assert.equal(f.moves.length, 1)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+}
+
+for (const [verb, error] of [
+  ['goto', 'page.goto: Timeout 5000ms exceeded.'],
+  ['goto', 'page.goto: Target page, context or browser has been closed'],
+  ['goto', 'page.goto: net::ERR_ABORTED at https://example.com/source'],
+  ['click', 'page.click: net::ERR_CONNECTION_TIMED_OUT at https://example.com/source'],
+]) {
+  test('an unresolved ' + verb + ' remains unknown: ' + error, async () => {
+    const f = fixture(), before = await observePage(f.page), root = await mkdtemp(join(tmpdir(), 'roami-navigation-'))
+    const receipts = new OperationReceipts(root), id = 'c'.repeat(32)
+    try {
+      f.page[verb] = async () => { throw new Error(error) }
+      const pending = await receipts.begin(id, [verb])
+      const result = await receipts.execute(id, pending.record.payloadHash, () => f.run(verb, before.signature))
+      assert.equal(result.state, 'unknown'); assert.equal(result.outcomeKnown, false)
+      assert.equal(result.errorCode, 'CHROME_OPERATION_OUTCOME_UNKNOWN')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+}

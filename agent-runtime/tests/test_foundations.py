@@ -245,7 +245,10 @@ async def test_tool_list_lists_categories_pages_and_removes_old_entry(store):
             call("tool_list", {"kind": "cli", "query": "mcp_fixture_echo"}), "worker", {}
         )
     )["items"]
-    assert not (await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "main", {}))["items"]
+    main_mcp = await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "main", {})
+    assert not main_mcp["items"]
+    assert main_mcp["scope"] == "current_role"
+    assert "not web search results" in main_mcp["hint"]
     assert not (await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {}))[
         "items"
     ]

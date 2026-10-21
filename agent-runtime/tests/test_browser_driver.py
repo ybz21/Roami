@@ -285,6 +285,130 @@ async def test_native_worker_uses_real_task_scope_and_verifies_independent_brows
         await runtime.close()
 
 
+@pytest.mark.parametrize("initial_failure", [False, True])
+async def test_failed_source_navigation_can_continue_in_the_same_task(store, initial_failure):
+    from test_runtime import until
+
+    fixture = BrowserFixture()
+
+    async def runner(argv, **options):
+        verb, _, args = fixture.arguments(argv)
+        result = await fixture(argv, **options)
+        if verb == "goto" and args[0] == "https://unreachable.example/":
+            receipt = json.loads(result["stdout"])
+            receipt.update(
+                state="failed",
+                inputStopped=True,
+                outcomeKnown=True,
+                errorCode="CHROME_NAVIGATION_CONNECTION_TIMED_OUT",
+                result={"stdout": ""},
+            )
+            fixture.receipts[receipt["id"]] = receipt
+            fixture.url = "chrome-error://chromewebdata/"
+            result["stdout"] = encoded(receipt)
+        return result
+
+    class RecoveryModel(BrowserModel):
+        async def stream(self, messages, tools):
+            if not tools or "ask_user" in {item["function"]["name"] for item in tools}:
+                yield ModelEvent("text", "Reported in the original conversation")
+                return
+            self.step += 1
+            result = json.loads(messages[-1]["content"]) if self.step > 1 else {}
+            if initial_failure and self.step == 2:
+                assert result["navigationFailed"] and result["opened"]
+                self.resource = result["resourceId"]
+            phase = self.step + int(initial_failure and self.step > 1)
+            if phase == 1:
+                name, args = (
+                    "browser_open",
+                    ({"url": "https://unreachable.example/"} if initial_failure else {}),
+                )
+            elif phase == 2:
+                self.resource = result["observation"]["resourceId"]
+                name, args = (
+                    "browser_act",
+                    {
+                        "kind": "goto",
+                        "observationId": result["observation"]["id"],
+                        "url": "https://unreachable.example/",
+                    },
+                )
+            elif phase == 3:
+                assert result["error"] == "CHROME_NAVIGATION_CONNECTION_TIMED_OUT"
+                assert not result.get("retryable")
+                name, args = "browser_observe", {"resourceId": self.resource}
+            elif phase == 4:
+                name, args = (
+                    "browser_act",
+                    {
+                        "kind": "goto",
+                        "observationId": result["observation"]["id"],
+                        "url": "https://fixture.example/alternative",
+                    },
+                )
+            else:
+                assert result["observation"]["url"] == "https://fixture.example/alternative"
+                yield ModelEvent("text", "Alternative source retrieved successfully.")
+                return
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "recovery-" + str(self.step),
+                    "type": "function",
+                    "function": {"name": name, "arguments": encoded(args)},
+                },
+            )
+
+    model = RecoveryModel()
+
+    async def verify(task, result):
+        return fixture.url == "https://fixture.example/alternative"
+
+    runtime = Runtime(
+        store,
+        model,
+        worker_model=model,
+        settings=Settings(browser={"enabled": True}),
+        verifier=verify,
+    )
+    runtime.browser.runner = runner
+    runtime.browser.receipt_reader = lambda operation_id: asyncio.sleep(
+        0, result=fixture.receipts[operation_id]
+    )
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Find an accessible source",
+            key="source",
+            record_intent=True,
+        )
+        runtime.wakeup.set()
+        await until(
+            store,
+            lambda db: (
+                row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))["state"] == "succeeded"
+            ),
+        )
+        assert (
+            await store.call(lambda db: db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]) == 1
+        )
+        assert fixture.writes.count("new") == 1
+        assert (
+            await store.call(
+                lambda db: db.execute(
+                    "SELECT COUNT(*) FROM tool_calls WHERE state='unknown'"
+                ).fetchone()[0]
+            )
+            == 0
+        )
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("known, expected", [(True, "cancelled"), (False, "interrupted")])
 async def test_browser_cancel_requires_actual_driver_stop_evidence(store, known, expected):
     from test_runtime import until

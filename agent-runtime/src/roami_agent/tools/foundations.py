@@ -148,6 +148,12 @@ class ToolDirectory:
         if alternatives and alternatives[0][1] and not any(entry[1] for entry in selected):
             selected = []
         result = {
+            "scope": "current_role",
+            "hint": (
+                "Local capabilities callable in this role only, not web search results. Zero matches "
+                "do not prove a worker lacks integrations or external services are unavailable. "
+                "For requested external facts, retrieve sources through a delegated browser lookup."
+            ),
             "catalogVersion": version,
             "items": [item for _, _, item in selected[offset : offset + limit]],
             "total": len(selected),
@@ -161,7 +167,8 @@ class ToolDirectory:
         }
         if not selected and alternatives:
             result["suggestions"] = [item for _, _, item in alternatives[:3]]
-            result["hint"] = (
+            result["hint"] += (
+                " "
                 "No matching "
                 + kind
                 + " operation. Follow the suggested workflow or capability instead of repeating the same search."
@@ -312,7 +319,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "tool_list",
-            "List available MCP, Skills and CLI capabilities by category. Optionally filter by intent or name and page with offset. Returns skill:// locations for read, or exact bash argv and input schemas. Known operations can run directly. This lists capabilities, not user history or web results.",
+            "List local MCP, Skill and CLI capabilities callable in this role, with name/intent/category filters and pagination. Returns skill:// paths or exact bash argv and schemas. Known operations can run directly. This is not web results or an external service/pricing directory; empty matches do not prevent delegated browser lookup.",
             object_schema(
                 {
                     "query": {"type": "string", "maxLength": 1000},
