@@ -496,6 +496,18 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def task_detail(task_id: str, owner: Owner):
         return {"data": await runtime.tasks.get(owner, task_id)}
 
+    @app.get("/v1/tasks/{task_id}/conversation")
+    async def task_conversation(task_id: str, owner: Owner, runId: str | None = None):
+        return {"data": await runtime.tasks.conversation(owner, task_id, runId)}
+
+    @app.get("/v1/tasks/{task_id}/activities")
+    async def task_activities(task_id: str, owner: Owner):
+        return {"data": await runtime.tasks.activities(owner, task_id)}
+
+    @app.get("/v1/tasks/{task_id}/activities/{activity_id}")
+    async def task_activity_detail(task_id: str, activity_id: str, owner: Owner):
+        return {"data": await runtime.tasks.activities(owner, task_id, activity_id)}
+
     @app.post("/v1/tasks", status_code=202)
     async def create_task(body: CreateTask, owner: Owner):
         result = await runtime.tasks.create(

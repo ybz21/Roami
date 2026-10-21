@@ -44,7 +44,9 @@ Desktop Home actions belong in the right workspace header when it is open; avoid
 entries beside the workspace tabs. Phone top-bar task entries are icon buttons with accessible names.
 Task lists show a short topic; keep full instructions in details. Task details show descriptions in three expandable lines,
 with agent instructions collapsed by default. Put the verified outcome and usable deliverables before execution records. Executor claims never
-override task or verification state.
+override task or verification state. Main chat shows task progress and actionable blockers; tool
+steps, routing explanations and internal IDs belong in execution records. Ended task details do
+not poll; refresh them through events, navigation or explicit recovery actions.
 
 Use existing automatic updates and mobile pull-to-refresh instead of a permanent refresh button
 or a toolbar devoted to it. Desktop pages use browser refresh/F5; keep explicit recovery actions

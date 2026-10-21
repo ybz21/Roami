@@ -36,7 +36,7 @@ function AgentImageAttachment({ file, node }: { file: Attachment; node: string |
   </span>
 }
 
-function AgentMessageView({ item, node, focused, remember, canAnswer = false, answer }: { item: AgentMessage; node: string | null; focused: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
+function AgentMessageView({ item, node, focused, remember, canAnswer = false, answer, readOnly = false, author = 'Roami' }: { item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; author?: string; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
   const { t, locale } = useI18n(), { message } = App.useApp(), [copied, setCopied] = useState(false)
   const assistant = item.role === 'assistant'
   const resolveResource = useCallback((href: string) => agentResourceUrl(href, node), [node])
@@ -47,7 +47,7 @@ function AgentMessageView({ item, node, focused, remember, canAnswer = false, an
     catch { message.error(t('agent.composer.copyFailed')) }
   }
   return <article data-message-id={item.id} data-notification-focus={focused || undefined} className={`agent-message ${item.role}`}>
-    {assistant && <div className="agent-author">Roami{item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}</div>}
+    {assistant && <div className="agent-author">{author}{item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}</div>}
     {report && <div className="agent-session-reply" role="status"><strong>{t('agent.sessionReply.' + reportStatus)}</strong><code>{report.sessionId}</code><small>{t('agent.sessionReply.unverified')}</small></div>}
     {item.content.text && (assistant ? <Markdown resolveHref={resolveResource}>{item.content.text}</Markdown> : <p className="agent-user-text">{item.content.text}</p>)}
     {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer} answer={answer && (text => answer(report ? t('agent.sessionReply.answer', { sessionId: report.sessionId, dispatchId: report.dispatchId, answer: text }) : text))} />}
@@ -56,7 +56,7 @@ function AgentMessageView({ item, node, focused, remember, canAnswer = false, an
       ? <AgentImageAttachment key={file.id} file={file} node={node} />
       : <a key={file.id} className="agent-file-card" href={attachmentUrl(file, node)} download={file.name}><FileTextIcon size={20} /><span>{file.name}<small>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</small></span></a>)}</div>}
     {['failed', 'interrupted'].includes(item.status) && <small className="agent-muted">{t('agent.interrupted')}</small>}
-    {assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length && <div className="agent-message-actions"><button type="button" className="agent-message-action" aria-label={t(copied ? 'agent.composer.copied' : 'agent.composer.copy')} onClick={() => { void copy() }}>{copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}</button><button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button></div>}
+    {!readOnly && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length && <div className="agent-message-actions"><button type="button" className="agent-message-action" aria-label={t(copied ? 'agent.composer.copied' : 'agent.composer.copy')} onClick={() => { void copy() }}>{copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}</button><button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button></div>}
     {assistant && item.completedEventId && <span className="agent-read-sentinel" data-event-id={item.completedEventId} aria-hidden />}
   </article>
 }

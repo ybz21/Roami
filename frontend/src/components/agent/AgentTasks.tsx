@@ -6,11 +6,14 @@ import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
 import { taskExecutor, taskGoal, taskInstructions } from './agent-task-protocol'
+import AgentTaskRecord from './AgentTaskRecord'
 import { taskTopic } from './task-topic'
 import { taskOutcome, taskReportLinks } from './task-outcome'
 import { useAgentData } from './useAgentData'
 import { useAgentTask } from './useAgentTask'
-import { TaskResult, TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
+import { useAgentDraft } from './useAgentDraft'
+import { agentDataKey } from './agent-data-cache'
+import { TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
 import { taskFailureKey } from './task-failure'
 import './agent-tasks.css'
 
@@ -38,7 +41,7 @@ export default function AgentTasks({ cid, onSession, onChanged, selectedTask, on
   const tasks = list.value || [], { loading, failed } = list
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
-    {selected ? <TaskInspector hideBack={hideBack} key={selected} id={selected} onBack={() => { setSelected(''); list.refresh() }} select={setSelected} onSession={onSession} onChanged={() => { list.refresh(); onChanged() }} /> : <>
+    {selected ? <TaskInspector hideBack={hideBack} key={agentDataKey('/agent/tasks/' + encodeURIComponent(selected))} id={selected} onBack={() => { setSelected(''); list.refresh() }} select={setSelected} onSession={onSession} onChanged={() => { list.refresh(); onChanged() }} /> : <>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
       {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
       {compact ? <TaskTimeline tasks={roots} select={setSelected} /> : (['attention', 'active', 'recent'] as const).map(group => {
@@ -100,7 +103,13 @@ function TaskDescription({ content }: { content: string }) {
 function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: { id: string; hideBack?: boolean; onBack: () => void; select: (id: string) => void; onSession: (id: string) => void; onChanged: () => void }) {
   const { t, locale } = useI18n()
   const snapshot = useAgentTask(id)
-  const [busy, setBusy] = useState(''), [error, setError] = useState(''), [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(''), [error, setError] = useState('')
+  const draftKey = 'roami.agent.task.draft.' + agentDataKey('/agent/tasks/' + encodeURIComponent(id))
+  const [draft, editDraft] = useAgentDraft(draftKey)
+  const setDraft = (text: string) => {
+    editDraft(text)
+    try { if (text) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey) } catch { /* Drafts remain usable without storage. */ }
+  }
   const [history, setHistory] = useState(false), [preview, setPreview] = useState('')
   const alive = useRef(true), controlFence = useRef(0), busyRef = useRef(false)
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null)
@@ -131,14 +140,16 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
     finally { if (alive.current) { controlFence.current = snapshot.refresh(); busyRef.current = false; setBusy('') } }
     return true
   }
-  const continueTask = async () => {
-    const text = draft.trim()
-    if (!task || !text || busy || stopping) return
+  const continueTask = async (answer?: string) => {
+    const text = (answer ?? draft).trim()
+    if (!task || !text || busy || stopping) return false
     if (!pending.current || pending.current.text !== text) pending.current = { text, revision: task.revision, key: crypto.randomUUID() }
     const request = pending.current
     if (await mutate('steer', '/agent/tasks/' + encodeURIComponent(id) + '/steer', { requestKey: request.key, revision: request.revision, text })) {
-      if (alive.current) { setDraft(''); pending.current = null }
+      if (alive.current) { if (!answer || draft.trim() === text) setDraft(''); pending.current = null }
+      return true
     }
+    return false
   }
   return <>
     {!hideBack && <div className="agent-task-section-head"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft />{t('agent.tasks')}</button></div>}
@@ -170,6 +181,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
       {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskTopic(child) || t('agent.task.untitled')}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
       {(snapshot.controls.failed || !!snapshot.controls.value?.resources.length || !!controls?.actions.some(action => action.state === 'unknown' && action.outcomeKnown !== true)) && <section className="agent-task-section"><h4>{t('agent.task.control')}</h4>
         {snapshot.controls.failed && <p role="alert">{t('agent.task.controlUnavailable')}</p>}
+        {(ended || snapshot.controls.failed) && <button type="button" className="tt-act" onClick={snapshot.refresh}>{t('agent.task.checkControl')}</button>}
         {!snapshot.controls.value && !snapshot.controls.failed && <Spin size="small" />}
         {snapshot.controls.value?.resources.map((resource) => {
           const safe = controlSafe
@@ -183,12 +195,11 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
         })}
         {controls?.actions.some((action) => action.state === 'unknown' && action.outcomeKnown !== true) && <p className="agent-task-note">{t('agent.task.reconcile')}</p>}
       </section>}
-      <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || !detailSafe} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
+
       <section className="agent-task-section"><button type="button" className="tt-act agent-task-disclosure" aria-expanded={history} onClick={() => setHistory(!history)}><ChevronRight />{t('agent.task.viewRecord')}</button>
-        {history && ended && <p className="agent-muted">{t('agent.task.archivedRecord')}</p>}
-        {history && detail?.attempts.map((attempt) => <div className="agent-task-attempt" key={attempt.id}><b>{t('agent.task.revision', { n: attempt.revision })}</b><span>{t('agent.state.' + attempt.state)}</span>{attempt.finishedMs && <time>{new Date(attempt.finishedMs).toLocaleString(locale)}</time>}<div className="agent-task-attempt-record"><TaskResult attempt={attempt} artifacts={artifacts} onPreview={previewArtifact} /></div></div>)}
-        {history && detail?.attemptsTruncated && <small className="agent-muted">{t('agent.task.moreHistory')}</small>}
+        {history && <AgentTaskRecord id={id} active={!ended} attempts={detail?.attempts || []} truncated={!!detail?.attemptsTruncated} artifacts={artifacts} onPreview={previewArtifact} onSession={onSession} onAnswer={continueTask} canAnswer={detailSafe && !terminal.has(task.state) && !busy && !stopping} />}
       </section>
+      <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || !detailSafe} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
     </>}
   </>
 }

@@ -3,7 +3,9 @@
 import json
 from pathlib import Path
 
+from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.conversation.activity_payloads import activity_payload
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_revisions import TaskRevisions
 from roami_agent.protocol.errors import DomainError
@@ -439,6 +441,62 @@ class Tasks:
                 ]
         return task
 
+    async def conversation(self, owner, task_id, run_id=None):
+        def read(db):
+            task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
+            if not task:
+                raise DomainError("TASK_NOT_FOUND", 404)
+            owned(db, owner, task["origin_conversation_id"])
+            if task["origin_message_id"] not in {
+                m["id"] for m in history(db, task["origin_branch_id"])
+            }:
+                raise DomainError("TASK_SOURCE_FORGOTTEN", 404)
+            run = row(
+                db,
+                "SELECT a.*,b.conversation_id FROM task_attempts a "
+                "JOIN branches b ON b.id=a.native_branch_id WHERE a.task_id=? "
+                + ("AND a.id=? " if run_id else "")
+                + "ORDER BY a.attempt_no DESC LIMIT 1",
+                (task_id, run_id) if run_id else (task_id,),
+            )
+            if not run:
+                raise DomainError("TASK_CONVERSATION_NOT_FOUND", 404)
+            conversation = owned(db, owner, run["conversation_id"])
+            started = row(
+                db,
+                "SELECT turn_id FROM events WHERE task_id=? AND kind IN ('task.started','task.preparing') "
+                "AND json_extract(payload_json,'$.runId')=? ORDER BY id LIMIT 1",
+                (task_id, run["id"]),
+            )
+            turn_id = started["turn_id"] if started else None
+            return {
+                "conversation": conversation,
+                "branchId": run["native_branch_id"],
+                "messages": [
+                    dict(m, content=json.loads(m["content_json"]))
+                    for m in history(db, run["native_branch_id"])
+                    if m["role"] in {"user", "assistant"} and turn_id and m["turn_id"] == turn_id
+                ],
+                "turns": [],
+                "activities": [],
+                "snapshotCursor": 0,
+            }
+
+        return await self.db.call(read)
+
+    async def activities(self, owner, task_id, activity_id=None):
+        def read(db):
+            task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
+            if not task:
+                raise DomainError("TASK_NOT_FOUND", 404)
+            cid, branch = task["origin_conversation_id"], task["origin_branch_id"]
+            owned(db, owner, cid)
+            if activity_id:
+                return activity_payload(db, owner, cid, activity_id, branch, task_id=task_id)
+            return conversation_activity(db, cid, history(db, branch), task_id=task_id)
+
+        return await self.db.call(read)
+
     async def get(self, owner, task_id):
         def read(db):
             task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
@@ -446,10 +504,11 @@ class Tasks:
                 raise DomainError("TASK_NOT_FOUND", 404)
             attempts = rows(
                 db,
-                "SELECT id,task_revision AS revision,state,session_id AS sessionId,started_ms AS startedMs,finished_ms AS finishedMs,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 21",
+                "SELECT id,attempt_no AS attemptNo,task_revision AS revision,state,session_id AS sessionId,started_ms AS startedMs,finished_ms AS finishedMs,native_branch_id,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 21",
                 (task_id,),
             )
             for attempt in attempts:
+                attempt["hasConversation"] = bool(attempt.pop("native_branch_id"))
                 result_json = attempt.pop("result_json")
                 attempt["result"] = json.loads(result_json) if result_json else None
             children = rows(

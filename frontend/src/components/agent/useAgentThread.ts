@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { openEventStream } from '../../api'
 import { agentCacheEpoch, agentDataKey, invalidateAgentData, loadAgentData, peekAgentData, storeAgentData } from './agent-data-cache'
+import { publishTaskEvent } from './agent-task-events'
 import { agentEvents, projectAgentEvent, type AgentSnapshot } from './agent-protocol'
 
 export function useAgentThread(cid: string, branch = '', node: string | null = null) {
@@ -27,7 +28,13 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
       try {
         const data = await loadAgentData<AgentSnapshot>(messages, freshFor)
         if (stopped) return
-        if (!view || data.snapshotCursor >= view.snapshotCursor) { view = data; publish() } else again = true
+        if (!view || data.snapshotCursor >= view.snapshotCursor) {
+          if (view && scope === agentDataKey(messages)) for (const item of data.activities || []) {
+            const previous = view.activities?.find(old => old.id === item.id)
+            if (item.kind === 'task' && (!previous || previous.updatedMs !== item.updatedMs)) publishTaskEvent({ id: data.snapshotCursor, kind: 'task.snapshot', payload: { activity: item } })
+          }
+          view = data; publish()
+        } else again = true
       } finally {
         loading = false
         if (again && !stopped) { again = false; schedule() }
@@ -52,6 +59,7 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
         void snapshot(5000).catch(() => {})
         for await (const event of agentEvents(response)) {
           if (stopped || !view) break
+          if (event.id > view.snapshotCursor && scope === agentDataKey(messages)) publishTaskEvent(event)
           const projected = projectAgentEvent(view, event)
           view = projected.view; publish()
           if (projected.reload) schedule()

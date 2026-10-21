@@ -84,3 +84,11 @@ it('shows the concrete routing explanation while the group is collapsed and reta
   expect(screen.getAllByText('Sources disagree')).toHaveLength(2)
   expect(screen.getAllByText('agent.routing.capabilitiesUnverified')).toHaveLength(2)
 })
+
+
+it('keeps past tool failures factual inside records without presenting a current task action', () => {
+  render(<AgentActivity record items={[{ ...task('failed'), id: 'tool:old', kind: 'tool' }, { ...task('succeeded'), id: 'tool:recovered', kind: 'tool' }]} onSession={vi.fn()} />)
+  expect(document.querySelectorAll('[data-activity-id]')).toHaveLength(2)
+  expect(document.querySelector('[data-state=failed]')).toBeTruthy()
+  expect(screen.queryByText('agent.activity.needsAttention')).toBeNull()
+})

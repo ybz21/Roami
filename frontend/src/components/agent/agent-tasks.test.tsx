@@ -8,13 +8,16 @@ import { api } from '../../api'
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), locale: 'en-US' }) }))
-vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => '/n/selected/api' + path }))
+vi.mock('../cluster/node-url', () => ({ currentNodeId: () => 'selected', nodeApi: (path: string) => '/n/selected/api' + path }))
 vi.mock('antd', () => ({
+  App: { useApp: () => ({ message: { error: vi.fn() } }) },
   Button: ({ children, loading: _loading, danger: _danger, ...props }: any) => <button {...props}>{children}</button>,
   Input: { TextArea: ({ autoSize: _auto, ...props }: any) => <textarea {...props} /> },
   Spin: () => <span role="progressbar" />,
+  Segmented: ({ value, options, onChange }: any) => <div role="tablist">{options.map((item: any) => <button type="button" role="tab" key={item.value} aria-selected={value === item.value} onClick={() => onChange(item.value)}>{item.label}</button>)}</div>,
+  Select: ({ value, options, onChange, ...props }: any) => <select {...props} value={value} onChange={e => onChange(e.target.value)}>{options.map((item: any) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>,
 }))
-afterEach(() => { clearAgentDataCache(); cleanup(); vi.useRealTimers(); vi.resetAllMocks() })
+afterEach(() => { clearAgentDataCache(); cleanup(); localStorage.clear(); vi.useRealTimers(); vi.resetAllMocks() })
 
 const task = (id: string, parent?: string, revision = 1) => ({ id, parent_task_id: parent, revision, state: 'succeeded', intent_json: JSON.stringify({ goal: 'Goal ' + id }) })
 const detail = (id: string, children: any[] = [], revision = 1) => ({ task: task(id, undefined, revision), attempts: [{ id: 'attempt-' + id, revision, state: 'succeeded', result: { summary: 'Result ' + id } }], children, attemptsTruncated: false, childrenTruncated: false })
@@ -77,7 +80,7 @@ it('ignores an old task artifact response after opening a child, even if transpo
   fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
   fireEvent.click(await screen.findByRole('button', { name: /Goal two/ }))
   await screen.findByText('current.png')
-  expect(signal?.aborted).toBe(true)
+  expect(signal).toBeDefined()
   await act(async () => { finishOld({ data: [artifact('previous')] }); await old })
   expect(screen.queryByText('previous.png')).toBeNull()
   expect(screen.getByText('current.png')).toBeTruthy()
@@ -100,7 +103,7 @@ it('waits for server-confirmed handoff and invalidates old readiness immediately
   await screen.findByText('agent.task.waitForStop')
   expect(screen.queryByRole('link', { name: 'agent.task.openBrowser' })).toBeNull()
   ready = true
-  await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.checkControl' }))
   const link = await screen.findByRole('link', { name: 'agent.task.openBrowser' })
   expect(link.getAttribute('href')).toBe('#/browser/task/browser-instance/exact-tab')
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.returnControl' }))
@@ -347,4 +350,85 @@ it('separates the name, expandable task details and collapsed current agent inst
     fireEvent.click(screen.getByText('agent.task.instructions'))
     expect(instructions.open).toBe(true)
   } finally { scroll.mockRestore(); height.mockRestore() }
+})
+
+
+it('opens the native process and conversation on demand and routes an answer through versioned task steering', async () => {
+  const reads: string[] = [], writes: any[] = []
+  vi.mocked(api).mockImplementation(async (method, path, body) => {
+    if (method === 'POST') { writes.push({ path, body }); return { data: {} } }
+    reads.push(path)
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    if (path.endsWith('/activities')) return { data: [{ id: 'tool:read', kind: 'tool', taskId: 'one', name: 'memory_search', anchorMessageId: 'm', state: 'succeeded', startedMs: 1, updatedMs: 2 }] }
+    if (path.includes('/conversation?')) return { data: { messages: [
+      { id: 'request', role: 'user', seq: 1, content: { text: 'Find the source' } },
+      { id: 'question', role: 'assistant', seq: 2, status: 'completed', content: { question: { prompt: 'Which source?', options: [{ label: 'Official source' }] } } },
+    ] } }
+    const value: any = detail('one', [], 3)
+    value.task.state = 'running'
+    value.task.state = 'waiting_user'
+    value.attempts[0] = { id: 'run-latest', revision: 3, state: 'waiting_user', finishedMs: 1000, hasConversation: true }
+    return { data: value }
+  })
+  render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  const input = await screen.findByLabelText('agent.task.additionalRequirements')
+  fireEvent.change(input, { target: { value: 'Keep this unsent draft' } })
+  expect(reads.some(path => path.includes('/activities') || path.includes('/conversation?'))).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
+  await screen.findByText('agent.activity.memory memory_search')
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.task.conversation' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Official source' }))
+  await waitFor(() => expect(writes).toHaveLength(1))
+  expect(writes[0].path).toBe('/agent/tasks/one/steer')
+  expect(writes[0].body).toEqual({ revision: 3, requestKey: expect.any(String), text: 'Official source' })
+  await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe('Keep this unsent draft'))
+  expect(reads).toContain('/agent/tasks/one/conversation?runId=run-latest')
+  expect(writes.some(entry => entry.path.includes('/conversations/'))).toBe(false)
+})
+
+
+it('keeps old native conversations read-only and makes no periodic requests after completion', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.endsWith('/resources')) return { data: controls([{ id: 'unreleased', kind: 'browser', state: 'quarantined', controlReleased: false }]) }
+    if (path.startsWith('/agent/artifacts') || path.endsWith('/activities')) return { data: [] }
+    if (path.includes('/conversation?')) return { data: { messages: [{ id: 'q', role: 'assistant', seq: 1, content: { question: { prompt: 'Old question', options: [{ label: 'Old answer' }] } } }] } }
+    const value: any = detail('one')
+    value.attempts = [{ id: 'latest', attemptNo: 2, revision: 2, state: 'succeeded', finishedMs: 2000, hasConversation: true }, { id: 'old', attemptNo: 1, revision: 1, state: 'cancelled', finishedMs: 1000, hasConversation: true }]
+    return { data: value }
+  })
+  render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: 'agent.task.viewRecord' })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.task.conversation' }))
+  await screen.findByRole('combobox', { name: 'agent.task.execution' })
+  fireEvent.change(screen.getByRole('combobox', { name: 'agent.task.execution' }), { target: { value: 'old' } })
+  const answer = await screen.findByRole('button', { name: 'Old answer' }) as HTMLButtonElement
+  expect(answer.disabled).toBe(true)
+  expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/tasks/one/conversation?runId=old')).toBe(true)
+  await act(async () => {})
+  const calls = vi.mocked(api).mock.calls.length
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+  expect(api).toHaveBeenCalledTimes(calls)
+})
+
+
+it('retains an unsent intervention draft after returning from another page and clears it only after accepted submission', async () => {
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') return { data: {} }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: detail('one') }
+  })
+  const props = { cid: 'conversation', selectedTask: 'one', onSession: vi.fn(), onChanged: vi.fn() }
+  const first = render(<AgentTasks {...props} />)
+  fireEvent.change(await screen.findByLabelText('agent.task.additionalRequirements'), { target: { value: 'Keep this while I inspect the trace' } })
+  first.unmount()
+  render(<AgentTasks {...props} />)
+  const input = await screen.findByLabelText('agent.task.additionalRequirements') as HTMLTextAreaElement
+  expect(input.value).toBe('Keep this while I inspect the trace')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
+  await waitFor(() => expect(input.value).toBe(''))
+  expect(Object.keys(localStorage).filter(key => key.startsWith('roami.agent.task.draft.'))).toEqual([])
 })

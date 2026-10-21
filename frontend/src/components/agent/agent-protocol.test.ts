@@ -37,12 +37,12 @@ it('stops the running indicator immediately when a turn fails', () => {
   expect(failed.view.messages[0].status).toBe('failed')
 })
 
-it('projects started and completed tools directly, retaining order and deduplicating replay', () => {
+it('hides routine tools while retaining unknown outcomes and replay ordering', () => {
   const activity = { id: 'tool:one', kind: 'tool', name: 'shell', anchorMessageId: 'm', state: 'running', startedMs: 100, updatedMs: 100 }
   const start = { id: 2, kind: 'tool.started', branchId: 'b', payload: { activity } }
   const running = projectAgentEvent(snapshot(), start)
   expect(running.reload).toBe(false)
-  expect(running.view.activities?.[0].state).toBe('running')
+  expect(running.view.activities).toEqual([])
   const done = projectAgentEvent(running.view, { ...start, id: 3, kind: 'tool.completed', payload: { activity: { ...activity, state: 'unknown', updatedMs: 200 } } })
   expect(done.reload).toBe(false)
   expect(done.view.activities).toHaveLength(1)

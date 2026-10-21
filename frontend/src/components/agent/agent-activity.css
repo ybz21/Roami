@@ -39,3 +39,14 @@ html[data-size="compact"] .agent-activity-toggle time { display:none; }
 .agent-routing-reason { margin:0 0 var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); overflow-wrap:anywhere; }
 .agent-routing-details { display:flex; flex-direction:column; gap:var(--sp-1); margin-block:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-routing-details p { margin:0; }
+
+.agent-task-progress { padding-block:var(--sp-2); color:var(--text-dim); font-size:var(--fs-sm); }
+.agent-task-progress-line { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--tap); }
+.agent-task-progress-line > svg { flex:none; }
+.agent-task-progress-line strong { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; color:var(--text-bright); }
+.agent-task-progress-line > span { flex:none; font-size:var(--fs-meta); }
+.agent-task-progress-line .tt-act { position:relative; display:grid; place-items:center; min-width:var(--tap); min-height:var(--tap); border-color:transparent; padding:var(--sp-1); }
+.agent-task-progress p { margin:var(--sp-1) 0 0; }
+.agent-task-progress.is-failed > p { color:var(--danger); }
+
+.agent-task-tool-steps { display:flex; flex-direction:column; gap:var(--sp-3); }

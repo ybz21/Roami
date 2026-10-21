@@ -153,7 +153,7 @@ class Conversations:
                     (selected,),
                 ),
                 "snapshotCursor": cursor,
-                "activities": conversation_activity(db, cid, result),
+                "activities": conversation_activity(db, cid, result, main_only=True),
             }
 
         return await self.db.call(read)

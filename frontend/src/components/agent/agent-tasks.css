@@ -68,3 +68,8 @@ html[data-pointer="coarse"] .agent-tasks .tt-act::after { content:''; position:a
 
 .agent-task-description { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-body); }
 .agent-task-description.clipped { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+.agent-task-record { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
+.agent-task-conversation { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
+.agent-task-conversation .agent-message { max-width:100%; }
+html[data-pointer="coarse"] .agent-task-record .ant-segmented-item-label { min-height:var(--tap); display:flex; align-items:center; justify-content:center; }

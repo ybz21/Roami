@@ -1,18 +1,34 @@
 """Bounded, credential-free execution facts for the conversation timeline."""
 
 import json
+import re
 
 from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import public_error_code
 from roami_agent.storage.database import rows
 
 
-def conversation_activity(db, cid, transcript):
+def task_activity_title(spec):
+    initial = spec.get("initialIntent")
+    initial = initial if isinstance(initial, dict) else {}
+    title = initial.get("title") or spec.get("title")
+    if isinstance(title, str) and title.strip():
+        return " ".join(title.split())[:80]
+    goal = initial.get("goal") or spec.get("goal")
+    if not isinstance(goal, str):
+        return None
+    goal = re.sub(r"https?://\S+|/(?:[^\s，。；：]+/)*[^\s，。；：]*", "", goal)
+    return " ".join(re.split(r"[\n。；：]|\.\s", goal)[0].split())[:80] or None
+
+
+def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False):
     visible = {m["id"] for m in transcript}
     tasks = rows(
         db,
-        "SELECT * FROM tasks WHERE origin_conversation_id=? ORDER BY created_ms DESC LIMIT 200",
-        (cid,),
+        "SELECT * FROM tasks WHERE origin_conversation_id=? "
+        + ("AND id=? " if task_id else "")
+        + "ORDER BY created_ms DESC LIMIT 200",
+        (cid, task_id) if task_id else (cid,),
     )
     tasks = [t for t in tasks if t["origin_message_id"] in visible]
     scope = {t["id"]: t for t in tasks}
@@ -49,13 +65,14 @@ def conversation_activity(db, cid, transcript):
         )
         attempt = attempts[0] if attempts else {}
         if attempt.get("native_branch_id"):
-            for turn in rows(
+            started = rows(
                 db,
-                "SELECT id FROM turns WHERE branch_id=? ORDER BY created_ms DESC LIMIT 200",
-                (attempt["native_branch_id"],),
-            ):
-                if len(child_turns) < 200:
-                    child_turns[turn["id"]] = task
+                "SELECT turn_id FROM events WHERE task_id=? AND kind IN ('task.started','task.preparing') "
+                "AND json_extract(payload_json,'$.runId')=? ORDER BY id LIMIT 1",
+                (task["id"], attempt["id"]),
+            )
+            if started and started[0]["turn_id"]:
+                child_turns[started[0]["turn_id"]] = task
         report = json.loads(attempt["result_json"]) if attempt.get("result_json") else {}
         target = spec.get("target") or {}
         activities.append(
@@ -63,6 +80,7 @@ def conversation_activity(db, cid, transcript):
                 "id": "task:" + task["id"],
                 "kind": "task",
                 "name": spec["executor"],
+                "title": task_activity_title(spec),
                 "anchorMessageId": anchor(task),
                 "taskId": task["id"],
                 "parentTaskId": task["parent_task_id"],
@@ -117,7 +135,7 @@ def conversation_activity(db, cid, transcript):
     }
     for call in calls:
         task = child_turns.get(call["turn_id"])
-        if not task and call["assistant_message_id"] not in visible:
+        if not task and (task_id or call["assistant_message_id"] not in visible):
             continue
         value = {}
         try:
@@ -167,12 +185,16 @@ def conversation_activity(db, cid, transcript):
                 else None,
             }
         )
-    failures = rows(
-        db,
-        "SELECT e.*,t.created_ms AS started_ms FROM events e JOIN turns t ON t.id=e.turn_id "
-        "WHERE e.conversation_id=? AND e.kind IN ('turn.failed','turn.interrupted') "
-        "ORDER BY e.created_ms DESC LIMIT 100",
-        (cid,),
+    failures = (
+        []
+        if task_id
+        else rows(
+            db,
+            "SELECT e.*,t.created_ms AS started_ms FROM events e JOIN turns t ON t.id=e.turn_id "
+            "WHERE e.conversation_id=? AND e.kind IN ('turn.failed','turn.interrupted') "
+            "ORDER BY e.created_ms DESC LIMIT 100",
+            (cid,),
+        )
     )
     seen_failures = set()
     for failure in failures:
@@ -194,4 +216,15 @@ def conversation_activity(db, cid, transcript):
                 "errorCode": public_error_code(json.loads(failure["payload_json"]).get("error")),
             }
         )
+    if main_only:
+        activities = [
+            item
+            for item in activities
+            if item["kind"] == "turn"
+            or (
+                item["kind"] == "task"
+                and (not item["parentTaskId"] or item["state"] in {"waiting_user", "unknown"})
+            )
+            or (item["kind"] == "tool" and item["state"] == "unknown")
+        ]
     return sorted(activities, key=lambda a: (a["startedMs"], a["id"]))[-200:]

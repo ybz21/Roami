@@ -37,7 +37,7 @@ def preview(value):
     return {"text": text[:16000], "truncated": len(text) > 16000}
 
 
-def activity_payload(db, owner, cid, aid, branch_id=None):
+def activity_payload(db, owner, cid, aid, branch_id=None, *, task_id=None):
     conversation = owned(db, owner, cid)
     branch_id = branch_id or conversation["active_branch_id"]
     if not row(db, "SELECT id FROM branches WHERE id=? AND conversation_id=?", (branch_id, cid)):
@@ -45,7 +45,7 @@ def activity_payload(db, owner, cid, aid, branch_id=None):
     activity = next(
         (
             item
-            for item in conversation_activity(db, cid, history(db, branch_id))
+            for item in conversation_activity(db, cid, history(db, branch_id), task_id=task_id)
             if item["id"] == aid
         ),
         None,

@@ -125,7 +125,9 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
         assert fixture.url == "https://example.org/quote"
         assert "new" in fixture.writes and "goto" in fixture.writes
         view = await runtime.conversations.messages("alice", conversation["id"])
-        assert any(activity.get("name") == "browser_open" for activity in view["activities"])
+        assert not any(activity["kind"] == "tool" for activity in view["activities"])
+        records = await runtime.tasks.activities("alice", task["id"])
+        assert any(activity.get("name") == "browser_open" for activity in records)
     finally:
         await runtime.close()
 

@@ -77,8 +77,16 @@ async def test_main_existing_session_delegate_sends_without_provider_hooks_or_co
             await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
         )
         view = await runtime.conversations.messages("alice", c["id"])
-        assert view["activities"][0]["state"] == "delivered"
-        assert view["activities"][0]["target"] == "stable-id"
+        assert view["activities"] == []
+        events = await runtime.conversations.events("alice", view["conversation"]["id"])
+        delivery = next(
+            e["payload"]["activity"]
+            for e in events
+            if e["kind"] == "tool.completed"
+            and e["payload"].get("activity", {}).get("state") == "delivered"
+        )
+        assert delivery["state"] == "delivered"
+        assert delivery["target"] == "stable-id"
         dispatch = await store.call(lambda db: row(db, "SELECT * FROM session_dispatches"))
         assert dispatch["conversation_id"] == c["id"] and dispatch["session_id"] == "stable-id"
         assert dispatch["delivery_state"] == "delivered" and dispatch["final_status"] is None

@@ -26,7 +26,7 @@ export function openAgentPage(view: AgentPageView, task = '') {
   const next = '#/' + agentPagePath(view, page?.origin || current, task)
   const params = getHashParams().toString(), target = next + (params ? '?' + params : '')
   const state = { ...history.state, [FROM]: location.hash }
-  if (page?.task && (view === 'tasks' || view === 'debug')) {
+  if (page?.task && page.view === view && (view === 'tasks' || view === 'debug')) {
     history.replaceState(history.state, '', target)
     window.dispatchEvent(new HashChangeEvent('hashchange'))
   } else {
@@ -38,7 +38,9 @@ export function openAgentPage(view: AgentPageView, task = '') {
 export function backAgentPage(page: AgentPageRoute) {
   const parent = page.task ? agentPagePath(page.view, page.origin) : page.origin
   const previous = history.state?.[FROM]
-  if (typeof previous === 'string' && normalizeRoute(previous.replace(/^#\/?/, '')) === parent) history.back()
+  const previousRoute = typeof previous === 'string' ? normalizeRoute(previous.replace(/^#\/?/, '')) : ''
+  const previousPage = readAgentPage(previousRoute)
+  if (previousRoute === parent || (page.task && previousRoute === page.origin) || (previousPage?.origin === page.origin && previousPage.view !== page.view)) history.back()
   else {
     const params = getHashParams().toString()
     location.replace('#/' + parent + (params ? '?' + params : ''))

@@ -1,3 +1,5 @@
+import { mainTaskActivities } from './main-task-activity'
+
 export type AgentQuestion = { prompt: string; options: { label: string; description?: string }[] }
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
 export type AgentMessage = {
@@ -5,7 +7,7 @@ export type AgentMessage = {
   content: { question?: AgentQuestion; text?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentRoutingDecision = { version: number; policyVersion: string; action: string; executor: string; complexity: 'bounded' | 'complex'; complexityBasis: Record<string, string>; routingExplanation: string; reasonCode: string; capabilityVerification?: string }
-export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; routingDecision?: AgentRoutingDecision; name: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
+export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; routingDecision?: AgentRoutingDecision; name: string; title?: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
 export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
@@ -19,9 +21,9 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   const data = event.payload
   if ((event.kind.startsWith('tool.') || event.kind.startsWith('task.')) && data.activity) {
     const item = data.activity as AgentActivityItem
-    next.activities = [...(view.activities || []).filter(existing => existing.id !== item.id), item]
+    next.activities = mainTaskActivities([...(view.activities || []).filter(existing => existing.id !== item.id), item])
       .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
-    return { view: next, reload: false }
+    return { view: next, reload: event.kind === 'task.steered' }
   }
   if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted') {
     next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: event.kind.slice(5) } : turn)

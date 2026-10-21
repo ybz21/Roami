@@ -144,6 +144,19 @@ async def test_active_steering_stops_the_old_worker_before_starting_new_revision
             )
         )
         assert attempts[0]["state"] == "cancelled" and attempts[1]["state"] == "succeeded"
+        old_view = await runtime.tasks.conversation("alice", task["id"], attempts[0]["id"])
+        new_view = await runtime.tasks.conversation("alice", task["id"], attempts[1]["id"])
+        assert attempts[0]["native_branch_id"] == attempts[1]["native_branch_id"]
+        assert not any(
+            "Updated task completed" in m["content"].get("text", "") for m in old_view["messages"]
+        )
+        assert any(
+            m["content"].get("text") == "Updated task completed" for m in new_view["messages"]
+        )
+        assert {m["id"] for m in old_view["messages"]}.isdisjoint(
+            m["id"] for m in new_view["messages"]
+        )
+
         assert not await store.call(
             lambda db: row(
                 db,

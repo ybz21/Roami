@@ -62,3 +62,17 @@ it('keeps debug selection on a scoped URL and replaces selection without another
   backAgentPage({ view: 'debug', origin, task: 'task:second' })
   expect(back).toHaveBeenCalledOnce()
 })
+
+
+it('returns from a task trace to the task detail instead of replacing it with the debug list', () => {
+  const origin = 'home/conversation'
+  const detail = '#/' + agentPagePath('tasks', origin, 'task')
+  history.replaceState({ roamiAgentPageFrom: '#/' + agentPagePath('tasks', origin) }, '', detail)
+  const length = history.length
+  openAgentPage('debug', 'task:task')
+  expect(history.length).toBe(length + 1)
+  expect(history.state.roamiAgentPageFrom).toBe(detail)
+  const back = vi.spyOn(history, 'back').mockImplementation(() => {})
+  backAgentPage({ view: 'debug', origin, task: 'task:task' })
+  expect(back).toHaveBeenCalledOnce()
+})

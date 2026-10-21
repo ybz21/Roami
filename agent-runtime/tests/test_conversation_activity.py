@@ -41,11 +41,10 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
         await runtime.chat.submit("alice", c["id"], "activity", "Count projects")
         await asyncio.wait_for(entered.wait(), 3)
         snapshot = await runtime.conversations.messages("alice", c["id"])
-        assert snapshot["activities"][0]["state"] == "running"
-        assert snapshot["activities"][0]["name"] == "workspace_overview"
+        assert snapshot["activities"] == []
         events = await runtime.conversations.events("alice", c["id"])
         started = next(e for e in events if e["kind"] == "tool.started")
-        assert started["payload"]["activity"] == snapshot["activities"][0]
+        assert started["payload"]["activity"]["name"] == "workspace_overview"
         assert started["payload"]["activity"]["state"] == "running"
         assert not any(e["kind"] == "tool.completed" for e in events)
         release.set()
@@ -53,7 +52,7 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
 
         await until(store, lambda db: row(db, "SELECT id FROM tool_calls WHERE state='succeeded'"))
         snapshot = await runtime.conversations.messages("alice", c["id"])
-        assert snapshot["activities"][0]["state"] == "succeeded"
+        assert snapshot["activities"] == []
         assert "arguments_json" not in json.dumps(snapshot["activities"])
         replay = await runtime.conversations.events("alice", c["id"])
         assert (
@@ -61,7 +60,7 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
             == "running"
         )
         completed = next(e for e in replay if e["kind"] == "tool.completed")
-        assert completed["payload"]["activity"] == snapshot["activities"][0]
+        assert completed["payload"]["activity"]["state"] == "succeeded"
         assert completed["id"] > started["id"]
     finally:
         release.set()
@@ -144,7 +143,7 @@ async def test_conflicting_session_override_is_rejected_before_queueing(store):
     assert await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
 
 
-async def test_worker_tool_activity_reaches_origin_conversation_while_running(store):
+async def test_worker_process_and_conversation_are_task_scoped_not_main_chat(store):
     entered, release = asyncio.Event(), asyncio.Event()
 
     class Model:
@@ -177,7 +176,60 @@ async def test_worker_tool_activity_reaches_origin_conversation_while_running(st
         await runtime.chat.submit("alice", c["id"], "nested", "Delegate read only")
         await asyncio.wait_for(entered.wait(), 4)
         view = await runtime.conversations.messages("alice", c["id"])
-        child = next(a for a in view["activities"] if a["name"] == "memory_search")
+        assert not any(a["kind"] == "tool" for a in view["activities"])
+        root = next(a for a in view["activities"] if a["kind"] == "task")
+        records = await runtime.tasks.activities("alice", root["taskId"])
+        child = next(a for a in records if a["name"] == "memory_search")
+        detail = await runtime.tasks.get("alice", root["taskId"])
+        run_id = detail["attempts"][0]["id"]
+        assert detail["attempts"][0]["hasConversation"] is True
+        worker = await runtime.tasks.conversation("alice", root["taskId"], run_id)
+        assert worker["conversation"]["id"] != c["id"]
+        assert all(m["role"] in {"user", "assistant"} for m in worker["messages"])
+        import httpx
+
+        from roami_agent.server.http import create_app
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "alice"},
+        ) as client:
+            base = f"/v1/tasks/{root['taskId']}"
+            assert (await client.get(base + "/activities")).status_code == 200
+            payload = await client.get(base + "/activities/" + child["id"])
+            assert (
+                payload.status_code == 200 and "fixture" in payload.json()["data"]["input"]["text"]
+            )
+            for suffix in [
+                "/activities",
+                "/activities/" + child["id"],
+                "/conversation?runId=" + run_id,
+            ]:
+                assert (
+                    await client.get(base + suffix, headers={"X-Roami-Owner": "bob"})
+                ).status_code == 404
+            assert (await client.get(base + "/activities/tool:foreign")).status_code == 404
+            main_tool = await store.call(
+                lambda db: row(
+                    db,
+                    "SELECT tc.id FROM tool_calls tc JOIN turns t ON t.id=tc.turn_id WHERE t.conversation_id=? LIMIT 1",
+                    (c["id"],),
+                )
+            )
+            assert (
+                await client.get(base + "/activities/tool:" + main_tool["id"])
+            ).status_code == 404
+            assert (await client.get(base + "/conversation?runId=foreign")).status_code == 404
+            assert (await client.get(base + "/conversation?runId=" + run_id)).json()["data"][
+                "messages"
+            ] == worker["messages"]
+            other = await runtime.tasks.create(
+                "alice", c["id"], "Another task", key="other-task", record_intent=True
+            )
+            other_detail = await runtime.tasks.get("alice", other["id"])
+            other_run = other_detail["attempts"][0]["id"]
+            assert (await client.get(base + "/conversation?runId=" + other_run)).status_code == 404
         assert child["state"] == "running" and child["taskId"]
         assert child["anchorMessageId"] in {m["id"] for m in view["messages"]}
         events = await runtime.conversations.events("alice", c["id"])
@@ -198,6 +250,14 @@ async def test_worker_tool_activity_reaches_origin_conversation_while_running(st
             e["kind"] == "task.activity" and e["payload"]["toolName"] == "memory_search"
             for e in events
         )
+        source = (await runtime.tasks.get("alice", root["taskId"]))["task"]["origin_message_id"]
+        await store.call(
+            lambda db: db.execute("UPDATE messages SET status='deleted' WHERE id=?", (source,)),
+            write=True,
+        )
+        with pytest.raises(DomainError, match="TASK_SOURCE_FORGOTTEN"):
+            await runtime.tasks.conversation("alice", root["taskId"], run_id)
+        assert await runtime.tasks.activities("alice", root["taskId"]) == []
     finally:
         release.set()
         await runtime.close()
@@ -281,7 +341,9 @@ async def test_command_nonzero_exit_is_failed_in_live_events_and_history(store):
 
     await store.call(record, write=True)
     snapshot = await conversations.messages("alice", c["id"])
-    activity = snapshot["activities"][0]
+    assert snapshot["activities"] == []
+    events = await conversations.events("alice", c["id"])
+    activity = events[-1]["payload"]["activity"]
     assert activity["state"] == "failed"
     assert activity["errorCode"] == "COMMAND_EXIT_NONZERO"
     assert "private output" not in json.dumps(activity)
@@ -322,7 +384,9 @@ async def test_payload_details_are_owner_scoped_live_and_not_in_events(store, mo
         await runtime.chat.submit("alice", conversation["id"], "details", "Count projects")
         await asyncio.wait_for(entered.wait(), 3)
         snapshot = await runtime.conversations.messages("alice", conversation["id"])
-        activity = snapshot["activities"][0]
+        assert snapshot["activities"] == []
+        events = await runtime.conversations.events("alice", conversation["id"])
+        activity = next(e["payload"]["activity"] for e in events if e["kind"] == "tool.started")
         path = f"/v1/conversations/{conversation['id']}/activities/{activity['id']}"
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
