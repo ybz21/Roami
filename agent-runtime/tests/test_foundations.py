@@ -250,9 +250,8 @@ async def test_tool_list_lists_categories_pages_and_removes_old_entry(store):
     assert not main_mcp["items"]
     assert main_mcp["scope"] == "current_role"
     assert "not web search results" in main_mcp["hint"]
-    assert not (await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {}))[
-        "items"
-    ]
+    research_mcp = await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {})
+    assert [item["name"] for item in research_mcp["items"]] == ["mcp_fixture_echo"]
     await runtime.capability_settings.save(
         "local", {"kind": "tools", "name": "mcp_fixture_echo", "enabled": False}
     )

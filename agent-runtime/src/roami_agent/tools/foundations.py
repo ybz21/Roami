@@ -36,7 +36,9 @@ class ToolDirectory:
             and (role != "main" or tool.main or tool.name == "artifact_read")
             and (
                 role != "research"
-                or tool.name in {"browser_open", "browser_observe", "browser_act"}
+                or tool.name in {"browser_open", "browser_observe", "browser_act", "mcp_discover"}
+                or tool.name.startswith("mcp_")
+                and tool.effect == "read"
             )
         ]
 
@@ -156,7 +158,7 @@ class ToolDirectory:
             "hint": (
                 "Local capabilities callable in this role only, not web search results. Zero matches "
                 "do not prove a worker lacks integrations or external services are unavailable. "
-                "For requested external facts, retrieve sources through a delegated browser lookup."
+                "For requested external facts, retrieve sources through delegated read-only MCP or browser research."
             ),
             "catalogVersion": version,
             "items": [item for _, _, item in selected[offset : offset + limit]],
@@ -380,7 +382,7 @@ class ToolDirectory:
         if not original or name in self.registry.disabled_tools:
             raise DomainError("TOOL_DISABLED" if original else "TOOL_UNAVAILABLE")
         validate_tool_arguments(original.schema, args)
-        if role == "research" and not research_call_allowed(name, args):
+        if role == "research" and not research_call_allowed(name, args, effect=original.effect):
             raise DomainError("TOOL_UNAVAILABLE")
         return original, args
 

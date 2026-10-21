@@ -395,7 +395,9 @@ class TaskDispatcher:
                 )
                 verified = bool(sources)
                 result["verification"] = {
-                    "kind": "browser_retrieval",
+                    "kind": "web_retrieval"
+                    if any(source.get("kind") == "mcp" for source in sources)
+                    else "browser_retrieval",
                     "state": "retrieved" if verified else "missing",
                     "sources": sources,
                 }

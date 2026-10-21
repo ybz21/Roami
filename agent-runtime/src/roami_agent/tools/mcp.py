@@ -191,17 +191,29 @@ class MCPConnections:
             alias = f"mcp_{connection.name}_{slug}_{digest[:10]}"
 
             async def invoke(
-                args, binding, alias=alias, connection=connection, remote_name=remote.name
+                args,
+                binding,
+                alias=alias,
+                connection=connection,
+                remote_name=remote.name,
+                effect=effect,
             ):
-                answer = await self._request(
-                    connection,
-                    "call",
-                    {"alias": alias, "arguments": args, "progress": binding.get("progress")},
-                )
+                try:
+                    answer = await self._request(
+                        connection,
+                        "call",
+                        {"alias": alias, "arguments": args, "progress": binding.get("progress")},
+                    )
+                except DomainError as exc:
+                    if effect == "read" and exc.code == "MCP_OUTCOME_UNKNOWN":
+                        raise DomainError("MCP_READ_FAILED") from None
+                    raise
                 try:
                     return await self.results.project(answer, binding, connection.name, remote_name)
                 except (DomainError, OSError):
-                    raise DomainError("MCP_OUTCOME_UNKNOWN") from None
+                    raise DomainError(
+                        "MCP_READ_FAILED" if effect == "read" else "MCP_OUTCOME_UNKNOWN"
+                    ) from None
 
             prepared.append(
                 Tool(alias, description, schema, invoke, effect=effect, source="external")
@@ -234,7 +246,13 @@ class MCPConnections:
 
     async def discover(self, args, binding):
         connection = self.connections[args["server"]]
-        return await self._request(connection, "discover", {})
+        result = await self._request(connection, "discover", {})
+        if self.registry.directory and binding.get("role"):
+            result = {
+                **result,
+                "catalog": self.registry.directory.list(kind="mcp", role=binding["role"], limit=20),
+            }
+        return result
 
     async def _ensure(self, connection):
         if self.closed:

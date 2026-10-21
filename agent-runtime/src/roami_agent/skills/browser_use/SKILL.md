@@ -5,13 +5,15 @@ description: Browse websites, research public information, interact with pages, 
 
 # Browser use
 
+For public facts, discover suitable read-only search MCP tools with `tool_list(kind="mcp")` first. Use the returned schemas; configured services may need `mcp_discover` before their tools appear. Use the browser for requested browser work or sources MCP cannot cover.
+
 Use `roami chrome` for browser work. The CLI catalog has one browser entry; open/observe/act handlers are internal. Read only the relevant reference using `read(path="skill://browser_use/references/FILE.md")`:
 
 - [Public research](references/research.md): source verification, timestamps and blocked sources.
 - [Managed tasks](references/managed-browser.md): native Worker commands, task resources and recovery.
 - [Terminal CLI](references/chrome-cli.md): professional Agent target selection, screenshots and recordings.
 
-Main delegates browser work with the current routing schema. Bounded public lookups or screenshots use `target={kind:"new_session",resourceOnly:true}`; this profile permits navigation and observation only. Interactions require a regular workspace task or a professional executor. Do not create a project for a lookup.
+Main delegates browser work with the current routing schema. Bounded public lookups or screenshots use `target={kind:"new_session",resourceOnly:true}`; this profile permits read-only MCP retrieval and browser navigation/observation. Interactions require a regular workspace task or a professional executor. Do not create a project for a lookup.
 
 Native Workers use `bash` argv with `roami chrome` commands; discover `tool_list(kind="cli",query="browser")` only when needed. Professional Agents use the terminal CLI directly. Both use the existing Chrome driver; loading this Skill never expands role permissions.
 

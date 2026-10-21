@@ -51,6 +51,7 @@ class Tools:
                 or role == "research"
                 and not self.directory
                 and tool.name not in RESEARCH_TOOLS
+                and not (tool.name.startswith("mcp_") and tool.effect == "read")
             ):
                 continue
             wire = tool.wire()
@@ -63,8 +64,8 @@ class Tools:
                 parameters = wire["function"]["parameters"]
                 if tool.name == "bash" and self.directory:
                     wire["function"]["description"] = (
-                        "Use only roami chrome browser navigation and observation commands through bash argv. "
-                        "Read skill://browser_use or roami chrome help. Research has no standalone shell, echo, curl or Python."
+                        "Use only read-only MCP operations discovered through tool_list, or roami chrome browser navigation "
+                        "and observation, through bash argv. Research has no standalone shell, echo, curl or Python."
                     )
                     wire["function"]["parameters"] = object_schema(
                         {"argv": parameters["properties"]["argv"]}, ["argv"]
@@ -114,7 +115,7 @@ class Tools:
         if (
             role == "research"
             and tool.name != "tool_list"
-            and not research_call_allowed(tool.name, args)
+            and not research_call_allowed(tool.name, args, effect=tool.effect)
         ):
             raise DomainError("TOOL_UNAVAILABLE")
         return tool, args
