@@ -7,6 +7,7 @@ import pytest
 from roami_agent.app import Runtime
 from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
+from roami_agent.context.token_estimate import text_tokens
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
@@ -75,8 +76,13 @@ async def test_current_input_above_soft_trigger_keeps_hard_limit_semantics(store
             row(db, "SELECT * FROM turns WHERE id=?", (receipt["turnId"],)), owner_id="alice"
         )
     )
-    settings, model = Settings(context_window=1000), SummaryModel()
-    builder = PromptBuilder(store, Context(store, model), settings)
+    model = SummaryModel()
+    context = Context(store, model)
+    probe, _ = await PromptBuilder(store, context, Settings()).build(turn, "", [], None)
+    # Keep the admission boundary independent of the fixed runtime policy text.
+    overhead = probe["estimatedTokens"] - text_tokens("a" * length)
+    settings = Settings(context_window=1000 + overhead)
+    builder = PromptBuilder(store, context, settings)
     if admitted:
         plan, _ = await builder.build(turn, "", [], None)
         assert (

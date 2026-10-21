@@ -19,7 +19,7 @@ func TestStableTargetSelectionAndSingleAttempt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	output, err := exec.Command("node", "--test", "target-selection.test.mjs", "operation-receipts.test.mjs", "browser-observation.test.mjs", "connection-queue.test.mjs", "screenshot-lifecycle.test.mjs", "navigation-observation.test.mjs").CombinedOutput()
+	output, err := exec.Command("node", "--test", "target-selection.test.mjs", "operation-receipts.test.mjs", "browser-observation.test.mjs", "connection-queue.test.mjs", "screenshot-lifecycle.test.mjs", "navigation-observation.test.mjs", "scoped-cdp.test.mjs").CombinedOutput()
 	if err != nil {
 		t.Fatalf("Chrome contract tests: %v\n%s", err, output)
 	}
@@ -32,7 +32,7 @@ func TestFirstRunDependencyOutputDoesNotPolluteJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	programs := map[string]string{
-		"npm":  "#!/bin/sh\nmkdir -p node_modules/playwright-core\nprintf 'added installer package\\n'\n",
+		"npm":  "#!/bin/sh\nmkdir -p node_modules/playwright-core node_modules/ws\nprintf 'added installer package\\n'\n",
 		"node": "#!/bin/sh\nprintf '{\"version\":\"fixture\"}\\n'\n",
 		"curl": "#!/bin/sh\nexit 0\n",
 	}

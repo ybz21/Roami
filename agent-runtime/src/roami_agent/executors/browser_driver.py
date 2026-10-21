@@ -514,6 +514,21 @@ class BrowserDriver:
     @passive_cancel_boundary
     async def open(self, args, binding):
         scope = await self.resources.scope(binding, input_action=True)
+        if binding.get("role") == "research" and args.get("url"):
+            stopped = await self.db.call(
+                lambda db: rows(
+                    db,
+                    "SELECT action_json FROM resource_actions WHERE task_id=? AND run_id=? "
+                    "AND state='unknown' AND json_extract(result_json,'$.inputStopped')=1 "
+                    "AND json_extract(action_json,'$.verb')='goto'",
+                    (scope["taskId"], scope["runId"]),
+                )
+            )
+            if any(
+                args["url"] in json.loads(action["action_json"]).get("args", [])
+                for action in stopped
+            ):
+                raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
         capabilities = await self.capabilities()
         browser_id = capabilities["browserId"]
         target_id = args.get("targetId")
@@ -629,7 +644,9 @@ class BrowserDriver:
             except DomainError as exc:
                 if exc.code not in {"CHROME_OBSERVATION_TIMEOUT", "CHROME_SCENE_CHANGED"}:
                     raise
-                body = await self._cli("observe", "--target", target_id, browser_id=browser_id)
+                body = await self._cli(
+                    "observe", "--target", target_id, browser_id=browser_id, readiness_wait_ms=5000
+                )
                 body, _ = self._observation(body, None)
                 body["screenshotError"] = exc.code
                 observed = await self.resources.observe(
@@ -739,6 +756,13 @@ class BrowserDriver:
                 "needsVerification": True,
             }
         except (DomainError, OSError, KeyError):
+            if recovery:
+                recovery["recovery"] = (
+                    "Navigation input has stopped, but its original outcome remains unknown and this page "
+                    "cannot currently be observed. Do not reopen the same URL or repeat failed observation calls. "
+                    "For this read-only lookup, another relevant public source may be opened in a new task-owned tab; "
+                    "keep this failure and verify facts from the new source. Human takeover and unknown writes still stop input."
+                )
             return {
                 "resourceId": resource["id"],
                 **recovery,

@@ -218,3 +218,29 @@ async def test_failed_web_verification_never_hands_candidate_facts_or_files_to_m
         assert json.loads(retained["result_json"]) == report
     finally:
         await runtime.close()
+
+
+def test_large_preflight_report_preserves_attempt_and_step_execution_scope():
+    completion = {
+        "taskId": "partial-task",
+        "runId": "partial-run",
+        "state": "failed",
+        "result": {
+            "state": "failed",
+            "summary": "Private detailed record. " * 20000,
+            "executionStarted": True,
+            "failedStep": {"phase": "preflight", "executionStarted": False},
+            "progress": {
+                "completedToolCount": 2,
+                "resourceActionCount": 4,
+                "observationCount": 7,
+                "sources": [{"url": "https://example.org/"}],
+            },
+        },
+    }
+    excerpt = completion_evidence(completion, budget=1024)
+    assert text_tokens(encoded(excerpt)) <= 1024
+    assert excerpt["result"]["executionStarted"] is True
+    assert excerpt["result"]["failedStep"]["executionStarted"] is False
+    assert excerpt["result"]["progress"]["resourceActionCount"] == 4
+    assert completion["result"]["progress"]["sources"]

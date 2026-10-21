@@ -24,11 +24,15 @@ var operationReceipts string
 //go:embed browser-observation.mjs
 var browserObservation string
 
+//go:embed scoped-cdp.mjs
+var scopedCDP string
+
 // Run keeps Playwright and its daemon behind the same public executable.
 func Run(args []string) error {
 	content := strings.ReplaceAll(launcher, "@@DRIVER@@", driver)
 	content = strings.ReplaceAll(content, "@@OPERATION_RECEIPTS@@", operationReceipts)
 	content = strings.ReplaceAll(content, "@@BROWSER_OBSERVATION@@", browserObservation)
+	content = strings.ReplaceAll(content, "@@SCOPED_CDP@@", scopedCDP)
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" || args[0] == "--version" {
 		cmd := exec.Command("bash", append([]string{"-s", "--"}, args...)...)
 		cmd.Stdin = strings.NewReader(content)

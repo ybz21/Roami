@@ -142,8 +142,23 @@ class ToolGateway:
                 value.update(
                     executionStarted=False,
                     retryable=False,
-                    recovery="Browser readiness failed before any browser action. End this attempt and "
+                    recovery="This tool call failed readiness before its browser action. Earlier calls in this attempt may have executed; preserve their results and sources. End this attempt and "
                     "report the dependency failure to Main; do not retry different URLs or probe shell commands.",
+                )
+            if (
+                role == "research"
+                and not isinstance(exc, ToolPreflightError)
+                and value["error"]
+                in {
+                    "BROWSER_SOURCE_UNAVAILABLE",
+                    "BROWSER_DRIVER_UNAVAILABLE",
+                    "CHROME_OBSERVATION_TIMEOUT",
+                }
+            ):
+                value["recovery"] = (
+                    "This source could not be read. Do not reopen the same URL or repeat identical failed observations. "
+                    "If its read-only navigation input has stopped, use another relevant public URL in a task-owned tab. "
+                    "Keep unknown outcomes and source limitations explicit; human takeover and unknown writes still stop input."
                 )
             if isinstance(exc, ToolArgumentsError):
                 value["argumentIssues"] = exc.issues

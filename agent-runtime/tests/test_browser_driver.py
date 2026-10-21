@@ -488,7 +488,7 @@ async def test_unavailable_background_screenshot_keeps_fresh_dom_and_never_repea
         if argv[2] == "observe" and "--screenshot" in argv:
             assert argv[argv.index("--timeout") + 1] == "5000"
             return {"exitCode": 1, "stdout": "", "stderr": "CHROME_OBSERVATION_TIMEOUT"}
-        assert argv[argv.index("--timeout") + 1] == "0"
+        assert argv[argv.index("--timeout") + 1] == ("5000" if argv[2] == "observe" else "0")
         return await fixture(argv, **options)
 
     runtime.browser.runner = runner
@@ -774,5 +774,84 @@ async def test_missing_or_invalid_process_claim_never_proves_input_stop(store, o
             lock.touch(mode=0o600)
             lock.write_text(owner)
         assert await runtime.browser._stored_receipt(operation_id) == receipt
+    finally:
+        await runtime.close()
+
+
+async def test_stopped_unreadable_source_is_not_reopened_and_alternate_source_remains_available(
+    store,
+):
+    from test_runtime import ConversationModel, until
+    from test_tool_rejection_progress import Calls
+
+    def opening(url):
+        return {
+            "name": "bash",
+            "arguments": encoded(
+                {
+                    "argv": [
+                        "roami",
+                        "agent",
+                        "capability",
+                        "call",
+                        "browser_open",
+                        "--input",
+                        encoded({"url": url}),
+                    ]
+                }
+            ),
+        }
+
+    first, alternate = "https://blocked.example/pricing", "https://alternate.example/pricing"
+    model = Calls([opening(first), opening(first), opening(alternate)])
+    fixture = BrowserFixture()
+    fixture.stop_known = False
+
+    async def runner(argv, **options):
+        result = await fixture(argv, **options)
+        verb, flags, args = fixture.arguments(argv)
+        if verb == "goto" and args[0] == first:
+            fixture.receipts[flags["--operation-id"]].update(
+                state="unknown", inputStopped=True, outcomeKnown=False
+            )
+            result["stdout"] = encoded(fixture.receipts[flags["--operation-id"]])
+        return result
+
+    runtime = Runtime(
+        store, ConversationModel(), worker_model=model, settings=Settings(browser={"enabled": True})
+    )
+    runtime.browser.runner = runner
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Compare sources",
+            key="source-recovery",
+            target={"kind": "new_session", "resourceOnly": True},
+            record_intent=True,
+        )
+        await runtime.start()
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM task_attempts WHERE task_id=? AND finished_ms IS NOT NULL",
+                (task["id"],),
+            ),
+        )
+        assert model.results[1]["error"] == "BROWSER_SOURCE_UNAVAILABLE"
+        assert "another relevant public URL" in model.results[1]["recovery"]
+        assert fixture.writes == ["new", "goto", "new", "goto"]
+        assert fixture.url == alternate
+        records = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT state,result_json FROM resource_actions WHERE task_id=? AND state='unknown'",
+                (task["id"],),
+            )
+        )
+        assert len(records) == 1
+        assert json.loads(records[0]["result_json"])["outcomeKnown"] is False
     finally:
         await runtime.close()

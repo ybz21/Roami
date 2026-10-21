@@ -189,6 +189,11 @@ ROAMI_BROWSER_OBSERVATION
     else
         mv -f "$observation_tmp" "${CHROME_DIR}/browser-observation.mjs"
     fi
+    local scoped_tmp="${CHROME_DIR}/scoped-cdp.mjs.$$.tmp"
+    cat > "$scoped_tmp" <<'ROAMI_SCOPED_CDP'
+@@SCOPED_CDP@@
+ROAMI_SCOPED_CDP
+    mv -f "$scoped_tmp" "${CHROME_DIR}/scoped-cdp.mjs"
     if [ -f "${CHROME_DIR}/driver.mjs" ] && cmp -s "$tmp" "${CHROME_DIR}/driver.mjs"; then
         rm -f "$tmp"
         return 0
@@ -196,16 +201,21 @@ ROAMI_BROWSER_OBSERVATION
     mv -f "$tmp" "${CHROME_DIR}/driver.mjs"
 }
 
-# 安装/校验依赖：node + npm + playwright-core
+_dependencies_ready() {
+    [ -d "${CHROME_DIR}/node_modules/playwright-core" ] && [ -d "${CHROME_DIR}/node_modules/ws" ] || return 1
+    node -e 'const p=require(process.argv[1]); const [major,minor]=p.version.split(".").map(Number); process.exit(major>1 || major===1 && minor>=61 ? 0 : 1)' "${CHROME_DIR}/node_modules/playwright-core/package.json" >/dev/null 2>&1
+}
+
+# Scoped CDP uses the public transport API available in Playwright 1.61.
 _setup() {
     command -v node >/dev/null 2>&1 || { _err "需要 node（未找到）"; return 1; }
     command -v npm  >/dev/null 2>&1 || { _err "需要 npm（未找到）"; return 1; }
     _write_driver
-    if [ ! -d "${CHROME_DIR}/node_modules/playwright-core" ]; then
+    if ! _dependencies_ready; then
         _info "安装 playwright-core → ${CHROME_DIR}（首次, 不下载额外浏览器）"
         ( cd "$CHROME_DIR" \
             && { [ -f package.json ] || npm init -y >/dev/null 2>&1; } \
-            && npm i --no-audit --no-fund --loglevel=error playwright-core >&2 ) \
+            && npm i --no-audit --no-fund --loglevel=error 'playwright-core@^1.61.0' 'ws@^8.18.0' >&2 ) \
             || { _err "playwright-core 安装失败（可重试: chrome setup）"; return 1; }
     fi
     return 0
@@ -381,7 +391,7 @@ if [ "$sub" = "screenshot" ] || [ "$sub" = "shot" ]; then
 fi
 
 # 首次/缺失才跑完整 setup（装依赖）；齐了就走快路径。
-if [ ! -f "${CHROME_DIR}/driver.mjs" ] || [ ! -d "${CHROME_DIR}/node_modules/playwright-core" ]; then
+if [ ! -f "${CHROME_DIR}/driver.mjs" ] || ! _dependencies_ready; then
     _setup || exit 1
 else
     # 根 chrome 是单文件分发；每次执行刷新内嵌 driver，确保升级后的 CLI 立即生效。

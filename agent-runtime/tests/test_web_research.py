@@ -176,3 +176,104 @@ async def test_research_catalog_and_invocation_deny_non_navigation_tools(store):
             await runtime.tools.invoke(
                 {"function": {"name": name, "arguments": json.dumps(args)}}, "research", {}
             )
+
+
+async def test_current_lookup_boundary_applies_to_custom_main_instructions_and_repeated_input(
+    store,
+):
+    class Main:
+        model = "custom-instruction-boundary"
+
+        def __init__(self):
+            self.prompts = []
+
+        async def stream(self, messages, tools):
+            self.prompts.append(messages)
+            yield ModelEvent("text", "Fixture response")
+
+    model = Main()
+    runtime = Runtime(
+        store,
+        model,
+        memory_model=MemoryModel(),
+        settings=Settings(main_instructions="Custom coordinator instructions"),
+    )
+    try:
+        conversation = await runtime.conversations.create("alice")
+        await runtime.start()
+        for key in ["first", "repeated"]:
+            receipt = await runtime.chat.submit("alice", conversation["id"], key, "查看济南天气")
+            await until(
+                store,
+                lambda db, turn_id=receipt["turnId"]: row(
+                    db,
+                    "SELECT id FROM turns WHERE id=? AND state='completed'",
+                    (turn_id,),
+                ),
+            )
+        assert len(model.prompts) == 2
+        for prompt in model.prompts:
+            assert prompt[0]["content"].startswith("Custom coordinator instructions")
+            boundary = [
+                m["content"]
+                for m in prompt
+                if m["role"] == "system" and m["content"].startswith("Current request boundary:")
+            ]
+            assert len(boundary) == 1
+            assert "retrieval after this request" in boundary[0]
+            assert "assistant-invented source restrictions" in boundary[0]
+            assert "recap/status rather than a lookup" in boundary[0]
+    finally:
+        await runtime.close()
+
+
+async def test_status_marks_old_research_as_cached_and_does_not_repeat_continuation_answers(store):
+    from roami_agent.protocol.serialization import encoded
+
+    runtime = Runtime(store, MemoryModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Public lookup",
+            key="cached-lookup",
+            target={"kind": "new_session", "resourceOnly": True},
+            record_intent=True,
+        )
+        intent = json.loads(task["intent_json"])
+        intent["continuation"] = {
+            "state": "succeeded",
+            "summary": "Old pricing table must not become a new lookup",
+        }
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET intent_json=? WHERE id=?", (encoded(intent), task["id"])
+            ),
+            write=True,
+        )
+        receipt = await runtime.conversations.accept(
+            "alice", conversation["id"], "new-lookup", "查看济南天气"
+        )
+        snapshot = await runtime.tools.registry["task_status"].handler(
+            {"taskId": task["id"]},
+            {"owner": "alice", "conversation": conversation["id"], "turnId": receipt["turnId"]},
+        )
+        assert snapshot[0]["latestAttempt"]["retrievalEvidence"]["freshForCurrentRequest"] is False
+        assert (
+            "Do not poll status or steer it again"
+            in snapshot[0]["latestAttempt"]["retrievalEvidence"]["recovery"]
+        )
+        await store.call(
+            lambda db: db.execute("UPDATE tasks SET state='failed' WHERE id=?", (task["id"],)),
+            write=True,
+        )
+        ended = await runtime.tools.registry["task_status"].handler(
+            {"taskId": task["id"]},
+            {"owner": "alice", "conversation": conversation["id"], "turnId": receipt["turnId"]},
+        )
+        assert "task_steer" in ended[0]["latestAttempt"]["retrievalEvidence"]["recovery"]
+        assert "Old pricing table" not in json.dumps(snapshot)
+        assert "Old pricing table" in json.dumps(await runtime.tasks.list("alice"))
+    finally:
+        await runtime.close()

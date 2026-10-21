@@ -285,9 +285,45 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         }
 
     async def status(args, binding):
-        return await tasks.list(
+        items = await tasks.list(
             binding["owner"], binding["conversation"], for_model=True, task_id=args.get("taskId")
         )
+
+        def annotate(db):
+            turn = row(db, "SELECT created_ms FROM turns WHERE id=?", (binding.get("turnId"),))
+            for item in items:
+                if item.get("contextExcluded") or not item.get("intent_json"):
+                    continue
+                intent = json.loads(item["intent_json"])
+                attempt = item.get("latestAttempt") or {}
+                if intent.get("target", {}).get("resourceOnly") is not True or not attempt.get(
+                    "runId"
+                ):
+                    continue
+                captured = row(
+                    db,
+                    "SELECT MAX(captured_ms) AS latest FROM resource_observations WHERE task_id=? AND run_id=? "
+                    "AND length(trim(json_extract(body_json,'$.domText')))>0",
+                    (item["id"], attempt["runId"]),
+                )["latest"]
+                attempt["retrievalEvidence"] = {
+                    "lastRetrievedMs": captured,
+                    "freshForCurrentRequest": bool(
+                        turn and captured and captured >= turn["created_ms"]
+                    ),
+                    "recovery": (
+                        "This task is already accepted and still pending. Its completion report will arrive automatically. "
+                        "Do not poll status or steer it again for this same request. Handle any other requested parts, then end this turn."
+                        if item["state"]
+                        not in {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}
+                        else "This is stored task status, not a fresh lookup. For a new lookup request, "
+                        "continue this task with task_steer at its current revision and retrieve sources again. "
+                        "Cached facts may answer an explicit recap/status request only; never present them as new retrieval."
+                    ),
+                }
+            return items
+
+        return await tasks.db.call(annotate)
 
     async def recall(args, binding):
         day = args.get("scope") == "day"

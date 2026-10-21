@@ -5,6 +5,7 @@
 | 文件 | 职责 |
 |---|---|
 | `driver.mjs` | Playwright over CDP、标签选择、截图与录制 |
+| `scoped-cdp.mjs` | 按目标页连接，隔离无关页面的初始化阻塞 |
 | `launcher.sh` | 依赖准备、共享 Chrome 配置、daemon 与 CDP 连接 |
 | `process.go` | 嵌入资源、内容版本缓存与子进程启动 |
 
@@ -16,11 +17,21 @@ go build -o /tmp/roami ./cmd/roami
 /tmp/roami chrome screenshot /tmp/check.png --full
 ```
 
-帮助不创建运行时缓存、不启动 Chrome、不安装依赖。实际自动化需要 Node、npm、playwright-core 和 Chrome；复用 CDP 时不下载 Playwright 自带浏览器。
+帮助不创建运行时缓存、不启动 Chrome、不安装依赖。实际自动化需要 Node ≥18、npm、playwright-core ≥1.61、ws 和 Chrome；复用 CDP 时不下载 Playwright 自带浏览器。
 
 默认复用 Web 控制台同一 CDP/profile，正式数据根跟随统一路径解析，兼容旧环境变量。`screenshot --fresh --goto <url>` 使用独立临时浏览器，适合不依赖登录态的验证。
 
 `scripts/build/build-chrome.sh` 仅生成 `exec roami chrome` 兼容启动器，不再复制驱动实现。安装器也可将旧 chrome 命令名链接到同一 Roami 二进制。
+
+## 按目标页连接
+
+`capabilities`、`tabs`、空白 `new` 直接通过浏览器级 CDP 查询或创建，不初始化现有页面。
+页面操作使用 Playwright 的公开 `connectOverCDP(transport)` 接口：根会话的自动附着排除所有目标，
+再显式附着本次选中的 target；目标页内 iframe 的自动附着保持原协议。无关页面不会被调试暂停或等待初始化。
+切换目标时断开旧连接，保留正在录制的连接直至录制停止。关闭连接不会关闭共享 Chrome。
+
+启动器检查依赖版本并按需升级到 Playwright ≥1.61 和 ws ≥8.18；新驱动使用带 `.scoped-v1` 后缀的
+独立 daemon socket，避免复用已加载旧代码的进程，不终止其动作。连接就绪检查仍有时限，页面操作不因连接失败自动重放。
 
 ## 稳定目标与单次调用
 

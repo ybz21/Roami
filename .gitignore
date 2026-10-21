@@ -41,3 +41,6 @@ agent-runtime/.pytest_cache/
 agent-runtime/.ruff_cache/
 agent-runtime/**/__pycache__/
 agent-runtime/dist/
+
+# Browser automation dependencies
+/backend/browser/automation/node_modules/

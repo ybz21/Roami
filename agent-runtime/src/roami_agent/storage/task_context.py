@@ -53,5 +53,14 @@ def model_task_projection(db, owner, tasks):
         ):
             result.append({"id": task["id"], "state": task["state"], "contextExcluded": True})
         else:
+            task = dict(task)
+            if task.get("intent_json"):
+                intent = json.loads(task["intent_json"])
+                if intent.get("target", {}).get("resourceOnly") is True:
+                    continuation = intent.get("continuation", {})
+                    if "summary" in continuation:
+                        continuation.pop("summary")
+                        continuation["previousResultAvailable"] = True
+                        task["intent_json"] = json.dumps(intent, ensure_ascii=False)
             result.append(task)
     return result

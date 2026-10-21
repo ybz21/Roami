@@ -203,7 +203,14 @@ class TaskDispatcher:
                 "summary": exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED",
             }
             if isinstance(exc, ToolPreflightError):
-                result.update(errorCode=exc.code, executionStarted=False, retryable=False)
+                progress = await self.db.call(lambda db: self.attempt_progress(db, task, run, turn))
+                result.update(
+                    errorCode=exc.code,
+                    executionStarted=progress["executionStarted"],
+                    retryable=False,
+                    progress=progress,
+                    failedStep={"phase": "preflight", "executionStarted": False},
+                )
             pending = (
                 await self.db.call(
                     lambda db: row(
@@ -227,6 +234,43 @@ class TaskDispatcher:
                 await self.complete(task, run, result, "interrupted", unknown=True)
                 return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
+
+    @staticmethod
+    def attempt_progress(db, task, run, turn):
+        counts = row(
+            db,
+            "SELECT COALESCE(SUM(x.state='succeeded'),0) AS completed,"
+            "COALESCE(SUM(x.state!='succeeded' AND COALESCE(json_extract(json_extract(m.content_json,'$.text'),'$.executionStarted'),1)!=0),0) AS uncertain "
+            "FROM tool_calls x LEFT JOIN messages m ON m.id=x.result_message_id WHERE x.turn_id=?",
+            (turn["id"] if turn else None,),
+        )
+        actions = row(
+            db,
+            "SELECT COUNT(*) AS total FROM resource_actions WHERE task_id=? AND run_id=?",
+            (task["id"], run["id"]),
+        )["total"]
+        observations = row(
+            db,
+            "SELECT COUNT(*) AS total FROM resource_observations WHERE task_id=? AND run_id=?",
+            (task["id"], run["id"]),
+        )["total"]
+        sources = rows(
+            db,
+            "SELECT json_extract(body_json,'$.url') AS url,MAX(captured_ms) AS retrievedMs "
+            "FROM resource_observations WHERE task_id=? AND run_id=? "
+            "AND length(trim(json_extract(body_json,'$.domText')))>0 "
+            "AND (json_extract(body_json,'$.url') LIKE 'http://%' OR json_extract(body_json,'$.url') LIKE 'https://%') "
+            "GROUP BY url ORDER BY retrievedMs DESC LIMIT 16",
+            (task["id"], run["id"]),
+        )
+        started = bool(counts["completed"] or actions or observations)
+        return {
+            "executionStarted": True if started else None if counts["uncertain"] else False,
+            "completedToolCount": counts["completed"],
+            "resourceActionCount": actions,
+            "observationCount": observations,
+            "sources": sources,
+        }
 
     async def end_prepared_turn(self, turn, state, code):
         if turn is None:

@@ -175,3 +175,101 @@ async def test_preflight_failure_is_reported_as_a_nonretryable_dependency_failur
         assert worker.calls == 1 and commands == ["capabilities"]
     finally:
         await runtime.close()
+
+
+async def test_later_preflight_preserves_completed_actions_and_sources_per_attempt(store):
+    from test_browser_driver import BrowserFixture
+    from test_runtime import ConversationModel, until
+
+    call = {
+        "name": "bash",
+        "arguments": json.dumps(
+            {
+                "argv": [
+                    "roami",
+                    "agent",
+                    "capability",
+                    "call",
+                    "browser_open",
+                    "--input",
+                    json.dumps({"url": "https://source.example/pricing"}),
+                ]
+            }
+        ),
+    }
+    worker = Calls([call] * 30)
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        worker_model=worker,
+        settings=Settings(browser={"enabled": True}),
+    )
+    browser, readiness = BrowserFixture(), 0
+
+    async def runner(argv, **options):
+        nonlocal readiness
+        if argv[2] == "capabilities":
+            readiness += 1
+            if readiness > 1:
+                return {"exitCode": 1, "stdout": "", "stderr": "Connection refused"}
+        return await browser(argv, **options)
+
+    runtime.browser.runner = runner
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            conversation["id"],
+            "Compare current public pricing",
+            key="partial-pricing",
+            target={"kind": "new_session", "resourceOnly": True},
+            record_intent=True,
+        )
+        await runtime.start()
+        await until(
+            store,
+            lambda db: row(db, "SELECT id FROM tasks WHERE id=? AND state='failed'", (task["id"],)),
+        )
+        first = await store.call(
+            lambda db: row(
+                db, "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=1", (task["id"],)
+            )
+        )
+        result = json.loads(first["result_json"])
+        assert result["errorCode"] == "BROWSER_DRIVER_UNAVAILABLE"
+        assert result["executionStarted"] is True
+        assert result["failedStep"] == {"phase": "preflight", "executionStarted": False}
+        assert result["progress"]["completedToolCount"] == 1
+        assert result["progress"]["resourceActionCount"] == 2
+        assert result["progress"]["observationCount"] >= 3
+        assert result["progress"]["sources"][0]["url"] == "https://source.example/pricing"
+        assert result.get("outcomeKnown") is not False
+        assert browser.writes == ["new", "goto"]
+        await runtime.tasks.revisions.request(
+            "alice", task["id"], "Continue the same lookup", 1, "continue-pricing"
+        )
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT id FROM tasks WHERE id=? AND revision=2 AND state='failed'",
+                (task["id"],),
+            ),
+        )
+        second = await store.call(
+            lambda db: row(
+                db, "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=2", (task["id"],)
+            )
+        )
+        assert first["native_branch_id"] == second["native_branch_id"]
+        next_result = json.loads(second["result_json"])
+        assert next_result["executionStarted"] is False
+        assert next_result["progress"]["sources"] == []
+        assert next_result["progress"]["resourceActionCount"] == 0
+        assert browser.writes == ["new", "goto"]
+        unchanged = await store.call(
+            lambda db: row(db, "SELECT result_json FROM task_attempts WHERE id=?", (first["id"],))
+        )
+        assert json.loads(unchanged["result_json"]) == result
+    finally:
+        await runtime.close()

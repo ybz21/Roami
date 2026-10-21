@@ -17,7 +17,11 @@ function fixture() {
   }, detach: async () => {} }) }
   const page = { context: () => context, url: () => state.url, evaluate: async () => ({ html: state.html, values: state.values, focused: state.focused, url: state.url, controls: [], title: 'News', domText: state.html, viewportSize: { width: 800, height: 600 }, deviceScale: 1 }), goto: async url => { moves.push(url); state.url = url }, title: async () => 'News', click: async selector => clicks.push(selector) }
   const browser = { contexts: () => [context], isConnected: () => true, close: async () => {} }
-  const session = new Session({ discover: async () => ({ id: 'browser', websocketUrl: 'ws://fixture' }), connect: async () => browser })
+  const session = new Session({ discover: async () => ({ id: 'browser', websocketUrl: 'ws://fixture' }), control: async () => ({ request: async method => {
+      if (method === 'Target.getTargets') return { targetInfos: [{ type: 'page', targetId: 'owned', url: 'https://example.com/news' }] }
+      if (method === 'Target.createTarget') return { targetId: 'owned' }
+      return {}
+    }, close: () => {} }), connect: async () => browser })
   const run = (verb, signature) => session.run(verb, { target: 'owned', 'expected-browser': 'browser', 'expected-scene': signature, 'no-focus': true }, [verb === 'goto' ? 'https://example.com/source' : '#button'], 0, { log: () => {} })
   return { state, page, moves, clicks, run }
 }

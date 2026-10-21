@@ -38,9 +38,25 @@ def completion_evidence(completion, *, budget):
     result = result if isinstance(result, dict) else {}
     detail = {
         key: result[key]
-        for key in ["outcomeKnown", "inputStopped", "cancellationRequested", "retryable"]
+        for key in [
+            "outcomeKnown",
+            "inputStopped",
+            "executionStarted",
+            "cancellationRequested",
+            "retryable",
+        ]
         if type(result.get(key)) is bool
     }
+    failed_step = result.get("failedStep")
+    if isinstance(failed_step, dict) and failed_step.get("phase") == "preflight":
+        detail["failedStep"] = {"phase": "preflight", "executionStarted": False}
+    progress = result.get("progress")
+    if isinstance(progress, dict):
+        detail["progress"] = {
+            key: progress[key]
+            for key in ["completedToolCount", "resourceActionCount", "observationCount"]
+            if type(progress.get(key)) is int and progress[key] >= 0
+        }
     if result.get("state") in {"succeeded", "failed", "cancelled"}:
         detail["state"] = result["state"]
     if type(result.get("exitCode")) is int and -(2**31) <= result["exitCode"] < 2**31:

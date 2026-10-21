@@ -21,6 +21,7 @@ function fixture(original = desktop, failure = '') {
       send: async (method, params) => {
         calls.push({ method, params })
         if (method === failure) throw new Error('CDP failure')
+        if (method === 'Target.getTargetInfo') return { targetInfo: { targetId: 'owned' } }
         if (method === 'Runtime.evaluate') return { result: { value: original } }
         if (method === 'Page.captureScreenshot') return { data: Buffer.from('image').toString('base64') }
         return {}
@@ -108,16 +109,23 @@ test('navigation releases the TLS session on success, navigation failure and sec
 test('failed new-tab navigation closes only the newly created page', async () => {
   const state = fixture()
   let closed = 0
+  state.page.url = () => 'about:blank'
+  state.page.bringToFront = async () => {}
   state.page.goto = async () => { throw new Error('navigation failed') }
   state.page.close = async () => { closed++ }
-  const ctx = { pages: () => [], newPage: async () => state.page }
+  const ctx = { pages: () => [state.page], newPage: async () => state.page }
   const browser = { contexts: () => [ctx], isConnected: () => true }
   const session = new Session({
     discover: async () => ({ id: 'browser', websocketUrl: 'ws://fixture/devtools/browser/browser' }),
-    connect: async () => browser,
+    control: async () => ({ request: async method => {
+      if (method === 'Target.getTargets') return { targetInfos: [{ type: 'page', targetId: 'owned', url: 'https://example.com/news' }] }
+      if (method === 'Target.createTarget') return { targetId: 'owned' }
+      if (method === 'Target.closeTarget') { closed++; return {} }
+      return {}
+    }, close: () => {} }), connect: async () => browser,
   })
   ctx.newCDPSession = state.page.context().newCDPSession
   await assert.rejects(session.run('new', {}, ['http://fixture'], 500, {}), /navigation failed/)
   assert.equal(closed, 1)
-  assert.equal(state.detached(), 1)
+  assert.equal(state.detached(), 2)
 })

@@ -19,9 +19,10 @@ import { tmpdir } from 'node:os'
 import net from 'node:net'
 import { OperationReceipts } from './operation-receipts.mjs'
 import { discoverBrowser, observePage } from './browser-observation.mjs'
+import { ScopedCDP, connectTarget, selectTarget } from './scoped-cdp.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
-const SOCK_PATH = process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock'
+const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v1'
 const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli.log'
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
@@ -189,7 +190,7 @@ async function withInsecureTLS(ctx, page, action) {
     await session.send('Security.enable') // 少这一句 setIgnoreCertificateErrors 会静默无效（返回 {} 但照拦）
     await session.send('Security.setIgnoreCertificateErrors', { ignore: true })
   } catch {} // 老版本 Chrome 不支持就算了，导航照走（顶多停在拦截页）
-  try { return await action() } finally { await session?.detach().catch(() => {}) }
+  try { return await action() } finally { if (session) await Promise.race([session.detach().catch(() => {}), sleep(250)]) }
 }
 
 const screenshotSessions = new WeakMap()
@@ -294,7 +295,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
   }
 
   switch (verb) {
-    case 'goto': { const p = await pickHere(); await withInsecureTLS(ctx, p, () => navigate(p, pos[0], { waitUntil: navigationWait(flags), timeout: to })); io.log({ url: p.url(), title: await p.title() }); break }
+    case 'goto': { const p = await pickHere(); await withInsecureTLS(ctx, p, () => navigate(p, pos[0], { waitUntil: navigationWait(flags), timeout: to })); io.log({ url: p.url(), title: await withTimeout(p.title(), 3000, 'navigation title').catch(() => '') }); break }
     case 'url': io.log((await pickHere()).url()); break
     case 'title': io.log(await (await pickHere()).title()); break
     case 'click': await (await pickHere()).click(pos[0], { timeout: to }); io.log('ok'); break
@@ -326,29 +327,7 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
       break
     }
     case 'pdf': { const f = pos[0] || 'page.pdf'; await (await pickHere()).pdf({ path: f }); io.log(f); break }
-    case 'capabilities': io.log({ version: 'roami-browser-v1', browserId: browserId, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene'] }); break
     case 'observe': io.log(await observePage(await pickHere(), flags.screenshot, { timeoutMs: to })); break
-    case 'tabs': io.log(await Promise.all(pages.map(async (pg, i) => ({ i, targetId: await targetIdentity(pg).catch(() => null), title: await pg.title().catch(() => ''), url: pg.url() })))); break
-    case 'new': {
-      if (flags['no-focus'] && !pos[0]) {
-        const session = await browser.newBrowserCDPSession()
-        try {
-          const { targetId } = await session.send('Target.createTarget', { url: 'about:blank', background: true })
-          io.log({ targetId, url: 'about:blank' })
-        } finally { await session.detach().catch(() => {}) }
-        break
-      }
-      const np = await ctx.newPage()
-      try {
-        if (pos[0]) await withInsecureTLS(ctx, np, () => np.goto(pos[0], { waitUntil: 'load', timeout: to }))
-      } catch (error) {
-        await np.close().catch(() => {})
-        throw error
-      }
-      if (!flags['no-focus']) await np.bringToFront().catch(() => {})
-      io.log({ i: userPages(ctx.pages()).indexOf(np), targetId: await targetIdentity(np), url: np.url() })
-      break
-    }
     case 'close': await (await pickHere()).close(); io.log('ok'); break
     default: fail('未知命令: ' + verb)
   }
@@ -543,27 +522,30 @@ function runFFmpeg(args, fail, timeoutMs) {
 // ── Session：daemon 里跨请求复用的 CDP 连接（一次性冷启动路径也走它，只是活不过一条命令） ──
 
 class Session {
-  constructor({ discover = discoverBrowser, connect } = {}) {
+  constructor({ discover = discoverBrowser, connect = connectTarget, control = ScopedCDP.connect } = {}) {
     this.browser = null; this.cdp = ''; this.browserId = ''; this.recorder = new Recorder()
     this.discover = discover
-    this.connect = connect || (async websocketUrl => {
-      const { chromium } = await import('playwright-core')
-      return chromium.connectOverCDP(websocketUrl, { timeout: 10000 })
-    })
+    this.connect = connect
+    this.control = control
+    this.controlSocket = null
+    this.controlUrl = ''
+    this.targetId = ''
+    this.recordingBrowser = null
   }
-  async browserFor(cdp) {
+  async browserFor(cdp, targetId = '') {
     const discovered = await this.discover(cdp)
     // 换了地址就得重连：daemon 常驻、缓存的是「上一条命令那台」的连接，而目标端口是会变的
     // （后端 9222 被占时会换端口）。不比对就会把命令继续发给旧的那台。
-    if (this.browser && (!this.browser.isConnected() || this.cdp !== cdp || this.browserId !== discovered.id)) {
-      try { await this.browser.close() } catch {} // 仅断连接，不杀共享 Chrome
+    if (this.browser && (!this.browser.isConnected() || this.cdp !== cdp || this.browserId !== discovered.id || this.targetId !== targetId)) {
+      if (this.browser !== this.recordingBrowser) { try { await this.browser.close() } catch {} }
       this.browser = null
     }
     if (!this.browser) {
       try {
-        this.browser = await this.connect(discovered.websocketUrl)
+        this.browser = await this.connect(discovered.websocketUrl, targetId)
         this.cdp = cdp
         this.browserId = discovered.id
+        this.targetId = targetId
       } catch (e) {
         throw new ChromeError('连不上 Chrome (' + cdp + '): ' + e.message)
       }
@@ -572,13 +554,59 @@ class Session {
   }
   async run(verb, flags, pos, timeoutMs, io) {
     const cdp = flags.cdp || process.env.TTMUX_CHROME_CDP || 'http://127.0.0.1:9222'
-    const browser = await this.browserFor(cdp)
-    const fail = (m) => { throw new ChromeError(m) }
+    const fail = message => { throw new ChromeError(message) }
+    if (verb === 'record' && pos[0] !== 'start') {
+      await this.recorder.handle(this.recordingBrowser, flags, pos, fail, io)
+      if (!this.recorder.isActive() && this.recordingBrowser !== this.browser) await this.recordingBrowser?.close().catch(() => {})
+      if (!this.recorder.isActive()) this.recordingBrowser = null
+      return
+    }
+    const discovered = await this.discover(cdp)
+    if (flags['expected-browser'] != null && flags['expected-browser'] !== discovered.id) throw new ChromeError('CHROME_BROWSER_CHANGED')
+    if (!this.controlSocket || this.controlUrl !== discovered.websocketUrl) {
+      this.controlSocket?.close()
+      const control = await this.control(discovered.websocketUrl)
+      this.controlSocket = control
+      this.controlUrl = discovered.websocketUrl
+      control.onclose = () => { if (this.controlSocket === control) this.controlSocket = null }
+    }
+    const control = this.controlSocket
+    if (verb === 'capabilities') {
+      await control.request('Browser.getVersion')
+      io.log({ version: 'roami-browser-v1', browserId: discovered.id, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene'] })
+      return
+    }
+    const listTargets = async () => (await control.request('Target.getTargets')).targetInfos
+      .filter(t => t.type === 'page' && userPages([{ url: () => t.url }]).length)
+    const targets = await listTargets()
+    if (verb === 'tabs') { io.log(targets.map((t, i) => ({ i, targetId: t.targetId, title: t.title, url: t.url }))); return }
+    let created
+    if (verb === 'new') {
+      created = await control.request('Target.createTarget', { url: 'about:blank', background: !!flags['no-focus'] })
+      if (!pos[0]) {
+        const i = (await listTargets()).findIndex(t => t.targetId === created.targetId)
+        io.log({ ...(i >= 0 ? { i } : {}), targetId: created.targetId, url: 'about:blank' })
+        return
+      }
+    }
+    const targetId = created?.targetId || selectTarget(targets, flags).targetId
+    const scopedFlags = { ...flags, target: targetId }
+    delete scopedFlags.tab; delete scopedFlags.url
+    const browser = await this.browserFor(cdp, targetId)
     try {
       // record 的状态（进行中的 CDP screencast 会话）要跨 start/stop 两次独立调用存活，
       // 不能像其它动词那样是一次性的 executeVerb 调用，得单独路由到常驻的 recorder 实例。
-      if (verb === 'record') { await this.recorder.handle(browser, flags, pos, fail, io); return }
-      await executeVerb(browser, verb, flags, pos, timeoutMs, io, this.browserId)
+      if (verb === 'record') {
+        await this.recorder.handle(browser, scopedFlags, pos, fail, io)
+        if (this.recorder.isActive()) this.recordingBrowser = browser
+        return
+      }
+      if (created) {
+        try { await executeVerb(browser, 'goto', scopedFlags, pos, timeoutMs, { log: () => {} }, this.browserId) }
+        catch (error) { await control.request('Target.closeTarget', { targetId }).catch(() => {}); throw error }
+        const i = (await listTargets()).findIndex(t => t.targetId === targetId)
+        io.log({ ...(i >= 0 ? { i } : {}), targetId, url: pos[0] })
+      } else await executeVerb(browser, verb, scopedFlags, pos, timeoutMs, io, this.browserId)
     } catch (e) {
       // Chrome 死在命令中途（被回收/重启）：丢弃缓存连接，下条命令干净重连；
       // 页面级错误（选择器超时等）原样往上抛，daemon_request_with_retry 据此判断要不要重试。
@@ -592,8 +620,12 @@ class Session {
     if (this.recorder.isActive()) {
       await this.recorder._stop(() => { throw new ChromeError('') }).catch(() => {})
     }
+    try { await this.recordingBrowser?.close() } catch {}
+    this.recordingBrowser = null
     try { await this.browser?.close() } catch {} // 仅断连接，不杀共享 Chrome
     this.browser = null
+    this.controlSocket?.close()
+    this.controlSocket = null
   }
 }
 
