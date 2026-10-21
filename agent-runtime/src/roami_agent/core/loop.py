@@ -213,9 +213,10 @@ class AgentLoop:
                     rejections = set()
                     for call in calls:
                         try:
-                            operation = self.tools.validate(call, role)[0].name
+                            tool = self.tools.validate(call, role)[0]
                         except (DomainError, KeyError, TypeError):
-                            operation = None
+                            tool = None
+                        operation = tool.name if tool else None
                         binding = {
                             "owner": owner,
                             "conversation": cid,
@@ -255,12 +256,24 @@ class AgentLoop:
                             )
                         handed_off = (
                             handed_off
-                            and operation in {"delegate", "task_steer"}
-                            and isinstance(value, dict)
-                            and value.get("acceptedOnly") is True
+                            and tool is not None
+                            and not (
+                                isinstance(value, dict)
+                                and (value.get("error") or value.get("exitCode", 0) != 0)
+                            )
+                            and (
+                                operation in {"delegate", "task_steer"}
+                                and isinstance(value, dict)
+                                and value.get("acceptedOnly") is True
+                                or operation not in {"delegate", "task_steer"}
+                                and tool.effect == "read"
+                            )
                         )
                         request_complete = (
-                            isinstance(value, dict) and value.get("requestComplete") is True
+                            operation in {"delegate", "task_steer"}
+                            and isinstance(value, dict)
+                            and value.get("acceptedOnly") is True
+                            and value.get("requestComplete") is True
                         )
                         if (
                             call["function"]["name"] == "ask_user"

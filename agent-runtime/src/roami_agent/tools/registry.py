@@ -56,7 +56,7 @@ class Tools:
             wire = tool.wire()
             if role == "main" and self.directory and tool.name == "delegate":
                 wire = deepcopy(wire)
-                wire["function"]["parameters"]["required"] = ["goal", "routing"]
+                wire["function"]["parameters"]["required"] = ["goal", "routing", "requestComplete"]
                 wire["function"]["parameters"]["properties"].pop("executor", None)
             if role == "research":
                 wire = deepcopy(wire)
@@ -137,7 +137,17 @@ class Tools:
         essential = {
             key: item
             for key, item in (value.items() if isinstance(value, dict) else ())
-            if key in {"exitCode", "state", "error", "acceptedOnly", "kind", "taskId", "id"}
+            if key
+            in {
+                "exitCode",
+                "state",
+                "error",
+                "acceptedOnly",
+                "requestComplete",
+                "kind",
+                "taskId",
+                "id",
+            }
             and isinstance(item, (bool, int, float, str, type(None)))
             and len(encoded(item)) <= 1000
         }

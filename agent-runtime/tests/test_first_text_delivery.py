@@ -52,14 +52,22 @@ async def test_delegate_wire_contract_rejects_invented_target_kinds(store):
             "function": {
                 "name": "delegate",
                 "arguments": json.dumps(
-                    {"goal": "work", "target": {"kind": "session", "sessionId": "observed-id"}}
+                    {
+                        "requestComplete": False,
+                        "goal": "work",
+                        "target": {"kind": "session", "sessionId": "observed-id"},
+                    }
                 ),
             },
         }
         _, args = runtime.tools.validate(call, "main")
         assert args["target"]["sessionId"] == "observed-id"
         call["function"]["arguments"] = json.dumps(
-            {"goal": "work", "target": {"kind": "existing_session", "sessionId": "observed-id"}}
+            {
+                "requestComplete": False,
+                "goal": "work",
+                "target": {"kind": "existing_session", "sessionId": "observed-id"},
+            }
         )
         with pytest.raises(DomainError):
             runtime.tools.validate(call, "main")

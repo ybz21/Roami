@@ -154,7 +154,10 @@ async def test_worker_process_and_conversation_are_task_scoped_not_main_chat(sto
             if worker and messages[-1]["role"] != "tool":
                 name, args = "memory_search", {"query": "fixture"}
             elif messages[-1]["content"] == "Delegate read only":
-                name, args = "delegate", {"goal": "Recall a memory, then answer briefly"}
+                name, args = (
+                    "delegate",
+                    {"requestComplete": False, "goal": "Recall a memory, then answer briefly"},
+                )
             else:
                 yield ModelEvent("text", "Read-only result recorded")
                 return
@@ -279,7 +282,13 @@ async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
     tools = Tools()
     register_main_tools(tools, TaskStore(), None, None)
     value = await tools.invoke(
-        {"id": "call", "function": {"name": "delegate", "arguments": json.dumps({"goal": "work"})}},
+        {
+            "id": "call",
+            "function": {
+                "name": "delegate",
+                "arguments": json.dumps({"requestComplete": False, "goal": "work"}),
+            },
+        },
         "main",
         {
             "owner": "alice",
@@ -291,6 +300,7 @@ async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
         },
     )
     assert value == {
+        "requestComplete": False,
         "id": "accepted-task",
         "taskId": "accepted-task",
         "kind": "background_task",

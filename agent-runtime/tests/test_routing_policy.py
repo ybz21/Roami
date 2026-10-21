@@ -58,6 +58,7 @@ class Targets:
 def request(complexity="complex", **overrides):
     return {
         "goal": "Independently investigate and verify a deliverable",
+        "requestComplete": False,
         "routing": {
             "explicitExecutor": None,
             "complexity": complexity,
@@ -418,6 +419,7 @@ async def test_cli_continuation_preserves_executor_and_cannot_cross_conversation
                     "name": "task_steer",
                     "arguments": json.dumps(
                         {
+                            "requestComplete": False,
                             "taskId": task["id"],
                             "revision": task["revision"],
                             "text": "Add this requirement",
@@ -444,6 +446,7 @@ async def test_cli_continuation_preserves_executor_and_cannot_cross_conversation
                         "name": "task_steer",
                         "arguments": json.dumps(
                             {
+                                "requestComplete": False,
                                 "taskId": task["id"],
                                 "revision": task["revision"],
                                 "text": "Late update",

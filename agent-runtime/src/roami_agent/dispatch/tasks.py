@@ -572,7 +572,7 @@ class Tasks:
             detail["delivery"] = await self.deliverables.collect(owner, detail)
         return detail
 
-    async def list(self, owner, cid=None, *, for_model=False, task_id=None):
+    async def list(self, owner, cid=None, *, for_model=False, task_id=None, exclude_task_ids=()):
         def read(db):
             if cid:
                 owned(db, owner, cid)
@@ -581,8 +581,14 @@ class Tasks:
                 "SELECT * FROM tasks WHERE owner_id=?"
                 + (" AND origin_conversation_id=?" if cid else "")
                 + (" AND id=?" if task_id else "")
+                + (" AND id NOT IN (SELECT value FROM json_each(?))" if exclude_task_ids else "")
                 + " ORDER BY created_ms DESC LIMIT 200",
-                (owner, *((cid,) if cid else ()), *((task_id,) if task_id else ())),
+                (
+                    owner,
+                    *((cid,) if cid else ()),
+                    *((task_id,) if task_id else ()),
+                    *((encoded(list(exclude_task_ids)),) if exclude_task_ids else ()),
+                ),
             )
             tasks = [self._view(db, task) for task in tasks]
             return model_task_projection(db, owner, tasks) if for_model else tasks

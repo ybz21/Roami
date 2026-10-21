@@ -155,7 +155,12 @@ async def test_main_routes_discovered_project_through_persisted_tool_result(stor
                 item = json.loads(latest["content"])["items"][0]
                 name, args = (
                     "delegate",
-                    {"goal": "Update expenses", "executor": "codex", "target": item},
+                    {
+                        "requestComplete": False,
+                        "goal": "Update expenses",
+                        "executor": "codex",
+                        "target": item,
+                    },
                 )
             else:
                 yield ModelEvent("text", "已安排，任务在后台准备。")

@@ -316,6 +316,7 @@ async def test_argument_diagnostics_explain_all_schema_errors_without_values(sto
         bad = call(
             "delegate",
             {
+                "requestComplete": False,
                 "goal": "Work",
                 "routing": {
                     "complexity": "complex",

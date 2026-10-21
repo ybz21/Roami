@@ -710,7 +710,7 @@ async def test_forgetting_during_model_stream_prevents_new_task_tool(store):
             if messages[-1]["role"] == "tool":
                 self.started.set()
                 await self.release.wait()
-                name, args = "delegate", {"goal": "repeat private origin"}
+                name, args = "delegate", {"requestComplete": False, "goal": "repeat private origin"}
             elif messages[-1]["content"] == "recall":
                 name, args = "memory_get", {"memoryId": saved["id"]}
             else:
@@ -852,7 +852,7 @@ async def test_forgetting_recalled_memory_follows_delegation_and_completion(stor
         async def stream(self, messages, tools):
             last = messages[-1]
             if last["role"] == "tool" and last.get("tool_call_id") == "recall":
-                name, args = "delegate", {"goal": "derived private goal"}
+                name, args = "delegate", {"requestComplete": False, "goal": "derived private goal"}
             elif last["role"] == "user" and last["content"] == "recall and delegate":
                 name, args = "memory_get", {"memoryId": saved["id"]}
             else:

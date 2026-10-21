@@ -48,6 +48,7 @@ async def test_invalid_local_path_never_creates_a_task(store, tmp_path, kind, ke
                         "name": "delegate",
                         "arguments": json.dumps(
                             {
+                                "requestComplete": False,
                                 "goal": "Build report",
                                 "target": {"kind": kind, "name": "report", key: paths[path]},
                             }

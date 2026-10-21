@@ -633,6 +633,7 @@ async def test_existing_legacy_codex_receives_main_message_through_real_go_cli(
                             "name": "delegate",
                             "arguments": json.dumps(
                                 {
+                                    "requestComplete": False,
                                     "goal": "Fix the layout",
                                     "executor": "codex",
                                     "target": {"kind": "session", "sessionId": name},

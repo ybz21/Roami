@@ -201,7 +201,10 @@ class NestedModel(ConversationModel):
                 {
                     "id": "root-delegate",
                     "type": "function",
-                    "function": {"name": "delegate", "arguments": json.dumps({"goal": "parent"})},
+                    "function": {
+                        "name": "delegate",
+                        "arguments": json.dumps({"requestComplete": False, "goal": "parent"}),
+                    },
                 },
             )
         elif last["content"] == "parent":
@@ -210,7 +213,10 @@ class NestedModel(ConversationModel):
                 {
                     "id": "child-delegate",
                     "type": "function",
-                    "function": {"name": "delegate", "arguments": json.dumps({"goal": "leaf"})},
+                    "function": {
+                        "name": "delegate",
+                        "arguments": json.dumps({"requestComplete": False, "goal": "leaf"}),
+                    },
                 },
             )
         elif last["content"] == "leaf":
@@ -525,7 +531,9 @@ async def test_completion_continues_next_stage_with_original_source_not_newer_in
                         "id": "continue-writing",
                         "function": {
                             "name": "delegate",
-                            "arguments": json.dumps({"goal": "second-stage"}),
+                            "arguments": json.dumps(
+                                {"requestComplete": False, "goal": "second-stage"}
+                            ),
                         },
                     },
                 )

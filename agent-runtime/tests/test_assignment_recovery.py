@@ -23,6 +23,8 @@ async def active_turn(store, binding):
 
 
 def call(key, name, arguments):
+    if name in {"delegate", "task_steer"}:
+        arguments = {"requestComplete": False, **arguments}
     return {"id": key, "function": {"name": name, "arguments": json.dumps(arguments)}}
 
 
@@ -307,6 +309,7 @@ async def test_unknown_continuation_returns_immediate_block_without_accepting_or
                                     "taskId": self.task_id,
                                     "revision": 1,
                                     "text": "Continue after the old execution is confirmed stopped",
+                                    "requestComplete": False,
                                 }
                             ),
                         ]

@@ -192,6 +192,12 @@ class ToolGateway:
                     "real returned resource/observation IDs. Correct the intended "
                     "call instead of repeating the rejected command."
                 )
+            if value["error"] == "TASK_ALREADY_HANDED_OFF":
+                value.update(
+                    executionStarted=False,
+                    recovery="This task already accepted work from this user turn. Do not restart or steer it again; "
+                    "completion will arrive automatically. Handle other requested parts, or end this turn.",
+                )
             validation = exc.__cause__
             if (
                 isinstance(validation, ValidationError)
@@ -318,6 +324,18 @@ class ToolGateway:
                     "When the user chose an executor, use that choice and its exact source quote instead. "
                     "Omit top-level executor and unrecognized fields such as taskDescription. "
                     "Correct arguments within the user's scope; never create test/probe tasks or ask the user to fix internal parameters."
+                )
+            if (
+                role == "main"
+                and isinstance(exc, ToolArgumentsError)
+                and any("requestComplete" in issue.get("missingFields", []) for issue in exc.issues)
+            ):
+                value.update(
+                    executionStarted=False,
+                    recovery="No task was created or continued. Correct this same intended call by adding "
+                    "requestComplete=true if all parts of the user request are handled/delegated, "
+                    "or false only if other requested parts still need handling. Do not wait or poll "
+                    "for accepted work. Preserve its goal, target and routing.",
                 )
             if (
                 role == "main"

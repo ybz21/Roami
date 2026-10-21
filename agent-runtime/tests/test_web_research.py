@@ -33,7 +33,7 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
                         "id": "research",
                         "function": {
                             "name": "delegate",
-                            "arguments": '{"goal":"Check the latest stock quote with sources and time","executor":"native","target":{"kind":"new_session","resourceOnly":true}}',
+                            "arguments": '{"requestComplete":false,"goal":"Check the latest stock quote with sources and time","executor":"native","target":{"kind":"new_session","resourceOnly":true}}',
                         },
                     },
                 )

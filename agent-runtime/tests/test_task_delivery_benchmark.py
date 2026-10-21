@@ -112,7 +112,12 @@ async def test_B06_failure_tool_receipt_returns_evidence_without_new_task(store)
             result={"state": "failed", "outcomeKnown": False},
         )
         reply = await tools.invoke(
-            {"function": {"name": "delegate", "arguments": json.dumps({"goal": "One more try"})}},
+            {
+                "function": {
+                    "name": "delegate",
+                    "arguments": json.dumps({"requestComplete": False, "goal": "One more try"}),
+                }
+            },
             "main",
             binding,
         )
@@ -355,6 +360,7 @@ async def test_B25_main_completion_loop_cannot_keep_creating_failed_tasks(store,
                             "name": "delegate",
                             "arguments": json.dumps(
                                 {
+                                    "requestComplete": False,
                                     "goal": "Rephrased deliverable " + str(self.calls),
                                     "executor": "codex",
                                 }

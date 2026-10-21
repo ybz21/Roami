@@ -174,7 +174,7 @@ class PromptBuilder:
                         "do not copy assistant-invented source restrictions, result counts, step limits or stop-on-block rules "
                         "from earlier delegated goals. If a source blocks access, use another relevant public "
                         "source when the user's scope permits; mark unverified facts plainly. "
-                        "On the last delegate/task_steer for this request, set requestComplete=true and end. "
+                        "Every delegate/task_steer requires requestComplete: true on the final handoff and false only while other parts remain; then end without polling. "
                         "An accepted/queued/running task is still pending: do not present earlier results "
                         "as this request's completed answer.",
                     },

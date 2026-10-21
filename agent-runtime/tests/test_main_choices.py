@@ -49,6 +49,7 @@ async def test_main_existing_session_delegate_sends_without_provider_hooks_or_co
                             "name": "delegate",
                             "arguments": json.dumps(
                                 {
+                                    "requestComplete": False,
                                     "goal": "Fix the layout",
                                     "executor": executor,
                                     "target": {"kind": "session", "sessionId": "Legacy Codex"},
