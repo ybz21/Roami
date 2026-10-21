@@ -555,7 +555,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "Continue tracked work with task_steer at its actual revision, preserving executor. fromMessageId forks completed checkpoints only.",
             object_schema(
                 {
-                    "goal": {"type": "string", "minLength": 1},
+                    "goal": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "For a self-contained public lookup, use the user's question verbatim. Do not add provider checklists, result counts or source examples. Resolve missing references only when needed.",
+                    },
                     "title": {
                         "type": "string",
                         "minLength": 1,
