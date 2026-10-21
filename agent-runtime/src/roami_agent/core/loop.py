@@ -6,7 +6,7 @@ import json
 from contextlib import asynccontextmanager
 from itertools import count
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ToolPreflightError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.models import Model
 from roami_agent.protocol.ports import (
@@ -111,6 +111,7 @@ class AgentLoop:
                 offset = await self.journal.attempt_offset(turn)
                 seen_rejections = set()
                 finalizing = False
+                finalization_error = None
                 for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
@@ -184,7 +185,9 @@ class AgentLoop:
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
                     if finalizing and calls:
-                        raise DomainError("TOOL_FINALIZATION_STALLED", 502)
+                        raise ToolPreflightError(
+                            finalization_error or "TOOL_FINALIZATION_STALLED", 503
+                        )
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
                     if len(calls) > 1 and any(
@@ -235,6 +238,7 @@ class AgentLoop:
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
                         if isinstance(value, dict) and value.get("finalizeFromEvidence") is True:
                             finalizing = True
+                            finalization_error = value.get("error")
                         if (
                             role == "main"
                             and operation in {"task_reply", "reply"}

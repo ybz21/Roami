@@ -194,7 +194,22 @@ class ToolGateway:
                     recovery="This tool call failed readiness before its browser action. Earlier calls in this attempt may have executed; preserve their results and sources. End this attempt and "
                     "report the dependency failure to Main; do not retry different URLs or probe shell commands.",
                 )
-                if isinstance(exc, ToolFinalizationRequired):
+                has_research_evidence = (
+                    role == "research"
+                    and binding.get("taskId")
+                    and binding.get("runId")
+                    and await self.db.call(
+                        lambda db: row(
+                            db,
+                            "SELECT id FROM resource_observations WHERE task_id=? AND run_id=? "
+                            "AND json_extract(body_json,'$.url') LIKE 'http%' AND length(trim(json_extract(body_json,'$.domText')))>0 LIMIT 1",
+                            (binding["taskId"], binding["runId"]),
+                        )
+                    )
+                )
+                if isinstance(exc, ToolFinalizationRequired) or (
+                    exc.code == "BROWSER_DRIVER_UNAVAILABLE" and has_research_evidence
+                ):
                     preflight_error = None
                     value.update(
                         finalizeFromEvidence=True,

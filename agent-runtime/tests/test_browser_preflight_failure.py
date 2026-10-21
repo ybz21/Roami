@@ -8,6 +8,7 @@ from test_tool_rejection_progress import Calls
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
@@ -271,5 +272,100 @@ async def test_later_preflight_preserves_completed_actions_and_sources_per_attem
             lambda db: row(db, "SELECT result_json FROM task_attempts WHERE id=?", (first["id"],))
         )
         assert json.loads(unchanged["result_json"]) == result
+    finally:
+        await runtime.close()
+
+
+async def test_later_driver_failure_allows_only_delivery_of_current_attempt_evidence(store):
+    from test_browser_driver import BrowserFixture
+    from test_runtime import ConversationModel, until
+
+    phase, readiness, browser = 0, 0, BrowserFixture()
+
+    class Worker:
+        model = "deliver-after-driver-failure"
+
+        async def stream(self, messages, tools):
+            nonlocal phase
+            phase += 1
+            if phase <= 2:
+                url = (
+                    "https://source.example/pricing" if phase == 1 else "https://alternate.example"
+                )
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": str(phase),
+                        "function": {
+                            "name": "bash",
+                            "arguments": json.dumps(
+                                {
+                                    "argv": [
+                                        "roami",
+                                        "agent",
+                                        "capability",
+                                        "call",
+                                        "browser_open",
+                                        "--input",
+                                        json.dumps({"url": url}),
+                                    ]
+                                }
+                            ),
+                        },
+                    },
+                )
+            else:
+                assert phase == 3 and tools == []
+                assert json.loads(messages[-1]["content"])["finalizeFromEvidence"] is True
+                yield ModelEvent(
+                    "text",
+                    "Available source: https://source.example/pricing\nAlternate source unavailable.",
+                )
+
+    async def runner(argv, **options):
+        nonlocal readiness
+        if argv[2] == "capabilities":
+            readiness += 1
+            if readiness > 1:
+                return {"exitCode": 1, "stdout": "", "stderr": "Connection refused"}
+        return await browser(argv, **options)
+
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        worker_model=Worker(),
+        memory_model=ConversationModel(),
+        settings=Settings(browser={"enabled": True}),
+    )
+    runtime.browser.runner = runner
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice",
+            c["id"],
+            "Read public sources",
+            key="source-proof",
+            target={"kind": "new_session", "resourceOnly": True},
+            record_intent=True,
+        )
+        await runtime.start()
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM tasks WHERE id=? AND state='succeeded'", (task["id"],)
+            ),
+        )
+        report = await store.call(
+            lambda db: row(
+                db,
+                "SELECT payload_json FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId')=?",
+                (task["id"],),
+            )
+        )
+        proof = json.loads(report["payload_json"])["completion"]["result"]["verification"][
+            "sources"
+        ]
+        assert [source["url"] for source in proof] == ["https://source.example/pricing"]
+        assert phase == 3 and browser.writes == ["new", "goto"]
     finally:
         await runtime.close()

@@ -111,7 +111,8 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
             yield ModelEvent("text", "Received")
 
     model = CapturedModel()
-    runtime = Runtime(store, model, settings=Settings(context_window=8000))
+    # Isolate admission from post-turn compaction as the default tool catalog grows.
+    runtime = Runtime(store, model, settings=Settings(context_window=8000, compaction_ratio=0.99))
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")

@@ -57,7 +57,7 @@ async def test_finalization_delivers_existing_findings_without_another_tool_acti
     try:
         turn = await claimed_turn(runtime)
         if retries:
-            with pytest.raises(DomainError, match="TOOL_FINALIZATION_STALLED"):
+            with pytest.raises(DomainError, match="BROWSER_SOURCE_UNAVAILABLE"):
                 await runtime.loop.run(turn, "worker")
         else:
             assert (
