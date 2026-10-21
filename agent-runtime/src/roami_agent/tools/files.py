@@ -24,11 +24,18 @@ def register_file_tools(registry, files):
     registry.add(
         Tool(
             "file_write",
-            "Atomically publish UTF-8 content after checking expectedSha256 against the current file; null requires a new file. A changed source is a conflict: read it again before editing.",
+            "Atomically publish UTF-8 content. To create a new file prefer expectedSha256 as actual JSON null (unquoted). For an existing file use the exact sha256 returned by file_read. A changed source is a conflict: read it again before editing.",
             object_schema(
                 {
                     "path": path,
-                    "expectedSha256": {"anyOf": [digest, {"type": "null"}]},
+                    "expectedSha256": {
+                        "description": 'New file: JSON null, without quotes. The literal string "null" also means exclusive creation only. Existing file: exact sha256 from read. Example: {"path":"answer.txt","expectedSha256":null,"content":"Answer"}. Never guess a hash.',
+                        "anyOf": [
+                            digest,
+                            {"type": "null"},
+                            {"type": "string", "enum": ["null"]},
+                        ],
+                    },
                     "content": {"type": "string"},
                 },
                 ["path", "expectedSha256", "content"],

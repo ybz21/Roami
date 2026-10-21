@@ -280,10 +280,27 @@ class ResourceLeases:
                 (state, packed, now_ms(), action_id),
             )
             if item["lease_epoch"] == action["lease_epoch"]:
+                stopped_navigation = (
+                    state == "unknown"
+                    and result.get("inputStopped") is True
+                    and item["kind"] == "browser"
+                    and json.loads(action["action_json"]).get("verb") == "goto"
+                    and row(
+                        db,
+                        "SELECT a.id FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
+                        "WHERE a.id=? AND a.task_id=? AND a.executor_kind='native' AND a.state='running' "
+                        "AND a.task_revision=t.revision AND json_extract(t.intent_json,'$.target.resourceOnly')=1",
+                        (action["run_id"], action["task_id"]),
+                    )
+                )
                 if item["state"] in {"pausing", "paused"}:
                     control = "paused" if result.get("inputStopped") is True else "pausing"
                 else:
-                    control = "quarantined" if state == "unknown" else item["state"]
+                    control = (
+                        "quarantined"
+                        if state == "unknown" and not stopped_navigation
+                        else item["state"]
+                    )
                 db.execute(
                     "UPDATE resources SET state=?,scene_epoch=scene_epoch+1 WHERE id=?",
                     (control, item["id"]),

@@ -72,11 +72,12 @@ async def test_search_skill_loading_and_disable_policy(store):
     ]
 
 
-async def test_main_foundations_preserve_file_hashes(store, tmp_path):
+@pytest.mark.parametrize("create_hash", [None, "null"])
+async def test_main_foundations_preserve_file_hashes(store, tmp_path, create_hash):
     runtime = Runtime(store, ConversationModel(), settings=Settings(shell_roots=(tmp_path,)))
     path = str(tmp_path / "example.txt")
     await runtime.tools.invoke(
-        call("write", {"path": path, "expectedSha256": None, "content": "first"}), "main", {}
+        call("write", {"path": path, "expectedSha256": create_hash, "content": "first"}), "main", {}
     )
     original = await runtime.tools.invoke(call("read", {"path": path}), "main", {})
     await runtime.tools.invoke(

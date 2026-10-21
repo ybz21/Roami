@@ -31,7 +31,7 @@ def register_browser_tools(registry, driver):
     registry.add(
         Tool(
             "browser_act",
-            "Perform one bounded action based on the latest observation. A successful action is not task acceptance. On a scene change, observe again; on unknown outcome or human takeover, stop and report instead of retrying or creating a replacement.",
+            "Perform one bounded action based on the latest observation. A successful action is not task acceptance. On a scene change, observe again. An unknown outcome must stop unless navigationRecoveryAvailable=true explicitly permits observing the stopped navigation in the same tab. Human takeover always stops input.",
             {
                 "type": "object",
                 "properties": {

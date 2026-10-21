@@ -30,7 +30,7 @@ def validate_tool_arguments(schema, arguments):
             issue["expectedAlternatives"] = [
                 {
                     key: option[key]
-                    for key in ("type", "pattern", "minLength", "maxLength", "required")
+                    for key in ("type", "enum", "pattern", "minLength", "maxLength", "required")
                     if key in option
                 }
                 for option in error.validator_value[:8]

@@ -263,8 +263,11 @@ async def test_nested_delegation_joins_descendants_and_reserves_main_capacity(st
 
 
 async def test_runtime_automatically_compacts_before_oversized_model_input(store):
+    from dataclasses import replace
+
     from test_context_provider import completed_conversation
 
+    from roami_agent.context.token_estimate import request_tokens
     from roami_agent.server.configuration import Settings
 
     class CompactingModel(ConversationModel):
@@ -276,7 +279,13 @@ async def test_runtime_automatically_compacts_before_oversized_model_input(store
                     yield item
 
     c = await completed_conversation(store)
-    runtime = Runtime(store, CompactingModel(), settings=Settings(context_window=4000))
+    runtime = Runtime(store, CompactingModel(), settings=Settings())
+    fixed = request_tokens(
+        [{"role": "system", "content": runtime.settings.main_instructions}],
+        runtime.tools.catalog("main"),
+    )
+    # Compaction must leave room for the real catalog as its schemas evolve.
+    runtime.settings.current = replace(runtime.settings.current, context_window=fixed + 1000)
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(

@@ -60,9 +60,46 @@ class BrowserDriver:
             if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > 256_000:
                 raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
             try:
-                return json.load(file)
+                receipt = json.load(file)
             except (ValueError, TypeError):
                 raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503) from None
+        receipt = self._receipt(receipt, operation_id)
+        if not isinstance(receipt, dict) or receipt.get("state") not in {"accepted", "running"}:
+            return receipt
+        try:
+            descriptor = os.open(
+                self.receipts / (operation_id + ".lock"),
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            )
+            with os.fdopen(descriptor, "rb") as lock:
+                info = os.fstat(lock.fileno())
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or info.st_uid != os.getuid()
+                    or info.st_mode & 0o077
+                    or info.st_size > 32
+                ):
+                    return receipt
+                owner = lock.read(32)
+            if not re.fullmatch(rb"[1-9][0-9]{0,9}", owner):
+                return receipt
+            pid = int(owner)
+            if pid > 2**31 - 1:
+                return receipt
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            # Process exit proves input stopped, never that a submitted action succeeded.
+            return {
+                **receipt,
+                "state": "unknown",
+                "inputStopped": True,
+                "outcomeKnown": False,
+                "errorCode": "CHROME_OPERATION_DRIVER_EXITED",
+                "stopEvidence": {"kind": "driver_process_exited", "pid": pid},
+            }
+        except OSError:
+            pass
+        return receipt
 
     async def _stored_receipt(self, operation_id):
         return await asyncio.to_thread(self._read_receipt_file, operation_id)
@@ -127,7 +164,7 @@ class BrowserDriver:
                 raise DomainError("BROWSER_PRIVATE_DIRECTORY_INVALID", 503)
 
     async def _cli(
-        self, verb, *args, operation_id=None, browser_id=None, signature=None, capture_wait_ms=0
+        self, verb, *args, operation_id=None, browser_id=None, signature=None, readiness_wait_ms=0
     ):
         await asyncio.to_thread(self._directories)
         argv = [
@@ -138,7 +175,7 @@ class BrowserDriver:
             "--no-retry",
             "--no-focus",
             "--timeout",
-            str(capture_wait_ms),
+            str(readiness_wait_ms),
         ]
         if self.config.get("endpoint"):
             argv += ["--cdp", self.config["endpoint"]]
@@ -358,6 +395,7 @@ class BrowserDriver:
             "driverState": receipt["state"],
             "error": receipt.get("errorCode"),
             "output": receipt.get("result", {}).get("stdout", ""),
+            **({"stopEvidence": receipt["stopEvidence"]} if receipt.get("stopEvidence") else {}),
         }
 
     async def _complete(self, scope, action, receipt):
@@ -373,6 +411,16 @@ class BrowserDriver:
         result = self._result(receipt)
         await self.resources.finish(scope["owner"], action["id"], state, result)
         return state, result
+
+    @staticmethod
+    def _stopped_research_navigation(binding, verb, receipt):
+        return (
+            binding.get("role") == "research"
+            and verb == "goto"
+            and receipt is not None
+            and receipt["state"] == "unknown"
+            and receipt["inputStopped"] is True
+        )
 
     async def _perform(
         self,
@@ -412,6 +460,9 @@ class BrowserDriver:
                     operation_id=action["id"],
                     browser_id=browser_id,
                     signature=signature,
+                    readiness_wait_ms=15_000
+                    if binding.get("role") == "research" and verb == "goto"
+                    else 0,
                 ),
                 action["id"],
             )
@@ -423,6 +474,13 @@ class BrowserDriver:
                     )
             except (DomainError, OSError, TimeoutError, asyncio.CancelledError):
                 receipt = None
+            if receipt and not receipt["inputStopped"]:
+                try:
+                    current = self._receipt(await self.receipt_reader(action["id"]), action["id"])
+                    if current["inputStopped"]:
+                        receipt = current
+                except (DomainError, OSError, TimeoutError):
+                    pass
             if receipt:
                 await self._complete(scope, action, receipt)
             else:
@@ -440,10 +498,14 @@ class BrowserDriver:
                 raise ToolCancellation(
                     input_stopped=bool(receipt and receipt["inputStopped"])
                 ) from None
-            if not receipt or receipt["state"] not in {"succeeded", "failed", "cancelled"}:
+            if (
+                not receipt or receipt["state"] not in {"succeeded", "failed", "cancelled"}
+            ) and not self._stopped_research_navigation(binding, verb, receipt):
                 raise DomainError("TOOL_OUTCOME_UNKNOWN") from None
         state, result = await self._complete(scope, action, receipt)
         if state == "unknown":
+            if self._stopped_research_navigation(binding, verb, receipt):
+                return result
             raise DomainError("TOOL_OUTCOME_UNKNOWN")
         if state != "succeeded":
             raise DomainError(receipt.get("errorCode") or "BROWSER_ACTION_FAILED", 409)
@@ -562,7 +624,7 @@ class BrowserDriver:
                     str(path),
                     browser_id=browser_id,
                     # Optional frames must release the observer queue so DOM evidence can continue.
-                    capture_wait_ms=5000,
+                    readiness_wait_ms=5000,
                 )
             except DomainError as exc:
                 if exc.code not in {"CHROME_OBSERVATION_TIMEOUT", "CHROME_SCENE_CHANGED"}:
@@ -658,17 +720,29 @@ class BrowserDriver:
             else body["signature"],
             phase=phase,
         )
+        action = {"operationId": result["operationId"], "state": "succeeded"}
+        recovery = {}
+        if result["driverState"] == "unknown":
+            action.update(state="unknown", inputStopped=True, outcomeKnown=False)
+            recovery = {
+                "navigationRecoveryAvailable": True,
+                "recovery": "Navigation input has stopped, but its original outcome remains unknown. "
+                "Read the current observation before choosing an accessible source in the same tab. "
+                "Do not replay form submissions or assert facts without fresh retrieval evidence.",
+            }
         try:
             after = await self.observe({"resourceId": resource["id"]}, binding)
             return {
                 **after,
-                "action": {"operationId": result["operationId"], "state": "succeeded"},
+                **recovery,
+                "action": action,
                 "needsVerification": True,
             }
         except (DomainError, OSError, KeyError):
             return {
                 "resourceId": resource["id"],
-                "action": {"operationId": result["operationId"], "state": "succeeded"},
+                **recovery,
+                "action": action,
                 "needsVerification": True,
                 "error": "BROWSER_OBSERVATION_UNAVAILABLE",
             }

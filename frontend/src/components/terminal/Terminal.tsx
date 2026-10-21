@@ -15,6 +15,7 @@ import { paneCellsToPixelRect } from './terminal-geometry'
 import { RESUME_RESYNC_MS, resumeHealFor, shouldJiggleAfterAttach } from './terminal-resize'
 import type { ResumeHeal, TerminalDimensions } from './terminal-resize'
 import { parseTerminalPong, parseTerminalRevived } from './terminal-lifecycle'
+import { synchronizeTerminalAtlas } from './terminal-atlas'
 import { useLayout } from '../../layout'
 
 export type TermStatus = 'connecting' | 'connected' | 'closed'
@@ -662,11 +663,15 @@ const Term = forwardRef<TermHandle, {
     // 上下文丢失（后台切回/GPU 回收/同页 WebGL 上下文超上限被回收最老的那个）时**先试着重建**，
     // 连着重建都失败才退回 DOM 渲染器——旧写法一丢就永久 dispose，此后这个标签一直是降级渲染。
     let lostAt = 0
+    let releaseAtlas: (() => void) | undefined
     const mountWebgl = () => {
       if (unmounted.current) return
+      let candidate: WebglAddon | undefined
       try {
-        const webgl = new WebglAddon(true)
+        const webgl = candidate = new WebglAddon(true)
         webgl.onContextLoss(() => {
+          releaseAtlas?.()
+          releaseAtlas = undefined
           try { webgl.dispose() } catch {}
           webglRef.current = undefined
           const now = performance.now()
@@ -676,8 +681,11 @@ const Term = forwardRef<TermHandle, {
           setTimeout(() => { if (!unmounted.current && termRef.current === term) mountWebgl() }, 500)
         })
         term.loadAddon(webgl)
+        releaseAtlas = synchronizeTerminalAtlas(term, webgl)
         webglRef.current = webgl
-      } catch { /* 不支持 WebGL 的浏览器继续用 DOM 渲染器 */ }
+      } catch {
+        try { candidate?.dispose() } catch {}
+      }
     }
     mountWebgl()
 
@@ -686,6 +694,8 @@ const Term = forwardRef<TermHandle, {
     const rebuildRenderer = () => {
       if (unmounted.current || termRef.current !== term) return
       beginVisualHandoff()
+      releaseAtlas?.()
+      releaseAtlas = undefined
       try { webglRef.current?.dispose() } catch {}
       webglRef.current = undefined
       mountWebgl()
@@ -1141,6 +1151,7 @@ const Term = forwardRef<TermHandle, {
       // （整页黑屏，而不只是这一个标签坏掉）。xterm 的 WebGL addon 就踩过——它按新版内核的
       // 私有字段做卸载判断，配到旧内核上必抛 TypeError，于是「关一个会话/改一次名」就黑屏。
       // 先单独拆 WebGL addon，再拆终端本体，各自兜住，任一步失败都不影响另一步和其他标签。
+      releaseAtlas?.()
       try { webglRef.current?.dispose() } catch {}
       webglRef.current = undefined
       try { term.dispose() } catch {}

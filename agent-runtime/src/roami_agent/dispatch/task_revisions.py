@@ -3,6 +3,7 @@
 import json
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.dispatch.navigation_recovery import recovered_navigation, stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -123,7 +124,26 @@ class TaskRevisions:
                     and run["state"] == "unknown"
                     and (run["executor_kind"] == "cli" or task["target_json"])
                 ):
-                    raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
+                    evidence = stopped_navigation(db, task, run)
+                    if not evidence:
+                        raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
+                    if not recovered_navigation(db, task, run):
+                        event(
+                            db,
+                            task["origin_conversation_id"],
+                            "task.navigation_recovery",
+                            {
+                                "taskId": task_id,
+                                "runId": run["id"],
+                                "revision": expected_revision,
+                                "inputStopped": True,
+                                "outcomeKnown": False,
+                                "reason": "stopped_navigation_only",
+                                **evidence,
+                            },
+                            task_id=task_id,
+                            key="navigation-recovery:" + run["id"],
+                        )
             intent = json.loads(task["intent_json"])
             goal = intent["goal"] + "\n\nAdditional user requirements:\n" + text
             operation = identity()
@@ -210,13 +230,21 @@ class TaskRevisions:
             (task["id"],),
         ):
             return "TASK_RESOURCE_NOT_RELEASED"
-        if row(
+        pending = rows(
             db,
             tree
-            + "SELECT 1 FROM tool_calls x JOIN turns t ON t.id=x.turn_id JOIN task_attempts a ON a.native_branch_id=t.branch_id "
-            "WHERE a.task_id IN (SELECT id FROM tree) AND x.effect='write' AND x.state IN ('planned','running','unknown') LIMIT 1",
+            + "SELECT DISTINCT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id JOIN task_attempts a ON a.native_branch_id=t.branch_id "
+            "WHERE a.task_id IN (SELECT id FROM tree) AND x.effect='write' AND x.state IN ('planned','running','unknown')",
             (task["id"],),
-        ):
+        )
+        recovered = set()
+        if pending:
+            for attempt in rows(
+                db, "SELECT * FROM task_attempts WHERE task_id=? AND state='unknown'", (task["id"],)
+            ):
+                if evidence := recovered_navigation(db, task, attempt):
+                    recovered.update(evidence["toolCallIds"])
+        if any(call["id"] not in recovered for call in pending):
             return "TASK_OUTCOME_UNRESOLVED"
         if row(
             db,
@@ -233,7 +261,9 @@ class TaskRevisions:
         ):
             return "TASK_EXECUTION_NOT_STOPPED"
         result = json.loads(run["result_json"]) if run["result_json"] else {}
-        if result.get("outcomeKnown") is False or result.get("inputStopped") is False:
+        if (
+            result.get("outcomeKnown") is False or result.get("inputStopped") is False
+        ) and not recovered_navigation(db, task, run):
             return "TASK_OUTCOME_UNRESOLVED"
         if run["state"] == "unknown" and (run["executor_kind"] == "cli" or task["target_json"]):
             return "TASK_OUTCOME_UNRESOLVED"

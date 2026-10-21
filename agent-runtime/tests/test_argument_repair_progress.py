@@ -9,6 +9,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.tool_arguments import ToolArgumentsError, validate_tool_arguments
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 
 
@@ -126,5 +127,65 @@ async def test_valid_tool_rounds_continue_beyond_old_step_limit(store):
     try:
         assert await runtime.loop.run(await claimed_turn(runtime), "main") == "Done"
         assert model.calls == 26 and len(effects) == 25
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("invalid_hash", ["NULL", "", "not-a-digest"])
+async def test_file_hash_repair_guidance_creates_and_reads_real_file(store, tmp_path, invalid_hash):
+    path = tmp_path / "answer.txt"
+
+    class FileModel:
+        model = "file-null-repair"
+
+        async def stream(self, messages, tools):
+            results = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
+            if len(results) == 0:
+                expected = invalid_hash
+            elif len(results) == 1:
+                assert not path.exists()
+                assert results[-1]["executionStarted"] is False
+                assert "actual JSON null" in results[-1]["recovery"]
+                expected = None
+            elif len(results) == 2:
+                assert path.read_text() == "Verified answer"
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "read-back",
+                        "function": {"name": "read", "arguments": json.dumps({"path": str(path)})},
+                    },
+                )
+                return
+            else:
+                assert results[-1]["data"] == "Verified answer"
+                yield ModelEvent("text", "Read back verified")
+                return
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "write-" + str(len(results)),
+                    "function": {
+                        "name": "write",
+                        "arguments": json.dumps(
+                            {
+                                "path": str(path),
+                                "expectedSha256": expected,
+                                "content": "Verified answer",
+                            }
+                        ),
+                    },
+                },
+            )
+
+    model = FileModel()
+    runtime = Runtime(store, model, worker_model=model, settings=Settings(shell_roots=(tmp_path,)))
+    try:
+        assert await runtime.loop.run(await claimed_turn(runtime), "worker") == "Read back verified"
+        with pytest.raises(DomainError, match="FILE_CHANGED"):
+            await runtime.files.write(
+                {"path": str(path), "expectedSha256": None, "content": "overwrite"}, {}
+            )
+        assert path.read_text() == "Verified answer"
     finally:
         await runtime.close()

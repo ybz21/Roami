@@ -148,6 +148,17 @@ class ToolGateway:
             if isinstance(exc, ToolArgumentsError):
                 value["argumentIssues"] = exc.issues
                 value["issuesTruncated"] = exc.truncated
+                if call["function"]["name"] in {"write", "file_write"} and any(
+                    issue["path"] == ["expectedSha256"] for issue in exc.issues
+                ):
+                    value["executionStarted"] = False
+                    value["recovery"] = (
+                        "For a NEW file, correct expectedSha256 to actual JSON null, without quotes: "
+                        '{"path":"the same requested path","expectedSha256":null,"content":"the requested content"}. '
+                        "For an EXISTING file, read it and use its exact "
+                        "returned sha256. Preserve the requested path and content; never guess a hash "
+                        "or overwrite a changed file. Correct this call instead of repeating it unchanged."
+                    )
             if tool is None and value["error"] == "TOOL_DISABLED":
                 value["recovery"] = (
                     "This call was rejected before execution because the capability is disabled. "
