@@ -7,7 +7,12 @@ from datetime import UTC, datetime
 
 from roami_agent.context.remembered import RememberedContext
 from roami_agent.context.task_evidence import completion_evidence
-from roami_agent.context.token_estimate import request_context, request_tokens
+from roami_agent.context.token_estimate import (
+    messages_tokens,
+    request_basis,
+    request_context,
+    request_tokens,
+)
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
@@ -155,15 +160,16 @@ class PromptBuilder:
                     messages=visible,
                     currentTurnStart=0,
                     historyView="task_progress",
+                    requestBasis=request_basis(dict(configuration, historyView="task_progress")),
+                    usageTokens=None,
+                    trailingTokens=None,
+                    historyTokens=messages_tokens(visible),
                     suppressedSourceMessageIds=[
                         mid for mid in plan.get("sourceMessageIds", []) if mid not in current_ids
                     ],
                     sourceMessageIds=current_ids,
-                    estimatedTokens=max(
-                        0,
-                        plan["estimatedTokens"]
-                        - request_tokens(plan["messages"], [])
-                        + request_tokens(visible, []),
+                    estimatedTokens=request_tokens(
+                        [{"role": "system", "content": full_instructions}] + visible, catalog
                     ),
                 )
             recent_tasks = (

@@ -33,6 +33,10 @@ class PromptManifests:
                             "role": role,
                             "requestBasis": plan.get("requestBasis"),
                             "historyFingerprint": plan.get("historyFingerprint"),
+                            "historyView": plan.get("historyView", "full"),
+                            "suppressedHistoryCount": len(
+                                plan.get("suppressedSourceMessageIds", [])
+                            ),
                             "estimatedTokens": plan.get("estimatedTokens"),
                             "modelContext": {key: plan.get(key) for key in CONTEXT_FIELDS},
                             "requestLimits": plan.get("requestLimits"),

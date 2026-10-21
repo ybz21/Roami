@@ -369,6 +369,22 @@ async def test_status_progress_guidance_preserves_explicit_full_result_requests(
         )
         await completed(store, receipt["turnId"])
         assert rounds == 2
+        manifests = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT parts_json FROM prompt_manifests WHERE turn_id=? ORDER BY attempt_no",
+                (receipt["turnId"],),
+            )
+        )
+        first, last = [json.loads(row["parts_json"]) for row in manifests]
+        if include_result:
+            assert first["requestBasis"] == last["requestBasis"]
+            assert last["historyView"] == "full"
+        else:
+            assert first["requestBasis"] != last["requestBasis"]
+            assert last["historyView"] == "task_progress"
+            assert last["suppressedHistoryCount"] > 0
+            assert last["modelContext"]["usageTokens"] is None
         await store.call(
             lambda db: db.execute("UPDATE tasks SET revision=2 WHERE id=?", (task_id,)), write=True
         )
