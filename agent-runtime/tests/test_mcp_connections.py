@@ -320,3 +320,20 @@ async def test_worker_discovers_calls_and_records_mcp_outcomes(
         assert all("sensitive progress detail" not in entry["payload_json"] for entry in progress)
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("remote", ["slow", "failure"])
+async def test_read_only_mcp_failures_do_not_become_unknown_writes(tmp_path, monkeypatch, remote):
+    monkeypatch.setenv("FIXTURE_MCP_TOKEN", "fixture-token")
+    registry = Tools()
+    config = spec(tmp_path)
+    config["read_only"] = [remote]
+    pool = MCPConnections(registry, {"docs": config})
+    try:
+        await pool.discover({"server": "docs"}, {})
+        pool.connections["docs"].config["timeout_seconds"] = 0.1 if remote == "slow" else 5
+        with pytest.raises(DomainError, match="^MCP_READ_FAILED$"):
+            await registry.invoke(wire(named(registry, remote)), "research", {})
+        assert (tmp_path / ("called-" + remote)).exists()
+    finally:
+        await pool.close()

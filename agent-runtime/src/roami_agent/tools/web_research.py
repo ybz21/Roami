@@ -1,6 +1,7 @@
-"""Main routes live web questions to scoped native Browser Use without a code workspace."""
+"""Main routes live web questions to read-only MCP or browser research."""
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.research import read_only_mcp_available
 from roami_agent.protocol.tools import Tool, object_schema
 
 BROWSER_TOOLS = {"browser_open", "browser_observe", "browser_act"}
@@ -9,9 +10,9 @@ BROWSER_TOOLS = {"browser_open", "browser_observe", "browser_act"}
 def register_research_tools(registry, tasks):
     def availability():
         worker = set(registry.registry) - registry.disabled_tools
-        return (
-            (not registry.directory or {"read", "bash"} <= worker)
-            and BROWSER_TOOLS <= worker
+        return (not registry.directory or {"read", "bash"} <= worker) and (
+            read_only_mcp_available(registry)
+            or BROWSER_TOOLS <= worker
             and "skill_read" in worker
             and "browser_use" in registry.skills
             and "browser_use" not in registry.disabled_skills
@@ -32,7 +33,8 @@ def register_research_tools(registry, tasks):
         task = await tasks.create(
             binding["owner"],
             binding["conversation"],
-            "Read skill://browser_use, then use roami chrome to research this request. "
+            "Discover available read-only search MCP tools with tool_list(kind=mcp) and use suitable tools. "
+            "Use roami chrome for requested browser navigation or when MCP cannot cover the request; read skill://browser_use as needed. "
             "This task has no code workspace; do not request a project or use Shell. Return verified source URLs, retrieval time, and any delayed/stale/blocked status. User request:\n"
             + args["goal"],
             key=binding["turnId"] + ":" + binding["toolCallId"],
@@ -62,7 +64,7 @@ def register_research_tools(registry, tasks):
     registry.add(
         Tool(
             "web_research",
-            "Research current public web information (prices, news, documentation) through Roami Chrome CLI in a native background task. User lookup requests authorize research; do not ask them to open a browser, create a project, or dispatch Codex. Returns queue acceptance only; the task result returns to this conversation with sources and time. Check capability_overview if unavailable.",
+            "Research current public web information through available read-only MCP tools or Roami Chrome in a native background task. No project is required. Returns queue acceptance only; verified sources and retrieval time return to this conversation. Check capability_overview if unavailable.",
             object_schema(
                 {"goal": {"type": "string", "minLength": 1, "maxLength": 19000}}, ["goal"]
             ),
