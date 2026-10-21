@@ -127,7 +127,7 @@ class Tools:
         if (
             len(body) <= 128_000
             or self.artifacts is None
-            or tool.name in {"task_status", "task_reply", "reply"}
+            or tool.name in {"task_status", "task_reply", "task_queue_reply", "reply"}
         ):
             return value
         reference = await self.artifacts.put(

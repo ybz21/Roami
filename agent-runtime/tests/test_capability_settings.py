@@ -115,6 +115,7 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
             "ask_user",
             "conversation_history",
             "task_reply",
+            "task_queue_reply",
             "reply",
         }
         assert any(

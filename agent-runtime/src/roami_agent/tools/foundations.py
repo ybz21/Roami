@@ -26,6 +26,7 @@ FOUNDATIONS = (
     "ask_user",
     "conversation_history",
     "task_reply",
+    "task_queue_reply",
     "reply",
 )
 WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
@@ -33,6 +34,7 @@ WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
     "delegate",
     "conversation_history",
     "task_reply",
+    "task_queue_reply",
     "reply",
 }
 RESEARCH_FOUNDATIONS = {"read", "bash", "tool_list"}

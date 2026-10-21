@@ -191,7 +191,8 @@ class AgentLoop:
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
                     if len(calls) > 1 and any(
-                        call["function"]["name"] in {"ask_user", "task_reply", "reply"}
+                        call["function"]["name"]
+                        in {"ask_user", "task_reply", "task_queue_reply", "reply"}
                         for call in calls
                     ):
                         raise DomainError("QUESTION_MUST_BE_ONLY_TOOL")
@@ -241,7 +242,7 @@ class AgentLoop:
                             finalization_error = value.get("error")
                         if (
                             role == "main"
-                            and operation in {"task_reply", "reply"}
+                            and operation in {"task_reply", "task_queue_reply", "reply"}
                             and isinstance(value, dict)
                             and isinstance(value.get("reply"), str)
                         ):

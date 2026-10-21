@@ -400,6 +400,7 @@ async def test_completion_evidence_stays_before_its_tool_round_after_context_reb
                 "ask_user",
                 "conversation_history",
                 "task_reply",
+                "task_queue_reply",
                 "reply",
             }
             self.main_prompts.append(json.loads(json.dumps(messages)))

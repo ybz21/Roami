@@ -456,10 +456,10 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "task_reply",
-            "Answer a question asking ONLY whether a task is finished/running, or whether any tasks are running. "
+            "Answer a question asking ONLY whether ONE referenced task is finished/running. "
             "Use this instead of composing a status answer from history. Reads actual task state and delivers "
             "one short answer in the user's language, ending this turn without another model call. Call alone without a text preamble. "
-            "Use taskId for a particular task; omit it only for an all-tasks running overview. "
+            "taskId is required: resolve the referenced task from context. Never substitute a queue overview. "
             "For detailed results, explanations, raw/debug fields, mixed requests or other languages use task_status instead.",
             object_schema(
                 {
@@ -471,7 +471,24 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "description": "Only for an explicit request to reply in a different language, copy the user's exact language instruction.",
                     },
                 },
-                [],
+                ["taskId"],
+            ),
+            progress_reply,
+            main=True,
+        )
+    )
+
+    registry.add(
+        Tool(
+            "task_queue_reply",
+            "Answer ONLY a whole-queue question such as whether any tasks are running. Never use for one referenced task. "
+            "Read current queue state and deliver a short answer, ending this turn. Call alone without a preamble. "
+            "Use task_reply with taskId for a particular task; task_status for details or mixed requests.",
+            object_schema(
+                {
+                    "language": {"type": "string", "enum": ["zh", "en"]},
+                    "languageQuote": {"type": "string", "minLength": 1},
+                }
             ),
             progress_reply,
             main=True,

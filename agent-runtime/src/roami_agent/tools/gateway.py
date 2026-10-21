@@ -478,9 +478,13 @@ class ToolGateway:
 
         def finish(db):
             committed_value, committed_state, committed_memories = value, state, memory_ids
-            if state == "succeeded" and operation_name in {"task_status", "task_reply"}:
+            if state == "succeeded" and operation_name in {
+                "task_status",
+                "task_reply",
+                "task_queue_reply",
+            }:
                 committed_value = model_task_projection(db, binding["owner"], value)
-                if operation_name == "task_reply":
+                if operation_name in {"task_reply", "task_queue_reply"}:
                     committed_value = {
                         "reply": task_progress(
                             committed_value,

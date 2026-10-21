@@ -73,7 +73,9 @@ async def test_context_reuses_actual_usage_adds_trailing_messages_and_invalidate
         runtime.settings.current = replace(runtime.settings.current, model="second")
         changed = await runtime.context.project("alice", c["id"])
         assert changed["usageTokens"] == 0
-        assert changed["estimatedTokens"] < 5020
+        assert changed["estimatedTokens"] == (
+            changed["historyTokens"] + changed["instructionTokens"] + changed["toolTokens"]
+        )
         runtime.settings.current = replace(runtime.settings.current, model="first")
         if invalidation == "edit":
             await store.call(

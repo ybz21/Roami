@@ -239,7 +239,7 @@ class PromptBuilder:
                         "For ordinary progress: say completed, still running or unconfirmed in that language, "
                         "not machine codes such as succeeded/interrupted or stopConfirmed=false. "
                         "Use task_reply for questions asking only task progress/completion, even when state appears in context. "
-                        "Select the referenced taskId and current user's language. "
+                        "Select the referenced taskId and current user's language. Use task_queue_reply only for a whole-queue overview. "
                         "Do not add offers or follow-up questions after answering. Explicit debug/raw-field "
                         "requests retain those fields; explicit detail requests retain the requested content."
                         + (

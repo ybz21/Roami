@@ -47,6 +47,19 @@ def test_actual_user_language_and_explicit_override_are_distinct():
     assert task_progress([], "en", single=False) == "No tasks are running."
 
 
+async def test_specific_task_reply_cannot_silently_fall_back_to_queue_overview(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        schema = runtime.tools.registry["task_reply"].schema
+        assert "taskId" in schema["required"]
+        assert "taskId" not in runtime.tools.registry["task_queue_reply"].schema["properties"]
+        with pytest.raises(DomainError, match="INVALID_TOOL_ARGUMENTS"):
+            await runtime.tools.invoke(call("task_reply", {}), "main", {})
+        assert not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()
+
+
 async def test_rejected_answer_is_not_published_and_correction_ends_without_rewrite(store):
     rounds = 0
 
