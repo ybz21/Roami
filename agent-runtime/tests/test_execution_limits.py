@@ -311,7 +311,10 @@ async def test_argument_diagnostics_explain_all_schema_errors_without_values(sto
         with pytest.raises(ToolArgumentsError) as failure:
             runtime.tools.validate(malformed, "main")
         issue = failure.value.issues[0]
-        assert issue["rule"] == "additionalProperties" and issue["allowedFields"] == ["taskId"]
+        assert issue["rule"] == "additionalProperties" and issue["allowedFields"] == [
+            "taskId",
+            "includeResult",
+        ]
         assert supplied_value not in json.dumps(failure.value.issues)
         bad = call(
             "delegate",

@@ -308,3 +308,63 @@ async def test_unscoped_status_can_discover_other_requested_tasks_after_handoff(
         assert rounds == 3 and len(await runtime.tasks.list("alice", c["id"])) == 2
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("include_result", [False, True])
+async def test_status_progress_guidance_preserves_explicit_full_result_requests(
+    store, include_result
+):
+    from test_task_delivery_benchmark import mark
+
+    report = "Full executor evidence, sources and limitations. " * 300
+    task_id = None
+    rounds = 0
+
+    class Main:
+        model = "progress-or-results"
+
+        async def stream(self, messages, tools):
+            nonlocal rounds
+            rounds += 1
+            if rounds == 1:
+                yield ModelEvent(
+                    "tool",
+                    call("task_status", {"taskId": task_id, "includeResult": include_result}),
+                )
+            else:
+                assert messages[-1]["role"] == "tool"
+                assert any(
+                    m["role"] == "system" and m["content"].startswith("Task response scope:")
+                    for m in messages
+                )
+                status = json.loads(messages[-1]["content"])[0]
+                if include_result:
+                    assert status["executorResult"]["summary"] == report
+                else:
+                    assert "executorResult" not in status
+                yield ModelEvent("text", report if include_result else "完成了。")
+
+    runtime = Runtime(store, Main(), settings=Settings(workers=0))
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", c["id"], "Prior lookup", key="prior", record_intent=True
+        )
+        task_id = task["id"]
+        await mark(runtime, task, "succeeded", {"state": "succeeded", "summary": report})
+        await runtime.start()
+        receipt = await runtime.chat.submit(
+            "alice", c["id"], "status", "Full results, please" if include_result else "Finished?"
+        )
+        await completed(store, receipt["turnId"])
+        assert rounds == 2
+        await store.call(
+            lambda db: db.execute("UPDATE tasks SET revision=2 WHERE id=?", (task_id,)), write=True
+        )
+        snapshot = await runtime.tools.registry["task_status"].handler(
+            {"taskId": task_id, "includeResult": True},
+            {"owner": "alice", "conversation": c["id"], "turnId": receipt["turnId"]},
+        )
+        assert snapshot[0]["executorResult"] is None
+    finally:
+        await runtime.close()

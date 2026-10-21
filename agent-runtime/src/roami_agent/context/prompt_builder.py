@@ -238,6 +238,39 @@ class PromptBuilder:
                         + "\nReply in that original request's language, not the executor evidence language.",
                     },
                 )
+            if not turn.get("executionRunId"):
+                status_call = await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT tool_name,arguments_json,state FROM tool_calls WHERE turn_id=? ORDER BY rowid DESC LIMIT 1",
+                        (turn["id"],),
+                    )
+                )
+                if (
+                    status_call
+                    and status_call["tool_name"] == "task_status"
+                    and status_call["state"] == "succeeded"
+                ):
+                    include_result = (
+                        json.loads(status_call["arguments_json"]).get("includeResult") is True
+                    )
+                    prompt.insert(
+                        2 + plan["currentTurnStart"],
+                        {
+                            "role": "system",
+                            "content": "Task response scope: the last task_status returned "
+                            + (
+                                "a stored executor result; unavailable or unknown results remain unavailable."
+                                if include_result
+                                else "progress, not the full result."
+                            )
+                            + " For a progress question, answer only the current state and essential blocker/next action in one short sentence; "
+                            "do not recite earlier reports, quota tables, internal IDs, step counts or logs. "
+                            "For an explicit request for prior detailed/full results, use task_status with includeResult=true "
+                            "and preserve the requested content and limitations. For a new factual lookup, dispatch fresh retrieval; "
+                            "stored results never count as fresh evidence. Follow the actual user request, not the amount of history available.",
+                        },
+                    )
             plain = [{"role": "system", "content": full_instructions}] + plan["messages"]
             if self.remembered:
                 recalled, evidence = await self.remembered.recall(turn, plan["messages"])

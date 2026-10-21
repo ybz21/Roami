@@ -308,6 +308,17 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     continue
                 intent = json.loads(item["intent_json"])
                 attempt = item.get("latestAttempt") or {}
+                if args.get("includeResult") is True and attempt.get("runId"):
+                    report = row(
+                        db,
+                        "SELECT result_json FROM task_attempts WHERE id=? AND task_id=? AND task_revision=?",
+                        (attempt["runId"], item["id"], item["revision"]),
+                    )
+                    item["executorResult"] = (
+                        json.loads(report["result_json"])
+                        if report and report["result_json"]
+                        else None
+                    )
                 if intent.get("target", {}).get("resourceOnly") is not True or not attempt.get(
                     "runId"
                 ):
@@ -529,8 +540,17 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "task_status",
-            "Read delegated task status in this conversation. Optionally filter by an exact taskId.",
-            object_schema({"taskId": {"type": "string", "minLength": 1, "maxLength": 200}}),
+            "Read delegated progress in this conversation. A progress question needs only state and essential blockers, not a repeated report. "
+            "Use includeResult=true only when the user asks for prior detailed/full results; the stored executor report is not fresh retrieval. Optionally filter by exact taskId.",
+            object_schema(
+                {
+                    "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
+                    "includeResult": {
+                        "type": "boolean",
+                        "description": "Return the full current-revision executor report for an explicit result/recap request; default false for progress.",
+                    },
+                }
+            ),
             status,
             main=True,
         )
