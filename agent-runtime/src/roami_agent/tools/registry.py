@@ -123,7 +123,8 @@ class Tools:
         tool, args = self.validate(call, role)
         value = await tool.handler(args, dict(binding, role=role))
         body = encoded(value).encode()
-        if len(body) <= 128_000 or self.artifacts is None:
+        # Status lists must survive the gateway's provenance recheck before commit.
+        if len(body) <= 128_000 or self.artifacts is None or tool.name == "task_status":
             return value
         reference = await self.artifacts.put(
             binding["owner"],

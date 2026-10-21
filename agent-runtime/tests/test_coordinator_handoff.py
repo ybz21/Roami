@@ -316,7 +316,7 @@ async def test_status_progress_guidance_preserves_explicit_full_result_requests(
 ):
     from test_task_delivery_benchmark import mark
 
-    report = "Full executor evidence, sources and limitations. " * 300
+    report = "Full executor evidence, sources and limitations. " * 3500
     task_id = None
     rounds = 0
 
@@ -340,13 +340,24 @@ async def test_status_progress_guidance_preserves_explicit_full_result_requests(
                 status = json.loads(messages[-1]["content"])[0]
                 if include_result:
                     assert status["executorResult"]["summary"] == report
+                    assert "OLD_ASSISTANT_TABLE" in str(messages)
                 else:
                     assert "executorResult" not in status
+                    assert "OLD_ASSISTANT_TABLE" not in str(messages)
+                    assert "Full executor evidence" not in str(messages)
                 yield ModelEvent("text", report if include_result else "完成了。")
 
     runtime = Runtime(store, Main(), settings=Settings(workers=0))
     try:
         c = await runtime.conversations.create("alice")
+        from roami_agent.storage.transcript_repository import message
+
+        await store.call(
+            lambda db: message(
+                db, c["id"], c["active_branch_id"], "assistant", {"text": "OLD_ASSISTANT_TABLE"}
+            ),
+            write=True,
+        )
         task = await runtime.tasks.create(
             "alice", c["id"], "Prior lookup", key="prior", record_intent=True
         )

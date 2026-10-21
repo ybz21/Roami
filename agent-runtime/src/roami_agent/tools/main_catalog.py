@@ -351,6 +351,27 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "Cached facts may answer an explicit recap/status request only; never present them as new retrieval."
                     ),
                 }
+            if args.get("includeResult") is not True:
+                items[:] = [
+                    {
+                        key: value
+                        for key, value in item.items()
+                        if key
+                        in {
+                            "id",
+                            "title",
+                            "revision",
+                            "state",
+                            "origin_message_id",
+                            "contextExcluded",
+                            "latestAttempt",
+                        }
+                    }
+                    for item in items
+                ]
+                for item in items:
+                    if item.get("latestAttempt") and item["state"] == "succeeded":
+                        item["latestAttempt"].pop("summary", None)
             return items
 
         return await tasks.db.call(annotate)
@@ -547,7 +568,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
                     "includeResult": {
                         "type": "boolean",
-                        "description": "Return the full current-revision executor report for an explicit result/recap request; default false for progress.",
+                        "description": "Return the full current-revision executor report for an explicit result/recap request; default false for progress. Use true also when earlier conversation references are needed; it restores full history.",
                     },
                 }
             ),

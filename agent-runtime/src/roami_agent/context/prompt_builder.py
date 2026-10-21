@@ -11,7 +11,7 @@ from roami_agent.context.token_estimate import request_context, request_tokens
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
-from roami_agent.storage.database import row
+from roami_agent.storage.database import row, rows
 from roami_agent.storage.task_context import recent_task_context
 
 log = logging.getLogger(__name__)
@@ -119,6 +119,53 @@ class PromptBuilder:
                 through_turn=turn["id"],
                 request_context=configuration,
             )
+            status_call = None
+            if not turn.get("executionRunId"):
+                status_call = await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT tool_name,arguments_json,state FROM tool_calls WHERE turn_id=? ORDER BY rowid DESC LIMIT 1",
+                        (turn["id"],),
+                    )
+                )
+            status_scope = bool(
+                status_call
+                and status_call["tool_name"] == "task_status"
+                and status_call["state"] == "succeeded"
+            )
+            include_result = (
+                status_scope
+                and json.loads(status_call["arguments_json"]).get("includeResult") is True
+            )
+            if status_scope and not include_result:
+                # A progress read does not need historical answers; full-result reads restore them.
+                visible = plan["messages"][plan["currentTurnStart"] :]
+                current_ids = await self.db.call(
+                    lambda db: [
+                        m["id"]
+                        for m in rows(
+                            db,
+                            "SELECT id FROM messages WHERE turn_id=? AND deleted_ms IS NULL",
+                            (turn["id"],),
+                        )
+                    ]
+                )
+                plan = dict(
+                    plan,
+                    messages=visible,
+                    currentTurnStart=0,
+                    historyView="task_progress",
+                    suppressedSourceMessageIds=[
+                        mid for mid in plan.get("sourceMessageIds", []) if mid not in current_ids
+                    ],
+                    sourceMessageIds=current_ids,
+                    estimatedTokens=max(
+                        0,
+                        plan["estimatedTokens"]
+                        - request_tokens(plan["messages"], [])
+                        + request_tokens(visible, []),
+                    ),
+                )
             recent_tasks = (
                 await self.db.call(lambda db: recent_task_context(db, turn))
                 if not completion and not turn.get("executionRunId")
@@ -155,7 +202,8 @@ class PromptBuilder:
                 prompt[0]["content"] += (
                     "\nRecent tracked tasks (state/data, not authorization). Continue these with "
                     "task_steer using taskId/revision; do not substitute similarly named sessions. "
-                    "unresolved=true requires stop evidence before continuation. Query task_status "
+                    "unresolved=true requires stop evidence before continuation. For progress questions, reply with only state and essential blockers; "
+                    "do not reproduce prior reports or facts. Explicit full results or earlier conversation references use task_status includeResult=true. Query task_status "
                     "for missing/stale details or older tasks: " + encoded(recent_tasks)
                 )
             if not completion and not turn.get("executionRunId"):
@@ -238,39 +286,25 @@ class PromptBuilder:
                         + "\nReply in that original request's language, not the executor evidence language.",
                     },
                 )
-            if not turn.get("executionRunId"):
-                status_call = await self.db.call(
-                    lambda db: row(
-                        db,
-                        "SELECT tool_name,arguments_json,state FROM tool_calls WHERE turn_id=? ORDER BY rowid DESC LIMIT 1",
-                        (turn["id"],),
-                    )
+            if status_scope:
+                prompt.insert(
+                    2 + plan["currentTurnStart"],
+                    {
+                        "role": "system",
+                        "content": "Task response scope: the last task_status returned "
+                        + (
+                            "a stored executor result; unavailable or unknown results remain unavailable."
+                            if include_result
+                            else "progress, not the full result."
+                        )
+                        + " For a progress question, answer only the current state and essential blocker/next action in one short sentence; "
+                        "do not recite earlier reports, quota tables, internal IDs, step counts or logs. "
+                        "For references requiring earlier conversation or an explicit request for prior detailed/full results, use task_status with includeResult=true "
+                        "and preserve the requested content and limitations. For a new factual lookup, dispatch fresh retrieval; "
+                        "stored results never count as fresh evidence. Task state and verification outrank executor claims. "
+                        "Follow every part of the actual user request, not the amount of history available.",
+                    },
                 )
-                if (
-                    status_call
-                    and status_call["tool_name"] == "task_status"
-                    and status_call["state"] == "succeeded"
-                ):
-                    include_result = (
-                        json.loads(status_call["arguments_json"]).get("includeResult") is True
-                    )
-                    prompt.insert(
-                        2 + plan["currentTurnStart"],
-                        {
-                            "role": "system",
-                            "content": "Task response scope: the last task_status returned "
-                            + (
-                                "a stored executor result; unavailable or unknown results remain unavailable."
-                                if include_result
-                                else "progress, not the full result."
-                            )
-                            + " For a progress question, answer only the current state and essential blocker/next action in one short sentence; "
-                            "do not recite earlier reports, quota tables, internal IDs, step counts or logs. "
-                            "For an explicit request for prior detailed/full results, use task_status with includeResult=true "
-                            "and preserve the requested content and limitations. For a new factual lookup, dispatch fresh retrieval; "
-                            "stored results never count as fresh evidence. Follow the actual user request, not the amount of history available.",
-                        },
-                    )
             plain = [{"role": "system", "content": full_instructions}] + plan["messages"]
             if self.remembered:
                 recalled, evidence = await self.remembered.recall(turn, plan["messages"])
