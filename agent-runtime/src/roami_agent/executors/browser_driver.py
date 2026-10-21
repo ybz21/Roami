@@ -511,6 +511,25 @@ class BrowserDriver:
             raise DomainError(receipt.get("errorCode") or "BROWSER_ACTION_FAILED", 409)
         return result
 
+    async def _unavailable_source(self, scope, binding, key, details):
+        if await self.db.call(
+            lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (key,))
+        ):
+            raise ToolPreflightError("BROWSER_SOURCE_UNAVAILABLE", 409)
+        await self.db.call(
+            lambda db: event(
+                db,
+                binding["conversation"],
+                "resource.observation_retry_blocked",
+                details,
+                key=key,
+                task_id=scope["taskId"],
+                turn_id=binding.get("turnId"),
+            ),
+            write=True,
+        )
+        raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
+
     @passive_cancel_boundary
     async def open(self, args, binding):
         scope = await self.resources.scope(binding, input_action=True)
@@ -528,7 +547,15 @@ class BrowserDriver:
                 args["url"] in json.loads(action["action_json"]).get("args", [])
                 for action in stopped
             ):
-                raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
+                await self._unavailable_source(
+                    scope,
+                    binding,
+                    "browser-source-retry:"
+                    + hashlib.sha256(
+                        encoded([scope["taskId"], scope["runId"], args["url"]]).encode()
+                    ).hexdigest(),
+                    {"stoppedNavigation": True},
+                )
         capabilities = await self.capabilities()
         browser_id = capabilities["browserId"]
         target_id = args.get("targetId")
@@ -564,6 +591,47 @@ class BrowserDriver:
                     and sum(":target:" in item["resource_key"] for item in owned)
                     >= self.config["max_tabs"]
                 ):
+                    budget_key = (
+                        "browser-tab-budget:"
+                        + hashlib.sha256(
+                            encoded(
+                                [
+                                    scope["taskId"],
+                                    scope["runId"],
+                                    browser_id,
+                                    self.config["max_tabs"],
+                                    sorted(
+                                        item["id"]
+                                        for item in owned
+                                        if ":target:" in item["resource_key"]
+                                    ),
+                                ]
+                            ).encode()
+                        ).hexdigest()
+                    )
+                    if await self.db.call(
+                        lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (budget_key,))
+                    ):
+                        raise ToolPreflightError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
+                    await self.db.call(
+                        lambda db: event(
+                            db,
+                            binding["conversation"],
+                            "resource.browser_budget_exhausted",
+                            {
+                                "maxTabs": self.config["max_tabs"],
+                                "ownedResourceIds": [
+                                    item["id"]
+                                    for item in owned
+                                    if ":target:" in item["resource_key"]
+                                ],
+                            },
+                            key=budget_key,
+                            task_id=scope["taskId"],
+                            turn_id=binding.get("turnId"),
+                        ),
+                        write=True,
+                    )
                     raise DomainError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
                 result = await self._perform(
                     scope,
@@ -640,7 +708,13 @@ class BrowserDriver:
         if binding.get("role") == "research" and await self.db.call(
             lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (failure_key,))
         ):
-            raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
+            retry_key = failure_key + ":retry"
+            await self._unavailable_source(
+                scope,
+                binding,
+                retry_key,
+                {"resourceId": resource["id"], "sceneEpoch": resource["scene_epoch"]},
+            )
         path = self.captures / (identity() + ".png")
         try:
             try:

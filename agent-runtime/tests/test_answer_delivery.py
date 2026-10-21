@@ -10,6 +10,7 @@ from test_runtime import ConversationModel
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
+from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import validate_answer
 from roami_agent.replies.task_progress import request_language, task_progress
 from roami_agent.server.configuration import Settings
@@ -97,6 +98,69 @@ async def test_rejected_answer_is_not_published_and_correction_ends_without_rewr
             )
         )
         assert [r["state"] for r in receipts] == ["failed", "succeeded"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "state,result",
+    [("cancelled", {"state": "cancelled"}), ("failed", {"state": "failed", "retryable": False})],
+)
+async def test_cancelled_or_non_retryable_callback_cannot_start_replacement_work(
+    store, state, result
+):
+    effects, rounds = [], 0
+
+    class Main:
+        model = "callback-write-guard"
+
+        async def stream(self, messages, tools):
+            nonlocal rounds
+            rounds += 1
+            if rounds == 1:
+                yield ModelEvent("tool", call("mutate", {}))
+            else:
+                assert rounds == 2
+                assert (
+                    json.loads(messages[-1]["content"])["error"]
+                    == "TASK_COMPLETION_RESTART_FORBIDDEN"
+                )
+                yield ModelEvent(
+                    "tool",
+                    call("reply", {"text": "任务已停止。", "mode": "brief", "language": "zh"}),
+                )
+
+    async def mutate(args, binding):
+        effects.append(True)
+        return {"ok": True}
+
+    runtime = Runtime(store, Main(), settings=Settings(workers=0))
+    runtime.tools.directory = None
+    runtime.tools.add(
+        Tool("mutate", "Start work", object_schema({}), mutate, main=True, effect="write")
+    )
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", c["id"], "查询资料", key="old", record_intent=True
+        )
+        attempt = await store.call(
+            lambda db: rows(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))[0]
+        )
+        await runtime.dispatch.complete(task, attempt, result, state)
+        job = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId')=?",
+                (task["id"],),
+            )[0]
+        )
+        turn = await runtime.mailbox.claim(job)
+        await runtime.loop.run(
+            turn, "main", completion=json.loads(job["payload_json"])["completion"]
+        )
+        assert effects == [] and rounds == 2
+        assert len(await runtime.tasks.list("alice", c["id"])) == 1
     finally:
         await runtime.close()
 

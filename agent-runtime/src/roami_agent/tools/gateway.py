@@ -71,6 +71,24 @@ class ToolGateway:
         await self.db.call(plan, write=True)
         preflight_error = None
         try:
+            if role == "main" and tool and tool.effect == "write":
+                callback = await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT j.payload_json FROM jobs j JOIN turns t ON t.id=j.aggregate_id "
+                        "WHERE t.id=? AND t.trigger_kind='completion' AND j.kind='turn.run'",
+                        (turn["id"],),
+                    )
+                )
+                if callback:
+                    import json
+
+                    completion = json.loads(callback["payload_json"]).get("completion", {})
+                    if (
+                        completion.get("state") == "cancelled"
+                        or (completion.get("result") or {}).get("retryable") is False
+                    ):
+                        raise DomainError("TASK_COMPLETION_RESTART_FORBIDDEN", 409)
 
             def start(db):
                 db.execute("UPDATE tool_calls SET state='running' WHERE id=?", (tool_id,))
@@ -138,6 +156,12 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN":
+                value.update(
+                    executionStarted=False,
+                    retryable=False,
+                    recovery="This is a cancelled or non-retryable task's completion report, not new authorization. Do not start work, send session instructions or change configuration. Report the committed outcome with reply/task_reply; a new user turn is required for further work.",
+                )
             if value["error"] in {
                 "REPLY_BOILERPLATE",
                 "REPLY_INTERNAL_FIELDS",
@@ -148,6 +172,12 @@ class ToolGateway:
                     "The answer was not delivered. Correct this reply: omit optional offers and machine fields in brief mode, "
                     "use the original user's language, and preserve requested details/raw records with an exact scopeQuote. "
                     "Do not repeat work or create tasks. Send the corrected answer with reply."
+                )
+            if value["error"] == "BROWSER_TAB_BUDGET_EXCEEDED":
+                value["recovery"] = (
+                    "This task has an explicitly configured tab budget. Changing the URL does not free a tab. "
+                    "Reuse a task-owned resource: browser_observe(resourceId), then browser_act goto with its observationId. "
+                    "Never close/adopt another task's or the user's tabs. Report partial results if no owned source is usable."
                 )
             if isinstance(exc, ToolPreflightError):
                 preflight_error = exc

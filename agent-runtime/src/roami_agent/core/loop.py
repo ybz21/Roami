@@ -251,7 +251,11 @@ class AgentLoop:
                             await self.context.after_turn(turn, instructions, catalog)
                             return reply
                         if (
-                            (operation is None or operation == "reply")
+                            (
+                                operation is None
+                                or operation == "reply"
+                                or (tool and tool.effect == "write")
+                            )
                             and isinstance(value, dict)
                             and value.get("error")
                             in {
@@ -263,6 +267,7 @@ class AgentLoop:
                                 "REPLY_INTERNAL_FIELDS",
                                 "REPLY_LANGUAGE_MISMATCH",
                                 "REPLY_SCOPE_QUOTE_REQUIRED",
+                                "TASK_COMPLETION_RESTART_FORBIDDEN",
                             }
                         ):
                             rejected_arguments = call["function"].get("arguments", "")
@@ -272,11 +277,17 @@ class AgentLoop:
                                 pass
                             rejections.add(
                                 (
-                                    call["function"]["name"],
+                                    "completion_write"
+                                    if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN"
+                                    else call["function"]["name"],
                                     value["error"],
                                     encoded(value.get("argumentIssues")),
                                     hashlib.sha256(
-                                        encoded(rejected_arguments).encode()
+                                        (
+                                            ""
+                                            if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN"
+                                            else encoded(rejected_arguments)
+                                        ).encode()
                                     ).hexdigest(),
                                 )
                             )

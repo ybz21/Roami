@@ -11,7 +11,7 @@ import pytest
 from roami_agent.app import Runtime
 from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.protocol.browser import browser_config
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ToolPreflightError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.serialization import encoded
 from roami_agent.server.configuration import Settings
@@ -668,6 +668,10 @@ async def test_unlimited_tabs_and_durable_observation_failure_do_not_weaken_owne
             runtime.browser.config["max_tabs"] = 5
             with pytest.raises(DomainError, match="BROWSER_TAB_BUDGET_EXCEEDED"):
                 await runtime.browser.open({}, binding)
+            with pytest.raises(ToolPreflightError, match="BROWSER_TAB_BUDGET_EXCEEDED"):
+                await runtime.browser.open(
+                    {"url": "https://different.example"}, dict(binding, toolCallId="different-url")
+                )
             runtime.browser.config["max_tabs"] = 0
             failed = True
             with pytest.raises(DomainError, match="BROWSER_DRIVER_UNAVAILABLE"):
@@ -678,6 +682,8 @@ async def test_unlimited_tabs_and_durable_observation_failure_do_not_weaken_owne
                 store, runtime.settings, runtime.resources, runtime.artifacts, runner=runner
             )
             with pytest.raises(DomainError, match="BROWSER_SOURCE_UNAVAILABLE"):
+                await runtime.browser.observe({"resourceId": resource_id}, binding)
+            with pytest.raises(ToolPreflightError, match="BROWSER_SOURCE_UNAVAILABLE"):
                 await runtime.browser.observe({"resourceId": resource_id}, binding)
             assert observations == count
             with pytest.raises(DomainError, match="RESOURCE_TASK_NOT_FOUND"):
