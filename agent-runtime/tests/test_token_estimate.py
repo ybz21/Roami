@@ -73,7 +73,9 @@ async def test_context_reuses_actual_usage_adds_trailing_messages_and_invalidate
         runtime.settings.current = replace(runtime.settings.current, model="second")
         changed = await runtime.context.project("alice", c["id"])
         assert changed["usageTokens"] == 0
-        assert changed["estimatedTokens"] < 5020
+        assert changed["estimatedTokens"] == (
+            changed["historyTokens"] + changed["instructionTokens"] + changed["toolTokens"]
+        )
         runtime.settings.current = replace(runtime.settings.current, model="first")
         if invalidation == "edit":
             await store.call(
@@ -111,7 +113,8 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
             yield ModelEvent("text", "Received")
 
     model = CapturedModel()
-    runtime = Runtime(store, model, settings=Settings(context_window=8000))
+    # Isolate admission from post-turn compaction as the default tool catalog grows.
+    runtime = Runtime(store, model, settings=Settings(context_window=8000, compaction_ratio=0.99))
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")

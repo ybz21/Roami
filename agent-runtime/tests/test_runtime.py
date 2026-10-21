@@ -14,7 +14,7 @@ class ConversationModel:
     async def stream(self, messages, tools):
         if messages[-1]["role"] == "tool":
             yield ModelEvent("text", "Task delegated; you can keep chatting.")
-        elif messages[-1]["content"].startswith("Background task result"):
+        elif any(m["content"].startswith("Background task result") for m in messages):
             yield ModelEvent("text", "Your background research is complete.")
         elif messages[-1]["content"] == "delegate research":
             yield ModelEvent(
@@ -195,6 +195,15 @@ class NestedModel(ConversationModel):
         last = messages[-1]
         if last["role"] == "tool":
             yield ModelEvent("text", "Delegated; awaiting descendants.")
+        elif any(m["content"].startswith("Background task result") for m in messages):
+            self.completions.append(
+                next(
+                    m["content"]
+                    for m in messages
+                    if m["content"].startswith("Background task result")
+                )
+            )
+            yield ModelEvent("text", "All delegated work is joined.")
         elif last["content"] == "root":
             yield ModelEvent(
                 "tool",
@@ -223,9 +232,6 @@ class NestedModel(ConversationModel):
             self.leaf_started.set()
             await self.leaf_release.wait()
             yield ModelEvent("text", "Leaf evidence.")
-        elif last["content"].startswith("Background task result"):
-            self.completions.append(last["content"])
-            yield ModelEvent("text", "All delegated work is joined.")
         else:
             yield ModelEvent("text", "Quick answer.")
 
@@ -392,6 +398,10 @@ async def test_completion_evidence_stays_before_its_tool_round_after_context_reb
                 "tool_list",
                 "delegate",
                 "ask_user",
+                "conversation_history",
+                "task_reply",
+                "task_queue_reply",
+                "reply",
             }
             self.main_prompts.append(json.loads(json.dumps(messages)))
             if len(self.main_prompts) == 1:

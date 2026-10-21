@@ -8,10 +8,16 @@ import httpx
 from jsonschema import ValidationError
 
 from roami_agent.conversation.activity_events import activity_event as event
-from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
+from roami_agent.protocol.errors import (
+    DomainError,
+    ToolCancellation,
+    ToolFinalizationRequired,
+    ToolPreflightError,
+)
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
+from roami_agent.replies.task_progress import task_progress
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
@@ -21,6 +27,20 @@ from roami_agent.storage.transcript_repository import message
 class ToolGateway:
     def __init__(self, database, tools, wakeup):
         self.db, self.tools, self.wakeup = database, tools, wakeup
+
+    async def reply_error(self, turn, text):
+        try:
+            await self.tools.registry["reply"].handler(
+                {"text": text},
+                {
+                    "owner": turn["owner_id"],
+                    "conversation": turn["conversation_id"],
+                    "turnId": turn["id"],
+                },
+            )
+        except DomainError as exc:
+            return exc.code
+        return None
 
     @staticmethod
     def activity(db, turn, binding, kind, payload):
@@ -70,6 +90,26 @@ class ToolGateway:
         await self.db.call(plan, write=True)
         preflight_error = None
         try:
+            if binding.get("finalizing"):
+                raise DomainError("TOOL_FINALIZING_READ_ONLY", 409)
+            if role == "main" and tool and tool.effect == "write":
+                callback = await self.db.call(
+                    lambda db: row(
+                        db,
+                        "SELECT j.payload_json FROM jobs j JOIN turns t ON t.id=j.aggregate_id "
+                        "WHERE t.id=? AND t.trigger_kind='completion' AND j.kind='turn.run'",
+                        (turn["id"],),
+                    )
+                )
+                if callback:
+                    import json
+
+                    completion = json.loads(callback["payload_json"]).get("completion", {})
+                    if completion.get("state") == "cancelled" or (
+                        completion.get("state") in {"failed", "interrupted"}
+                        and (completion.get("result") or {}).get("retryable") is False
+                    ):
+                        raise DomainError("TASK_COMPLETION_RESTART_FORBIDDEN", 409)
 
             def start(db):
                 db.execute("UPDATE tool_calls SET state='running' WHERE id=?", (tool_id,))
@@ -137,6 +177,35 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] in {"TASK_RESULT_REQUIRED", "TASK_REPLY_TASK_MISMATCH"}:
+                value["recovery"] = (
+                    "This is a completion report for one task. Deliver its actual requested findings, "
+                    "verified result or actionable blocker with reply, rather than a generic completion label "
+                    "or whole-queue overview. Do not rerun the task."
+                )
+            if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN":
+                value.update(
+                    executionStarted=False,
+                    retryable=False,
+                    recovery="This is a cancelled or non-retryable task's completion report, not new authorization. Do not start work, send session instructions or change configuration. Report the committed outcome with reply/task_reply; a new user turn is required for further work.",
+                )
+            if value["error"] in {
+                "REPLY_BOILERPLATE",
+                "REPLY_INTERNAL_FIELDS",
+                "REPLY_LANGUAGE_MISMATCH",
+                "REPLY_SCOPE_QUOTE_REQUIRED",
+            }:
+                value["recovery"] = (
+                    "The answer was not delivered. Correct this reply: omit optional offers and machine fields in brief mode, "
+                    "use the original user's language, and preserve requested details/raw records with an exact scopeQuote. "
+                    "Do not repeat work or create tasks. Send the corrected answer with reply."
+                )
+            if value["error"] == "BROWSER_TAB_BUDGET_EXCEEDED":
+                value["recovery"] = (
+                    "This task has an explicitly configured tab budget. Changing the URL does not free a tab. "
+                    "Reuse a task-owned resource: browser_observe(resourceId), then browser_act goto with its observationId. "
+                    "Never close/adopt another task's or the user's tabs. Report partial results if no owned source is usable."
+                )
             if isinstance(exc, ToolPreflightError):
                 preflight_error = exc
                 value.update(
@@ -145,6 +214,27 @@ class ToolGateway:
                     recovery="This tool call failed readiness before its browser action. Earlier calls in this attempt may have executed; preserve their results and sources. End this attempt and "
                     "report the dependency failure to Main; do not retry different URLs or probe shell commands.",
                 )
+                has_research_evidence = (
+                    role == "research"
+                    and binding.get("taskId")
+                    and binding.get("runId")
+                    and await self.db.call(
+                        lambda db: row(
+                            db,
+                            "SELECT id FROM resource_observations WHERE task_id=? AND run_id=? "
+                            "AND json_extract(body_json,'$.url') LIKE 'http%' AND length(trim(json_extract(body_json,'$.domText')))>0 LIMIT 1",
+                            (binding["taskId"], binding["runId"]),
+                        )
+                    )
+                )
+                if isinstance(exc, ToolFinalizationRequired) or (
+                    exc.code == "BROWSER_DRIVER_UNAVAILABLE" and has_research_evidence
+                ):
+                    preflight_error = None
+                    value.update(
+                        finalizeFromEvidence=True,
+                        recovery="No further tools are permitted in this attempt. Finish now using only sources already read in this attempt: give verified partial findings and explicitly name unconfirmed items. Do not fabricate missing facts or retry/delegate. If nothing was verified, say so plainly.",
+                    )
             if (
                 role == "research"
                 and not isinstance(exc, ToolPreflightError)
@@ -408,8 +498,21 @@ class ToolGateway:
 
         def finish(db):
             committed_value, committed_state, committed_memories = value, state, memory_ids
-            if state == "succeeded" and operation_name == "task_status":
+            if state == "succeeded" and operation_name in {
+                "task_status",
+                "task_reply",
+                "task_queue_reply",
+            }:
                 committed_value = model_task_projection(db, binding["owner"], value)
+                if operation_name in {"task_reply", "task_queue_reply"}:
+                    committed_value = {
+                        "reply": task_progress(
+                            committed_value,
+                            args.get("language", "zh"),
+                            single=bool(args.get("taskId")),
+                        ),
+                        "tasks": committed_value,
+                    }
             if state == "succeeded" and operation_name == "artifact_read":
                 source = row(
                     db,

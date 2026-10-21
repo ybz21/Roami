@@ -16,8 +16,27 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.command_families import COMMANDS, INTERNAL, operation_kind, public_operation
 from roami_agent.tools.process import execute
 
-FOUNDATIONS = ("read", "bash", "edit", "write", "tool_list", "delegate", "ask_user")
-WORKER_FOUNDATIONS = set(FOUNDATIONS) - {"ask_user", "delegate"}
+FOUNDATIONS = (
+    "read",
+    "bash",
+    "edit",
+    "write",
+    "tool_list",
+    "delegate",
+    "ask_user",
+    "conversation_history",
+    "task_reply",
+    "task_queue_reply",
+    "reply",
+)
+WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
+    "ask_user",
+    "delegate",
+    "conversation_history",
+    "task_reply",
+    "task_queue_reply",
+    "reply",
+}
 RESEARCH_FOUNDATIONS = {"read", "bash", "tool_list"}
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 

@@ -6,8 +6,8 @@ import json
 from contextlib import asynccontextmanager
 from itertools import count
 
-from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.identity import now_ms
+from roami_agent.protocol.errors import DomainError, ToolPreflightError
+from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.models import Model
 from roami_agent.protocol.ports import (
     ContextBuilder,
@@ -110,6 +110,8 @@ class AgentLoop:
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
                 seen_rejections = set()
+                finalizing = False
+                finalization_error = None
                 for step in count(offset):
                     if task_id:
                         await self.charge_task(task_id)
@@ -170,6 +172,8 @@ class AgentLoop:
                                     first_delta
                                     or len(buffer.encode()) >= 1024
                                     or self.clock() - flushed >= 0.1
+                                ) and (
+                                    role != "main" or not await self.gateway.reply_error(turn, text)
                                 ):
                                     await self.journal.delta(turn, mid, text, buffer)
                                     buffer, flushed = "", self.clock()
@@ -180,12 +184,34 @@ class AgentLoop:
                                 usage = part.value
                     self.preemptible.discard(tid)
                     phase = "tools"
+                    invalid_reply = (
+                        role == "main"
+                        and text.strip()
+                        and await self.gateway.reply_error(turn, text)
+                    )
+                    if invalid_reply and not calls:
+                        calls = [
+                            {
+                                "id": "call_" + identity()[:24],
+                                "type": "function",
+                                "function": {"name": "reply", "arguments": encoded({"text": text})},
+                            }
+                        ]
+                    if invalid_reply:
+                        text, buffer = "", ""
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
+                        buffer = ""
+                    if finalizing and calls:
+                        raise ToolPreflightError(
+                            finalization_error or "TOOL_FINALIZATION_STALLED", 503
+                        )
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
                     if len(calls) > 1 and any(
-                        call["function"]["name"] == "ask_user" for call in calls
+                        call["function"]["name"]
+                        in {"ask_user", "task_reply", "task_queue_reply", "reply"}
+                        for call in calls
                     ):
                         raise DomainError("QUESTION_MUST_BE_ONLY_TOOL")
                     await self.journal.finish(
@@ -226,10 +252,39 @@ class AgentLoop:
                             "originMessageId": origin["id"] if origin else None,
                             "toolCallId": call["id"],
                             "workspace": turn.get("workspace"),
+                            "finalizing": finalizing,
                         }
                         value = await self.gateway.invoke(turn, mid, call, role, binding)
+                        if isinstance(value, dict) and value.get("finalizeFromEvidence") is True:
+                            finalizing = True
+                            finalization_error = value.get("error")
                         if (
-                            operation is None
+                            role == "main"
+                            and operation in {"task_reply", "task_queue_reply", "reply"}
+                            and isinstance(value, dict)
+                            and isinstance(value.get("reply"), str)
+                        ):
+                            reply = value["reply"]
+                            reply_id = await self.journal.start(turn)
+                            await self.journal.delta(turn, reply_id, reply, reply)
+                            await self.journal.finish(
+                                turn,
+                                reply_id,
+                                reply,
+                                [],
+                                usage,
+                                step + 1,
+                                final=True,
+                                completion=completion,
+                            )
+                            await self.context.after_turn(turn, instructions, catalog)
+                            return reply
+                        if (
+                            (
+                                operation is None
+                                or operation in {"reply", "task_reply", "task_queue_reply"}
+                                or (tool and tool.effect == "write")
+                            )
                             and isinstance(value, dict)
                             and value.get("error")
                             in {
@@ -237,6 +292,13 @@ class AgentLoop:
                                 "INVALID_CLI_ARGUMENTS",
                                 "TOOL_UNAVAILABLE",
                                 "TOOL_DISABLED",
+                                "REPLY_BOILERPLATE",
+                                "REPLY_INTERNAL_FIELDS",
+                                "REPLY_LANGUAGE_MISMATCH",
+                                "REPLY_SCOPE_QUOTE_REQUIRED",
+                                "TASK_RESULT_REQUIRED",
+                                "TASK_REPLY_TASK_MISMATCH",
+                                "TASK_COMPLETION_RESTART_FORBIDDEN",
                             }
                         ):
                             rejected_arguments = call["function"].get("arguments", "")
@@ -246,11 +308,17 @@ class AgentLoop:
                                 pass
                             rejections.add(
                                 (
-                                    call["function"]["name"],
+                                    "completion_write"
+                                    if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN"
+                                    else call["function"]["name"],
                                     value["error"],
                                     encoded(value.get("argumentIssues")),
                                     hashlib.sha256(
-                                        encoded(rejected_arguments).encode()
+                                        (
+                                            ""
+                                            if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN"
+                                            else encoded(rejected_arguments)
+                                        ).encode()
                                     ).hexdigest(),
                                 )
                             )
@@ -318,6 +386,22 @@ class AgentLoop:
                     catalog = self.tools.catalog(role)
                     phase = "context"
                     plan, prompt = await self.build_context(turn, instructions, catalog, completion)
+                    if finalizing:
+                        catalog = []
+                        plan = dict(
+                            plan,
+                            historyView="finalization",
+                            requestBasis=hashlib.sha256(
+                                encoded([plan.get("requestBasis"), "finalization"]).encode()
+                            ).hexdigest(),
+                        )
+                        prompt.insert(
+                            1 + plan["currentTurnStart"],
+                            {
+                                "role": "system",
+                                "content": "This attempt is closing after an unchanged blocker. No further tools or inputs are allowed. Report only findings verified from sources already read in this attempt, with their URLs and limitations. Mark everything else unconfirmed. Do not invent missing facts or restart work.",
+                            },
+                        )
         except TimeoutError as exc:
             code = (
                 "MODEL_DEADLINE"

@@ -3,12 +3,13 @@
 import json
 
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.task_request import task_user_request
 
 
 def recent_task_context(db, turn):
     tasks = rows(
         db,
-        "SELECT t.id,t.revision,t.state,t.origin_message_id,t.intent_json,a.state AS attempt_state,a.result_json "
+        "SELECT t.id,t.revision,t.state,t.origin_message_id,t.intent_json,m.content_json,m.conversation_id,a.state AS attempt_state,a.result_json "
         "FROM tasks t JOIN messages m ON m.id=t.origin_message_id "
         "LEFT JOIN task_attempts a ON a.id=(SELECT id FROM task_attempts WHERE task_id=t.id "
         "AND task_revision=t.revision ORDER BY attempt_no DESC LIMIT 1) "
@@ -20,6 +21,9 @@ def recent_task_context(db, turn):
     )
     result = []
     for task in tasks:
+        source = task_user_request(db, {**task, "id": task["origin_message_id"]})
+        if source is None:
+            continue
         intent = json.loads(task["intent_json"])
         evidence = json.loads(task["result_json"]) if task["result_json"] else {}
         result.append(
@@ -28,7 +32,7 @@ def recent_task_context(db, turn):
                 "sourceMessageId": task["origin_message_id"],
                 "revision": task["revision"],
                 "state": task["state"],
-                "goal": intent["goal"][:240],
+                "goal": json.loads(source["content_json"]).get("text", ""),
                 "executor": intent["executor"],
                 "unresolved": task["attempt_state"] == "unknown"
                 or evidence.get("outcomeKnown") is False

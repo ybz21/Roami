@@ -133,7 +133,7 @@ async def test_two_background_questions_do_not_need_an_extra_main_model_round(st
         async def stream(self, messages, tools):
             if messages[-1]["role"] == "tool":
                 raise AssertionError("Do not spend a model request acknowledging accepted work")
-            if str(messages[-1]["content"]).startswith("Background task result"):
+            if any(str(m["content"]).startswith("Background task result") for m in messages):
                 yield ModelEvent("text", "Result: " + str(messages[-1]["content"]))
             else:
                 goal = messages[-1]["content"]

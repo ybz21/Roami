@@ -11,7 +11,7 @@ from test_runtime import ConversationModel
 from roami_agent.app import Runtime
 from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.protocol.browser import browser_config
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ToolPreflightError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.server.configuration import Settings
@@ -138,9 +138,29 @@ async def test_twenty_tabs_across_tasks_then_pressure_recycles_only_released_tab
             "runId": first[1],
             "turnId": "turn",
             "toolCallId": "extra",
+            "conversation": await store.call(
+                lambda db: row(
+                    db, "SELECT origin_conversation_id FROM tasks WHERE id=?", (first[0],)
+                )["origin_conversation_id"]
+            ),
         }
+        await store.call(
+            lambda db: db.execute(
+                "INSERT INTO turns(id,conversation_id,branch_id,trigger_kind,state,created_ms) "
+                "SELECT 'turn',conversation_id,id,'user','completed',0 FROM branches WHERE conversation_id=? LIMIT 1",
+                (binding["conversation"],),
+            ),
+            write=True,
+        )
         with pytest.raises(DomainError, match="BROWSER_TAB_BUDGET_EXCEEDED"):
             await runtime.browser.open({}, binding)
+        restarted = BrowserDriver(
+            store, runtime.settings, runtime.resources, runtime.artifacts, runner=chrome
+        )
+        with pytest.raises(ToolPreflightError, match="BROWSER_TAB_BUDGET_EXCEEDED"):
+            await restarted.open(
+                {"url": "https://another.example"}, dict(binding, toolCallId="retry")
+            )
         assert chrome.counter == 20 and not chrome.closed
         lease = await store.call(
             lambda db: row(

@@ -12,6 +12,10 @@ class ToolPreflightError(DomainError):
     """An unavailable dependency prevents starting the tool action."""
 
 
+class ToolFinalizationRequired(ToolPreflightError):
+    """An unchanged blocker allows reporting existing evidence, but no further tools."""
+
+
 class ToolCancellation(asyncio.CancelledError):
     def __init__(self, *, input_stopped):
         super().__init__()

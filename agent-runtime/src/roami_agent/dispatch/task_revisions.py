@@ -147,6 +147,15 @@ class TaskRevisions:
             intent = json.loads(task["intent_json"])
             goal = intent["goal"] + "\n\nAdditional user requirements:\n" + text
             operation = identity()
+            source_user = (
+                row(
+                    db,
+                    "SELECT id FROM messages WHERE turn_id=? AND role='user' AND deleted_ms IS NULL ORDER BY seq LIMIT 1",
+                    (source_turn_id,),
+                )
+                if source_turn_id
+                else None
+            )
             mid = message(
                 db,
                 task["origin_conversation_id"],
@@ -157,6 +166,7 @@ class TaskRevisions:
                     "taskSteer": task_id,
                     "operationId": operation,
                     "taskRevision": expected_revision,
+                    **({"sourceUserMessageId": source_user["id"]} if source_user else {}),
                 },
             )
             payload = {

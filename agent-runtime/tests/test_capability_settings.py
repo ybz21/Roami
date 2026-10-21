@@ -113,6 +113,10 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
             "tool_list",
             "delegate",
             "ask_user",
+            "conversation_history",
+            "task_reply",
+            "task_queue_reply",
+            "reply",
         }
         assert any(
             command["name"] == "roami" for group in data["cli"] for command in group["commands"]

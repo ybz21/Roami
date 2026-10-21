@@ -20,10 +20,15 @@ from roami_agent.executors.input_cancellation import (
     passive_cancel_boundary,
 )
 from roami_agent.protocol.browser import browser_config
-from roami_agent.protocol.errors import DomainError, ToolCancellation, ToolPreflightError
+from roami_agent.protocol.errors import (
+    DomainError,
+    ToolCancellation,
+    ToolFinalizationRequired,
+    ToolPreflightError,
+)
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, rows
+from roami_agent.storage.database import event, row, rows
 from roami_agent.tools.process import execute
 
 
@@ -298,16 +303,7 @@ class BrowserDriver:
     @staticmethod
     def _view(observation):
         view = dict(observation)
-        view["domText"] = view.get("domText", "").encode()[:3000].decode(errors="ignore")
-        view["url"] = view.get("url", "").encode()[:1200].decode(errors="ignore")
-        controls = view.get("controls", [])
-        view["controls"] = controls[:12]
-        view["controlsTruncated"] = view.get("controlsTruncated", False) or len(controls) > 12
-        while len(encoded(view).encode()) > 8000 and view["controls"]:
-            view["controls"].pop()
-            view["controlsTruncated"] = True
-        if len(encoded(view).encode()) > 8000:
-            raise DomainError("BROWSER_OBSERVATION_LIMIT", 503)
+        view["controlsTruncated"] = view.get("controlsTruncated", False)
         return view
 
     async def capabilities(self, *, no_start=False):
@@ -515,6 +511,61 @@ class BrowserDriver:
             raise DomainError(receipt.get("errorCode") or "BROWSER_ACTION_FAILED", 409)
         return result
 
+    async def _unavailable_source(self, scope, binding, key, details):
+        if await self.db.call(
+            lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (key,))
+        ):
+            raise ToolFinalizationRequired("BROWSER_SOURCE_UNAVAILABLE", 409)
+        await self.db.call(
+            lambda db: event(
+                db,
+                binding["conversation"],
+                "resource.observation_retry_blocked",
+                details,
+                key=key,
+                task_id=scope["taskId"],
+                turn_id=binding.get("turnId"),
+            ),
+            write=True,
+        )
+        raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
+
+    async def _tab_budget_exhausted(self, scope, binding, browser_id):
+        tabs = await self.db.call(
+            lambda db: rows(
+                db,
+                "SELECT resource_id FROM browser_tabs WHERE browser_id=? AND state!='closed' "
+                "ORDER BY resource_id",
+                (browser_id,),
+            )
+        )
+        ids = [tab["resource_id"] for tab in tabs]
+        key = (
+            "browser-tab-budget:"
+            + hashlib.sha256(
+                encoded(
+                    [scope["taskId"], scope["runId"], browser_id, self.config["max_tabs"], ids]
+                ).encode()
+            ).hexdigest()
+        )
+        if await self.db.call(
+            lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (key,))
+        ):
+            raise ToolFinalizationRequired("BROWSER_TAB_BUDGET_EXCEEDED", 409)
+        await self.db.call(
+            lambda db: event(
+                db,
+                binding["conversation"],
+                "resource.browser_budget_exhausted",
+                {"maxTabs": self.config["max_tabs"], "pooledResourceIds": ids},
+                key=key,
+                task_id=scope["taskId"],
+                turn_id=binding.get("turnId"),
+            ),
+            write=True,
+        )
+        raise DomainError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
+
     @passive_cancel_boundary
     async def open(self, args, binding):
         scope = await self.resources.scope(binding, input_action=True)
@@ -532,7 +583,15 @@ class BrowserDriver:
                 args["url"] in json.loads(action["action_json"]).get("args", [])
                 for action in stopped
             ):
-                raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
+                await self._unavailable_source(
+                    scope,
+                    binding,
+                    "browser-source-retry:"
+                    + hashlib.sha256(
+                        encoded([scope["taskId"], scope["runId"], args["url"]]).encode()
+                    ).hexdigest(),
+                    {"stoppedNavigation": True},
+                )
         async with self.tabs.lock:
             capabilities = await self.capabilities()
             browser_id = capabilities["browserId"]
@@ -565,7 +624,12 @@ class BrowserDriver:
                     {"browserId": browser_id},
                 )
                 try:
-                    await self.tabs.make_room(capabilities)
+                    try:
+                        await self.tabs.make_room(capabilities)
+                    except DomainError as exc:
+                        if exc.code != "BROWSER_TAB_BUDGET_EXCEEDED":
+                            raise
+                        await self._tab_budget_exhausted(scope, binding, browser_id)
                     result = await self._perform(
                         scope,
                         lease,
@@ -633,6 +697,24 @@ class BrowserDriver:
         resource = await self.resources.resource(scope, args["resourceId"])
         browser_id, target_id = self._target(resource)
         resource = await self._claim(scope, resource["resource_key"], binding=binding)
+        failure_key = (
+            "browser-observation-failed:"
+            + hashlib.sha256(
+                encoded(
+                    [scope["taskId"], scope["runId"], resource["id"], resource["scene_epoch"]]
+                ).encode()
+            ).hexdigest()
+        )
+        if binding.get("role") == "research" and await self.db.call(
+            lambda db: row(db, "SELECT id FROM events WHERE event_key=?", (failure_key,))
+        ):
+            retry_key = failure_key + ":retry"
+            await self._unavailable_source(
+                scope,
+                binding,
+                retry_key,
+                {"resourceId": resource["id"], "sceneEpoch": resource["scene_epoch"]},
+            )
         path = self.captures / (identity() + ".png")
         try:
             try:
@@ -697,6 +779,29 @@ class BrowserDriver:
                 body,
             )
             return {"observation": self._view(observed), "artifactRefs": [artifact]}
+        except DomainError as exc:
+            if binding.get("role") == "research" and exc.code in {
+                "BROWSER_DRIVER_UNAVAILABLE",
+                "CHROME_OBSERVATION_TIMEOUT",
+                "CHROME_TARGET_NOT_FOUND",
+            }:
+                await self.db.call(
+                    lambda db, code=exc.code: event(
+                        db,
+                        binding["conversation"],
+                        "resource.observation_failed",
+                        {
+                            "resourceId": resource["id"],
+                            "sceneEpoch": resource["scene_epoch"],
+                            "error": code,
+                        },
+                        key=failure_key,
+                        task_id=scope["taskId"],
+                        turn_id=binding.get("turnId"),
+                    ),
+                    write=True,
+                )
+            raise
         finally:
             await asyncio.to_thread(path.unlink, missing_ok=True)
 
