@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from itertools import count
 
 from roami_agent.protocol.errors import DomainError, ToolPreflightError
-from roami_agent.protocol.identity import now_ms
+from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.models import Model
 from roami_agent.protocol.ports import (
     ContextBuilder,
@@ -172,6 +172,8 @@ class AgentLoop:
                                     first_delta
                                     or len(buffer.encode()) >= 1024
                                     or self.clock() - flushed >= 0.1
+                                ) and (
+                                    role != "main" or not await self.gateway.reply_error(turn, text)
                                 ):
                                     await self.journal.delta(turn, mid, text, buffer)
                                     buffer, flushed = "", self.clock()
@@ -182,8 +184,24 @@ class AgentLoop:
                                 usage = part.value
                     self.preemptible.discard(tid)
                     phase = "tools"
+                    invalid_reply = (
+                        role == "main"
+                        and text.strip()
+                        and await self.gateway.reply_error(turn, text)
+                    )
+                    if invalid_reply and not calls:
+                        calls = [
+                            {
+                                "id": "call_" + identity()[:24],
+                                "type": "function",
+                                "function": {"name": "reply", "arguments": encoded({"text": text})},
+                            }
+                        ]
+                    if invalid_reply:
+                        text, buffer = "", ""
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
+                        buffer = ""
                     if finalizing and calls:
                         raise ToolPreflightError(
                             finalization_error or "TOOL_FINALIZATION_STALLED", 503
@@ -264,7 +282,7 @@ class AgentLoop:
                         if (
                             (
                                 operation is None
-                                or operation == "reply"
+                                or operation in {"reply", "task_reply", "task_queue_reply"}
                                 or (tool and tool.effect == "write")
                             )
                             and isinstance(value, dict)
@@ -278,6 +296,8 @@ class AgentLoop:
                                 "REPLY_INTERNAL_FIELDS",
                                 "REPLY_LANGUAGE_MISMATCH",
                                 "REPLY_SCOPE_QUOTE_REQUIRED",
+                                "TASK_RESULT_REQUIRED",
+                                "TASK_REPLY_TASK_MISMATCH",
                                 "TASK_COMPLETION_RESTART_FORBIDDEN",
                             }
                         ):

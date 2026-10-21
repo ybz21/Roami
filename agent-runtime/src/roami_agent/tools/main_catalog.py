@@ -445,6 +445,32 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         return await tasks.db.call(annotate)
 
     async def progress_reply(args, binding):
+        def callback_result(db):
+            callback = row(
+                db,
+                "SELECT j.payload_json FROM jobs j JOIN turns t ON t.id=j.aggregate_id "
+                "WHERE t.id=? AND t.trigger_kind='completion' AND j.kind='turn.run'",
+                (binding["turnId"],),
+            )
+            if not callback:
+                return
+            completion = json.loads(callback["payload_json"]).get("completion", {})
+            if args.get("taskId") != completion.get("taskId"):
+                raise DomainError("TASK_REPLY_TASK_MISMATCH", 409)
+            if completion.get("state") not in {"succeeded", "failed", "waiting_user"}:
+                return
+            references = (completion.get("result") or {}).get("artifactRefs", [])
+            if completion.get("state") in {"succeeded", "waiting_user"}:
+                for reference in references if isinstance(references, list) else []:
+                    if isinstance(reference, dict) and row(
+                        db,
+                        "SELECT id FROM artifacts WHERE id=? AND owner_id=? AND task_id=? AND deleted_ms IS NULL",
+                        (reference.get("id"), binding["owner"], completion.get("taskId")),
+                    ):
+                        return
+            raise DomainError("TASK_RESULT_REQUIRED", 409)
+
+        await tasks.db.call(callback_result)
         items = await status(args, binding)
         language = request_language(
             await reply_source(binding),
@@ -460,6 +486,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "Use this instead of composing a status answer from history. Reads actual task state and delivers "
             "one short answer in the user's language, ending this turn without another model call. Call alone without a text preamble. "
             "taskId is required: resolve the referenced task from context. Never substitute a queue overview. "
+            "Completion callbacks without verified downloadable files must use reply to deliver the actual findings or blocker. "
             "For detailed results, explanations, raw/debug fields, mixed requests or other languages use task_status instead.",
             object_schema(
                 {

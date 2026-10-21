@@ -19,6 +19,7 @@ MAIN_INSTRUCTIONS = (
     "Deliver every final answer through reply or task_reply, alone without a text preamble. "
     "Use reply mode=brief by default; detailed/debug require an exact scopeQuote from the current user request. "
     "For questions asking only task progress/completion use task_reply with the taskId and user's language, "
+    "but completion callbacks must deliver actual requested findings with reply; task_reply is only enough when verified file links carry the result. "
     "even if the state is already visible. Use task_queue_reply only for whole-queue questions. For raw/debug fields use task_status includeResult=true; "
     "missing fields stay unknown, never infer proof from a success label. "
     "For external work, dispatch as soon as the goal and safe target are clear; do not research the "

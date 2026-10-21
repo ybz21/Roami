@@ -60,7 +60,8 @@ async def test_specific_task_reply_cannot_silently_fall_back_to_queue_overview(s
         await runtime.close()
 
 
-async def test_rejected_answer_is_not_published_and_correction_ends_without_rewrite(store):
+@pytest.mark.parametrize("plain", [False, True])
+async def test_rejected_answer_is_not_published_and_correction_ends_without_rewrite(store, plain):
     rounds = 0
 
     class Main:
@@ -70,6 +71,9 @@ async def test_rejected_answer_is_not_published_and_correction_ends_without_rewr
             nonlocal rounds
             rounds += 1
             if rounds == 1:
+                if plain:
+                    yield ModelEvent("text", "已完成，随时告诉我。")
+                    return
                 yield ModelEvent(
                     "tool",
                     call(
@@ -79,6 +83,10 @@ async def test_rejected_answer_is_not_published_and_correction_ends_without_rewr
             else:
                 assert rounds == 2
                 assert json.loads(messages[-1]["content"])["error"] == "REPLY_BOILERPLATE"
+                if plain:
+                    assert messages[-2]["tool_calls"][0]["type"] == "function"
+                    assert messages[-1]["tool_call_id"].startswith("call_")
+                    assert len(messages[-1]["tool_call_id"]) == 29
                 yield ModelEvent(
                     "tool",
                     call(
@@ -111,6 +119,65 @@ async def test_rejected_answer_is_not_published_and_correction_ends_without_rewr
             )
         )
         assert [r["state"] for r in receipts] == ["failed", "succeeded"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("queue", [False, True])
+async def test_completion_callback_cannot_replace_findings_with_generic_status(store, queue):
+    rounds, task_id = 0, None
+
+    class Main:
+        model = "completion-content"
+
+        async def stream(self, messages, tools):
+            nonlocal rounds
+            rounds += 1
+            if rounds == 1:
+                yield ModelEvent(
+                    "tool",
+                    call(
+                        "task_queue_reply" if queue else "task_reply",
+                        {} if queue else {"taskId": task_id},
+                    ),
+                )
+            else:
+                assert rounds == 2
+                assert json.loads(messages[-1]["content"])["error"] == (
+                    "TASK_REPLY_TASK_MISMATCH" if queue else "TASK_RESULT_REQUIRED"
+                )
+                yield ModelEvent("tool", call("reply", {"text": "济南18至24摄氏度，无降雨。"}))
+
+    runtime = Runtime(store, Main(), settings=Settings(workers=0), memory_model=ConversationModel())
+    try:
+        c = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", c["id"], "查看济南天气", key="weather", record_intent=True
+        )
+        task_id = task["id"]
+        attempt = await store.call(
+            lambda db: rows(db, "SELECT * FROM task_attempts WHERE task_id=?", (task_id,))[0]
+        )
+        await runtime.dispatch.complete(
+            task,
+            attempt,
+            {"state": "succeeded", "summary": "受控测试数据：济南18至24摄氏度，无降雨。"},
+            "succeeded",
+        )
+        job = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId')=?",
+                (task_id,),
+            )[0]
+        )
+        turn = await runtime.mailbox.claim(job)
+        await runtime.loop.run(
+            turn, "main", completion=json.loads(job["payload_json"])["completion"]
+        )
+        transcript = await runtime.conversations.messages("alice", c["id"])
+        assert transcript["messages"][-1]["content"]["text"] == "济南18至24摄氏度，无降雨。"
+        assert len(await runtime.tasks.list("alice", c["id"])) == 1
     finally:
         await runtime.close()
 

@@ -28,6 +28,20 @@ class ToolGateway:
     def __init__(self, database, tools, wakeup):
         self.db, self.tools, self.wakeup = database, tools, wakeup
 
+    async def reply_error(self, turn, text):
+        try:
+            await self.tools.registry["reply"].handler(
+                {"text": text},
+                {
+                    "owner": turn["owner_id"],
+                    "conversation": turn["conversation_id"],
+                    "turnId": turn["id"],
+                },
+            )
+        except DomainError as exc:
+            return exc.code
+        return None
+
     @staticmethod
     def activity(db, turn, binding, kind, payload):
         event(db, turn["conversation_id"], kind, payload, turn_id=turn["id"])
@@ -163,6 +177,12 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] in {"TASK_RESULT_REQUIRED", "TASK_REPLY_TASK_MISMATCH"}:
+                value["recovery"] = (
+                    "This is a completion report for one task. Deliver its actual requested findings, "
+                    "verified result or actionable blocker with reply, rather than a generic completion label "
+                    "or whole-queue overview. Do not rerun the task."
+                )
             if value["error"] == "TASK_COMPLETION_RESTART_FORBIDDEN":
                 value.update(
                     executionStarted=False,

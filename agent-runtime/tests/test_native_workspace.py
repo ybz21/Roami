@@ -28,7 +28,7 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
         model = "bare-main-report"
 
         async def stream(self, messages, tools):
-            yield ModelEvent("text", "文件已保存。")
+            yield ModelEvent("text", "File saved.")
 
     class Worker:
         model = "bare-worker-report"

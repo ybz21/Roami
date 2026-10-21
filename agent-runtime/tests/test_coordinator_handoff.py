@@ -345,7 +345,7 @@ async def test_status_progress_guidance_preserves_explicit_full_result_requests(
                     assert "executorResult" not in status
                     assert "OLD_ASSISTANT_TABLE" not in str(messages)
                     assert "Full executor evidence" not in str(messages)
-                yield ModelEvent("text", report if include_result else "完成了。")
+                yield ModelEvent("text", report if include_result else "Done.")
 
     runtime = Runtime(store, Main(), settings=Settings(workers=0))
     try:
