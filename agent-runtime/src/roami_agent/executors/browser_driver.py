@@ -299,16 +299,7 @@ class BrowserDriver:
     @staticmethod
     def _view(observation):
         view = dict(observation)
-        view["domText"] = view.get("domText", "").encode()[:3000].decode(errors="ignore")
-        view["url"] = view.get("url", "").encode()[:1200].decode(errors="ignore")
-        controls = view.get("controls", [])
-        view["controls"] = controls[:12]
-        view["controlsTruncated"] = view.get("controlsTruncated", False) or len(controls) > 12
-        while len(encoded(view).encode()) > 8000 and view["controls"]:
-            view["controls"].pop()
-            view["controlsTruncated"] = True
-        if len(encoded(view).encode()) > 8000:
-            raise DomainError("BROWSER_OBSERVATION_LIMIT", 503)
+        view["controlsTruncated"] = view.get("controlsTruncated", False)
         return view
 
     async def capabilities(self):

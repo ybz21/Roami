@@ -616,6 +616,19 @@ def test_browser_budget_is_optional_and_has_no_fixed_ceiling(budget):
     assert browser_config({"enabled": True})["max_tabs"] == 0
 
 
+def test_captured_source_facts_and_navigation_links_remain_available_to_worker():
+    body = {
+        "domText": "Navigation header " * 250 + "\nVerified free plan: 1,000 credits/month.",
+        "url": "https://source.example/search?q=" + "a" * 1600,
+        "controls": [{"href": "https://source.example/pricing/" + str(i)} for i in range(64)],
+    }
+    view = BrowserDriver._view(body)
+    assert view["domText"] == body["domText"]
+    assert view["url"] == body["url"]
+    assert view["controls"][63]["href"].endswith("/63")
+    assert view["controlsTruncated"] is False
+
+
 async def test_unlimited_tabs_and_durable_observation_failure_do_not_weaken_ownership(store):
     from test_runtime import ConversationModel, until
 
