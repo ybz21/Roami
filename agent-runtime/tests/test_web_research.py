@@ -51,9 +51,9 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
                 assert "Original user request" in seed
                 assert "Check the latest stock quote\n\nDelegated goal" in seed
                 assert "Check the latest stock quote with sources and time" in seed
-                name, args = "tool_list", {"query": "web-research"}
+                name, args = "tool_list", {"query": "browser_use"}
             elif self.step == 2:
-                name, args = "read", {"path": "skill://web-research"}
+                name, args = "read", {"path": "skill://browser_use"}
             elif self.step == 3:
                 name, args = "browser_act", {}
             elif self.step == 4:
@@ -163,14 +163,14 @@ async def test_research_catalog_and_invocation_deny_non_navigation_tools(store):
     catalog = runtime.tools.catalog("research")
     assert {tool["function"]["name"] for tool in catalog} == {"read", "bash", "tool_list"}
     commands = runtime.tools.directory.list("browser", "cli", 10, "research")["items"]
-    assert {item["name"] for item in commands} == {"browser_open", "browser_observe", "browser_act"}
-    action = next(item for item in commands if item["name"] == "browser_act")
-    assert action["inputSchema"]["properties"]["kind"]["enum"] == ["goto"]
+    assert {item["name"] for item in commands} == {"roami chrome"}
+    forms = [item["argv"][2] for item in commands[0]["commands"]]
+    assert "goto" in forms and "click" not in forms
     for name, args in [
         ("shell", {"argv": ["echo", "forbidden"]}),
         ("browser_act", {"kind": "click", "observationId": "scene", "selector": "#buy"}),
         ("browser_open", {"targetId": "user-owned"}),
-        ("skill_read", {"name": "roami-dispatch"}),
+        ("skill_read", {"name": "roami"}),
     ]:
         with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
             await runtime.tools.invoke(

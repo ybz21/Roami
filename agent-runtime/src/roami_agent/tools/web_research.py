@@ -13,8 +13,8 @@ def register_research_tools(registry, tasks):
             (not registry.directory or {"read", "bash"} <= worker)
             and BROWSER_TOOLS <= worker
             and "skill_read" in worker
-            and "web-research" in registry.skills
-            and "web-research" not in registry.disabled_skills
+            and "browser_use" in registry.skills
+            and "browser_use" not in registry.disabled_skills
         )
 
     async def capabilities(args, binding):
@@ -32,7 +32,7 @@ def register_research_tools(registry, tasks):
         task = await tasks.create(
             binding["owner"],
             binding["conversation"],
-            "Read the web-research skill, then use Browser tools through Roami Chrome CLI to research this request. "
+            "Read skill://browser_use, then use roami chrome to research this request. "
             "This task has no code workspace; do not request a project or use Shell. Return verified source URLs, retrieval time, and any delayed/stale/blocked status. User request:\n"
             + args["goal"],
             key=binding["turnId"] + ":" + binding["toolCallId"],

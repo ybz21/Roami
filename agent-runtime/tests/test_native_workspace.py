@@ -396,7 +396,7 @@ async def test_multistep_turn_does_not_sum_individual_model_request_timeouts(sto
                         "id": "load-workflow",
                         "function": {
                             "name": "read",
-                            "arguments": json.dumps({"path": "skill://web-research"}),
+                            "arguments": json.dumps({"path": "skill://browser_use"}),
                         },
                     },
                 )

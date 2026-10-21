@@ -31,6 +31,8 @@
 .tt-capability-connection.connected { color:var(--ok); }.tt-capability-connection.connected i { background:var(--ok); }
 .tt-capability-connection.unavailable { color:var(--danger); }.tt-capability-connection.unavailable i { background:var(--danger); }
 .tt-capability-detail { display:flex; flex-direction:column; gap:var(--sp-4); min-width:0; }
+.tt-capability-detail summary { position:relative; cursor:pointer; }
+html[data-pointer="coarse"] .tt-capability-detail summary::after { content:""; position:absolute; inset-inline:calc(-1 * var(--sp-1)); top:50%; height:max(100%, var(--tap)); transform:translateY(-50%); }
 .tt-capability-detail p { margin:0; overflow-wrap:anywhere; }
 .tt-capability-detail pre { white-space:pre-wrap; overflow-wrap:anywhere; padding:var(--sp-3); background:var(--bg-container); border-radius:var(--r-sm); font-size:var(--fs-sm); }
 .tt-capability-detail-scroll { flex:1; min-height:0; overflow:auto; padding:var(--sp-4) var(--pad-page); }

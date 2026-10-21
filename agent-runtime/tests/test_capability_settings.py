@@ -40,7 +40,7 @@ async def test_external_tool_policy_blocks_stale_calls_and_survives_recreation(s
     )
     assert any(
         item["name"] == "http_fixture"
-        for item in recreated.tools.directory.list("http_fixture", "cli", 10, "worker")["items"]
+        for item in recreated.tools.directory.list("http_fixture", "tool", 10, "worker")["items"]
     )
 
 
@@ -67,8 +67,10 @@ async def test_external_skill_can_be_disabled_and_reenabled(store, tmp_path):
 async def test_builtins_reject_both_enable_and_disable_and_old_disabled_config_is_ignored(store):
     runtime = Runtime(store, ConversationModel(), settings=external_settings())
     for kind, name in [
-        ("tools", tool["name"]) for tool in runtime.capability_settings.view("local")["tools"]
-    ] + [("tools", "session_send"), ("skills", "roami-dispatch"), ("skills", "web-research")]:
+        ("tools", tool["name"])
+        for tool in runtime.capability_settings.view("local")["tools"]
+        if tool["source"] == "builtin"
+    ] + [("tools", "session_send"), ("skills", "roami"), ("skills", "browser_use")]:
         for enabled in (True, False):
             with pytest.raises(DomainError, match="BUILTIN_CAPABILITY_READ_ONLY"):
                 await runtime.capability_settings.save(
@@ -77,9 +79,7 @@ async def test_builtins_reject_both_enable_and_disable_and_old_disabled_config_i
     path = runtime.capability_settings.path
     path.parent.mkdir(parents=True, mode=0o700)
     path.write_text(
-        json.dumps(
-            {"tools": ["bash", "session_send", "http_fixture"], "skills": ["roami-dispatch"]}
-        )
+        json.dumps({"tools": ["bash", "session_send", "http_fixture"], "skills": ["roami"]})
     )
     path.chmod(0o600)
     recreated = Runtime(store, ConversationModel(), settings=external_settings())
@@ -88,6 +88,7 @@ async def test_builtins_reject_both_enable_and_disable_and_old_disabled_config_i
     assert all(
         tool["enabled"] and not tool["mutable"]
         for tool in recreated.capability_settings.view("local")["tools"]
+        if tool["source"] == "builtin"
     )
 
 
@@ -102,8 +103,7 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
         assert response.status_code == 200
         data = response.json()["data"]
         assert any(
-            skill["name"] == "roami-dispatch" and skill["source"] == "builtin"
-            for skill in data["skills"]
+            skill["name"] == "roami" and skill["source"] == "builtin" for skill in data["skills"]
         )
         assert {tool["name"] for tool in data["tools"]} == {
             "read",
@@ -115,9 +115,7 @@ async def test_http_catalog_omits_provider_secrets_and_rejects_foreign_owner(sto
             "ask_user",
         }
         assert any(
-            command["name"] == "session_send"
-            for group in data["cli"]
-            for command in group["commands"]
+            command["name"] == "roami" for group in data["cli"] for command in group["commands"]
         )
         assert not any(key in data for key in ["apiKey", "headers", "env", "command"])
         assert (

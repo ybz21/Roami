@@ -58,17 +58,17 @@ async def test_reference_cannot_escape_skill_or_bypass_research_profile(store, t
             await runtime.tools.invoke(read(path), "main", {})
     with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
         await runtime.tools.invoke(
-            read("skill://roami-dispatch/references/chrome.md"), "research", {}
+            read("skill://roami/references/node-operations.md"), "research", {}
         )
     assert any(
-        item["name"] == "roami-dispatch"
+        item["name"] == "browser_use"
         for item in runtime.tools.directory.list("截图", "skill")["items"]
     )
     assert (
         "roami chrome"
         in (
             await runtime.tools.invoke(
-                read("skill://roami-dispatch/references/chrome.md"), "main", {}
+                read("skill://browser_use/references/chrome-cli.md"), "main", {}
             )
         )["text"]
     )

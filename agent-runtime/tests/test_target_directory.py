@@ -318,5 +318,9 @@ async def test_dispatch_skill_is_available_to_main_in_installed_package(store):
     runtime = Runtime(store, ConversationModel())
     catalog = runtime.tools.catalog(role="main")
     assert {"read", "tool_list"} <= {tool["function"]["name"] for tool in catalog}
-    loaded = await runtime.tools.registry["skill_read"].handler({"name": "roami-dispatch"}, {})
-    assert loaded["version"] and "nextOffset" in loaded["text"] and "session_send" in loaded["text"]
+    loaded = await runtime.tools.registry["skill_read"].handler({"name": "roami"}, {})
+    assert loaded["version"] and "projects-sessions.md" in loaded["text"]
+    reference = await runtime.tools.registry["skill_read"].handler(
+        {"name": "roami", "reference": "references/projects-sessions.md"}, {}
+    )
+    assert "nextOffset" in reference["text"] and "roami session send" in reference["text"]

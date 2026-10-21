@@ -13,7 +13,7 @@ import (
 
 func runAgentCapability(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent capability list [--kind all|mcp|skill|cli] [--query TEXT] [--limit 10] [--offset 0]\nroami agent capability show NAME\nroami agent capability call NAME --input JSON --turn TURN --call CALL\nCalls require the running Agent tool context; bash supplies it automatically. List and show are read-only.")
+		fmt.Println("roami agent capability list [--kind all|mcp|skill|cli|tool] [--query TEXT] [--limit 10] [--offset 0]\nroami agent capability show NAME\nroami agent capability call NAME --input JSON --turn TURN --call CALL\nCalls require the running Agent tool context; bash supplies it automatically. List and show are read-only.")
 		return 0
 	}
 	sub := args[0]
@@ -33,7 +33,7 @@ func runAgentCapability(args []string) int {
 	}
 	flags := flag.NewFlagSet("agent capability "+sub, flag.ContinueOnError)
 	query := flags.String("query", "", "capability name or intent")
-	kind := flags.String("kind", "all", "all, mcp, skill or cli")
+	kind := flags.String("kind", "all", "all, mcp, skill, cli or tool")
 	limit := flags.Int("limit", 10, "page size, 1 to 20")
 	offset := flags.Int("offset", 0, "catalog offset")
 	input := flags.String("input", "{}", "JSON arguments")
@@ -58,7 +58,7 @@ func runAgentCapability(args []string) int {
 	var body any
 	switch sub {
 	case "list":
-		if *kind != "all" && *kind != "mcp" && *kind != "skill" && *kind != "cli" || *limit < 1 || *limit > 20 || *offset < 0 {
+		if *kind != "all" && *kind != "mcp" && *kind != "skill" && *kind != "cli" && *kind != "tool" || *limit < 1 || *limit > 20 || *offset < 0 {
 			fmt.Fprintln(os.Stderr, "invalid kind or pagination")
 			return 2
 		}

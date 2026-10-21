@@ -1,3 +1,5 @@
+import roamiGuide from '../../agent-runtime/src/roami_agent/skills/roami/SKILL.md?raw'
+import browserGuide from '../../agent-runtime/src/roami_agent/skills/browser_use/SKILL.md?raw'
 import type { RegisteredAgent } from '../src/agent-registry'
 import type { Catalog } from '../src/components/capabilities/CapabilityCatalog'
 import type { ManagedEntry, ManagedKind } from '../src/components/capabilities/capability-format'
@@ -28,10 +30,11 @@ export function catalog(): Catalog {
     managed: structuredClone(managed),
     skills: [
       ...Object.values(managed.skills).map(item => ({ ...item, text: item.text || '', version: 'prototype', source: 'managed', enabled: !disabled.has(item.name), mutable: true })),
-      { name: 'roami-dispatch', text: '# Roami 工作流\n\n管理项目、会话和任务，并核对执行结果。', version: 'builtin', source: 'builtin', enabled: true, mutable: false },
+      { name: 'roami', text: roamiGuide, version: 'builtin', source: 'builtin', enabled: true, mutable: false },
+      { name: 'browser_use', text: browserGuide, version: 'builtin', source: 'builtin', enabled: true, mutable: false },
     ],
     tools: foundations.map(name => ({ name, description: name, schema: { type: 'object', properties: {} }, effect: 'read', source: 'builtin', mutable: false, enabled: true })),
-    cli: [{ name: 'registered', commands: Object.values(managed.cli).map(item => ({ name: 'cli_' + item.name, description: item.description || '', source: 'external', enabled: !disabled.has('cli_' + item.name), mutable: true })) }, { name: 'mcp', commands: Object.keys(managed.mcp).filter(name => connected.has(name)).map(name => ({ name: 'mcp_' + name + '_search', description: 'Search connected content', enabled: !disabled.has('mcp_' + name + '_search'), mutable: true, source: 'external' })) }],
+    cli: [{ name: 'builtin', commands: [{ name: 'roami', skill: 'roami', description: '', source: 'builtin', enabled: true, mutable: false, commands: [{ argv: ['roami', 'help'] }] }, { name: 'roami chrome', skill: 'browser_use', description: '', source: 'builtin', enabled: true, mutable: false, commands: [{ argv: ['roami', 'chrome', 'help'] }] }] }, { name: 'registered', commands: Object.values(managed.cli).map(item => ({ name: 'cli_' + item.name, description: item.description || '', source: 'external', enabled: !disabled.has('cli_' + item.name), mutable: true })) }, { name: 'mcp', commands: Object.keys(managed.mcp).filter(name => connected.has(name)).map(name => ({ name: 'mcp_' + name + '_search', description: 'Search connected content', enabled: !disabled.has('mcp_' + name + '_search'), mutable: true, source: 'external' })) }],
     mcp: Object.values(managed.mcp).map(item => ({ name: item.name, transport: String(item.config?.transport || 'stdio'), state: connected.has(item.name) ? 'connected' : 'not_connected', tools: connected.has(item.name) ? 1 : 0, toolNames: connected.has(item.name) ? ['mcp_' + item.name + '_search'] : [] })),
   }
 }

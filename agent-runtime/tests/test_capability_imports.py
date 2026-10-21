@@ -42,7 +42,7 @@ async def test_skill_creation_edit_policy_removal_and_restart(store):
     await recreated.capability_imports.save("local", "skills", None, "workflow", remove=True)
     assert "workflow" not in Runtime(store, ConversationModel()).tools.skills
     with pytest.raises(DomainError, match="MANAGED_CAPABILITY_NOT_FOUND"):
-        await imports.save("local", "skills", None, "roami-dispatch", remove=True)
+        await imports.save("local", "skills", None, "roami", remove=True)
 
 
 async def test_cli_executes_argv_without_shell_and_respects_roots(store, tmp_path):
@@ -190,7 +190,7 @@ async def test_http_limits_ownership_and_managed_crud(store):
             await client.put(path + "/workflow", json={**payload, "text": "Changed"})
         ).status_code == 200
         assert (await client.delete(path + "/workflow")).status_code == 200
-        assert (await client.delete(path + "/roami-dispatch")).status_code == 404
+        assert (await client.delete(path + "/roami")).status_code == 404
 
 
 async def test_mcp_limit_edit_and_restart_preserve_all_connections(store):

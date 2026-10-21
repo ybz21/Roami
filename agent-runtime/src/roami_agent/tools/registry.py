@@ -63,9 +63,8 @@ class Tools:
                 parameters = wire["function"]["parameters"]
                 if tool.name == "bash" and self.directory:
                     wire["function"]["description"] = (
-                        "Call registered browser operations only: argv=[roami,agent,capability,call,"
-                        "NAME,--input,JSON]. Discover browser_open/browser_observe/browser_act "
-                        "with tool_list. Research has no standalone shell, echo, curl or Python."
+                        "Use only roami chrome browser navigation and observation commands through bash argv. "
+                        "Read skill://browser_use or roami chrome help. Research has no standalone shell, echo, curl or Python."
                     )
                     wire["function"]["parameters"] = object_schema(
                         {"argv": parameters["properties"]["argv"]}, ["argv"]
@@ -76,7 +75,7 @@ class Tools:
                 elif tool.name == "browser_open":
                     parameters["properties"].pop("targetId", None)
                 elif tool.name == "skill_read":
-                    parameters["properties"]["name"]["enum"] = ["web-research"]
+                    parameters["properties"]["name"]["enum"] = ["browser_use", "web-research"]
             result.append(wire)
         return result
 

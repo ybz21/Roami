@@ -10,10 +10,10 @@ import CapabilityEditor, { capabilityError } from './CapabilityEditor'
 import type { ManagedCatalog, ManagedEntry, ManagedKind } from './capability-format'
 
 type Skill = { name: string; description?: string; text: string; version: string; source: string; enabled: boolean; mutable?: boolean; references?: Record<string, { text: string; version: string }> }
-type Tool = { name: string; description: string; schema?: unknown; effect?: string; enabled: boolean; mutable?: boolean; source?: string }
+type Tool = { name: string; description: string; schema?: unknown; effect?: string; enabled: boolean; mutable?: boolean; source?: string; skill?: string; commands?: { argv: string[] }[] }
 type Server = { name: string; transport: string; state: string; tools: number; toolNames?: string[] }
-export type Catalog = { skills: Skill[]; tools: Tool[]; cli?: { name: string; commands: Tool[] }[]; mcp: Server[]; managed?: ManagedCatalog }
-type Entry = { name: string; description: string; source: string; enabled?: boolean; mutable?: boolean; text?: string; schema?: unknown; references?: Skill['references']; state?: string; tools?: number; toolNames?: string[]; effect?: string; managed?: ManagedEntry }
+export type Catalog = { skills: Skill[]; tools: Tool[]; cli?: { name: string; commands: Tool[] }[]; mcp: Server[]; mcpTools?: Tool[]; managed?: ManagedCatalog }
+type Entry = { name: string; description: string; source: string; enabled?: boolean; mutable?: boolean; text?: string; schema?: unknown; references?: Skill['references']; state?: string; tools?: number; toolNames?: string[]; effect?: string; managed?: ManagedEntry; skill?: string; commands?: { argv: string[] }[] }
 
 export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | 'tools' }) {
   const { t, locale } = useI18n()
@@ -33,9 +33,9 @@ export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | '
     return () => abort.abort()
   }, [version, t])
   const managed = kind === 'tools' ? {} : catalog?.managed?.[kind] || {}
-  const rows: Entry[] = kind === 'skills' ? (catalog?.skills || []).map(skill => ({ ...skill, description: ['roami-dispatch', 'web-research'].includes(skill.name) ? t('agent.capabilities.skillDescription.' + skill.name) : skill.description || t('agent.capabilities.skillFallback'), managed: managed[skill.name] }))
+  const rows: Entry[] = kind === 'skills' ? (catalog?.skills || []).map(skill => ({ ...skill, description: ['roami', 'browser_use'].includes(skill.name) ? t('agent.capabilities.skillDescription.' + skill.name) : skill.description || t('agent.capabilities.skillFallback'), managed: managed[skill.name] }))
     : kind === 'mcp' ? (catalog?.mcp || []).map(server => ({ ...server, source: server.transport, description: t('capabilities.toolCount', { count: new Intl.NumberFormat(locale).format(server.tools) }), managed: managed[server.name] }))
-    : (kind === 'tools' ? catalog?.tools || [] : (catalog?.cli || []).flatMap(group => group.commands).filter(tool => !tool.name.startsWith('mcp_'))).map(tool => ({ ...tool, description: kind === 'tools' ? t('agent.capabilities.toolDescription.' + tool.name) : tool.description, source: tool.source || 'builtin', managed: managed[tool.name.replace(/^cli_/, '')] }))
+    : (kind === 'tools' ? catalog?.tools || [] : (catalog?.cli || []).flatMap(group => group.commands).filter(tool => !tool.name.startsWith('mcp_'))).map(tool => ({ ...tool, description: kind === 'tools' && ['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user', 'computer_open', 'computer_observe', 'computer_act'].includes(tool.name) ? t('agent.capabilities.toolDescription.' + tool.name) : ['roami', 'roami chrome'].includes(tool.name) ? t('agent.capabilities.cliDescription.' + tool.name) : tool.description, source: tool.source || 'builtin', managed: managed[tool.name.replace(/^cli_/, '')] }))
   const filtered = rows.filter(row => `${row.name} ${row.description}`.toLowerCase().includes(query.trim().toLowerCase()))
   const selected = rows.find(row => row.name === selectedName)
   const change = async (row: Entry, enabled: boolean) => {
@@ -80,9 +80,10 @@ export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | '
     <div className="tt-capability-detail-meta"><Tag>{source(selected)}</Tag>{selected.state && <Tag>{t('agent.capabilities.mcp.' + selected.state)}</Tag>}</div>
     <p>{selected.description}</p>
     {actions(selected)}
+    {selected.skill && <details><summary>{t('capabilities.relatedSkill', { name: selected.skill })}</summary><Markdown>{catalog?.skills.find(skill => skill.name === selected.skill)?.text.replace(/^---\n[\s\S]*?\n---\n/, '') || ''}</Markdown></details>}
     {kind === 'mcp' && !!selected.toolNames?.length && <div className="tt-capability-remote-tools">
       <h3>{t('capabilities.serverTools')}</h3>
-      {(catalog?.cli || []).flatMap(group => group.commands).filter(tool => selected.toolNames?.includes(tool.name)).map(tool => <div className="tt-capability-remote-tool" key={tool.name}><span><strong>{tool.name}</strong><small>{tool.description}</small></span><Switch aria-label={t('agent.capabilities.enable', { name: tool.name })} checked={tool.enabled} disabled={!!saving} loading={saving === tool.name} onChange={enabled => { void change({ ...tool, source: 'external' }, enabled) }} /></div>)}
+      {(catalog?.mcpTools || (catalog?.cli || []).flatMap(group => group.commands)).filter(tool => selected.toolNames?.includes(tool.name)).map(tool => <div className="tt-capability-remote-tool" key={tool.name}><span><strong>{tool.name}</strong><small>{tool.description}</small></span><Switch aria-label={t('agent.capabilities.enable', { name: tool.name })} checked={tool.enabled} disabled={!!saving} loading={saving === tool.name} onChange={enabled => { void change({ ...tool, source: 'external' }, enabled) }} /></div>)}
     </div>}
     {error && <Alert type="error" message={error} />}
     {selected.text !== undefined ? <>
@@ -105,7 +106,7 @@ export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | '
       </div>
       <button type="button" className="tt-capability-open" onClick={() => { setSelectedName(row.name); setReference('') }}><strong>{row.managed?.name || row.name}</strong></button>
       <p className="tt-capability-description">{row.description}</p>
-      <div className="tt-capability-cardfooter"><button type="button" className="tt-act" onClick={() => { setSelectedName(row.name); setReference('') }}>{t(kind === 'skills' ? 'agent.capabilities.content' : kind === 'mcp' ? 'agent.capabilities.connectionDetails' : 'agent.capabilities.parameters')}</button>
+      <div className="tt-capability-cardfooter"><button type="button" className="tt-act" onClick={() => { setSelectedName(row.name); setReference('') }}>{t(kind === 'skills' ? 'agent.capabilities.content' : kind === 'mcp' ? 'agent.capabilities.connectionDetails' : row.commands ? 'capabilities.commands' : 'agent.capabilities.parameters')}</button>
         <div>{kind === 'mcp' && <button type="button" className="tt-act" disabled={!!saving} onClick={() => { void connect(row) }}>{t(saving === row.name ? 'capabilities.connecting' : 'capabilities.connect')}</button>}{row.managed && <button type="button" className="tt-act" disabled={!!saving} onClick={() => setEditor({ entry: row.managed })}><PencilIcon size={14} />{t('capabilities.edit')}</button>}</div>
       </div>
     </article>)}</div>

@@ -43,26 +43,25 @@ async def test_actual_catalog_and_settings_have_only_seven_tools(store):
     view = runtime.capability_settings.view("local")
     assert {x["name"] for x in view["tools"]} == set(FOUNDATIONS)
     operations = {x["name"] for group in view["cli"] for x in group["commands"]}
-    assert "session_send" in operations and "web_research" not in operations
+    assert operations == {"roami"}
 
 
 async def test_search_skill_loading_and_disable_policy(store):
     runtime = Runtime(store, ConversationModel())
-    result = await runtime.tools.invoke(call("tool_list", {"query": "roami-dispatch"}), "main", {})
+    result = await runtime.tools.invoke(call("tool_list", {"query": "roami"}), "main", {})
     skill = next(x for x in result["items"] if x["kind"] == "skill")
-    assert skill["location"] == "skill://roami-dispatch"
+    assert skill["location"] == "skill://roami"
     assert (
-        "capability"
+        "roami"
         in (await runtime.tools.invoke(call("read", {"path": skill["location"]}), "main", {}))[
             "text"
         ]
     )
     assert any(
-        x["name"] == "session_send"
-        for x in runtime.tools.directory.list("发消息", "cli", 10)["items"]
+        x["name"] == "roami" for x in runtime.tools.directory.list("发消息", "cli", 10)["items"]
     )
     before = runtime.tools.directory.list("session_send", "cli", 10)
-    for kind, name in (("tools", "session_send"), ("skills", "roami-dispatch")):
+    for kind, name in (("tools", "session_send"), ("skills", "roami")):
         with pytest.raises(DomainError, match="BUILTIN_CAPABILITY_READ_ONLY"):
             await runtime.capability_settings.save(
                 "local", {"kind": kind, "name": name, "enabled": False}
@@ -171,9 +170,9 @@ async def test_cli_directory_and_unbound_call_rejection(store):
         base_url="http://agent",
         headers={"X-Roami-Owner": "local"},
     ) as client:
-        response = await client.get("/v1/tool-directory", params={"query": "roami-dispatch"})
+        response = await client.get("/v1/tool-directory", params={"query": "roami"})
         assert response.status_code == 200 and response.json()["data"]["items"]
-        assert (await client.get("/v1/tool-directory/session_send")).status_code == 200
+        assert (await client.get("/v1/tool-directory/roami")).status_code == 200
         response = await client.post(
             "/v1/tool-directory/session_send/call",
             json={
@@ -196,16 +195,13 @@ async def test_discovery_handles_retired_names_weather_and_kind_misses_without_o
     )
     directory = runtime.tools.directory
     found = directory.list("web_research", "all", 5)
-    assert found["items"][0]["name"] == "web-research"
+    assert found["items"][0]["name"] == "browser_use"
     assert not any(item["name"] == "capability_overview" for item in found["items"])
-    for query in ("web_research", "web_research 联网查询 天气", "今天北京天气"):
-        result = directory.list(query, "cli", 5)
-        assert result["items"] == []
-        assert result["suggestions"][0]["name"] == "web-research"
-        assert "resourceOnly:true" in result["hint"]
-    assert directory.list("capability_overview", "cli")["items"][0]["name"] == "capability_overview"
-    assert (
-        directory.list("browser_open", "cli", 5, "research")["items"][0]["name"] == "browser_open"
+    for query in ("browser", "browser_open", "网页"):
+        result = directory.list(query, "cli", 5, "research")
+        assert result["items"][0]["name"] == "roami chrome"
+    assert all(
+        item["name"] != "capability_overview" for item in directory.list(kind="cli")["items"]
     )
     assert not directory.list("zxqv493", "cli")["items"]
 
@@ -221,6 +217,10 @@ async def test_tool_list_lists_categories_pages_and_removes_old_entry(store):
     runtime.tools.add(
         Tool("mcp_fixture_echo", "MCP fixture echo", object_schema({}), echo, source="external")
     )
+    for index in range(12):
+        runtime.tools.add(
+            Tool(f"cli_page_{index}", "Page fixture", object_schema({}), echo, source="external")
+        )
     assert "tool_search" not in runtime.tools.registry
     with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
         await runtime.tools.invoke(call("tool_search", {"query": "browser"}), "main", {})

@@ -116,7 +116,7 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def tool_directory(
         owner: Owner,
         query: str = Query(default="", max_length=1000),
-        kind: Literal["all", "mcp", "skill", "cli"] = "all",
+        kind: Literal["all", "mcp", "skill", "cli", "tool"] = "all",
         limit: int = Query(10, ge=1, le=20),
         offset: int = Query(0, ge=0),
     ):

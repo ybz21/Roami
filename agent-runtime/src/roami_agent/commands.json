@@ -1,0 +1,69 @@
+{
+  "workspace_overview": [
+    "project",
+    "overview"
+  ],
+  "target_search": [
+    "agent",
+    "target",
+    "search"
+  ],
+  "target_resolve": [
+    "agent",
+    "target",
+    "resolve"
+  ],
+  "session_send": [
+    "session",
+    "send"
+  ],
+  "session_dispatch_status": [
+    "session",
+    "dispatch-status"
+  ],
+  "executor_catalog": [
+    "agent",
+    "execution",
+    "catalog"
+  ],
+  "task_status": [
+    "agent",
+    "task",
+    "status"
+  ],
+  "task_cancel": [
+    "agent",
+    "task",
+    "cancel"
+  ],
+  "task_steer": [
+    "agent",
+    "task",
+    "steer"
+  ],
+  "memory_search": [
+    "agent",
+    "memory",
+    "search"
+  ],
+  "memory_get": [
+    "agent",
+    "memory",
+    "get"
+  ],
+  "reminder_create": [
+    "agent",
+    "reminder",
+    "add"
+  ],
+  "reminder_list": [
+    "agent",
+    "reminder",
+    "ls"
+  ],
+  "reminder_cancel": [
+    "agent",
+    "reminder",
+    "cancel"
+  ]
+}

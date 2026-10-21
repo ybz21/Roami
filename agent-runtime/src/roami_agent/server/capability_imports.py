@@ -12,6 +12,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, SchemaError
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.skill_names import SKILL_ALIASES
 from roami_agent.protocol.tools import Tool
 from roami_agent.server.model_settings import ModelSettings
 from roami_agent.tools.mcp import Connection, validate_servers
@@ -155,7 +156,7 @@ class CapabilityImports:
                 if replacing == (kind, name):
                     continue
                 exists = (
-                    name in tools.skills
+                    (name in tools.skills or name in SKILL_ALIASES)
                     if kind == "skills"
                     else name in self.runtime.mcp.connections
                     if kind == "mcp"

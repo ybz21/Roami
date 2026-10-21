@@ -93,7 +93,7 @@ async def test_research_can_change_rejected_arguments_and_recover_to_a_registere
     try:
         assert await runtime.loop.run(await claimed_turn(runtime), "research") == "Done"
         assert model.calls == 4 and effects == ["owned"]
-        assert "registered" in model.results[0]["recovery"]
+        assert "roami chrome" in model.results[0]["recovery"]
     finally:
         await runtime.close()
 

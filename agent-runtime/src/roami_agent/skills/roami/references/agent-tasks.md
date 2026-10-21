@@ -1,13 +1,15 @@
 # Agent 任务、进度、消息与提醒
 
+下文命令后的对象表示 `--input JSON` 的输入；原生任务执行完整 argv，身份由宿主绑定。
+
 ## 受管任务状态
 
-- `task_status {}` 返回当前 Main 的任务投影。用户问进度时查一次；正常等回调，不忙轮询。
-- 受管原任务续作用 `task_steer {taskId:ID,revision:实际版本,text:"追加要求"}`，保留原执行器和工作区。接受回执只表示排队，收到后结束本轮，不另建替代任务。
+- `roami agent task status {}` 返回当前 Main 的任务投影。用户问进度时查一次；正常等回调，不忙轮询。
+- 受管原任务续作用 `roami agent task steer {taskId:ID,revision:实际版本,text:"追加要求"}`，保留原执行器和工作区。接受回执只表示排队，收到后结束本轮，不另建替代任务。
 - `latestAttempt.outcomeKnown=false` 或 `stopConfirmed=false` 不证明已停止；续作须等待真实停止证据。不要把同项目的 live 会话猜成原任务会话，只有 attempt 中的实际 sessionId 才能建立绑定。
-- `task_cancel {taskId:ID}` 取消本用户委派任务。cancelling 不等于停止，不能据此撤回旧会话已收到的消息，更不能杀掉所有 tmux 会话。
+- `roami agent task cancel {taskId:ID}` 取消本用户委派任务。cancelling 不等于停止，不能据此撤回旧会话已收到的消息，更不能杀掉所有 tmux 会话。
 - 原 Main 自动接收工具开始 / 结束、执行、验收与结果。状态 planned/queued/preparing/running/verifying 表示不同阶段；failed/cancelled/unknown 分开，未知不标成功，不盲目重派。
-- `session_send` 投递到原专业会话并建立派活回报通道。返回 dispatchId / replyExpected=true，目标提示词自带实例隔离的 CLI 回报命令。executionTracked=false 仍表示缺少供应商生命周期证明；投递成功不等于完成。
+- `roami session send` 投递到原专业会话并建立派活回报通道。返回 dispatchId / replyExpected=true，目标提示词自带实例隔离的 CLI 回报命令。executionTracked=false 仍表示缺少供应商生命周期证明；投递成功不等于完成。
 
 ## 原会话回报闭环
 
@@ -17,11 +19,11 @@
 roami agent reply --dispatch DISPATCH_ID --file RESULT.json
 ```
 
-必须使用附带命令中的完整实例环境和真实 DISPATCH_ID，不自行填 Main ID、不用 session_send 回发到 Main，也不用另建会话。
+必须使用附带命令中的完整实例环境和真实 DISPATCH_ID，不自行填 Main ID、不用 roami session send 回发到 Main，也不用另建会话。
 
 结果 JSON：`{"key":"final","status":"completed","summary":"实际结果、PR/文件链接、验证与限制"}`。失败用 failed；进展用 progress 和独立稳定 key；需要决策用 blocked 和独立 key，可附 `question:{prompt,options:[{label,description}]}`，2–4 个可识别选项。仅 completed / failed 为终态。CLI 出错保留结果文件，以相同 key / 同一 JSON 重试，不能重跑业务。收到 `messageId` / `eventId` 才说明 Main 已落盘；不等于手机系统推送已送达。
 
-主对话按原分支追加消息，经既有 SSE、未读和通知通道展示；回报直接入历史，不等待 Main 再调用模型重写。下一轮 Main 上下文含原目标和状态，内容按外部证据处理。`session_dispatch_status {dispatchId}` 查看投递状态、最近回报；未回报显示 unconfirmed，不通过终端静止、会话退出或超时猜成功，不自动重投未知写操作。
+主对话按原分支追加消息，经既有 SSE、未读和通知通道展示；回报直接入历史，不等待 Main 再调用模型重写。下一轮 Main 上下文含原目标和状态，内容按外部证据处理。`roami session dispatch-status {dispatchId}` 查看投递状态、最近回报；未回报显示 unconfirmed，不通过终端静止、会话退出或超时猜成功，不自动重投未知写操作。
 
 这是执行器主动 CLI 回报协议，不能保证不遵守命令或已崩溃的旧执行器自动回报；这些仍保持未确认。不会把报告自动升级为独立验收完成，也不覆盖已有受跟踪任务的 report / lifecycle 协议。
 
@@ -69,7 +71,7 @@ pause 只有实际停止输入并释放租约后才返回 takeoverReady；pausin
 
 ## 提醒与每日简报
 
-Main 受管能力：`reminder_list {}`；`reminder_create` 带 text 并且只选一种时间：afterSeconds、whenMs、dailyAt（可附 timezone）；`reminder_cancel {id:ID}`。每日简报用 kind=daily_brief 且 dailyAt，不能同时带相对时间。模糊时间用选择题确认，不能自行添加用户未要求的定时任务。
+Main 受管能力：`roami agent reminder ls {}`；`roami agent reminder add` 带 text 并且只选一种时间：afterSeconds、whenMs、dailyAt（可附 timezone）；`roami agent reminder cancel {id:ID}`。每日简报用 kind=daily_brief 且 dailyAt，不能同时带相对时间。模糊时间用选择题确认，不能自行添加用户未要求的定时任务。
 
 对应完整 CLI：
 

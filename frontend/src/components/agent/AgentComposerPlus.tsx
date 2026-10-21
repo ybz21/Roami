@@ -62,7 +62,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
         <p className="agent-menu-section">{t('agent.composer.skillsSection')}</p>
         {skillsLoading && <p className="agent-menu-note" role="status"><Spin size="small" /> {t('agent.composer.skillsLoading')}</p>}
         {skillsFailed ? <div className="agent-menu-note" role="alert">{t('agent.composer.skillsFailed')}<button type="button" className="tt-act" onClick={() => setSkillsVersion(value => value + 1)}>{t('agent.retry')}</button></div> : !skillsLoading && !skills.length && <p className="agent-menu-note">{t('agent.composer.skillsEmpty')}</p>}
-        {skills.map(skill => row(skill.name, <FileTextIcon size={20} />, () => close(() => onSkill?.(skill.name)), ['roami-dispatch', 'web-research'].includes(skill.name) ? t('agent.capabilities.skillDescription.' + skill.name) : skill.description || t('agent.composer.skillHint')))}
+        {skills.map(skill => row(skill.name, <FileTextIcon size={20} />, () => close(() => onSkill?.(skill.name)), ['roami', 'browser_use'].includes(skill.name) ? t('agent.capabilities.skillDescription.' + skill.name) : skill.description || t('agent.composer.skillHint')))}
       </>}
       <p className="agent-menu-section">{t('agent.composer.conversationSection')}</p>
       {(!contextUsage?.cid || !onContext) && row(t('agent.compactNow'), <ArchiveIcon size={20} />, () => close(onCompact), t('agent.composer.compactHint'), !canCompact)}

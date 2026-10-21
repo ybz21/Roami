@@ -127,6 +127,12 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 	if len(args) == 0 {
 		return false, 0
 	}
+	if commandFamilyHelp(args) {
+		return true, 0
+	}
+	if handled, code := runBoundCommand(args); handled {
+		return true, code
+	}
 	word, rest := args[0], args[1:]
 	switch word {
 	case "help", "commands", "-h", "--help":
@@ -211,12 +217,18 @@ func legacySessionCommand(word string) bool {
 }
 
 func runChrome(args []string) int {
+	if handled, code := managedChrome(args); handled {
+		return code
+	}
 	if err := automation.Run(args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if e, ok := err.(*exec.ExitError); ok {
 			return e.ExitCode()
 		}
 		return 1
+	}
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
+		fmt.Println("\n  Managed task forms (require the active Agent tool context):\n    roami chrome observe|screenshot --resource ID\n    roami chrome goto URL --observation ID\n    roami chrome click SELECTOR --observation ID\n    roami chrome fill|type SELECTOR TEXT --observation ID\n    roami chrome press KEY --observation ID")
 	}
 	return 0
 }

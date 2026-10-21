@@ -117,3 +117,14 @@ it('starts a new skill from a template and previews the written instructions', a
   fireEvent.click(screen.getByText('capabilities.preview', { exact: true }))
   expect(screen.queryByRole('textbox', { name: 'capabilities.instructions' })).toBeNull()
 })
+
+it('shows command families with their skill guide while retaining external CLI actions', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { ...catalog, skills: [{ name: 'browser_use', text: '# Browser guide', source: 'builtin', version: 'v1', enabled: true }], cli: [{ name: 'commands', commands: [{ name: 'roami chrome', description: 'Browser', source: 'builtin', enabled: true, mutable: false, skill: 'browser_use', schema: { commands: [{ argv: ['roami', 'chrome', 'new', 'URL'] }] } }] }] } })
+  render(<CapabilityCatalog kind="cli" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'roami chrome' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('capabilities.relatedSkill')).toBeTruthy()
+  expect(within(dialog).getByText(/"chrome"/)).toBeTruthy()
+  expect(screen.queryByRole('switch')).toBeNull()
+  expect(screen.queryByText('browser_open')).toBeNull()
+})

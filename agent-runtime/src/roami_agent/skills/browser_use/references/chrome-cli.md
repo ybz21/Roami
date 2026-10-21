@@ -1,28 +1,3 @@
-# Roami Chrome：浏览器操作、截图与录屏
-
-Chrome 是 Roami CLI 的一部分：`roami chrome COMMAND ...`，旧入口 `chrome COMMAND ...` 兼容。不是额外安装一个模型工具。先看 `roami chrome help` 与 `roami chrome capabilities`，了解当前驱动、浏览器实例和支持项，不默认用户电脑、任务浏览器与 Web 镜像是同一个实例。
-
-## Main / 原生 Worker 的受管路径
-
-Main 快速确认需求并委派。公开联网查询使用 `delegate(executor="native",target={kind:"new_session",resourceOnly:true},goal=...)`，Worker 读 web-research；此角色仅能导航和观察，不能点击、填表、eval 或通用 Shell。
-
-需要网页交互时使用有工作区的普通原生任务，或用户指定的 Codex / Claude 等专业 Agent；普通 Worker 可发现 browser_act 的 click/fill/type/press/goto。不要让检索角色反复重试被禁止的交互，也不要为了只读查询创建项目。
-
-通过 `tool_list(query="browser",kind="cli")` 发现并运行以下能力，参数以返回 schema 为准：
-
-| 能力 | 输入 | 输出 / 后续动作 |
-| --- | --- | --- |
-| browser_open | `{url:"https://目标"}` | 获取任务资源及首份观察；已有 resourceId 但观察失败，继续 observe，不再创建替代标签 |
-| browser_observe | `{resourceId:"返回的ID"}` | 最新 observationId、DOM 控件、已保存 PNG 的 artifactRefs.downloadUrl、截断标记 |
-| browser_act | `{observationId:"最新ID",kind:"click",selector:"实际观察到的选择器"}` | 基于最新页面执行单步；页面变化后重新观察 |
-| browser_act | kind=fill/type，附 selector、text | 填充 / 逐字输入；fill 是直接设值，type 是逐字键入 |
-| browser_act | kind=press，附 key（如 Enter） | 按键；不要凭模型猜焦点或旧 selector |
-| browser_act | kind=goto，附 url | 导航；研究角色仅开放此 action |
-
-用户明确要截图时，核对观察中的页面 URL / 内容后直接返回 artifactRefs 的真实 downloadUrl；PNG 已持久化，无需再用 write、通用 Shell 或另找工作区。普通查询不附这些内部截图。
-
-参数例子：先搜索拿到真实 argv，然后把 JSON input 替换成 `{ "resourceId": "实际资源ID" }` 执行观察。运行时绑定任务、租约、操作 ID 与证据，不手写这些内部身份。出现人工接管、场景冲突、未知副作用时停止输入并回报；未知点击不能靠重开标签或换 operation-id 再试。
-
 ## 完整标准 CLI：专业 Agent / 终端
 
 下面命令使用用户授权范围内、明确选中的标签页。统一前缀 `roami chrome`，可用 `chrome` 兼容入口。宿主 7 工具中的受管 bash 不是无限制 CLI 终端；未开放的命令交给具备对应 CLI 环境的专业 Agent，不用 Shell 包装绕过角色或资源策略。

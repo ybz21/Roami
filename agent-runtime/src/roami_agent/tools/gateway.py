@@ -158,12 +158,12 @@ class ToolGateway:
                     "This call was rejected before execution. "
                     + (
                         "Research has no standalone shell: do not probe with echo, curl or Python. "
-                        "Use tool_list(kind=cli,query=browser) for registered browser operations. "
+                        "Read skill://browser_use and use roami chrome help for admitted browser commands. "
                         if role == "research"
                         else "Use tool_list to find a registered operation available in this role. "
                     )
-                    + "Use argv=[roami,agent,capability,call,NAME,--input,JSON] with serialized "
-                    "JSON input and real returned resource/observation IDs. Correct the intended "
+                    + "Use the exact command argv returned by tool_list or command-family help, with "
+                    "real returned resource/observation IDs. Correct the intended "
                     "call instead of repeating the rejected command."
                 )
             validation = exc.__cause__

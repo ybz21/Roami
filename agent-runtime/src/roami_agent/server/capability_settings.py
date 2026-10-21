@@ -8,7 +8,9 @@ import tempfile
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.skill_names import skill_location
 from roami_agent.server.model_settings import ModelSettings
+from roami_agent.tools.command_families import operation_kind
 from roami_agent.tools.foundations import FOUNDATIONS, RESEARCH_FOUNDATIONS, WORKER_FOUNDATIONS
 
 
@@ -52,6 +54,7 @@ class CapabilitySettings:
         return self.runtime.tools.registry[name].source == "external"
 
     def apply(self):
+        self.saved["skills"] = [skill_location(name)[0] for name in self.saved["skills"]]
         for kind, entries in (
             ("tools", self.runtime.tools.registry),
             ("skills", self.runtime.tools.skills),
@@ -74,17 +77,32 @@ class CapabilitySettings:
                     "schema": tool.schema,
                     "effect": tool.effect,
                     "main": tool.main,
-                    "roles": ["main"]
-                    + (["worker"] if tool.name in WORKER_FOUNDATIONS else [])
+                    "roles": (["main"] if tool.main else [])
+                    + (
+                        ["worker"]
+                        if tool.name in WORKER_FOUNDATIONS or operation_kind(tool) == "tool"
+                        else []
+                    )
                     + (["research"] if tool.name in RESEARCH_FOUNDATIONS else []),
                     "enabled": tool.name not in tools.disabled_tools,
                     "source": tool.source,
                     "mutable": tool.source == "external",
                 }
                 for tool in sorted(tools.registry.values(), key=lambda tool: tool.name)
-                if not tools.directory or tool.name in FOUNDATIONS
+                if not tools.directory or tool.name in FOUNDATIONS or operation_kind(tool) == "tool"
             ],
             "cli": tools.directory.groups() if tools.directory else [],
+            "mcpTools": [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "enabled": tool.name not in tools.disabled_tools,
+                    "source": tool.source,
+                    "mutable": tool.source == "external",
+                }
+                for tool in tools.registry.values()
+                if tool.name.startswith("mcp_")
+            ],
             "skills": [
                 {
                     "name": name,
@@ -121,6 +139,8 @@ class CapabilitySettings:
             or type(patch["enabled"]) is not bool
         ):
             raise DomainError("INVALID_CAPABILITY_CONFIG")
+        if patch["kind"] == "skills":
+            patch = {**patch, "name": skill_location(patch["name"])[0]}
         async with self.lock:
             names = (
                 self.runtime.tools.registry

@@ -10,26 +10,16 @@ from dataclasses import replace
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.research import research_call_allowed
 from roami_agent.protocol.serialization import encoded
+from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.command_families import COMMANDS, INTERNAL, operation_kind, public_operation
 from roami_agent.tools.process import execute
 
 FOUNDATIONS = ("read", "bash", "edit", "write", "tool_list", "delegate", "ask_user")
 WORKER_FOUNDATIONS = set(FOUNDATIONS) - {"ask_user", "delegate"}
 RESEARCH_FOUNDATIONS = {"read", "bash", "tool_list"}
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
-GROUPS = {
-    "workspace_overview": "sessions",
-    "target_search": "sessions",
-    "target_resolve": "sessions",
-    "session_send": "sessions",
-    "session_dispatch_status": "sessions",
-    "task_status": "tasks",
-    "task_cancel": "tasks",
-    "task_steer": "tasks",
-    "capability_overview": "discovery",
-    "executor_catalog": "discovery",
-}
 
 
 class ToolDirectory:
@@ -58,7 +48,7 @@ class ToolDirectory:
                 if (
                     name in self.registry.disabled_skills
                     or role == "research"
-                    and name != "web-research"
+                    and name != "browser_use"
                 ):
                     continue
                 entries.append(
@@ -72,22 +62,28 @@ class ToolDirectory:
                     }
                 )
         if "bash" not in self.registry.disabled_tools:
+            entries.extend(self.command_entries(role))
             for tool in self.operations(role):
-                if tool.name in self.registry.disabled_tools:
+                if (
+                    tool.name in self.registry.disabled_tools
+                    or tool.source == "builtin"
+                    and (
+                        tool.name in COMMANDS
+                        or tool.name in INTERNAL
+                        or tool.name.startswith("browser_")
+                    )
+                ):
                     continue
-                schema = deepcopy(tool.schema)
-                if role == "research":
-                    if tool.name == "browser_act":
-                        schema["properties"]["kind"]["enum"] = ["goto"]
-                        schema["required"] = ["observationId", "kind", "url"]
-                    elif tool.name == "browser_open":
-                        schema["properties"].pop("targetId", None)
+                category = operation_kind(tool)
                 entries.append(
                     {
-                        "id": ("mcp:" if tool.name.startswith("mcp_") else "cli:") + tool.name,
-                        "kind": "mcp" if tool.name.startswith("mcp_") else "cli",
+                        "id": category + ":" + tool.name,
+                        "kind": category,
                         "name": tool.name,
                         "description": tool.description,
+                        "source": tool.source,
+                        "mutable": tool.source == "external",
+                        "enabled": True,
                         "argv": [
                             "roami",
                             "agent",
@@ -97,13 +93,15 @@ class ToolDirectory:
                             "--input",
                             "JSON",
                         ],
-                        "inputSchema": schema,
+                        "inputSchema": deepcopy(tool.schema),
                         "effect": tool.effect,
                     }
                 )
         version = hashlib.sha256(encoded(entries).encode()).hexdigest()
         normalize = lambda value: re.sub(r"[-_\s]+", " ", value.casefold()).strip()
         words = normalize(query).split()
+        if query in {**SKILL_ALIASES, "web_research": "browser_use"}:
+            words = normalize({**SKILL_ALIASES, "web_research": "browser_use"}[query]).split()
         aliases = {
             "会话": "session target",
             "项目": "project workspace target",
@@ -117,7 +115,7 @@ class ToolDirectory:
             "记忆": "memory",
             "提醒": "reminder",
             "任务": "task",
-            "技能": "skill dispatch",
+            "技能": "skill roami",
             "能力": "capability overview",
             "联网": "web research browser",
             "天气": "web research weather forecast",
@@ -133,8 +131,14 @@ class ToolDirectory:
                 terms.update(alternatives.split())
         ranked = []
         for item in entries:
-            name, description = normalize(item["name"]), normalize(item["description"])
-            name_score = sum(term in name.split() for term in terms)
+            name, description = (
+                normalize(item["name"]),
+                normalize(item["description"] + " " + " ".join(item.get("searchTerms", []))),
+            )
+            name_score = sum(
+                term in (name + " " + normalize(" ".join(item.get("searchTerms", [])))).split()
+                for term in terms
+            )
             if item["name"] == "capability_overview" and query and not name_score:
                 continue
             score = name_score * 20 + sum(term in description for term in terms)
@@ -161,7 +165,7 @@ class ToolDirectory:
             "nextOffset": offset + limit if offset + limit < len(selected) else None,
             "totals": {
                 category: sum(item["kind"] == category for item in entries)
-                for category in ("mcp", "skill", "cli")
+                for category in ("mcp", "skill", "cli", "tool")
             },
             "truncated": offset + limit < len(selected),
         }
@@ -173,27 +177,123 @@ class ToolDirectory:
                 + kind
                 + " operation. Follow the suggested workflow or capability instead of repeating the same search."
             )
-            if any(item["name"] == "web-research" for item in result["suggestions"]):
+            if any(item["name"] == "browser_use" for item in result["suggestions"]):
                 result["hint"] += (
-                    " web-research is a Skill, not a web_research CLI command. For bounded public lookups Main can directly delegate "
-                    "executor=native, target={kind:new_session,resourceOnly:true}, with routing complexity=bounded and a concrete basis. Complex investigations use a professional executor; task examples are open."
+                    " browser_use guides public research. Main can delegate with target={kind:new_session,resourceOnly:true} "
+                    "and bounded routing; complex investigations use a professional executor."
                 )
         return result
 
-    def groups(self):
-        groups = {}
-        for tool in self.operations("worker"):
-            name = GROUPS.get(tool.name, tool.name.split("_", 1)[0])
-            groups.setdefault(name, []).append(
+    def command_entries(self, role):
+        available = {
+            tool.name: tool
+            for tool in self.operations(role)
+            if tool.name not in self.registry.disabled_tools
+        }
+        entries = []
+        commands = [
+            {
+                "argv": ["roami", *path, "--input", "JSON"],
+                "inputSchema": deepcopy(available[name].schema),
+                "effect": available[name].effect,
+            }
+            for name, path in COMMANDS.items()
+            if name in available
+        ]
+        if commands:
+            entries.append(
                 {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "enabled": tool.name not in self.registry.disabled_tools,
-                    "source": tool.source,
-                    "mutable": tool.source == "external",
+                    "id": "cli:roami",
+                    "kind": "cli",
+                    "name": "roami",
+                    "skill": "roami",
+                    "description": "Roami projects, sessions, tasks, executors, reminders and memory.",
+                    "argv": ["roami", "help"],
+                    "commands": commands,
+                    "searchTerms": list(COMMANDS),
+                    "effect": "mixed",
+                    "source": "builtin",
+                    "mutable": False,
+                    "enabled": True,
                 }
             )
-        return [{"name": name, "commands": commands} for name, commands in sorted(groups.items())]
+        if "browser_open" in available:
+            browser_commands = [
+                ["new", "URL"],
+                ["observe", "--resource", "RESOURCE_ID"],
+                ["screenshot", "--resource", "RESOURCE_ID"],
+                ["goto", "URL", "--observation", "OBSERVATION_ID"],
+            ]
+            if role != "research":
+                browser_commands.extend(
+                    [
+                        ["observe", "--target", "TARGET_ID"],
+                        ["click", "SELECTOR", "--observation", "OBSERVATION_ID"],
+                        ["fill", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
+                        ["type", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
+                        ["press", "KEY", "--observation", "OBSERVATION_ID"],
+                    ]
+                )
+            entries.append(
+                {
+                    "id": "cli:roami chrome",
+                    "kind": "cli",
+                    "name": "roami chrome",
+                    "skill": "browser_use",
+                    "description": "Browser navigation, observation, web research, screenshots and page interactions through Roami Chrome.",
+                    "argv": ["roami", "chrome", "help"],
+                    "commands": [{"argv": ["roami", "chrome", *args]} for args in browser_commands],
+                    "searchTerms": [
+                        "browser_open",
+                        "browser_observe",
+                        "browser_act",
+                        "chrome",
+                        "recording",
+                        "tabs",
+                    ],
+                    "effect": "mixed",
+                    "source": "builtin",
+                    "mutable": False,
+                    "enabled": True,
+                }
+            )
+        return entries
+
+    def groups(self):
+        entries = self.command_entries("worker")
+        for item in entries:
+            item["schema"] = {"commands": item["commands"]}
+        for tool in self.operations("worker"):
+            if tool.source == "external" and operation_kind(tool) == "cli":
+                entries.append(
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "source": tool.source,
+                        "enabled": tool.name not in self.registry.disabled_tools,
+                        "mutable": True,
+                        "schema": deepcopy(tool.schema),
+                        "effect": tool.effect,
+                    }
+                )
+        return [{"name": "commands", "commands": entries}]
+
+    def help_tool(self, argv, role):
+        family = "roami chrome" if argv[1:2] == ["chrome"] else "roami"
+        entries = [entry for entry in self.command_entries(role) if entry["name"] == family]
+        if not entries:
+            raise DomainError("TOOL_UNAVAILABLE")
+
+        async def help_command(args, binding):
+            return entries[0]
+
+        return Tool(
+            "command_help",
+            "Show admitted command usage.",
+            object_schema({}),
+            help_command,
+            main=True,
+        ), {}
 
     @staticmethod
     def argv(args):
@@ -216,15 +316,18 @@ class ToolDirectory:
                 return argv[4], json.loads(argv[6])
             except ValueError:
                 raise DomainError("INVALID_CLI_ARGUMENTS") from None
+        if argv and argv[0] in {"roami", self.settings.cli_bin}:
+            return public_operation(argv[1:])
         return None
 
     def resolve(self, tool, args, role):
         if tool.name == "read":
             path = args["path"]
             if path.startswith("skill://"):
-                skill, separator, reference = path.removeprefix("skill://").partition("/")
+                skill, _separator, reference = path.removeprefix("skill://").partition("/")
+                skill, reference = skill_location(skill, reference)
                 name, args = "skill_read", {"name": skill}
-                if separator:
+                if reference:
                     args["reference"] = reference
             elif path.startswith("artifact://"):
                 name, args = (
@@ -242,7 +345,14 @@ class ToolDirectory:
             name = "file_patch" if tool.name == "edit" else "file_write"
             return replace(self.registry.registry[name], main=True), args
         elif tool.name == "bash":
-            operation = self.operation(self.argv(args))
+            argv = self.argv(args)
+            if (
+                argv
+                and argv[0] in {"roami", self.settings.cli_bin}
+                and argv[1:] in (["help"], ["--help"], ["chrome", "help"], ["chrome", "--help"])
+            ):
+                return self.help_tool(argv, role)
+            operation = self.operation(argv)
             if operation is None:
                 if role == "research":
                     raise DomainError("TOOL_UNAVAILABLE")
@@ -280,13 +390,18 @@ def register_foundations(registry, settings):
     registry.directory = directory
 
     async def list_tools(args, binding):
-        return directory.list(
+        result = directory.list(
             args.get("query", ""),
             args.get("kind", "all"),
             args.get("limit", 10),
             binding.get("role", "main"),
             args.get("offset", 0),
         )
+        if binding.get("role", "main") != "research":
+            result["availability"] = await registry.registry["capability_overview"].handler(
+                {}, binding
+            )
+        return result
 
     async def bash(args, binding):
         argv = directory.argv(args)
@@ -323,7 +438,7 @@ def register_foundations(registry, settings):
             object_schema(
                 {
                     "query": {"type": "string", "maxLength": 1000},
-                    "kind": {"enum": ["all", "mcp", "skill", "cli"]},
+                    "kind": {"enum": ["all", "mcp", "skill", "cli", "tool"]},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 20},
                     "offset": {"type": "integer", "minimum": 0},
                 },
@@ -381,7 +496,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "bash",
-            "Execute Roami CLI argv discovered by tool_list, or shell commands in a prepared workspace. For Roami business actions use ['roami','agent','capability','call',NAME,'--input',JSON]. Registered read/write effects and receipts are enforced by runtime. General shell needs cwd inside allowed roots; no implicit code workspace is created.",
+            "Execute Roami CLI argv discovered by tool_list, or shell commands in a prepared workspace. Use roami or roami chrome command families from tool_list; load their associated Skill as needed. Registered read/write effects and receipts are enforced by runtime. General shell needs cwd inside allowed roots; no implicit code workspace is created.",
             schema,
             bash,
             main=True,

@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
 from roami_agent.protocol.tools import Tool, object_schema
 
 
@@ -35,7 +36,7 @@ def register_skills(registry, settings):
             for reference, content in references.items():
                 digest.update(("\0" + reference + "\0" + content["version"]).encode())
             name = path.parent.name
-            if name in skills:
+            if name in skills or name in SKILL_ALIASES:
                 raise DomainError("DUPLICATE_SKILL")
             skills[name] = {
                 "text": text,
@@ -54,11 +55,12 @@ def register_skills(registry, settings):
     if skills:
 
         async def skill(args, binding):
-            if args["name"] in registry.disabled_skills:
+            name, reference_path = skill_location(args["name"], args.get("reference", ""))
+            if name in registry.disabled_skills:
                 raise DomainError("SKILL_DISABLED")
-            value = skills[args["name"]]
-            if args.get("reference"):
-                reference = value["references"].get(args["reference"])
+            value = skills[name]
+            if reference_path:
+                reference = value["references"].get(reference_path)
                 if not reference:
                     raise DomainError("SKILL_REFERENCE_NOT_FOUND", 404)
                 return {**reference, "skillVersion": value["version"]}
@@ -67,11 +69,11 @@ def register_skills(registry, settings):
         registry.add(
             Tool(
                 "skill_read",
-                "Read a workflow skill when needed. roami-dispatch covers project/session routing; web-research covers current public information through Roami Chrome CLI. Available: "
+                "Read a workflow skill when needed. roami covers Roami operations; browser_use covers roami chrome and public research. Available: "
                 + ", ".join(skills),
                 object_schema(
                     {
-                        "name": {"type": "string", "enum": list(skills)},
+                        "name": {"type": "string", "enum": [*skills, *SKILL_ALIASES]},
                         "reference": {
                             "type": "string",
                             "pattern": r"^references/[a-zA-Z0-9_-]+\.md$",
