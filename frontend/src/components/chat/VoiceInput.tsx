@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { App as AntApp, Tooltip } from 'antd'
 import { useLayout } from '../../layout'
 import { api, transcribe } from '../../api'
+import { currentNodeId } from '../cluster/node-url'
 import { useI18n } from '../../i18n'
 import { isHotkeyKeyUp, matchHotkey, useKeybindings } from '../shell/keybindings'
 
@@ -38,14 +39,16 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   const { coarse } = useLayout()
   const clickMode = !coarse
   const maxTimer = useRef<number | undefined>(undefined)
+  const appVersion = typeof navigator !== 'undefined' ? navigator.userAgent.match(/RoamiApp\/(\d+)\.(\d+)\.(\d+)/) : null
+  const nativeAudio = !!appVersion && (Number(appVersion[1]) > 0 || Number(appVersion[2]) > 4 || (Number(appVersion[2]) === 4 && Number(appVersion[3]) >= 4))
   const HOTKEY_LABEL = kb.label
   const hkRef = useRef(kb.key); hkRef.current = kb.key
   // 录音能力探测：getUserMedia/MediaRecorder 仅在安全上下文(HTTPS / localhost)可用。
   // 手机走 LAN 的 http:// 访问时 navigator.mediaDevices 为 undefined，按了也录不了，
   // 故按钮置灰并给出「需 HTTPS」的明确提示，而不是含糊的「麦克风被拒」。
-  const micUsable = typeof navigator !== 'undefined'
+  const micUsable = nativeAudio || (typeof navigator !== 'undefined'
     && !!navigator.mediaDevices?.getUserMedia
-    && typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined'
+    && typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined')
   const micHint = window.isSecureContext === false ? t('voice.insecureContext') : t('voice.unsupported')
   const [configured, setConfigured] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -53,6 +56,7 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   const [cancelArmed, setCancelArmed] = useState(false)
 
   const recRef = useRef<MediaRecorder | null>(null)
+  const nativeSessionRef = useRef(false)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const pressedRef = useRef(false)   // 手指是否仍按住(应对授权异步期间的提前松手)
@@ -84,6 +88,46 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     streamRef.current = null
   }
 
+  const markRecording = () => {
+    startTsRef.current = Date.now()
+    setSecs(0)
+    setPhase('recording')
+    timerRef.current = window.setInterval(() => setSecs(Math.floor((Date.now() - startTsRef.current) / 1000)), 250)
+    maxTimer.current = window.setTimeout(() => endRef.current(), MAX_MS)
+  }
+
+  useEffect(() => {
+    if (!nativeAudio) return
+    const onNativeAudio = (event: Event) => {
+      if (!nativeSessionRef.current) return
+      const { kind, value } = (event as CustomEvent<{ kind: string; value?: string }>).detail
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = undefined }
+      if (maxTimer.current) { clearTimeout(maxTimer.current); maxTimer.current = undefined }
+      if (kind === 'permission') {
+        nativeSessionRef.current = false
+        pressedRef.current = false
+        setPhase('idle')
+        if (value === 'granted') message.info(t('voice.permissionGrantedRetry'))
+        else message.error(t('voice.micDenied'))
+      } else if (kind === 'success') {
+        nativeSessionRef.current = false
+        setPhase('idle')
+        if (value?.trim()) { onResult(value.trim()); message.success(t('voice.recognized')) }
+        else message.info(t('voice.empty'))
+      } else if (kind === 'short') {
+        nativeSessionRef.current = false
+        setPhase('idle')
+        message.info(t('voice.tooShort'))
+      } else if (kind === 'error') {
+        nativeSessionRef.current = false
+        setPhase('idle')
+        message.error(value === 'unavailable' ? t('voice.nativeUnavailable') : t('voice.failed', { message: value || t('voice.nativeUnavailable') }))
+      }
+    }
+    window.addEventListener('roami-native-audio', onNativeAudio)
+    return () => window.removeEventListener('roami-native-audio', onNativeAudio)
+  }, [nativeAudio, message, onResult, t])
+
   const begin = async (clientY: number, viaKey = false) => {
     if (phase !== 'idle') return
     byKeyRef.current = viaKey
@@ -95,13 +139,28 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     setCancelArmed(false)
     startYRef.current = clientY
     setPhase('requesting')
+    if (nativeAudio) {
+      nativeSessionRef.current = true
+      const status = window.prompt(`roami-audio-v1:start:${currentNodeId() || ''}`)
+      if (status === 'recording') markRecording()
+      else if (status !== 'permission') {
+        nativeSessionRef.current = false
+        pressedRef.current = false
+        setPhase('idle')
+        message.error(status === 'busy' ? t('voice.nativeBusy') : t('voice.nativeUnavailable'))
+      }
+      return
+    }
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch {
+    } catch (error) {
       pressedRef.current = false
       setPhase('idle')
-      message.error(t('voice.micDenied'))
+      const cause = error as { name?: string; message?: string }
+      const detail = [cause?.name || 'Error', cause?.message].filter(Boolean).join(': ')
+      const client = navigator.userAgent.match(/RoamiApp\/[^\s]+/)?.[0] || 'Web'
+      message.error({ key: 'voice-mic-access', content: t('voice.micDeniedDetail', { detail, client, secure: String(window.isSecureContext) }), duration: 8 })
       return
     }
     if (!pressedRef.current) { stream.getTracks().forEach((tk) => tk.stop()); setPhase('idle'); return } // 授权期间已松手
@@ -114,11 +173,7 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     rec.onstop = () => { stopTracks(); finish() }
     recRef.current = rec
     rec.start()
-    startTsRef.current = Date.now()
-    setSecs(0)
-    setPhase('recording')
-    timerRef.current = window.setInterval(() => setSecs(Math.floor((Date.now() - startTsRef.current) / 1000)), 250)
-    maxTimer.current = window.setTimeout(() => endRef.current(), MAX_MS)
+    markRecording()
   }
 
   const move = (clientY: number) => {
@@ -134,6 +189,14 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     if (maxTimer.current) { clearTimeout(maxTimer.current); maxTimer.current = undefined }
     if (phase === 'requesting') { setPhase('idle'); return } // 还没真正开录
     if (phase !== 'recording') return
+    if (nativeAudio) {
+      const tooShort = Date.now() - startTsRef.current < MIN_MS
+      window.prompt(`roami-audio-v1:${cancelRef.current || tooShort ? 'cancel' : 'stop'}`)
+      if (cancelRef.current || tooShort) nativeSessionRef.current = false
+      setPhase(cancelRef.current || tooShort ? 'idle' : 'transcribing')
+      if (tooShort && !cancelRef.current) message.info(t('voice.tooShort'))
+      return
+    }
     try { recRef.current?.stop() } catch { stopTracks(); setPhase('idle') } // onstop 里走 finish()
   }
 

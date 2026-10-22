@@ -18,6 +18,7 @@ import android.os.Bundle
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
+import android.webkit.JsPromptResult
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -41,13 +42,20 @@ class WebActivity : AppCompatActivity() {
     private lateinit var apkUpdate: ApkUpdate
     private var askingSsl = false
     private var pendingAudio: PermissionRequest? = null
+    private var nativePermissionPending = false
+    private lateinit var nativeVoice: NativeVoiceInput
     private var lastImeHeight = -1
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val request = pendingAudio ?: return@registerForActivityResult
-        pendingAudio = null
-        if (granted && ServerOrigin.matches(base, request.origin.toString()))
-            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-        else request.deny()
+        pendingAudio?.let { request ->
+            pendingAudio = null
+            if (granted && ServerOrigin.matches(base, request.origin.toString()))
+                request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+            else request.deny()
+        }
+        if (nativePermissionPending) {
+            nativePermissionPending = false
+            emitNativeVoice("permission", if (granted) "granted" else "denied")
+        }
     }
 
     // 网页里的 <input type=file>（上传文件到工作目录、贴图）：WebView 默认什么都不做，得自己接系统选择器
@@ -72,6 +80,9 @@ class WebActivity : AppCompatActivity() {
         base = intent.getStringExtra("url") ?: Prefs(this).current ?: run { finish(); return }
         apkUpdate = ApkUpdate(this, base)
         web = WebView(this)
+        nativeVoice = NativeVoiceInput(this, base,
+            { CookieManager.getInstance().getCookie(base) },
+            { kind, value -> runOnUiThread { emitNativeVoice(kind, value) } })
         setContentView(web)
         // adjustNothing keeps the page stable; WebView does not expose its IME height to JS.
         ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { _, insets ->
@@ -122,6 +133,28 @@ class WebActivity : AppCompatActivity() {
             }
         }
         web.webChromeClient = object : WebChromeClient() {
+            // prompt 提供调用帧 URL；只让当前 Roami 站点控制原生麦克风。
+            override fun onJsPrompt(view: WebView, url: String, message: String, defaultValue: String, result: JsPromptResult): Boolean {
+                if (!message.startsWith("roami-audio-v1:")) return false
+                if (!ServerOrigin.matches(base, url) || !ServerOrigin.matches(base, view.url ?: "")) {
+                    result.confirm("denied")
+                    return true
+                }
+                val command = message.removePrefix("roami-audio-v1:")
+                val response = when {
+                    command.startsWith("start:") -> nativeVoice.start(command.removePrefix("start:")).also {
+                        if (it == "permission") {
+                            nativePermissionPending = true
+                            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                    command == "stop" -> nativeVoice.stop(false)
+                    command == "cancel" -> nativeVoice.stop(true)
+                    else -> "unknown"
+                }
+                result.confirm(response)
+                return true
+            }
             override fun onPermissionRequest(request: PermissionRequest) {
                 if (!ServerOrigin.matches(base, request.origin.toString()) ||
                     PermissionRequest.RESOURCE_AUDIO_CAPTURE !in request.resources) {
@@ -206,9 +239,16 @@ class WebActivity : AppCompatActivity() {
     override fun onResume() { super.onResume(); shake.start(); web.onResume(); apkUpdate.onResume() }
     override fun onPause() { super.onPause(); shake.stop(); web.onPause() }
     override fun onDestroy() {
+        if (::nativeVoice.isInitialized) nativeVoice.close()
         pendingAudio?.deny()
         pendingAudio = null
         super.onDestroy()
         if (::web.isInitialized) web.destroy()
+    }
+
+    private fun emitNativeVoice(kind: String, value: String?) {
+        if (!::web.isInitialized || !ServerOrigin.matches(base, web.url ?: "")) return
+        val detail = org.json.JSONObject().put("kind", kind).put("value", value)
+        runCatching { web.evaluateJavascript("window.dispatchEvent(new CustomEvent('roami-native-audio',{detail:$detail}))", null) }
     }
 }
