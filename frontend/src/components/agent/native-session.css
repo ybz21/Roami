@@ -16,3 +16,5 @@
 .agent-native-workspace .native-session { flex:1; height:auto; }
 .agent-native-workspace-nav { flex:none; display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); min-height:calc(var(--sp-5) * 2); border-bottom:1px solid var(--border-subtle); font-size:var(--fs-body); }
 .agent-native-workspace-nav > .tt-act { min-height:var(--tap); padding:var(--sp-1) var(--sp-2); }
+html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-btn { position:relative; }
+html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-btn::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
