@@ -277,7 +277,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   }, [target, tabs])
 
   // 切到手动模式：人正在手动操作（切标签/点镜像页面），此时后端广播的 active 不该把
-  // 面板拽走。只能靠主动点"智能体模式"按钮切回去，不会自己超时恢复。
+  // 面板拽走。通过更多菜单恢复自动跟随，不会自行超时恢复。
   const pauseFollow = () => {
     followPausedRef.current = true
     setFollowPaused(true)
@@ -696,6 +696,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // ⋯ 菜单：低频动作一律进这里，主行永远只有四个目标（设计 17 §3）。
   // 窄档下把「前进 / 主页」也收进来——它们是次高频，后退才是必须留在外面的那一枚。
   const menuItems: MenuProps['items'] = [
+    { key: 'follow', icon: followPaused ? <BotIcon size={15} /> : <UserIcon size={15} />,
+      label: t(followPaused ? 'browser.resumeFollow' : 'browser.pauseFollow'), onClick: () => followPaused ? resumeFollow() : pauseFollow() },
     // 全屏摆在最前：远端视口固定之后，「黑边多厚」只取决于观看区多大，铺满显示器就是把黑边挤没
     ...(fs.supported ? [
       { key: 'fs', icon: fs.on ? <ExitFullscreenIcon size={15} /> : <FullscreenIcon size={15} />,
@@ -714,7 +716,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     { key: 'newpage', icon: <OpenInIcon size={15} />, label: t('mirror.openInNewPage'),
       onClick: () => window.open('/#/browser?terms=none', '_blank') },
     { type: 'divider' as const, key: 'd2' },
-    { key: 'newtab', icon: <PlusIcon />, label: t('browser.newTab'), onClick: newTab },
+    { key: 'newtab', icon: <PlusIcon />, label: t('browser.newHumanTab'), onClick: newTab },
   ]
 
   const deviceName = device ? t(DEVICES.find((d) => d.key === device)?.nameKey || 'browser.device.desktop') : t('browser.device.desktop')
@@ -758,9 +760,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
         {shelf !== 'narrow' && (
           <TabStrip tabs={displayTabs} active={target} pinned={pinnedTabs} onPin={togglePin} onOrigin={changeOrigin}
             onSelect={switchTab} onClose={closeTab} onCloseMany={closeTabs} onAdd={newTab}
-            extra={<StatusChip icon={followPaused ? <UserIcon size={12} /> : <BotIcon size={12} />}
-              strong={followPaused ? t('browser.followModeHuman') : t('browser.followModeAgent')}
-              active={!followPaused} onClick={() => (followPaused ? resumeFollow() : pauseFollow())} />} />
+            onGroupChange={pauseFollow} onOpenTabs={() => setTabsOpen(true)} />
         )}
         <MirrorChrome
           chromeRef={shelfRef}
@@ -792,14 +792,11 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
             <MirrorMenu items={menuItems} label={t('common.more')} />
           </>}
           chips={shelf === 'narrow' ? <>
-            <StatusChip icon={followPaused ? <UserIcon size={12} /> : <BotIcon size={12} />}
-              strong={followPaused ? t('browser.followModeHuman') : t('browser.followModeAgent')}
-              active={!followPaused} onClick={() => (followPaused ? resumeFollow() : pauseFollow())} />
             {deviceChip}
           </> : undefined}
         />
-        {/* 手机标签：横条在 360 上放不下第三枚，换成「⧉N + 抽屉」（设计 17 §4） */}
-        <TabSheet open={tabsOpen} tabs={displayTabs} active={target} pinned={pinnedTabs}
+        {/* 窄档使用全屏目录，桌面从右侧展开。 */}
+        <TabSheet compact={shelf === 'narrow'} open={tabsOpen} tabs={displayTabs} active={target} pinned={pinnedTabs}
           onPin={togglePin} onOrigin={changeOrigin} onCloseMany={closeTabs} onClose={() => setTabsOpen(false)}
           onSelect={(id) => { switchTab(id); setTabsOpen(false) }}
           onCloseTab={closeTab} onAdd={() => { newTab(); setTabsOpen(false) }} />
