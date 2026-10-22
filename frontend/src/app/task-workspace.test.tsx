@@ -25,6 +25,22 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('workspace tab lifecycle', () => {
+  it('preserves live memory filters and selection when restoring and updating terminal tabs', async () => {
+    history.replaceState({ roamiMemoryFrom: '#/home/memory/home' }, '', '#/home/memory/home?memoryView=review&memoryScope=project&memoryEntity=project-a&memoryQuery=Codex&memoryPage=1&memoryId=one&terms=%241&active=%241&node=n1')
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+    const params = () => new URLSearchParams(location.hash.split('?')[1])
+    expect(Object.fromEntries(params())).toMatchObject({ memoryView: 'review', memoryScope: 'project', memoryEntity: 'project-a', memoryQuery: 'Codex', memoryPage: '1', memoryId: 'one', node: 'n1' })
+    const updated = params(); updated.set('memoryId', 'two')
+    history.replaceState(history.state, '', '#/home/memory/home?' + updated)
+    act(() => result.current.workspace.openTerm('beta'))
+    expect(params().get('memoryId')).toBe('two')
+    expect(params().get('memoryQuery')).toBe('Codex')
+    act(() => result.current.workspace.closeTerm('beta'))
+    expect(params().get('memoryId')).toBe('two')
+    expect(history.state.roamiMemoryFrom).toBe('#/home/memory/home')
+  })
+
   it('waits for session identity before restoring URL tabs and node-local files', async () => {
     saveTabs('node-a', ['$2'], '$2', [{ path: '/repo/readme.md', preview: false, mode: 'preview', task: '/repo' }], '/repo/readme.md')
     history.replaceState(null, '', '#/w?terms=%241&active=%241')

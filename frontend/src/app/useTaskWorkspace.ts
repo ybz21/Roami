@@ -8,7 +8,7 @@ import { lastTabOf, rememberLastTab } from '../components/shell/task-last-tab'
 import { useBackDismiss } from '../components/shell/useBackDismiss'
 import { useWorkspaceLayout } from '../components/shell/useWorkspaceLayout'
 import { dropDeadTokens, loadTabs, saveTabs, type FileTab } from '../components/terminal/term-tabs-store'
-import { TASK_ROUTE, readTermTokens, setHashParams } from '../route-hash'
+import { TASK_ROUTE, getHashParams, readTermTokens, setHashParams } from '../route-hash'
 
 import type { SessionDirectory } from './useSessionDirectory'
 type TaskWorkspaceOptions = {
@@ -106,6 +106,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     const toks = terms.map(toTok)
     const activeTok = active ? toTok(active) : ''
     setHashParams({
+      ...Object.fromEntries(getHashParams()),
       terms: toks.map(encodeURIComponent).join(','),
       active: activeTok ? encodeURIComponent(activeTok) : '',
     })
