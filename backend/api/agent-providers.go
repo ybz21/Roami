@@ -16,6 +16,8 @@ func providerError(c *gin.Context, err error) {
 	switch code {
 	case "INVALID_AGENT_KIND", "INVALID_MODEL_PROFILE", "INVALID_MODEL_PROTOCOL", "INVALID_MODEL_KEY", "MODEL_KEY_ENV_MISSING":
 		status = http.StatusBadRequest
+	case "MODEL_LIST_UNAUTHORIZED", "MODEL_LIST_UNSUPPORTED", "MODEL_LIST_FAILED":
+		status = http.StatusBadGateway
 	case "MODEL_PROFILE_NOT_FOUND":
 		status = http.StatusNotFound
 	case "MODEL_PROFILE_ACTIVE", "MODEL_PROFILE_NAME_EXISTS", "MODEL_PROFILE_LIMIT", "AGENT_CONFIG_CHANGED", "AGENT_CONFIG_INVALID", "AGENT_CONFIG_PATH_INVALID",
@@ -112,4 +114,21 @@ func (a *API) changeAgentModel(c *gin.Context, restore bool) {
 		return
 	}
 	c.JSON(http.StatusOK, view)
+}
+
+func (a *API) AgentModelOptions(c *gin.Context) {
+	if a.AgentProviders == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "MODEL_STORE_UNAVAILABLE"}})
+		return
+	}
+	var query agentproviders.ModelQuery
+	if !providerBody(c, &query) {
+		return
+	}
+	models, err := a.AgentProviders.ModelOptions(c.Request.Context(), c.Param("kind"), query)
+	if err != nil {
+		providerError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"models": models})
 }

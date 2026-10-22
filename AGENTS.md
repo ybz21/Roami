@@ -775,3 +775,14 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
   <p>隔离 Go 服务、HOME、私有 tmux 和固定升级程序完成四种 Agent 的保存、应用、恢复、升级后版本读取；已安装的 Codex 0.162.1、OpenCode 2.0.27、Pi 1.1.0 均成功读取生成的原生配置，未发起模型调用。OpenCode 原生服务使用独立配置与端口。</p>
   <p>桌面中文深色 / 英文浅色在 320、390、820、1100、1280、1600、1920 宽度无文档溢出。Redmi Note 8 真机以 392 CSS px / coarse 指针完成预设编辑、保存、切换、恢复、Android 返回及升级确认；键盘 314px 时保存按钮位于键盘上方，触控高度 44px，四个底部主入口恢复正常。截图与验收脚本在 /tmp/agent-models-*，现用服务及用户原生配置未修改。</p>
 </section>
+
+<section id="professional-agent-model-picker" lang="zh-CN">
+  <h2>Agent 模型下拉选择 · 2026-10-22</h2>
+  <h3>产品设计与用户故事</h3>
+  <p>四类 Agent 的模型字段统一为可搜索、可手动输入的下拉框，保留已有模型和未保存输入。用户可点击“获取模型”，按当前服务地址、协议和密钥读取真实模型列表；修改连接信息后清空旧服务返回的候选，失败保留模型选择及表单。服务不支持列模型时允许继续输入自定义模型。</p>
+  <h3>技术设计</h3>
+  <p>AgentModels.tsx 复用 antd AutoComplete，候选来自同服务已有预设和显式查询结果。新增 POST /api/agent/professional/:kind/model-options，复用预设私有密钥和输入验证；按协议读取 OpenAI / Anthropic 兼容的 GET models，Anthropic 支持分页。请求有时限、响应和条目上限，不跟随重定向、不返回上游错误正文、不执行模型推理，不新增轮询或隐式应用。网络读取在预设锁外执行；变更连接会取消旧请求并丢弃过期结果。</p>
+  <h3>验收记录</h3>
+  <p>仓库 full 门禁及 Go 竞态测试通过；前端 127 文件 / 913 用例、typecheck、i18n、hover 与生产构建通过。覆盖四类 Agent、保存密钥和环境变量、Anthropic 分页、连接取消、失败保留、重定向及响应限制；Python 按仓库改动范围规则跳过，构建保留已有大块体积提示。</p>
+  <p>隔离 Go / HOME / 原生配置 / tmux 和本地模型服务完成四类 Agent 查询、下拉选择、自定义保存及刷新恢复。桌面中英文深浅主题在 320–1920 宽度无文档溢出；Redmi Note 8 真机以 coarse 指针完成查询、搜索、Android 原生点按候选、保存、刷新与返回，键盘 314px 时输入位于可见表单内、保存高度 44px 且不被遮挡。截图和脚本位于 /tmp/model-picker-*，未改动现用服务和原生配置，未调用推理接口。</p>
+</section>

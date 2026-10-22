@@ -56,3 +56,15 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-agent-model-scroll { pad
 html:is([data-size="compact"],[data-size="medium"]) .tt-agent-model-actions { padding:var(--sp-3) var(--pad-page); margin-top:0; background:var(--bg-base); }
 html[data-pointer="coarse"] .tt-agent-models :is(.ant-input,.ant-input-affix-wrapper,.ant-btn,.ant-select-selector) { min-height:var(--tap); }
 html[data-pointer="coarse"] .tt-agent-models .ant-select-selector { align-items:center; }
+
+.tt-agent-model-field { display:flex; flex-direction:column; gap:var(--sp-2); font-size:var(--fs-sm); }
+.tt-agent-model-picker { position:relative; display:flex; align-items:center; gap:var(--sp-2); min-width:0; }
+.tt-agent-model-picker > .ant-select { flex:1; min-width:0; }
+.tt-agent-model-fetch-error { margin:0; color:var(--warn); font-size:var(--fs-meta); }
+
+html[data-pointer="coarse"] .tt-agent-model-options .ant-select-item-option { min-height:var(--tap); }
+
+html:is([data-size="compact"],[data-size="medium"]) .tt-agent-model-options .rc-virtual-list-holder { max-height:calc((100dvh - var(--kb) - var(--mobile-topbar-h) - var(--tap) - var(--sp-4) * 2) / 2) !important; }
+
+html[data-pointer="coarse"] .tt-agent-model-picker > .ant-select { height:var(--tap); }
+html[data-pointer="coarse"] .tt-agent-model-picker .ant-input-affix-wrapper > .ant-input { min-height:0; }

@@ -88,3 +88,8 @@ export async function applyAgentModel(kind: string, id: string, revision: string
 export async function restoreAgentModel(kind: string, revision: string): Promise<AgentModelView> {
   return api('POST', modelPath(kind) + '/restore', { revision })
 }
+
+export async function agentModelOptions(kind: string, input: AgentModelInput & { profileId?: string }, signal?: AbortSignal): Promise<string[]> {
+  const result = await api('POST', `/agent/professional/${encodeURIComponent(kind)}/model-options`, input, { signal })
+  return result.models
+}
