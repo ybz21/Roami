@@ -20,7 +20,8 @@ def continuation_candidates(db, owner, conversation, turn_id, target):
         "AND u.branch_id=t.origin_branch_id "
         "JOIN messages m ON m.id=t.origin_message_id AND m.deleted_ms IS NULL "
         "WHERE t.owner_id=? AND t.origin_conversation_id=? AND t.parent_task_id IS NULL "
-        "AND json_extract(t.intent_json,'$.executor') IN ('codex','claude') "
+        "AND json_extract(t.intent_json,'$.executor') IN ('codex','claude','native') "
+        "AND NOT EXISTS(SELECT 1 FROM task_session_closures z WHERE z.task_id=t.id AND z.state='closed') "
         "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id "
         "AND o.message_id=t.origin_message_id) ORDER BY t.created_ms DESC,t.id",
         (turn_id, owner, conversation),

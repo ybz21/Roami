@@ -3504,6 +3504,11 @@ const zhCN = {
   'agent.task.sessionCloseUnknown': '关闭状态未确认，请检查原会话。',
   'agent.task.sessionBusy': '会话仍在工作，请先停止本轮再关闭。',
   'agent.task.sessionUnavailable': '原会话不可用，请检查原会话；不会自动更换智能体。',
+  'agent.task.enterSession': '进入会话',
+  'agent.task.project': '项目',
+  'agent.session': '会话',
+  'agent.task.filter.open': '会话未关闭',
+  'agent.task.details': '任务详情',
 }
 
 export default zhCN

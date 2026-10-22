@@ -47,7 +47,35 @@ class TaskSessions:
                 raise DomainError("TASK_SESSION_CLOSING", 409)
             if task["state"] not in STABLE or not run["finished_ms"]:
                 raise DomainError("TASK_SESSION_BUSY", 409)
-            if run["executor_kind"] != "cli" or not run["session_id"] or not self.executor:
+            if run["executor_kind"] == "native":
+                native = row(
+                    db, "SELECT id,branch_id FROM native_sessions WHERE task_id=?", (task_id,)
+                )
+                if not native:
+                    raise DomainError("TASK_SESSION_UNAVAILABLE", 409)
+                tree = "WITH RECURSIVE tree(id) AS (SELECT ? UNION SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) "
+                if row(
+                    db,
+                    tree
+                    + "SELECT 1 FROM resources WHERE owner_task_id IN (SELECT id FROM tree) AND (lease_until_ms IS NOT NULL OR state!='idle') LIMIT 1",
+                    (task_id,),
+                ):
+                    raise DomainError("TASK_RESOURCE_NOT_RELEASED", 409)
+                if row(
+                    db,
+                    tree
+                    + "SELECT 1 FROM tasks WHERE id IN (SELECT id FROM tree) AND id!=? AND state NOT IN ('succeeded','failed','cancelled','interrupted') LIMIT 1",
+                    (task_id, task_id),
+                ):
+                    raise DomainError("TASK_SESSION_BUSY", 409)
+                if row(
+                    db,
+                    "SELECT 1 FROM turns WHERE branch_id=? AND state IN ('queued','running') UNION ALL SELECT 1 FROM tool_calls x JOIN turns u ON u.id=x.turn_id WHERE u.branch_id=? AND x.state IN ('planned','running','unknown') LIMIT 1",
+                    (native["branch_id"], native["branch_id"]),
+                ):
+                    raise DomainError("TASK_SESSION_BUSY", 409)
+                run["session_id"] = native["id"]
+            elif run["executor_kind"] != "cli" or not run["session_id"] or not self.executor:
                 raise DomainError("TASK_SESSION_UNAVAILABLE", 409)
             evidence = json.loads(run["result_json"]) if run["result_json"] else {}
             if (
@@ -73,7 +101,11 @@ class TaskSessions:
         if closed:
             return {"taskId": task_id, "state": "closed"}
         try:
-            result = await self.executor.command("close", "--key", run["launch_id"])
+            result = (
+                {"state": "closed", "session": run["session_id"]}
+                if run["executor_kind"] == "native"
+                else await self.executor.command("close", "--key", run["launch_id"])
+            )
             if result.get("state") != "closed" or result.get("session") != run["session_id"]:
                 raise DomainError("TASK_SESSION_CLOSE_UNKNOWN", 409)
         except (DomainError, OSError, TimeoutError) as exc:

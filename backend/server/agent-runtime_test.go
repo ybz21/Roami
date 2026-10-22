@@ -16,7 +16,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	gate := auth.New("test-only-login", "", "", 5, 30, nil)
 	group := router.Group("/api", gate.Middleware())
 	mountAgentRuntime(group, Config{DataDir: t.TempDir()})
-	for _, path := range []string{"/api/agent/conversations/probe/debug", "/api/agent/conversations/probe/debug/trace", "/api/agent/traces", "/api/agent/capability-settings", "/api/agent/main-conversation", "/api/agent/notification-deliveries", "/api/agent/reminders", "/api/agent/notification-preferences", "/api/agent/status", "/api/agent/conversations", "/api/agent/notifications", "/api/agent/artifacts", "/api/agent/artifacts/probe", "/api/agent/artifacts/probe/content", "/api/agent/tasks/probe/resources", "/api/agent/tasks/probe/activities", "/api/agent/tasks/probe/activities/tool:probe", "/api/agent/tasks/probe/conversation?runId=run", "/api/agent/resources/probe", "/api/agent/tasks/probe/steering/operation"} {
+	for _, path := range []string{"/api/agent/conversations/probe/debug", "/api/agent/conversations/probe/debug/trace", "/api/agent/traces", "/api/agent/capability-settings", "/api/agent/main-conversation", "/api/agent/notification-deliveries", "/api/agent/reminders", "/api/agent/notification-preferences", "/api/agent/status", "/api/agent/conversations", "/api/agent/notifications", "/api/agent/artifacts", "/api/agent/artifacts/probe", "/api/agent/artifacts/probe/content", "/api/agent/tasks/probe/resources", "/api/agent/tasks/probe/activities", "/api/agent/tasks/probe/activities/tool:probe", "/api/agent/tasks/probe/conversation?runId=run", "/api/agent/native-sessions", "/api/agent/native-sessions/probe", "/api/agent/native-sessions/probe/conversation", "/api/agent/native-sessions/probe/events", "/api/agent/resources/probe", "/api/agent/tasks/probe/steering/operation"} {
 		recorder := httptest.NewRecorder()
 		method := "GET"
 		if path == "/api/agent/main-conversation" {
@@ -35,6 +35,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		}
 	}
 	for _, request := range []struct{ method, path string }{
+		{"POST", "/api/agent/tasks/probe/close-session"},
 		{"POST", "/api/agent/capability-imports/skills"},
 		{"PUT", "/api/agent/capability-imports/cli/fixture"},
 		{"DELETE", "/api/agent/capability-imports/mcp/fixture"},

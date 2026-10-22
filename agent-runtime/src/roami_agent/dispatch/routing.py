@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.dispatch.workflow_preferences import workspace_preference
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import object_schema
 from roami_agent.storage.context_admission import assert_context_admitted
@@ -47,6 +48,16 @@ def routing_schema():
                     "quote": text,
                 },
                 ["executor", "memoryId", "revision", "quote"],
+            ),
+            "workspacePreference": object_schema(
+                {
+                    "memoryId": text,
+                    "revision": {"type": "integer", "minimum": 1},
+                    "quote": text,
+                    "base": text,
+                    "remote": text,
+                },
+                ["memoryId", "revision", "quote"],
             ),
             "requiredCapabilities": {
                 "type": "array",
@@ -122,7 +133,14 @@ class TaskRouter:
             or assessment["userQuote"] not in json.loads(origin["content_json"]).get("text", "")
         ):
             raise DomainError("ROUTING_EXPLICIT_SOURCE_REQUIRED")
-        target = args.get("target") or {"kind": "new_session"}
+        target = dict(args.get("target") or {"kind": "new_session"})
+        workflow = await workspace_preference(
+            self.memory, assessment.get("workspacePreference"), binding, target
+        )
+        if workflow:
+            for name in ("base", "remote"):
+                if name in workflow["values"]:
+                    target.setdefault(name, workflow["values"][name])
         if target["kind"] == "project" and not target.get("projectId"):
             raise DomainError("CODING_PROJECT_ID_REQUIRED")
         if target["kind"] == "session" and not target.get("sessionId"):
@@ -136,6 +154,7 @@ class TaskRouter:
             "routingExplanation": assessment["routingExplanation"],
             "targetRef": target,
             "metadataRefs": [],
+            **({"workflowPreference": workflow} if workflow else {}),
             "capabilityVerification": "not_verified",
             "requiredCapabilities": assessment.get("requiredCapabilities", []),
         }
@@ -231,6 +250,12 @@ class TaskRouter:
         def persist(db):
             # A second admission closes the gap while CLI metadata was in flight.
             source(db)
+            if workflow and not row(
+                db,
+                "SELECT id FROM memory_records WHERE id=? AND owner_id=? AND state='active' AND revision=?",
+                (workflow["memoryId"], binding["owner"], workflow["revision"]),
+            ):
+                raise DomainError("WORKFLOW_PREFERENCE_SOURCE_INVALID", 409)
             old = row(db, "SELECT payload_json FROM events WHERE event_key=?", (key,))
             if old:
                 return json.loads(old["payload_json"])["decision"]

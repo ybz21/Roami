@@ -789,7 +789,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 
 <section id="task-native-session-design" lang="zh-CN">
   <h2>任务会话与 native 托管设计 · 2026-10-22</h2>
-  <p>设计提案，尚未实施。完整 HTML 入口：<a href="docs/design/20261022-任务会话与工作习惯/index.html">任务、会话与工作习惯</a>；<a href="docs/design/20261022-任务会话与工作习惯/verification.html">原型验证记录</a>。</p>
+  <p>设计与实施记录。完整 HTML 入口：<a href="docs/design/20261022-任务会话与工作习惯/index.html">任务、会话与工作习惯</a>；<a href="docs/design/20261022-任务会话与工作习惯/verification.html">原型验证记录</a>；<a href="docs/design/20261022-任务会话与工作习惯/implementation.html">实际实现与验收</a>。</p>
   <h3>产品设计</h3>
   <p>首页中间保留 Main，右侧任务栏展示任务及可点击项目归属；进入会话直接打开绑定原会话。用户确认结束前保留原身份与筛选；工作习惯只影响新任务，续改复用原工作区和智能体。</p>
   <h3>用户故事</h3>
@@ -798,4 +798,11 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
   <p>native 拟统一托管在 ~/.roami/agents/native/时间戳-随机后缀/，以 .session.json 记录身份关联、.chat.jsonl 记录对话和工具调用，context 与 blobs 保存检查点及大输出。现有 SQLite 继续负责在线事务与调度，事务 outbox 串行补写日志；关闭保留记录，恢复不重放工具副作用。模块、接口、迁移与故障验收在完整稿中定义。</p>
   <h3>设计验证</h3>
   <p>Chrome 原型 51 项、Android 真机 9 项检查通过；仅验证设计交互、布局和示例记录格式，不代表真实文件托管、数据库迁移或故障恢复已实施。</p>
+</section>
+
+<section id="task-native-session-implementation" lang="zh-CN">
+<h2>native 会话托管实施 · 2026-10-22</h2>
+<p>首页任务栏与详情直达原会话和项目；桌面在 Main 右侧打开 native，手机为全屏单返回栏。记住筛选、选择、位置及草稿；等待验收与终态详情不轮询。项目目录提供 native 入口，不移动首页任务主列表。</p>
+<p>schema 12 登记稳定 native 身份和父子关系，以同事务 outbox 生成私有 JSONL、校验 gzip 分段；七天前正文在无在途 turn、保留最近两轮且可精确恢复时改为认证引用。备份格式 3 同时包含数据库、native 目录和附件；关闭保留历史，恢复不重放工具。采用带来源、修订与有效范围的工作习惯，只影响新项目任务，续改保持原 Agent / branch / workspace。</p>
+<p>设计原型与真实实现的目录、接口和验收差异见上述实际实现 HTML；开发文档中文是 i18n 例外，产品文字均走 i18n。代码未部署。</p>
 </section>

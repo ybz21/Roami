@@ -529,6 +529,36 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def tasks(owner: Owner, conversationId: str | None = None):
         return {"data": await runtime.tasks.list(owner, conversationId)}
 
+    @app.get("/v1/native-sessions")
+    async def native_sessions(owner: Owner, projectId: str | None = None):
+        return {"data": await runtime.native_sessions.list(owner, project_id=projectId)}
+
+    @app.get("/v1/native-sessions/{session_id}")
+    async def native_session(session_id: str, owner: Owner):
+        return {"data": await runtime.native_sessions.get(owner, session_id)}
+
+    @app.get("/v1/native-sessions/{session_id}/conversation")
+    async def native_conversation(
+        session_id: str,
+        owner: Owner,
+        before: int | None = Query(None, ge=1),
+        limit: int = Query(80, ge=1, le=200),
+    ):
+        return {
+            "data": await runtime.native_sessions.conversation(
+                owner, session_id, before=before, limit=limit
+            )
+        }
+
+    @app.get("/v1/native-sessions/{session_id}/events")
+    async def native_events(
+        session_id: str,
+        owner: Owner,
+        after: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=200),
+    ):
+        return {"data": await runtime.native_sessions.events(owner, session_id, after, limit)}
+
     @app.get("/v1/tasks/{task_id}")
     async def task_detail(task_id: str, owner: Owner):
         return {"data": await runtime.tasks.get(owner, task_id)}

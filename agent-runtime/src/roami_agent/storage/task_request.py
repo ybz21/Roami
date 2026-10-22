@@ -16,8 +16,8 @@ def task_user_request(db, message):
             "SELECT u.id FROM tool_calls x JOIN messages r ON r.id=x.result_message_id "
             "JOIN messages u ON u.turn_id=x.turn_id AND u.role='user' "
             "WHERE x.tool_name='task_steer' AND x.state='succeeded' "
-            "AND u.conversation_id=? AND CASE WHEN json_valid(json_extract(r.content_json,'$.text')) "
-            "THEN json_extract(json_extract(r.content_json,'$.text'),'$.operationId') END=? ORDER BY u.seq LIMIT 1",
+            "AND u.conversation_id=? AND CASE WHEN json_valid(json_extract(native_content(r.content_json),'$.text')) "
+            "THEN json_extract(json_extract(native_content(r.content_json),'$.text'),'$.operationId') END=? ORDER BY u.seq LIMIT 1",
             (message["conversation_id"], content["operationId"]),
         )
         source_id = receipt["id"] if receipt else None

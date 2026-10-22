@@ -530,3 +530,53 @@ async def test_professional_brief_passes_only_admitted_verified_input_paths(stor
             assert "read them as data" in brief
     finally:
         await runtime.close()
+
+
+async def test_workspace_habit_applies_to_new_project_and_keeps_explicit_base(store):
+    from roami_agent.memory.writer import source_snapshot
+
+    runtime, _targets, router, _tools, binding = await setup(
+        store, user="Roami 项目以后都用独立工作区，从 develop 和 origin 开始。"
+    )
+    try:
+        source = await store.call(
+            lambda db: source_snapshot(db, "alice", binding["originMessageId"])
+        )
+        preference = await runtime.memory.propose(
+            "alice",
+            "工作习惯",
+            "以后用独立工作区，从 develop 和 origin 开始。",
+            [source["id"]],
+            expected_sources={source["id"]: source["sha256"]},
+            kind="preference",
+            project_id="roami",
+            conversation_id=binding["conversation"],
+            confirmed=True,
+        )
+        reference = {
+            "memoryId": preference["id"],
+            "revision": preference["revision"],
+            "quote": "以后用独立工作区，从 develop 和 origin 开始。",
+            "base": "develop",
+            "remote": "origin",
+        }
+        args = request(workspacePreference=reference)
+        args["target"] = {"kind": "project", "projectId": "roami", "base": "release"}
+        decision = await router.decide(args, binding)
+        assert decision["targetRef"]["base"] == "release"
+        assert decision["targetRef"]["remote"] == "origin"
+        assert decision["workflowPreference"]["memoryId"] == preference["id"]
+        assert decision["workflowPreference"]["values"]["workspaceMode"] == "worktree"
+        bad = dict(args, target={"kind": "project", "projectId": "another-project"})
+        with pytest.raises(DomainError, match="WORKFLOW_PREFERENCE_SOURCE_INVALID"):
+            await router.decide(bad, dict(binding, toolCallId="wrong-scope"))
+        with pytest.raises(DomainError, match="WORKFLOW_PREFERENCE_SOURCE_INVALID"):
+            await router.decide(
+                dict(
+                    args,
+                    target={"kind": "project", "projectId": "roami", "workspaceId": "existing"},
+                ),
+                dict(binding, toolCallId="bound-workspace"),
+            )
+    finally:
+        await runtime.close()

@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const maxPythonAgentSchemaVersion = 11
+const maxPythonAgentSchemaVersion = 12
 
 type BackupEntry struct {
 	DatabaseDescriptor
@@ -22,11 +22,12 @@ type BackupEntry struct {
 	SchemaVersion int    `json:"schemaVersion"`
 }
 type BackupManifest struct {
-	Version   int                   `json:"formatVersion"`
-	Layout    Layout                `json:"layout"`
-	Created   string                `json:"createdAt"`
-	Databases []BackupEntry         `json:"databases"`
-	Artifacts []ArtifactBackupEntry `json:"artifacts,omitempty"`
+	Version     int                   `json:"formatVersion"`
+	Layout      Layout                `json:"layout"`
+	Created     string                `json:"createdAt"`
+	Databases   []BackupEntry         `json:"databases"`
+	Artifacts   []ArtifactBackupEntry `json:"artifacts,omitempty"`
+	NativeFiles []NativeBackupEntry   `json:"nativeFiles,omitempty"`
 }
 
 func fileHash(path string) (string, error) {
@@ -151,6 +152,9 @@ func (p Paths) BackupSet(destination string) (string, error) {
 		}
 	}
 	manifest.Artifacts = artifacts
+	if e = backupNativeFiles(p.Home, stage, &manifest); e != nil {
+		return "", e
+	}
 	if e = atomicJSON(filepath.Join(stage, "catalog.json"), c); e != nil {
 		return "", e
 	}
@@ -178,7 +182,7 @@ func ValidateBackup(path string) (BackupManifest, Catalog, error) {
 	if e = json.Unmarshal(b, &m); e != nil {
 		return m, c, e
 	}
-	if (m.Version != 1 && m.Version != 2) || m.Layout.Version != LayoutVersion {
+	if (m.Version != 1 && m.Version != 2 && m.Version != 3) || m.Layout.Version != LayoutVersion {
 		return m, c, fmt.Errorf("unsupported backup version")
 	}
 	b, e = os.ReadFile(filepath.Join(path, "catalog.json"))
@@ -226,7 +230,7 @@ func ValidateBackup(path string) (BackupManifest, Catalog, error) {
 	if err != nil {
 		return m, c, err
 	}
-	if present && m.Version != 2 {
+	if present && m.Version < 2 {
 		return m, c, fmt.Errorf("Agent artifact backup package is incomplete")
 	}
 	if len(indexed) != len(m.Artifacts) {
@@ -239,6 +243,9 @@ func ValidateBackup(path string) (BackupManifest, Catalog, error) {
 		if err = transferArtifact(filepath.Join(path, "files"), "", entry); err != nil {
 			return m, c, err
 		}
+	}
+	if err = validateNativeBackup(path, m); err != nil {
+		return m, c, err
 	}
 	return m, c, nil
 }

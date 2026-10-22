@@ -314,7 +314,7 @@ class Memories:
                     "JOIN prompt_manifests p ON p.turn_id=m.turn_id JOIN json_each(p.parts_json,'$.sourceMessageIds') j "
                     "JOIN affected a ON a.id=j.value WHERE c.owner_id=? AND m.role IN ('assistant','tool') "
                     "UNION SELECT m.id FROM messages m JOIN conversations c ON c.id=m.conversation_id "
-                    "JOIN json_each(m.content_json,'$.sourceMessageIds') j JOIN affected a ON a.id=j.value "
+                    "JOIN json_each(native_content(m.content_json),'$.sourceMessageIds') j JOIN affected a ON a.id=j.value "
                     "WHERE c.owner_id=? AND m.role='assistant' "
                     "UNION SELECT paired.id FROM messages original JOIN affected a ON a.id=original.id "
                     "JOIN messages paired ON paired.turn_id=original.turn_id "

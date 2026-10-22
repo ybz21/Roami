@@ -27,6 +27,7 @@ EXTRACTION_PROMPT = (
     "For an explicitly personal, reusable preference (such as the user's default response style or "
     'their own preference identifier), set proposedScope="user_preference". Otherwise use '
     'proposedScope="source"; project/task rules, one-off instructions and facts are never user preferences. '
+    "Reusable coding habits (Roami project, independent worktree, base branch and coding environment) are preferences with their original project/conversation scope; do not infer them from tool behavior or broaden them to all projects. "
     'Omit evidenceQuote for inferred memories. At most eight memories; return {"memories":[]} '
     "when nothing is reusable."
 )

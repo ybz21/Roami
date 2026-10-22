@@ -1,3 +1,4 @@
+import NativeProjectSessions from '../agent/NativeProjectSessions'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
 // 项目页（08 设计）——「项目 = 目录（git 可选），任务驱动」：
@@ -1418,6 +1419,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
 
         {/* ── 任务流 ── */}
         {tab === 'tasks' && (<>
+          <NativeProjectSessions projectId={proj.key} />
           {sect(t('project.section.active'), mine.length)}
           {/* 分组优先级 蜂群 ⬡ > parent 树 > 平铺（08 §2.2）：成员按编队组头聚合，组头 → 蜂群台 */}
           {(() => {

@@ -1,6 +1,6 @@
 # 任务、会话与工作习惯
 
-2026-10-22 设计提案，尚未实施。入口：[可交互 HTML](index.html)。
+2026-10-22。入口：[可交互设计稿](index.html) · [实际实现与验收](implementation.html)。
 
 同一 HTML 包含产品设计、用户故事、桌面／手机交互原型、技术架构、状态与接口提案、迁移和评审验收。
 
@@ -18,7 +18,7 @@
 
 ## 直达会话与 native 托管修订
 
-任务行和详情的“进入会话”直接导航到原专业会话或统一 native 会话页。native 默认目录为 `~/.roami/agents/native/<UTC毫秒时间戳-随机后缀>/`，`.chat.jsonl` 保存消息与调用，`.session.json` 保存身份关联，`context/` 与 `blobs/` 保存检查点及大输出。拟通过 SQLite 事务 outbox 补写日志；关闭不删除，恢复不重跑副作用。当前仅设计和样例，真实托管尚未实施。
+任务行和详情的“进入会话”直接导航到原专业会话或统一 native 会话页。native 默认目录为 `~/.roami/agents/native/<UTC毫秒时间戳-随机后缀>/`，`.chat.jsonl` 保存消息与调用，`.session.json` 保存身份关联，`context/` 与 `blobs/` 保存检查点及大输出。拟通过 SQLite 事务 outbox 补写日志；关闭不删除，恢复不重跑副作用。原型仍使用样例；实际目录、接口、压缩和验收见 implementation.html。
 
 示例：[JSONL](examples/native-session-example.jsonl)、[会话元信息](examples/native-session-metadata.json)。
 
@@ -26,4 +26,4 @@
 
 将本目录保留完整结构，用 Chrome 打开 `index.html`。原型的 CSS、JavaScript 和图标均已内嵌，不需要启动 Roami 或安装依赖；JSONL 和元信息示例位于相邻 `examples/`。设计稿中的拟议接口尚未实现，所有交互只更新隔离的浏览器示例数据。
 
-当前运行中的 native 消息、分支与工具记录保存在 `~/.roami/database/agents/runtime.db`。本 PR 只交付设计和示例，不创建真实 native 托管目录、不迁移数据库、不改动产品运行行为。文档使用中文，属于开发设计文档的 i18n 例外。
+当前运行中的 native 消息、分支与工具记录保存在 `~/.roami/database/agents/runtime.db`。原设计 PR #426 交付原型；实施 issue #429 补齐真实托管、schema 12、无损 gzip 分段、旧正文冷存、备份恢复及前端入口。代码尚未部署，具体契约与验收以 implementation.html 为准。文档使用中文，属于开发设计文档的 i18n 例外。

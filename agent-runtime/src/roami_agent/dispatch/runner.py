@@ -240,7 +240,7 @@ class TaskDispatcher:
         counts = row(
             db,
             "SELECT COALESCE(SUM(x.state='succeeded'),0) AS completed,"
-            "COALESCE(SUM(x.state!='succeeded' AND COALESCE(json_extract(json_extract(m.content_json,'$.text'),'$.executionStarted'),1)!=0),0) AS uncertain "
+            "COALESCE(SUM(x.state!='succeeded' AND COALESCE(json_extract(json_extract(native_content(m.content_json),'$.text'),'$.executionStarted'),1)!=0),0) AS uncertain "
             "FROM tool_calls x LEFT JOIN messages m ON m.id=x.result_message_id WHERE x.turn_id=?",
             (turn["id"] if turn else None,),
         )

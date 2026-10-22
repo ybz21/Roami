@@ -25,6 +25,15 @@ class ConversationService:
         self.preempt = preempt
 
     async def submit(self, owner, cid, request_key, text, attachment_ids=None):
+        native = await self.db.call(
+            lambda db: row(
+                db,
+                "SELECT task_id FROM native_sessions WHERE conversation_id=? AND owner_id=?",
+                (cid, owner),
+            )
+        )
+        if native:
+            raise DomainError("NATIVE_SESSION_USE_TASK_CHANNEL", 409)
         parts = text.strip().split(maxsplit=1)
         command, arguments = (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
         if text.strip().startswith("/") and "\n" not in text.strip():

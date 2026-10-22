@@ -3495,6 +3495,11 @@ const enUS = {
   'agent.task.sessionCloseUnknown': 'Closure is unconfirmed. Check the original session.',
   'agent.task.sessionBusy': 'The session is still working. Stop the current turn before closing.',
   'agent.task.sessionUnavailable': 'The original session is unavailable. Check that session; the agent will not be replaced.',
+  'agent.task.enterSession': 'Enter session',
+  'agent.task.project': 'Project',
+  'agent.session': 'Session',
+  'agent.task.filter.open': 'Open sessions',
+  'agent.task.details': 'Task details',
 }
 
 export default enUS

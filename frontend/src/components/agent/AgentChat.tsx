@@ -10,6 +10,7 @@ import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
 import { openAgentPage } from './agent-page-route'
 import AgentTasks from './AgentTasks'
+import NativeSession from './NativeSession'
 import { taskFailureKey } from './task-failure'
 import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
@@ -40,7 +41,8 @@ export function agentFailure(error: any, t: (key: string) => string) {
 }
 const newKey = () => crypto.randomUUID()
 
-export default function AgentChat({ cid, branch, focusMessage = '', inactive = false, node, inbox, inboxOpen, select, notifications, projects, onSession, mobileActionsHost }: {
+export default function AgentChat({ cid, branch, focusMessage = '', inactive = false, nativeSession, onCloseNative, node, inbox, inboxOpen, select, notifications, projects, onSession, mobileActionsHost }: {
+  nativeSession?: string; onCloseNative?: () => void
   cid: string; branch: string; focusMessage?: string; inactive?: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
   select: (cid: string, branch?: string, message?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
@@ -49,7 +51,9 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const { t } = useI18n(), { phone, landscape, size } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch, node)
   const workspace = useAgentWorkspace(node), wide = size === 'large'
-  const [workspaceTask, setWorkspaceTask] = useState('')
+  const workspaceSelectionKey = 'roami.task.selection.' + (node || 'local') + ':' + cid
+  const [workspaceTask, editWorkspaceTask] = useAgentDraft(workspaceSelectionKey)
+  const setWorkspaceTask = (value: string) => { editWorkspaceTask(value); try { if (value) localStorage.setItem(workspaceSelectionKey, value); else localStorage.removeItem(workspaceSelectionKey) } catch { /* Keep selection in memory. */ } }
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
@@ -241,7 +245,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
-    {!phone && !(wide && workspace.open) && <div className="agent-chat-actions">
+    {!phone && !(wide && (workspace.open || nativeSession)) && <div className="agent-chat-actions">
       {conversationActions}
       {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
     </div>}
@@ -303,7 +307,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>
 
       {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
-      {panel === 'tasks' && <AgentTasks key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox.refresh() }} />}
+      {panel === 'tasks' && <AgentTasks projects={projects} key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox.refresh() }} />}
       {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID, sourceBranch, sourceMessage) => { setPanel(null); select(sourceCID, sourceBranch, sourceMessage) }} />}
       {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? context.contextWindow ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.contextWindow }) : t('agent.contextUnknown', { used: context.estimatedTokens }) : t('agent.contextHint')}</p>{context?.contextWindow && <p>{t('agent.contextMeter.threshold', { percent: Math.round((context.compactionRatio ?? 0.75) * 100) })}</p>}{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
         <Button disabled={!cid || readOnly || compacting || running} onClick={() => { void submit('/compact') }}>{t('agent.compactNow')}</Button>
@@ -316,6 +320,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
-  {wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  {wide && nativeSession ? <aside className="agent-workspace-rail agent-native-workspace" aria-label={t('agent.session')}><div className="agent-native-workspace-nav"><button type="button" className="tt-act" onClick={onCloseNative}>{t('common.back')}</button><span>{t('agent.session')}</span></div><NativeSession id={nativeSession} node={node} projects={projects} onChanged={() => { thread.refresh(); inbox.refresh() }} /></aside> : wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
   </div>
 }

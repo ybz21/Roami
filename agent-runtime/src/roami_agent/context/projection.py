@@ -259,8 +259,8 @@ class Context:
                 for r in rows(
                     db,
                     "SELECT DISTINCT turn_id FROM tool_calls WHERE turn_id IN (SELECT id FROM turns WHERE conversation_id=?) AND state='succeeded' AND "
-                    "((tool_name='reply' AND json_extract(arguments_json,'$.mode') IN ('debug','detailed')) "
-                    "OR (tool_name='task_status' AND json_extract(arguments_json,'$.includeResult')=1))",
+                    "((tool_name='reply' AND json_extract(native_content(arguments_json),'$.mode') IN ('debug','detailed')) "
+                    "OR (tool_name='task_status' AND json_extract(native_content(arguments_json),'$.includeResult')=1))",
                     (cid,),
                 )
             }

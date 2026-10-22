@@ -56,6 +56,7 @@ from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, lo
 from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
+from roami_agent.storage.native_sessions import NativeSessions
 from roami_agent.storage.task_deliverables import TaskDeliverables
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
@@ -164,6 +165,8 @@ class Runtime:
         self.brief_monitor = None
         self.artifact_monitor = None
         self.native_reconciliation_monitor = None
+        self.native_session_monitor = None
+        self.native_sessions = NativeSessions(database)
         self.native_reconciliation = NativeWorkspaceReconciliation(
             database, self.settings, resources=self.resources
         )
@@ -280,6 +283,7 @@ class Runtime:
         await self.resources.recover()
         await self.dispatch.recover()
         await self.briefs.recover()
+        await self.native_sessions.recover()
         if self.settings.proactive_enabled:
             await self.proactive.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
@@ -291,6 +295,7 @@ class Runtime:
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
         self.brief_monitor = asyncio.create_task(self._monitor_briefs())
         self.artifact_monitor = asyncio.create_task(self._monitor_artifacts())
+        self.native_session_monitor = asyncio.create_task(self._monitor_native_sessions())
         if self.db.managed:
             self.native_reconciliation_monitor = asyncio.create_task(
                 self._monitor_native_reconciliation()
@@ -298,6 +303,14 @@ class Runtime:
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
+
+    async def _monitor_native_sessions(self):
+        while not self.stopping:
+            try:
+                await self.native_sessions.maintain()
+            except (DomainError, OSError, ValueError):
+                log.exception("Native session projection failed")
+            await asyncio.sleep(5)
 
     async def _monitor_native_reconciliation(self):
         while not self.stopping:
@@ -424,10 +437,14 @@ class Runtime:
         if self.control_monitor:
             self.control_monitor.cancel()
             await asyncio.gather(self.control_monitor, return_exceptions=True)
+        if self.native_session_monitor:
+            self.native_session_monitor.cancel()
+            await asyncio.gather(self.native_session_monitor, return_exceptions=True)
         running = [item["handle"] for item in self.active.values()]
         for handle in running:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
+        await self.native_sessions.flush()
         await self.mcp.close()
         await self.desktop.close()
         await self.files.close()

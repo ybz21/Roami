@@ -350,8 +350,8 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
     await context.run(job["id"])
     await store.call(enlarge_recent, write=True)
     before = (await context.project("alice", c["id"]))["snapshotId"]
-    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 6000
-    runtime = Runtime(store, model, settings=Settings(context_window=6000))
+    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 7000
+    runtime = Runtime(store, model, settings=Settings(context_window=7000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(
@@ -365,7 +365,7 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
         )
         plan = await context.project("alice", c["id"])
         assert plan["snapshotId"] != before
-        assert plan["estimatedTokens"] < 6000
+        assert plan["estimatedTokens"] < 7000
         messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
         assert len(messages) == 14
         assert messages[-1]["content"]["text"] == "Answer: Please fix this screenshot layout."
