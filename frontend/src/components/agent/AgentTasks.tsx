@@ -18,6 +18,16 @@ import { taskFailureKey } from './task-failure'
 import './agent-tasks.css'
 
 const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
+const active = new Set(['queued', 'preparing', 'running', 'verifying', 'cancelling'])
+const taskFilters = ['all', 'attention', 'active', 'ended'] as const
+type TaskFilter = typeof taskFilters[number]
+
+function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
+  if (filter === 'all') return true
+  if (filter === 'active') return active.has(task.state)
+  if (filter === 'ended') return terminal.has(task.state)
+  return !active.has(task.state) && task.state !== 'succeeded' && task.state !== 'cancelled'
+}
 
 function failure(code: string | undefined, t: (key: string) => string) {
   if (code === 'TASK_OUTCOME_UNRESOLVED') return t('agent.task.reconcile')
@@ -35,21 +45,20 @@ type Props = { cid: string; onSession: (id: string) => void; onChanged: () => vo
 export default function AgentTasks({ cid, onSession, onChanged, selectedTask, onSelectTask, compact = false, hideBack = false }: Props) {
   const { t } = useI18n()
   const [localSelected, setLocalSelected] = useState('')
+  const [filter, setFilter] = useState<TaskFilter>('all')
   const selected = selectedTask ?? localSelected
   const setSelected = (id: string) => { if (onSelectTask) onSelectTask(id); else setLocalSelected(id) }
   const list = useAgentData<AgentTask[]>(cid ? '/agent/tasks?conversationId=' + encodeURIComponent(cid) : null, 3000, 3000, 'GET', !selected)
   const tasks = list.value || [], { loading, failed } = list
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
+  const visible = roots.filter(task => matchesTaskFilter(task, filter))
   return <div className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
     {selected ? <TaskInspector hideBack={hideBack} key={agentDataKey('/agent/tasks/' + encodeURIComponent(selected))} id={selected} onBack={() => { setSelected(''); list.refresh() }} select={setSelected} onSession={onSession} onChanged={() => { list.refresh(); onChanged() }} /> : <>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
       {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
-      {compact ? <TaskTimeline tasks={roots} select={setSelected} /> : (['attention', 'active', 'recent'] as const).map(group => {
-        const current = roots.filter(task => (['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(task.state) ? 'active' : ['succeeded', 'cancelled'].includes(task.state) ? 'recent' : 'attention') === group)
-          .sort((a, b) => (b.updated_ms || b.created_ms || 0) - (a.updated_ms || a.created_ms || 0))
-        if (!current.length) return null
-        return <section className="agent-task-list-group" key={group}><h4>{t('agent.workspace.taskGroup.' + group)}<span>{current.length}</span></h4>{current.map(task => <TaskRow key={task.id} task={task} compact={compact} select={setSelected} />)}</section>
-      })}
+      {!!roots.length && <div className="agent-task-filters" role="group" aria-label={t('agent.task.filter.label')}>{taskFilters.map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t('agent.task.filter.' + value)}</button>)}</div>}
+      {!loading && !failed && !!roots.length && !visible.length && <p className="agent-muted" role="status">{t('agent.task.filter.empty')}</p>}
+      <TaskTimeline tasks={visible} compact={compact} select={setSelected} />
     </>}
   </div>
 }
@@ -57,7 +66,7 @@ export default function AgentTasks({ cid, onSession, onChanged, selectedTask, on
 function taskTime(task: AgentTask) {
   return [task.updated_ms, task.created_ms].find(time => typeof time === 'number' && Number.isFinite(time) && time > 0) || 0
 }
-function TaskTimeline({ tasks, select }: { tasks: AgentTask[]; select: (id: string) => void }) {
+function TaskTimeline({ tasks, compact, select }: { tasks: AgentTask[]; compact: boolean; select: (id: string) => void }) {
   const { t, locale } = useI18n(), now = new Date(), yesterday = new Date(now)
   yesterday.setDate(now.getDate() - 1)
   const sorted = [...tasks].sort((a, b) => taskTime(b) - taskTime(a) || a.id.localeCompare(b.id))
@@ -65,7 +74,7 @@ function TaskTimeline({ tasks, select }: { tasks: AgentTask[]; select: (id: stri
   return <div className="agent-task-timeline">{sorted.map(task => {
     const date = taskTime(task) ? new Date(taskTime(task)) : null, day = date?.toDateString() || 'unknown'
     const heading = day !== previous; previous = day
-    return <Fragment key={task.id}>{heading && <h4>{!date ? t('agent.workspace.timeUnknown') : day === now.toDateString() ? t('agent.workspace.today') : day === yesterday.toDateString() ? t('agent.workspace.yesterday') : new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date)}</h4>}<TaskRow task={task} compact select={select} /></Fragment>
+    return <Fragment key={task.id}>{heading && <h4>{!date ? t('agent.workspace.timeUnknown') : day === now.toDateString() ? t('agent.workspace.today') : day === yesterday.toDateString() ? t('agent.workspace.yesterday') : new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date)}</h4>}<TaskRow task={task} compact={compact} select={select} /></Fragment>
   })}</div>
 }
 

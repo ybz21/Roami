@@ -18,8 +18,7 @@
 .agent-workspace-rail .agent-tasks .tt-act { min-height:calc(var(--tap) - var(--sp-2)); min-width:calc(var(--tap) - var(--sp-2)); padding:var(--sp-1) var(--sp-2); border-color:transparent; }
 .agent-workspace-rail .agent-task-heading { flex-wrap:wrap; }
 .agent-tasks-compact .agent-task-section-head { align-items:center; font-size:var(--fs-meta); }
-.agent-task-timeline > h4,.agent-memory-compact .agent-memory-day-heading { color:var(--text-bright); font-size:var(--fs-body); font-weight:500; margin:var(--sp-4) 0 var(--sp-2); }
-.agent-task-timeline > h4:first-child { margin-top:0; }
+.agent-memory-compact .agent-memory-day-heading { color:var(--text-bright); font-size:var(--fs-body); font-weight:500; margin:var(--sp-4) 0 var(--sp-2); }
 .agent-tasks-compact .agent-task-card { display:flex; align-items:flex-start; gap:var(--sp-3); padding:var(--sp-3) var(--sp-2); margin-inline:calc(-1 * var(--sp-2)); width:calc(100% + var(--sp-2) * 2); border:0; border-radius:var(--r-sm); background:transparent; cursor:pointer; }
 .agent-tasks-compact .agent-task-status-icon { display:grid; place-items:center; flex:none; width:calc(var(--sp-5) + var(--sp-4)); height:calc(var(--sp-5) + var(--sp-4)); border-radius:var(--r-card); color:var(--text-bright); background:var(--bg-base); }
 .agent-task-card[data-state="failed"] .agent-task-status-icon { color:var(--danger); }

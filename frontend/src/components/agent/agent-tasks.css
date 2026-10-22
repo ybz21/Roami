@@ -42,8 +42,14 @@ html[data-pointer="coarse"] .agent-tasks .tt-act::after { content:''; position:a
 .agent-task-requirements.clipped { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
 .agent-task-artifact small { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
 
-.agent-task-list-group h4 { display:flex; align-items:center; gap:var(--sp-2); margin:var(--sp-3) 0 var(--sp-1); color:var(--text-dim); font-size:var(--fs-sm); font-weight:500; }
-.agent-task-list-group h4 > span { color:var(--text-dimmer); font-size:var(--fs-meta); }
+.agent-task-filters { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.agent-task-filters > button { position:relative; min-height:var(--ctl-h); padding:var(--sp-1) var(--sp-2); border:1px solid var(--border-subtle); border-radius:var(--r-xs); background:transparent; color:var(--text-dim); font-size:var(--fs-sm); cursor:pointer; }
+.agent-task-filters > button[aria-pressed="true"] { color:var(--accent); border-color:var(--accent-border); background:var(--sel-bg); }
+.agent-task-filters > button:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
+:where(html[data-pointer="fine"]) .agent-task-filters > button:hover { background:var(--list-hover); }
+html[data-pointer="coarse"] .agent-task-filters > button::after { content:''; position:absolute; inset:calc(-1 * var(--sp-1)); }
+.agent-task-timeline > h4 { color:var(--text-bright); font-size:var(--fs-body); font-weight:500; margin:var(--sp-4) 0 var(--sp-2); }
+.agent-task-timeline > h4:first-child { margin-top:0; }
 .agent-task-link time { margin-left:var(--sp-2); }
 .agent-task-report { overflow-wrap:anywhere; min-width:0; }
 .agent-task-log { min-width:0; width:100%; }

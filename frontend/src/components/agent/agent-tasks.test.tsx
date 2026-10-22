@@ -160,16 +160,66 @@ it('binds acceptance to the displayed revision and execution attempt', async () 
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/verify', { accepted: true, revision: 2, runId: 'attempt-one' }))
 })
 
-it('groups attention before active and ended tasks without treating unknown as success', async () => {
-  vi.mocked(api).mockResolvedValue({ data: [{ ...task('done'), updated_ms: 1 }, { ...task('active'), state: 'running', updated_ms: 2 }, { ...task('waiting'), state: 'waiting_user', updated_ms: 3 }, { ...task('unknown'), state: 'future-state', updated_ms: 4 }] })
-  const page = render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
-  await screen.findByRole('button', { name: /Goal waiting/ })
-  const groups = page.container.querySelectorAll('.agent-task-list-group')
-  expect(groups[0].textContent).toContain('agent.workspace.taskGroup.attention')
-  expect(groups[0].textContent).toContain('agent.state.unknown')
-  expect(groups[0].textContent).not.toContain('agent.state.succeeded')
-  expect(groups[1].textContent).toContain('agent.workspace.taskGroup.active')
-  expect(groups[2].textContent).toContain('agent.workspace.taskGroup.recent')
+it.each([false, true])('sorts by time across states and filters without extra requests (compact=%s)', async compact => {
+  vi.mocked(api).mockResolvedValue({ data: [
+    { ...task('failed'), state: 'failed', updated_ms: 2 },
+    { ...task('active'), state: 'running', updated_ms: 7 },
+    { ...task('waiting'), state: 'waiting_user', updated_ms: 3 },
+    { ...task('unknown'), state: 'future-state', updated_ms: 8 },
+    { ...task('done'), updated_ms: 9 },
+    { ...task('cancelled'), state: 'cancelled', updated_ms: 4 },
+    { ...task('interrupted'), state: 'interrupted', updated_ms: 1 },
+    { ...task('queued'), state: 'queued', created_ms: 6 },
+  ] })
+  const page = render(<AgentTasks compact={compact} cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: /Goal done/ })
+  const titles = () => [...page.container.querySelectorAll('.agent-task-link b')].map(el => el.textContent)
+  expect(titles()).toEqual(['Goal done', 'Goal unknown', 'Goal active', 'Goal queued', 'Goal cancelled', 'Goal waiting', 'Goal failed', 'Goal interrupted'])
+  expect(page.container.querySelector('.agent-task-list-group')).toBeNull()
+  const reads = vi.mocked(api).mock.calls.length
+  const choose = (value: string) => fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.' + value }))
+  choose('attention')
+  expect(titles()).toEqual(['Goal unknown', 'Goal waiting', 'Goal failed', 'Goal interrupted'])
+  expect(screen.getByText('agent.state.unknown')).toBeTruthy()
+  expect(screen.queryByText('agent.state.succeeded')).toBeNull()
+  choose('active')
+  expect(titles()).toEqual(['Goal active', 'Goal queued'])
+  choose('ended')
+  expect(titles()).toEqual(['Goal done', 'Goal cancelled', 'Goal failed', 'Goal interrupted'])
+  choose('all')
+  expect(titles()[0]).toBe('Goal done')
+  expect(screen.getByRole('button', { name: 'agent.task.filter.all' }).getAttribute('aria-pressed')).toBe('true')
+  expect(api).toHaveBeenCalledTimes(reads)
+})
+
+it('keeps the filter when returning from task details', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [{ ...task('one'), state: 'failed' }, task('done')] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: detail('one') }
+  })
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: /Goal one/ })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.attention' }))
+  fireEvent.click(screen.getByRole('button', { name: /Goal one/ }))
+  await screen.findByText('Result one')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.tasks' }))
+  await screen.findByRole('button', { name: /Goal one/ })
+  expect(screen.getByRole('button', { name: 'agent.task.filter.attention' }).getAttribute('aria-pressed')).toBe('true')
+  expect(screen.queryByRole('button', { name: /Goal done/ })).toBeNull()
+})
+
+it('can clear an empty filter without losing tasks', async () => {
+  vi.mocked(api).mockResolvedValue({ data: [task('one')] })
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: /Goal one/ })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.active' }))
+  expect(screen.getByRole('status').textContent).toBe('agent.task.filter.empty')
+  expect(screen.queryByText('agent.noTasks')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.all' }))
+  expect(screen.getByRole('button', { name: /Goal one/ })).toBeTruthy()
+  expect(screen.queryByRole('status')).toBeNull()
 })
 
 it('keeps compact task cards truthful and selects the exact task without a modal', async () => {
