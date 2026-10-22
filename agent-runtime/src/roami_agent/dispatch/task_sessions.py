@@ -27,6 +27,19 @@ class TaskSessions:
         self.db, self.executor, self.confirm = database, executor, confirm
 
     async def close(self, owner, task_id, revision, run_id):
+        def finish(db, task, run):
+            db.execute(
+                "UPDATE task_session_closures SET state='closed',updated_ms=? WHERE task_id=?",
+                (now_ms(), task_id),
+            )
+            event(
+                db,
+                task["origin_conversation_id"],
+                "task.session_closed",
+                {"taskId": task_id, "sessionId": run["session_id"]},
+                task_id=task_id,
+            )
+
         def reserve(db):
             task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
             if not task:
@@ -43,7 +56,11 @@ class TaskSessions:
             prior = session_closure(db, task_id)
             if prior and prior["state"] == "closed":
                 return task, run, True
-            if prior and prior["state"] in {"closing", "unknown"}:
+            if (
+                prior
+                and prior["state"] in {"closing", "unknown"}
+                and run["executor_kind"] != "native"
+            ):
                 raise DomainError("TASK_SESSION_CLOSING", 409)
             if task["state"] not in STABLE or not run["finished_ms"]:
                 raise DomainError("TASK_SESSION_BUSY", 409)
@@ -104,17 +121,18 @@ class TaskSessions:
                 "ON CONFLICT(task_id) DO UPDATE SET task_revision=excluded.task_revision,run_id=excluded.run_id,launch_id=excluded.launch_id,session_id=excluded.session_id,state='closing',error_code=NULL,updated_ms=excluded.updated_ms",
                 (task_id, revision, run_id, run["launch_id"], run["session_id"], now_ms()),
             )
+            if run["executor_kind"] == "native":
+                finish(db, task, run)
+                return task, run, True
             return task, run, False
 
         task, run, closed = await self.db.call(reserve, write=True)
         if closed:
+            if task["state"] == "waiting_user":
+                await self.confirm(owner, task_id, True, revision=revision, run_id=run_id)
             return {"taskId": task_id, "state": "closed"}
         try:
-            result = (
-                {"state": "closed", "session": run["session_id"]}
-                if run["executor_kind"] == "native"
-                else await self.executor.command("close", "--key", run["launch_id"])
-            )
+            result = await self.executor.command("close", "--key", run["launch_id"])
             if result.get("state") != "closed" or result.get("session") != run["session_id"]:
                 raise DomainError("TASK_SESSION_CLOSE_UNKNOWN", 409)
         except (DomainError, OSError, TimeoutError) as exc:
@@ -134,20 +152,7 @@ class TaskSessions:
             )
             raise DomainError(code, 409) from exc
 
-        def finish(db):
-            db.execute(
-                "UPDATE task_session_closures SET state='closed',updated_ms=? WHERE task_id=?",
-                (now_ms(), task_id),
-            )
-            event(
-                db,
-                task["origin_conversation_id"],
-                "task.session_closed",
-                {"taskId": task_id, "sessionId": run["session_id"]},
-                task_id=task_id,
-            )
-
-        await self.db.call(finish, write=True)
+        await self.db.call(lambda db: finish(db, task, run), write=True)
         if task["state"] == "waiting_user":
             await self.confirm(owner, task_id, True, revision=revision, run_id=run_id)
         return {"taskId": task_id, "state": "closed"}

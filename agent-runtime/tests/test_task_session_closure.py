@@ -137,3 +137,23 @@ async def test_unresolved_old_execution_cannot_be_closed_as_verified_completion(
         assert not calls
     finally:
         await runtime.close()
+
+
+async def test_retry_after_acceptance_failure_does_not_close_the_professional_session_twice(store):
+    runtime, task, run, calls, service = await prepare(store)
+    original = service.confirm
+
+    async def unavailable(*args, **kwargs):
+        raise DomainError("INJECTED_ACCEPTANCE_FAILURE", 503)
+
+    service.confirm = unavailable
+    try:
+        with pytest.raises(DomainError, match="INJECTED_ACCEPTANCE_FAILURE"):
+            await service.close("alice", task["id"], 1, run["id"])
+        assert len(calls) == 1
+        service.confirm = original
+        await service.close("alice", task["id"], 1, run["id"])
+        assert len(calls) == 1
+        assert (await runtime.tasks.get("alice", task["id"]))["task"]["state"] == "succeeded"
+    finally:
+        await runtime.close()

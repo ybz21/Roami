@@ -457,3 +457,43 @@ async def test_closing_parent_checks_pending_work_in_descendants(store, pending)
         is None
     )
     assert (await service.get("alice", parent["id"]))["lifecycle"] == "open"
+
+
+async def test_native_close_database_failure_rolls_back_the_input_fence(store, monkeypatch):
+    from roami_agent.dispatch import task_sessions
+
+    service, session, _, task = await native(store)
+
+    def complete(db):
+        db.execute("UPDATE tasks SET state='failed' WHERE id=?", (task["id"],))
+        db.execute(
+            "UPDATE task_attempts SET state='failed',finished_ms=1 WHERE task_id=?", (task["id"],)
+        )
+        return row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+
+    run = await store.call(complete, write=True)
+
+    async def confirm(*args, **kwargs):
+        raise AssertionError("Failed execution must not become verified success")
+
+    original = task_sessions.event
+
+    def fail_event(*args, **kwargs):
+        raise DomainError("INJECTED_DATABASE_FAILURE", 503)
+
+    monkeypatch.setattr(task_sessions, "event", fail_event)
+    closer = task_sessions.TaskSessions(store, None, confirm)
+    with pytest.raises(DomainError, match="INJECTED_DATABASE_FAILURE"):
+        await closer.close("alice", task["id"], 1, run["id"])
+    assert (
+        await store.call(
+            lambda db: row(db, "SELECT * FROM task_session_closures WHERE task_id=?", (task["id"],))
+        )
+        is None
+    )
+    assert (await service.get("alice", session["id"]))["lifecycle"] == "open"
+    monkeypatch.setattr(task_sessions, "event", original)
+    assert (await closer.close("alice", task["id"], 1, run["id"]))["state"] == "closed"
+    assert (
+        await store.call(lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],)))
+    )["state"] == "failed"
