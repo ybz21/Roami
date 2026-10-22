@@ -33,6 +33,7 @@ section "CLI entry audit"
 node scripts/dev/quality/cli-entry-audit.mjs
 bash scripts/dev/selftest/install-storage-preflight.sh
 bash scripts/dev/selftest/retired-session-entries.sh
+bash scripts/dev/selftest/python-check-scope.sh
 
 section "Shell syntax"
 shell_files="$(git ls-files '*.sh' 'scripts/*.sh')"
@@ -56,12 +57,17 @@ fi
 section "Go tests"
 go test ./...
 
-section "Python Agent runtime"
-if ! command -v uv >/dev/null 2>&1; then
-  echo "uv is missing. Install uv, then run: cd agent-runtime && uv sync --frozen" >&2
-  exit 1
+python_checks="$(bash scripts/dev/quality/python-check-scope.sh "$MODE")"
+if [ "$python_checks" = true ]; then
+  section "Python Agent runtime"
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "uv is missing. Install uv, then run: cd agent-runtime && uv sync --frozen" >&2
+    exit 1
+  fi
+  (cd agent-runtime && uv sync --frozen --quiet && uv run --frozen ruff check src tests && uv run --frozen ruff format --check src tests && uv run --frozen pytest -q)
+else
+  section "Python Agent runtime skipped (no related changes)"
 fi
-(cd agent-runtime && uv sync --frozen --quiet && uv run --frozen ruff check src tests && uv run --frozen ruff format --check src tests && uv run --frozen pytest -q)
 
 section "Frontend checks"
 if [ ! -d frontend/node_modules ]; then

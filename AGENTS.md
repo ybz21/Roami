@@ -243,6 +243,11 @@ or memory reduction claim. Evidence and the next steps live in
 - Run `scripts/dev/quality/check.sh quick` before committing local changes.
 - Run `scripts/dev/quality/check.sh full` before opening or updating a PR with runtime behavior
   changes.
+- Scope checks to the affected code. Run Python dependency sync, lint, formatting, and tests only
+  when Python code, runtime resources, dependencies, or Python test configuration changes; skip
+  them for frontend-only and other unrelated changes. Local hooks inspect staged changes, and CI
+  inspects the complete PR or push diff, including deleted files. If the comparison cannot be
+  determined reliably, run the Python checks instead of silently skipping them.
 - Frontend changes must additionally pass
   `npm run typecheck && npm run i18n:check && npm run hover:check && npx vitest run && npm run build`.
 - Install the tracked Git hooks with `bash scripts/dev/install-git-hooks.sh`; it sets
