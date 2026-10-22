@@ -786,3 +786,16 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
   <p>仓库 full 门禁及 Go 竞态测试通过；前端 127 文件 / 913 用例、typecheck、i18n、hover 与生产构建通过。覆盖四类 Agent、保存密钥和环境变量、Anthropic 分页、连接取消、失败保留、重定向及响应限制；Python 按仓库改动范围规则跳过，构建保留已有大块体积提示。</p>
   <p>隔离 Go / HOME / 原生配置 / tmux 和本地模型服务完成四类 Agent 查询、下拉选择、自定义保存及刷新恢复。桌面中英文深浅主题在 320–1920 宽度无文档溢出；Redmi Note 8 真机以 coarse 指针完成查询、搜索、Android 原生点按候选、保存、刷新与返回，键盘 314px 时输入位于可见表单内、保存高度 44px 且不被遮挡。截图和脚本位于 /tmp/model-picker-*，未改动现用服务和原生配置，未调用推理接口。</p>
 </section>
+
+<section id="task-native-session-design" lang="zh-CN">
+  <h2>任务会话与 native 托管设计 · 2026-10-22</h2>
+  <p>设计提案，尚未实施。完整 HTML 入口：<a href="docs/design/20261022-任务会话与工作习惯/index.html">任务、会话与工作习惯</a>；<a href="docs/design/20261022-任务会话与工作习惯/verification.html">原型验证记录</a>。</p>
+  <h3>产品设计</h3>
+  <p>首页中间保留 Main，右侧任务栏展示任务及可点击项目归属；进入会话直接打开绑定原会话。用户确认结束前保留原身份与筛选；工作习惯只影响新任务，续改复用原工作区和智能体。</p>
+  <h3>用户故事</h3>
+  <p>用户能从首页直接进入专业或 native 会话，补充修改后仍回到原任务；也能点击项目名进入所属项目，返回保留筛选、搜索和位置。</p>
+  <h3>技术设计</h3>
+  <p>native 拟统一托管在 ~/.roami/agents/native/时间戳-随机后缀/，以 .session.json 记录身份关联、.chat.jsonl 记录对话和工具调用，context 与 blobs 保存检查点及大输出。现有 SQLite 继续负责在线事务与调度，事务 outbox 串行补写日志；关闭保留记录，恢复不重放工具副作用。模块、接口、迁移与故障验收在完整稿中定义。</p>
+  <h3>设计验证</h3>
+  <p>Chrome 原型 51 项、Android 真机 9 项检查通过；仅验证设计交互、布局和示例记录格式，不代表真实文件托管、数据库迁移或故障恢复已实施。</p>
+</section>
