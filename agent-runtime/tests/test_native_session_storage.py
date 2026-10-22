@@ -377,3 +377,83 @@ async def test_short_old_messages_stay_inline_when_a_reference_would_be_larger(s
         lambda db: db.execute("SELECT content_json FROM messages WHERE id=?", (mid,)).fetchone()[0]
     )
     assert json.loads(raw) == {"text": "Done"}
+
+
+@pytest.mark.parametrize("pending", ["tool", "steering", "professional_outcome"])
+async def test_closing_parent_checks_pending_work_in_descendants(store, pending):
+    from roami_agent.dispatch.task_sessions import TaskSessions
+    from roami_agent.protocol.identity import identity
+
+    service, parent, _, task = await native(store)
+    await store.call(
+        lambda db: db.execute("UPDATE tasks SET state='running' WHERE id=?", (task["id"],)),
+        write=True,
+    )
+    child = await Tasks(store, Conversations(store)).create(
+        "alice",
+        parent["conversation_id"],
+        "Child work",
+        key="close-child",
+        parent_task_id=task["id"],
+        executor="codex" if pending == "professional_outcome" else "native",
+        target={"kind": "new_session", "directory": str(store.data_root)},
+    )
+
+    def prepare(db):
+        for ident in (task["id"], child["id"]):
+            db.execute("UPDATE tasks SET state='failed' WHERE id=?", (ident,))
+            db.execute(
+                "UPDATE task_attempts SET state='failed',finished_ms=1 WHERE task_id=?", (ident,)
+            )
+        child_run = row(db, "SELECT * FROM task_attempts WHERE task_id=?", (child["id"],))
+        if pending == "tool":
+            native_child = row(db, "SELECT * FROM native_sessions WHERE task_id=?", (child["id"],))
+            turn = identity()
+            db.execute(
+                "INSERT INTO turns(id,conversation_id,branch_id,trigger_kind,state,created_ms) VALUES(?,?,?,'continuation','completed',1)",
+                (turn, native_child["conversation_id"], native_child["branch_id"]),
+            )
+            mid = message(
+                db,
+                native_child["conversation_id"],
+                native_child["branch_id"],
+                "assistant",
+                {"text": "Uncertain write"},
+                turn_id=turn,
+            )
+            call = identity()
+            db.execute(
+                "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,created_ms,updated_ms) VALUES(?,?,?,'write_file','{}','write','unknown',?,1,1)",
+                (call, turn, mid, call),
+            )
+        elif pending == "professional_outcome":
+            db.execute(
+                "UPDATE task_attempts SET state='unknown',result_json=? WHERE id=?",
+                (json.dumps({"inputStopped": False, "outcomeKnown": False}), child_run["id"]),
+            )
+        return row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+
+    run = await store.call(prepare, write=True)
+    if pending == "steering":
+        await Tasks(store, Conversations(store)).revisions.request(
+            "alice", child["id"], "Continue this child", 1, "pending-child"
+        )
+
+    async def confirm(*args, **kwargs):
+        raise AssertionError("Unsettled parent must not be confirmed")
+
+    closer = TaskSessions(store, None, confirm)
+    expected = {
+        "tool": "TASK_SESSION_BUSY",
+        "steering": "TASK_STEER_PENDING",
+        "professional_outcome": "TASK_OUTCOME_UNRESOLVED",
+    }[pending]
+    with pytest.raises(DomainError, match=expected):
+        await closer.close("alice", task["id"], 1, run["id"])
+    assert (
+        await store.call(
+            lambda db: row(db, "SELECT * FROM task_session_closures WHERE task_id=?", (task["id"],))
+        )
+        is None
+    )
+    assert (await service.get("alice", parent["id"]))["lifecycle"] == "open"
