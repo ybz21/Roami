@@ -737,3 +737,17 @@ GET /browser/tabs + PATCH /tabs/:id   复用现有读取与移组，不新增后
   <p>隔离 Go 服务在缺少 OpenCode 安装目录的 PATH 下自动返回四种本机已安装版本；桌面中英与深浅主题、Redmi Note 8 真机 392 CSS px / coarse 确认版本可见，真实手势滚动、详情点按与返回，无文档或横向溢出。截图保存在 /tmp/agent-versions-*，未部署到现用服务。</p>
   <p>版本位置修订：版本移至名称下方，与登录状态分开展示；复用字号、颜色和间距令牌。前端全部门禁及 899 个用例通过，桌面中文深色、英文浅色和 Redmi Note 8 真机验证位置、滚动、名称点按及详情返回。截图位于 /tmp/agent-version-placement-*。</p>
 </section>
+
+
+<section id="task-native-session-design" lang="zh-CN">
+  <h2>任务会话与 native 托管设计 · 2026-10-22</h2>
+  <p>设计提案，尚未实施。完整 HTML 入口：<a href="docs/design/20261022-任务会话与工作习惯/index.html">任务、会话与工作习惯</a>；<a href="docs/design/20261022-任务会话与工作习惯/verification.html">原型验证记录</a>。</p>
+  <h3>产品设计</h3>
+  <p>首页中间保留 Main，右侧任务栏展示任务及可点击项目归属；进入会话直接打开绑定原会话。用户确认结束前保留原身份与筛选；工作习惯只影响新任务，续改复用原工作区和智能体。</p>
+  <h3>用户故事</h3>
+  <p>用户能从首页直接进入专业或 native 会话，补充修改后仍回到原任务；也能点击项目名进入所属项目，返回保留筛选、搜索和位置。</p>
+  <h3>技术设计</h3>
+  <p>native 拟统一托管在 ~/.roami/agents/native/时间戳-随机后缀/，以 .session.json 记录身份关联、.chat.jsonl 记录对话和工具调用，context 与 blobs 保存检查点及大输出。现有 SQLite 继续负责在线事务与调度，事务 outbox 串行补写日志；关闭保留记录，恢复不重放工具副作用。模块、接口、迁移与故障验收在完整稿中定义。</p>
+  <h3>设计验证</h3>
+  <p>Chrome 原型 51 项、Android 真机 9 项检查通过；仅验证设计交互、布局和示例记录格式，不代表真实文件托管、数据库迁移或故障恢复已实施。</p>
+</section>
