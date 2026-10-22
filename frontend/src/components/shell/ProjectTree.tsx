@@ -189,13 +189,10 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     </Dropdown>
   )
 
-  // 任务是一张卡（参照 Orca 的侧栏）：头行、「N 个会话」折叠头、会话行带时间；收起时只剩一枚「✳ +N ›」
+  // 会话直接列出，项目行统一控制折叠。
   const taskRows = (task: TreeTask, projName?: string) => {
     const on = activeTask === task.key
-    const many = task.sessions.length > 1
-    const open = !many || !closed.has(task.key)
     const hasActive = task.sessions.some((s) => s.name === activeSession)
-    const agents = task.sessions.filter((s) => s.agent)
     const own = task.sessions.filter((x) => !x.reviewOf) // 互审是附属，不算「这个任务有几个会话」
     const sole = own.length === 1 && task.sessions.length === 1 && own[0].label === task.name ? own[0] : null
     if (sole) return <div key={task.key} className={`tt-tree-task${on ? ' on' : ''}`}>{soleRow(task, sole)}</div>
@@ -204,24 +201,9 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     // 派生/收尾这些动作项目行的 ⋯ 里都有。
     const bare = !!task.main && !!projName && task.name === projName
     return (
-      <div key={task.key} className={`tt-tree-task${on ? ' on' : ''}${bare ? ' bare' : ''}`}>
+      <div key={task.key} className={`tt-tree-task${on ? ' on' : ''}`}>
         {!bare && taskHead(task, taskBadge(task), on && !hasActive)}
-        {many && (
-          <button type="button" className={`tt-tree-agents${open ? '' : ' closed'}`} onClick={() => toggle(task.key)}
-            aria-expanded={open} aria-label={open ? t('common.collapse') : t('common.expand')}>
-            <span className="nm">{t('tree.sessionsN', { n: task.sessions.length })}</span>
-            <span className="chev"><ChevronDown size={13} /></span>
-          </button>
-        )}
-        {open
-          ? <div className="tt-tree-sessions">{task.sessions.map((s) => sessionRow(task.key, s))}</div>
-          : (
-            <button type="button" className="tt-tree-more" onClick={() => toggle(task.key)} title={t('common.expand')}>
-              {agents[0] ? <AgentLogo kind={agents[0].agent!} size={13} /> : <TerminalIcon size={13} />}
-              <span>+{task.sessions.length}</span>
-              <span className="chev"><ChevronDown size={12} /></span>
-            </button>
-          )}
+        <div className="tt-tree-sessions">{task.sessions.map((s) => sessionRow(task.key, s))}</div>
       </div>
     )
   }

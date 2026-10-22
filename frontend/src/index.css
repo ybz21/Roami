@@ -632,7 +632,7 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-nav-tree::-webkit-scrollbar-thumb { background: transparent; border: 0; }
 :where(html[data-pointer="fine"]) .tt-nav-tree:hover { scrollbar-color: var(--scroll-thumb) transparent; }
 :where(html[data-pointer="fine"]) .tt-nav-tree:hover::-webkit-scrollbar-thumb { background: var(--scroll-thumb); }
-.tt-tree-task > .tt-tree-row.head { padding-left: 10px; border-radius: var(--r-xs); }
+.tt-tree-task > .tt-tree-row.head { padding-left: var(--sp-3); border-radius: var(--r-xs); }
 .tt-tree-task > .tt-tree-row.head .nm { font-weight: 500; font-size: var(--fs-sm); }
 /* 头行右端的分支状态图标（Orca 卡片右上角那枚）：颜色说状态，悬停看分支和数字 */
 .wtst { flex: 0 0 auto; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
@@ -657,30 +657,20 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-pill.sm.danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-soft); }
 .tt-pill.sm.warn { color: var(--warn); border-color: var(--warn-border); background: var(--warn-soft); }
 .tt-pill.sm.dim { color: var(--text-dim); }
-.tt-tree-agents { display: flex; align-items: center; gap: 4px; width: calc(100% - 12px); margin: 2px 6px 0; height: 26px; padding: 0 6px 0 26px; border: 0; background: none; border-radius: var(--r-xs); color: var(--text-dim); font: inherit; font-size: var(--fs-meta); cursor: pointer; }
-.tt-tree-agents .nm { flex: 1; text-align: left; }
-.tt-tree-agents .chev { display: inline-flex; color: var(--text-dimmer); transition: transform .15s; }
-.tt-tree-agents.closed .chev { transform: rotate(-90deg); }
-:where(html[data-pointer="fine"]) .tt-tree-agents:hover { background: var(--list-hover); color: var(--text-bright); }
-/* 「项目目录」那张兜底卡不画头行（同名重复），会话行也就不必再缩一级 */
-.tt-tree-task.bare .tt-tree-sessions .tt-tree-row { padding-left: 22px; }
-.tt-tree-sessions .tt-tree-row { padding-left: 30px; padding-right: 8px; min-height: 30px; border-radius: var(--r-xs); margin: 0 6px; width: calc(100% - 12px); gap: 8px; }
+/* 会话与任务头行对齐，不再为会话数量多缩一级。 */
+.tt-tree-sessions .tt-tree-row { padding-left: var(--sp-3); padding-right: var(--sp-2); min-height: 30px; border-radius: var(--r-xs); margin: 0; width: 100%; gap: var(--sp-2); }
 .tt-tree-sessions .tt-tree-row .nm { flex: 1 1 auto; }
 .tt-tree-sessions .tt-tree-row .nm { color: var(--text-dim); font-size: var(--fs-sm); font-weight: 400; }
 /* 休眠会话（重启带走、点开即在原目录重开）：整行淡一档 */
 .tt-tree-row.dormant .ic, .tt-tree-row.dormant .nm { opacity: .55; }
 /* 互审陪跑：缩进半格挂在被审那条下面，字弱一档——它是附属，不是并列的另一个会话 */
-.tt-tree-sessions .tt-tree-row.review { padding-left: 42px; }
+.tt-tree-sessions .tt-tree-row.review { padding-left: calc(var(--sp-3) * 2); }
 .tt-tree-sessions .tt-tree-row.review .nm { color: var(--text-dimmer); }
 .tt-tree-sessions .tt-tree-row.on .nm { color: var(--text-bright); }
 :where(html[data-pointer="fine"]) .tt-tree-sessions .tt-tree-row:hover .nm { color: var(--text-bright); }
 /* 行尾时间在会话行和单会话任务卡头行都出现：不许收缩、不许折行——名字一长「刚刚」会被挤成竖排两个字 */
 .tt-tree-row .tm { flex: 0 0 auto; white-space: nowrap; margin-left: 0; color: var(--text-dimmer); font: 400 var(--fs-micro)/1 var(--mono); }
 .tt-tree-sessions .tt-tree-row .nm + .dot { margin-left: 0; }
-/* 收起：一枚「✳ +N ›」小药丸，点了展开 */
-.tt-tree-more { display: inline-flex; align-items: center; gap: 5px; margin: 2px 0 0 30px; height: 24px; padding: 0 8px; border-radius: var(--r-pill); border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-dim); font-size: var(--fs-meta); }
-.tt-tree-more .chev { display: inline-flex; color: var(--text-dimmer); transform: rotate(-90deg); }
-:where(html[data-pointer="fine"]) .tt-tree-more:hover { border-color: var(--accent-border); color: var(--text-bright); }
 /* 会话行末尾的状态点（只在运行 / 等你时有） */
 .tt-tree-row .nm + .dot { flex: 0 0 auto; margin-left: auto; }
 .tt-tree-empty { padding: 4px 12px 8px; color: var(--text-dimmer); font-size: var(--fs-meta); }

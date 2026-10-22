@@ -583,7 +583,6 @@ const enUS = {
   'tabs.newHere': 'In the current session directory',
   'tree.renameTask': 'Rename task',
   'tree.menu.open': 'Open',
-  'tree.sessionsN': '{n} sessions',
   'tree.merged': 'merged',
   'pr.loading': 'Looking up the PR for this branch…',
   'pr.none': 'No PR for this branch yet',

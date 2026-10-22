@@ -583,7 +583,6 @@ const zhCN = {
   'tabs.newHere': '在当前会话的目录里',
   'tree.renameTask': '重命名任务',
   'tree.menu.open': '打开',
-  'tree.sessionsN': '{n} 个会话',
   'tree.merged': '已合入',
   'pr.loading': '在查这条分支的 PR…',
   'pr.none': '这条分支还没有 PR',
