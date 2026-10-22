@@ -553,7 +553,8 @@ class BrowserDriver:
         )
         raise DomainError("BROWSER_SOURCE_UNAVAILABLE", 409)
 
-    async def _tab_budget_exhausted(self, scope, binding, browser_id):
+    async def _tab_budget_exhausted(self, scope, binding, browser_id, capabilities):
+        limit = self.tabs.capacity(capabilities)
         tabs = await self.db.call(
             lambda db: rows(
                 db,
@@ -566,9 +567,7 @@ class BrowserDriver:
         key = (
             "browser-tab-budget:"
             + hashlib.sha256(
-                encoded(
-                    [scope["taskId"], scope["runId"], browser_id, self.config["max_tabs"], ids]
-                ).encode()
+                encoded([scope["taskId"], scope["runId"], browser_id, limit, ids]).encode()
             ).hexdigest()
         )
         if await self.db.call(
@@ -580,7 +579,7 @@ class BrowserDriver:
                 db,
                 binding["conversation"],
                 "resource.browser_budget_exhausted",
-                {"maxTabs": self.config["max_tabs"], "pooledResourceIds": ids},
+                {"maxTabs": limit, "pooledResourceIds": ids},
                 key=key,
                 task_id=scope["taskId"],
                 turn_id=binding.get("turnId"),
@@ -652,7 +651,7 @@ class BrowserDriver:
                     except DomainError as exc:
                         if exc.code != "BROWSER_TAB_BUDGET_EXCEEDED":
                             raise
-                        await self._tab_budget_exhausted(scope, binding, browser_id)
+                        await self._tab_budget_exhausted(scope, binding, browser_id, capabilities)
                     result = await self._perform(
                         scope,
                         lease,

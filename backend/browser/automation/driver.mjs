@@ -24,7 +24,7 @@ import { discoverBrowser, observePage } from './browser-observation.mjs'
 import { ScopedCDP, connectTarget, selectTarget } from './scoped-cdp.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
-const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v4'
+const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v5'
 const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli.log'
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
@@ -34,7 +34,7 @@ const OPERATION_VERBS = new Set(['new', 'goto', 'url', 'title', 'click', 'fill',
 const runCatalog = promisify(execFile)
 async function catalogEvent(event) {
   const binary = process.env.ROAMI_CHROME_CATALOG_BIN
-  if (!binary) return { entries: {}, policies: { agent: { sleepAfterSeconds: 120, closeAfterSeconds: 600 }, human: { sleepAfterSeconds: 1800, closeAfterSeconds: 0 } } }
+  if (!binary) return { entries: {}, policies: { agent: { maxTabs: 20, sleepAfterSeconds: 120, closeAfterSeconds: 600 }, human: { maxTabs: 0, sleepAfterSeconds: 1800, closeAfterSeconds: 0 } } }
   try {
     const { stdout } = await runCatalog(binary, ['chrome', '_tab-event', JSON.stringify(event)], { timeout: 5000, maxBuffer: 4 * 1024 * 1024 })
     return JSON.parse(stdout)
@@ -629,7 +629,9 @@ class Session {
     const control = this.controlSocket
     if (verb === 'capabilities') {
       await control.request('Browser.getVersion')
-      io.log({ version: 'roami-browser-v1', browserId: discovered.id, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close', 'tab_catalog', 'background_tab_sleep'] })
+      const targets = (await control.request('Target.getTargets')).targetInfos.filter(t => t.type === 'page' && userPages([{ url: () => t.url }]).length)
+      const catalog = await catalogEvent({ action: 'sync', browserId: discovered.id, targets: targets.map(t => t.targetId) })
+      io.log({ version: 'roami-browser-v1', browserId: discovered.id, tabPolicies: catalog.policies, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close', 'tab_catalog', 'background_tab_sleep'] })
       return
     }
     const listTargets = async () => (await control.request('Target.getTargets')).targetInfos
@@ -652,7 +654,9 @@ class Session {
     let created
     if (verb === 'new') {
       if (flags.origin && !['human', 'agent'].includes(flags.origin)) throw new ChromeError('INVALID_BROWSER_TAB_METADATA')
-      if (flags.origin !== 'human' && targets.filter(t => catalog.entries[t.targetId]?.origin !== 'human').length >= 20) throw new ChromeError('BROWSER_TAB_BUDGET_EXCEEDED')
+      const origin = flags.origin || 'agent'
+      const limit = catalog.policies[origin].maxTabs
+      if (limit > 0 && targets.filter(t => (catalog.entries[t.targetId]?.origin || 'agent') === origin).length >= limit) throw new ChromeError('BROWSER_TAB_BUDGET_EXCEEDED')
       created = await control.request('Target.createTarget', { url: 'about:blank', background: !!flags['no-focus'] })
       await catalogEvent({ action: 'create', browserId: discovered.id, targetId: created.targetId, origin: flags.origin || 'agent' })
       if (!pos[0]) {

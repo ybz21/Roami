@@ -101,10 +101,18 @@ async def add_tab(runtime, chrome, target, *, idle_ms=0):
     return rid
 
 
-def test_browser_pool_configuration_is_bounded_at_twenty():
+def test_legacy_browser_pool_configuration_supports_custom_and_unlimited_capacity():
     assert browser_config({"enabled": True})["max_tabs"] == 20
     assert browser_config({"max_tabs": 20})["idle_timeout_seconds"] == 600
-    for value in [{"max_tabs": 21}, {"idle_timeout_seconds": True}, {"idle_timeout_seconds": 0}]:
+    assert browser_config({"max_tabs": 50})["max_tabs"] == 50
+    assert browser_config({"max_tabs": 0})["max_tabs"] == 0
+    for value in [
+        {"max_tabs": 1001},
+        {"max_tabs": -1},
+        {"max_tabs": True},
+        {"idle_timeout_seconds": True},
+        {"idle_timeout_seconds": 0},
+    ]:
         with pytest.raises(DomainError, match="INVALID_BROWSER_CONFIG"):
             browser_config(value)
 
@@ -417,5 +425,28 @@ async def test_catalog_enrolls_legacy_and_human_tabs_with_distinct_sleep_and_clo
         await runtime.browser.tabs.sweep()
         assert chrome.closed == ["legacy-agent"]
         assert "human-page" in chrome.targets and "user-tab" in chrome.targets
+    finally:
+        await runtime.close()
+
+
+async def test_catalog_capacity_overrides_legacy_limit_and_applies_changes_without_restart(store):
+    runtime, chrome = await fixture(store)
+    try:
+        for index in range(25):
+            await add_tab(runtime, chrome, "agent-" + str(index))
+        chrome.foreground.update(chrome.targets)
+        capabilities = {
+            "browserId": BROWSER,
+            "features": ["background_tab_close"],
+            "tabPolicies": {"agent": {"maxTabs": 50}},
+        }
+        await runtime.browser.tabs.make_room(capabilities)
+        capabilities["tabPolicies"]["agent"]["maxTabs"] = 20
+        with pytest.raises(DomainError, match="BROWSER_TAB_BUDGET_EXCEEDED"):
+            await runtime.browser.tabs.make_room(capabilities)
+        attempts = list(chrome.closed)
+        capabilities["tabPolicies"]["agent"]["maxTabs"] = 0
+        await runtime.browser.tabs.make_room(capabilities)
+        assert len(chrome.targets) == 26 and chrome.closed == attempts
     finally:
         await runtime.close()

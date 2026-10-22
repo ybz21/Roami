@@ -75,7 +75,7 @@ status / cancel 不连接或启动 Chrome；目录必须为当前用户私有。
 
 ### Agent 标签池
 
-原生 Agent 创建的标签页按浏览器实例共用容量，`tools.browser.max_tabs` 默认 20，允许 1..20；旧配置中的显式值仍保留，升级到 20 页时同步将已有 `max_tabs = 3` 改为 `max_tabs = 20`。用户自行打开或仅借用的页面不计入回收池。
+页面按当前分组共用容量：浏览器设置中的 `tabPolicies.agent.maxTabs` 默认 20，`tabPolicies.human.maxTabs` 默认 0（不限），两者允许 0..1000。CLI、REST 和原生 Agent 共用这份实时配置；旧驱动才回落 `tools.browser.max_tabs`（同样允许 0..1000）。调低上限不会立刻关闭现有页面，满额时限制新建与移入，自动回收仍遵守占用和输入保护。
 
 任务释放控制权后，页面默认保留 600 秒；`idle_timeout_seconds` 可配置为 30..86400 秒。后台每 30 秒检查一次，每轮最多尝试回收 3 页。创建新页遇满额时优先回收最早空闲页面。活动租约、人工接管、未知动作和前台页面受保护；无安全候选时返回 `BROWSER_TAB_BUDGET_EXCEEDED`，不抢占其他任务。
 

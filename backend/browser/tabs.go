@@ -73,7 +73,7 @@ func NewTab(c *gin.Context) {
 		return
 	}
 	defer release()
-	if body.Origin != "human" {
+	{
 		identity, err := currentBrowserIdentity()
 		if err != nil {
 			reply(c, err)
@@ -89,13 +89,18 @@ func NewTab(c *gin.Context) {
 			reply(c, err)
 			return
 		}
+		origin := body.Origin
+		if origin == "" {
+			origin = "agent"
+		}
+		limit := catalog.Policies.For(origin).MaxTabs
 		count := 0
 		for _, id := range ids {
-			if catalog.Entries[id].Origin != "human" {
+			if catalog.Entries[id].Origin == origin {
 				count++
 			}
 		}
-		if count >= 20 {
+		if limit > 0 && count >= limit {
 			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "BROWSER_TAB_BUDGET_EXCEEDED"}})
 			return
 		}
@@ -198,7 +203,7 @@ func UpdateTab(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "CHROME_TARGET_NOT_FOUND"}})
 		return
 	}
-	if in.Origin == "agent" {
+	if in.Origin == "agent" || in.Origin == "human" {
 		cfgStore.mu.Lock()
 		file := cfgStore.file
 		cfgStore.mu.Unlock()
@@ -225,11 +230,12 @@ func UpdateTab(c *gin.Context) {
 		}
 		count := 0
 		for _, target := range ids {
-			if catalog.Entries[target].Origin == "agent" {
+			if catalog.Entries[target].Origin == in.Origin {
 				count++
 			}
 		}
-		if catalog.Entries[id].Origin != "agent" && count >= 20 {
+		limit := catalog.Policies.For(in.Origin).MaxTabs
+		if catalog.Entries[id].Origin != in.Origin && limit > 0 && count >= limit {
 			c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "BROWSER_TAB_BUDGET_EXCEEDED"}})
 			return
 		}

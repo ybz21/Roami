@@ -106,7 +106,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       await api('PATCH', `/browser/tabs/${id}`, change)
       setTabs(current => current.map(tab => tab.id === id ? { ...tab, ...change } : tab))
       if (change.pinned !== undefined) setPinnedTabs(current => { const next = new Set(current); if (change.pinned) next.add(id); else next.delete(id); return next })
-    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUSY' ? t('browser.tabBusy') : error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.agentLimit') : error.message) }
+    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUSY' ? t('browser.tabBusy') : error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : error.message) }
   }
   const togglePin = (id: string) => { void changeTab(id, { pinned: !pinnedTabs.has(id) }) }
   const changeOrigin = (id: string, origin: 'human' | 'agent') => { void changeTab(id, { origin }) }
@@ -240,7 +240,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       setTabs((prev) => mergeTabs(prev, list))
       const fresh = list.find((t) => !known.has(t.id)) // 真正新增的(在右侧)，而非后端顺序的末位
       setTarget(fresh?.id || list[list.length - 1]?.id || '')
-    } catch (e: any) { message.error(e.message) }
+    } catch (e: any) { message.error(e.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : e.message) }
   }
   const closeTabs = async (ids: string[]) => {
     if (ids.includes(pinnedTarget.current)) { pinnedTarget.current = ''; expectedBrowserRef.current = ''; setExpectedBrowser('') }
@@ -266,7 +266,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       if (!result?.data?.id) return
       switchTab(result.data.id)
       await closeTab(previous)
-    } catch (error: any) { message.error(error.message) }
+    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : error.message) }
   }
 
   // 地址栏跟随当前标签页真实 URL（聚焦编辑时不覆盖；about:blank 显示为空）

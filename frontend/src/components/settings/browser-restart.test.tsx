@@ -71,7 +71,7 @@ it('commits lifecycle policy after editing instead of applying partial numbers',
   fireEvent.change(input, { target: { value: '1440' } })
   expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
   fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 })
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ human: { sleepAfterSeconds: 1800, closeAfterSeconds: 86400 } }) })))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ human: { maxTabs: 0, sleepAfterSeconds: 1800, closeAfterSeconds: 86400 } }) })))
 })
 
 it('preserves an invalid policy draft until the user corrects it', async () => {
@@ -85,5 +85,22 @@ it('preserves an invalid policy draft until the user corrects it', async () => {
   expect((input as HTMLInputElement).value).toBe('1')
   expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
   fireEvent.change(input, { target: { value: '20' } }); fireEvent.blur(input)
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ agent: { sleepAfterSeconds: 120, closeAfterSeconds: 1200 } }) })))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ agent: { maxTabs: 20, sleepAfterSeconds: 120, closeAfterSeconds: 1200 } }) })))
+})
+
+
+it('saves independent tab limits without restarting Chrome and retains old policy defaults', async () => {
+  vi.spyOn(App, 'useApp').mockReturnValue({ message: { error: vi.fn() }, modal: {} } as any)
+  vi.mocked(api).mockResolvedValue({ data: { tabPolicies: { agent: { sleepAfterSeconds: 240 }, human: { closeAfterSeconds: 0 } } } })
+  render(<BrowserSettings />)
+  const agent = await screen.findByRole('spinbutton', { name: 'browser.group.agent settings.browserMaxTabs' })
+  expect((agent as HTMLInputElement).value).toBe('20')
+  fireEvent.change(agent, { target: { value: '50' } }); fireEvent.blur(agent)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: {
+    agent: { maxTabs: 50, sleepAfterSeconds: 240, closeAfterSeconds: 600 }, human: { maxTabs: 0, sleepAfterSeconds: 1800, closeAfterSeconds: 0 },
+  } })))
+  const human = screen.getByRole('spinbutton', { name: 'browser.group.human settings.browserMaxTabs' })
+  fireEvent.change(human, { target: { value: '8' } }); fireEvent.keyDown(human, { key: 'Enter', keyCode: 13 })
+  await waitFor(() => expect(api).toHaveBeenLastCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ human: expect.objectContaining({ maxTabs: 8 }) }) })))
+  expect(screen.queryByText('settings.browserPendingRestart')).toBeNull()
 })

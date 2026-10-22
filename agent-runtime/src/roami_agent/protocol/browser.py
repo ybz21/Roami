@@ -27,7 +27,7 @@ def browser_config(value):
         or not isinstance(result["existing_tabs"], bool)
         or not isinstance(result["max_tabs"], int)
         or isinstance(result["max_tabs"], bool)
-        or not 1 <= result["max_tabs"] <= 20
+        or not 0 <= result["max_tabs"] <= 1000
         or type(result["idle_timeout_seconds"]) is not int
         or not 30 <= result["idle_timeout_seconds"] <= 86400
     ):

@@ -3364,7 +3364,7 @@ const enUS = {
   'agent.notification.readAll': 'Mark all read',
   'agent.notification.confirmCancel': 'Cancel reminder',
   'agent.notification.keepReminder': 'Keep reminder',
-  'browser.agentLimit': 'The Agent group is full. Close a page or move one to Human first.',
+  'browser.groupLimit': 'This group has reached its tab limit. Close a page or adjust the limit in Browser settings.',
   'browser.createdBy': 'Opened by: {creator}',
   'browser.groups': "Tab groups",
   'browser.group.human': "Human",
@@ -3374,10 +3374,11 @@ const enUS = {
   'browser.moveToHuman': "Move to Human",
   'browser.sleeping': "Sleeping",
   'browser.tabBusy': "This page is busy. Try again after the operation finishes.",
+  'settings.browserMaxTabs': 'Tab limit',
   'settings.browserTabPolicies': "Tab lifecycle",
   'settings.browserSleepAfter': "Sleep after (minutes)",
   'settings.browserCloseAfter': "Close after (minutes)",
-  'settings.browserPolicyHelp': "Zero disables a policy. Active pages are protected. Sleeping pages wake when selected.",
+  'settings.browserPolicyHelp': 'Zero means unlimited tabs or disables the timeout. Pages in use are protected.',
   'settings.browserPolicyOrder': "Closing must be later than sleeping.",
 }
 

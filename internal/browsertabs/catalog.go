@@ -13,6 +13,7 @@ import (
 )
 
 type Policy struct {
+	MaxTabs           int `json:"maxTabs"`
 	SleepAfterSeconds int `json:"sleepAfterSeconds"`
 	CloseAfterSeconds int `json:"closeAfterSeconds"`
 }
@@ -21,9 +22,31 @@ type Policies struct {
 	Human Policy `json:"human"`
 }
 
-func Defaults() Policies { return Policies{Agent: Policy{120, 600}, Human: Policy{1800, 0}} }
+func Defaults() Policies {
+	return Policies{Agent: Policy{MaxTabs: 20, SleepAfterSeconds: 120, CloseAfterSeconds: 600}, Human: Policy{SleepAfterSeconds: 1800}}
+}
+
+func (p *Policies) UnmarshalJSON(data []byte) error {
+	type plain Policies
+	value := plain(Defaults())
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = Policies(value)
+	return nil
+}
+
+func (p Policies) For(origin string) Policy {
+	if origin == "human" {
+		return p.Human
+	}
+	return p.Agent
+}
 func (p Policies) Valid() bool {
 	for _, v := range []Policy{p.Agent, p.Human} {
+		if v.MaxTabs < 0 || v.MaxTabs > 1000 {
+			return false
+		}
 		if v.SleepAfterSeconds < 0 || v.CloseAfterSeconds < 0 || v.SleepAfterSeconds > 604800 || v.CloseAfterSeconds > 604800 || (v.SleepAfterSeconds > 0 && v.CloseAfterSeconds > 0 && v.CloseAfterSeconds < v.SleepAfterSeconds) {
 			return false
 		}

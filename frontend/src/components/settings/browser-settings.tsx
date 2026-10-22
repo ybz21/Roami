@@ -11,7 +11,7 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { pollWhileVisible } from '../../visible-poll'
 
-const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '', autoRecover: true, tabPolicies: { agent: { sleepAfterSeconds: 120, closeAfterSeconds: 600 }, human: { sleepAfterSeconds: 1800, closeAfterSeconds: 0 } } }
+const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '', autoRecover: true, tabPolicies: { agent: { maxTabs: 20, sleepAfterSeconds: 120, closeAfterSeconds: 600 }, human: { maxTabs: 0, sleepAfterSeconds: 1800, closeAfterSeconds: 0 } } }
 
 export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (() => Promise<void>) | null) => void }) {
   const { message, modal } = AntApp.useApp()
@@ -23,7 +23,10 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
   const writes = useRef<Promise<unknown>>(Promise.resolve())
   const cfgRef = useRef(cfg)
   useEffect(() => { cfgRef.current = cfg }, [cfg])
-  const readState = useSettingsRead(() => api('GET', '/browser/config').then((r) => { setCfg({ ...DEFAULTS, ...r.data }) }))
+  const readState = useSettingsRead(() => api('GET', '/browser/config').then((r) => { setCfg({ ...DEFAULTS, ...r.data, tabPolicies: {
+    agent: { ...DEFAULTS.tabPolicies.agent, ...r.data.tabPolicies?.agent },
+    human: { ...DEFAULTS.tabPolicies.human, ...r.data.tabPolicies?.human },
+  } }) }))
 
   const persist = (next: any) => {
     const write = writes.current.catch(() => {}).then(() => api('PUT', '/browser/config', next))
@@ -71,9 +74,9 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
       message.error(e.message)
     })
   }
-  const editPolicy = (origin: 'human' | 'agent', field: 'sleepAfterSeconds' | 'closeAfterSeconds', minutes: number | null) => {
+  const editPolicy = (origin: 'human' | 'agent', field: 'maxTabs' | 'sleepAfterSeconds' | 'closeAfterSeconds', value: number | null) => {
     const previous = cfgRef.current
-    const policy = { ...previous.tabPolicies[origin], [field]: (minutes || 0) * 60 }
+    const policy = { ...previous.tabPolicies[origin], [field]: (value || 0) * (field === 'maxTabs' ? 1 : 60) }
     const next = { ...previous, tabPolicies: { ...previous.tabPolicies, [origin]: policy } }
     cfgRef.current = next; setCfg(next)
   }
@@ -106,6 +109,8 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
         {(['human', 'agent'] as const).map(origin => <Space key={origin} direction="vertical" size="small" style={{ marginBottom: 'var(--sp-4)', display: 'flex' }}>
           <span>{t(`browser.group.${origin}`)}</span>
           <Space wrap>
+            <label>{t('settings.browserMaxTabs')} <InputNumber min={0} max={1000} precision={0} aria-label={`${t(`browser.group.${origin}`)} ${t('settings.browserMaxTabs')}`}
+              value={cfg.tabPolicies[origin].maxTabs} onChange={value => editPolicy(origin, 'maxTabs', value)} onBlur={commitPolicies} onPressEnter={commitPolicies} /></label>
             <label>{t('settings.browserSleepAfter')} <InputNumber min={0} max={10080} precision={0} aria-label={`${t(`browser.group.${origin}`)} ${t('settings.browserSleepAfter')}`}
               value={cfg.tabPolicies[origin].sleepAfterSeconds / 60} onChange={value => editPolicy(origin, 'sleepAfterSeconds', value)} onBlur={commitPolicies} onPressEnter={commitPolicies} /></label>
             <label>{t('settings.browserCloseAfter')} <InputNumber min={0} max={10080} precision={0} aria-label={`${t(`browser.group.${origin}`)} ${t('settings.browserCloseAfter')}`}

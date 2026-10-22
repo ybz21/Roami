@@ -1,11 +1,39 @@
 package browsertabs
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 )
+
+func TestCapacityDefaultsMigrationAndValidation(t *testing.T) {
+	var policies Policies
+	if err := json.Unmarshal([]byte(`{"agent":{"sleepAfterSeconds":0},"human":{"closeAfterSeconds":60}}`), &policies); err != nil {
+		t.Fatal(err)
+	}
+	if policies.Agent.MaxTabs != 20 || policies.Agent.SleepAfterSeconds != 0 || policies.Human.MaxTabs != 0 {
+		t.Fatal("older settings lost defaults or explicit zero", policies)
+	}
+	root := t.TempDir()
+	for _, limit := range []int{0, 8, 50, 1000, -1, 1001} {
+		policies.Agent.MaxTabs = limit
+		policies.Human.CloseAfterSeconds = 0
+		valid := limit >= 0 && limit <= 1000
+		if policies.Valid() != valid {
+			t.Fatalf("capacity %d validation", limit)
+		}
+		data, _ := json.Marshal(map[string]Policies{"tabPolicies": policies})
+		if err := os.WriteFile(filepath.Join(root, "browser-config.json"), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+		got := ReadPolicies(root)
+		if valid && got.Agent.MaxTabs != limit || !valid && got.Agent.MaxTabs != 20 {
+			t.Fatal("catalog read disagrees with saved configuration", got)
+		}
+	}
+}
 
 func TestOriginPersistenceProtectionAndStaleMaintenance(t *testing.T) {
 	root := t.TempDir()

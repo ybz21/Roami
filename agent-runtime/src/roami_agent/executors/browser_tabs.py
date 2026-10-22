@@ -297,6 +297,12 @@ class BrowserTabs:
             )
         )
 
+    def capacity(self, capabilities):
+        value = capabilities.get("tabPolicies", {}).get("agent", {}).get("maxTabs")
+        if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 1000:
+            return value
+        return self.driver.config["max_tabs"]
+
     async def make_room(self, capabilities):
         browser_id = capabilities["browserId"]
         live = await self.inventory(browser_id)
@@ -308,13 +314,14 @@ class BrowserTabs:
                 (browser_id,),
             )["n"]
         )
-        if count < self.driver.config["max_tabs"]:
+        limit = self.capacity(capabilities)
+        if limit == 0 or count < limit:
             return
         if "background_tab_close" in capabilities["features"]:
             for candidate in await self.candidates(browser_id):
                 if await self.recycle(candidate["resource_id"], browser_id):
                     count -= 1
-                    if count < self.driver.config["max_tabs"]:
+                    if count < limit:
                         return
         raise DomainError("BROWSER_TAB_BUDGET_EXCEEDED", 409)
 
