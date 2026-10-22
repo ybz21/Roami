@@ -154,7 +154,7 @@ func (h *HostAPI) git(dir string, args ...string) string {
 func (h *HostAPI) agentProviders() (any, error) {
 	providers := map[string]bool{}
 	for _, kind := range agent.Kinds() {
-		_, err := exec.LookPath(agent.Get(kind).Bin())
+		_, err := agent.ResolveBinary(kind)
 		providers[kind] = err == nil
 	}
 	return providers, nil

@@ -76,6 +76,7 @@ const zhCN = {
   'capabilities.agents.auth.expired': "登录已过期",
   'capabilities.agents.version': "版本",
   'capabilities.agents.versionUnchecked': "点击检查获取版本",
+  'capabilities.agents.versionUnknown': "版本未知",
   'capabilities.agents.versionUnavailable': "版本读取失败，可重试检查",
   'capabilities.agents.binary': "程序位置",
   'capabilities.agents.openTerminal': "打开终端",

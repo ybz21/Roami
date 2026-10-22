@@ -11,8 +11,9 @@
 
 .tt-agent-cardhead .tt-agentmark { display:flex; align-items:center; margin-right:var(--sp-2); }
 .tt-agent-cardhead .tt-capability-connection { margin-left:auto; }
+.tt-agent-identity { display:flex; flex-direction:column; gap:var(--sp-1); min-width:0; }
 .tt-agent-meta { display:flex; flex-wrap:wrap; gap:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
-.tt-agent-version { font-family:var(--mono); overflow-wrap:anywhere; }
+.tt-agent-version { color:var(--text-dim); font-size:var(--fs-meta); font-family:var(--mono); overflow-wrap:anywhere; }
 .tt-agent-cadence { max-width:var(--content-overview); margin:var(--sp-4) auto 0; display:flex; align-items:center; gap:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
 .tt-agent-detail { display:flex; flex-direction:column; gap:var(--sp-4); }
 .tt-agent-detail p { margin:0; color:var(--text-dim); font-size:var(--fs-sm); }

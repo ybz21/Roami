@@ -28,8 +28,9 @@ func TestProfessionalInstallArgs(t *testing.T) {
 	}
 }
 
-func TestVersionChecksAreExplicitAndDoNotImplyAuthentication(t *testing.T) {
+func TestAutomaticVersionDiscoveryDoesNotImplyAuthentication(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
 	marker := filepath.Join(dir, "version-ran")
 	path := filepath.Join(dir, "codex")
 	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf 'codex-cli 1.2.3\\n'\nprintf ran > '"+marker+"'\n"), 0o755); err != nil {
@@ -37,11 +38,11 @@ func TestVersionChecksAreExplicitAndDoNotImplyAuthentication(t *testing.T) {
 	}
 	t.Setenv("PATH", dir)
 	rows := DiscoverProfessionalAgents(context.Background())
-	if _, err := os.Stat(marker); !os.IsNotExist(err) {
-		t.Fatal("automatic discovery started a CLI")
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("automatic discovery did not read the installed version")
 	}
 	for _, row := range rows {
-		if row.Kind == "codex" && (!row.Installed || row.Authentication != "unknown" || row.Binary != path) {
+		if row.Kind == "codex" && (!row.Installed || row.Authentication != "unknown" || row.Binary != path || row.Version != "codex-cli 1.2.3") {
 			t.Fatal("installation was treated as sign-in")
 		}
 	}
@@ -51,6 +52,35 @@ func TestVersionChecksAreExplicitAndDoNotImplyAuthentication(t *testing.T) {
 	}
 	if _, err := CheckProfessionalAgent(context.Background(), "codex;exit"); err == nil {
 		t.Fatal("accepted an arbitrary command")
+	}
+}
+
+func TestNativeOpenCodeDiscoveryAndVersionCheck(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	binDir := filepath.Join(home, ".opencode", "bin")
+	if err := os.MkdirAll(binDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(home, "version-ran")
+	path := filepath.Join(binDir, "opencode")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n[ \"$#\" -eq 1 ] && [ \"$1\" = --version ] || exit 1\nprintf '1.2.3\\n'\nprintf ran > '"+marker+"'\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	row := discoverProfessionalAgent(context.Background(), "opencode")
+	if !row.Installed || row.Binary != path || row.Authentication != "unknown" {
+		t.Fatalf("native install not discovered: %+v", row)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("discovery executed OpenCode")
+	}
+	row, err := CheckProfessionalAgent(context.Background(), "opencode")
+	if err != nil || row.Version != "1.2.3" || row.VersionState != "available" || row.Binary != path {
+		t.Fatalf("native version check: %+v, %v", row, err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("explicit version check did not execute OpenCode")
 	}
 }
 

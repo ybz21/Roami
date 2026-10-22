@@ -76,6 +76,7 @@ const enUS = {
   'capabilities.agents.auth.expired': "Sign-in expired",
   'capabilities.agents.version': "Version",
   'capabilities.agents.versionUnchecked': "Check to read the version",
+  'capabilities.agents.versionUnknown': "Version unavailable",
   'capabilities.agents.versionUnavailable': "Could not read the version. Retry the check.",
   'capabilities.agents.binary': "Executable",
   'capabilities.agents.openTerminal': "Open terminal",

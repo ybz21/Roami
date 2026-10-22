@@ -69,7 +69,7 @@ it('waits for stored preferences before hydrating a command and preserves edits 
   await screen.findByText('capabilities.agents.saved')
 })
 
-it('keeps a checked version across automatic snapshots and preserves data after discovery failure', async () => {
+it('accepts newer versions from automatic snapshots and preserves data after discovery failure', async () => {
   vi.mocked(checkAgent).mockResolvedValue({ ...snapshot, version: 'codex-cli 1.2.3', versionState: 'available' })
   render(<AgentCatalog onSelect={vi.fn()} />)
   const card = screen.getByRole('article', { name: 'Codex' })
@@ -77,12 +77,25 @@ it('keeps a checked version across automatic snapshots and preserves data after 
   fireEvent.click(within(card).getByRole('button', { name: 'capabilities.agents.check' }))
   await screen.findByText('codex-cli 1.2.3')
   expect(checkAgent).toHaveBeenCalledWith('codex')
+  vi.mocked(discoverAgents).mockResolvedValue([{ ...snapshot, version: 'codex-cli 2.0.0', versionState: 'available' }])
   await act(() => state.polls[0](new AbortController().signal))
-  expect(screen.getByText('codex-cli 1.2.3')).toBeTruthy()
+  expect(screen.getByText('codex-cli 2.0.0')).toBeTruthy()
+  expect(screen.queryByText('codex-cli 1.2.3')).toBeNull()
   vi.mocked(discoverAgents).mockRejectedValueOnce(new Error('offline'))
   await act(async () => { try { await state.polls[0](new AbortController().signal) } catch {} })
   expect(screen.getByText('agent.professional.loadFailed')).toBeTruthy()
-  expect(screen.getByText('codex-cli 1.2.3')).toBeTruthy()
+  expect(screen.getByText('codex-cli 2.0.0')).toBeTruthy()
+})
+
+it('shows all installed versions on entry without explicit checks and marks unreadable versions', async () => {
+  vi.mocked(discoverAgents).mockResolvedValue([
+    ...['claude', 'codex', 'opencode'].map(kind => ({ ...snapshot, kind, version: kind + ' 1.0', versionState: 'available' as const })),
+    { ...snapshot, kind: 'pi', versionState: 'unavailable' },
+  ])
+  render(<AgentCatalog onSelect={vi.fn()} />)
+  for (const kind of ['claude', 'codex', 'opencode']) expect(await screen.findByText(kind + ' 1.0')).toBeTruthy()
+  expect(within(screen.getByRole('article', { name: 'Pi' })).getByText('capabilities.agents.versionUnknown')).toBeTruthy()
+  expect(checkAgent).not.toHaveBeenCalled()
 })
 
 it('uses the installation endpoint only after confirming a missing agent installation', async () => {

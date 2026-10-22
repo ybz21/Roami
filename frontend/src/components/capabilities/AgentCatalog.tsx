@@ -23,7 +23,6 @@ export function AgentCatalog({ initialKind, onSelect, onLaunch }: { initialKind?
   const [agents, setAgents] = useState<RegisteredAgent[] | null>(null)
   const [failed, setFailed] = useState(false), [version, setVersion] = useState(0)
   const [query, setQuery] = useState(''), [busy, setBusy] = useState('')
-  const [checked, setChecked] = useState<Record<string, RegisteredAgent>>({})
   const [launching, setLaunching] = useState(false)
   useEffect(() => {
     const poll = pollWhileVisible(async signal => {
@@ -34,10 +33,7 @@ export function AgentCatalog({ initialKind, onSelect, onLaunch }: { initialKind?
     }, interval * 1000)
     return poll.stop
   }, [interval, version])
-  const rows = (agents || []).map(row => {
-    const probe = checked[row.kind]
-    return probe?.binary === row.binary ? { ...row, version: probe?.version, versionState: probe?.versionState } : row
-  })
+  const rows = agents || []
   const current = isAgentKind(initialKind) ? initialKind : null
   const selected = rows.find(row => row.kind === current)
   const close = () => onSelect('')
@@ -46,7 +42,6 @@ export function AgentCatalog({ initialKind, onSelect, onLaunch }: { initialKind?
     setBusy('check:' + kind)
     try {
       const result = await checkAgent(kind)
-      setChecked(value => ({ ...value, [kind]: result }))
       setAgents(value => value ? [...value.filter(row => row.kind !== kind), result] : [result])
     } catch { message.error(t('capabilities.agents.checkFailed')) }
     finally { setBusy('') }
@@ -56,7 +51,6 @@ export function AgentCatalog({ initialKind, onSelect, onLaunch }: { initialKind?
     setBusy('install:' + kind)
     try {
       await installAgent(kind)
-      setChecked(value => { const next = { ...value }; delete next[kind]; return next })
       message.success(t('agentDiscovery.installed')); setVersion(value => value + 1)
     } catch { message.error(t('agent.professional.installFailed')) }
     finally { setBusy('') }
@@ -99,9 +93,12 @@ export function AgentCatalog({ initialKind, onSelect, onLaunch }: { initialKind?
       return <article className="tt-capability-row" key={kind} aria-label={names[kind]}>
         <div className="tt-capability-cardhead tt-agent-cardhead"><span className="tt-agentmark"><AgentLogo kind={kind} size={32} /></span>
           <span className={'tt-capability-connection' + (row?.installed ? ' connected' : '')}><i aria-hidden="true" />{installation(row)}</span></div>
-        <button type="button" className="tt-capability-open" onClick={() => onSelect(kind)}><strong>{names[kind]}</strong></button>
+        <div className="tt-agent-identity">
+          <button type="button" className="tt-capability-open" onClick={() => onSelect(kind)}><strong>{names[kind]}</strong></button>
+          {row?.installed && <span className="tt-agent-version">{row.version || t('capabilities.agents.versionUnknown')}</span>}
+        </div>
         <p className="tt-capability-description">{t('capabilities.agents.description.' + kind)}</p>
-        <div className="tt-agent-meta"><span>{authentication(row)}</span>{row?.version && <span className="tt-agent-version">{row.version}</span>}</div>
+        <div className="tt-agent-meta"><span>{authentication(row)}</span></div>
         {row?.installed && <AgentBalance agent={row} />}
         <div className="tt-capability-cardfooter"><button type="button" className="tt-act" onClick={() => onSelect(kind)}><GearIcon size={14} />{t('capabilities.agents.manage')}</button>
           <div>{row && !row.installed ? installAction(kind, row) : <button type="button" className="tt-act" disabled={!!busy} onClick={() => { void check(kind) }}>{t(busy === 'check:' + kind ? 'capabilities.agents.checking' : 'capabilities.agents.check')}</button>}</div>

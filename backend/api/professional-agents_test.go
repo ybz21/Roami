@@ -10,6 +10,8 @@ import (
 )
 
 func TestProfessionalAgentsWithoutPluginDaemon(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("PATH", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
 	router := gin.New()
