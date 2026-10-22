@@ -27,7 +27,7 @@ type TaskFilter = typeof taskFilters[number]
 function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   if (filter === 'all') return true
   if (filter === 'active') return active.has(task.state)
-  if (filter === 'open') return !!(task.nativeSession || task.latestAttempt?.agentConversationId) && task.sessionClosure?.state !== 'closed'
+  if (filter === 'open') return !!(task.nativeSession || task.latestAttempt?.agentConversationId || task.latestAttempt?.sessionId && !terminal.has(task.state)) && task.sessionClosure?.state !== 'closed'
   if (filter === 'ended') return terminal.has(task.state)
   return !active.has(task.state) && task.state !== 'succeeded' && task.state !== 'cancelled'
 }

@@ -559,3 +559,14 @@ it('refreshes a fast native continuation without Main events and stops reading a
   await act(async () => { await vi.advanceTimersByTimeAsync(6500) })
   expect(vi.mocked(api).mock.calls.length).toBe(count)
 })
+
+
+it('keeps a running professional session visible while its provider context is still being registered', async () => {
+  const starting = { ...task('starting'), state: 'running', latestAttempt: { state: 'running', executorKind: 'cli', sessionId: 'original-session', agentConversationId: null } }
+  vi.mocked(api).mockResolvedValue({ data: [starting] })
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: /Goal starting/ })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.open' }))
+  expect(screen.getByRole('button', { name: /Goal starting/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'agent.task.enterSession' })).toBeTruthy()
+})
