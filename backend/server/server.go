@@ -116,6 +116,13 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/agent/professional", h.ProfessionalAgents)
 		g.POST("/agent/professional/:kind/install", h.InstallProfessionalAgent)
 		g.POST("/agent/professional/:kind/check", h.CheckProfessionalAgent)
+		g.POST("/agent/professional/:kind/upgrade", h.UpgradeProfessionalAgent)
+		g.GET("/agent/professional/:kind/models", h.AgentModelProfiles)
+		g.POST("/agent/professional/:kind/models", h.SaveAgentModelProfile)
+		g.PUT("/agent/professional/:kind/models/:profile", h.SaveAgentModelProfile)
+		g.DELETE("/agent/professional/:kind/models/:profile", h.DeleteAgentModelProfile)
+		g.POST("/agent/professional/:kind/models/:profile/apply", h.ApplyAgentModelProfile)
+		g.POST("/agent/professional/:kind/models/restore", h.RestoreAgentModelProfile)
 
 		g.GET("/fs", h.FS)
 		g.GET("/files", h.Files)            // 文件侧栏：列目录

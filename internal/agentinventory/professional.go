@@ -18,6 +18,9 @@ type ProfessionalAgent struct {
 	Version        string     `json:"version,omitempty"`
 	VersionState   string     `json:"versionState,omitempty"`
 	Authentication string     `json:"authentication"`
+	UpgradeMethod  string     `json:"upgradeMethod,omitempty"`
+	CanUpgrade     bool       `json:"canUpgrade"`
+	ModelPreset    string     `json:"modelPreset,omitempty"`
 	Quota          AgentQuota `json:"quota"`
 }
 
@@ -59,7 +62,13 @@ func discoverProfessionalAgent(ctx context.Context, kind string) ProfessionalAge
 	if q.Reason == "login_expired" {
 		authentication = "expired"
 	}
-	return ProfessionalAgent{Kind: kind, Installed: installed, Binary: path, Authentication: authentication, Quota: q}
+	row := ProfessionalAgent{Kind: kind, Installed: installed, Binary: path, Authentication: authentication, Quota: q}
+	if installed {
+		if plan, err := ProfessionalUpgradePlan(kind); err == nil {
+			row.CanUpgrade, row.UpgradeMethod = true, plan.Method
+		}
+	}
+	return row
 }
 
 // Explicit checks bypass completed cache entries and join any matching in-flight probe.
@@ -116,6 +125,12 @@ func ProfessionalInstallArgs(kind string) ([]string, error) {
 }
 
 func InstallProfessionalAgent(ctx context.Context, args []string) error {
+	select {
+	case professionalMaintenance <- struct{}{}:
+		defer func() { <-professionalMaintenance }()
+	default:
+		return fmt.Errorf("AGENT_MAINTENANCE_BUSY")
+	}
 	if err := exec.CommandContext(ctx, "npm", args...).Run(); err != nil {
 		return err
 	}

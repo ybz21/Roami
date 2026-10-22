@@ -3,14 +3,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { AgentCatalog } from './AgentCatalog'
 import { AgentBalance } from './AgentBalance'
-import { checkAgent, discoverAgents, installAgent } from '../../agent-registry'
+import { checkAgent, discoverAgents, installAgent, upgradeAgent } from '../../agent-registry'
 import { useBackDismiss } from '../shell/useBackDismiss'
 
 const state = vi.hoisted(() => ({
   prefs: { agentBalanceRefreshSeconds: 60, codexCommand: 'codex --model configured', claudeCommand: 'claude', piCommand: 'pi', opencodeCommand: 'opencode' },
   loaded: true, phone: false, save: vi.fn(), polls: [] as Array<(signal: AbortSignal) => Promise<unknown>>, stop: vi.fn(),
 }))
-vi.mock('../../agent-registry', () => ({ discoverAgents: vi.fn(), installAgent: vi.fn(), checkAgent: vi.fn() }))
+vi.mock('../../agent-registry', () => ({ discoverAgents: vi.fn(), installAgent: vi.fn(), checkAgent: vi.fn(), upgradeAgent: vi.fn() }))
 vi.mock('../../preferences', () => ({ usePreferences: () => [state.prefs, state.save], preferencesLoaded: () => state.loaded }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: state.phone }) }))
 vi.mock('../../visible-poll', () => ({ pollWhileVisible: (load: (signal: AbortSignal) => Promise<unknown>) => {
@@ -71,20 +71,40 @@ it('waits for stored preferences before hydrating a command and preserves edits 
 
 it('accepts newer versions from automatic snapshots and preserves data after discovery failure', async () => {
   vi.mocked(checkAgent).mockResolvedValue({ ...snapshot, version: 'codex-cli 1.2.3', versionState: 'available' })
-  render(<AgentCatalog onSelect={vi.fn()} />)
+  render(<AgentCatalog initialKind="codex" onSelect={vi.fn()} />)
   const card = screen.getByRole('article', { name: 'Codex' })
-  await screen.findByText('agent.professional.remaining{"percent":75}')
-  fireEvent.click(within(card).getByRole('button', { name: 'capabilities.agents.check' }))
-  await screen.findByText('codex-cli 1.2.3')
+  await within(card).findByText('agent.professional.remaining{"percent":75}')
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'capabilities.agents.check' }))
+  await within(card).findByText('codex-cli 1.2.3')
   expect(checkAgent).toHaveBeenCalledWith('codex')
   vi.mocked(discoverAgents).mockResolvedValue([{ ...snapshot, version: 'codex-cli 2.0.0', versionState: 'available' }])
   await act(() => state.polls[0](new AbortController().signal))
-  expect(screen.getByText('codex-cli 2.0.0')).toBeTruthy()
+  expect(within(card).getByText('codex-cli 2.0.0')).toBeTruthy()
   expect(screen.queryByText('codex-cli 1.2.3')).toBeNull()
   vi.mocked(discoverAgents).mockRejectedValueOnce(new Error('offline'))
   await act(async () => { try { await state.polls[0](new AbortController().signal) } catch {} })
   expect(screen.getByText('agent.professional.loadFailed')).toBeTruthy()
-  expect(screen.getByText('codex-cli 2.0.0')).toBeTruthy()
+  expect(within(card).getByText('codex-cli 2.0.0')).toBeTruthy()
+})
+
+it('upgrades an installed agent after confirmation and displays the verified version', async () => {
+  vi.mocked(upgradeAgent).mockResolvedValue({ ...snapshot, version: 'codex-cli 2.0.0', versionState: 'available' })
+  render(<AgentCatalog onSelect={vi.fn()} />)
+  const card = screen.getByRole('article', { name: 'Codex' })
+  fireEvent.click(await within(card).findByRole('button', { name: 'capabilities.agents.update' }))
+  expect(upgradeAgent).not.toHaveBeenCalled()
+  fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.agents.update' }))
+  await within(card).findByText('codex-cli 2.0.0')
+  expect(upgradeAgent).toHaveBeenCalledWith('codex')
+  expect(installAgent).not.toHaveBeenCalled()
+})
+
+it('opens the agent model route directly from its card', async () => {
+  const select = vi.fn()
+  render(<AgentCatalog onSelect={select} />)
+  const card = screen.getByRole('article', { name: 'Codex' })
+  fireEvent.click(within(card).getByRole('button', { name: 'capabilities.models.manage' }))
+  expect(select).toHaveBeenCalledWith('codex/models')
 })
 
 it('shows all installed versions on entry without explicit checks and marks unreadable versions', async () => {
