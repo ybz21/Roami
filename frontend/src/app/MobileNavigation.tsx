@@ -36,7 +36,7 @@ export function MobileTopBar({ tab, go, unread, notifications, newTask, search, 
           {tab === 'home' && <span ref={setMobileActionsHost} className="tt-mobile-page-actions" />}
           <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon size={20} />{!!unread && <span className="agent-badge">{unread > 99 ? '99+' : unread}</span>}</button>
           {mobilePrimary && navRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
-            onClick={newTask}><PlusIcon size={20} /></button>}
+            onClick={() => newTask()}><PlusIcon size={20} /></button>}
           <button type="button" className="tt-mobile-topbar-icon"
             aria-label={t(tab === 'projects' || tab === 'sessions' ? 'mobile.searchSessions' : tab === 'settings' ? 'set.searchPlaceholder' : 'workspace.search')}
             onClick={() => { if (tab === 'projects' || tab === 'sessions' || tab === 'settings') search(); else openPalette() }}>

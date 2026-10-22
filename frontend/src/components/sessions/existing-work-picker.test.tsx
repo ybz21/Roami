@@ -50,6 +50,7 @@ describe('开任务 · 「已有」选择器', () => {
     }))
     fetchMock = vi.fn(async (url: string) => {
       const u = String(url)
+      if (u.includes('/git/is-repo')) return jsonResponse({ data: { repo: true, hasCommits: true } })
       if (u.includes('/git/worktrees')) return jsonResponse({ data: WORKTREES })
       if (u.includes('/git/branches')) return jsonResponse({ data: BRANCHES })
       if (u.includes('/worktree-sessions')) {
@@ -104,7 +105,7 @@ describe('开任务 · 「已有」选择器', () => {
     // pill 上写明代价：开干会为它新开一个工作区
     expect(await screen.findByText('建工作区')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('开干 ⏎'))
+    fireEvent.click(screen.getByRole('button', { name: /开\s*干/ }))
     await waitFor(() => expect(body('/worktree-sessions')).toHaveLength(1))
     expect(body('/worktree-sessions')[0]).toMatchObject({ dir: '/repo', branch: 'feat/old', existing: true })
     await waitFor(() => expect(body('/tasks/_/send')).toHaveLength(1))
@@ -122,7 +123,7 @@ describe('开任务 · 「已有」选择器', () => {
     await openPicker()
 
     fireEvent.click(list().getByText('feat/a'))
-    fireEvent.click(screen.getByText('开干 ⏎'))
+    fireEvent.click(screen.getByRole('button', { name: /开\s*干/ }))
     await waitFor(() => expect(body('/sessions')).toHaveLength(1))
     expect(body('/sessions')[0]).toMatchObject({ dir: '/repo/.worktrees/a' })
     expect(body('/worktree-sessions')).toHaveLength(0)

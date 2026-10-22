@@ -83,7 +83,7 @@ func scrubGitEnv() []string {
 func git(ctx context.Context, dir string, args ...string) (string, error) {
 	full := append([]string{"-C", dir, "-c", "core.quotepath=false"}, args...)
 	cmd := exec.CommandContext(ctx, "git", full...)
-	cmd.Env = append(scrubGitEnv(), "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(scrubGitEnv(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
 	out, err := cmd.CombinedOutput()
 	return strings.TrimRight(string(out), "\n"), err
 }
@@ -94,7 +94,7 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 func gitID(ctx context.Context, dir string, args ...string) (string, error) {
 	full := append([]string{"-C", dir, "-c", "core.quotepath=false"}, args...)
 	cmd := exec.CommandContext(ctx, "git", full...)
-	cmd.Env = append(scrubGitEnv(), "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(scrubGitEnv(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
 	if _, err := git(ctx, dir, "var", "GIT_AUTHOR_IDENT"); err != nil {
 		cmd.Env = append(cmd.Env,
 			"GIT_AUTHOR_NAME=roam", "GIT_AUTHOR_EMAIL=roam@localhost",

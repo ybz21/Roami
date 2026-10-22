@@ -15,6 +15,7 @@ import type { LocalBranch } from '../git/local-branches'
 import { pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { relTime } from '../../time-format'
 import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-brief'
+import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
 // 由 prompt 首句推会话名：派活时用户只写了要干什么，名字不该再问一遍。
 // worktree 分支默认名：会话名 slug（小写、非字母数字转 -）
@@ -61,7 +62,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   // 「已有」选中值：'wt:<路径>'（进这个工作区）/ 'br:<分支>'（为这条分支开一个工作区）
   const [existing, setExisting] = useState('')
   const [autoReview, setAutoReview] = useState(false)
-  const [isGitRepo, setIsGitRepo] = useState(false)
+  const setup = useRepositorySetup(open ? dir.trim() : '')
+  const isGitRepo = setup.ready
   const [creating, setCreating] = useState(false)
   // worktree 展开态（W1）：只选「基于」。分支不提前指定——后端按会话名占位，
   // Agent 开工后按任务 git branch -m 语义化（交互修订 4：先建会话再建 worktree）。
@@ -76,7 +78,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const [prefs] = usePreferences()
   useEffect(() => {
     if (!open) return
-    setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); setAutoReview(false); setIsGitRepo(false)
+    setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); setAutoReview(false)
     setBase(''); setBranches([]); setRemoteBranches([]); setDefBranch(''); setExistingWts([]); setMainPath(''); setExisting('')
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
     if (parent) {
@@ -86,15 +88,6 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       return () => { cancelled = true }
     }
   }, [open, parent])
-  useEffect(() => {
-    const d = dir.trim()
-    if (!d) { setIsGitRepo(false); return }
-    let cancelled = false
-    api('GET', `/git/is-repo?path=${encodeURIComponent(d)}`).then((r) => {
-      if (!cancelled) setIsGitRepo(!!r?.data?.repo)
-    }).catch(() => { if (!cancelled) setIsGitRepo(false) })
-    return () => { cancelled = true }
-  }, [dir])
   // 目录是 git 仓库时拉已有 worktree（三选一的「已有」选项 + 计数）
   useEffect(() => {
     if (!isGitRepo || !dir.trim()) { setExistingWts([]); setExisting(''); setWtMode('repo'); return }
@@ -133,6 +126,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   // 单子里还多列一条主仓库检出的分支（置灰），免得搜不到时以为是漏了
   const pickable = branches.filter((b) => !b.worktree || b.worktree === mainPath)
   const ok = async () => {
+    if (setup.blocked || creating) return
     // prompt-first：名字可全派生；prompt 与名字都空才拦
     let finalName = name.trim()
     if (!finalName) {
@@ -224,7 +218,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       <Modal open={open} onCancel={onClose} onOk={ok}
         okText={parent ? t('session.fork.ok') : t('file.create')}
         title={parent ? t('session.fork.title', { parent }) : t('session.new')} destroyOnClose
-        confirmLoading={creating}>
+        confirmLoading={creating} okButtonProps={{ disabled: setup.blocked }}>
         <Space direction="vertical" style={{ width: '100%' }}>
           {/* 名称是一等短输入(可留空自动命名)；需求是任务本体,发给 Agent/派生分支 */}
           <Input placeholder={t('session.namePlaceholder2')} value={name} autoFocus
@@ -254,7 +248,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
               </div>
             )}
           </>)}
-          {/* 工作区三选一（W1 交互修订）：常驻不隐藏(cc96123 教训)——非 git 目录整组置灰+tooltip */}
+          {!!dir.trim() && <RepositorySetup setup={setup} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text-dim)', fontSize: 13, flex: '0 0 auto' }}>{t('session.wt.where')}</span>
@@ -263,16 +257,15 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
                   { label: t('session.wt.newWt'), value: 'new' },
                   { label: t('session.wt.existingWt', { count: existingCount }), value: 'existing', disabled: !existingCount },
                 ] : [
-                  { label: parent ? t('session.fork.parentDir') : t('session.wt.mainRepo'), value: 'repo' },
+                  { label: t('session.gitSetup.directory'), value: 'repo' },
                 ]} />
               </Tooltip>
             </div>
-            <div style={{ color: 'var(--text-dimmer)', fontSize: 12 }}>
-              {!isGitRepo ? (parent ? t('session.fork.parentNotRepo') : t('session.worktreeNeedsRepo'))
-                : wtMode === 'repo' ? (parent ? t('session.fork.hintParent') : t('session.wt.hintRepo'))
+            {isGitRepo && <div style={{ color: 'var(--text-dimmer)', fontSize: 'var(--fs-meta)' }}>
+              {wtMode === 'repo' ? (parent ? t('session.fork.hintParent') : t('session.wt.hintRepo'))
                   : wtMode === 'new' ? t('session.wt.hintNew')
                     : pickedBranch(existing) ? t('session.wt.hintAdopt') : t('session.wt.hintExisting')}
-            </div>
+            </div>}
             {/* 「已有」两组：现成的工作区（进去接着干）+ 还没有工作区的本地分支（选中即为它开一个）。
                 主仓库检出的那条分支留着但置灰——不然搜 main 搜不到，人会当成漏了 */}
             {wtMode === 'existing' && (

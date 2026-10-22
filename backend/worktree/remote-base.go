@@ -50,6 +50,19 @@ func (s *Service) freshBase(ctx context.Context, repo Repo, base, remote string)
 				return PreparedBase{}, errf("REMOTE_UNRESOLVED", "cannot list remotes")
 			}
 			all := strings.Fields(names)
+			if len(all) == 0 {
+				if base == "" {
+					base = s.defaultBase(ctx, repo)
+				}
+				if _, e := git(ctx, repo.Root, "check-ref-format", "refs/heads/"+base); e != nil {
+					return PreparedBase{}, errf("BAD_BASE", "invalid local branch %q", base)
+				}
+				oid, e := git(ctx, repo.Root, "rev-parse", "--verify", "--end-of-options", "refs/heads/"+base+"^{commit}")
+				if e != nil {
+					return PreparedBase{}, errf("BAD_BASE", "cannot resolve local branch %q", base)
+				}
+				return PreparedBase{repo: repo.Root, base: base, oid: strings.TrimSpace(oid)}, nil
+			}
 			if len(all) != 1 {
 				return PreparedBase{}, errf("REMOTE_REQUIRED", "select a remote before creating a task worktree")
 			}

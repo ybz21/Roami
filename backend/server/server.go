@@ -164,7 +164,8 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/file/touch", h.FileTouch) // 文件侧栏：在指定目录新建空文件
 		g.POST("/upload", h.Upload)        // 上传文件到指定目录（拖拽到对话框 / 文件侧栏）
 
-		g.GET("/git/status", h.GitStatus)    // Git 面板：当前工作目录所属仓库状态
+		g.GET("/git/status", h.GitStatus) // Git 面板：当前工作目录所属仓库状态
+		g.POST("/git/initialize", h.GitInitialize)
 		g.GET("/git/diff", h.GitDiff)        // Git 面板：单文件差异
 		g.POST("/git/stage", h.GitStage)     // 暂存
 		g.POST("/git/unstage", h.GitUnstage) // 取消暂存

@@ -359,8 +359,33 @@ func (a *API) GitIsRepo(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
-	_, err := runGit(ctx, dir, "rev-parse", "--git-dir")
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"repo": err == nil}})
+	state, err := a.WT.RepositoryState(ctx, dir)
+	if err != nil {
+		wtErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": state})
+}
+
+func (a *API) GitInitialize(c *gin.Context) {
+	var b struct {
+		Dir string `json:"dir"`
+	}
+	if err := c.ShouldBindJSON(&b); err != nil || strings.TrimSpace(b.Dir) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
+		return
+	}
+	ctx, cancel := wtCtx(c)
+	defer cancel()
+	state, err := a.WT.InitializeRepository(ctx, b.Dir)
+	if err != nil {
+		wtErr(c, err)
+		return
+	}
+	projRespMu.Lock()
+	projResp = nil
+	projRespMu.Unlock()
+	c.JSON(http.StatusOK, gin.H{"data": state})
 }
 
 // GitOp POST /git/op {root, op} —— 远端操作：push / pull / fetch / sync(pull+push)。

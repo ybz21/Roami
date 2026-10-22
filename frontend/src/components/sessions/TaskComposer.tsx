@@ -6,6 +6,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { App as AntApp, Button, Dropdown, Input } from 'antd'
 import { api, upload, makeClipboardImageFile } from '../../api'
+import { pollWhileVisible } from '../../visible-poll'
 import { appendPaths } from '../../agent-paths'
 import { agentLaunch } from '../../agent-command'
 import { agentName, type AgentKind } from '../../agent-kind'
@@ -18,6 +19,7 @@ import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-brief'
+import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
 export type TaskComposerHandle = { focus: () => void; insert: (text: string) => void }
 
@@ -28,10 +30,12 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   /** 建完（会话已开）：项目主页刷新列表，弹窗关掉自己 */
   onCreated?: (name: string) => void
   autoFocus?: boolean
-}>(function TaskComposer({ dir, isGit, openTerm, onCreated, autoFocus }, ref) {
+}>(function TaskComposer({ dir, isGit: gitHint, openTerm, onCreated, autoFocus }, ref) {
   const { t } = useI18n()
   const { message } = AntApp.useApp()
   const [prefs] = usePreferences()
+  const setup = useRepositorySetup(dir, gitHint)
+  const isGit = setup.ready
   const [prompt, setPrompt] = useState('')
   const [wtMode, setWtMode] = useState<'new' | 'existing'>('new')
   const [agent, setAgent] = useState<AgentKind | 'none'>('claude')
@@ -53,33 +57,23 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   }))
   useEffect(() => { if (autoFocus) setTimeout(() => promptRef.current?.focus?.(), 0) }, [autoFocus])
 
-  // worktree 清单（「已有(N)」）与分支（「基于」）：和项目主页同两条接口
   useEffect(() => {
-    if (!dir || !isGit) { setWtsAll([]); return }
-    let stop = false
-    const loadWts = () => api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`).then((r) => {
-      if (!stop) setWtsAll(Array.isArray(r?.data) ? r.data : [])
-    }).catch(() => {})
-    loadWts()
-    const i = setInterval(loadWts, 5000)
-    return () => { stop = true; clearInterval(i) }
-  }, [dir, isGit])
-  // 分支清单同时喂两处：「基于」（新建档的起点）和「已有」（可收养的分支）。
-  // worktree 清单 5s 一轮，分支跟着一起——刚 push 完删掉工作区的分支得立刻能选到。
-  useEffect(() => {
-    if (!dir || !isGit) { setBranches([]); return }
-    let stop = false
-    const load = () => api('GET', `/git/branches?dir=${encodeURIComponent(dir)}`).then((r) => {
-      if (stop) return
-      const def = r?.data?.default || ''
+    setWtsAll([]); setBranches([]); setRemoteBranches([]); setDefBranch(''); setBase(''); setExisting('')
+    if (!dir || !isGit) return
+    const poll = pollWhileVisible(async (signal) => {
+      const [worktrees, refs] = await Promise.all([
+        api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`, undefined, { signal }),
+        api('GET', `/git/branches?dir=${encodeURIComponent(dir)}`, undefined, { signal }),
+      ])
+      if (signal.aborted) return
+      setWtsAll(Array.isArray(worktrees?.data) ? worktrees.data : [])
+      const def = refs?.data?.default || ''
       setDefBranch(def)
-      setBranches(r?.data?.branches || [])
-      setRemoteBranches(r?.data?.remotes || [])
-      setBase((prev) => prev || def) // 「基于」默认跟主干走；用户选过就不再被覆盖
-    }).catch(() => {})
-    load()
-    const i = setInterval(load, 5000)
-    return () => { stop = true; clearInterval(i) }
+      setBranches(refs?.data?.branches || [])
+      setRemoteBranches(refs?.data?.remotes || [])
+      setBase((prev) => prev || def)
+    }, 5000)
+    return () => poll.stop()
   }, [dir, isGit])
   const wts = useMemo(() => wtsAll.filter((w: any) => !w.isMain && !w.prunable), [wtsAll])
   const mainPath = useMemo(() => wtsAll.find((w: any) => w.isMain)?.path || '', [wtsAll])
@@ -126,7 +120,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   })()
 
   const goCreate = async () => {
-    if (!dir || creating) return
+    if (!dir || creating || setup.blocked) return
     if (!prompt.trim()) { message.error(t('session.promptOrNameRequired')); return }
     if (isGit && wtMode === 'existing' && !existing) { message.error(t('project.where.pickFirst')); return }
     // 名字一律从需求派生：这就是任务名（23 设计 §3.3 #6），agent 不再改它
@@ -195,6 +189,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
 
   return (
     <div className="tt-composer prj-in" style={{ animationDelay: '60ms' }}>
+      <RepositorySetup setup={setup} />
       <Input.TextArea ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
         placeholder={isGit ? t('project.composerPlaceholder') : t('project.composerPlain')} autoSize={{ minRows: 2, maxRows: 6 }} variant="borderless"
         onPaste={onPaste}
@@ -254,7 +249,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
             disabled={uploading} onClick={() => fileRef.current?.click()}>
             <PaperclipIcon size={13} />
           </button>
-          <Button type="primary" size="small" className="prj-go" loading={creating} onClick={goCreate}>{t('project.go')}</Button>
+          <Button type="primary" size="small" className="prj-go" loading={creating} disabled={setup.blocked} onClick={goCreate}>{t('project.go')}</Button>
         </span>
       </div>
     </div>

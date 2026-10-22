@@ -707,3 +707,19 @@ GET /browser/tabs + PATCH /tabs/:id   复用现有读取与移组，不新增后
   <h3>验收记录</h3>
   <p>真实隔离 Chrome 验证分组按钮位于标签条右端、恢复各组最近页面、目录同时展示两组、搜索不激活页面、REST 移组与更多菜单中的自动跟随。Redmi Note 8 真机验证搜索、移组、Android 返回、20 个智能体页面触控滚动，搜索和分组栏保持固定。320、390、820、1100、1280、1600、1920 宽度在中文深色与英文浅色下共 14 组验证无文档或横向溢出。前端 124 个测试文件、887 个用例通过，执行 full 与提交前 quick 门禁。截图位于 /tmp/browser-right-after.png、browser-right-directory.png、browser-right-phone.png、browser-right-phone-scroll.png；未部署到现用服务。</p>
 </section>
+
+<section id="non-git-task-setup" lang="zh-CN">
+  <h2>无 Git 项目开任务修复 · 2026-10-22</h2>
+  <h3>产品设计</h3>
+  <p>开任务和新建／派生会话按实际目录检查 Git，不依赖项目列表的旧状态。未初始化或没有首次提交时显示短提示，保留直接在目录开工的能力；用户可显式确认将当前文件保存为首次提交，遵循现有 .gitignore，成功后开放 worktree。失败保留任务与 Agent 选择，提供重试。</p>
+  <h3>用户故事</h3>
+  <p>新项目用户能在同一表单初始化 Git、保存项目快照并创建含现有文件的独立工作区；已有空仓库用户能补首次提交；不需要版本管理的用户可直接开工。</p>
+  <h3>技术设计</h3>
+  <p>backend/worktree/repository-setup.go 负责目录探测、初始化和首次快照，以目录锁及现有仓库锁串行写入；有提交的仓库幂等返回，不提交后续改动。GET /git/is-repo 增加 hasCommits 与 root；POST /git/initialize 显式修复。RepositorySetup.tsx 在任务表单共用检查、确认及恢复状态，过期目录响应不能覆盖新选择。remote-base.go 在无任何远端时验证并使用本地分支快照；有远端继续 fetch，失败不回退旧快照。任务目录刷新复用 pollWhileVisible。手机顶栏新会话按钮显式无参调用，防止点击事件被当作目录。</p>
+  <h3>验收计划</h3>
+  <p>验证未初始化、空仓库、有提交、忽略规则、失败重试、幂等与子目录边界；真实新 worktree 包含项目快照，原有远端拉取与失败保护通过。前端覆盖确认／取消、检查失败、任务内容保留与正确提交路径，执行仓库门禁、桌面与 Android 真机触控验收。</p>
+  <h3>验收记录</h3>
+  <p>Go 全量与仓库 full 门禁通过，Python 845 个用例通过；最终前端 126 个文件、896 个用例以及 typecheck、i18n、hover、生产构建通过。构建保留现有大块体积提示。quick 中一次已有 Claude 取消时序用例在并行构建下失败，单独重复 3 次通过，随后完整 quick 重跑通过。</p>
+  <p>隔离 Go 服务、私有 tmux 和真实 Git 验证未初始化目录、已有空仓库 develop 分支、首次快照及无远端 worktree 创建；任务目录含原文件，.gitignore 排除本地文件。桌面验证中文深色及英文浅色；Redmi Note 8 真机以 392 CSS px、coarse 指针完成顶部入口、项目选择、任务输入、确认取消、初始化及新 worktree 会话创建。键盘实测 314px，确认动作高度至少 44px，无文档或横向溢出，未出现浏览器脚本错误。</p>
+  <p>截图和验收脚本位于 /tmp/git-setup-*，不进入主分支。现用服务未部署本分支，用户项目未被初始化或提交。</p>
+</section>

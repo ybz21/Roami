@@ -1,0 +1,13 @@
+.tt-repository-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+}
+.tt-repository-setup > span { flex: 1 1 60%; }
+.tt-repository-error { white-space: pre-wrap; overflow-wrap: anywhere; }
+html[data-pointer="coarse"] .tt-repository-setup .ant-btn,
+html[data-pointer="coarse"] .tt-repository-confirm .ant-btn { min-height: var(--tap); }
