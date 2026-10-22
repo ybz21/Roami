@@ -1,0 +1,7 @@
+ALTER TABLE browser_tabs ADD COLUMN origin TEXT NOT NULL DEFAULT 'agent';
+ALTER TABLE browser_tabs ADD COLUMN protected INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE browser_tabs ADD COLUMN sleeping INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE browser_tabs ADD COLUMN sleep_after_seconds INTEGER NOT NULL DEFAULT 120;
+ALTER TABLE browser_tabs ADD COLUMN close_after_seconds INTEGER NOT NULL DEFAULT 600;
+ALTER TABLE browser_tabs ADD COLUMN maintenance_verb TEXT NOT NULL DEFAULT 'close';
+ALTER TABLE browser_tabs ADD COLUMN catalog_used_ms INTEGER NOT NULL DEFAULT 0;

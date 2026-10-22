@@ -3,7 +3,9 @@ package automation
 import (
 	"crypto/sha256"
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"github.com/ybz21/Roami/internal/browsertabs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,6 +46,28 @@ func Run(args []string) error {
 		return err
 	}
 
+	if len(args) > 0 && args[0] == "_tab-event" {
+		if len(args) < 2 {
+			return browsertabs.ErrInvalid
+		}
+		var e browsertabs.Event
+		if err := json.Unmarshal([]byte(args[1]), &e); err != nil {
+			return err
+		}
+		result, err := browsertabs.Apply(paths.Data, e)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
+	}
+
+	if len(args) > 0 && args[0] == "new" {
+		release, err := browsertabs.CreationLock(paths.Data)
+		if err != nil {
+			return err
+		}
+		defer release()
+	}
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
 	dir := filepath.Join(paths.Data, "cache", "chrome", hash[:16])
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -74,5 +98,8 @@ func Run(args []string) error {
 	cmd := exec.Command("bash", append([]string{path}, args...)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	cmd.Env = append(os.Environ(), "ROAMI_HOME="+paths.Home, "ROAMI_DATA="+paths.Data)
+	if binary, err := os.Executable(); err == nil {
+		cmd.Env = append(cmd.Env, "ROAMI_CHROME_CATALOG_BIN="+binary)
+	}
 	return cmd.Run()
 }

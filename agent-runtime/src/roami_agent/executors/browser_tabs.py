@@ -60,7 +60,7 @@ class BrowserTabs:
             not isinstance(t, dict) or not isinstance(t.get("targetId"), str) for t in targets
         ):
             raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503)
-        return {t["targetId"] for t in targets}
+        return {t["targetId"]: t for t in targets}
 
     async def sync(self, browser_id, live):
         # Successful create receipts are the only provenance accepted for pre-upgrade tabs.
@@ -89,6 +89,33 @@ class BrowserTabs:
                     proof["target_id"],
                     created_ms=proof["created_ms"],
                 )
+        if isinstance(live, dict):
+            for target_id, meta in live.items():
+                if meta.get("origin") not in {"human", "agent"}:
+                    continue
+                rid = await self.track("local", browser_id, target_id)
+                timestamp = meta.get("lastUsedAt", now_ms())
+                await self.db.call(
+                    lambda db, rid=rid, meta=meta, timestamp=timestamp: db.execute(
+                        "UPDATE browser_tabs SET catalog_used_ms=?,origin=?,protected=?,sleeping=?,sleep_after_seconds=?,close_after_seconds=?,"
+                        "last_used_ms=MAX(last_used_ms,?),idle_since_ms=CASE WHEN idle_since_ms IS NOT NULL THEN MAX(idle_since_ms,?) ELSE NULL END "
+                        "WHERE resource_id=?",
+                        (
+                            timestamp,
+                            meta["origin"],
+                            int(bool(meta.get("pinned") or meta.get("busy"))),
+                            int(bool(meta.get("sleeping"))),
+                            meta.get(
+                                "sleepAfterSeconds", 120 if meta["origin"] == "agent" else 1800
+                            ),
+                            meta.get("closeAfterSeconds", 600 if meta["origin"] == "agent" else 0),
+                            timestamp,
+                            timestamp,
+                            rid,
+                        ),
+                    ),
+                    write=True,
+                )
         tracked = await self.db.call(
             lambda db: rows(
                 db,
@@ -107,6 +134,25 @@ class BrowserTabs:
                     )
                 except (DomainError, OSError, TimeoutError):
                     continue
+                if tab["catalog_used_ms"] and receipt["state"] in {
+                    "succeeded",
+                    "failed",
+                    "cancelled",
+                }:
+                    await self.driver._cli(
+                        "_tab-event",
+                        encoded(
+                            {
+                                "action": "finish",
+                                "browserId": browser_id,
+                                "targetId": tab["target_id"],
+                                "token": tab["close_operation_id"],
+                                "known": True,
+                                "sleeping": receipt["state"] == "succeeded"
+                                and tab["maintenance_verb"] == "sleep",
+                            }
+                        ),
+                    )
                 await self.finish(tab["resource_id"], receipt)
 
     async def closed(self, resource_id):
@@ -137,7 +183,9 @@ class BrowserTabs:
                 "UPDATE browser_tabs SET close_receipt_json=? WHERE resource_id=?",
                 (encoded(receipt), resource_id),
             )
-            if receipt["state"] in {"failed", "cancelled"} and receipt["inputStopped"] is True:
+            if (
+                receipt["state"] in {"failed", "cancelled"} and receipt["inputStopped"] is True
+            ) or (receipt["state"] == "succeeded" and tab["maintenance_verb"] == "sleep"):
                 db.execute(
                     "UPDATE browser_tabs SET state='open',retry_after_ms=? WHERE resource_id=?",
                     (now_ms() + 60_000, resource_id),
@@ -149,10 +197,21 @@ class BrowserTabs:
             return True
 
         accepted = await self.db.call(write, write=True)
-        if accepted and receipt["state"] == "succeeded":
+        if (
+            accepted
+            and receipt["state"] == "succeeded"
+            and await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT maintenance_verb FROM browser_tabs WHERE resource_id=?",
+                    (resource_id,),
+                )["maintenance_verb"]
+            )
+            == "close"
+        ):
             await self.closed(resource_id)
 
-    async def recycle(self, resource_id, browser_id):
+    async def recycle(self, resource_id, browser_id, *, verb="close"):
         operation = identity()
 
         def reserve(db):
@@ -165,6 +224,7 @@ class BrowserTabs:
             if (
                 not tab
                 or tab["browser_id"] != browser_id
+                or tab["protected"]
                 or resource["state"] != "idle"
                 or resource["owner_task_id"]
                 or resource["owner_run_id"]
@@ -177,8 +237,8 @@ class BrowserTabs:
             ):
                 return None
             db.execute(
-                "UPDATE browser_tabs SET state='closing',close_operation_id=?,close_receipt_json=NULL WHERE resource_id=?",
-                (operation, resource_id),
+                "UPDATE browser_tabs SET state='closing',close_operation_id=?,close_receipt_json=NULL,maintenance_verb=? WHERE resource_id=?",
+                (operation, verb, resource_id),
             )
             db.execute(
                 "UPDATE resources SET state='quarantined',lease_epoch=lease_epoch+1 WHERE id=?",
@@ -193,7 +253,14 @@ class BrowserTabs:
             async with asyncio.timeout(6):
                 receipt = self.driver._receipt(
                     await self.driver._cli(
-                        "close",
+                        verb,
+                        "--expected-origin",
+                        tab["origin"],
+                        *(
+                            ["--expected-last-used", str(tab["catalog_used_ms"])]
+                            if tab["catalog_used_ms"]
+                            else []
+                        ),
                         "--target",
                         tab["target_id"],
                         "--only-if-background",
@@ -209,21 +276,24 @@ class BrowserTabs:
         await self.finish(resource_id, receipt)
         return receipt["state"] == "succeeded"
 
-    async def candidates(self, browser_id, *, expired=False):
-        cutoff = (
-            now_ms() - self.driver.config.get("idle_timeout_seconds", 600) * 1000
+    async def candidates(self, browser_id, *, expired=False, sleeping=False):
+        policy = (
+            " AND b.sleep_after_seconds>0 AND b.sleeping=0 AND b.idle_since_ms<=?-b.sleep_after_seconds*1000"
+            if sleeping
+            else " AND b.close_after_seconds>0 AND b.idle_since_ms<=?-b.close_after_seconds*1000"
             if expired
-            else now_ms()
+            else " AND b.origin='agent' AND b.close_after_seconds>0"
         )
         return await self.db.call(
             lambda db: rows(
                 db,
                 "SELECT b.resource_id FROM browser_tabs b JOIN resources r ON r.id=b.resource_id "
-                "WHERE b.browser_id=? AND b.state='open' AND b.idle_since_ms<=? AND b.retry_after_ms<=? "
+                "WHERE b.browser_id=? AND b.state='open' AND b.protected=0 AND b.idle_since_ms<=? AND b.retry_after_ms<=? "
                 "AND r.state='idle' AND r.owner_task_id IS NULL AND r.owner_run_id IS NULL "
                 "AND NOT EXISTS(SELECT 1 FROM resource_actions a WHERE a.resource_id=r.id AND a.state IN ('running','unknown')) "
-                "ORDER BY b.idle_since_ms,b.last_used_ms,b.created_ms,b.resource_id LIMIT 20",
-                (browser_id, cutoff, now_ms()),
+                + policy
+                + " ORDER BY b.idle_since_ms,b.last_used_ms,b.created_ms,b.resource_id LIMIT 20",
+                (browser_id, now_ms(), now_ms(), *([now_ms()] if expired or sleeping else [])),
             )
         )
 
@@ -234,7 +304,7 @@ class BrowserTabs:
         count = await self.db.call(
             lambda db: row(
                 db,
-                "SELECT COUNT(*) AS n FROM browser_tabs WHERE browser_id=? AND state!='closed'",
+                "SELECT COUNT(*) AS n FROM browser_tabs WHERE browser_id=? AND origin='agent' AND state!='closed'",
                 (browser_id,),
             )["n"]
         )
@@ -256,21 +326,18 @@ class BrowserTabs:
         ):
             return
         self.next_sweep = time.monotonic() + 30
-        if not await self.db.call(
-            lambda db: row(
-                db,
-                "SELECT resource_id AS id FROM browser_tabs WHERE state!='closed' UNION ALL "
-                "SELECT id FROM resources WHERE kind='browser' AND created_by_task=1 "
-                "AND NOT EXISTS(SELECT 1 FROM browser_tabs b WHERE b.resource_id=resources.id) LIMIT 1",
-            )
-        ):
-            return
         async with self.lock:
-            async with asyncio.timeout(6):
-                capabilities = await self.driver.capabilities(no_start=True)
+            try:
+                async with asyncio.timeout(6):
+                    capabilities = await self.driver.capabilities(no_start=True)
+            except (DomainError, OSError, TimeoutError):
+                return
             if "background_tab_close" not in capabilities.get("features", []):
                 return
             browser_id = capabilities["browserId"]
             await self.sync(browser_id, await self.inventory(browser_id))
             for candidate in (await self.candidates(browser_id, expired=True))[:3]:
                 await self.recycle(candidate["resource_id"], browser_id)
+            if "background_tab_sleep" in capabilities.get("features", []):
+                for candidate in (await self.candidates(browser_id, sleeping=True))[:3]:
+                    await self.recycle(candidate["resource_id"], browser_id, verb="sleep")

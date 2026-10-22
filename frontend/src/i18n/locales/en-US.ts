@@ -3364,6 +3364,21 @@ const enUS = {
   'agent.notification.readAll': 'Mark all read',
   'agent.notification.confirmCancel': 'Cancel reminder',
   'agent.notification.keepReminder': 'Keep reminder',
+  'browser.agentLimit': 'The Agent group is full. Close a page or move one to Human first.',
+  'browser.createdBy': 'Opened by: {creator}',
+  'browser.groups': "Tab groups",
+  'browser.group.human': "Human",
+  'browser.group.agent': "Agent",
+  'browser.groupCount': "{group} ({count})",
+  'browser.moveToAgent': "Move to Agent",
+  'browser.moveToHuman': "Move to Human",
+  'browser.sleeping': "Sleeping",
+  'browser.tabBusy': "This page is busy. Try again after the operation finishes.",
+  'settings.browserTabPolicies': "Tab lifecycle",
+  'settings.browserSleepAfter': "Sleep after (minutes)",
+  'settings.browserCloseAfter': "Close after (minutes)",
+  'settings.browserPolicyHelp': "Zero disables a policy. Active pages are protected. Sleeping pages wake when selected.",
+  'settings.browserPolicyOrder': "Closing must be later than sleeping.",
 }
 
 export default enUS

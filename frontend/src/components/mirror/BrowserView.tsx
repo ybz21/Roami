@@ -18,6 +18,7 @@ import {
   fmtRate, IconBtn, MirrorChrome, MirrorMenu, Omnibox, StatusChip, StreamControl, useFullscreen, useShelf, type Quality,
 } from './mirror'
 import { TabSheet, TabStrip, type TabInfo } from './browser-tabs'
+import { pollWhileVisible } from '../../visible-poll'
 import { connectBrowserStream } from './browser-stream'
 
 // 清晰度档位与手机页共用（mirror.tsx 的 QUALITY_OPTS），这里只有存盘的 key 不同
@@ -61,7 +62,7 @@ function mergeTabs(prev: TabInfo[], incoming: TabInfo[]): TabInfo[] {
   const out: TabInfo[] = []
   for (const p of prev) {            // 1) 旧 tab 按原顺序保留，取最新标题/url
     const cur = byId.get(p.id)
-    if (cur) { out.push(cur); byId.delete(p.id) }
+    if (cur) { out.push({ ...p, ...cur }); byId.delete(p.id) }
   }
   for (const t of incoming) {        // 2) 新 tab 追加到右侧(按后端相对顺序)
     if (byId.has(t.id)) out.push(t)
@@ -98,12 +99,17 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   useEffect(() => {
     try { localStorage.setItem('roam.browser.pinnedTabs', JSON.stringify([...pinnedTabs])) } catch { /* 当前页仍可固定 */ }
   }, [pinnedTabs])
+  const legacyPins = useRef(new Set(pinnedTabs))
   const displayTabs = [...tabs.filter((tb) => pinnedTabs.has(tb.id)), ...tabs.filter((tb) => !pinnedTabs.has(tb.id))]
-  const togglePin = (id: string) => setPinnedTabs((current) => {
-    const next = new Set(current)
-    if (next.has(id)) next.delete(id); else next.add(id)
-    return next
-  })
+  const changeTab = async (id: string, change: Partial<TabInfo>) => {
+    try {
+      await api('PATCH', `/browser/tabs/${id}`, change)
+      setTabs(current => current.map(tab => tab.id === id ? { ...tab, ...change } : tab))
+      if (change.pinned !== undefined) setPinnedTabs(current => { const next = new Set(current); if (change.pinned) next.add(id); else next.delete(id); return next })
+    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUSY' ? t('browser.tabBusy') : error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.agentLimit') : error.message) }
+  }
+  const togglePin = (id: string) => { void changeTab(id, { pinned: !pinnedTabs.has(id) }) }
+  const changeOrigin = (id: string, origin: 'human' | 'agent') => { void changeTab(id, { origin }) }
   const tabsRef = useRef<TabInfo[]>([]) // 供 ws.onmessage 等闭包读到最新标签集（识别新开的那个）
   const [target, setTarget] = useState(initialTarget)
   const [expectedBrowser, setExpectedBrowser] = useState(browserInstance)
@@ -204,27 +210,31 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const visibleTabs = (list: TabInfo[]) => list.filter((x) => !dismissedRef.current.has(x.id))
 
   // 拉取标签页列表（每 3s 刷新，反映 agent 自己开的标签页/标题变化）
-  const loadTabs = async () => {
+  const loadTabs = async (signal?: AbortSignal) => {
     try {
       const expected = expectedBrowserRef.current
-      const r = await api('GET', '/browser/tabs' + (expected ? '?expectedBrowser=' + encodeURIComponent(expected) : ''))
+      const r = await api('GET', '/browser/tabs' + (expected ? '?expectedBrowser=' + encodeURIComponent(expected) : ''), undefined, { signal })
       const list: TabInfo[] = visibleTabs(r?.data || [])
+      for (const tab of list.filter(tab => legacyPins.current.has(tab.id))) {
+        await api('PATCH', `/browser/tabs/${tab.id}`, { pinned: true })
+        tab.pinned = true; legacyPins.current.delete(tab.id)
+      }
+      setPinnedTabs(new Set(list.filter(tab => tab.pinned).map(tab => tab.id)))
       setTabs((prev) => mergeTabs(prev, list)) // 稳定顺序，避免后端重排导致 tab 乱跳
       // 任务接管固定目标，消失时不切换到其他页面。
       setTarget((current) => pinnedTarget.current && current === pinnedTarget.current ? current : list.some((item) => item.id === current) ? current : (list[0]?.id || ''))
-    } catch {}
+    } catch (error) { if (signal) throw error }
   }
   useEffect(() => {
-    loadTabs()
-    const t = setInterval(loadTabs, 3000)
-    return () => clearInterval(t)
+    const poll = pollWhileVisible(signal => loadTabs(signal), 3000)
+    return () => poll.stop()
   }, [])
 
   const newTab = async () => {
     pinnedTarget.current = ''; setExpectedBrowser('')
     try {
       const known = new Set(tabs.map((t) => t.id)) // 记下创建前的 id，用于定位新开的那个
-      await api('POST', '/browser/tabs', { url: home }) // 新标签默认开导航起始页
+      await api('POST', '/browser/tabs', { url: home, origin: 'human' }) // 新标签默认开导航起始页
       const r = await api('GET', '/browser/tabs')
       const list: TabInfo[] = visibleTabs(r?.data || [])
       setTabs((prev) => mergeTabs(prev, list))
@@ -252,7 +262,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     const previous = target
     const address = tabs.find(tab => tab.id === previous)?.url
     try {
-      const result = await api('POST', '/browser/tabs', { url: address && address !== 'about:blank' ? address : smartUrl(url || home) })
+      const result = await api('POST', '/browser/tabs', { url: address && address !== 'about:blank' ? address : smartUrl(url || home), origin: 'human' })
       if (!result?.data?.id) return
       switchTab(result.data.id)
       await closeTab(previous)
@@ -296,6 +306,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
         const list: TabInfo[] = visibleTabs(r?.data || [])
         const fresh = list.find((t) => !known.has(t.id))
         if (fresh) {
+          if (Date.now() - lastInputTouch.current < 5000) { await api('PATCH', `/browser/tabs/${fresh.id}`, { origin: 'human' }); fresh.origin = 'human' }
           setTabs((prev) => mergeTabs(prev, list))
           switchTab(fresh.id) // 切镜像 + 前置，画面随之跳到新标签
           return
@@ -306,7 +317,12 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     }
   }
 
+  const lastInputTouch = useRef(0)
   const send = (o: any) => {
+    if (['mouse', 'wheel', 'key', 'nav'].includes(o.type) && target && Date.now() - lastInputTouch.current > 5000) {
+      lastInputTouch.current = Date.now()
+      void api('POST', `/browser/tabs/${target}/activate`).catch(() => {})
+    }
     // DuplexTransport.send 对 p2p 自带 open-before-send 排队、对 frp 内部判 readyState，
     // 这里直接发即可（未连时 frp 分支静默丢弃，与迁移前 ws.readyState 守卫等价）。
     tpRef.current?.send(JSON.stringify(o))
@@ -688,7 +704,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     ] : []),
     ...(shelf === 'narrow' ? [
       { key: 'forward', icon: <ChevronRight />, label: t('file.forward'), onClick: () => act('forward') },
-      { key: 'home', icon: <HomeIcon size={15} />, label: t('browser.home'), onClick: () => act('navigate', { url: home }) },
+      { key: 'home', icon: <HomeIcon size={15} />, label: t('browser.home'), onClick: () => act('navigate', { url: home, origin: 'human' }) },
       { type: 'divider' as const, key: 'd1' },
     ] : []),
     { key: 'rotate', icon: <RotateScreenIcon />, label: rotation ? `${t('browser.rotateTitle')} ${rotation}°` : t('browser.rotateTitle'), onClick: rotate },
@@ -740,7 +756,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
             从前是五行散装控件——「前往」实心按钮比地址栏还抢戏、四档清晰度常驻一整行、
             「外部打开」被挤成第五行的孤儿。现在只有一个主角：omnibox。 */}
         {shelf !== 'narrow' && (
-          <TabStrip tabs={displayTabs} active={target} pinned={pinnedTabs} onPin={togglePin}
+          <TabStrip tabs={displayTabs} active={target} pinned={pinnedTabs} onPin={togglePin} onOrigin={changeOrigin}
             onSelect={switchTab} onClose={closeTab} onCloseMany={closeTabs} onAdd={newTab}
             extra={<StatusChip icon={followPaused ? <UserIcon size={12} /> : <BotIcon size={12} />}
               strong={followPaused ? t('browser.followModeHuman') : t('browser.followModeAgent')}
@@ -753,7 +769,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
             {shelf !== 'narrow' && <>
               <IconBtn icon={<ChevronRight size={17} />} label={t('file.forward')} onClick={() => act('forward')} />
               <IconBtn icon={<RefreshIcon size={16} />} label={t('common.refresh')} onClick={() => act('reload')} />
-              <IconBtn icon={<HomeIcon size={16} />} label={t('browser.home')} onClick={() => act('navigate', { url: home })} />
+              <IconBtn icon={<HomeIcon size={16} />} label={t('browser.home')} onClick={() => act('navigate', { url: home, origin: 'human' })} />
             </>}
             <Omnibox
               value={url}
@@ -784,7 +800,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
         />
         {/* 手机标签：横条在 360 上放不下第三枚，换成「⧉N + 抽屉」（设计 17 §4） */}
         <TabSheet open={tabsOpen} tabs={displayTabs} active={target} pinned={pinnedTabs}
-          onPin={togglePin} onCloseMany={closeTabs} onClose={() => setTabsOpen(false)}
+          onPin={togglePin} onOrigin={changeOrigin} onCloseMany={closeTabs} onClose={() => setTabsOpen(false)}
           onSelect={(id) => { switchTab(id); setTabsOpen(false) }}
           onCloseTab={closeTab} onAdd={() => { newTab(); setTabsOpen(false) }} />
         <style>{`

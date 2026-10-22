@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const maxPythonAgentSchemaVersion = 9
+const maxPythonAgentSchemaVersion = 10
 
 type BackupEntry struct {
 	DatabaseDescriptor

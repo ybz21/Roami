@@ -337,3 +337,85 @@ async def test_pre_upgrade_create_receipts_recover_only_proven_live_targets(stor
         assert not chrome.closed and "user-tab" in chrome.targets
     finally:
         await runtime.close()
+
+
+async def test_catalog_enrolls_legacy_and_human_tabs_with_distinct_sleep_and_close_policies(store):
+    runtime, chrome = await fixture(store)
+    chrome.targets.update({"legacy-agent", "human-page"})
+    old = now_ms() - 300_000
+    metadata = {
+        target: {
+            "origin": "human" if target == "human-page" else "agent",
+            "lastUsedAt": old,
+            "sleepAfterSeconds": 60,
+            "closeAfterSeconds": 0 if target == "human-page" else 600,
+        }
+        for target in chrome.targets
+    }
+    base = chrome.__call__
+    slept = []
+
+    async def runner(argv, **options):
+        verb, flags, _ = chrome.arguments(argv)
+        if verb == "tabs":
+            result = [{"targetId": target, **metadata[target]} for target in chrome.targets]
+        elif verb == "capabilities":
+            result = json.loads((await base(argv, **options))["stdout"])
+            result["features"].append("background_tab_sleep")
+        elif verb == "sleep":
+            target = flags["--target"]
+            assert flags["--expected-origin"] == metadata[target]["origin"]
+            assert int(flags["--expected-last-used"]) == old
+            slept.append(target)
+            metadata[target]["sleeping"] = True
+            result = {
+                "version": 1,
+                "id": flags["--operation-id"],
+                "payloadHash": "a" * 64,
+                "state": "succeeded",
+                "inputStopped": True,
+                "outcomeKnown": True,
+                "result": {"stdout": "ok"},
+            }
+            chrome.receipts[result["id"]] = result
+        else:
+            return await base(argv, **options)
+        return {"exitCode": 0, "stdout": encoded(result), "stderr": ""}
+
+    runtime.browser.runner = runner
+    try:
+        await runtime.browser.tabs.sync(BROWSER, await runtime.browser.tabs.inventory(BROWSER))
+        records = await store.call(lambda db: rows(db, "SELECT * FROM browser_tabs"))
+        assert len(records) == 3
+        assert next(tab for tab in records if tab["target_id"] == "human-page")["origin"] == "human"
+        assert all(tab["idle_since_ms"] > old for tab in records)
+        # Simulate elapsed idle time after the first registration grace period.
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE browser_tabs SET idle_since_ms=?,last_used_ms=?", (old, old)
+            ),
+            write=True,
+        )
+        metadata["user-tab"]["pinned"] = True
+        await runtime.browser.tabs.sweep()
+        assert set(slept) == {"legacy-agent", "human-page"}
+        assert not chrome.closed
+        assert not await store.call(
+            lambda db: row(db, "SELECT resource_id FROM browser_tabs WHERE state='closed'")
+        )
+        expired = now_ms() - 900_000
+        for meta in metadata.values():
+            meta["lastUsedAt"] = expired
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE browser_tabs SET idle_since_ms=?,last_used_ms=?,retry_after_ms=0",
+                (expired, expired),
+            ),
+            write=True,
+        )
+        runtime.browser.tabs.next_sweep = 0
+        await runtime.browser.tabs.sweep()
+        assert chrome.closed == ["legacy-agent"]
+        assert "human-page" in chrome.targets and "user-tab" in chrome.targets
+    finally:
+        await runtime.close()

@@ -341,6 +341,9 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
   roami chrome wait  <选择器>            等待元素出现
   roami chrome screenshot [文件] [--full]   截图（默认 screenshot.png）
   roami chrome pdf   [文件]              导出 PDF（headless）
+  roami chrome sleep --target <id>        后台页休眠（保留状态）
+  roami chrome wake --target <id>         唤醒页面
+  roami chrome new [url] --origin human   显式归人工组；默认 agent
   roami chrome capabilities              查询驱动能力与浏览器实例身份
   roami chrome observe --target <id> [--screenshot <文件.png>]
   roami chrome tabs                      列出标签页（序号 / 标题 / url）

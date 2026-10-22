@@ -13,17 +13,19 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/browsertabs"
 )
 
 // Config 是可在 UI 里调的 Chrome 启动项。字符串空 / Fullscreen 为 nil = 未设，回落到 env/默认。
 type Config struct {
-	Headless    string `json:"headless"`   // "auto"(按有无显示器自动) | "on"(强制无头) | "off"(强制有头)
-	WindowSize  string `json:"windowSize"` // headless 初始窗口，如 "1920,1080"
-	Fullscreen  *bool  `json:"fullscreen"` // headful 是否全屏启动(--start-fullscreen)
-	Scale       string `json:"scale"`      // --force-device-scale-factor
-	Profile     string `json:"profile"`    // --user-data-dir（用户数据目录）
-	AutoRecover *bool  `json:"autoRecover"`
-	Bin         string `json:"bin"` // chrome 可执行路径（空=自动探测）
+	TabPolicies *browsertabs.Policies `json:"tabPolicies,omitempty"`
+	Headless    string                `json:"headless"`   // "auto"(按有无显示器自动) | "on"(强制无头) | "off"(强制有头)
+	WindowSize  string                `json:"windowSize"` // headless 初始窗口，如 "1920,1080"
+	Fullscreen  *bool                 `json:"fullscreen"` // headful 是否全屏启动(--start-fullscreen)
+	Scale       string                `json:"scale"`      // --force-device-scale-factor
+	Profile     string                `json:"profile"`    // --user-data-dir（用户数据目录）
+	AutoRecover *bool                 `json:"autoRecover"`
+	Bin         string                `json:"bin"` // chrome 可执行路径（空=自动探测）
 }
 
 var cfgStore struct {
@@ -148,6 +150,7 @@ func effectiveConfig() Config {
 	}
 	return Config{
 		AutoRecover: &recover,
+		TabPolicies: c.TabPolicies,
 		Headless:    pick(normalizeHeadless(c.Headless), "", "auto"),
 		WindowSize:  pick(c.WindowSize, os.Getenv("TTMUX_CHROME_WINDOW"), "1920,1080"),
 		Fullscreen:  &fs,
@@ -159,7 +162,12 @@ func effectiveConfig() Config {
 
 // GetConfig 返回当前生效配置（已填默认值，便于 UI 直接展示）。
 func GetConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"data": effectiveConfig()})
+	cfg := effectiveConfig()
+	if cfg.TabPolicies == nil {
+		p := browsertabs.Defaults()
+		cfg.TabPolicies = &p
+	}
+	c.JSON(http.StatusOK, gin.H{"data": cfg})
 }
 
 // Health 报告 Chrome 当前是否可用、CDP 地址、最近一次启动失败原因，供前端在「连不上」时显示为什么。
@@ -182,6 +190,10 @@ func SetConfig(c *gin.Context) {
 	var in Config
 	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
+		return
+	}
+	if in.TabPolicies != nil && !in.TabPolicies.Valid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "INVALID_BROWSER_TAB_POLICY"}})
 		return
 	}
 	in.Headless = normalizeHeadless(in.Headless) // 落盘的就是干净值，chrome CLI 也读同一份文件

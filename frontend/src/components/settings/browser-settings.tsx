@@ -6,11 +6,12 @@ import { useSettingsRead } from './settings-read'
 // 单这一页留个保存按钮，用户就得记住哪一页要按、哪一页不用。尺寸与 profile 要新起的 Chrome
 // 才吃得到，所以「重启 Chrome」是这一页的**页级动作**，摆在页头（见 registry）。
 import { useEffect, useRef, useState } from 'react'
-import { App as AntApp, Input, Segmented, Space, Switch } from 'antd'
+import { App as AntApp, Input, InputNumber, Segmented, Space, Switch } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
+import { pollWhileVisible } from '../../visible-poll'
 
-const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '', autoRecover: true }
+const DEFAULTS = { headless: 'auto', windowSize: '1920,1080', fullscreen: true, scale: '2', profile: '/tmp/ttmux-chrome', bin: '', autoRecover: true, tabPolicies: { agent: { sleepAfterSeconds: 120, closeAfterSeconds: 600 }, human: { sleepAfterSeconds: 1800, closeAfterSeconds: 0 } } }
 
 export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (() => Promise<void>) | null) => void }) {
   const { message, modal } = AntApp.useApp()
@@ -53,17 +54,11 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
     return () => onRestartReady?.(null)
   }, [!!readState, onRestartReady, t])
   useEffect(() => {
-    let disposed = false
-    let timer: ReturnType<typeof setTimeout>
-    const poll = async () => {
-      try {
-        const response = await api('GET', '/browser/health')
-        if (!disposed) setHealth(response.data)
-      } catch { if (!disposed) setHealth(null) }
-      if (!disposed) timer = setTimeout(() => { void poll() }, 5000)
-    }
-    void poll()
-    return () => { disposed = true; clearTimeout(timer) }
+    const poll = pollWhileVisible(async signal => {
+      try { const response = await api('GET', '/browser/health', undefined, { signal }); if (!signal.aborted) setHealth(response.data) }
+      catch (error) { if (!signal.aborted) setHealth(null); throw error }
+    }, 5000)
+    return () => poll.stop()
   }, [])
   const setRecovery = (value: boolean) => {
     const previous = cfgRef.current
@@ -75,6 +70,21 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
       if (cfgRef.current === next) { cfgRef.current = previous; setCfg(previous) }
       message.error(e.message)
     })
+  }
+  const editPolicy = (origin: 'human' | 'agent', field: 'sleepAfterSeconds' | 'closeAfterSeconds', minutes: number | null) => {
+    const previous = cfgRef.current
+    const policy = { ...previous.tabPolicies[origin], [field]: (minutes || 0) * 60 }
+    const next = { ...previous, tabPolicies: { ...previous.tabPolicies, [origin]: policy } }
+    cfgRef.current = next; setCfg(next)
+  }
+  const commitPolicies = () => {
+    const next = cfgRef.current
+    if (Object.values(next.tabPolicies).some((policy: any) => policy.closeAfterSeconds && policy.sleepAfterSeconds && policy.closeAfterSeconds < policy.sleepAfterSeconds)) {
+      message.error(t('settings.browserPolicyOrder')); return
+    }
+    const write = writes.current.catch(() => {}).then(() => api('PUT', '/browser/config', next))
+    writes.current = write
+    void write.catch((error: any) => message.error(error.message))
   }
   // 输入框：只改本地状态，失焦才写——每敲一个字发一次 PUT 既吵又会打乱光标
   const edit = (k: string, v: any) => setCfg((c: any) => { const n = { ...c, [k]: v }; cfgRef.current = n; return n })
@@ -91,6 +101,19 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
         <span>{t('settings.browserAutoRecover')}</span>
         <span style={dim}>{t('settings.browserAutoRecoverHelp')}</span>
       </Space>
+      <section aria-label={t('settings.browserTabPolicies')}>
+        <h3 style={{ fontSize: 'var(--fs-sm)', margin: 'var(--sp-4) 0 var(--sp-3)' }}>{t('settings.browserTabPolicies')}</h3>
+        {(['human', 'agent'] as const).map(origin => <Space key={origin} direction="vertical" size="small" style={{ marginBottom: 'var(--sp-4)', display: 'flex' }}>
+          <span>{t(`browser.group.${origin}`)}</span>
+          <Space wrap>
+            <label>{t('settings.browserSleepAfter')} <InputNumber min={0} max={10080} precision={0} aria-label={`${t(`browser.group.${origin}`)} ${t('settings.browserSleepAfter')}`}
+              value={cfg.tabPolicies[origin].sleepAfterSeconds / 60} onChange={value => editPolicy(origin, 'sleepAfterSeconds', value)} onBlur={commitPolicies} onPressEnter={commitPolicies} /></label>
+            <label>{t('settings.browserCloseAfter')} <InputNumber min={0} max={10080} precision={0} aria-label={`${t(`browser.group.${origin}`)} ${t('settings.browserCloseAfter')}`}
+              value={cfg.tabPolicies[origin].closeAfterSeconds / 60} onChange={value => editPolicy(origin, 'closeAfterSeconds', value)} onBlur={commitPolicies} onPressEnter={commitPolicies} /></label>
+          </Space>
+        </Space>)}
+        <span style={dim}>{t('settings.browserPolicyHelp')}</span>
+      </section>
       {pendingRestart && <span role="status">{t('settings.browserPendingRestart')}</span>}
       <Space align="center" wrap>
         <span>{t('settings.browserMode')}</span>

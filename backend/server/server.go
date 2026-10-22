@@ -335,6 +335,7 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/browser/tabs", browser.Tabs)      // 标签页：列出
 		g.POST("/browser/tabs", browser.NewTab)   // 标签页：新建
 		g.DELETE("/browser/tabs/:id", browser.CloseTab)
+		g.PATCH("/browser/tabs/:id", browser.UpdateTab)
 		g.POST("/browser/tabs/:id/back", browser.TabBack)         // 后退
 		g.POST("/browser/tabs/:id/forward", browser.TabForward)   // 前进
 		g.POST("/browser/tabs/:id/reload", browser.TabReload)     // 刷新

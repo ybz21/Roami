@@ -81,6 +81,8 @@ class BrowserFixture:
                     "expected_scene",
                 ],
             }
+        elif verb == "_tab-event":
+            output = {"entries": {}}
         elif verb == "tabs":
             output = [{"targetId": "target-fixture"}] if "new" in self.writes else []
         elif verb in {"operation-cancel", "operation-status"}:

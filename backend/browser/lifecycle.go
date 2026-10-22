@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/ybz21/Roami/internal/browsertabs"
 )
 
 var restarting atomic.Bool
@@ -148,6 +149,7 @@ func restartChrome(fallback []string) (restartResult, error) {
 		}
 	}
 	rememberRecoveryURLs(urls)
+	origins := savedRecoveryTabs()
 	if err := stopLocalChrome(); err != nil {
 		setLastErr(err.Error())
 		return restartResult{}, err
@@ -164,7 +166,7 @@ func restartChrome(fallback []string) (restartResult, error) {
 	if err != nil || identity == old {
 		return restartResult{}, fmt.Errorf("Chrome did not start a new browser instance")
 	}
-	restored, err := restoreTabs(urls)
+	restored, err := restoreTabs(urls, origins)
 	if err != nil {
 		setLastErr(err.Error())
 		return restartResult{}, err
@@ -173,18 +175,43 @@ func restartChrome(fallback []string) (restartResult, error) {
 	return restartResult{OK: true, BrowserID: identity, RestoredTabs: restored}, nil
 }
 
-func restoreTabs(urls []string) (int, error) {
+func restoreTabs(urls []string, origins []recoveryTab) (int, error) {
+	var identity, first string
+	if len(origins) > 0 {
+		urls = make([]string, len(origins))
+		for i, tab := range origins {
+			urls[i] = tab.URL
+		}
+		var err error
+		identity, err = currentBrowserIdentity()
+		if err != nil {
+			return 0, err
+		}
+	}
 	available := map[string]int{}
 	for _, page := range listPages() {
 		available[page.URL]++
 	}
-	for _, address := range urls {
-		if available[address] > 0 {
+	for i, address := range urls {
+		if len(origins) == 0 && available[address] > 0 {
 			available[address]--
 			continue
 		}
-		if _, err := newTab(address); err != nil {
+		id, err := newTab(address)
+		if err != nil {
 			return 0, fmt.Errorf("Chrome restarted but could not restore a tab: %w", err)
+		}
+		if first == "" {
+			first = id
+		}
+		if i < len(origins) {
+			tab := origins[i]
+			if tab.CreatedBy == "" {
+				tab.CreatedBy = "agent"
+			}
+			if _, err = tabCatalog(browsertabs.Event{Action: "restore", BrowserID: identity, TargetID: id, Origin: tab.Origin, Pinned: &tab.Pinned, CreatedBy: tab.CreatedBy}); err != nil {
+				return 0, err
+			}
 		}
 	}
 	if len(urls) > 0 {
@@ -192,6 +219,10 @@ func restoreTabs(urls []string) (int, error) {
 			if page.URL == "about:blank" {
 				_ = closeTab(page.ID)
 			}
+		}
+		if first != "" {
+			_ = activateTab(first)
+			return len(urls), nil
 		}
 		for _, page := range listPages() {
 			if page.URL == urls[0] {
@@ -203,9 +234,16 @@ func restoreTabs(urls []string) (int, error) {
 	return len(urls), nil
 }
 
+type recoveryTab struct {
+	CreatedBy string `json:"createdBy"`
+	URL       string `json:"url"`
+	Origin    string `json:"origin"`
+	Pinned    bool   `json:"pinned"`
+}
 type recoverySnapshot struct {
-	Profile string   `json:"profile"`
-	URLs    []string `json:"urls"`
+	Tabs    []recoveryTab `json:"tabs,omitempty"`
+	Profile string        `json:"profile"`
+	URLs    []string      `json:"urls"`
 }
 
 func recoveryFile() string {
@@ -231,7 +269,24 @@ func rememberRecoveryURLs(urls []string) {
 	if file == "" {
 		return
 	}
-	data, _ := json.Marshal(recoverySnapshot{Profile: effectiveConfig().Profile, URLs: urls})
+	tabs := savedRecoveryTabs()
+	if identity, err := currentBrowserIdentity(); err == nil {
+		pages := listPages()
+		ids := make([]string, 0, len(pages))
+		for _, p := range pages {
+			ids = append(ids, p.ID)
+		}
+		if catalog, err := tabCatalog(browsertabs.Event{Action: "sync", BrowserID: identity, Targets: ids}); err == nil {
+			tabs = nil
+			for _, p := range pages {
+				if p.URL != "" && p.URL != "about:blank" {
+					meta := catalog.Entries[p.ID]
+					tabs = append(tabs, recoveryTab{URL: p.URL, Origin: meta.Origin, Pinned: meta.Pinned, CreatedBy: meta.CreatedBy})
+				}
+			}
+		}
+	}
+	data, _ := json.Marshal(recoverySnapshot{Profile: effectiveConfig().Profile, URLs: urls, Tabs: tabs})
 	cfgStore.mu.Lock()
 	defer cfgStore.mu.Unlock()
 	if err := os.WriteFile(file+".tmp", data, 0o600); err == nil {
@@ -370,4 +425,13 @@ func StartRecovery(parent context.Context) func() {
 		}
 	}()
 	return func() { cancel(); <-done }
+}
+
+func savedRecoveryTabs() []recoveryTab {
+	var snapshot recoverySnapshot
+	b, _ := os.ReadFile(recoveryFile())
+	if json.Unmarshal(b, &snapshot) != nil || snapshot.Profile != effectiveConfig().Profile {
+		return nil
+	}
+	return snapshot.Tabs
 }

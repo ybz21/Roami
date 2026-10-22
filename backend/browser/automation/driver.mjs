@@ -12,22 +12,56 @@
 // 忙等死循环（不依赖出问题的那段代码自己配合退出，直接从外面强杀更可靠）。
 import { writeFile, mkdir, mkdtemp, rm, copyFile, rename } from 'node:fs/promises'
 import { existsSync, unlinkSync, writeFileSync, openSync, realpathSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, extname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import net from 'node:net'
-import { OperationReceipts } from './operation-receipts.mjs'
+import { OperationReceipts, operationFailureCode } from './operation-receipts.mjs'
 import { discoverBrowser, observePage } from './browser-observation.mjs'
 import { ScopedCDP, connectTarget, selectTarget } from './scoped-cdp.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
-const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v3'
+const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v4'
 const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli.log'
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
 class ChromeError extends Error {}
-const OPERATION_VERBS = new Set(['new', 'goto', 'url', 'title', 'click', 'fill', 'type', 'press', 'close', 'screenshot', 'shot', 'text', 'html', 'attr', 'wait', 'pdf', 'observe'])
+const OPERATION_VERBS = new Set(['new', 'goto', 'url', 'title', 'click', 'fill', 'type', 'press', 'close', 'screenshot', 'shot', 'text', 'html', 'attr', 'wait', 'pdf', 'observe', 'sleep', 'wake'])
+
+const runCatalog = promisify(execFile)
+async function catalogEvent(event) {
+  const binary = process.env.ROAMI_CHROME_CATALOG_BIN
+  if (!binary) return { entries: {}, policies: { agent: { sleepAfterSeconds: 120, closeAfterSeconds: 600 }, human: { sleepAfterSeconds: 1800, closeAfterSeconds: 0 } } }
+  try {
+    const { stdout } = await runCatalog(binary, ['chrome', '_tab-event', JSON.stringify(event)], { timeout: 5000, maxBuffer: 4 * 1024 * 1024 })
+    return JSON.parse(stdout)
+  } catch (error) {
+    if (error.stderr?.includes('BROWSER_TAB_BUSY')) throw new ChromeError('CHROME_TARGET_IN_USE')
+    throw error
+  }
+}
+
+export async function maintenanceSafe(page) {
+  try {
+    const frames = typeof page.frames === 'function' ? page.frames() : [page]
+    const protectedFrames = await Promise.all(frames.map(frame => frame.evaluate(() => {
+    if (document.visibilityState === 'visible' || document.hasFocus()) return true
+    if ([...document.querySelectorAll('audio,video')].some(e => !e.paused && !e.ended)) return true
+    if (navigator.mediaSession?.playbackState === 'playing') return true
+    return [...document.querySelectorAll('input,textarea,select,[contenteditable]')].some(e => {
+      if (e.isContentEditable) return !!e.textContent.trim()
+      if (e instanceof HTMLSelectElement) { const options = [...e.options]; return options.some(o => o.defaultSelected) ? options.some(o => o.selected !== o.defaultSelected) : e.selectedIndex !== 0 }
+      if (e instanceof HTMLInputElement && (e.type === 'checkbox' || e.type === 'radio')) return e.checked !== e.defaultChecked
+      if (e instanceof HTMLInputElement && e.type === 'file') return !!e.files.length
+      return e.value !== e.defaultValue
+    })
+    })))
+    return !protectedFrames.some(Boolean)
+  } catch { return false }
+}
 
 // ── 纯工具函数：不依赖某一次调用的 flags/pos，daemon 内多条请求共用也安全 ──────────────
 
@@ -328,10 +362,17 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
     }
     case 'pdf': { const f = pos[0] || 'page.pdf'; await (await pickHere()).pdf({ path: f }); io.log(f); break }
     case 'observe': io.log(await observePage(await pickHere(), flags.screenshot, { timeoutMs: to })); break
+    case 'sleep': case 'wake': {
+      const page = await pickHere()
+      if (verb === 'sleep' && (!flags.target || !flags['no-focus'] || !(await withTimeout(maintenanceSafe(page), to, 'background sleep check').catch(() => false)))) fail('CHROME_TARGET_IN_USE')
+      const session = await ctx.newCDPSession(page)
+      try { await session.send('Page.setWebLifecycleState', { state: verb === 'sleep' ? 'frozen' : 'active' }) } finally { await session.detach() }
+      io.log('ok'); break
+    }
     case 'close': {
       if (flags['only-if-background'] && (!flags.target || !flags['no-focus'])) fail('CHROME_TARGET_SELECTION_CONFLICT')
       const page = await pickHere()
-      if (flags['only-if-background'] && await withTimeout(page.evaluate(() => document.visibilityState === 'visible' || document.hasFocus()), to, 'background close check')) fail('CHROME_TARGET_IN_USE')
+      if (flags['only-if-background'] && !(await withTimeout(maintenanceSafe(page), to, 'background close check').catch(() => false))) fail('CHROME_TARGET_IN_USE')
       await page.close(); io.log('ok'); break
     }
     default: fail('未知命令: ' + verb)
@@ -569,7 +610,11 @@ class Session {
     const fail = message => { throw new ChromeError(message) }
     if (verb === 'record' && pos[0] !== 'start') {
       await this.recorder.handle(this.recordingBrowser, flags, pos, fail, io)
-      if (!this.recorder.isActive()) this.recordingBrowser = null
+      if (!this.recorder.isActive()) {
+        this.recordingBrowser = null
+        if (this.recordingCatalog) await catalogEvent({ action: 'finish', ...this.recordingCatalog, known: true })
+        this.recordingCatalog = null
+      }
       return
     }
     const discovered = await this.discover(cdp)
@@ -584,7 +629,7 @@ class Session {
     const control = this.controlSocket
     if (verb === 'capabilities') {
       await control.request('Browser.getVersion')
-      io.log({ version: 'roami-browser-v1', browserId: discovered.id, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close'] })
+      io.log({ version: 'roami-browser-v1', browserId: discovered.id, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close', 'tab_catalog', 'background_tab_sleep'] })
       return
     }
     const listTargets = async () => (await control.request('Target.getTargets')).targetInfos
@@ -597,10 +642,19 @@ class Session {
         try { await cached.browser.close() } catch {}
       }
     }
-    if (verb === 'tabs') { io.log(targets.map((t, i) => ({ i, targetId: t.targetId, title: t.title, url: t.url }))); return }
+    const catalog = await catalogEvent({ action: 'sync', browserId: discovered.id, targets: targets.map(t => t.targetId) })
+    if (verb === 'tabs') {
+      io.log(targets.map((t, i) => {
+        const meta = catalog.entries[t.targetId] || { origin: 'agent', lastUsedAt: Date.now() }
+        return { i, targetId: t.targetId, title: t.title, url: t.url, ...meta, ...catalog.policies[meta.origin] }
+      })); return
+    }
     let created
     if (verb === 'new') {
+      if (flags.origin && !['human', 'agent'].includes(flags.origin)) throw new ChromeError('INVALID_BROWSER_TAB_METADATA')
+      if (flags.origin !== 'human' && targets.filter(t => catalog.entries[t.targetId]?.origin !== 'human').length >= 20) throw new ChromeError('BROWSER_TAB_BUDGET_EXCEEDED')
       created = await control.request('Target.createTarget', { url: 'about:blank', background: !!flags['no-focus'] })
+      await catalogEvent({ action: 'create', browserId: discovered.id, targetId: created.targetId, origin: flags.origin || 'agent' })
       if (!pos[0]) {
         const i = (await listTargets()).findIndex(t => t.targetId === created.targetId)
         io.log({ ...(i >= 0 ? { i } : {}), targetId: created.targetId, url: 'about:blank' })
@@ -610,13 +664,19 @@ class Session {
     const targetId = created?.targetId || selectTarget(targets, flags).targetId
     const scopedFlags = { ...flags, target: targetId }
     delete scopedFlags.tab; delete scopedFlags.url
+    const token = flags['operation-id'] || randomUUID()
+    const maintenance = verb === 'sleep' || (verb === 'close' && flags['only-if-background'])
+    await catalogEvent({ action: maintenance ? 'maintain' : 'start', browserId: discovered.id, targetId, token, origin: flags['expected-origin'] || 'agent', ...(flags['expected-last-used'] ? { lastUsedAt: Number(flags['expected-last-used']) } : {}) })
+    let known = false, succeeded = false
     const browser = await this.browserFor(cdp, targetId)
     try {
+      if (!maintenance && catalog.entries[targetId]?.sleeping) await executeVerb(browser, 'wake', { target: targetId, 'no-focus': true }, [], timeoutMs, { log: () => {} }, this.browserId)
       // record 的状态（进行中的 CDP screencast 会话）要跨 start/stop 两次独立调用存活，
       // 不能像其它动词那样是一次性的 executeVerb 调用，得单独路由到常驻的 recorder 实例。
       if (verb === 'record') {
         await this.recorder.handle(browser, scopedFlags, pos, fail, io)
         if (this.recorder.isActive()) this.recordingBrowser = browser
+        if (this.recorder.isActive()) this.recordingCatalog = { browserId: discovered.id, targetId, token }; else known = true
         return
       }
       if (created) {
@@ -625,11 +685,15 @@ class Session {
         const i = (await listTargets()).findIndex(t => t.targetId === targetId)
         io.log({ ...(i >= 0 ? { i } : {}), targetId, url: pos[0] })
       } else await executeVerb(browser, verb, scopedFlags, pos, timeoutMs, io, this.browserId)
+      known = true; succeeded = true
     } catch (e) {
       // Chrome 死在命令中途（被回收/重启）：丢弃缓存连接，下条命令干净重连；
       // 页面级错误（选择器超时等）原样往上抛，daemon_request_with_retry 据此判断要不要重试。
       if (this.browser && !this.browser.isConnected()) this.browser = null
+      if (operationFailureCode(e.message) !== 'CHROME_OPERATION_OUTCOME_UNKNOWN' || ['observe', 'title', 'text', 'html', 'attr', 'url', 'wait', 'screenshot', 'shot'].includes(verb)) known = true
       throw e
+    } finally {
+      await catalogEvent({ action: 'finish', browserId: discovered.id, targetId, token, known, sleeping: succeeded && verb === 'sleep' })
     }
   }
   async close() {
@@ -637,6 +701,7 @@ class Session {
     // 半途而废的录制总比什么都没有强，agent 至少能看到"进行到哪一步"。
     if (this.recorder.isActive()) {
       await this.recorder._stop(() => { throw new ChromeError('') }).catch(() => {})
+      if (this.recordingCatalog) await catalogEvent({ action: 'finish', ...this.recordingCatalog, known: true }).catch(() => {})
     }
     const browsers = new Set([...this.connections.values()].map(entry => entry.browser))
     if (this.recordingBrowser) browsers.add(this.recordingBrowser)

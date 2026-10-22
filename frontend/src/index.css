@@ -1031,19 +1031,19 @@ html[data-pointer="coarse"] .mc { --ctl-h: 36px; }
 /* 窄档标签抽屉里的卡片 */
 .mc-tabcard {
   display: flex; align-items: center; gap: var(--sp-2);
-  padding: 9px 10px; margin-bottom: 6px; min-height: 48px;
+  padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-2); min-height: var(--tap);
   border-radius: var(--r-sm); background: var(--bg-base);
   box-shadow: inset 0 0 0 1px var(--border-subtle); cursor: pointer;
 }
 .mc-tabcard.is-on { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent-border); }
 .mc-tabcard-fav {
-  flex: 0 0 auto; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center;
+  flex: 0 0 auto; width: var(--sp-5); height: var(--sp-5); border-radius: var(--r-xs); display: grid; place-items: center;
   background: var(--bg-elevated); color: var(--text-dimmer); font-size: var(--fs-micro); font-weight: 700;
 }
 .mc-tabcard-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .mc-tabcard-meta .t { font-size: var(--fs-sm); color: var(--text-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mc-tabcard-meta .u {
-  font-size: var(--fs-micro); color: var(--text-dimmer); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-meta); color: var(--text-dimmer); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 .mc-newtab {
@@ -3824,7 +3824,7 @@ html[data-pointer="coarse"] .tt-ka-rules .tt-act.xs { height: 30px; width: 34px;
   background: var(--bg-container); color: inherit; font: inherit; cursor: pointer; min-height: 44px;
 }
 :where(html[data-pointer="fine"]) .tt-inbox-row:hover { background: var(--list-hover); }
-.tt-inbox-row .ic { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-size: var(--fs-meta); font-weight: 700; color: #fff; background: var(--text-dimmer); }
+.tt-inbox-row .ic { flex: 0 0 auto; width: var(--sp-5); height: var(--sp-5); border-radius: var(--r-xs); display: grid; place-items: center; font-size: var(--fs-meta); font-weight: 700; color: #fff; background: var(--text-dimmer); }
 .tt-inbox-row.waiting .ic { background: var(--warn); }
 .tt-inbox-row.done .ic { background: var(--ok-solid); }
 .tt-inbox-row.error .ic { background: var(--danger); }
@@ -4008,3 +4008,14 @@ html[data-size="compact"] .ant-modal { max-width: calc(100vw - 24px); margin-inl
 .tt-appupdate code { overflow-wrap: anywhere; font-size: var(--fs-meta); }
 button.tt-appupdate { width: 100%; text-align: left; font: inherit; cursor: pointer; }
 .tt-appupdate .action { color: var(--accent); }
+
+.mc-tab-groups { flex: 0 0 auto; padding: var(--sp-1); }
+.mc-tab-sleep { color: var(--text-dim); font-size: var(--fs-meta); margin-inline-start: var(--sp-2); }
+:where(html[data-pointer="coarse"]) .mc-tab-groups .ant-segmented-item-label { min-height: var(--tap); display: flex; align-items: center; }
+
+.mc-tab-list { flex: 1; min-height: 0; overflow: auto; padding: var(--sp-3); }
+.mc-tab-select, .mc-tabcard-select { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-2); padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.mc-tabcard-select { min-height: var(--tap); }
+button.mc-tab-x { padding: 0; border: 0; background: transparent; cursor: pointer; }
+
+.mc-tab.pinned .mc-tab-select { justify-content: center; }

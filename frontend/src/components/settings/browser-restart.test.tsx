@@ -61,3 +61,29 @@ it('recovery switch is saved immediately without a pending restart', async () =>
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ autoRecover: false })))
   expect(screen.queryByText('settings.browserPendingRestart')).toBeNull()
 })
+
+
+it('commits lifecycle policy after editing instead of applying partial numbers', async () => {
+  vi.spyOn(App, 'useApp').mockReturnValue({ message: { error: vi.fn() }, modal: {} } as any)
+  vi.mocked(api).mockResolvedValue({ data: {} })
+  render(<BrowserSettings />)
+  const input = await screen.findByRole('spinbutton', { name: 'browser.group.human settings.browserCloseAfter' })
+  fireEvent.change(input, { target: { value: '1440' } })
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
+  fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 })
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ human: { sleepAfterSeconds: 1800, closeAfterSeconds: 86400 } }) })))
+})
+
+it('preserves an invalid policy draft until the user corrects it', async () => {
+  const error = vi.fn()
+  vi.spyOn(App, 'useApp').mockReturnValue({ message: { error }, modal: {} } as any)
+  vi.mocked(api).mockResolvedValue({ data: {} })
+  render(<BrowserSettings />)
+  const input = await screen.findByRole('spinbutton', { name: 'browser.group.agent settings.browserCloseAfter' })
+  fireEvent.change(input, { target: { value: '1' } }); fireEvent.blur(input)
+  expect(error).toHaveBeenCalledWith('settings.browserPolicyOrder')
+  expect((input as HTMLInputElement).value).toBe('1')
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(0)
+  fireEvent.change(input, { target: { value: '20' } }); fireEvent.blur(input)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/browser/config', expect.objectContaining({ tabPolicies: expect.objectContaining({ agent: { sleepAfterSeconds: 120, closeAfterSeconds: 1200 } }) })))
+})

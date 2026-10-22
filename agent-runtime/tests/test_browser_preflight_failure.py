@@ -145,7 +145,8 @@ async def test_preflight_failure_is_reported_as_a_nonretryable_dependency_failur
     commands = []
 
     async def offline(argv, **kwargs):
-        commands.append(argv[2])
+        if "--no-start" not in argv:
+            commands.append(argv[2])
         return {"exitCode": 1, "stdout": "", "stderr": "Connection refused"}
 
     runtime.browser.runner = offline
@@ -209,7 +210,7 @@ async def test_later_preflight_preserves_completed_actions_and_sources_per_attem
 
     async def runner(argv, **options):
         nonlocal readiness
-        if argv[2] == "capabilities":
+        if argv[2] == "capabilities" and "--no-start" not in argv:
             readiness += 1
             if readiness > 1:
                 return {"exitCode": 1, "stdout": "", "stderr": "Connection refused"}
@@ -324,7 +325,7 @@ async def test_later_driver_failure_allows_only_delivery_of_current_attempt_evid
 
     async def runner(argv, **options):
         nonlocal readiness
-        if argv[2] == "capabilities":
+        if argv[2] == "capabilities" and "--no-start" not in argv:
             readiness += 1
             if readiness > 1:
                 return {"exitCode": 1, "stdout": "", "stderr": "Connection refused"}

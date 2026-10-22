@@ -126,3 +126,16 @@ test('executor death leaves a persistent claim that a new process cannot replay'
   assert.equal(calls, 0)
   assert.equal((await recovered.cancel(id)).state, 'running')
 }))
+
+test('a full tab pool persists a known rejection without replaying creation', () => fixture(async (receipts, root) => {
+  const first = await receipts.begin(id, ['new'])
+  const result = await receipts.execute(id, first.record.payloadHash, async () => { throw new Error('BROWSER_TAB_BUDGET_EXCEEDED') })
+  assert.equal(result.state, 'failed')
+  assert.equal(result.outcomeKnown, true)
+  assert.equal(result.inputStopped, true)
+  const recovered = new OperationReceipts(root)
+  let creations = 0
+  const replay = await recovered.execute(id, first.record.payloadHash, async () => { creations++ })
+  assert.equal(replay.state, 'failed')
+  assert.equal(creations, 0)
+}))

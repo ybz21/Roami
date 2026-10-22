@@ -22,3 +22,21 @@ describe('mobile browser tab actions', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 })
+
+it('separates human and Agent pages and exposes source changes and sleeping state', async () => {
+  const onOrigin = vi.fn(), onSelect = vi.fn()
+  render(<I18nProvider><TabSheet open tabs={[
+    { id: 'human', title: 'My page', url: 'https://human.test', origin: 'human' },
+    { id: 'agent', title: 'Research', url: 'https://agent.test', origin: 'agent', sleeping: true },
+  ]} active="human" pinned={new Set()} onClose={vi.fn()} onSelect={onSelect} onCloseTab={vi.fn()}
+    onCloseMany={vi.fn()} onPin={vi.fn()} onOrigin={onOrigin} onAdd={vi.fn()} /></I18nProvider>)
+  expect(screen.queryByText('Research')).toBeNull()
+  fireEvent.click(screen.getByText('智能体 (1)'))
+  expect(onSelect).not.toHaveBeenCalled()
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(screen.getByText('休眠')).toBeTruthy()
+  expect(screen.queryByText('My page')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '更多' }))
+  fireEvent.click(await screen.findByText('移到人工组'))
+  expect(onOrigin).toHaveBeenCalledWith('agent', 'human')
+})

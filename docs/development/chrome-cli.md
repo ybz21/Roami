@@ -80,3 +80,12 @@ status / cancel 不连接或启动 Chrome；目录必须为当前用户私有。
 任务释放控制权后，页面默认保留 600 秒；`idle_timeout_seconds` 可配置为 30..86400 秒。后台每 30 秒检查一次，每轮最多尝试回收 3 页。创建新页遇满额时优先回收最早空闲页面。活动租约、人工接管、未知动作和前台页面受保护；无安全候选时返回 `BROWSER_TAB_BUDGET_EXCEEDED`，不抢占其他任务。
 
 关闭使用持久 `operationId`、精确 `browserId` / `targetId` 及 `--only-if-background --no-focus`。关闭未知时只核对原回执与 target 是否仍存在，不重新发送关闭。回收命令带 `--no-start`，浏览器关闭后不会被后台回收拉起。数据库保存成功创建的来源证明、空闲时间与关闭回执；升级时仅从成功创建回执补登记仍存在的页面，不按 URL 或标签序号猜所有权。
+
+### 页面来源与生命周期
+
+新建页默认 `origin=agent`；`roami chrome new URL --origin human` 显式归人工组，Web 新建始终发送 `origin: human`。
+`tabs` 返回 `origin`、`pinned`、`sleeping`、`lastUsedAt` 和两项策略时间。界面可改组及固定；归属不按 URL 猜测。
+休眠使用 `Page.setWebLifecycleState(frozen)` 保留页面状态，再次使用先唤醒。它减少后台执行，关闭才释放页面。
+浏览器设置中的 `tabPolicies.agent/human` 为统一策略，`sleepAfterSeconds`、`closeAfterSeconds` 的 0 表示禁用。
+默认智能体 120/600 秒、人工 1800/0 秒。回收由原生 Agent 服务的既有维护循环执行；服务停止时不进行自动休眠或关闭。
+维护要求稳定目标、无占用且无未决操作；前台、固定、未提交表单和媒体播放均跳过。

@@ -3373,6 +3373,21 @@ const zhCN = {
   'agent.notification.readAll': '全部已读',
   'agent.notification.confirmCancel': '确认取消',
   'agent.notification.keepReminder': '保留提醒',
+  'browser.agentLimit': '智能体组已满，请先关闭页面或移到人工组。',
+  'browser.createdBy': '创建来源：{creator}',
+  'browser.groups': "页面分组",
+  'browser.group.human': "人工",
+  'browser.group.agent': "智能体",
+  'browser.groupCount': "{group} ({count})",
+  'browser.moveToAgent': "移到智能体组",
+  'browser.moveToHuman': "移到人工组",
+  'browser.sleeping': "休眠",
+  'browser.tabBusy': "页面正在使用，请在操作结束后重试。",
+  'settings.browserTabPolicies': "页面生命周期",
+  'settings.browserSleepAfter': "休眠时间（分钟）",
+  'settings.browserCloseAfter': "关闭时间（分钟）",
+  'settings.browserPolicyHelp': "设为 0 可关闭对应策略；使用中的页面受保护，选中休眠页会自动唤醒。",
+  'settings.browserPolicyOrder': "关闭时间不能早于休眠时间。",
 }
 
 export default zhCN

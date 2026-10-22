@@ -115,7 +115,7 @@ class BrowserDriver:
         pending = await self.db.call(
             lambda db: rows(
                 db,
-                "SELECT a.*,r.owner_id,t.origin_conversation_id FROM resource_actions a "
+                "SELECT a.*,r.owner_id,r.resource_key,t.origin_conversation_id FROM resource_actions a "
                 "JOIN resources r ON r.id=a.resource_id JOIN tasks t ON t.id=a.task_id "
                 "WHERE r.kind='browser' AND a.state='unknown' "
                 "AND COALESCE(json_extract(a.result_json,'$.inputStopped'),0)!=1 "
@@ -129,6 +129,29 @@ class BrowserDriver:
                 receipt = self._receipt(await self.receipt_reader(action["id"]), action["id"])
                 if not receipt["inputStopped"]:
                     continue
+                if (
+                    receipt["state"] in {"succeeded", "failed", "cancelled"}
+                    and ":target:" in action["resource_key"]
+                ):
+                    browser, target = (
+                        action["resource_key"].removeprefix("browser:").split(":target:", 1)
+                    )
+                    try:
+                        await self._cli(
+                            "_tab-event",
+                            encoded(
+                                {
+                                    "action": "finish",
+                                    "browserId": browser,
+                                    "targetId": target,
+                                    "token": action["id"],
+                                    "known": True,
+                                }
+                            ),
+                            "--no-start",
+                        )
+                    except (DomainError, OSError, TimeoutError):
+                        continue
                 await self._complete({"owner": action["owner_id"]}, action, receipt)
 
                 def record(db, action=action, receipt=receipt):
@@ -534,7 +557,7 @@ class BrowserDriver:
         tabs = await self.db.call(
             lambda db: rows(
                 db,
-                "SELECT resource_id FROM browser_tabs WHERE browser_id=? AND state!='closed' "
+                "SELECT resource_id FROM browser_tabs WHERE browser_id=? AND origin='agent' AND state!='closed' "
                 "ORDER BY resource_id",
                 (browser_id,),
             )

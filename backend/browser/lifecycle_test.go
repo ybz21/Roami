@@ -2,9 +2,12 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/ybz21/Roami/internal/browsertabs"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,6 +54,17 @@ func TestRestartRefusesUnidentifiedProcess(t *testing.T) {
 }
 
 func TestRecoverySnapshotIsPrivateAndProfileBound(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/json/version" {
+			_, _ = w.Write([]byte(`{"webSocketDebuggerUrl":"ws://fixture/devtools/browser/snapshot"}`))
+		} else {
+			_, _ = w.Write([]byte(`[]`))
+		}
+	}))
+	defer fake.Close()
+	previous := cdpAddress()
+	setCDPAddress(fake.URL)
+	defer setCDPAddress(previous)
 	InitConfig(t.TempDir())
 	t.Cleanup(func() { cfgStore.mu.Lock(); cfgStore.file, cfgStore.portFile = "", ""; cfgStore.mu.Unlock() })
 	urls := []string{"https://example.com/#/one", "https://example.com/#/two"}
@@ -100,5 +114,49 @@ func TestRendererProbeAcceptsReplyAndHonorsDeadline(t *testing.T) {
 				t.Fatalf("got %v", got)
 			}
 		})
+	}
+}
+
+func TestRecoveryBindsOriginsToCreatedTargetsDespiteDuplicateURLs(t *testing.T) {
+	InitConfig(t.TempDir())
+	t.Cleanup(func() { cfgStore.mu.Lock(); cfgStore.file, cfgStore.portFile = "", ""; cfgStore.mu.Unlock() })
+	pages := []target{{ID: "existing", Type: "page", URL: "https://same.example"}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/json/version":
+			_, _ = w.Write([]byte(`{"webSocketDebuggerUrl":"ws://fixture/devtools/browser/replacement"}`))
+		case "/json":
+			_ = json.NewEncoder(w).Encode(pages)
+		case "/json/new":
+			page := target{ID: "restored-" + strconv.Itoa(len(pages)), Type: "page", URL: "https://same.example"}
+			pages = append([]target{page}, pages...)
+			_ = json.NewEncoder(w).Encode(page)
+		default:
+			_, _ = w.Write([]byte("ok"))
+		}
+	}))
+	defer server.Close()
+	old := cdpAddress()
+	setCDPAddress(server.URL)
+	defer setCDPAddress(old)
+	if _, err := tabCatalog(browsertabs.Event{Action: "create", BrowserID: "replacement", TargetID: "existing", Origin: "human"}); err != nil {
+		t.Fatal(err)
+	}
+	origins := []recoveryTab{{URL: "https://same.example", Origin: "human", CreatedBy: "agent", Pinned: true}, {URL: "https://same.example", Origin: "agent", CreatedBy: "human"}}
+	if _, err := restoreTabs([]string{origins[0].URL, origins[1].URL}, origins); err != nil {
+		t.Fatal(err)
+	}
+	result, err := tabCatalog(browsertabs.Event{Action: "sync", BrowserID: "replacement", Targets: []string{"existing", "restored-1", "restored-2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Entries["existing"].CreatedBy != "human" || result.Entries["existing"].Origin != "human" {
+		t.Fatal("overwrote an existing page")
+	}
+	if result.Entries["restored-1"].CreatedBy != "agent" || !result.Entries["restored-1"].Pinned || result.Entries["restored-1"].Origin != "human" {
+		t.Fatal("lost first snapshot origin")
+	}
+	if result.Entries["restored-2"].CreatedBy != "human" || result.Entries["restored-2"].Origin != "agent" {
+		t.Fatal("mixed origins by URL order")
 	}
 }

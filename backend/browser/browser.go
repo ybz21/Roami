@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/ybz21/Roami/internal/browsertabs"
 )
 
 // CDPBase 是 Chrome 远程调试根地址。默认 127.0.0.1:9222；端口被占时会自动换一个空闲端口并记录复用。
@@ -263,8 +264,8 @@ func ensureChromeLocked() error {
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); { // 最多等 5s（含探活自身耗时）
 		if alive() {
 			setLastErr("") // 就绪：清掉上次错误
-			if *cfg.AutoRecover {
-				if _, err := restoreTabs(savedRecoveryURLs()); err != nil {
+			if *cfg.AutoRecover && !restarting.Load() {
+				if _, err := restoreTabs(savedRecoveryURLs(), savedRecoveryTabs()); err != nil {
 					return err
 				}
 			}
@@ -592,7 +593,31 @@ func withTab(id string, fn func(*cdp) error) error {
 		return err
 	}
 	defer back.Close()
-	return fn(&cdp{ws: back})
+	connection := &cdp{ws: back}
+	cfgStore.mu.Lock()
+	configured := cfgStore.file != ""
+	cfgStore.mu.Unlock()
+	if configured {
+		identity, err := currentBrowserIdentity()
+		if err != nil {
+			return err
+		}
+		token := strconv.FormatInt(time.Now().UnixNano(), 10)
+		if _, err = tabCatalog(browsertabs.Event{Action: "start", BrowserID: identity, TargetID: id, Token: token}); err != nil {
+			return err
+		}
+		known := false
+		defer func() {
+			_, _ = tabCatalog(browsertabs.Event{Action: "finish", BrowserID: identity, TargetID: id, Token: token, Known: known})
+		}()
+		if _, err = connection.call("Page.setWebLifecycleState", map[string]any{"state": "active"}); err != nil {
+			return err
+		}
+		err = fn(connection)
+		known = err == nil
+		return err
+	}
+	return fn(connection)
 }
 
 func tabReload(id string) error {

@@ -6,6 +6,9 @@ import { isAbsolute, join } from 'node:path'
 const states = new Set(['accepted', 'running', 'succeeded', 'failed', 'cancelled', 'unknown'])
 const receiptError = code => Object.assign(new Error(code), { code })
 
+export const operationFailureCode = message => message === 'BROWSER_TAB_BUDGET_EXCEEDED' || /^CHROME_(TARGET_(INVALID|NOT_FOUND|SELECTION_CONFLICT|IN_USE)|SCENE_CHANGED|BROWSER_CHANGED|NAVIGATION_(NAME_NOT_RESOLVED|CONNECTION_TIMED_OUT|CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|NETWORK_CHANGED|PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED|EMPTY_RESPONSE|SSL_PROTOCOL_ERROR|CERT_AUTHORITY_INVALID|CERT_DATE_INVALID))$/.test(message)
+        ? message : 'CHROME_OPERATION_OUTCOME_UNKNOWN'
+
 export class OperationReceipts {
   static hash(payload) {
     return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
@@ -143,8 +146,7 @@ export class OperationReceipts {
       return await this.save({ ...running, state: 'succeeded', outcomeKnown: true, inputStopped: true,
         result, updatedMs: Date.now() })
     } catch (error) {
-      const code = /^CHROME_(TARGET_(INVALID|NOT_FOUND|SELECTION_CONFLICT|IN_USE)|SCENE_CHANGED|BROWSER_CHANGED|NAVIGATION_(NAME_NOT_RESOLVED|CONNECTION_TIMED_OUT|CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|NETWORK_CHANGED|PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED|EMPTY_RESPONSE|SSL_PROTOCOL_ERROR|CERT_AUTHORITY_INVALID|CERT_DATE_INVALID))$/.test(error.message)
-        ? error.message : 'CHROME_OPERATION_OUTCOME_UNKNOWN'
+      const code = operationFailureCode(error.message)
       const known = code !== 'CHROME_OPERATION_OUTCOME_UNKNOWN'
       return this.save({ ...running, state: known ? 'failed' : 'unknown', outcomeKnown: known,
         inputStopped: true, errorCode: code, updatedMs: Date.now() })
