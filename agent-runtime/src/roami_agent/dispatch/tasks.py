@@ -9,12 +9,14 @@ from roami_agent.conversation.activity_payloads import activity_payload
 from roami_agent.dispatch.navigation_recovery import stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_revisions import TaskRevisions
+from roami_agent.dispatch.task_sessions import session_closure
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.task_context import model_task_projection
+from roami_agent.storage.task_continuation import continuation_candidates
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -165,6 +167,13 @@ class Tasks:
                 if stored_spec != spec or task["origin_conversation_id"] != cid:
                     raise DomainError("TASK_KEY_CONFLICT", 409)
                 return task
+            if (
+                source_turn_id
+                and not parent_task_id
+                and not from_message_id
+                and continuation_candidates(db, owner, cid, source_turn_id, target)
+            ):
+                raise DomainError("TASK_CONTINUATION_REQUIRED", 409)
             if source_turn_id:
                 for rejection in rows(
                     db,
@@ -521,7 +530,7 @@ class Tasks:
                 raise DomainError("TASK_NOT_FOUND", 404)
             attempts = rows(
                 db,
-                "SELECT id,attempt_no AS attemptNo,task_revision AS revision,state,session_id AS sessionId,started_ms AS startedMs,finished_ms AS finishedMs,native_branch_id,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 21",
+                "SELECT id,attempt_no AS attemptNo,task_revision AS revision,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,started_ms AS startedMs,finished_ms AS finishedMs,native_branch_id,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 21",
                 (task_id,),
             )
             for attempt in attempts:
@@ -561,6 +570,7 @@ class Tasks:
                     )
                 )
                 else None,
+                "sessionClosure": session_closure(db, task_id),
                 "attempts": attempts[:20],
                 "attemptsTruncated": len(attempts) > 20,
                 "children": [self._view(db, child) for child in children[:100]],

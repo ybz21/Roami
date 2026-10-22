@@ -448,7 +448,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
                 store,
                 ResultModel(),
                 settings=settings,
-                executor=CodingExecutor(store, settings),
+                executor=CodingExecutor(store, settings, persistent=False),
                 verifier=verifier,
             )
 

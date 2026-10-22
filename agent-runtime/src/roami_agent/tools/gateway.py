@@ -304,8 +304,13 @@ class ToolGateway:
                 "WORKSPACE_OUTSIDE_CONFIGURED_ROOTS",
             }:
                 value["recovery"] = (
-                    "Main has no shell workspace for this operation. Do not retry shell commands, "
-                    "guess cwd or search projects to read a webpage. For bounded public lookups use delegate executor=native "
+                    "Main has no shell workspace for this operation. Do not retry shell commands or guess cwd. "
+                    "An error affects only this attempted operation: preserve every other part of the current request. "
+                    "Resolve project/session metadata through target_search/target_resolve; a project edit still needs its own handoff. "
+                    "Keep requestComplete=false until all requested parts have been handled or handed off. Do not reduce a mixed request to its lookup part. "
+                    "Do not search projects to read a webpage. For changes or missing deliverables of an existing task, "
+                    "use task_steer with its taskId/revision; preserve the original executor and workspace, even after completion. "
+                    "For bounded public lookups use delegate executor=native "
                     "with the current user's goal. For web-only reading use "
                     "target={kind:new_session,resourceOnly:true} with bounded routing; complex work goes to a professional executor with concrete routing evidence. For bounded file deliverables use "
                     "target={kind:new_session,directory:the_user_requested_directory}. "

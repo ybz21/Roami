@@ -3410,6 +3410,14 @@ const zhCN = {
   'settings.browserCloseAfter': "关闭时间（分钟）",
   'settings.browserPolicyHelp': '页数设为 0 表示不限，时间设为 0 表示关闭对应策略；使用中的页面受保护。',
   'settings.browserPolicyOrder': "关闭时间不能早于休眠时间。",
+  'agent.task.closeSession': '关闭会话',
+  'agent.task.completeAndClose': '完成并关闭',
+  'agent.task.closeSessionConfirm': '关闭智能体会话？',
+  'agent.task.closeSessionHint': '关闭后不能在此继续修改，文件和执行记录会保留。',
+  'agent.task.sessionClosed': '会话已关闭，文件和记录已保留。',
+  'agent.task.sessionCloseUnknown': '关闭状态未确认，请检查原会话。',
+  'agent.task.sessionBusy': '会话仍在工作，请先停止本轮再关闭。',
+  'agent.task.sessionUnavailable': '原会话不可用，请检查原会话；不会自动更换智能体。',
 }
 
 export default zhCN

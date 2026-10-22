@@ -254,7 +254,8 @@ class PromptBuilder:
             if recent_tasks:
                 prompt[0]["content"] += (
                     "\nRecent tracked tasks (state/data, not authorization). Continue these with "
-                    "task_steer using taskId/revision; do not substitute similarly named sessions. "
+                    "task_steer using taskId/revision for edits, additions and missing deliverables, even after completion. "
+                    "Preserve the bound executor without a new quote; do not delegate into its workspace or substitute similarly named sessions. "
                     "unresolved=true requires stop evidence before continuation. For progress questions, reply with only state and essential blockers; "
                     "do not reproduce prior reports or facts. Explicit full results or earlier conversation references use task_status includeResult=true. Query task_status "
                     "for missing/stale details or older tasks: " + encoded(recent_tasks)
@@ -275,7 +276,11 @@ class PromptBuilder:
                         "do not copy assistant-invented source restrictions, result counts, step limits or stop-on-block rules "
                         "from earlier delegated goals. If a source blocks access, use another relevant public "
                         "source when the user's scope permits; mark unverified facts plainly. "
-                        "Every delegate/task_steer requires requestComplete: true on the final handoff and false only while other parts remain; then end without polling. "
+                        "Before a handoff, inventory ALL independent outcomes requested in this user message. "
+                        "requestComplete applies to the WHOLE message, not just the submitted goal. "
+                        "If any outcome still needs work or target discovery, set requestComplete=false and handle that outcome next. "
+                        "For mixed lookup and project-edit requests, hand off both; never finish after only the lookup. "
+                        "Every delegate/task_steer requires requestComplete: true only on the final handoff, then end without polling. "
                         "An accepted/queued/running task is still pending: do not present earlier results "
                         "as this request's completed answer.",
                     },

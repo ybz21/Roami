@@ -32,15 +32,16 @@ type SessionBinding struct {
 }
 
 type sessionLifecycle struct {
-	Binding    SessionBinding  `json:"binding"`
-	Executor   string          `json:"executor"`
-	State      string          `json:"state"`
-	TurnID     string          `json:"turnId"`
-	PromptHash string          `json:"promptHash"`
-	LaunchKey  string          `json:"launchKey,omitempty"`
-	Tools      map[string]bool `json:"tools"`
-	ClaudeStop *claudeStop     `json:"claudeStop,omitempty"`
-	UpdatedMS  int64           `json:"updatedMs"`
+	InitialLaunch bool            `json:"initialLaunch,omitempty"`
+	Binding       SessionBinding  `json:"binding"`
+	Executor      string          `json:"executor"`
+	State         string          `json:"state"`
+	TurnID        string          `json:"turnId"`
+	PromptHash    string          `json:"promptHash"`
+	LaunchKey     string          `json:"launchKey,omitempty"`
+	Tools         map[string]bool `json:"tools"`
+	ClaudeStop    *claudeStop     `json:"claudeStop,omitempty"`
+	UpdatedMS     int64           `json:"updatedMs"`
 }
 
 type SessionEvent struct {
@@ -193,7 +194,11 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 	switch {
 	case claudeHandled:
 	case event.Hook == "SessionStart":
-		state.State = "unknown"
+		if state.InitialLaunch {
+			state.State = "submitting"
+		} else {
+			state.State = "unknown"
+		}
 	case event.Hook == "UserPromptSubmit":
 		promptHash := workspaceHash(event.Prompt)
 		if state.State == "busy" && state.TurnID == event.TurnID && state.PromptHash == promptHash {
@@ -205,6 +210,11 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || promptHash != workspaceHash(sessionPrompt(dir, spec)) || state.State != "submitting" {
 				state.State = "unknown"
 				return writeJSON(path, state)
+			}
+			if state.InitialLaunch {
+				if err := s.bindInitialSession(dir, &state, binding, event.ProviderID); err != nil {
+					return err
+				}
 			}
 		}
 		state.TurnID, state.PromptHash, state.State = event.TurnID, promptHash, "busy"

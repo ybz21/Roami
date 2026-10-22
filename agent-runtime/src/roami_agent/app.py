@@ -30,6 +30,7 @@ from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.routing import TaskRouter
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
+from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
@@ -224,6 +225,7 @@ class Runtime:
             self.wakeup,
             self.active,
         )
+        self.task_sessions = TaskSessions(database, self.executor, self.dispatch.confirm)
         self.loop = AgentLoop(
             model,
             self.worker_model,

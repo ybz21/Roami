@@ -27,6 +27,7 @@ import (
 )
 
 type Spec struct {
+	Persistent     bool   `json:"persistent,omitempty"`
 	Key            string `json:"key"`
 	Executor       string `json:"executor"`
 	Directory      string `json:"directory,omitempty"`
@@ -340,6 +341,9 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	}
 	if spec.SessionID != "" {
 		return fmt.Errorf("SESSION_RUNNER_UNSUPPORTED")
+	}
+	if spec.Persistent {
+		return s.runPersistent(ctx, dir, spec)
 	}
 	a := agent.Get(spec.Executor)
 	if a == nil {

@@ -3401,6 +3401,14 @@ const enUS = {
   'settings.browserCloseAfter': "Close after (minutes)",
   'settings.browserPolicyHelp': 'Zero means unlimited tabs or disables the timeout. Pages in use are protected.',
   'settings.browserPolicyOrder': "Closing must be later than sleeping.",
+  'agent.task.closeSession': 'Close session',
+  'agent.task.completeAndClose': 'Finish and close',
+  'agent.task.closeSessionConfirm': 'Close agent session?',
+  'agent.task.closeSessionHint': 'You cannot continue editing here after closing. Files and execution records are kept.',
+  'agent.task.sessionClosed': 'Session closed. Files and records are kept.',
+  'agent.task.sessionCloseUnknown': 'Closure is unconfirmed. Check the original session.',
+  'agent.task.sessionBusy': 'The session is still working. Stop the current turn before closing.',
+  'agent.task.sessionUnavailable': 'The original session is unavailable. Check that session; the agent will not be replaced.',
 }
 
 export default enUS

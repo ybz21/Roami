@@ -134,3 +134,8 @@ class NotificationPreferences(Payload):
 class DeliveryReceipt(Payload):
     claimToken: str = Field(min_length=1, max_length=200)
     outcome: dict
+
+
+class CloseTaskSession(Payload):
+    revision: int = Field(ge=1)
+    runId: str = Field(min_length=1, max_length=200)

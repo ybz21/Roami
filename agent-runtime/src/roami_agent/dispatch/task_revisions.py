@@ -5,6 +5,7 @@ import json
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.navigation_recovery import recovered_navigation, stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
+from roami_agent.dispatch.task_sessions import assert_session_open
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -96,6 +97,7 @@ class TaskRevisions:
                 ):
                     raise DomainError("TASK_STEER_KEY_CONFLICT", 409)
                 return self._receipt(previous)
+            assert_session_open(db, task_id)
             if task["revision"] != expected_revision:
                 raise DomainError("TASK_REVISION_CHANGED", 409)
             if row(
@@ -360,7 +362,13 @@ class TaskRevisions:
                 if intent["target"]["kind"] == "new_project":
                     intent.setdefault("provisionLaunchId", run["launch_id"])
                 target = json.loads(task["target_json"]) if task["target_json"] else {}
-                if intent["target"]["kind"] != "session" and target.get("workspaceId"):
+                if run["executor_kind"] == "cli" and run["session_id"]:
+                    intent["target"] = {
+                        "kind": "session",
+                        "sessionId": run["session_id"],
+                        "nodeId": run["node_id"] or "local",
+                    }
+                elif intent["target"]["kind"] != "session" and target.get("workspaceId"):
                     intent["target"] = (
                         {
                             "kind": "project",

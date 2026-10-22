@@ -13,6 +13,7 @@ from roami_agent.conversation.attachments import MAX_UPLOAD_BYTES
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import (
+    CloseTaskSession,
     Compact,
     Confirm,
     ConfirmTask,
@@ -571,6 +572,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/tasks/{task_id}/steering/{operation_id}")
     async def steering(task_id: str, operation_id: str, owner: Owner):
         return {"data": await runtime.tasks.revisions.get(owner, task_id, operation_id)}
+
+    @app.post("/v1/tasks/{task_id}/close-session")
+    async def close_task_session(task_id: str, body: CloseTaskSession, owner: Owner):
+        return {
+            "data": await runtime.task_sessions.close(owner, task_id, body.revision, body.runId)
+        }
 
     @app.post("/v1/tasks/{task_id}/cancel")
     async def cancel_task(task_id: str, owner: Owner):

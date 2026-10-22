@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Input, Spin } from 'antd'
+import { Button, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
 import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, ChevronLeft, ChevronRight } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -30,6 +30,10 @@ function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
 }
 
 function failure(code: string | undefined, t: (key: string) => string) {
+  if (code === 'TASK_SESSION_CLOSED') return t('agent.task.sessionClosed')
+  if (code === 'TASK_SESSION_CLOSING' || code === 'TASK_SESSION_CLOSE_UNKNOWN') return t('agent.task.sessionCloseUnknown')
+  if (code === 'SESSION_NOT_IDLE' || code === 'TASK_SESSION_BUSY') return t('agent.task.sessionBusy')
+  if (code === 'SESSION_TARGET_NOT_FOUND' || code === 'SESSION_LIFECYCLE_UNAVAILABLE' || code === 'SESSION_BINDING_CONFLICT' || code === 'TASK_SESSION_UNAVAILABLE') return t('agent.task.sessionUnavailable')
   if (code === 'TASK_OUTCOME_UNRESOLVED') return t('agent.task.reconcile')
   if (code === 'RESOURCE_STOP_UNCONFIRMED' || code === 'TASK_RESOURCE_NOT_RELEASED') return t('agent.task.waitForControl')
   if (code === 'TASK_REVISION_CHANGED' || code === 'TASK_RESULT_SUPERSEDED' || code === 'TASK_STEER_PENDING') return t('agent.task.changed')
@@ -119,6 +123,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
     editDraft(text)
     try { if (text) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey) } catch { /* Drafts remain usable without storage. */ }
   }
+  const [closeConfirm, setCloseConfirm] = useState(false)
   const [history, setHistory] = useState(false), [preview, setPreview] = useState('')
   const alive = useRef(true), controlFence = useRef(0), busyRef = useRef(false)
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null)
@@ -129,6 +134,11 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
   const controls = controlSafe ? snapshot.controls.value : null
   const latest = detail?.attempts[0], steering = detail?.steering
   const artifacts = useMemo(() => [...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()], [snapshot.artifacts.value, detail?.delivery?.artifacts])
+  const sessionClosed = detail?.sessionClosure?.state === 'closed'
+  const sessionClosing = ['closing', 'unknown'].includes(detail?.sessionClosure?.state || '')
+  const sessionId = detail?.attempts.find(attempt => attempt.sessionId)?.sessionId || task?.latestAttempt?.sessionId
+  const professional = !!task && ['codex', 'claude'].includes(taskExecutor(task) || '')
+  const retainedSession = professional && !!(task?.latestAttempt?.agentConversationId || detail?.attempts.some(attempt => attempt.sessionId === sessionId && attempt.agentConversationId))
   const ended = !!latest?.finishedMs || terminal.has(task?.state || '')
   const previewArtifact = useCallback((artifactId: string) => {
     setPreview(artifactId)
@@ -171,12 +181,16 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
       {failed ? <p className="agent-task-note error" role="status">{t(reason || 'agent.task.incomplete')}</p> : outcome && <section className="agent-task-section agent-task-outcome"><h4>{t('agent.task.result')}</h4>{task.state !== 'succeeded' && <p className="agent-muted">{t('agent.task.resultPending')}</p>}<p>{outcome}</p></section>}
       {!!reportLinks.length && <section className="agent-task-section"><h4>{t(task.state === 'succeeded' ? 'agent.task.deliveryLinks' : 'agent.task.reportedLinks')}</h4>{reportLinks.map(href => <a className="tt-act agent-task-delivery-link" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</section>}
       <div className="agent-task-actions">
-        {!ended && task.latestAttempt?.sessionId && <Button onClick={() => onSession(task.latestAttempt!.sessionId!)}>{t('agent.openSession')}</Button>}
+        {sessionId && (!ended || retainedSession) && !sessionClosed && <Button onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
+        {retainedSession && sessionId && terminal.has(task.state) && !sessionClosed && <Button disabled={!detailSafe || !!busy || sessionClosing} onClick={() => setCloseConfirm(true)}>{t('agent.task.closeSession')}</Button>}
         {task.parent_task_id && <Button onClick={() => select(task.parent_task_id!)}>{t('agent.task.parent')}</Button>}
         {(!terminal.has(task.state) || stopping) && <Button danger disabled={!detailSafe || !!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
       </div>
       {steering && ['stopping', 'blocked', 'cancelled'].includes(steering.state) && <p className="agent-task-note" role="status">{steering.state === 'blocked' ? failure(steering.errorCode, t) : t('agent.task.steering.' + steering.state)}</p>}
-      {error && <p className="agent-task-note error" role="alert">{error}</p>}
+      {error && !closeConfirm && <p className="agent-task-note error" role="alert">{error}</p>}
+      {sessionClosed && <p className="agent-task-note" role="status">{t('agent.task.sessionClosed')}</p>}
+      {sessionClosing && <p className="agent-task-note" role="status">{t('agent.task.sessionCloseUnknown')}</p>}
+      <Modal open={closeConfirm} title={t('agent.task.closeSessionConfirm')} okText={t('agent.task.completeAndClose')} cancelText={t('common.cancel')} confirmLoading={busy === 'close-session'} onCancel={() => { if (!busy) setCloseConfirm(false) }} onOk={() => { void mutate('close-session', '/agent/tasks/' + encodeURIComponent(id) + '/close-session', { revision: task.revision, runId: latest?.id }).then(ok => { if (ok) setCloseConfirm(false) }) }}><p>{t('agent.task.closeSessionHint')}</p>{error && <p role="alert" className="agent-task-note error">{error}</p>}</Modal>
       {(artifacts.length > 0 || snapshot.artifacts.failed || !!detail?.delivery?.unavailable.length) && <section className="agent-task-section"><h4>{t('agent.task.artifacts')}</h4>
         {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}
         {!snapshot.artifacts.value && !snapshot.artifacts.failed && <Spin size="small" />}
@@ -186,7 +200,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
           <a className="tt-act" href={nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')} download={artifact.name}>{t('agent.task.download')}</a>
         </div>{preview === artifact.id && <TaskArtifactPreview artifact={artifact} />}</div>)}
       </section>}
-      {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.accept')}</Button><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
+      {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || !detailSafe} onClick={() => { if (retainedSession && sessionId) setCloseConfirm(true); else void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t(retainedSession && sessionId ? 'agent.task.completeAndClose' : 'agent.task.accept')}</Button><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
       {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskTopic(child) || t('agent.task.untitled')}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
       {(snapshot.controls.failed || !!snapshot.controls.value?.resources.length || !!controls?.actions.some(action => action.state === 'unknown' && action.outcomeKnown !== true)) && <section className="agent-task-section"><h4>{t('agent.task.control')}</h4>
         {snapshot.controls.failed && <p role="alert">{t('agent.task.controlUnavailable')}</p>}
@@ -208,7 +222,7 @@ function TaskInspector({ id, hideBack, onBack, select, onSession, onChanged }: {
       <section className="agent-task-section"><button type="button" className="tt-act agent-task-disclosure" aria-expanded={history} onClick={() => setHistory(!history)}><ChevronRight />{t('agent.task.viewRecord')}</button>
         {history && <AgentTaskRecord id={id} active={!ended} attempts={detail?.attempts || []} truncated={!!detail?.attemptsTruncated} artifacts={artifacts} onPreview={previewArtifact} onSession={onSession} onAnswer={continueTask} canAnswer={detailSafe && !terminal.has(task.state) && !busy && !stopping} />}
       </section>
-      <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || !detailSafe} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
+      <section className="agent-task-section"><label htmlFor={'agent-steer-' + id}>{t('agent.task.additionalRequirements')}</label><Input.TextArea id={'agent-steer-' + id} value={draft} disabled={!!busy || stopping || sessionClosed || sessionClosing} maxLength={10000} autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setDraft(event.target.value)} placeholder={t('agent.task.continuePlaceholder')} /><Button disabled={!draft.trim() || !!busy || stopping || !detailSafe || sessionClosed || sessionClosing} loading={busy === 'steer'} onClick={() => { void continueTask() }}>{t('agent.task.continue')}</Button></section>
     </>}
   </>
 }

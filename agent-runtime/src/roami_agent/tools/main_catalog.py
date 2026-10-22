@@ -9,6 +9,7 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import validate_answer
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
+from roami_agent.storage.task_continuation import continuation_candidates
 from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
@@ -317,6 +318,23 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 **routing_args,
             )
         except DomainError as exc:
+            if exc.code == "TASK_CONTINUATION_REQUIRED":
+                candidates = await tasks.db.call(
+                    lambda db: continuation_candidates(
+                        db, binding["owner"], binding["conversation"], binding["turnId"], target
+                    )
+                )
+                return {
+                    "code": exc.code,
+                    "acceptedOnly": False,
+                    "state": "blocked",
+                    "tasks": candidates[:8],
+                    "nextAction": "This workspace belongs to tracked work. For edits, additions or missing deliverables, "
+                    "call task_steer with the referenced taskId and current revision. Preserve its executor, workspace "
+                    "and session; no new executor quote is needed. If ambiguous, inspect task_status or ask which task. "
+                    "Do not drop the executor, change directory or create a replacement. Genuinely independent work "
+                    "uses a separate workspace through the discovered project, never a second agent in this workspace.",
+                }
             if exc.code != "TASK_FAILURE_REVIEW_REQUIRED":
                 raise
             previous = await tasks.list(binding["owner"], binding["conversation"], for_model=True)
@@ -375,6 +393,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 if item.get("contextExcluded") or not item.get("intent_json"):
                     continue
                 intent = json.loads(item["intent_json"])
+                item["executor"] = intent["executor"]
                 attempt = item.get("latestAttempt") or {}
                 if args.get("includeResult") is True and attempt.get("runId"):
                     report = row(
@@ -429,6 +448,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                             "id",
                             "title",
                             "revision",
+                            "executor",
                             "state",
                             "origin_message_id",
                             "contextExcluded",
@@ -596,7 +616,9 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "Omit executor for configured project/preference/node selection; requests without routing retain legacy defaults. "
             "Main session targets send directly, including legacy sessions without callbacks: delivery only. "
             "Other targets return queued background_task/taskId, not completion. Task/native-branch IDs are not session IDs. "
-            "Continue tracked work with task_steer at its actual revision, preserving executor. fromMessageId forks completed checkpoints only.",
+            "Edits, additions and missing deliverables of tracked work use task_steer, even after completion; "
+            "do not delegate a new task into its workspace. The original executor choice remains bound without a fresh quote. "
+            "fromMessageId forks completed checkpoints only.",
             object_schema(
                 {
                     "goal": {
@@ -612,7 +634,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     },
                     "requestComplete": {
                         "type": "boolean",
-                        "description": "Required: true after all requested parts are handled/delegated; false only while other parts remain. Never wait or poll for delegated work.",
+                        "description": "Required: applies to the ENTIRE current user message, not this goal alone. Inventory every independent requested outcome. false while ANY other part remains unhandled (including target discovery); true only on the final handoff. Never wait or poll for delegated work.",
                     },
                     "routing": routing_schema(),
                     "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
@@ -681,7 +703,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "revision": {"type": "integer", "minimum": 1},
                     "requestComplete": {
                         "type": "boolean",
-                        "description": "Required: true after all requested parts are handled/delegated; false only while other parts remain. Never wait or poll for delegated work.",
+                        "description": "Required: applies to the ENTIRE current user message, not this task alone. false while ANY other requested part remains unhandled; true only on the final handoff. Never wait or poll for delegated work.",
                     },
                     "text": {"type": "string", "minLength": 1},
                 },

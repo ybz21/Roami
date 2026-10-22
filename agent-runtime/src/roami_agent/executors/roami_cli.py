@@ -29,8 +29,9 @@ SESSION_REJECTIONS = {
 class CodingExecutor:
     can_reconcile = True
 
-    def __init__(self, database, settings):
+    def __init__(self, database, settings, *, persistent=True):
         self.db, self.settings = database, settings
+        self.persistent = persistent
         self.artifacts = None
 
     async def command(self, sub, *args, spec=None):
@@ -42,7 +43,9 @@ class CodingExecutor:
         )
         if response["exitCode"]:
             # CLI diagnostics may contain paths or account details; keep them out of model context.
-            if sub == "launch" and response["stderr"].strip() in SESSION_REJECTIONS:
+            if sub in {"launch", "close"} and response["stderr"].strip() in SESSION_REJECTIONS | {
+                "SESSION_BINDING_CONFLICT"
+            }:
                 raise DomainError(response["stderr"].strip())
             raise DomainError("CODING_EXECUTOR_UNAVAILABLE", 503)
         try:
@@ -69,6 +72,7 @@ class CodingExecutor:
         if (deadline := json.loads(task["budget_json"]).get("deadlineMs")) and deadline <= now_ms():
             raise DomainError("TASK_BUDGET_EXCEEDED")
         launch = {
+            "persistent": self.persistent,
             "key": run["launch_id"],
             "executor": spec["executor"],
             "prompt": (

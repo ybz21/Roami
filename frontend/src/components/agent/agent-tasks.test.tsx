@@ -14,6 +14,7 @@ vi.mock('antd', () => ({
   Button: ({ children, loading: _loading, danger: _danger, ...props }: any) => <button {...props}>{children}</button>,
   Input: { TextArea: ({ autoSize: _auto, ...props }: any) => <textarea {...props} /> },
   Spin: () => <span role="progressbar" />,
+  Modal: ({ open, title, children, okText, cancelText, onOk, onCancel }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button><button onClick={onCancel}>{cancelText}</button></div> : null,
   Segmented: ({ value, options, onChange }: any) => <div role="tablist">{options.map((item: any) => <button type="button" role="tab" key={item.value} aria-selected={value === item.value} onClick={() => onChange(item.value)}>{item.label}</button>)}</div>,
   Select: ({ value, options, onChange, ...props }: any) => <select {...props} value={value} onChange={e => onChange(e.target.value)}>{options.map((item: any) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>,
 }))
@@ -481,4 +482,34 @@ it('retains an unsent intervention draft after returning from another page and c
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
   await waitFor(() => expect(input.value).toBe(''))
   expect(Object.keys(localStorage).filter(key => key.startsWith('roami.agent.task.draft.'))).toEqual([])
+})
+
+
+it('keeps the completed professional session reachable and closes it only after confirmation', async () => {
+  let closed = false
+  const opened = vi.fn()
+  const professional = { ...task('one'), intent_json: JSON.stringify({ goal: 'Goal one', executor: 'codex' }), latestAttempt: { executorKind: 'cli', sessionId: 'original-codex', agentConversationId: 'original-context' } }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') { closed = true; return { data: { state: 'closed' } } }
+    if (path.includes('?conversationId=')) return { data: [professional] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: professional, sessionClosure: closed ? { state: 'closed' } : null, attempts: [{ ...detail('one').attempts[0], sessionId: 'original-codex', finishedMs: 1 }] } }
+  })
+  render(<AgentTasks cid="conversation" onSession={opened} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.openSession' }))
+  expect(opened).toHaveBeenCalledWith('original-codex')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.closeSession' }))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')).toHaveLength(0)
+  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.closeSession' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.completeAndClose' }))
+  await screen.findByText('agent.task.sessionClosed')
+  expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/close-session', { revision: 1, runId: 'attempt-one' })
+  expect(screen.queryByRole('button', { name: 'agent.openSession' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'agent.task.continue' }).hasAttribute('disabled')).toBe(true)
+  expect(screen.getByText('Result one')).toBeTruthy()
 })

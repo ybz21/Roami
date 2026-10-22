@@ -108,8 +108,7 @@ class ExamTargets:
                 for k in ["codex", "claude"]
             ],
             "commandAvailability": {
-                name: name in {"python3", "node", "git", "npm"}
-                for name in commands or []
+                name: name in {"python3", "node", "git", "npm"} for name in commands or []
             },
         }
 
@@ -118,10 +117,7 @@ class ExamTargets:
         found = [
             v
             for v in values
-            if (
-                not query
-                or query.casefold() in json.dumps(v, ensure_ascii=False).casefold()
-            )
+            if (not query or query.casefold() in json.dumps(v, ensure_ascii=False).casefold())
             and (not project_id or v.get("projectId") == project_id)
         ]
         return {
@@ -143,9 +139,7 @@ class ExamTargets:
         ]
         if len(matches) != 1:
             raise DomainError(
-                "SESSION_TARGET_AMBIGUOUS"
-                if len(matches) > 1
-                else "SESSION_TARGET_NOT_FOUND"
+                "SESSION_TARGET_AMBIGUOUS" if len(matches) > 1 else "SESSION_TARGET_NOT_FOUND"
             )
         return matches[0]
 
@@ -277,6 +271,24 @@ CASES = [
         "未说明文件要求的简单整理直接在聊天回复，不建任务或额外写文件。",
         "direct_explanation",
     ),
+    (
+        "Q21",
+        "产品原型呢，比如在哪设置okr？",
+        "已有 Codex 设计稿待验收；自然追问补交付物应续改原任务，不能默认改派 Claude。",
+        "design_continue",
+    ),
+    (
+        "Q22",
+        "设置入口藏得太深了，放到项目首页，点进去可以添加目标和关键结果。",
+        "修改上一份设计稿原型，沿用 Codex、原 taskId、会话和工作区。",
+        "design_continue",
+    ),
+    (
+        "Q23",
+        "刚才那个设计稿再补一个手机端的原型。",
+        "原任务已完成也续改同一 Codex 任务；用户不必重复指定执行器。",
+        "design_continue",
+    ),
 ]
 
 
@@ -295,13 +307,14 @@ async def run_case(provider, settings, output, number, case):
     if kind == "explicit":
         # A conflicting default prevents an automatic choice from accidentally passing.
         targets.projects[0]["defaultExecutor"] = "claude"
+    if kind == "design_continue":
+        targets.projects[0]["defaultExecutor"] = "claude"
+        settings = replace(settings, professional_executor="claude")
     database = Database(root / "runtime.db", root, managed=False)
     await database.open()
     counted = MeasuredMain(provider)
     with patch("roami_agent.app.TargetDirectory", lambda *args: targets):
-        runtime = Runtime(
-            database, counted, settings=settings, memory_model=QuietMemory()
-        )
+        runtime = Runtime(database, counted, settings=settings, memory_model=QuietMemory())
 
     async def block_external(args, binding):
         raise DomainError("WORKSPACE_REQUIRED")
@@ -314,17 +327,21 @@ async def run_case(provider, settings, output, number, case):
     try:
         conversation = await runtime.conversations.create("exam")
         cid = conversation["id"]
-        if kind in {"auth", "unknown", "continue"}:
+        if kind in {"auth", "unknown", "continue", "design_continue"}:
             seeded = await runtime.tasks.create(
                 "exam",
                 cid,
-                "修复 Roami 设置保存问题，保留已有代码并补齐测试",
+                "用 Codex 在 Roami 项目产出 OKR 自动迭代的产品和技术 HTML 设计稿"
+                if kind == "design_continue"
+                else "修复 Roami 设置保存问题，保留已有代码并补齐测试",
                 key="seed",
                 executor="codex",
                 target={"kind": "project", "projectId": "proj-roami"},
                 record_intent=True,
             )
             state = "interrupted" if kind == "unknown" else "failed"
+            if kind == "design_continue":
+                state = "succeeded" if ident == "Q23" else "waiting_user"
             result = {
                 "state": "failed",
                 "summary": "MODEL_HTTP_401"
@@ -332,6 +349,12 @@ async def run_case(provider, settings, output, number, case):
                 else "EXECUTION_DEADLINE_OR_INTERRUPTION",
                 "outcomeKnown": kind != "unknown",
             }
+            if kind == "design_continue":
+                result = {
+                    "state": "succeeded",
+                    "summary": f"OKR 产品与技术设计稿已保存：{directory}/index.html、product.html、technical.html。未实现业务代码。",
+                    "inputStopped": True,
+                }
 
             def seed(db):
                 db.execute("UPDATE tasks SET state=? WHERE id=?", (state, seeded["id"]))
@@ -343,6 +366,25 @@ async def run_case(provider, settings, output, number, case):
                         seeded["id"],
                     ),
                 )
+                if kind == "design_continue":
+                    db.execute(
+                        "UPDATE tasks SET target_json=? WHERE id=?",
+                        (
+                            json.dumps(
+                                {
+                                    "workdir": str(directory),
+                                    "sessionId": "sid-original-codex",
+                                    "workspaceId": "design-workspace",
+                                    "projectId": "proj-roami",
+                                }
+                            ),
+                            seeded["id"],
+                        ),
+                    )
+                    db.execute(
+                        "UPDATE task_attempts SET state='succeeded',session_id='sid-original-codex' WHERE task_id=?",
+                        (seeded["id"],),
+                    )
 
             await database.call(seed, write=True)
         questions = question if isinstance(question, list) else [question]
@@ -354,9 +396,7 @@ async def run_case(provider, settings, output, number, case):
         async with asyncio.timeout(600):
             while True:
                 current = await database.call(
-                    lambda db: rows(
-                        db, "SELECT state FROM turns WHERE trigger_kind='user'"
-                    )
+                    lambda db: rows(db, "SELECT state FROM turns WHERE trigger_kind='user'")
                 )
                 if current and all(
                     t["state"] in {"completed", "waiting_user", "failed", "interrupted"}
@@ -373,7 +413,7 @@ async def run_case(provider, settings, output, number, case):
             == 0
         )
         continuation = None
-        if kind in {"unknown", "continue"}:
+        if kind in {"unknown", "continue", "design_continue"}:
             await runtime.tasks.revisions.advance()
             continuation = await runtime.tasks.get("exam", seeded["id"])
         tasks = await runtime.tasks.list("exam", cid)
@@ -386,9 +426,7 @@ async def run_case(provider, settings, output, number, case):
         )
         view = await runtime.conversations.messages("exam", cid)
         answers = [
-            m["content"].get("text", "")
-            for m in view["messages"]
-            if m["role"] == "assistant"
+            m["content"].get("text", "") for m in view["messages"] if m["role"] == "assistant"
         ]
         turns = await database.call(
             lambda db: rows(
@@ -405,7 +443,19 @@ async def run_case(provider, settings, output, number, case):
         plans = [json.loads(t["intent_json"]) for t in created]
         operations = [t["tool_name"] for t in tools]
         questions_called = "ask_user" in operations
-        if kind == "weather":
+        if kind == "design_continue":
+            continued = continuation["task"]
+            intent = json.loads(continued["intent_json"])
+            passed = (
+                not created
+                and not targets.sends
+                and "task_steer" in operations
+                and continued["revision"] == 2
+                and intent["executor"] == "codex"
+                and intent["target"].get("sessionId") == "sid-original-codex"
+                and not questions_called
+            )
+        elif kind == "weather":
             passed = (
                 len(plans) == 1
                 and plans[0]["executor"] == "native"
@@ -437,9 +487,7 @@ async def run_case(provider, settings, output, number, case):
             plan = plans[0] if len(plans) == 1 else {}
             destination = plan.get("target", {})
             goal = plan.get("goal", "")
-            passed = plan.get("executor") == "codex" and not destination.get(
-                "resourceOnly"
-            )
+            passed = plan.get("executor") == "codex" and not destination.get("resourceOnly")
             if kind == "complex_default_directory":
                 passed = (
                     passed
@@ -472,9 +520,7 @@ async def run_case(provider, settings, output, number, case):
             )
         elif kind == "missing":
             passed = (
-                not plans
-                and not targets.sends
-                and (questions_called or "目录" in "".join(answers))
+                not plans and not targets.sends and (questions_called or "目录" in "".join(answers))
             )
         elif kind == "ambiguous":
             passed = not plans and not targets.sends and questions_called
@@ -495,8 +541,7 @@ async def run_case(provider, settings, output, number, case):
                 not plans
                 and not targets.sends
                 and not any(
-                    t["tool_name"] == "task_steer" and t["state"] == "succeeded"
-                    for t in tools
+                    t["tool_name"] == "task_steer" and t["state"] == "succeeded" for t in tools
                 )
             )
         elif kind == "unknown":
@@ -517,8 +562,7 @@ async def run_case(provider, settings, output, number, case):
                 and len(steering) == 1
                 and steering[0]["taskId"] == seeded["id"]
                 and continuation["task"]["revision"] == 2
-                and json.loads(continuation["task"]["intent_json"])["executor"]
-                == "codex"
+                and json.loads(continuation["task"]["intent_json"])["executor"] == "codex"
             )
         elif kind in {"two", "rapid"}:
             native = [
@@ -529,8 +573,7 @@ async def run_case(provider, settings, output, number, case):
             coding = [
                 p
                 for p in plans
-                if p["executor"] == "codex"
-                and p["target"].get("projectId") == "proj-roami"
+                if p["executor"] == "codex" and p["target"].get("projectId") == "proj-roami"
             ]
             passed = len(plans) == 2 and len(native) == 1 and len(coding) == 1
             if kind == "rapid":
@@ -545,9 +588,7 @@ async def run_case(provider, settings, output, number, case):
                 )
         else:
             passed = not plans and "".join(answers).strip().strip("。.* \n") == "2"
-        passed = passed and all(
-            t["state"] in {"completed", "waiting_user"} for t in turns
-        )
+        passed = passed and all(t["state"] in {"completed", "waiting_user"} for t in turns)
         result = {
             "id": ident,
             "round": number,
@@ -567,9 +608,7 @@ async def run_case(provider, settings, output, number, case):
                 {
                     **t,
                     "arguments_json": json.loads(t["arguments_json"]),
-                    "result_json": json.loads(t["result_json"])
-                    if t["result_json"]
-                    else None,
+                    "result_json": json.loads(t["result_json"]) if t["result_json"] else None,
                 }
                 for t in tools
             ],
@@ -594,10 +633,7 @@ async def run_case(provider, settings, output, number, case):
     (root / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print(
         json.dumps(
-            {
-                k: result.get(k)
-                for k in ["id", "round", "passed", "seconds", "modelCalls", "error"]
-            }
+            {k: result.get(k) for k in ["id", "round", "passed", "seconds", "modelCalls", "error"]}
         ),
         flush=True,
     )
@@ -612,9 +648,7 @@ async def main():
         action="store_true",
         help="Use the configured provider; incurs model requests",
     )
-    parser.add_argument(
-        "--config", type=Path, default=Path.home() / ".roami/agent.toml"
-    )
+    parser.add_argument("--config", type=Path, default=Path.home() / ".roami/agent.toml")
     parser.add_argument("--provider-root", type=Path, default=Path.home() / ".roami")
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--cases", default="")
@@ -674,9 +708,7 @@ async def main():
         "total": len(results),
         "results": results,
     }
-    (args.output / "results.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2)
-    )
+    (args.output / "results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
     print(json.dumps({k: report[k] for k in ["model", "passed", "total"]}), flush=True)
     raise SystemExit(0 if report["passed"] == report["total"] else 1)
 
