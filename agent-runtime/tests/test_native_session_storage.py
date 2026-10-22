@@ -359,3 +359,21 @@ async def test_native_http_history_is_owned_and_paged_without_creating_work(stor
             )
     finally:
         await runtime.close()
+
+
+async def test_short_old_messages_stay_inline_when_a_reference_would_be_larger(store):
+    service, session, _, _ = await native(store)
+    mid = await store.call(
+        lambda db: message(
+            db, session["conversation_id"], session["branch_id"], "assistant", {"text": "Done"}
+        ),
+        write=True,
+    )
+    await store.call(
+        lambda db: db.execute("UPDATE messages SET created_ms=1 WHERE id=?", (mid,)), write=True
+    )
+    await service.archive("alice", session["id"])
+    raw = await store.call(
+        lambda db: db.execute("SELECT content_json FROM messages WHERE id=?", (mid,)).fetchone()[0]
+    )
+    assert json.loads(raw) == {"text": "Done"}

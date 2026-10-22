@@ -443,6 +443,8 @@ class NativeSessions:
                 if source[field] != encoded(record["payload"][payload]):
                     continue
                 reference = db.native_payloads.reference(ident, segment, record, payload)
+                if len(reference.encode()) >= len(source[field].encode()):
+                    continue
                 db.execute(
                     f"UPDATE {table} SET {field}=? WHERE id=? AND {field}=?",
                     (reference, source["id"], source[field]),
