@@ -17,7 +17,7 @@ export default function AgentWorkspaceRail({ cid, connected, actions, inbox, tab
 }) {
   const { t } = useI18n()
   const label = (key: WorkspaceTab, icon: ReactNode) => <span className="agent-workspace-tab">{icon}{t('agent.workspace.' + key)}</span>
-  return <aside className="agent-workspace-rail" aria-label={t('agent.workspace.title')}>
+  return <aside className="agent-workspace-rail" data-tab={tab} aria-label={t('agent.workspace.title')}>
     <Tabs activeKey={tab} onChange={key => change(key as WorkspaceTab)} tabBarExtraContent={{ right: <div className="agent-workspace-toolbar">
       <span className="agent-workspace-connection" data-connected={connected} role="img" aria-label={t(connected ? 'agent.workspace.connected' : 'agent.workspace.reconnecting')} title={t(connected ? 'agent.workspace.connected' : 'agent.workspace.reconnecting')} />
       {actions}

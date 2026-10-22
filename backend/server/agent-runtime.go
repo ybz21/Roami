@@ -54,7 +54,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/resources/:resource/pause"}, {"POST", "/agent/resources/:resource/resume"},
 		{"GET", "/agent/memories/:memory"}, {"GET", "/agent/memories"}, {"POST", "/agent/memories"}, {"DELETE", "/agent/memories/:memory"},
 		{"POST", "/agent/memories/:memory/confirm"},
-		{"GET", "/agent/memories/:memory/sources"},
+		{"GET", "/agent/memories/:memory/sources"}, {"GET", "/agent/memories/:memory/detail"}, {"GET", "/agent/memories/:memory/history"},
 	} {
 		g.Handle(route.method, route.path, forward)
 	}

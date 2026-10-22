@@ -94,6 +94,10 @@ class Confirm(Payload):
     accepted: bool
 
 
+class ConfirmMemory(Confirm):
+    expectedCurrentId: str | None = Field(default=None, max_length=200)
+
+
 class ConfirmTask(Confirm):
     revision: int | None = Field(default=None, ge=1)
     runId: str | None = Field(default=None, min_length=1, max_length=200)

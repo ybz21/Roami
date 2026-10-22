@@ -7,12 +7,13 @@ import httpx
 from pydantic import ValidationError
 
 from roami_agent.memory.daily import DAILY_KINDS, day_bounds, event_day
-from roami_agent.memory.intake import direct_user_preference
-from roami_agent.memory.writer import commit_memory, source_snapshot
+from roami_agent.memory.preference import commit_extracted_memory, reconcile_promoted_preferences
+from roami_agent.memory.writer import source_snapshot
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.memory import MemoryProposals
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.database import event as record_event
 from roami_agent.storage.database import row, rows
 
 EXTRACTION_PROMPT = (
@@ -40,12 +41,13 @@ class MemoryJobs:
         self.cursor_key = "memory.scan:v1:" + daily.timezone
 
     async def recover(self):
-        await self.db.call(
-            lambda db: db.execute(
+        def write(db):
+            db.execute(
                 "UPDATE jobs SET state='queued' WHERE kind IN ('memory.extract','memory.daily') AND state='running'"
-            ),
-            write=True,
-        )
+            )
+            reconcile_promoted_preferences(db)
+
+        await self.db.call(write, write=True)
 
     async def scan(self):
         def write(db):
@@ -292,51 +294,22 @@ class MemoryJobs:
                     return
                 if candidates is not None:
                     for candidate in candidates:
-                        confirmed = direct_user_preference(candidate, sources)
-                        user_preference = (
-                            candidate.proposedScope == "user_preference"
-                            and confirmed
-                            and not scope.get("task_id")
-                            and not scope.get("project_id")
-                        )
-                        record_scope = (
-                            dict(scope, conversation_id=None) if user_preference else scope
-                        )
-                        record = commit_memory(
+                        commit_extracted_memory(
                             db,
                             payload["owner"],
-                            candidate.title,
-                            candidate.body,
-                            list(
-                                dict.fromkeys(
-                                    candidate.sourceIds
-                                    + [
-                                        source_id
-                                        for source_id in expected
-                                        if source_id.startswith("artifact:")
-                                    ]
-                                )
-                            ),
-                            kind=candidate.kind,
-                            confirmed=confirmed,
-                            automatic=True,
-                            expected_sources=expected,
-                            source_watermark=payload["eventId"],
-                            **record_scope,
+                            candidate,
+                            sources,
+                            scope,
+                            expected,
+                            payload["eventId"],
                         )
-                        if user_preference:
-                            db.execute(
-                                "INSERT OR IGNORE INTO memory_edges(parent_id,derived_id) "
-                                "SELECT DISTINCT r.id,? FROM memory_records r JOIN memory_sources s ON s.memory_id=r.id "
-                                "WHERE r.owner_id=? AND r.kind='preference' AND r.conversation_id=? "
-                                "AND r.state='active' AND s.message_id IN (SELECT value FROM json_each(?))",
-                                (
-                                    record["id"],
-                                    payload["owner"],
-                                    scope["conversation_id"],
-                                    encoded(candidate.sourceIds),
-                                ),
-                            )
+                    if candidates:
+                        record_event(
+                            db,
+                            scope["conversation_id"],
+                            "memory.updated",
+                            {"sourceEventId": payload["eventId"]},
+                        )
                 db.execute(
                     "UPDATE jobs SET state='done',payload_json=? WHERE id=?",
                     (

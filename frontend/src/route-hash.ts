@@ -5,6 +5,7 @@
 // 旧链接兼容：/#/env → /#/settings，/#/overview → /#/projects（概览并进项目页，18 设计）
 export function normalizeRoute(raw: string): string {
   const route = raw.split('?')[0]
+  if (route === 'settings/agent/memory') return 'home/memory/home'
   if (route === 'settings/agent/bin') return 'capabilities/agents'
   if (route.startsWith('settings/agent/bin/')) return 'capabilities/agents/' + route.slice('settings/agent/bin/'.length)
   if (route === 'plugins') return 'capabilities/plugins'

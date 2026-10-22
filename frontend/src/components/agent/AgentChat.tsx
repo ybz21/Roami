@@ -241,7 +241,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const panelTitle = panel ? t(`agent.${panel}`) : ''
   const latestUserSeq = useMemo(() => bodies.reduce((seq, m) => m.role === 'user' ? Math.max(seq, m.seq) : seq, 0), [bodies])
 
-  return <div className="agent-workspace"><section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
+  return <div className="agent-workspace" style={inactive ? { display: 'none' } : undefined}><section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
@@ -320,6 +320,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
-  {wide && nativeSession ? <aside className="agent-workspace-rail agent-native-workspace" aria-label={t('agent.session')}><div className="agent-native-workspace-nav"><button type="button" className="tt-act" onClick={onCloseNative}>{t('common.back')}</button><span>{t('agent.session')}</span></div><NativeSession id={nativeSession} node={node} projects={projects} onChanged={() => { thread.refresh(); inbox.refresh() }} /></aside> : wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  {wide && nativeSession ? <aside className="agent-workspace-rail agent-native-workspace" aria-label={t('agent.session')}><div className="agent-native-workspace-nav"><button type="button" className="tt-act" onClick={onCloseNative}>{t('common.back')}</button><span>{t('agent.session')}</span></div><NativeSession id={nativeSession} node={node} projects={projects} onChanged={() => { thread.refresh(); inbox.refresh() }} /></aside> : !inactive && wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
   </div>
 }

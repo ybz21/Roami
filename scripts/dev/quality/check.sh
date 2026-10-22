@@ -26,7 +26,10 @@ changed_files() {
 tracked_source_files() {
   git ls-files -z \
     '*.go' '*.py' '*.sh' '*.bash' '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' \
-    ':!:frontend/dist/*' ':!:frontend/node_modules/*'
+    ':!:frontend/dist/*' ':!:frontend/node_modules/*' |
+    while IFS= read -r -d '' file; do
+      [ ! -f "$file" ] || printf '%s\0' "$file"
+    done
 }
 
 section "CLI entry audit"
