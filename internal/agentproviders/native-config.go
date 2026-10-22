@@ -108,18 +108,39 @@ func readNative(ctx context.Context, kind string, checkVersion bool) (nativeConf
 	return nativeConfig{Documents: docs, Major: major}, nil
 }
 
+// Resolve existing ancestors too, so creating a file does not change its identity.
+func canonicalConfigPath(path string) (string, error) {
+	candidate := path
+	suffix := ""
+	for {
+		resolved, err := filepath.EvalSymlinks(candidate)
+		if err == nil {
+			return filepath.Join(resolved, suffix), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("AGENT_CONFIG_READ_FAILED")
+		}
+		if info, linkErr := os.Lstat(candidate); linkErr == nil && info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("AGENT_CONFIG_PATH_INVALID")
+		}
+		parent := filepath.Dir(candidate)
+		if parent == candidate {
+			return "", fmt.Errorf("AGENT_CONFIG_PATH_INVALID")
+		}
+		suffix = filepath.Join(filepath.Base(candidate), suffix)
+		candidate = parent
+	}
+}
+
 func readDocument(doc document) (document, error) {
 	if !filepath.IsAbs(doc.Path) {
 		return document{}, fmt.Errorf("AGENT_CONFIG_PATH_INVALID")
 	}
-	resolved, err := filepath.EvalSymlinks(doc.Path)
-	if err == nil {
-		doc.Path = resolved
-	} else if !os.IsNotExist(err) {
-		return document{}, fmt.Errorf("AGENT_CONFIG_READ_FAILED")
-	} else if info, linkErr := os.Lstat(doc.Path); linkErr == nil && info.Mode()&os.ModeSymlink != 0 {
-		return document{}, fmt.Errorf("AGENT_CONFIG_PATH_INVALID")
+	resolved, err := canonicalConfigPath(doc.Path)
+	if err != nil {
+		return document{}, err
 	}
+	doc.Path = resolved
 	f, err := os.Open(doc.Path)
 	if os.IsNotExist(err) {
 		doc.Exists, doc.Data = false, nil

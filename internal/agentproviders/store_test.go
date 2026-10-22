@@ -239,3 +239,36 @@ func TestMultiFileWriteFailureRollsBackAndPreservesPreset(t *testing.T) {
 		t.Fatalf("partial write claimed success: %+v, %v", view, err)
 	}
 }
+
+func TestFirstApplyThroughConfigDirectorySymlinkKeepsRestoreState(t *testing.T) {
+	store, home := isolatedProviderStore(t)
+	target := filepath.Join(home, "dotfiles", "claude")
+	if err := os.MkdirAll(target, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(home, ".claude")); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	p, err := store.Save(ctx, "claude", "", modelInput("claude"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := store.View(ctx, "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.Apply(ctx, "claude", p.ID, view.Revision); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := store.View(ctx, "claude")
+	if err != nil || !reopened.CanRestore || reopened.ActiveID != p.ID || !reopened.Profiles[0].Applied {
+		t.Fatalf("symlink changed configuration identity: %+v %v", reopened, err)
+	}
+	if _, err = store.Restore(ctx, "claude", reopened.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Lstat(filepath.Join(home, ".claude")); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("configuration directory symlink was replaced")
+	}
+}
