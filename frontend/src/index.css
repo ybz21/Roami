@@ -1918,6 +1918,9 @@ html[data-theme="light"] .tt-opencode-logo .light { display: block; }
 .tt-file-context-open > .cc-filerow { background: var(--sel-bg); }
 /* 手动控制的右键菜单不要被整行触发器拉伸到文件抽屉宽度。 */
 .tt-file-context-menu { width: max-content !important; min-width: 130px !important; }
+.tt-file-upload-trigger { width: var(--sp-5); min-width: var(--sp-5); height: var(--sp-5); padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+html[data-pointer="coarse"] .tt-file-upload-trigger { width: var(--tap) !important; min-width: var(--tap) !important; height: var(--tap) !important; }
+html[data-pointer="coarse"] .tt-file-upload-menu .ant-dropdown-menu-item { min-height: var(--tap); }
 /* Git 分组标题上的操作按钮：平时半透明，hover 分组时变实 */
 .cc-git-section-act .cc-dl { opacity: .5; }
 :where(html[data-pointer="fine"]) .cc-git-section:hover .cc-git-section-act .cc-dl,
