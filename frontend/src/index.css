@@ -616,6 +616,7 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-tree .dot.idle { opacity: .4; }
 .tt-tree .dot.run { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .tt-tree .dot.wait { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.tt-tree .dot.sleep { background: var(--text-dim); box-shadow: 0 0 0 3px var(--sel-bg); }
 .tt-tree .dot.fin { background: var(--swarm); }
 /* 会话沿用侧栏底色，避免每个任务再套一张卡片。 */
 .tt-tree-task { margin: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3); padding: 0; border: 0; border-radius: 0; background: transparent; }

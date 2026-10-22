@@ -135,7 +135,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
         aria-current={activeTask === task && activeSession === s.name ? 'true' : undefined}>
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
         <span className="nm">{rowLabel(s)}</span>
-        {s.dormant ? <span className="bd">{t('tree.dormant')}</span> : dot(s, false)}
+        {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, false)}
         {!s.dormant && s.at ? <span className="tm">{ago(s.at, t)}</span> : null}
       </button>
     </Dropdown>
@@ -183,7 +183,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
         <span className="nm">{s.label}</span>
         {task.unfinished && taskBadge(task)}
-        {s.dormant ? <span className="bd">{t('tree.dormant')}</span> : dot(s, false)}
+        {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, false)}
         {!s.dormant && s.at ? <span className="tm">{ago(s.at, t)}</span> : null}
       </button>
     </Dropdown>
