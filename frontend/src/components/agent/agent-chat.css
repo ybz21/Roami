@@ -1,9 +1,7 @@
-.tt-page-home { height:100%; min-height:0; width:100%; padding:0; overflow:hidden; }
+.tt-page.tt-page-home { height:100%; min-height:0; width:100%; padding:0; overflow:hidden; }
 .agent-chat { position:relative; display:flex; flex:1; flex-direction:column; min-height:0; min-width:0; height:100%; padding-bottom:var(--kb); box-sizing:border-box; }
-.agent-pagehead { padding:var(--sp-3) var(--sp-5); margin:0; flex:none; align-items:center; }
-.agent-pagehead h2 { font-size:var(--fs-body); max-width:calc(var(--sp-5) * 24); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.agent-pagehead .acts { gap:var(--sp-2); }
-.agent-pagehead .tt-act { display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); border-color:transparent; background:transparent; }
+.agent-chat-actions { display:flex; flex:none; justify-content:flex-end; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--sp-5); }
+.agent-chat-actions .tt-act { display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); border-color:transparent; background:transparent; }
 .agent-conversation-title { flex:1; min-width:0; display:flex; align-items:center; gap:var(--sp-2); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; min-height:var(--tap); border:0; padding:0; background:transparent; color:var(--text-dim); font-size:var(--fs-sm); text-align:left; cursor:pointer; }
 .agent-reading { display:flex; position:relative; flex:1; min-height:0; min-width:0; }
 .agent-messages { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4) var(--sp-5); }
@@ -95,7 +93,6 @@ html[data-pointer="coarse"] .agent-composer .tt-pill::after,html[data-pointer="c
 html[data-pointer="coarse"] .agent-message-action { width:calc(var(--tap) - var(--sp-2)); height:calc(var(--tap) - var(--sp-2)); }
 html[data-pointer="coarse"] .agent-message-action::after { content:''; position:absolute; inset:calc(-1 * var(--sp-1)); }
 html[data-pointer="coarse"] .agent-file-card button::after { content:''; position:absolute; inset:calc(-1 * var(--sp-3)); }
-html[data-size="compact"] .agent-pagehead,html[data-size="medium"] .agent-pagehead { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .tt-page.tt-page-home { padding:0; }
 html:is([data-size="compact"],[data-size="medium"]) .agent-messages { padding:var(--sp-4) max(var(--sp-4),var(--safe-r)) var(--sp-3) max(var(--sp-4),var(--safe-l)); }
 html[data-size="compact"] .agent-message.user { max-width:95%; }

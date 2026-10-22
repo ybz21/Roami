@@ -235,17 +235,16 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     {secondaryActions}
   </>
   const panelTitle = panel ? t(`agent.${panel}`) : ''
-  const title = 'Roami'
   const latestUserSeq = useMemo(() => bodies.reduce((seq, m) => m.role === 'user' ? Math.max(seq, m.seq) : seq, 0), [bodies])
 
   return <div className="agent-workspace"><section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
-    <header className="tt-pagehead agent-pagehead"><div><h2>{title}</h2></div><div className="acts">
-      {!phone && !(wide && workspace.open) && conversationActions}
-      {wide && !workspace.open && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
-    </div></header>
+    {!phone && !(wide && workspace.open) && <div className="agent-chat-actions">
+      {conversationActions}
+      {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
+    </div>}
     {phone && mobileActionsHost && createPortal(
       <>
         <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.workspace.tasks')} onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>

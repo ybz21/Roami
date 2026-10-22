@@ -71,16 +71,19 @@ it('sends slash commands immediately instead of leaving stop trapped behind the 
 it('moves secondary actions into the open desktop workspace and keeps them reachable when closed', () => {
   state.layout.size = 'large'
   const page = render(<AgentChat {...props} />)
-  const header = page.container.querySelector('header')!
   const rail = screen.getByRole('complementary', { name: 'workspace' })
-  expect(within(header as HTMLElement).queryByRole('button')).toBeNull()
+  expect(page.container.querySelector('.agent-chat-actions')).toBeNull()
   fireEvent.click(within(rail).getByRole('button', { name: 'agent.notifications' }))
   expect(props.notifications).toHaveBeenCalledTimes(1)
   expect(within(rail).getByRole('button', { name: 'agent.composer.conversationMenu' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'close workspace' }))
   expect(screen.queryByRole('complementary', { name: 'workspace' })).toBeNull()
-  fireEvent.click(within(header as HTMLElement).getByRole('button', { name: 'agent.workspace.tasks' }))
+  const actions = page.container.querySelector('.agent-chat-actions')! as HTMLElement
+  fireEvent.click(within(actions).getByRole('button', { name: 'agent.notifications' }))
+  expect(props.notifications).toHaveBeenCalledTimes(2)
+  fireEvent.click(within(actions).getByRole('button', { name: 'agent.workspace.tasks' }))
   expect(screen.getByRole('complementary', { name: 'workspace' })).toBeTruthy()
+  expect(page.container.querySelector('.agent-chat-actions')).toBeNull()
 })
 
 it('renders the phone task destination as an accessible icon without visible text', () => {
