@@ -65,7 +65,7 @@
         "agentic-vbench-assembly-task1"
       ],
       "dataset_revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
-      "status": "source_contract_locked_native_environment_and_adapter_pending"
+      "status": "two_native_media_contracts_original_verifier_acceptance_passed_not_live_agent"
     },
     {
       "benchmark_id": "dsbench",
@@ -247,13 +247,13 @@
     "no_candidate": "没有新提案也全量执行，标记基线稳定性观察；相同策略的随机波动不能晋级。"
   },
   "next_steps": [
-    "接齐剩余10项公开任务的原生环境与适配（SWE、公司、桌面、视频、长记忆及GAIA访问）",
+    "接齐剩余8项公开任务的原生环境与适配（SWE、公司、桌面、长记忆及GAIA访问）",
     "为5项复杂产物接入独立校准评分，并扩充办公/GUI私有隐藏场景",
     "修复现用模型鉴权，指定实际测试机和每日Token预算，再运行正式全60项",
     "回顾全部指标与原始日志，在预算内积累真实同机对照收益证据"
   ],
   "implementation": {
-    "public_materialized": 10,
+    "public_materialized": 12,
     "authored_selected_materialized": 40,
     "protocol_smoke_cases": 2,
     "active_machine_bindings": 0,

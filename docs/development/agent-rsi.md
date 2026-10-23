@@ -152,7 +152,7 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 正式准入使用 `daily_suite.py` 的固定配额：公开20、自有真实20、机制20，核对指定自有ID、唯一上游任务和不可变revision。调度、周期完成和源码晋级使用同一检查；只有60条记录不能通过。新增 `assemble-daily --id NAME --suite PACK ... --output FILE` 合并各包，不满足合同则拒绝写出。
 
-公开19个task ID已选择，其中10项是可执行合同；另10项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
+公开19个task ID已选择，其中12项是可执行合同；另8项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
 
 ```bash
 python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials
@@ -186,6 +186,10 @@ uv run roami-agent-evaluate evaluation-status --ledger /private/evaluation/ledge
 uv run roami-agent-evaluate evaluation-config --ledger /private/evaluation/ledger.sqlite3 --owner local --config /private/evaluation-settings.json
 ```
 
-`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备50项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。修复鉴权走正常Roami模型设置，不把密钥写进任务或仓库。
+`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备52项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。修复鉴权走正常Roami模型设置，不把密钥写进任务或仓库。
 
 新增公开导入：`import-data-analysis --metadata DATA.json --archive DATA.zip --group-id ID --question-id questionN --revision DATA_COMMIT --upstream-revision CODE_COMMIT --output FILE`；`import-vectorization --source-dir TASK --revision COMMIT --output FILE`。DSBench保留原工作簿、背景和问题，使用独立精确JSON答案；MLAgentBench对现代NumPy做显式标量兼容，限定修改forward函数、核验数值，并以四组交替的宿主计时中位数检查90%时限。均为注明改造的内部合同，不声称官方分数或Roami收益；示范实现更快不等于Roami自身生成更快。
+
+AgenticVBench导入：`import-media --kind assembly|repair --source-dir /path/to/task --archive /path/to/private/materials.zip --revision COMMIT --data-revision HF_COMMIT --output /path/to/private/suite.json`。两项原题及素材已固定版本，原始判定器只在退出Agent后的独立容器执行；参考音频、DNSMOS权重和脚本不进入Agent视图。另查素材hash、音频16kHz单声道PCM16及样本数、视频完整片段与连续时间轴。RSI固定门槛为组装reward=1、修复reward≥0.8；离线环境与附加断言使其不等同官方成绩。正反产物验收不代表Agent能力。
+
+本轮开发镜像沿用冻结基础镜像并离线安装固定版本依赖，43个安装包均校验PyPI官方发布hash；试验容器仍无网络，不携带代理配置。镜像ID与实际增量构建配方保存在私有验收证据中；标准完整构建入口仍为improvement.Dockerfile。

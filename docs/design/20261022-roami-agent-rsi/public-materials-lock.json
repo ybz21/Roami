@@ -5,7 +5,7 @@
   "source_tasks_selected_in_this_lock": 15,
   "total_selected_with_financial_samples": 19,
   "public_target": 20,
-  "runnable_public_contracts": 10,
+  "runnable_public_contracts": 12,
   "source_selection_is_not_environment_acceptance": true,
   "sources": [
     {
@@ -276,7 +276,7 @@
         "exp-codec-restore-task01",
         "agentic-vbench-assembly-task1"
       ],
-      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "status": "two_native_media_contracts_original_verifier_acceptance_passed_not_live_agent",
       "files": [
         {
           "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/environment/Dockerfile",
@@ -375,6 +375,18 @@
           "sha256": "7820afc5f626f519319d248d1871a9303efd9eb28c93e508078d45b777916994",
           "bytes": 887,
           "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "agentic_vbench_materials/assembly.zip",
+          "url": "https://huggingface.co/datasets/ameddserM/agentic_vbench_video_assembly/resolve/66b983e7552edba9dedb6858705bae8f2b6fa945/materials/1.zip",
+          "bytes": 14452898,
+          "sha256": "fa5613c8e303501a5aa44d943367b9e025fc2b9f9008f12e532541596de1781f"
+        },
+        {
+          "path": "agentic_vbench_materials/repair.zip",
+          "url": "https://huggingface.co/datasets/ameddserM/agentic_vbench_video_repair/resolve/9f2b57edfa70a7b1e22f84c646b44c8838652f95/materials/exp-codec-restore-task01.zip",
+          "bytes": 3078521,
+          "sha256": "68be3fd036112bf3b7d7db7613065cdfa24fe66a25226c944f4056bfa0df6d93"
         }
       ]
     },

@@ -1,15 +1,16 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami Agent RSI · 实施与验收</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"></head><body><main><article class="rsi-overview">
 <nav><a href="index.html">架构</a><a href="automation-roles.html">执行手段</a><a href="sampling-plan.html">60项组合</a><a href="public-materials-lock.json">材料锁</a></nav>
-<h1>实施与验收</h1><p>已准备50项正式合同与54项私有技术契约；正式每日60项尚未启用，没有质量、生成速度或Token收益结论。</p>
+<h1>实施与验收</h1><p>已准备52项正式合同与54项私有技术契约；正式每日60项尚未启用，没有质量、生成速度或Token收益结论。</p>
 <div class="tablewrap"><table><thead><tr><th>部分</th><th>已验证</th><th>剩余条件</th></tr></thead><tbody>
 <tr><td>自动闭环</td><td>定时发起、逐项复盘、隔离补丁、独立验证、专用实例应用、观察关单及退化重开</td><td>设施验收通过；现用服务部署适配未接入</td></tr>
 <tr><td>被测执行链</td><td>Main委派、Native Worker读写、任务回报；各角色日志和用量分别采集</td><td>演练为确定性模型；任务等待验收不会伪装成成功</td></tr>
 <tr><td>自有40项</td><td>20项机制容器回归；20项判定器正确/错误产物验收</td><td>5项复杂产物仍需独立校准评分</td></tr>
-<tr><td>公开20项</td><td>19项已选ID，10项合同可执行；56份来源文件固定hash</td><td>另10项需原生环境/适配或访问授权</td></tr>
+<tr><td>公开20项</td><td>19项已选ID，12项合同可执行；58份来源文件固定hash</td><td>另8项需原生环境/适配或访问授权</td></tr>
+<tr><td>音视频</td><td>原始音频/视频判定器正反验收，素材与参考隔离；补齐格式、完整片段与时间轴检查</td><td>离线改编；固定RSI门槛，不宣称官方榜单成绩</td></tr>
 <tr><td>私有验证</td><td>54个不同代码契约家族，验证24/隐藏30；正反判定器验收通过，答案未公开</td><td>不代表未见办公、GUI、媒体场景；家族划分不等于统计独立证明</td></tr>
 <tr><td>日终完成</td><td>统一核对20/20/20、出分、完整计量、规则扫描和全部语义回顾</td><td>执行结束、只扫规则或评分待定，都不能记作完整一天</td></tr>
 <tr><td>真实预检</td><td>现用主模型已发现；一次请求返回HTTP401，已停止且未重试</td><td>用量未知；待有效鉴权、测试机清单及每日预算</td></tr>
 </tbody></table></div>
-<p>剩余公开任务：SWE-bench 2、公司环境2、桌面2、视频2、长记忆1、GAIA访问1。源材料已选不等于原生环境已接通。</p>
+<p>剩余公开任务：SWE-bench 2、公司环境2、桌面2、长记忆1、GAIA访问1。源材料已选不等于原生环境已接通。</p>
 <p><a href="/api/file/serve/tmp/roami-rsi-expanded-acceptance.html">本轮验收证据</a> · <a href="private-validation-lock.json">私有范围与摘要</a> · <a href="../../development/agent-rsi.md">运行命令</a></p>
 </article></main></body></html>
