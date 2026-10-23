@@ -2,11 +2,18 @@
 
 [English](README.md) ｜ **简体中文**
 
-> **把你的开发机变成一个随身 AI 编程工作站。**
+> **掌管众智，随时远程操控。**
 
 **Roami** 让你**在任何地方、任何时间，用手机、平板或电脑连回自己的开发机**，
-继续写代码、跑测试、看日志、调浏览器，并监督 Claude Code、Codex 等
-AI coding agent 持续工作。
+在同一个控制台掌管 Claude Code、Codex、OpenCode、Pi 等 AI 编程 Agent，
+继续写代码、跑测试、看日志、调浏览器。随手查看进度、追加指令、接管终端，
+不在桌前，也能让开发机上的工作持续推进。
+
+<p align="center">
+  <img src="docs/assets/roami-agent-gods.webp" width="520" alt="Roami 手持手机法宝，掌管 Codex、Claude Code、OpenCode 与 Pi 四位智能之神">
+</p>
+
+<p align="center"><strong>手机在手，众智听令；你在远方，工作照常。</strong></p>
 
 它解决的是一个很具体的问题：**复杂开发任务不应该被你的设备、网络和时间切碎。**
 代码、终端、开发服务、浏览器和 Agent 都留在开发机上持续运行；你换设备、断线、
