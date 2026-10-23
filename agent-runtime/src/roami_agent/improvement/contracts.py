@@ -90,12 +90,29 @@ def validate_case(case):
             "workbook",
             "terminal",
             "python_contract",
+            "media",
             "vectorization",
         }
     )
     if judge["kind"] == "vectorization":
         require(isinstance(judge.get("source"), str) and bool(judge["source"]))
         require(number(judge.get("max_time_ratio"), 0.1, 0.99))
+    if judge["kind"] == "media":
+        require(judge.get("media_kind") in {"assembly", "repair"})
+        require(
+            isinstance(judge.get("upstream_verifier"), str) and bool(judge["upstream_verifier"])
+        )
+        require(number(judge.get("minimum_reward"), 0.5, 1))
+        require(isinstance(judge.get("golden"), dict))
+        require(
+            set(judge["golden"])
+            == (
+                set()
+                if judge["media_kind"] == "assembly"
+                else {"clean.wav", "window.json", "sig_bak_ovr.onnx"}
+            )
+        )
+        require(all(isinstance(v, str) and len(v) <= 4_000_000 for v in judge["golden"].values()))
     if judge["kind"] == "python_contract":
         relative_file(Path("/workspace"), judge["module"])
         require(isinstance(judge.get("probes"), list) and 1 <= len(judge["probes"]) <= 50)

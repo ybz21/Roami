@@ -63,7 +63,7 @@ def judge_case(case, output, workspace):
         from roami_agent.improvement.spreadsheet import grade_workbook
 
         return grade_workbook(case, workspace)
-    if kind in {"external", "rubric", "terminal", "python_contract", "vectorization"}:
+    if kind in {"external", "rubric", "terminal", "python_contract", "vectorization", "media"}:
         return {
             **quality(dict.fromkeys(DIMENSIONS, 0), hard_passed=True, pending=True),
             "reason": "independent_judge_required",

@@ -203,6 +203,10 @@ class ContainerExecutor:
                 from roami_agent.improvement.vectorization import grade_vectorization
 
                 grade = await grade_vectorization(case, workspace, self)
+            elif kind == "media":
+                from roami_agent.improvement.media_tasks import grade_media
+
+                grade = await grade_media(case, workspace, self)
             else:
                 grade = judge_case(case, output, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")

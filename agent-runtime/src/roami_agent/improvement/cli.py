@@ -32,6 +32,23 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-media":
+        from roami_agent.improvement.media_tasks import import_media
+
+        suite = import_media(
+            args.source_dir,
+            args.archive,
+            kind=args.kind,
+            revision=args.revision,
+            data_revision=args.data_revision,
+        )
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+        }
     if args.command == "import-data-analysis":
         from roami_agent.improvement.data_analysis import import_data_analysis
 
@@ -341,6 +358,12 @@ def main():
     p.add_argument("--source-dir", required=True, type=Path)
     p.add_argument("--revision", required=True)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-media")
+    for name in ("source-dir", "archive", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    p.add_argument("--kind", required=True, choices=("assembly", "repair"))
+    p.add_argument("--revision", required=True)
+    p.add_argument("--data-revision", required=True)
     for name in ("register-suite", "evaluation-config", "evaluation-status"):
         p = commands.add_parser(name)
         p.add_argument("--ledger", required=True, type=Path)

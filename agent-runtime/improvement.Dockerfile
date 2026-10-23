@@ -6,6 +6,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 RUN uv pip install --python .venv/bin/python playwright numpy pandas matplotlib pytest pytest-asyncio
 RUN uv pip install --python .venv/bin/python "openpyxl>=3.1,<4"
+RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev libsndfile1 && rm -rf /var/lib/apt/lists/*
+RUN uv pip install --python .venv/bin/python "opencv-python-headless==4.13.*" "numpy<3" "scipy<2" "soundfile==0.13.*" "pesq==0.0.4" "pystoi==0.4.*" "librosa==0.11.*" onnxruntime
 COPY src ./src
 COPY migrations ./migrations
 RUN uv sync --frozen --no-dev --inexact
