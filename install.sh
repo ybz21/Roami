@@ -68,13 +68,18 @@ detect_asset() {
 }
 
 # 解析生效的 release tag：显式 ROAMI_VERSION 直接用；否则优先 stable「latest」，
-# 若仓库只有 prerelease（latest 会 404）则退回 GitHub API 取最新一个 release（含 prerelease）。
+# 若只有 prerelease 则查询发布列表；匿名 API 限流时使用公开 Atom 订阅源。
 resolve_tag() {
   if [ "$VERSION" != latest ]; then printf '%s\n' "$VERSION"; return; fi
-  local report
+  local report tag
   report="$(curl -fsSL --connect-timeout 10 --max-time 60 "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null)" \
-    || report="$(curl -fsSL --connect-timeout 10 --max-time 60 "https://api.github.com/repos/${REPO}/releases?per_page=1")" || return 1
-  printf '%s\n' "$report" | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+    || report="$(curl -fsSL --connect-timeout 10 --max-time 60 "https://api.github.com/repos/${REPO}/releases?per_page=1" 2>/dev/null)" || report=""
+  tag="$(printf '%s\n' "$report" | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | sed -n '1p')"
+  if [ -n "$tag" ]; then printf '%s\n' "$tag"; return; fi
+  report="$(curl -fsSL --connect-timeout 10 --max-time 60 "https://github.com/${REPO}/releases.atom")" || return 1
+  tag="$(printf '%s\n' "$report" | sed -n 's|.*<id>tag:github.com,2008:Repository/[0-9][0-9]*/\([^<]*\)</id>.*|\1|p' | sed -n '1p')"
+  [ -n "$tag" ] || return 1
+  printf '%s\n' "$tag"
 }
 
 download_url() {
