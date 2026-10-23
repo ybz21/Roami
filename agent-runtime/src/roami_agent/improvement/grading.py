@@ -59,7 +59,11 @@ def quality(dimensions, profile="mechanism", *, hard_passed, pending=False):
 def judge_case(case, output, workspace):
     judge = case["judge"]
     kind = judge["kind"]
-    if kind in {"external", "rubric"}:
+    if kind == "workbook":
+        from roami_agent.improvement.spreadsheet import grade_workbook
+
+        return grade_workbook(case, workspace)
+    if kind in {"external", "rubric", "terminal"}:
         return {
             **quality(dict.fromkeys(DIMENSIONS, 0), hard_passed=True, pending=True),
             "reason": "independent_judge_required",

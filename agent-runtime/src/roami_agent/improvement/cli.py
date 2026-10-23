@@ -16,6 +16,7 @@ from roami_agent.improvement.contracts import (
     validate_suite,
 )
 from roami_agent.improvement.cycle import run_cycle, watch
+from roami_agent.improvement.daily_suite import assemble_daily, daily_coverage
 from roami_agent.improvement.executors import ExternalExecutor, NativeFilesExecutor, private_json
 from roami_agent.improvement.ledger import Ledger
 from roami_agent.improvement.policy import BOUNDS, next_candidate
@@ -31,6 +32,40 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-terminal":
+        from roami_agent.improvement.terminal_tasks import import_terminal
+
+        suite = import_terminal(args.source_dir, task_id=args.task_id, revision=args.revision)
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+        }
+    if args.command == "import-spreadsheet":
+        from roami_agent.improvement.spreadsheet import import_spreadsheet
+
+        suite = import_spreadsheet(
+            args.metadata,
+            args.source,
+            args.golden,
+            revision=args.revision,
+            upstream_revision=args.upstream_revision,
+        )
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+        }
+    if args.command == "assemble-daily":
+        suite = assemble_daily(
+            args.id, [validate_suite(load_json(p, maximum=100_000_000)) for p in args.suite]
+        )
+        private_json(args.output, suite)
+        return {"suite": suite["id"], "hash": suite["content_hash"], **daily_coverage(suite)}
     if args.command == "register-machine":
         from roami_agent.improvement.control import ImprovementControl
 
@@ -221,10 +256,24 @@ def main():
     p.add_argument("--count", type=int, default=3)
     p.add_argument("--seed", type=int, default=20261023)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-spreadsheet")
+    for name in ("metadata", "source", "golden", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    p.add_argument("--revision", required=True)
+    p.add_argument("--upstream-revision", required=True)
+    p = commands.add_parser("import-terminal")
+    p.add_argument("--source-dir", required=True, type=Path)
+    p.add_argument("--task-id", required=True, choices=("cancel-async-tasks", "db-wal-recovery"))
+    p.add_argument("--revision", required=True)
+    p.add_argument("--output", required=True, type=Path)
     p = commands.add_parser("readiness")
     p.add_argument("--bank", required=True, type=Path)
     p.add_argument("--plan", required=True, type=Path)
     p.add_argument("--suite", action="append", default=[], type=Path)
+    p = commands.add_parser("assemble-daily")
+    p.add_argument("--id", required=True)
+    p.add_argument("--suite", action="append", required=True, type=Path)
+    p.add_argument("--output", required=True, type=Path)
     for name in ("report", "recover"):
         p = commands.add_parser(name)
         p.add_argument("--ledger", required=True, type=Path)

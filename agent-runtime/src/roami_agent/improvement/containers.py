@@ -269,6 +269,10 @@ class ContainerExecutor:
                 from roami_agent.improvement.authored_grading import grade_authored
 
                 grade = await grade_authored(case, workspace, self)
+            elif case["judge"]["kind"] == "terminal":
+                from roami_agent.improvement.terminal_tasks import grade_terminal
+
+                grade = await grade_terminal(case, workspace, self)
             else:
                 grade = judge_case(case, response.get("output", ""), workspace)
             elapsed = (time.monotonic() - started) * 1000

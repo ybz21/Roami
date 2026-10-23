@@ -8,7 +8,7 @@
 - `external`：约定好的本地程序或 SSH/容器包装程序，接入原生基准环境。仓库目前提供协议与超时清理，**尚未提供 Harbor、OSWorld、TheAgentCompany 等实际适配器**。隔离未被验证的外部结果阻止晋级。
 - `protocol_fixture` / `smoke`：确定性模型驱动真实运行时文件工具，再由独立判定器回读。只检查评测设施，不计 Agent 能力得分，不参与候选搜索或发布。
 
-正式混合套件缩减到 60 项：20 条公开任务、20 条自有真实任务、20 条机制回归。每天完整执行60项，稳定版/候选版各跑一次时为120个episode。新想法不替换正式题，只使用剩余实验预算。机制回归尽量不用模型；所有测试机共享日预算。80 条自建规格保留为候选库，其中40项已有夹具配方或运行时回归变体，仍需容器和判定器验收。不能因存在JSON就计作已通过案例。当前公开导入器支持 FinQA、ConvFinQA；其余任务须逐一接入环境、输入与判定器。GAIA 的访问条款仍由数据使用者处理。
+正式混合套件缩减到 60 项：20 条公开任务、20 条自有真实任务、20 条机制回归。每天完整执行60项，稳定版/候选版各跑一次时为120个episode。新想法不替换正式题，只使用剩余实验预算。机制回归尽量不用模型；所有测试机共享日预算。80 条自建规格保留为候选库，其中40项已有夹具配方或运行时回归变体，已完成20项容器机制回归，以及20项判定器正反样例验收；复杂产物仍需独立校准评分。不能因存在JSON就计作已通过案例。当前公开导入器支持 FinQA、ConvFinQA、SpreadsheetBench Verified单工作簿与两项Terminal-Bench适配；其余任务须逐一接入环境、输入与判定器。GAIA 的访问条款仍由数据使用者处理。
 
 ## 安装与无模型冒烟
 
@@ -143,6 +143,28 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 源码验证按受影响的Python运行时执行冻结基线回归；受保护的RSI评测器自身测试不作为候选修改面。失败日志保存在`checks/<action_id>/regression-*.json`，不把原始验证输出反馈给修复模型。
 
-预算示例：当前每日A/B预留120次执行；同日推进一次候选全60项A/B及54项私有A/B，另需228次，合计至少348个episode额度。复盘和补丁模型调用另按输入字节与输出上限保守预留，展示实际计量；默认每次模型调用的准入上限64000，不能代替owner日额度。混合公开测试split的正式套件需关闭四参数auto_candidates搜索；语义复盘仅用development证据提出源码修改。
+预算示例：当前每日A/B预留120次执行；同日推进一次候选全60项A/B及54项私有A/B，另需228次，合计至少348个episode额度。复盘和补丁模型调用另按输入字节与输出上限保守预留，展示实际计量；默认每次模型调用的准入上限64000，不能代替owner日额度。混合公开测试split仍完整执行；四参数候选只消费development生成的提案，保护题结果不进入搜索；语义复盘仅用development证据提出源码修改。
 
 受控缓存条件通过本地`register-machine --ledger ... --owner local --config ...`登记，需明确`cache_mode`和`cache_attestation`；Web登记的默认机器保持uncontrolled，不凭容器隔离就宣称控制了模型缓存。
+
+
+## 套件验收与材料锁
+
+正式准入使用 `daily_suite.py` 的固定配额：公开20、自有真实20、机制20，核对指定自有ID、唯一上游任务和不可变revision。调度、周期完成和源码晋级使用同一检查；只有60条记录不能通过。新增 `assemble-daily --id NAME --suite PACK ... --output FILE` 合并各包，不满足合同则拒绝写出。
+
+公开19个task ID已选择，其中7项是可执行合同；另13项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
+
+```bash
+python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials
+```
+
+下载器核对长度与SHA256，默认总量上限256MB，可用`--only mlagentbench`筛选来源。它不执行上游脚本、注册套件或接受受限访问条件。SpreadsheetBench适配显式检查单工作簿保存值、原有单元格和取消合并；不自动重算公式、不称作官方OJ成绩。
+
+```bash
+cd agent-runtime
+uv run roami-agent-evaluate import-spreadsheet --metadata /path/to/record.json --source /path/to/input.xlsx --golden /path/to/golden.xlsx --revision DATA_COMMIT --upstream-revision CODE_COMMIT --output /path/to/private/spreadsheet-suite.json
+```
+
+自有包已升级为`authored-40-v3`：输入与PPT原件冻结；PPT明示135/8日目标、核验真实PDF页和文字；回测纠错核对包含退市资产的因果重跑结果。已知ID、cluster及完全相同输入禁止跨日常/私有集合；语义改写是否独立仍需来源审查，不能只改seed或标签凑数。以上设施验收未使用真实模型，不代表收益或隐藏能力成绩。
+
+Terminal-Bench导入：`import-terminal --source-dir /path/to/task --task-id cancel-async-tasks --revision COMMIT --output /path/to/private/suite.json`，另支持`db-wal-recovery`。输入只含原题与初始文件；上游verifier保留在宿主机，退出Agent后在独立容器临时目录执行。原断言保留，路径/app映射到临时目录，环境为Python3.12离线镜像；不声称官方环境可比。异步任务6项和数据库恢复7项原断言已完成正确/错误产物验收，无真实模型成绩。

@@ -131,7 +131,7 @@ async def run_mechanism(case, policy, root, executor):
     program = """import json,pytest
 from roami_agent.protocol.improvement import policy_binding
 policy_binding.set({{"policy":json.loads({!r})}})
-result=pytest.main([{},"-q","--rootdir=/testing","-p","no:cacheprovider","--basetemp=/tmp/rsi-tests"])
+result=pytest.main([{},"-q","--asyncio-mode=auto","--rootdir=/testing","-p","no:cacheprovider","--basetemp=/tmp/rsi-tests"])
 print(json.dumps({{"exit_code":int(result)}}))
 """.format(json.dumps(policy), ",".join(repr("/testing/" + s) for s in selectors))
     started = time.monotonic()

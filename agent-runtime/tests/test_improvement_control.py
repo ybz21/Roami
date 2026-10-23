@@ -225,11 +225,34 @@ def test_release_requires_actual_log_reviews_instead_of_report_completion_flag(t
 async def test_no_new_candidate_still_runs_the_full_daily_suite(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
+    from roami_agent.improvement.corpus import authored_suite
+    from roami_agent.improvement.daily_suite import PUBLIC_QUOTAS, assemble_daily
     from roami_agent.improvement.worker import EvaluationWorker
 
     c, settings = control(tmp_path)
     case = json.loads(suite_file(tmp_path).read_text())["cases"][0]
-    full = freeze_suite("full", [{**case, "id": str(i)} for i in range(60)])
+    public = freeze_suite(
+        "public",
+        [
+            {
+                **case,
+                "id": f"{name}:{i}",
+                "layer": "public_component",
+                "split": "public_test",
+                "origin": {
+                    "benchmark": name,
+                    "task_id": str(i),
+                    "revision": "a" * 40,
+                    "input_sha256": digest([name, i]),
+                    "source_split": "test",
+                    "adapter_revision": "fixture-only",
+                },
+            }
+            for name, count in PUBLIC_QUOTAS.items()
+            for i in range(count)
+        ],
+    )
+    full = assemble_daily("full", [authored_suite("fixture-only"), public])
     path = tmp_path / "full.json"
     path.write_text(json.dumps(full))
     c.register_suite("local", path)

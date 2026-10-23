@@ -9,6 +9,7 @@ from roami_agent.improvement.containers import ContainerExecutor
 from roami_agent.improvement.contracts import digest, load_json, require, validate_suite
 from roami_agent.improvement.control import ImprovementControl
 from roami_agent.improvement.cycle import run_cycle
+from roami_agent.improvement.daily_suite import daily_coverage, validate_private_separation
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.source_revision import allowed, source_hash
 
@@ -124,7 +125,8 @@ async def verify_candidate(
             (candidate["finding"]["cycle_id"], action["owner"]),
         ).fetchone()
     require(origin is not None, "RSI_EVIDENCE_MISMATCH")
-    require(len(suites[0]["cases"]) == 60, "RSI_FORMAL_SUITE_INCOMPLETE")
+    require(daily_coverage(suites[0])["complete"], "RSI_FORMAL_SUITE_INCOMPLETE")
+    validate_private_separation(*suites)
     private = suites[1]["cases"]
     require(
         all(c["split"] in {"holdout", "validation"} for c in private), "RSI_PRIVATE_SPLIT_REQUIRED"

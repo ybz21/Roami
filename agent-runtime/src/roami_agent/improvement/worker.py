@@ -83,9 +83,10 @@ class EvaluationWorker:
             suite = validate_suite(load_json(Path(source["path"]), maximum=100_000_000))
             require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
             if request["kind"] == "daily":
+                from roami_agent.improvement.daily_suite import daily_coverage
+
                 require(
-                    len(suite["cases"]) == 60
-                    and not any(c["layer"] == "smoke" for c in suite["cases"]),
+                    daily_coverage(suite)["complete"],
                     "RSI_FORMAL_SUITE_INCOMPLETE",
                 )
             settings = self.runtime.settings.current
@@ -110,10 +111,6 @@ class EvaluationWorker:
             baseline = {k: getattr(settings, k) for k in BOUNDS}
             candidate = {**baseline, **prefs["candidate_policy"]}
             if prefs["auto_candidates"]:
-                require(
-                    all(c["split"] == "development" for c in suite["cases"]),
-                    "RSI_SEARCH_DEVELOPMENT_ONLY",
-                )
                 history = [
                     c["report"]
                     for c in self.service.ledger.list(request["owner"], 100)
@@ -122,7 +119,12 @@ class EvaluationWorker:
                     and c["report"].get("model_hash") == executor.model_hash
                     and c["report"].get("implementation_hash") == implementation_hash()
                 ]
-                candidate = next_candidate(baseline, history) or baseline
+                # Cycle proposals contain development trials only; protected tasks still run.
+                candidate = (
+                    (next_candidate(baseline, history) or baseline)
+                    if any(c["split"] == "development" for c in suite["cases"])
+                    else baseline
+                )
             source_builds = None
             from roami_agent.improvement.release_observation import active_code
 

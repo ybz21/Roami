@@ -7,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, identifier, load_json, require, validate_suite
+from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.policy import validate_policy
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -92,7 +93,7 @@ class ImprovementControl:
                 ).fetchone()
                 summary = json.loads(summary[0])
                 require(
-                    summary["count"] == 60 and not summary["layers"].get("smoke"),
+                    summary.get("daily_coverage", {}).get("complete") is True,
                     "RSI_FORMAL_SUITE_INCOMPLETE",
                 )
             for machine in value["machine_ids"]:
@@ -157,6 +158,7 @@ class ImprovementControl:
             "layers": dict(Counter(c["layer"] for c in suite["cases"])),
             "splits": dict(Counter(c["split"] for c in suite["cases"])),
             "content_hash": suite["content_hash"],
+            "daily_coverage": daily_coverage(suite),
         }
         with self.ledger.connection() as db:
             db.execute(

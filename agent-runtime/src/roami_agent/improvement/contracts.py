@@ -78,7 +78,29 @@ def validate_case(case):
         relative_file(Path("/workspace"), name)
         require(isinstance(content, str) and len(content) <= 1_000_000)
     judge = case.get("judge", {})
-    require(judge.get("kind") in {"numeric", "json", "external", "rubric", "authored", "mechanism"})
+    require(
+        judge.get("kind")
+        in {
+            "numeric",
+            "json",
+            "external",
+            "rubric",
+            "authored",
+            "mechanism",
+            "workbook",
+            "terminal",
+        }
+    )
+    if judge["kind"] == "terminal":
+        require(
+            isinstance(judge.get("upstream_verifier"), str) and bool(judge["upstream_verifier"])
+        )
+        require(judge.get("test_driver") is None or isinstance(judge["test_driver"], str))
+    if judge["kind"] == "workbook":
+        require("input.xlsx" in case.get("asset_files", {}))
+        relative_file(Path("/workspace"), judge["path"])
+        require(isinstance(judge.get("expected"), dict) and bool(judge["expected"]))
+        require(isinstance(judge.get("sheet"), str) and bool(judge["sheet"]))
     for name, content in case.get("asset_files", {}).items():
         relative_file(Path("/workspace"), name)
         require(isinstance(content, str) and len(content) <= 16_000_000)

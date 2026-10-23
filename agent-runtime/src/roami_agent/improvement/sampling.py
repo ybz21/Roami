@@ -7,6 +7,7 @@ import re
 from collections import defaultdict
 
 from roami_agent.improvement.contracts import digest, freeze_suite, number, require
+from roami_agent.improvement.daily_suite import daily_coverage
 
 
 def stratified_sample(records, count, *, seed):
@@ -145,11 +146,11 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
 
 def catalog_readiness(case_bank, sampling_plan, suites):
     runnable = {c["id"] for suite in suites for c in suite["cases"]}
-    public = defaultdict(list)
+    public = defaultdict(set)
     for suite in suites:
         for case in suite["cases"]:
             if case["layer"].startswith("public_"):
-                public[case["origin"]["benchmark"]].append(case["origin"]["task_id"])
+                public[case["origin"]["benchmark"]].add(case["origin"]["task_id"])
     return {
         "target": sampling_plan["target_size"],
         "authored_bank": len(case_bank["cases"]),
@@ -160,9 +161,12 @@ def catalog_readiness(case_bank, sampling_plan, suites):
                 "benchmark": p["benchmark_id"],
                 "target": p["target_count"],
                 "materialized": len(public[p["benchmark_id"]]),
-                "upstream_ids": public[p["benchmark_id"]],
+                "upstream_ids": sorted(public[p["benchmark_id"]]),
             }
             for p in sampling_plan["public_sampling"]
         ],
+        "daily_coverage": daily_coverage(
+            {"cases": [c for suite in suites for c in suite["cases"]]}
+        ),
         "note": "Materialized means runnable contract, not environment ready or evaluated pass.",
     }

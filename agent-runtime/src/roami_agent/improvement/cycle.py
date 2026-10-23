@@ -16,6 +16,7 @@ from roami_agent.improvement.contracts import (
     require,
     validate_suite,
 )
+from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.policy import policy_id, propose, validate_policy
 from roami_agent.protocol.errors import DomainError
@@ -86,7 +87,7 @@ async def run_cycle(
         "runner_version": VERSION,
         "request_key": request_key,
         "implementation_hash": implementation_hash(),
-        "standard_version": "rsi-v1.3-daily-full-20261023",
+        "standard_version": "rsi-v1.4-daily-coverage-20261023",
         "suite_id": suite["id"],
         "suite_hash": suite["content_hash"],
         "case_hashes": {c["id"]: digest(c) for c in cases},
@@ -94,7 +95,8 @@ async def run_cycle(
         "coverage_mode": "full_suite",
         "expected_cases": len(cases),
         "review_required": True,
-        "formal_daily_suite": len(cases) == 60 and not any(c["layer"] == "smoke" for c in cases),
+        "formal_daily_suite": daily_coverage(suite)["complete"],
+        "daily_coverage": daily_coverage(suite),
         "machine": machine,
         "model_hash": executor.model_hash,
         "baseline_policy": baseline,

@@ -143,7 +143,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         )
         required = ["backup_restore.py", "backup.zip", "restored/database.json", "result.json"]
         schema = {
-            "contract": "backup_restore.py CLI: backup SOURCE ZIP / restore ZIP TARGET。还原目标含完整source内容；schema!=1拒绝且保持已有目标。生成可核对result.json和真实backup.zip。"
+            "contract": "backup_restore.py CLI: backup SOURCE ZIP / restore ZIP TARGET。保留source原始输入，只删除演练副本；还原目标含完整source内容；schema!=1拒绝且保持已有目标。生成可核对result.json和真实backup.zip。"
         }
         judge["source"] = {k.removeprefix("source/"): v for k, v in files.items()}
     elif case_id == "DOC-03":
@@ -151,7 +151,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         required = ["updated.pptx", "changes.md", "preview.pdf"]
         judge["rubric"] = True
         schema = {
-            "contract": "编辑source.pptx，保存updated.pptx；生成changes.md与LibreOffice导出的preview.pdf。源文件保持；未改页XML语义、文本与对象保持。"
+            "contract": "第3页指标120改为135，第5页计划5日改为8日。编辑source.pptx，保存updated.pptx；生成changes.md与LibreOffice导出的preview.pdf。源文件保持；未改页XML语义、文本与对象保持。"
         }
     elif case_id == "DOC-05":
         inputs = {
@@ -435,8 +435,16 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
                 "old_claim_valid": False,
                 "delisted_included": True,
             }
+            strategy = backtest(data["bars"])
+            judge["corrected_expected"] = {
+                "receipt": nonce,
+                "universe": ["REGULAR", "DELISTED"],
+                "strategy": strategy,
+                "delisted_final_equity": 2000,
+                "portfolio_final_equity": (strategy["equity"][-1] + 2000) / 2,
+            }
             schema = {
-                "contract": "result.json含receipt、biases=[lookahead,survivorship]、old_claim_valid=false、delisted_included=true；报告定位flawed.py两行，analysis.py使用因果数据与包含退市的股票池重跑，保存corrected.json与逐笔记录。"
+                "contract": "result.json含receipt、biases=[lookahead,survivorship]、old_claim_valid=false、delisted_included=true；报告定位flawed.py两行。analysis.py重跑生成corrected.json：receipt、universe=[REGULAR,DELISTED]、strategy（REGULAR的因果MA3/MA5回测，收盘信号下一bar开盘执行，初始10000，费用与滑点取prices.json，含trades和equity，不强制期末平仓）、delisted_final_equity=2000、portfolio_final_equity（两资产初始各10000、等权归一至10000，取两者末净值平均）。不能只写已修复。"
             }
             required.append("corrected.json")
         elif case_id == "QUANT-04":
@@ -482,6 +490,9 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         files["prices.json"] = json.dumps(data)
         judge.update(expected=expected, numeric_tolerance=1e-5)
     elif case_id == "LAB-05":
+        files["experience-v1.json"] = json.dumps(
+            {"version": 1, "entry": "python test.py", "source": "project/README.md"}
+        )
         files["project/README.md"] = (
             "测试入口是 python verify_current.py，旧的 python test.py 已停用。版本凭证 " + nonce
         )
@@ -497,7 +508,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         }
         schema = {
             **schema_shape(expected),
-            "contract": "先记录experience.json，引用实际README与版本；然后更改项目版本时核对新README再运行新测试入口，把原始输出与新版本凭证保存在transfer-log.json。不得把本次题目答案作为经验。",
+            "contract": "experience-v1.json是已过期经验；当前project为新版本。核对新README并运行新入口，再保存experience.json，引用README与版本凭证，将原始输出保存在transfer-log.json。这是已有经验失效后的复核任务，不是两次独立会话的长期记忆测量。不得把本次题目答案作为经验。",
         }
         judge["expected"] = expected
     else:
@@ -510,14 +521,22 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         + ", ".join(required)
         + "。如有result.json，字段按合同给出，不添加未证实信息。报告引用输入文件与receipt。"
     )
-    judge.update(required=required, protected={k: digest(files[k]) for k in protected})
+    editable = {"app.py", "index.html", "existing.js"}
+    protected = sorted(set(protected) | (set(files) - editable))
+    judge.update(
+        required=required,
+        protected={k: digest(files[k]) for k in protected},
+        protected_assets={
+            k: hashlib.sha256(base64.b64decode(v)).hexdigest() for k, v in assets.items()
+        },
+    )
     return {
         "files": files,
         "asset_files": assets,
         "judge": judge,
         "prompt_suffix": prompt,
         "fixture_receipt": nonce,
-        "fixture_revision": "roami-authored-v2",
+        "fixture_revision": "roami-authored-v3",
     }
 
 

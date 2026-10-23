@@ -1,6 +1,6 @@
 {
   "plan_version": "roami-rsi-mixed-v3-daily-full-20261023",
-  "status": "scope_frozen_materialization_and_acceptance_pending",
+  "status": "scope_frozen_authored_grader_accepted_public_native_adapters_pending",
   "target_size": 60,
   "public_target": 20,
   "authored_selected": 40,
@@ -12,63 +12,83 @@
       "name": "SWE-bench Verified",
       "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified",
       "target_count": 2,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "pylint-dev__pylint-6903",
+        "scikit-learn__scikit-learn-13496"
+      ],
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "status": "source_contract_locked_native_environment_and_adapter_pending"
     },
     {
       "benchmark_id": "terminal_bench",
       "name": "Terminal-Bench",
       "source_url": "https://github.com/harbor-framework/terminal-bench-2",
       "target_count": 2,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "cancel-async-tasks",
+        "db-wal-recovery"
+      ],
+      "dataset_revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "status": "two_adapted_agent_contracts_materialized_upstream_assertions_container_accepted_not_model_evaluated"
     },
     {
       "benchmark_id": "the_agent_company",
       "name": "TheAgentCompany",
       "source_url": "https://github.com/TheAgentCompany/TheAgentCompany",
       "target_count": 2,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "ds-stock-analysis-slides",
+        "hr-make-slides-introduce-leadership"
+      ],
+      "dataset_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "status": "source_contract_locked_native_environment_and_adapter_pending"
     },
     {
       "benchmark_id": "osworld",
       "name": "OSWorld",
       "source_url": "https://github.com/xlang-ai/OSWorld",
       "target_count": 2,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "04578141-1d42-4146-b9cf-6fab4ce5fd74",
+        "05dd4c1d-c489-4c85-8389-a7836c4f0567"
+      ],
+      "dataset_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "status": "source_contract_locked_native_environment_and_adapter_pending"
     },
     {
       "benchmark_id": "agentic_vbench",
       "name": "AgenticVBench",
       "source_url": "https://github.com/PhiloLabs/agentic-vbench",
       "target_count": 2,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "exp-codec-restore-task01",
+        "agentic-vbench-assembly-task1"
+      ],
+      "dataset_revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "status": "source_contract_locked_native_environment_and_adapter_pending"
     },
     {
       "benchmark_id": "dsbench",
       "name": "DSBench",
       "source_url": "https://github.com/LiqiangJing/DSBench",
       "target_count": 2,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "00000018:question24",
+        "00000013:question19"
+      ],
+      "dataset_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+      "status": "source_contract_locked_workbooks_and_adapter_pending"
     },
     {
       "benchmark_id": "spreadsheetbench",
       "name": "SpreadsheetBench",
       "source_url": "https://github.com/Reality2byte/SpreadsheetBench",
       "target_count": 1,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "verified400:38703"
+      ],
+      "dataset_revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+      "status": "adapted_component_contract_materialized_grader_accepted_not_model_evaluated"
     },
     {
       "benchmark_id": "gaia",
@@ -77,16 +97,18 @@
       "target_count": 1,
       "selected_upstream_ids": [],
       "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "status": "gated_access_not_accepted"
     },
     {
       "benchmark_id": "longmemeval_v2",
       "name": "LongMemEval-V2",
       "source_url": "https://github.com/xiaowu0162/LongMemEval-V2",
       "target_count": 1,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "4ed01379"
+      ],
+      "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+      "status": "source_contract_locked_native_environment_and_adapter_pending"
     },
     {
       "benchmark_id": "finqa",
@@ -117,9 +139,11 @@
       "name": "MLAgentBench",
       "source_url": "https://github.com/snap-stanford/MLAgentBench",
       "target_count": 1,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "awaiting_access_version_lock_and_sample_selection"
+      "selected_upstream_ids": [
+        "vectorization"
+      ],
+      "dataset_revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+      "status": "source_contract_locked_native_environment_and_adapter_pending"
     }
   ],
   "authored_case_ids": [
@@ -169,8 +193,8 @@
     "total_specifications": 80,
     "selected": 40,
     "remaining_pool": 40,
-    "fixtures": "recipes_and_regression_variants_implemented_acceptance_pending",
-    "runs": "not_run"
+    "fixtures": "authored_v3_known_answer_and_mutation_grader_acceptance_complete",
+    "runs": "container_grader_acceptance_not_live_agent_trials"
   },
   "sampling_rules": [
     "按场景、难度、任务时长和环境分层抽取，冻结seed与抽样清单；不根据候选得分换题。",
@@ -206,20 +230,22 @@
     "no_candidate": "没有新提案也全量执行，标记基线稳定性观察；相同策略的随机波动不能晋级。"
   },
   "next_steps": [
-    "固定剩余16项公开样本与原生环境",
-    "验收40项自有夹具和判定器",
-    "接入主动观察、修改与回归闭环，并统一其Token计量",
-    "在日预算内分批积累同机对照证据"
+    "完成其余13条公开合同的原生环境与执行适配；GAIA仍需合法访问或版本化替换",
+    "接入复杂产物的独立校准评分，不能把硬断言通过当作视觉质量",
+    "构建独立私有验证24与隐藏30个来源分组，禁止重用日常题",
+    "绑定实际测试机、模型和预算，运行每日完整60项并观测收益"
   ],
   "implementation": {
-    "public_materialized": 4,
+    "public_materialized": 7,
     "authored_selected_materialized": 40,
     "protocol_smoke_cases": 2,
     "active_machine_bindings": 0,
     "live_model_trials": 0,
     "sample_lock": "public-sample-lock.json",
     "runbook": "../../development/agent-rsi.md",
-    "authored_acceptance": "pending_container_and_grader_acceptance"
+    "authored_acceptance": "20_container_mechanisms_and_20_known_answer_mutation_grader_fixtures_passed_visual_rubrics_pending",
+    "public_source_ids_selected": 19,
+    "public_materials_lock": "public-materials-lock.json"
   },
   "autonomous_research": {
     "primary_inputs": [

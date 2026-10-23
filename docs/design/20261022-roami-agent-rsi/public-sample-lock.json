@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "4_public_component_contracts_imported_not_model_evaluated",
-  "materialized_public": 4,
-  "target_public": 60,
+  "status": "7_public_contracts_imported_not_model_evaluated",
+  "materialized_public": 7,
+  "target_public": 20,
   "sampled_on": "2026-10-23",
   "suites": [
     {
@@ -156,6 +156,76 @@
         }
       ],
       "official_leaderboard_comparable": false
+    },
+    {
+      "suite_id": "spreadsheetbench-verified400-sample-v1",
+      "suite_hash": "6af1caa4944df0d79fa445fa84770635a4e7fbaf1d46007b17453e9d7eedc436",
+      "benchmark": "spreadsheetbench",
+      "source_url": "https://huggingface.co/datasets/KAKA22/SpreadsheetBench",
+      "source_revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+      "source_split": "verified_400",
+      "selected": [
+        {
+          "case_id": "spreadsheetbench:38703",
+          "benchmark": "spreadsheetbench",
+          "task_id": "verified400:38703",
+          "revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+          "upstream_revision": "49b73a94775fb489063f60ca1865e3a650079a79",
+          "source_split": "verified_400",
+          "input_sha256": "eaa432b7490153d195b2cb86208ee5fbe085f75f660c6a6262390a75d386d80d",
+          "adapter_revision": "spreadsheet-values-v1",
+          "adapted": true,
+          "adaptation": "One workbook; saved target values, preserved input cells and unmerged cells; no formula recalculation or official OJ comparability."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "golden_saved_values_passed_original_and_corrupted_outputs_rejected"
+    },
+    {
+      "suite_id": "terminal-bench-cancel-async-tasks-v1",
+      "suite_hash": "64f4d2fe9aa824986e43b18b23f4a1584c0d0d222402c3aaabdd27868f5975fc",
+      "benchmark": "terminal_bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "source_revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "selected": [
+        {
+          "case_id": "terminal_bench:cancel-async-tasks",
+          "benchmark": "terminal_bench",
+          "task_id": "cancel-async-tasks",
+          "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+          "source_split": "released_tasks",
+          "input_sha256": "d2040b3b0a9f8836b84504c28e0b268858d24efa22a3bedc30913303bd09d48f",
+          "verifier_sha256": "9614aa8684e7882bf41042e18b94e7c8dcb7004fbac6d6bb34c870eaaa17a9e9",
+          "adapter_revision": "terminal-offline-v1",
+          "adapted": true,
+          "adaptation": "Original result assertions; path /app remapped, Python 3.12 offline image, no upstream installation bootstrap. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "actual_container_reference_solution_passed_and_broken_output_rejected"
+    },
+    {
+      "suite_id": "terminal-bench-db-wal-recovery-v1",
+      "suite_hash": "07b2833d125dff1a39f816c94ab11965bd5504d572346586b8424281aa686db1",
+      "benchmark": "terminal_bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "source_revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "selected": [
+        {
+          "case_id": "terminal_bench:db-wal-recovery",
+          "benchmark": "terminal_bench",
+          "task_id": "db-wal-recovery",
+          "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+          "source_split": "released_tasks",
+          "input_sha256": "1107ba1e5c7086de9dae5119f859cf12cbed9152a942d66cfbf23fc01a1eff75",
+          "verifier_sha256": "cbecfc42ea658756577bb85f9f9be5ab35f5a34527950184bd2003da39257da7",
+          "adapter_revision": "terminal-offline-v1",
+          "adapted": true,
+          "adaptation": "Original result assertions; path /app remapped, Python 3.12 offline image, no upstream installation bootstrap. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "actual_container_reference_solution_passed_and_broken_output_rejected"
     }
   ]
 }

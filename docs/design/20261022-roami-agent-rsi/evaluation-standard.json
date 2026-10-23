@@ -1,5 +1,5 @@
 {
-  "standard_version": "rsi-v1.3-daily-full-20261023",
+  "standard_version": "rsi-v1.4-daily-coverage-20261023",
   "status": "specification_with_partial_runner_not_live_model_evaluated",
   "scope": {
     "real_categories": 12,
@@ -256,5 +256,6 @@
     "authored_selected": 40,
     "status": "partially_materialized_not_model_evaluated",
     "quality_metrics": "unchanged_from_v1.1"
-  }
+  },
+  "daily_suite_contract": "roami-daily-60-v1"
 }

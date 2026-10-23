@@ -1,57 +1,13 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami Agent RSI · 首批实施记录</title><link rel="stylesheet" href="design.css"></head><body><main><article>
-<nav aria-label="实施记录"><a href="index.html">完整方案</a><a href="#implemented">已实现</a><a href="#verification">验证</a><a href="#remaining">待完成</a><a href="sampling-plan.html">60项组合</a><a href="public-sample-lock.json">样本锁</a></nav>
-<h1>Roami Agent RSI · 首批实施</h1><p>2026-10-23 · feat/roami-agent-rsi</p>
-<p>已完成可运行评测底座、有限参数搜索与每日 worker。正式测试机、真实模型评测、完整60例套件和线上策略发布尚未接通；当前没有质量、速度或 Token 已改善的结论。</p>
-<h2 id="implemented">已实现的闭环</h2>
-<pre>上游固定版本 / 自建冻结合同
-  → 分层抽样 + 输入 / 样本哈希
-  → 每日机器准入 + A/B 整轮预算预留
-  → 独立运行时（新数据库、新工作区） / 外部测试机协议
-  → 独立断言判定 + 显式待评分
-  → 同案例 / 机器 / 模型 / 缓存的成对比较
-  → development 失败待诊断 / 单参数提案
-  → 次日消费未试过的候选
-  → 私有报告与只读 owner API
-  → 晋级诊断；线上发布未实现</pre>
-<div class="tablewrap"><table><thead><tr><th>模块</th><th>实际能力</th><th>边界</th></tr></thead><tbody>
-<tr><td>contracts.py / sampling.py</td><td>冻结 suite、分层抽样、版本与哈希；FinQA / ConvFinQA 导入</td><td>只导出正文、表格与问题给 Agent；不是官方完整榜单</td></tr>
-<tr><td>executors.py</td><td>真实 Runtime 文件任务；外部 worker 请求 / 响应、超时清理</td><td>文件模式不开放 shell 或现用会话；外部环境仍需实际适配</td></tr>
-<tr><td>measurements.py</td><td>所有模型角色共用 episode 预算；调用、重试、观测 Token、过程耗时</td><td>未来维护成本不伪造为0；完整 Token 未知则阻止晋级</td></tr>
-<tr><td>grading.py</td><td>数值 / JSON 独立断言；双评分人盲评、分歧待复核</td><td>客观通过不替代 PPT、视频的视觉质量</td></tr>
-<tr><td>comparison.py</td><td>基线通过保护、独立 cluster bootstrap、私有验证 / 隐藏集门槛</td><td>小样本、夹具、未知用量和不受控缓存不能晋级</td></tr>
-<tr><td>policy.py</td><td>记忆条数 / Token、上下文保留量、目录页大小四个有界参数</td><td>单因素候选；权限、角色、评分器与隐藏数据不可修改</td></tr>
-<tr><td>ledger.py / cycle.py / cli.py</td><td>私有SQLite账本、原子日预算、同机同日不重跑、A/B随机顺序、独立每日worker</td><td>不自动重放中断工作；暂不回收预留预算</td></tr>
-<tr><td>status.py / Go 网关</td><td>登录后按 owner 读取周期摘要</td><td>摘要不返回隐藏输入、完整输出或参考答案；首页面板未实现</td></tr>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roami Agent RSI · 实施与验收</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"></head><body><main><article class="rsi-overview">
+<nav><a href="index.html">架构</a><a href="automation-roles.html">执行手段</a><a href="sampling-plan.html">60项组合</a><a href="public-materials-lock.json">材料锁</a></nav>
+<h1>实施与验收</h1><p>2026-10-23 · 当前尚未启动正式60项真实模型评测，没有质量、速度或Token改善结论。</p>
+<div class="tablewrap"><table><thead><tr><th>部分</th><th>已验证</th><th>剩余条件</th></tr></thead><tbody>
+<tr><td>自动闭环</td><td>定时发起、逐项复盘、隔离补丁、独立验证、RSI实例应用、观察关单与退化重开</td><td>已用确定性模型验收；生产部署适配未接入</td></tr>
+<tr><td>自有40项</td><td>20项机制容器回归；20项判定器正确产物及错误产物验收</td><td>5项复杂产物保留独立校准评分；不是Agent能力成绩</td></tr>
+<tr><td>公开20项</td><td>19项选定ID；7项可执行合同；54份来源材料已固定hash</td><td>剩余13项正式合同及原生环境/适配；GAIA尚无访问</td></tr>
+<tr><td>正式套件</td><td>统一核对20/20/20配额、指定ID、唯一上游任务与固定版本</td><td>不能只复制记录凑满60；材料可下载不等于可运行</td></tr>
+<tr><td>独立验证</td><td>阻止ID、cluster和完全相同输入与日常集重叠</td><td>24验证、30隐藏独立来源尚未创建；改seed不算独立</td></tr>
+<tr><td>每日运行</td><td>共享预算、持久队列、规则与语义日志回顾</td><td>测试机、模型、日额度尚未绑定；付费调用0</td></tr>
 </tbody></table></div>
-<p>当前默认参数保持原行为，只有隔离实验应用候选。完整模块入口在 agent-runtime/src/roami_agent/improvement/；命令与机器配置见 <a href="../../development/agent-rsi.md">运行手册</a> 与 scripts/dev/agent-evaluation/machine.example.json。</p>
-<p>与完整设计的阶段差异：当前使用独立私有账本与独立长期worker，标准、机器和策略以冻结manifest保存；尚未迁入主运行库的跨机任务状态机。先验证执行、成本和失败边界，后续再接入跨机调度与发布恢复。</p>
-<h2 id="verification">真实运行证据</h2>
-<p>通过 scripts/dev/isolated-roami.sh 创建专用实例，以确定性模型驱动真实 intake、read、write、上下文、记忆提取和数据库提交，再由判定器读回 output.json。两例各跑基线 / 候选，共四次执行。它们验证设施，位于60例目标套件之外，不代表 Agent 能力或模型收益。</p>
-<div class="tablewrap"><table><thead><tr><th>设施任务</th><th>组别</th><th>独立判定</th><th>工具次数</th><th>模型次数</th><th>已观测Token</th><th>完整Token</th><th>实际产物</th></tr></thead><tbody><tr><td>PROTOCOL-FILES-2</td><td>基线</td><td>通过</td><td>2</td><td>4</td><td>480（夹具用量）</td><td>未知：次日维护未结算</td><td><a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-evidence-20261023%2Fresults%2Fruns%2F52a2e38ee5adea9473bc12c724457aa7f8d325cb5c16b650ece6d4864a346830%2F1903e5942363652f67ae-baseline%2Fworkspace%2Foutput.json">回读产物</a></td></tr><tr><td>PROTOCOL-FILES-2</td><td>候选</td><td>通过</td><td>2</td><td>4</td><td>480（夹具用量）</td><td>未知：次日维护未结算</td><td><a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-evidence-20261023%2Fresults%2Fruns%2F52a2e38ee5adea9473bc12c724457aa7f8d325cb5c16b650ece6d4864a346830%2F1903e5942363652f67ae-candidate%2Fworkspace%2Foutput.json">回读产物</a></td></tr><tr><td>PROTOCOL-FILES-1</td><td>基线</td><td>通过</td><td>2</td><td>4</td><td>480（夹具用量）</td><td>未知：次日维护未结算</td><td><a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-evidence-20261023%2Fresults%2Fruns%2F52a2e38ee5adea9473bc12c724457aa7f8d325cb5c16b650ece6d4864a346830%2Ffb2047b022df8021125e-baseline%2Fworkspace%2Foutput.json">回读产物</a></td></tr><tr><td>PROTOCOL-FILES-1</td><td>候选</td><td>通过</td><td>2</td><td>4</td><td>480（夹具用量）</td><td>未知：次日维护未结算</td><td><a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-evidence-20261023%2Fresults%2Fruns%2F52a2e38ee5adea9473bc12c724457aa7f8d325cb5c16b650ece6d4864a346830%2Ffb2047b022df8021125e-candidate%2Fworkspace%2Foutput.json">回读产物</a></td></tr></tbody></table></div>
-<p>两组均通过2例，verified_deliveries=0，eligible_for_promotion=false。未触发真实模型调用、线上策略修改或正式每日服务。<a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-evidence-result.json">打开原始报告</a>。</p>
-<p id="quality-evidence">仓库 quick 门禁通过：896 项 Python 测试、全量 Go 测试、i18n / hover / typecheck 通过。最终记忆结算修订后，RSI、自动记忆与执行追踪专项 50 项通过。文档相对链接与 JSON 格式验证通过。</p>
-<h3>首批公开样本</h3>
-<p>FinQA dev：873条可支持数值记录中分层抽3条，10条不支持记录及理由进入锁；ConvFinQA dev：417条可支持会话中抽1条，4条排除。版本、来源、适配方式、原始ID和SHA-256见 <a href="public-sample-lock.json">公开样本锁</a>。原始数据与参考答案保留在本机私有评测文件，未加入仓库。</p>
-<ul><li>FinQA：L/2015/page_59.pdf-1、PM/2018/page_24.pdf-2、IP/2012/page_93.pdf-4。</li><li>ConvFinQA：Double_KHC/2016/page_23.pdf，共2轮，逐轮判定且不注入参考历史答案。</li></ul>
-<p>这些是公开财务推理组件合同，尚未跑真实模型；不等于股票策略、端到端研究或上游官方执行准确率。</p>
-<h3>范围与目标修订 · 2026-10-23</h3><p>正式库存从100项减至60项：公开20 + 自有真实20 + 机制回归20。每日完整执行60项，成功与失败的指标和具体日志都回顾；新想法另列受限开发实验，不替换正式题。主流程调整为主动跑题、观察行为、提出建议并实际修改。完整自主观察与源码修改器尚未接通，参数搜索不代表该闭环已经完成。</p>
-<p>本轮范围调整验证：60项JSON配额与HTML表格一致，SVG与Excalidraw文本逐行一致；RSI专项36项通过，含此前4项抽样（已被每日全量修订取代）和无模型回归零Token预留。仓库quick门禁通过，903项Python测试、Go测试及前端静态检查通过；前端907项测试和生产构建通过。隔离测试tmux实例已清理。本轮未运行付费模型评测，未测得真实Token改善比例；产品界面仍待实际桌面与手机验收。</p><h3>每日全量与指标/日志回顾 · 2026-10-23</h3>
-<p>当前标准rsi-v1.3-daily-full-20261023：正式60项每天全跑，取消按预算静默删题；A/B各一轮为120个episode。默认每日case固定60、episode上限120，Token预算仍为0且自动日程默认关闭。整套预算不足或正式用例未接齐明确阻断。手动诊断包与设施冒烟不冒称正式当日完成。</p>
-<p>已实现每项实际模型请求/文本与工具响应、工具参数/结果、trace、错误和回归输出采集。behavior_review.py逐项检查成功与失败，生成带文件hash和具体record/span位置的观察及修改建议。已知规则回顾不增加模型调用；完整语义诊断和自主源码修改仍待接通。未知消耗保留null，缺日志与未完成回顾阻止晋级；发布不信任报告自报“已完成”，重新核对实际逐项回顾与覆盖。</p>
-<p>验证：仓库quick通过，915项Python与全量Go测试、前端静态检查通过；最终专项51项覆盖全60项/120次日志回顾、预算不足零调用、禁止旧抽样、中断留证、成功案例回顾、失败消耗与未知用量、日志缺失/路径逃逸、外部日志上限及伪造完成标记。前端910项测试与生产构建通过。桌面及Redmi Note 8对真实页面组件配隔离示例数据检查固定60和回顾覆盖；真机coarse触控命中49.8px、真实滑动有效，无横向或文档滚动。这是组件验收，不是完整App导航或真实模型成绩。</p>
-<p>新增真实运行时设施冒烟回顾：2项×A/B共4次，16次模型协议调用与8次工具调用均有具体记录；检测到4次延迟维护未结算，完整Token保持未知。未调用付费模型，不是正式60项已完成。<a href="/api/file/serve/tmp/roami-rsi-daily-review.html">打开可读回顾与逐项原日志</a> · <a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-daily-full-phone.png">手机组件验收截图（示例数据）</a></p>
-<h3>出分后的自动化编排设计 · 2026-10-23</h3><p>新增<a href="index.html#closed-loop">内部改进工单、任务自动派发、源码候选独立验证及观察后关闭/重开的设计契约</a>。此部分仍为待实施；本轮没有创建GitHub Issue/PR，没有启动编码Agent或部署服务。已核对现有Tasks.create幂等key和task.run/task.verify接入位置，明确跨库outbox、租约、预算及源码构建版本适配需求。</p><h2 id="remaining">剩余实施与接入</h2>
-<ol><li>测试机地址、容器 / 桌面 / 浏览器环境、可用模型与日预算：尚未提供或绑定。补齐后部署独立worker。</li><li>其他16条公开任务及实际适配器；自选40条任务已有夹具配方或运行时回归变体，容器和判定器尚待验收，保留80条规格池。</li><li>独立私有验证至少24例、隐藏至少30例：尚未创建，不使用公开测试冒充隐藏集。</li><li>工具执行与回执策略、记忆生成维护、路由、模型预算等更多决策适配，以及多因素实验：后续实现。</li><li>正式收益实验尚未运行；发布/回滚与首页操作已接入代码，尚待完整验收。</li></ol>
-<h3>参与者与交接设计 · 2026-10-23</h3>
-<p>新增<a href="automation-roles.html">参与者与自动化流程</a>，明确谁发起、谁复盘提问、谁修复、谁独立验收、谁应用及关单；包含逐阶段输入输出、时序、复盘覆盖与数据隔离、执行器选择、失败交接和端到端验收。核对现有Runtime.start、EvaluationWorker.monitor、Control.schedule/enqueue和Tasks接入点；特别说明当前多机逐机整套A/B成本，尚无自动分片。</p>
-<p>本次仅补充设计和交叉入口，未创建新角色或启动编码任务，未运行付费模型、启用日程、部署或创建外部Issue。语义复盘、自动源码修改与观察关单仍为待接通。</p>
-<p>文档验收：新增角色页、总方案和实施记录的HTML结构、唯一ID、相对链接及锚点检查通过；现有JSON可解析，正式每日60项和待实施状态未改变，git diff --check通过。隔离Chrome渲染检查了<a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-roles-design.png">三个问题的回答</a>和<a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-roles-responsibilities.png">角色责任表</a>，测试实例已清理；本次无运行时代码变更，未重复运行代码测试。</p>
-<h3>图表版精简 · 2026-10-23</h3>
-<p><a href="automation-roles.html">角色页</a>改为一张架构图、一张执行手段表及三种闭环结果；正文文字较上一版减少约80%，运行成本与接入细节折叠。总方案默认展示架构，原指标和技术契约保留在折叠附录，旧锚点访问时自动展开。架构SVG与可编辑Excalidraw同步重画，手机提供纵向图；本次不改运行逻辑或实现状态。</p>
-<p>验证：1440px桌面和390px手机视口下，无文档/表格横向溢出，分别选择横向/纵向架构图；默认折叠与旧锚点自动展开通过。图中文字经CJK字体尺寸核对，SVG与Excalidraw文本一致；HTML结构、相对链接、JSON和diff检查通过。<a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-visual-desktop.png">桌面预览</a> · <a href="/api/file/raw?path=%2Ftmp%2Froami-rsi-visual-mobile-execution.png">窄屏执行表预览</a>。仅文档变化，未重复运行代码测试。</p>
-<h3>自动研发代码接入 · 2026-10-23</h3>
-<p>新增持久ResearchWorkflow/ResearchWorker、逐项语义复盘、硬预算原生补丁、源码构建配对、独立私有晋级门禁、RSI runner版本绑定及后续观察关单/回滚重开。原生修复不依赖聊天消息或用户每日派发；Codex尚无硬Token预算适配，未自动启用，生产部署不冒充RSI实例绑定。</p>
-<p>验收：仓库full检查点929项Python、Go及前端静态/构建通过；前端911项通过。真实容器源码marker基线1/候选2且答案不可见；运行时冻结回归861通过、6跳过。端到端使用确定性模型与推进时钟验证真实隔离补丁和两次日观察关闭；这不是正式60项真实模型成绩。容器回归修复了原路由测试的后台反馈竞态，保留原断言；修正验收容器的目录布局与临时可执行夹具权限。</p>
-<p><a href="/api/file/serve/tmp/roami-rsi-workflow-acceptance.html">设施验收与原始证据</a>。Redmi真机已完成新增记录的触控展开与恢复操作，观察中不显示修复完成。正式机器、剩余16条公开材料、自有夹具完整验收、独立私有验证集及实际预算仍待接齐，未启动付费每日运行。</p>
-<p>未来架构、产品设计与用户故事继续以 <a href="index.html">完整方案</a> 为准；本页只记录当前实际实现。</p>
+<p><a href="/api/file/serve/tmp/roami-rsi-corpus-acceptance.html">本轮验收证据</a> · <a href="/api/file/serve/tmp/roami-rsi-workflow-acceptance.html">闭环设施验收</a> · <a href="../../development/agent-rsi.md">运行命令</a></p>
 </article></main></body></html>

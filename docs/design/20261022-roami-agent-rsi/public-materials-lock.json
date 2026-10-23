@@ -1,0 +1,517 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-23",
+  "selection_seed": 20261023,
+  "source_tasks_selected_in_this_lock": 15,
+  "total_selected_with_financial_samples": 19,
+  "public_target": 20,
+  "runnable_public_contracts": 7,
+  "source_selection_is_not_environment_acceptance": true,
+  "sources": [
+    {
+      "benchmark": "terminal_bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "selected_upstream_ids": [
+        "cancel-async-tasks",
+        "db-wal-recovery"
+      ],
+      "status": "two_adapted_agent_contracts_materialized_upstream_assertions_container_accepted_not_model_evaluated",
+      "files": [
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/README.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/README.md",
+          "sha256": "9adf86b1279cc44f83fe16e6d340595aa992240f1d87243d204cae32e453693b",
+          "bytes": 1627,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/environment/Dockerfile",
+          "sha256": "1ee7bdb4a7536f5f114c11a3ac6ff42790abfea901fcba6b2a8ea8685f19140e",
+          "bytes": 213,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/instruction.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/instruction.md",
+          "sha256": "23d22f7039b50682941652c716f96dac314b8585c32c133614cac77dc067f47e",
+          "bytes": 537,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/solution/solve.sh",
+          "sha256": "4938ca4ad5b7dcd36b414b42a1abb10c058ecefce7462b678f9bd05c9fae1844",
+          "bytes": 709,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/task.toml",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/task.toml",
+          "sha256": "14db0675e04408f2133b0067e8dbddf66a1d6e7baf6b8d38bef8ecccfc4e58a8",
+          "bytes": 927,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/tests/test.py",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/tests/test.py",
+          "sha256": "f533c0a64db068f582b4733c5b81f2e66b8fa52fcd3efa65752e6bd6d24780aa",
+          "bytes": 701,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/tests/test.sh",
+          "sha256": "79600a6b863def31b4daa008297423010cd2d6243e689d67503e118e4dc53397",
+          "bytes": 639,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/tests/test_outputs.py",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/tests/test_outputs.py",
+          "sha256": "d6f510b51fafc81b4e9b5cc95535aa13491c8753e0e4171db42c45f4de460ee7",
+          "bytes": 4225,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/README.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/README.md",
+          "sha256": "600762031a1a02ecc3b46d70f7683f3ff930b47c8a3d0e27cc31b146158c3126",
+          "bytes": 2040,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/environment/Dockerfile",
+          "sha256": "63a260531c62f4ae72060db17f295c0aa03cfc6321f8162c324b7aa6b3f81302",
+          "bytes": 407,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/instruction.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/instruction.md",
+          "sha256": "5a20375162921b8911c67035d1905df7fd335d1bed03044271e608b2c3c93b26",
+          "bytes": 658,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/solution/solve.sh",
+          "sha256": "ed8530c94103bf19783a1d41bc63fe4db478cdd9629f22fee25c45a45699f5e8",
+          "bytes": 3080,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/task.toml",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/task.toml",
+          "sha256": "1cdc2c615e259bc10265efbe71b518332070c1c002e226566399e9788f18d0aa",
+          "bytes": 926,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/tests/test.sh",
+          "sha256": "4770437ea96c3cc84684b4f99d55fb148fcac09f9ea1e8ef49de487716e6c334",
+          "bytes": 608,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/tests/test_outputs.py",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/tests/test_outputs.py",
+          "sha256": "88dc5c2a3abba75bca0e0f9136223ae5bb585d5984b8d9eba51a7829c1d2ba49",
+          "bytes": 4263,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/environment/main.db",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/environment/main.db",
+          "sha256": "68cb288eb29e76d814b4e7ee6887b37c415675e644f88173bc191348e290d119",
+          "bytes": 8192,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/environment/main.db-wal.encrypted",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/environment/main.db-wal.encrypted",
+          "sha256": "68753bdce26196a53194260d001544cc6bb8f9f38e2f2f6826d09798e31e6e26",
+          "bytes": 16512,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "the_agent_company",
+      "source_url": "https://github.com/TheAgentCompany/TheAgentCompany",
+      "revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "selected_upstream_ids": [
+        "ds-stock-analysis-slides",
+        "hr-make-slides-introduce-leadership"
+      ],
+      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "files": [
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/Dockerfile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/Dockerfile",
+          "sha256": "6461bc23e041f9a706c53510611ebadb729b2cb0d4101f43c4dacf1266be9ee7",
+          "bytes": 242,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/Makefile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/Makefile",
+          "sha256": "3081bfd0b98d836021cde3e64b69a5fc8c34fdeb0b07fca03a032905a57559e2",
+          "bytes": 356,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/checkpoints.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/checkpoints.md",
+          "sha256": "d601aa5e9905fea1cfcbe4a44fa8ed8c789b2667fa35d4fba40e4a06d6bd609a",
+          "bytes": 742,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/dependencies.yml",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/dependencies.yml",
+          "sha256": "7a002a095bf9d24020d890667ecccfc725fb25abd474f408a343f019878a8a92",
+          "bytes": 10,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/evaluator.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/evaluator.py",
+          "sha256": "b4926f32e89fe6ba01c0e7697e6f71100608c415dc7c2911eae1c03ae69f67a9",
+          "bytes": 5519,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/stock_data.csv",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/stock_data.csv",
+          "sha256": "1b8940d298205bed6700b1f7aea0321385c5aff0599f3fcec173300c9bb3fcbf",
+          "bytes": 370122,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/task.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/task.md",
+          "sha256": "621281d20fa3e0b4dbf6903ff871e035c99bb194a80b4fe3e1188f7f7954281b",
+          "bytes": 1733,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/Dockerfile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/Dockerfile",
+          "sha256": "c20a3a6eec33f98715a41984a0691c992b909a3b607dc736acfc097f3f4e03a8",
+          "bytes": 86,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/Makefile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/Makefile",
+          "sha256": "bd5b6c42578f04072eafab8fd86d8204a65ec49f61a6f0ff1a257cd095abf158",
+          "bytes": 386,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/checkpoints.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/checkpoints.md",
+          "sha256": "e25aaa3a3c39ed2041c77636eb9ffbc5720e9b9f7168a13f245161c52a454e31",
+          "bytes": 419,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/dependencies.yml",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/dependencies.yml",
+          "sha256": "508a1e726cb62011a11096d4772546116aef14d260df43ca9a834fcec52368a2",
+          "bytes": 12,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/evaluator.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/evaluator.py",
+          "sha256": "ee7cf7c01e5064a5b4e7810c74a8a760220f2bf30049bdcaba3f3bac45cf5137",
+          "bytes": 2581,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/task.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/task.md",
+          "sha256": "bcfd6d66d62abeac8cf166735d09c6d71e0797507f2be0980d319f72345dda2f",
+          "bytes": 740,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "osworld",
+      "source_url": "https://github.com/xlang-ai/OSWorld",
+      "revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "selected_upstream_ids": [
+        "04578141-1d42-4146-b9cf-6fab4ce5fd74",
+        "05dd4c1d-c489-4c85-8389-a7836c4f0567"
+      ],
+      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "files": [
+        {
+          "path": "xlang-ai__OSWorld/selected/evaluation_examples/examples/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74.json",
+          "url": "https://raw.githubusercontent.com/xlang-ai/OSWorld/04718eab9327856efe8192cc58161acc7a7627e2/evaluation_examples/examples/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74.json",
+          "sha256": "36f63b205a16e2889c287738c6c0e5dfefcf1ddf00e17e750c5bc903d86c1b71",
+          "bytes": 3024,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "xlang-ai__OSWorld/selected/evaluation_examples/examples/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567.json",
+          "url": "https://raw.githubusercontent.com/xlang-ai/OSWorld/04718eab9327856efe8192cc58161acc7a7627e2/evaluation_examples/examples/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567.json",
+          "sha256": "ac8fe4b98fb5d3497939f5f5cd5a0897dd5ab0c401551d1fa249d13c6e3094fd",
+          "bytes": 2546,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "agentic_vbench",
+      "source_url": "https://github.com/PhiloLabs/agentic-vbench",
+      "revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "selected_upstream_ids": [
+        "exp-codec-restore-task01",
+        "agentic-vbench-assembly-task1"
+      ],
+      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "files": [
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/environment/Dockerfile",
+          "sha256": "8b936a8b07ee5409425084570320a0042dcfbba95d221fec4a290849e7e437d7",
+          "bytes": 894,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/instruction.md",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/instruction.md",
+          "sha256": "f355d25db0a87069ecac430fc5ae419d334dd14cfe6014908898457a9947e799",
+          "bytes": 16272,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/solution/solve.sh",
+          "sha256": "5cc925d6454e62989151f18fc80caeace7105404e0ac6b6cab9eb5a8c69b699b",
+          "bytes": 2147,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/judge.py",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/judge.py",
+          "sha256": "61a3ec3270a5ecf9ea394c6f7216d08a9af1d9ef794bf6ac297752f30fee168e",
+          "bytes": 10284,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/test.sh",
+          "sha256": "77090cecd2e77160a80ee0cfbed6d65a948d4170aaa8fb56141b621eedb685a1",
+          "bytes": 684,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/workdir/setup.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/workdir/setup.sh",
+          "sha256": "a3ccba68e567fdbf0692a7bdd860a81b158f099ce5405efdd2f754f3b75d77b9",
+          "bytes": 404,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/task.toml",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/task.toml",
+          "sha256": "6202ea523a43bbc4028445b4e85a0f68e0b39ab3fc42641982a4981e408e1f97",
+          "bytes": 507,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/environment/Dockerfile",
+          "sha256": "e3eb0a77b92534d5bda881cb15b37f15be8c7dd007faf0a22cb054ffb6c779c4",
+          "bytes": 1014,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/instruction.md",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/instruction.md",
+          "sha256": "e0d003085f36df7debe69467fb557e5e634437c00665fd03182165cfbab5f54c",
+          "bytes": 640,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/solution/solve.sh",
+          "sha256": "0fb4193148a19e4b8de5afdba2424f019b373b1c516e6fb2e3d70578062c5146",
+          "bytes": 772,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/judge.py",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/judge.py",
+          "sha256": "54e638bd0f283c7499d8364942c7d096da83c7d7aee3087ecacc67455088b29c",
+          "bytes": 10525,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/test.sh",
+          "sha256": "5f2efb43fa8fe585db5748247d8db37ecd2eeb09680cf9e60cfaad42d2fa3416",
+          "bytes": 1090,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/workdir/setup.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/workdir/setup.sh",
+          "sha256": "34d48ba3de6536f571093cb70c6ec7b7bfe5521bdab09c24293fcf6f6f87562f",
+          "bytes": 402,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/task.toml",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/task.toml",
+          "sha256": "7820afc5f626f519319d248d1871a9303efd9eb28c93e508078d45b777916994",
+          "bytes": 887,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "mlagentbench",
+      "source_url": "https://github.com/snap-stanford/MLAgentBench",
+      "revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+      "selected_upstream_ids": [
+        "vectorization"
+      ],
+      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "files": [
+        {
+          "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/env/train.py",
+          "url": "https://raw.githubusercontent.com/snap-stanford/MLAgentBench/5d71205cc20a8e95d43aa7cb7120e89ca3323e31/MLAgentBench/benchmarks/vectorization/env/train.py",
+          "sha256": "fe9442577dc78d1e53657f9ddf0904272d70de2b8e8759a531a484c68e2cbcf5",
+          "bytes": 8691,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/scripts/eval.py",
+          "url": "https://raw.githubusercontent.com/snap-stanford/MLAgentBench/5d71205cc20a8e95d43aa7cb7120e89ca3323e31/MLAgentBench/benchmarks/vectorization/scripts/eval.py",
+          "sha256": "991953c1c4e770a9335f1d8cff3a7edead961cbee81842133a0ef2b007b41d55",
+          "bytes": 364,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/scripts/research_problem.txt",
+          "url": "https://raw.githubusercontent.com/snap-stanford/MLAgentBench/5d71205cc20a8e95d43aa7cb7120e89ca3323e31/MLAgentBench/benchmarks/vectorization/scripts/research_problem.txt",
+          "sha256": "49ccb7b07a615230acb7d29826d2ff6a1b343192741b558f2443acb4eb1e61ab",
+          "bytes": 360,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "swe_verified",
+      "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified",
+      "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "selected_upstream_ids": [
+        "pylint-dev__pylint-6903",
+        "scikit-learn__scikit-learn-13496"
+      ],
+      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "files": [
+        {
+          "path": "swe_verified/data/test-00000-of-00001.parquet",
+          "url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified/resolve/78f471bf655a3137b2e8a75af1501690ec009ec3/data/test-00000-of-00001.parquet",
+          "sha256": "030cfd7f2a704c4c0226e7f104c725a3b41230b1d3517f9c915ad7ea5be3fa25",
+          "bytes": 6304616,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "longmemeval_v2",
+      "source_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2",
+      "revision": "f152293e235517d504809563c833d7190b8c713b",
+      "selected_upstream_ids": [
+        "4ed01379"
+      ],
+      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "files": [
+        {
+          "path": "longmemeval_v2/questions.jsonl",
+          "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/resolve/f152293e235517d504809563c833d7190b8c713b/questions.jsonl",
+          "sha256": "0a3ae5ebea938c24d7800e1e0b0828e08ae1646f939a53853b2b8cdc08e292b7",
+          "bytes": 286186,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "longmemeval_v2/haystacks/lme_v2_small.json",
+          "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/resolve/f152293e235517d504809563c833d7190b8c713b/haystacks/lme_v2_small.json",
+          "sha256": "9b5301defb23a088a5f06e45ff8d5f35e569d78305a66d492046a9fff9b46593",
+          "bytes": 822632,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "dsbench",
+      "source_url": "https://github.com/LiqiangJing/DSBench",
+      "revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+      "selected_upstream_ids": [
+        "00000018:question24",
+        "00000013:question19"
+      ],
+      "selection_groups": [
+        {
+          "group_id": "00000018",
+          "group_name": "2017-finals-castles-in-the-air",
+          "question_id": "question24",
+          "source_url": "https://www.eloquens.com/tool/PGqTr5/finance/modeloff-sample-past-questions/2017-finals-castles-in-the-air"
+        },
+        {
+          "group_id": "00000013",
+          "group_name": "2017-round-2-late-again",
+          "question_id": "question19",
+          "source_url": "https://www.eloquens.com/tool/8QEc23/finance/modeloff-sample-past-questions/2017-round-2-late-again"
+        }
+      ],
+      "status": "source_contract_locked_workbooks_and_adapter_pending",
+      "files": [
+        {
+          "path": "LiqiangJing__DSBench/selected/data_analysis/data.json",
+          "url": "https://raw.githubusercontent.com/LiqiangJing/DSBench/ba786096137a5108af11c016ad3f09cdb97beefd/data_analysis/data.json",
+          "sha256": "ff822b69d46e08b384fa9b93ff39762c33b9887d315a5653bb536aeaba7572ea",
+          "bytes": 19407,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "spreadsheetbench",
+      "source_url": "https://huggingface.co/datasets/KAKA22/SpreadsheetBench",
+      "revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+      "selected_upstream_ids": [
+        "verified400:38703"
+      ],
+      "status": "adapted_component_contract_materialized_grader_accepted_not_model_evaluated",
+      "files": [
+        {
+          "path": "spreadsheet_verified_400.tar.gz",
+          "url": "https://huggingface.co/datasets/KAKA22/SpreadsheetBench/resolve/ab0b742b0fc95b946f212d80ac7771b5531272e4/spreadsheetbench_verified_400.tar.gz",
+          "sha256": "10ef893dd29cb13ab97143ea787e68cdc9574a13873ab9a54e50b31dc03fc949",
+          "bytes": 14958255,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "gaia",
+      "source_url": "https://huggingface.co/datasets/gaia-benchmark/GAIA",
+      "revision": null,
+      "selected_upstream_ids": [],
+      "status": "gated_access_not_accepted",
+      "files": []
+    }
+  ]
+}

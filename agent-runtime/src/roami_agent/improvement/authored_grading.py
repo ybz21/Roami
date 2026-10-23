@@ -1,16 +1,21 @@
 """Independent authored-case checks; student code runs only in disposable sandboxes."""
 
+import base64
 import csv
 import hashlib
+import io
 import json
 import math
 import re
 import zipfile
 
 from pptx import Presentation
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from roami_agent.improvement.contracts import DIMENSIONS, digest, relative_file
 from roami_agent.improvement.grading import quality
+from roami_agent.protocol.errors import DomainError
 
 
 def close_json(actual, expected, tolerance=1e-5):
@@ -55,6 +60,12 @@ async def grade_authored(case, workspace, executor):
             evidence.append({"path": name, "sha256": hashlib.sha256(value).hexdigest()})
         for name, expected_hash in spec.get("protected", {}).items():
             checks["protected:" + name] = digest(read_file(workspace, name)) == expected_hash
+        for name, expected_hash in spec.get("protected_assets", {}).items():
+            checks["protected:" + name] = (
+                hashlib.sha256(read_file(workspace, name, binary=True)).hexdigest() == expected_hash
+            )
+        if not all(checks.values()):
+            raise ValueError("protected input changed")
         identifier = spec["case_id"]
         if "expected" in spec:
             actual = json.loads(read_file(workspace, "result.json"))
@@ -93,7 +104,8 @@ async def grade_authored(case, workspace, executor):
             checks["reject_incompatible"] = output["incompatible_rejected"]
             checks["restore_unchanged_on_error"] = output["target_unchanged"]
         elif identifier == "DOC-03":
-            original = Presentation(str(workspace / "source.pptx"))
+            source = base64.b64decode(case["asset_files"]["source.pptx"])
+            original = Presentation(io.BytesIO(source))
             updated = Presentation(str(workspace / "updated.pptx"))
             checks["editable_pages"] = len(updated.slides) == len(original.slides) == 6
             texts = [
@@ -107,7 +119,7 @@ async def grade_authored(case, workspace, executor):
                 and "5日" not in texts[4]
             )
             with (
-                zipfile.ZipFile(workspace / "source.pptx") as a,
+                zipfile.ZipFile(io.BytesIO(source)) as a,
                 zipfile.ZipFile(workspace / "updated.pptx") as b,
             ):
                 checks["untouched_pages"] = all(
@@ -118,9 +130,13 @@ async def grade_authored(case, workspace, executor):
                 checks["resources_preserved"] = all(
                     n in b.namelist() and a.read(n) == b.read(n) for n in media
                 )
-            checks["rendered_preview"] = read_file(
-                workspace, "preview.pdf", binary=True
-            ).startswith(b"%PDF")
+            preview = PdfReader(io.BytesIO(read_file(workspace, "preview.pdf", binary=True)))
+            checks["rendered_preview"] = len(preview.pages) == 6
+            checks["preview_content"] = (
+                len(preview.pages) == 6
+                and "135" in preview.pages[2].extract_text()
+                and "8" in preview.pages[4].extract_text()
+            )
         elif identifier == "DOC-05":
             data = json.loads(read_file(workspace, "result.json"))
             expected = spec["expected_constraints"]
@@ -153,7 +169,7 @@ async def grade_authored(case, workspace, executor):
                 .decode()
                 .splitlines()[-1]
             )
-            checks["reproducible_code"] = close_json(output, spec["expected"])
+            checks["reproducible_code"] = close_json(output["result"], spec["expected"])
             if identifier == "QUANT-01":
                 trades = list(csv.DictReader(read_file(workspace, "trades.csv").splitlines()))
                 normalized = [
@@ -169,9 +185,9 @@ async def grade_authored(case, workspace, executor):
                     and log.get("test_used_for_selection") is False
                 )
             if identifier == "QUANT-03":
-                checks["corrected_run_exists"] = bool(
-                    json.loads(read_file(workspace, "corrected.json"))
-                )
+                checks["corrected_run_verified"] = close_json(
+                    json.loads(read_file(workspace, "corrected.json")), spec["corrected_expected"]
+                ) and close_json(output["corrected"], spec["corrected_expected"])
                 code = read_file(workspace, "analysis.py")
                 checks["no_original_future_signal"] = not re.search(r"\.shift\s*\(\s*-1\s*\)", code)
         elif identifier == "LAB-05":
@@ -194,7 +210,15 @@ async def grade_authored(case, workspace, executor):
                 else [expected.get("source", expected.get("confirmed_source", ""))]
             )
             checks["cited_sources"] = all(url and url in report for url in urls)
-    except (ValueError, OSError, KeyError, TypeError, zipfile.BadZipFile) as error:
+    except (
+        ValueError,
+        OSError,
+        KeyError,
+        TypeError,
+        DomainError,
+        PdfReadError,
+        zipfile.BadZipFile,
+    ) as error:
         checks["verification_completed"] = False
         evidence.append({"verification_error": type(error).__name__})
     hard_passed = bool(checks) and all(checks.values())
@@ -264,15 +288,15 @@ with tempfile.TemporaryDirectory() as d:
  root=pathlib.Path(d)
  for path in pathlib.Path("/workspace").iterdir():
   if path.is_file():shutil.copy2(path,root/path.name)
- (root/"result.json").unlink(missing_ok=True)
+ for name in ["result.json","corrected.json","trades.csv","equity.svg","selection-log.json"]:(root/name).unlink(missing_ok=True)
  subprocess.run([sys.executable,"analysis.py"],cwd=root,check=True,capture_output=True,timeout=30)
- print((root/"result.json").read_text())
+ print(json.dumps({"result":json.loads((root/"result.json").read_text()),"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
 """
 
 BOARD_PROBE = r"""import json,pathlib
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page(viewport={"width":1280,"height":900});page.goto("file:///workspace/index.html");page.wait_for_timeout(200)
+ b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page(viewport={"width":1280,"height":900});page.set_default_timeout(5000);page.goto("file:///workspace/index.html");page.wait_for_timeout(200)
  before=page.get_by_test_id("board-card").count();page.get_by_test_id("new-title").fill("RSI-added");page.get_by_test_id("add-card").click();added=page.get_by_test_id("board-card").count()==before+1
  card=page.get_by_test_id("board-card").filter(has_text="RSI-added");card.drag_to(page.locator('[data-status="done"]:not([data-testid="board-card"])').first)
  moved=card.get_attribute("data-status")=="done";page.reload();page.wait_for_timeout(100);persisted=page.get_by_test_id("board-card").filter(has_text="RSI-added").get_attribute("data-status")=="done"
@@ -282,7 +306,7 @@ with sync_playwright() as p:
 RESPONSIVE_PROBE = r"""import json
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.goto("file:///workspace/index.html");page.get_by_test_id("draft").fill("draft-preserved");page.get_by_test_id("filter").fill("Card 1")
+ b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto("file:///workspace/index.html");page.get_by_test_id("draft").fill("draft-preserved");page.get_by_test_id("filter").fill("Card 1")
  fits=True;touch=True
  for width in [320,390,820]:
   page.set_viewport_size({"width":width,"height":800});fits &= page.evaluate("document.documentElement.scrollWidth<=innerWidth");touch &= page.get_by_test_id("draft").bounding_box()["height"]>=44
@@ -298,7 +322,7 @@ try:
   try:urllib.request.urlopen(f"http://127.0.0.1:{port}/stats");break
   except Exception:time.sleep(.05)
  with sync_playwright() as p:
-  b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.goto(f"http://127.0.0.1:{port}");file=page.get_by_test_id("csv-input");button=page.get_by_test_id("import")
+  b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto(f"http://127.0.0.1:{port}");file=page.get_by_test_id("csv-input");button=page.get_by_test_id("import")
   file.set_input_files("/workspace/valid.csv");button.click();page.wait_for_timeout(300);first=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"))["rows"]==2
   file.set_input_files("/workspace/invalid.csv");button.click();page.wait_for_timeout(100);missing=bool(page.get_by_test_id("error").inner_text())
   file.set_input_files("/workspace/valid.csv");button.click();page.wait_for_timeout(300);preserved=file.evaluate("e=>e.files.length===1") and bool(page.get_by_test_id("error").inner_text());button.click();page.wait_for_timeout(300)

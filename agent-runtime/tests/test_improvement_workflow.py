@@ -14,6 +14,7 @@ from roami_agent.improvement.candidate_checks import checked_evidence, verify_ca
 from roami_agent.improvement.contracts import digest, freeze_suite
 from roami_agent.improvement.control import ImprovementControl
 from roami_agent.improvement.cycle import run_cycle
+from roami_agent.improvement.daily_suite import AUTHORED_IDS, MECHANISM_IDS, PUBLIC_QUOTAS
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.ledger import Ledger
 from roami_agent.improvement.release_observation import activate_code, active_code, observe_code
@@ -60,7 +61,7 @@ class Reviewer:
         else:
             packet = json.loads(messages[1]["content"])
             findings = []
-            if self.finding and packet["case_id"] == "case-00" and packet["arm"] == "baseline":
+            if self.finding and packet["case_id"] == "CODE-01" and packet["arm"] == "baseline":
                 findings = [
                     {
                         "mechanism": "context-retention",
@@ -108,7 +109,7 @@ class FixtureExecutor:
                 "result_json": '{"value":1}',
             }
         ]
-        if case["id"] == "case-00":
+        if case["id"] == "CODE-01":
             calls.append({**calls[0], "id": "two"})
         private_json(root / "execution-log.json", {"tool_calls": calls, "traces": []})
         return {
@@ -142,26 +143,47 @@ class FixtureCodeExecutor(FixtureExecutor):
 
 
 def make_suite(count=60, *, private=False, protected=False):
-    return freeze_suite(
-        "private" if private else "daily",
-        [
-            {
-                "id": ("private-" if private else "case-") + f"{i:02d}",
-                "category": "CODE",
-                "layer": "authored_real",
-                "split": ("holdout" if i < 30 else "validation")
-                if private
-                else ("public_test" if protected else "development"),
-                "cluster": ("private-" if private else "dev-") + str(i),
-                "prompt": "Fixture task, never a capability score",
-                "counts_as_delivery": True,
-                "files": {},
-                "limits": {"seconds": 10, "tokens": 10, "requests": 1},
-                "judge": {"kind": "numeric", "expected": 1},
-            }
-            for i in range(count)
-        ],
-    )
+    cases = [
+        {
+            "id": ("private-" if private else "case-") + f"{i:02d}",
+            "category": "CODE",
+            "layer": "authored_real",
+            "split": ("holdout" if i < 30 else "validation")
+            if private
+            else ("public_test" if protected else "development"),
+            "cluster": ("private-" if private else "dev-") + str(i),
+            "prompt": ("Private fixture " if private else "Daily fixture ") + str(i),
+            "counts_as_delivery": True,
+            "files": {},
+            "limits": {"seconds": 10, "tokens": 10, "requests": 1},
+            "judge": {"kind": "numeric", "expected": 1},
+        }
+        for i in range(count)
+    ]
+    if not private:
+        own = sorted(AUTHORED_IDS) + sorted(MECHANISM_IDS)
+        public = [(name, i) for name, quota in PUBLIC_QUOTAS.items() for i in range(quota)]
+        for i, case in enumerate(cases):
+            if i < 40:
+                case["id"] = own[i]
+                if i >= 20:
+                    case.update(
+                        layer="mechanism", counts_as_delivery=False, judge={"kind": "mechanism"}
+                    )
+            else:
+                name, index = public[i - 40]
+                case.update(
+                    layer="public_component",
+                    origin={
+                        "benchmark": name,
+                        "task_id": str(index),
+                        "revision": "a" * 40,
+                        "input_sha256": digest([name, index]),
+                        "source_split": "dev",
+                        "adapter_revision": "fixture-v1",
+                    },
+                )
+    return freeze_suite("private" if private else "daily", cases)
 
 
 async def setup(tmp_path):
@@ -413,7 +435,7 @@ async def test_worker_failure_keeps_issue_and_bounds_repair_attempts(tmp_path):
         "hypothesis": "fixture",
         "suggestion": "fix",
         "cycle_id": review["subject"],
-        "case_id": "case-00",
+        "case_id": "CODE-01",
     }
     w.record_findings(review, [f])
     w.complete(review, {"done": True})
@@ -545,7 +567,7 @@ async def test_observation_requires_semantic_review_and_rolls_back_regression(tm
     class Regression(FixtureCodeExecutor):
         async def run_arm(self, arm, case, policy, root):
             result = await super().run_arm(arm, case, policy, root)
-            if arm == "candidate" and case["id"] == "case-00":
+            if arm == "candidate" and case["id"] == "CODE-01":
                 result["grade"] = {"quality": 0, "passed": False, "pending": False}
                 result["verified_delivery"] = False
             return result
