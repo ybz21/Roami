@@ -5,6 +5,7 @@ WORKDIR /opt/roami-agent
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 RUN uv pip install --python .venv/bin/python playwright numpy pandas matplotlib pytest pytest-asyncio
+RUN uv pip install --python .venv/bin/python "openpyxl>=3.1,<4"
 COPY src ./src
 COPY migrations ./migrations
 RUN uv sync --frozen --no-dev --inexact

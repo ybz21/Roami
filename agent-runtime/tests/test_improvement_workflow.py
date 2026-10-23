@@ -186,6 +186,18 @@ def make_suite(count=60, *, private=False, protected=False):
     return freeze_suite("private" if private else "daily", cases)
 
 
+def seed_review_for_stage_fixture(workflow, action):
+    """Lease/source-boundary tests use fixture reviews, never model evidence."""
+    cycle = workflow.ledger.get(action["owner"], action["payload"]["cycle_id"])
+    for trial in cycle["trials"]:
+        workflow.save_review(
+            action["owner"],
+            cycle["id"],
+            trial["arm"] + ":" + trial["case_id"],
+            {"reviewed": True, "fixture_only": True},
+        )
+
+
 async def setup(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir(parents=True)
@@ -257,12 +269,14 @@ async def test_full_research_handoff_isolated_patch_independent_gate_and_two_day
     w.discover()
     w.discover()
     action = w.claim()
+    assert not w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
     assert action["kind"] == "review"
     provider = Reviewer(finding=True, expand=True)
     summary = await observe_cycle(w, action, Settings(), cfg, provider_factory=lambda _: provider)
     assert summary == {"cycle_id": cycle["cycle_id"], "semantic_reviewed": 120, "findings": 1}
     assert provider.calls == 121 and len(w.review_saved("owner", cycle["cycle_id"])) == 120
     w.complete(action, summary)
+    assert w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
     assert len(w.snapshot("owner")["improvements"]) == 1
     repair = w.claim()
     assert repair["kind"] == "repair"
@@ -314,6 +328,28 @@ async def test_full_research_handoff_isolated_patch_independent_gate_and_two_day
     assert not (await git(repo, "status", "--porcelain")).strip()
 
 
+@pytest.mark.parametrize("unresolved", ["score", "usage"])
+async def test_daily_completion_rejects_claimed_reviews_and_pending_scores(tmp_path, unresolved):
+    w, _, _, _, cycle = await setup(tmp_path)
+    w.discover()
+    action = w.claim()
+    with pytest.raises(DomainError, match="REVIEW_INCOMPLETE"):
+        w.complete(action, {"semantic_reviewed": 120})
+    seed_review_for_stage_fixture(w, action)
+    with w.ledger.connection() as db:
+        field, value = (
+            ("$.grade.pending", "true") if unresolved == "score" else ("$.metrics.tokens", "null")
+        )
+        db.execute(
+            "UPDATE rsi_trials SET record_json=json_set(record_json,?,json(?)) WHERE cycle_id=? AND arm='baseline' AND case_id='CODE-01'",
+            (field, value, cycle["cycle_id"]),
+        )
+    w.complete(action, {"semantic_reviewed": 120})
+    report = w.ledger.get("owner", cycle["cycle_id"])["report"]
+    assert report["semantic_review"]["complete"]
+    assert not report["evaluation_complete"] and not report["daily_complete"]
+
+
 async def test_unknown_paid_operation_is_never_replayed_on_resume(tmp_path):
     w, cfg, _, _, _cycle = await setup(tmp_path)
     w.discover()
@@ -361,7 +397,8 @@ async def test_lease_fencing_and_duplicate_dispatch_survive_restarts(tmp_path):
     assert first["id"] == second["id"] and first["lease"] != second["lease"]
     with pytest.raises(DomainError, match="LEASE_LOST"):
         w.complete(first, {"fake": True})
-    restarted.complete(second, {"reviewed": 0})
+    seed_review_for_stage_fixture(restarted, second)
+    restarted.complete(second, {"reviewed": 120})
     assert restarted.claim() is None
 
 
@@ -438,6 +475,7 @@ async def test_worker_failure_keeps_issue_and_bounds_repair_attempts(tmp_path):
         "case_id": "CODE-01",
     }
     w.record_findings(review, [f])
+    seed_review_for_stage_fixture(w, review)
     w.complete(review, {"done": True})
     repair = w.claim()
     w.complete(
@@ -630,6 +668,7 @@ async def test_source_alias_cannot_expose_protected_evaluator_to_repair_model(tm
         "paths": ["agent-runtime/src/roami_agent/context/alias/oracle.py"],
     }
     w.record_findings(review, [finding])
+    seed_review_for_stage_fixture(w, review)
     w.complete(review, {"done": True})
     repair = w.claim()
     provider = Reviewer()

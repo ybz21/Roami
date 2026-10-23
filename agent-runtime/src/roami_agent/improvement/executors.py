@@ -85,12 +85,15 @@ class NativeFilesExecutor:
         fixture=False,
         settle_maintenance=False,
         allow_shell=False,
+        allow_tasks=False,
         workspace=None,
         provider_factory=None,
     ):
         self.settings, self.fixture = settings, fixture
         self.settle_maintenance = settle_maintenance
         self.allow_shell, self.workspace = allow_shell, workspace
+        self.allow_tasks = allow_tasks
+        require(not allow_tasks or allow_shell, "RSI_CONTAINER_REQUIRED")
         self.provider_factory = provider_factory
         require(
             not allow_shell
@@ -187,6 +190,19 @@ class NativeFilesExecutor:
         }
         if self.allow_shell:
             allowed.update({"bash", "shell"})
+        if self.allow_tasks:
+            from roami_agent.improvement.evaluation_tasks import bind_evaluation_tasks
+
+            allowed.update(
+                {
+                    "delegate",
+                    "task_status",
+                    "task_reply",
+                    "task_queue_reply",
+                    "conversation_history",
+                }
+            )
+            bind_evaluation_tasks(runtime, workspace)
         runtime.tools.disabled_tools.update(set(runtime.tools.registry) - allowed)
         output, trace, failure = "", None, None
         turn_grades, traces, tool_records = [], [], []
@@ -220,6 +236,10 @@ class NativeFilesExecutor:
                     if turn["state"] != "completed":
                         failure = "RSI_TURN_" + turn["state"].upper()
                         break
+                    if self.allow_tasks:
+                        from roami_agent.improvement.evaluation_tasks import settle_evaluation_tasks
+
+                        await settle_evaluation_tasks(database)
                     view = await runtime.conversations.messages(
                         "rsi-evaluation", conversation["id"]
                     )
@@ -245,6 +265,13 @@ class NativeFilesExecutor:
                     if m["role"] == "assistant" and m["content"].get("text")
                 ]
                 output = final[-1]["content"]["text"] if final else ""
+                if self.allow_tasks:
+                    turns = await database.call(
+                        lambda db: [
+                            r[0] for r in db.execute("SELECT id FROM turns ORDER BY created_ms,id")
+                        ]
+                    )
+                    traces = [await runtime.traces.get("rsi-evaluation", turn_id=t) for t in turns]
                 trace = await runtime.traces.get("rsi-evaluation", turn_id=receipt["turnId"])
                 grade = judge_case(case, output, workspace)
                 if turn_grades and not all(g["passed"] for g in turn_grades):
@@ -290,6 +317,14 @@ class NativeFilesExecutor:
                     )
                 ]
             )
+            task_records = await database.call(
+                lambda db: [
+                    dict(t)
+                    for t in db.execute(
+                        "SELECT id,state,revision FROM tasks ORDER BY created_ms,id"
+                    )
+                ]
+            )
             await database.close()
             private_json(root / "model-log.json", {"requests": journal, "source": "host_provider"})
             private_json(
@@ -299,6 +334,10 @@ class NativeFilesExecutor:
                     "tool_calls": tool_records,
                     "failure": failure,
                     "output": output,
+                    "tasks": task_records,
+                    "runtime_profile": "main_and_native_worker"
+                    if self.allow_tasks
+                    else "file_tools_only",
                 },
             )
         if failure:
@@ -331,6 +370,8 @@ class NativeFilesExecutor:
             metrics["tokens"] = None
             metrics["token_coverage"] = "partial_deferred_maintenance"
         blockers = ["protocol_fixture"] if self.fixture else []
+        if failure:
+            blockers.append(failure)
         if budget.unknown:
             blockers.append("unknown_provider_usage")
         if deferred_jobs:

@@ -8,7 +8,7 @@
 - `external`：约定好的本地程序或 SSH/容器包装程序，接入原生基准环境。仓库目前提供协议与超时清理，**尚未提供 Harbor、OSWorld、TheAgentCompany 等实际适配器**。隔离未被验证的外部结果阻止晋级。
 - `protocol_fixture` / `smoke`：确定性模型驱动真实运行时文件工具，再由独立判定器回读。只检查评测设施，不计 Agent 能力得分，不参与候选搜索或发布。
 
-正式混合套件缩减到 60 项：20 条公开任务、20 条自有真实任务、20 条机制回归。每天完整执行60项，稳定版/候选版各跑一次时为120个episode。新想法不替换正式题，只使用剩余实验预算。机制回归尽量不用模型；所有测试机共享日预算。80 条自建规格保留为候选库，其中40项已有夹具配方或运行时回归变体，已完成20项容器机制回归，以及20项判定器正反样例验收；复杂产物仍需独立校准评分。不能因存在JSON就计作已通过案例。当前公开导入器支持 FinQA、ConvFinQA、SpreadsheetBench Verified单工作簿与两项Terminal-Bench适配；其余任务须逐一接入环境、输入与判定器。GAIA 的访问条款仍由数据使用者处理。
+正式混合套件缩减到 60 项：20 条公开任务、20 条自有真实任务、20 条机制回归。每天完整执行60项，稳定版/候选版各跑一次时为120个episode。新想法不替换正式题，只使用剩余实验预算。机制回归尽量不用模型；所有测试机共享日预算。80 条自建规格保留为候选库，其中40项已有夹具配方或运行时回归变体，已完成20项容器机制回归，以及20项判定器正反样例验收；复杂产物仍需独立校准评分。不能因存在JSON就计作已通过案例。当前公开导入器支持FinQA、ConvFinQA、SpreadsheetBench Verified、两项Terminal-Bench、两项DSBench及MLAgentBench向量化适配；其余任务须逐一接入环境、输入与判定器。GAIA 的访问条款仍由数据使用者处理。
 
 ## 安装与无模型冒烟
 
@@ -152,7 +152,7 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 正式准入使用 `daily_suite.py` 的固定配额：公开20、自有真实20、机制20，核对指定自有ID、唯一上游任务和不可变revision。调度、周期完成和源码晋级使用同一检查；只有60条记录不能通过。新增 `assemble-daily --id NAME --suite PACK ... --output FILE` 合并各包，不满足合同则拒绝写出。
 
-公开19个task ID已选择，其中7项是可执行合同；另13项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
+公开19个task ID已选择，其中10项是可执行合同；另10项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
 
 ```bash
 python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials
@@ -168,3 +168,24 @@ uv run roami-agent-evaluate import-spreadsheet --metadata /path/to/record.json -
 自有包已升级为`authored-40-v3`：输入与PPT原件冻结；PPT明示135/8日目标、核验真实PDF页和文字；回测纠错核对包含退市资产的因果重跑结果。已知ID、cluster及完全相同输入禁止跨日常/私有集合；语义改写是否独立仍需来源审查，不能只改seed或标签凑数。以上设施验收未使用真实模型，不代表收益或隐藏能力成绩。
 
 Terminal-Bench导入：`import-terminal --source-dir /path/to/task --task-id cancel-async-tasks --revision COMMIT --output /path/to/private/suite.json`，另支持`db-wal-recovery`。输入只含原题与初始文件；上游verifier保留在宿主机，退出Agent后在独立容器临时目录执行。原断言保留，路径/app映射到临时目录，环境为Python3.12离线镜像；不声称官方环境可比。异步任务6项和数据库恢复7项原断言已完成正确/错误产物验收，无真实模型成绩。
+
+## Main / Worker 与最终日终状态
+
+容器执行现为 Main → Native Worker → 完成回报，保留真实调度、模型角色、工具记录和任务状态。任务工作区仅绑定当前容器的 `/workspace`，不创建或连接 Go/tmux 会话。内部写任务仍可处于 `waiting_user`；它不作为得分依据，宿主独立判定器在模型与容器退出后核验产物。进程报告失败、未知写入或超时不会被一个正确文件覆盖，评分本身也必须在总交付时限内完成。
+
+`full_suite_complete` 表示整套执行与规则日志覆盖。`evaluation_complete` 另要求评分已定且用量完整；`daily_complete` 再要求逐条语义回顾全部落盘。`report.json` 是评分阶段快照；语义回顾后的最终状态通过 `report` CLI / API 读取账本，不能把规则已扫描当作一天已完整复盘。
+
+私有包 `roami-private-contracts-54-v1` 含24个验证、30个隐藏代码契约家族，已完成54组正确产物与54组错误产物的容器判定器验收。相近分组取版本/区间模板已剔除，不按seed凑样本。具体题目、输入与答案只保存在本机私有目录，不进入Git或Agent容器；公开的 `private-validation-lock.json` 仅列范围、hash及验收数。此集合验证的是有限代码功能，不等于未见办公、GUI、视频工作流的完整泛化证明；晋级仍须完整60项质量保护。
+
+本地操作入口（CLI不自动启用日程）：
+
+```bash
+cd agent-runtime
+uv run roami-agent-evaluate register-suite --ledger /private/evaluation/ledger.sqlite3 --owner local --source /private/corpus/suite.json
+uv run roami-agent-evaluate evaluation-status --ledger /private/evaluation/ledger.sqlite3 --owner local
+uv run roami-agent-evaluate evaluation-config --ledger /private/evaluation/ledger.sqlite3 --owner local --config /private/evaluation-settings.json
+```
+
+`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备50项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。修复鉴权走正常Roami模型设置，不把密钥写进任务或仓库。
+
+新增公开导入：`import-data-analysis --metadata DATA.json --archive DATA.zip --group-id ID --question-id questionN --revision DATA_COMMIT --upstream-revision CODE_COMMIT --output FILE`；`import-vectorization --source-dir TASK --revision COMMIT --output FILE`。DSBench保留原工作簿、背景和问题，使用独立精确JSON答案；MLAgentBench对现代NumPy做显式标量兼容，限定修改forward函数、核验数值，并以四组交替的宿主计时中位数检查90%时限。均为注明改造的内部合同，不声称官方分数或Roami收益；示范实现更快不等于Roami自身生成更快。

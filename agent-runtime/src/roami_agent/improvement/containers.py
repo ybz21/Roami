@@ -66,7 +66,9 @@ class ContainerExecutor:
         regression_root=None,
     ):
         self.settings, self.image = settings, image
-        self.model_hash = digest([NativeFilesExecutor(settings).model_hash, "container-uds-v1"])
+        self.model_hash = digest(
+            [NativeFilesExecutor(settings).model_hash, "container-uds-v2-main-worker"]
+        )
         self.image_id = None
         self.provider_factory = provider_factory
         self.source_root = Path(source_root).resolve() if source_root is not None else None
@@ -180,6 +182,32 @@ class ContainerExecutor:
         finally:
             await self.remove(name, name)
 
+    async def verify(self, case, workspace, output, *, started):
+        remaining = case["limits"]["seconds"] - (time.monotonic() - started)
+        require(remaining > 0, "RSI_TIME_BUDGET")
+        async with asyncio.timeout(remaining):
+            kind = case["judge"]["kind"]
+            if kind == "authored":
+                from roami_agent.improvement.authored_grading import grade_authored
+
+                grade = await grade_authored(case, workspace, self)
+            elif kind == "terminal":
+                from roami_agent.improvement.terminal_tasks import grade_terminal
+
+                grade = await grade_terminal(case, workspace, self)
+            elif kind == "python_contract":
+                from roami_agent.improvement.code_contract import grade_code_contract
+
+                grade = await grade_code_contract(case, workspace, self)
+            elif kind == "vectorization":
+                from roami_agent.improvement.vectorization import grade_vectorization
+
+                grade = await grade_vectorization(case, workspace, self)
+            else:
+                grade = judge_case(case, output, workspace)
+        require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
+        return grade
+
     async def run(self, case, policy, root):
         if not self.image_id:
             await self.preflight()
@@ -192,7 +220,7 @@ class ContainerExecutor:
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))
         view["prompt"] += (
-            "\n本任务在无网络的独立工作区执行，可直接使用文件与bash工具。按要求生成真实产物；不要等待其他执行器。"
+            "\n本任务在无网络的独立容器中执行，工作目录为/workspace。需要委派时明确使用native Worker，target={kind:new_session,directory:/workspace}；不连接专业CLI、其他节点或现用会话。小型文件操作仍可直接完成。最终产物由容器外独立判定器在模型退出后验收，内部任务等待验收不代表最终得分。"
         )
         view["followups"] = case.get("followups", [])
         private_json(state / "request.json", {"case": view, "policy": policy})
@@ -261,23 +289,26 @@ class ContainerExecutor:
                         "start", "--attach", name, timeout=case["limits"]["seconds"] + 10
                     )
                     response = load_json(state / "response.json", maximum=4_000_000)
+                    require(
+                        isinstance(response.get("release_blockers"), list),
+                        "RSI_RUNTIME_RESPONSE_INVALID",
+                    )
                     if gateway.errors:
                         failure = gateway.errors[0]
+                    elif response["release_blockers"]:
+                        failure = "RSI_RUNTIME_REPORTED_FAILURE"
                 await self.remove(name, name)
                 created = False
-            if case["judge"]["kind"] == "authored":
-                from roami_agent.improvement.authored_grading import grade_authored
-
-                grade = await grade_authored(case, workspace, self)
-            elif case["judge"]["kind"] == "terminal":
-                from roami_agent.improvement.terminal_tasks import grade_terminal
-
-                grade = await grade_terminal(case, workspace, self)
-            else:
-                grade = judge_case(case, response.get("output", ""), workspace)
+            grade = await self.verify(case, workspace, response.get("output", ""), started=started)
             elapsed = (time.monotonic() - started) * 1000
         except (DomainError, OSError, TimeoutError, ValueError) as error:
-            failure = error.code if isinstance(error, DomainError) else "RSI_CONTAINER_FAILED"
+            failure = (
+                error.code
+                if isinstance(error, DomainError)
+                else (
+                    "RSI_TIME_BUDGET" if isinstance(error, TimeoutError) else "RSI_CONTAINER_FAILED"
+                )
+            )
             grade = {
                 "quality": 0,
                 "passed": False,
@@ -294,6 +325,17 @@ class ContainerExecutor:
                     await provider.close()
             private_json(root / "model-log.json", {"requests": journal, "source": "host_provider"})
         metrics = budget.metrics()
+        if failure:
+            grade.update(
+                artifact_assessment=dict(grade),
+                artifact_check_reason=grade.get("reason"),
+                reason=failure,
+                execution_error=failure,
+                quality=0,
+                passed=False,
+                hard_passed=False,
+                pending=False,
+            )
         metrics.update(
             elapsed_ms=elapsed if grade["passed"] and not failure else None,
             episode_ms=elapsed,
@@ -318,5 +360,6 @@ class ContainerExecutor:
                 "read_only_root": True,
                 "host_grader_after_exit": True,
                 "provider_keys_in_container": False,
+                "runtime_profile": "main_and_native_worker",
             },
         }

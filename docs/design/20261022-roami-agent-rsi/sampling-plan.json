@@ -77,7 +77,7 @@
         "00000013:question19"
       ],
       "dataset_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
-      "status": "source_contract_locked_workbooks_and_adapter_pending"
+      "status": "two_frozen_workbook_question_contracts_materialized_with_exact_json_grade_not_model_evaluated"
     },
     {
       "benchmark_id": "spreadsheetbench",
@@ -143,7 +143,7 @@
         "vectorization"
       ],
       "dataset_revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
-      "status": "source_contract_locked_native_environment_and_adapter_pending"
+      "status": "adapted_numpy_forward_contract_container_correctness_and_host_clock_accepted_not_live_model_evaluated"
     }
   ],
   "authored_case_ids": [
@@ -215,7 +215,24 @@
     "native_scores": "保留上游原生分数，不把不同量纲直接平均。",
     "roami_metrics": "附加任务完成状态、产物核验、同机耗时、全链路Token与过程指标。",
     "private_splits": "公开抽样不等于隐藏集；正式晋级仍需独立私有验证与隐藏证据，按需分批积累，不新增每日全量运行集，不降低统计门槛换取通过。",
-    "nonregression": "保护基线已通过的任务与必要机制；发布阻断与质量门槛继续适用。"
+    "nonregression": "保护基线已通过的任务与必要机制；发布阻断与质量门槛继续适用。",
+    "private_implementation": {
+      "schema_version": 1,
+      "suite_id": "roami-private-contracts-54-v1",
+      "suite_hash": "822288431e74df604d4a7937bbba9fae34672641144d965ed7d10e27678f249a",
+      "cases": 54,
+      "validation_rule_families": 24,
+      "holdout_rule_families": 30,
+      "scope": "54 different business-rule families; common function interface is the grader protocol. No seed variants count as extra clusters. This measures bounded code contracts alongside the full daily suite, not private end-to-end office or GUI generalization.",
+      "private_inputs_and_oracles_published": false,
+      "removed_shared_template_families": 7,
+      "acceptance": {
+        "reference_outputs_passed": 54,
+        "mutations_rejected": 54,
+        "kind": "container_grader_acceptance_not_live_model_generalization"
+      },
+      "scope_limit": "Does not replace unseen office, GUI or media workflows. Family partitions are an operational sampling rule, not proof of statistical independence."
+    }
   },
   "scheduling": {
     "materialization_gate": "20项公开task ID和revision绑定、40项自有夹具验收、预算和机器就绪后，才标为完整60项可执行套件。",
@@ -230,22 +247,25 @@
     "no_candidate": "没有新提案也全量执行，标记基线稳定性观察；相同策略的随机波动不能晋级。"
   },
   "next_steps": [
-    "完成其余13条公开合同的原生环境与执行适配；GAIA仍需合法访问或版本化替换",
-    "接入复杂产物的独立校准评分，不能把硬断言通过当作视觉质量",
-    "构建独立私有验证24与隐藏30个来源分组，禁止重用日常题",
-    "绑定实际测试机、模型和预算，运行每日完整60项并观测收益"
+    "接齐剩余10项公开任务的原生环境与适配（SWE、公司、桌面、视频、长记忆及GAIA访问）",
+    "为5项复杂产物接入独立校准评分，并扩充办公/GUI私有隐藏场景",
+    "修复现用模型鉴权，指定实际测试机和每日Token预算，再运行正式全60项",
+    "回顾全部指标与原始日志，在预算内积累真实同机对照收益证据"
   ],
   "implementation": {
-    "public_materialized": 7,
+    "public_materialized": 10,
     "authored_selected_materialized": 40,
     "protocol_smoke_cases": 2,
     "active_machine_bindings": 0,
-    "live_model_trials": 0,
+    "live_model_trials": 1,
     "sample_lock": "public-sample-lock.json",
     "runbook": "../../development/agent-rsi.md",
     "authored_acceptance": "20_container_mechanisms_and_20_known_answer_mutation_grader_fixtures_passed_visual_rubrics_pending",
     "public_source_ids_selected": 19,
-    "public_materials_lock": "public-materials-lock.json"
+    "public_materials_lock": "public-materials-lock.json",
+    "completed_live_agent_trials": 0,
+    "live_preflight_status": "HTTP_401_usage_unknown_stopped_no_automatic_replay",
+    "private_validation_lock": "private-validation-lock.json"
   },
   "autonomous_research": {
     "primary_inputs": [

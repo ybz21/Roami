@@ -32,6 +32,48 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-data-analysis":
+        from roami_agent.improvement.data_analysis import import_data_analysis
+
+        suite = import_data_analysis(
+            args.metadata,
+            args.archive,
+            group_id=args.group_id,
+            question_id=args.question_id,
+            revision=args.revision,
+            upstream_revision=args.upstream_revision,
+        )
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+        }
+    if args.command == "import-vectorization":
+        from roami_agent.improvement.vectorization import import_vectorization
+
+        suite = import_vectorization(args.source_dir, revision=args.revision)
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+        }
+    if args.command in {"register-suite", "evaluation-config", "evaluation-status"}:
+        from roami_agent.improvement.control import ImprovementControl
+
+        control = ImprovementControl(Ledger(args.ledger))
+        if args.command == "register-suite":
+            return control.register_suite(args.owner, args.source)
+        if args.command == "evaluation-status":
+            return {
+                "preferences": control.preferences(args.owner),
+                "catalog": control.catalog(args.owner),
+                "requests": control.requests(args.owner),
+            }
+        return control.save(args.owner, load_json(args.config, maximum=65536))
     if args.command == "import-terminal":
         from roami_agent.improvement.terminal_tasks import import_terminal
 
@@ -290,6 +332,23 @@ def main():
             p.add_argument("--config", required=True, type=Path)
         if name == "research-resume":
             p.add_argument("--action", required=True)
+    p = commands.add_parser("import-data-analysis")
+    for name in ("metadata", "archive", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    for name in ("group-id", "question-id", "revision", "upstream-revision"):
+        p.add_argument("--" + name, required=True)
+    p = commands.add_parser("import-vectorization")
+    p.add_argument("--source-dir", required=True, type=Path)
+    p.add_argument("--revision", required=True)
+    p.add_argument("--output", required=True, type=Path)
+    for name in ("register-suite", "evaluation-config", "evaluation-status"):
+        p = commands.add_parser(name)
+        p.add_argument("--ledger", required=True, type=Path)
+        p.add_argument("--owner", required=True)
+        if name == "register-suite":
+            p.add_argument("--source", required=True, type=Path)
+        elif name == "evaluation-config":
+            p.add_argument("--config", required=True, type=Path)
     args = parser.parse_args()
     try:
         result = asyncio.run(execute(args))

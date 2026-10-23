@@ -166,7 +166,25 @@ def catalog_readiness(case_bank, sampling_plan, suites):
             for p in sampling_plan["public_sampling"]
         ],
         "daily_coverage": daily_coverage(
-            {"cases": [c for suite in suites for c in suite["cases"]]}
+            {
+                "cases": [
+                    c
+                    for suite in suites
+                    for c in suite["cases"]
+                    if c["split"] in {"development", "public_test"}
+                ]
+            }
         ),
+        "private_cluster_counts": {
+            split: len(
+                {
+                    c.get("cluster", c["id"])
+                    for suite in suites
+                    for c in suite["cases"]
+                    if c["split"] == split
+                }
+            )
+            for split in ("validation", "holdout")
+        },
         "note": "Materialized means runnable contract, not environment ready or evaluated pass.",
     }

@@ -240,6 +240,10 @@ class ResearchWorkflow:
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             self._owned_action(db, action)
+            if action["kind"] == "review":
+                from roami_agent.improvement.semantic_completion import complete_cycle_review
+
+                complete_cycle_review(db, action["owner"], action["payload"]["cycle_id"])
             db.execute(
                 "UPDATE rsi_actions SET state='done',result_json=?,error_code=?,lease=NULL,expires_ms=NULL WHERE id=?",
                 (

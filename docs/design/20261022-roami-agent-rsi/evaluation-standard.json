@@ -1,5 +1,5 @@
 {
-  "standard_version": "rsi-v1.4-daily-coverage-20261023",
+  "standard_version": "rsi-v1.5-runtime-and-complete-review-20261023",
   "status": "specification_with_partial_runner_not_live_model_evaluated",
   "scope": {
     "real_categories": 12,
@@ -17,13 +17,19 @@
     },
     "private_validation": {
       "minimum_cases": 24,
-      "status": "not_created",
-      "location": "outside_agent_access"
+      "status": "materialized_bounded_code_contracts_grader_accepted_not_live_evaluated",
+      "location": "outside_agent_access",
+      "materialized_cases": 24,
+      "scope": "bounded_code_contracts_only_not_unseen_office_gui_media",
+      "aggregate_lock": "private-validation-lock.json"
     },
     "private_holdout": {
       "minimum_independent_cases": 30,
-      "status": "not_created",
-      "location": "outside_agent_access"
+      "status": "materialized_bounded_code_contracts_grader_accepted_not_live_evaluated",
+      "location": "outside_agent_access",
+      "materialized_cases": 30,
+      "scope": "bounded_code_contracts_only_not_unseen_office_gui_media",
+      "aggregate_lock": "private-validation-lock.json"
     },
     "authored_specification_bank": 80,
     "real_workloads_in_authored_bank": 60,
@@ -141,7 +147,7 @@
     "excellence": "每个case执行前冻结优秀项；没有适用优秀项的维度最高3档，拒绝事后奖励长答案、额外步骤或自我表扬。"
   },
   "aggregation": {
-    "quality": "先对每个真实类别的5个case取均值（失败为0），再对12类等权平均；同时逐类、逐机公开。机制集单独报告，不混入均值。",
+    "quality": "正式组合中，40项交付任务按冻结类别权重汇总并逐类/逐机公开，20项机制独立报告；当前50项未形成完整60项套件，不计算正式整体分。旧80项规格池的12类×5项不作为正式60项分母。",
     "completion": "case_pass与verified_delivery分开；正确拒绝、取消或预算停止可通过机制case，但不计入成功交付分母。",
     "failed_attempts": "所有失败和重试保留；预检发现环境缺失标unsupported/incomplete，不静默删题。",
     "reference_weights": "初版12类等权；有真实任务分布后另建标准版本，同时重跑基线。",
@@ -257,5 +263,6 @@
     "status": "partially_materialized_not_model_evaluated",
     "quality_metrics": "unchanged_from_v1.1"
   },
-  "daily_suite_contract": "roami-daily-60-v1"
+  "daily_suite_contract": "roami-daily-60-v1",
+  "daily_completion_contract": "Complete formal coverage, resolved grades and metered usage, rule log coverage and all semantic trial reviews; execution ending alone is not daily completion."
 }

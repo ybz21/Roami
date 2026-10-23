@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "7_public_contracts_imported_not_model_evaluated",
-  "materialized_public": 7,
+  "status": "10_public_contracts_imported_no_completed_live_agent_benchmark",
+  "materialized_public": 10,
   "target_public": 20,
   "sampled_on": "2026-10-23",
   "suites": [
@@ -226,6 +226,73 @@
       ],
       "official_leaderboard_comparable": false,
       "grader_acceptance": "actual_container_reference_solution_passed_and_broken_output_rejected"
+    },
+    {
+      "suite_id": "mlagentbench-vectorization-sample-v1",
+      "suite_hash": "a2103febb526576e001db2fb42716baf39bacec605727b252ffba6926d6db843",
+      "benchmark": "mlagentbench",
+      "source_revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+      "selected": [
+        {
+          "case_id": "mlagentbench:vectorization",
+          "benchmark": "mlagentbench",
+          "task_id": "vectorization",
+          "revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+          "source_split": "released_tasks",
+          "input_sha256": "eaf2d53dc47acd160fd7f2b33a88d5090216f584bf79bbb9af6ded98e6714313",
+          "upstream_source_digest": "6d100a69b37008c077fd0550c32870ce6d0573f7dfeaa4ec1141100ca2167e45",
+          "compatibility_patch": "explicit_size_one_scalar_conversion",
+          "adapter_revision": "numpy-vectorization-host-v1",
+          "adapted": true,
+          "adaptation": "Explicit scalar conversion for modern NumPy; frozen forward-only edit, numerical checks and four alternating host sandbox time pairs (median ratio <=0.9); not official environment or submitted-time comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "frozen_answer_or_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "dsbench-00000018-question24-v1",
+      "suite_hash": "e57760a02f0c4deb338b9ca33005a863c08af210adbed7f1050d7a6bf3021ab9",
+      "benchmark": "dsbench",
+      "source_revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+      "selected": [
+        {
+          "case_id": "dsbench:00000018:question24",
+          "benchmark": "dsbench",
+          "task_id": "00000018:question24",
+          "revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+          "upstream_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+          "source_split": "data_analysis",
+          "input_sha256": "c6b21cfba4aa6643658313a029e95c5f083a0ad8e3d6ab61fa92e3c4024787fe",
+          "adapter_revision": "dsbench-final-value-v1",
+          "adapted": true,
+          "adaptation": "Frozen original workbook, introduction and questions; exact selected JSON answer instead of the upstream LLM judge. Not official-score comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "frozen_answer_or_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "dsbench-00000013-question19-v1",
+      "suite_hash": "c02ca6a2943412aac355f0fae4f1ef52551dfc2913630fc48b3f05a46bfddc8e",
+      "benchmark": "dsbench",
+      "source_revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+      "selected": [
+        {
+          "case_id": "dsbench:00000013:question19",
+          "benchmark": "dsbench",
+          "task_id": "00000013:question19",
+          "revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+          "upstream_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+          "source_split": "data_analysis",
+          "input_sha256": "20b3ff07eeb3ebea9ac709aa50989eb6a3c788a0b89496cc312cce5dc6c7b173",
+          "adapter_revision": "dsbench-final-value-v1",
+          "adapted": true,
+          "adaptation": "Frozen original workbook, introduction and questions; exact selected JSON answer instead of the upstream LLM judge. Not official-score comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "frozen_answer_or_reference_passed_mutation_rejected_not_live_agent_ability"
     }
   ]
 }

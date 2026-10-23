@@ -5,7 +5,7 @@
   "source_tasks_selected_in_this_lock": 15,
   "total_selected_with_financial_samples": 19,
   "public_target": 20,
-  "runnable_public_contracts": 7,
+  "runnable_public_contracts": 10,
   "source_selection_is_not_environment_acceptance": true,
   "sources": [
     {
@@ -385,7 +385,7 @@
       "selected_upstream_ids": [
         "vectorization"
       ],
-      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "status": "adapted_numpy_forward_contract_container_correctness_and_host_clock_accepted_not_live_model_evaluated",
       "files": [
         {
           "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/env/train.py",
@@ -476,7 +476,7 @@
           "source_url": "https://www.eloquens.com/tool/8QEc23/finance/modeloff-sample-past-questions/2017-round-2-late-again"
         }
       ],
-      "status": "source_contract_locked_workbooks_and_adapter_pending",
+      "status": "two_frozen_workbook_question_contracts_materialized_with_exact_json_grade_not_model_evaluated",
       "files": [
         {
           "path": "LiqiangJing__DSBench/selected/data_analysis/data.json",
@@ -484,8 +484,23 @@
           "sha256": "ff822b69d46e08b384fa9b93ff39762c33b9887d315a5653bb536aeaba7572ea",
           "bytes": 19407,
           "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "dsbench-data.json",
+          "url": "https://huggingface.co/datasets/liqiang888/DSBench/resolve/1196d6553ec200e1262841efc89cda5954ffe89f/data_analysis/data.json",
+          "sha256": "ff822b69d46e08b384fa9b93ff39762c33b9887d315a5653bb536aeaba7572ea",
+          "bytes": 19407,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "dsbench-data.zip",
+          "url": "https://huggingface.co/datasets/liqiang888/DSBench/resolve/1196d6553ec200e1262841efc89cda5954ffe89f/data_analysis/data.zip",
+          "sha256": "3a53d89bf0307978522d684fc2b49c8697a754444c0c2dd2e4771d0d8fdfb4e0",
+          "bytes": 8027257,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
         }
-      ]
+      ],
+      "data_revision": "1196d6553ec200e1262841efc89cda5954ffe89f"
     },
     {
       "benchmark": "spreadsheetbench",

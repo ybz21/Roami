@@ -448,6 +448,7 @@ agent-runtime/src/roami_agent/tools/
   <h3>自动研发实施 · 2026-10-23</h3>
   <p>ResearchWorkflow/ResearchWorker持久派发；behavior_observer逐项读证据；source_revision在detached worktree应用补丁；candidate_checks用冻结镜像、只读基线测试与独立私有门槛验证；release_observation仅绑定RSI runner，并在两个后续完整日周期后关单或退化回滚重开。原生模型费用与每日评测共用账本，未知调用不重放。源代码权限通过本机CLI配置，Web仅展示进度及恢复阻塞。设施测试不代表真实模型成绩；正式机器、60项材料、私有验证和预算仍须接齐。</p>
   <p>套件验收修订：daily_suite.py统一检查20公开/20自有/20机制配额、指定ID及固定来源；私有集禁止已知ID、cluster与完全相同输入重叠。authored-v3保护冻结输入，PPT对照原件并核对PDF，回测纠错核对因果重跑和退市资产。20机制容器回归与20判定器正反样例通过；5项复杂产物仍待校准评分。公开19项ID已选择，7项可执行合同；其余13项正式合同、私有验证和机器预算未齐。材料hash和精简验收表保存在上述docs入口。</p>
+  <p>全链执行与日终修订：容器内启用Main→Native Worker→回报，工作区只绑定外层容器目录，不建立Go/tmux会话，内部waiting_user如实保留，最终由退出后的宿主评分器验收。评分耗时计入总交付时限；评分或用量未定、语义回顾缺项时daily_complete保持false。私有54项不同代码契约已按24/30划分并通过正反验收，不替代办公/GUI隐藏场景；公开合同增至10项，正式共50/60。一次真实预检返回HTTP401且用量未知，未自动重试或启用日程。最新状态和私有范围摘要见docs实施页。</p>
 </section>
 
 <section id="skill-cli-organization-review" lang="zh-CN">

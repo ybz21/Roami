@@ -89,8 +89,20 @@ def validate_case(case):
             "mechanism",
             "workbook",
             "terminal",
+            "python_contract",
+            "vectorization",
         }
     )
+    if judge["kind"] == "vectorization":
+        require(isinstance(judge.get("source"), str) and bool(judge["source"]))
+        require(number(judge.get("max_time_ratio"), 0.1, 0.99))
+    if judge["kind"] == "python_contract":
+        relative_file(Path("/workspace"), judge["module"])
+        require(isinstance(judge.get("probes"), list) and 1 <= len(judge["probes"]) <= 50)
+        require(
+            isinstance(judge.get("expected"), list)
+            and len(judge["probes"]) == len(judge["expected"])
+        )
     if judge["kind"] == "terminal":
         require(
             isinstance(judge.get("upstream_verifier"), str) and bool(judge["upstream_verifier"])

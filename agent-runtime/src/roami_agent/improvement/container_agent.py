@@ -51,6 +51,7 @@ async def main():
     executor = NativeFilesExecutor(
         settings,
         allow_shell=True,
+        allow_tasks=True,
         workspace=Path("/workspace"),
         settle_maintenance=True,
         provider_factory=via_gateway,
