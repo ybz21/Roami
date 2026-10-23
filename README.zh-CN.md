@@ -143,24 +143,26 @@ Roami 的重点不是「多一个终端工具」，而是让开发机变成一�
 
 ## 安装与启动
 
-`roami` 将前端与会话核心编入同一二进制；Web 控制台运行不需要 Go/Node/npm，浏览器自动化另需 Node 与 Chrome。
+完整安装包包含内嵌前端的 `roami`、独立 Python 和智能体生产依赖；目标机无需预装 Python、uv、Go 或 Node。浏览器自动化另需 Node 与 Chrome。
 配置与数据都在 `~/.roami/`（`config.yaml` 首次运行自动生成）。
 
 ### 方式 A — 装成常驻服务（推荐给 24 小时常驻运行的机器）
 
-一行下载二进制并注册为 **systemd** 常驻服务（重启、注销后仍在跑）：
+一条命令安装完整环境并注册常驻服务（Linux 使用 systemd，macOS 使用 launchd）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
 ```
 
-`install.sh` 把 `roami` 装到 `~/.local/bin` 并注册用户级服务——用
-`systemctl --user {status|restart|stop} roami` 管理。环境开关：`ROAMI_VERSION=vX.Y.Z`、
-`ROAMI_BIN_DIR=DIR`、`ROAMI_SYSTEM=1`（系统级服务，需 sudo）、`ROAMI_NO_SERVICE=1`（只装二进制）。
+`install.sh` 把入口装到 `~/.local/bin`，完整环境保存在 `~/.local/share/roami/releases/`。它在目标机创建 venv，使用包内 wheel 离线安装依赖，并验证设置保存与重启恢复后再切换版本。重复执行同一条命令即可升级；任务正在执行时会保留旧版，提示稍后重试。
+
+Linux 用 `systemctl --user {status|restart|stop} roami` 管理；macOS 使用 `~/Library/LaunchAgents/com.roami.console.plist`。Roami 自动守护智能体子进程，崩溃后退避重启；模型地址和密钥仍在网页填写。用 `roami agent status` 查看运行状态，`roami agent installed-status` 验证主服务与运行时版本及设置可读性。
+
+环境开关：`ROAMI_VERSION=vX.Y.Z`、`ROAMI_BIN_DIR=DIR`、`ROAMI_INSTALL_ROOT=DIR`、`ROAMI_SYSTEM=1`（系统级服务，需 sudo）、`ROAMI_NO_SERVICE=1`（安装完整环境后手动运行 `roami`）。离线安装可设置 `ROAMI_BUNDLE_FILE=/path/roami-linux-amd64.tar.gz`，同目录需有对应 `.sha256`；tmux 等宿主工具仍需预先准备。
 
 ### 方式 B — 手动跑二进制
 
-到 [Releases](https://github.com/ybz21/Roam/releases) 下对应 OS/arch 的构建，直接运行（不建服务，适合 macOS 或先试用）：
+只需前端与会话核心时，可到 [Releases](https://github.com/ybz21/Roam/releases) 下载裸二进制。内置智能体及其设置需要完整包；若只是不想注册服务，使用 `ROAMI_NO_SERVICE=1` 的安装方式。
 
 ```bash
 # 例：Linux x86_64

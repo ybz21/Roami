@@ -184,29 +184,27 @@ closed.
 
 ## Install And Start
 
-`roami` is a single binary with an embedded frontend and an integrated session core.
-The web console needs no Go/Node/npm on the target; browser automation uses Node and Chrome. Config and data live in
+The complete release includes `roami` with its embedded frontend, a private Python interpreter and all production Agent dependencies.
+No preinstalled Python, uv, Go or Node is needed; browser automation uses Node and Chrome. Config and data live in
 `~/.roami/` (`config.yaml` is generated on first run).
 
 ### Option A — install as a service (recommended for always-on / 24×7 machines)
 
-One line downloads the binary and registers it as a persistent **systemd**
-service (survives reboots and logout):
+One command installs the complete environment and registers a persistent service: systemd on Linux, launchd on macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
 ```
 
-`install.sh` installs `roami` into `~/.local/bin` and sets up a user service —
-manage it with `systemctl --user {status|restart|stop} roami`. Env switches:
-`ROAMI_VERSION=vX.Y.Z`, `ROAMI_BIN_DIR=DIR`, `ROAMI_SYSTEM=1` (system-wide service,
-needs sudo), `ROAMI_NO_SERVICE=1` (install the binary only).
+`install.sh` creates the command in `~/.local/bin` and keeps complete releases in `~/.local/share/roami/releases/`. It creates a venv at its final location, installs the included wheels offline, and verifies settings persistence before activation. Run the same command to upgrade; busy Agents keep running and block activation until idle.
+
+Manage Linux services with `systemctl --user {status|restart|stop} roami`; macOS uses `~/Library/LaunchAgents/com.roami.console.plist`. Roami supervises its Agent child with restart backoff. Configure the model in the web UI. `roami agent status` shows runtime state; `roami agent installed-status` checks both service versions and settings access.
+
+Env switches: `ROAMI_VERSION=vX.Y.Z`, `ROAMI_BIN_DIR=DIR`, `ROAMI_INSTALL_ROOT=DIR`, `ROAMI_SYSTEM=1` (system-wide service, needs sudo), `ROAMI_NO_SERVICE=1` (install the complete environment, then start `roami` manually). For offline installation set `ROAMI_BUNDLE_FILE` to the platform archive with its adjacent `.sha256`; host tools such as tmux still need to be available.
 
 ### Option B — run the binary manually
 
-Grab the build for your OS/arch from the
-[Releases](https://github.com/ybz21/Roam/releases) page and run it directly (no
-service — good for macOS or a quick try):
+The bare binaries on the [Releases](https://github.com/ybz21/Roam/releases) page include the web frontend and session core. The built-in Agent and its settings require the complete package. Use `ROAMI_NO_SERVICE=1` above for a complete installation without service registration:
 
 ```bash
 # example: Linux x86_64

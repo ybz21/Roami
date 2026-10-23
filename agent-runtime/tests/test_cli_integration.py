@@ -146,9 +146,10 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
 
     try:
         with tempfile.TemporaryDirectory(prefix="agent-uds-") as short_root:
-            env["XDG_RUNTIME_DIR"] = short_root
+            env["ROAMI_DATA"] = short_root
+            env["XDG_RUNTIME_DIR"] = "/unused-interactive-runtime-dir"
             await cli("init", "--runtime-dir", str(runtime_dir))
-            catalog = json.loads((tmp_path / "database/catalog.json").read_text())
+            catalog = json.loads((Path(short_root) / "database/catalog.json").read_text())
             entry = next(d for d in catalog["databases"] if d["id"] == "agent-runtime")
             assert entry["state"] == "ready" and entry["path"] == "agents/runtime.db"
             service = await asyncio.create_subprocess_exec(

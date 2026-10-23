@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
@@ -31,6 +32,7 @@ from roami_agent.protocol.http import (
     SessionReport,
     SteerTask,
 )
+from roami_agent.server.installation import Installation
 from roami_agent.server.model_settings import ModelSettings
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
@@ -48,6 +50,26 @@ def create_app(runtime, *, manage_lifecycle=True):
     app = FastAPI(
         title="Roami Agent", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
     )
+
+    installation = Installation(runtime)
+
+    @app.middleware("http")
+    async def installation_fence(request, call_next):
+        if (
+            installation.active
+            and request.method not in {"GET", "HEAD"}
+            and request.url.path != "/internal/installation/quiesce"
+        ):
+            return JSONResponse({"error": {"code": "AGENT_UPGRADE_IN_PROGRESS"}}, status_code=503)
+        return await call_next(request)
+
+    @app.post("/internal/installation/quiesce")
+    async def quiesce(request: Request, owner: Owner):
+        try:
+            body = await request.json()
+        except ValueError:
+            raise DomainError("INVALID_REQUEST") from None
+        return {"data": await installation.quiesce(owner, body)}
 
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):
@@ -341,6 +363,9 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def status(owner: Owner):
         return {
             "data": {
+                "managed": getattr(runtime, "managed_parent", False),
+                "pid": os.getpid(),
+                "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "memoryTimezone": runtime.memory.daily.timezone,
@@ -489,6 +514,9 @@ def create_app(runtime, *, manage_lifecycle=True):
         result = await runtime.context.project(owner, cid, branch_id=branch)
         return {
             "data": {
+                "managed": getattr(runtime, "managed_parent", False),
+                "pid": os.getpid(),
+                "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 **{k: v for k, v in result.items() if k != "messages"},
             }

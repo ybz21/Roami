@@ -1,63 +1,88 @@
 name: release
-
-# Build and publish prebuilt artifacts so `curl | bash` installs can download them:
-#   - roami-<os>-<arch>   单一自包含二进制（内嵌前端与会话核心），下载即用
-#   - chrome             chrome-cli（架构无关）
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
-  release:
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend once (reused by all roami targets)
+      - run: npm ci && npm run build
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-
-      - name: Build roami single binaries (frontend and session core)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend
+          path: frontend/dist
+  bundle:
+    needs: frontend
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: linux-amd64
+          - runner: ubuntu-22.04-arm
+            target: linux-arm64
+          - runner: macos-15-intel
+            target: darwin-amd64
+          - runner: macos-15
+            target: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.11.2'
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend
+          path: frontend/dist
+      - name: Build native binary and complete Python runtime
         env:
+          SKIP_FRONTEND: '1'
           ROAMI_BUILD_VERSION: ${{ github.ref_name }}
         run: |
-          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
-            os=${t%/*}; arch=${t#*/}
-            echo "building roami-$os-$arch ($ROAMI_BUILD_VERSION)"
-            SKIP_FRONTEND=1 GOOS=$os GOARCH=$arch bash scripts/build/build-roami.sh
-          done
-
-      - name: Build browser compatibility asset
+          test "$(go env GOOS)-$(go env GOARCH)" = '${{ matrix.target }}'
+          bash scripts/build/build-roami.sh
+          bash scripts/build/build-agent-bundle.sh
+      - name: Install session substrate
         run: |
-          mkdir -p dist
-          bash scripts/build/build-chrome.sh dist/chrome
-
-      - name: Publish release assets
-        uses: softprops/action-gh-release@v2
+          if ! command -v tmux >/dev/null; then
+            if command -v brew >/dev/null; then brew install tmux; else sudo apt-get update && sudo apt-get install -y tmux; fi
+          fi
+      - name: Install and exercise the published package
+        env:
+          ROAMI_TEST_VERSION: ${{ github.ref_name }}
+        run: bash scripts/dev/selftest/agent-install.sh backend/dist/roami-${{ matrix.target }}.tar.gz
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            backend/dist/roami-*
-            dist/*
+          name: release-${{ matrix.target }}
+          path: backend/dist/roami-*
+  publish:
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: dist
+      - run: bash scripts/build/build-chrome.sh dist/chrome
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
           fail_on_unmatched_files: true
-          # tag 里带连字符（如 v0.1.0-rc.1）视为 prerelease
           prerelease: ${{ contains(github.ref_name, '-') }}
-          # 自动生成 release 说明（依据自上个 tag 以来的合并 PR / 提交）
           generate_release_notes: true

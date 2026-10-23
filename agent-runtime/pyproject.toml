@@ -12,6 +12,7 @@ dependencies = [
     "python-xlib>=0.33 ; sys_platform == 'linux'",
     "pillow>=11",
     "pypdf>=6.21,<7",
+    "tzdata>=2025.2",
 ]
 
 [project.scripts]
