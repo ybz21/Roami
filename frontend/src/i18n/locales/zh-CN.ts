@@ -12,6 +12,8 @@ const zhCN = {
   'agent.rsi.stage.review': "复盘与提问",
   'agent.rsi.stage.repair': "隔离修改",
   'agent.rsi.stage.verify': "独立验收",
+  'agent.rsi.reviewPullRequest': '查看 PR',
+  'agent.rsi.stage.publish': '提交草稿 PR',
   'agent.rsi.stage.activate': "应用到评测实例",
   'agent.rsi.state.done': "已交接",
   'agent.rsi.state.diagnosing': "诊断中",

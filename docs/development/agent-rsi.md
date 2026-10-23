@@ -248,3 +248,59 @@ uv run python -m roami_agent.improvement.cli import-gaia-course \
 ```
 
 HR staging保留原workspaces/tasks目录，并把原workspaces/base_image/common.py、scoring.py复制到staging根目录。股票raw-source从固定镜像的原生WebDAV读取；导入只冻结hash，运行时重新核对。公开问题API会变动；再次下载必须匹配材料锁，不默默接受新版本。正式组合为`roami-formal-60-v6`；启用前仍须接通并校准7项独立产物评分，再绑定开发测试机和日额度；当前待评状态不能靠人工改passed字段消除。
+
+
+<a id="daily-v1"></a>
+## 首版每日自动运行
+
+```text
+开发版内置定时器（03:00）
+  → 全60项 → 程序评分 + 复盘Agent逐项检查指标/日志
+  → 去重内部问题单 → 修复Agent独立worktree修改
+  → 原问题复测 + 冻结回归 + 全量/私有A/B
+  → quick/full → 自动草稿PR（配置后，人工审阅合并）
+  → 专用开发评测实例 → 两个后续完整日 → 关闭；退化则回滚重开
+```
+
+| 问题 | 首版执行方式 |
+|---|---|
+| 谁发起 | 开发版常驻服务中的 `EvaluationWorker`，不是由用户或聊天Agent每天发起；日期+机器幂等入队，重启只补当天 |
+| 谁复盘、提问题 | 程序核对全部指标与日志完整性；`ResearchWorker / behavior_observer`逐项语义回顾，异常展开原记录并创建内部问题单 |
+| 谁改 | 原生修复Agent在detached worktree生成受限补丁；模型、复盘与评分共用日预算 |
+| 谁验收 | `candidate_checks`独立服务，用冻结原问题、回归、全量和私有集检查；修复者不能自报通过 |
+| 是否测完就提PR | 先建内部问题单；有补丁且独立验收通过，配置GitHub交付后才自动提草稿PR并附验收截图 |
+| 如何交付 | 专用分支，不force push、不自动合并；只自动应用到开发评测实例，普通用户仍走正常发布 |
+| 失败怎么办 | 阶段和证据落盘；预算不足等待，未知执行不重放，创建PR断线先查远端；复测失败保留问题，观察退化回滚重开 |
+
+开发版运行时的数据根记为 `DEV_DATA`，账本固定为 `$DEV_DATA/agents/improvement/ledger.sqlite3`。先用已有 `register-suite`、`register-machine`、`evaluation-config` 配齐60项套件、机器和日预算，再用 `research-config` 配置仓库、基线commit、允许修改的运行时代码范围和私有验证集。两个 enabled 开关分别控制每日测试与自动修复；无需额外叠加 cron。
+
+```bash
+# 本机 gh 已登录目标仓库；配置里不保存访问令牌。
+agent-runtime/.venv/bin/roami-agent-evaluate configure-review-publication \
+  --ledger "$DEV_DATA/agents/improvement/ledger.sqlite3" --owner "$RSI_OWNER" \
+  --config scripts/dev/agent-evaluation/review-publication.example.json
+
+agent-runtime/.venv/bin/roami-agent-evaluate evaluation-status \
+  --ledger "$DEV_DATA/agents/improvement/ledger.sqlite3" --owner "$RSI_OWNER"
+agent-runtime/.venv/bin/roami-agent-evaluate research-status \
+  --ledger "$DEV_DATA/agents/improvement/ledger.sqlite3" --owner "$RSI_OWNER"
+```
+
+GitHub交付是显式本机配置，默认没有此配置，不对外发PR。目标仓库必须与配置 remote 的 GitHub 地址一致。发布前重新核验冻结比较证据；提交前quick、推送前full。PR只写公开用例ID、受控源码路径、验证摘要与报告hash，不上传原始日志、隐藏题、凭证或用户记录。创建请求先写私有发送标记；断线后查到精确分支/commit的PR就续接，查不到则阻塞，不能再次POST。
+
+当前60项合同已备，7项复杂产物已接真实离线渲染和两个不同模型的盲评接口。正式使用必须先完成12个有参考标签的平衡校准锚点，安装真实模型校准证书。`calibrate-artifacts`执行有界校准，`configure-artifact-review`安装私有证书；协议演练证书不能用于正式日跑。相关字段和限制见CLI `--help` 与 `artifact_review.py`。
+
+**当前日程仍未启用**：已登记专用本机容器runner，真实评分校准和日预算未齐。已验证自动闭环设施与真实执行器小任务，不代表跑完真实60项或已获得效率收益。
+
+## OpenCode / Pi 托管执行
+
+任务接口、Main路由、默认执行器、任务列表和续接均支持 `opencode` / `pi`。`routing.model={id,quote}`可将用户明确请求的原生模型传给初始CLI；续接保留原模型，不覆盖会话身份。安装、登录和任务结果分开确认，不会因指定的执行器不可用而改派native包装器。
+
+| 执行器 | 原生协议 | 完成和续接 |
+|---|---|---|
+| OpenCode 2 | `run --standalone --format json`，提示词从stdin传递 | 精确session ID；退出后读取本会话导出，核对新提示词、时间、目录、最终文本和成功状态。兼容本机2.0.27缺少step_finish的情况 |
+| Pi | `--print --mode json --session-id` | 固定UUID；最终assistant message与agent_settled、退出及进程停止共同确认 |
+
+托管会话由Roami常驻控制器保留，逐轮启动原生JSON进程；在任务对话中继续，终端展示执行记录。独立打开的普通Agent TUI不会被冒认成托管会话。取消只作用于本次执行的进程组，确认没有额外写进程后结束；会话仍可继续，关闭使用显式身份校验。
+
+已用OpenCode2.0.27、Pi1.1.0完成首次、原会话续聊、取消后恢复与关闭的真实CLI验收；也分别用正常配置的真实模型完成文件创建和原会话追加修改。前者是本地固定响应协议测试，后者是小任务执行验证，均不替代正式60项质量成绩。

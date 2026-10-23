@@ -436,6 +436,9 @@ class ResearchWorkflow:
                     {
                         **{k: r[k] for k in ("id", "state", "revision", "updated_ms")},
                         "title": json.loads(r["finding_json"])["fact"][:100],
+                        "reviewUrl": json.loads(r["data_json"])
+                        .get("review_publication", {})
+                        .get("url"),
                     }
                     for r in db.execute(
                         "SELECT * FROM rsi_improvements WHERE owner=? ORDER BY updated_ms DESC LIMIT 100",

@@ -806,3 +806,14 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
 <p>本轮验收：Go与full门禁通过，Python1086项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
 </section>
+
+<section id="roami-rsi-daily-v1" lang="zh-CN">
+<h2>RSI首版自动执行 · 2026-10-24</h2>
+<h3>产品设计与用户故事</h3><p>开发版每天03:00由内置定时器发起完整60项，不依赖聊天或用户使用记录。程序出分、复盘Agent逐项看指标与日志，创建去重内部问题单；修复Agent独立worktree改允许范围的运行时代码，独立验收后自动提交草稿PR（显式配置GitHub目标），人工审阅合并。仅开发评测实例自动应用并观察，两次后续完整日后才关单，退化回滚重开。</p>
+<h3>技术设计与模块</h3><pre>EvaluationWorker → ResearchWorkflow / behavior_observer → source_revision
+→ candidate_checks（原问题、回归、全量与私有配对）
+→ github_publication（重验证据、quick/full、专用分支、草稿PR与截图）
+→ release_observation（开发评测实例、后续全量观察、关闭/回滚）</pre>
+<p>GitHub配置位于账本旁的私有review-publication目录，缺省不向外写入。创建请求断线先读远端对账，未确认结果不重复POST；不自动合并，不上传原始日志、隐藏答案或凭证。OpenCode和Pi托管任务采用原生JSON进程加常驻控制器，续聊绑定原生ID；完成确认进程退出与无额外写进程。OpenCode2额外核对精确会话导出的提示词、完成状态与时间，禁止用旧结果冒充新完成。</p>
+<p>7项复杂产物已接离线渲染和独立双评分，但本机容器runner已登记，真实校准和日预算尚未齐，不能宣称每日评测已经启用。详见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#first-version">首版运行图表</a>及<a href="docs/development/agent-rsi.md#daily-v1">操作手册</a>。</p>
+</section>

@@ -177,3 +177,6 @@ html[data-size="compact"] .agent-outbox-marker { min-width:var(--sp-5); }
 .agent-context-meter.is-near-limit small,.agent-context-meter.is-stale small { color:var(--warn); }
 
 html[data-pointer="coarse"] .agent-outbox .tt-act { min-width:calc(var(--tap) - var(--sp-2)); padding-inline:var(--sp-1); }
+
+html[data-pointer="coarse"] .agent-executor-menu .ant-dropdown-menu-item { position:relative; margin-block:var(--sp-3); }
+html[data-pointer="coarse"] .agent-executor-menu .ant-dropdown-menu-item::before { content:""; position:absolute; inset-inline:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }

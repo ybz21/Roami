@@ -57,3 +57,13 @@ it('shows observation as pending and keeps recovery actions in execution records
   fireEvent.click(screen.getByRole('button', { name: '重试' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/improvement/research/step/resume', undefined))
 })
+
+
+it('links a published draft while preserving its pending observation state', () => {
+  state.overview = { ...overview(), research: { settings: { enabled: true }, actions: [], improvements: [{ id: 'i', title: 'Observed behavior', state: 'observing', reviewUrl: 'https://github.com/example/rsi-test/pull/1' }] } }
+  render(<AgentImprovement node={null} />)
+  const link = screen.getByRole('link', { name: '查看 PR' })
+  expect(link.getAttribute('href')).toBe('https://github.com/example/rsi-test/pull/1')
+  expect(link.getAttribute('rel')).toContain('noopener')
+  expect(screen.getByText('Observed behavior')).toBeTruthy()
+})

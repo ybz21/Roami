@@ -32,7 +32,7 @@ def problem_improved(finding, baseline, candidate):
 
 
 class CodePairExecutor:
-    def __init__(self, settings, candidate, *, provider_factory=None):
+    def __init__(self, settings, candidate, *, provider_factory=None, artifact_reviewer=None):
         tests = Path(candidate["baseline_root"]) / "agent-runtime/tests"
         self.executors = {
             arm: ContainerExecutor(
@@ -40,6 +40,7 @@ class CodePairExecutor:
                 source_root=candidate[arm + "_root"],
                 regression_root=tests,
                 provider_factory=provider_factory,
+                artifact_reviewer=artifact_reviewer,
             )
             for arm in ("baseline", "candidate")
         }
@@ -141,7 +142,18 @@ async def verify_candidate(
         and clusters["holdout"].isdisjoint(clusters["validation"]),
         "RSI_PRIVATE_VALIDATION_REQUIRED",
     )
-    executor = executor_factory(settings, candidate)
+    if executor_factory is CodePairExecutor:
+        from roami_agent.improvement.artifact_review import ArtifactReviewer, needs_artifact_review
+
+        reviewer = ArtifactReviewer.load(settings, workflow.ledger.path.parent, action["owner"])
+        require(
+            reviewer is not None
+            or not any(needs_artifact_review(c) for s in suites for c in s["cases"]),
+            "RSI_ARTIFACT_REVIEW_REQUIRED",
+        )
+        executor = executor_factory(settings, candidate, artifact_reviewer=reviewer)
+    else:
+        executor = executor_factory(settings, candidate)
     fingerprint = await executor.preflight()
     day = workflow.day(action["owner"])
     with workflow.ledger.connection() as db:

@@ -12,6 +12,8 @@ const enUS = {
   'agent.rsi.stage.review': "Review and diagnosis",
   'agent.rsi.stage.repair': "Isolated repair",
   'agent.rsi.stage.verify': "Independent verification",
+  'agent.rsi.reviewPullRequest': 'View PR',
+  'agent.rsi.stage.publish': 'Submit draft PR',
   'agent.rsi.stage.activate': "Apply to evaluation instance",
   'agent.rsi.state.done': "Handed off",
   'agent.rsi.state.diagnosing': "Diagnosing",

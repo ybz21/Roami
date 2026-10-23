@@ -669,6 +669,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             key=body.requestKey,
             parent_task_id=body.parentTaskId,
             executor=body.executor,
+            model=body.model,
             target=body.target,
             from_message_id=body.fromMessageId,
             record_intent=True,

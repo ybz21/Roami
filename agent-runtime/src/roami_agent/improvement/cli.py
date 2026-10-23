@@ -32,6 +32,41 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "configure-review-publication":
+        from roami_agent.improvement.github_publication import configure_publication
+
+        return configure_publication(
+            args.ledger.parent, args.owner, load_json(args.config, maximum=65536)
+        )
+    if args.command == "configure-artifact-review":
+        from roami_agent.improvement.artifact_review import ArtifactReviewer, private_document
+
+        profile = private_document(args.profile)
+        certificate = private_document(args.certificate)
+        reviewer = ArtifactReviewer(Settings(), {**profile, "certificate": certificate})
+        directory = args.ledger.parent / "artifact-review" / digest(args.owner)[:24]
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        require(not directory.is_symlink() and directory.stat().st_mode & 0o077 == 0)
+        certificate_name = "calibration-" + reviewer.calibration_id + ".json"
+        if not (directory / certificate_name).exists():
+            private_json(directory / certificate_name, certificate)
+        private_json(directory / "profile.json", {**profile, "certificate_file": certificate_name})
+        return {
+            "configured": True,
+            "profile_hash": reviewer.content_hash,
+            "calibration_id": reviewer.calibration_id,
+            "path": str(directory / "profile.json"),
+        }
+    if args.command == "calibrate-artifacts":
+        from roami_agent.improvement.artifact_review import calibrate_artifacts, private_document
+
+        return await calibrate_artifacts(
+            Settings(),
+            private_document(args.profile),
+            private_document(args.anchors),
+            args.output,
+            token_limit=args.token_limit,
+        )
     if args.command == "import-gaia-course":
         from roami_agent.improvement.gaia_tasks import import_gaia_course
 
@@ -444,6 +479,18 @@ def main():
     p.add_argument("--source-dir", required=True, type=Path)
     p.add_argument("--revision", required=True)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("configure-review-publication")
+    p.add_argument("--ledger", type=Path, required=True)
+    p.add_argument("--owner", required=True)
+    p.add_argument("--config", type=Path, required=True)
+    p = commands.add_parser("configure-artifact-review")
+    for name in ("ledger", "profile", "certificate"):
+        p.add_argument("--" + name, type=Path, required=True)
+    p.add_argument("--owner", required=True)
+    p = commands.add_parser("calibrate-artifacts")
+    for name in ("profile", "anchors", "output"):
+        p.add_argument("--" + name, type=Path, required=True)
+    p.add_argument("--token-limit", type=int, required=True)
     p = commands.add_parser("import-gaia-course")
     p.add_argument("--source", required=True, type=Path)
     p.add_argument("--output", required=True, type=Path)

@@ -4,7 +4,7 @@
 <body><main><article class="rsi-overview">
 <nav aria-label="方案章节"><a href="automation-roles.html">架构与执行</a><a href="evaluation.html">Case与标准</a><a href="sampling-plan.html">60项清单</a><a href="implementation.html">实施记录</a></nav>
 <h1>Roami Agent RSI</h1><p class="rsi-lead">每日全60项 → 复盘提问 → 隔离修改 → 独立验收 → 应用观察。</p>
-<p class="rsi-status">仅开发版运行RSI，普通安装版无入口、接口或后台任务。60/60项合同已备；7项产物待独立质量评分，日程尚未启用。</p>
+<p class="rsi-status">仅开发版运行RSI，普通安装版无入口、接口或后台任务。60/60项合同已备；7项产物已接入双盲评分，真实校准待完成，日程尚未启用。</p>
 <figure><picture><source media="(max-width: 599px)" srcset="architecture-mobile.svg"><img src="architecture.svg" alt="RSI架构：程序调度，被测Agent做题，复盘Agent提问，修复Agent改代码，独立验收并应用观察。"></picture></figure>
 <p><a href="automation-roles.html#roles">看执行手段与职责表</a> · <a href="automation-roles.html#closed-loop">看失败处理与关单条件</a> · <a href="architecture.excalidraw" download>下载可编辑图</a></p>
 <section id="product"><h2>目标与评定</h2>
@@ -22,7 +22,7 @@
 <section id="stories"><h2>用户能看到什么</h2>
 <p>开发版配置完成后，关闭聊天仍每天测试；首页展示执行、出分和复盘覆盖，正在修的问题、补丁、前后对比、当前阻塞及下一步。每项成功和失败都能追溯到具体日志。</p></section>
 <section id="closed-loop"><h2>闭环规则</h2>
-<p>程序定时发起 → 被测Agent做题 → 独立判定 → 复盘Agent提出问题 → 修复Agent生成隔离补丁 → 独立验收 → 专用实例应用 → 两个后续完整日观察 → 关单。退化回滚并重开，失败回到诊断；Issue/PR是可选同步。</p>
+<p>程序定时发起 → 被测Agent做题 → 独立判定 → 复盘Agent提出问题 → 修复Agent生成隔离补丁 → 独立验收 → 自动草稿PR（配置后）→ 专用开发实例应用 → 两个后续完整日观察 → 关单。退化回滚并重开，失败回到诊断；出分先生成内部问题单，独立复测通过才提草稿PR，人工审阅合并。</p>
 <p>动作、预算和租约持久化；未知执行先对账，不自动重放付费调用。每天完整60项、全部出分、完整计量、规则扫描和逐条语义复盘缺一不可。改进仅应用于开发评测实例；普通安装版不运行、不读取RSI策略，改进通过正常版本发布交付。</p>
 <p><a href="automation-roles.html">职责、执行手段与异常处理</a></p></section>
 <section id="technical"><h2>代码架构</h2>
@@ -31,6 +31,7 @@
 <tr><td>ContainerExecutor / evaluation_tasks</td><td>Main→Native Worker；任务、各角色轨迹；退出后判定产物</td><td>无网络、只挂载本题；答案仅宿主机可见</td></tr>
 <tr><td>ResearchWorkflow / behavior_observer</td><td>逐条语义复盘、证据、去重工单、持久派发</td><td>保护题不进入修改上下文；缺复盘不算完成</td></tr>
 <tr><td>source_revision / candidate_checks</td><td>独立worktree补丁、冻结回归、全量与私有配对</td><td>修复者不能修改判定器、隐藏集或自行验收</td></tr>
+<tr><td>github_publication</td><td>独立证据重验、quick/full、专用分支、草稿PR与截图；断线对账</td><td>显式配置仓库；不上传原始轨迹/隐藏题，不自动合并</td></tr>
 <tr><td>release_observation</td><td>版本绑定、后续观察、关闭/回滚/重开</td><td>当前只应用到已配置的专用评测实例</td></tr>
 </tbody></table></div>
 <p>代码：<code>agent-runtime/src/roami_agent/improvement/</code>。配置、工单和运行日志保存在节点私有数据目录；套件、标准、镜像及源码版本均记录hash。</p>

@@ -32,6 +32,9 @@ type SessionBinding struct {
 }
 
 type sessionLifecycle struct {
+	Structured    bool            `json:"structured,omitempty"`
+	Model         string          `json:"model,omitempty"`
+	Permission    string          `json:"permission,omitempty"`
 	InitialLaunch bool            `json:"initialLaunch,omitempty"`
 	Binding       SessionBinding  `json:"binding"`
 	Executor      string          `json:"executor"`
@@ -283,7 +286,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 }
 
 func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error) {
-	if (spec.Executor != "codex" && spec.Executor != "claude") || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
+	if (spec.Executor != "codex" && spec.Executor != "claude" && !structuredExecutor(spec.Executor)) || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)
@@ -323,6 +326,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	var state sessionLifecycle
 	if readJSON(path, &state) != nil || state.Executor != spec.Executor || state.Binding.ProviderID == "" {
 		return Status{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
+	}
+	if structuredExecutor(spec.Executor) && (!state.Structured || !sessionProcessesStopped(state.Binding)) {
+		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 	}
 	if state.State != "idle" || state.LaunchKey != "" || len(state.Tools) != 0 {
 		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
@@ -372,6 +378,13 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	if err = writeJSON(path, state); err != nil {
 		return Status{}, err
 	}
+	if state.Structured {
+		// The resident runner consumes this journal entry exactly once.
+		lease()
+		stateUnlock()
+		stateUnlock = func() {}
+		return s.Status(spec.Key)
+	}
 	rt := s.Runtime
 	rt.Context = ctx
 	if err = rt.SendPromptSubmit(binding.Pane, sessionPrompt(dir, spec)); err != nil {
@@ -394,7 +407,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 		return status, err
 	}
 	var state sessionLifecycle
-	if readJSON(path, &state) != nil || state.LaunchKey != key || state.State != "busy" {
+	if readJSON(path, &state) != nil || state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State = "unknown"
 		return status, nil
 	}

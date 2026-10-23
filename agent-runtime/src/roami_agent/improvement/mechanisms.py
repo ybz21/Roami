@@ -82,6 +82,14 @@ NODES = {
     "PL01": [
         ("execution_traces", "trace_joins_native_task_and_completion_without_another_user_turn"),
         ("native_workspace", "created_file_is_delivered_even_when_worker_and_main_omit_links"),
+        (
+            "assignment_recovery",
+            "untracked_user_executor_is_explained_and_cannot_be_hidden_in_native_wrapper",
+        ),
+        (
+            "routing_policy",
+            "new_professional_executor_and_model_reach_the_accepted_task",
+        ),
     ],
     "PL02": [
         (
@@ -125,6 +133,7 @@ async def run_mechanism(case, policy, root, executor):
     )
     require(tests.is_dir(), "RSI_REGRESSION_PACK_REQUIRED")
     selectors = nodes(case["id"])
+    require(case["judge"].get("selectors") == selectors, "RSI_REGRESSION_PACK_CHANGED")
     require(
         all((tests / n.split("::")[0]).is_file() for n in selectors), "RSI_REGRESSION_PACK_REQUIRED"
     )

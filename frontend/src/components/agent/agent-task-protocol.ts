@@ -1,3 +1,4 @@
+import { isAgentKind, type AgentKind } from '../../agent-kind'
 import type { AgentTask } from './agent-protocol'
 
 export type TaskSteering = { operationId: string; taskId: string; state: string; revision: number; errorCode?: string; text?: string }
@@ -18,9 +19,9 @@ export function taskInstructions(task: AgentTask): string {
   try { const goal = JSON.parse(task.intent_json).goal; return typeof goal === 'string' ? goal : '' } catch { return '' }
 }
 
-export function taskExecutor(task: AgentTask): 'native' | 'codex' | 'claude' | null {
+export function taskExecutor(task: AgentTask): 'native' | AgentKind | null {
   const kind = task.latestAttempt?.executorKind
-  if (kind === 'native' || kind === 'codex' || kind === 'claude') return kind
+  if (kind === 'native' || isAgentKind(kind)) return kind
   if (kind !== 'cli') return null
-  try { const executor = JSON.parse(task.intent_json).executor; return executor === 'codex' || executor === 'claude' ? executor : null } catch { return null }
+  try { const executor = JSON.parse(task.intent_json).executor; return isAgentKind(executor) ? executor : null } catch { return null }
 }

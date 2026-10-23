@@ -44,6 +44,13 @@ def review_trial(trial, root):
         names.append("project-runtime-log.json")
     if trial.get("isolation", {}).get("company_runtime"):
         names.append("company-runtime-log.json")
+    if trial.get("isolation", {}).get("artifact_review"):
+        names.append("artifact-review.json")
+        if (
+            trial.get("grade", {}).get("artifact_evidence_hash")
+            or (root / "artifact-evidence.json").exists()
+        ):
+            names.append("artifact-evidence.json")
     names.extend(
         name for name in ("worker-stdout.log", "worker-stderr.log") if (root / name).exists()
     )
@@ -81,6 +88,22 @@ def review_trial(trial, root):
                                 "evidence": {**reference, "record": index},
                             }
                         )
+                elif name == "artifact-evidence.json":
+                    expected = trial.get("grade", {}).get(
+                        "artifact_evidence_hash", value.get("content_hash")
+                    )
+                    if value.get("content_hash") != expected or expected != digest(
+                        {k: v for k, v in value.items() if k != "content_hash"}
+                    ):
+                        raise ValueError("artifact_evidence_changed")
+                    reference["rendered_images"] = len(value["images"])
+                    reference["artifacts"] = value["artifacts"]
+                elif name == "artifact-review.json":
+                    if not isinstance(value.get("ratings"), list) or not isinstance(
+                        value.get("metrics"), dict
+                    ):
+                        raise ValueError("invalid_artifact_review")
+                    reference["ratings_reviewed"] = len(value["ratings"])
                 else:
                     records, traces = value["tool_calls"], value["traces"]
                     if not isinstance(records, list) or not isinstance(traces, list):

@@ -70,10 +70,22 @@ class ContainerExecutor:
         provider_factory=None,
         source_root=None,
         regression_root=None,
+        artifact_reviewer=None,
     ):
         self.settings, self.image = settings, image
+        self.artifact_reviewer = artifact_reviewer
+        if artifact_reviewer:
+            require(
+                image in {IMAGE, artifact_reviewer.profile["renderer_image"]},
+                "RSI_ARTIFACT_RENDERER_CHANGED",
+            )
+            self.image = artifact_reviewer.profile["renderer_image"]
         self.model_hash = digest(
-            [NativeFilesExecutor(settings).model_hash, "container-uds-v2-main-worker"]
+            [
+                NativeFilesExecutor(settings).model_hash,
+                "container-uds-v2-main-worker",
+                artifact_reviewer.content_hash if artifact_reviewer else None,
+            ]
         )
         self.image_id = None
         self.provider_factory = provider_factory
@@ -105,9 +117,18 @@ class ContainerExecutor:
         if case["judge"]["kind"] == "mechanism":
             from roami_agent.improvement.mechanisms import nodes
 
-            nodes(case["id"])
+            selected = nodes(case["id"])
+            if "selectors" in case["judge"]:
+                require(case["judge"]["selectors"] == selected, "RSI_REGRESSION_PACK_CHANGED")
             return 0
-        return case["limits"]["tokens"]
+        from roami_agent.improvement.artifact_review import needs_artifact_review
+
+        extra = (
+            self.artifact_reviewer.profile["max_tokens"]
+            if self.artifact_reviewer and needs_artifact_review(case)
+            else 0
+        )
+        return case["limits"]["tokens"] + extra
 
     async def preflight(self):
         try:
@@ -115,6 +136,11 @@ class ContainerExecutor:
         except (DomainError, ValueError):
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
         self.image_id = detail["Id"]
+        if self.artifact_reviewer:
+            require(
+                self.image_id == self.artifact_reviewer.profile["renderer_image"],
+                "RSI_ARTIFACT_RENDERER_CHANGED",
+            )
         return {
             "image_id": self.image_id,
             "environment_hash": digest([self.image_id, "network-none", "nonroot-readonly-v1"]),
@@ -298,6 +324,9 @@ class ContainerExecutor:
         name = "roami-rsi-agent-" + secrets.token_hex(10)
         failure = None
         response = {}
+        review_budget = None
+        artifact_review_ms = 0
+        generation_elapsed = None
         created = False
         try:
             with tempfile.TemporaryDirectory(prefix="roami-rsi-gateway-") as directory:
@@ -378,6 +407,19 @@ class ContainerExecutor:
             grade = await self.verify(
                 case, workspace, response.get("output", ""), started=started, evidence_root=root
             )
+            generation_elapsed = (time.monotonic() - started) * 1000
+            if (
+                grade.get("pending")
+                and grade.get("hard_passed")
+                and self.artifact_reviewer
+                and not failure
+            ):
+                review_started = time.monotonic()
+                review_budget = self.artifact_reviewer.budget()
+                grade = await self.artifact_reviewer.review(
+                    case, grade, root, self, budget=review_budget, journal=journal
+                )
+                artifact_review_ms = (time.monotonic() - review_started) * 1000
             elapsed = (time.monotonic() - started) * 1000
         except (DomainError, OSError, TimeoutError, ValueError) as error:
             failure = (
@@ -402,7 +444,10 @@ class ContainerExecutor:
                 if hasattr(provider, "close"):
                     await provider.close()
             private_json(root / "model-log.json", {"requests": journal, "source": "host_provider"})
-        metrics = budget.metrics()
+        from roami_agent.improvement.artifact_review import episode_metrics
+
+        metrics = episode_metrics(budget, review_budget)
+        metrics["artifact_review_ms"] = artifact_review_ms
         metrics["fixture_setup_ms"] = setup_ms
         if case["judge"]["kind"] == "swe":
             log = root / "project-runtime-log.json"
@@ -428,7 +473,9 @@ class ContainerExecutor:
                 pending=False,
             )
         metrics.update(
-            elapsed_ms=elapsed if grade["passed"] and not failure else None,
+            elapsed_ms=(generation_elapsed if generation_elapsed is not None else elapsed)
+            if grade["passed"] and not failure
+            else None,
             episode_ms=elapsed,
             right_censored=not grade["passed"] or bool(failure),
             process_diagnostics=response.get("metrics", {}),
@@ -437,6 +484,8 @@ class ContainerExecutor:
         blockers = [failure] if failure else []
         if budget.unknown:
             blockers.append("unknown_provider_usage")
+        if review_budget and review_budget.unknown:
+            blockers.append("unknown_artifact_review_usage")
         return {
             "grade": grade,
             "metrics": metrics,
@@ -452,6 +501,11 @@ class ContainerExecutor:
                 "host_grader_after_exit": True,
                 "provider_keys_in_container": False,
                 "runtime_profile": "main_and_native_worker",
+                **(
+                    {"artifact_review": self.artifact_reviewer.content_hash}
+                    if review_budget
+                    else {}
+                ),
                 **(
                     {"project_runtime": case["judge"]["image"]}
                     if case["judge"]["kind"] == "swe"

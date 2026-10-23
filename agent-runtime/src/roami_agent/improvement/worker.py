@@ -92,9 +92,21 @@ class EvaluationWorker:
             if machine["mode"] in {"native_files", "container"}:
                 require(settings.endpoint and settings.model, "MODEL_NOT_CONFIGURED")
                 if machine["mode"] == "container":
+                    from roami_agent.improvement.artifact_review import (
+                        ArtifactReviewer,
+                        needs_artifact_review,
+                    )
                     from roami_agent.improvement.containers import ContainerExecutor
 
-                    executor = ContainerExecutor(settings)
+                    reviewer = ArtifactReviewer.load(
+                        settings, self.service.ledger.path.parent, request["owner"]
+                    )
+                    require(
+                        reviewer is not None
+                        or not any(needs_artifact_review(c) for c in suite["cases"]),
+                        "RSI_ARTIFACT_REVIEW_REQUIRED",
+                    )
+                    executor = ContainerExecutor(settings, artifact_reviewer=reviewer)
                     fingerprint = await executor.preflight()
                 else:
                     executor = NativeFilesExecutor(settings, settle_maintenance=True)
@@ -132,7 +144,7 @@ class EvaluationWorker:
                 from roami_agent.improvement.candidate_checks import CodePairExecutor
 
                 require(machine["mode"] == "container", "RSI_CODE_CONTAINER_REQUIRED")
-                executor = CodePairExecutor(settings, release)
+                executor = CodePairExecutor(settings, release, artifact_reviewer=reviewer)
                 fingerprint = await executor.preflight()
                 machine = {**machine, **fingerprint}
                 source_builds = executor.builds

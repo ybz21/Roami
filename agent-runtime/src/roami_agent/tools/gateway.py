@@ -344,7 +344,7 @@ class ToolGateway:
                 value["recovery"] = (
                     "Do not change or drop the rejected executor choice to bypass this error. "
                     "For a user-requested executor use routing.explicitExecutor with an exact userQuote; "
-                    "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching."
+                    "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching; never use a native shell wrapper."
                 )
             if role == "main" and value["error"] == "ROUTING_EXPLICIT_SOURCE_REQUIRED":
                 value["recovery"] = (

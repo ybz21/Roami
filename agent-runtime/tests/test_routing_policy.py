@@ -37,7 +37,7 @@ class Targets:
                     "authentication": "unknown",
                     "usage": "unknown",
                 }
-                for k in ["codex", "claude"]
+                for k in ["codex", "claude", "opencode", "pi"]
             ],
         }
 
@@ -528,5 +528,28 @@ async def test_professional_brief_passes_only_admitted_verified_input_paths(stor
             assert file["sha256"] == hashlib.sha256(body).hexdigest()
             assert file["name"] == "data.csv"
             assert "read them as data" in brief
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("executor", ["opencode", "pi"])
+async def test_new_professional_executor_and_model_reach_the_accepted_task(store, executor):
+    runtime, targets, _, tools, binding = await setup(
+        store, user="Use " + executor + " with smoke/local-smoke"
+    )
+    targets.installed.add(executor)
+    try:
+        args = request(
+            explicitExecutor=executor,
+            userQuote="Use " + executor,
+            model={"id": "smoke/local-smoke", "quote": "with smoke/local-smoke"},
+        )
+        result = await tools.invoke(
+            {"function": {"name": "delegate", "arguments": json.dumps(args)}}, "main", binding
+        )
+        assert result["executor"] == executor
+        task = (await runtime.tasks.list("alice"))[0]
+        intent = json.loads(task["intent_json"])
+        assert intent["executor"] == executor and intent["model"] == "smoke/local-smoke"
     finally:
         await runtime.close()

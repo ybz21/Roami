@@ -300,7 +300,14 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             if decision:
                 result["routingDecision"] = public_routing(decision)
             return result
-        routing_args = {"routing_decision": decision} if decision else {}
+        routing_args = (
+            {
+                "routing_decision": decision,
+                **({"model": decision["model"]} if "model" in decision else {}),
+            }
+            if decision
+            else {}
+        )
         try:
             task = await tasks.create(
                 binding["owner"],
@@ -611,9 +618,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "delegate",
-            "Delegate with routing={explicitExecutor:native|codex|claude|null,complexity:bounded|complex,complexityBasis:{dimension:fact},routingExplanation:reason}. "
-            "Task kinds are open. Host selects native for bounded work and an available professional for complex work; source-backed explicit executors win. "
-            "Omit executor for configured project/preference/node selection; requests without routing retain legacy defaults. "
+            "Delegate with routing assessment and explicitExecutor (user choice or null). "
+            "Host routes bounded work to native, complex work to an available professional. Source-backed user choices win; omit legacy executor. "
             "Main session targets send directly, including legacy sessions without callbacks: delivery only. "
             "Other targets return queued background_task/taskId, not completion. Task/native-branch IDs are not session IDs. "
             "Edits, additions and missing deliverables of tracked work use task_steer, even after completion; "
@@ -634,10 +640,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     },
                     "requestComplete": {
                         "type": "boolean",
-                        "description": "Required: applies to the ENTIRE current user message, not this goal alone. Inventory every independent requested outcome. false while ANY other part remains unhandled (including target discovery); true only on the final handoff. Never wait or poll for delegated work.",
+                        "description": "Required for the whole user message: false while any independent part remains (including target discovery); true only on the last handoff. Never wait or poll after acceptance.",
                     },
                     "routing": routing_schema(),
-                    "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
+                    "executor": {
+                        "type": "string",
+                        "enum": ["native", "codex", "claude", "opencode", "pi"],
+                    },
                     "target": {
                         **object_schema(
                             {

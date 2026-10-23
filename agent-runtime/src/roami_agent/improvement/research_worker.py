@@ -65,6 +65,12 @@ class ResearchWorker:
                 result = await self.revisions.repair(self.workflow, action, settings, config)
             elif action["kind"] == "verify":
                 result = await verify_candidate(self.workflow, action, settings, config)
+            elif action["kind"] == "publish":
+                from roami_agent.improvement.github_publication import publish_verified
+
+                result = await publish_verified(
+                    self.workflow, action, self.revisions, config, settings
+                )
             elif action["kind"] == "activate":
                 result = await activate_code(self.workflow, action, self.revisions, config)
             else:
@@ -73,9 +79,15 @@ class ResearchWorker:
                 "review": (None, None),
                 "repair": ("verify", "verifying"),
                 "verify": ("activate", "ready"),
+                "publish": ("activate", "ready"),
                 "activate": (None, "observing"),
             }
             next_kind, item_state = transitions[action["kind"]]
+            if action["kind"] == "verify":
+                from roami_agent.improvement.github_publication import publication_profile
+
+                if publication_profile(self.service.ledger.path.parent, action["owner"]):
+                    next_kind = "publish"
             await asyncio.to_thread(
                 self.workflow.complete, action, result, next_kind=next_kind, item_state=item_state
             )

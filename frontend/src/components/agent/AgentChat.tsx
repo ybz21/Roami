@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
+import { agentName, isAgentKind, type AgentKind } from '../../agent-kind'
 import { AgentLogo, ArrowDown, ArrowUp, BellIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PanelRightIcon, RefreshIcon, StopIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -54,7 +55,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const [workspaceTask, setWorkspaceTask] = useState('')
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
-  const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
+  const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState<AgentKind>('codex')
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const showPanel = (next: 'tasks' | 'memory' | 'context') => {
     if (phone && next !== 'context') { openAgentPage(next); return }
@@ -297,7 +298,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
         </form>
         {target !== 'direct' && <div className="agent-task-options">
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
-          <Dropdown trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'codex', label: 'Codex', icon: <AgentLogo kind="codex" /> }, { key: 'claude', label: 'Claude Code', icon: <AgentLogo kind="claude" /> }], onClick: ({ key }) => setExecutor(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor as 'codex' | 'claude'} />{executor === 'codex' ? 'Codex' : 'Claude Code'}<ChevronDown /></button></Dropdown>
+          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: (['codex', 'claude', 'opencode', 'pi'] as const).map(kind => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown>
         </div>}
       </div>
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />

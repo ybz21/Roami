@@ -90,6 +90,18 @@ def record_excerpt(root, reference, record=None):
         value = json.loads(raw)
         require(isinstance(value, dict), "RSI_EVIDENCE_UNAVAILABLE")
         records = value.get("tool_calls", value.get("requests", []))
+        if "ratings" in value:
+            records = value["ratings"]
+        elif "images" in value and "artifacts" in value:
+            records = [
+                {
+                    "instruction": value["instruction"],
+                    "grounding": value["grounding"],
+                    "artifacts": value["artifacts"],
+                },
+                *value["texts"],
+                *[{k: v for k, v in image.items() if k != "data"} for image in value["images"]],
+            ]
         require(isinstance(records, list), "RSI_EVIDENCE_UNAVAILABLE")
         if record is not None:
             require(
