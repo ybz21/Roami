@@ -1,6 +1,6 @@
 {
-  "plan_version": "roami-rsi-mixed-v3-daily-full-20261023",
-  "status": "scope_frozen_authored_grader_accepted_public_native_adapters_pending",
+  "plan_version": "roami-rsi-mixed-v4-daily-full-public-course-20261023",
+  "status": "all60_contracts_materialized_seven_artifact_reviews_and_operational_configuration_pending",
   "target_size": 60,
   "public_target": 20,
   "authored_selected": 40,
@@ -41,7 +41,7 @@
         "hr-make-slides-introduce-leadership"
       ],
       "dataset_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
-      "status": "source_contract_locked_native_environment_and_adapter_pending"
+      "status": "two_native_environment_contracts_accepted_independent_artifact_quality_pending"
     },
     {
       "benchmark_id": "osworld",
@@ -93,11 +93,14 @@
     {
       "benchmark_id": "gaia",
       "name": "GAIA",
-      "source_url": "https://huggingface.co/datasets/gaia-benchmark/GAIA",
+      "source_url": "https://huggingface.co/learn/agents-course/unit4/hands-on",
       "target_count": 1,
-      "selected_upstream_ids": [],
-      "dataset_revision": null,
-      "status": "gated_access_not_accepted"
+      "selected_upstream_ids": [
+        "6f37996b-2ac7-44b0-8e68-6d28256631b4"
+      ],
+      "dataset_revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+      "status": "official_public_course_sample_complete_table_reasoning_with_added_exhaustive_proof_accepted",
+      "scope": "Official public course20-question API sample; no gated corpus or leaderboard submission."
     },
     {
       "benchmark_id": "longmemeval_v2",

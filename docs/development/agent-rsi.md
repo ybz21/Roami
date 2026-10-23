@@ -152,7 +152,7 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 正式准入使用 `daily_suite.py` 的固定配额：公开20、自有真实20、机制20，核对指定自有ID、唯一上游任务和不可变revision。调度、周期完成和源码晋级使用同一检查；只有60条记录不能通过。新增 `assemble-daily --id NAME --suite PACK ... --output FILE` 合并各包，不满足合同则拒绝写出。
 
-公开19个task ID已选择，其中17项是可执行合同；另3项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
+公开20个task ID与合同已齐；公司2项产物仍待独立质量评分。GAIA使用官方课程公开样本，无需访问受限整库。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
 
 ```bash
 python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials --max-total-bytes 1500000000
@@ -186,7 +186,7 @@ uv run roami-agent-evaluate evaluation-status --ledger /private/evaluation/ledge
 uv run roami-agent-evaluate evaluation-config --ledger /private/evaluation/ledger.sqlite3 --owner local --config /private/evaluation-settings.json
 ```
 
-`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备57项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。该401来自未获得凭证的隔离CLI；主服务只读接口显示Main/Worker均keyConfigured=true，不能据此断言主服务密钥失效。正式评测由开发服务内Worker共享运行配置，不提取进程环境、不在聊天或仓库传密钥。
+`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备60项正式合同和54项私有代码契约；7项产物待独立质量评分，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。该401来自未获得凭证的隔离CLI；主服务只读接口显示Main/Worker均keyConfigured=true，不能据此断言主服务密钥失效。正式评测由开发服务内Worker共享运行配置，不提取进程环境、不在聊天或仓库传密钥。
 
 新增公开导入：`import-data-analysis --metadata DATA.json --archive DATA.zip --group-id ID --question-id questionN --revision DATA_COMMIT --upstream-revision CODE_COMMIT --output FILE`；`import-vectorization --source-dir TASK --revision COMMIT --output FILE`。DSBench保留原工作簿、背景和问题，使用独立精确JSON答案；MLAgentBench对现代NumPy做显式标量兼容，限定修改forward函数、核验数值，并以四组交替的宿主计时中位数检查90%时限。均为注明改造的内部合同，不声称官方分数或Roami收益；示范实现更快不等于Roami自身生成更快。
 
@@ -218,4 +218,33 @@ LongMemEval-V2导入：`import-long-memory --questions questions.jsonl --haystac
 
 此题原短语判定无需付费Judge；RSI另查完整历史不被改动、严格最终短语、真实引用与表单邮件动作的支持证据，避免只包含正确词的错误答案通过。正确样例、5类错误样例和Main→Native Worker全历史检索演练均通过。此适配不含截图、记忆摄入、跨会话持久学习或官方查询延迟；演练使用确定性提供器，不报告真实模型收益。判定器代码固定在上游`2cc8c540bdb87fe6761629b585e727e1c4704520`，数据固定在`f152293e235517d504809563c833d7190b8c713b`。
 
-大文件下载按校验过的Content-Range分段，错位或截断即拒绝；不支持Range的服务器仅接受从头完整下载并核对总长/hash。既有大文件用流式hash复查，失败不留下有效半文件。完整57项诊断组合约140MB，读取、私有集隔离及不完整60项准入的负向检查均通过。
+大文件下载按校验过的Content-Range分段，错位或截断即拒绝；不支持Range的服务器仅接受从头完整下载并核对总长/hash。既有大文件用流式hash复查，失败不留下有效半文件。当前完整60项组合约142MB，读取、正式组成准入及私有集隔离均通过；组成通过不代表质量评分完成或日程已启用。
+
+
+### 公司原生流程与 GAIA 公开课程样本
+
+| 合同 | 执行与验收 | 边界 |
+| --- | --- | --- |
+| 领导介绍 | 每题恢复原始RocketChat数据库；原5个检查点＋当前执行者向HR的新通知 | 传记真实性与视觉仍待独立质量评分 |
+| 股票报告 | 每题启动固定ownCloud镜像，读原始CSV；退出后下载3个远端文件再验收 | 原严格CSV分数单列；改编容差rtol=1e-12/atol=1e-10；原7个图表/讲稿点未出分 |
+| GAIA运算表 | 官方课程20题API中的完整公开题；原答案＋穷举反例证明 | 无受限整库、远端提交或榜单成绩 |
+
+原生服务仅用内部不发布端口的Docker网络；被测容器仍无网络，文件/API经题目专用Unix socket访问，凭证留在宿主机。服务均非root、限资源、无宿主数据挂载；退出后按标签核验并清理容器及ownCloud临时数据卷。所有写入记录结果，未知写入阻断后续写入并要求只读对账。缺伴随日志不能通过复盘。
+
+```bash
+# 所有输入均来自public-materials-lock.json；镜像须先按digest装入本机。
+uv run python -m roami_agent.improvement.cli import-company \
+  --source-dir /private/company-staging --snapshot /private/db.dump \
+  --images /private/company-images.json --revision 98b68ef82a47690c316f42fddb05baafaab56851 \
+  --snapshot-revision rocketchat-20241123 --output /private/company-hr.json
+uv run python -m roami_agent.improvement.cli import-company-stock \
+  --source-dir /private/materials/TheAgentCompany__TheAgentCompany/selected \
+  --image ghcr.io/theagentcompany/servers-owncloud@sha256:326406d88345899db22fc1081aa8fa15415c542a71b80486c0a2cebf59f56f63 \
+  --raw-source /private/stock_data_raw.csv --revision 98b68ef82a47690c316f42fddb05baafaab56851 \
+  --output /private/company-stock.json
+uv run python -m roami_agent.improvement.cli import-gaia-course \
+  --source /private/materials/HuggingFace__agents-course/selected/questions.json \
+  --output /private/gaia-course.json
+```
+
+HR staging保留原workspaces/tasks目录，并把原workspaces/base_image/common.py、scoring.py复制到staging根目录。股票raw-source从固定镜像的原生WebDAV读取；导入只冻结hash，运行时重新核对。公开问题API会变动；再次下载必须匹配材料锁，不默默接受新版本。正式组合为`roami-formal-60-v6`；启用前仍须接通并校准7项独立产物评分，再绑定开发测试机和日额度；当前待评状态不能靠人工改passed字段消除。

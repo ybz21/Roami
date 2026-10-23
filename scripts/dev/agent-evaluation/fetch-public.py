@@ -74,7 +74,9 @@ def fetch(lock, root, *, only=(), maximum=256_000_000):
             raise ValueError("Invalid material path")
         if url.scheme != "https" or url.hostname not in {
             "raw.githubusercontent.com",
+            "github.com",
             "huggingface.co",
+            "agents-course-unit4-scoring.hf.space",
         }:
             raise ValueError("Only pinned official source URLs are supported")
         path = root / relative

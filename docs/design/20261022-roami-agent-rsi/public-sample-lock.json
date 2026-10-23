@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "17_public_contracts_imported_no_completed_live_agent_benchmark",
-  "materialized_public": 17,
+  "status": "20_public_contracts_imported_no_completed_live_agent_benchmark",
+  "materialized_public": 20,
   "target_public": 20,
   "sampled_on": "2026-10-23",
   "suites": [
@@ -455,6 +455,90 @@
       ],
       "official_leaderboard_comparable": false,
       "grader_acceptance": "full100_textual_trajectories_reference_and5_negatives_and_scripted_Main_Worker_not_real_Agent_memory_ability"
+    },
+    {
+      "suite_id": "the-agent-company-leadership-native-v1",
+      "suite_hash": "e208f9794ff28ebaaf07baaafdccb2449e3efb4ba3c6332fdff2d4e1ca0a1a03",
+      "benchmark": "the_agent_company",
+      "source_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "source_split": "company_hr_workflow",
+      "adapted": true,
+      "official_leaderboard_comparable": false,
+      "selected": [
+        {
+          "case_id": "the-agent-company:hr-make-slides-introduce-leadership",
+          "upstream_id": "hr-make-slides-introduce-leadership",
+          "case_sha256": "9818310a4f4c88f9a953db831b8c6b79b74700de1918d8ae0f98431bcb752719",
+          "benchmark": "the_agent_company",
+          "task_id": "hr-make-slides-introduce-leadership",
+          "revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+          "source_split": "company_hr_workflow",
+          "adapter_revision": "native-rocketchat-with-post-exit-snapshot-v1",
+          "snapshot_revision": "rocketchat-20241123:asset-208611276",
+          "snapshot_sha256": "d3826434819eb1630c0547770ba94232d846799aa8d8469d0448f18570eb1e59",
+          "verifier_sha256": "ee7cf7c01e5064a5b4e7810c74a8a760220f2bf30049bdcaba3f3bac45cf5137",
+          "input_sha256": "6e37fed10ed756362aa6b0ac0feb072997aabedefc521b3398d2e7df3085bf52",
+          "adapted": true,
+          "adaptation": "Native RocketChat5.3 and Mongo5 services, pinned snapshot restored per trial, internal unpublished network, authenticated allowlisted Unix-socket API bridge. Original5 checkpoint predicates/scoring are retained; transport reads a post-exit native snapshot using correct direct-room lookup. Added new-notification and unchanged-directory gates. Browser/NPC interaction excluded; biography/visual quality remains pending calibrated review."
+        }
+      ],
+      "acceptance": "native_contract_and_logs_accepted_quality_pending",
+      "scope": "Native RocketChat5.3 and Mongo5 services, pinned snapshot restored per trial, internal unpublished network, authenticated allowlisted Unix-socket API bridge. Original5 checkpoint predicates/scoring are retained; transport reads a post-exit native snapshot using correct direct-room lookup. Added new-notification and unchanged-directory gates. Browser/NPC interaction excluded; biography/visual quality remains pending calibrated review."
+    },
+    {
+      "suite_id": "the-agent-company-stock-native-v1",
+      "suite_hash": "398d04fe411473276e297edadbad2ebd7e69210b281886ccafb939c3728b0b00",
+      "benchmark": "the_agent_company",
+      "source_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "source_split": "company_stock_workflow",
+      "adapted": true,
+      "official_leaderboard_comparable": false,
+      "selected": [
+        {
+          "case_id": "the-agent-company:ds-stock-analysis-slides",
+          "upstream_id": "ds-stock-analysis-slides",
+          "case_sha256": "624d32f581418655807991107d8d2acfa22f238488b4d3db83cd97d1dd92c43a",
+          "benchmark": "the_agent_company",
+          "task_id": "ds-stock-analysis-slides",
+          "revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+          "source_split": "company_stock_workflow",
+          "adapter_revision": "native-owncloud-post-exit-webdav-v1",
+          "input_sha256": "4085ce54fd870ba80bd82ad5a64bc9a5d4da04acfdd5075dcfe4e9eda2075aec",
+          "verifier_sha256": "b4926f32e89fe6ba01c0e7697e6f71100608c415dc7c2911eae1c03ae69f67a9",
+          "adapted": true,
+          "adaptation": "Publisher ownCloud1.0.0 seeded image pinned by digest, fresh anonymous data volume per trial, non-root internal unpublished service, allowlisted Unix-socket WebDAV. Original CSV equality checkpoint retained; original seven LLM chart/script points unscored pending independent calibration. Adapted numeric gate rtol=1e-12/atol=1e-10 handles seven published float roundoff artifacts; the original strict equality result remains separately reported. Extra source-immutability and remote-delivery structural gates. No browser or official full score."
+        }
+      ],
+      "acceptance": "native_contract_and_logs_accepted_quality_pending",
+      "scope": "Publisher ownCloud1.0.0 seeded image pinned by digest, fresh anonymous data volume per trial, non-root internal unpublished service, allowlisted Unix-socket WebDAV. Original CSV equality checkpoint retained; original seven LLM chart/script points unscored pending independent calibration. Adapted numeric gate rtol=1e-12/atol=1e-10 handles seven published float roundoff artifacts; the original strict equality result remains separately reported. Extra source-immutability and remote-delivery structural gates. No browser or official full score."
+    },
+    {
+      "suite_id": "gaia-course-counterexamples-v1",
+      "suite_hash": "2efc738e2e423d3d595000c49a5da34bddd0db6b6290de136dd32fdcb9a32cc0",
+      "benchmark": "gaia",
+      "source_revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+      "source_split": "official_agents_course:gaia_validation_level1",
+      "adapted": true,
+      "official_leaderboard_comparable": false,
+      "selected": [
+        {
+          "case_id": "gaia-course:6f37996b-2ac7-44b0-8e68-6d28256631b4",
+          "upstream_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+          "case_sha256": "271103561b6bb76d0cc4fb3abd33b47e8ee5744b9b3bc155b940109820483b5c",
+          "benchmark": "gaia",
+          "task_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+          "revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+          "source_split": "official_agents_course:gaia_validation_level1",
+          "source_url": "https://agents-course-unit4-scoring.hf.space/questions",
+          "source_documentation": "https://huggingface.co/learn/agents-course/unit4/hands-on",
+          "input_sha256": "7a2d441e7b205a98c5c12708326ee6b921cc5a628d762b372254d45ac87a80c9",
+          "adapter_revision": "complete-table-exhaustive-proof-v1",
+          "adapted": true,
+          "adaptation": "Original public-course question and complete operator table. Expected result independently derived by exhaustive enumeration; added immutable-input and complete-proof assertions. Does not access the gated GAIA repository or submit to any leaderboard; not official-score comparable."
+        }
+      ],
+      "acceptance": "official_public_course_complete_table_and_exhaustive_proof_accepted",
+      "scope": "Original public-course question and complete operator table. Expected result independently derived by exhaustive enumeration; added immutable-input and complete-proof assertions. Does not access the gated GAIA repository or submit to any leaderboard; not official-score comparable."
     }
   ]
 }

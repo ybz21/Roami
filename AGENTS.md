@@ -803,6 +803,6 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <section id="roami-rsi-development-only" lang="zh-CN">
 <h2>RSI开发版边界修订 · 2026-10-23</h2>
 <p>RSI仅在显式development编译通道运行；普通安装版不构造服务、worker、接口或策略绑定，旧enabled设置不生效，入口由当前节点状态控制。改进只应用于开发评测实例，经正常审阅发布后交付用户。无版本差异每日60次，候选对照120次；全部指标与日志仍逐次复盘。</p>
-<p>当前正式合同57/60：公开17、自有40；SWE两项原生环境与PPT两项状态提取的正反验收已通过，PPT不代表GUI；长记忆新增完整100条原始文本轨迹的检索与独立证据判定，不含记忆摄入或持久学习。剩余公司环境2、GAIA1，另5项复杂产物待独立校准。主服务已配置模型凭证；历史401来自缺凭证的隔离CLI，不是主服务鉴权结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
-<p>本轮验收：Go与full门禁通过，Python1035项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
+<p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
+<p>本轮验收：Go与full门禁通过，Python1086项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
 </section>

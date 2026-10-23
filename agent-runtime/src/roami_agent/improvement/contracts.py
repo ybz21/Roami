@@ -96,8 +96,63 @@ def validate_case(case):
             "swe",
             "slides",
             "long_memory",
+            "company",
+            "company_stock",
+            "gaia_course",
         }
     )
+    if judge["kind"] == "gaia_course":
+        from roami_agent.improvement.gaia_tasks import TASK_ID, table_counterexamples
+
+        require(judge.get("task_id") == TASK_ID)
+        question = case.get("files", {}).get("question.md")
+        require(isinstance(question, str) and 0 < len(question) <= 100000)
+        require(hashlib.sha256(question.encode()).hexdigest() == judge.get("input_sha256"))
+        pairs, affected = table_counterexamples(question)
+        require(judge.get("counterexamples") == pairs and judge.get("affected") == affected)
+    if judge["kind"] == "company_stock":
+        from roami_agent.improvement.stock_environment import IMAGE_RE
+        from roami_agent.improvement.stock_tasks import TASK_ID
+
+        require(judge.get("task_id") == TASK_ID)
+        require(isinstance(judge.get("image"), str) and re.fullmatch(IMAGE_RE, judge["image"]))
+        for key in ("raw_sha256", "golden_sha256"):
+            require(bool(re.fullmatch(r"[a-f0-9]{64}", judge.get(key, ""))))
+        require(isinstance(judge.get("golden"), str) and 0 < len(judge["golden"]) <= 3000000)
+        import base64
+
+        require(
+            hashlib.sha256(base64.b64decode(judge["golden"], validate=True)).hexdigest()
+            == judge["golden_sha256"]
+        )
+        require(
+            all(
+                isinstance(judge.get(key), str) and 0 < len(judge[key]) <= 2000000
+                for key in ("verifier", "checkpoint")
+            )
+        )
+        require(judge.get("rubric_required") is True)
+    if judge["kind"] == "company":
+        from roami_agent.improvement.company_environment import IMAGE_RE
+        from roami_agent.improvement.company_tasks import TASK_ID
+
+        require(judge.get("task_id") == TASK_ID)
+        require(isinstance(judge.get("images"), dict) and set(judge["images"]) == set(IMAGE_RE))
+        require(
+            all(
+                isinstance(judge["images"][k], str) and re.fullmatch(pattern, judge["images"][k])
+                for k, pattern in IMAGE_RE.items()
+            )
+        )
+        require(isinstance(judge.get("db_dump"), str) and 0 < len(judge["db_dump"]) <= 6000000)
+        require(bool(re.fullmatch(r"[a-f0-9]{64}", judge.get("db_sha256", ""))))
+        require(
+            all(
+                isinstance(judge.get(key), str) and 0 < len(judge[key]) <= 2000000
+                for key in ("verifier", "common_helpers", "scoring")
+            )
+        )
+        require(judge.get("rubric_required") is True)
     if judge["kind"] == "long_memory":
         from roami_agent.improvement.long_memory import EVAL_SPEC, QUESTION_ID
 

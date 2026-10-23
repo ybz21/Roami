@@ -32,6 +32,44 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-gaia-course":
+        from roami_agent.improvement.gaia_tasks import import_gaia_course
+
+        suite = import_gaia_course(args.source)
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "gated_corpus_accessed": False,
+            "official_leaderboard_comparable": False,
+        }
+    if args.command == "import-company-stock":
+        from roami_agent.improvement.stock_tasks import import_stock
+
+        suite = import_stock(
+            args.source_dir, image=args.image, raw_source=args.raw_source, revision=args.revision
+        )
+        private_json(args.output, suite)
+        return {"suite_hash": suite["content_hash"], "cases": len(suite["cases"])}
+    if args.command == "import-company":
+        from roami_agent.improvement.company_tasks import import_company
+
+        suite = import_company(
+            args.source_dir,
+            args.snapshot,
+            images=load_json(args.images),
+            revision=args.revision,
+            snapshot_revision=args.snapshot_revision,
+        )
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "artifact_review_required": True,
+            "official_leaderboard_comparable": False,
+        }
     if args.command == "import-long-memory":
         from roami_agent.improvement.long_memory import import_long_memory
 
@@ -406,6 +444,20 @@ def main():
     p.add_argument("--source-dir", required=True, type=Path)
     p.add_argument("--revision", required=True)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-gaia-course")
+    p.add_argument("--source", required=True, type=Path)
+    p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-company-stock")
+    p.add_argument("--source-dir", type=Path, required=True)
+    p.add_argument("--image", required=True)
+    p.add_argument("--raw-source", type=Path, required=True)
+    p.add_argument("--revision", required=True)
+    p.add_argument("--output", type=Path, required=True)
+    p = commands.add_parser("import-company")
+    for name in ("source-dir", "snapshot", "images", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    for name in ("revision", "snapshot-revision"):
+        p.add_argument("--" + name, required=True)
     p = commands.add_parser("import-long-memory")
     for name in ("questions", "haystacks", "trajectories", "verifier", "output"):
         p.add_argument("--" + name, required=True, type=Path)

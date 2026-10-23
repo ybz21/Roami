@@ -59,6 +59,10 @@ def quality(dimensions, profile="mechanism", *, hard_passed, pending=False):
 def judge_case(case, output, workspace):
     judge = case["judge"]
     kind = judge["kind"]
+    if kind == "gaia_course":
+        from roami_agent.improvement.gaia_tasks import grade_gaia_course
+
+        return grade_gaia_course(case, workspace)
     if kind == "workbook":
         from roami_agent.improvement.spreadsheet import grade_workbook
 
@@ -73,6 +77,8 @@ def judge_case(case, output, workspace):
         "swe",
         "slides",
         "long_memory",
+        "company",
+        "company_stock",
     }:
         return {
             **quality(dict.fromkeys(DIMENSIONS, 0), hard_passed=True, pending=True),

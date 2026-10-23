@@ -58,7 +58,7 @@ async def docker_command(*args, timeout=30, input=None, maximum=8_000_000):
 async def remove_container(name, label):
     data = json.loads(await docker_command("inspect", name))[0]
     require(data["Config"]["Labels"].get("roami.rsi") == label, "RSI_CONTAINER_IDENTITY_CHANGED")
-    await docker_command("rm", "--force", name)
+    await docker_command("rm", "--force", "--volumes", name)
 
 
 class ContainerExecutor:
@@ -184,7 +184,7 @@ class ContainerExecutor:
         finally:
             await self.remove(name, name)
 
-    async def verify(self, case, workspace, output, *, started):
+    async def verify(self, case, workspace, output, *, started, evidence_root=None):
         remaining = case["limits"]["seconds"] - (time.monotonic() - started)
         require(remaining > 0, "RSI_TIME_BUDGET")
         async with asyncio.timeout(remaining):
@@ -221,6 +221,18 @@ class ContainerExecutor:
                 from roami_agent.improvement.long_memory import grade_long_memory
 
                 grade = await grade_long_memory(case, workspace, self)
+            elif kind == "company":
+                from roami_agent.improvement.company_tasks import grade_company
+
+                require(evidence_root is not None, "RSI_COMPANY_SNAPSHOT_FAILED")
+                grade = await grade_company(
+                    case, workspace, self, state_path=evidence_root / "company-snapshot.json"
+                )
+            elif kind == "company_stock":
+                from roami_agent.improvement.stock_tasks import grade_stock
+
+                require(evidence_root is not None, "RSI_COMPANY_SNAPSHOT_FAILED")
+                grade = await grade_stock(case, self, root=evidence_root)
             else:
                 grade = judge_case(case, output, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
@@ -250,6 +262,14 @@ class ContainerExecutor:
             from roami_agent.improvement.long_memory import prepare_history
 
             await asyncio.to_thread(prepare_history, case, workspace)
+        elif case["judge"]["kind"] == "company":
+            from roami_agent.improvement.company_environment import resolve_images
+
+            await resolve_images(case["judge"]["images"])
+        elif case["judge"]["kind"] == "company_stock":
+            from roami_agent.improvement.stock_environment import resolve_image
+
+            await resolve_image(case["judge"]["image"])
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))
@@ -281,6 +301,7 @@ class ContainerExecutor:
         created = False
         try:
             with tempfile.TemporaryDirectory(prefix="roami-rsi-gateway-") as directory:
+                from roami_agent.improvement.company_runtime import company_runtime
                 from roami_agent.improvement.project_runtime import project_runtime
 
                 async with (
@@ -288,7 +309,11 @@ class ContainerExecutor:
                     project_runtime(
                         case, directory, workspace, root, started + case["limits"]["seconds"]
                     ) as project,
+                    company_runtime(
+                        case, directory, workspace, root, started + case["limits"]["seconds"]
+                    ) as company,
                 ):
+                    setup_ms = (time.monotonic() - started) * 1000
                     await docker_command(
                         "create",
                         "--name",
@@ -344,9 +369,15 @@ class ContainerExecutor:
                     r["state"] in {"running", "unknown"} for r in project.records
                 ):
                     failure = "RSI_PROJECT_RUNTIME_UNSETTLED"
+                if company is not None and any(
+                    r["state"] in {"running", "unknown"} for r in company.records
+                ):
+                    failure = "RSI_COMPANY_RUNTIME_UNSETTLED"
                 await self.remove(name, name)
                 created = False
-            grade = await self.verify(case, workspace, response.get("output", ""), started=started)
+            grade = await self.verify(
+                case, workspace, response.get("output", ""), started=started, evidence_root=root
+            )
             elapsed = (time.monotonic() - started) * 1000
         except (DomainError, OSError, TimeoutError, ValueError) as error:
             failure = (
@@ -379,6 +410,12 @@ class ContainerExecutor:
             metrics["project_source"] = prepared_project
             metrics["project_test_calls"] = len(records)
             metrics["project_test_ms"] = sum(r["elapsed_ms"] for r in records)
+        if case["judge"]["kind"] in {"company", "company_stock"}:
+            log = root / "company-runtime-log.json"
+            data = load_json(log) if log.exists() else {"tool_calls": [], "native_http_calls": 0}
+            metrics["company_api_calls"] = len(data["tool_calls"])
+            metrics["company_api_ms"] = sum(r["elapsed_ms"] for r in data["tool_calls"])
+            metrics["company_native_http_calls"] = data["native_http_calls"]
         if failure:
             grade.update(
                 artifact_assessment=dict(grade),
@@ -418,6 +455,14 @@ class ContainerExecutor:
                 **(
                     {"project_runtime": case["judge"]["image"]}
                     if case["judge"]["kind"] == "swe"
+                    else {}
+                ),
+                **(
+                    {
+                        "company_runtime": case["judge"].get("images", case["judge"].get("image")),
+                        "service_network": "internal_unpublished",
+                    }
+                    if case["judge"]["kind"] in {"company", "company_stock"}
                     else {}
                 ),
             },

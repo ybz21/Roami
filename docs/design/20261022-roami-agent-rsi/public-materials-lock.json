@@ -2,10 +2,10 @@
   "schema_version": 1,
   "checked_on": "2026-10-23",
   "selection_seed": 20261023,
-  "source_tasks_selected_in_this_lock": 15,
-  "total_selected_with_financial_samples": 19,
+  "source_tasks_selected_in_this_lock": 16,
+  "total_selected_with_financial_samples": 20,
   "public_target": 20,
-  "runnable_public_contracts": 17,
+  "runnable_public_contracts": 20,
   "source_selection_is_not_environment_acceptance": true,
   "sources": [
     {
@@ -147,7 +147,7 @@
         "ds-stock-analysis-slides",
         "hr-make-slides-introduce-leadership"
       ],
-      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "status": "two_native_services_and_post_exit_contracts_accepted_independent_artifact_quality_pending",
       "files": [
         {
           "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/Dockerfile",
@@ -239,8 +239,65 @@
           "sha256": "bcfd6d66d62abeac8cf166735d09c6d71e0797507f2be0980d319f72345dda2f",
           "bytes": 740,
           "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/base_image/common.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/base_image/common.py",
+          "sha256": "32f5365249e5995f417c8fadf337572a8748222f5c812ae1dfe87367a60c4adc",
+          "bytes": 28775,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/base_image/scoring.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/base_image/scoring.py",
+          "sha256": "446dec4587f0e2f6d65968cbc13f01be099939de01d0045bb8b37419140b7ecb",
+          "bytes": 5914,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/docker-compose.yml",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/docker-compose.yml",
+          "sha256": "da46a8200800776e1aae0b585005f860cdb1db808e3320b9041bd594c2846c4d",
+          "bytes": 4518,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/owncloud/Dockerfile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/owncloud/Dockerfile",
+          "sha256": "aa507c035283cd421feb1b3976cc329b5f79dfb4e8715cd3a5e699366cd33115",
+          "bytes": 403,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/owncloud/init.sh",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/owncloud/init.sh",
+          "sha256": "56a7b41b41b5efe89644f34a030ab23ed9afd091781500dddfdc8fc48a2b404d",
+          "bytes": 1479,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/rocketchat/data_restore/restore.sh",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/rocketchat/data_restore/restore.sh",
+          "sha256": "e339c58211716ef88adfaa4f2d84b1dadc5592e5ff2657a9d6788327a5ad5b49",
+          "bytes": 889,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/environment/db.dump",
+          "url": "https://github.com/TheAgentCompany/the-agent-company-backup-data/releases/download/rocketchat-20241123/db.dump",
+          "sha256": "d3826434819eb1630c0547770ba94232d846799aa8d8469d0448f18570eb1e59",
+          "bytes": 1144726,
+          "exposure": "host_only_original_database_snapshot_not_agent_input"
         }
-      ]
+      ],
+      "snapshot_authenticity": "Publisher release asset pinned by locally computed digest; no publisher digest was supplied.",
+      "service_images": {
+        "mongo": "mongo@sha256:9fe0747650162376edd9f67a0b8e48a43e920cca54f134be82e45ce46ae7fc8d",
+        "rocketchat": "rocketchat/rocket.chat@sha256:55e17e7ee850c0757c66b53bd0adf49bcea349fb985f4bec2cdcf8c7a7276ec4",
+        "owncloud": "ghcr.io/theagentcompany/servers-owncloud@sha256:326406d88345899db22fc1081aa8fa15415c542a71b80486c0a2cebf59f56f63"
+      },
+      "stock_raw_csv_sha256": "5e83e1084cdebcfe78892cc345d38a8d584d2533e58efab722294a94edf1874c",
+      "grading_scope": "HR original5 checkpoints plus fresh recipient/sender state; stock original strict CSV checkpoint reported separately from explicit rtol1e-12/atol1e-10 gate. Two artifacts still require calibrated quality. API workflows exclude browser and NPC evaluation."
     },
     {
       "benchmark": "osworld",
@@ -610,11 +667,22 @@
     },
     {
       "benchmark": "gaia",
-      "source_url": "https://huggingface.co/datasets/gaia-benchmark/GAIA",
-      "revision": null,
-      "selected_upstream_ids": [],
-      "status": "gated_access_not_accepted",
-      "files": []
+      "source_url": "https://huggingface.co/learn/agents-course/unit4/hands-on",
+      "revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+      "selected_upstream_ids": [
+        "6f37996b-2ac7-44b0-8e68-6d28256631b4"
+      ],
+      "status": "official_public_course_sample_complete_table_with_added_proof_accepted_not_gated_full_corpus",
+      "files": [
+        {
+          "path": "HuggingFace__agents-course/selected/questions.json",
+          "url": "https://agents-course-unit4-scoring.hf.space/questions",
+          "sha256": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+          "bytes": 7458,
+          "exposure": "public_questions_only_no_remote_submission"
+        }
+      ],
+      "scope": "Original complete supplied table from official20-question course API; added exhaustive counterexample proof. No gated corpus or leaderboard submission."
     }
   ],
   "large_materials_explicit_max_total_bytes": 1500000000
