@@ -47,14 +47,13 @@ async def test_stdio_discovery_namespaces_scopes_credentials_and_catalog_change(
     config = spec(tmp_path)
     pool = MCPConnections(registry, {"docs": config, "other": config})
     try:
-        assert registry.catalog("main") == []
+        assert len(registry.catalog("main")) == 1
         assert len(registry.catalog("worker")) == 1
         first = await pool.discover({"server": "docs"}, {})
         echo = named(registry, "echo")
         assert registry.registry[echo].effect == "read"
         assert registry.registry[named(registry, "slow")].effect == "write"
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-            await registry.invoke(wire(echo), "main", {})
+        assert await registry.invoke(wire(echo), "main", {})
         result = await registry.invoke(wire(echo, "中文"), "worker", {})
         assert result["structuredContent"] == {
             "text": "中文",
@@ -159,14 +158,15 @@ async def test_stdio_unusable_result_is_not_a_success_or_secret_leak(tmp_path, m
         await pool.close()
 
 
-async def test_streamable_http_initialization_authentication_and_call(monkeypatch):
+@pytest.mark.parametrize("transport", ["sse", "streamable_http"])
+async def test_remote_initialization_authentication_and_call(monkeypatch, transport):
     fixture = FastMCP("http-fixture")
 
     @fixture.tool()
     def echo(text: str) -> str:
         return text
 
-    app = fixture.streamable_http_app()
+    app = fixture.sse_app() if transport == "sse" else fixture.streamable_http_app()
 
     async def authenticated(scope, receive, send):
         if (
@@ -180,8 +180,9 @@ async def test_streamable_http_initialization_authentication_and_call(monkeypatc
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         config = {
-            "transport": "streamable_http",
-            "url": f"http://127.0.0.1:{sock.getsockname()[1]}/mcp",
+            "transport": transport,
+            "url": f"http://127.0.0.1:{sock.getsockname()[1]}/"
+            + ("sse" if transport == "sse" else "mcp"),
             "key_env": "FIXTURE_MCP_TOKEN",
             "read_only": ["echo"],
         }

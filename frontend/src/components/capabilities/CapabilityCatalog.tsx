@@ -68,7 +68,7 @@ export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | '
     }
     finally { setSaving('') }
   }
-  const source = (row: Entry) => kind === 'mcp' ? (row.source === 'streamable_http' ? 'HTTP' : row.source) : t('capabilities.source.' + (row.managed ? 'managed' : row.source === 'builtin' ? 'builtin' : 'configured'))
+  const source = (row: Entry) => kind === 'mcp' ? t('capabilities.transport.' + row.source) : t('capabilities.source.' + (row.managed ? 'managed' : row.source === 'builtin' ? 'builtin' : 'configured'))
   const actions = (row: Entry) => <div className="tt-capability-actions">
     {kind === 'mcp' && <Button loading={saving === row.name} disabled={!!saving} onClick={() => { void connect(row) }}>{t('capabilities.connect')}</Button>}
     {row.managed && <>

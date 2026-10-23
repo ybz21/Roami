@@ -9,7 +9,8 @@ import { CapabilityCatalog } from './CapabilityCatalog'
 import './capabilities.css'
 
 const PluginsPanel = lazy(() => import('../plugins/PluginsPanel'))
-const kinds = ['agents', 'plugins', 'skills', 'mcp', 'cli', 'tools'] as const
+const CapabilityMarket = lazy(() => import('./CapabilityMarket'))
+const kinds = ['agents', 'plugins', 'skills', 'mcp', 'cli', 'tools', 'markets'] as const
 export type CapabilityKind = typeof kinds[number]
 
 export default function CapabilitiesPage({ sub = '', onNav, onLaunchAgent }: { sub?: string; onNav: (route: string) => void; onLaunchAgent?: (kind: AgentKind) => Promise<void> }) {
@@ -23,6 +24,6 @@ export default function CapabilitiesPage({ sub = '', onNav, onLaunchAgent }: { s
     <Tabs className="tt-capability-tabs" activeKey={active} onChange={kind => onNav('capabilities/' + kind)} destroyInactiveTabPane
       items={kinds.map(kind => ({ key: kind, label: t('capabilities.tab.' + kind), children: kind === 'agents' ? <AgentCatalog initialKind={rest[0]} initialSection={rest[1]} onSelect={id => onNav('capabilities/agents' + (id ? '/' + id : ''))} onLaunch={onLaunchAgent} /> : kind === 'plugins'
         ? <Suspense fallback={<Spin />}><PluginsPanel initialId={rest.join('/') || undefined} onSelect={id => onNav('capabilities/plugins' + (id ? '/' + id : ''))} /></Suspense>
-        : <CapabilityCatalog kind={kind} /> }))} />
+        : kind === 'markets' ? <Suspense fallback={<Spin />}><CapabilityMarket /></Suspense> : <CapabilityCatalog kind={kind} /> }))} />
   </div>
 }

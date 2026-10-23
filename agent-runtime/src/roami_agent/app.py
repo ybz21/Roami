@@ -50,6 +50,7 @@ from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
 from roami_agent.server.capability_imports import CapabilityImports
+from roami_agent.server.capability_markets import CapabilityMarkets
 from roami_agent.server.capability_settings import CapabilitySettings
 from roami_agent.server.configuration import Settings
 from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, load_model_settings
@@ -69,6 +70,7 @@ from roami_agent.tools.foundations import register_foundations
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.mcp import MCPConnections, validate_servers
+from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.web_research import register_research_tools
@@ -275,8 +277,13 @@ class Runtime:
         self.model_settings = ModelSettings(self, configured_provider)
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
+        self.capability_markets = CapabilityMarkets(self)
+        self.professional_capabilities = ProfessionalCapabilities(self)
+        if isinstance(self.executor, CodingExecutor):
+            self.executor.capabilities = self.professional_capabilities
 
     async def start(self):
+        await self.professional_capabilities.recover()
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
@@ -445,6 +452,8 @@ class Runtime:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
         await self.native_sessions.flush()
+        await self.professional_capabilities.close()
+        await self.capability_markets.close()
         await self.mcp.close()
         await self.desktop.close()
         await self.files.close()
