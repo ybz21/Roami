@@ -6,7 +6,7 @@ Roami 是自托管的，没有商店里的 App。手机端就是这个网站本�
 |---|---|---|
 | iPhone | Safari 打开 → 分享 → 加到主屏幕 | 加到主屏后才有（iOS 16.4+） |
 | Android | Chrome 打开 → 菜单 → 安装应用 | 装完就有 |
-| Android（真 App） | 部署者用 `scripts/build/build-apk.sh --install` 打包，手机上「装到手机」页直接下载 | App 自己的长连接，不依赖 Google |
+| Android（真 App） | 从 [GitHub Releases](https://github.com/ybz21/Roami/releases) 下载 `roami.apk`，或由部署者自行打包 | App 自己的长连接，不依赖 Google |
 
 前两条的推送是 Web Push，密钥在 `~/.roami/push/vapid.json`，每个部署自己生成，不经过任何中心服务；
 第三条是 App 前台服务挂一条 WebSocket 到 `/api/events/ws`（Gotify / ntfy 的做法），事件来了弹本地通知，通知栏上直接 允许 / 拒绝。
@@ -27,6 +27,38 @@ Roami 默认用自签证书。手机不认它的话，浏览器不把这里当�
 手机怎么连到 Roami 所在的机器（内网 / VPN / 隧道）不在 Roami 的范围内，和桌面浏览器是同一个前提。
 
 ## Android App（mobile/android）
+
+### Release 下载与签名
+
+版本标签发布会同时构建 macOS / Linux 运行包和 Android APK，全部成功后才上传 Release。
+Android 附件为 `roami.apk`、`roami.apk.sha256`、`roami.apk.version`；APK 版本沿用 Android 工程的
+`versionName` / `versionCode`，与服务端标签独立。`roami.apk.version` 从构建后的 APK 读取。
+
+正式发版前，在仓库 Settings → Secrets and variables → Actions 配置固定证书：
+
+| Secret | 内容 |
+|---|---|
+| `ROAMI_ANDROID_KEYSTORE_BASE64` | 签名 keystore 文件的 Base64 |
+| `ROAMI_ANDROID_STORE_PASSWORD` | keystore 密码 |
+| `ROAMI_ANDROID_KEY_ALIAS` | 签名密钥别名 |
+| `ROAMI_ANDROID_KEY_PASSWORD` | 签名密钥密码 |
+
+缺少签名配置时发版失败，不回退为临时 debug 证书。私钥不进入仓库或构建附件，并在 CI 结束后删除临时文件。
+PR 和手工运行 Android APK 工作流只生成临时证书的 `android-apk-test` 验证附件，不会发布 Release。
+覆盖升级必须沿用同一证书；从其他证书签名的自打包版切换时，需要先卸载旧 App。
+
+本地生成正式发布附件：
+
+```bash
+# 设置 ROAMI_ANDROID_KEYSTORE（文件路径）、ROAMI_ANDROID_STORE_PASSWORD、
+# ROAMI_ANDROID_KEY_ALIAS、ROAMI_ANDROID_KEY_PASSWORD 后运行：
+bash scripts/build/build-apk.sh --publish /tmp/roami-android-release
+```
+
+下载的 APK 可直接安装。若要通过自己的 Roami 安装页分发，将 `roami.apk` 和 `roami.apk.version`
+放到该实例的数据目录即可，无需重启。
+
+### 自行打包
 
 打开先选环境或输网址（摇一摇随时回来），里面通过 WebView 加载同一个 React 站点；网页更新后 App 界面也会更新，
 无需重新打包。App 额外处理自签证书信任、文件上传和下载、按需请求麦克风权限，
