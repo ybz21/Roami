@@ -51,7 +51,7 @@ jobs:
       - name: Build native binary and complete Python runtime
         env:
           SKIP_FRONTEND: '1'
-          ROAMI_BUILD_VERSION: ${{ github.ref_name }}
+          ROAMI_BUILD_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: |
           test "$(go env GOOS)-$(go env GOARCH)" = '${{ matrix.target }}'
           bash scripts/build/build-roami.sh
@@ -63,13 +63,14 @@ jobs:
           fi
       - name: Install and exercise the published package
         env:
-          ROAMI_TEST_VERSION: ${{ github.ref_name }}
+          ROAMI_TEST_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: bash scripts/dev/selftest/agent-install.sh backend/dist/roami-${{ matrix.target }}.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.target }}
           path: backend/dist/roami-*
   publish:
+    if: startsWith(github.ref, 'refs/tags/')
     needs: bundle
     runs-on: ubuntu-latest
     steps:
