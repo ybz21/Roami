@@ -162,6 +162,8 @@ class EvaluationWorker:
                 daily_tokens=prefs["daily_tokens"],
                 daily_episodes=prefs["daily_episodes"],
                 request_key=request["id"] if request["kind"] == "manual" else "daily",
+                schedule_period=prefs["period_key"],
+                period_machines=prefs["machine_ids"],
                 source_builds=source_builds,
                 paired=baseline != candidate or source_builds is not None,
             )

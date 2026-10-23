@@ -256,7 +256,7 @@ async def test_no_new_candidate_still_runs_the_full_daily_suite(tmp_path, monkey
     path = tmp_path / "full.json"
     path.write_text(json.dumps(full))
     c.register_suite("local", path)
-    c.save("local", {**settings, "suite_id": "full"})
+    c.save("local", {**settings, "suite_id": "full", "enabled": True})
     c.enqueue("local", machine_id="a", request_key="daily", kind="daily")
     ran = {}
 

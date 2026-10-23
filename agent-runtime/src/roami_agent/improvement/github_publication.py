@@ -272,7 +272,16 @@ def review_body(candidate):
         )
     )
     return (
-        "每日完整评测在用例 `"
+        (
+            "关联汇总 Issue："
+            + candidate["issue"]["url"]
+            + " · 条目 `"
+            + candidate.get("point_id", "")[:12]
+            + "`。\n\n"
+            if candidate.get("issue")
+            else ""
+        )
+        + "完整评测在用例 `"
         + case
         + "` 观察到异常。本补丁修改 "
         + ", ".join("`" + p + "`" for p in paths)
@@ -284,6 +293,6 @@ def review_body(candidate):
         + "- 回归输出 hash：`"
         + candidate["regression_output_hash"]
         + "`。\n"
-        + "- 仅应用到开发评测实例；后续两个完整日继续观察，退化时回滚并重开问题。\n\n"
+        + "- 仅应用到开发评测实例；后续两个完整周期继续观察，退化时回滚并重开问题。\n\n"
         + "此 PR 由 RSI 自动提交为草稿，保留人工审阅和合并。原始日志、隐藏集、凭证及用户记录不上传。"
     )

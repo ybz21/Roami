@@ -58,6 +58,16 @@ class Reviewer:
         self.calls += 1
         if messages[0]["content"].startswith("You are Roami's isolated"):
             value = {"patch": PATCH, "explanation": "Fixture source change"}
+        elif messages[0]["content"].startswith("Write Roami's complete"):
+            value = {"summary": "Fixture review summary; no real model quality claim."}
+        elif "Issue Agent" in messages[0]["content"]:
+            packet = json.loads(messages[1]["content"])
+            value = {
+                "points": [
+                    {"id": p["id"], "priority": "P2", "category": "context_retention"}
+                    for p in packet["points"]
+                ]
+            }
         else:
             packet = json.loads(messages[1]["content"])
             findings = []
@@ -198,6 +208,55 @@ def seed_review_for_stage_fixture(workflow, action):
         )
 
 
+def complete_review_fixture(workflow, action, result, *, finish_issue=True):
+    """Synthetic Issue receipt for tests that exercise later source/lease boundaries."""
+    cycle_id = action["payload"]["cycle_id"]
+    with workflow.ledger.connection() as db:
+        exists = db.execute(
+            "SELECT 1 FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+            (action["owner"], cycle_id),
+        ).fetchone()
+        findings = [
+            json.loads(r[0])
+            for r in db.execute(
+                "SELECT finding_json FROM rsi_improvements WHERE owner=?", (action["owner"],)
+            )
+        ]
+    if not exists:
+        points = [
+            {"id": digest([f["mechanism"], sorted(f["paths"])]), "finding": f} for f in findings
+        ]
+        workflow.save_report(
+            action,
+            {
+                "cycle_id": cycle_id,
+                "day": workflow.day(action["owner"]),
+                "sha256": digest([cycle_id, points]),
+                "points": points,
+                "document": "Fixture report",
+            },
+        )
+    workflow.complete(action, result)
+    if not finish_issue:
+        return
+    issue = workflow.claim()
+    assert issue["kind"] == "issue"
+    report = workflow.report(action["owner"], cycle_id)
+    workflow.complete(
+        issue,
+        {
+            "cycle_id": cycle_id,
+            "issue": {
+                "repository": "example/rsi-test",
+                "number": 1,
+                "url": "https://github.com/example/rsi-test/issues/1",
+                "report_hash": report["sha256"],
+                "fixture_only": True,
+            },
+        },
+    )
+
+
 async def setup(tmp_path, *, paired=True):
     repo = tmp_path / "repo"
     repo.mkdir(parents=True)
@@ -275,8 +334,8 @@ async def test_full_research_handoff_isolated_patch_independent_gate_and_two_day
     provider = Reviewer(finding=True, expand=True)
     summary = await observe_cycle(w, action, Settings(), cfg, provider_factory=lambda _: provider)
     assert summary == {"cycle_id": cycle["cycle_id"], "semantic_reviewed": 120, "findings": 1}
-    assert provider.calls == 121 and len(w.review_saved("owner", cycle["cycle_id"])) == 120
-    w.complete(action, summary)
+    assert provider.calls == 122 and len(w.review_saved("owner", cycle["cycle_id"])) == 120
+    complete_review_fixture(w, action, summary)
     assert w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
     assert len(w.snapshot("owner")["improvements"]) == 1
     repair = w.claim()
@@ -324,7 +383,7 @@ async def test_full_research_handoff_isolated_patch_independent_gate_and_two_day
         assert review["kind"] == "review"
         await observe_cycle(w, review, Settings(), cfg, provider_factory=lambda _: Reviewer())
         state = observe_code(w, "owner", result["cycle_id"])
-        w.complete(review, {"reviewed": 120})
+        complete_review_fixture(w, review, {"reviewed": 120})
         assert state["state"] == ("observing" if observation == 0 else "closed_fixed")
     assert not (await git(repo, "status", "--porcelain")).strip()
 
@@ -345,7 +404,7 @@ async def test_daily_completion_rejects_claimed_reviews_and_pending_scores(tmp_p
             "UPDATE rsi_trials SET record_json=json_set(record_json,?,json(?)) WHERE cycle_id=? AND arm='baseline' AND case_id='CODE-01'",
             (field, value, cycle["cycle_id"]),
         )
-    w.complete(action, {"semantic_reviewed": 120})
+    complete_review_fixture(w, action, {"semantic_reviewed": 120}, finish_issue=False)
     report = w.ledger.get("owner", cycle["cycle_id"])["report"]
     assert report["semantic_review"]["complete"]
     assert not report["evaluation_complete"] and not report["daily_complete"]
@@ -399,7 +458,7 @@ async def test_lease_fencing_and_duplicate_dispatch_survive_restarts(tmp_path):
     with pytest.raises(DomainError, match="LEASE_LOST"):
         w.complete(first, {"fake": True})
     seed_review_for_stage_fixture(restarted, second)
-    restarted.complete(second, {"reviewed": 120})
+    complete_review_fixture(restarted, second, {"reviewed": 120})
     assert restarted.claim() is None
 
 
@@ -477,11 +536,11 @@ async def test_worker_failure_keeps_issue_and_bounds_repair_attempts(tmp_path):
     }
     w.record_findings(review, [f])
     seed_review_for_stage_fixture(w, review)
-    w.complete(review, {"done": True})
+    complete_review_fixture(w, review, {"done": True})
     repair = w.claim()
     w.complete(
         repair,
-        {"finding": f, "attempt": 1, "improvement_id": repair["subject"]},
+        {"finding": f, "attempt": 1, "improvement_id": repair["payload"]["improvement_id"]},
         next_kind="verify",
         item_state="verifying",
     )
@@ -497,7 +556,7 @@ async def test_worker_failure_keeps_issue_and_bounds_repair_attempts(tmp_path):
     retry = w.claim()
     assert retry["kind"] == "repair" and retry["payload"]["attempt"] == 2
     assert len(w.snapshot("owner")["improvements"]) == 1
-    result = {"finding": f, "attempt": 2, "improvement_id": repair["subject"]}
+    result = {"finding": f, "attempt": 2, "improvement_id": repair["payload"]["improvement_id"]}
     w.complete(retry, result, next_kind="verify", item_state="verifying")
     await worker.execute(w.claim())
     assert w.snapshot("owner")["improvements"][0]["state"] == "blocked"
@@ -586,7 +645,7 @@ async def test_observation_requires_semantic_review_and_rolls_back_regression(tm
     await observe_cycle(
         w, review, Settings(), cfg, provider_factory=lambda _: Reviewer(finding=True)
     )
-    w.complete(review, {"done": True})
+    complete_review_fixture(w, review, {"done": True})
     repair = w.claim()
     revisions = SourceRevisions(w.ledger.path.parent / "source")
     candidate = await revisions.repair(
@@ -633,7 +692,7 @@ async def test_observation_requires_semantic_review_and_rolls_back_regression(tm
     observed = observe_code(w, "owner", result["cycle_id"])
     assert observed["state"] == "reopened" and observed["rollback"]
     assert active_code(w, "owner") is None
-    w.complete(review, {"done": True})
+    complete_review_fixture(w, review, {"done": True})
     next_step = w.claim()
     assert next_step["kind"] == "repair" and next_step["payload"]["attempt"] == 2
     assert (repo / SOURCE).read_text() == "VALUE = 1\n"
@@ -670,7 +729,7 @@ async def test_source_alias_cannot_expose_protected_evaluator_to_repair_model(tm
     }
     w.record_findings(review, [finding])
     seed_review_for_stage_fixture(w, review)
-    w.complete(review, {"done": True})
+    complete_review_fixture(w, review, {"done": True})
     repair = w.claim()
     provider = Reviewer()
     with pytest.raises(DomainError, match="SOURCE_CONTEXT_REQUIRED"):
@@ -686,7 +745,7 @@ async def test_single_baseline_semantic_review_finishes_all_sixty_before_repair(
     action = w.claim()
     provider = Reviewer(finding=True)
     summary = await observe_cycle(w, action, Settings(), cfg, provider_factory=lambda _: provider)
-    assert summary["semantic_reviewed"] == 60 and provider.calls == 60
+    assert summary["semantic_reviewed"] == 60 and provider.calls == 61
     saved = w.review_saved("owner", cycle["cycle_id"])
     assert len(saved) == 60
     missing, original = next(iter(saved.items()))
@@ -699,7 +758,7 @@ async def test_single_baseline_semantic_review_finishes_all_sixty_before_repair(
         w.complete(action, summary)
     assert not w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
     w.save_review("owner", cycle["cycle_id"], missing, original)
-    w.complete(action, summary)
+    complete_review_fixture(w, action, summary)
     assert w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
     assert len(w.snapshot("owner")["improvements"]) == 1
     assert w.claim()["kind"] == "repair"

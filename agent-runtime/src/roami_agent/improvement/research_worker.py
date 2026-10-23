@@ -63,6 +63,16 @@ class ResearchWorker:
                 )
             elif action["kind"] == "repair":
                 result = await self.revisions.repair(self.workflow, action, settings, config)
+            elif action["kind"] == "issue":
+                from roami_agent.improvement.github_issues import publish_issue
+                from roami_agent.improvement.review_report import compose_issue
+
+                plan = await compose_issue(self.workflow, action, settings, config)
+                result = await publish_issue(self.workflow, action, plan)
+            elif action["kind"] == "sync_issue":
+                from roami_agent.improvement.github_issues import sync_issue
+
+                result = await sync_issue(self.workflow, action)
             elif action["kind"] == "verify":
                 result = await verify_candidate(self.workflow, action, settings, config)
             elif action["kind"] == "publish":
@@ -77,6 +87,8 @@ class ResearchWorker:
                 raise DomainError("RSI_UNKNOWN_ACTION")
             transitions = {
                 "review": (None, None),
+                "issue": ("sync_issue", None),
+                "sync_issue": (None, None),
                 "repair": ("verify", "verifying"),
                 "verify": ("activate", "ready"),
                 "publish": ("activate", "ready"),
@@ -91,6 +103,10 @@ class ResearchWorker:
             await asyncio.to_thread(
                 self.workflow.complete, action, result, next_kind=next_kind, item_state=item_state
             )
+            if action["kind"] in {"review", "publish", "activate"}:
+                await asyncio.to_thread(
+                    self.workflow.enqueue_issue_sync, action["owner"], action["id"]
+                )
         except asyncio.CancelledError:
             # The lease expires after shutdown; paid operations remain non-replayable until reconciled.
             raise
@@ -130,7 +146,16 @@ class ResearchWorker:
                 action["owner"],
                 "repair",
                 item_id + ":" + str(attempt),
-                {"finding": finding, "attempt": attempt, "improvement_id": item_id},
+                {
+                    **{
+                        k: action["payload"][k]
+                        for k in ("issue", "point_id")
+                        if k in action["payload"]
+                    },
+                    "finding": finding,
+                    "attempt": attempt,
+                    "improvement_id": item_id,
+                },
             )
             db.execute(
                 "UPDATE rsi_improvements SET state='diagnosing',revision=revision+1 WHERE id=? AND owner=?",

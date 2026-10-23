@@ -209,7 +209,12 @@ async def test_review_link_survives_in_owner_improvement_snapshot(tmp_path):
 
 
 async def test_worker_hands_verified_result_to_publication_and_waits_on_failure(tmp_path):
-    from test_improvement_workflow import SOURCE, seed_review_for_stage_fixture, setup
+    from test_improvement_workflow import (
+        SOURCE,
+        complete_review_fixture,
+        seed_review_for_stage_fixture,
+        setup,
+    )
 
     from roami_agent.improvement.research_worker import ResearchWorker
 
@@ -224,9 +229,13 @@ async def test_worker_hands_verified_result_to_publication_and_waits_on_failure(
         "paths": [SOURCE],
     }
     workflow.record_findings(review, [finding])
-    workflow.complete(review, {"fixture_only": True})
+    complete_review_fixture(workflow, review, {"fixture_only": True})
     repair = workflow.claim()
-    candidate = {"improvement_id": repair["subject"], "finding": finding, "fixture_only": True}
+    candidate = {
+        "improvement_id": repair["payload"]["improvement_id"],
+        "finding": finding,
+        "fixture_only": True,
+    }
     workflow.complete(repair, candidate, next_kind="verify", item_state="verifying")
     configure_publication(
         workflow.ledger.path.parent,

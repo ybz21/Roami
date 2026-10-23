@@ -3,13 +3,14 @@ import { Button, Checkbox, Input, InputNumber, Select, Spin, Switch } from 'antd
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useAgentData } from './useAgentData'
+import Markdown from '../markdown/Markdown'
 import './agent-improvement.css'
 
 type Preferences = { revision: number; enabled: boolean; timezone: string; hour: number; daily_tokens: number; daily_episodes: number; cases_per_day: number; suite_id: string; machine_ids: string[]; auto_candidates: boolean; candidate_policy: Record<string, number> }
 type Comparison = { pairs: number; quality_delta: number; paired_elapsed_ratio_p50: number | null; paired_success_token_ratio_p50: number | null; eligible_for_promotion: boolean; reasons: string[]; release_blockers: string[]; strata: { layer: string; category: string; n: number; baseline_passes: number; candidate_passes: number }[] }
 type Cycle = { id: string; day: string; state: string; machine_id: string; report: { comparison?: Comparison; review?: { complete: boolean; expected_trials: number; metrics_reviewed: number; logs_reviewed: number }; counts?: Record<string, { executed: number; passed: number; verified_deliveries: number }> } | null }
 type Request = { id: string; machine_id: string; state: string; error_code: string | null; cycle_id: string | null }
-type Research = { review_coverage?: { cycle_id: string; reviewed: number }[]; model_cost?: { total_tokens: number | null }; settings: { enabled: boolean }; actions: { id: string; kind: string; state: string; error_code: string | null }[]; improvements: { id: string; title: string; state: string; reviewUrl?: string | null }[] }
+type Research = { reports?: { cycle_id: string; day: string; points: number; issueUrl: string | null }[]; review_coverage?: { cycle_id: string; reviewed: number }[]; model_cost?: { total_tokens: number | null }; settings: { enabled: boolean }; actions: { id: string; kind: string; state: string; error_code: string | null }[]; improvements: { id: string; title: string; state: string; reviewUrl?: string | null }[] }
 type Overview = { research?: Research; preferences: Preferences; catalog: { machines: { id: string; label: string; mode: string }[]; suites: { id: string; count: number; splits: Record<string, number> }[] }; cycles: Cycle[]; requests: Request[]; releases: { seq: number; active: string | null; history: { seq: number; release_id: string | null; action: string; created_ms: number }[] } }
 
 export default function AgentImprovement({ node }: { node: string | null }) {
@@ -19,14 +20,25 @@ export default function AgentImprovement({ node }: { node: string | null }) {
   const [draft, setDraft] = useState<Preferences | null>(null), [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(''), [error, setError] = useState('')
   const [selected, setSelected] = useState<string[]>([]), [detail, setDetail] = useState('')
+  const [documents, setDocuments] = useState<Record<string, string>>({})
   const scope = useRef(node); scope.current = node
-  useEffect(() => { setDraft(null); setDirty(false); setSelected([]); setDetail(''); setError('') }, [node])
+  useEffect(() => { setDraft(null); setDirty(false); setSelected([]); setDetail(''); setError(''); setDocuments({}) }, [node])
   useEffect(() => { if (data.value && !dirty) setDraft({ ...data.value.preferences, cases_per_day: 60 }) }, [data.value, dirty])
   useEffect(() => {
     const active = data.value?.requests.some(r => ['queued', 'running', 'cancelling'].includes(r.state)) || data.value?.research?.actions.some(a => ['queued', 'running'].includes(a.state))
     setPoll(active ? 2000 : (data.value?.preferences.enabled || data.value?.research?.settings.enabled) ? 30000 : 0)
   }, [data.value])
   const change = (patch: Partial<Preferences>) => { setDirty(true); setDraft(value => value && ({ ...value, ...patch })) }
+  const loadReport = async (cycleId: string) => {
+    const owner = node
+    setBusy('report'); setError('')
+    try {
+      const response = await api('GET', '/agent/improvement/cycles/' + encodeURIComponent(cycleId))
+      if (typeof response.data?.review_document !== 'string') throw new Error('missing report')
+      if (scope.current === owner) setDocuments(current => ({ ...current, [cycleId]: response.data.review_document }))
+    } catch { if (scope.current === owner) setError('RSI_REVIEW_REPORT_UNAVAILABLE') }
+    finally { if (scope.current === owner) setBusy('') }
+  }
   const mutate = async (key: string, path: string, body?: unknown, method = 'POST') => {
     const owner = node
     setBusy(key); setError('')
@@ -70,15 +82,19 @@ export default function AgentImprovement({ node }: { node: string | null }) {
       </div>
       <div className="agent-rsi-actions">
         <Button type="primary" loading={busy === 'save'} disabled={!dirty || !!busy} onClick={() => mutate('save', '/preferences', draft, 'PUT')}>{t('agent.rsi.save')}</Button>
-        <Button disabled={dirty || !!busy || !draft.machine_ids.length || !draft.daily_tokens} onClick={() => { void (async () => { for (const machine_id of draft.machine_ids) await mutate('run', '/requests', { machine_id, request_key: key() }) })() }}>{t('agent.rsi.run')}</Button>
+        <Button disabled={dirty || !!busy || !draft.machine_ids.length || !draft.daily_tokens} onClick={() => { void (async () => { const request_key = key(); for (const machine_id of draft.machine_ids) await mutate('run', '/requests', { machine_id, request_key }) })() }}>{t('agent.rsi.run')}</Button>
         {!value.catalog.suites.length && <Button loading={busy === 'prepare'} disabled={!!busy} onClick={() => mutate('prepare', '/prepare')}>{t('agent.rsi.prepare')}</Button>}
         {!value.catalog.machines.length && <Button disabled={!!busy} onClick={() => mutate('machine', '/machines', { id: 'local-container', label: t('agent.rsi.localMachine'), mode: 'container' })}>{t('agent.rsi.addLocal')}</Button>}
       </div>
       {!draft.daily_tokens && <p className="agent-rsi-muted">{t('agent.rsi.budgetHint')}</p>}
     </section>
     {!!value.requests.length && <section className="agent-rsi-section"><h3>{t('agent.rsi.execution')}</h3>{value.requests.map(request => <div className="agent-rsi-row" key={request.id}><span>{value.catalog.machines.find(m => m.id === request.machine_id)?.label || request.machine_id}<small>{state(request.state)}{request.error_code && t('agent.rsi.failureCode', { code: request.error_code })}</small></span>{['queued', 'running'].includes(request.state) && <button type="button" className="tt-act" disabled={!!busy} onClick={() => mutate('cancel', '/requests/' + request.id + '/cancel')}>{t('agent.rsi.cancel')}</button>}</div>)}</section>}
-    {value.research && (value.research.settings.enabled || !!value.research.improvements.length) && <section className="agent-rsi-section">
+    {value.research && (value.research.settings.enabled || !!value.research.improvements.length || !!value.research.reports?.length) && <section className="agent-rsi-section">
       <h3>{t('agent.rsi.research')}</h3>
+      {value.research.reports?.map(report => <div key={report.cycle_id}>
+        <div className="agent-rsi-row"><span>{t('agent.rsi.periodReport', { date: report.day, count: report.points })}</span>{report.issueUrl?.startsWith('https://github.com/') && <a className="tt-act" href={report.issueUrl} target="_blank" rel="noopener noreferrer">{t('agent.rsi.viewIssue')}</a>}</div>
+        <details><summary>{t('agent.rsi.reviewDocument')}</summary>{documents[report.cycle_id] ? <Markdown allowImages={false}>{documents[report.cycle_id]}</Markdown> : <Button loading={busy === 'report'} disabled={!!busy} onClick={() => void loadReport(report.cycle_id)}>{t('agent.rsi.loadReport')}</Button>}</details>
+      </div>)}
       {!value.research.improvements.length && <p className="agent-rsi-muted">{t('agent.rsi.noFindings')}</p>}
       {value.research.improvements.map(item => <div className="agent-rsi-row" key={item.id}><span>{item.title}<small>{state(item.state)}</small></span>{item.reviewUrl?.startsWith('https://github.com/') && <a className="tt-act" href={item.reviewUrl} target="_blank" rel="noopener noreferrer">{t('agent.rsi.reviewPullRequest')}</a>}</div>)}
       <details><summary>{t('agent.rsi.researchSteps')}</summary>{value.research.model_cost && <p className="agent-rsi-muted">{t('agent.rsi.researchTokens', { count: value.research.model_cost.total_tokens == null ? t('agent.rsi.unknown') : number(value.research.model_cost.total_tokens) })}</p>}{value.research.actions.map(action => <div className="agent-rsi-row" key={action.id}><span>{t('agent.rsi.stage.' + action.kind)}<small>{state(action.state)}{action.error_code && t('agent.rsi.failureCode', { code: action.error_code })}</small></span>{['blocked', 'waiting_budget'].includes(action.state) && <button type="button" className="tt-act" disabled={!!busy} onClick={() => mutate('resume', '/research/' + action.id + '/resume')}>{t('agent.rsi.retry')}</button>}</div>)}</details>

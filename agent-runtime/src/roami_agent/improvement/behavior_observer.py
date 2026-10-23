@@ -33,6 +33,11 @@ return no findings. When protected=true return findings=[]; never echo protected
 
 
 async def model_json(workflow, action, settings, config, key, messages, *, provider_factory=None):
+    if provider_factory is None:
+        from roami_agent.improvement.codex_roles import codex_json
+
+        return await codex_json(workflow, action, config, key, messages)
+
     from roami_agent.app import configured_provider
 
     route = settings.route("main")
@@ -121,6 +126,53 @@ def record_excerpt(root, reference, record=None):
     }
 
 
+async def prefetch_reviews(workflow, action, settings, config, packets, saved):
+    groups, group = [], {}
+    for key, packet in packets.items():
+        proposed = {**group, key: packet}
+        if group and (
+            next(iter(group.values()))["protected"] != packet["protected"]
+            or len(proposed) > 4
+            or len(json.dumps(proposed, ensure_ascii=False).encode()) + 18000
+            > config["model_tokens"]
+        ):
+            groups.append(group)
+            group = {}
+        group[key] = packet
+    if group:
+        groups.append(group)
+    reviews = {}
+    for group in groups:
+        if all(key in saved for key in group):
+            continue
+        paid = await model_json(
+            workflow,
+            action,
+            settings,
+            config,
+            "batch:" + digest(list(group)),
+            [
+                {
+                    "role": "system",
+                    "content": INSTRUCTIONS
+                    + '\nReview EVERY supplied trial independently. Return {"reviews":[{"key":"exact trial key","reviewed":true,"reads":[],"findings":[]}]} with each key exactly once. Each reads/findings follows the contract above; do not merge evidence across trials.',
+                },
+                {"role": "user", "content": json.dumps({"trials": group}, ensure_ascii=False)},
+            ],
+        )
+        value = json.loads(paid["text"])
+        results = value.get("reviews")
+        require(
+            isinstance(results, list)
+            and len(results) == len(group)
+            and all(isinstance(v, dict) and isinstance(v.get("key"), str) for v in results),
+            "RSI_INVALID_OBSERVATION",
+        )
+        require({v["key"] for v in results} == set(group), "RSI_REVIEW_INCOMPLETE")
+        reviews.update({v["key"]: v for v in results})
+    return reviews
+
+
 async def observe_cycle(workflow, action, settings, config, *, provider_factory=None):
     cycle = await asyncio.to_thread(
         workflow.ledger.get, action["owner"], action["payload"]["cycle_id"]
@@ -137,11 +189,9 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
     definitions = {c["id"]: c for c in frozen["cases"]}
     saved = await asyncio.to_thread(workflow.review_saved, action["owner"], cycle["id"])
     findings = []
+    packets = {}
     for trial in cycle["trials"]:
         key = trial["arm"] + ":" + trial["case_id"]
-        if key in saved:
-            findings.extend(saved[key].get("findings", []))
-            continue
         review = trial["log_review"]
         require(review["complete"], "RSI_REVIEW_INCOMPLETE")
         root = (
@@ -152,7 +202,7 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
         )
         protected = trial["split"] != "development"
         references = review["logs"]
-        packet = {
+        packets[key] = {
             "task": {"prompt": definitions[trial["case_id"]]["prompt"][:4000]},
             "case_id": trial["case_id"],
             "arm": trial["arm"],
@@ -164,20 +214,43 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
             "allowed_paths": config["allowed_paths"],
             "concrete_logs": [record_excerpt(root, r) for r in references],
         }
+    prefetched = (
+        await prefetch_reviews(workflow, action, settings, config, packets, saved)
+        if provider_factory is None
+        else {}
+    )
+    for trial in cycle["trials"]:
+        key = trial["arm"] + ":" + trial["case_id"]
+        if key in saved:
+            findings.extend(saved[key].get("findings", []))
+            continue
+        packet = packets[key]
+        references = packet["evidence"]
+        protected = packet["protected"]
+        root = (
+            workflow.ledger.path.parent
+            / "runs"
+            / cycle["id"]
+            / (digest(trial["case_id"])[:20] + "-" + trial["arm"])
+        )
         messages = [
             {"role": "system", "content": INSTRUCTIONS},
             {"role": "user", "content": json.dumps(packet, ensure_ascii=False)},
         ]
         final = None
         for round_ in range(3):
-            paid = await model_json(
-                workflow,
-                action,
-                settings,
-                config,
-                key + ":" + str(round_),
-                messages,
-                provider_factory=provider_factory,
+            paid = (
+                {"text": json.dumps(prefetched[key], ensure_ascii=False)}
+                if round_ == 0 and key in prefetched
+                else await model_json(
+                    workflow,
+                    action,
+                    settings,
+                    config,
+                    key + ":" + str(round_),
+                    messages,
+                    provider_factory=provider_factory,
+                )
             )
             value = json.loads(paid["text"])
             require(
@@ -262,7 +335,12 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
         }
         await asyncio.to_thread(workflow.save_review, action["owner"], cycle["id"], key, result)
         findings.extend(accepted)
-    await asyncio.to_thread(workflow.record_findings, action, findings)
+    from roami_agent.improvement.review_report import build_review_report
+
+    report = await build_review_report(
+        workflow, action, settings, config, cycle, findings, provider_factory=provider_factory
+    )
+    await asyncio.to_thread(workflow.save_report, action, report)
     return {
         "cycle_id": cycle["id"],
         "semantic_reviewed": expected_trials,

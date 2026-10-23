@@ -213,6 +213,7 @@ class ImprovementControl:
             ).fetchone()
             require(machine and suite, "RSI_SETUP_REQUIRED")
             payload = {
+                "period_key": request_key,
                 "preferences": prefs,
                 "machine": json.loads(machine[0]),
                 "suite": dict(suite),
@@ -234,6 +235,25 @@ class ImprovementControl:
         for owner in owners:
             prefs = self.preferences(owner)
             now = datetime.now(ZoneInfo(prefs["timezone"]))
+            with self.ledger.connection() as db:
+                for request in db.execute(
+                    "SELECT id,created_ms,payload_json FROM rsi_requests WHERE owner=? AND kind='daily' AND state='queued'",
+                    (owner,),
+                ).fetchall():
+                    payload = json.loads(request["payload_json"])
+                    period = (
+                        payload.get("period_key")
+                        or datetime.fromtimestamp(
+                            request["created_ms"] / 1000, ZoneInfo(prefs["timezone"])
+                        )
+                        .date()
+                        .isoformat()
+                    )
+                    if period < now.date().isoformat():
+                        db.execute(
+                            "UPDATE rsi_requests SET state='interrupted',error_code='RSI_SCHEDULE_EXPIRED',updated_ms=? WHERE id=? AND state='queued'",
+                            (now_ms(), request["id"]),
+                        )
             if now.hour >= prefs["hour"]:
                 for machine in prefs["machine_ids"]:
                     self.enqueue(
@@ -244,7 +264,7 @@ class ImprovementControl:
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             request = db.execute(
-                "SELECT * FROM rsi_requests WHERE state='queued' ORDER BY created_ms,id LIMIT 1"
+                "SELECT r.* FROM rsi_requests r WHERE r.state='queued' AND (r.kind='manual' OR EXISTS(SELECT 1 FROM rsi_preferences p WHERE p.owner=r.owner AND json_extract(p.value_json,'$.enabled')=1)) ORDER BY r.created_ms,r.id LIMIT 1"
             ).fetchone()
             if not request:
                 return None
@@ -258,7 +278,11 @@ class ImprovementControl:
 
     def profiles(self, request):
         payload = json.loads(request["payload_json"])
-        prefs = {**payload["preferences"], "cases_per_day": 60}
+        prefs = {
+            **payload["preferences"],
+            "cases_per_day": 60,
+            "period_key": payload.get("period_key", request["id"]),
+        }
         return prefs, payload["machine"], payload["suite"]
 
     def finish(self, request, state, *, cycle_id=None, error_code=None):

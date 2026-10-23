@@ -59,7 +59,7 @@ uv run --frozen roami-agent-evaluate cycle --config /private/evaluations/machine
 uv run --frozen roami-agent-evaluate watch --config /private/evaluations/machine.json
 ```
 
-`cycle` 执行当天一次；`watch` 是独立长期 worker，在配置时区的 `hour` 后每天尝试一次，不占 Main 队列，不补跑停机期间的所有历史日期。适合由系统服务管理。多测试机使用同一中央账本、不同机器 ID；远程环境通过外部包装程序调用。SQLite 账本放在中央本地磁盘，不直接共享到网络文件系统。
+`cycle` 执行当天一次；`watch` 是独立长期 worker，按配置时区的 `hour` 每天触发一次，不占 Main 队列，不补跑停机期间的所有历史日期。适合由系统服务管理。多测试机使用同一中央账本、不同机器 ID；远程环境通过外部包装程序调用。SQLite 账本放在中央本地磁盘，不直接共享到网络文件系统。
 
 每轮先按实际执行组数原子预留 **整套 episode 的 Token 上限及次数**。超过日预算直接拒绝。当前采用保守预留，不回收未用余额；中断、用量未知也保留预留。每次模型请求用输入 UTF-8 字节量加协议余量、输出上限做保守准入，再按供应商用量结算。供应商未报用量、重试成本不全或超过预算时阻止后续请求。此限额不是供应商侧的金额硬上限，供应商侧配额仍应独立配置。
 
@@ -119,17 +119,18 @@ worker 每条 trial 更新心跳。超时周期恢复为 interrupted，保留已
 
 ## 自动研发运行
 
-[图表版架构与执行](../design/20261022-roami-agent-rsi/automation-roles.html)。每日worker仍负责正式全60项；ResearchWorker自动消费已完成每日周期，逐次语义复盘、去重建内部工单、隔离补丁、独立源码验证、绑定专用评测实例，再观察两个后续完整日周期。所有阶段持久化，带租约和幂等键；付费调用结果未知时不重放。当前尚未启用正式运行。
+[图表版架构与执行](../design/20261022-roami-agent-rsi/automation-roles.html)。定时worker负责每轮正式全60项，每天03:00；ResearchWorker自动消费已完成每日周期，Codex逐项复盘、Codex汇总一个GitHub Issue、Codex隔离补丁、独立源码验证、绑定专用评测实例，再观察两个后续完整周期。所有阶段持久化，带租约和幂等键；付费调用结果未知时不重放。当前尚未启用正式运行。
 
 | 执行环节 | 当前手段 |
 | --- | --- |
-| 复盘 | 继承主模型，每次执行独立上下文；按hash/record展开原日志，保护题的结果不反馈到优化侧 |
-| 修改 | 原生模型生成受限补丁；硬Token上限、独立worktree、受保护目录检查 |
+| 复盘 | Codex最多4项一批、逐项检查指标与日志；按hash/record展开证据，保护题独立分批 |
+| 提 Issue | Codex整理优先级与完整清单；全机复盘齐后，程序核验并发布一个周期汇总Issue |
+| 修改 | Codex返回受限补丁，程序在独立worktree校验应用；按Issue条目追踪，不能自报验收 |
 | 验收 | 冻结镜像、两组源码hash、基线只读测试；全60项与独立24验证/30隐藏门槛 |
-| 应用 | 仅绑定专用RSI runner，后续两天全量加语义复盘后关单；退化回滚并重开 |
-| Codex / 生产部署 | 当前未自动接入；缺硬Token计量适配或生产部署适配时不绕过 |
+| 应用 | 仅绑定专用RSI runner，后续两个完整周期加语义复盘后勾选，全部完成关Issue；退化回滚并重开 |
+| 执行 / 部署 | 三个角色固定Codex CLI，计量、超时、未知调用不重放；只应用开发评测实例，生产仍正常审阅发布 |
 
-首次在本机配置。示例默认关闭，先填真实repo、已提交的base_commit、允许目录及私有验证suite；沿用已配置的Roami主模型。配置源代码执行范围只允许通过本地CLI，Web接口不接收任意命令：
+首次在本机配置。示例默认关闭，先填真实repo、已提交的base_commit、允许目录及私有验证suite；三个角色复用本机Codex登录和配置模型，不回退Roami主模型。配置源代码执行范围只允许通过本地CLI，Web接口不接收任意命令：
 
 ```bash
 cd agent-runtime
@@ -251,28 +252,29 @@ HR staging保留原workspaces/tasks目录，并把原workspaces/base_image/commo
 
 
 <a id="daily-v1"></a>
-## 首版每日自动运行
+## 首版定时自动运行
 
 ```text
-开发版内置定时器（03:00）
-  → 全60项 → 程序评分 + 复盘Agent逐项检查指标/日志
-  → 去重内部问题单 → 修复Agent独立worktree修改
+开发版内置定时器（每天03:00）
+  → 每台机器全60项 → 程序评分 + Codex复盘完整指标/日志
+  → 全机复盘文档 → Codex整理一个GitHub Issue → 确认发布
+  → Codex按条目生成补丁，程序在独立worktree校验应用
   → 原问题复测 + 冻结回归 + 全量/私有A/B
   → quick/full → 自动草稿PR（配置后，人工审阅合并）
-  → 专用开发评测实例 → 两个后续完整日 → 关闭；退化则回滚重开
+  → 专用开发评测实例 → 两个后续完整周期 → 勾选条目，全部完成关Issue；退化则回滚重开
 ```
 
 | 问题 | 首版执行方式 |
 |---|---|
-| 谁发起 | 开发版常驻服务中的 `EvaluationWorker`，不是由用户或聊天Agent每天发起；日期+机器幂等入队，重启只补当天 |
-| 谁复盘、提问题 | 程序核对全部指标与日志完整性；`ResearchWorker / behavior_observer`逐项语义回顾，异常展开原记录并创建内部问题单 |
-| 谁改 | 原生修复Agent在detached worktree生成受限补丁；模型、复盘与评分共用日预算 |
+| 谁发起 | 开发版常驻服务中的 `EvaluationWorker`，不是由用户或聊天Agent每天发起；周期+机器幂等入队，重启只补本周期 |
+| 谁复盘、提问题 | 程序核对全部指标与日志完整性；Codex复盘全部执行，异常展开原记录；Codex Issue Agent汇总全部测试机，程序发布一个Issue |
+| 谁改 | Codex生成受限补丁，程序在detached worktree校验应用；模型、复盘与评分共用日预算 |
 | 谁验收 | `candidate_checks`独立服务，用冻结原问题、回归、全量和私有集检查；修复者不能自报通过 |
-| 是否测完就提PR | 先建内部问题单；有补丁且独立验收通过，配置GitHub交付后才自动提草稿PR并附验收截图 |
+| 是否测完就提PR | 先确认汇总GitHub Issue；有补丁且独立验收通过，配置GitHub交付后才自动提草稿PR并附验收截图 |
 | 如何交付 | 专用分支，不force push、不自动合并；只自动应用到开发评测实例，普通用户仍走正常发布 |
 | 失败怎么办 | 阶段和证据落盘；预算不足等待，未知执行不重放，创建PR断线先查远端；复测失败保留问题，观察退化回滚重开 |
 
-开发版运行时的数据根记为 `DEV_DATA`，账本固定为 `$DEV_DATA/agents/improvement/ledger.sqlite3`。先用已有 `register-suite`、`register-machine`、`evaluation-config` 配齐60项套件、机器和日预算，再用 `research-config` 配置仓库、基线commit、允许修改的运行时代码范围和私有验证集。两个 enabled 开关分别控制每日测试与自动修复；无需额外叠加 cron。
+开发版运行时的数据根记为 `DEV_DATA`，账本固定为 `$DEV_DATA/agents/improvement/ledger.sqlite3`。先用已有 `register-suite`、`register-machine`、`evaluation-config` 配齐60项套件、机器和日预算，再用 `research-config` 配置仓库、基线commit、允许修改的运行时代码范围和私有验证集。两个 enabled 开关分别控制定时测试与Codex自动研发；无需额外叠加 cron。
 
 ```bash
 # 本机 gh 已登录目标仓库；配置里不保存访问令牌。
@@ -286,7 +288,7 @@ agent-runtime/.venv/bin/roami-agent-evaluate research-status \
   --ledger "$DEV_DATA/agents/improvement/ledger.sqlite3" --owner "$RSI_OWNER"
 ```
 
-GitHub交付是显式本机配置，默认没有此配置，不对外发PR。目标仓库必须与配置 remote 的 GitHub 地址一致。发布前重新核验冻结比较证据；提交前quick、推送前full。PR只写公开用例ID、受控源码路径、验证摘要与报告hash，不上传原始日志、隐藏题、凭证或用户记录。创建请求先写私有发送标记；断线后查到精确分支/commit的PR就续接，查不到则阻塞，不能再次POST。
+GitHub交付是显式本机配置，默认没有此配置，不对外写Issue或PR；没有确认Issue就不自动修复。目标仓库必须与配置 remote 的 GitHub 地址一致。发布前重新核验冻结比较证据；提交前quick、推送前full。PR只写公开用例ID、受控源码路径、验证摘要与报告hash，不上传原始日志、隐藏题、凭证或用户记录。创建请求先写私有发送标记；断线后查到精确分支/commit的PR就续接，查不到则阻塞，不能再次POST。
 
 当前60项合同已备，7项复杂产物已接真实离线渲染和两个不同模型的盲评接口。正式使用必须先完成12个有参考标签的平衡校准锚点，安装真实模型校准证书。`calibrate-artifacts`执行有界校准，`configure-artifact-review`安装私有证书；协议演练证书不能用于正式日跑。相关字段和限制见CLI `--help` 与 `artifact_review.py`。
 
@@ -304,3 +306,27 @@ GitHub交付是显式本机配置，默认没有此配置，不对外发PR。目
 托管会话由Roami常驻控制器保留，逐轮启动原生JSON进程；在任务对话中继续，终端展示执行记录。独立打开的普通Agent TUI不会被冒认成托管会话。取消只作用于本次执行的进程组，确认没有额外写进程后结束；会话仍可继续，关闭使用显式身份校验。
 
 已用OpenCode2.0.27、Pi1.1.0完成首次、原会话续聊、取消后恢复与关闭的真实CLI验收；也分别用正常配置的真实模型完成文件创建和原会话追加修改。前者是本地固定响应协议测试，后者是小任务执行验证，均不替代正式60项质量成绩。
+
+
+<a id="codex-roles"></a>
+## Codex 三角色与周期汇总
+
+| 配置 | 取值 / 作用 |
+| --- | --- |
+| 评测 preferences | `hour: 3`、`timezone: "Asia/Shanghai"`；每天全跑固定60项，不按周或轮换抽样 |
+| Research 配置 | `repair_executor: "codex"`；复盘、Issue、修复均固定Codex，不按此字段改派其他模型 |
+| Codex 登录 | 在开发节点正常完成 `codex login`；复用当前配置模型与环境变量凭证引用，不复制auth文件、不加载个人hooks/MCP/插件 |
+| GitHub 登录 | 本机 `gh auth status`；用已有 `configure-review-publication` 指定仓库，Issue和PR共用同一个私有配置 |
+| 启用 | 日预算仍按执行日期生效；旧 `native_patch` 配置读取为停用，需要保存Codex配置后再启用 |
+
+`codex exec --json --ephemeral --ignore-user-config --ignore-rules --sandbox read-only` 在私有证据目录执行。程序只继承模型路由与登录所需环境，禁用执行工具、web、hooks及多Agent派生，遇到不支持的自定义provider配置会阻塞。每次记录原生thread ID、JSONL、stdout/stderr、用量和耗时；无工具角色不会直接写源码或调用GitHub。
+
+复盘采用稳定的小批次（最多4项；保护题独立分批），恢复时复用已结算的同批响应；逐项验证与保存，不以“批次成功”替代60项覆盖。异常额外展开原始记录，至多三轮。每台机器形成完整复盘；同周期所有配置机器完成且评分、用量、复盘齐全后，才合成一个完整文档和一个Issue。相同根因去重为一个条目，完整文档保留各机证据。
+
+Issue Agent列全量条目并给P1/P2/P3优先级。程序核对条目无遗漏、仓库与回执、稳定marker；创建结果未知时查远端，未确认不再POST。公开Issue只含受控Case ID、路径、指标、优先级和验收合同，完整事实与原日志留在登录后的开发页“完整复盘”。`GET /api/agent/improvement/cycles/{id}` 返回所有者范围内的 `review_document`；汇总ID使用 `period-` 前缀。无确认问题也生成复盘Issue记录，随后同步关闭，不派空修复。
+
+修复按Issue条目生成补丁并独立验收；草稿PR回链汇总Issue，不使用提前关闭父Issue的关键词。只有独立观察通过才勾选，全部条目完成才关闭。一次只观察一个源码候选，其他条目排队；退化回滚、重开条目及原Issue。后续两个完整日周期必须通过，不能用同一天的重复测试凑数。
+
+**费用边界：** `model_tokens` 是每次Codex调用的保守准入预留。CLI在turn完成后才报告Token，无供应商侧总Token硬截断保证；超额、超时或用量未知立即阻止后续付费调用，不自动重放。所有阶段共享日预算，保留供应商侧配额。一次本机真实CLI协议检查消耗15,912 Token，含配置模型的固定上下文，不能当成RSI收益；批量复盘用于减少重复启动，但尚无真实整套60项成本对照。
+
+当前仍未开启付费自动日程：预算0，产物质量校准和受控环境条件未齐。CLI/Issue/闭环测试证明设施行为，不代表完整60项已跑过或已产生真实修复PR。

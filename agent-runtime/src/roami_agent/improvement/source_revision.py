@@ -179,6 +179,7 @@ class SourceRevisions:
         check = await git(candidate, "diff", "--name-only")
         require(not check.strip(), "RSI_SOURCE_WORKSPACE_DIRTY")
         snapshot = {
+            **{k: action["payload"][k] for k in ("issue", "point_id") if k in action["payload"]},
             "improvement_id": action["payload"].get("improvement_id", action["subject"]),
             "parent_commit": base,
             "baseline_root": str(baseline),

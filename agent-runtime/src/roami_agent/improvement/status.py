@@ -1,6 +1,7 @@
 """Read-only owner-scoped experiment summaries for the Roami gateway."""
 
 import asyncio
+import json
 
 from roami_agent.improvement.control import ImprovementControl
 from roami_agent.improvement.ledger import Ledger
@@ -39,6 +40,27 @@ class ImprovementStatus:
         }
 
     async def get(self, owner, cycle_id):
+        if cycle_id.startswith("period-"):
+            report = await asyncio.to_thread(self.research.report, owner, cycle_id)
+            return {
+                "id": cycle_id,
+                "state": "completed",
+                "day": report["day"],
+                "report": None,
+                "review_document": report["document"],
+            }
         cycle = await asyncio.to_thread(self.ledger.get, owner, cycle_id)
+
         # Hidden tasks' prompts, outputs, oracle and trial traces are absent from this endpoint.
-        return {k: cycle[k] for k in ("id", "state", "day", "report")}
+        def document():
+            with self.ledger.connection() as db:
+                row = db.execute(
+                    "SELECT report_json FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+                    (owner, cycle_id),
+                ).fetchone()
+                return json.loads(row[0])["document"] if row else None
+
+        return {
+            **{k: cycle[k] for k in ("id", "state", "day", "report")},
+            "review_document": await asyncio.to_thread(document),
+        }

@@ -1,38 +1,28 @@
 <!doctype html>
-<html lang="zh-CN"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roami Agent RSI · 架构与执行</title>
-<link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css">
-</head><body><main><article class="rsi-overview">
-<nav aria-label="设计章节"><a href="#architecture">架构</a><a href="#roles">执行手段</a><a href="#closed-loop">闭环</a><a href="index.html">总方案与附录</a></nav>
-<header><h1>Roami Agent RSI</h1><p class="rsi-lead">每天自己测试、观察、修改，让质量更好、交付更快、Token 更少。</p>
-<p class="rsi-status">仅开发版启动控制器；普通安装版不运行RSI。60项合同已齐；独立产物评分已接线，已登记本机容器runner；校准及日预算未齐，日程尚未启用。</p></header>
-<section id="architecture"><h2>架构：程序管流程，Agent 做判断与修改</h2>
-<figure><picture><source media="(max-width: 599px)" srcset="architecture-mobile.svg"><img src="architecture.svg" alt="控制器启动：被测Agent执行60项，复盘Agent提出问题，修复Agent隔离修改，独立验收后应用，后续观察再关单。"></picture>
-<figcaption>三个 Agent 使用独立上下文；修复者不能自行验收或发布。</figcaption></figure></section>
-<section id="roles"><h2>执行手段：谁来做，怎么落地</h2>
-<div class="tablewrap"><table><thead><tr><th>环节 / 负责者</th><th>执行方式</th><th>交付物</th></tr></thead><tbody>
-<tr><td>发起 / 控制器</td><td>开发版服务内置定时器，每天03:00（上海时间）按日期幂等入队；重启只补当天，先检查机器与日预算。</td><td>冻结的评测计划</td></tr>
-<tr><td>做题 / 被测 Agent</td><td>Runner驱动Main与Native Worker，完整跑60项；程序算分并扫描全部日志。</td><td>产物、指标、日志</td></tr>
-<tr><td>复盘 / 复盘 Agent</td><td>默认使用 Roami 主模型。逐项看证据，异常展开原日志，申请最小复现。</td><td>证据、原因假设、改法</td></tr>
-<tr><td>修改 / 修复 Agent</td><td>持久队列派发原生修复 Agent，在独立 worktree 生成并校验补丁，模型调用受硬 Token 上限约束。</td><td>真实补丁与变更说明</td></tr>
-<tr><td>验收 / 独立服务</td><td>重建候选、回归原问题、完整60项同机A/B；正式晋级需满足私有验证门槛。</td><td>独立通过或拒绝报告</td></tr>
-<tr><td>提交 / 交付程序</td><td>独立验收通过后，按配置运行quick/full；推送专用分支、自动提草稿PR并附验收截图。断线先查询对账，结果未知不重复创建。</td><td>可审阅补丁与草稿PR</td></tr>
-<tr><td>应用 / 发布程序</td><td>仅应用到开发评测实例；普通用户通过正常版本升级获得改进，不在本机自测试或自修改。</td><td>版本、回滚点、观察记录</td></tr>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Roami RSI · Codex 复盘与修复</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"></head>
+<body><main><article class="rsi-overview">
+<nav aria-label="设计章节"><a href="#architecture">架构</a><a href="#roles">执行</a><a href="#closure">闭环</a><a href="index.html">详细方案</a></nav>
+<header><h1>Roami Agent RSI</h1><p class="rsi-lead">自动测试，Codex 复盘、汇总 Issue、修复；人查看复盘、问题与 PR。</p><p class="rsi-status">仅开发版。每天 03:00（上海时间）完整跑 60 项；当前预算为 0、质量校准未齐，付费日程尚未开启。</p></header>
+<section id="architecture"><h2>架构</h2><figure><picture><source media="(max-width: 599px)" srcset="architecture-mobile.svg"><img src="architecture.svg" alt="控制器定时全量测试，Codex 复盘、汇总单个 Issue、隔离修复，程序独立验收和观察后回写 Issue。"></picture><figcaption>被测者是 Roami Agent；复盘、Issue、修复三个角色全部使用独立 Codex 上下文。</figcaption></figure></section>
+<section id="roles"><h2>谁参与，怎么执行</h2><div class="tablewrap"><table><thead><tr><th>负责者</th><th>执行手段</th><th>交付物</th></tr></thead><tbody>
+<tr><td>常驻控制器</td><td>服务内置定时器，按日期幂等入队；重启仅补本周期，无需用户发消息。</td><td>冻结套件、机器、预算与版本</td></tr>
+<tr><td>被测 Roami Agent</td><td>每台机器全跑 60 项；稳定版单跑，候选对照为 60 × 2。程序算分并扫描每条日志。</td><td>产物、效果、时间、Token、工具与模型调用记录</td></tr>
+<tr><td>Codex 复盘 Agent</td><td>最多 4 项一批，逐项看指标与具体证据；异常按索引展开，事实与假设分开。所有测试机完成后合并文档。</td><td>完整周期复盘、编号待修点、证据、建议与验收指标</td></tr>
+<tr><td>Codex Issue Agent</td><td>根据复盘列全量修复清单、排序与优先级；程序核验并发布一个汇总 GitHub Issue，确认成功才派修复。</td><td>每天一个 Issue，不按 Case 或测试机拆单</td></tr>
+<tr><td>Codex 修复 Agent</td><td>按条目读允许范围的源码，生成最小补丁；程序在 detached worktree 校验并应用。每问题最多两次自动尝试。</td><td>代码补丁、说明、关联 Issue 与条目 ID</td></tr>
+<tr><td>独立验收程序</td><td>复测原问题、冻结回归、同机全量 A/B 和私有门槛；通过 quick / full 后提交草稿 PR，回链 Issue。</td><td>验收证据、PR 与截图；拒绝则保留未完成</td></tr>
+<tr><td>观察与同步程序</td><td>只绑定开发评测实例；后续两个完整周期通过才勾选条目，全部完成才关闭 Issue；退化回滚并重开。</td><td>可追踪进度、观察记录、关闭或重开</td></tr>
+<tr><td>人</td><td>查看每日汇总文档、Issue 和 PR，处理明确阻塞并审阅合并。</td><td>合并决定；普通用户通过正常版本升级获得改进</td></tr>
 </tbody></table></div></section>
-<section id="closed-loop"><h2>闭环：工单贯穿，不止于出分</h2>
-<div class="rsi-outcomes"><div><strong>验收通过</strong><p>应用版本，经过两次后续每日全量与复盘，控制器才关单。</p></div><div><strong>验收失败 / 应用退化</strong><p>失败回到诊断；退化回滚并重开。同一问题追加证据，不重复建单。</p></div><div><strong>服务中断 / 预算不足</strong><p>状态和下一步落盘，恢复后对账续跑；不足则等待，不能少跑题冒充完成。</p></div></div>
-<p class="rsi-footnote">每天出分先建内部问题单，不是直接提PR。配置GitHub交付后，修复且独立验收通过才自动提草稿PR；合并由人审阅。开发评测实例继续观察，两个后续完整日通过才关单，退化则回滚重开。</p></section>
-<section id="first-version"><h2>首版怎么启动</h2><div class="tablewrap"><table><thead><tr><th>一次性配置</th><th>每天自动执行</th><th>需要人处理</th></tr></thead><tbody><tr><td>开发版、机器、60项套件、模型、评分校准、日预算；源码允许范围与GitHub目标</td><td>03:00全跑 → 出分/日志复盘 → 内部问题单 → 隔离修改 → 独立复测 → 草稿PR → 开发实例观察</td><td>审阅合并PR；模型鉴权、未知写入或校准缺失等明确阻塞</td></tr></tbody></table></div><p>控制器是程序，不需要你每天发消息或人工点运行。普通安装版不会启动任何一环。当前尚未开启真实每日运行；配置未齐时显示阻塞，不伪报完成。</p><p><a href="../../development/agent-rsi.md#daily-v1">安装与配置命令</a> · <a href="implementation.html">已验证与待启用项</a></p></section>
-<details id="implementation"><summary>运行成本与接入细节</summary>
-<ul><li><strong>用户故事：</strong>关闭聊天后，仍能看到每日结果、待修问题、补丁和下一步。</li>
-<li><strong>首次配置：</strong>机器、60项套件、模型、预算、源码仓库、私有验证集和应用范围；自动PR另配置目标仓库、分支和本机gh登录。之后不依赖聊天窗口；用户只处理明确阻塞。</li>
-<li><strong>实际成本：</strong>无版本差异时完整60项只跑一次；参数候选或源码对照时为60项×2组=120次。默认关闭参数搜索。每台配置机器各跑整套，多机不自动分片；修复、复盘和额外验证都共用日预算。</li>
-<li><strong>省Token：</strong>20项机制回归优先不用模型；规则全量扫描，模型逐项看摘要与索引、异常再展开原日志。规则覆盖和语义回顾分别记账，出分、用量完整和全部语义回顾齐全，才记日终完成。缺日志或未知用量不准晋级。</li>
-<li><strong>工作边界：</strong>每天全60项不轮换；新想法只做额外开发实验。开发侧不读取隐藏题答案或受保护轨迹；评分标准、权限与隐藏集不交给修复者修改。</li>
-<li><strong>接入顺序：</strong>已接入持久工单、语义复盘、隔离源码补丁、代码版本A/B与评测实例绑定；普通安装版不创建RSI服务、接口、账本或策略绑定；旧启用设置也不生效。</li>
-<li><strong>模块：</strong>EvaluationWorker → ResearchWorkflow / ResearchWorker → behavior_observer → source_revision → candidate_checks → github_publication（可选）→ release_observation。</li>
-<li><strong>防止空转：</strong>默认一次只修一个问题，每个问题最多两次自动编码尝试；无新问题继续次日测试。原生修复走同一预算账本；Codex适配器尚无硬Token预算，未自动接入。</li></ul>
-<p><a href="index.html#technical">模块与数据契约</a> · <a href="evaluation.html">Case与评判标准</a> · <a href="implementation.html">实际实现记录</a> · <a href="architecture.excalidraw" download>下载可编辑架构图</a>（在 Excalidraw 中打开）。</p>
-</details>
+<section id="closure"><h2>闭环条件</h2><div class="rsi-outcomes"><div><strong>一个周期，一个 Issue</strong><p>全机结果与复盘齐全才汇总；缺测不冒充完成。未发现确认问题仍保留复盘记录，不生成空补丁。</p></div><div><strong>提 PR 不等于修好了</strong><p>通过独立观察才勾选。一次只观察一个源码候选，其他修复排队，防止版本互相覆盖。</p></div><div><strong>断线先对账</strong><p>Issue / PR 请求结果未知时先查远端，不重复创建；未知付费调用不重放，保留日志等待核对。</p></div></div></section>
+<details><summary>模块、预算与边界</summary><pre>EvaluationWorker → behavior_observer（Codex 批量逐项复盘）
+→ review_report（完整文档 / 全机汇总）
+→ Codex Issue Agent → github_issues（发布确认）
+→ source_revision（Codex 补丁 / 隔离应用）
+→ candidate_checks → github_publication（草稿 PR）
+→ release_observation → github_issues（勾选 / 关单 / 重开）</pre>
+<p>三个角色通过 <code>codex exec --json --sandbox read-only</code> 接收证据包，复用本机 Codex 登录和配置模型，不回退 Roami 主模型。禁用个人 hooks、MCP、插件与执行工具；修复只返回补丁，源码写入和 GitHub 写入由程序完成。每次保留原生 thread ID、JSONL、输出、耗时和用量。依据 <a href="https://developers.openai.com/codex/noninteractive">Codex 官方非交互文档</a>。</p>
+<p>整套测试先做预算准入；复盘、Issue 和修复也计入账本。Codex 每次保留 <code>model_tokens</code> 准入额度并设置超时，完成后记录真实用量；超过额度或用量未知即停止后续付费调用。CLI 未提供可验证的供应商侧总 Token 硬截断，不能把准入预算说成费用硬封顶。使用供应商配额独立控制金额。所有阶段按执行日期共享日预算。</p>
+<p>完整复盘在登录后的开发页面读取；公开 Issue 仅含安全的 Case / 路径 / 指标 / 优先级 / 验收清单及报告 hash，原始日志、隐藏集和用户数据留在开发机。源码允许范围、评分器与隐藏集不能由修复者修改。</p>
+<p><a href="../../development/agent-rsi.md#codex-roles">配置与运行手册</a> · <a href="implementation.html">实际验收边界</a> · <a href="architecture.excalidraw" download>可编辑架构图</a></p></details>
 </article></main></body></html>

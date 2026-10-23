@@ -61,6 +61,8 @@ async def run_cycle(
     case_limit=None,
     seed=20261023,
     request_key="daily",
+    schedule_period=None,
+    period_machines=None,
     source_builds=None,
     paired=True,
 ):
@@ -96,6 +98,8 @@ async def run_cycle(
         "RSI_FULL_SUITE_BUDGET",
     )
     manifest = {
+        "schedule_period": schedule_period,
+        "period_machines": period_machines,
         "runner_version": VERSION,
         "request_key": request_key,
         "implementation_hash": implementation_hash(),

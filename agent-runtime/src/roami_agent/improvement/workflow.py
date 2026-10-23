@@ -43,6 +43,14 @@ CREATE TABLE IF NOT EXISTS rsi_code_observations (
  owner TEXT NOT NULL, improvement_id TEXT NOT NULL, cycle_id TEXT NOT NULL,
  day TEXT NOT NULL, passed INTEGER NOT NULL, PRIMARY KEY(owner,improvement_id,cycle_id)
 );
+CREATE TABLE IF NOT EXISTS rsi_review_reports (
+ owner TEXT NOT NULL, cycle_id TEXT NOT NULL, report_json TEXT NOT NULL,
+ issue_json TEXT, created_ms INTEGER NOT NULL, PRIMARY KEY(owner,cycle_id)
+);
+CREATE TABLE IF NOT EXISTS rsi_report_items (
+ owner TEXT NOT NULL, cycle_id TEXT NOT NULL, improvement_id TEXT NOT NULL,
+ point_id TEXT NOT NULL, PRIMARY KEY(owner,cycle_id,improvement_id)
+);
 """
 DEFAULTS = {
     "enabled": False,
@@ -51,7 +59,7 @@ DEFAULTS = {
     "allowed_paths": [],
     "model_tokens": 64000,
     "model_seconds": 180,
-    "repair_executor": "native_patch",
+    "repair_executor": "codex",
     "validation_suite_id": "",
     "max_attempts": 2,
     "observation_days": 2,
@@ -65,17 +73,21 @@ class ResearchWorkflow:
     def settings(self, owner):
         with self.ledger.connection() as db:
             r = db.execute("SELECT * FROM rsi_research_settings WHERE owner=?", (owner,)).fetchone()
-            return {
+            value = {
                 **DEFAULTS,
                 **(json.loads(r["config_json"]) if r else {}),
                 "revision": r["revision"] if r else 0,
             }
+            if value["repair_executor"] == "native_patch":
+                value["repair_executor"] = "codex"
+                value["enabled"] = False
+            return value
 
     def configure(self, owner, raw):
         require(isinstance(raw, dict) and set(raw) == {*DEFAULTS, "revision"})
         value = {k: raw[k] for k in DEFAULTS}
         require(type(value["enabled"]) is bool)
-        require(value["repair_executor"] == "native_patch", "RSI_METERED_REPAIR_REQUIRED")
+        require(value["repair_executor"] == "codex", "RSI_CODEX_REQUIRED")
         require(type(value["model_tokens"]) is int and 10000 <= value["model_tokens"] <= 100000)
         require(type(value["model_seconds"]) is int and 10 <= value["model_seconds"] <= 600)
         require(type(value["max_attempts"]) is int and 1 <= value["max_attempts"] <= 3)
@@ -162,6 +174,7 @@ class ResearchWorkflow:
                 for r in db.execute(
                     "SELECT c.owner,c.id FROM rsi_cycles c JOIN rsi_research_settings s ON s.owner=c.owner "
                     "WHERE c.state='completed' AND json_extract(s.config_json,'$.enabled')=1 "
+                    "AND json_extract(s.config_json,'$.repair_executor')='codex' "
                     "AND json_extract(c.report_json,'$.full_suite_complete')=1 "
                     "AND json_extract(c.manifest_json,'$.formal_daily_suite')=1 "
                     "AND (json_extract(c.manifest_json,'$.request_key')='daily' OR EXISTS "
@@ -195,7 +208,10 @@ class ResearchWorkflow:
                 "WHERE a.state='queued' AND a.due_ms<=? "
                 "AND (a.kind='review' OR NOT EXISTS(SELECT 1 FROM rsi_actions active "
                 "WHERE active.owner=a.owner AND active.state='running' AND active.kind!='review')) "
-                "AND json_extract(s.config_json,'$.enabled')=1 ORDER BY a.created_ms,a.rowid LIMIT 1",
+                "AND (a.kind!='repair' OR NOT EXISTS(SELECT 1 FROM rsi_improvements i WHERE i.owner=a.owner AND i.state IN ('verifying','ready','observing'))) "
+                "AND (a.kind NOT IN ('repair','activate') OR NOT EXISTS(SELECT 1 FROM rsi_requests r WHERE r.owner=a.owner AND r.state IN ('queued','running','cancelling'))) "
+                "AND json_extract(s.config_json,'$.repair_executor')='codex' "
+                "AND json_extract(s.config_json,'$.enabled')=1 ORDER BY CASE a.kind WHEN 'review' THEN 0 WHEN 'issue' THEN 1 WHEN 'sync_issue' THEN 2 ELSE 3 END,a.created_ms,a.rowid LIMIT 1",
                 (self.clock(),),
             ).fetchone()
             if not row:
@@ -226,7 +242,8 @@ class ResearchWorkflow:
         row = db.execute(
             "SELECT a.* FROM rsi_actions a JOIN rsi_research_settings s ON s.owner=a.owner "
             "WHERE a.id=? AND a.owner=? AND a.lease=? "
-            "AND a.state='running' AND a.expires_ms>=? AND json_extract(s.config_json,'$.enabled')=1",
+            "AND a.state='running' AND a.expires_ms>=? AND json_extract(s.config_json,'$.enabled')=1 "
+            "AND json_extract(s.config_json,'$.repair_executor')='codex'",
             (action["id"], action["owner"], action["lease"], self.clock()),
         ).fetchone()
         require(row is not None, "RSI_ACTION_LEASE_LOST")
@@ -244,6 +261,17 @@ class ResearchWorkflow:
                 from roami_agent.improvement.semantic_completion import complete_cycle_review
 
                 complete_cycle_review(db, action["owner"], action["payload"]["cycle_id"])
+                require(
+                    db.execute(
+                        "SELECT 1 FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+                        (action["owner"], action["payload"]["cycle_id"]),
+                    ).fetchone(),
+                    "RSI_REVIEW_REPORT_REQUIRED",
+                )
+                next_kind = None
+                self._queue_report_issue(db, action)
+            if action["kind"] == "issue":
+                self._attach_issue(db, action, result)
             db.execute(
                 "UPDATE rsi_actions SET state='done',result_json=?,error_code=?,lease=NULL,expires_ms=NULL WHERE id=?",
                 (
@@ -273,7 +301,7 @@ class ResearchWorkflow:
                 "VALUES(?,?,?,?,?,?)",
                 (
                     action["owner"],
-                    None if action["kind"] == "review" else item_id,
+                    None if action["kind"] in {"review", "issue", "sync_issue"} else item_id,
                     action["id"],
                     action["kind"] + ".completed",
                     json.dumps(result),
@@ -339,11 +367,196 @@ class ResearchWorkflow:
                     "INSERT OR IGNORE INTO rsi_improvements VALUES(?,?,?,'diagnosing',1,?,'{}',?)",
                     (item_id, action["owner"], fingerprint, json.dumps(f), self.clock()),
                 )
-                self._enqueue(db, action["owner"], "repair", item_id, {"finding": f, "attempt": 1})
                 db.execute(
                     "INSERT INTO rsi_improvement_events(owner,improvement_id,action_id,event,data_json,created_ms) "
                     "VALUES(?,?,?,'evidence.added',?,?)",
                     (action["owner"], item_id, action["id"], json.dumps(f), self.clock()),
+                )
+
+    def save_report(self, action, report):
+        self.record_findings(action, [p["finding"] for p in report["points"]])
+        with self.ledger.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._owned_action(db, action)
+            prior = db.execute(
+                "SELECT report_json FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+                (action["owner"], report["cycle_id"]),
+            ).fetchone()
+            require(prior is None or json.loads(prior[0]) == report, "RSI_REVIEW_REPORT_CONFLICT")
+            db.execute(
+                "INSERT OR IGNORE INTO rsi_review_reports VALUES(?,?,?,NULL,?)",
+                (action["owner"], report["cycle_id"], json.dumps(report), self.clock()),
+            )
+            for point in report["points"]:
+                db.execute(
+                    "INSERT OR IGNORE INTO rsi_report_items VALUES(?,?,?,?)",
+                    (
+                        action["owner"],
+                        report["cycle_id"],
+                        digest([action["owner"], point["id"]]),
+                        point["id"],
+                    ),
+                )
+
+    def report(self, owner, cycle_id):
+        with self.ledger.connection() as db:
+            row = db.execute(
+                "SELECT report_json,issue_json FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+                (owner, cycle_id),
+            ).fetchone()
+            require(row is not None, "RSI_REVIEW_REPORT_REQUIRED")
+            return {**json.loads(row[0]), "issue": json.loads(row[1]) if row[1] else None}
+
+    def report_ready(self, owner, report):
+        with self.ledger.connection() as db:
+            return self._report_ready(db, owner, report)
+
+    def _report_ready(self, db, owner, report):
+        for cycle_id in report.get("source_cycles", [report["cycle_id"]]):
+            cycle = db.execute(
+                "SELECT report_json FROM rsi_cycles WHERE owner=? AND id=?", (owner, cycle_id)
+            ).fetchone()
+            if cycle is None or not json.loads(cycle[0]).get("daily_complete"):
+                return False
+        return True
+
+    def _queue_report_issue(self, db, action):
+        owner, cycle_id = action["owner"], action["payload"]["cycle_id"]
+        original = json.loads(
+            db.execute(
+                "SELECT report_json FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+                (owner, cycle_id),
+            ).fetchone()[0]
+        )
+        report = original
+        expected = original.get("expected_machines", [])
+        if len(expected) > 1:
+            members = [
+                json.loads(r[0])
+                for r in db.execute(
+                    "SELECT report_json FROM rsi_review_reports WHERE owner=?", (owner,)
+                )
+            ]
+            members = [
+                r
+                for r in members
+                if r.get("group_id") == original["group_id"]
+                and len(r.get("source_cycles", [])) == 1
+            ]
+            if {r["machine_id"] for r in members} != set(expected):
+                return
+            require(
+                len(members) == len(expected)
+                and all(set(r["expected_machines"]) == set(expected) for r in members),
+                "RSI_PERIOD_REPORT_CONFLICT",
+            )
+            if not all(self._report_ready(db, owner, r) for r in members):
+                return
+            members.sort(key=lambda r: r["machine_id"])
+            cycle_id = "period-" + original["group_id"]
+            document = "# Roami RSI 全机复盘\n\n" + "\n\n".join(
+                "## " + r["machine_id"] + "\n\n" + r["document"] for r in members
+            )
+            points = {p["id"]: p for r in members for p in r["points"]}
+            report = {
+                "cycle_id": cycle_id,
+                "day": members[0]["day"],
+                "group_id": original["group_id"],
+                "expected_machines": expected,
+                "source_cycles": [r["cycle_id"] for r in members],
+                "sha256": digest(document),
+                "document": document,
+                "points": [points[k] for k in sorted(points)],
+                "reviewer": "codex",
+            }
+            db.execute(
+                "INSERT OR IGNORE INTO rsi_review_reports VALUES(?,?,?,NULL,?)",
+                (owner, cycle_id, json.dumps(report), self.clock()),
+            )
+            stored = json.loads(
+                db.execute(
+                    "SELECT report_json FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+                    (owner, cycle_id),
+                ).fetchone()[0]
+            )
+            require(stored == report, "RSI_PERIOD_REPORT_CONFLICT")
+            for point in report["points"]:
+                db.execute(
+                    "INSERT OR IGNORE INTO rsi_report_items VALUES(?,?,?,?)",
+                    (owner, cycle_id, digest([owner, point["id"]]), point["id"]),
+                )
+        if self._report_ready(db, owner, report):
+            self._enqueue(db, owner, "issue", cycle_id, {"cycle_id": cycle_id})
+
+    def _attach_issue(self, db, action, result):
+        cycle_id = action["payload"]["cycle_id"]
+        row = db.execute(
+            "SELECT report_json FROM rsi_review_reports WHERE owner=? AND cycle_id=?",
+            (action["owner"], cycle_id),
+        ).fetchone()
+        require(row is not None, "RSI_REVIEW_REPORT_REQUIRED")
+        report = json.loads(row[0])
+        require(self._report_ready(db, action["owner"], report), "RSI_EVIDENCE_INCOMPLETE")
+        issue = result.get("issue", {})
+        import re
+
+        require(
+            issue.get("report_hash") == report["sha256"]
+            and type(issue.get("number")) is int
+            and issue["number"] > 0
+            and isinstance(issue.get("repository"), str)
+            and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", issue["repository"])
+            and issue.get("url")
+            == f"https://github.com/{issue['repository']}/issues/{issue['number']}",
+            "RSI_ISSUE_PUBLICATION_REQUIRED",
+        )
+        db.execute(
+            "UPDATE rsi_review_reports SET issue_json=? WHERE owner=? AND cycle_id=?",
+            (json.dumps(issue), action["owner"], cycle_id),
+        )
+        order = {
+            p["id"]: (p["priority"], i)
+            for i, p in enumerate(issue.get("plan", {}).get("points", []))
+        }
+        for point in sorted(report["points"], key=lambda p: order.get(p["id"], ("P2", 0))):
+            item_id = digest([action["owner"], point["id"]])
+            row = db.execute(
+                "SELECT state FROM rsi_improvements WHERE owner=? AND id=?",
+                (action["owner"], item_id),
+            ).fetchone()
+            require(row is not None, "RSI_FINDING_REQUIRED")
+            pending = db.execute(
+                "SELECT 1 FROM rsi_actions WHERE owner=? AND kind='repair' AND json_extract(payload_json,'$.improvement_id')=? AND state IN ('queued','running','blocked','waiting_budget')",
+                (action["owner"], item_id),
+            ).fetchone()
+            if row[0] in {"diagnosing", "reopened", "closed_fixed"} and not pending:
+                db.execute(
+                    "UPDATE rsi_improvements SET state='diagnosing',revision=revision+1,updated_ms=? WHERE owner=? AND id=?",
+                    (self.clock(), action["owner"], item_id),
+                )
+                self._enqueue(
+                    db,
+                    action["owner"],
+                    "repair",
+                    item_id + ":" + cycle_id,
+                    {
+                        "improvement_id": item_id,
+                        "finding": point["finding"],
+                        "attempt": 1,
+                        "issue": issue,
+                        "point_id": point["id"],
+                    },
+                )
+
+    def enqueue_issue_sync(self, owner, cycle_id):
+        with self.ledger.connection() as db:
+            reports = db.execute(
+                "SELECT cycle_id FROM rsi_review_reports WHERE owner=? AND issue_json IS NOT NULL",
+                (owner,),
+            ).fetchall()
+            for report in reports:
+                self._enqueue(
+                    db, owner, "sync_issue", report[0] + ":" + cycle_id, {"cycle_id": report[0]}
                 )
 
     def reserve_operation(self, owner, day, key, tokens):
@@ -357,6 +570,13 @@ class ResearchWorkflow:
                     prior["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION"
                 )
                 return json.loads(prior["result_json"])
+            require(
+                not db.execute(
+                    "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state!='completed' OR json_extract(result_json,'$.value.metrics.tokens')>reserved)",
+                    (owner,),
+                ).fetchone(),
+                "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
+            )
             budget = db.execute(
                 "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
             ).fetchone()
@@ -429,6 +649,18 @@ class ResearchWorkflow:
                     {k: r[k] for k in ("id", "kind", "subject", "state", "error_code", "due_ms")}
                     for r in db.execute(
                         "SELECT * FROM rsi_actions WHERE owner=? ORDER BY created_ms DESC LIMIT 100",
+                        (owner,),
+                    )
+                ],
+                "reports": [
+                    {
+                        "cycle_id": r["cycle_id"],
+                        "day": json.loads(r["report_json"])["day"],
+                        "points": len(json.loads(r["report_json"])["points"]),
+                        "issueUrl": json.loads(r["issue_json"])["url"] if r["issue_json"] else None,
+                    }
+                    for r in db.execute(
+                        "SELECT * FROM rsi_review_reports WHERE owner=? AND (COALESCE(json_array_length(json_extract(report_json,'$.expected_machines')),0)<=1 OR json_array_length(json_extract(report_json,'$.source_cycles'))>1) ORDER BY created_ms DESC LIMIT 30",
                         (owner,),
                     )
                 ],

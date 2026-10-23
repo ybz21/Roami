@@ -143,9 +143,9 @@ def observe_code(workflow, owner, cycle_id):
         days = [
             r[0]
             for r in db.execute(
-                "SELECT DISTINCT day FROM rsi_code_observations WHERE owner=? "
-                "AND improvement_id=? AND passed=1 ORDER BY day",
-                (owner, release["improvement_id"]),
+                "SELECT DISTINCT o.day FROM rsi_code_observations o JOIN rsi_cycles c ON c.id=o.cycle_id AND c.owner=o.owner WHERE o.owner=? "
+                "AND o.improvement_id=? AND o.passed=1 AND o.day>? AND json_extract(c.manifest_json,'$.source_builds.candidate')=? ORDER BY o.day",
+                (owner, release["improvement_id"], created[0], release["candidate_build_hash"]),
             )
         ]
         if not passed:
@@ -165,6 +165,7 @@ def observe_code(workflow, owner, cycle_id):
                 "repair",
                 release["improvement_id"] + ":" + str(attempt),
                 {
+                    **{k: release[k] for k in ("issue", "point_id") if k in release},
                     "improvement_id": release["improvement_id"],
                     "attempt": attempt,
                     "finding": {**release["finding"], "regression_cycle_id": cycle_id},

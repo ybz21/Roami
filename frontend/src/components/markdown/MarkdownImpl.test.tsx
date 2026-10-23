@@ -17,6 +17,12 @@ const show = (href = '/api/file/serve/tmp/demo.html', onLinkClick?: (href: strin
 )
 
 describe('Markdown mobile file navigation', () => {
+  it('can render private reviews without loading model-authored image URLs', () => {
+    const content = 'Review evidence.\n\n![untrusted image](https://example.invalid/image?evidence=private)'
+    const { container } = render(<I18nProvider><Markdown allowImages={false}>{content}</Markdown></I18nProvider>)
+    expect(screen.getByText('Review evidence.')).toBeTruthy()
+    expect(container.querySelector('img')).toBeNull()
+  })
   it('opens one full-screen preview and returns without leaving the conversation', async () => {
     show()
     const originalURL = location.href

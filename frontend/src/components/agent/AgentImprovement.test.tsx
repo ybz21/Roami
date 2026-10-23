@@ -7,6 +7,7 @@ import { api } from '../../api'
 
 const state = vi.hoisted(() => ({ overview: null as any, refresh: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('./useAgentData', () => ({ useAgentData: () => ({ value: state.overview, loading: false, failed: false, refresh: state.refresh }) }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ locale: 'zh-CN', t: (key: string, vars: Record<string, string | number> = {}) => ((zhCN as Record<string, string>)[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(vars[name])) }) }))
 vi.mock('antd', () => ({
@@ -66,4 +67,21 @@ it('links a published draft while preserving its pending observation state', () 
   expect(link.getAttribute('href')).toBe('https://github.com/example/rsi-test/pull/1')
   expect(link.getAttribute('rel')).toContain('noopener')
   expect(screen.getByText('Observed behavior')).toBeTruthy()
+})
+
+it('keeps a full daily suite and links the aggregated Issue with a private report', async () => {
+  state.overview = { ...overview(), research: { settings: { enabled: true }, actions: [{ id: 'issue-role', kind: 'issue', state: 'done', error_code: null }], improvements: [], reports: [{ cycle_id: 'period-test', day: '2026-10-24', points: 2, issueUrl: 'https://github.com/example/rsi-test/issues/3' }] } }
+  vi.mocked(api).mockResolvedValue({ data: { review_document: '# Codex 复盘\n\n本轮完整证据。' } })
+  render(<AgentImprovement node={null} />)
+  expect((await screen.findByLabelText('每日完整评测（项）') as HTMLInputElement).value).toBe('60')
+  const issue = screen.getByRole('link', { name: '查看 Issue' })
+  expect(issue.getAttribute('href')).toBe('https://github.com/example/rsi-test/issues/3')
+  expect(issue.getAttribute('rel')).toContain('noopener')
+  fireEvent.click(screen.getByText('完整复盘'))
+  fireEvent.click(screen.getByRole('button', { name: '读取复盘' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/improvement/cycles/period-test'))
+  expect(await screen.findByText('本轮完整证据。')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('开始时间（小时）'), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/preferences', expect.objectContaining({ hour: 4, cases_per_day: 60 })))
 })
