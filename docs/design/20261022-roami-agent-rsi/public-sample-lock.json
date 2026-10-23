@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "status": "4_public_component_contracts_imported_not_model_evaluated",
+  "materialized_public": 4,
+  "target_public": 60,
+  "sampled_on": "2026-10-23",
+  "suites": [
+    {
+      "suite_id": "finqa-sample-v1",
+      "suite_hash": "9d0da4f71672d602678160bc56c6c631d5db443f886c9ba3887dae1af32aaca2",
+      "source_url": "https://github.com/czyssrs/FinQA",
+      "license_url": "https://github.com/czyssrs/FinQA/blob/0f16e2867befa6840783e58be38c9efb9229d742/LICENSE",
+      "benchmark": "finqa",
+      "source_revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+      "source_split": "dev",
+      "source_sha256": "a847fb7e0d61a3125a1e2909852df6b89f1ee64d2c5ff1bf689e332214deee51",
+      "seed": 20261023,
+      "source_records": 883,
+      "eligible_records": 873,
+      "excluded": [
+        {
+          "id": "PNC/2009/page_46.pdf-3",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "UNP/2011/page_76.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "PPG/2013/page_40.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "PPG/2013/page_40.pdf-1",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "BLL/2010/page_28.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "JPM/2014/page_65.pdf-4",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "AES/2002/page_46.pdf-1",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "PNC/2013/page_207.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "ETR/2016/page_418.pdf-3",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "JPM/2014/page_65.pdf-5",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        }
+      ],
+      "selected": [
+        {
+          "case_id": "finqa:4f978c08853a6db6",
+          "upstream_id": "L/2015/page_59.pdf-1",
+          "stratum": "short_small_table",
+          "upstream_sample_sha256": "ffacd3deddd39fabad6277fa4b4cf1754db0d07fafeb5aa772eb4bc609075bb3",
+          "case_sha256": "cd78208d4d18e2bd007d6f2ace639a0d5cd54d126820987ff411642dbf153638",
+          "benchmark": "finqa",
+          "task_id": "L/2015/page_59.pdf-1",
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "source_split": "dev",
+          "input_sha256": "59abcb7950d24f0bda80af417fd7425a64488d8f5b3ec7b603bed7b4d074481b",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        },
+        {
+          "case_id": "finqa:ab5bf9f64e475b1a",
+          "upstream_id": "PM/2018/page_24.pdf-2",
+          "stratum": "multi_large_table",
+          "upstream_sample_sha256": "6bf7925a70f99d84bad0d5e17c3dec0efe002c32f60eb8670a6a6940040a4116",
+          "case_sha256": "36c2c82f89c5c0d6c4dea95d0d8700074a54bbf006bc8827c89c99ac4595ee5f",
+          "benchmark": "finqa",
+          "task_id": "PM/2018/page_24.pdf-2",
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "source_split": "dev",
+          "input_sha256": "d1815a031fe84f824e4ff9c0eece85818970f3d45d45817851efdff18cd74ff4",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        },
+        {
+          "case_id": "finqa:d587661d9420b7e1",
+          "upstream_id": "IP/2012/page_93.pdf-4",
+          "stratum": "multi_small_table",
+          "upstream_sample_sha256": "a5ba21bf59a4478713aa60dbaad731239aa7067c6e25cdfc28be617b83d94d2c",
+          "case_sha256": "667ccabb68ddcd2ce2e655040fa4c66cce3846fd5b9b74040d21066da1db5c9e",
+          "benchmark": "finqa",
+          "task_id": "IP/2012/page_93.pdf-4",
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "source_split": "dev",
+          "input_sha256": "c3a53c86677c80b3fda6850e9bed3c9599f25cc25e15cd0afb62d56168bc9fac",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        }
+      ],
+      "official_leaderboard_comparable": false
+    },
+    {
+      "suite_id": "convfinqa-sample-v1",
+      "suite_hash": "7604a9e813122bbcbcaaf7c7e22cfb22a8b048735f0d11ebb73f625e919b02e0",
+      "source_url": "https://github.com/czyssrs/ConvFinQA",
+      "license_url": "https://github.com/czyssrs/ConvFinQA/blob/cf3eed2d5984960bf06bb8145bcea5e80b0222a6/LICENSE",
+      "benchmark": "convfinqa",
+      "source_revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6",
+      "source_split": "dev",
+      "source_sha256": "9665dd60f106e5cd41d37537edac97bbd26eb7629ad63ca2390b19d4619ba51b",
+      "seed": 20261023,
+      "source_records": 421,
+      "eligible_records": 417,
+      "excluded": [
+        {
+          "id": "Double_PNC/2013/page_207.pdf",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "Single_AES/2002/page_46.pdf-1",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "Double_AES/2002/page_46.pdf",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "Double_BLL/2010/page_28.pdf",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        }
+      ],
+      "selected": [
+        {
+          "case_id": "convfinqa:85d9a548c6a57df1",
+          "upstream_id": "Double_KHC/2016/page_23.pdf",
+          "stratum": "short_small_table",
+          "upstream_sample_sha256": "d4a3864c8458c0f73f960ebb20fb22a67872e7c3820e8dd15671a2684f95f816",
+          "case_sha256": "8bf73398f38b206a2c54e4c9b7fae4642e24388986f314d347003505cbf3aa1e",
+          "benchmark": "convfinqa",
+          "task_id": "Double_KHC/2016/page_23.pdf",
+          "revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6",
+          "source_split": "dev",
+          "input_sha256": "2480821666cc1b8c8afde61eb954258a8f2734e2d80da5319e231b082c97b237",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        }
+      ],
+      "official_leaderboard_comparable": false
+    }
+  ]
+}

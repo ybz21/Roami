@@ -5,6 +5,7 @@ import AgentMemory from './AgentMemory'
 import AgentTasks from './AgentTasks'
 import AgentInbox from './AgentInbox'
 import AgentDebug from './AgentDebug'
+import AgentImprovement from './AgentImprovement'
 import { backAgentPage, openAgentPage, type AgentPageRoute } from './agent-page-route'
 import type { AgentInboxState } from './useAgentInbox'
 import './agent-home-page.css'
@@ -27,6 +28,7 @@ export default function AgentHomePage({ page, node, inbox, projects, select, onS
       {page.view === 'memory' && <AgentMemory cid={cid} projects={projects} select={select} />}
       {page.view === 'notifications' && <AgentInbox inbox={inbox} select={select} />}
       {page.view === 'debug' && <AgentDebug cid={cid} branch={parts[2] ? decodeURIComponent(parts[2]) : ''} node={node} selected={page.task} unavailable={inbox.unavailable} onSelect={value => openAgentPage('debug', value)} />}
+      {page.view === 'improvement' && <AgentImprovement node={node} />}
     </section>
   </MobileSubPage>
 }

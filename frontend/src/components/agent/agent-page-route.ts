@@ -1,8 +1,8 @@
 import { getHashParams, normalizeRoute } from '../../route-hash'
 
-export type AgentPageView = 'tasks' | 'memory' | 'notifications' | 'debug'
+export type AgentPageView = 'tasks' | 'memory' | 'notifications' | 'debug' | 'improvement'
 export type AgentPageRoute = { view: AgentPageView; origin: string; task: string }
-const views = new Set(['tasks', 'memory', 'notifications', 'debug'])
+const views = new Set(['tasks', 'memory', 'notifications', 'debug', 'improvement'])
 const FROM = 'roamiAgentPageFrom'
 
 export function readAgentPage(route: string): AgentPageRoute | null {

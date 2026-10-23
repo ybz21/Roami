@@ -427,6 +427,28 @@ agent-runtime/src/roami_agent/tools/
   </ul>
 </section>
 
+<section id="roami-agent-rsi-design" lang="zh-CN">
+  <h1>Roami Agent RSI 方案 · 2026-10-22</h1>
+  <p>按用户要求，完整方案、整体架构图、决策空间展开图和可编辑 Excalidraw 文件统一保存在 <a href="docs/design/20261022-roami-agent-rsi/index.html">docs/design/20261022-roami-agent-rsi/</a>，后续修订维护该正文。</p>
+  <h2>产品设计</h2>
+  <p>每日主动跑用例或设计新实验，观察实际行为并提出修改意见，在隔离源码工作区实施后验证结果效果、交付时间与单位成功 Token；用户日常使用记录不是必要输入。参数搜索只属于辅助实验。</p>
+  <h2>用户故事</h2>
+  <p>用户能查看跨机评测证据、具体策略差异和三目标变化，在允许范围内应用或恢复策略，日常会话与测试环境隔离。</p>
+  <h2>技术设计</h2>
+  <p>复用运行时 trace、任务验收、调度与存储；已实现隔离评测、每日worker、规则回顾和有限参数发布底座。现已接入ResearchWorker、语义复盘、持久工单、隔离补丁、源码A/B和专用评测实例观察；真实每日评测尚未启用。完整模块、协议、接口和验收标准见设计正文。</p>
+  <p>调研与评价修订：<a href="docs/design/20261022-roami-agent-rsi/research.html">开源做法与源码核对</a>、<a href="docs/design/20261022-roami-agent-rsi/evaluation.html">程序员工作 / 业余任务的 80 项候选规格与评价标准</a>。80项仅为候选池，正式库存已调整为60项（公开20、自有真实20、机制回归20）；尚无真实模型全量成绩，权重、断言和资源上限均有版本记录。</p>
+  <p>自动化闭环修订：常驻RSI服务使用内部持久动作队列推进复盘、原生模型修复、独立验证、专用实例应用、观察与关闭/重开。原生修复采用硬Token准入；Codex适配器尚无对应预算边界，未自动启用。GitHub Issue/PR仍为可选同步；状态、幂等outbox、预算及关闭证据契约见<a href="docs/design/20261022-roami-agent-rsi/index.html#closed-loop">详细设计</a>。</p>
+  <p>参与者与交接修订：<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">图表版架构与执行设计</a>以架构图、执行手段表和闭环条件明确角色；运行边界与模块折叠展示。控制器发起，被测Agent做题，复盘Agent提问，原生模型隔离修改，独立服务验收应用，后续两个合格日周期后控制器关单。本地角色链已接入，正式运行仍待用例和机器配置；总方案的历史技术契约保留在折叠附录。</p>
+  <h3>首批实施记录 · 2026-10-23</h3>
+  <p>范围修订：正式任务库存为60项（公开20、自有真实20、机制回归20），每天完整执行60项，并回顾所有指标与具体日志；新想法作为剩余预算内的额外开发实验，不替换正式题。机制回归优先使用无模型测试，不预占模型Token；所有测试机共享日预算。主动观察和源码补丁已接入，正式场景与真实模型验收仍未完成。</p>
+  <p>已实现评测CLI、隔离文件运行、独立判定、成对比较、预算账本、每日worker与有限参数候选队列。4条公开财务组件合同已锁定，2条确定性设施任务已完成A/B；正式测试机、真实模型收益、完整60例及线上发布未完成。详见 <a href="docs/design/20261022-roami-agent-rsi/implementation.html">实施记录</a> 和 <a href="docs/development/agent-rsi.md">运行手册</a>。</p>
+  <p>每日全量修订：规则回顾已逐项接入模型/工具具体日志，缺日志或覆盖不足不能记为当日完成。rsi-v1.3要求正式60项每天全跑，A/B共120次执行；预算不足不静默缩题。quick门禁915项Python通过，最终专项51项、前端910项及生产构建通过；手机组件使用隔离示例数据验证触控与回顾覆盖，真实模型成绩和完整自主源码修改仍未交付。</p>
+  <p>验收：仓库quick门禁通过（896项Python测试、全量Go与前端静态检查）；最终记忆结算修订后专项50项通过。独立tmux实例已按身份清理，无真实模型收益分数。</p>
+
+  <h3>自动研发实施 · 2026-10-23</h3>
+  <p>ResearchWorkflow/ResearchWorker持久派发；behavior_observer逐项读证据；source_revision在detached worktree应用补丁；candidate_checks用冻结镜像、只读基线测试与独立私有门槛验证；release_observation仅绑定RSI runner，并在两个后续完整日周期后关单或退化回滚重开。原生模型费用与每日评测共用账本，未知调用不重放。源代码权限通过本机CLI配置，Web仅展示进度及恢复阻塞。设施测试不代表真实模型成绩；正式机器、60项材料、私有验证和预算仍须接齐。</p>
+</section>
+
 <section id="skill-cli-organization-review" lang="zh-CN">
   <h1>Skill 与 CLI 职责整理 · 2026-10-21</h1>
   <p>状态：已实施。两个内置 Skill、公开 CLI 命令族、受管适配与旧路径兼容已经落地；验收使用独立数据目录和 tmux 服务。</p>

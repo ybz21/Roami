@@ -221,11 +221,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
   }
   const moreMenu = { items: [
+    { key: 'improvement', label: t('agent.improvement'), icon: <ClockIcon size={16} /> },
     { key: 'debug', label: t('agent.debug'), icon: <CodeIcon size={16} /> },
     ...(!wide ? [
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     ] : []),
-  ], onClick: ({ key }: { key: string }) => { if (key === 'debug') openAgentPage('debug'); else showPanel(key as 'tasks' | 'memory') } }
+  ], onClick: ({ key }: { key: string }) => { if (key === 'debug' || key === 'improvement') openAgentPage(key); else showPanel(key as 'tasks' | 'memory') } }
   const secondaryActions = <>
     <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>

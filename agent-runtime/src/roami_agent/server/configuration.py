@@ -176,6 +176,9 @@ class Settings:
     context_window: int | None = None
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
+    memory_recall_limit: int = 8
+    memory_recall_tokens: int = 2000
+    tool_directory_page_size: int = 10
     compaction_ratio: float = 0.75
     timeout_seconds: int = 0
     shell_roots: tuple[Path, ...] = ()

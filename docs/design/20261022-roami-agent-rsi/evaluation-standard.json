@@ -1,0 +1,260 @@
+{
+  "standard_version": "rsi-v1.3-daily-full-20261023",
+  "status": "specification_with_partial_runner_not_live_model_evaluated",
+  "scope": {
+    "real_categories": 12,
+    "decision_domains": {
+      "MG": "记忆生成维护",
+      "MR": "记忆检索使用",
+      "CT": "上下文处理",
+      "TL": "工具列表与发现",
+      "TE": "工具执行",
+      "TR": "工具回执处理",
+      "SK": "Skill 与流程",
+      "PL": "规划与委派",
+      "MB": "模型与推理预算",
+      "VD": "验证与停止"
+    },
+    "private_validation": {
+      "minimum_cases": 24,
+      "status": "not_created",
+      "location": "outside_agent_access"
+    },
+    "private_holdout": {
+      "minimum_independent_cases": 30,
+      "status": "not_created",
+      "location": "outside_agent_access"
+    },
+    "authored_specification_bank": 80,
+    "real_workloads_in_authored_bank": 60,
+    "mechanism_regressions_in_authored_bank": 20
+  },
+  "quality": {
+    "dimensions": [
+      "correctness",
+      "completeness",
+      "usability",
+      "grounding"
+    ],
+    "grade_to_points": {
+      "0": 0,
+      "1": 25,
+      "2": 50,
+      "3": 80,
+      "4": 100
+    },
+    "profiles": {
+      "coding": {
+        "correctness": 0.45,
+        "completeness": 0.2,
+        "usability": 0.25,
+        "grounding": 0.1
+      },
+      "engineering": {
+        "correctness": 0.4,
+        "completeness": 0.25,
+        "usability": 0.2,
+        "grounding": 0.15
+      },
+      "presentation": {
+        "correctness": 0.3,
+        "completeness": 0.25,
+        "usability": 0.35,
+        "grounding": 0.1
+      },
+      "demo": {
+        "correctness": 0.35,
+        "completeness": 0.25,
+        "usability": 0.3,
+        "grounding": 0.1
+      },
+      "media": {
+        "correctness": 0.3,
+        "completeness": 0.2,
+        "usability": 0.4,
+        "grounding": 0.1
+      },
+      "research": {
+        "correctness": 0.4,
+        "completeness": 0.2,
+        "usability": 0.15,
+        "grounding": 0.25
+      },
+      "analysis": {
+        "correctness": 0.45,
+        "completeness": 0.2,
+        "usability": 0.2,
+        "grounding": 0.15
+      },
+      "finance_research": {
+        "correctness": 0.4,
+        "completeness": 0.2,
+        "usability": 0.15,
+        "grounding": 0.25
+      },
+      "quant": {
+        "correctness": 0.45,
+        "completeness": 0.2,
+        "usability": 0.2,
+        "grounding": 0.15
+      },
+      "experiment": {
+        "correctness": 0.35,
+        "completeness": 0.25,
+        "usability": 0.25,
+        "grounding": 0.15
+      },
+      "mechanism": {
+        "correctness": 0.4,
+        "completeness": 0.25,
+        "usability": 0.2,
+        "grounding": 0.15
+      }
+    },
+    "formula": "Q = sum(profile_weight[d] * grade_to_points[grade[d]])",
+    "pass": {
+      "all_case_hard_assertions": true,
+      "minimum_dimension_grade": 3,
+      "minimum_Q": 80,
+      "unreviewed_subjective_dimensions": "pending_not_pass"
+    },
+    "hard_failure_Q": 0,
+    "scale": {
+      "0": "缺失、错误或伪造",
+      "1": "重大缺陷不可用",
+      "2": "需要明显返工",
+      "3": "满足全部必需要求，仅容许非必要的轻微改进空间",
+      "4": "达到执行前冻结的优秀锚点；额外篇幅或工具次数不构成优秀"
+    },
+    "blind_review": {
+      "raters": 2,
+      "order": "randomized",
+      "must_view": [
+        "task",
+        "artifacts_or_rendered_output",
+        "required_source_evidence"
+      ],
+      "disagreement_gt_grades": 1,
+      "resolution": "human_review",
+      "calibration": "每类先用人工标注的好/临界/坏样本校准；记录一致率，不把两次同模型调用当独立专家"
+    },
+    "excellence": "每个case执行前冻结优秀项；没有适用优秀项的维度最高3档，拒绝事后奖励长答案、额外步骤或自我表扬。"
+  },
+  "aggregation": {
+    "quality": "先对每个真实类别的5个case取均值（失败为0），再对12类等权平均；同时逐类、逐机公开。机制集单独报告，不混入均值。",
+    "completion": "case_pass与verified_delivery分开；正确拒绝、取消或预算停止可通过机制case，但不计入成功交付分母。",
+    "failed_attempts": "所有失败和重试保留；预检发现环境缺失标unsupported/incomplete，不静默删题。",
+    "reference_weights": "初版12类等权；有真实任务分布后另建标准版本，同时重跑基线。",
+    "efficiency": "先按任务类别/机器/模型/缓存档位比较同一批case，再用固定权重汇总相对比值；只有所有必测层都有可比结果才给整体结论。不能直接把视频秒数和问答秒数混成总P50。"
+  },
+  "metrics": {
+    "quality": "Q、真实交付率、返工、严重错误与逐类回归",
+    "time": "客户端接收到可用结果的P50；首段有效内容、排队、模型、工具、验证、用户等待单列。仅服务端可测时标server_only。",
+    "token": "相同类别所有尝试的实际全链路Token / verified_delivery；零交付记不可计算。机制集单列每episode消耗。",
+    "usage": "未知不是零；缓存/推理子项去重；含Main、Worker、专业Agent、重试、压缩记忆与回报；优化器与评分成本单列。",
+    "process": [
+      "model_requests",
+      "tool_calls",
+      "discovery_rounds",
+      "invalid_arguments",
+      "retries",
+      "critical_path",
+      "duplicate_reads",
+      "memory_precision_recall_on_labeled_fixtures",
+      "constraint_retention",
+      "source_coverage"
+    ],
+    "proxies_are_not_rewards": true,
+    "failure_time": "未交付记录为在冻结截止时间右删失；中途快速失败不算更快交付。另报实际失败结束时间。成功共同子集的耗时只作辅助，不能隐去其他失败。"
+  },
+  "limits": {
+    "note": "以下是首轮资源保护上限，不是性能SLA；先核对预算再运行，预检能力缺失不能假跑。改变上限须新建试验版本。 多轮记忆case的上限作用于整个episode，不能每轮重置；provider未知用量触发保守预算策略。",
+    "simple": {
+      "wall_seconds": 60,
+      "observed_token_ceiling": 32000,
+      "model_requests": 8
+    },
+    "standard": {
+      "wall_seconds": 300,
+      "observed_token_ceiling": 128000,
+      "model_requests": 24
+    },
+    "long": {
+      "wall_seconds": 900,
+      "observed_token_ceiling": 384000,
+      "model_requests": 64
+    },
+    "media": {
+      "wall_seconds": 1800,
+      "observed_token_ceiling": 384000,
+      "model_requests": 64
+    }
+  },
+  "promotion": {
+    "protected_regressions": "基线已通过的case登记为保护集；候选不得失去已有成功。新增能力尚未达标仍列失败，不把全部挑战集预先宣称回归全绿。",
+    "release_blockers": [
+      "越权/数据泄露",
+      "修改评分器/隐藏集",
+      "重复副作用或伪造完成",
+      "财经未来数据泄漏却宣传结果",
+      "必要机制检查失败",
+      "适用必测环境未覆盖"
+    ],
+    "quality_CI_lower_difference_min": -1,
+    "completion_rate_CI_lower_difference_min": -0.02,
+    "one_improvement_required": {
+      "Q_absolute": 3,
+      "delivery_P50_relative": -0.1,
+      "token_per_delivery_relative": -0.1
+    },
+    "other_efficiency_regression_max": 0.05,
+    "confidence": "95%配对区间，按独立任务聚类；改善方向须受区间支持，样本不足只提案。",
+    "minimum_independent_holdout_pairs": 30,
+    "P95_min_observations_per_stratum": 100,
+    "must_cover": "所有适用必测机器和变更涉及的任务类别；能力覆盖声明须包含全部12类。"
+  },
+  "schedule": {
+    "daily": "每日全量60项正式用例；同机随机AB/BA顺序，稳定版和候选版各一次，共120个episode。成功与失败的全部指标和具体日志逐项回顾。",
+    "cases_per_day": 60,
+    "episodes_per_machine_AB_once": 120,
+    "screening_only": false,
+    "full_candidate": "每日全量不等于满足晋级；私有验证/未见任务和配对证据仍独立决定晋级。",
+    "repeat": "扩大验证按需跨日重复，按独立case聚类，不把重复和随机变体当独立题。",
+    "budget": "整套启动前足额预留全局Token及episode；不足明确阻断，不缩成部分题。新想法只使用剩余实验预算，不替换正式60项。",
+    "review": "逐项记录指标覆盖、实际日志hash及record/span，给出发现、原因假设、修改建议和回归要求；缺日志/缺项/回顾未完成不得记为当日完成。",
+    "status": "pending_full_materialization_and_machine_budget_binding",
+    "active_plan": "sampling-plan.json"
+  },
+  "case_contract": [
+    "id",
+    "prompt",
+    "preconditions",
+    "expected_terminal",
+    "required_deliverables",
+    "hard_assertions",
+    "decision_domains",
+    "grading_profile",
+    "quality_anchors_3",
+    "limit_profile",
+    "fixture_status",
+    "execution_status"
+  ],
+  "evidence_policy": "真实产物与来源优先；模型自述不代替状态或验证。测试答案、oracle和私有评分数据不进入被评Agent的输入。",
+  "sources": [
+    "https://github.com/gepa-ai/gepa",
+    "https://github.com/ace-agent/ace",
+    "https://github.com/harbor-framework/harbor",
+    "https://github.com/TheAgentCompany/TheAgentCompany",
+    "https://github.com/PhiloLabs/agentic-vbench",
+    "https://github.com/xiaowu0162/LongMemEval-V2"
+  ],
+  "suite_composition": {
+    "active_plan": "sampling-plan.json",
+    "target_size": 100,
+    "public_target": 60,
+    "imported_public": 4,
+    "authored_selected": 40,
+    "status": "partially_materialized_not_model_evaluated",
+    "quality_metrics": "unchanged_from_v1.1"
+  }
+}
