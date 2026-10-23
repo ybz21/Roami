@@ -5,6 +5,7 @@ import AgentMessageView from './AgentMessageView'
 import type { AgentMessage } from './agent-protocol'
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: Record<string, string>) => key + (values ? ' ' + Object.values(values).join(' ') : ''), locale: 'en-US' }) }))
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('antd', () => ({ App: { useApp: () => ({ message: { error: vi.fn() } }) } }))
 vi.mock('../markdown/Markdown', () => ({ default: ({ children }: any) => <p>{children}</p> }))
 afterEach(cleanup)

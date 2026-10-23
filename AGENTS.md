@@ -1064,3 +1064,14 @@ conversation/professional_activity.py
   <p>桌面检查 320、390、820、1100、1440 宽度，页面与文档无横向溢出，文档不滚动，浏览器无脚本错误；中文深色与英文浅色分别核对。证据与截图保存于 /tmp/roami-market-*，包括 live-evidence、call-evidence、phone-import-evidence、phone-sse-evidence 和 width-evidence。开发实例使用独立数据目录、数据库、Unix socket 与记录过身份的 tmux 服务；不部署到用户现用服务。</p>
   <p>专业接入使用真实 Go CLI、私有 Unix socket、Python 运行时与隔离 tmux，Codex／Claude 的 TUI 使用确定性离线测试程序，不消耗模型调用。两类会话均从派发提示读取私有上下文，成功读取已导入 find-skills、执行固定版本 Prettier（3.9.10）、发现并调用真实 SSE 服务；每次任务的四个调用进入执行记录，重复请求返回同一回执，取消后的调用被拒绝。定向用例另覆盖上下文伪造、跨所有者、旧版本、已结束尝试、忘记来源、改派、停用、目录越界、并发重复、运行时关闭及重启恢复。原始证据为 /tmp/roami-market-professional-evidence.json；测试结束已关闭确切执行会话并通过隔离启动器清理私有 tmux 服务。</p>
 </section>
+
+<section id="mobile-document-access-20261024" lang="zh-CN">
+  <h1>手机文档预览与保存 · 2026-10-24</h1>
+  <h2>产品设计</h2>
+  <p>聊天中的任务产物链接和附件在手机内打开全屏二级页，保留返回和下载。PDF 逐页绘制，PPTX 沿用本地渲染器并隔离页面内容；文件页和任务详情复用同一预览。Android 保存使用已信任的服务器证书及登录态，系统保存框保留中文原名，文件写入完成后才提示成功，失败清理本次创建的残缺文件。</p>
+  <h2>用户故事</h2>
+  <p>用户在聊天里点开 PDF 或 PPTX 即可查看、翻页或滚动，然后返回原对话；点下载能选择保存位置并得到原文件。跨节点链接保留来源节点，外链及显式下载继续正常导航。</p>
+  <h2>技术设计</h2>
+  <p>file-link 识别产物内容地址并按需读取元信息；MobileFilePreview、TaskArtifactPreview 与文件页复用 documents/DocumentPreview、PdfDocument。PDF.js 与 Worker 按需加载，画布限制像素预算；PPTX 页面使用禁脚本和外部网络的 sandbox。DocumentDownload 使用同源 OkHttp、CookieManager、Tls 和 ACTION_CREATE_DOCUMENT，DocumentName 解析 UTF-8 Content-Disposition。WebMessage 下载入口仅注入受信任服务器来源、仅接受主框架消息；保留普通 DownloadListener 兜底，已由网页接管的附件预览不再触发下载。APK 升级为 0.3.9，保留现有签名。</p>
+  <p>验收：Redmi Note 8 的 Chrome 和正式签名 App 在自签 HTTPS 下完成 PDF 绘制与翻页、PPTX 触控滚动和返回；两份文件通过系统保存框保留中文及加号文件名，手机文件 SHA-256 与服务器原件分别一致。接口要求 HttpOnly 登录 Cookie，确认原生保存携带登录态。跨节点链接与显式下载通过回归检查；前端完整检查、仓库 full 门禁及 Android 单元测试和签名构建通过。测试材料使用隔离示例，不外传用户文档。</p>
+</section>

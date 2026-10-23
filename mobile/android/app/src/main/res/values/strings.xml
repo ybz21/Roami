@@ -47,4 +47,9 @@
     <string name="attention_title">%1$d 项需要处理</string>
     <string name="attention_body">待确认会话和待收尾任务</string>
     <string name="agent_new_message">大总管有新消息</string>
+    <string name="document_downloading">正在保存文件…</string>
+    <string name="document_saved">已保存：%1$s</string>
+    <string name="document_failed">保存失败，请重试</string>
+    <string name="document_login">登录已失效，请重新登录后保存</string>
+    <string name="document_busy">请先完成当前文件的保存</string>
 </resources>
