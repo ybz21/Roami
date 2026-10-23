@@ -36,8 +36,12 @@ for wheel in wheels:
                     library = Path(temporary) / Path(member).name
                     library.write_bytes(archive.read(member))
                     linked = subprocess.check_output(["otool", "-L", str(library)], text=True)
+                    identity = subprocess.check_output(["otool", "-D", str(library)], text=True)
+                    own_names = {line.strip() for line in identity.splitlines()[1:]}
                     for dependency in linked.splitlines()[1:]:
                         name = dependency.strip().split(" (", 1)[0]
+                        if name in own_names:
+                            continue
                         if not name.startswith(("/usr/lib/", "/System/Library/")):
                             raise ValueError(f"Non-system cryptography dependency: {name}")
 # Source inputs were lock/hash checked by pip; installation pins the resulting target wheels.
