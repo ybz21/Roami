@@ -40,6 +40,8 @@ def review_trial(trial, root):
         )
 
     names = list(LOGS.get(trial.get("execution_kind"), ("execution-log.json",)))
+    if trial.get("isolation", {}).get("project_runtime"):
+        names.append("project-runtime-log.json")
     names.extend(
         name for name in ("worker-stdout.log", "worker-stderr.log") if (root / name).exists()
     )

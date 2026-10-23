@@ -92,8 +92,27 @@ def validate_case(case):
             "python_contract",
             "media",
             "vectorization",
+            "swe",
         }
     )
+    if judge["kind"] == "swe":
+        from roami_agent.improvement.swe_tasks import IMAGE_PATTERN, TASKS
+
+        require(judge.get("instance_id") in TASKS)
+        require(bool(re.fullmatch(IMAGE_PATTERN, judge.get("image", ""))))
+        require(bool(re.fullmatch(r"[a-f0-9]{40}", judge.get("base_commit", ""))))
+        require(bool(re.fullmatch(r"[a-f0-9]{64}", judge.get("archive_sha256", ""))))
+        require(judge.get("production_prefix") == TASKS[judge["instance_id"]][0])
+        require(judge.get("test_file") == TASKS[judge["instance_id"]][1])
+        require(isinstance(judge.get("test_patch"), str) and 0 < len(judge["test_patch"]) <= 200000)
+        require(
+            isinstance(judge.get("archive_parts"), list) and 1 <= len(judge["archive_parts"]) <= 7
+        )
+        require(len(set(judge["archive_parts"])) == len(judge["archive_parts"]))
+        require(all(p in case.get("asset_files", {}) for p in judge["archive_parts"]))
+        for key in ("fail_to_pass", "pass_to_pass"):
+            require(isinstance(judge.get(key), list) and 1 <= len(judge[key]) <= 2000)
+            require(all(isinstance(t, str) and len(t) <= 2000 for t in judge[key]))
     if judge["kind"] == "vectorization":
         require(isinstance(judge.get("source"), str) and bool(judge["source"]))
         require(number(judge.get("max_time_ratio"), 0.1, 0.99))

@@ -21,7 +21,7 @@ from roami_agent.protocol.model_routes import settings_with_route
 IMAGE = "roami-rsi-eval:local"
 
 
-async def docker_command(*args, timeout=30, input=None):
+async def docker_command(*args, timeout=30, input=None, maximum=8_000_000):
     process = await asyncio.create_subprocess_exec(
         "docker",
         *args,
@@ -40,19 +40,25 @@ async def docker_command(*args, timeout=30, input=None):
                 chunks, size = [], 0
                 while chunk := await stream.read(65536):
                     size += len(chunk)
-                    require(size <= 8_000_000, "RSI_DOCKER_OUTPUT_LIMIT")
+                    require(size <= maximum, "RSI_DOCKER_OUTPUT_LIMIT")
                     chunks.append(chunk)
                 return b"".join(chunks)
 
             out, _err = await asyncio.gather(bounded(process.stdout), bounded(process.stderr))
             await process.wait()
         require(process.returncode == 0, "RSI_DOCKER_COMMAND_FAILED")
-        require(len(out) <= 8_000_000, "RSI_DOCKER_OUTPUT_LIMIT")
+        require(len(out) <= maximum, "RSI_DOCKER_OUTPUT_LIMIT")
         return out
     finally:
         if process.returncode is None:
             process.kill()
             await process.wait()
+
+
+async def remove_container(name, label):
+    data = json.loads(await docker_command("inspect", name))[0]
+    require(data["Config"]["Labels"].get("roami.rsi") == label, "RSI_CONTAINER_IDENTITY_CHANGED")
+    await docker_command("rm", "--force", name)
 
 
 class ContainerExecutor:
@@ -115,11 +121,7 @@ class ContainerExecutor:
         }
 
     async def remove(self, name, label):
-        data = json.loads(await docker_command("inspect", name))[0]
-        require(
-            data["Config"]["Labels"].get("roami.rsi") == label, "RSI_CONTAINER_IDENTITY_CHANGED"
-        )
-        await docker_command("rm", "--force", name)
+        await remove_container(name, label)
 
     async def sandbox(self, workspace, program, *, input=None, timeout=60, runtime=False):
         if not self.image_id:
@@ -207,6 +209,10 @@ class ContainerExecutor:
                 from roami_agent.improvement.media_tasks import grade_media
 
                 grade = await grade_media(case, workspace, self)
+            elif kind == "swe":
+                from roami_agent.improvement.swe_tasks import grade_swe
+
+                grade = await grade_swe(case, workspace, self)
             else:
                 grade = judge_case(case, output, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
@@ -219,8 +225,16 @@ class ContainerExecutor:
             from roami_agent.improvement.mechanisms import run_mechanism
 
             return await run_mechanism(case, policy, root, self)
+        started = time.monotonic()
         workspace, state = root / "workspace", root / "state"
         materialize(case, workspace)
+        prepared_project = None
+        if case["judge"]["kind"] == "swe":
+            from roami_agent.improvement.swe_tasks import prepare_project, resolve_image
+
+            await resolve_image(case["judge"]["image"])
+            prepared_project = await asyncio.to_thread(prepare_project, case, workspace)
+        require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))
         view["prompt"] += (
@@ -228,7 +242,9 @@ class ContainerExecutor:
         )
         view["followups"] = case.get("followups", [])
         private_json(state / "request.json", {"case": view, "policy": policy})
+        setup_ms = (time.monotonic() - started) * 1000
         budget = EpisodeBudget(case["limits"])
+        budget.started = started
         providers, models, journal = [], {}, []
         for role in ("main", "worker", "memory"):
             actual = "main" if role == "main" else "worker"
@@ -244,12 +260,19 @@ class ContainerExecutor:
             providers.append(provider)
             models[role] = MeteredModel(provider, budget, role, output_cap=cap, journal=journal)
         name = "roami-rsi-agent-" + secrets.token_hex(10)
-        started, failure = time.monotonic(), None
+        failure = None
         response = {}
         created = False
         try:
             with tempfile.TemporaryDirectory(prefix="roami-rsi-gateway-") as directory:
-                async with ModelGateway(Path(directory) / "gateway.sock", models) as gateway:
+                from roami_agent.improvement.project_runtime import project_runtime
+
+                async with (
+                    ModelGateway(Path(directory) / "gateway.sock", models) as gateway,
+                    project_runtime(
+                        case, directory, workspace, root, started + case["limits"]["seconds"]
+                    ) as project,
+                ):
                     await docker_command(
                         "create",
                         "--name",
@@ -289,9 +312,9 @@ class ContainerExecutor:
                         self.image_id,
                     )
                     created = True
-                    await docker_command(
-                        "start", "--attach", name, timeout=case["limits"]["seconds"] + 10
-                    )
+                    remaining = case["limits"]["seconds"] - (time.monotonic() - started)
+                    require(remaining > 0, "RSI_TIME_BUDGET")
+                    await docker_command("start", "--attach", name, timeout=remaining)
                     response = load_json(state / "response.json", maximum=4_000_000)
                     require(
                         isinstance(response.get("release_blockers"), list),
@@ -301,6 +324,10 @@ class ContainerExecutor:
                         failure = gateway.errors[0]
                     elif response["release_blockers"]:
                         failure = "RSI_RUNTIME_REPORTED_FAILURE"
+                if project is not None and any(
+                    r["state"] in {"running", "unknown"} for r in project.records
+                ):
+                    failure = "RSI_PROJECT_RUNTIME_UNSETTLED"
                 await self.remove(name, name)
                 created = False
             grade = await self.verify(case, workspace, response.get("output", ""), started=started)
@@ -329,6 +356,13 @@ class ContainerExecutor:
                     await provider.close()
             private_json(root / "model-log.json", {"requests": journal, "source": "host_provider"})
         metrics = budget.metrics()
+        metrics["fixture_setup_ms"] = setup_ms
+        if case["judge"]["kind"] == "swe":
+            log = root / "project-runtime-log.json"
+            records = load_json(log)["tool_calls"] if log.exists() else []
+            metrics["project_source"] = prepared_project
+            metrics["project_test_calls"] = len(records)
+            metrics["project_test_ms"] = sum(r["elapsed_ms"] for r in records)
         if failure:
             grade.update(
                 artifact_assessment=dict(grade),
@@ -365,5 +399,10 @@ class ContainerExecutor:
                 "host_grader_after_exit": True,
                 "provider_keys_in_container": False,
                 "runtime_profile": "main_and_native_worker",
+                **(
+                    {"project_runtime": case["judge"]["image"]}
+                    if case["judge"]["kind"] == "swe"
+                    else {}
+                ),
             },
         }

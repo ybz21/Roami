@@ -87,7 +87,7 @@ async def run_cycle(
         "runner_version": VERSION,
         "request_key": request_key,
         "implementation_hash": implementation_hash(),
-        "standard_version": "rsi-v1.5-runtime-and-complete-review-20261023",
+        "standard_version": "rsi-v1.6-project-runtime-and-setup-clock-20261023",
         "suite_id": suite["id"],
         "suite_hash": suite["content_hash"],
         "case_hashes": {c["id"]: digest(c) for c in cases},

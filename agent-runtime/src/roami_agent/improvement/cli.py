@@ -32,6 +32,21 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-swe":
+        from roami_agent.improvement.swe_tasks import import_swe
+
+        records = load_json(args.source, maximum=100000000)
+        rows = [r for r in records if r["instance_id"] == args.instance_id]
+        require(len(rows) == 1, "RSI_SOURCE_TASK_REQUIRED")
+        suite = await import_swe(rows[0], revision=args.revision)
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+        }
+
     if args.command == "import-media":
         from roami_agent.improvement.media_tasks import import_media
 
@@ -358,6 +373,11 @@ def main():
     p.add_argument("--source-dir", required=True, type=Path)
     p.add_argument("--revision", required=True)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-swe")
+    for name in ("source", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    p.add_argument("--instance-id", required=True)
+    p.add_argument("--revision", required=True)
     p = commands.add_parser("import-media")
     for name in ("source-dir", "archive", "output"):
         p.add_argument("--" + name, required=True, type=Path)
