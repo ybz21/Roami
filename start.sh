@@ -190,6 +190,13 @@ elif [ -d backend/api ] && [ "$(find backend cmd internal pkg plugins \( -name '
   build_backend
 fi
 
+# The source-development path prepares the same runtime before the web supervisor uses it.
+if [ "$DEV" = 1 ]; then
+  command -v uv >/dev/null || { echo "uv 未安装，源码开发需要 uv 准备智能体运行时"; exit 1; }
+  "$BIN" agent setup --runtime-dir "$(pwd)/agent-runtime"
+  export ROAMI_AGENT_RUNTIME="$(pwd)/agent-runtime"
+fi
+
 # ── KVM：--dev 才动手拿权限，平时只提醒 ──────────────────────────
 #
 # 为什么分开：systemd 的 ExecStart 就是 `start.sh fg`，普通启动也常在后台跑，

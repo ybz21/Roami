@@ -492,6 +492,7 @@ async def serve(args):
         worker_model=worker,
         executor=CodingExecutor(database, settings),
     )
+    runtime.managed_parent = getattr(args, "parent_fd", None) is not None
     try:
         args.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(args.socket.parent, 0o700)
@@ -520,7 +521,22 @@ async def serve(args):
                     timeout_graceful_shutdown=3,
                 )
             )
-            await server.serve(sockets=[bound])
+            parent_fd = getattr(args, "parent_fd", None)
+            loop = asyncio.get_running_loop()
+            if parent_fd is not None:
+
+                def parent_closed():
+                    if not os.read(parent_fd, 1):
+                        server.should_exit = True
+                        loop.remove_reader(parent_fd)
+
+                loop.add_reader(parent_fd, parent_closed)
+            try:
+                await server.serve(sockets=[bound])
+            finally:
+                if parent_fd is not None:
+                    loop.remove_reader(parent_fd)
+                    os.close(parent_fd)
     finally:
         await runtime.close()
         await provider.close()
@@ -538,6 +554,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--socket", type=Path)
     parser.add_argument("--initialize", action="store_true")
+    parser.add_argument("--parent-fd", type=int)
     args = parser.parse_args()
     if not args.initialize and not args.socket:
         parser.error("--socket is required when serving")

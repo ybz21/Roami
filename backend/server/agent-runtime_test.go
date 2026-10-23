@@ -58,6 +58,11 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("private route mounted publicly: %d", recorder.Code)
 	}
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/internal/installation/quiesce", nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("private installation route mounted publicly: %d", recorder.Code)
+	}
 }
 
 func TestRuntimeCapabilitySettingsCoexistWithSessionCapabilityGuide(t *testing.T) {

@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 #
-# Roami 常驻安装器 —— 下载单一自包含二进制并注册为常驻服务（systemd）。适合 24 小时运行的机器。
+# Roami 常驻安装器 —— 下载完整运行包并注册为常驻服务（systemd / launchd）。适合 24 小时运行的机器。
 #
 # 一行安装（推荐）：
 #   curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
 #
-# roami 是自包含二进制（内嵌前端与会话核心），目标机无需 go/node/npm。
+# 完整包携带 Python 和全部智能体依赖，目标机无需 Python/uv/go/node/npm。
 # 配置与数据都在 ~/.roami/（首次启动自动生成 config.yaml）。首次打开网页设置登录口令。
 #
 # 环境开关：
 #   ROAMI_VERSION=vX.Y.Z   指定版本（默认 latest）
 #   ROAMI_BIN_DIR=DIR      安装目录（默认 ~/.local/bin）
-#   ROAMI_NO_SERVICE=1     只装二进制，不注册 systemd 服务
+#   ROAMI_NO_SERVICE=1     安装完整包，跳过开机服务（显示手工启动命令）
+#   ROAMI_BUNDLE_FILE=FILE 离线安装本地完整包（需同目录 .sha256）
+#   ROAMI_INSTALL_ROOT=DIR 版本目录（默认 ~/.local/share/roami）
 #   ROAMI_SYSTEM=1         注册系统级 systemd 服务（/etc/systemd/system，需 root/sudo）
 #   ROAMI_NO_KVM=1         跳过 /dev/kvm 授权（则本机 Android 模拟器起不来）
 #   ROAMI_FROM_SOURCE=1    在仓库 clone 内从源码构建（需 go+node），而非下载 release
@@ -30,6 +32,13 @@ if [ "${ROAMI_SYSTEM:-0}" = 1 ] && [ -n "${SUDO_USER:-}" ]; then
 fi
 BIN_DIR="${ROAMI_BIN_DIR:-${INSTALL_RUN_HOME}/.local/bin}"
 SERVICE_NAME="roami"
+INSTALL_ROOT="${ROAMI_INSTALL_ROOT:-${INSTALL_RUN_HOME}/.local/share/roami}"
+INSTALL_SLOT=""
+INSTALL_WORK=""
+INSTALL_ACTIVATED=0
+INSTALL_QUIESCED=0
+INSTALL_LOCKED=0
+INSTALL_PREVIOUS=""
 
 # ── 输出助手 ─────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -61,21 +70,47 @@ detect_asset() {
 # 解析生效的 release tag：显式 ROAMI_VERSION 直接用；否则优先 stable「latest」，
 # 若仓库只有 prerelease（latest 会 404）则退回 GitHub API 取最新一个 release（含 prerelease）。
 resolve_tag() {
-  [ "$VERSION" != latest ] && { echo "$VERSION"; return; }
-  if curl -fsIL -o /dev/null "https://github.com/${REPO}/releases/latest/download/${ASSET}" 2>/dev/null; then
-    echo latest; return
-  fi
-  curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=1" 2>/dev/null \
-    | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/'
+  if [ "$VERSION" != latest ]; then printf '%s\n' "$VERSION"; return; fi
+  local report
+  report="$(curl -fsSL --connect-timeout 10 --max-time 60 "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null)" \
+    || report="$(curl -fsSL --connect-timeout 10 --max-time 60 "https://api.github.com/repos/${REPO}/releases?per_page=1")" || return 1
+  printf '%s\n' "$report" | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
 }
 
-download_url() {  # <tag>
-  local tag="$1"
-  if [ -z "$tag" ] || [ "$tag" = latest ]; then
-    echo "https://github.com/${REPO}/releases/latest/download/${ASSET}"
+download_url() {
+  printf '%s/download/%s/%s.tar.gz\n' "${ROAMI_RELEASE_BASE_URL:-https://github.com/$REPO/releases}" "$1" "$ASSET"
+}
+
+run_as_service_user() {
+  if [ "${ROAMI_SYSTEM:-0}" = 1 ] && [ "$(id -u)" = 0 ] && [ "$INSTALL_RUN_USER" != root ]; then
+    runuser -u "$INSTALL_RUN_USER" -- env "HOME=$INSTALL_RUN_HOME" "$@"
   else
-    echo "https://github.com/${REPO}/releases/download/${tag}/${ASSET}"
+    "$@"
   fi
+}
+
+archive_digest() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+  else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
+
+cleanup_installation() {
+  local status=$?
+  if [ "$status" != 0 ] && [ "$INSTALL_ACTIVATED" = 1 ]; then
+    warn "启动验证失败，恢复之前的程序；现有数据未迁移。"
+    if [ -n "$INSTALL_PREVIOUS" ]; then
+      run_as_service_user "$INSTALL_SLOT/bin/roami" agent install-bundle --activate --destination "$INSTALL_PREVIOUS" --bin-dir "$BIN_DIR" || true
+    elif [ -f "$INSTALL_ROOT/previous-binary" ]; then
+      run_as_service_user cp "$INSTALL_ROOT/previous-binary" "$BIN_DIR/roami.rollback"
+      run_as_service_user mv -f "$BIN_DIR/roami.rollback" "$BIN_DIR/roami"
+    fi
+    restart_existing_service || true
+  fi
+  if [ "$status" != 0 ] && [ "$INSTALL_QUIESCED" = 1 ]; then
+    run_as_service_user "$INSTALL_SLOT/bin/roami" agent resume-upgrade >/dev/null 2>&1 || true
+  fi
+  [ -z "$INSTALL_WORK" ] || rm -rf "$INSTALL_WORK"
+  if [ "$INSTALL_LOCKED" = 1 ]; then run_as_service_user rmdir "$INSTALL_ROOT/.install-lock" || true; fi
 }
 
 # ── 安装二进制：下载 release，或（ROAMI_FROM_SOURCE / 下载失败且在 clone 内）从源码构建 ──
@@ -91,8 +126,11 @@ preflight_storage() {
     die "存储预检失败；现有安装未替换。检查候选程序: $candidate"
   fi
   if printf '%s' "$report" | grep -Eq '"migrationRequired"[[:space:]]*:[[:space:]]*true'; then
-    local pending="${candidate%.tmp}.upgrade"
-    mv -f "$candidate" "$pending"
+    local pending="$candidate"
+    if [[ "$candidate" = *.tmp ]]; then
+      pending="${candidate%.tmp}.upgrade"
+      mv -f "$candidate" "$pending"
+    fi
     die "检测到旧数据库布局，现有安装未替换。先停止旧服务与插件写者，用 $pending db migrate --layout --dry-run 盘点，再用 --layout --offline 迁移，完成后重新安装。"
   fi
 }
@@ -121,39 +159,91 @@ service_path_environment() {
 }
 
 install_binary() {
-  mkdir -p "$BIN_DIR"
-  local dest="${BIN_DIR}/roami"
+  run_as_service_user mkdir -p "$BIN_DIR" "$INSTALL_ROOT/releases"
+  BIN_DIR="$(cd "$BIN_DIR" && pwd)"
+  INSTALL_ROOT="$(cd "$INSTALL_ROOT" && pwd)"
+  run_as_service_user mkdir "$INSTALL_ROOT/.install-lock" || die "另一个安装正在进行；若已中断，确认没有安装进程后移除 $INSTALL_ROOT/.install-lock"
+  INSTALL_LOCKED=1
+  INSTALL_WORK="$(mktemp -d)"
+  local archive tag="" digest expected url here
+  archive="${ROAMI_BUNDLE_FILE:-}"
+  if [ "${ROAMI_FROM_SOURCE:-0}" = 1 ]; then
+    here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+    [ -f "$here/scripts/build/build-agent-bundle.sh" ] || die "源码构建需在仓库内运行"
+    (cd "$here" && bash scripts/build/build-roami.sh && bash scripts/build/build-agent-bundle.sh)
+    archive="$here/backend/dist/$ASSET.tar.gz"
+  fi
+  if [ -n "$archive" ]; then
+    [ -f "$archive" ] && [ -f "$archive.sha256" ] || die "离线包或校验文件不存在"
+    cp "$archive" "$INSTALL_WORK/bundle.tar.gz"
+    cp "$archive.sha256" "$INSTALL_WORK/bundle.sha256"
+  else
+    tag="$(resolve_tag)" || die "无法获取发布版本，现有安装未修改"
+    [[ "$tag" =~ ^[A-Za-z0-9._-]+$ ]] || die "发布版本无效"
+    url="$(download_url "$tag")"
+    step "下载 Roami 完整包 $tag ($ASSET)..."
+    curl -fSL --connect-timeout 10 --retry 3 -o "$INSTALL_WORK/bundle.tar.gz" "$url" || die "完整包下载失败，现有安装未修改"
+    curl -fsSL --connect-timeout 10 --retry 3 -o "$INSTALL_WORK/bundle.sha256" "$url.sha256" || die "发布校验文件下载失败"
+  fi
+  expected="$(awk 'NR==1 {print $1}' "$INSTALL_WORK/bundle.sha256")"
+  [[ "$expected" =~ ^[a-fA-F0-9]{64}$ ]] || die "发布校验文件无效"
+  digest="$(archive_digest "$INSTALL_WORK/bundle.tar.gz")"
+  [ "$digest" = "$expected" ] || die "完整包校验失败，现有安装未修改"
+  tar -xOf "$INSTALL_WORK/bundle.tar.gz" bin/roami > "$INSTALL_WORK/roami" || die "完整包缺少主程序"
+  chmod +x "$INSTALL_WORK/roami"
+  if [ "${ROAMI_SYSTEM:-0}" = 1 ] && [ "$(id -u)" = 0 ]; then chown -R "$INSTALL_RUN_USER" "$INSTALL_WORK"; fi
+  INSTALL_SLOT="$INSTALL_ROOT/releases/$digest"
+  if [ ! -f "$INSTALL_SLOT/ready" ]; then
+    step "安装私有 Python 和智能体依赖..."
+    run_as_service_user "$INSTALL_WORK/roami" agent install-bundle --archive "$INSTALL_WORK/bundle.tar.gz" --destination "$INSTALL_SLOT" --expected-version "$tag" || die "运行环境准备失败，现有安装未修改"
+  fi
+  preflight_storage "$INSTALL_SLOT/bin/roami"
+  run_as_service_user "$INSTALL_SLOT/bin/roami" agent install-bundle --check --destination "$INSTALL_SLOT" --expected-version "$tag" || die "数据库版本需要离线备份升级；现有安装未修改"
+  step "验证智能体运行环境..."
+  run_as_service_user "$INSTALL_SLOT/bin/roami" agent install-probe --runtime-dir "$INSTALL_SLOT/runtime" || die "智能体验证失败，现有安装未修改"
+  info "完整包准备完成"
+}
 
-  if [ "${ROAMI_FROM_SOURCE:-0}" != 1 ]; then
-    local tag url; tag="$(resolve_tag)"; url="$(download_url "$tag")"
-    step "下载 ${ASSET} (${tag:-latest})..."
-    if curl -fSL --progress-bar -o "${dest}.tmp" "$url"; then
-      preflight_storage "${dest}.tmp"
-      mv "${dest}.tmp" "$dest"; chmod +x "$dest"
-      link_legacy_name "$dest"
-      info "roami 已安装到 $dest"
-      return 0
+restart_existing_service() {
+  if [ "${ROAMI_NO_SERVICE:-0}" = 1 ]; then return 0; fi
+  if [ "$OS" = darwin ]; then
+    local plist="$INSTALL_RUN_HOME/Library/LaunchAgents/com.roami.console.plist"
+    launchctl unload "$plist" 2>/dev/null || true
+    launchctl load "$plist"
+  elif [ "${ROAMI_SYSTEM:-0}" = 1 ]; then
+    local elevate=""; [ "$(id -u)" = 0 ] || elevate=sudo
+    $elevate systemctl restart roami.service
+  elif command -v systemctl >/dev/null 2>&1; then
+    systemctl --user restart roami.service
+  fi
+}
+
+activate_installation() {
+  INSTALL_PREVIOUS="$(readlink "$INSTALL_ROOT/current" 2>/dev/null || true)"
+  if [ -e "$BIN_DIR/roami" ]; then
+    run_as_service_user "$INSTALL_SLOT/bin/roami" agent prepare-upgrade || die "智能体正忙或状态未知；请任务结束后重试"
+    INSTALL_QUIESCED=1
+    if [ "${ROAMI_NO_SERVICE:-0}" != 1 ] && [ "$OS" != darwin ]; then
+      if [ "${ROAMI_SYSTEM:-0}" = 1 ]; then
+        systemctl is-active --quiet roami.service || {
+          if run_as_service_user "$BIN_DIR/roami" agent status >/dev/null 2>&1; then die "运行中的实例不归本安装服务管理，请先停止该实例"; fi
+        }
+      else
+        systemctl --user is-active --quiet roami.service || {
+          if run_as_service_user "$BIN_DIR/roami" agent status >/dev/null 2>&1; then die "运行中的实例不归本安装服务管理，请先停止该实例"; fi
+        }
+      fi
     fi
-    rm -f "${dest}.tmp"
-    warn "下载失败（可能该 release 尚未发布）。"
+    if [ "${ROAMI_NO_SERVICE:-0}" = 1 ]; then
+      # Manual instances cannot be safely replaced without owning their lifecycle.
+      if run_as_service_user "$BIN_DIR/roami" agent status >/dev/null 2>&1; then
+        die "检测到手工运行的智能体，请先停止该实例再安装"
+      fi
+    fi
   fi
-
-  # 源码构建回退（需在 clone 内，且有 go+node）
-  local here; here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
-  if [ -f "${here}/scripts/build/build-roami.sh" ] && command -v go >/dev/null && command -v npm >/dev/null; then
-    step "从源码构建 roami（scripts/build/build-roami.sh）..."
-    ( cd "$here" && bash scripts/build/build-roami.sh )
-    local built="${here}/backend/dist/${ASSET}"
-    [ -f "$built" ] || die "源码构建未产出当前平台二进制"
-    # 服务正跑着时 cp 直接覆盖会报「文本文件忙」；先落临时名再 mv，rename 对运行中的二进制是原子的
-    cp "$built" "${dest}.tmp"; chmod +x "${dest}.tmp"
-    preflight_storage "${dest}.tmp"
-    mv -f "${dest}.tmp" "$dest"
-    link_legacy_name "$dest"
-    info "roami 已从源码构建并安装到 $dest"
-    return 0
-  fi
-  die "无法安装 roami：下载失败且非源码环境（需 clone 仓库 + go/npm，或先发布 release）"
+  run_as_service_user "$INSTALL_SLOT/bin/roami" agent install-bundle --activate --destination "$INSTALL_SLOT" --bin-dir "$BIN_DIR" || die "版本切换失败"
+  INSTALL_ACTIVATED=1
+  link_legacy_name "$BIN_DIR/roami"
 }
 
 # ── tmux（会话基座）：roami 内置会话核心，但会话/蜂群仍需宿主机的 tmux ─────
@@ -169,7 +259,7 @@ ensure_tmux() {
   elif command -v apk     >/dev/null; then $sudo apk add tmux
   elif command -v brew    >/dev/null; then brew install tmux
   fi
-  command -v tmux >/dev/null && info "tmux 已安装" || warn "tmux 未安装：会话/蜂群功能需要它，请手动安装后重试"
+  command -v tmux >/dev/null && info "tmux 已安装" || die "tmux 未安装；安装完成后重试本命令"
 }
 
 # ── Chromium（「浏览器」镜像页需要一台 Chrome/Chromium 才能投屏）─────
@@ -253,22 +343,10 @@ ensure_kvm() {
 # 已经存在同名**真文件**（旧版二进制）时也换成软链——留着两个二进制只会让人不知道跑的是哪个。
 link_legacy_name() {
   local dest="$1" legacy
-  local here retirement
-  here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
-  retirement="${here}/scripts/install/retire-session-entries.sh"
-  if [ ! -f "$retirement" ]; then
-    retirement="$(mktemp)"
-    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${ROAMI_INSTALL_BRANCH:-main}/scripts/install/retire-session-entries.sh" -o "$retirement" || die "无法加载旧入口迁移脚本"
-  fi
-  source "$retirement"
-  retire_roami_session_entries "$BIN_DIR"
-  [ "$retirement" = "${here}/scripts/install/retire-session-entries.sh" ] || rm -f "$retirement"
-  for legacy in roam chrome; do
-    ln -sfn "$dest" "${BIN_DIR}/${legacy}"
-  done
-  mkdir -p "${HOME}/.local/share/bash-completion/completions"
-  "$dest" completion > "${HOME}/.local/share/bash-completion/completions/roami"
-  "$dest" session completion
+  run_as_service_user bash -c 'source "$1"; retire_roami_session_entries "$2"' _ "$INSTALL_SLOT/install/retire-session-entries.sh" "$BIN_DIR"
+  for legacy in roam chrome; do run_as_service_user ln -sfn "$dest" "$BIN_DIR/$legacy"; done
+  run_as_service_user bash -c 'mkdir -p "$HOME/.local/share/bash-completion/completions"; "$1" completion > "$HOME/.local/share/bash-completion/completions/roami"' _ "$dest"
+  run_as_service_user "$dest" session completion
 }
 
 
@@ -286,8 +364,20 @@ retire_legacy_service() {
 }
 
 # ── systemd 常驻服务 ─────────────────────────────────────────────
+systemd_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"; value="${value//\"/\\\"}"; value="${value//%/%%}"
+  printf '%s' "$value"
+}
+
+xml_escape() {
+  local value="$1"
+  value="${value//&/\&amp;}"; value="${value//</\&lt;}"; value="${value//>/\&gt;}"
+  printf '%s' "$value"
+}
+
 install_service_user() {
-  command -v systemctl >/dev/null || { warn "无 systemd，跳过服务注册；手动运行：${BIN_DIR}/roami"; return 0; }
+  command -v systemctl >/dev/null || die "本系统无 systemd；可设 ROAMI_NO_SERVICE=1 安装后运行 $BIN_DIR/roami"
   retire_legacy_service
   local unit_dir="${HOME}/.config/systemd/user"
   mkdir -p "$unit_dir"
@@ -299,9 +389,10 @@ Wants=network-online.target
 
 [Service]
 $(service_path_environment)
-ExecStart=${BIN_DIR}/roami
+ExecStart="$(systemd_escape "$BIN_DIR/roami")"
 Restart=always
 RestartSec=3
+TimeoutStopSec=25
 # roami 起的 tmux server 在同一个 cgroup 里：默认 KillMode 会在 restart 时连 tmux 一起杀，所有会话当场没了
 KillMode=process
 
@@ -330,11 +421,12 @@ Wants=network-online.target
 
 [Service]
 User=${user}
-Environment=HOME=${service_home}
+Environment="HOME=$(systemd_escape "$service_home")"
 $(service_path_environment)
-ExecStart=${BIN_DIR}/roami
+ExecStart="$(systemd_escape "$BIN_DIR/roami")"
 Restart=always
 RestartSec=3
+TimeoutStopSec=25
 # roami 起的 tmux server 在同一个 cgroup 里：默认 KillMode 会在 restart 时连 tmux 一起杀，所有会话当场没了
 KillMode=process
 
@@ -357,14 +449,16 @@ install_service_launchd() {
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.roami.console</string>
-  <key>ProgramArguments</key><array><string>${BIN_DIR}/roami</string></array>
+  <key>ProgramArguments</key><array><string>$(xml_escape "$BIN_DIR/roami")</string></array>
   <key>EnvironmentVariables</key><dict>
 $(service_path_environment plist)
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>${HOME}/.roami/roami.log</string>
-  <key>StandardErrorPath</key><string>${HOME}/.roami/roami.log</string>
+  <key>ThrottleInterval</key><integer>3</integer>
+  <key>ExitTimeOut</key><integer>25</integer>
+  <key>StandardOutPath</key><string>$(xml_escape "$HOME/.roami/roami.log")</string>
+  <key>StandardErrorPath</key><string>$(xml_escape "$HOME/.roami/roami.log")</string>
 </dict>
 </plist>
 EOF
@@ -372,7 +466,7 @@ EOF
   if launchctl load "$plist" 2>/dev/null; then
     info "已注册 launchd 服务：launchctl {unload|load} ${plist}（日志 ~/.roami/roami.log）"
   else
-    warn "launchctl load 失败，可手动运行：${BIN_DIR}/roami"
+    die "launchd 服务启动失败，请检查 $HOME/.roami/roami.log"
   fi
 }
 
@@ -381,15 +475,17 @@ echo ""
 echo -e "  ${bold}Roami${reset} ${dim}— 常驻安装（下载二进制 + systemd/launchd 常驻）${reset}"
 echo ""
 
+trap cleanup_installation EXIT
 detect_asset
 install_binary
 ensure_tmux
-ensure_chrome
-ensure_adb
-ensure_kvm
+ensure_chrome || warn "Chrome 安装失败，可稍后安装"
+ensure_adb || warn "ADB 安装失败，可稍后安装"
+ensure_kvm || warn "KVM 授权未完成"
+activate_installation
 
 if [ "${ROAMI_NO_SERVICE:-0}" = 1 ]; then
-  step "ROAMI_NO_SERVICE=1：跳过服务注册"
+  step "已安装完整环境；启动：$BIN_DIR/roami"
 elif [ "${ROAMI_SYSTEM:-0}" = 1 ]; then
   install_service_system
 elif [ "$OS" = darwin ]; then
@@ -397,6 +493,19 @@ elif [ "$OS" = darwin ]; then
 else
   install_service_user
 fi
+
+# Always verify the private runtime after the service manager reports success.
+if [ "${ROAMI_NO_SERVICE:-0}" != 1 ]; then
+  installed_ready=0
+  attempt=0
+  while [ "$attempt" -lt "${ROAMI_INSTALL_WAIT_SECONDS:-60}" ]; do
+    attempt=$((attempt + 1))
+    if run_as_service_user "$BIN_DIR/roami" agent installed-status >/dev/null 2>&1; then installed_ready=1; break; fi
+    sleep 1
+  done
+  [ "$installed_ready" = 1 ] || die "智能体服务未就绪，请检查 Roami 服务日志"
+fi
+INSTALL_QUIESCED=0
 
 # PATH 提示
 if [[ ":$PATH:" != *":${BIN_DIR}:"* ]]; then
