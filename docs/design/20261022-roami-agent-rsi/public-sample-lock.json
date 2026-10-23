@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "12_public_contracts_imported_no_completed_live_agent_benchmark",
-  "materialized_public": 12,
+  "status": "16_public_contracts_imported_no_completed_live_agent_benchmark",
+  "materialized_public": 16,
   "target_public": 20,
   "sampled_on": "2026-10-23",
   "suites": [
@@ -339,6 +339,98 @@
       ],
       "official_leaderboard_comparable": false,
       "grader_acceptance": "original_verifier_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "swe-pylint-dev__pylint-6903-v1",
+      "suite_hash": "40ea5e9b270e7d0d91eda316e4b30766992e7be27718fe126e79f2bdfd201d06",
+      "benchmark": "swe_verified",
+      "source_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "selected": [
+        {
+          "case_id": "swe_verified:pylint-dev__pylint-6903",
+          "benchmark": "swe_verified",
+          "task_id": "pylint-dev__pylint-6903",
+          "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+          "source_split": "test",
+          "input_sha256": "21fae4f08ddb16aa8cde1cae86d37459cf5eacb0f7e363c1059b3cd5f2338617",
+          "base_commit": "ca80f03a43bc39e4cc2c67dc99817b3c9f13b8a6",
+          "runtime_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-6903@sha256:bad80b1c20eeb5d49a6e82dc485ee40fbd67b91df47b56740e1be5471b678f5b",
+          "adapter_revision": "native-project-snapshot-v1",
+          "adapted": true,
+          "adaptation": "Frozen upstream image and project interpreter; clean source snapshot without future Git history; native tests through a scoped broker; original held-out test patch and required pass lists, no dependency reinstall. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "swe-scikit-learn__scikit-learn-13496-v1",
+      "suite_hash": "0fa0f82d54c65a8f0dbc8ff6f2aa68c1c9d2d1329489eb7109354e2fcc47dedf",
+      "benchmark": "swe_verified",
+      "source_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "selected": [
+        {
+          "case_id": "swe_verified:scikit-learn__scikit-learn-13496",
+          "benchmark": "swe_verified",
+          "task_id": "scikit-learn__scikit-learn-13496",
+          "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+          "source_split": "test",
+          "input_sha256": "1c809317fdf186f1fbfa738b3456b869eb4db6ec198a4428fbc5205acb70e315",
+          "base_commit": "3aefc834dce72e850bff48689bea3c7dff5f3fad",
+          "runtime_image": "swebench/sweb.eval.x86_64.scikit-learn_1776_scikit-learn-13496@sha256:adee9f4911a853e64f9ae4ebd7b1bf32615cbf52c3210873e9a752fb5fb975e6",
+          "adapter_revision": "native-project-snapshot-v1",
+          "adapted": true,
+          "adaptation": "Frozen upstream image and project interpreter; clean source snapshot without future Git history; native tests through a scoped broker; original held-out test patch and required pass lists, no dependency reinstall. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "osworld-05dd4c1d-c489-4c85-8389-a7836c4f0567-slide-state-v1",
+      "suite_hash": "a7b89a282b52fc768cf6d6ed116bec80ddb3f62b4ec48cecc87acd60d3cda11a",
+      "benchmark": "osworld",
+      "source_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "selected": [
+        {
+          "case_id": "osworld:05dd4c1d-c489-4c85-8389-a7836c4f0567",
+          "benchmark": "osworld",
+          "task_id": "05dd4c1d-c489-4c85-8389-a7836c4f0567",
+          "revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+          "data_revision": "1e112283c4ecb08d6fed8069bca7de74fa2f12aa",
+          "source_split": "libreoffice_impress",
+          "input_sha256": "3d93e2180aa5428e5c2ab3156d014cda42c880479a403c5f37625932718bcb6b",
+          "verifier_sha256": "d3107ee1db4ccf4473996c207e49b4dac595197c9607cbece1ba51cac3b9c430",
+          "adapter_revision": "slide-state-original-comparison-v1",
+          "adapted": true,
+          "adaptation": "Original source file, instructions, two alternative references and original compare_pptx_files options. Extracted document-state contract, no VM/GUI interaction or visual quality score; not official leaderboard-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "osworld-04578141-1d42-4146-b9cf-6fab4ce5fd74-slide-state-v1",
+      "suite_hash": "a044c5598d91e1dad84289b505b92bafa17d6e944be5d43f23ad506faef46f01",
+      "benchmark": "osworld",
+      "source_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "selected": [
+        {
+          "case_id": "osworld:04578141-1d42-4146-b9cf-6fab4ce5fd74",
+          "benchmark": "osworld",
+          "task_id": "04578141-1d42-4146-b9cf-6fab4ce5fd74",
+          "revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+          "data_revision": "1e112283c4ecb08d6fed8069bca7de74fa2f12aa",
+          "source_split": "libreoffice_impress",
+          "input_sha256": "14c59bb4d0784ecc15adefa6ccf575f12ad9cbf67efdba71d519605aea55725f",
+          "verifier_sha256": "d3107ee1db4ccf4473996c207e49b4dac595197c9607cbece1ba51cac3b9c430",
+          "adapter_revision": "slide-state-original-comparison-v1",
+          "adapted": true,
+          "adaptation": "Original source file, instructions, two alternative references and original compare_pptx_files options. Extracted document-state contract, no VM/GUI interaction or visual quality score; not official leaderboard-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
     }
   ]
 }

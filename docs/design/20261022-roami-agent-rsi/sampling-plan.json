@@ -17,7 +17,7 @@
         "scikit-learn__scikit-learn-13496"
       ],
       "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
-      "status": "source_contract_locked_native_environment_and_adapter_pending"
+      "status": "two_native_project_environment_contracts_accepted"
     },
     {
       "benchmark_id": "terminal_bench",
@@ -53,7 +53,7 @@
         "05dd4c1d-c489-4c85-8389-a7836c4f0567"
       ],
       "dataset_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
-      "status": "source_contract_locked_native_environment_and_adapter_pending"
+      "status": "two_extracted_pptx_state_contracts_accepted_not_gui"
     },
     {
       "benchmark_id": "agentic_vbench",
@@ -239,21 +239,22 @@
     "daily": "每天完整执行冻结的60项正式任务，不抽样、不轮换省略。出现失败也继续执行其余用例并回顾。",
     "cases_per_day_default": 60,
     "full_suite": "60项每天全跑；稳定版与候选版各执行一轮A/B时共120个episode，不是120个不同case。",
-    "budget_scope": "所有测试机共用owner日预算。整套运行前按两组最坏成本与120个episode足额预留；不足则明确阻断，不缩成子集或冒称当日完成。观察、修改与复核也计入同一日预算。",
+    "budget_scope": "所有测试机共用owner日预算。按实际执行组数预留整套最坏成本：无版本差异60次，对照120次；预算不足整套阻断，观察、修改与复核也计入同一预算。",
     "model_free_regressions": 20,
     "current_state": "no_automatic_schedule_created",
     "coverage_mode": "full_suite",
     "new_ideas": "正式60项不被替换；新想法是剩余预算内的额外开发实验，不足时延期。",
-    "no_candidate": "没有新提案也全量执行，标记基线稳定性观察；相同策略的随机波动不能晋级。"
+    "no_candidate": "无版本差异时完整60项只跑稳定版一次，参数搜索默认关闭；基线观察不准晋级。仍在源码对照中的版本保持120次。",
+    "development_only": true
   },
   "next_steps": [
-    "接齐剩余8项公开任务的原生环境与适配（SWE、公司、桌面、长记忆及GAIA访问）",
+    "接齐剩余4项公开任务（公司环境2、长记忆1、GAIA访问1）；PPT两项仅覆盖文档状态，不覆盖GUI。",
     "为5项复杂产物接入独立校准评分，并扩充办公/GUI私有隐藏场景",
-    "修复现用模型鉴权，指定实际测试机和每日Token预算，再运行正式全60项",
+    "在开发服务内共享现有模型配置，绑定测试机及明确每日Token预算；完整套件齐全后才启用全60项",
     "回顾全部指标与原始日志，在预算内积累真实同机对照收益证据"
   ],
   "implementation": {
-    "public_materialized": 12,
+    "public_materialized": 16,
     "authored_selected_materialized": 40,
     "protocol_smoke_cases": 2,
     "active_machine_bindings": 0,
@@ -264,7 +265,7 @@
     "public_source_ids_selected": 19,
     "public_materials_lock": "public-materials-lock.json",
     "completed_live_agent_trials": 0,
-    "live_preflight_status": "HTTP_401_usage_unknown_stopped_no_automatic_replay",
+    "live_preflight_status": "isolated_CLI_without_credentials_HTTP_401_not_live_service_auth_verdict",
     "private_validation_lock": "private-validation-lock.json"
   },
   "autonomous_research": {

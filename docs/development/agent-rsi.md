@@ -1,6 +1,6 @@
 # Roami Agent RSI 评测运行手册
 
-设计入口：[RSI 方案](../design/20261022-roami-agent-rsi/index.html)。已实现评测、有限参数候选搜索，以及发布/回滚和首页操作接口；新增能力仍待完整验收。现已接入独立ResearchWorker：语义复盘、持久工单、计量修复、源码A/B和评测实例观察；正式运行仍待验收和配置。正式测试机尚未绑定，不安装每日服务。
+设计入口：[RSI 方案](../design/20261022-roami-agent-rsi/index.html)。已实现评测、有限参数候选搜索，以及发布/回滚和首页操作接口；新增能力仍待完整验收。现已接入独立ResearchWorker：语义复盘、持久工单、计量修复、源码A/B和评测实例观察；正式运行仍待验收和配置。RSI仅在开发版可用；正式测试机尚未绑定，未启用每日任务。
 
 ## 可运行范围
 
@@ -61,7 +61,7 @@ uv run --frozen roami-agent-evaluate watch --config /private/evaluations/machine
 
 `cycle` 执行当天一次；`watch` 是独立长期 worker，在配置时区的 `hour` 后每天尝试一次，不占 Main 队列，不补跑停机期间的所有历史日期。适合由系统服务管理。多测试机使用同一中央账本、不同机器 ID；远程环境通过外部包装程序调用。SQLite 账本放在中央本地磁盘，不直接共享到网络文件系统。
 
-每轮先原子预留 **A/B 两组全部选中 episode 的 Token 上限及次数**。超过日预算直接拒绝。当前采用保守预留，不回收未用余额；中断、用量未知也保留预留。每次模型请求用输入 UTF-8 字节量加协议余量、输出上限做保守准入，再按供应商用量结算。供应商未报用量、重试成本不全或超过预算时阻止后续请求。此限额不是供应商侧的金额硬上限，供应商侧配额仍应独立配置。
+每轮先按实际执行组数原子预留 **整套 episode 的 Token 上限及次数**。超过日预算直接拒绝。当前采用保守预留，不回收未用余额；中断、用量未知也保留预留。每次模型请求用输入 UTF-8 字节量加协议余量、输出上限做保守准入，再按供应商用量结算。供应商未报用量、重试成本不全或超过预算时阻止后续请求。此限额不是供应商侧的金额硬上限，供应商侧配额仍应独立配置。
 
 `auto_candidates=true` 只允许 development 套件。候选生成器按单参数缩减预算做有界搜索，用冻结的基线重新 A/B；下一天消费未试过的提案。失败先标为待诊断，不继续缩预算。它不是 GEPA/ACE 完整实现，不调用模型自改代码，不修改线上策略；需要更丰富的诊断策略时扩展 `policy.py`。
 
@@ -106,7 +106,7 @@ worker 每条 trial 更新心跳。超时周期恢复为 interrupted，保留已
 
 每天完整运行冻结的60项，取消按4项抽样。稳定版与候选版各执行一次为120个episode；“60项”指独立case数。正式每日调度要求suite确实包含60项，现有40项自有包只能显式手动诊断，不冒充正式套件。
 
-运行前必须足额预留整套A/B最坏Token与episode上限。预算不足时返回`RSI_FULL_SUITE_BUDGET`或`RSI_DAILY_BUDGET`，不缩减题目、不发起部分模型调用；缺正式用例返回`RSI_FORMAL_SUITE_INCOMPLETE`。示例预算Token设为0占位，需按实际冻结suite和多机分配配置，不自动增加预算。
+运行前必须按实际执行组数足额预留整套最坏Token与episode上限。预算不足时返回`RSI_FULL_SUITE_BUDGET`或`RSI_DAILY_BUDGET`，不缩减题目、不发起部分模型调用；缺正式用例返回`RSI_FORMAL_SUITE_INCOMPLETE`。示例预算Token设为0占位，需按实际冻结suite和多机分配配置，不自动增加预算。
 
 每项保存`model-log.json`（实际请求、文本/工具响应与各角色用量）及`execution-log.json`（工具参数/结果、trace、错误与实际输出）。机制回归保存`regression.log`；外部runner须提供同格式`execution-log.json`，同时保留有大小上限的stdout/stderr。容器模型日志由宿主采集，容器内部trace保留为进程证据，不冒充宿主计量。
 
@@ -143,7 +143,7 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 源码验证按受影响的Python运行时执行冻结基线回归；受保护的RSI评测器自身测试不作为候选修改面。失败日志保存在`checks/<action_id>/regression-*.json`，不把原始验证输出反馈给修复模型。
 
-预算示例：当前每日A/B预留120次执行；同日推进一次候选全60项A/B及54项私有A/B，另需228次，合计至少348个episode额度。复盘和补丁模型调用另按输入字节与输出上限保守预留，展示实际计量；默认每次模型调用的准入上限64000，不能代替owner日额度。混合公开测试split仍完整执行；四参数候选只消费development生成的提案，保护题结果不进入搜索；语义复盘仅用development证据提出源码修改。
+预算示例：无版本差异每日预留60次，参数候选或源码对照预留120次；同日推进一次候选全60项A/B及54项私有A/B，另需228次，合计至少288或348个episode额度。复盘和补丁模型调用另按输入字节与输出上限保守预留，展示实际计量；默认每次模型调用的准入上限64000，不能代替owner日额度。混合公开测试split仍完整执行；四参数候选只消费development生成的提案，保护题结果不进入搜索；语义复盘仅用development证据提出源码修改。
 
 受控缓存条件通过本地`register-machine --ledger ... --owner local --config ...`登记，需明确`cache_mode`和`cache_attestation`；Web登记的默认机器保持uncontrolled，不凭容器隔离就宣称控制了模型缓存。
 
@@ -152,7 +152,7 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 正式准入使用 `daily_suite.py` 的固定配额：公开20、自有真实20、机制20，核对指定自有ID、唯一上游任务和不可变revision。调度、周期完成和源码晋级使用同一检查；只有60条记录不能通过。新增 `assemble-daily --id NAME --suite PACK ... --output FILE` 合并各包，不满足合同则拒绝写出。
 
-公开19个task ID已选择，其中12项是可执行合同；另8项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
+公开19个task ID已选择，其中16项是可执行合同；另4项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
 
 ```bash
 python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials
@@ -186,10 +186,29 @@ uv run roami-agent-evaluate evaluation-status --ledger /private/evaluation/ledge
 uv run roami-agent-evaluate evaluation-config --ledger /private/evaluation/ledger.sqlite3 --owner local --config /private/evaluation-settings.json
 ```
 
-`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备52项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。修复鉴权走正常Roami模型设置，不把密钥写进任务或仓库。
+`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备56项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。该401来自未获得凭证的隔离CLI；主服务只读接口显示Main/Worker均keyConfigured=true，不能据此断言主服务密钥失效。正式评测由开发服务内Worker共享运行配置，不提取进程环境、不在聊天或仓库传密钥。
 
 新增公开导入：`import-data-analysis --metadata DATA.json --archive DATA.zip --group-id ID --question-id questionN --revision DATA_COMMIT --upstream-revision CODE_COMMIT --output FILE`；`import-vectorization --source-dir TASK --revision COMMIT --output FILE`。DSBench保留原工作簿、背景和问题，使用独立精确JSON答案；MLAgentBench对现代NumPy做显式标量兼容，限定修改forward函数、核验数值，并以四组交替的宿主计时中位数检查90%时限。均为注明改造的内部合同，不声称官方分数或Roami收益；示范实现更快不等于Roami自身生成更快。
 
 AgenticVBench导入：`import-media --kind assembly|repair --source-dir /path/to/task --archive /path/to/private/materials.zip --revision COMMIT --data-revision HF_COMMIT --output /path/to/private/suite.json`。两项原题及素材已固定版本，原始判定器只在退出Agent后的独立容器执行；参考音频、DNSMOS权重和脚本不进入Agent视图。另查素材hash、音频16kHz单声道PCM16及样本数、视频完整片段与连续时间轴。RSI固定门槛为组装reward=1、修复reward≥0.8；离线环境与附加断言使其不等同官方成绩。正反产物验收不代表Agent能力。
 
 本轮开发镜像沿用冻结基础镜像并离线安装固定版本依赖，43个安装包均校验PyPI官方发布hash；试验容器仍无网络，不携带代理配置。镜像ID与实际增量构建配方保存在私有验收证据中；标准完整构建入口仍为improvement.Dockerfile。
+
+## 开发版专用与本轮新增合同
+
+| 发行方式 | RSI 行为 |
+| --- | --- |
+| 普通安装、未指定构建通道 | 编译通道默认release；不构造RSI服务/worker、不挂载RSI接口、不读取旧启用设置或策略，首页无入口 |
+| `bash start.sh --dev` | 显式编译development通道，Go启动Python时传内部开发标记；仍须完成套件、机器和额度配置后主动启用 |
+| 自定义开发构建 | `ROAMI_BUILD_CHANNEL=development scripts/build/build-roami.sh`；发布构建不设置此变量，版本名含dev也不会启用 |
+
+前端只根据当前节点 `/agent/status` 的 `developmentRsi=true` 显示入口；未知或失败时隐藏。普通版直接访问RSI深链会返回原页，直接请求API返回404。旧账本即使enabled=true也不会启动后台任务。开发评测的修改仅作用于专用实例，普通用户通过正常代码审阅与版本发布获得改进。
+
+无参数或源码差异时，EvaluationWorker每天只跑稳定版全60项，并逐项语义复盘。参数搜索默认关闭；存在参数候选或仍在执行源码版本对照时仍跑120次。手动 `cycle` 为兼容旧配置默认配对，配置 `paired:false` 仅允许相同策略及相同/无源码版本，不能用单轮证明候选晋级。标准升至v1.7；包含环境准备耗时的新计时口径不能直接与旧标准比较。
+
+| 导入命令 | 环境与独立验证 |
+| --- | --- |
+| `import-swe --source DATA.json --instance-id ID --revision COMMIT --output FILE` | 两项指定SWE任务；固定上游镜像、基线源码、本地Git，无未来提交历史；只交付生产Python补丁。测试补丁宿主保管，原生Python验证在独立容器运行，不重装依赖、不声称官方可比 |
+| `import-slides --metadata TASK.json --materials DIR --revision CODE_COMMIT --data-revision HF_COMMIT --output FILE` | 两项OSWorld原始PPT与参考差分；退出Agent后用原比较函数验证。参考只在独立判定器内可见，仅代表PPT状态提取，不代表桌面GUI或视觉优秀 |
+
+SWE任务可通过 `/workspace/project-python.py` 调用有次数、时间和输出上限的原生项目Python，不能访问Docker控制端。项目测试命令、输出和源码hash另存 `project-runtime-log.json`；缺此日志不算复盘完整。冻结suite统一读取上限256MB，56项诊断组合约127MB，已完成读取、私有集隔离及不完整正式准入的负向检查。

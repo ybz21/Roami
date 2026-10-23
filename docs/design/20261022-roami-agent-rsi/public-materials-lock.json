@@ -5,7 +5,7 @@
   "source_tasks_selected_in_this_lock": 15,
   "total_selected_with_financial_samples": 19,
   "public_target": 20,
-  "runnable_public_contracts": 12,
+  "runnable_public_contracts": 16,
   "source_selection_is_not_environment_acceptance": true,
   "sources": [
     {
@@ -250,7 +250,7 @@
         "04578141-1d42-4146-b9cf-6fab4ce5fd74",
         "05dd4c1d-c489-4c85-8389-a7836c4f0567"
       ],
-      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "status": "two_extracted_slide_state_contracts_original_metric_accepted_not_gui",
       "files": [
         {
           "path": "xlang-ai__OSWorld/selected/evaluation_examples/examples/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74.json",
@@ -265,6 +265,55 @@
           "sha256": "ac8fe4b98fb5d3497939f5f5cd5a0897dd5ab0c401551d1fa249d13c6e3094fd",
           "bytes": 2546,
           "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "osworld_materials/45_2.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74/45_2.pptx",
+          "sha256": "0cc143e4f7587ecd5b7af54ff6e0b9cd40c0a32c485340f6e8ce0b082571ccb1",
+          "bytes": 21107729,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/45_2_Gold.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74/45_2_Gold.pptx",
+          "sha256": "739850a630bf25b77c6789903dd425bedf508b9cfa9834bace9475a0a5b492a5",
+          "bytes": 21107754,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/45_2_Gold_all_fonts.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74/45_2_Gold_all_fonts.pptx",
+          "sha256": "52075c0d24304b1e2ffe97dfa5f02d003041512743a27a9f733c5bce0439d6e6",
+          "bytes": 21107759,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/38_1.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567/38_1.pptx",
+          "sha256": "67b6e43fd65bde152c532c5f579cfd04e23855f39bee6c9cb4d0cb6f12e2dd7d",
+          "bytes": 6166120,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/38_1_Gold.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567/38_1_Gold.pptx",
+          "sha256": "66dcccc5560e9cd1b684477dce5dbdda2a65fe6d8c4aefa12e2768f3a5e7de5a",
+          "bytes": 6166278,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/38_1_Gold_all_fonts.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567/38_1_Gold_all_fonts.pptx",
+          "sha256": "f59294d3b30b8c1e7a86618f54bf2a4b32844ea9d69d19e41b5a921e5c373ec9",
+          "bytes": 6166281,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/slides.py",
+          "url": "https://raw.githubusercontent.com/xlang-ai/OSWorld/04718eab9327856efe8192cc58161acc7a7627e2/desktop_env/evaluators/metrics/slides.py",
+          "sha256": "c8f56352659b23985d01b7b301207caa429a628dc32f6f2693d4a5ed3378628d",
+          "bytes": 76151,
+          "exposure": "host_only_verifier"
         }
       ]
     },
@@ -430,7 +479,7 @@
         "pylint-dev__pylint-6903",
         "scikit-learn__scikit-learn-13496"
       ],
-      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "status": "two_native_project_image_contracts_reference_and_baseline_controls_passed_not_real_Agent",
       "files": [
         {
           "path": "swe_verified/data/test-00000-of-00001.parquet",
@@ -438,6 +487,18 @@
           "sha256": "030cfd7f2a704c4c0226e7f104c725a3b41230b1d3517f9c915ad7ea5be3fa25",
           "bytes": 6304616,
           "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ],
+      "environment_images": [
+        {
+          "task": "pylint-dev__pylint-6903",
+          "image_digest": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-6903@sha256:bad80b1c20eeb5d49a6e82dc485ee40fbd67b91df47b56740e1be5471b678f5b",
+          "native_required_tests": 9
+        },
+        {
+          "task": "scikit-learn__scikit-learn-13496",
+          "image_digest": "swebench/sweb.eval.x86_64.scikit-learn_1776_scikit-learn-13496@sha256:adee9f4911a853e64f9ae4ebd7b1bf32615cbf52c3210873e9a752fb5fb975e6",
+          "native_required_tests": 20
         }
       ]
     },

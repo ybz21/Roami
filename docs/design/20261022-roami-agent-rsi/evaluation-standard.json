@@ -1,5 +1,5 @@
 {
-  "standard_version": "rsi-v1.6-project-runtime-and-setup-clock-20261023",
+  "standard_version": "rsi-v1.7-single-baseline-daily-20261023",
   "status": "specification_with_partial_runner_not_live_model_evaluated",
   "scope": {
     "real_categories": 12,
@@ -147,7 +147,7 @@
     "excellence": "每个case执行前冻结优秀项；没有适用优秀项的维度最高3档，拒绝事后奖励长答案、额外步骤或自我表扬。"
   },
   "aggregation": {
-    "quality": "正式组合中，40项交付任务按冻结类别权重汇总并逐类/逐机公开，20项机制独立报告；当前52项未形成完整60项套件，不计算正式整体分。旧80项规格池的12类×5项不作为正式60项分母。",
+    "quality": "正式组合中，40项交付任务按冻结类别权重汇总并逐类/逐机公开，20项机制独立报告；当前56项未形成完整60项套件，不计算正式整体分。旧80项规格池的12类×5项不作为正式60项分母。",
     "completion": "case_pass与verified_delivery分开；正确拒绝、取消或预算停止可通过机制case，但不计入成功交付分母。",
     "failed_attempts": "所有失败和重试保留；预检发现环境缺失标unsupported/incomplete，不静默删题。",
     "reference_weights": "初版12类等权；有真实任务分布后另建标准版本，同时重跑基线。",
@@ -220,7 +220,7 @@
     "must_cover": "所有适用必测机器和变更涉及的任务类别；能力覆盖声明须包含全部12类。"
   },
   "schedule": {
-    "daily": "每日全量60项正式用例；同机随机AB/BA顺序，稳定版和候选版各一次，共120个episode。成功与失败的全部指标和具体日志逐项回顾。",
+    "daily": "仅开发版每日全量60项；无版本差异跑稳定版一次60个episode，参数候选或源码对照时随机AB/BA各一次共120。每次成功和失败的指标与具体日志全部回顾。",
     "cases_per_day": 60,
     "episodes_per_machine_AB_once": 120,
     "screening_only": false,
@@ -229,7 +229,10 @@
     "budget": "整套启动前足额预留全局Token及episode；不足明确阻断，不缩成部分题。新想法只使用剩余实验预算，不替换正式60项。",
     "review": "逐项记录指标覆盖、实际日志hash及record/span，给出发现、原因假设、修改建议和回归要求；缺日志/缺项/回顾未完成不得记为当日完成。",
     "status": "pending_full_materialization_and_machine_budget_binding",
-    "active_plan": "sampling-plan.json"
+    "active_plan": "sampling-plan.json",
+    "episodes_per_machine_baseline_once": 60,
+    "development_only": true,
+    "auto_parameter_search_default": false
   },
   "case_contract": [
     "id",
@@ -264,5 +267,10 @@
     "quality_metrics": "unchanged_from_v1.1"
   },
   "daily_suite_contract": "roami-daily-60-v1",
-  "daily_completion_contract": "Complete formal coverage, resolved grades and metered usage, rule log coverage and all semantic trial reviews; execution ending alone is not daily completion."
+  "daily_completion_contract": "Complete formal coverage, resolved grades and metered usage, rule log coverage and all semantic trial reviews; execution ending alone is not daily completion.",
+  "deployment": {
+    "release_build": "no_RSI_services_routes_ledger_policy_binding_or_UI",
+    "development_build": "explicit_build_channel_development_then_owner_schedule_opt_in",
+    "delivery_to_users": "normal_reviewed_version_release_not_local_self_modification"
+  }
 }

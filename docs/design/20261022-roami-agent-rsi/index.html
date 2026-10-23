@@ -4,7 +4,7 @@
 <body><main><article class="rsi-overview">
 <nav aria-label="方案章节"><a href="automation-roles.html">架构与执行</a><a href="evaluation.html">Case与标准</a><a href="sampling-plan.html">60项清单</a><a href="implementation.html">实施记录</a></nav>
 <h1>Roami Agent RSI</h1><p class="rsi-lead">每日全60项 → 复盘提问 → 隔离修改 → 独立验收 → 应用观察。</p>
-<p class="rsi-status">已备52项正式合同与54项私有技术契约；真实预检被401阻断，正式每日运行未启用。</p>
+<p class="rsi-status">仅开发版运行RSI，普通安装版无入口、接口或后台任务。已备56/60项正式合同；日程尚未启用。</p>
 <figure><picture><source media="(max-width: 599px)" srcset="architecture-mobile.svg"><img src="architecture.svg" alt="RSI架构：程序调度，被测Agent做题，复盘Agent提问，修复Agent改代码，独立验收并应用观察。"></picture></figure>
 <p><a href="automation-roles.html#roles">看执行手段与职责表</a> · <a href="automation-roles.html#closed-loop">看失败处理与关单条件</a> · <a href="architecture.excalidraw" download>下载可编辑图</a></p>
 <section id="product"><h2>目标与评定</h2>
@@ -13,21 +13,21 @@
 <tr><td>时间</td><td>排队、模型、工具、验证；交付P50，样本足够再看P95</td><td>同机同模型配对；失败不能算更快交付</td></tr>
 <tr><td>Token</td><td>Main、Worker、记忆、重试；复盘与修复另列</td><td>全部尝试总量/成功交付；未知用量不能记0</td></tr>
 </tbody></table></div>
-<p>每日固定公开20项、自有真实任务20项、机制20项，稳定版和候选各一次，共120次执行。另有私有验证24项、隐藏30项，用于晋级；当前私有集只覆盖代码契约。新想法作为额外实验，不替换每日题目。</p>
+<p>每日固定公开20项、自有真实任务20项、机制20项，无版本差异时稳定版全跑一次，共60次；参数候选或源码版本对照时各跑一次，共120次。另有私有验证24项、隐藏30项，用于晋级；当前私有集只覆盖代码契约。新想法作为额外实验，不替换每日题目。</p>
 <details><summary>改进范围与晋级门槛</summary>
 <p>改进范围：记忆生成/检索、上下文、工具发现/执行/回执、Skill流程、规划委派、模型预算、验证停止。工具次数和重复读取用于定位问题，不能取代效果评分。</p>
 <p>冻结标准：质量差95%区间下限≥−1分，交付率差下限≥−2个百分点；至少质量+3分、交付P50−10%或单位成功Token−10%之一达标，其余效率退化≤5%。按独立任务家族重采样，样本不足不晋级。不同机器、模型与缓存档分别比较。</p>
 <p><a href="evaluation-standard.json">完整指标契约</a> · <a href="evaluation.html">任务与评分锚点</a> · <a href="sampling-plan.html">正式套件覆盖</a> · <a href="research.html">开源研究</a> · <a href="public-benchmarks.html">公开数据集</a></p>
 </details></section>
 <section id="stories"><h2>用户能看到什么</h2>
-<p>关闭聊天后仍每天测试；首页展示执行、出分和复盘覆盖，正在修的问题、补丁、前后对比、当前阻塞及下一步。每项成功和失败都能追溯到具体日志。</p></section>
+<p>开发版配置完成后，关闭聊天仍每天测试；首页展示执行、出分和复盘覆盖，正在修的问题、补丁、前后对比、当前阻塞及下一步。每项成功和失败都能追溯到具体日志。</p></section>
 <section id="closed-loop"><h2>闭环规则</h2>
 <p>程序定时发起 → 被测Agent做题 → 独立判定 → 复盘Agent提出问题 → 修复Agent生成隔离补丁 → 独立验收 → 专用实例应用 → 两个后续完整日观察 → 关单。退化回滚并重开，失败回到诊断；Issue/PR是可选同步。</p>
-<p>动作、预算和租约持久化；未知执行先对账，不自动重放付费调用。每天完整60项、全部出分、完整计量、规则扫描和逐条语义复盘缺一不可。现用服务部署适配尚未接入。</p>
+<p>动作、预算和租约持久化；未知执行先对账，不自动重放付费调用。每天完整60项、全部出分、完整计量、规则扫描和逐条语义复盘缺一不可。改进仅应用于开发评测实例；普通安装版不运行、不读取RSI策略，改进通过正常版本发布交付。</p>
 <p><a href="automation-roles.html">职责、执行手段与异常处理</a></p></section>
 <section id="technical"><h2>代码架构</h2>
 <div class="tablewrap"><table><thead><tr><th>模块</th><th>职责与保存的数据</th><th>隔离边界</th></tr></thead><tbody>
-<tr><td>EvaluationWorker / cycle</td><td>每日幂等计划、完整A/B、trial、指标与日志hash</td><td>私有SQLite账本；全角色共用日预算</td></tr>
+<tr><td>EvaluationWorker / cycle</td><td>开发版幂等计划、60项观察/120次对照、指标与日志hash</td><td>私有SQLite账本；全角色共用日预算</td></tr>
 <tr><td>ContainerExecutor / evaluation_tasks</td><td>Main→Native Worker；任务、各角色轨迹；退出后判定产物</td><td>无网络、只挂载本题；答案仅宿主机可见</td></tr>
 <tr><td>ResearchWorkflow / behavior_observer</td><td>逐条语义复盘、证据、去重工单、持久派发</td><td>保护题不进入修改上下文；缺复盘不算完成</td></tr>
 <tr><td>source_revision / candidate_checks</td><td>独立worktree补丁、冻结回归、全量与私有配对</td><td>修复者不能修改判定器、隐藏集或自行验收</td></tr>

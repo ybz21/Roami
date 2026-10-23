@@ -799,3 +799,10 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
   <p>隔离 Go 服务、HOME、私有 tmux 和固定升级程序完成四种 Agent 的保存、应用、恢复、升级后版本读取；已安装的 Codex 0.162.1、OpenCode 2.0.27、Pi 1.1.0 均成功读取生成的原生配置，未发起模型调用。OpenCode 原生服务使用独立配置与端口。</p>
   <p>桌面中文深色 / 英文浅色在 320、390、820、1100、1280、1600、1920 宽度无文档溢出。Redmi Note 8 真机以 392 CSS px / coarse 指针完成预设编辑、保存、切换、恢复、Android 返回及升级确认；键盘 314px 时保存按钮位于键盘上方，触控高度 44px，四个底部主入口恢复正常。截图与验收脚本在 /tmp/agent-models-*，现用服务及用户原生配置未修改。</p>
 </section>
+
+<section id="roami-rsi-development-only" lang="zh-CN">
+<h2>RSI开发版边界修订 · 2026-10-23</h2>
+<p>RSI仅在显式development编译通道运行；普通安装版不构造服务、worker、接口或策略绑定，旧enabled设置不生效，入口由当前节点状态控制。改进只应用于开发评测实例，经正常审阅发布后交付用户。无版本差异每日60次，候选对照120次；全部指标与日志仍逐次复盘。</p>
+<p>当前正式合同56/60：公开16、自有40；SWE两项原生环境与PPT两项状态提取的正反验收已通过，PPT不代表GUI。剩余公司环境2、长记忆1、GAIA1，另5项复杂产物待独立校准。主服务已配置模型凭证；历史401来自缺凭证的隔离CLI，不是主服务鉴权结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
+<p>本轮验收：Go与full门禁通过，Python1016项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
+</section>
