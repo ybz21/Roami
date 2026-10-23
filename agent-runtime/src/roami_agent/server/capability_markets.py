@@ -12,6 +12,7 @@ from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server import market_catalogs
+from roami_agent.server.market_installations import MarketInstallations
 from roami_agent.server.model_settings import ModelSettings
 
 
@@ -22,6 +23,7 @@ class CapabilityMarkets:
         self.lock = asyncio.Lock()
         self.requests = asyncio.Semaphore(4)
         self.cache, self.inflight = {}, {}
+        self.installations = MarketInstallations(self)
         self.sources = copy.deepcopy(market_catalogs.DEFAULT_SOURCES)
         if self.path.exists() or self.path.is_symlink():
             info = self.path.lstat()
@@ -178,3 +180,4 @@ class CapabilityMarkets:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self.inflight.clear()
+        self.installations.receipts.clear()

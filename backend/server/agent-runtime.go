@@ -31,6 +31,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 	for _, route := range []struct{ method, path string }{
 		{"GET", "/agent/capability-markets"}, {"PUT", "/agent/capability-markets"},
 		{"GET", "/agent/capability-markets/:source/search"}, {"POST", "/agent/capability-markets/preview"},
+		{"POST", "/agent/capability-markets/prepare"}, {"POST", "/agent/capability-markets/install"},
 		{"PUT", "/agent/capability-imports/:kind/:name"}, {"DELETE", "/agent/capability-imports/:kind/:name"}, {"POST", "/agent/capability-imports/mcp/:name/connect"}, {"GET", "/agent/capability-imports"}, {"POST", "/agent/capability-imports/:kind"}, {"GET", "/agent/capability-settings"}, {"PUT", "/agent/capability-settings"}, {"POST", "/agent/main-conversation"}, {"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
 		{"POST", "/agent/attachments"},
 		{"GET", "/agent/traces"},

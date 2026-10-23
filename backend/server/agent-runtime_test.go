@@ -39,6 +39,8 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		{"PUT", "/api/agent/capability-markets"},
 		{"GET", "/api/agent/capability-markets/npm/search?query=cli"},
 		{"POST", "/api/agent/capability-markets/preview"},
+		{"POST", "/api/agent/capability-markets/prepare"},
+		{"POST", "/api/agent/capability-markets/install"},
 		{"POST", "/api/agent/tasks/probe/close-session"},
 		{"POST", "/api/agent/capability-imports/skills"},
 		{"PUT", "/api/agent/capability-imports/cli/fixture"},

@@ -69,6 +69,7 @@ from roami_agent.tools.files import register_file_tools
 from roami_agent.tools.foundations import register_foundations
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
+from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.registry import Tools
@@ -278,6 +279,7 @@ class Runtime:
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
         self.capability_markets = CapabilityMarkets(self)
+        register_market_commands(self.tools, self.capability_markets)
         self.professional_capabilities = ProfessionalCapabilities(self)
         if isinstance(self.executor, CodingExecutor):
             self.executor.capabilities = self.professional_capabilities

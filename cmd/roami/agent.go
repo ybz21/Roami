@@ -351,7 +351,8 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	if method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
+	marketRequest := strings.HasPrefix(path, "/v1/capability-markets")
+	if marketRequest || method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
 		cancel()
 		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 	}
@@ -363,7 +364,7 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Roami-Owner", "local")
 	transport := agentruntime.Transport(socket)
-	if method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
+	if marketRequest || method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
 		transport.ResponseHeaderTimeout = 100 * time.Second
 	}
 	defer transport.CloseIdleConnections()

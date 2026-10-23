@@ -182,6 +182,24 @@ def create_app(runtime, *, manage_lifecycle=True):
             )
         }
 
+    @app.post("/v1/capability-markets/prepare")
+    async def prepare_market_install(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.prepare(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/install")
+    async def install_market_option(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.install(
+                owner, await capability_payload(request)
+            )
+        }
+
     @app.get("/v1/traces")
     async def execution_trace(
         owner: Owner,

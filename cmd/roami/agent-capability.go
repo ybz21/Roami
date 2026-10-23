@@ -16,7 +16,11 @@ import (
 )
 
 func runAgentCapability(args []string) int {
+	if len(args) > 0 && args[0] == "market" {
+		return runAgentMarket(args[1:])
+	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		fmt.Println("roami agent capability market help")
 		fmt.Println("roami agent capability list [--kind all|mcp|skill|cli|tool] [--query TEXT] [--limit 10] [--offset 0]\nroami agent capability show NAME\nroami agent capability read SKILL --context FILE [--reference references/FILE.md]\nroami agent capability call NAME --input JSON --context FILE [--call REQUEST_ID]\nroami agent capability call NAME --input JSON --turn TURN --call CALL\nProfessional calls require the private context file issued for an active Roami task. Reuse --call only to recover the same invocation; unknown outcomes must not be replayed. Native bash supplies turn/call context automatically. List and show are read-only.")
 		return 0
 	}

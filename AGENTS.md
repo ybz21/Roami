@@ -1044,6 +1044,10 @@ conversation/professional_activity.py
   持久执行回执进入现有任务记录及按需详情，沿用秘密字段打码</pre>
   <p>每次专业派发生成 0600 上下文文件，服务端以节点私有密钥签名；提示仅包含路径，不包含签名。上下文绑定所有者、任务、尝试和版本，取消、完成、来源忘记、排队改派或预算到期即拒绝新调用。只允许 Skill 读取、MCP 发现和外部注册操作，不借此开放内部调度工具。执行期间持续复验任务状态，撤销时取消底层操作。</p>
   <p>请求号在执行前原子登记到已有事件存储；相同号和参数返回原回执，不重跑。参数冲突拒绝，进行中或进程重启后的未完成调用保持未知结果，不能自动重放。每个任务最多 1024 次登记、每节点最多 16 个并发、单次最多 90 秒；CLI 等待预算为 100 秒。完成结果与失败进入任务执行记录，主聊天仍只显示任务进度和可行动阻塞。</p>
+  <h3>CLI 与 Roami 自主接入 · 2026-10-23</h3>
+  <p>终端增加 roami agent capability market sources／search／preview／install，JSON 参数与现有命令族一致。主 Agent 与普通 Worker 通过同一动态 CLI 目录按需发现；专业任务可使用自己的 --context 与 --call。研究只读角色不开放安装。市场指令与描述作为待审阅数据，只有用户要求安装时才执行 install。</p>
+  <p>server/market_installations.py 保存最多 32 份、十分钟有效的固定版本预览，CLI 只返回说明摘要、附件名和完整配置，不把附件 Base64 放入模型上下文。安装以 previewId／option／可选 name 选择原包，复用托管注册、名称冲突和原子保存；失败保留预览。来源停用或改址、预览过期均拒绝继续安装；相同选择重试返回同一回执，被编辑或移除后报冲突。sources／search／preview 为读取，install 为写入，沿用当前调用上下文、任务撤销和执行记录。MCP 保持未连接，CLI 首次调用下载的规则保持一致。</p>
+  <p>实现模块：tools/market_commands.py 注册按需工具；commands.json 维护公开路径；cmd/roami/agent-market.go 同时服务普通终端及已绑定的 Agent 调用；POST /api/agent/capability-markets/prepare 与 /install 复用登录网关。平台常驻模型 schema 数量保持原有基础工具集合。</p>
   <h2>调研来源</h2>
   <ul>
     <li><a href="https://github.com/vercel-labs/skills">skills.sh 安装工具与公开源码</a></li>

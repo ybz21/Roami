@@ -18,6 +18,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row
+from roami_agent.tools.market_commands import MARKET_OPERATIONS
 
 
 class ProfessionalCapabilities:
@@ -189,7 +190,10 @@ class ProfessionalCapabilities:
         ):
             raise DomainError("ACTIVE_TASK_CONTEXT_REQUIRED", 409)
         tool = self.runtime.tools.registry.get(name)
-        if not tool or (tool.source != "external" and name not in {"skill_read", "mcp_discover"}):
+        if not tool or (
+            tool.source != "external"
+            and name not in {"skill_read", "mcp_discover"} | MARKET_OPERATIONS
+        ):
             raise DomainError("TOOL_UNAVAILABLE", 409)
         wire = {"function": {"name": name, "arguments": encoded(payload["arguments"])}}
         request_key = hashlib.sha256(
