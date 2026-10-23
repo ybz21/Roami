@@ -6,7 +6,7 @@ from pathlib import Path
 
 from roami_agent.improvement.comparison import compare
 from roami_agent.improvement.containers import ContainerExecutor
-from roami_agent.improvement.contracts import digest, load_json, require, validate_suite
+from roami_agent.improvement.contracts import digest, load_suite, require
 from roami_agent.improvement.control import ImprovementControl
 from roami_agent.improvement.cycle import run_cycle
 from roami_agent.improvement.daily_suite import daily_coverage, validate_private_separation
@@ -117,7 +117,7 @@ async def verify_candidate(
                 "SELECT * FROM rsi_suites WHERE owner=? AND id=?", (action["owner"], suite_id)
             ).fetchone()
             require(row is not None, "RSI_SUITE_NOT_FOUND")
-            value = validate_suite(load_json(Path(row["path"])))
+            value = load_suite(Path(row["path"]))
             require(value["content_hash"] == row["content_hash"], "RSI_SUITE_HASH_MISMATCH")
             suites.append(value)
         origin = db.execute(

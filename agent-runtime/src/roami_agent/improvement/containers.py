@@ -213,6 +213,10 @@ class ContainerExecutor:
                 from roami_agent.improvement.swe_tasks import grade_swe
 
                 grade = await grade_swe(case, workspace, self)
+            elif kind == "slides":
+                from roami_agent.improvement.slide_tasks import grade_slides
+
+                grade = await grade_slides(case, workspace, self)
             else:
                 grade = judge_case(case, output, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
@@ -234,6 +238,10 @@ class ContainerExecutor:
 
             await resolve_image(case["judge"]["image"])
             prepared_project = await asyncio.to_thread(prepare_project, case, workspace)
+        elif case["judge"]["kind"] == "slides":
+            from roami_agent.improvement.slide_tasks import prepare_slides
+
+            await asyncio.to_thread(prepare_slides, case, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))

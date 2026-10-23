@@ -10,9 +10,8 @@ from zoneinfo import ZoneInfo
 from roami_agent.improvement.contracts import (
     digest,
     implementation_hash,
-    load_json,
+    load_suite,
     require,
-    validate_suite,
 )
 from roami_agent.improvement.policy import BOUNDS, next_candidate
 from roami_agent.protocol.errors import DomainError
@@ -80,7 +79,7 @@ class EvaluationWorker:
 
         try:
             prefs, machine, source = await asyncio.to_thread(self.service.control.profiles, request)
-            suite = validate_suite(load_json(Path(source["path"]), maximum=100_000_000))
+            suite = load_suite(Path(source["path"]))
             require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
             if request["kind"] == "daily":
                 from roami_agent.improvement.daily_suite import daily_coverage

@@ -12,8 +12,8 @@ from roami_agent.improvement.contracts import (
     digest,
     implementation_hash,
     load_json,
+    load_suite,
     require,
-    validate_suite,
 )
 from roami_agent.improvement.cycle import run_cycle, watch
 from roami_agent.improvement.daily_suite import assemble_daily, daily_coverage
@@ -32,6 +32,21 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-slides":
+        from roami_agent.improvement.slide_tasks import import_slides
+
+        suite = import_slides(
+            args.metadata, args.materials, revision=args.revision, data_revision=args.data_revision
+        )
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+            "scope": "slide_state_not_gui",
+        }
+
     if args.command == "import-swe":
         from roami_agent.improvement.swe_tasks import import_swe
 
@@ -135,9 +150,7 @@ async def execute(args):
             "official_leaderboard_comparable": False,
         }
     if args.command == "assemble-daily":
-        suite = assemble_daily(
-            args.id, [validate_suite(load_json(p, maximum=100_000_000)) for p in args.suite]
-        )
+        suite = assemble_daily(args.id, [load_suite(p) for p in args.suite])
         private_json(args.output, suite)
         return {"suite": suite["id"], "hash": suite["content_hash"], **daily_coverage(suite)}
     if args.command == "register-machine":
@@ -197,7 +210,7 @@ async def execute(args):
         return catalog_readiness(
             load_json(args.bank),
             load_json(args.plan),
-            [validate_suite(load_json(p)) for p in args.suite],
+            [load_suite(p) for p in args.suite],
         )
     if args.command == "report":
         ledger = Ledger(args.ledger)
@@ -210,7 +223,7 @@ async def execute(args):
     config = load_json(args.config, maximum=65536)
     base = args.config.resolve().parent
     require(config.get("schema_version") == 1)
-    suite = validate_suite(load_json(resolve(base, config["suite"])))
+    suite = load_suite(resolve(base, config["suite"]))
     root = resolve(base, config["output_root"])
     require(not root.exists() or not root.is_symlink(), "RSI_PRIVATE_OUTPUT_REQUIRED")
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -373,6 +386,11 @@ def main():
     p.add_argument("--source-dir", required=True, type=Path)
     p.add_argument("--revision", required=True)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-slides")
+    for name in ("metadata", "materials", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    for name in ("revision", "data-revision"):
+        p.add_argument("--" + name, required=True)
     p = commands.add_parser("import-swe")
     for name in ("source", "output"):
         p.add_argument("--" + name, required=True, type=Path)

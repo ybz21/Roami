@@ -71,6 +71,7 @@ def judge_case(case, output, workspace):
         "vectorization",
         "media",
         "swe",
+        "slides",
     }:
         return {
             **quality(dict.fromkeys(DIMENSIONS, 0), hard_passed=True, pending=True),

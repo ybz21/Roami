@@ -8,10 +8,9 @@ from pathlib import Path
 
 from roami_agent.improvement.contracts import (
     digest,
-    load_json,
+    load_suite,
     relative_file,
     require,
-    validate_suite,
 )
 from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
 from roami_agent.protocol.model_routes import settings_with_route
@@ -114,11 +113,7 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
         workflow.ledger.get, action["owner"], action["payload"]["cycle_id"]
     )
     require(cycle["state"] == "completed" and len(cycle["trials"]) == 120, "RSI_REVIEW_INCOMPLETE")
-    frozen = validate_suite(
-        load_json(
-            workflow.ledger.path.parent / "runs" / cycle["id"] / "suite.json", maximum=100_000_000
-        )
-    )
+    frozen = load_suite(workflow.ledger.path.parent / "runs" / cycle["id"] / "suite.json")
     require(frozen["content_hash"] == cycle["manifest"]["suite_hash"], "RSI_SUITE_HASH_MISMATCH")
     definitions = {c["id"]: c for c in frozen["cases"]}
     saved = await asyncio.to_thread(workflow.review_saved, action["owner"], cycle["id"])

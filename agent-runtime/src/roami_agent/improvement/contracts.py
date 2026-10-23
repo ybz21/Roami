@@ -10,6 +10,7 @@ from pathlib import Path
 from roami_agent.protocol.errors import DomainError
 
 VERSION = "roami-rsi-runner-v1"
+MAX_SUITE_BYTES = 256_000_000
 DIMENSIONS = ("correctness", "completeness", "usability", "grounding")
 LAYERS = {"public_agent", "public_component", "authored_real", "mechanism", "smoke"}
 SPLITS = {"development", "validation", "holdout", "public_test"}
@@ -93,8 +94,30 @@ def validate_case(case):
             "media",
             "vectorization",
             "swe",
+            "slides",
         }
     )
+    if judge["kind"] == "slides":
+        from roami_agent.improvement.slide_tasks import TASKS
+
+        require(judge.get("task_id") in TASKS)
+        require(bool(re.fullmatch(r"[a-f0-9]{64}", judge.get("source_sha256", ""))))
+        require(
+            isinstance(judge.get("source_parts"), list) and 1 <= len(judge["source_parts"]) <= 8
+        )
+        require(len(set(judge["source_parts"])) == len(judge["source_parts"]))
+        require(all(p in case.get("asset_files", {}) for p in judge["source_parts"]))
+        require(isinstance(judge.get("verifier"), str) and len(judge["verifier"]) <= 2000000)
+        require(isinstance(judge.get("references"), list) and len(judge["references"]) == 2)
+        require(isinstance(judge.get("options"), list) and len(judge["options"]) == 2)
+        for reference in judge["references"]:
+            require(
+                isinstance(reference, dict)
+                and isinstance(reference.get("remove"), list)
+                and isinstance(reference.get("replace"), dict)
+            )
+            require(bool(re.fullmatch(r"[a-f0-9]{64}", reference.get("content_sha256", ""))))
+            require(sum(len(v) for v in reference["replace"].values()) <= 4000000)
     if judge["kind"] == "swe":
         from roami_agent.improvement.swe_tasks import IMAGE_PATTERN, TASKS
 
@@ -197,6 +220,10 @@ def freeze_suite(identifier_, cases, **metadata):
     suite = {"schema_version": 1, "id": identifier_, "cases": cases, **metadata}
     suite["content_hash"] = digest(suite)
     return validate_suite(suite)
+
+
+def load_suite(path):
+    return validate_suite(load_json(path, maximum=MAX_SUITE_BYTES))
 
 
 def agent_view(case, workspace):

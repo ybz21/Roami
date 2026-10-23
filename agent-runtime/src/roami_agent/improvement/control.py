@@ -6,7 +6,7 @@ from collections import Counter
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from roami_agent.improvement.contracts import digest, identifier, load_json, require, validate_suite
+from roami_agent.improvement.contracts import digest, identifier, load_suite, require
 from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.policy import validate_policy
 from roami_agent.protocol.errors import DomainError
@@ -151,7 +151,7 @@ class ImprovementControl:
         return {k: raw[k] for k in ("id", "label", "mode")}
 
     def register_suite(self, owner, path):
-        suite = validate_suite(load_json(path, maximum=100_000_000))
+        suite = load_suite(path)
         summary = {
             "id": suite["id"],
             "count": len(suite["cases"]),
