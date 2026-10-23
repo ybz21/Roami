@@ -198,21 +198,6 @@ html[data-size="compact"] .prj-subbar.searching .prj-iconbtn.find{display:none}
 .prj-chip .n{font-family:ui-monospace,monospace;font-size:var(--fs-micro);color:var(--text-dimmer)}
 .prj-chip.on .n{color:var(--accent)}
 
-/* 「其他项目」：没有会话在跑的项目不值一张卡（图纸 14-desktop-workspace/desktop-ia.html §二）——
-   实测 4 个空项目占掉 467px 的栅格。折成一行一个：名字 + 路径 + 可清理标。 */
-.prj-quiet{display:grid;grid-template-columns:minmax(96px,150px) minmax(0,1fr) auto;align-items:center;
-  gap:var(--sp-3);min-height:36px;padding:var(--sp-1) var(--sp-2);border-radius:var(--r-sm);
-  cursor:pointer;transition:background .14s}
-.prj-quiet+.prj-quiet{border-top:1px solid var(--border-subtle)}
-:where(html[data-pointer="fine"]) .prj-quiet:hover{background:var(--list-hover)}
-.prj-quiet .nm{font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prj-quiet .p{font-family:ui-monospace,monospace;font-size:var(--fs-meta);color:var(--text-dimmer);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-html[data-size="compact"] .prj-quiet{grid-template-columns:minmax(0,1fr) auto;min-height:44px}
-html[data-size="compact"] .prj-quiet .p{display:none}
-/* 右列：可清理标签或「空闲多久」。两者互斥——有活要干时不必再说它闲着。 */
-.prj-quiet .qt{font-size:var(--fs-micro);color:var(--text-dimmer);white-space:nowrap}
-
 .prj-panel{background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:12px;margin-top:8px}
 .prj-wtrow{padding:13px 16px}
 .prj-wtrow+.prj-wtrow{border-top:1px solid var(--border-subtle)}
@@ -495,8 +480,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
   // 置顶与其余共用同一套栅格，只靠 section header 分组（14 §6.1）——两套栅格会让
   // 卡片宽度在分组之间对不齐
   const pinned = visible.filter((p) => p.pinned)
-  // 没有会话、也没有待收尾/竞赛的项目折到页尾（图纸 desktop-ia.html §二）：它们和「正在跑
-  // 两个任务」的项目占同样大的卡，还被同一行最高的卡撑高，页面下三分之一因此全是空卡。
+  // 空闲项目单独分组，卡片与操作仍复用 ProjectCard。
   const isQuiet = (p: Proj) => p.sessions <= 0 && p.unfinished <= 0 && p.races <= 0
   const rest = visible.filter((p) => !p.pinned && !isQuiet(p))
   // 不活跃那节按「什么时候空下来的」排：刚空的在前，久无人问津的沉底。
@@ -644,20 +628,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
                 <span className="hint">{t('project.quietHint')}</span>
                 <span className="ln" />
               </div>
-              <div>
-                {quiet.map((p) => (
-                  <div key={p.key} className="prj-quiet" onClick={() => goProject(p.key)}
-                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); goProject(p.key) } }}>
-                    <span className="nm">{p.name}</span>
-                    <span className="p" title={p.dir}>{p.dir}</span>
-                    <span className="qt">
-                      {p.cleanable > 0
-                        ? <Tag color="success" style={{ margin: 0 }}>{t('project.cleanableCount', { count: p.cleanable })}</Tag>
-                        : (p.archivedAt ? t('project.quietSince', { when: relTime(p.archivedAt, t) }) : null)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <div className="prj-grid" onKeyDown={onGridKey}>{quiet.map(card)}</div>
             </>
           )}
 
