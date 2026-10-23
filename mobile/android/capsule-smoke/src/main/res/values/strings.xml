@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Roami Capsule Test</string>
+    <string name="instructions">Start the two-minute task and return home. A task in the notification shade does not mean the system showed a status chip. Return here to check the actual promotion result.</string>
+    <string name="start">Start test task</string>
+    <string name="stop">Stop test task</string>
+    <string name="promotion_settings">Live Update settings</string>
+    <string name="permission_missing">Notifications are disabled. Grant the permission and start again.</string>
+    <string name="diagnostics">Android API: %1$d\nDevice: %2$s\nNotification permission: %3$s\nSystem permits promoted notifications: %4$s\nNotification meets promotion rules: %5$s\nSystem actually promoted notification: %6$s</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="not_started">Test not started</string>
+    <string name="task_title">Roami test task is running</string>
+    <string name="task_body">A two-minute test of the system status chip. Tap to view details.</string>
+    <string name="chip_text">Testing</string>
+    <string name="channel_name">Capsule test task</string>
+</resources>

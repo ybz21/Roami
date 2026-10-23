@@ -96,19 +96,22 @@ func (s *PushStore) Count() int {
 
 // PushPayload 是发给 Service Worker 的 JSON：sw.js 按它画通知、决定按钮
 type PushPayload struct {
-	Conversation string   `json:"conversation,omitempty"`
-	Branch       string   `json:"branch,omitempty"`
-	Message      string   `json:"message,omitempty"`
-	HidePreview  bool     `json:"hidePreview,omitempty"`
-	Locale       string   `json:"locale,omitempty"`
-	ID           int64    `json:"id"`
-	Type         string   `json:"type"` // session.waiting | session.done | session.error
-	Session      string   `json:"session"`
-	Label        string   `json:"label"`
-	Title        string   `json:"title"`
-	Body         string   `json:"body"`
-	Actions      []string `json:"actions,omitempty"` // 通知上的按钮：allow / deny；能确定是 y/n 或「1. Yes」时才给
-	Badge        int      `json:"badge"`             // 需要你的条数
+	SelectionMode string               `json:"selectionMode,omitempty"`
+	Prompt        string               `json:"prompt,omitempty"`
+	Choices       []NotificationChoice `json:"choices,omitempty"`
+	Conversation  string               `json:"conversation,omitempty"`
+	Branch        string               `json:"branch,omitempty"`
+	Message       string               `json:"message,omitempty"`
+	HidePreview   bool                 `json:"hidePreview,omitempty"`
+	Locale        string               `json:"locale,omitempty"`
+	ID            int64                `json:"id"`
+	Type          string               `json:"type"` // session.waiting | session.done | session.error
+	Session       string               `json:"session"`
+	Label         string               `json:"label"`
+	Title         string               `json:"title"`
+	Body          string               `json:"body"`
+	Actions       []string             `json:"actions,omitempty"` // 通知上的按钮：allow / deny；能确定是 y/n 或「1. Yes」时才给
+	Badge         int                  `json:"badge"`             // 需要你的条数
 }
 
 // Broadcast 发给全部设备；网关回 404 / 410 的订阅当场删掉（用户在手机上撤销了权限）。

@@ -7,13 +7,13 @@ val releaseKeystore = System.getenv("ROAMI_ANDROID_KEYSTORE")
 
 android {
     namespace = "com.roami.app"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.roami.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.3.8"
+        versionCode = 25
+        versionName = "0.4.14"
     }
     signingConfigs {
         if (!releaseKeystore.isNullOrBlank()) {

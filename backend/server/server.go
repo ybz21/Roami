@@ -231,7 +231,8 @@ func New(cfg Config) *gin.Engine {
 		g.PATCH("/sessions/:name", h.RenameSession)
 		g.DELETE("/sessions/:name", h.KillSession)
 		g.GET("/sessions/:name/capture", h.Capture)
-		g.POST("/sessions/:name/keys", h.Keys)                       // 注入原始按键（响应 TUI 选择框）
+		g.POST("/sessions/:name/keys", h.Keys) // 注入原始按键（响应 TUI 选择框）
+		g.POST("/sessions/:name/respond", h.NotificationResponse)
 		g.POST("/sessions/:name/type", h.SessionType)                // 字面量打字进 pane（终端页语音回填）
 		g.GET("/sessions/:name/cwd", h.SessionCwd)                   // 会话工作目录（文件侧栏定位）
 		g.GET("/sessions/:name/claude", h.ClaudeStatus)              // 检测是否在跑 claude

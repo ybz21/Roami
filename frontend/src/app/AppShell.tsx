@@ -83,6 +83,9 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   useEffect(() => {
     if (!inboxSub) return
     const name = inboxSub
+    runtime.setClaudeView(v => ({ ...v, [name]: true }))
+    runtime.setCodexView(v => ({ ...v, [name]: true }))
+    runtime.setOpenCodeView(v => ({ ...v, [name]: true }))
     const qi = location.hash.indexOf('?')
     history.replaceState(history.state, '', '#/projects' + (qi >= 0 ? location.hash.slice(qi) : ''))
     setRoute('projects')

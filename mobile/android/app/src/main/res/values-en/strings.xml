@@ -1,4 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="event_choice_chip">Choose</string>
+    <string name="event_input_chip">Input</string>
+    <string name="event_choice_title">Choose the next step</string>
+    <string name="event_input_title">More information is needed</string>
+    <string name="event_pending_chip">%1$d tasks</string>
+    <string name="event_other_tasks">%1$d other alerts are available in the notification drawer.</string>
+    <string name="event_unlock_details">Unlock to view task details</string>
+    <string name="event_all_tasks">All alerts</string>
+    <string name="event_no_tasks">No pending alerts</string>
+    <string name="event_back">Back</string>
+    <string name="event_open_input">Add information in chat</string>
+    <string name="event_open_preview">Open preview</string>
+    <string name="event_response_title">Review the current question</string>
+    <string name="event_open_task">Resolve in task</string>
     <string name="agent_new_message">New message from your agent</string>
+    <string name="event_waiting_title">Your decision is needed</string>
+    <string name="event_waiting_chip">Review</string>
+    <string name="event_finished_chip">Done</string>
+    <string name="event_failed_chip">Error</string>
+    <string name="event_waiting_body">Task needs your approval. Tap to open the session.</string>
+    <string name="event_action_failed">Could not submit. Try again · %1$s</string>
+    <string name="event_finished_title">Task completed</string>
+    <string name="event_failed_title">Task needs attention</string>
+    <string name="event_view_result">Tap to view the task result</string>
+    <string name="event_acknowledge">Dismiss</string>
+    <string name="event_prompt_changed">The question changed. Open the session to see the current choices.</string>
+    <string name="event_all_choices">All choices</string>
 </resources>

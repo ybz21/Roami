@@ -10,7 +10,7 @@ export default function App() {
   const routing = useAppRoute()
 
   if (authed === null) return <div style={{ height: '100dvh', display: 'grid', placeItems: 'center' }}><Spin size="large" /></div>
-  if (!authed) return <Login onOk={async () => { await onLogin(); routing.go('projects') }} />
+  if (!authed) return <Login onOk={async () => { await onLogin(); if (!routing.inboxSub) routing.go('projects') }} />
   if (routing.soloName) return <SoloTerminal name={routing.soloName} />
   return <AppShell routing={routing} logout={logout} />
 }

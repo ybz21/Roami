@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -79,15 +81,22 @@ func (a *API) EventsWS(c *gin.Context) {
 		return
 	}
 	defer conn.Close()
+	conn.SetReadLimit(4096)
 	ch := a.Events.subscribe()
 	defer a.Events.unsubscribe(ch)
+	log.Printf("notification websocket: connected android=%t clients=%d", strings.HasPrefix(c.GetHeader("User-Agent"), "RoamiApp/"), a.Events.Count())
+	defer log.Printf("notification websocket: disconnected")
 	_ = conn.WriteJSON(gin.H{"type": "hello", "badge": a.Inbox.Unread()})
 	done := make(chan struct{})
 	go func() { // 只为发现对端断开；客户端不需要发任何东西
 		defer close(done)
 		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
+			_, body, err := conn.ReadMessage()
+			if err != nil {
 				return
+			}
+			if r, ok := notificationReceipt(body); ok {
+				log.Printf("notification receipt: event=%d status=%s capsule_requested=%t", r.ID, r.Status, r.Capsule)
 			}
 		}
 	}()
@@ -109,4 +118,17 @@ func (a *API) EventsWS(c *gin.Context) {
 			}
 		}
 	}
+}
+
+type taskReceipt struct {
+	Type    string `json:"type"`
+	ID      int64  `json:"id"`
+	Status  string `json:"status"`
+	Capsule bool   `json:"capsule"`
+}
+
+func notificationReceipt(body []byte) (taskReceipt, bool) {
+	var r taskReceipt
+	err := json.Unmarshal(body, &r)
+	return r, err == nil && r.Type == "receipt" && r.ID > 0 && (r.Status == "posted" || r.Status == "blocked" || r.Status == "error")
 }

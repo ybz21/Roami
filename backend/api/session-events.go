@@ -2,14 +2,16 @@ package api
 
 // 会话事件（24 稿 §6）：把 tmux 里看得见的三件事变成通知——
 //   session.waiting  屏上出现等你的选择框（抓屏，连续两轮为真才发；回到不等就复位）
-//   session.done     Claude 一轮说完了（转录最后一条 assistant 是 end_turn 且不在等你）
+//   session.done     Claude、Codex 或 OpenCode 一轮说完了且不在等你
 //   session.error    agent 进程没了、屏上还留着报错
 // 5s 一轮；启动那一轮只登记不发（进程一重启就把早已在等的再推一遍是噪音）。
 // event → 收件箱落库 + Web Push 广播。
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -19,6 +21,7 @@ import (
 type sessionEventState struct {
 	streak   int
 	notified bool
+	prompt   string
 	lastTurn string // 已经通知过的那条 end_turn 的 uuid
 	hadAgent bool
 }
@@ -60,7 +63,11 @@ func (e *sessionEvents) observe(in observeInput) []PushPayload {
 	for name, label := range in.sessions {
 		cap := in.capture(name)
 		st := e.state[name]
-		waiting := sessionWaiting(cap)
+		prompt, waiting := notificationPromptFromScreen(cap)
+		if waiting && st.prompt != prompt.token() {
+			st.streak, st.notified = 0, false
+			st.prompt = prompt.token()
+		}
 
 		// ── 等你 ──
 		if !waiting {
@@ -72,7 +79,8 @@ func (e *sessionEvents) observe(in observeInput) []PushPayload {
 			}
 			if st.streak >= 2 && !st.notified {
 				st.notified = true
-				p := PushPayload{Type: "session.waiting", Session: name, Label: label, Title: label, Body: waitingSummary(cap, 140)}
+				p := PushPayload{Type: "session.waiting", Session: name, Label: label, Title: label, Body: prompt.body(), Prompt: prompt.token(), Choices: prompt.Choices}
+				p.SelectionMode = prompt.selectionMode()
 				if _, opts, ok := waitingPrompt(cap); (ok && len(opts) > 0 && yesFirst.MatchString(opts[0])) || yesNoPat.MatchString(waitStripCtl(cap)) {
 					p.Actions = []string{"allow", "deny"}
 				}
@@ -85,7 +93,7 @@ func (e *sessionEvents) observe(in observeInput) []PushPayload {
 			lt := in.lastTurn(name)
 			if lt.key != "" && lt.key != st.lastTurn {
 				if lt.stop == "end_turn" && !waiting && e.seeded && time.Since(lt.at) < 10*time.Minute {
-					out = append(out, PushPayload{Type: "session.done", Session: name, Label: label, Title: label, Body: oneLine(lt.text, 140)})
+					out = append(out, PushPayload{Type: "session.done", Session: name, Label: label, Title: label, Body: oneLine(lt.text, 1200)})
 				}
 				st.lastTurn = lt.key
 			}
@@ -172,6 +180,93 @@ func claudeLastTurn(file string) lastTurnInfo {
 	return lastTurnInfo{}
 }
 
+func codexLastTurn(file string) lastTurnInfo {
+	if file == "" {
+		return lastTurnInfo{}
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return lastTurnInfo{}
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return lastTurnInfo{}
+	}
+	const tailBytes = 1 << 20
+	off := st.Size() - tailBytes
+	if off < 0 {
+		off = 0
+	}
+	buf := make([]byte, st.Size()-off)
+	if _, err := f.ReadAt(buf, off); err != nil && len(buf) == 0 {
+		return lastTurnInfo{}
+	}
+	lines := bytes.Split(buf, []byte("\n"))
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := bytes.TrimSpace(lines[i])
+		if !bytes.Contains(line, []byte(`"task_complete"`)) {
+			continue
+		}
+		var row struct {
+			Type      string `json:"type"`
+			Timestamp string `json:"timestamp"`
+			Payload   struct {
+				Type             string  `json:"type"`
+				TurnID           string  `json:"turn_id"`
+				CompletedAt      float64 `json:"completed_at"`
+				CompletedAtMS    int64   `json:"completed_at_ms"`
+				LastAgentMessage string  `json:"last_agent_message"`
+			} `json:"payload"`
+		}
+		if json.Unmarshal(line, &row) != nil || row.Type != "event_msg" || row.Payload.Type != "task_complete" || row.Payload.TurnID == "" {
+			continue
+		}
+		at, _ := time.Parse(time.RFC3339Nano, row.Timestamp)
+		if row.Payload.CompletedAtMS > 0 {
+			at = time.UnixMilli(row.Payload.CompletedAtMS)
+		} else if row.Payload.CompletedAt > 0 {
+			at = time.Unix(int64(row.Payload.CompletedAt), 0)
+		}
+		return lastTurnInfo{key: row.Payload.TurnID, stop: "end_turn", text: row.Payload.LastAgentMessage, at: at}
+	}
+	return lastTurnInfo{}
+}
+
+func openCodeLastTurn(db *sql.DB, id string) lastTurnInfo {
+	if db == nil || id == "" {
+		return lastTurnInfo{}
+	}
+	var messageID, data string
+	if db.QueryRow(`SELECT id,data FROM session_message WHERE session_id=? AND type='assistant' ORDER BY seq DESC LIMIT 1`, id).Scan(&messageID, &data) != nil {
+		return lastTurnInfo{}
+	}
+	var row struct {
+		Finish string `json:"finish"`
+		Time   struct {
+			Completed int64 `json:"completed"`
+		} `json:"time"`
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if json.Unmarshal([]byte(data), &row) != nil || row.Time.Completed <= 0 {
+		return lastTurnInfo{}
+	}
+	var texts []string
+	for _, part := range row.Content {
+		if part.Type == "text" && part.Text != "" {
+			texts = append(texts, part.Text)
+		}
+	}
+	stop := row.Finish
+	if stop == "stop" {
+		stop = "end_turn"
+	}
+	return lastTurnInfo{key: messageID, stop: stop, text: strings.Join(texts, " "), at: time.UnixMilli(row.Time.Completed)}
+}
+
 // SessionEventLoop 后台探测循环
 func (a *API) SessionEventLoop() {
 	ev := newSessionEvents()
@@ -227,7 +322,22 @@ func (a *API) SessionEventLoop() {
 		}
 		lastTurn := func(name string) lastTurnInfo {
 			p, ok := procs[name]
-			if !ok || p.Kind != "claude" {
+			if !ok {
+				return lastTurnInfo{}
+			}
+			if p.Kind == "opencode" {
+				db, err := openCodeDB()
+				if err != nil {
+					return lastTurnInfo{}
+				}
+				defer db.Close()
+				id := openCodeSession(db, openCodeSessionDir(name, p.Dir), p.Pid)
+				return openCodeLastTurn(db, id)
+			}
+			if p.Kind == "codex" {
+				return codexLastTurn(codexRollout(p.Dir, p.Pid, capture(name)))
+			}
+			if p.Kind != "claude" {
 				return lastTurnInfo{}
 			}
 			k := fileKey{name, p.Pid}
@@ -244,12 +354,17 @@ func (a *API) SessionEventLoop() {
 			p.ID = a.Inbox.Publish(p.Type, p.Session, p.Label, p.Body)
 			p.Badge = a.Inbox.Unread()
 			a.Push.Broadcast(p)
-			a.Events.Broadcast(p)
+			accepted, dropped := a.Events.enqueue(p)
+			log.Printf("session event: type=%s session=%s event=%d websocket=%d dropped=%d", p.Type, p.Session, p.ID, accepted, dropped)
 		}
 		now := time.Now()
 		for name := range sessions {
 			cap := capture(name)
-			snap := liveSnap{Waiting: sessionWaiting(cap), At: now}
+			prompt, waiting := notificationPromptFromScreen(cap)
+			snap := liveSnap{Waiting: waiting, At: now}
+			if waiting {
+				snap.Prompt = &prompt
+			}
 			if p, ok := procs[name]; ok && p.Kind != "" {
 				snap.Agent = p.Kind
 				snap.Busy = screenBusy(cap) || (p.Kind == "opencode" && openCodeActive[name])

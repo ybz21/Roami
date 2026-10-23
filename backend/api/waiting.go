@@ -174,7 +174,8 @@ func sessionWaiting(capture string) bool {
 		}
 		break
 	}
-	return false
+	_, ok := unnumberedNotificationPrompt(capture)
+	return ok
 }
 
 // waitingPrompt 从一屏 capture 里取出正在等的那个问题和它的选项（给通知正文用）。

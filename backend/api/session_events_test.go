@@ -1,10 +1,70 @@
 package api
 
 import (
+	"database/sql"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestCodexCompletionEvent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	line := `{"timestamp":"2026-10-22T07:00:00Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","last_agent_message":"任务完成"}}`
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := codexLastTurn(path)
+	if got.key != "turn-1" || got.stop != "end_turn" || got.text != "任务完成" || got.at.IsZero() {
+		t.Fatalf("Codex 完成事件解析错误: %+v", got)
+	}
+}
+
+func TestCodexCompletionSurvivesLargeFollowingToolOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	completed := `{"timestamp":"2026-10-22T07:00:00Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","last_agent_message":"已修复上传失败，并通过构建验证。"}}`
+	following := `{"type":"response_item","payload":{"type":"function_call_output","output":"` + strings.Repeat("x", 128<<10) + `"}}`
+	if err := os.WriteFile(path, []byte(completed+"\n"+following+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := codexLastTurn(path)
+	if got.key != "turn-1" || !strings.Contains(got.text, "上传失败") {
+		t.Fatalf("lost completion after tool output: %+v", got)
+	}
+}
+
+func TestOpenCodeCompletionEvent(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE session_message (id TEXT, session_id TEXT, type TEXT, seq INTEGER, data TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	insert := func(id string, seq int, finish string, completed int64) {
+		t.Helper()
+		data := `{"finish":"` + finish + `","time":{"completed":` + strconv.FormatInt(completed, 10) + `},"content":[{"type":"text","text":"任务完成"}]}`
+		if _, err := db.Exec(`INSERT INTO session_message VALUES (?, 'session-1', 'assistant', ?, ?)`, id, seq, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert("message-1", 1, "tool-calls", time.Now().UnixMilli())
+	insert("message-2", 2, "", 0)
+	if got := openCodeLastTurn(db, "session-1"); got.key != "" {
+		t.Fatalf("流式消息不应发完成提醒: %+v", got)
+	}
+	if _, err := db.Exec(`DELETE FROM session_message WHERE id='message-2'`); err != nil {
+		t.Fatal(err)
+	}
+	insert("message-3", 3, "stop", time.Now().UnixMilli())
+	got := openCodeLastTurn(db, "session-1")
+	if got.key != "message-3" || got.stop != "end_turn" || got.text != "任务完成" {
+		t.Fatalf("OpenCode 完成事件解析错误: %+v", got)
+	}
+}
 
 const waitScreen = "Do you want to proceed?\n❯ 1. Yes\n  2. No\nEnter to select · Esc to cancel"
 
@@ -26,7 +86,7 @@ func TestSessionEventsDebounceAndReset(t *testing.T) {
 	if len(got[0].Actions) != 2 {
 		t.Fatalf("1. Yes 这种该带 允许/拒绝: %+v", got[0])
 	}
-	if got[0].Body != "Do you want to proceed? · 1. Yes / 2. No" {
+	if got[0].Body != "Do you want to proceed?\n1. Yes\n2. No" {
 		t.Fatalf("正文该是问题加选项: %q", got[0].Body)
 	}
 	if got := ev.observe(inputOf(sess, waitScreen)); len(got) != 0 {

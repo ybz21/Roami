@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Roami"
 include(":app")
+include(":capsule-smoke")
