@@ -83,7 +83,9 @@ function SessionConversation({ metadata, node, projects, onChanged }: { metadata
     } catch { if (alive.current) setError(t('agent.requestFailed')) }
     finally { sending.current = false; if (alive.current) setBusy(false) }
   }
-  const messages = [...new Map([...older, ...(conversation.value?.messages || [])].map(item => [item.id, item])).values()].sort((a, b) => a.seq - b.seq)
+  const messages = [...new Map([...older, ...(conversation.value?.messages || [])].map(item => [item.id, item])).values()]
+    .filter(item => ['user', 'assistant'].includes(item.role) && (item.content.text || item.content.question || item.content.taskStatus || item.content.attachments?.length || item.status === 'streaming'))
+    .sort((a, b) => a.seq - b.seq)
   useLayoutEffect(() => {
     const element = scroll.current
     if (!element) return

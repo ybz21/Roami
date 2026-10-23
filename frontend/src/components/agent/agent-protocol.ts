@@ -25,9 +25,14 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
       .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
     return { view: next, reload: event.kind === 'task.steered' }
   }
-  if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted') {
-    next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: event.kind.slice(5) } : turn)
-    next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: event.kind.slice(5) } : message)
+  if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted' || event.kind === 'turn.deferred') {
+    const deferred = event.kind === 'turn.deferred'
+    next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: deferred ? 'queued' : event.kind.slice(5) } : turn)
+    next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: deferred ? 'interrupted' : event.kind.slice(5) } : message)
+    return { view: next, reload: true }
+  }
+  if (event.kind === 'message.tool_calls') {
+    next.messages = view.messages.map(message => message.id === data.messageId ? { ...message, status: 'completed', content: { ...message.content, tool_calls: data.calls } } : message)
     return { view: next, reload: true }
   }
   if (event.kind === 'message.started') {

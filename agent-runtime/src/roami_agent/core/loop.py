@@ -44,7 +44,8 @@ class AgentLoop:
 
     def preempt(self, turn_id):
         handle = self.turn_tasks.get(turn_id)
-        if turn_id in self.preemptible and handle and not handle.done():
+        # Repeated cancellation can interrupt the journal cleanup and strand a running turn.
+        if turn_id in self.preemptible and handle and not handle.done() and not handle.cancelling():
             handle.cancel("NEW_USER_INTENT")
 
     async def build_context(self, turn, instructions, catalog, completion):

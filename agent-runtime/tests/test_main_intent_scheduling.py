@@ -3,6 +3,7 @@
 import asyncio
 import json
 
+import pytest
 from test_runtime import ConversationModel, until
 
 from roami_agent.app import Runtime
@@ -15,6 +16,84 @@ async def completed(store, turn_id):
         store,
         lambda db: row(db, "SELECT id FROM turns WHERE id=? AND state='completed'", (turn_id,)),
     )
+
+
+@pytest.mark.parametrize(
+    "first_action,second_action",
+    [("message", "message"), ("message", "stop"), ("stop", "message"), ("stop", "stop")],
+)
+async def test_repeated_interruptions_finish_cleanup_and_answer_followups(
+    store, monkeypatch, first_action, second_action
+):
+    entered, cleaning, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    class SlowFirst:
+        model = "interrupt-cleanup"
+
+        async def stream(self, messages, tools):
+            if messages[-1]["content"] == "original":
+                entered.set()
+                await asyncio.Event().wait()
+            yield ModelEvent("text", "Answered")
+
+    runtime = Runtime(store, SlowFirst())
+    defer, fail = runtime.journal.defer, runtime.journal.fail
+
+    async def defer_after_cleanup(turn, **kwargs):
+        if not kwargs.get("only_if_pending"):
+            cleaning.set()
+            await release.wait()
+        return await defer(turn, **kwargs)
+
+    async def fail_after_cleanup(*args, **kwargs):
+        cleaning.set()
+        await release.wait()
+        return await fail(*args, **kwargs)
+
+    monkeypatch.setattr(runtime.journal, "defer", defer_after_cleanup)
+    monkeypatch.setattr(runtime.journal, "fail", fail_after_cleanup)
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        cid = conversation["id"]
+        original = await runtime.chat.submit("alice", cid, "original", "original")
+        await asyncio.wait_for(entered.wait(), 2)
+        followups = []
+        for index, action in enumerate((first_action, second_action)):
+            if action == "stop":
+                await runtime.chat.interrupt("alice", cid, f"stop-{index}")
+            else:
+                followups.append(await runtime.chat.submit("alice", cid, f"next-{index}", "next"))
+            await asyncio.wait_for(cleaning.wait(), 2)
+        release.set()
+        followups.append(await runtime.chat.submit("alice", cid, "continue", "continue"))
+        for receipt in followups:
+            await completed(store, receipt["turnId"])
+        messages = (await runtime.conversations.messages("alice", cid))["messages"]
+        for receipt in followups:
+            assert any(
+                message["turn_id"] == receipt["turnId"]
+                and message["role"] == "assistant"
+                and message["content"].get("text") == "Answered"
+                for message in messages
+            )
+        if "stop" not in (first_action, second_action):
+            await completed(store, original["turnId"])
+        else:
+            saved = await store.call(
+                lambda db: row(db, "SELECT state FROM turns WHERE id=?", (original["turnId"],))
+            )
+            assert saved["state"] == "interrupted"
+        assert not await store.call(
+            lambda db: row(
+                db,
+                "SELECT id FROM turns WHERE branch_id=? AND state='running'",
+                (conversation["active_branch_id"],),
+            )
+        )
+    finally:
+        release.set()
+        await runtime.close()
 
 
 async def test_new_question_answers_before_slow_original_and_original_resumes(store):
