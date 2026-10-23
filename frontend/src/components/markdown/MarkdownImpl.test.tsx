@@ -8,6 +8,7 @@ import { resetStack, stackSize } from '../shell/useBackDismiss'
 const device = vi.hoisted(() => ({ phone: true }))
 vi.mock('../../layout', () => ({ useLayout: () => device }))
 vi.mock('../files/fileview/FileView', () => ({ FileView: ({ path }: { path: string }) => <div data-testid="file-view">{path}</div> }))
+vi.mock('../documents/DocumentPreview', async importOriginal => ({ ...await importOriginal<any>(), default: ({ src, name }: { src: string; name: string }) => <div data-testid="document-preview" data-src={src}>{name}</div> }))
 
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, headers: new Headers() }))) })
 afterEach(() => { cleanup(); resetStack(); device.phone = true; vi.unstubAllGlobals() })
@@ -17,6 +18,16 @@ const show = (href = '/api/file/serve/tmp/demo.html', onLinkClick?: (href: strin
 )
 
 describe('Markdown mobile file navigation', () => {
+  it('previews PDF and PPTX artifacts and keeps a named download on the originating node', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'report', name: '架构.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', sizeBytes: 512 } }), { headers: { 'Content-Type': 'application/json' } }))
+    show('/n/other/api/agent/artifacts/report/content')
+    fireEvent.click(screen.getByRole('link', { name: 'demo' }))
+    const preview = await screen.findByTestId('document-preview')
+    expect(preview.textContent).toBe('架构.pptx')
+    expect(preview.getAttribute('data-src')).toContain('/n/other/api/agent/artifacts/report/content')
+    expect(screen.getByRole('link', { name: /下载|Download/ }).getAttribute('download')).toBe('架构.pptx')
+    expect(screen.getByRole('link', { name: /下载|Download/ }).getAttribute('href')).toContain('/n/other/api/agent/artifacts/report/content?dl=1')
+  })
   it('opens one full-screen preview and returns without leaving the conversation', async () => {
     show()
     const originalURL = location.href

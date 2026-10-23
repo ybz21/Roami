@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="agent_new_message">New message from your agent</string>
+    <string name="document_downloading">Saving file…</string>
+    <string name="document_saved">Saved: %1$s</string>
+    <string name="document_failed">Could not save. Please retry.</string>
+    <string name="document_login">Your session expired. Sign in again to save.</string>
+    <string name="document_busy">Finish saving the current file first</string>
 </resources>

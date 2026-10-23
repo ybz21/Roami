@@ -4,6 +4,10 @@ import MobileSubPage from '../MobileSubPage'
 import { lazyRetry } from '../lazy-retry'
 import { useI18n } from '../../i18n'
 import type { FileLink } from './file-link'
+import { DownloadIcon } from '../files/file-icons'
+import type { TaskArtifact } from '../agent/agent-task-protocol'
+import { canPreviewArtifact, TaskArtifactPreview } from '../agent/TaskOutput'
+import DocumentPreview, { isPdfDocument, isPptxDocument } from '../documents/DocumentPreview'
 
 const FileView = lazyRetry(() => import('../files/fileview/FileView').then((m) => ({ default: m.FileView })))
 
@@ -12,6 +16,19 @@ export default function MobileFilePreview({ link, onBack }: { link: FileLink; on
   const [path, setPath] = useState(link.path)
   const [loading, setLoading] = useState(link.resolvePath)
   const [error, setError] = useState('')
+  const [artifact, setArtifact] = useState<TaskArtifact | null>(null)
+  const directDocument = isPdfDocument(link.name, '') || isPptxDocument(link.name, '')
+  useEffect(() => {
+    if (!link.metadataUrl) return
+    const controller = new AbortController()
+    setLoading(true); setError(''); setArtifact(null)
+    void fetch(link.metadataUrl, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal }).then(async response => {
+      if (!response.ok) throw new Error(String(response.status))
+      const result = await response.json()
+      if (!controller.signal.aborted) setArtifact(result.data)
+    }).catch(error => { if (!controller.signal.aborted) setError(String(error)) }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [link])
   useEffect(() => {
     if (!link.resolvePath) return
     const controller = new AbortController()
@@ -28,9 +45,12 @@ export default function MobileFilePreview({ link, onBack }: { link: FileLink; on
     return () => controller.abort()
   }, [link])
   return (
-    <MobileSubPage title={path?.split('/').pop() || link.name} onBack={onBack} layer="session">
+    <MobileSubPage title={artifact?.name || path?.split('/').pop() || link.name} onBack={onBack} layer="session">
+      {(artifact || (!path && directDocument)) && <div className="document-preview-download"><a href={link.url + (link.url.includes('?') ? '&' : '?') + 'dl=1'} download={artifact?.name || link.name}><DownloadIcon />{t('file.download')}</a></div>}
       {loading ? <Spin /> : error ? <div role="alert" style={{ padding: 'var(--sp-4)', color: 'var(--text-dim)' }}>{t('file.openFailed', { message: error })}</div> : path
         ? <Suspense fallback={<Spin />}><FileView path={path} accent="var(--accent)" inline tabbed forcePreview onClose={onBack} onOpenPath={setPath} /></Suspense>
+        : artifact ? canPreviewArtifact(artifact) ? <TaskArtifactPreview artifact={artifact} contentUrl={link.url} fullHeight /> : <p role="status">{t('document.previewUnavailable')}</p>
+        : directDocument ? <div className="document-preview-full"><DocumentPreview src={link.url} name={link.name} mimeType="" /></div>
         : <iframe title={link.name} src={link.url} style={{ flex: 1, minHeight: 0, width: '100%', border: 0, background: 'var(--bg-base)' }} />}
     </MobileSubPage>
   )

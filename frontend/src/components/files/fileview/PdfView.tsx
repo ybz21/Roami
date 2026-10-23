@@ -1,6 +1,9 @@
-// PDF 展示：iframe 内嵌后端 raw（浏览器原生 PDF 阅读器）。
+import { Suspense } from 'react'
 import { PreviewShell } from './PreviewShell'
 import { useI18n } from '../../../i18n'
+import { lazyRetry } from '../../lazy-retry'
+
+const PdfDocument = lazyRetry(() => import('../../documents/PdfDocument'))
 
 export function PdfView({ path, rawUrl, name, inline, truncated }: {
   path: string
@@ -12,7 +15,7 @@ export function PdfView({ path, rawUrl, name, inline, truncated }: {
   const { t } = useI18n()
   return (
     <PreviewShell path={path} title={t('file.pdfPreview')} inline={inline} truncated={truncated}>
-      <iframe title={name} src={rawUrl} style={{ width: '100%', height: '100%', border: 0, background: '#fff' }} />
+      <Suspense fallback={<p role="status">{t('common.loading')}</p>}><PdfDocument src={rawUrl} name={name} /></Suspense>
     </PreviewShell>
   )
 }

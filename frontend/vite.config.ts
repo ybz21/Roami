@@ -1,9 +1,29 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+const pdfResources = ['cmaps', 'standard_fonts'].flatMap(directory => {
+  const root = new URL(`./node_modules/pdfjs-dist/${directory}/`, import.meta.url)
+  return readdirSync(root).map(name => ({ path: `pdfjs/${directory}/${name}`, source: fileURLToPath(new URL(name, root)) }))
+})
 
 // 开发期把 /api（含 WebSocket）代理到后端 Gin（:13579）
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'pdf-document-resources',
+    generateBundle() {
+      for (const resource of pdfResources) this.emitFile({ type: 'asset', fileName: resource.path, source: readFileSync(resource.source) })
+    },
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const resource = pdfResources.find(item => '/' + item.path === request.url?.split('?')[0])
+        if (!resource) return next()
+        response.setHeader('Content-Type', 'application/octet-stream')
+        response.end(readFileSync(resource.source))
+      })
+    },
+  }],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -19,6 +39,7 @@ export default defineConfig({
           // 4.3MB JS + 146KB 阻塞 CSS 全进首屏，懒加载失效）。固定进 vendor（入口本就依赖）。
           if (id.includes('vite/preload-helper')) return 'vendor'
           if (!id.includes('node_modules')) return
+          if (id.includes('pdfjs-dist')) return 'pdf'
           // Office 预览（docx/xlsx/pptx）很重，仅看 Office 文件时才用 → 独立块（配合 FileBrowser 懒加载按需取）
           // jszip 是 docx-preview / pptx-to-html 的专属依赖，一并归入，别落进首屏 vendor。
           if (/docx-preview|xlsx|pptx|jvmr|jszip/.test(id)) return 'office'

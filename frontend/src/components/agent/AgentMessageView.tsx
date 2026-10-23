@@ -1,5 +1,5 @@
 import AgentQuestion from './AgentQuestion'
-import { memo, useCallback, useState } from 'react'
+import { memo, Suspense, useCallback, useState } from 'react'
 import { App, Image } from 'antd'
 import { CheckIcon, CopyIcon, FileTextIcon, NotebookIcon } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -7,6 +7,12 @@ import { agentResourceUrl } from './agent-resource-url'
 import Markdown from '../markdown/Markdown'
 import type { AgentMessage } from './agent-protocol'
 import { activityReason } from './AgentActivity'
+import { useLayout } from '../../layout'
+import { lazyRetry } from '../lazy-retry'
+import { fileLink, type FileLink } from '../markdown/file-link'
+import { canPreviewArtifact } from './TaskOutput'
+
+const MobileFilePreview = lazyRetry(() => import('../markdown/MobileFilePreview'))
 
 type Attachment = NonNullable<AgentMessage['content']['attachments']>[number]
 
@@ -38,6 +44,8 @@ function AgentImageAttachment({ file, node }: { file: Attachment; node: string |
 
 function AgentMessageView({ item, node, focused, remember, canAnswer = false, answer, readOnly = false, author = 'Roami' }: { item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; author?: string; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
   const { t, locale } = useI18n(), { message } = App.useApp(), [copied, setCopied] = useState(false)
+  const { phone } = useLayout()
+  const [preview, setPreview] = useState<FileLink | null>(null)
   const assistant = item.role === 'assistant'
   const resolveResource = useCallback((href: string) => agentResourceUrl(href, node), [node])
   const report = item.content.sessionReply
@@ -54,10 +62,15 @@ function AgentMessageView({ item, node, focused, remember, canAnswer = false, an
     {item.content.taskStatus && <div className="agent-task-status" role="status"><strong>{t('agent.activity.result', { state: t('agent.state.' + item.content.taskStatus.state) })}</strong><span>{item.content.taskStatus.errorCode ? activityReason(item.content.taskStatus.errorCode, t) : t('agent.activity.resultRecorded')}</span><small>{t('agent.activity.reportUnavailable')}</small><code>{item.content.taskStatus.taskId}</code></div>}
     {!!item.content.attachments?.length && <div className="agent-message-files">{item.content.attachments.map(file => file.mimeType?.startsWith('image/') && file.previewState !== 'unavailable'
       ? <AgentImageAttachment key={file.id} file={file} node={node} />
-      : <a key={file.id} className="agent-file-card" href={attachmentUrl(file, node)} download={file.name}><FileTextIcon size={20} /><span>{file.name}<small>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</small></span></a>)}</div>}
+      : <a key={file.id} className="agent-file-card" href={attachmentUrl(file, node)} download={file.name} onClick={event => {
+        if (!phone || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !canPreviewArtifact(file)) return
+        const link = fileLink(attachmentUrl(file, node), location.origin, '/api/file/raw')
+        if (link) { event.preventDefault(); setPreview(link) }
+      }}><FileTextIcon size={20} /><span>{file.name}<small>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</small></span></a>)}</div>}
     {['failed', 'interrupted'].includes(item.status) && <small className="agent-muted">{t('agent.interrupted')}</small>}
     {!readOnly && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length && <div className="agent-message-actions"><button type="button" className="agent-message-action" aria-label={t(copied ? 'agent.composer.copied' : 'agent.composer.copy')} onClick={() => { void copy() }}>{copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}</button><button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button></div>}
     {assistant && item.completedEventId && <span className="agent-read-sentinel" data-event-id={item.completedEventId} aria-hidden />}
+    {preview && <Suspense fallback={null}><MobileFilePreview link={preview} onBack={() => setPreview(null)} /></Suspense>}
   </article>
 }
 

@@ -251,17 +251,9 @@ function extractSlideSize(html: string) {
   return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 ? { width, height } : null
 }
 
-function SlideMarkup({ slide, scale }: { slide: SlideData; scale: number }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const host = ref.current
-    if (!host) return
-    const template = document.createElement('template')
-    template.innerHTML = slide.html
-    host.replaceChildren(template.content.cloneNode(true))
-    return () => host.replaceChildren()
-  }, [slide.html])
-  return <div ref={ref} style={{ width: slide.width, height: slide.height, transform: `scale(${scale})`, transformOrigin: 'top left' }} />
+function SlideMarkup({ slide, scale, title }: { slide: SlideData; scale: number; title: string }) {
+  const document = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data: blob:; font-src data:; base-uri \'none\'; form-action \'none\'"><style>html,body{margin:0;overflow:hidden}</style>' + slide.html
+  return <iframe title={title} sandbox="" srcDoc={document} tabIndex={-1} style={{ width: slide.width, height: slide.height, border: 0, pointerEvents: 'none', transform: `scale(${scale})`, transformOrigin: 'top left' }} />
 }
 
 export function PptxFilePreview({ src, name, downloadUrl }: CommonProps) {
@@ -276,7 +268,10 @@ export function PptxFilePreview({ src, name, downloadUrl }: CommonProps) {
   useEffect(() => {
     const node = containerRef.current
     if (!node) return
-    const update = () => setViewportWidth(Math.max(Math.floor(node.clientWidth) - 32, 320))
+    const update = () => {
+      const padding = parseFloat(getComputedStyle(node).getPropertyValue('--sp-4')) || 0
+      setViewportWidth(Math.max(Math.floor(node.clientWidth) - padding * 2, 1))
+    }
     update()
     const ro = new ResizeObserver(update)
     ro.observe(node)
@@ -316,17 +311,17 @@ export function PptxFilePreview({ src, name, downloadUrl }: CommonProps) {
   return (
     <div ref={containerRef} style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {loading ? <Loading /> : (
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: '#eef1f5' }}>
-          <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: 18 }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: 'var(--bg-base)' }}>
+          <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-5)', padding: 'var(--sp-4)' }}>
             {slides.map((slide, i) => {
               const scale = Math.min(Math.max(deferredWidth / slide.width, 0.1), 1)
               const w = Math.max(Math.round(slide.width * scale), 1)
               const h = Math.max(Math.round(slide.height * scale), 1)
               return (
-                <section key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: '#667085' }}>{t('office.page', { page: i + 1 })}</span>
-                  <div style={{ width: w, height: h, overflow: 'hidden', background: '#fff', borderRadius: 8, boxShadow: '0 18px 45px rgba(15,23,42,.14)' }}>
-                    <SlideMarkup slide={slide} scale={scale} />
+                <section key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                  <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dim)' }}>{t('office.page', { page: i + 1 })}</span>
+                  <div style={{ width: w, height: h, overflow: 'hidden', background: '#fff' }}>
+                    <SlideMarkup slide={slide} scale={scale} title={`${name} ${t('office.page', { page: i + 1 })}`} />
                   </div>
                 </section>
               )
