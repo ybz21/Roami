@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { agentEvents, projectAgentEvent, type AgentSnapshot } from './agent-protocol'
+import { agentTimeline } from './agent-timeline'
 
 const snapshot = (): AgentSnapshot => ({ conversation: { id: 'c', title: 'Conversation', active_branch_id: 'b', updated_ms: 0 }, branchId: 'b', messages: [], turns: [], snapshotCursor: 1 })
 
@@ -35,6 +36,27 @@ it('stops the running indicator immediately when a turn fails', () => {
   expect(failed.reload).toBe(true)
   expect(failed.view.turns[0].state).toBe('failed')
   expect(failed.view.messages[0].status).toBe('failed')
+})
+
+it('settles tool-call messages before the next reply starts while history is delayed', () => {
+  const calls = [{ id: 'read', function: { name: 'read', arguments: '{}' } }]
+  let view = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'tools', turnId: 't' } }).view
+  const settled = projectAgentEvent(view, { id: 3, kind: 'message.tool_calls', payload: { messageId: 'tools', calls } })
+  expect(settled.view.messages[0]).toMatchObject({ status: 'completed', content: { tool_calls: calls } })
+  expect(settled.view.turns[0].state).toBe('running')
+  expect(settled.reload).toBe(true)
+  view = projectAgentEvent(settled.view, { id: 4, kind: 'message.started', payload: { messageId: 'reply', turnId: 't' } }).view
+  expect(agentTimeline(view.messages, []).map(entry => entry.id)).toEqual(['reply'])
+})
+
+it('clears the old typing indicator immediately when a new message defers the turn', () => {
+  const started = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'old', turnId: 'old-turn' } }).view
+  const deferred = projectAgentEvent(started, { id: 3, kind: 'turn.deferred', payload: { turnId: 'old-turn', reason: 'NEW_USER_INTENT' } })
+  expect(deferred.view.messages[0].status).toBe('interrupted')
+  expect(deferred.view.turns[0].state).toBe('queued')
+  expect(agentTimeline(deferred.view.messages, [])).toEqual([])
+  const next = projectAgentEvent(deferred.view, { id: 4, kind: 'message.started', payload: { messageId: 'new', turnId: 'new-turn' } }).view
+  expect(agentTimeline(next.messages, []).map(entry => entry.id)).toEqual(['new'])
 })
 
 it('hides routine tools while retaining unknown outcomes and replay ordering', () => {

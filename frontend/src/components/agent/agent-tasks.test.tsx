@@ -535,6 +535,29 @@ it('keeps filters across remounts and exposes original session and project as se
 })
 
 
+it('hides empty native tool replies while retaining real content and the active reply', async () => {
+  const messages = [
+    { id: 'user', role: 'user', status: 'completed', seq: 1, content: { text: 'Update the presentation' } },
+    ...Array.from({ length: 13 }, (_, i) => ({ id: 'tool-' + i, role: 'assistant', status: 'completed', seq: i + 2, content: { text: '', tool_calls: [{ id: 'call-' + i }] } })),
+    { id: 'result', role: 'tool', status: 'completed', seq: 15, content: { text: 'Internal tool result' } },
+    { id: 'answer', role: 'assistant', status: 'completed', seq: 16, content: { text: 'Working on the presentation' } },
+    { id: 'active', role: 'assistant', status: 'streaming', seq: 17, content: { text: '' } },
+  ]
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path.endsWith('/conversation')) return { data: { messages, before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: detail('original') }
+  })
+  const page = render(<NativeSession id="native-id" node={null} projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Working on the presentation')
+  expect(screen.getAllByText('agent.task.subagent')).toHaveLength(2)
+  expect(page.container.querySelectorAll('.agent-typing')).toHaveLength(1)
+  expect(screen.queryByText('Internal tool result')).toBeNull()
+  expect(screen.getByText('Update the presentation')).toBeTruthy()
+})
+
 it('refreshes a fast native continuation without Main events and stops reading after it settles', async () => {
   let phase = 0
   const nativeTask = { ...task('original'), nativeSession: { id: 'native-id', conversationId: 'native-conversation' } }
