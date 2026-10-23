@@ -198,7 +198,7 @@ def seed_review_for_stage_fixture(workflow, action):
         )
 
 
-async def setup(tmp_path):
+async def setup(tmp_path, *, paired=True):
     repo = tmp_path / "repo"
     repo.mkdir(parents=True)
     await git(repo, "init", "-q")
@@ -260,6 +260,7 @@ async def setup(tmp_path):
         output_root=ledger.path.parent / "runs",
         daily_tokens=20000000,
         daily_episodes=1000,
+        paired=paired,
     )
     return workflow, config, clock, repo, cycle
 
@@ -677,3 +678,28 @@ async def test_source_alias_cannot_expose_protected_evaluator_to_repair_model(tm
             w, repair, Settings(), cfg, provider_factory=lambda _: provider
         )
     assert provider.calls == 0
+
+
+async def test_single_baseline_semantic_review_finishes_all_sixty_before_repair(tmp_path):
+    w, cfg, _clock, _repo, cycle = await setup(tmp_path, paired=False)
+    w.discover()
+    action = w.claim()
+    provider = Reviewer(finding=True)
+    summary = await observe_cycle(w, action, Settings(), cfg, provider_factory=lambda _: provider)
+    assert summary["semantic_reviewed"] == 60 and provider.calls == 60
+    saved = w.review_saved("owner", cycle["cycle_id"])
+    assert len(saved) == 60
+    missing, original = next(iter(saved.items()))
+    with w.ledger.connection() as db:
+        db.execute(
+            "DELETE FROM rsi_semantic_reviews WHERE owner=? AND cycle_id=? AND trial_key=?",
+            ("owner", cycle["cycle_id"], missing),
+        )
+    with pytest.raises(DomainError, match="REVIEW_INCOMPLETE"):
+        w.complete(action, summary)
+    assert not w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
+    w.save_review("owner", cycle["cycle_id"], missing, original)
+    w.complete(action, summary)
+    assert w.ledger.get("owner", cycle["cycle_id"])["report"]["daily_complete"]
+    assert len(w.snapshot("owner")["improvements"]) == 1
+    assert w.claim()["kind"] == "repair"

@@ -5,7 +5,7 @@ import json
 import statistics
 from collections import Counter
 
-from roami_agent.improvement.contracts import digest, relative_file
+from roami_agent.improvement.contracts import digest, evaluation_arms, relative_file
 from roami_agent.protocol.errors import DomainError
 
 LOGS = {
@@ -161,10 +161,13 @@ def review_trial(trial, root):
 def review_cycle(manifest, trials):
     details, pair_findings = [], []
     expected = set(manifest["case_ids"])
-    executed = {arm: {t["case_id"] for t in items} for arm, items in trials.items()}
-    full = all(ids == expected for ids in executed.values())
+    required_arms = evaluation_arms(manifest)
+    executed = {arm: {t["case_id"] for t in trials.get(arm, [])} for arm in required_arms}
+    full = all(ids == expected for ids in executed.values()) and not any(
+        trials.get(arm) for arm in set(trials) - set(required_arms)
+    )
     index = {arm: {t["case_id"]: t for t in items} for arm, items in trials.items()}
-    for case_id in sorted(executed["baseline"] & executed["candidate"]):
+    for case_id in sorted(executed["baseline"] & executed.get("candidate", set())):
         a, b = index["baseline"][case_id], index["candidate"][case_id]
         codes = []
         if a["grade"]["passed"] and (
@@ -257,7 +260,7 @@ def review_cycle(manifest, trials):
     counts.update(f["code"] for f in pair_findings)
     summary = {
         "complete": full and all(t["complete"] for t in details),
-        "expected_trials": 2 * len(expected),
+        "expected_trials": len(required_arms) * len(expected),
         "metrics_reviewed": len(details),
         "logs_reviewed": sum(t["complete"] for t in details),
         "finding_counts": dict(counts),

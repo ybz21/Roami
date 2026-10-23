@@ -8,6 +8,7 @@ from pathlib import Path
 
 from roami_agent.improvement.contracts import (
     digest,
+    evaluation_arms,
     load_suite,
     relative_file,
     require,
@@ -112,7 +113,13 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
     cycle = await asyncio.to_thread(
         workflow.ledger.get, action["owner"], action["payload"]["cycle_id"]
     )
-    require(cycle["state"] == "completed" and len(cycle["trials"]) == 120, "RSI_REVIEW_INCOMPLETE")
+    expected_trials = len(evaluation_arms(cycle["manifest"])) * len(cycle["manifest"]["case_ids"])
+    require(
+        cycle["state"] == "completed"
+        and len(cycle["manifest"]["case_ids"]) == 60
+        and len(cycle["trials"]) == expected_trials,
+        "RSI_REVIEW_INCOMPLETE",
+    )
     frozen = load_suite(workflow.ledger.path.parent / "runs" / cycle["id"] / "suite.json")
     require(frozen["content_hash"] == cycle["manifest"]["suite_hash"], "RSI_SUITE_HASH_MISMATCH")
     definitions = {c["id"]: c for c in frozen["cases"]}
@@ -244,4 +251,8 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
         await asyncio.to_thread(workflow.save_review, action["owner"], cycle["id"], key, result)
         findings.extend(accepted)
     await asyncio.to_thread(workflow.record_findings, action, findings)
-    return {"cycle_id": cycle["id"], "semantic_reviewed": 120, "findings": len(findings)}
+    return {
+        "cycle_id": cycle["id"],
+        "semantic_reviewed": expected_trials,
+        "findings": len(findings),
+    }

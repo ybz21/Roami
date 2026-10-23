@@ -35,7 +35,9 @@ cp -r frontend/dist/. "$WEBUI_DIST/"
 # 4) 编译 roami（内嵌前端 + CLI；版本号由 ROAMI_BUILD_VERSION 注入，默认 dev）
 mkdir -p "$(dirname "$OUT")"
 VER="${ROAMI_BUILD_VERSION:-dev}"
+CHANNEL="${ROAMI_BUILD_CHANNEL:-release}"
+case "$CHANNEL" in release|development) ;; *) echo "Unknown build channel: $CHANNEL" >&2; exit 1 ;; esac
 CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-  go build -ldflags "-X main.version=${VER}" -o "$ROOT/$OUT" ./cmd/roami
+  go build -ldflags "-X main.version=${VER} -X main.buildChannel=${CHANNEL}" -o "$ROOT/$OUT" ./cmd/roami
 
 echo "built $OUT ($(du -h "$OUT" | cut -f1))"

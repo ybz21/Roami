@@ -15,6 +15,7 @@ import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
 import './agent-workspace.css'
 import { useAgentThread } from './useAgentThread'
+import { useAgentData } from './useAgentData'
 import { useAgentHistory } from './useAgentHistory'
 import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentDraft } from './useAgentDraft'
@@ -48,6 +49,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
 }) {
   const { t } = useI18n(), { phone, landscape, size } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch, node)
+  const rsi = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60_000)
   const workspace = useAgentWorkspace(node), wide = size === 'large'
   const [workspaceTask, setWorkspaceTask] = useState('')
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
@@ -221,7 +223,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
   }
   const moreMenu = { items: [
-    { key: 'improvement', label: t('agent.improvement'), icon: <ClockIcon size={16} /> },
+    ...(rsi.value?.developmentRsi === true ? [{ key: 'improvement', label: t('agent.improvement'), icon: <ClockIcon size={16} /> }] : []),
     { key: 'debug', label: t('agent.debug'), icon: <CodeIcon size={16} /> },
     ...(!wide ? [
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },

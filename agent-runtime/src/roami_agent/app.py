@@ -90,6 +90,7 @@ class Runtime:
         memory_model=None,
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
+        development_rsi=False,
     ):
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
@@ -210,7 +211,7 @@ class Runtime:
         self.cli_commands = CLICommands(database, self.tools, self.journal)
         self.manifests = PromptManifests(database)
         self.traces = ExecutionTraces(database)
-        self.improvement = ImprovementStatus(database.data_root)
+        self.improvement = ImprovementStatus(database.data_root) if development_rsi else None
         self.debug = ExecutionDebug(database, self.context, self.settings, self.traces)
         self.dispatch = TaskDispatcher(
             database,
@@ -278,7 +279,7 @@ class Runtime:
         self.capability_settings = CapabilitySettings(self)
 
     async def run_turn(self, turn, *args, **kwargs):
-        if not self.improvement.ledger.path.exists():
+        if self.improvement is None or not self.improvement.ledger.path.exists():
             return await self.loop.run(turn, *args, **kwargs)
 
         def scope(db):
@@ -330,7 +331,7 @@ class Runtime:
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
-        if self.db.managed:
+        if self.db.managed and self.improvement is not None:
             from roami_agent.improvement.worker import EvaluationWorker
 
             self.improvement.worker = EvaluationWorker(self, self.improvement)
@@ -434,9 +435,9 @@ class Runtime:
 
     async def close(self):
         self.stopping = True
-        if self.improvement.research_worker:
+        if self.improvement is not None and self.improvement.research_worker:
             await self.improvement.research_worker.close()
-        if self.improvement.worker:
+        if self.improvement is not None and self.improvement.worker:
             await self.improvement.worker.close()
         self.scheduler.stopping = True
         self.wakeup.set()
@@ -519,6 +520,7 @@ async def serve(args):
         settings=settings,
         worker_model=worker,
         executor=CodingExecutor(database, settings),
+        development_rsi=args.development_rsi,
     )
     try:
         args.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -566,6 +568,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--socket", type=Path)
     parser.add_argument("--initialize", action="store_true")
+    parser.add_argument("--development-rsi", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if not args.initialize and not args.socket:
         parser.error("--socket is required when serving")

@@ -222,6 +222,12 @@ def freeze_suite(identifier_, cases, **metadata):
     return validate_suite(suite)
 
 
+def evaluation_arms(manifest):
+    arms = manifest.get("trial_arms", ["baseline", "candidate"])
+    require(arms in (["baseline"], ["baseline", "candidate"]), "RSI_INVALID_EVALUATION_ARMS")
+    return arms
+
+
 def load_suite(path):
     return validate_suite(load_json(path, maximum=MAX_SUITE_BYTES))
 

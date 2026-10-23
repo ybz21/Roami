@@ -151,6 +151,7 @@ class EvaluationWorker:
                 daily_episodes=prefs["daily_episodes"],
                 request_key=request["id"] if request["kind"] == "manual" else "daily",
                 source_builds=source_builds,
+                paired=baseline != candidate or source_builds is not None,
             )
             await asyncio.to_thread(
                 self.service.control.finish,

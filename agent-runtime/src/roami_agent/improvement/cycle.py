@@ -62,6 +62,7 @@ async def run_cycle(
     seed=20261023,
     request_key="daily",
     source_builds=None,
+    paired=True,
 ):
     validate_suite(suite)
     baseline = validate_policy(baseline)
@@ -70,6 +71,14 @@ async def run_cycle(
         require(set(source_builds) == {"baseline", "candidate"})
         require(all(isinstance(v, str) and len(v) == 64 for v in source_builds.values()))
         require(callable(getattr(executor, "run_arm", None)), "RSI_CODE_EXECUTOR_REQUIRED")
+    require(type(paired) is bool)
+    require(
+        paired
+        or baseline == candidate
+        and (source_builds is None or source_builds["baseline"] == source_builds["candidate"]),
+        "RSI_COMPARISON_REQUIRED",
+    )
+    trial_arms = ["baseline", "candidate"] if paired else ["baseline"]
     require(machine.get("cache_mode") in {"cold", "warm", "uncontrolled"})
     require(
         isinstance(machine.get("environment_hash"), str) and len(machine["environment_hash"]) == 64,
@@ -81,13 +90,16 @@ async def run_cycle(
     reservation = getattr(executor, "reservation_tokens", lambda case: case["limits"]["tokens"])
     costs = {case["id"]: reservation(case) for case in cases}
     require(all(type(cost) is int and cost >= 0 for cost in costs.values()))
-    tokens = 2 * sum(costs.values())
-    require(tokens <= daily_tokens and 2 * len(cases) <= daily_episodes, "RSI_FULL_SUITE_BUDGET")
+    tokens = len(trial_arms) * sum(costs.values())
+    require(
+        tokens <= daily_tokens and len(trial_arms) * len(cases) <= daily_episodes,
+        "RSI_FULL_SUITE_BUDGET",
+    )
     manifest = {
         "runner_version": VERSION,
         "request_key": request_key,
         "implementation_hash": implementation_hash(),
-        "standard_version": "rsi-v1.6-project-runtime-and-setup-clock-20261023",
+        "standard_version": "rsi-v1.7-single-baseline-daily-20261023",
         "suite_id": suite["id"],
         "suite_hash": suite["content_hash"],
         "case_hashes": {c["id"]: digest(c) for c in cases},
@@ -108,7 +120,8 @@ async def run_cycle(
         else "baseline_stability",
         "seed": seed,
         "reserved_tokens": tokens,
-        "reserved_episodes": 2 * len(cases),
+        "reserved_episodes": len(trial_arms) * len(cases),
+        "trial_arms": trial_arms,
     }
     if source_builds is not None:
         manifest["source_builds"] = source_builds
@@ -127,11 +140,11 @@ async def run_cycle(
     cycle_root.mkdir(parents=True, mode=0o700)
     private_json(cycle_root / "manifest.json", manifest)
     private_json(cycle_root / "suite.json", suite)
-    trials = {"baseline": [], "candidate": []}
+    trials = {arm: [] for arm in trial_arms}
     try:
         for case in cases:
             # Order is balanced without learning the verifier or looking at either result.
-            arms = ["baseline", "candidate"]
+            arms = list(trial_arms)
             random.Random(digest([seed, day, case["id"]])).shuffle(arms)
             for arm in arms:
                 root = cycle_root / (digest(case["id"])[:20] + "-" + arm)
@@ -190,11 +203,22 @@ async def run_cycle(
                 private_json(root / "trial.json", trial)
                 await asyncio.to_thread(ledger.append, owner, cycle_id, arm, trial)
                 trials[arm].append(trial)
-        comparison = compare(trials["baseline"], trials["candidate"])
+        comparison = (
+            compare(trials["baseline"], trials["candidate"])
+            if paired
+            else {
+                "pairs": 0,
+                "eligible_for_promotion": False,
+                "reasons": ["quality_noninferiority_unproven"],
+                "release_blockers": ["baseline_observation_only"],
+            }
+        )
         review = review_cycle(manifest, trials)
         private_json(cycle_root / "review.json", review)
         development = [
-            t for t in trials["candidate"] if t["split"] == "development" and t["layer"] != "smoke"
+            t
+            for t in trials.get("candidate", trials["baseline"])
+            if t["split"] == "development" and t["layer"] != "smoke"
         ]
         proposals = propose(candidate, development) if development else []
         report = {

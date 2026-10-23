@@ -137,111 +137,119 @@ def create_app(runtime, *, manage_lifecycle=True):
             )
         }
 
-    @app.get("/v1/improvement/cycles")
-    async def improvement_cycles(owner: Owner, limit: int = Query(default=20, ge=1, le=100)):
-        return {"data": await runtime.improvement.list(owner, limit)}
+    if runtime.improvement is not None:
 
-    @app.get("/v1/improvement/cycles/{cycle_id}")
-    async def improvement_cycle(cycle_id: str, owner: Owner):
-        return {"data": await runtime.improvement.get(owner, cycle_id)}
+        @app.get("/v1/improvement/cycles")
+        async def improvement_cycles(owner: Owner, limit: int = Query(default=20, ge=1, le=100)):
+            return {"data": await runtime.improvement.list(owner, limit)}
 
-    async def improvement_payload(request):
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > 8192:
-                raise DomainError("RSI_PAYLOAD_TOO_LARGE", 413)
-        try:
-            result = json.loads(body)
-        except (ValueError, RecursionError):
-            raise DomainError("RSI_INVALID_REQUEST") from None
-        if not isinstance(result, dict):
-            raise DomainError("RSI_INVALID_REQUEST")
-        return result
+        @app.get("/v1/improvement/cycles/{cycle_id}")
+        async def improvement_cycle(cycle_id: str, owner: Owner):
+            return {"data": await runtime.improvement.get(owner, cycle_id)}
 
-    @app.get("/v1/improvement")
-    async def improvement_overview(owner: Owner):
-        return {"data": await runtime.improvement.overview(owner)}
+        async def improvement_payload(request):
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > 8192:
+                    raise DomainError("RSI_PAYLOAD_TOO_LARGE", 413)
+            try:
+                result = json.loads(body)
+            except (ValueError, RecursionError):
+                raise DomainError("RSI_INVALID_REQUEST") from None
+            if not isinstance(result, dict):
+                raise DomainError("RSI_INVALID_REQUEST")
+            return result
 
-    @app.get("/v1/improvement/research")
-    async def improvement_research(owner: Owner):
-        return {"data": await asyncio.to_thread(runtime.improvement.research.snapshot, owner)}
+        @app.get("/v1/improvement")
+        async def improvement_overview(owner: Owner):
+            return {"data": await runtime.improvement.overview(owner)}
 
-    @app.post("/v1/improvement/research/{action_id}/resume")
-    async def improvement_research_resume(action_id: str, owner: Owner):
-        ModelSettings.owner(owner)
-        return {
-            "data": await asyncio.to_thread(runtime.improvement.research.resume, owner, action_id)
-        }
+        @app.get("/v1/improvement/research")
+        async def improvement_research(owner: Owner):
+            return {"data": await asyncio.to_thread(runtime.improvement.research.snapshot, owner)}
 
-    @app.put("/v1/improvement/preferences")
-    async def improvement_preferences(request: Request, owner: Owner):
-        ModelSettings.owner(owner)
-        value = await asyncio.to_thread(
-            runtime.improvement.control.save, owner, await improvement_payload(request)
-        )
-        runtime.improvement.wakeup.set()
-        return {"data": value}
+        @app.post("/v1/improvement/research/{action_id}/resume")
+        async def improvement_research_resume(action_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.research.resume, owner, action_id
+                )
+            }
 
-    @app.post("/v1/improvement/machines")
-    async def improvement_machine(request: Request, owner: Owner):
-        ModelSettings.owner(owner)
-        return {
-            "data": await asyncio.to_thread(
-                runtime.improvement.control.register_machine,
-                owner,
-                await improvement_payload(request),
-                local_only=True,
+        @app.put("/v1/improvement/preferences")
+        async def improvement_preferences(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                runtime.improvement.control.save, owner, await improvement_payload(request)
             )
-        }
+            runtime.improvement.wakeup.set()
+            return {"data": value}
 
-    @app.post("/v1/improvement/requests")
-    async def improvement_request(request: Request, owner: Owner):
-        ModelSettings.owner(owner)
-        payload = await improvement_payload(request)
-        if set(payload) != {"machine_id", "request_key"}:
-            raise DomainError("RSI_INVALID_REQUEST")
-        result = await asyncio.to_thread(runtime.improvement.control.enqueue, owner, **payload)
-        runtime.improvement.wakeup.set()
-        return {"data": result}
+        @app.post("/v1/improvement/machines")
+        async def improvement_machine(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.control.register_machine,
+                    owner,
+                    await improvement_payload(request),
+                    local_only=True,
+                )
+            }
 
-    @app.post("/v1/improvement/requests/{request_id}/cancel")
-    async def cancel_improvement_request(request_id: str, owner: Owner):
-        ModelSettings.owner(owner)
-        result = await asyncio.to_thread(runtime.improvement.control.cancel, owner, request_id)
-        runtime.improvement.wakeup.set()
-        return {"data": result}
+        @app.post("/v1/improvement/requests")
+        async def improvement_request(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if set(payload) != {"machine_id", "request_key"}:
+                raise DomainError("RSI_INVALID_REQUEST")
+            result = await asyncio.to_thread(runtime.improvement.control.enqueue, owner, **payload)
+            runtime.improvement.wakeup.set()
+            return {"data": result}
 
-    @app.post("/v1/improvement/releases")
-    async def release_improvement(request: Request, owner: Owner):
-        ModelSettings.owner(owner)
-        payload = await improvement_payload(request)
-        if set(payload) != {"cycle_ids", "expected_seq", "request_key"}:
-            raise DomainError("RSI_INVALID_REQUEST")
-        return {
-            "data": await asyncio.to_thread(runtime.improvement.releases.publish, owner, **payload)
-        }
+        @app.post("/v1/improvement/requests/{request_id}/cancel")
+        async def cancel_improvement_request(request_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            result = await asyncio.to_thread(runtime.improvement.control.cancel, owner, request_id)
+            runtime.improvement.wakeup.set()
+            return {"data": result}
 
-    @app.post("/v1/improvement/rollback")
-    async def rollback_improvement(request: Request, owner: Owner):
-        ModelSettings.owner(owner)
-        payload = await improvement_payload(request)
-        if not {"expected_seq", "request_key"} <= set(payload) or set(payload) - {
-            "expected_seq",
-            "request_key",
-            "release_id",
-        }:
-            raise DomainError("RSI_INVALID_REQUEST")
-        return {
-            "data": await asyncio.to_thread(runtime.improvement.releases.rollback, owner, **payload)
-        }
+        @app.post("/v1/improvement/releases")
+        async def release_improvement(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if set(payload) != {"cycle_ids", "expected_seq", "request_key"}:
+                raise DomainError("RSI_INVALID_REQUEST")
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.releases.publish, owner, **payload
+                )
+            }
 
-    @app.post("/v1/improvement/prepare")
-    async def prepare_improvement(owner: Owner):
-        ModelSettings.owner(owner)
-        from roami_agent.improvement.corpus import prepare_corpus
+        @app.post("/v1/improvement/rollback")
+        async def rollback_improvement(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if not {"expected_seq", "request_key"} <= set(payload) or set(payload) - {
+                "expected_seq",
+                "request_key",
+                "release_id",
+            }:
+                raise DomainError("RSI_INVALID_REQUEST")
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.releases.rollback, owner, **payload
+                )
+            }
 
-        return {"data": await asyncio.to_thread(prepare_corpus, runtime.improvement, owner)}
+        @app.post("/v1/improvement/prepare")
+        async def prepare_improvement(owner: Owner):
+            ModelSettings.owner(owner)
+            from roami_agent.improvement.corpus import prepare_corpus
+
+            return {"data": await asyncio.to_thread(prepare_corpus, runtime.improvement, owner)}
 
     @app.get("/v1/tool-directory/{name}")
     async def tool_operation(name: str, owner: Owner):
@@ -450,6 +458,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "memoryTimezone": runtime.memory.daily.timezone,
+                "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
                 "images": runtime.settings.route("main").capabilities.get("images") is True,
                 "writerBacklog": runtime.db.pending,

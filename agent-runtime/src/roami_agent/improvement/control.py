@@ -21,7 +21,7 @@ DEFAULTS = {
     "cases_per_day": 60,
     "suite_id": "",
     "machine_ids": [],
-    "auto_candidates": True,
+    "auto_candidates": False,
     "candidate_policy": {},
 }
 

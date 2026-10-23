@@ -313,6 +313,7 @@ async def execute(args):
             daily_tokens=budgets["tokens"],
             daily_episodes=budgets["episodes"],
             seed=config.get("seed", 20261023),
+            paired=config.get("paired", True),
         )
         if args.command == "watch":
             print(json.dumps(result, ensure_ascii=False), flush=True)

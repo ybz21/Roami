@@ -28,6 +28,9 @@ import (
 // version 是 roam 版本号，发布时由 -ldflags "-X main.version=<tag>" 注入（默认 dev）。
 var version = "dev"
 
+// Release builds keep RSI unavailable, including when old local preferences enabled it.
+var buildChannel = "release"
+
 func main() {
 	if retiredSessionEntry(filepath.Base(os.Args[0])) {
 		_, code := runCLI(nil, "")

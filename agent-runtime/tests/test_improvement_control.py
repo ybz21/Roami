@@ -166,7 +166,7 @@ async def test_mutating_http_endpoints_enforce_owner_and_request_shape(store):
     class Model:
         model = "fixture"
 
-    runtime = Runtime(store, Model())
+    runtime = Runtime(store, Model(), development_rsi=True)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
         base_url="http://runtime",
@@ -279,6 +279,7 @@ async def test_no_new_candidate_still_runs_the_full_daily_suite(tmp_path, monkey
     await EvaluationWorker(runtime, service).execute(c.claim())
     assert len(ran["suite"]["cases"]) == 60
     assert ran["baseline"] == ran["candidate"]
+    assert ran["paired"] is False
     assert c.requests("local")[0]["state"] == "completed"
 
 

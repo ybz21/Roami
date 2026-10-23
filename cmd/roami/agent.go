@@ -269,12 +269,7 @@ func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
 	if _, err := exec.LookPath(python); err != nil {
 		return fmt.Errorf("AGENT_DEPENDENCIES_MISSING: run roami agent setup --runtime-dir %q", dir)
 	}
-	args := []string{"-m", "roami_agent.app", "--data-root", p.Storage.Data, "--database", p.Database, "--config", p.Config}
-	if initialize {
-		args = append(args, "--initialize")
-	} else {
-		args = append(args, "--socket", p.Socket)
-	}
+	args := agentRuntimeArgs(p, initialize, buildChannel)
 	cmd := exec.Command(python, args...)
 	if binary, err := os.Executable(); err == nil {
 		cmd.Env = append(os.Environ(), "ROAMI_AGENT_CLI="+binary)
@@ -340,4 +335,17 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 		return raw, fmt.Errorf("agent HTTP %d", response.StatusCode)
 	}
 	return raw, nil
+}
+
+func agentRuntimeArgs(p agentruntime.Paths, initialize bool, channel string) []string {
+	args := []string{"-m", "roami_agent.app", "--data-root", p.Storage.Data, "--database", p.Database, "--config", p.Config}
+	if channel == "development" {
+		args = append(args, "--development-rsi")
+	}
+	if initialize {
+		args = append(args, "--initialize")
+	} else {
+		args = append(args, "--socket", p.Socket)
+	}
+	return args
 }

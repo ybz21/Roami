@@ -2,7 +2,7 @@
 
 import json
 
-from roami_agent.improvement.contracts import require
+from roami_agent.improvement.contracts import evaluation_arms, require
 
 
 def complete_cycle_review(db, owner, cycle_id):
@@ -11,7 +11,7 @@ def complete_cycle_review(db, owner, cycle_id):
     ).fetchone()
     require(cycle is not None and cycle["state"] == "completed", "RSI_REVIEW_INCOMPLETE")
     manifest, report = json.loads(cycle["manifest_json"]), json.loads(cycle["report_json"])
-    expected = {arm + ":" + c for arm in ("baseline", "candidate") for c in manifest["case_ids"]}
+    expected = {arm + ":" + c for arm in evaluation_arms(manifest) for c in manifest["case_ids"]}
     reviews = {
         r["trial_key"]: json.loads(r["review_json"])
         for r in db.execute(

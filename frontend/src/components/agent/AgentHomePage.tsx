@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useI18n } from '../../i18n'
 import MobileSubPage from '../MobileSubPage'
 import AgentMemory from './AgentMemory'
@@ -6,6 +6,7 @@ import AgentTasks from './AgentTasks'
 import AgentInbox from './AgentInbox'
 import AgentDebug from './AgentDebug'
 import AgentImprovement from './AgentImprovement'
+import { useAgentData } from './useAgentData'
 import { backAgentPage, openAgentPage, type AgentPageRoute } from './agent-page-route'
 import type { AgentInboxState } from './useAgentInbox'
 import './agent-home-page.css'
@@ -17,6 +18,10 @@ export default function AgentHomePage({ page, node, inbox, projects, select, onS
   onSession: (id: string) => void; onChanged: () => void
 }) {
   const { t } = useI18n()
+  const rsi = useAgentData<{ developmentRsi: boolean }>(page.view === 'improvement' ? '/agent/status' : null, 60_000)
+  useEffect(() => {
+    if (page.view === 'improvement' && !rsi.loading && rsi.value?.developmentRsi !== true) backAgentPage(page)
+  }, [page, rsi.loading, rsi.value])
   const scroll = useRef<HTMLElement>(null), listScroll = useRef(0)
   useLayoutEffect(() => { if (scroll.current) scroll.current.scrollTop = page.task ? 0 : listScroll.current }, [page.task])
   const parts = page.origin.split('/')
@@ -28,7 +33,7 @@ export default function AgentHomePage({ page, node, inbox, projects, select, onS
       {page.view === 'memory' && <AgentMemory cid={cid} projects={projects} select={select} />}
       {page.view === 'notifications' && <AgentInbox inbox={inbox} select={select} />}
       {page.view === 'debug' && <AgentDebug cid={cid} branch={parts[2] ? decodeURIComponent(parts[2]) : ''} node={node} selected={page.task} unavailable={inbox.unavailable} onSelect={value => openAgentPage('debug', value)} />}
-      {page.view === 'improvement' && <AgentImprovement node={node} />}
+      {page.view === 'improvement' && rsi.value?.developmentRsi === true && <AgentImprovement node={node} />}
     </section>
   </MobileSubPage>
 }

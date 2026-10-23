@@ -390,7 +390,7 @@ async def test_real_runtime_file_tools_are_graded_and_ledger_repeated_cycle_is_i
 
 
 async def test_improvement_http_is_owner_scoped_and_omits_hidden_trial_content(store):
-    runtime = Runtime(store, UsageModel(None))
+    runtime = Runtime(store, UsageModel(None), development_rsi=True)
     ledger = runtime.improvement.ledger
     manifest = {"reserved_tokens": 100, "reserved_episodes": 2, "machine": {"id": "local"}}
     identifier, _ = ledger.reserve(

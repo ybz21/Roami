@@ -234,3 +234,37 @@ async def test_external_worker_log_limit_preserves_bounded_output_and_does_not_h
     with pytest.raises(DomainError, match="LOG_TOO_LARGE"):
         await asyncio.wait_for(executor.run(case, {}, root), timeout=5)
     assert 0 < (root / "worker-stdout.log").stat().st_size <= 4_000_000
+
+
+async def test_single_baseline_keeps_every_case_and_log_without_duplicate_trials(tmp_path):
+    executor = RegressionExecutor(reservation=10)
+    arguments = {
+        **cycle_arguments(tmp_path, executor),
+        "daily_tokens": 600,
+        "daily_episodes": 60,
+        "paired": False,
+    }
+    result = await run_cycle(**arguments)
+    assert executor.calls == 60
+    assert result["full_suite_complete"] and result["review"]["expected_trials"] == 60
+    assert result["review"]["logs_reviewed"] == result["review"]["metrics_reviewed"] == 60
+    assert set(result["counts"]) == {"baseline"}
+    assert result["comparison"]["pairs"] == 0 and not result["comparison"]["eligible_for_promotion"]
+    cycle = arguments["ledger"].get("local", result["cycle_id"])
+    assert cycle["manifest"]["trial_arms"] == ["baseline"]
+    assert cycle["manifest"]["reserved_tokens"] == 600
+    assert cycle["manifest"]["reserved_episodes"] == 60
+    assert not (await run_cycle(**arguments))["admitted"] and executor.calls == 60
+
+
+async def test_changed_policy_cannot_skip_its_paired_comparison(tmp_path):
+    executor = RegressionExecutor()
+    with pytest.raises(DomainError, match="COMPARISON_REQUIRED"):
+        await run_cycle(
+            **{
+                **cycle_arguments(tmp_path, executor),
+                "paired": False,
+                "candidate": {"memory_recall_tokens": 1500},
+            }
+        )
+    assert executor.calls == 0
