@@ -72,6 +72,7 @@ def judge_case(case, output, workspace):
         "media",
         "swe",
         "slides",
+        "long_memory",
     }:
         return {
             **quality(dict.fromkeys(DIMENSIONS, 0), hard_passed=True, pending=True),

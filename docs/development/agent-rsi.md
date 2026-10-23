@@ -152,13 +152,13 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 
 正式准入使用 `daily_suite.py` 的固定配额：公开20、自有真实20、机制20，核对指定自有ID、唯一上游任务和不可变revision。调度、周期完成和源码晋级使用同一检查；只有60条记录不能通过。新增 `assemble-daily --id NAME --suite PACK ... --output FILE` 合并各包，不满足合同则拒绝写出。
 
-公开19个task ID已选择，其中16项是可执行合同；另4项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
+公开19个task ID已选择，其中17项是可执行合同；另3项正式合同仍待环境/适配（含未获访问的GAIA）。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
 
 ```bash
-python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials
+python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials --max-total-bytes 1500000000
 ```
 
-下载器核对长度与SHA256，默认总量上限256MB，可用`--only mlagentbench`筛选来源。它不执行上游脚本、注册套件或接受受限访问条件。SpreadsheetBench适配显式检查单工作簿保存值、原有单元格和取消合并；不自动重算公式、不称作官方OJ成绩。
+下载器核对长度与SHA256，默认总量上限256MB；完整材料现含1.2GB轨迹池，须显式指定上面的大文件额度，可用`--only mlagentbench`筛选来源。它不执行上游脚本、注册套件或接受受限访问条件。SpreadsheetBench适配显式检查单工作簿保存值、原有单元格和取消合并；不自动重算公式、不称作官方OJ成绩。
 
 ```bash
 cd agent-runtime
@@ -186,7 +186,7 @@ uv run roami-agent-evaluate evaluation-status --ledger /private/evaluation/ledge
 uv run roami-agent-evaluate evaluation-config --ledger /private/evaluation/ledger.sqlite3 --owner local --config /private/evaluation-settings.json
 ```
 
-`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备56项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。该401来自未获得凭证的隔离CLI；主服务只读接口显示Main/Worker均keyConfigured=true，不能据此断言主服务密钥失效。正式评测由开发服务内Worker共享运行配置，不提取进程环境、不在聊天或仓库传密钥。
+`evaluation-config` 使用状态中的完整preferences与revision，沿用机器、套件、额度检查；没有完整60项不能开启。当前已备57项正式合同和54项私有代码契约，正式机器和每日额度尚未绑定。一次限额64000 Token的真实开发预检返回HTTP401，供应商未提供用量，按未知保留预留并停止，未自动重试。该401来自未获得凭证的隔离CLI；主服务只读接口显示Main/Worker均keyConfigured=true，不能据此断言主服务密钥失效。正式评测由开发服务内Worker共享运行配置，不提取进程环境、不在聊天或仓库传密钥。
 
 新增公开导入：`import-data-analysis --metadata DATA.json --archive DATA.zip --group-id ID --question-id questionN --revision DATA_COMMIT --upstream-revision CODE_COMMIT --output FILE`；`import-vectorization --source-dir TASK --revision COMMIT --output FILE`。DSBench保留原工作簿、背景和问题，使用独立精确JSON答案；MLAgentBench对现代NumPy做显式标量兼容，限定修改forward函数、核验数值，并以四组交替的宿主计时中位数检查90%时限。均为注明改造的内部合同，不声称官方分数或Roami收益；示范实现更快不等于Roami自身生成更快。
 
@@ -212,3 +212,10 @@ AgenticVBench导入：`import-media --kind assembly|repair --source-dir /path/to
 | `import-slides --metadata TASK.json --materials DIR --revision CODE_COMMIT --data-revision HF_COMMIT --output FILE` | 两项OSWorld原始PPT与参考差分；退出Agent后用原比较函数验证。参考只在独立判定器内可见，仅代表PPT状态提取，不代表桌面GUI或视觉优秀 |
 
 SWE任务可通过 `/workspace/project-python.py` 调用有次数、时间和输出上限的原生项目Python，不能访问Docker控制端。项目测试命令、输出和源码hash另存 `project-runtime-log.json`；缺此日志不算复盘完整。冻结suite统一读取上限256MB，56项诊断组合约127MB，已完成读取、私有集隔离及不完整正式准入的负向检查。
+
+
+LongMemEval-V2导入：`import-long-memory --questions questions.jsonl --haystacks lme_v2_small.json --trajectories trajectories.jsonl --verifier qa_eval_metrics.py --revision DATA_COMMIT --code-revision CODE_COMMIT --output FILE`。选定题`4ed01379`使用完整small haystack的100条原始文本轨迹（约94MB），不筛选答案相关记录；源池1,195,604,539字节，已核对官方LFS SHA256。输入压缩后准备到`history/`，顺序写入`history-index.json`，答案和原判定器不进入Agent视图。
+
+此题原短语判定无需付费Judge；RSI另查完整历史不被改动、严格最终短语、真实引用与表单邮件动作的支持证据，避免只包含正确词的错误答案通过。正确样例、5类错误样例和Main→Native Worker全历史检索演练均通过。此适配不含截图、记忆摄入、跨会话持久学习或官方查询延迟；演练使用确定性提供器，不报告真实模型收益。判定器代码固定在上游`2cc8c540bdb87fe6761629b585e727e1c4704520`，数据固定在`f152293e235517d504809563c833d7190b8c713b`。
+
+大文件下载按校验过的Content-Range分段，错位或截断即拒绝；不支持Range的服务器仅接受从头完整下载并核对总长/hash。既有大文件用流式hash复查，失败不留下有效半文件。完整57项诊断组合约140MB，读取、私有集隔离及不完整60项准入的负向检查均通过。

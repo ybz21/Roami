@@ -95,8 +95,35 @@ def validate_case(case):
             "vectorization",
             "swe",
             "slides",
+            "long_memory",
         }
     )
+    if judge["kind"] == "long_memory":
+        from roami_agent.improvement.long_memory import EVAL_SPEC, QUESTION_ID
+
+        require(judge.get("question_id") == QUESTION_ID and judge.get("eval_spec") == EVAL_SPEC)
+        require(isinstance(judge.get("expected"), str) and 0 < len(judge["expected"]) <= 4000)
+        require(isinstance(judge.get("verifier"), str) and 0 < len(judge["verifier"]) <= 200000)
+        require(
+            isinstance(judge.get("history_parts"), list) and 1 <= len(judge["history_parts"]) <= 6
+        )
+        require(len(set(judge["history_parts"])) == len(judge["history_parts"]))
+        require(all(p in case.get("asset_files", {}) for p in judge["history_parts"]))
+        require(bool(re.fullmatch(r"[a-f0-9]{64}", judge.get("packed_sha256", ""))))
+        records = judge.get("records")
+        require(isinstance(records, list) and len(records) == 100, "RSI_FULL_HISTORY_REQUIRED")
+        require(all(isinstance(r, dict) and set(r) == {"id", "bytes", "sha256"} for r in records))
+        require(
+            all(isinstance(r["id"], str) and re.fullmatch(r"[a-f0-9]{8}", r["id"]) for r in records)
+        )
+        require(len({r["id"] for r in records}) == 100, "RSI_FULL_HISTORY_REQUIRED")
+        require(all(type(r["bytes"]) is int and 0 < r["bytes"] <= 20000000 for r in records))
+        require(
+            all(
+                isinstance(r["sha256"], str) and re.fullmatch(r"[a-f0-9]{64}", r["sha256"])
+                for r in records
+            )
+        )
     if judge["kind"] == "slides":
         from roami_agent.improvement.slide_tasks import TASKS
 

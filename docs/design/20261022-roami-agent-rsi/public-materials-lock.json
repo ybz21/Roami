@@ -5,7 +5,7 @@
   "source_tasks_selected_in_this_lock": 15,
   "total_selected_with_financial_samples": 19,
   "public_target": 20,
-  "runnable_public_contracts": 16,
+  "runnable_public_contracts": 17,
   "source_selection_is_not_environment_acceptance": true,
   "sources": [
     {
@@ -509,7 +509,7 @@
       "selected_upstream_ids": [
         "4ed01379"
       ],
-      "status": "source_contract_locked_native_environment_and_adapter_pending",
+      "status": "one_complete100_textual_history_retrieval_contract_accepted_no_ingestion_or_screenshots",
       "files": [
         {
           "path": "longmemeval_v2/questions.jsonl",
@@ -524,8 +524,23 @@
           "sha256": "9b5301defb23a088a5f06e45ff8d5f35e569d78305a66d492046a9fff9b46593",
           "bytes": 822632,
           "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "longmemeval_v2/trajectories.jsonl",
+          "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/resolve/f152293e235517d504809563c833d7190b8c713b/trajectories.jsonl",
+          "sha256": "363cec9a8e87aa8d9101ce4e600aadbf7031d674056ebe4f969e8424abc5f3c6",
+          "bytes": 1195604539,
+          "exposure": "host_only_adapter_selects_all100_original_textual_trajectories_answer_and_metric_remain_host_only"
+        },
+        {
+          "path": "longmemeval_v2/qa_eval_metrics.py",
+          "url": "https://raw.githubusercontent.com/xiaowu0162/LongMemEval-V2/2cc8c540bdb87fe6761629b585e727e1c4704520/evaluation/qa_eval_metrics.py",
+          "sha256": "f8ba659e237c4282a07a92538090ea500ce8483820b390b1d19af187c01417ac",
+          "bytes": 20800,
+          "exposure": "host_only_adapter_selects_all100_original_textual_trajectories_answer_and_metric_remain_host_only"
         }
-      ]
+      ],
+      "code_revision": "2cc8c540bdb87fe6761629b585e727e1c4704520"
     },
     {
       "benchmark": "dsbench",
@@ -601,5 +616,6 @@
       "status": "gated_access_not_accepted",
       "files": []
     }
-  ]
+  ],
+  "large_materials_explicit_max_total_bytes": 1500000000
 }

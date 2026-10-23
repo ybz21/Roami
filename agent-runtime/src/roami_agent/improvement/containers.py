@@ -217,6 +217,10 @@ class ContainerExecutor:
                 from roami_agent.improvement.slide_tasks import grade_slides
 
                 grade = await grade_slides(case, workspace, self)
+            elif kind == "long_memory":
+                from roami_agent.improvement.long_memory import grade_long_memory
+
+                grade = await grade_long_memory(case, workspace, self)
             else:
                 grade = judge_case(case, output, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
@@ -242,6 +246,10 @@ class ContainerExecutor:
             from roami_agent.improvement.slide_tasks import prepare_slides
 
             await asyncio.to_thread(prepare_slides, case, workspace)
+        elif case["judge"]["kind"] == "long_memory":
+            from roami_agent.improvement.long_memory import prepare_history
+
+            await asyncio.to_thread(prepare_history, case, workspace)
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))

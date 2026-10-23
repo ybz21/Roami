@@ -32,6 +32,25 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "import-long-memory":
+        from roami_agent.improvement.long_memory import import_long_memory
+
+        suite = import_long_memory(
+            args.questions,
+            args.haystacks,
+            args.trajectories,
+            args.verifier,
+            revision=args.revision,
+            code_revision=args.code_revision,
+        )
+        private_json(args.output, suite)
+        return {
+            "suite": suite["id"],
+            "hash": suite["content_hash"],
+            "cases": 1,
+            "official_leaderboard_comparable": False,
+            "scope": "complete_textual_haystack_not_persisted_memory",
+        }
     if args.command == "import-slides":
         from roami_agent.improvement.slide_tasks import import_slides
 
@@ -387,6 +406,11 @@ def main():
     p.add_argument("--source-dir", required=True, type=Path)
     p.add_argument("--revision", required=True)
     p.add_argument("--output", required=True, type=Path)
+    p = commands.add_parser("import-long-memory")
+    for name in ("questions", "haystacks", "trajectories", "verifier", "output"):
+        p.add_argument("--" + name, required=True, type=Path)
+    for name in ("revision", "code-revision"):
+        p.add_argument("--" + name, required=True)
     p = commands.add_parser("import-slides")
     for name in ("metadata", "materials", "output"):
         p.add_argument("--" + name, required=True, type=Path)

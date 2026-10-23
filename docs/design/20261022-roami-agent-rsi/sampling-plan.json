@@ -108,7 +108,7 @@
         "4ed01379"
       ],
       "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
-      "status": "source_contract_locked_native_environment_and_adapter_pending"
+      "status": "complete100_textual_history_native_deterministic_grade_accepted_not_persisted_memory"
     },
     {
       "benchmark_id": "finqa",
@@ -248,13 +248,13 @@
     "development_only": true
   },
   "next_steps": [
-    "接齐剩余4项公开任务（公司环境2、长记忆1、GAIA访问1）；PPT两项仅覆盖文档状态，不覆盖GUI。",
+    "接齐剩余3项公开任务（公司环境2、GAIA访问1）；PPT只测文档状态，长记忆只测完整100条文本历史检索，不含记忆摄入或图片。",
     "为5项复杂产物接入独立校准评分，并扩充办公/GUI私有隐藏场景",
     "在开发服务内共享现有模型配置，绑定测试机及明确每日Token预算；完整套件齐全后才启用全60项",
     "回顾全部指标与原始日志，在预算内积累真实同机对照收益证据"
   ],
   "implementation": {
-    "public_materialized": 16,
+    "public_materialized": 17,
     "authored_selected_materialized": 40,
     "protocol_smoke_cases": 2,
     "active_machine_bindings": 0,

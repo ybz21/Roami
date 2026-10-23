@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "16_public_contracts_imported_no_completed_live_agent_benchmark",
-  "materialized_public": 16,
+  "status": "17_public_contracts_imported_no_completed_live_agent_benchmark",
+  "materialized_public": 17,
   "target_public": 20,
   "sampled_on": "2026-10-23",
   "suites": [
@@ -431,6 +431,30 @@
       ],
       "official_leaderboard_comparable": false,
       "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "longmemeval-v2-4ed01379-textual-v1",
+      "suite_hash": "ded9a4328b717247d07cc696d9465555d3f8fff3ec4a90b7e6ae391bb5a15c60",
+      "benchmark": "longmemeval_v2",
+      "source_revision": "f152293e235517d504809563c833d7190b8c713b",
+      "selected": [
+        {
+          "case_id": "longmemeval-v2:4ed01379",
+          "benchmark": "longmemeval_v2",
+          "task_id": "4ed01379",
+          "revision": "f152293e235517d504809563c833d7190b8c713b",
+          "code_revision": "2cc8c540bdb87fe6761629b585e727e1c4704520",
+          "source_split": "small:enterprise:static-environment",
+          "input_sha256": "be12a68ad99f2f4a68e3d69638135bdc8e9b73d168b761c5e5a5ec9f7db9776e",
+          "source_trajectories_sha256": "363cec9a8e87aa8d9101ce4e600aadbf7031d674056ebe4f969e8424abc5f3c6",
+          "verifier_sha256": "f8ba659e237c4282a07a92538090ea500ce8483820b390b1d19af187c01417ac",
+          "adapter_revision": "textual-complete-small-haystack-v1",
+          "adapted": true,
+          "adaptation": "All100 original small-tier textual trajectories and original deterministic metric; no screenshots, memory ingestion, persisted learning or official latency comparison. Added exact final-answer and citation-integrity gates."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "full100_textual_trajectories_reference_and5_negatives_and_scripted_Main_Worker_not_real_Agent_memory_ability"
     }
   ]
 }
