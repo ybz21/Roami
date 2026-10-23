@@ -4,6 +4,7 @@ import json
 import re
 
 from roami_agent.conversation.activity import conversation_activity
+from roami_agent.conversation.professional_activity import professional_payload
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import history, owned
@@ -54,7 +55,9 @@ def activity_payload(db, owner, cid, aid, branch_id=None, *, task_id=None):
         raise DomainError("ACTIVITY_NOT_FOUND", 404)
     kind, _, ident = aid.partition(":")
     output = None
-    if kind == "tool":
+    if kind == "capability":
+        arguments, output = professional_payload(db, aid)
+    elif kind == "tool":
         call = row(
             db,
             "SELECT tc.*,m.content_json AS output_json,m.deleted_ms AS output_deleted,m.status AS output_status "

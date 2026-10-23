@@ -6,10 +6,19 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestCapabilityDownloadUsesBoundedLongerHeaderBudget(t *testing.T) {
+	proxy := Proxy("/tmp/unused-roami-test.sock").(*httputil.ReverseProxy)
+	transport := proxy.Transport.(capabilityTransport)
+	if transport.standard.ResponseHeaderTimeout != 15*time.Second || transport.marketplace.ResponseHeaderTimeout != 100*time.Second {
+		t.Fatal("ordinary requests and capability downloads must keep distinct bounded budgets")
+	}
+}
 
 func TestProxyIdentityStreamingAndPath(t *testing.T) {
 	socket := filepath.Join(t.TempDir(), "agent.sock")

@@ -64,7 +64,11 @@ def register_skills(registry, settings):
                 if not reference:
                     raise DomainError("SKILL_REFERENCE_NOT_FOUND", 404)
                 return {**reference, "skillVersion": value["version"]}
-            return {"text": value["text"], "version": value["version"]}
+            return {
+                "text": value["text"],
+                "version": value["version"],
+                **({"packagePath": value["packagePath"]} if value.get("packagePath") else {}),
+            }
 
         registry.add(
             Tool(
@@ -76,7 +80,7 @@ def register_skills(registry, settings):
                         "name": {"type": "string", "enum": [*skills, *SKILL_ALIASES]},
                         "reference": {
                             "type": "string",
-                            "pattern": r"^references/[a-zA-Z0-9_-]+\.md$",
+                            "pattern": r"^[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*$",
                         },
                     },
                     ["name"],

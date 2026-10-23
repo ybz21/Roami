@@ -1,4 +1,8 @@
 {
+  "market_sources": ["agent", "capability", "market", "sources"],
+  "market_search": ["agent", "capability", "market", "search"],
+  "market_preview": ["agent", "capability", "market", "preview"],
+  "market_install": ["agent", "capability", "market", "install"],
   "workspace_overview": [
     "project",
     "overview"

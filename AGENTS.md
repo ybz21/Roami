@@ -1002,3 +1002,65 @@ scripts/dev/selftest/agent-install.sh 全新／重复／失败安装回归</pre>
   <p>隔离复现记录：/tmp/roami-settings-diagnosis-6bzq3vf4/results.json。只有 Go 主程序时模型设置返回 503 AGENT_RUNTIME_UNAVAILABLE；补启运行时后，即使没有 agent.toml、模型地址和密钥，也返回 200。安装与守护实现已完成；公开版本尚未发布。</p>
   <p>Python 官方将 venv 定义为应在目标位置重建的环境：<a href="https://docs.python.org/3/library/venv.html">venv 文档</a>。独立 Python 发行版归档结构见 <a href="https://gregoryszorc.com/docs/python-build-standalone/main/distributions.html">python-build-standalone 文档</a>；固定 Python 管理方式见 <a href="https://docs.astral.sh/uv/guides/install-python/">uv Python 管理文档</a>。这些支持发行方式选择，不代表上述 Roami 安装实现已通过验收。</p>
 </section>
+
+<section id="capability-markets-design" lang="zh-CN">
+  <h1>开放能力市场与 MCP 传输接入 · 2026-10-23</h1>
+  <h2>产品设计</h2>
+  <p>能力中心新增“市场”，首批接入 skills.sh、官方 MCP Registry 和 npm。来源可启停、编辑服务地址，或新增兼容相同接口的来源。搜索按用户操作发起；结果展示名称、摘要、版本，查看时解析真实配置，再进入现有可编辑确认表单。导入成功后在 Skill、MCP、CLI 原分类管理；保留来源、固定版本和 Skill 附件，不覆盖重名项。MCP 不因浏览或保存而启动；CLI 明示首次调用由 npx 下载固定版本，参数使用 args 数组。</p>
+  <p>MCP 的本地程序、SSE、Streamable HTTP 三种传输均可新建、编辑、导入、连接和调用。type 与 transport 冲突时拒绝导入；保留现有 HTTPS、凭证环境变量引用、取消和连接生命周期边界。手机详情与来源配置复用全屏 MobileSubPage，表单滚动和保存栏沿用现有令牌。</p>
+  <h2>用户故事</h2>
+  <ol>
+    <li>我能搜索公开技能，查看上游来源和固定提交，确认后保留指令、引用文档、脚本和附件，重启后继续使用。</li>
+    <li>我能从官方 MCP 目录选择 SSE、Streamable HTTP 或支持的 npm／PyPI 本地程序配置，修改名称、参数和凭证环境变量引用后保存，再显式连接。</li>
+    <li>我能从 npm 查找具有命令行入口的软件包，固定版本并注册；普通库没有入口时给出明确提示，不假装可调用。</li>
+    <li>我能停用市场来源而不删除已导入能力；主 Agent、后台工作 Agent 与平台派发的 Codex／Claude 任务共用已安装能力和停用策略，专业任务也能读取 Skill 附件和调用 MCP／CLI。</li>
+    <li>我能在手机完成市场搜索、来源配置、详情、确认导入与返回，失败保留输入和最近结果。</li>
+  </ol>
+  <h2>技术设计</h2>
+  <pre>frontend/src/components/capabilities/
+  CapabilityMarket.tsx       按需搜索、结果分页、接入选项和导入确认
+  MarketSources.tsx          来源配置、启停和完整替换
+  CapabilityEditor.tsx       复用导入表单，保留来源、附件与参数模式
+agent-runtime/src/roami_agent/server/
+  capability_markets.py      所有者检查、私有来源配置、请求合并与缓存
+  market_catalogs.py         skills.sh／MCP Registry／npm 只读适配
+  skill_package.py           有界附件验证、不可变包目录与完整性校验
+  capability_imports.py      原有原子注册、启停及恢复；新增附件与 argv 参数模式
+  http.py                    私有接口，由原 Go 登录网关转发
+agent-runtime/src/roami_agent/tools/mcp.py
+                             SDK stdio／SSE／Streamable HTTP，统一连接 actor</pre>
+  <p>GET／PUT /api/agent/capability-markets 管理来源，GET /api/agent/capability-markets/{source}/search 按需搜索，POST /api/agent/capability-markets/preview 获取待确认导入项。来源配置私有文件 0600，原子替换；禁用来源拒绝新查询。目录请求最多四个并行，合并同请求、缓存一分钟，不新增常驻轮询；关闭运行时取消所有目录请求。</p>
+  <p>GitHub 技能按固定提交下载，拒绝符号链接、路径穿越和冲突路径，最多 100 个文件、384000 字节，保留仓库许可证。附件随注册数据保存，运行时只读副本按内容散列放在节点 agents/capability-packages 下；旧版本保留以免破坏正在运行的任务。单个带附件的 Skill 请求最多 600000 字节，总目录仍最多 1 MiB。脚本不在导入时执行，后续运行继续经过已有工作目录与进程权限边界。npm 只从包元信息中的 bin 登记命令，固定版本并以 argv 数组调用。</p>
+  <p>平台主 Agent、后台工作 Agent 和托管专业任务使用同一注册表。Codex／Claude 任务通过任务级 CLI 入口读取 Skill 和引用、发现 MCP 工具、调用已注册 MCP／CLI；不用为各专业程序另装一份能力。专业程序原有的全局配置继续由其自身管理。Docker／MCPB 和需 OAuth 的条目不伪报已接入；不支持的包装格式明确报告。</p>
+  <h3>专业任务接入</h3>
+  <pre>executors/roami_cli.py → tools/professional_capabilities.py
+  派发提示携带只读目录命令及私有上下文文件路径
+cmd/roami/agent-capability.go
+  list／show；read／call --context FILE --call REQUEST_ID
+server/http.py → ProfessionalCapabilities → Tools.invoke
+  校验签名、所有者、运行中任务／尝试、版本、来源和预算
+  复用能力启停、参数 Schema、MCP actor、CLI 工作目录与产物外置
+conversation/professional_activity.py
+  持久执行回执进入现有任务记录及按需详情，沿用秘密字段打码</pre>
+  <p>每次专业派发生成 0600 上下文文件，服务端以节点私有密钥签名；提示仅包含路径，不包含签名。上下文绑定所有者、任务、尝试和版本，取消、完成、来源忘记、排队改派或预算到期即拒绝新调用。只允许 Skill 读取、MCP 发现和外部注册操作，不借此开放内部调度工具。执行期间持续复验任务状态，撤销时取消底层操作。</p>
+  <p>请求号在执行前原子登记到已有事件存储；相同号和参数返回原回执，不重跑。参数冲突拒绝，进行中或进程重启后的未完成调用保持未知结果，不能自动重放。每个任务最多 1024 次登记、每节点最多 16 个并发、单次最多 90 秒；CLI 等待预算为 100 秒。完成结果与失败进入任务执行记录，主聊天仍只显示任务进度和可行动阻塞。</p>
+  <h3>CLI 与 Roami 自主接入 · 2026-10-23</h3>
+  <p>终端增加 roami agent capability market sources／search／preview／install，JSON 参数与现有命令族一致。主 Agent 与普通 Worker 通过同一动态 CLI 目录按需发现；专业任务可使用自己的 --context 与 --call。研究只读角色不开放安装。市场指令与描述作为待审阅数据，只有用户要求安装时才执行 install。</p>
+  <p>server/market_installations.py 保存最多 32 份、十分钟有效的固定版本预览，CLI 只返回说明摘要、附件名和完整配置，不把附件 Base64 放入模型上下文。安装以 previewId／option／可选 name 选择原包，复用托管注册、名称冲突和原子保存；失败保留预览。来源停用或改址、预览过期均拒绝继续安装；相同选择重试返回同一回执，被编辑或移除后报冲突。sources／search／preview 为读取，install 为写入，沿用当前调用上下文、任务撤销和执行记录。MCP 保持未连接，CLI 首次调用下载的规则保持一致。</p>
+  <p>实现模块：tools/market_commands.py 注册按需工具；commands.json 维护公开路径；cmd/roami/agent-market.go 同时服务普通终端及已绑定的 Agent 调用；POST /api/agent/capability-markets/prepare 与 /install 复用登录网关。平台常驻模型 schema 数量保持原有基础工具集合。</p>
+  <h2>调研来源</h2>
+  <ul>
+    <li><a href="https://github.com/vercel-labs/skills">skills.sh 安装工具与公开源码</a></li>
+    <li><a href="https://modelcontextprotocol.io/registry/registry-aggregators">官方 MCP Registry 聚合接口</a></li>
+    <li><a href="https://github.com/openclaw/clawhub/blob/main/docs/http-api.md">ClawHub 公开搜索与下载 API（后续适配来源）</a></li>
+    <li><a href="https://skillsmp.com/developers">SkillsMP API（后续适配来源）</a></li>
+    <li><a href="https://smithery.ai/docs/api-reference/servers/download-server-bundle">Smithery 下载接口（后续适配来源）</a></li>
+    <li><a href="https://glama.ai/mcp/reference">Glama API 与署名要求（后续适配来源）</a></li>
+  </ul>
+  <h2>验收</h2>
+  <p>仓库 full 门禁通过，包含 Go 全量测试和 940 个运行时用例；前端 129 个文件、930 个用例通过，typecheck、i18n（3537 个键）、hover 与生产构建通过。最后对执行目录投影和 CLI 返回状态的调整另通过专业接入 12 个定向用例及 Go CLI 包全量测试。格式与静态检查通过，构建保留原有大块提示；最新完整日志为 /tmp/roami-market-quality-platform.log。</p>
+  <p>隔离 Go 登录网关与真实 Python 运行时已完成 skills.sh 上的 find-skills、官方目录中的 Context7 配置和 npm Prettier 固定版本导入。重载注册数据后，Prettier 实际输出 3.9.10，SSE 服务实际返回 market smoke。SDK 的 stdio 子进程、SSE 和 Streamable HTTP 实服均验证初始化、认证、发现及调用；来源禁用、重名、原子失败、重启恢复、附件路径与符号链接保护有回归覆盖。</p>
+  <p>Redmi Note 8 真机在 392 CSS px／coarse 下完成市场搜索、来源编辑保存、SSE 新建连接、真实手势滚动，以及 Vercel React Best Practices 的 76 个文件下载、修改名称、确认导入、Skill 详情与返回。只有一个二级页返回栏；列表手势由 0 滚至约 418px，文档保持 0，无横向溢出。键盘实测 314px，保存按钮高 44px、底边约 440px，位于 766px 视口的键盘上方并能真实点按。紧凑标签栏的市场项宽 44px，完整可见。</p>
+  <p>桌面检查 320、390、820、1100、1440 宽度，页面与文档无横向溢出，文档不滚动，浏览器无脚本错误；中文深色与英文浅色分别核对。证据与截图保存于 /tmp/roami-market-*，包括 live-evidence、call-evidence、phone-import-evidence、phone-sse-evidence 和 width-evidence。开发实例使用独立数据目录、数据库、Unix socket 与记录过身份的 tmux 服务；不部署到用户现用服务。</p>
+  <p>专业接入使用真实 Go CLI、私有 Unix socket、Python 运行时与隔离 tmux，Codex／Claude 的 TUI 使用确定性离线测试程序，不消耗模型调用。两类会话均从派发提示读取私有上下文，成功读取已导入 find-skills、执行固定版本 Prettier（3.9.10）、发现并调用真实 SSE 服务；每次任务的四个调用进入执行记录，重复请求返回同一回执，取消后的调用被拒绝。定向用例另覆盖上下文伪造、跨所有者、旧版本、已结束尝试、忘记来源、改派、停用、目录越界、并发重复、运行时关闭及重启恢复。原始证据为 /tmp/roami-market-professional-evidence.json；测试结束已关闭确切执行会话并通过隔离启动器清理私有 tmux 服务。</p>
+</section>

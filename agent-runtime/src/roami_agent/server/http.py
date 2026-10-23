@@ -84,15 +84,17 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.capability_settings.view(owner)
         return {"data": {"available": True, "maxBytes": 65536, "kinds": ["skills", "cli", "mcp"]}}
 
-    async def capability_payload(request):
+    async def capability_payload(request, maximum=65536):
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > 65536:
+            if len(body) > maximum:
                 raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
         try:
             return json.loads(body)
         except (ValueError, RecursionError):
+            if len(body) > 65536:
+                raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413) from None
             raise DomainError("INVALID_CAPABILITY_IMPORT") from None
 
     @app.post("/v1/capability-imports/{kind}")
@@ -102,7 +104,9 @@ def create_app(runtime, *, manage_lifecycle=True):
         ModelSettings.owner(owner)
         return {
             "data": await runtime.capability_imports.save(
-                owner, kind, await capability_payload(request)
+                owner,
+                kind,
+                await capability_payload(request, 600_000 if kind == "skills" else 65536),
             )
         }
 
@@ -113,7 +117,10 @@ def create_app(runtime, *, manage_lifecycle=True):
         ModelSettings.owner(owner)
         return {
             "data": await runtime.capability_imports.save(
-                owner, kind, await capability_payload(request), name
+                owner,
+                kind,
+                await capability_payload(request, 600_000 if kind == "skills" else 65536),
+                name,
             )
         }
 
@@ -145,6 +152,53 @@ def create_app(runtime, *, manage_lifecycle=True):
     ):
         runtime.capability_settings.view(owner)
         return {"data": runtime.tools.directory.list(query, kind, limit, "worker", offset=offset)}
+
+    @app.get("/v1/capability-markets")
+    async def markets(owner: Owner):
+        return {"data": runtime.capability_markets.view(owner)}
+
+    @app.put("/v1/capability-markets")
+    async def save_markets(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.save(owner, await capability_payload(request))
+        }
+
+    @app.get("/v1/capability-markets/{source}/search")
+    async def search_market(
+        source: str,
+        owner: Owner,
+        query: str = Query(min_length=1, max_length=200),
+        cursor: str = Query(default="", max_length=1000),
+    ):
+        return {"data": await runtime.capability_markets.search(owner, source, query, cursor)}
+
+    @app.post("/v1/capability-markets/preview")
+    async def preview_market(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.preview(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/prepare")
+    async def prepare_market_install(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.prepare(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/install")
+    async def install_market_option(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.install(
+                owner, await capability_payload(request)
+            )
+        }
 
     @app.get("/v1/traces")
     async def execution_trace(
@@ -229,6 +283,8 @@ def create_app(runtime, *, manage_lifecycle=True):
             payload = json.loads(body)
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
+        if isinstance(payload, dict) and "executionContext" in payload:
+            return {"data": await runtime.professional_capabilities.call(name, payload, owner)}
         return {"data": await runtime.cli_commands.call(name, payload, owner)}
 
     @app.get("/v1/capability-settings")

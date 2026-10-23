@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
@@ -350,6 +351,11 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	marketRequest := strings.HasPrefix(path, "/v1/capability-markets")
+	if marketRequest || method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
+		cancel()
+		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+	}
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, "http://roami-agent"+path, bytes.NewReader(data))
 	if err != nil {
@@ -358,6 +364,9 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Roami-Owner", "local")
 	transport := agentruntime.Transport(socket)
+	if marketRequest || method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
+		transport.ResponseHeaderTimeout = 100 * time.Second
+	}
 	defer transport.CloseIdleConnections()
 	response, err := (&http.Client{Transport: transport}).Do(req)
 	if err != nil {

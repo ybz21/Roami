@@ -24,6 +24,9 @@ func boundCommand(args []string) (string, string, bool) {
 }
 
 func runBoundCommand(args []string) (bool, int) {
+	if len(args) >= 3 && slices.Equal(args[:3], []string{"agent", "capability", "market"}) {
+		return false, 0
+	}
 	name, input, matched := boundCommand(args)
 	if !matched {
 		return false, 0
