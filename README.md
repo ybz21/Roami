@@ -2,12 +2,20 @@
 
 **English** | [Simplified Chinese](README.zh-CN.md)
 
-> **Turn your development machines into an always-on AI coding workstation.**
+> **Command your AI agents. From anywhere.**
 
 **Roami** lets you **connect back to your own development machines from anywhere,
 at any time, using a phone, tablet, or laptop.** You can keep coding, run tests,
-watch logs, debug in a browser, and supervise Claude Code, Codex, or other AI
-coding agents while the real work continues on the machine that owns it.
+watch logs, debug in a browser, and manage Claude Code, Codex, OpenCode, Pi,
+and other AI coding agents from one console while the real work continues on
+your development machines. Check progress, send instructions, and take over a
+live terminal without being at your desk.
+
+<p align="center">
+  <img src="docs/assets/roami-agent-gods.webp" width="520" alt="Roami wielding a smartphone to command the gods of Codex, Claude Code, OpenCode, and Pi">
+</p>
+
+<p align="center"><strong>Your phone is the remote. Your agents keep working.</strong></p>
 
 It solves a concrete problem: **complex development work should not be broken
 apart by your device, network, or schedule.** Your code, terminals, dev
