@@ -23,7 +23,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 archive = Path(sys.argv[1]).resolve()
 assert archive.is_file() and Path(str(archive) + ".sha256").is_file()
-root = Path(tempfile.mkdtemp(prefix="roami-install-test-"))
+root = Path(tempfile.mkdtemp(prefix="roami-install-test-")).resolve()
 root.chmod(0o700)
 (root / "user-home").mkdir()
 launcher = ["bash", str(REPO / "scripts/dev/isolated-roami.sh"), str(root)]
