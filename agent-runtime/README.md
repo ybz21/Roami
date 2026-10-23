@@ -10,6 +10,8 @@ Installation prepares and probes a new release before activation, fences mutatio
 
 Build with `bash scripts/build/build-agent-bundle.sh` after the native Go/frontend build. Release CI builds and runs the complete installer on Linux amd64/arm64 and macOS Intel/Apple Silicon before publishing any assets. `bash scripts/dev/selftest/agent-install.sh <archive>` exercises curl-to-bash installation with no Python/uv/Go/Node on PATH and fixture service managers; it never changes host services.
 
+Intel macOS bundles build the locked cryptography source with Rust and statically linked OpenSSL on the release builder because upstream no longer publishes Intel wheels. OpenSSL source is checksum-pinned; `otool` rejects external dynamic library dependencies. Build inputs remain in `requirements.lock.txt`; `requirements.txt` pins the produced platform wheels. End-user installation still needs no compiler or OpenSSL installation.
+
 ## Development and verification
 
 ```sh

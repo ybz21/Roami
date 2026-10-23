@@ -929,7 +929,8 @@ server/http.py → Go /api/agent 网关 → 上述目录与详情服务</pre>
   bin/roami                     Go 主程序，继续内嵌前端
   runtime/python/               固定构建的 CPython 3.12 独立发行版
   runtime/wheels/               roami_agent 及全部生产依赖 wheel
-  runtime/requirements.txt       从 uv.lock 导出的精确版本与 wheel 哈希
+  runtime/requirements.lock.txt  从 uv.lock 导出的构建输入与上游哈希
+  runtime/requirements.txt       当前平台实际 wheel 的精确版本与哈希
   runtime/pyproject.toml         运行时识别与构建元数据
   manifest.json                 版本、源提交、目标平台、文件哈希、Python 构建、协议版本
   licenses/                     Python 与依赖发行许可
@@ -984,6 +985,7 @@ scripts/dev/selftest/agent-install.sh 全新／重复／失败安装回归</pre>
   </ul>
   <h3>实施修订与验收 · 2026-10-23</h3>
   <p>完整包固定 CPython 3.12.13，发布 CI 固定 uv 0.11.2。应用构建为普通 wheel，生产依赖从 uv.lock 导出并带哈希；包内携带 wheel、Python 及许可，目标机通过包内 Python 的 venv／pip 离线创建环境，不依赖系统 Python 或目标机 uv。实际目录为 releases/&lt;archive-sha256&gt;，安装完成后不移动环境。</p>
+  <p>原生 CI 发现的兼容修订：macOS 的 /var 与 /private/var 是同一目录，安装测试根统一解析真实路径。cryptography 49 起停止发布 Intel Mac wheel；Intel 构建机使用锁定源码构建当前版本，静态链接经固定 SHA-256 验证的 OpenSSL 3.5.9，部署目标为 macOS 11，随包保留 OpenSSL 许可。构建后用 otool 拒绝系统目录之外的动态库依赖，不要求用户安装 Rust、OpenSSL 或 Homebrew 库。构建输入保留原锁定哈希，目标安装清单由实际 wheel 生成并使用产物哈希；编译仅发生在构建机。</p>
   <p>Go 的 install-bundle 实现安全解包、拒绝链接与越界路径、平台／版本及逐文件哈希校验、运行环境准备和原子指针切换；激活失败恢复原指针，旧裸二进制另行保留。install-probe 使用临时存储与本地模型目录 fixture 验证设置读取、保存和重启恢复。已有环境不会被原地覆盖；升级通过私有 quiesce 入口检查在途工作并短暂停止新写入，失败／超时恢复接收请求，私有入口不公开挂载。</p>
   <p>Go 监督 Python 子进程并在异常退出后指数退避重启；就绪后停止探测定时器，常态不增加健康轮询。继承的存活管道在父进程正常退出或崩溃时通知子进程退出，Python 继续使用原有独占数据库锁。systemd／launchd 负责启动和重启 Go；Linux 保留 KillMode=process，避免重启控制台时杀掉用户 tmux 会话。独立手工运行时保持原归属，安装时要求先停止，不自动接管。</p>
   <p>Unix socket 改为同实例数据目录下的确定路径，不再因交互 shell 与服务的 XDG_RUNTIME_DIR 不同而失联；超长路径使用 /tmp 下按用户隔离、校验所有者与 0700 权限的短目录。内置智能体读取设置不需要先配置模型。运行时不可用时前端显示已有“暂时无法连接智能体”文案，不再提示用户检查模型地址和密钥。</p>

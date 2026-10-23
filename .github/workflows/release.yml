@@ -48,6 +48,9 @@ jobs:
         with:
           name: frontend
           path: frontend/dist
+      - name: Prepare Intel macOS wheel compiler
+        if: matrix.target == 'darwin-amd64'
+        run: command -v rustc || brew install rust
       - name: Build native binary and complete Python runtime
         env:
           SKIP_FRONTEND: '1'
