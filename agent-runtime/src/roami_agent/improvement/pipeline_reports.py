@@ -38,7 +38,8 @@ class RunCosts:
 
     def reserve_operation(self, owner, day, key, tokens):
         require(owner == self.owner, "RSI_RUN_NOT_FOUND")
-        snapshot = self.records.get(owner, self.run_id)["snapshot"]
+        value = self.records.get(owner, self.run_id)
+        snapshot = value["snapshot"]
         cap = snapshot["pipeline"]["codex_tokens"] * 2
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -50,6 +51,20 @@ class RunCosts:
                     row["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION"
                 )
                 return json.loads(row["result_json"])
+            summary = value["summary"] or {}
+            require(
+                all(
+                    summary.get(key, 0) is not None
+                    for key in ("generation_tokens", "artifact_review_tokens")
+                ),
+                "RSI_USAGE_UNKNOWN",
+            )
+            require(
+                not db.execute(
+                    "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND state='unknown'", (owner,)
+                ).fetchone(),
+                "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
+            )
             require(not snapshot.get("imported"), "RSI_DAILY_BUDGET")
             rows = db.execute(
                 "SELECT * FROM rsi_pipeline_costs WHERE owner=? AND run_id=?", (owner, self.run_id)

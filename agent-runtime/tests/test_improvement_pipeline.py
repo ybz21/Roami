@@ -225,3 +225,139 @@ def test_empty_baseline_is_rejected_before_diagnostic_admission(tmp_path):
         enqueue_diagnostic(service, "local", {"request_key": "bad", "baseline_run": run_id})
     with service.ledger.connection() as db:
         assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
+
+
+def test_memory_route_is_optional_frozen_and_validated(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    old = service.runs.settings("local")
+    legacy = {k: v for k, v in old.items() if k not in {"memory_model", "memory_reasoning_effort"}}
+    current = service.runs.configure("local", legacy)
+    result = service.runs.configure(
+        "local", {**current, "memory_model": "glm-5.3-flash", "memory_reasoning_effort": "low"}
+    )
+    assert result["memory_model"] == "glm-5.3-flash"
+    with pytest.raises(DomainError, match="INVALID_SETTINGS"):
+        service.runs.configure("local", {**result, "memory_model": "bad\nmodel"})
+
+
+def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_again(
+    tmp_path, monkeypatch
+):
+    from types import SimpleNamespace
+
+    from roami_agent.improvement.contracts import freeze_suite, load_suite
+    from roami_agent.server.configuration import Settings
+
+    service = ImprovementStatus(tmp_path)
+    service.control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    base = load_suite(suite_file(tmp_path))["cases"][0]
+    suite = freeze_suite("rated", [{**base, "id": name} for name in ("DOC-05", "DEMO-01")])
+    path = tmp_path / "rated.json"
+    path.write_text(json.dumps(suite))
+    service.control.register_suite("local", path)
+    prefs = service.control.preferences("local")
+    service.control.save("local", {**prefs, "suite_id": "rated", "machine_ids": ["a"]})
+    monkeypatch.setattr(
+        "roami_agent.improvement.artifact_review.ArtifactReviewer.load",
+        lambda *args: SimpleNamespace(
+            content_hash="qualified-rater", profile={"max_tokens": 50000}
+        ),
+    )
+    first = enqueue_diagnostic(
+        service,
+        "local",
+        {"request_key": "rated-one", "case_ids": ["DOC-05", "DEMO-01"]},
+        Settings(),
+    )
+    run = service.runs.get("local", first["id"])
+    assert run["snapshot"]["artifact_review"] == {
+        "hash": "qualified-rater",
+        "reservation_tokens": 100000,
+    }
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 528000
+        db.execute(
+            "INSERT INTO rsi_operation_costs VALUES('unknown','local','today',100,'unknown',NULL)"
+        )
+    assert (
+        enqueue_diagnostic(
+            service, "local", {"request_key": "rated-one", "case_ids": ["DOC-05", "DEMO-01"]}
+        )
+        == first
+    )
+    with pytest.raises(DomainError, match="RECONCILIATION"):
+        enqueue_diagnostic(
+            service, "local", {"request_key": "new", "case_ids": ["DOC-05"]}, Settings()
+        )
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 528000
+
+
+@pytest.mark.parametrize("field", ["generation_tokens", "artifact_review_tokens"])
+def test_unknown_evaluation_usage_blocks_paid_codex_review(tmp_path, field):
+    service, run_id = setup_run(tmp_path)
+    service.runs.set_state("local", run_id, "report_queued", {field: None})
+    costs = RunCosts(service.runs, "local", run_id)
+    with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):
+        costs.reserve_operation("local", "today", "review", 64000)
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM rsi_pipeline_costs").fetchone()[0] == 0
+
+
+def test_unknown_calibration_blocks_paid_codex_review(tmp_path):
+    service, run_id = setup_run(tmp_path)
+    with service.ledger.connection() as db:
+        db.execute(
+            "INSERT INTO rsi_operation_costs VALUES('calibration','local','today',100,'unknown',NULL)"
+        )
+    with pytest.raises(DomainError, match="RECONCILIATION"):
+        RunCosts(service.runs, "local", run_id).reserve_operation("local", "today", "review", 64000)
+
+
+@pytest.mark.asyncio
+async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monkeypatch):
+    from roami_agent.improvement.contracts import freeze_suite, load_suite
+    from roami_agent.improvement.pipeline_runner import execute_diagnostic
+    from roami_agent.server.configuration import Settings
+
+    service = ImprovementStatus(tmp_path)
+    service.control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    base = load_suite(suite_file(tmp_path))["cases"][0]
+    path = tmp_path / "two.json"
+    path.write_text(json.dumps(freeze_suite("two", [{**base, "id": name} for name in ("a", "b")])))
+    service.control.register_suite("local", path)
+    service.control.save(
+        "local", {**service.control.preferences("local"), "suite_id": "two", "machine_ids": ["a"]}
+    )
+    run = enqueue_diagnostic(service, "local", {"request_key": "two", "case_ids": ["a", "b"]})
+    calls = []
+
+    class Executor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def preflight(self):
+            return {}
+
+        async def run(self, case, policy, target):
+            calls.append(case["id"])
+            return {
+                "grade": {"passed": False},
+                "metrics": {"tokens": None, "artifact_review_tokens": None},
+            }
+
+    monkeypatch.setattr("roami_agent.improvement.containers.ContainerExecutor", Executor)
+    await execute_diagnostic(
+        SimpleNamespace(settings=SimpleNamespace(current=Settings())),
+        service,
+        service.control.claim(),
+    )
+    value = service.runs.get("local", run["id"])
+    assert calls == ["a"]
+    assert value["summary"]["artifact_review_tokens"] is None
+    assert value["cases"][1]["signals"] == ["RSI_USAGE_UNKNOWN"]
+    assert next(n for n in value["nodes"] if n["node"] == "evaluate")["state"] == "blocked"

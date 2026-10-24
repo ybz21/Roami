@@ -973,3 +973,44 @@ async def test_task_status_revalidates_forgetting_before_tool_result_commit(stor
         assert "contextExcluded" in tool["content_json"]
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "error,terminal",
+    [
+        ("MODEL_OUTPUT_LENGTH", True),
+        ("MODEL_OUTPUT_CONTENT_FILTER", True),
+        ("MODEL_HTTP_503", False),
+    ],
+)
+async def test_extraction_does_not_repeat_nonrecoverable_generation(store, error, terminal):
+    class FaultyMemory:
+        model = "fixture-memory-failure"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            yield ModelEvent("usage", {"input_tokens": 12, "output_tokens": 8})
+            raise DomainError(error)
+
+    extractor = FaultyMemory()
+    runtime = Runtime(store, ConversationModel(), memory_model=extractor)
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        await runtime.chat.submit(
+            "alice", conversation["id"], "one", "Use a separate worktree for this project"
+        )
+        expected = "failed" if terminal else "queued"
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='memory.extract' AND state=? AND attempts=1",
+                (expected,),
+            ),
+        )
+        assert extractor.calls == 1
+        assert await runtime.memory.candidates("alice") == []
+    finally:
+        await runtime.close()

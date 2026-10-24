@@ -164,3 +164,11 @@ async def test_backtest_fix_must_match_recomputed_causal_result(tmp_path):
     (tmp_path / "corrected.json").write_text(json.dumps(case["judge"]["corrected_expected"]))
     # A correct-looking submitted file still fails when the independent rerun disagrees.
     assert not (await grade_authored(case, tmp_path, Rerun()))["hard_passed"]
+
+
+def test_public_preconditions_are_presented_without_exposing_oracle():
+    suite = authored_suite("independent-fairness-check")
+    case = next(c for c in suite["cases"] if c["id"] == "CODE-01")
+    assert "默认每页 5 条" in case["prompt"] and "页码从 1 开始" in case["prompt"]
+    assert case["origin"]["recipe_revision"] == "authored-v6"
+    assert "expected" not in case["prompt"]

@@ -1158,3 +1158,18 @@ POST preview：只读预估最大配对预留；PUT research：限额字段与�
   <h2>验收</h2>
   <p>仓库 quick 门禁通过；前端 129 个文件、936 个用例通过，typecheck、i18n、hover 和生产构建通过。构建保留已有大块体积提示。桌面检查 320、390、820、1100、1440 宽度及中英文／深浅主题，并检查首页工作区；Redmi Note 8 在 392 CSS px／coarse 下完成五项筛选、刷新保留选择、详情返回、原会话入口、真实手势滚动与四个底部主入口点按。筛选命中区至少 44px，会话入口为 44×52px，文档不滚动且无横向溢出。证据位于 /tmp/task-page-{phone,desktop}-acceptance.json，截图为 /tmp/task-page-after-phone.png 与 /tmp/task-page-after-workspace.png。使用隔离示例数据与私有 tmux 服务，不修改现用服务。</p>
 </section>
+
+<section id="rsi-artifact-calibration-repair-20261024" lang="zh-CN">
+<h2>RSI产物评分与修复 · 2026-10-24</h2>
+<h3>Product Design</h3>
+<p>实验页为记忆角色提供可选模型与推理强度；历史Run单列产物评分用量。未保存配置不能启动诊断。评分校准不满足时保留待评，问题列表不能因代码已修改就显示修复。</p>
+<h3>User Stories</h3>
+<p>维护者先审阅12项独立完整/缺陷样本，再运行双模型校准；每一分绑定原始证据。超时后先对账，避免重复费用。修复记忆截断和题面歧义后，查看同合同复测证据；题目修订单列为不可比较。</p>
+<h3>Technical Design</h3>
+<pre>离线材料生成 → 人工参考 → 两个视觉模型 → 校准证书 → 固定7项产物评分
+Run配置快照 → 独立Agent镜像 + 冻结渲染镜像 → 生成/评分分别计量
+异常用量 → 阻止后续付费 → 请求ID对账 → 明确恢复
+Issue证据 → 补丁 → 独立检查 → 同合同复测 → 连续日观察</pre>
+<p>artifact_review显式提供证据标签与输出上限；ContainerExecutor分离被测镜像、渲染镜像和可选记忆路由；EpisodeBudget/ChatCompletionsProvider用上下文限定的opaque请求ID关联上游日志，普通请求不增加评测标识。PipelineRunner预留每个产物评分预算，未知用量停止后续生成；RunCosts阻止未知计量后的新付费复盘。MemoryJobs不重放确定性无效输出；corpus新版本显式包含公开前置条件，旧冻结数据不变。</p>
+<p>真实校准完成4项双评，PPT可用性有分歧，第5项超时且用量未知，未签发证书。人工标注、完整校准、正式7项评分和真实问题复测仍待完成；当前不能宣称Issue #446已修复或已降低Token。</p>
+</section>

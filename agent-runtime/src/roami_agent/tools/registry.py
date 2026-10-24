@@ -58,6 +58,14 @@ class Tools:
                 wire = deepcopy(wire)
                 wire["function"]["parameters"]["required"] = ["goal", "routing", "requestComplete"]
                 wire["function"]["parameters"]["properties"].pop("executor", None)
+            if role == "main" and self.directory and tool.name == "bash":
+                wire = deepcopy(wire)
+                wire["function"]["description"] = (
+                    "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
+                    "For code, scripts or batch file work, delegate to a worker with the existing "
+                    "user-requested directory; do not probe with shell commands here. "
+                    "Registered permissions and execution receipts remain enforced."
+                )
             if role == "research":
                 wire = deepcopy(wire)
                 parameters = wire["function"]["parameters"]

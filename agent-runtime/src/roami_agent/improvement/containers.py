@@ -6,7 +6,7 @@ import os
 import secrets
 import tempfile
 import time
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from roami_agent.app import configured_provider
@@ -72,15 +72,12 @@ class ContainerExecutor:
         regression_root=None,
         artifact_reviewer=None,
         output_caps=None,
+        generation_overrides=None,
+        memory_route=None,
     ):
         self.settings, self.image = settings, image
         self.artifact_reviewer = artifact_reviewer
-        if artifact_reviewer:
-            require(
-                image in {IMAGE, artifact_reviewer.profile["renderer_image"]},
-                "RSI_ARTIFACT_RENDERER_CHANGED",
-            )
-            self.image = artifact_reviewer.profile["renderer_image"]
+        self.artifact_renderer = None
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
@@ -88,6 +85,9 @@ class ContainerExecutor:
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
+        self.memory_route = memory_route
+        if memory_route is not None:
+            self.model_hash = digest([self.model_hash, asdict(memory_route)])
         self.image_id = None
         self.provider_factory = provider_factory
         self.source_root = Path(source_root).resolve() if source_root is not None else None
@@ -100,6 +100,18 @@ class ContainerExecutor:
             ),
             "RSI_POLICY_OUT_OF_RANGE",
         )
+        from roami_agent.providers.generation_parameters import generation_parameters
+
+        self.generation_overrides = generation_overrides or {}
+        require(
+            set(self.generation_overrides) <= {"main", "worker", "memory"},
+            "RSI_POLICY_OUT_OF_RANGE",
+        )
+        for parameters in self.generation_overrides.values():
+            generation_parameters(parameters)
+            require("max_tokens" not in parameters, "RSI_POLICY_OUT_OF_RANGE")
+        if self.generation_overrides:
+            self.model_hash = digest([self.model_hash, self.generation_overrides])
         if self.output_caps:
             self.model_hash = digest([self.model_hash, self.output_caps])
 
@@ -147,14 +159,22 @@ class ContainerExecutor:
         except (DomainError, ValueError):
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
         self.image_id = detail["Id"]
+        renderer_id = None
         if self.artifact_reviewer:
-            require(
-                self.image_id == self.artifact_reviewer.profile["renderer_image"],
-                "RSI_ARTIFACT_RENDERER_CHANGED",
-            )
+            expected = self.artifact_reviewer.profile["renderer_image"]
+            if self.image_id == expected:
+                self.artifact_renderer = self
+            else:
+                self.artifact_renderer = ContainerExecutor(self.settings, image=expected)
+                await self.artifact_renderer.preflight()
+            renderer_id = self.artifact_renderer.image_id
+            require(renderer_id == expected, "RSI_ARTIFACT_RENDERER_CHANGED")
         return {
             "image_id": self.image_id,
-            "environment_hash": digest([self.image_id, "network-none", "nonroot-readonly-v1"]),
+            "artifact_renderer_image_id": renderer_id,
+            "environment_hash": digest(
+                [self.image_id, renderer_id, "network-none", "nonroot-readonly-v1"]
+            ),
         }
 
     async def remove(self, name, label):
@@ -321,9 +341,21 @@ class ContainerExecutor:
         providers, models, journal = [], {}, []
         for role in ("main", "worker", "memory"):
             actual = "main" if role == "main" else "worker"
-            route = self.settings.route(actual)
+            route = (
+                self.memory_route
+                if role == "memory" and self.memory_route is not None
+                else self.settings.route(actual)
+            )
             cap = self.output_caps.get(role, min(4096, route.parameters.get("max_tokens", 4096)))
-            route = replace(route, max_retries=0, parameters=dict(route.parameters, max_tokens=cap))
+            route = replace(
+                route,
+                max_retries=0,
+                parameters={
+                    **route.parameters,
+                    **self.generation_overrides.get(role, {}),
+                    "max_tokens": cap,
+                },
+            )
             settings = settings_with_route(self.settings, actual, route)
             provider = (
                 self.provider_factory(settings, role)
@@ -428,7 +460,12 @@ class ContainerExecutor:
                 review_started = time.monotonic()
                 review_budget = self.artifact_reviewer.budget()
                 grade = await self.artifact_reviewer.review(
-                    case, grade, root, self, budget=review_budget, journal=journal
+                    case,
+                    grade,
+                    root,
+                    self.artifact_renderer or self,
+                    budget=review_budget,
+                    journal=journal,
                 )
                 artifact_review_ms = (time.monotonic() - review_started) * 1000
             elapsed = (time.monotonic() - started) * 1000

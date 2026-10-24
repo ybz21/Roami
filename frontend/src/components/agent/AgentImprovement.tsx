@@ -103,7 +103,7 @@ export default function AgentImprovement({ node, workflow = false, runId = '', o
   return <div className="agent-rsi">
     {workflow && (dirty || researchDirty) && <p role="status" className="agent-rsi-muted">{t('agent.experiment.unsaved')}</p>}
     {workflow && <ExperimentWorkflow stage={stage} view={view} onStage={setStage} onView={setView} states={{}} />}
-    {workflow && <PipelineRuns data={value.pipeline} view={view} node={node} runId={runId} onRun={id => { setView('runs'); if (onRun) onRun(id); else location.hash = '#/settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : '') }} refresh={data.refresh} eligible={!!draft.suite_id && !!draft.machine_ids.length} />}
+    {workflow && <PipelineRuns data={value.pipeline} view={view} node={node} runId={runId} onRun={id => { setView('runs'); if (onRun) onRun(id); else location.hash = '#/settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : '') }} refresh={data.refresh} eligible={!dirty && !!draft.suite_id && !!draft.machine_ids.length} />}
     {workflow && showWorkflow && stage !== 'evaluate' && <section className="agent-rsi-section agent-experiment-config">
       <h3>{t('agent.experiment.stage.' + stage)}</h3>
       <p className="agent-rsi-muted">{t('agent.experiment.hint.' + stage)}</p>

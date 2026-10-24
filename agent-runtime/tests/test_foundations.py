@@ -357,3 +357,24 @@ async def test_exact_task_status_filters_before_page_limit_and_preserves_scope(s
             )
     finally:
         await runtime.close()
+
+
+def test_main_catalog_does_not_advertise_an_implicit_shell_workspace():
+    from roami_agent.protocol.tools import Tool, object_schema
+    from roami_agent.tools.registry import Tools
+
+    registry = Tools()
+    registry.directory = object()
+    registry.add(
+        Tool(
+            "bash",
+            "Shell in a prepared workspace",
+            object_schema({}),
+            lambda *args: None,
+            main=True,
+        )
+    )
+    main = registry.catalog("main")[0]["function"]["description"]
+    worker = registry.catalog("worker")[0]["function"]["description"]
+    assert "Main has no implicit shell workspace" in main and "delegate" in main
+    assert worker == "Shell in a prepared workspace"

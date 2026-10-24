@@ -4,12 +4,14 @@ import asyncio
 import hashlib
 import json
 import math
+import re
 import time
 from copy import deepcopy
 
 import httpx
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.model_observation import model_observation
 from roami_agent.protocol.models import ModelEvent, model_endpoint
 from roami_agent.protocol.serialization import encoded
 from roami_agent.providers.generation_parameters import generation_parameters
@@ -119,6 +121,16 @@ class ChatCompletions:
 
     async def _stream_once(self, messages, tools, attempt):
         headers = {"Authorization": "Bearer " + self.api_key} if self.api_key else {}
+        observation = model_observation.get()
+        if observation:
+            headers.update(
+                {
+                    "X-Eval-Session-Id": observation["session"],
+                    "X-Eval-Agent-Id": observation["role"],
+                    "X-Eval-Call-Role": observation["role"],
+                    "X-Request-Id": observation["request"],
+                }
+            )
         body = {
             **self.parameters,
             "model": self.model,
@@ -177,7 +189,11 @@ class ChatCompletions:
             if response.status_code >= 400:
                 # Provider bodies can contain echoed prompts and credentials; do not relay them.
                 raise DomainError("MODEL_HTTP_" + str(response.status_code), 502)
-            yield ModelEvent("telemetry", {"phase": "headers", "attempt": attempt + 1})
+            request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
+            receipt = {"phase": "headers", "attempt": attempt + 1}
+            if request_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", request_id):
+                receipt["requestId"] = request_id
+            yield ModelEvent("telemetry", receipt)
             first_delta = True
             lines = response.aiter_lines()
             async for line in lines:

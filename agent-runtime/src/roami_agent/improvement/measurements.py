@@ -6,11 +6,14 @@ import time
 
 from roami_agent.improvement.contracts import require
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import identity
+from roami_agent.protocol.model_observation import model_observation
 
 
 class EpisodeBudget:
-    def __init__(self, limits):
+    def __init__(self, limits, *, observation_id=None):
         self.limits = limits
+        self.observation_id = observation_id or "rsi-" + identity()
         self.started = time.monotonic()
         self.requests = []
         self.lock = asyncio.Lock()
@@ -94,10 +97,22 @@ class MeteredModel:
         entry, estimate = await self.budget.admit(messages, tools, self.output_cap)
         entry["role"] = self.role
         started, usage = time.monotonic(), {}
+        observation = model_observation.get()
+        observation_token = None
+        if observation is None:
+            observation = {
+                "session": self.budget.observation_id,
+                "request": identity(),
+                "role": self.role,
+            }
+            observation_token = model_observation.set(observation)
         record = None
         if self.journal is not None:
             record = {
                 "request": len(self.journal) + 1,
+                "observation_id": observation["session"],
+                "request_id": observation["request"],
+                "model": self.model,
                 "role": self.role,
                 "messages": json.loads(json.dumps(messages)),
                 "tools": json.loads(json.dumps(tools)),
@@ -107,7 +122,7 @@ class MeteredModel:
             self.journal.append(record)
         try:
             async for event in self.provider.stream(messages, tools):
-                if record is not None and event.kind in {"text", "tool", "usage"}:
+                if record is not None and event.kind in {"text", "tool", "usage", "telemetry"}:
                     record["events"].append({"kind": event.kind, "value": event.value})
                 if event.kind == "usage":
                     usage = dict(event.value)
@@ -117,7 +132,11 @@ class MeteredModel:
                 record["error_code"] = getattr(exc, "code", type(exc).__name__)
             raise
         finally:
-            await self.budget.settle(entry, estimate, usage, time.monotonic() - started)
+            try:
+                await self.budget.settle(entry, estimate, usage, time.monotonic() - started)
+            finally:
+                if observation_token is not None:
+                    model_observation.reset(observation_token)
 
 
 def trace_metrics(trace):

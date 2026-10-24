@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, InputNumber, Spin, Switch } from 'antd'
+import { Button, Input, InputNumber, Select, Spin, Switch } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import Markdown from '../markdown/Markdown'
@@ -7,7 +7,7 @@ import { useAgentData } from './useAgentData'
 import ExperimentWorkflow, { type ExperimentStage } from './ExperimentWorkflow'
 import './pipeline-runs.css'
 
-export type PipelineSettings = { revision: number; auto_publish: boolean; daily_tokens: number; generation_tokens: number; codex_tokens: number; output_tokens: number; memory_output_tokens: number }
+export type PipelineSettings = { revision: number; auto_publish: boolean; daily_tokens: number; generation_tokens: number; codex_tokens: number; output_tokens: number; memory_output_tokens: number; memory_model?: string | null; memory_reasoning_effort?: string | null }
 type Issue = { id: string; case_id: string; code: string; latest_status?: string; status?: string; latest_run_id?: string }
 type Run = { id: string; mode: string; state: string; created_ms: number; updated_ms: number; summary: Record<string, number | null> | null; issue: { url: string; number: number } | null }
 export type PipelineOverview = { settings: PipelineSettings; runs: Run[]; issues: Issue[]; publication?: { repository: string | null } }
@@ -43,6 +43,8 @@ export default function PipelineRuns({ data, view, node, runId = '', onRun, refr
       <div className="agent-rsi-form pipeline-settings">
         <label>{t('agent.pipeline.autoPublish')}<Switch checked={draft.auto_publish} disabled={!!busy} onChange={auto_publish => change({ auto_publish })} /></label>
         {(['daily_tokens', 'generation_tokens', 'codex_tokens', 'output_tokens', 'memory_output_tokens'] as const).map(key => <label key={key}>{t('agent.pipeline.setting.' + key)}<InputNumber value={draft[key]} min={key === 'codex_tokens' ? 20000 : key === 'output_tokens' ? 4096 : key === 'memory_output_tokens' ? 1024 : 10000} max={key === 'output_tokens' ? 16384 : key === 'memory_output_tokens' ? 8192 : key === 'codex_tokens' ? 100000 : key === 'generation_tokens' ? 2000000 : 100000000} onChange={value => value != null && change({ [key]: value })} /></label>)}
+        <label>{t('agent.pipeline.setting.memory_model')}<Input value={draft.memory_model || ''} placeholder={t('agent.pipeline.workerDefault')} onChange={event => change({ memory_model: event.target.value || null })} /></label>
+        <label>{t('agent.pipeline.setting.memory_reasoning_effort')}<Select value={draft.memory_reasoning_effort || ''} options={[{ value: '', label: t('agent.pipeline.workerDefault') }, ...['low', 'medium', 'high'].map(value => ({ value, label: t('agent.reasoning.' + value) }))]} onChange={value => change({ memory_reasoning_effort: value || null })} /></label>
       </div>
       <div className="agent-rsi-actions"><Button disabled={!dirty || !!busy} loading={busy === 'save'} onClick={() => void mutate('save', '/settings', draft, 'PUT')}>{t('agent.rsi.save')}</Button><Button disabled={dirty || !!busy || !eligible} loading={busy === 'start'} onClick={() => start()}>{t('agent.pipeline.startTen')}</Button></div>
       <p className="agent-rsi-muted">{t('agent.pipeline.diagnosticHint')}</p>
@@ -98,6 +100,7 @@ function PipelineRunDetail({ runId, onRetry, onPublish, onRerun, onCancel, busy,
   return <div className="pipeline-run-detail">
     <div className="agent-rsi-heading"><h3>{t('agent.pipeline.mode.' + value.mode)} · {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value.created_ms)}</h3><span>{t('agent.pipeline.runState.' + value.state)}</span></div>
     <div className="agent-rsi-summary"><div><span>{t('agent.pipeline.taskPassed')}</span><strong>{tasks.filter(c => c.passed).length}/{tasks.length}</strong></div><div><span>{t('agent.pipeline.mechanisms')}</span><strong>{mechanisms.filter(c => c.passed).length}/{mechanisms.length}</strong></div><div><span>{t('agent.pipeline.generationTokens')}</span><strong>{number(value.summary?.generation_tokens)}</strong></div></div>
+    {(value.summary?.artifact_review_tokens === null || !!value.summary?.artifact_review_tokens) && <p className="agent-rsi-muted">{t('agent.pipeline.artifactTokens', { count: number(value.summary?.artifact_review_tokens) })}</p>}
     {value.summary?.codex_tokens !== undefined && <p className="agent-rsi-muted">{t('agent.pipeline.codexTokens', { count: number(value.summary.codex_tokens) })}</p>}
     <div className="agent-rsi-actions">{['running', 'queued'].includes(value.state) && <Button disabled={!!busy} onClick={async () => { await onCancel(); data.refresh() }}>{t('agent.rsi.cancel')}</Button>}<Button disabled={!!busy || ['running', 'queued', 'reviewing', 'report_queued'].includes(value.state)} onClick={onRerun}>{t('agent.pipeline.rerun')}</Button>{value.state === 'blocked' && <Button disabled={!!busy} onClick={async () => { await onRetry(); data.refresh() }}>{t('agent.pipeline.resumeReport')}</Button>}{value.issue?.url?.startsWith('https://github.com/') ? <a className="tt-act" href={value.issue.url} target="_blank" rel="noopener noreferrer">{t('agent.rsi.viewIssue')}</a> : value.artifacts.some(a => a.name === 'issue-plan.json') && <Button disabled={!!busy} onClick={async () => { await onPublish(); refresh(); data.refresh() }}>{t('agent.pipeline.publishIssue')}</Button>}</div>
     <ExperimentWorkflow stage={stage} view="workflow" onStage={setStage} onView={() => {}} states={Object.fromEntries(value.nodes.map(node => [node.node, node.state]))} tabs={false} caption={t('agent.pipeline.frozenRun')} stateLabel={state => t('agent.pipeline.nodeState.' + state)} />

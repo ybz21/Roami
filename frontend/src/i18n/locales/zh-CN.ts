@@ -3849,6 +3849,10 @@ const zhCN = {
   'agent.pipeline.publishIssue': "发布 GitHub Issue",
   'agent.experiment.hint.evaluate': "在隔离环境中测试，保存产物、评分和调用记录。",
 
+  'agent.pipeline.setting.memory_model': '记忆模型',
+  'agent.pipeline.setting.memory_reasoning_effort': '记忆推理强度',
+  'agent.pipeline.workerDefault': '沿用 Worker 配置',
+  'agent.pipeline.artifactTokens': '产物评分用量：{count} Token',
 }
 
 export default zhCN

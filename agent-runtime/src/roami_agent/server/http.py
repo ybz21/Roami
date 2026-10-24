@@ -262,7 +262,11 @@ def create_app(runtime, *, manage_lifecycle=True):
 
             ModelSettings.owner(owner)
             value = await asyncio.to_thread(
-                enqueue_diagnostic, runtime.improvement, owner, await improvement_payload(request)
+                enqueue_diagnostic,
+                runtime.improvement,
+                owner,
+                await improvement_payload(request),
+                runtime.settings.current,
             )
             runtime.improvement.wakeup.set()
             return {"data": value}
