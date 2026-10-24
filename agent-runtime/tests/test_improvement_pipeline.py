@@ -99,6 +99,10 @@ def test_diagnostic_queue_is_idempotent_and_admission_is_atomic(tmp_path):
     with service.ledger.connection() as db:
         assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 856000
         assert db.execute("SELECT COUNT(*) FROM rsi_pipeline_runs").fetchone()[0] == 2
+    service.runs.configure("local", {**service.runs.settings("local"), "daily_tokens": 2000000})
+    enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
+    with pytest.raises(DomainError, match="DAILY_BUDGET"):
+        service.runs.configure("local", {**service.runs.settings("local"), "daily_tokens": 1000000})
 
 
 def test_unknown_codex_cost_prevents_paid_replay(tmp_path):

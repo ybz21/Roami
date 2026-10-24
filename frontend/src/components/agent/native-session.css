@@ -8,10 +8,6 @@
 .native-session-composer textarea { flex:1; min-width:0; }
 .native-session-composer p { flex-basis:100%; margin:0; font-size:var(--fs-sm); color:var(--text-dim); }
 .agent-mobile-page.agent-session-page { overflow:hidden; padding:0; }
-.agent-task-entry { min-width:0; }
-.agent-task-entry-actions { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); padding-inline:var(--sp-2); padding-bottom:var(--sp-2); }
-.agent-task-entry-actions:empty { display:none; }
-.agent-task-entry-actions > .tt-act { font-size:var(--fs-meta); }
 
 .agent-native-workspace .native-session { flex:1; height:auto; }
 .agent-native-workspace-nav { flex:none; display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); min-height:calc(var(--sp-5) * 2); border-bottom:1px solid var(--border-subtle); font-size:var(--fs-body); }

@@ -216,6 +216,27 @@ class RunRecords:
                 type(value["revision"]) is int and value["revision"] == prior["revision"],
                 "RSI_SETTINGS_CONFLICT",
             )
+            if value["daily_tokens"] != prior["daily_tokens"]:
+                from datetime import datetime
+                from zoneinfo import ZoneInfo
+
+                prefs = db.execute(
+                    "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
+                ).fetchone()
+                timezone = (
+                    json.loads(prefs[0]).get("timezone", "Asia/Shanghai")
+                    if prefs
+                    else "Asia/Shanghai"
+                )
+                day = datetime.now(ZoneInfo(timezone)).date().isoformat()
+                budget = db.execute(
+                    "SELECT tokens_reserved FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
+                ).fetchone()
+                require(not budget or budget[0] <= value["daily_tokens"], "RSI_DAILY_BUDGET")
+                db.execute(
+                    "UPDATE rsi_budgets SET tokens_limit=? WHERE owner=? AND day=?",
+                    (value["daily_tokens"], owner, day),
+                )
             result = {**value, "revision": value["revision"] + 1}
             db.execute(
                 "INSERT OR REPLACE INTO rsi_pipeline_settings VALUES(?,?)",

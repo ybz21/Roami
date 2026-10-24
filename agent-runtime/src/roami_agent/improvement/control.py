@@ -341,6 +341,7 @@ class ImprovementControl:
 
     def cancel(self, owner, request_id):
         with self.ledger.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
             request = db.execute(
                 "SELECT state FROM rsi_requests WHERE owner=? AND id=?", (owner, request_id)
             ).fetchone()

@@ -1138,7 +1138,7 @@ POST preview：只读预估最大配对预留；PUT research：限额字段与�
 <p>验收：quick/full通过，Python1238项、前端132文件/960项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
 </section>
 
-<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/workflow-contract.json">机器可读默认合同</a>。本次10项用独立原型验证产出与持久化，不声称正式调度已接入通用Run接口。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
+<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
 
 <section id="rsi-pipeline-delivery-20261024" lang="zh-CN">
 <h2>RSI运行闭环 · 2026-10-24</h2>
@@ -1146,5 +1146,15 @@ POST preview：只读预估最大配对预留；PUT research：限额字段与�
 <p>开发版设置的实验/RSI提供独立运行地址、逐节点职责/状态/文件、GitHub汇总Issue及本地问题列表；从历史运行复测相同Case，区分仍存在、未复现、未验证、未覆盖和合同变化。普通安装不启用。</p>
 <h3>Technical Design</h3>
 <p>RunRecords在同一私有SQLite保存Run/Attempt/Case/Issue/Observation/Effect；EvaluationWorker复用单队列，PipelineReportWorker用Codex复盘和问题排序、程序脱敏并幂等发布GitHub。PipelineRuns按Run读取状态和hash校验产物，结束记录不轮询。正式源码修复沿用ResearchWorker与独立验证、发布、观察门禁。</p>
-<p><a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组修复复测继续保留失败与待验证。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组10项复测真实任务0/6、机制4/4；Issue #446保留19项仍存在、8项未验证。全仓full门禁通过，Python1249项、前端963项、桌面9档和Android真机触控/滚动通过。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
+<section id="background-task-list-20261024" lang="zh-CN">
+  <h1>后台任务列表整理 · 2026-10-24</h1>
+  <h2>产品设计</h2>
+  <p>手机筛选使用简短标签与轻量选中态，常用中文宽度下完整显示五项。任务采用平面行，标题、真实状态、执行器和时间构成主体，日期分组弱化；分隔线归属整条任务。原会话改为行尾终端图标入口，提供可访问名称；项目链接按需显示。桌面工作区复用同一列表层级。</p>
+  <h2>用户故事</h2>
+  <p>用户能快速扫描任务主题与状态，点标题查看详情，点行尾图标进入原会话；保留筛选、返回与滚动位置。长标题和项目名不撑宽页面，触屏入口保持至少 44px 命中区。</p>
+  <h2>技术设计</h2>
+  <p>AgentTasks.tsx 的 TaskRow 使用独立任务按钮、项目链接和会话按钮，避免嵌套交互。agent-tasks.css 统一网格行、日期、筛选与触屏命中区，移除 agent-workspace.css 和 native-session.css 中分散的列表样式。时间只显示时分，日期由已有分组标题承载；复用 SVG 图标、主题令牌与 i18n，不改变任务请求和刷新逻辑。</p>
+  <h2>验收</h2>
+  <p>仓库 quick 门禁通过；前端 129 个文件、936 个用例通过，typecheck、i18n、hover 和生产构建通过。构建保留已有大块体积提示。桌面检查 320、390、820、1100、1440 宽度及中英文／深浅主题，并检查首页工作区；Redmi Note 8 在 392 CSS px／coarse 下完成五项筛选、刷新保留选择、详情返回、原会话入口、真实手势滚动与四个底部主入口点按。筛选命中区至少 44px，会话入口为 44×52px，文档不滚动且无横向溢出。证据位于 /tmp/task-page-{phone,desktop}-acceptance.json，截图为 /tmp/task-page-after-phone.png 与 /tmp/task-page-after-workspace.png。使用隔离示例数据与私有 tmux 服务，不修改现用服务。</p>
 </section>
