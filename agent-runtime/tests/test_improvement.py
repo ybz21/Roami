@@ -516,3 +516,27 @@ Path(request["response_path"]).write_text(json.dumps(response))
     executor = ExternalExecutor([sys.executable, str(script)], model_hash="fixed")
     with pytest.raises(DomainError, match="EXTERNAL_USAGE"):
         await executor.run(case(), {}, root)
+
+
+async def test_interrupted_provider_journal_preserves_error_without_guessing_usage():
+    class Interrupted:
+        model = "fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", "partial")
+            raise DomainError("MODEL_STREAM_INCOMPLETE", 502)
+
+    budget = EpisodeBudget({"tokens": 100000, "seconds": 10, "requests": 2})
+    journal = []
+    with pytest.raises(DomainError, match="MODEL_STREAM_INCOMPLETE"):
+        async for _ in MeteredModel(Interrupted(), budget, "memory", journal=journal).stream(
+            [], []
+        ):
+            pass
+    assert journal[0]["error_code"] == "MODEL_STREAM_INCOMPLETE"
+    assert journal[0]["events"] == [{"kind": "text", "value": "partial"}]
+    assert budget.metrics()["tokens"] is None
+    with pytest.raises(DomainError, match="USAGE_UNKNOWN"):
+        async for _ in MeteredModel(Interrupted(), budget, "memory").stream([], []):
+            pass
+    assert len(budget.requests) == 1

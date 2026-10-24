@@ -85,3 +85,54 @@ it('keeps a full daily suite and links the aggregated Issue with a private repor
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/preferences', expect.objectContaining({ hour: 4, cases_per_day: 60 })))
 })
+
+function workflowOverview() {
+  return { ...overview(), research: { settings: { revision: 2, enabled: false, model_tokens: 64000, model_seconds: 180, max_attempts: 2, observation_days: 2, repo: '/trusted' }, actions: [{ id: 'review-a', kind: 'review', state: 'blocked', error_code: 'RSI_USAGE_UNKNOWN' }], improvements: [], reports: [{ cycle_id: 'daily-a', day: '2026-10-24', points: 1, issueUrl: 'https://github.com/example/repo/issues/1' }] } }
+}
+it('configures a selected workflow node without sending trusted source targets', async () => {
+  state.overview = workflowOverview()
+  vi.mocked(api).mockResolvedValue({ data: {} })
+  render(<AgentImprovement node="a" workflow />)
+  expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(5)
+  fireEvent.click(screen.getByRole('button', { name: /2 复盘/ }))
+  expect(screen.getByText('Codex 逐项回顾指标、调用过程和日志，生成每日复盘文档。')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Codex 每次准入预算（Token）'), { target: { value: '32000' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/research', { revision: 2, enabled: false, model_tokens: 32000, model_seconds: 180, max_attempts: 2, observation_days: 2 }))
+})
+it('previews admission without enqueueing work and keeps daily issue access in its own tab', async () => {
+  state.overview = workflowOverview()
+  vi.mocked(api).mockResolvedValue({ data: { cases: 60, machines: 1, episodes: 120, reservation_tokens: null, next_run: null, codex_tokens_per_operation: 64000, blockers: ['RSI_ARTIFACT_REVIEW_REQUIRED'] } })
+  render(<AgentImprovement node="a" workflow />)
+  fireEvent.click(screen.getByRole('button', { name: '预览运行' }))
+  await screen.findByText('最多执行数（基线与候选）')
+  expect(api).toHaveBeenCalledWith('POST', '/agent/improvement/preview')
+  expect(vi.mocked(api).mock.calls.some(call => call[1].includes('/requests'))).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: '每日 Issue' }))
+  expect(screen.getByRole('link', { name: '查看 Issue' }).getAttribute('href')).toBe('https://github.com/example/repo/issues/1')
+  expect(screen.queryByText('每日评测')).toBeNull()
+})
+it('preserves failed configuration input and invalidates the preview when edited', async () => {
+  state.overview = workflowOverview()
+  vi.mocked(api).mockRejectedValue({ apiError: { code: 'RSI_SETTINGS_CONFLICT' } })
+  render(<AgentImprovement node="a" workflow />)
+  fireEvent.click(screen.getByRole('button', { name: /4 修复/ }))
+  fireEvent.change(screen.getByLabelText('每个问题最多修复次数'), { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存' }))
+  await screen.findByRole('alert')
+  expect((screen.getByLabelText('每个问题最多修复次数') as HTMLInputElement).value).toBe('3')
+  fireEvent.click(screen.getByRole('button', { name: /1 评测/ }))
+  expect((screen.getByRole('button', { name: '预览运行' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('reuses the same manual request key after a partial multi-machine failure', async () => {
+  state.overview = { ...workflowOverview(), preferences: { ...workflowOverview().preferences, daily_tokens: 100000, machine_ids: ['a', 'b'] } }
+  vi.mocked(api).mockResolvedValueOnce({ data: {} }).mockRejectedValueOnce({ apiError: { code: 'RSI_OPERATION_FAILED' } }).mockResolvedValue({ data: {} })
+  render(<AgentImprovement node="a" workflow />)
+  fireEvent.click(screen.getByRole('button', { name: '运行一次' }))
+  await screen.findByRole('alert')
+  const requestKey = vi.mocked(api).mock.calls[0][2].request_key
+  fireEvent.click(screen.getByRole('button', { name: '运行一次' }))
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(4))
+  expect(vi.mocked(api).mock.calls.every(call => call[2].request_key === requestKey)).toBe(true)
+})

@@ -132,6 +132,11 @@ class ResearchWorkflow:
             )
         return {**value, "revision": revision + 1}
 
+    def configure_experiment(self, owner, raw):
+        fields = {"enabled", "model_tokens", "model_seconds", "max_attempts", "observation_days"}
+        require(isinstance(raw, dict) and set(raw) == fields | {"revision"})
+        return self.configure(owner, {**self.settings(owner), **raw})
+
     def _enqueue(self, db, owner, kind, subject, payload):
         action_id = digest([owner, kind, subject])
         db.execute(

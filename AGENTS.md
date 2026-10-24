@@ -1125,3 +1125,15 @@ conversation/professional_activity.py
   <p>file-link 识别产物内容地址并按需读取元信息；MobileFilePreview、TaskArtifactPreview 与文件页复用 documents/DocumentPreview、PdfDocument。PDF.js 与 Worker 按需加载，画布限制像素预算；PPTX 页面使用禁脚本和外部网络的 sandbox。DocumentDownload 使用同源 OkHttp、CookieManager、Tls 和 ACTION_CREATE_DOCUMENT，DocumentName 解析 UTF-8 Content-Disposition。WebMessage 下载入口仅注入受信任服务器来源、仅接受主框架消息；保留普通 DownloadListener 兜底，已由网页接管的附件预览不再触发下载。APK 升级为 0.3.9，保留现有签名。</p>
   <p>验收：Redmi Note 8 的 Chrome 和正式签名 App 在自签 HTTPS 下完成 PDF 绘制与翻页、PPTX 触控滚动和返回；两份文件通过系统保存框保留中文及加号文件名，手机文件 SHA-256 与服务器原件分别一致。接口要求 HttpOnly 登录 Cookie，确认原生保存携带登录态。跨节点链接与显式下载通过回归检查；前端完整检查、仓库 full 门禁及 Android 单元测试和签名构建通过。测试材料使用隔离示例，不外传用户文档。</p>
 </section>
+
+<section id="rsi-experiment-workflow" lang="zh-CN">
+<h2>RSI 实验 Workflow · 2026-10-24</h2>
+<h3>Product Design / User Stories</h3>
+<p>开发版“设置 / 实验”用可点选七节点显示评测、Codex复盘、Codex汇总Issue、Codex修复、独立验收、草稿PR和观察。用户配置机器、日程、预算、Codex额度和重试，再预览运行；运行记录和每日Issue独立查看。普通安装版不注册入口或挂载评测组件。</p>
+<h3>Technical Design</h3>
+<pre>SettingsPage → ExperimentWorkflow / AgentImprovement → 所有者Go网关
+→ development-only HTTP → ImprovementControl / ResearchWorkflow
+POST preview：只读预估最大配对预留；PUT research：限额字段与修订号校验</pre>
+<p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
+<p>验收：前端132文件/959项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
+</section>

@@ -19,6 +19,7 @@ import MobilePageSearch from '../mobile/MobilePageSearch'
 import { SettingRow } from './SettingRow'
 import { useEnvPush } from './env-vars'
 import { buildSettings, itemText, rowCount, type SettingsModel, type SettingsPageDef } from './registry'
+import { useAgentData } from '../agent/useAgentData'
 
 const DEFAULT_PAGE = 'common'
 
@@ -93,6 +94,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const nodes = useClusterNodes()
   const nodeId = useCurrentNodeId()
   const [q, setQ] = useState('')
+  const channel = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60000)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [openParents, setOpenParents] = useState<Record<string, boolean>>({})
   const searchRef = useRef<HTMLInputElement>(null)
@@ -120,7 +122,8 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
       await browserRestart.current()
     },
     onEnvPush: pushEnv,
-  }), [t, mode, locale, prefs, nodeLabel, onLogout])
+    developmentRsi: channel.value?.developmentRsi === true, nodeId,
+  }), [t, mode, locale, prefs, nodeLabel, onLogout, nodeId, channel.value?.developmentRsi])
 
   const routed = pageFromRoute(sub || '')
   const current = model.pages[routed] ? routed : DEFAULT_PAGE

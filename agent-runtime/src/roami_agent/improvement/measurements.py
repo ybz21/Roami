@@ -112,6 +112,10 @@ class MeteredModel:
                 if event.kind == "usage":
                     usage = dict(event.value)
                 yield event
+        except BaseException as exc:
+            if record is not None:
+                record["error_code"] = getattr(exc, "code", type(exc).__name__)
+            raise
         finally:
             await self.budget.settle(entry, estimate, usage, time.monotonic() - started)
 

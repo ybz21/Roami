@@ -42,6 +42,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/improvement/releases"}, {"POST", "/agent/improvement/rollback"},
 		{"POST", "/agent/improvement/prepare"},
 		{"GET", "/agent/improvement/research"},
+		{"PUT", "/agent/improvement/research"}, {"POST", "/agent/improvement/preview"},
 		{"POST", "/agent/improvement/research/:action_id/resume"},
 		{"GET", "/agent/conversations/:cid/debug"}, {"GET", "/agent/conversations/:cid/debug/trace"},
 		{"DELETE", "/agent/attachments/:attachment"},

@@ -4,6 +4,31 @@
 <nav aria-label="设计章节"><a href="#architecture">架构</a><a href="#roles">执行</a><a href="#closure">闭环</a><a href="index.html">详细方案</a></nav>
 <header><h1>Roami Agent RSI</h1><p class="rsi-lead">自动测试，Codex 复盘、汇总 Issue、修复；人查看复盘、问题与 PR。</p><p class="rsi-status">仅开发版。每天 03:00（上海时间）完整跑 60 项；当前预算为 0、质量校准未齐，付费日程尚未开启。</p></header>
 <section id="architecture"><h2>架构</h2><figure><picture><source media="(max-width: 599px)" srcset="architecture-mobile.svg"><img src="architecture.svg" alt="控制器定时全量测试，Codex 复盘、汇总单个 Issue、隔离修复，程序独立验收和观察后回写 Issue。"></picture><figcaption>被测者是 Roami Agent；复盘、Issue、修复三个角色全部使用独立 Codex 上下文。</figcaption></figure></section>
+<section id="workflow"><h2>设置 / 实验：Workflow</h2>
+<p>仅开发节点显示。点选节点配置参数；切换“运行记录”看指标与日志复盘，切换“每日 Issue”看完整文档、工单和 PR。</p>
+<pre>评测 → Codex 复盘 → Codex 汇总 Issue → Codex 修复 → 独立验收 → 草稿 PR → 观察
+ ↑                  每天全跑 60 项；节点状态来自持久动作队列                  │
+ └────────────────── 回归通过关单；退化回滚并重开 ──────────────────┘</pre>
+<div class="tablewrap"><table><thead><tr><th>节点</th><th>可配置</th><th>固定约束</th></tr></thead><tbody>
+<tr><td>评测</td><td>测试集、机器、时区、时间、Token / 执行次数预算、候选参数</td><td>完整60项；无候选60次，有候选120次 / 机</td></tr>
+<tr><td>复盘</td><td>自动闭环开关、Codex每次准入预算与时限</td><td>复盘 / Issue / 修复均为Codex</td></tr>
+<tr><td>Issue / 修复</td><td>每问题最多尝试1–3次</td><td>每日汇总一个Issue；仓库和源码权限由本机可信配置指定</td></tr>
+<tr><td>验收 / PR / 观察</td><td>连续观察2–14天</td><td>冻结判定不可跳过；仅草稿PR，不自动合并</td></tr>
+</tbody></table></div>
+<p>“预览运行”只读配置，按配对情况估算最大预留，明确列出校准与预算阻塞；不调用模型。配置成功保存后才运行，失败保留输入。跨机器提交失败时重用请求键，避免重试重复入队。</p>
+<details><summary>模块与接口</summary><pre>SettingsPage（节点 developmentRsi 门禁）
+ → AgentImprovement / ExperimentWorkflow（节点、表单、记录与报告）
+ → Go 所有者网关 → development-only HTTP
+ → ImprovementControl / ResearchWorkflow（校验、修订号、预算与队列）
+POST /agent/improvement/preview   只读准入估算；非环境验证成功
+PUT  /agent/improvement/research  有限字段；不可改仓库、命令、基线或源码范围</pre></details>
+</section>
+<section id="diagnostic"><h2>2026-10-24 实际诊断</h2><div class="tablewrap"><table><thead><tr><th>证据</th><th>结果</th></tr></thead><tbody>
+<tr><td>完整60项逐项尝试</td><td>未形成正式全套成绩。首题产物断言通过，但记忆维护缺少完整用量；后续39个模型Case被共享熔断阻止或失败</td></tr>
+<tr><td>20项机制测试</td><td>手工脚本目录拼接错误；修正后单列零模型补测20/20通过，原始失败保留</td></tr>
+<tr><td>真实Codex复盘 / Issue</td><td>两次共34,418 Token；已知生成用量下界6,356，总量未知；不是完整运行成本</td></tr>
+<tr><td>闭环入口</td><td><a href="https://github.com/ybz21/Roami/issues/443">诊断问题汇总 #443</a>；7项复杂产物仍缺真实校准，不晋级；自动日程保持关闭</td></tr>
+</tbody></table></div></section>
 <section id="roles"><h2>谁参与，怎么执行</h2><div class="tablewrap"><table><thead><tr><th>负责者</th><th>执行手段</th><th>交付物</th></tr></thead><tbody>
 <tr><td>常驻控制器</td><td>服务内置定时器，按日期幂等入队；重启仅补本周期，无需用户发消息。</td><td>冻结套件、机器、预算与版本</td></tr>
 <tr><td>被测 Roami Agent</td><td>每台机器全跑 60 项；稳定版单跑，候选对照为 60 × 2。程序算分并扫描每条日志。</td><td>产物、效果、时间、Token、工具与模型调用记录</td></tr>

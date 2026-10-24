@@ -245,6 +245,28 @@ def create_app(runtime, *, manage_lifecycle=True):
         async def improvement_research(owner: Owner):
             return {"data": await asyncio.to_thread(runtime.improvement.research.snapshot, owner)}
 
+        @app.put("/v1/improvement/research")
+        async def improvement_experiment_settings(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                runtime.improvement.research.configure_experiment,
+                owner,
+                await improvement_payload(request),
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.post("/v1/improvement/preview")
+        async def improvement_preview(owner: Owner):
+            from roami_agent.improvement.experiment_preview import preview
+
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    preview, runtime.improvement, owner, runtime.settings.current
+                )
+            }
+
         @app.post("/v1/improvement/research/{action_id}/resume")
         async def improvement_research_resume(action_id: str, owner: Owner):
             ModelSettings.owner(owner)
