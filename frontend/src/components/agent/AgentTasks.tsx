@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
-import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, ChevronLeft, ChevronRight } from '../../icons'
+import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, FolderIcon, TerminalIcon, ChevronLeft, ChevronRight } from '../../icons'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
@@ -94,15 +94,16 @@ function TaskRow({ task, compact, select, projects, onSession }: { projects: { i
   const time = taskTime(task) ? new Date(taskTime(task)) : null
   const name = executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''
   return <div className="agent-task-entry"><button type="button" className={`agent-task-link${compact ? ' agent-task-card' : ''}`} data-state={state} onClick={() => select(task.id)}>
-    {compact && <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>}
+    <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>
     <span className="agent-task-row-copy">
       <b>{taskTopic(task) || t('agent.task.untitled')}</b>
-      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{compact && (executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />)}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleString(locale, compact ? { hour: '2-digit', minute: '2-digit' } : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}</small>
-    </span>{!compact && <ChevronRight />}
-  </button><div className="agent-task-entry-actions">
-    {task.projectId && <a className="tt-act" href={'#/projects/' + encodeURIComponent(task.projectId)}>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</a>}
-    {task.nativeSession ? <button type="button" className="tt-act" onClick={() => openAgentPage('session', task.nativeSession!.id)}>{t('agent.task.enterSession')}</button> : task.latestAttempt?.sessionId && task.sessionClosure?.state !== 'closed' && <button type="button" className="tt-act" onClick={() => onSession(task.latestAttempt!.sessionId!)}>{t('agent.task.enterSession')}</button>}
-  </div></div>
+      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
+    </span>
+  </button>
+    {task.projectId && <a className="tt-act agent-task-project" href={'#/projects/' + encodeURIComponent(task.projectId)}><FolderIcon size={14} /><span>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</span></a>}
+    <div className="agent-task-entry-actions">
+      {task.nativeSession ? <button type="button" className="tt-act agent-task-session" aria-label={t('agent.task.enterSession')} onClick={() => openAgentPage('session', task.nativeSession!.id)}><TerminalIcon size={18} /></button> : task.latestAttempt?.sessionId && task.sessionClosure?.state !== 'closed' && <button type="button" className="tt-act agent-task-session" aria-label={t('agent.task.enterSession')} onClick={() => onSession(task.latestAttempt!.sessionId!)}><TerminalIcon size={18} /></button>}
+    </div></div>
 }
 
 function TaskDescription({ content }: { content: string }) {
