@@ -18,18 +18,6 @@
 .agent-workspace-rail .agent-tasks .tt-act { min-height:calc(var(--tap) - var(--sp-2)); min-width:calc(var(--tap) - var(--sp-2)); padding:var(--sp-1) var(--sp-2); border-color:transparent; }
 .agent-workspace-rail .agent-task-heading { flex-wrap:wrap; }
 .agent-tasks-compact .agent-task-section-head { align-items:center; font-size:var(--fs-meta); }
-.agent-tasks-compact .agent-task-card { display:flex; align-items:flex-start; gap:var(--sp-3); padding:var(--sp-3) var(--sp-2); margin-inline:calc(-1 * var(--sp-2)); width:calc(100% + var(--sp-2) * 2); border:0; border-radius:var(--r-sm); background:transparent; cursor:pointer; }
-.agent-tasks-compact .agent-task-status-icon { display:grid; place-items:center; flex:none; width:calc(var(--sp-5) + var(--sp-4)); height:calc(var(--sp-5) + var(--sp-4)); border-radius:var(--r-card); color:var(--text-bright); background:var(--bg-base); }
-.agent-task-card[data-state="failed"] .agent-task-status-icon { color:var(--danger); }
-.agent-task-card[data-state="waiting_user"] .agent-task-status-icon,.agent-task-card[data-state="unknown"] .agent-task-status-icon { color:var(--warn); }
-.agent-tasks-compact .agent-task-row-copy { display:flex; flex-direction:column; flex:1; min-width:0; gap:var(--sp-1); }
-.agent-tasks-compact .agent-task-card b { font-size:var(--fs-body); font-weight:500; line-height:1.5; }
-.agent-task-card .agent-task-card-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); margin:0; }
-.agent-task-card-meta .agent-task-state { padding:0; background:transparent; color:var(--text-dim); }
-.agent-task-card-meta .agent-task-state[data-state="failed"] { color:var(--danger); }
-.agent-task-card-meta .agent-task-state[data-state="unknown"],.agent-task-card-meta .agent-task-state[data-state="waiting_user"] { color:var(--warn); }
-.agent-tasks-compact .agent-task-card:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
-:where(html[data-pointer="fine"]) .agent-tasks-compact .agent-task-card:hover { background:var(--list-hover); }
 .agent-workspace-empty { display:flex; flex-direction:column; align-items:center; gap:var(--sp-3); padding:calc(var(--sp-5) * 2) var(--sp-4); color:var(--text-dim); text-align:center; font-size:var(--fs-sm); }
 .agent-workspace-empty strong { color:var(--text-bright); font-weight:500; }
 .agent-workspace-empty p { margin:0; line-height:1.6; }

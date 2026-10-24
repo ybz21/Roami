@@ -1075,3 +1075,15 @@ conversation/professional_activity.py
   <p>file-link 识别产物内容地址并按需读取元信息；MobileFilePreview、TaskArtifactPreview 与文件页复用 documents/DocumentPreview、PdfDocument。PDF.js 与 Worker 按需加载，画布限制像素预算；PPTX 页面使用禁脚本和外部网络的 sandbox。DocumentDownload 使用同源 OkHttp、CookieManager、Tls 和 ACTION_CREATE_DOCUMENT，DocumentName 解析 UTF-8 Content-Disposition。WebMessage 下载入口仅注入受信任服务器来源、仅接受主框架消息；保留普通 DownloadListener 兜底，已由网页接管的附件预览不再触发下载。APK 升级为 0.3.9，保留现有签名。</p>
   <p>验收：Redmi Note 8 的 Chrome 和正式签名 App 在自签 HTTPS 下完成 PDF 绘制与翻页、PPTX 触控滚动和返回；两份文件通过系统保存框保留中文及加号文件名，手机文件 SHA-256 与服务器原件分别一致。接口要求 HttpOnly 登录 Cookie，确认原生保存携带登录态。跨节点链接与显式下载通过回归检查；前端完整检查、仓库 full 门禁及 Android 单元测试和签名构建通过。测试材料使用隔离示例，不外传用户文档。</p>
 </section>
+
+<section id="background-task-list-20261024" lang="zh-CN">
+  <h1>后台任务列表整理 · 2026-10-24</h1>
+  <h2>产品设计</h2>
+  <p>手机筛选使用简短标签与轻量选中态，常用中文宽度下完整显示五项。任务采用平面行，标题、真实状态、执行器和时间构成主体，日期分组弱化；分隔线归属整条任务。原会话改为行尾终端图标入口，提供可访问名称；项目链接按需显示。桌面工作区复用同一列表层级。</p>
+  <h2>用户故事</h2>
+  <p>用户能快速扫描任务主题与状态，点标题查看详情，点行尾图标进入原会话；保留筛选、返回与滚动位置。长标题和项目名不撑宽页面，触屏入口保持至少 44px 命中区。</p>
+  <h2>技术设计</h2>
+  <p>AgentTasks.tsx 的 TaskRow 使用独立任务按钮、项目链接和会话按钮，避免嵌套交互。agent-tasks.css 统一网格行、日期、筛选与触屏命中区，移除 agent-workspace.css 和 native-session.css 中分散的列表样式。时间只显示时分，日期由已有分组标题承载；复用 SVG 图标、主题令牌与 i18n，不改变任务请求和刷新逻辑。</p>
+  <h2>验收</h2>
+  <p>仓库 quick 门禁通过；前端 129 个文件、936 个用例通过，typecheck、i18n、hover 和生产构建通过。构建保留已有大块体积提示。桌面检查 320、390、820、1100、1440 宽度及中英文／深浅主题，并检查首页工作区；Redmi Note 8 在 392 CSS px／coarse 下完成五项筛选、刷新保留选择、详情返回、原会话入口、真实手势滚动与四个底部主入口点按。筛选命中区至少 44px，会话入口为 44×52px，文档不滚动且无横向溢出。证据位于 /tmp/task-page-{phone,desktop}-acceptance.json，截图为 /tmp/task-page-after-phone.png 与 /tmp/task-page-after-workspace.png。使用隔离示例数据与私有 tmux 服务，不修改现用服务。</p>
+</section>
