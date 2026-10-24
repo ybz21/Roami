@@ -24,8 +24,8 @@ func TestExecutorDiscoveryDoesNotRunCommandsOrInferAccounts(t *testing.T) {
 		if candidate.Kind == "codex" {
 			found = candidate.Installed && candidate.Tracked
 		}
-		if candidate.Kind == "opencode" && candidate.Tracked {
-			t.Fatal("unimplemented tracked adapter exposed")
+		if candidate.Kind == "opencode" && !candidate.Tracked {
+			t.Fatal("OpenCode tracked adapter missing")
 		}
 	}
 	if !found {
@@ -62,7 +62,7 @@ func TestNativeOpenCodeExecutorDiscovery(t *testing.T) {
 	found := false
 	for _, candidate := range catalog.Candidates {
 		if candidate.Kind == "opencode" {
-			found = candidate.Installed && !candidate.Tracked && candidate.Authentication == "unknown"
+			found = candidate.Installed && candidate.Tracked && candidate.Authentication == "unknown"
 		}
 	}
 	if !found {

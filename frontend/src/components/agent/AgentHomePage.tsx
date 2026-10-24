@@ -1,9 +1,12 @@
+import { useEffect } from 'react'
 import { useI18n } from '../../i18n'
 import MobileSubPage from '../MobileSubPage'
 import AgentMemory from './AgentMemory'
 import AgentTasks from './AgentTasks'
 import AgentInbox from './AgentInbox'
 import AgentDebug from './AgentDebug'
+import AgentImprovement from './AgentImprovement'
+import { useAgentData } from './useAgentData'
 import NativeSession from './NativeSession'
 import { backAgentPage, openAgentPage, type AgentPageRoute } from './agent-page-route'
 import type { AgentInboxState } from './useAgentInbox'
@@ -16,6 +19,10 @@ export default function AgentHomePage({ page, node, inbox, projects, select, onS
   onSession: (id: string) => void; onChanged: () => void
 }) {
   const { t } = useI18n()
+  const rsi = useAgentData<{ developmentRsi: boolean }>(page.view === 'improvement' ? '/agent/status' : null, 60_000)
+  useEffect(() => {
+    if (page.view === 'improvement' && !rsi.loading && rsi.value?.developmentRsi !== true) backAgentPage(page)
+  }, [page, rsi.loading, rsi.value])
   const parts = page.origin.split('/')
   const cid = parts[0] === 'home' && parts[1] && parts[1] !== 'new' ? decodeURIComponent(parts[1]) : inbox.conversations[0]?.id || ''
   const title = t('agent.' + page.view)
@@ -26,6 +33,7 @@ export default function AgentHomePage({ page, node, inbox, projects, select, onS
       {page.view === 'notifications' && <AgentInbox inbox={inbox} select={select} />}
       {page.view === 'session' && <NativeSession id={page.task} node={node} projects={projects} onChanged={onChanged} />}
       {page.view === 'debug' && <AgentDebug cid={cid} branch={parts[2] ? decodeURIComponent(parts[2]) : ''} node={node} selected={page.task} unavailable={inbox.unavailable} onSelect={value => openAgentPage('debug', value)} />}
+      {page.view === 'improvement' && rsi.value?.developmentRsi === true && <AgentImprovement node={node} />}
     </section>
   </MobileSubPage>
 }

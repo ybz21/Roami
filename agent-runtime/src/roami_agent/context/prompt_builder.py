@@ -29,7 +29,7 @@ class PromptBuilder:
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
         self.chat_images = chat_images
-        self.remembered = RememberedContext(memory) if memory else None
+        self.remembered = RememberedContext(memory, settings) if memory else None
 
     async def _images(self, turn, plan, prompt):
         if self.chat_images:

@@ -1,0 +1,25 @@
+.agent-rsi { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-5); padding: var(--sp-4); }
+.agent-rsi-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+.agent-rsi-summary div { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.agent-rsi-summary span, .agent-rsi-muted, .agent-rsi-row small { color: var(--text-dim); font-size: var(--fs-meta); }
+.agent-rsi-summary strong { font-size: var(--fs-title); font-weight: 600; }
+.agent-rsi-section { border-top: 1px solid var(--border-subtle); padding-top: var(--sp-4); min-width: 0; }
+.agent-rsi-section h3, .agent-rsi-section h4 { margin: 0; font-size: var(--fs-body); font-weight: 600; }
+.agent-rsi-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.agent-rsi-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.agent-rsi-form label { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; font-size: var(--fs-sm); }
+.agent-rsi-form .ant-input-number, .agent-rsi-form .ant-select { width: 100%; }
+.agent-rsi-form .ant-checkbox-wrapper { flex-direction: row; align-items: center; }
+.agent-rsi-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); }
+.agent-rsi-row { display: flex; gap: var(--sp-3); align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding: var(--sp-3) 0; min-width: 0; }
+.agent-rsi-row small { display: block; overflow-wrap: anywhere; }
+.agent-rsi-row > span { min-width: 0; overflow-wrap: anywhere; }
+.agent-rsi-cycle { display: flex; flex: 1; justify-content: space-between; gap: var(--sp-3); text-align: start; border: 0; background: transparent; color: var(--text-bright); padding: var(--sp-2) 0; cursor: pointer; min-width: 0; }
+.agent-rsi-detail { border-left: 1px solid var(--border-subtle); padding: var(--sp-3); margin-top: var(--sp-3); overflow-wrap: anywhere; }
+.agent-rsi-detail dl div { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.agent-rsi-detail dd { margin: 0; }
+.agent-rsi-error { color: var(--danger); overflow-wrap: anywhere; }
+html[data-size="compact"] .agent-rsi-form { grid-template-columns: minmax(0, 1fr); }
+html[data-pointer="coarse"] .agent-rsi-cycle { min-height: var(--tap); }
+html[data-pointer="coarse"] .agent-rsi-section summary { min-height: var(--tap); padding-block: var(--sp-3); }
+html[data-pointer="coarse"] .agent-rsi-row .ant-checkbox-wrapper { min-width: var(--tap); min-height: var(--tap); display: flex; align-items: center; }

@@ -1,9 +1,27 @@
 """Explicit role-specific provider configuration without credential material."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import model_endpoint
+
+
+def settings_with_route(settings, role, route):
+    if role != "main":
+        return replace(settings, worker_route=route)
+    return replace(
+        settings,
+        endpoint=route.endpoint,
+        model=route.name,
+        key_env=route.key_env,
+        timeout_seconds=route.timeout_seconds,
+        model_retries=route.max_retries,
+        model_capabilities=route.capabilities,
+        model_cache=route.cache,
+        model_parameters=route.parameters,
+        context_window=route.context_window,
+        image_limits=route.image_limits,
+    )
 
 
 @dataclass(frozen=True)

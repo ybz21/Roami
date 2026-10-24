@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.improvement import policy_value
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
 from roami_agent.providers.model_catalog import fetch_catalog
@@ -24,7 +25,15 @@ class RuntimeSettings:
         self.updating = False
 
     def __getattr__(self, name):
-        return getattr(self.current, name)
+        value = getattr(self.current, name)
+        if name in {
+            "memory_recall_limit",
+            "memory_recall_tokens",
+            "tool_directory_page_size",
+            "keep_recent_tokens",
+        }:
+            return policy_value(name, value)
+        return value
 
 
 def settings_path(root):

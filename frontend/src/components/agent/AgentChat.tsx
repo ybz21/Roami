@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
+import { agentName, isAgentKind, type AgentKind } from '../../agent-kind'
 import { AgentLogo, ArrowDown, ArrowUp, BellIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PanelRightIcon, RefreshIcon, StopIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -16,6 +17,7 @@ import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
 import './agent-workspace.css'
 import { useAgentThread } from './useAgentThread'
+import { useAgentData } from './useAgentData'
 import { useAgentHistory } from './useAgentHistory'
 import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentDraft } from './useAgentDraft'
@@ -50,13 +52,14 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
 }) {
   const { t } = useI18n(), { phone, landscape, size } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch, node)
+  const rsi = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60_000)
   const workspace = useAgentWorkspace(node), wide = size === 'large'
   const workspaceSelectionKey = 'roami.task.selection.' + (node || 'local') + ':' + cid
   const [workspaceTask, editWorkspaceTask] = useAgentDraft(workspaceSelectionKey)
   const setWorkspaceTask = (value: string) => { editWorkspaceTask(value); try { if (value) localStorage.setItem(workspaceSelectionKey, value); else localStorage.removeItem(workspaceSelectionKey) } catch { /* Keep selection in memory. */ } }
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
-  const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
+  const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState<AgentKind>('codex')
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const showPanel = (next: 'tasks' | 'memory' | 'context') => {
     if (phone && next !== 'context') { openAgentPage(next); return }
@@ -225,11 +228,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
   }
   const moreMenu = { items: [
+    ...(rsi.value?.developmentRsi === true ? [{ key: 'improvement', label: t('agent.improvement'), icon: <ClockIcon size={16} /> }] : []),
     { key: 'debug', label: t('agent.debug'), icon: <CodeIcon size={16} /> },
     ...(!wide ? [
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     ] : []),
-  ], onClick: ({ key }: { key: string }) => { if (key === 'debug') openAgentPage('debug'); else showPanel(key as 'tasks' | 'memory') } }
+  ], onClick: ({ key }: { key: string }) => { if (key === 'debug' || key === 'improvement') openAgentPage(key); else showPanel(key as 'tasks' | 'memory') } }
   const secondaryActions = <>
     <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
@@ -298,7 +302,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
         </form>
         {target !== 'direct' && <div className="agent-task-options">
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
-          <Dropdown trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'codex', label: 'Codex', icon: <AgentLogo kind="codex" /> }, { key: 'claude', label: 'Claude Code', icon: <AgentLogo kind="claude" /> }], onClick: ({ key }) => setExecutor(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor as 'codex' | 'claude'} />{executor === 'codex' ? 'Codex' : 'Claude Code'}<ChevronDown /></button></Dropdown>
+          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: (['codex', 'claude', 'opencode', 'pi'] as const).map(kind => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown>
         </div>}
       </div>
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />

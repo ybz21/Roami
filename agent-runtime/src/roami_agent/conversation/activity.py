@@ -102,7 +102,7 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                     if spec.get("routingDecision")
                     else {}
                 ),
-                "external": spec["executor"] in {"codex", "claude"},
+                "external": spec["executor"] in {"codex", "claude", "opencode", "pi"},
                 "delivered": bool(attempt.get("session_id"))
                 and bool(
                     rows(

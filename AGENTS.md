@@ -427,6 +427,30 @@ agent-runtime/src/roami_agent/tools/
   </ul>
 </section>
 
+<section id="roami-agent-rsi-design" lang="zh-CN">
+  <h1>Roami Agent RSI 方案 · 2026-10-22</h1>
+  <p>按用户要求，完整方案、整体架构图、决策空间展开图和可编辑 Excalidraw 文件统一保存在 <a href="docs/design/20261022-roami-agent-rsi/index.html">docs/design/20261022-roami-agent-rsi/</a>，后续修订维护该正文。</p>
+  <h2>产品设计</h2>
+  <p>每日主动跑用例或设计新实验，观察实际行为并提出修改意见，在隔离源码工作区实施后验证结果效果、交付时间与单位成功 Token；用户日常使用记录不是必要输入。参数搜索只属于辅助实验。</p>
+  <h2>用户故事</h2>
+  <p>用户能查看跨机评测证据、具体策略差异和三目标变化，在允许范围内应用或恢复策略，日常会话与测试环境隔离。</p>
+  <h2>技术设计</h2>
+  <p>复用运行时 trace、任务验收、调度与存储；已实现隔离评测、每日worker、规则回顾和有限参数发布底座。现已接入ResearchWorker、语义复盘、持久工单、隔离补丁、源码A/B和专用评测实例观察；真实每日评测尚未启用。完整模块、协议、接口和验收标准见设计正文。</p>
+  <p>调研与评价修订：<a href="docs/design/20261022-roami-agent-rsi/research.html">开源做法与源码核对</a>、<a href="docs/design/20261022-roami-agent-rsi/evaluation.html">程序员工作 / 业余任务的 80 项候选规格与评价标准</a>。80项仅为候选池，正式库存已调整为60项（公开20、自有真实20、机制回归20）；尚无真实模型全量成绩，权重、断言和资源上限均有版本记录。</p>
+  <p>自动化闭环修订：常驻RSI服务使用内部持久动作队列推进Codex复盘、Codex汇总GitHub Issue、Codex修复、独立验证、专用实例应用、观察与关闭/重开。Codex执行采用预算准入、原生用量与超时，CLI不保证供应商侧硬Token截断。GitHub Issue确认后才派修复，独立验收后发草稿PR；状态、幂等outbox、预算及关闭证据契约见<a href="docs/design/20261022-roami-agent-rsi/index.html#closed-loop">详细设计</a>。</p>
+  <p>参与者与交接修订：<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">图表版架构与执行设计</a>以架构图、执行手段表和闭环条件明确角色；运行边界与模块折叠展示。控制器发起，被测Agent做题，Codex复盘并输出文档，Codex汇总Issue，Codex隔离修改，独立服务验收应用，后续两个合格日周期后控制器关单。本地角色链已接入，正式运行仍待用例和机器配置；总方案的历史技术契约保留在折叠附录。</p>
+  <h3>首批实施记录 · 2026-10-23</h3>
+  <p>范围修订：正式任务库存为60项（公开20、自有真实20、机制回归20），每天完整执行60项，并回顾所有指标与具体日志；新想法作为剩余预算内的额外开发实验，不替换正式题。机制回归优先使用无模型测试，不预占模型Token；所有测试机共享日预算。主动观察和源码补丁已接入，正式场景与真实模型验收仍未完成。</p>
+  <p>已实现评测CLI、隔离文件运行、独立判定、成对比较、预算账本、每日worker与有限参数候选队列。4条公开财务组件合同已锁定，2条确定性设施任务已完成A/B；正式测试机、真实模型收益、完整60例及线上发布未完成。详见 <a href="docs/design/20261022-roami-agent-rsi/implementation.html">实施记录</a> 和 <a href="docs/development/agent-rsi.md">运行手册</a>。</p>
+  <p>每日全量修订：规则回顾已逐项接入模型/工具具体日志，缺日志或覆盖不足不能记为当日完成。rsi-v1.3要求正式60项每天全跑，A/B共120次执行；预算不足不静默缩题。quick门禁915项Python通过，最终专项51项、前端910项及生产构建通过；手机组件使用隔离示例数据验证触控与回顾覆盖，真实模型成绩和完整自主源码修改仍未交付。</p>
+  <p>验收：仓库quick门禁通过（896项Python测试、全量Go与前端静态检查）；最终记忆结算修订后专项50项通过。独立tmux实例已按身份清理，无真实模型收益分数。</p>
+
+  <h3>自动研发实施 · 2026-10-23</h3>
+  <p>ResearchWorkflow/ResearchWorker持久派发；behavior_observer逐项读证据；source_revision在detached worktree应用补丁；candidate_checks用冻结镜像、只读基线测试与独立私有门槛验证；release_observation仅绑定RSI runner，并在两个后续完整日周期后关单或退化回滚重开。原生模型费用与每日评测共用账本，未知调用不重放。源代码权限通过本机CLI配置，Web仅展示进度及恢复阻塞。设施测试不代表真实模型成绩；正式机器、60项材料、私有验证和预算仍须接齐。</p>
+  <p>套件验收修订：daily_suite.py统一检查20公开/20自有/20机制配额、指定ID及固定来源；私有集禁止已知ID、cluster与完全相同输入重叠。authored-v3保护冻结输入，PPT对照原件并核对PDF，回测纠错核对因果重跑和退市资产。20机制容器回归与20判定器正反样例通过；5项复杂产物仍待校准评分。公开19项ID已选择，7项可执行合同；其余13项正式合同、私有验证和机器预算未齐。材料hash和精简验收表保存在上述docs入口。</p>
+  <p>全链执行与日终修订：容器内启用Main→Native Worker→回报，工作区只绑定外层容器目录，不建立Go/tmux会话，内部waiting_user如实保留，最终由退出后的宿主评分器验收。评分耗时计入总交付时限；评分或用量未定、语义回顾缺项时daily_complete保持false。私有54项不同代码契约已按24/30划分并通过正反验收，不替代办公/GUI隐藏场景；公开合同增至12项，正式共52/60。一次真实预检返回HTTP401且用量未知，未自动重试或启用日程。最新状态和私有范围摘要见docs实施页。</p>
+</section>
+
 <section id="skill-cli-organization-review" lang="zh-CN">
   <h1>Skill 与 CLI 职责整理 · 2026-10-21</h1>
   <p>状态：已实施。两个内置 Skill、公开 CLI 命令族、受管适配与旧路径兼容已经落地；验收使用独立数据目录和 tmux 服务。</p>
@@ -776,6 +800,32 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
   <p>桌面中文深色 / 英文浅色在 320、390、820、1100、1280、1600、1920 宽度无文档溢出。Redmi Note 8 真机以 392 CSS px / coarse 指针完成预设编辑、保存、切换、恢复、Android 返回及升级确认；键盘 314px 时保存按钮位于键盘上方，触控高度 44px，四个底部主入口恢复正常。截图与验收脚本在 /tmp/agent-models-*，现用服务及用户原生配置未修改。</p>
 </section>
 
+<section id="roami-rsi-development-only" lang="zh-CN">
+<h2>RSI开发版边界修订 · 2026-10-23</h2>
+<p>RSI仅在显式development编译通道运行；普通安装版不构造服务、worker、接口或策略绑定，旧enabled设置不生效，入口由当前节点状态控制。改进只应用于开发评测实例，经正常审阅发布后交付用户。无版本差异每日60次，候选对照120次；全部指标与日志仍逐次复盘。</p>
+<p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
+<p>本轮验收：Go与full门禁通过，Python1086项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
+</section>
+
+<section id="roami-rsi-daily-v1" lang="zh-CN">
+<h2>RSI首版自动执行 · 2026-10-24</h2>
+<h3>产品设计与用户故事</h3><p>开发版每天03:00由内置定时器发起完整60项，不依赖聊天或用户使用记录。程序出分、复盘Agent逐项看指标与日志，创建去重内部问题单；修复Agent独立worktree改允许范围的运行时代码，独立验收后自动提交草稿PR（显式配置GitHub目标），人工审阅合并。仅开发评测实例自动应用并观察，两次后续完整日后才关单，退化回滚重开。</p>
+<h3>技术设计与模块</h3><pre>EvaluationWorker → ResearchWorkflow / behavior_observer → source_revision
+→ candidate_checks（原问题、回归、全量与私有配对）
+→ github_publication（重验证据、quick/full、专用分支、草稿PR与截图）
+→ release_observation（开发评测实例、后续全量观察、关闭/回滚）</pre>
+<p>GitHub配置位于账本旁的私有review-publication目录，缺省不向外写入。创建请求断线先读远端对账，未确认结果不重复POST；不自动合并，不上传原始日志、隐藏答案或凭证。OpenCode和Pi托管任务采用原生JSON进程加常驻控制器，续聊绑定原生ID；完成确认进程退出与无额外写进程。OpenCode2额外核对精确会话导出的提示词、完成状态与时间，禁止用旧结果冒充新完成。</p>
+<p>7项复杂产物已接离线渲染和独立双评分，但本机容器runner已登记，真实校准和日预算尚未齐，不能宣称每日评测已经启用。详见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#first-version">首版运行图表</a>及<a href="docs/development/agent-rsi.md#daily-v1">操作手册</a>。</p>
+</section>
+
+<section id="roami-rsi-codex-period" lang="zh-CN">
+<h2>RSI Codex 三角色与汇总 Issue · 2026-10-24</h2>
+<h3>产品设计</h3><p>复盘、Issue、修复固定三个Codex角色。完整复盘列全部待修点，全机完成后每天只发一个GitHub Issue，确认回执后按条目修复。独立验收后发回链草稿PR，两个后续完整周期观察通过才勾选，全部完成关Issue，退化回滚重开。普通安装版不运行。</p>
+<h3>用户故事</h3><p>按每日自动执行要求，每天03:00完整跑60项；人查看每日报告、Issue和PR，审阅合并，不逐日派任务。未确认预算与评分校准之前保持停用。</p>
+<h3>技术设计</h3><p>behavior_observer最多4项一批，保护题隔离；codex_roles使用只读无工具的原生CLI，记录thread ID、JSONL与用量。review_report和ResearchWorkflow持久保存全量文档与全机汇总；github_issues对账、发布确认并同步清单，source_revision只应用校验补丁。一次只观察一个源码候选，防止后续修复覆盖观察版本。CLI无供应商侧总Token硬截断保证，超额或未知调用阻止后续付费执行。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；合并主线后quick/full通过（Python1232项），前端952项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
+</section>
+
 <section id="professional-agent-model-picker" lang="zh-CN">
   <h2>Agent 模型下拉选择 · 2026-10-22</h2>
   <h3>产品设计与用户故事</h3>
@@ -1076,6 +1126,27 @@ conversation/professional_activity.py
   <p>验收：Redmi Note 8 的 Chrome 和正式签名 App 在自签 HTTPS 下完成 PDF 绘制与翻页、PPTX 触控滚动和返回；两份文件通过系统保存框保留中文及加号文件名，手机文件 SHA-256 与服务器原件分别一致。接口要求 HttpOnly 登录 Cookie，确认原生保存携带登录态。跨节点链接与显式下载通过回归检查；前端完整检查、仓库 full 门禁及 Android 单元测试和签名构建通过。测试材料使用隔离示例，不外传用户文档。</p>
 </section>
 
+<section id="rsi-experiment-workflow" lang="zh-CN">
+<h2>RSI 实验 Workflow · 2026-10-24</h2>
+<h3>Product Design / User Stories</h3>
+<p>开发版“设置 / 实验”用可点选七节点显示评测、Codex复盘、Codex汇总Issue、Codex修复、独立验收、草稿PR和观察。用户配置机器、日程、预算、Codex额度和重试，再预览运行；运行记录和每日Issue独立查看。普通安装版不注册入口或挂载评测组件。</p>
+<h3>Technical Design</h3>
+<pre>SettingsPage → ExperimentWorkflow / AgentImprovement → 所有者Go网关
+→ development-only HTTP → ImprovementControl / ResearchWorkflow
+POST preview：只读预估最大配对预留；PUT research：限额字段与修订号校验</pre>
+<p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
+<p>验收：quick/full通过，Python1238项、前端132文件/960项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
+</section>
+
+<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
+
+<section id="rsi-pipeline-delivery-20261024" lang="zh-CN">
+<h2>RSI运行闭环 · 2026-10-24</h2>
+<h3>Product Design / User Stories</h3>
+<p>开发版设置的实验/RSI提供独立运行地址、逐节点职责/状态/文件、GitHub汇总Issue及本地问题列表；从历史运行复测相同Case，区分仍存在、未复现、未验证、未覆盖和合同变化。普通安装不启用。</p>
+<h3>Technical Design</h3>
+<p>RunRecords在同一私有SQLite保存Run/Attempt/Case/Issue/Observation/Effect；EvaluationWorker复用单队列，PipelineReportWorker用Codex复盘和问题排序、程序脱敏并幂等发布GitHub。PipelineRuns按Run读取状态和hash校验产物，结束记录不轮询。正式源码修复沿用ResearchWorker与独立验证、发布、观察门禁。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组10项复测真实任务0/6、机制4/4；Issue #446保留19项仍存在、8项未验证。全仓full门禁通过，Python1249项、前端963项、桌面9档和Android真机触控/滚动通过。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
 <section id="background-task-list-20261024" lang="zh-CN">
   <h1>后台任务列表整理 · 2026-10-24</h1>
   <h2>产品设计</h2>

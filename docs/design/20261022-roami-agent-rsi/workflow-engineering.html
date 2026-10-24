@@ -1,0 +1,52 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RSI · 运行与问题闭环</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"></head><body><main><article class="rsi-overview">
+<header><h1>RSI · 运行与问题闭环</h1><p class="rsi-lead">设置 → 实验 → RSI。仅开发版注册接口和 Worker，普通安装不启动 RSI。</p></header>
+<section><h2>产品设计与用户故事</h2><p>配置下次流水线；选择一次运行，查看每个节点的职责、状态、历史尝试和文件。点击本地问题可回到最近运行；“复测同组 Case”沿用 Case 清单，重新冻结当前配置，不覆盖旧记录。</p></section>
+<section><h2>架构</h2><svg viewBox="0 0 1080 330" role="img" aria-label="配置版本冻结为一次运行，程序调度节点，数据库记录状态，文件系统记录产物"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L7 4L0 8" fill="none" stroke="var(--text-dim)"/></marker></defs>
+<g fill="var(--bg-container)" stroke="var(--border)"><rect x="8" y="16" width="250" height="86"/><rect x="305" y="16" width="300" height="86"/><rect x="652" y="16" width="420" height="86"/><rect x="8" y="182" width="322" height="110"/><rect x="378" y="182" width="322" height="110"/><rect x="748" y="182" width="324" height="110"/></g>
+<g fill="var(--text-bright)" font-family="system-ui,sans-serif" font-size="18"><text x="24" y="47">实验注册表 / 定义版本</text><text x="24" y="78">RSI；以后可注册 OKR</text><text x="321" y="47">Run：冻结配置、源码、Case</text><text x="321" y="78">手动 / 每日定时，幂等触发</text><text x="668" y="47">节点调度器：依赖、预算、租约</text><text x="668" y="78">Roami Agent / Codex / 独立程序</text><text x="24" y="216">同一 SQLite 事务</text><text x="24" y="247">Run / Attempt / Event / Outbox</text><text x="394" y="216">私有文件产物库</text><text x="394" y="247">不可变文件 + SHA256 + 类型</text><text x="764" y="216">按 Run 查询与预览</text><text x="764" y="247">该次节点状态、产物和报告</text></g>
+<g fill="none" stroke="var(--text-dim)" stroke-width="2" marker-end="url(#a)"><path d="M258 59H297"/><path d="M605 59H644"/><path d="M862 102V142H170V174"/><path d="M862 142H540V174"/><path d="M330 237H370"/><path d="M700 237H740"/></g></svg>
+<pre>程序每天触发完整60项 / 用户手动诊断10项
+                   ↓
+         Roami Agent + 容器外判定器
+                   ↓ 失败、阻塞也记录
+     Codex复盘 → Codex问题排序 → GitHub汇总Issue
+                   ↓ 有正式证据与可信源码配置
+     Codex修复 → 程序独立A/B验收 → 草稿PR → 两日观察</pre>
+<p>诊断模式只生成报告与Issue，不跳过正式验收而自动改线上代码。源码修复沿用独立 ResearchWorker；手工修复版本也可通过同组复测追踪问题。</p></section>
+<section><h2>节点执行手段</h2><div class="tablewrap"><table><thead><tr><th>节点 / 执行者</th><th>做什么</th><th>保存什么</th></tr></thead><tbody>
+<tr><td>评测 / 程序与Roami Agent</td><td>冻结Case/hash和预算，隔离运行；逐项独立判定</td><td>Case结果、用量、工具/角色日志、产物、镜像指纹</td></tr>
+<tr><td>复盘 / Codex</td><td>逐项检查指标和行为，区分事实与根因假设</td><td>review.md、调用计量与原始回执</td></tr>
+<tr><td>Issue / Codex与程序</td><td>Codex排序已确认问题；程序生成脱敏清单并自动发布</td><td>issue-plan.json、issue.md、GitHub回执</td></tr>
+<tr><td>修复 / Codex</td><td>在可信源码范围内、独立worktree产生候选</td><td>源码差异、候选hash、修改说明</td></tr>
+<tr><td>验收 / 独立程序</td><td>回归与正式冻结Case配对；缺分和未知用量不能晋级</td><td>验证报告、A/B指标与证据hash</td></tr>
+<tr><td>发布 / 程序</td><td>质量门禁通过后创建草稿PR，不自动合入用户版本</td><td>提交hash、PR与检查回执</td></tr>
+<tr><td>观察 / 程序</td><td>两个后续完整合格日，回归则撤回评测候选</td><td>按日证据、关闭或回滚回执</td></tr>
+</tbody></table></div></section>
+<section><h2>工程实现</h2><pre>SettingsPage / AgentImprovement / PipelineRuns
+                  ↓ 登录与owner鉴权
+Go /api/agent/improvement/pipeline/* → Python私有HTTP
+                  ↓
+ImprovementControl + EvaluationWorker（共用单执行队列）
+RunRecords（SQLite）+ PipelineReportWorker（Codex / GitHub）
+ResearchWorker（正式复盘 / Codex修复 / 验证 / 发布 / 观察）
+                  ↓
+data_root/agents/improvement/
+  ledger.sqlite3                   Run / Attempt / Case / Issue / Observation / Effect
+  pipeline-artifacts/owner-hash/run-id/stage/  不可变文件 + SHA256
+  pipeline-artifacts/owner-hash/run-id/case-hash/  私有运行原始记录</pre>
+<p>Run与7个节点先同事务落库，再开始模型调用。配置CAS保存，运行冻结快照。每个Run、节点、文件均按owner查验；文件限制大小、边界与hash，只作为文本预览，不执行HTML。GitHub稳定标记按owner+Run生成；POST结果未知时先查远端，禁止盲重提。付费用量未知也不自动重放。取消排队立即结束，取消运行只停该Run拥有的资源，保留已产生证据。</p>
+<pre>GET  /api/agent/improvement                         配置、运行列表、本地问题
+PUT  /api/agent/improvement/pipeline/settings        CAS配置诊断预算与自动发布
+POST /api/agent/improvement/pipeline/requests        诊断 / 同组复测，幂等key
+GET  /api/agent/improvement/pipeline/runs/{id}       该次节点、Case、问题、文件索引
+GET  /api/agent/improvement/pipeline/runs/{id}/artifacts/{id}
+POST /api/agent/improvement/pipeline/runs/{id}/resume   仅恢复已对账的报告节点
+POST /api/agent/improvement/pipeline/runs/{id}/publish  明确发布或对账</pre></section>
+<section><h2>如何确认修好</h2><div class="tablewrap"><table><thead><tr><th>本次状态</th><th>程序依据</th></tr></thead><tbody>
+<tr><td>仍存在</td><td>同Case再次观测到相同错误码或失败检查</td></tr>
+<tr><td>本次未复现</td><td>相同Case合同通过，评分非待定、用量已知；仍不自动关闭Issue</td></tr>
+<tr><td>未验证 / 未覆盖</td><td>失败、阻塞、待评分、未知用量 / 本次没有运行该Case</td></tr>
+<tr><td>不可比较</td><td>Case合同hash变化；不借改题获得“修复”</td></tr>
+</tbody></table></div><p>页面分别显示真实任务与零模型机制回归。失败耗时不当成速度提升，未知Token不记0；提高输出上限等配置变化写入快照，不能据此宣称Token节省。</p></section>
+<section><h2>本机验收与边界</h2><p>已将历史10项导入正式Run存储并自动发布 <a href="https://github.com/ybz21/Roami/issues/445">Issue #445</a>。本轮修复工作区委派与执行器来源误传，使用相同10项复测并逐问题记录。本轮默认诊断：生成30万、Codex每角色6.4万、输出8192、记忆2048；本机复测明确配置生成50万，与旧2048/512输出快照分别保存。</p><p>正式库存仍为60项。7项复杂产物尚缺真实校准评分，正式每日自动调度保持关闭，不能把诊断或机制通过当作完整60项验收。本文描述已实现的运行页面和报告发布；正式自动修复晋级仍服从原验收与观察门禁。</p><p><a href="light-run-20261024.html">前一轮10项原始验收记录</a> · <a href="automation-roles.html">正式自动修复职责</a></p></section>
+</article></main></body></html>

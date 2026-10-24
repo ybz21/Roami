@@ -8,7 +8,7 @@ from roami_agent.protocol.tools import object_schema
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row
 
-EXECUTORS = {"native", "codex", "claude"}
+EXECUTORS = {"native", "codex", "claude", "opencode", "pi"}
 
 
 def routing_schema():
@@ -18,8 +18,18 @@ def routing_schema():
             "explicitExecutor": {
                 "type": ["string", "null"],
                 "enum": [None, *sorted(EXECUTORS)],
-                "description": "Required on every assessment: the user's explicitly requested executor, or null only when the user made no executor choice. Never put the choice only in goal or routingExplanation.",
+                "description": "Required: the user's requested executor; null only with no user choice. Never hide a requested CLI in goal or relabel it as native.",
             },
+            "model": object_schema(
+                {
+                    "id": {"type": "string", "minLength": 1, "maxLength": 300},
+                    "quote": {
+                        **text,
+                        "description": "Exact user quote requesting this native CLI model. Omit model to use the CLI default.",
+                    },
+                },
+                ["id", "quote"],
+            ),
             "taskDescription": {**text, "maxLength": 1000},
             "complexity": {
                 "type": "string",
@@ -133,6 +143,12 @@ class TaskRouter:
             or assessment["userQuote"] not in json.loads(origin["content_json"]).get("text", "")
         ):
             raise DomainError("ROUTING_EXPLICIT_SOURCE_REQUIRED")
+        model = assessment.get("model")
+        if model and (
+            not model["quote"].strip()
+            or model["quote"] not in json.loads(origin["content_json"]).get("text", "")
+        ):
+            raise DomainError("ROUTING_EXPLICIT_SOURCE_REQUIRED")
         target = dict(args.get("target") or {"kind": "new_session"})
         workflow = await workspace_preference(
             self.memory, assessment.get("workspacePreference"), binding, target
@@ -158,7 +174,11 @@ class TaskRouter:
             "capabilityVerification": "not_verified",
             "requiredCapabilities": assessment.get("requiredCapabilities", []),
         }
+        if model:
+            decision["model"] = model["id"]
         if target["kind"] == "session":
+            if model:
+                raise DomainError("INVALID_SESSION_EXECUTION_SPEC")
             identity = await self.targets.resolve("session", target["sessionId"])
             actual = identity.get("executor")
             if explicit and actual != explicit:
@@ -225,6 +245,8 @@ class TaskRouter:
                     raise DomainError("ROUTING_PROFESSIONAL_UNAVAILABLE")
                 if catalog not in decision["metadataRefs"]:
                     decision["metadataRefs"].append(catalog)
+            if selected == "native" and model:
+                raise DomainError("INVALID_TASK_MODEL")
             if selected != "native":
                 if explicit:
                     catalog = catalog or await self.targets.executors()

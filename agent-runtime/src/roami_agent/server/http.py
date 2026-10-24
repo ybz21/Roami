@@ -213,6 +213,205 @@ def create_app(runtime, *, manage_lifecycle=True):
             )
         }
 
+    if runtime.improvement is not None:
+
+        @app.get("/v1/improvement/cycles")
+        async def improvement_cycles(owner: Owner, limit: int = Query(default=20, ge=1, le=100)):
+            return {"data": await runtime.improvement.list(owner, limit)}
+
+        @app.get("/v1/improvement/cycles/{cycle_id}")
+        async def improvement_cycle(cycle_id: str, owner: Owner):
+            return {"data": await runtime.improvement.get(owner, cycle_id)}
+
+        async def improvement_payload(request):
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > 8192:
+                    raise DomainError("RSI_PAYLOAD_TOO_LARGE", 413)
+            try:
+                result = json.loads(body)
+            except (ValueError, RecursionError):
+                raise DomainError("RSI_INVALID_REQUEST") from None
+            if not isinstance(result, dict):
+                raise DomainError("RSI_INVALID_REQUEST")
+            return result
+
+        @app.get("/v1/improvement")
+        async def improvement_overview(owner: Owner):
+            return {"data": await runtime.improvement.overview(owner)}
+
+        @app.put("/v1/improvement/pipeline/settings")
+        async def pipeline_settings(request: Request, owner: Owner):
+            from roami_agent.improvement.github_publication import publication_profile
+
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if (
+                payload.get("auto_publish")
+                and publication_profile(runtime.improvement.ledger.path.parent, owner) is None
+            ):
+                raise DomainError("RSI_PUBLICATION_SETUP_REQUIRED")
+            return {
+                "data": await asyncio.to_thread(runtime.improvement.runs.configure, owner, payload)
+            }
+
+        @app.post("/v1/improvement/pipeline/requests")
+        async def pipeline_request(request: Request, owner: Owner):
+            from roami_agent.improvement.pipeline_runner import enqueue_diagnostic
+
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                enqueue_diagnostic, runtime.improvement, owner, await improvement_payload(request)
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}")
+        async def pipeline_run(run_id: str, owner: Owner):
+            return {"data": await asyncio.to_thread(runtime.improvement.runs.get, owner, run_id)}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}/artifacts/{artifact_id}")
+        async def pipeline_artifact(run_id: str, artifact_id: str, owner: Owner):
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.runs.read_artifact, owner, run_id, artifact_id
+                )
+            }
+
+        @app.post("/v1/improvement/pipeline/runs/{run_id}/resume")
+        async def pipeline_resume(run_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            return {"data": await asyncio.to_thread(runtime.improvement.runs.resume, owner, run_id)}
+
+        @app.post("/v1/improvement/pipeline/runs/{run_id}/publish")
+        async def pipeline_publish(run_id: str, owner: Owner):
+            from roami_agent.improvement.pipeline_reports import publish_run_issue
+
+            ModelSettings.owner(owner)
+            records = runtime.improvement.runs
+            value = await asyncio.to_thread(records.get, owner, run_id)
+            plan = next((a for a in value["artifacts"] if a["name"] == "issue-plan.json"), None)
+            if plan is None or not any(a["name"] == "review.md" for a in value["artifacts"]):
+                raise DomainError("RSI_REVIEW_REPORT_UNAVAILABLE")
+            body = await asyncio.to_thread(records.read_artifact, owner, run_id, plan["id"])
+            receipt = await publish_run_issue(records, owner, run_id, json.loads(body["text"]))
+            records.node(owner, run_id, "issue", "succeeded")
+            if value["mode"] in {"diagnostic", "imported"} and value["state"] in {
+                "completed",
+                "blocked",
+            }:
+                records.set_state(owner, run_id, "completed")
+            return {"data": receipt}
+
+        @app.get("/v1/improvement/research")
+        async def improvement_research(owner: Owner):
+            return {"data": await asyncio.to_thread(runtime.improvement.research.snapshot, owner)}
+
+        @app.put("/v1/improvement/research")
+        async def improvement_experiment_settings(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                runtime.improvement.research.configure_experiment,
+                owner,
+                await improvement_payload(request),
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.post("/v1/improvement/preview")
+        async def improvement_preview(owner: Owner):
+            from roami_agent.improvement.experiment_preview import preview
+
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    preview, runtime.improvement, owner, runtime.settings.current
+                )
+            }
+
+        @app.post("/v1/improvement/research/{action_id}/resume")
+        async def improvement_research_resume(action_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.research.resume, owner, action_id
+                )
+            }
+
+        @app.put("/v1/improvement/preferences")
+        async def improvement_preferences(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                runtime.improvement.control.save, owner, await improvement_payload(request)
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.post("/v1/improvement/machines")
+        async def improvement_machine(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.control.register_machine,
+                    owner,
+                    await improvement_payload(request),
+                    local_only=True,
+                )
+            }
+
+        @app.post("/v1/improvement/requests")
+        async def improvement_request(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if set(payload) != {"machine_id", "request_key"}:
+                raise DomainError("RSI_INVALID_REQUEST")
+            result = await asyncio.to_thread(runtime.improvement.control.enqueue, owner, **payload)
+            runtime.improvement.wakeup.set()
+            return {"data": result}
+
+        @app.post("/v1/improvement/requests/{request_id}/cancel")
+        async def cancel_improvement_request(request_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            result = await asyncio.to_thread(runtime.improvement.control.cancel, owner, request_id)
+            runtime.improvement.wakeup.set()
+            return {"data": result}
+
+        @app.post("/v1/improvement/releases")
+        async def release_improvement(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if set(payload) != {"cycle_ids", "expected_seq", "request_key"}:
+                raise DomainError("RSI_INVALID_REQUEST")
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.releases.publish, owner, **payload
+                )
+            }
+
+        @app.post("/v1/improvement/rollback")
+        async def rollback_improvement(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if not {"expected_seq", "request_key"} <= set(payload) or set(payload) - {
+                "expected_seq",
+                "request_key",
+                "release_id",
+            }:
+                raise DomainError("RSI_INVALID_REQUEST")
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.releases.rollback, owner, **payload
+                )
+            }
+
+        @app.post("/v1/improvement/prepare")
+        async def prepare_improvement(owner: Owner):
+            ModelSettings.owner(owner)
+            from roami_agent.improvement.corpus import prepare_corpus
+
+            return {"data": await asyncio.to_thread(prepare_corpus, runtime.improvement, owner)}
+
     @app.get("/v1/tool-directory/{name}")
     async def tool_operation(name: str, owner: Owner):
         runtime.capability_settings.view(owner)
@@ -425,6 +624,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "memoryTimezone": runtime.memory.daily.timezone,
+                "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
                 "images": runtime.settings.route("main").capabilities.get("images") is True,
                 "writerBacklog": runtime.db.pending,
@@ -668,6 +868,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             key=body.requestKey,
             parent_task_id=body.parentTaskId,
             executor=body.executor,
+            model=body.model,
             target=body.target,
             from_message_id=body.fromMessageId,
             record_intent=True,

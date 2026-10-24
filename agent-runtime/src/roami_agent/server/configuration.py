@@ -47,7 +47,7 @@ MAIN_INSTRUCTIONS = (
     "A task_steer receipt in stopping state is queued while waiting for stop proof, not a failed dispatch. "
     "Never poll or create a replacement task. "
     "Every new delegate call includes routing={complexity:bounded|complex,complexityBasis:{dimension:fact},"
-    "routingExplanation:concrete reason in the user language,explicitExecutor:native|codex|claude|null}. "
+    "routingExplanation:reason in user language,explicitExecutor:requested kind or null}. "
     "Always fill explicitExecutor: use the user's requested executor, or null only when no executor was specified. "
     "When null, omit userQuote; never ask the user to choose an executor just to repair tool arguments. "
     "Never leave a user choice only in goal, routingExplanation or userQuote. Assess in this same turn, without an extra "
@@ -176,6 +176,9 @@ class Settings:
     context_window: int | None = None
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
+    memory_recall_limit: int = 8
+    memory_recall_tokens: int = 2000
+    tool_directory_page_size: int = 10
     compaction_ratio: float = 0.75
     timeout_seconds: int = 0
     shell_roots: tuple[Path, ...] = ()
@@ -289,7 +292,7 @@ class Settings:
             or not 0 < result.compaction_ratio < 1
         ):
             raise DomainError("INVALID_RUNTIME_CONFIG")
-        if result.professional_executor not in {"", "codex", "claude"}:
+        if result.professional_executor not in {"", "codex", "claude", "opencode", "pi"}:
             raise ValueError("Invalid professional_executor")
         if any(
             type(value) is not int or value < 0

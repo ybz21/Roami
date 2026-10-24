@@ -91,6 +91,8 @@ class CodingExecutor:
             if json.loads(task["budget_json"]).get("deadlineMs")
             else 0,
         }
+        if spec.get("model") and target["kind"] != "session":
+            launch["model"] = spec["model"]
         launch["prompt"] = (
             "Roami final handoff: " + DELIVERY_INSTRUCTIONS + "\n\nTask:\n" + launch["prompt"]
         )

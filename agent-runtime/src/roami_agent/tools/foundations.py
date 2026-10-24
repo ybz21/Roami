@@ -414,7 +414,7 @@ def register_foundations(registry, settings):
         result = directory.list(
             args.get("query", ""),
             args.get("kind", "all"),
-            args.get("limit", 10),
+            args.get("limit", settings.tool_directory_page_size),
             binding.get("role", "main"),
             args.get("offset", 0),
         )

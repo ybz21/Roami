@@ -61,6 +61,7 @@ class Tasks:
         key,
         parent_task_id=None,
         executor="native",
+        model=None,
         target=None,
         from_message_id=None,
         origin_message_id=None,
@@ -74,9 +75,18 @@ class Tasks:
             not key
             or len(key) > 200
             or not goal.strip()
-            or executor not in {"native", "codex", "claude"}
+            or executor not in {"native", "codex", "claude", "opencode", "pi"}
         ):
             raise DomainError("INVALID_TASK")
+        if model is not None and (
+            executor == "native"
+            or target
+            and target.get("kind") == "session"
+            or not isinstance(model, str)
+            or not model.strip()
+            or len(model) > 300
+        ):
+            raise DomainError("INVALID_TASK_MODEL")
         if title is not None:
             if not isinstance(title, str) or not title.strip() or len(title) > 80:
                 raise DomainError("INVALID_TASK")
@@ -116,7 +126,7 @@ class Tasks:
             )
         ):
             raise DomainError("INVALID_RESOURCE_ONLY_TARGET")
-        if executor in {"codex", "claude"} and target.get("kind") == "session":
+        if executor in {"codex", "claude", "opencode", "pi"} and target.get("kind") == "session":
             if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if any(target.get(k) for k in ["directory", "workspaceId", "base", "remote"]):
@@ -131,6 +141,8 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if model is not None:
+            spec["model"] = model
         if title is not None:
             spec["title"] = title
         if routing_decision is not None:
@@ -187,7 +199,10 @@ class Tasks:
                     error = rejected_result.get("error")
                     if error == "TASK_SESSION_BINDING_REQUIRED":
                         raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
-                    if error in {"ROUTING_EXECUTOR_CONFLICT", "ROUTING_EXPLICIT_UNAVAILABLE"}:
+                    if error in {
+                        "ROUTING_EXECUTOR_CONFLICT",
+                        "ROUTING_EXPLICIT_UNAVAILABLE",
+                    }:
                         rejected_args = json.loads(rejection["arguments_json"])
                         requested = (rejected_args.get("routing") or {}).get(
                             "explicitExecutor"

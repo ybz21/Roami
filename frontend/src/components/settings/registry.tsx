@@ -26,6 +26,7 @@ import { AgentMemorySettings } from './agent-memory-settings'
 import { AgentMessageSettings } from './agent-message-settings'
 import { AgentSettings } from './agent-settings'
 import { AccountActions } from './account-actions'
+import AgentImprovement from '../agent/AgentImprovement'
 
 export const MAX_ROWS = 6
 
@@ -110,6 +111,10 @@ export function buildSettings(deps: {
   onLogout?: () => void
   nodeLabel: string
   isHub: boolean
+  developmentRsi?: boolean
+  nodeId?: string | null
+  experimentRunId?: string
+  onExperimentRun?: (id: string) => void
   onBrowserReady?: (run: (() => Promise<void>) | null) => void
   onBrowserRestart: () => void
   onEnvPush: () => void
@@ -166,6 +171,7 @@ export function buildSettings(deps: {
   }
 
   const pages: SettingsPageDef[] = [
+    ...(deps.developmentRsi ? [{ id: 'experiments.rsi', name: t('agent.experiment.rsi'), parent: t('agent.experiment.title'), scope: 'node' as const, items: [{ id: 'rsiWorkflow', label: t('agent.experiment.title'), bare: true, control: { kind: 'custom' as const, node: <AgentImprovement key={deps.nodeId} node={deps.nodeId || null} workflow runId={deps.experimentRunId} onRun={deps.onExperimentRun} /> }, keywords: 'RSI workflow pipeline experiment 流水线 实验 每日 复盘 Issue Codex' }] }] : []),
     { id: 'agent.messages', name: t('agent.notification.settings'), parent: t('set.groupAgent'), scope: 'node', items: [{ id: 'agentMessages', label: t('agent.notification.settings'), bare: true, control: { kind: 'custom', node: <AgentMessageSettings /> }, keywords: 'notifications reminders delivery quiet hours 通知 消息 免打扰 提醒 投递' }] },
     { id: 'agent.runtime', name: t('agent.models.settings'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <AgentSettings /> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
     { id: 'agent.memory', name: t('agent.memoryCenter'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
@@ -339,6 +345,7 @@ export function buildSettings(deps: {
     // 这一段的页直接摊平：段标题已经写了「这台机器」，再套一层同名的父节点是把同一件事说两遍
     { kind: 'section', title: deps.nodeLabel ? t('set.secNode', { node: deps.nodeLabel }) : t('set.groupNode'), note: '' },
     ...(['node.browser', 'node.phone', 'node.speech', 'node.p2p', 'node.env', 'sec'].map((page) => ({ kind: 'leaf', page } as TreeNode))),
+    ...(deps.developmentRsi ? [{ kind: 'section' as const, title: t('agent.experiment.title'), note: '' }, { kind: 'leaf' as const, page: 'experiments.rsi' }] : []),
     { kind: 'section', title: t('set.secCluster'), note: '' },
     { kind: 'leaf', page: 'cluster' },
     { kind: 'leaf', page: 'about' },

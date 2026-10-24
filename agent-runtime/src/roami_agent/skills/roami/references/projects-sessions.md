@@ -29,7 +29,7 @@
 
 使用模型的 `delegate`，不是把新会话命令拼进旧会话投递。
 
-每次 `delegate` 都带 `routing:{complexity:"bounded",complexityBasis:{维度:"具体事实"},routingExplanation:"本次执行负担",explicitExecutor:null}`；复杂工作把 complexity 改为 `complex`。用户指定执行器时，把 `explicitExecutor` 改成 `native` / `codex` / `claude`，同时提供原始用户消息中的准确 `userQuote`；没有指定则用 `null` 并省略 `userQuote`。选择不能只写进 goal、说明或引文，不再填写顶层 executor。依据实际自主探索与验证负担判断复杂度，不按文件类型或任务名称分流。
+每次 `delegate` 都带 `routing:{complexity:"bounded",complexityBasis:{维度:"具体事实"},routingExplanation:"本次执行负担",explicitExecutor:null}`；复杂工作把 complexity 改为 `complex`。用户指定执行器时，把 `explicitExecutor` 改成 `native` / `codex` / `claude` / `opencode` / `pi`，同时提供原始用户消息中的准确 `userQuote`；没有指定则用 `null` 并省略 `userQuote`。选择不能只写进 goal、说明或引文，不再填写顶层 executor。依据实际自主探索与验证负担判断复杂度，不按文件类型或任务名称分流。
 
 | 场景 | 参数 | 行为 |
 | --- | --- | --- |

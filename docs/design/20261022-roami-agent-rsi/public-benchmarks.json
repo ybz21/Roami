@@ -1,0 +1,352 @@
+{
+  "checked_at": "2026-10-23",
+  "status": "catalog_only_no_data_import_or_agent_runs",
+  "entries": [
+    {
+      "id": "swe_verified",
+      "name": "SWE-bench Verified",
+      "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "CODE",
+        "DEBUG",
+        "REVIEW"
+      ],
+      "upstream_evaluation": "仓库补丁能否通过任务专属测试；保留原始resolved结果。",
+      "access_and_environment": "500项人工筛选任务；需要对应仓库环境和测试镜像。",
+      "coverage_limit": "重点是解决既有issue，不等于新功能、产品体验与全部开发工作。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "terminal_bench",
+      "name": "Terminal-Bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "CODE",
+        "DEBUG",
+        "OPS",
+        "LAB"
+      ],
+      "upstream_evaluation": "隔离终端任务的独立verifier。",
+      "access_and_environment": "经Harbor运行；2.0/2.1/更新任务需固定版本，不混用分数。",
+      "coverage_limit": "是任务数据集；Harbor是运行框架，二者不混为一谈。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "the_agent_company",
+      "name": "TheAgentCompany",
+      "source_url": "https://github.com/TheAgentCompany/TheAgentCompany",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "CODE",
+        "OPS",
+        "DOC",
+        "DATA"
+      ],
+      "upstream_evaluation": "最终状态与交付为主，检查点辅助。",
+      "access_and_environment": "公开175个任务镜像的目录；需模拟公司服务、预置数据和Docker。",
+      "coverage_limit": "PPT内容检查需补足Roami的渲染可读性与交付要求。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "officebench",
+      "name": "OfficeBench",
+      "source_url": "https://github.com/zlwang-cs/OfficeBench",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "DOC",
+        "DATA"
+      ],
+      "upstream_evaluation": "跨应用办公任务的任务专属检查。",
+      "access_and_environment": "需预置文档、应用和工作流环境。",
+      "coverage_limit": "不能把单项办公成功当成完整私人助理能力。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "osworld",
+      "name": "OSWorld",
+      "source_url": "https://github.com/xlang-ai/OSWorld",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "DOC",
+        "DATA",
+        "OPS"
+      ],
+      "upstream_evaluation": "真实桌面任务的执行结果检查。",
+      "access_and_environment": "需桌面虚拟机或受支持环境，包含LibreOffice等应用。",
+      "coverage_limit": "测使用与修改桌面内容，不能直接代表从需求生成可交互Demo。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "slidesbench",
+      "name": "SlidesBench / AutoPresent",
+      "source_url": "https://github.com/para-lost/AutoPresent/tree/main/slidesbench",
+      "resource_type": "artifact_generation_benchmark",
+      "capability_coverage": [
+        "DOC"
+      ],
+      "upstream_evaluation": "指令到幻灯片生成的自动评测。",
+      "access_and_environment": "代码、数据入口和示例公开；导入前确认具体素材和使用条件。",
+      "coverage_limit": "是幻灯片生成切片；不完整覆盖调研、整套PPT故事、讲稿与跨轮修改。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "agentic_vbench",
+      "name": "AgenticVBench",
+      "source_url": "https://github.com/PhiloLabs/agentic-vbench",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "VIDEO"
+      ],
+      "upstream_evaluation": "修复、组装、排序、改编；程序判定与brief评分结合。",
+      "access_and_environment": "100项视频后期任务，基于Harbor；需素材、媒体依赖与相应评审服务。",
+      "coverage_limit": "不同任务族的reward需分别保留，不能当成统一成片质量分。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "dsbench",
+      "name": "DSBench",
+      "source_url": "https://github.com/LiqiangJing/DSBench",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "DATA",
+        "LAB"
+      ],
+      "upstream_evaluation": "真实分析与建模任务，使用任务答案或模型表现度量。",
+      "access_and_environment": "官方论文列466项分析与74项建模任务；需下载数据和配置计算环境。",
+      "coverage_limit": "不要与名为DS-bench的数据科学代码题库混淆；后者不是同一项目。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "spreadsheetbench",
+      "name": "SpreadsheetBench",
+      "source_url": "https://github.com/Reality2byte/SpreadsheetBench",
+      "resource_type": "artifact_generation_benchmark",
+      "capability_coverage": [
+        "DATA",
+        "DOC"
+      ],
+      "upstream_evaluation": "按指令修改真实工作簿，多个测试文件核查泛化。",
+      "access_and_environment": "原版912项指令与表格；另有Verified及V2，导入时分版本固定。",
+      "coverage_limit": "重点是表格操作，不能替代全部统计分析或研究报告。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "spider2",
+      "name": "Spider 2.0",
+      "source_url": "https://github.com/xlang-ai/Spider2",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "DATA",
+        "CODE"
+      ],
+      "upstream_evaluation": "企业SQL与数据工程流程的结果检查。",
+      "access_and_environment": "不同子集有SQLite、云数仓或dbt等依赖，先选择可复现环境。",
+      "coverage_limit": "云账户与环境依赖可能限制每日运行，不把不可访问题目静默删除。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "gaia",
+      "name": "GAIA",
+      "source_url": "https://huggingface.co/datasets/gaia-benchmark/GAIA",
+      "resource_type": "tool_augmented_qa_benchmark",
+      "capability_coverage": [
+        "NEWS",
+        "DATA",
+        "LAB"
+      ],
+      "upstream_evaluation": "工具辅助、多模态与多步骤问题的最终答案正确性。",
+      "access_and_environment": "公开页面但文件gated，需接受条件；dev与隐藏答案test不同，不公开转存题目。",
+      "coverage_limit": "不是新闻新鲜度或长报告交付评分；联网来源会变化。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "browsecomp",
+      "name": "BrowseComp",
+      "source_url": "https://github.com/openai/simple-evals",
+      "resource_type": "browsing_qa_benchmark",
+      "capability_coverage": [
+        "NEWS"
+      ],
+      "upstream_evaluation": "需要深入检索的问题，主要核对最终答案。",
+      "access_and_environment": "官方参考实现与题目入口公开；需实际网页检索与评分适配。",
+      "coverage_limit": "不是最新新闻数据集，答案正确也不等于报告来源、时效和完整性达标。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "finqa",
+      "name": "FinQA",
+      "source_url": "https://github.com/czyssrs/FinQA",
+      "resource_type": "domain_qa_dataset",
+      "capability_coverage": [
+        "STOCK",
+        "DATA"
+      ],
+      "upstream_evaluation": "财报表格/文本的数值推理，含程序与执行结果标注。",
+      "access_and_environment": "公开JSON数据与评测脚本；私有test没有公开参考答案。",
+      "coverage_limit": "是金融推理组件数据，不是完整金融Agent或策略交易评测。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "convfinqa",
+      "name": "ConvFinQA",
+      "source_url": "https://github.com/czyssrs/ConvFinQA",
+      "resource_type": "domain_qa_dataset",
+      "capability_coverage": [
+        "STOCK",
+        "DATA"
+      ],
+      "upstream_evaluation": "多轮财报数字推理与上下文衔接。",
+      "access_and_environment": "公开数据与代码，按官方切分接入。",
+      "coverage_limit": "不测实时新闻、长期个性化或策略收益可靠性。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "longmemeval",
+      "name": "LongMemEval",
+      "source_url": "https://github.com/xiaowu0162/LongMemEval",
+      "resource_type": "memory_benchmark",
+      "capability_coverage": [
+        "MECH"
+      ],
+      "upstream_evaluation": "长期对话中的提取、多会话推理、时间、更新与未知问题。",
+      "access_and_environment": "历史对话与问题集、评测代码；记忆快照需隔离。",
+      "coverage_limit": "回忆问题正确不等于实际任务办成；需与任务交付结合。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "longmemeval_v2",
+      "name": "LongMemEval-V2",
+      "source_url": "https://github.com/xiaowu0162/LongMemEval-V2",
+      "resource_type": "memory_benchmark",
+      "capability_coverage": [
+        "MECH",
+        "LAB"
+      ],
+      "upstream_evaluation": "环境经验、流程、状态变化与前提，同时观察准确率和查询延迟。",
+      "access_and_environment": "官方数据准备与评测代码；长历史体积和检索环境需配置。",
+      "coverage_limit": "不直接覆盖Roami的owner、资源租约、取消恢复和工具写操作。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    },
+    {
+      "id": "mlagentbench",
+      "name": "MLAgentBench",
+      "source_url": "https://github.com/snap-stanford/MLAgentBench",
+      "resource_type": "agent_task_benchmark",
+      "capability_coverage": [
+        "LAB",
+        "DATA"
+      ],
+      "upstream_evaluation": "机器学习实验的完成与模型效果。",
+      "access_and_environment": "公开代码与实验任务，需要任务数据及对应算力。",
+      "coverage_limit": "覆盖ML实验，不能代表全部前沿项目、个人自动化和本地设备实验。",
+      "checked_at": "2026-10-23",
+      "integration_status": "source_reviewed_not_downloaded_or_run",
+      "pinned_revision": null
+    }
+  ],
+  "case_category_candidates": {
+    "CODE": [
+      "swe_verified",
+      "terminal_bench"
+    ],
+    "DEBUG": [
+      "swe_verified",
+      "terminal_bench"
+    ],
+    "REVIEW": [
+      "swe_verified"
+    ],
+    "OPS": [
+      "terminal_bench",
+      "the_agent_company"
+    ],
+    "DOC": [
+      "the_agent_company",
+      "officebench",
+      "osworld",
+      "slidesbench"
+    ],
+    "DEMO": [],
+    "VIDEO": [
+      "agentic_vbench"
+    ],
+    "NEWS": [
+      "gaia",
+      "browsecomp"
+    ],
+    "DATA": [
+      "dsbench",
+      "spreadsheetbench",
+      "spider2"
+    ],
+    "STOCK": [
+      "finqa",
+      "convfinqa"
+    ],
+    "QUANT": [],
+    "LAB": [
+      "mlagentbench",
+      "terminal_bench"
+    ],
+    "MECH": [
+      "longmemeval",
+      "longmemeval_v2"
+    ]
+  },
+  "category_gaps": {
+    "CODE": "新增功能、用户现有工作区和具体目录边界仍需自建。",
+    "DEBUG": "生产风格日志、历史决策与故障注入按Roami补充。",
+    "REVIEW": "新增测试有效性、PR说明和实际团队规则需补充。",
+    "OPS": "Roami节点、私有tmux、生产隔离与资源恢复需自建。",
+    "DOC": "公开PPT任务可作基线，自己的模板、跨轮修改和分享场景需补充。",
+    "DEMO": "本轮未核实一个能完整覆盖可交互Demo、移动端、刷新恢复和错误处理的统一公开集；保留自建端到端验收。",
+    "VIDEO": "可直接借用上游任务协议；产品宣传素材、品牌与中文解说另补。",
+    "NEWS": "补固定时点回放、官方更正、转载去重，以及滚动联网的新鲜度观察。",
+    "DATA": "保留业务口径、异常处理和整份分析报告交付。",
+    "STOCK": "财报推理有公共数据；实时信息、个性观察清单与证据情景仍需自建。",
+    "QUANT": "本轮列出的FinRL/FinRobot是开发框架，不能当作独立Agent评测数据集；策略需点时数据、成本、基准和独立回测oracle。",
+    "LAB": "RAG、前沿方法复现、本地模型与设备等任务按需要补充。",
+    "MECH": "权限、遗忘传播、工具目录、重复副作用、预算与恢复使用Roami自有回归。"
+  },
+  "rules": [
+    "保留上游task ID、split、revision和grader版本；导入前锁定数据hash。",
+    "公开基准原生分数与Roami交付质量、时间、Token分别记录。",
+    "抽样或改造任务不可宣称官方完整基准分数。",
+    "公开test可能已被模型或优化器接触，不能冒充私有未见任务。",
+    "当前80项全是自建规格，不伪标为上游真实样本。"
+  ]
+}

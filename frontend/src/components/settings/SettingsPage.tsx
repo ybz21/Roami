@@ -19,11 +19,12 @@ import MobilePageSearch from '../mobile/MobilePageSearch'
 import { SettingRow } from './SettingRow'
 import { useEnvPush } from './env-vars'
 import { buildSettings, itemText, rowCount, type SettingsModel, type SettingsPageDef } from './registry'
+import { useAgentData } from '../agent/useAgentData'
 
 const DEFAULT_PAGE = 'common'
 
 /** 路由片段 ↔ 页 id：URL 里用 /，id 里用 . */
-export function pageFromRoute(sub: string): string { return sub.replace(/\//g, '.') }
+export function pageFromRoute(sub: string): string { return sub === 'experiments' ? 'experiments.rsi' : sub.replace(/\//g, '.') }
 export function routeFromPage(id: string): string { return id.replace(/\./g, '/') }
 
 function Chevron({ open }: { open: boolean }) {
@@ -93,6 +94,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const nodes = useClusterNodes()
   const nodeId = useCurrentNodeId()
   const [q, setQ] = useState('')
+  const channel = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60000)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [openParents, setOpenParents] = useState<Record<string, boolean>>({})
   const searchRef = useRef<HTMLInputElement>(null)
@@ -111,6 +113,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const browserRestart = useRef<(() => Promise<void>) | null>(null)
   const registerBrowserRestart = useRef((run: (() => Promise<void>) | null) => { browserRestart.current = run }).current
   const nodeLabel = nodes.find((n) => n.id === nodeId)?.name || ''
+  const runId = sub?.startsWith('experiments/rsi/') ? sub.slice('experiments/rsi/'.length) : ''
   const model = useMemo(() => buildSettings({
     t, theme: mode, setTheme: setMode, locale, setLocale, prefs, setPrefs,
     setWorkspace: saveWorkspace, nodeLabel, isHub: false, onLogout,
@@ -120,9 +123,11 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
       await browserRestart.current()
     },
     onEnvPush: pushEnv,
-  }), [t, mode, locale, prefs, nodeLabel, onLogout])
+    developmentRsi: channel.value?.developmentRsi === true, nodeId, experimentRunId: runId,
+    onExperimentRun: id => { const route = 'settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : ''); if (onNav) onNav(route); else location.hash = '#/' + route },
+  }), [t, mode, locale, prefs, nodeLabel, onLogout, nodeId, channel.value?.developmentRsi, runId, onNav])
 
-  const routed = pageFromRoute(sub || '')
+  const routed = pageFromRoute(runId ? 'experiments/rsi' : sub || '')
   const current = model.pages[routed] ? routed : DEFAULT_PAGE
   const go = (id: string) => {
     setQ('')
@@ -243,7 +248,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           </div>
         )}
         {openSub && (
-          <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))} manageHistory={false} keepBottomNav>
+          <MobileSubPage title={openSub.name} onBack={() => { const route = runId ? 'settings/experiments/rsi' : 'settings'; if (onNav) onNav(route); else location.hash = '#/' + route }} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
               <PaneHead page={openSub} model={model} compact />
               {saveStatus}

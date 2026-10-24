@@ -1,5 +1,6 @@
 """Routing uses current CLI identity, bounded metadata and explicit ambiguity errors."""
 
+import asyncio
 import json
 
 import pytest
@@ -171,8 +172,13 @@ async def test_main_routes_discovered_project_through_persisted_tool_result(stor
             )
 
     monkeypatch.setattr(targets, "execute", execute)
-    runtime = Runtime(store, Model())
-    # Drive only the Main turn; no real coding session is messaged or created.
+
+    class PendingExecutor:
+        async def run(self, task, run):
+            await asyncio.Event().wait()
+
+    # Hold background execution so its failure report cannot race the Main-only assertions.
+    runtime = Runtime(store, Model(), executor=PendingExecutor())
     c = await runtime.conversations.create("alice")
     reply = await runtime.chat.submit("alice", c["id"], "route", "给记账项目安排工作")
     await runtime.start()

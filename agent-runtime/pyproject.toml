@@ -12,11 +12,13 @@ dependencies = [
     "python-xlib>=0.33 ; sys_platform == 'linux'",
     "pillow>=11",
     "pypdf>=6.21,<7",
+    "python-pptx>=1,<2",
     "tzdata>=2025.2",
 ]
 
 [project.scripts]
 roami-agent = "roami_agent.app:main"
+roami-agent-evaluate = "roami_agent.improvement.cli:main"
 
 [build-system]
 requires = ["hatchling"]

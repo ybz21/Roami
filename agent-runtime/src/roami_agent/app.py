@@ -38,12 +38,15 @@ from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
+from roami_agent.improvement.policy import BOUNDS
+from roami_agent.improvement.status import ImprovementStatus
 from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
 from roami_agent.observability.execution_debug import ExecutionDebug
-from roami_agent.observability.execution_traces import ExecutionTraces
+from roami_agent.observability.execution_traces import ExecutionTraces, origin_turn
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.improvement import policy_binding
 from roami_agent.providers.chat_completions import ChatCompletions
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
@@ -91,6 +94,7 @@ class Runtime:
         memory_model=None,
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
+        development_rsi=False,
     ):
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
@@ -213,6 +217,7 @@ class Runtime:
         self.cli_commands = CLICommands(database, self.tools, self.journal)
         self.manifests = PromptManifests(database)
         self.traces = ExecutionTraces(database)
+        self.improvement = ImprovementStatus(database.data_root) if development_rsi else None
         self.debug = ExecutionDebug(database, self.context, self.settings, self.traces)
         self.dispatch = TaskDispatcher(
             database,
@@ -220,7 +225,7 @@ class Runtime:
             executor,
             verifier,
             NativeExecutor(
-                lambda *args, **kwargs: self.loop.run(*args, **kwargs),
+                lambda *args, **kwargs: self.run_turn(*args, **kwargs),
                 database,
                 self.settings,
                 resources=self.resources
@@ -260,7 +265,7 @@ class Runtime:
             self.context,
             self.dispatch,
             self.mailbox,
-            self.loop.run,
+            self.run_turn,
             self.wakeup,
             self.active,
             self.memory_jobs,
@@ -283,6 +288,34 @@ class Runtime:
         self.professional_capabilities = ProfessionalCapabilities(self)
         if isinstance(self.executor, CodingExecutor):
             self.executor.capabilities = self.professional_capabilities
+
+    async def run_turn(self, turn, *args, **kwargs):
+        if self.improvement is None or not self.improvement.ledger.path.exists():
+            return await self.loop.run(turn, *args, **kwargs)
+
+        def scope(db):
+            root = origin_turn(db, turn["owner_id"], turn_id=turn["id"])
+            return dict(
+                db.execute(
+                    "SELECT id,created_ms FROM conversations WHERE id=? AND owner_id=?",
+                    (root["conversation_id"], turn["owner_id"]),
+                ).fetchone()
+            )
+
+        conversation = await self.db.call(scope)
+        baseline = {key: getattr(self.settings.current, key) for key in BOUNDS}
+        binding = await asyncio.to_thread(
+            self.improvement.releases.bind,
+            turn["owner_id"],
+            conversation["id"],
+            conversation["created_ms"],
+            baseline,
+        )
+        token = policy_binding.set(binding)
+        try:
+            return await self.loop.run(turn, *args, **kwargs)
+        finally:
+            policy_binding.reset(token)
 
     async def start(self):
         await self.professional_capabilities.recover()
@@ -312,6 +345,19 @@ class Runtime:
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
+        if self.db.managed and self.improvement is not None:
+            from roami_agent.improvement.worker import EvaluationWorker
+
+            self.improvement.worker = EvaluationWorker(self, self.improvement)
+            await self.improvement.worker.start()
+            from roami_agent.improvement.research_worker import ResearchWorker
+
+            self.improvement.research_worker = ResearchWorker(self, self.improvement)
+            await self.improvement.research_worker.start()
+            from roami_agent.improvement.pipeline_reports import PipelineReportWorker
+
+            self.improvement.report_worker = PipelineReportWorker(self.improvement)
+            await self.improvement.report_worker.start()
 
     async def _monitor_native_sessions(self):
         while not self.stopping:
@@ -415,6 +461,12 @@ class Runtime:
 
     async def close(self):
         self.stopping = True
+        if self.improvement is not None and self.improvement.report_worker:
+            await self.improvement.report_worker.close()
+        if self.improvement is not None and self.improvement.research_worker:
+            await self.improvement.research_worker.close()
+        if self.improvement is not None and self.improvement.worker:
+            await self.improvement.worker.close()
         self.scheduler.stopping = True
         self.wakeup.set()
         if self.supervisor:
@@ -502,6 +554,7 @@ async def serve(args):
         settings=settings,
         worker_model=worker,
         executor=CodingExecutor(database, settings),
+        development_rsi=getattr(args, "development_rsi", False),
     )
     runtime.managed_parent = getattr(args, "parent_fd", None) is not None
     try:
@@ -565,6 +618,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--socket", type=Path)
     parser.add_argument("--initialize", action="store_true")
+    parser.add_argument("--development-rsi", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--parent-fd", type=int)
     args = parser.parse_args()
     if not args.initialize and not args.socket:

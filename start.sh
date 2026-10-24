@@ -167,22 +167,20 @@ fi
 
 # ── 后端：源码比二进制新时编译；纯安装包继续用 install.sh 产物 ─────────────
 build_backend() {
-  local version
+  local version build_channel
   version="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
-  go build -ldflags "-X main.version=${version}" -o backend/ttmux-web.next ./cmd/roami || {
+  build_channel=release
+  if [ "$DEV" = 1 ]; then build_channel=development; fi
+  go build -ldflags "-X main.version=${version} -X main.buildChannel=${build_channel}" -o backend/ttmux-web.next ./cmd/roami || {
     rm -f backend/ttmux-web.next
     return 1
   }
   mv backend/ttmux-web.next "$BIN"
 }
 if [ "$DEV" = 1 ]; then
-  # 检测 .go 与 go:embed 的资源(*.tmpl/*.html)变更，避免改模板却跳过编译
-  if [ ! -f "$BIN" ] || [ "$(find backend cmd internal pkg plugins \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then
-    echo "==> 编译后端..."
-    build_backend
-  else
-    echo "==> 后端无变更，跳过编译"
-  fi
+  # Build flags select the development channel even when source timestamps are unchanged.
+  echo "==> 编译开发版后端..."
+  build_backend
 elif [ ! -x "$BIN" ]; then
   echo "✘ 未找到 $BIN —— 先构建：bash install.sh   或   bash start.sh --dev"; exit 1
 elif [ -d backend/api ] && [ "$(find backend cmd internal pkg plugins \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) -newer "$BIN" 2>/dev/null | head -1)" ]; then

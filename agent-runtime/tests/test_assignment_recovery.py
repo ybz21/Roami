@@ -418,3 +418,40 @@ async def test_accepted_steering_cannot_be_replaced_with_another_task_in_the_sam
         assert len(await runtime.tasks.list("alice")) == 2
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("executor", ["opencode", "pi"])
+async def test_untracked_user_executor_is_explained_and_cannot_be_hidden_in_native_wrapper(
+    store, executor
+):
+    runtime, targets, _, tools, binding = await setup(
+        store, user="Use " + executor + " for the architecture report"
+    )
+    runtime.gateway.tools = tools
+    try:
+        turn = await active_turn(store, binding)
+        args = request(explicitExecutor=executor, userQuote="Use " + executor)
+        rejected = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call("unsupported", "delegate", args),
+            "main",
+            binding,
+        )
+        assert rejected["error"] == "ROUTING_EXPLICIT_UNAVAILABLE"
+        assert "native shell wrapper" in rejected["recovery"]
+        assert not targets.sends and not await runtime.tasks.list("alice")
+        binding["toolCallId"] = "wrapper"
+        wrapper = request("bounded")
+        wrapper["goal"] = "Use a native shell driver to invoke the requested professional CLI"
+        fallback = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call("wrapper", "delegate", wrapper),
+            "main",
+            binding,
+        )
+        assert fallback["error"] == "ROUTING_EXECUTOR_CONFLICT"
+        assert not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
+import { agentName, isAgentKind } from '../../agent-kind'
 import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, FolderIcon, TerminalIcon, ChevronLeft, ChevronRight } from '../../icons'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
@@ -92,12 +93,12 @@ function TaskRow({ task, compact, select, projects, onSession }: { projects: { i
   const { t, locale } = useI18n(), executor = taskExecutor(task)
   const state = ['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'
   const time = taskTime(task) ? new Date(taskTime(task)) : null
-  const name = executor === 'codex' ? 'Codex' : executor === 'claude' ? 'Claude Code' : executor === 'native' ? t('agent.workspace.native') : ''
+  const name = isAgentKind(executor) ? executor === 'claude' ? 'Claude Code' : agentName(executor) : executor === 'native' ? t('agent.workspace.native') : ''
   return <div className="agent-task-entry"><button type="button" className={`agent-task-link${compact ? ' agent-task-card' : ''}`} data-state={state} onClick={() => select(task.id)}>
     <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>
     <span className="agent-task-row-copy">
       <b>{taskTopic(task) || t('agent.task.untitled')}</b>
-      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{executor === 'codex' || executor === 'claude' ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
+      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
     </span>
   </button>
     {task.projectId && <a className="tt-act agent-task-project" href={'#/projects/' + encodeURIComponent(task.projectId)}><FolderIcon size={14} /><span>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</span></a>}
@@ -147,7 +148,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const sessionClosed = detail?.sessionClosure?.state === 'closed'
   const sessionClosing = ['closing', 'unknown'].includes(detail?.sessionClosure?.state || '')
   const sessionId = detail?.attempts.find(attempt => attempt.sessionId)?.sessionId || task?.latestAttempt?.sessionId
-  const professional = !!task && ['codex', 'claude'].includes(taskExecutor(task) || '')
+  const professional = !!task && isAgentKind(taskExecutor(task))
   const retainedSession = !!task?.nativeSession || professional && !!(task?.latestAttempt?.agentConversationId || detail?.attempts.some(attempt => attempt.sessionId === sessionId && attempt.agentConversationId))
   const ended = !!latest?.finishedMs || terminal.has(task?.state || '')
   const previewArtifact = useCallback((artifactId: string) => {

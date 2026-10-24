@@ -4,17 +4,18 @@ import { afterEach, expect, it, vi } from 'vitest'
 import AgentChat from './AgentChat'
 import { api } from '../../api'
 
-const state = vi.hoisted(() => ({ layout: { phone: false, landscape: false, size: 'medium' }, turns: [{ id: 'current', state: 'running' }], messages: [] as any[], renderMessage: vi.fn(() => null), accepted: vi.fn(), refresh: vi.fn() }))
+const state = vi.hoisted(() => ({ developmentRsi: undefined as boolean | undefined, menuItems: [] as any[], layout: { phone: false, landscape: false, size: 'medium' }, turns: [{ id: 'current', state: 'running' }], messages: [] as any[], renderMessage: vi.fn(() => null), accepted: vi.fn(), refresh: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
 vi.mock('../../layout', () => ({ useLayout: () => state.layout }))
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: { error: vi.fn() } }) },
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Dropdown: ({ children }: any) => children,
+  Dropdown: ({ children, menu }: any) => { state.menuItems = menu.items; return children },
   Input: Object.assign((props: any) => <input {...props} />, { TextArea: ({ variant: _variant, autoSize: _autoSize, ...props }: any) => <textarea {...props} /> }),
   Modal: () => null, Spin: () => null,
 }))
+vi.mock('./useAgentData', () => ({ useAgentData: () => ({ value: { developmentRsi: state.developmentRsi } }) }))
 vi.mock('./useAgentThread', () => ({ useAgentThread: () => ({ connected: true, view: { conversation: { id: 'main', active_branch_id: 'branch' }, branchId: 'branch', messages: state.messages, turns: state.turns }, accepted: state.accepted, refresh: state.refresh }) }))
 vi.mock('./useAgentAttachments', () => ({ useAgentAttachments: () => ({ ids: [], items: [], blocked: false, clear: vi.fn() }) }))
 vi.mock('./useAgentModels', () => ({ useAgentModels: () => ({}) }))
@@ -30,7 +31,7 @@ vi.mock('./AgentMemory', () => ({ default: () => null }))
 vi.mock('../markdown/Markdown', () => ({ default: () => null }))
 
 const props = { cid: 'main', branch: '', node: null, inbox: { conversations: [{ id: 'main' }], refresh: vi.fn() } as any, inboxOpen: false, select: vi.fn(), notifications: vi.fn(), projects: [], onSession: vi.fn(), onOverview: vi.fn() }
-afterEach(() => { cleanup(); localStorage.clear(); vi.clearAllMocks(); state.layout = { phone: false, landscape: false, size: 'medium' }; state.messages = []; state.turns = [{ id: 'current', state: 'running' }] })
+afterEach(() => { state.developmentRsi = undefined; cleanup(); localStorage.clear(); vi.clearAllMocks(); state.layout = { phone: false, landscape: false, size: 'medium' }; state.messages = []; state.turns = [{ id: 'current', state: 'running' }] })
 
 it('does not rerender settled history while typing in the composer', () => {
   state.messages = [{ id: 'answer', role: 'assistant', status: 'completed', seq: 1, content: { text: 'A long completed report' } }]
@@ -96,4 +97,10 @@ it('renders the phone task destination as an accessible icon without visible tex
     expect(task.textContent).toBe('')
     expect(task.querySelector('svg')).toBeTruthy()
   } finally { host.remove() }
+})
+
+it.each([undefined, false, true])('shows RSI only after the node confirms development availability (%s)', developmentRsi => {
+  state.developmentRsi = developmentRsi
+  render(<AgentChat {...props} />)
+  expect(state.menuItems.some(item => item.key === 'improvement')).toBe(developmentRsi === true)
 })

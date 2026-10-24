@@ -234,7 +234,7 @@ async def test_coding_new_project_resolves_before_launch_without_using_loose_dir
     assert calls == ["provision", "launch"]
 
 
-@pytest.mark.parametrize("provider", ["codex", "claude"])
+@pytest.mark.parametrize("provider", ["codex", "claude", "opencode", "pi"])
 async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(
     store, tmp_path, provider
 ):
@@ -324,7 +324,7 @@ async def test_session_preflight_rejection_is_distinct_from_submission_uncertain
     assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "unknown"
 
 
-@pytest.mark.parametrize("executor", ["native", "codex", "claude"])
+@pytest.mark.parametrize("executor", ["native", "codex", "claude", "opencode", "pi"])
 async def test_loose_task_rejects_project_parent_directory_before_recording_intent(store, executor):
     from roami_agent.protocol.errors import DomainError
 
