@@ -14,12 +14,19 @@ REMEMBER = re.compile(
 )
 
 
-def remember_request(db, owner, conversation_id, message_id, text):
+def remembered_body(text):
     match = REMEMBER.fullmatch(text.strip())
     if not match:
         return None
     body = match["body"].strip()
     if not body or len(body) > 2000 or body.endswith(("?", "？")):
+        return None
+    return body
+
+
+def remember_request(db, owner, conversation_id, message_id, text):
+    body = remembered_body(text)
+    if body is None:
         return None
     record = commit_memory(
         db,

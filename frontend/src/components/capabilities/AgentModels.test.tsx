@@ -2,9 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import AgentModels from './AgentModels'
-import { agentModels, applyAgentModel, deleteAgentModel, restoreAgentModel, saveAgentModel, type AgentModelProfile, type AgentModelView } from '../../agent-registry'
+import { agentModels, agentModelOptions, applyAgentModel, deleteAgentModel, restoreAgentModel, saveAgentModel, type AgentModelProfile, type AgentModelView } from '../../agent-registry'
 
-vi.mock('../../agent-registry', () => ({ agentModels: vi.fn(), applyAgentModel: vi.fn(), deleteAgentModel: vi.fn(), restoreAgentModel: vi.fn(), saveAgentModel: vi.fn() }))
+vi.mock('../../agent-registry', () => ({ agentModels: vi.fn(), agentModelOptions: vi.fn(), applyAgentModel: vi.fn(), deleteAgentModel: vi.fn(), restoreAgentModel: vi.fn(), saveAgentModel: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 const preset: AgentModelProfile = { id: 'profile-1', name: 'Work gateway', baseUrl: 'https://gateway.example/v1', model: 'custom-model', protocol: 'openai-responses', authMode: 'api_key', hasKey: true, applied: false }
 const view: AgentModelView = { profiles: [preset], current: { model: 'original-model' }, revision: 'revision-1', changed: false, canRestore: false, configPaths: ['/config/config.toml'] }
@@ -81,4 +81,48 @@ it('restores the original configuration explicitly and prevents deleting the act
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.models.restore' }))
   await waitFor(() => expect(restoreAgentModel).toHaveBeenCalledWith('codex', 'revision-1'))
   expect(deleteAgentModel).not.toHaveBeenCalled()
+})
+
+for (const kind of ['claude', 'codex', 'opencode', 'pi'] as const) {
+  it(`offers searchable model choices and loads models with the stored credential for ${kind}`, async () => {
+    vi.mocked(agentModelOptions).mockResolvedValue(['remote-model-a', 'remote-model-b'])
+    render(<AgentModels kind={kind} />)
+    fireEvent.click(within(await screen.findByRole('article', { name: preset.name })).getByRole('button', { name: 'capabilities.models.editAction' }))
+    const model = screen.getByRole('combobox', { name: 'capabilities.models.model' })
+    fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.fetchModels' }))
+    await waitFor(() => expect(agentModelOptions).toHaveBeenCalledWith(kind, expect.objectContaining({ profileId: preset.id, apiKey: '', baseUrl: preset.baseUrl }), expect.any(AbortSignal)))
+    fireEvent.focus(model); fireEvent.change(model, { target: { value: 'remote-model-b' } })
+    await screen.findByRole('option', { name: 'remote-model-b' })
+    fireEvent.keyDown(model, { key: 'ArrowDown', code: 'ArrowDown' }); fireEvent.keyDown(model, { key: 'Enter', code: 'Enter' })
+    expect((model as HTMLInputElement).value).toBe('remote-model-b')
+    expect(applyAgentModel).not.toHaveBeenCalled()
+  })
+}
+
+it('keeps manual model input and credentials after model discovery fails', async () => {
+  vi.mocked(agentModelOptions).mockRejectedValue(new Error('MODEL_LIST_UNSUPPORTED'))
+  render(<AgentModels kind="codex" />)
+  fireEvent.click(within(await screen.findByRole('article', { name: preset.name })).getByRole('button', { name: 'capabilities.models.editAction' }))
+  const model = screen.getByLabelText('capabilities.models.model')
+  fireEvent.change(model, { target: { value: 'my-private-model' } })
+  fireEvent.change(screen.getByLabelText('capabilities.models.apiKey'), { target: { value: 'typed-key' } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.fetchModels' }))
+  await screen.findByText('capabilities.models.error.modelUnsupported')
+  expect((model as HTMLInputElement).value).toBe('my-private-model')
+  expect((screen.getByLabelText('capabilities.models.apiKey') as HTMLInputElement).value).toBe('typed-key')
+})
+
+it('ignores models from a connection that was changed while loading', async () => {
+  let resolve!: (models: string[]) => void
+  vi.mocked(agentModelOptions).mockImplementation(() => new Promise(done => { resolve = done }))
+  render(<AgentModels kind="codex" />)
+  fireEvent.click(within(await screen.findByRole('article', { name: preset.name })).getByRole('button', { name: 'capabilities.models.editAction' }))
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.fetchModels' }))
+  const signal = vi.mocked(agentModelOptions).mock.calls[0][2]!
+  fireEvent.change(screen.getByLabelText('capabilities.models.baseUrl'), { target: { value: 'https://other.example/v1' } })
+  expect(signal.aborted).toBe(true)
+  resolve(['obsolete-model'])
+  const model = screen.getByLabelText('capabilities.models.model')
+  fireEvent.focus(model); fireEvent.change(model, { target: { value: 'obsolete' } })
+  await waitFor(() => expect(screen.queryByRole('option', { name: 'obsolete-model' })).toBeNull())
 })

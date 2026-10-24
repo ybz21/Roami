@@ -29,6 +29,9 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 	for _, route := range []struct{ method, path string }{
+		{"GET", "/agent/capability-markets"}, {"PUT", "/agent/capability-markets"},
+		{"GET", "/agent/capability-markets/:source/search"}, {"POST", "/agent/capability-markets/preview"},
+		{"POST", "/agent/capability-markets/prepare"}, {"POST", "/agent/capability-markets/install"},
 		{"PUT", "/agent/capability-imports/:kind/:name"}, {"DELETE", "/agent/capability-imports/:kind/:name"}, {"POST", "/agent/capability-imports/mcp/:name/connect"}, {"GET", "/agent/capability-imports"}, {"POST", "/agent/capability-imports/:kind"}, {"GET", "/agent/capability-settings"}, {"PUT", "/agent/capability-settings"}, {"POST", "/agent/main-conversation"}, {"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
 		{"POST", "/agent/attachments"},
 		{"GET", "/agent/traces"},
@@ -54,13 +57,15 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"GET", "/agent/notifications"}, {"GET", "/agent/tasks/:task"}, {"GET", "/agent/tasks"}, {"POST", "/agent/tasks"},
 		{"GET", "/agent/artifacts"}, {"GET", "/agent/artifacts/:artifact"}, {"GET", "/agent/artifacts/:artifact/content"}, {"DELETE", "/agent/artifacts/:artifact"},
 		{"POST", "/agent/tasks/:task/steer"}, {"GET", "/agent/tasks/:task/steering/:operation"},
+		{"GET", "/agent/native-sessions"}, {"GET", "/agent/native-sessions/:session"}, {"GET", "/agent/native-sessions/:session/conversation"}, {"GET", "/agent/native-sessions/:session/events"},
+		{"POST", "/agent/tasks/:task/close-session"},
 		{"POST", "/agent/tasks/:task/cancel"}, {"POST", "/agent/tasks/:task/verify"},
 		{"GET", "/agent/tasks/:task/activities"}, {"GET", "/agent/tasks/:task/activities/:activity"}, {"GET", "/agent/tasks/:task/conversation"},
 		{"GET", "/agent/tasks/:task/resources"}, {"GET", "/agent/resources/:resource"},
 		{"POST", "/agent/resources/:resource/pause"}, {"POST", "/agent/resources/:resource/resume"},
 		{"GET", "/agent/memories/:memory"}, {"GET", "/agent/memories"}, {"POST", "/agent/memories"}, {"DELETE", "/agent/memories/:memory"},
 		{"POST", "/agent/memories/:memory/confirm"},
-		{"GET", "/agent/memories/:memory/sources"},
+		{"GET", "/agent/memories/:memory/sources"}, {"GET", "/agent/memories/:memory/detail"}, {"GET", "/agent/memories/:memory/history"},
 	} {
 		g.Handle(route.method, route.path, forward)
 	}

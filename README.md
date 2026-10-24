@@ -1,411 +1,290 @@
 # Roami
 
-**English** | [Simplified Chinese](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md)
 
-> **Turn your development machines into an always-on AI coding workstation.**
+> **Roami, god of the agents.**
+>
+> Control Claude Code, Codex, OpenCode, Pi, and more from anywhere.
 
-**Roami** lets you **connect back to your own development machines from anywhere,
-at any time, using a phone, tablet, or laptop.** You can keep coding, run tests,
-watch logs, debug in a browser, and supervise Claude Code, Codex, or other AI
-coding agents while the real work continues on the machine that owns it.
+In our brand mythology, Roami is the god who commands a pantheon of AI agents.
+Claude Code, Codex, OpenCode, and Pi each wield their own power. Standing among
+them, Roami holds a phone as his divine instrument, connecting their powers in
+the palm of his hand. Through it, you issue instructions, watch the work unfold,
+and take command from afar.
 
-It solves a concrete problem: **complex development work should not be broken
-apart by your device, network, or schedule.** Your code, terminals, dev
-services, browser, and agents all keep running on the development machine. You
-can switch devices, disconnect, leave your desk, and come back to the same
-working scene. Unless you close them intentionally, the work does not disappear
-because a local terminal exited, a browser tab closed, or a laptop lid shut.
+![Roami, the god of agents, wielding a phone to command Codex, Claude Code, OpenCode, and Pi](docs/assets/roami-agent-gods.webp)
 
-**Roami at a glance:**
+That is the idea behind the product: **many agents, one place to command them,
+wherever you are.**
 
-- **Everything is organized by project**: each repository becomes a mission
-  control with its tasks, worktrees, agent formations, and activity — the
-  workbench is a battle map of what needs you across all projects.
-- **Remote development without losing the scene**: check progress from a phone,
-  add instructions from a tablet, take over coding from a laptop, while the
-  working context stays on the development machine.
-- **Long tasks keep running**: tests, builds, migrations, logs, and debugging
-  sessions survive lid closes, network drops, and device changes.
-- **AI agents become manageable**: describe a task and an agent starts working
-  in an isolated worktree; watch it as a terminal or as a rendered conversation,
-  and send follow-ups from any device.
-- **Complex work can be orchestrated**: race two agents on the same task, or
-  split a goal across a swarm with dependencies, a board, and a shared feed.
-- **More than one machine**: a laptop, a workstation, and a Jetson can all sit
-  behind one console — switch between them from the same window, and one page
-  tells you whether they are all healthy.
+Roami puts the coding agents on your development machines under one remote
+console. From your phone, tablet, or computer, **start agent sessions, send
+instructions, follow their progress, and take over the terminal** through a
+browser or the Android app. The built-in assistant helps coordinate tasks,
+messages, and memory. Your agents, repositories, and processes keep running on
+your own Linux or macOS machines.
 
-Roami is not another cloud IDE. It connects to your real development machines and
-puts projects, terminals, browser, files, tasks, and AI agents into a remotely
-controllable workspace. What you see is a console; behind it is still the
-development environment and toolchain you already use.
+**Your agents work on the development machine. You stay in control from your phone.**
 
-![Roami — the workbench on the left, a live Claude Code session on the right](docs/screenshots/hero.en.png)
+[Get started](#get-started) · [Android app](#android-app) · [Product tour](#product-tour) · [All features](docs/features.md) · [Roadmap](ROADMAP.md) · [Downloads](https://github.com/ybz21/Roami/releases)
 
-<sub>One window: what needs you across every project, and the agent that is working right now.</sub>
+![Roami Home on desktop and in the Android app](docs/screenshots/current/hero.en.webp)
 
-## Core Capabilities
+## What you can do
 
-- **A project is the unit of work**: sessions, tasks, worktrees, and agent
-  formations all hang off the repository they belong to — open a project and
-  everything about it is one screen away.
-- **Close the lid, the work keeps running**: terminals, dev servers, tests, and
-  agent conversations live on the development machine — a dropped network or a
-  shut laptop never kills the scene.
-- **Any device is the same desk**: open the Web console from a phone, tablet, or
-  laptop and land back in the exact project you left — zero install, no native
-  app to update.
-- **Describe a task, an agent takes it**: type what you want, and Claude Code or
-  Codex starts in an isolated worktree on its own branch — race two agents on the
-  same task and keep the better result.
-- **Read agents, don't decode them**: a running Claude Code or Codex session can
-  be read as a real conversation — messages, diffs, and folded tool runs — or as
-  the raw terminal, whichever you need at that moment.
-- **Formations split one goal across many hands**: hand the API to one member,
-  the frontend to another, tests to a third — a shared board and message feed
-  keep them in sync, and dependencies unlock the next step automatically.
-- **The debugging browser and a real phone live on the dev machine too**: login
-  state, screenshots, and repro flows stay put, so remote UI debugging picks up
-  right where it was.
-- **Built for humans and agents to share one workspace**: take over from the Web
-  console by hand, or let agents read state, collect output, and keep pushing.
+- **Control your coding agents remotely.** Manage Claude Code, Codex, OpenCode,
+  and Pi from one console. Start a persistent session, read its output, send
+  another instruction, or take over its terminal from the Android app or a
+  browser. Agent-specific installation, version, and launch settings live in
+  the capability center.
+- **Coordinate work through one conversation.** Ask the built-in assistant to
+  handle a task, inspect progress, and continue the discussion. Tasks, messages,
+  and memory sit beside the conversation on desktop.
+- **Keep work organized by project.** Repositories bring together tasks,
+  worktrees, sessions, branches, and activity. Run independent changes in
+  isolated worktrees, compare agent attempts, or coordinate a swarm.
+- **Continue from another device.** Read results on your phone, send another
+  instruction, or return to a full desktop workspace. Closing the client or
+  losing its connection does not close sessions on the server.
+- **Extend what the assistant can do.** Create or import Skills, configure MCP
+  servers and CLIs, install plugins, and discover capabilities through the
+  market. Review imported configuration before saving it.
+- **Use the actual development tools.** Work with files and Git, operate the
+  development machine's Chrome, and mirror a connected Android device. Add a
+  hub when you need one console for several machines.
 
-## Screenshots
+## Get started
 
-**The workbench answers one question: what needs me?** Projects that are waiting
-on you come first, each with its running tasks, worktree count, and swarms —
-then recent activity across every repository.
+### 1. Install on your development machine
 
-![Workbench: what needs you, per-project tasks, and recent activity](docs/screenshots/workbench.en.png)
-
-**Read the agent, not the terminal.** The same Claude Code or Codex session can
-be rendered as a conversation: messages, code blocks, diffs, and folded tool runs,
-with a status bar for mode, context use, and elapsed time — and a box to reply in.
-
-![A Claude Code session rendered as a conversation](docs/screenshots/chat.en.png)
-
-**Or take the raw terminal, because it is a real tmux session.** Full TUI
-fidelity, tabs that persist per machine, a file drawer and Git panel one click
-away, and — on a phone — a key bar and voice input.
-
-![The same session as a live terminal, with the toolbar and mobile key bar](docs/screenshots/terminal.en.png)
-
-**A formation, at a glance.** A live topology of every member, a shared
-collaboration wall, a drag-to-flow board, and an inbox of items waiting for
-review — a goal split across agents stays legible.
-
-![Swarm dashboard: topology, plaza, and board](docs/screenshots/swarm.en.png)
-
-**Many machines, one console.** The hub page says in one line whether the hub is
-healthy, lists every machine with its latency, CPU, memory, and session count,
-and keeps a log of what happened lately — who dropped, who came back, and how
-long they were gone.
-
-![Hub page: hub health, machines, and the recent event log](docs/screenshots/hub.en.png)
-
-**Settings you can actually find things in.** Search across every setting by
-name, description, or key; categories are grouped by scope — what follows you
-between machines, what belongs to this machine, and what applies to the whole
-cluster.
-
-![Settings: search, category tree, and one page per category](docs/screenshots/settings.en.png)
-
-**Browse and edit files without leaving the console.** Folders and files in two
-resizable columns, a preview on hover, and drag a path straight into a terminal
-or an agent prompt.
-
-![File workspace: folder column, file column, and preview](docs/screenshots/files.en.png)
-
-**Drive a real browser from the console.** The dev machine's Chrome is mirrored
-into the console — open tabs, navigate, click, and type. Debug a web app, keep a
-login session, or let an agent reproduce a flow, all on the development machine.
-
-![Browser mirror: a live Chrome tab driven from the console](docs/screenshots/browser.en.png)
-
-**Control a real phone from the console.** Mirror an Android device over adb — the
-live screen, streaming stats, and remote nav bar — to reproduce mobile flows or
-check an app right next to your terminals.
-
-![Phone mirror: a live Android device inside the console](docs/screenshots/phone.en.png)
-
-## Mobile: work from anywhere
-
-**Your whole workspace fits in a phone.** Open the console in any mobile browser —
-no app to install — and land back in the same projects, tasks, and agents.
-A bottom bar carries the five places you actually go, and a session dock keeps the
-running agent one tap away.
-
-![Roami on a phone: the workbench and the session dock](docs/screenshots/mobile-office.en.png)
-
-**Talk to an agent from your phone.** Open a session and read it as a
-conversation — the same cards, diffs, and status bar as the desktop — then type or
-dictate a follow-up and keep the task moving without a laptop.
-
-![Chatting with Claude Code on a phone](docs/screenshots/mobile-chat.en.png)
-
-## Why It Exists
-
-Remote development is easy for small tasks. Once the work becomes complex, it
-starts to hit many breakpoints:
-
-- dev servers need to keep running
-- tests, logs, and builds need multiple terminals
-- browser state matters for reproducing bugs
-- agents need isolated context and follow-up instructions
-- long tasks should keep running while you are offline
-- you need to quickly understand, per project, what is still running and what
-  is waiting for you
-- and once there is more than one machine, you need to know which one a session
-  is even on
-
-Roami treats the development machine as the single real working scene. The server
-keeps work alive, and the Web console lets you reconnect from any device. When
-automation is needed, scriptable interfaces expose sessions, tasks, logs, and
-agent orchestration.
-
-## Typical Use
-
-1. Start Roami on your development machine.
-2. Open the Web console from a phone, tablet, or another computer.
-3. Open a project, enter an existing task or terminal, and continue the
-   previous working scene.
-4. Describe a new task and let Claude Code, Codex, or another agent run it in an
-   isolated worktree on the development machine.
-5. Leave the browser or close your local terminal; terminals, services, logs,
-   and agents keep running on the development machine.
-6. Come back later from any device: the workbench shows which projects need
-   input, and each project shows where its tasks got to.
-
-Roami is not mainly "one more terminal tool." It turns the development machine
-into a continuously available workspace. The terminals, running services,
-debugging browser, AI agent conversations, and task state on that machine do not
-vanish just because a local device shut down, SSH disconnected, or a browser tab
-closed.
-
-## Install And Start
-
-`roami` is a single binary with an embedded frontend and an integrated session core.
-The web console needs no Go/Node/npm on the target; browser automation uses Node and Chrome. Config and data live in
-`~/.roami/` (`config.yaml` is generated on first run).
-
-### Option A — install as a service (recommended for always-on / 24×7 machines)
-
-One line downloads the binary and registers it as a persistent **systemd**
-service (survives reboots and logout):
+Supported release bundles: **Linux and macOS, x86-64 and ARM64**. Install `tmux`
+on the host first, then run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ybz21/Roami/main/install.sh | bash
 ```
 
-`install.sh` installs `roami` into `~/.local/bin` and sets up a user service —
-manage it with `systemctl --user {status|restart|stop} roami`. Env switches:
-`ROAMI_VERSION=vX.Y.Z`, `ROAMI_BIN_DIR=DIR`, `ROAMI_SYSTEM=1` (system-wide service,
-needs sudo), `ROAMI_NO_SERVICE=1` (install the binary only).
+The installer downloads the complete bundle and starts a persistent service:
+**systemd on Linux, launchd on macOS**. The bundle includes the web frontend,
+a private Python interpreter, and the built-in agent's production dependencies.
+You do not need to install Python, uv, Go, or Node to run the bundled console and
+assistant. Optional features have their own requirements:
 
-### Option B — run the binary manually
+| Feature | On the development machine |
+|---|---|
+| Persistent terminals and agent sessions | `tmux` |
+| Professional coding agents | The relevant CLI, its login, and provider access |
+| Browser mirror and automation | Chrome and Node |
+| Android device mirror | ADB and a connected, authorized Android device |
 
-Grab the build for your OS/arch from the
-[Releases](https://github.com/ybz21/Roam/releases) page and run it directly (no
-service — good for macOS or a quick try):
+For an installation without service registration:
 
 ```bash
-# example: Linux x86_64
-curl -fsSL -o ~/.local/bin/roami \
-  https://github.com/ybz21/Roam/releases/latest/download/roami-linux-amd64
-chmod +x ~/.local/bin/roami
-roami                    # starts the Web console on 0.0.0.0:13579
+curl -fsSL https://raw.githubusercontent.com/ybz21/Roami/main/install.sh \
+  | ROAMI_NO_SERVICE=1 bash
+roami
 ```
 
-### Option C — from source (development)
+Download complete packages and Android APKs from
+[Releases](https://github.com/ybz21/Roami/releases). Pre-release builds are listed
+there too. The standalone server binary does **not** include the Python runtime;
+use the complete bundle for the built-in assistant.
 
-```bash
-git clone https://github.com/ybz21/Roam.git
-cd Roami
-./start.sh --dev       # build CLI/chrome/skills + frontend + backend from source, then run
-```
+### 2. Open the console and configure your assistant
 
-`start.sh` also supports `stop` / `status` / `logs` / `fg`; plain `./start.sh`
-runs already-built artifacts without recompiling.
+Open the address printed by Roami, normally `https://<machine-address>:13579`.
+Set an access password on first use. In **Settings**, configure the built-in
+assistant's model provider, endpoint, model, and credentials. In
+**Capabilities → Agents**, check your installed coding agents and open a
+terminal to finish their login when needed.
 
-On first launch there is **no password**: open the Web console in a browser and
-set one before entering. Change it later under **Settings → Security**, or edit
-`~/.roami/config.yaml`. By default the console listens on `0.0.0.0:13579`
-(self-signed HTTPS, because microphone and clipboard need a secure context), so
-devices on the same LAN can reach it. For remote access, prefer Tailscale,
-Cloudflare Tunnel, SSH forwarding, or frp.
+Configuration and data default to `~/.roami/`. Run the installer again to
+upgrade; an active agent can delay activation until its work is idle.
 
-Exposing Roami through **frp with HTTPS** so mobile voice input and clipboard
-continue to work through the tunnel is covered in
-**[docs/deploy/frp.md](docs/deploy/frp.md)** (bilingual).
+### 3. Add a project and start working
 
-Full installation, deployment, remote access, and command-line automation notes
-live in **[docs/install/](docs/install/)**.
+Open **Projects** and add an existing repository, create a directory, or clone a
+repository. Start a task or terminal, then return to **Home** to work through the
+assistant. Open the same server from another device to continue.
 
-## More Than One Machine
+Your client needs a route to the server: the same LAN, a VPN, or a configured
+remote-access tunnel. Roami does not establish that connection automatically.
+For off-LAN access, see the [HTTPS tunnel guide](docs/deploy/frp.md).
 
-A single Roami is a complete product; you only need this section when you have a
-second machine. Every machine keeps running its own sessions, agents, and files —
-the hub only routes to them, so nothing about a machine depends on the hub being
-alive except reaching it from outside.
+## Product tour
 
-**The hub** is the same binary started in hub mode. It runs no sessions, no
-agents, and no browser — just the registry, the console, and the tunnel:
+### Home: a conversation with its work in view
+
+Home is the main assistant conversation. On a wide desktop, the right workspace
+has **Tasks / Messages / Memory** tabs. Open a task to see its outcome,
+deliverables, and execution details, or open memory to review what the assistant
+retains. Task progress and actionable questions stay close to the discussion.
+
+On phones, the four main destinations are **Home / Projects / Tools / Settings**.
+Messages and task details open as secondary pages with their own return bar.
+
+### Projects: from a repository to running work
+
+Projects collect sessions, worktrees, tasks, and activity around each repository.
+Open an existing session, launch an independent change, or compare attempts.
+Professional sessions can be read as a conversation where supported, with the
+original terminal available when you need the CLI's full interface.
+
+![Current Projects page](docs/screenshots/current/projects.en.webp)
+
+For larger jobs, swarms provide members, dependencies, a shared board, and a
+message feed. The underlying sessions remain real tmux sessions on the host.
+
+### Capabilities: agents, tools, and a market
+
+The capability center has **Agents, Plugins, Skills, MCP, CLI, Core tools, and Markets**
+tabs. Check installed agents and versions, configure launch commands and supported
+model settings, and inspect available usage information.
+
+![Current capability center with imported Skills](docs/screenshots/current/capabilities.en.webp)
+
+Create a Skill or upload `SKILL.md`; register a CLI with its argument list; add
+an MCP server and explicitly connect it to discover tools. The market searches
+configured sources for Skills, MCP servers, and CLI packages, then lets you
+preview and edit an import before saving it.
+
+Roami-managed capabilities serve the built-in assistant. Professional CLIs also
+have their own Skill and MCP configuration; importing a capability into Roami
+does not automatically configure every CLI.
+
+### Tools: files, browser, and a real phone
+
+The file workspace supports browsing, previews, editing, and Git inspection.
+The browser workspace mirrors Chrome on the development machine, including its
+existing tabs and login state. The phone workspace mirrors an Android device
+connected to that machine over ADB.
+
+![Current file workspace](docs/screenshots/current/workspace.en.webp)
+
+The **Android app below is a remote client**. The **phone mirror** is a separate
+feature for operating and debugging a device attached to your development
+machine.
+
+## Android app
+
+Install **`roami.apk`** from [GitHub Releases](https://github.com/ybz21/Roami/releases)
+on **Android 8.0 or newer**. Open it, enter your Roami server's full address,
+confirm its certificate if necessary, and log in. The app connects to your own
+server; it does not run the coding agents on your phone.
+
+![Roami Android app: Home and mobile tools](docs/screenshots/current/android.en.webp)
+
+The app adds native integration around the same web workspace:
+
+- **Saved server environments.** Reopen a saved server, or shake the phone to
+  return to the environment picker.
+- **Session and assistant notifications.** A foreground-service connection
+  receives events without Google push services. Supported session confirmation
+  prompts offer **Allow / Deny** actions in the notification.
+- **A home-screen widget and app badge.** See running sessions and pending work,
+  open a session, or start a task. Notification and badge behavior depends on
+  Android permissions and the device's launcher and battery settings.
+- **Files, voice, and updates.** Upload and download files, grant microphone
+  access when needed, and install APK updates through the server's installation
+  page when the administrator has made a newer APK available there.
+
+Voice transcription also needs a speech-recognition provider configured on the server.
+
+The APK and server have separate version numbers. Public APK releases use a
+fixed signing certificate so later releases can upgrade the installed app.
+
+Prefer a browser? Android Chrome and iPhone Safari can add Roami to the home
+screen. On iPhone, Web Push requires an installed home-screen web app and iOS
+16.4 or newer. Open **Settings → Install on phone** for certificate, installation,
+and notification guidance. See [mobile setup](docs/deploy/mobile.md) for details
+and Android source builds.
+
+## Several machines, one console
+
+Each development machine owns its files, agents, and sessions. An optional hub
+provides a shared console and an outbound connection from each node, so nodes
+behind NAT do not require inbound port forwarding to reach the hub.
 
 ```yaml
-# ~/.roami/config.yaml on the hub
+# On the hub: ~/.roami/config.yaml
 cluster:
   mode: hub
-  public_url: https://roami.example.com    # the address machines dial back on
+  public_url: https://roami.example.com
 ```
 
-**Each machine** dials out to the hub with a one-time enrollment token (issue it
-under **Settings → Cluster**), then swaps it for a long-lived credential:
-
 ```yaml
-# ~/.roami/config.yaml on a machine
+# On a development machine: ~/.roami/config.yaml
 cluster:
   hub: https://roami.example.com
   token: <one-time enrollment token>
-  name: workstation                        # display name, defaults to hostname
+  name: workstation
 ```
 
-Because the tunnel is outbound, a machine behind NAT or a home router needs no
-port forwarding. From then on:
+Issue the enrollment token in the cluster settings. Use the machine switcher to
+move between nodes; sessions continue on their own host when the client changes
+nodes or disconnects.
 
-- the machine switcher in the console (and under **More** on a phone) moves the
-  whole workspace to another machine — terminal tabs are remembered per machine,
-  so switching back lands you on the same sessions;
-- the **hub page** shows hub health, every machine's latency, CPU, memory, and
-  session count, plus an event log of drops and reconnects;
-- a machine whose numbers keep climbing raises a dot on the navigation rail —
-  the health check watches the *shape* of the curve rather than absolute
-  thresholds, so a bigger machine doesn't false-positive;
-- **Full monitor** on any machine opens the same monitoring panel the
-  `roam.host-monitor` plugin draws locally — CPU, GPU, disk, and network history.
+## CLI and development
 
-## For Claude Code / Codex
-
-If Claude Code, Codex, or another command-line coding tool is installed on the
-development machine, the project page is the fastest way to use it: describe a
-task and the agent starts in an isolated worktree on its own branch, so parallel
-tasks never step on each other. You can also race Claude Code and Codex on the
-same task and keep the better result, or run any tool directly inside a
-persistent Roami terminal. Execution, output, context, and the follow-up channel
-all stay on the development machine — when you return from a phone or tablet,
-you can read where it got to and add more instructions.
-
-For more complex work, launch a formation: a swarm splits the goal across
-multiple members — one handles the API, one the frontend, one tests. A shared
-board and message feed synchronize progress, and dependencies unlock the next
-step when earlier work is done.
-
-## Command Line And Automation
-
-Roami also provides command-line entry points for scripts, automation, and AI
-agents. This is not the main entry point for most users; start from the Web
-console in most cases.
-
-`roami` is the single entry point. Plugin commands are grouped by plugin name
-(any unique prefix works). Session operations use `roami session`; unknown session commands are rejected:
+`roami` is the command entry point for the console, sessions, browser automation,
+and installed plugins:
 
 ```bash
-roami help                        # what is installed and how to reach it
-roami cron list                   # scheduled tasks
-roami im send --text "done"       # message yourself through the IM bridge
-roami host stats                  # host resource snapshot
-roami session ls                  # sessions — integrated core
-roami session swarm ls              # session and swarm operations
-roami adb devices -l              # connected Android devices
-roami -addr 0.0.0.0:13579         # no subcommand: start the web console (unchanged)
+roami help
+roami session ls --json
+roami project ls --json
+roami agent status
+roami chrome help
+roami adb devices -l
 ```
 
-Underneath:
-
-- `roami session`: manages persistent sessions, background tasks, agent workers, swarms,
-  and machine-readable state.
-- `roami chrome`: drives Chrome on the development machine for UI debugging,
-  screenshots, form flows, and automated validation.
-- `roami adb`: forwards native ADB commands for Android screenshots, touch input,
-  app operations, file transfer, and device debugging; requires system ADB.
-
-Plugins extend the console itself — `roam.host-monitor` contributes the resource
-monitor, `roam.cron` adds scheduled prompts with its own configuration panel.
-Whatever a plugin declares in its manifest shows up as a `roami <name> <command>`
-group with no extra wiring.
-
-Command details are intentionally not expanded on the home page, so the README
-does not become a tool manual. When needed, see
-**[docs/install/](docs/install/)**, `roami help`, `roami session help`, `roami chrome help`, and `roami adb help`.
-
-## Development And Contribution
-
-Install the repository Git hooks once per clone:
+For a source checkout, install the Go and Node versions required by
+[go.mod](go.mod) and [the frontend](frontend/package.json), plus the host tools
+for the features you use. Prepare the built-in assistant runtime as described
+in [agent-runtime/README.md](agent-runtime/README.md), then:
 
 ```bash
+git clone https://github.com/ybz21/Roami.git
+cd Roami
 bash scripts/dev/install-git-hooks.sh
+./start.sh --dev fg
 ```
 
-The pre-commit hook runs the quick quality gate. CI runs the full gate on pushes
-and pull requests:
+Repository checks:
 
 ```bash
 scripts/dev/quality/check.sh quick
 scripts/dev/quality/check.sh full
 ```
 
-Build and run the Web console:
+Contributors follow [AGENTS.md](AGENTS.md), including the design system, i18n,
+session isolation, and screenshot requirements. Android build and signing
+instructions are in [mobile setup](docs/deploy/mobile.md).
 
-```bash
-./start.sh --dev fg
-```
+## Access and security
 
-Frontend only:
+Roami can operate your terminal, files, browser, and agents. Protect it like
+remote access to the development account: use a strong password, enable
+optional two-factor authentication, and keep access behind a trusted network,
+VPN, or authenticated tunnel.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+HTTPS is enabled by default with a self-signed certificate. Trust the server's
+CA on clients or provide a trusted certificate for microphone, clipboard, and
+web-push features that require a secure context. Closing a client keeps host
+processes alive; a host reboot or a deliberately stopped session is a different
+boundary.
 
-Backend only:
+## Documentation
 
-```bash
-TTMUX_WEB_PASSWORD=dev go run ./cmd/roami server
-```
-
-CLI smoke test:
-
-```bash
-ROAMI_BIN=/tmp/roami bash tests/test-session-cli.sh
-```
-
-Agent-facing rules for this repository (design system, i18n, quality gates) live
-in **[AGENTS.md](AGENTS.md)** — the single source both Codex and Claude Code read.
-
-## Security Notes
-
-Roami can control your development machine's terminal, files, browser, and
-agents. Treat it as close to SSH access. For real deployments:
-
-- Use a strong access password, and enable two-factor authentication when
-  needed.
-- Prefer Tailscale, Cloudflare Tunnel, SSH forwarding, or frp for external
-  access.
-- Do not expose the Web console port directly to the public Internet.
-- Enrollment tokens are one-time and expire (30 minutes by default); machines
-  keep a long-lived credential afterwards, and the hub stores only its hash.
-- The diagnostic endpoint (`ROAMI_PPROF`) is off by default and refuses to bind
-  anything but loopback.
-- Run it only on machines and accounts you trust.
-
-## Docs
-
-- [docs/features.md](docs/features.md) - full feature list
-- [docs/install/](docs/install/) - installation and deployment
-- [docs/design/](docs/design/) - design docs for swarm orchestration, plaza
-  boards, cluster topology, and Web integration
-- [backend/README.md](backend/README.md) - backend implementation details
+- [Complete feature inventory](docs/features.md)
+- [Roadmap: RSI, personal digital twin, and OKR execution](ROADMAP.md)
+- [Mobile setup and Android builds](docs/deploy/mobile.md)
+- [HTTPS remote-access tunnel](docs/deploy/frp.md)
+- [Installation and deployment reference](docs/install/README.md)
+- [Built-in agent runtime](agent-runtime/README.md)
+- [Plugin development](docs/design/plugin/README.md)
+- [Backend](backend/README.md)
 
 ## License
 
-GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE).
+[GNU Affero General Public License v3.0](LICENSE).

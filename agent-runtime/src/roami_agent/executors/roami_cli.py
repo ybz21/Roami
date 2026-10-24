@@ -33,6 +33,7 @@ class CodingExecutor:
         self.db, self.settings = database, settings
         self.persistent = persistent
         self.artifacts = None
+        self.capabilities = None
 
     async def command(self, sub, *args, spec=None):
         response = await execute(
@@ -97,6 +98,8 @@ class CodingExecutor:
         )
         if self.artifacts:
             launch["prompt"] += await professional_brief(self.db, self.artifacts, task, run)
+        if self.capabilities:
+            launch["prompt"] = await self.capabilities.brief(task, run) + "\n\n" + launch["prompt"]
         if target.get("nodeId", "local") != "local":
             raise DomainError("CODING_NODE_UNAVAILABLE")
         if target["kind"] == "session":

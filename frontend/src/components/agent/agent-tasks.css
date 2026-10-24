@@ -80,3 +80,5 @@ html[data-pointer="coarse"] .agent-task-filters > button::after { content:''; po
 .agent-task-conversation { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
 .agent-task-conversation .agent-message { max-width:100%; }
 html[data-pointer="coarse"] .agent-task-record .ant-segmented-item-label { min-height:var(--tap); display:flex; align-items:center; justify-content:center; }
+
+.native-project-sessions { padding:var(--sp-3); }

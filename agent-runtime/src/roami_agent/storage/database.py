@@ -18,6 +18,10 @@ from roami_agent.storage.migrations import SCHEMA_VERSION, initial_schema, upgra
 T = TypeVar("T")
 
 
+class NativeConnection(sqlite3.Connection):
+    native_payloads = None
+
+
 class Database:
     def __init__(self, path: Path, data_root: Path, *, managed: bool = True):
         self.path, self.data_root, self.managed = path, data_root, managed
@@ -67,7 +71,7 @@ class Database:
             if entry["state"] == "ready" and not self.path.exists():
                 raise DomainError("DATABASE_MISSING", 503)
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self.connection = sqlite3.connect(self.path, isolation_level=None)
+        self.connection = sqlite3.connect(self.path, isolation_level=None, factory=NativeConnection)
         os.chmod(self.path, 0o600)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=1000;")
@@ -89,6 +93,28 @@ class Database:
             raise DomainError("AGENT_SCHEMA_UNSUPPORTED", 503)
         self.connection.executescript("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
         upgrade_schema(self.connection, version)
+        from roami_agent.storage.native_payloads import NativePayloads
+
+        home = (self.instance_paths or {}).get("homeRoot") or self.data_root
+        if self.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='native_storage_config'"
+        ).fetchone():
+            key = self.connection.execute(
+                "SELECT reference_key FROM native_storage_config WHERE id=1"
+            ).fetchone()[0]
+            self.connection.native_payloads = NativePayloads(
+                Path(home) / "agents" / "native", bytes.fromhex(key)
+            )
+        self.connection.create_function(
+            "native_content",
+            1,
+            self.connection.native_payloads.resolve
+            if self.connection.native_payloads
+            else lambda value: value,
+        )
+        from roami_agent.storage.native_public_record import public_json
+
+        self.connection.create_function("native_public", 1, public_json)
 
     async def call(self, fn: Callable[[sqlite3.Connection], T], *, write: bool = False) -> T:
         if self.closed:
@@ -131,13 +157,23 @@ class Database:
         self.pool.shutdown(wait=True)
 
 
+def hydrated(connection, value):
+    result = dict(value)
+    resolver = getattr(connection, "native_payloads", None)
+    if resolver:
+        for key, content in result.items():
+            if key.endswith("_json"):
+                result[key] = resolver.resolve(content)
+    return result
+
+
 def row(connection, sql: str, args=()):
     value = connection.execute(sql, args).fetchone()
-    return dict(value) if value else None
+    return hydrated(connection, value) if value else None
 
 
 def rows(connection, sql: str, args=()):
-    return [dict(r) for r in connection.execute(sql, args)]
+    return [hydrated(connection, r) for r in connection.execute(sql, args)]
 
 
 def event(connection, conversation_id: str, kind: str, payload, *, key=None, **refs) -> int:

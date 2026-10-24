@@ -55,3 +55,12 @@ it('shows catalog errors without disabling manual selection or saving the draft'
   expect((mainModel() as HTMLInputElement).disabled).toBe(false)
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
 })
+
+it('identifies an unavailable local runtime and retries the settings request', async () => {
+  vi.mocked(api).mockRejectedValueOnce(Object.assign(new Error('AGENT_RUNTIME_UNAVAILABLE'), { apiError: { code: 'AGENT_RUNTIME_UNAVAILABLE' } })).mockResolvedValue({ data: settings })
+  setup()
+  expect((await screen.findByRole('alert')).textContent).toContain('agent.unavailable')
+  expect(screen.queryByText('agent.models.failed')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByLabelText('agent.models.baseUrl')
+})

@@ -151,7 +151,7 @@ class PromptBuilder:
                 lambda db: row(
                     db,
                     "SELECT id FROM tool_calls WHERE turn_id=? AND state='succeeded' AND "
-                    "(tool_name='conversation_history' OR (tool_name='task_status' AND json_extract(arguments_json,'$.includeResult')=1)) LIMIT 1",
+                    "(tool_name='conversation_history' OR (tool_name='task_status' AND json_extract(native_content(arguments_json),'$.includeResult')=1)) LIMIT 1",
                     (turn["id"],),
                 )
             )

@@ -15,6 +15,7 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.native_session_registry import register as register_native_session
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.task_continuation import continuation_candidates
 from roami_agent.storage.transcript_repository import history, message, owned
@@ -212,8 +213,8 @@ class Tasks:
                     db,
                     "SELECT x.id FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
                     "WHERE x.turn_id=? AND x.tool_name='delegate' AND x.state='failed' AND "
-                    "CASE WHEN json_valid(json_extract(m.content_json,'$.text')) THEN "
-                    "json_extract(json_extract(m.content_json,'$.text'),'$.error') END "
+                    "CASE WHEN json_valid(json_extract(native_content(m.content_json),'$.text')) THEN "
+                    "json_extract(json_extract(native_content(m.content_json),'$.text'),'$.error') END "
                     "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') LIMIT 1",
                     (source_turn_id,),
                 )
@@ -397,6 +398,7 @@ class Tasks:
                 db.execute(
                     "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
                 )
+                register_native_session(db, tid, child, branch_id)
                 seed = goal
                 if (spec.get("target") or {}).get("resourceOnly"):
                     original = json.loads(origin["content_json"]).get("text", "")
@@ -435,6 +437,17 @@ class Tasks:
 
     @staticmethod
     def _view(db, task):
+        native = row(
+            db, "SELECT id,conversation_id FROM native_sessions WHERE task_id=?", (task["id"],)
+        )
+        task["nativeSession"] = (
+            {"id": native["id"], "conversationId": native["conversation_id"]} if native else None
+        )
+        task["sessionClosure"] = session_closure(db, task["id"])
+        target = json.loads(task.get("target_json") or "null") or json.loads(
+            task["intent_json"]
+        ).get("target", {})
+        task["projectId"] = target.get("projectId")
         task["latestAttempt"] = row(
             db,
             "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind,result_json AS inspectionResultJson,"

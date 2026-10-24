@@ -825,3 +825,303 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <h3>技术设计</h3><p>behavior_observer最多4项一批，保护题隔离；codex_roles使用只读无工具的原生CLI，记录thread ID、JSONL与用量。review_report和ResearchWorkflow持久保存全量文档与全机汇总；github_issues对账、发布确认并同步清单，source_revision只应用校验补丁。一次只观察一个源码候选，防止后续修复覆盖观察版本。CLI无供应商侧总Token硬截断保证，超额或未知调用阻止后续付费执行。</p>
 <p><a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；本轮quick/full通过（Python1138项），前端923项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
 </section>
+
+<section id="professional-agent-model-picker" lang="zh-CN">
+  <h2>Agent 模型下拉选择 · 2026-10-22</h2>
+  <h3>产品设计与用户故事</h3>
+  <p>四类 Agent 的模型字段统一为可搜索、可手动输入的下拉框，保留已有模型和未保存输入。用户可点击“获取模型”，按当前服务地址、协议和密钥读取真实模型列表；修改连接信息后清空旧服务返回的候选，失败保留模型选择及表单。服务不支持列模型时允许继续输入自定义模型。</p>
+  <h3>技术设计</h3>
+  <p>AgentModels.tsx 复用 antd AutoComplete，候选来自同服务已有预设和显式查询结果。新增 POST /api/agent/professional/:kind/model-options，复用预设私有密钥和输入验证；按协议读取 OpenAI / Anthropic 兼容的 GET models，Anthropic 支持分页。请求有时限、响应和条目上限，不跟随重定向、不返回上游错误正文、不执行模型推理，不新增轮询或隐式应用。网络读取在预设锁外执行；变更连接会取消旧请求并丢弃过期结果。</p>
+  <h3>验收记录</h3>
+  <p>仓库 full 门禁及 Go 竞态测试通过；前端 127 文件 / 913 用例、typecheck、i18n、hover 与生产构建通过。覆盖四类 Agent、保存密钥和环境变量、Anthropic 分页、连接取消、失败保留、重定向及响应限制；Python 按仓库改动范围规则跳过，构建保留已有大块体积提示。</p>
+  <p>隔离 Go / HOME / 原生配置 / tmux 和本地模型服务完成四类 Agent 查询、下拉选择、自定义保存及刷新恢复。桌面中英文深浅主题在 320–1920 宽度无文档溢出；Redmi Note 8 真机以 coarse 指针完成查询、搜索、Android 原生点按候选、保存、刷新与返回，键盘 314px 时输入位于可见表单内、保存高度 44px 且不被遮挡。截图和脚本位于 /tmp/model-picker-*，未改动现用服务和原生配置，未调用推理接口。</p>
+</section>
+
+<section id="task-native-session-design" lang="zh-CN">
+  <h2>任务会话与 native 托管设计 · 2026-10-22</h2>
+  <p>设计与实施记录。完整 HTML 入口：<a href="docs/design/20261022-任务会话与工作习惯/index.html">任务、会话与工作习惯</a>；<a href="docs/design/20261022-任务会话与工作习惯/verification.html">原型验证记录</a>；<a href="docs/design/20261022-任务会话与工作习惯/implementation.html">实际实现与验收</a>。</p>
+  <h3>产品设计</h3>
+  <p>首页中间保留 Main，右侧任务栏展示任务及可点击项目归属；进入会话直接打开绑定原会话。用户确认结束前保留原身份与筛选；工作习惯只影响新任务，续改复用原工作区和智能体。</p>
+  <h3>用户故事</h3>
+  <p>用户能从首页直接进入专业或 native 会话，补充修改后仍回到原任务；也能点击项目名进入所属项目，返回保留筛选、搜索和位置。</p>
+  <h3>技术设计</h3>
+  <p>native 拟统一托管在 ~/.roami/agents/native/时间戳-随机后缀/，以 .session.json 记录身份关联、.chat.jsonl 记录对话和工具调用，context 与 blobs 保存检查点及大输出。现有 SQLite 继续负责在线事务与调度，事务 outbox 串行补写日志；关闭保留记录，恢复不重放工具副作用。模块、接口、迁移与故障验收在完整稿中定义。</p>
+  <h3>设计验证</h3>
+  <p>Chrome 原型 51 项、Android 真机 9 项检查通过；仅验证设计交互、布局和示例记录格式，不代表真实文件托管、数据库迁移或故障恢复已实施。</p>
+</section>
+
+<section id="task-native-session-implementation" lang="zh-CN">
+<h2>native 会话托管实施 · 2026-10-22</h2>
+<p>首页任务栏与详情直达原会话和项目；桌面在 Main 右侧打开 native，手机为全屏单返回栏。记住筛选、选择、位置及草稿；等待验收与终态详情不轮询。项目目录提供 native 入口，不移动首页任务主列表。</p>
+<p>schema 12 登记稳定 native 身份和父子关系，以同事务 outbox 生成私有 JSONL、校验 gzip 分段；七天前正文在无在途 turn、保留最近两轮且可精确恢复时改为认证引用。备份格式 3 同时包含数据库、native 目录和附件；关闭保留历史，恢复不重放工具。采用带来源、修订与有效范围的工作习惯，只影响新项目任务，续改保持原 Agent / branch / workspace。</p>
+<p>设计原型与真实实现的目录、接口和验收差异见上述实际实现 HTML；开发文档中文是 i18n 例外，产品文字均走 i18n。代码未部署。</p>
+</section>
+
+<section id="duplicate-preference-reconciliation" lang="zh-CN">
+  <h2>重复偏好记忆修复 · 2026-10-22</h2>
+  <h3>产品设计</h3>
+  <p>显式记忆请求即时保存，后台提取不因标题不同或包含“帮我记下”前缀再增加一条有效记忆。确认为个人长期偏好后保留长期记录，对话副本转为历史记录，保留来源和删除／忘记关联。启动时整理已有提升关系中同源、同内容的重复副本，不做模糊语义合并。</p>
+  <h3>用户故事</h3>
+  <p>用户说一次记住偏好，列表和召回只得到一条有效记忆；重复后台提取不增加副本。历史来源可追溯，删除后不回退到旧副本；不同内容、来源、项目和任务保持各自范围。</p>
+  <h3>技术设计</h3>
+  <p>memory/intake.py 复用显式请求正文解析；memory/preference.py 在现有来源校验下按正文、来源 ID 和指纹匹配，复用已有记录或提升后 supersede 本地副本；memory/jobs.py 在提取提交和启动恢复时调用。保留 memory_edges，更新 memory_epoch，写入沿用数据库事务。历史整理仅处理已有提升关系、范围一致且长期目标仍有效的记录，不增加轮询或模型调用。</p>
+  <h3>验收记录</h3>
+  <p>仓库 full 门禁通过，Python 全量 880 个用例通过；记忆相关 57 个用例覆盖新写入、重复提取、历史整理幂等、来源、范围、过期及删除关联。隔离 Unix HTTP 服务配合固定模型响应验证截图原文只返回一条长期偏好、来源未变、跨用户不可见及删除后零条；历史种子从两条整理为一条。验收文件为 /tmp/duplicate-memory-acceptance.json 与同名 PNG，现用服务和记忆未修改。</p>
+</section>
+
+<section id="memory-browsing-design" lang="zh-CN">
+  <h1>记忆浏览设计 · 2026-10-22</h1>
+  <div id="memory-browsing-prototype">
+    <p>运行 <code>cd frontend &amp;&amp; node scripts/build-memory-design.mjs</code>，生成 /tmp/memory-browsing-design.html 与独立原型。原型复用项目主题、i18n、图标、断点与 MobileSubPage，只使用内存示例，不连接业务 API，也不保存生产偏好。</p>
+    <p><a href="/api/file/serve/tmp/memory-browsing-design.html">打开设计与可点击原型</a></p>
+    <iframe title="记忆浏览原型" src="/api/file/serve/tmp/memory-browsing-prototype.html" width="100%" height="760" sandbox="allow-scripts allow-forms"></iframe>
+  </div>
+  <h2 id="memory-browsing-product">产品设计</h2>
+  <h3>问题与目标</h3>
+  <p>现有目录把类型“偏好”与范围“个人／对话／项目／任务”放进同一筛选；同一行反复展示标题、正文、展开和来源按钮。列表内展开挤乱阅读位置，手机来源弹窗截断长内容。统一目标是让用户快速回答：记住了什么、适用于哪里、来自哪句话、如何纠正。</p>
+  <h3>入口与信息架构</h3>
+  <p>桌面首页保留右侧“任务／消息／记忆”工作台；记忆头部的展开入口进入完整浏览，设置旧入口继续兼容。手机从已有记忆入口打开全屏二级页，不增加主导航项。目录默认“已记住”，旁边为“待确认”和“每日足迹”；“待确认”同时容纳候选与冲突，冲突显示文字提示，计数为零则隐藏。足迹是使用统计，不混入可复用记忆。</p>
+  <p>首层只放搜索和范围选择，默认全部范围。个人长期、项目、对话、任务是范围；偏好、事实、决策、摘要是类型，收进可展开筛选。选择项目／对话／任务范围后，完整实现提供对应实体选择，不能把“范围类别”冒充某个实体。“对话”筛选指存放在该对话的记忆；个人长期单独列出，不用“当前可用”暗示当前回答已采用。</p>
+  <h3>列表与详情</h3>
+  <p>列表使用平面行：短标题、最多两行正文摘要、适用范围和更新时间。去掉日期主分组、永久总数栏、每行来源与展开按钮；整行可键盘和触摸打开详情。非当前范围显示具体项目／对话／任务名称，缺失名称显示“来源不可用”等可读状态，完整 ID 仅在技术详情中。搜索支持标题、正文，范围选项和类型共同过滤，空结果提供清除筛选；只有一页时不显示分页。</p>
+  <p>完整桌面浏览为列表与详情并排，两区独立滚动；窄工作台在同一面板内从列表切详情，返回恢复筛选和滚动位置，不新增第三栏。详情依次呈现完整内容、真实状态、适用范围、来源原文和折叠变更记录。个人长期说明“可在其他对话中检索使用”，不声称每次都会使用，也不填造召回次数或最后使用时间。</p>
+  <p>来源在详情中直接预览原句、对话名称和时间，打开来源对话定位原消息；返回记忆恢复位置。多来源分别展开，来源变化或不可用显示相应状态和恢复动作，不清空记忆正文。归并的旧对话副本放进变更记录，只保留一条有效目录项；不在客户端做模糊去重，不隐藏未确认的真实冲突。</p>
+  <h3>待确认、删除和足迹</h3>
+  <p>候选详情先展示内容和来源，再确认记住或拒绝。冲突同时展示现有记忆与待确认内容，确认替换前使用短确认框，旧版本保留。来源变化需重新核实，不能在未加载可靠来源时确认。删除记忆与彻底忘记继续放在更多菜单，确认文案明确“保留来源”和“屏蔽后续上下文”的区别，沿用后端真实语义；失败保留列表、详情和选择，不伪报成功。</p>
+  <p>每日足迹按日期、项目浏览，列表仅呈现对话轮数和任务完成数，详情展开已有活动统计；没有记录的指标显示“未记录”，不补零。原型使用明确的示例统计，不推断生产活跃度。</p>
+  <h3>手机与状态反馈</h3>
+  <p>列表、记忆详情和来源对话都是 URL 管理的全屏二级页，只使用一层等高返回栏及一个内容滚动容器，保留四个底部入口。返回不叠加 overlay history；候选确认栏位于滚动区外，由 MobileSubPage 统一避让安全区和键盘。搜索、过滤、详情返回保留当前位置。图标有可访问名称，触控目标至少 44px，悬停只对鼠标生效。加载采用占位；后台更新失败保留最近列表，显示短错误和重试，不新增永久刷新按钮。</p>
+  <h2 id="memory-browsing-stories">用户故事</h2>
+  <ol>
+    <li>我在工作台扫一眼就能看懂已保存的偏好和适用范围，不必逐条展开，也不会看到归并后的两条副本。</li>
+    <li>我可以搜索 Codex，点开记忆看到原话及来源对话；查看来源后返回原来的列表位置。</li>
+    <li>我可以区分个人长期与某个项目／对话／任务的规则，不误以为已保存就意味着每次回答都会采用。</li>
+    <li>我能查看待确认内容，发现与现有偏好冲突时先对比原文，再决定替换或拒绝；网络失败不丢失当前查看内容。</li>
+    <li>我在手机上能完成搜索、筛选、读全文、查看来源、返回与删除确认，长内容不被小弹窗截断。</li>
+    <li>我可以单独查看每日足迹；它不挤占偏好和知识的目录，不把未知统计当作零。</li>
+  </ol>
+  <h2 id="memory-browsing-technical">技术设计</h2>
+  <h3>代码与模块架构</h3>
+  <pre>frontend/src/components/agent/
+AgentMemory.tsx            视图、范围／类型筛选、URL 和选择状态
+MemoryList.tsx             平面列表、搜索结果、分页与滚动恢复
+MemoryDetail.tsx           全文、范围、来源、候选／冲突与操作
+memory-record.ts          目录、详情、来源与活动的类型及格式
+useMemoryCatalog.ts        节点／所有者／筛选缓存、过期结果隔离与请求合并
+agent-memory-events.ts     复用会话事件失效缓存，刷新已挂载目录
+memory-browser-route.ts    复用 agent-page-route 的入口、详情和来源深链
+MobileSubPage              手机唯一返回栏、滚动区、键盘与安全区
+prototypes/memory-browser.tsx       本轮隔离交互稿
+prototypes/memory-browser-data.ts   明确的示例来源与冲突数据
+scripts/build-memory-design.mjs     从本节提取设计并打包单文件 HTML</pre>
+  <h3>查询、状态与接口边界</h3>
+  <p>沿用 GET /memories/catalog、GET /memories/{id}/sources、POST /memories/{id}/confirm 和 DELETE /memories/{id} 的所有者与范围边界。目录状态名映射为已记住 active、待确认 candidate＋conflict、每日足迹 category=activity；候选＋冲突必须在服务端统一筛选、排序、计数和分页，不能客户端分别抓一页再拼接。范围类别筛选同样在服务端分页前处理，具体实体继续传 projectId／conversationId／taskId，类型单独使用 kind。</p>
+  <p>已补充只读详情 GET /memories/{id}/detail 与按需历史 GET /memories/{id}/history，支持 active／candidate／conflict 的详情与关联当前版本，返回可读实体名称、来源状态和受所有者约束的归并／修订历史。历史只沿可信 canonical_key、supersedes_id、memory_edges 及相同来源指纹追踪，不因共享一条来源就把不同内容合并为版本。来源证据加载及确认提交继续复验，客户端不从标题或摘要推断冲突。原 GET /memories/{id} 的有效记录语义保持；目录新增 state=review 与 scope，GET /memories/facets 返回同一视图下的可读实体选项及待确认数量。确认提交携带 expectedCurrentId，来源及版本变化返回冲突，保留当前内容供重新核实。</p>
+  <p>扩展现有 home/memory/{origin} 路由的记忆详情／来源状态，保留节点参数和来源返回路径；旧 settings/agent/memory 链接映射到完整目录。筛选保存在 URL，草稿和滚动按节点／视图保留；回退、刷新和横竖屏不丢选中项。复用已有事件与可见性刷新，不新增逐条轮询；详情与来源按需加载，忽略过期结果并合并并发请求，辅助失败不覆盖正文。未知召回关系不展示，真实召回证据仍从对应回复的执行记录查看。</p>
+  <h3>设计阶段交付与验收边界</h3>
+  <p>设计阶段交付可点击示例原型；以下为原型阶段的隔离边界，正式实现见落地修订。原型复用项目主题令牌、图标、全局 i18n、useLayout 与 MobileSubPage；中英文切换只翻译界面，示例用户原文保留中文。浏览器原型使用 sandbox、内存偏好和禁出网 fetch，不写实际服务配置。底部主导航为宿主环境示意，本轮可操作范围为记忆浏览及其详情、来源、筛选、候选确认、删除和返回。开发者设计正文使用中文，属于 i18n 文档例外。</p>
+  <p>验收计划：桌面完整浏览与工作台、手机真机搜索／筛选／返回／滚动／键盘；中文深色和英文浅色；加载、失败与空结果；确认替换、拒绝、删除取消及来源变化；页面无文档或横向溢出。原型验证不等于业务接口已实现，落地验收另需服务端范围与分页、所有者隔离及来源失效测试。</p>
+  <h3>原型验收记录</h3>
+  <p>前端 typecheck、i18n（3471 个键）、hover、127 个测试文件／907 个用例和生产构建通过，构建保留已有大块体积提示。桌面验证目录／详情、工作台内返回、搜索空态、冲突对比及确认取消、拒绝、来源跳转、变更记录与活动详情；中文深色和英文浅色各在 320、390、820、1100、1280、1600、1920 宽度检查，共 14 组无文档或横向溢出，浏览器无脚本错误。</p>
+  <p>Redmi Note 8 真机以 392 CSS px／coarse 指针验证真实触摸命中、来源对话、Android 返回、候选对比及滚动；展开长内容后滚动由 0 变为约 136px。隔离 HTTPS 预览中实测键盘 314px，--kb 同步、底栏隐藏、搜索保持可见。静态原型启动与真实应用一样启用 VirtualKeyboard 覆盖模式；真机键盘验收使用安全上下文，不以 HTTP 预览替代。</p>
+  <p>设计、独立原型与截图为 /tmp/memory-browsing-*；校验记录含 validation.json、width-validation.json 和 phone-validation.json。产物仅使用示例内容，未替换生产页面或修改生产记忆。</p>
+  <h3>落地修订 · 2026-10-22</h3>
+  <p>用户确认后，实际 AgentMemory 已替换为同一套目录／详情组件，完整页面、桌面工作台和手机入口共用查询与路由。删除旧卡片组件和样式；完整页面打开期间只保留原对话事件连接，不再挂载隐藏的第二份记忆工作台。旧设置地址继续显示完整目录。范围、类型、实体、搜索、分页与选中项进入 URL，搜索和筛选替换当前记录，选择详情增加一条历史；Android 返回逐层恢复，列表滚动按节点及筛选保留。</p>
+  <pre>agent-runtime/src/roami_agent/memory/
+  catalog.py       服务端范围类别、候选并集、计数分页与实体目录
+  detail.py        所有者隔离的详情、当前版本、精确归并与修订历史
+  evidence.py      有界来源原话、来源变化和不可用状态
+  preference.py    同一来源／相同正文的偏好复用与旧副本归并
+  records.py       确认的版本守卫与原有删除／彻底忘记语义
+server/http.py → Go /api/agent 网关 → 上述目录与详情服务</pre>
+  <p>历史只读展示最近 50 项，并如实标明截断；归并仅认明确关联、同一所有者、相同来源指纹及去除“记住”前缀后完全一致的正文。遗漏或已彻底忘记的来源同时退出目录、历史和候选计数。来源不可用时仍可阅读待确认正文，但不能确认；服务端提交再次校验来源和当前版本。目录无常驻轮询，复用现有会话记忆事件和可见性更新，历史只在展开后加载。</p>
+  <p>运行验收使用 /tmp/roami-mem-browser 内的独立配置、数据库、Unix socket 与私有 tmux 服务，Go 网关对接实际 Python 运行时；注入确定性模型和示例来源，未使用生产模型凭证，也未改写生产记忆。质量脚本修正了删除旧组件后仍扫描不存在文件的问题。</p>
+  <h3>实现验收记录</h3>
+  <p>PR 整合复查补充：终端标签恢复与变更仅覆盖 terms／active，并保留当前 URL 的记忆筛选、页码和选中项；回归覆盖初始化、异步恢复及随后切换终端标签，避免刷新后丢失记忆深链。</p>
+  <p>桌面真实服务已验证单条偏好及归并历史、来源跳转与浏览器返回、活动详情、旧设置链接、候选冲突对比及取消。中文深色、英文浅色分别检查 320、390、820、1100、1280、1600、1920 七档宽度，14 组均无文档或横向溢出。工作台详情替换列表，返回后滚动位置由 380px 恢复为 380px；模拟删除请求失败时，正文和选中项保留。</p>
+  <p>Redmi Note 8 真机在 392 CSS px／coarse 指针下完成真实触控搜索、来源跳转、Android 返回、候选确认、冲突取消与删除取消。HTTPS 键盘实测 314px，搜索框可见且底栏隐藏；长详情真实手势滚动约 450px。手机只有一个返回栏和一个内容滚动容器，底部四个主入口均完成真实点按，关键控件命中区至少 44px，安全区正常，无横向或文档滚动。</p>
+  <p>前端 128 个测试文件／913 个用例通过；typecheck、i18n（3483 个键）、hover 与生产构建通过，保留已有大块体积提示。Go 测试和 887 个运行时用例通过，覆盖候选并集分页、独立范围、不放宽召回、来源失效、当前版本冲突、所有者隔离、忘记后的隐私及精确历史；full 门禁通过，最终记录为 /tmp/memory-browser-quality-accepted.log。实现仍在独立工作区，未自动部署至正在使用的服务。</p>
+</section>
+
+<section id="agent-runtime-distribution-design" lang="zh-CN">
+  <h1>一条命令安装 Roami · 2026-10-23</h1>
+  <p>状态：已实现，安装与守护验收见本节末尾；尚未合并发布到公开安装入口。</p>
+  <h2>产品设计</h2>
+  <h3>用户只执行一条命令</h3>
+  <pre><code>curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash</code></pre>
+  <p>沿用当前仓库与入口。macOS、Ubuntu 用户使用同一条命令；无需 clone 仓库，无需安装 Python、uv、pip、Node 或 Go，无需激活 venv 或手动拉起智能体服务。bash 不直接下载 URL，因此公开入口采用 curl 下载并交给 bash。模型服务凭证仍由用户在网页设置中填写。</p>
+  <p>安装器自动识别系统及 CPU，下载完整包，安装私有运行时，注册现有 systemd／launchd 服务，启动并验证本机模型设置接口。成功后只显示访问地址、首次设置登录口令的提示和日志位置。重复执行同一命令即升级；默认不要求用户选择安装类型或 Python 版本。</p>
+  <h3>推荐决策</h3>
+  <table>
+    <thead><tr><th>方式</th><th>用户体验</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td>完整包带 Python、应用 wheel 和依赖 wheel</td><td>一次下载；环境安装不再访问 PyPI</td><td>默认方案</td></tr>
+      <tr><td>安装器在线下载 uv／Python，再安装依赖</td><td>命令也只有一条，但依赖多个外部下载源</td><td>可作为开发路径，不作为默认发布安装</td></tr>
+      <tr><td>直接压缩构建机的 venv</td><td>携带绝对路径和平台绑定，换目录容易失效</td><td>不采用</td></tr>
+    </tbody>
+  </table>
+  <p>默认包携带固定版本的 CPython 独立发行版；在用户机器的最终安装目录创建 venv，再使用包内 wheel 离线安装。包体积、下载时间和安装磁盘占用由实际构建测量，本方案不预报数字。运行时环境准备完成后不再移动目录。</p>
+  <h3>边界与失败反馈</h3>
+  <p>“无需预装开发工具”限定为 Roami 与智能体运行时；现有会话功能所需 tmux 继续由安装器探测并按系统安装，必要时明确提示包管理器权限。Chrome、ADB、KVM 沿用可选功能策略，其安装失败不伪报智能体安装失败。完整包下载后，Python／依赖安装可断网完成，不等于 Chrome、tmux 等宿主工具也离线可装。</p>
+  <p>下载、校验、建环境或预检失败时保留现有版本，报出失败步骤和重试入口；首次安装失败不得打印“完成”。模型尚未配置时设置表单应可打开；服务故障与模型连接／认证错误分开显示。安装完成不声称用户已配置模型或可使用未登录的专业 Agent。</p>
+  <h2>用户故事</h2>
+  <ol>
+    <li>第一次安装的人复制一条命令，结束后直接打开网页填写模型地址和密钥。</li>
+    <li>没有 Python、uv、Node、Go 的 Mac 或 Ubuntu 机器，也能安装并打开智能体设置。</li>
+    <li>已有用户再次执行原命令升级，配置、登录口令、对话和模型密钥保留。</li>
+    <li>准备新版本时断网或依赖损坏，旧版本继续可用，重新执行命令能重试。</li>
+    <li>重启电脑或智能体进程崩溃后自动恢复，用户无需再运行第二条启动命令。</li>
+  </ol>
+  <h2>技术设计</h2>
+  <h3>发布资产</h3>
+  <p>发布四份完整资产：roami-linux-amd64.tar.gz、roami-linux-arm64.tar.gz、roami-darwin-amd64.tar.gz、roami-darwin-arm64.tar.gz。当前裸二进制保留为高级使用入口；安装器默认选择完整包，不悄悄退回缺少运行时的裸二进制。</p>
+  <pre>roami-&lt;os&gt;-&lt;arch&gt;.tar.gz
+  bin/roami                     Go 主程序，继续内嵌前端
+  runtime/python/               固定构建的 CPython 3.12 独立发行版
+  runtime/wheels/               roami_agent 及全部生产依赖 wheel
+  runtime/requirements.lock.txt  从 uv.lock 导出的构建输入与上游哈希
+  runtime/requirements.txt       当前平台实际 wheel 的精确版本与哈希
+  runtime/pyproject.toml         运行时识别与构建元数据
+  manifest.json                 版本、源提交、目标平台、文件哈希、Python 构建、协议版本
+  licenses/                     Python 与依赖发行许可
+  runtime/.venv/                目标机生成，不在压缩包中</pre>
+  <p>构建固定 Python 补丁版本与独立发行版构建号，不使用浮动 latest。现有 uv.lock 是唯一依赖解析来源，导出生产依赖，排除 pytest、ruff 等开发组；构建包含 migrations 和 Skill 资源的非 editable 应用 wheel。每个平台收集匹配 ABI／架构的全部 wheel；缺少 wheel 时构建失败，不能把源码编译留给用户。Linux 的 glibc 下限与 macOS 最低版本根据实际 Python 和 wheel 清单锁定，并以相应系统实测后公布，不把 Linux 包声称为支持 Alpine/musl。</p>
+  <h3>安装与目录</h3>
+  <pre>~/.local/bin/roami                 稳定入口
+~/.local/share/roami/
+  releases/&lt;version&gt;-&lt;manifest-hash&gt;/
+    bin/roami
+    runtime/python/
+    runtime/.venv/
+    manifest.json
+  current                         原子切换的已验证版本指针
+~/.roami/                         原有用户配置、模型密钥、数据库、会话与附件</pre>
+  <p>系统级安装按实际服务用户解析安装根，保留现有 ROAMI_* 自定义存储路径，不把运行时目录与用户数据库混在一起。运行时查找优先显式 --runtime-dir／ROAMI_AGENT_RUNTIME，再找当前发布目录的 runtime，最后保留源码开发路径。服务启动使用绝对路径，不依赖交互 shell 的 PATH、activate 或工作目录。</p>
+  <ol>
+    <li>安装互斥锁防止两个安装器同时激活；解析一次具体 release tag，包和校验清单取自同一 release，禁止下载过程中多次解析 latest。</li>
+    <li>下载到临时文件，核对摘要及 manifest 平台、版本与路径；拒绝越界归档条目。生产发布必须同时具备主程序和运行时资产。</li>
+    <li>把新版本解压到不会再改名的独立最终目录，先标记未完成。使用包内 Python 创建 .venv，通过 ensurepip 和本地 wheel 离线安装精确依赖；无需用户安装 uv 或系统 Python。不写系统 site-packages。</li>
+    <li>用候选程序执行原有存储布局预检；在临时配置、数据库、私有 tmux 服务和 socket 下完成初始化及模型设置 GET/PUT/重启恢复预检，不使用真实用户的模型凭证或数据库。</li>
+    <li>预检成功后标记 ready。等待现有智能体空闲并有序停止本安装管理的服务；有在途任务或服务归属不明时中止激活并给出重试说明，不终止用户任务。</li>
+    <li>必要时先做一致性存储备份，再原子切换 current，同时切换 Go 与 Python 版本；注册／重启原有 systemd 或 launchd 服务。首次从普通二进制入口迁入版本目录时保留原程序备份。</li>
+    <li>检查主服务及智能体状态、实际模型设置接口。未配置模型时也必须返回可填写的设置。无服务管理器环境给出明确的前台启动方式，不声称已注册开机启动。</li>
+  </ol>
+  <p>准备阶段失败不触碰旧版本。激活后失败需区分数据库迁移：未迁移可回切旧程序；已经迁移则先停止新写者，通过现有存储备份恢复完整实例后再回退，禁止只切旧程序读取新 schema。保留上一份可用发布目录；清理必须避开 current、上一版本及仍有进程引用的环境。首版自动回退只承诺已验证的备份／迁移路径，未知写入状态保留现场并报恢复步骤。</p>
+  <h3>运行时生命周期</h3>
+  <p>Go 主进程统一管理智能体子进程，覆盖安装版、自定义目录启动和 start.sh 开发路径。systemd／launchd 仍只管理一个 Roami 服务，不另让用户配置 Python 服务。默认启动仅运行已准备好的环境，不在服务启动时下载或安装依赖。</p>
+  <p>主服务启动时先解析同实例存储、取得运行时独占锁，再启动 Python，等待私有 socket 就绪；异常退出有退避重启。SIGTERM 时先停止接收新工作，按既有任务语义关闭并等待子进程退出。父进程意外死亡通过继承的存活管道关闭通知子进程退出，不能只依赖 Linux 专有机制；运行时锁保证旧写者未退出时不会启动第二个写者。只回收自己启动且身份匹配的子进程，不接管或终止手动启动的运行时。</p>
+  <p>Go 与 Python 使用同一实例路径和 Unix socket 解析规则，覆盖 macOS 长 HOME 和 Linux XDG_RUNTIME_DIR 不一致场景；超长路径必须有同用户私有短路径策略或明确可恢复错误。hub 模式不启动本机运行时。独立 roami agent serve 保留供开发与诊断使用，并与自动管理共用单实例锁。</p>
+  <h3>代码与模块架构</h3>
+  <pre>.github/workflows/release.yml        四平台原生构建／验收与完整资产发布
+scripts/build/build-agent-bundle.sh  Python、应用 wheel、依赖 wheel 和 manifest
+scripts/build/build-roami.sh         保留 Go／内嵌前端构建
+install.sh                          单命令入口、预检、准备／激活与服务登记
+scripts/install/agent-environment.sh 目标目录建 venv 和离线依赖安装
+cmd/roami/agent.go                  发布目录发现、setup 和 init 兼容
+cmd/roami/agent-supervisor.go        Go 管理运行时进程、就绪、退避与停止
+cmd/roami/main.go                   standard 启停接入，hub 排除
+agent-runtime/src/roami_agent/app.py 运行时锁、父进程存活管道和有序退出
+frontend/.../agent-models.ts         区分运行时不可用与模型服务错误
+scripts/dev/selftest/agent-install.sh 全新／重复／失败安装回归</pre>
+  <h3>实施顺序与验收</h3>
+  <p>按“完整资产构建 → 目标机离线环境准备 → Go 生命周期 → 安装器接入 → 错误提示 → 四平台安装验收”实施；这些是开发步骤，最终用户始终只有同一条命令。</p>
+  <ul>
+    <li>Linux amd64／arm64 与 macOS Intel／Apple Silicon 均使用原生系统验证；至少在干净 Ubuntu 和真实 macOS 完成从公开安装入口到打开设置页的完整流程。</li>
+    <li>验收机无预装 Python／uv／Go／Node；完整包下载后禁用外网仍可创建环境、启动服务。生产包不含构建机路径、editable 指针或开发依赖。</li>
+    <li>未配置任何模型时设置 GET 成功；用本地模型 fixture 验证配置保存、模型列表、真实对话和重启恢复，不调用付费模型。</li>
+    <li>重复安装、同版本重试、升级、下载中断、哈希错误、缺 wheel、环境创建失败和启动失败均有明确结果；准备失败保持旧服务和数据。</li>
+    <li>验证路径含空格、长 HOME、自定义数据目录、systemd／launchd 环境、父进程崩溃、重复启动与子进程恢复；不泄漏第二个运行时或改动用户 tmux 服务。</li>
+    <li>迁移升级单测和真实备份恢复；同一命令升级后原有口令、模型设置和对话仍可读取。完成仓库 quick／full 门禁及受影响前端检查；真实公开资产尚未发布前明确标记为本地候选验收。</li>
+  </ul>
+  <h3>实施修订与验收 · 2026-10-23</h3>
+  <p>完整包固定 CPython 3.12.13，发布 CI 固定 uv 0.11.2。应用构建为普通 wheel，生产依赖从 uv.lock 导出并带哈希；包内携带 wheel、Python 及许可，目标机通过包内 Python 的 venv／pip 离线创建环境，不依赖系统 Python 或目标机 uv。实际目录为 releases/&lt;archive-sha256&gt;，安装完成后不移动环境。</p>
+  <p>原生 CI 发现的兼容修订：macOS 的 /var 与 /private/var 是同一目录，安装测试根统一解析真实路径。cryptography 49 起停止发布 Intel Mac wheel；Intel 构建机使用锁定源码构建当前版本，静态链接经固定 SHA-256 验证的 OpenSSL 3.5.9，部署目标为 macOS 11，随包保留 OpenSSL 许可。构建后用 otool 拒绝系统目录之外的动态库依赖，不要求用户安装 Rust、OpenSSL 或 Homebrew 库。构建输入保留原锁定哈希，目标安装清单由实际 wheel 生成并使用产物哈希；编译仅发生在构建机。</p>
+  <p>Go 的 install-bundle 实现安全解包、拒绝链接与越界路径、平台／版本及逐文件哈希校验、运行环境准备和原子指针切换；激活失败恢复原指针，旧裸二进制另行保留。install-probe 使用临时存储与本地模型目录 fixture 验证设置读取、保存和重启恢复。已有环境不会被原地覆盖；升级通过私有 quiesce 入口检查在途工作并短暂停止新写入，失败／超时恢复接收请求，私有入口不公开挂载。</p>
+  <p>Go 监督 Python 子进程并在异常退出后指数退避重启；就绪后停止探测定时器，常态不增加健康轮询。继承的存活管道在父进程正常退出或崩溃时通知子进程退出，Python 继续使用原有独占数据库锁。systemd／launchd 负责启动和重启 Go；Linux 保留 KillMode=process，避免重启控制台时杀掉用户 tmux 会话。独立手工运行时保持原归属，安装时要求先停止，不自动接管。</p>
+  <p>Unix socket 改为同实例数据目录下的确定路径，不再因交互 shell 与服务的 XDG_RUNTIME_DIR 不同而失联；超长路径使用 /tmp 下按用户隔离、校验所有者与 0700 权限的短目录。内置智能体读取设置不需要先配置模型。运行时不可用时前端显示已有“暂时无法连接智能体”文案，不再提示用户检查模型地址和密钥。</p>
+  <p>数据库边界：本版自动安装与升级只接受当前 schema。旧布局沿用安装前检查；schema 不同则在读取检查阶段阻止激活，保留旧服务和数据，要求使用已有离线备份／迁移流程。尚未实现跨 schema 的自动备份恢复，不把程序回切当成数据库回退。默认完整包安装与 ROAMI_NO_SERVICE 手工启动均可用；tmux 仍是宿主依赖，Chrome／ADB／KVM 为独立可选能力。</p>
+  <ul>
+    <li>Linux 本机通过真实 curl 到 bash 的安装入口，测试 PATH 无 Python／uv／Go／Node；使用临时 systemd／launchd 适配器启动真实服务，不修改宿主常驻服务。覆盖全新安装、重复执行、含空格目录、持久对话与配置、新版本目录切换、启动失败恢复旧版、校验失败保留现有服务和子进程崩溃恢复。</li>
+    <li>Ubuntu 24.04 干净容器只准备 curl、CA 和 tmux，运行阶段关闭 Docker 网络；系统无 Python／uv／Go／Node。实际安装完整包、启动 HTTPS、校验内嵌前端、首次设置口令并通过认证网关读取空模型设置。该检查发现最小系统缺失时区数据库，已把 tzdata 加入生产依赖并增加无宿主 zoneinfo 回归。</li>
+    <li>Python 集成覆盖父进程 SIGTERM／SIGKILL、子进程强制退出及自动恢复、升级忙状态、升级期间拒绝写入、恢复接收和私有接口所有者隔离；Go 覆盖归档越界与链接拒绝、失败清理、版本指针回退和长目录／不同 XDG 环境。</li>
+    <li>桌面实际设置表单可打开；Redmi Note 8 真机为 392 CSS px、compact／coarse，输入框命中高度 44px，真实点按聚焦，键盘 314px，无横向或文档滚动。截图位于 /tmp/roami-install-settings-desktop.png 与 /tmp/roami-install-settings-phone-full.png，触控记录为 /tmp/roami-install-phone-validation.json。</li>
+    <li>macOS Intel／Apple Silicon 的 Go 二进制交叉编译通过；四平台原生完整包安装验收已接入发布 CI，全部 bundle 验收成功后才进入 publish。此开发机没有实际运行 macOS 原生安装，不把交叉编译当作该项通过。</li>
+    <li>最终 full 质量门禁、Go 测试、908 个 Python 用例、925 个前端用例、typecheck／i18n／hover 和生产构建通过；保留已有前端大块体积提示。最终自动检查与运行证据汇总于 /tmp/roami-install-acceptance.json；测试和演示仅使用临时配置、无付费模型调用，未更新用户现用 Roami 服务。CLI 输出与此开发设计正文按 i18n 规范的终端／开发文档例外保留中文，产品文案复用已有中英文键。</li>
+  </ul>
+  <h3>依据与当前证据</h3>
+  <p>隔离复现记录：/tmp/roami-settings-diagnosis-6bzq3vf4/results.json。只有 Go 主程序时模型设置返回 503 AGENT_RUNTIME_UNAVAILABLE；补启运行时后，即使没有 agent.toml、模型地址和密钥，也返回 200。安装与守护实现已完成；公开版本尚未发布。</p>
+  <p>Python 官方将 venv 定义为应在目标位置重建的环境：<a href="https://docs.python.org/3/library/venv.html">venv 文档</a>。独立 Python 发行版归档结构见 <a href="https://gregoryszorc.com/docs/python-build-standalone/main/distributions.html">python-build-standalone 文档</a>；固定 Python 管理方式见 <a href="https://docs.astral.sh/uv/guides/install-python/">uv Python 管理文档</a>。这些支持发行方式选择，不代表上述 Roami 安装实现已通过验收。</p>
+</section>
+
+<section id="capability-markets-design" lang="zh-CN">
+  <h1>开放能力市场与 MCP 传输接入 · 2026-10-23</h1>
+  <h2>产品设计</h2>
+  <p>能力中心新增“市场”，首批接入 skills.sh、官方 MCP Registry 和 npm。来源可启停、编辑服务地址，或新增兼容相同接口的来源。搜索按用户操作发起；结果展示名称、摘要、版本，查看时解析真实配置，再进入现有可编辑确认表单。导入成功后在 Skill、MCP、CLI 原分类管理；保留来源、固定版本和 Skill 附件，不覆盖重名项。MCP 不因浏览或保存而启动；CLI 明示首次调用由 npx 下载固定版本，参数使用 args 数组。</p>
+  <p>MCP 的本地程序、SSE、Streamable HTTP 三种传输均可新建、编辑、导入、连接和调用。type 与 transport 冲突时拒绝导入；保留现有 HTTPS、凭证环境变量引用、取消和连接生命周期边界。手机详情与来源配置复用全屏 MobileSubPage，表单滚动和保存栏沿用现有令牌。</p>
+  <h2>用户故事</h2>
+  <ol>
+    <li>我能搜索公开技能，查看上游来源和固定提交，确认后保留指令、引用文档、脚本和附件，重启后继续使用。</li>
+    <li>我能从官方 MCP 目录选择 SSE、Streamable HTTP 或支持的 npm／PyPI 本地程序配置，修改名称、参数和凭证环境变量引用后保存，再显式连接。</li>
+    <li>我能从 npm 查找具有命令行入口的软件包，固定版本并注册；普通库没有入口时给出明确提示，不假装可调用。</li>
+    <li>我能停用市场来源而不删除已导入能力；主 Agent、后台工作 Agent 与平台派发的 Codex／Claude 任务共用已安装能力和停用策略，专业任务也能读取 Skill 附件和调用 MCP／CLI。</li>
+    <li>我能在手机完成市场搜索、来源配置、详情、确认导入与返回，失败保留输入和最近结果。</li>
+  </ol>
+  <h2>技术设计</h2>
+  <pre>frontend/src/components/capabilities/
+  CapabilityMarket.tsx       按需搜索、结果分页、接入选项和导入确认
+  MarketSources.tsx          来源配置、启停和完整替换
+  CapabilityEditor.tsx       复用导入表单，保留来源、附件与参数模式
+agent-runtime/src/roami_agent/server/
+  capability_markets.py      所有者检查、私有来源配置、请求合并与缓存
+  market_catalogs.py         skills.sh／MCP Registry／npm 只读适配
+  skill_package.py           有界附件验证、不可变包目录与完整性校验
+  capability_imports.py      原有原子注册、启停及恢复；新增附件与 argv 参数模式
+  http.py                    私有接口，由原 Go 登录网关转发
+agent-runtime/src/roami_agent/tools/mcp.py
+                             SDK stdio／SSE／Streamable HTTP，统一连接 actor</pre>
+  <p>GET／PUT /api/agent/capability-markets 管理来源，GET /api/agent/capability-markets/{source}/search 按需搜索，POST /api/agent/capability-markets/preview 获取待确认导入项。来源配置私有文件 0600，原子替换；禁用来源拒绝新查询。目录请求最多四个并行，合并同请求、缓存一分钟，不新增常驻轮询；关闭运行时取消所有目录请求。</p>
+  <p>GitHub 技能按固定提交下载，拒绝符号链接、路径穿越和冲突路径，最多 100 个文件、384000 字节，保留仓库许可证。附件随注册数据保存，运行时只读副本按内容散列放在节点 agents/capability-packages 下；旧版本保留以免破坏正在运行的任务。单个带附件的 Skill 请求最多 600000 字节，总目录仍最多 1 MiB。脚本不在导入时执行，后续运行继续经过已有工作目录与进程权限边界。npm 只从包元信息中的 bin 登记命令，固定版本并以 argv 数组调用。</p>
+  <p>平台主 Agent、后台工作 Agent 和托管专业任务使用同一注册表。Codex／Claude 任务通过任务级 CLI 入口读取 Skill 和引用、发现 MCP 工具、调用已注册 MCP／CLI；不用为各专业程序另装一份能力。专业程序原有的全局配置继续由其自身管理。Docker／MCPB 和需 OAuth 的条目不伪报已接入；不支持的包装格式明确报告。</p>
+  <h3>专业任务接入</h3>
+  <pre>executors/roami_cli.py → tools/professional_capabilities.py
+  派发提示携带只读目录命令及私有上下文文件路径
+cmd/roami/agent-capability.go
+  list／show；read／call --context FILE --call REQUEST_ID
+server/http.py → ProfessionalCapabilities → Tools.invoke
+  校验签名、所有者、运行中任务／尝试、版本、来源和预算
+  复用能力启停、参数 Schema、MCP actor、CLI 工作目录与产物外置
+conversation/professional_activity.py
+  持久执行回执进入现有任务记录及按需详情，沿用秘密字段打码</pre>
+  <p>每次专业派发生成 0600 上下文文件，服务端以节点私有密钥签名；提示仅包含路径，不包含签名。上下文绑定所有者、任务、尝试和版本，取消、完成、来源忘记、排队改派或预算到期即拒绝新调用。只允许 Skill 读取、MCP 发现和外部注册操作，不借此开放内部调度工具。执行期间持续复验任务状态，撤销时取消底层操作。</p>
+  <p>请求号在执行前原子登记到已有事件存储；相同号和参数返回原回执，不重跑。参数冲突拒绝，进行中或进程重启后的未完成调用保持未知结果，不能自动重放。每个任务最多 1024 次登记、每节点最多 16 个并发、单次最多 90 秒；CLI 等待预算为 100 秒。完成结果与失败进入任务执行记录，主聊天仍只显示任务进度和可行动阻塞。</p>
+  <h3>CLI 与 Roami 自主接入 · 2026-10-23</h3>
+  <p>终端增加 roami agent capability market sources／search／preview／install，JSON 参数与现有命令族一致。主 Agent 与普通 Worker 通过同一动态 CLI 目录按需发现；专业任务可使用自己的 --context 与 --call。研究只读角色不开放安装。市场指令与描述作为待审阅数据，只有用户要求安装时才执行 install。</p>
+  <p>server/market_installations.py 保存最多 32 份、十分钟有效的固定版本预览，CLI 只返回说明摘要、附件名和完整配置，不把附件 Base64 放入模型上下文。安装以 previewId／option／可选 name 选择原包，复用托管注册、名称冲突和原子保存；失败保留预览。来源停用或改址、预览过期均拒绝继续安装；相同选择重试返回同一回执，被编辑或移除后报冲突。sources／search／preview 为读取，install 为写入，沿用当前调用上下文、任务撤销和执行记录。MCP 保持未连接，CLI 首次调用下载的规则保持一致。</p>
+  <p>实现模块：tools/market_commands.py 注册按需工具；commands.json 维护公开路径；cmd/roami/agent-market.go 同时服务普通终端及已绑定的 Agent 调用；POST /api/agent/capability-markets/prepare 与 /install 复用登录网关。平台常驻模型 schema 数量保持原有基础工具集合。</p>
+  <h2>调研来源</h2>
+  <ul>
+    <li><a href="https://github.com/vercel-labs/skills">skills.sh 安装工具与公开源码</a></li>
+    <li><a href="https://modelcontextprotocol.io/registry/registry-aggregators">官方 MCP Registry 聚合接口</a></li>
+    <li><a href="https://github.com/openclaw/clawhub/blob/main/docs/http-api.md">ClawHub 公开搜索与下载 API（后续适配来源）</a></li>
+    <li><a href="https://skillsmp.com/developers">SkillsMP API（后续适配来源）</a></li>
+    <li><a href="https://smithery.ai/docs/api-reference/servers/download-server-bundle">Smithery 下载接口（后续适配来源）</a></li>
+    <li><a href="https://glama.ai/mcp/reference">Glama API 与署名要求（后续适配来源）</a></li>
+  </ul>
+  <h2>验收</h2>
+  <p>仓库 full 门禁通过，包含 Go 全量测试和 940 个运行时用例；前端 129 个文件、930 个用例通过，typecheck、i18n（3537 个键）、hover 与生产构建通过。最后对执行目录投影和 CLI 返回状态的调整另通过专业接入 12 个定向用例及 Go CLI 包全量测试。格式与静态检查通过，构建保留原有大块提示；最新完整日志为 /tmp/roami-market-quality-platform.log。</p>
+  <p>隔离 Go 登录网关与真实 Python 运行时已完成 skills.sh 上的 find-skills、官方目录中的 Context7 配置和 npm Prettier 固定版本导入。重载注册数据后，Prettier 实际输出 3.9.10，SSE 服务实际返回 market smoke。SDK 的 stdio 子进程、SSE 和 Streamable HTTP 实服均验证初始化、认证、发现及调用；来源禁用、重名、原子失败、重启恢复、附件路径与符号链接保护有回归覆盖。</p>
+  <p>Redmi Note 8 真机在 392 CSS px／coarse 下完成市场搜索、来源编辑保存、SSE 新建连接、真实手势滚动，以及 Vercel React Best Practices 的 76 个文件下载、修改名称、确认导入、Skill 详情与返回。只有一个二级页返回栏；列表手势由 0 滚至约 418px，文档保持 0，无横向溢出。键盘实测 314px，保存按钮高 44px、底边约 440px，位于 766px 视口的键盘上方并能真实点按。紧凑标签栏的市场项宽 44px，完整可见。</p>
+  <p>桌面检查 320、390、820、1100、1440 宽度，页面与文档无横向溢出，文档不滚动，浏览器无脚本错误；中文深色与英文浅色分别核对。证据与截图保存于 /tmp/roami-market-*，包括 live-evidence、call-evidence、phone-import-evidence、phone-sse-evidence 和 width-evidence。开发实例使用独立数据目录、数据库、Unix socket 与记录过身份的 tmux 服务；不部署到用户现用服务。</p>
+  <p>专业接入使用真实 Go CLI、私有 Unix socket、Python 运行时与隔离 tmux，Codex／Claude 的 TUI 使用确定性离线测试程序，不消耗模型调用。两类会话均从派发提示读取私有上下文，成功读取已导入 find-skills、执行固定版本 Prettier（3.9.10）、发现并调用真实 SSE 服务；每次任务的四个调用进入执行记录，重复请求返回同一回执，取消后的调用被拒绝。定向用例另覆盖上下文伪造、跨所有者、旧版本、已结束尝试、忘记来源、改派、停用、目录越界、并发重复、运行时关闭及重启恢复。原始证据为 /tmp/roami-market-professional-evidence.json；测试结束已关闭确切执行会话并通过隔离启动器清理私有 tmux 服务。</p>
+</section>
+
+<section id="mobile-document-access-20261024" lang="zh-CN">
+  <h1>手机文档预览与保存 · 2026-10-24</h1>
+  <h2>产品设计</h2>
+  <p>聊天中的任务产物链接和附件在手机内打开全屏二级页，保留返回和下载。PDF 逐页绘制，PPTX 沿用本地渲染器并隔离页面内容；文件页和任务详情复用同一预览。Android 保存使用已信任的服务器证书及登录态，系统保存框保留中文原名，文件写入完成后才提示成功，失败清理本次创建的残缺文件。</p>
+  <h2>用户故事</h2>
+  <p>用户在聊天里点开 PDF 或 PPTX 即可查看、翻页或滚动，然后返回原对话；点下载能选择保存位置并得到原文件。跨节点链接保留来源节点，外链及显式下载继续正常导航。</p>
+  <h2>技术设计</h2>
+  <p>file-link 识别产物内容地址并按需读取元信息；MobileFilePreview、TaskArtifactPreview 与文件页复用 documents/DocumentPreview、PdfDocument。PDF.js 与 Worker 按需加载，画布限制像素预算；PPTX 页面使用禁脚本和外部网络的 sandbox。DocumentDownload 使用同源 OkHttp、CookieManager、Tls 和 ACTION_CREATE_DOCUMENT，DocumentName 解析 UTF-8 Content-Disposition。WebMessage 下载入口仅注入受信任服务器来源、仅接受主框架消息；保留普通 DownloadListener 兜底，已由网页接管的附件预览不再触发下载。APK 升级为 0.3.9，保留现有签名。</p>
+  <p>验收：Redmi Note 8 的 Chrome 和正式签名 App 在自签 HTTPS 下完成 PDF 绘制与翻页、PPTX 触控滚动和返回；两份文件通过系统保存框保留中文及加号文件名，手机文件 SHA-256 与服务器原件分别一致。接口要求 HttpOnly 登录 Cookie，确认原生保存携带登录态。跨节点链接与显式下载通过回归检查；前端完整检查、仓库 full 门禁及 Android 单元测试和签名构建通过。测试材料使用隔离示例，不外传用户文档。</p>
+</section>

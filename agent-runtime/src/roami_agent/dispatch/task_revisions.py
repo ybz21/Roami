@@ -396,6 +396,7 @@ class TaskRevisions:
                             "text": "Continue the existing task; preserve completed work and inspect current state before changes. Updated goal:\n"
                             + payload["goal"],
                             "taskRevision": revision,
+                            "displayText": payload["text"],
                         },
                     )
                 db.execute(

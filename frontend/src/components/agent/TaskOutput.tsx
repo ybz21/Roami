@@ -4,6 +4,7 @@ import { nodeApi } from '../cluster/node-url'
 import Markdown from '../markdown/Markdown'
 import type { TaskArtifact, TaskAttempt } from './agent-task-protocol'
 import { taskFailureKey } from './task-failure'
+import DocumentPreview, { isPdfDocument, isPptxDocument } from '../documents/DocumentPreview'
 
 export function taskOutputHref(href: string, artifacts: TaskArtifact[]): string {
   const output = artifacts.find(item => item.metadata?.sourcePath === href)
@@ -35,34 +36,33 @@ function TaskResultBody({ attempt, artifacts, onPreview }: { attempt: TaskAttemp
 
 export const TaskResult = memo(TaskResultBody)
 
-export function TaskArtifactPreview({ artifact }: { artifact: TaskArtifact }) {
+export function TaskArtifactPreview({ artifact, contentUrl, fullHeight = false }: { artifact: TaskArtifact; contentUrl?: string; fullHeight?: boolean }) {
   const { t } = useI18n()
-  const [text, setText] = useState<string | null>(null), [failed, setFailed] = useState(false), [pdfURL, setPdfURL] = useState('')
-  const url = nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')
-  const image = /^image\/(png|jpeg|webp|gif)$/.test(artifact.mimeType), pdf = artifact.mimeType === 'application/pdf'
+  const [text, setText] = useState<string | null>(null), [failed, setFailed] = useState(false)
+  const url = contentUrl || nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')
+  const image = /^image\/(png|jpeg|webp|gif)$/.test(artifact.mimeType)
+  const document = isPdfDocument(artifact.name, artifact.mimeType) || isPptxDocument(artifact.name, artifact.mimeType)
   useEffect(() => {
-    if (image) return
+    if (image || document) return
     const controller = new AbortController()
-    let objectURL = ''
-    setText(null); setFailed(false); setPdfURL('')
+    setText(null); setFailed(false)
     void fetch(url, { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('ARTIFACT_UNAVAILABLE')
-      if (pdf) {
-        const body = await response.blob()
-        if (!controller.signal.aborted) { objectURL = URL.createObjectURL(body); setPdfURL(objectURL) }
-      } else {
-        const body = await response.text()
-        if (!controller.signal.aborted) setText(body)
-      }
+      const body = await response.text()
+      if (!controller.signal.aborted) setText(body)
     }).catch(() => { if (!controller.signal.aborted) setFailed(true) })
-    return () => { controller.abort(); if (objectURL) URL.revokeObjectURL(objectURL) }
-  }, [url, image, pdf])
+    return () => controller.abort()
+  }, [url, image, document])
+  if (document) return <div className={fullHeight ? 'document-preview-full' : 'agent-task-document-preview'}><DocumentPreview src={url} name={artifact.name} mimeType={artifact.mimeType} /></div>
   if (image) return failed ? <p role="alert">{t('agent.task.artifactsUnavailable')}</p> : <img className="agent-task-preview" src={url} alt={artifact.name} onError={() => setFailed(true)} />
   if (failed) return <p role="alert">{t('agent.task.artifactsUnavailable')}</p>
-  if (pdf && pdfURL) return <iframe className="agent-task-frame" src={pdfURL} title={artifact.name} />
   if (text === null) return <p role="status">{t('common.loading')}</p>
   if (artifact.mimeType === 'text/html') return <iframe className="agent-task-frame" sandbox="" title={artifact.name} srcDoc={'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; base-uri \'none\'; form-action \'none\'">' + text} />
   return <div className="agent-task-document">{artifact.name.toLowerCase().endsWith('.md') ? <Markdown resolveHref={(href, kind) => kind === 'link' && /^https?:\/\//i.test(href) ? href : '#'}>{text}</Markdown> : <pre>{text}</pre>}</div>
 }
 
-export const canPreviewArtifact = (artifact: TaskArtifact) => artifact.sizeBytes <= (artifact.mimeType === 'application/pdf' ? 8 : 1) * 1024 * 1024 && (/^image\/(png|jpeg|webp|gif)$/.test(artifact.mimeType) || artifact.mimeType.startsWith('text/') || ['application/json', 'application/pdf'].includes(artifact.mimeType))
+export const canPreviewArtifact = (artifact: TaskArtifact) => {
+  const mime = artifact.mimeType || ''
+  const document = isPdfDocument(artifact.name, mime) || isPptxDocument(artifact.name, mime)
+  return artifact.sizeBytes <= (document ? 8 : 1) * 1024 * 1024 && (document || /^image\/(png|jpeg|webp|gif)$/.test(mime) || mime.startsWith('text/') || mime === 'application/json')
+}

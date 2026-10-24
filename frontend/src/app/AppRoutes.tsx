@@ -9,6 +9,8 @@ import MobileSubPage from '../components/MobileSubPage'
 import Sessions from '../components/sessions/Sessions'
 import SettingsPage from '../components/settings/SettingsPage'
 import { type TreeSrc } from '../components/shell/task-tree-snapshot'
+import { useLayout } from '../layout'
+import { backAgentPage } from '../components/agent/agent-page-route'
 import { useI18n } from '../i18n'
 import type { AppRoute } from './useAppRoute'
 import type { TaskWorkspace } from './useTaskWorkspace'
@@ -53,8 +55,10 @@ export default function AppRoutes({ routing, isMobile, active, projects, actions
   const { openTerm, closeTerm, newTerminalAt, logout } = actions
   const { node: curNodeId, inbox: agentInbox, open: agentInboxOpen } = agent
   const { t } = useI18n()
+  const { size } = useLayout()
+  const inlineNative = agentPage?.view === 'session' && size === 'large' && !isMobile
   const mobileSessions = (
-    <MobileSessions onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
+    <MobileSessions initialProjectKey={projectSub || undefined} onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
       onNewTask={actions.newTask}
       onNewInWorktree={(kind, path) => { void newTerminalAt(kind, path) }} />
   )
@@ -72,8 +76,8 @@ export default function AppRoutes({ routing, isMobile, active, projects, actions
     hub: <HubPage />,
     capabilities: <CapabilitiesPage sub={pluginSub} onNav={go} onLaunchAgent={kind => newTerminalAt(kind, '')} />,
     home: <>
-      {(!agentPage || agentParts[0] === 'home') && <AgentChat inactive={!!agentPage} cid={agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={agent.notifications} projects={projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />}
-      {agentPage && <AgentHomePage key={`${curNodeId || 'local'}:${agentPage.view}:${agentPage.origin}`} page={agentPage} node={curNodeId} inbox={agentInbox} projects={projects.map(p => ({ id: p.key, name: p.name }))} select={selectAgent} onSession={openTerm} onChanged={agentInbox.refresh} />}
+      {(!agentPage || agentParts[0] === 'home' || inlineNative) && <AgentChat inactive={!!agentPage} nativeSession={inlineNative ? agentPage?.task : undefined} onCloseNative={() => { if (agentPage) backAgentPage(agentPage) }} cid={inlineNative ? agentCID || agentInbox.conversations[0]?.id || '' : agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={agent.notifications} projects={projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />}
+      {agentPage && !inlineNative && <AgentHomePage key={`${curNodeId || 'local'}:${agentPage.view}:${agentPage.origin}`} page={agentPage} node={curNodeId} inbox={agentInbox} projects={projects.map(p => ({ id: p.key, name: p.name }))} select={selectAgent} onSession={openTerm} onChanged={agentInbox.refresh} />}
     </>,
     activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={actions.openProject}

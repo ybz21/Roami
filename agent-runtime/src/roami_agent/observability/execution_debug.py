@@ -83,7 +83,7 @@ class ExecutionDebug:
                 db,
                 "SELECT u.id,'turn' AS kind,u.state,u.created_ms AS createdMs,u.finished_ms AS finishedMs,"
                 "(SELECT CASE WHEN EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND o.message_id=m.id) "
-                "THEN NULL ELSE substr(json_extract(m.content_json,'$.text'),1,160) END FROM messages m "
+                "THEN NULL ELSE substr(json_extract(native_content(m.content_json),'$.text'),1,160) END FROM messages m "
                 "WHERE m.turn_id=u.id AND m.role='user' AND m.deleted_ms IS NULL ORDER BY m.seq LIMIT 1) AS preview "
                 "FROM turns u WHERE u.conversation_id=? AND u.branch_id=? AND u.trigger_kind='user' AND u.created_ms>=?",
                 (owner, cid, bid, timestamp - minutes * 60_000),

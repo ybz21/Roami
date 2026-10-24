@@ -15,6 +15,8 @@ type LayoutPlan struct {
 	Legacy    bool                 `json:"legacy"`
 }
 type layoutJournal struct {
+	NativeStage     string                `json:"nativeStage,omitempty"`
+	NativeFiles     []NativeBackupEntry   `json:"nativeFiles,omitempty"`
 	Layout          Layout                `json:"layout"`
 	Stage           string                `json:"stage"`
 	ArtifactVerify  bool                  `json:"artifactVerify,omitempty"`
@@ -113,6 +115,9 @@ func (p Paths) RecoverLayout() error {
 	if c.Instance != j.Layout.Instance {
 		return fmt.Errorf("recovery instance mismatch")
 	}
+	if e = finishNativeRestore(p, j); e != nil {
+		return e
+	}
 	if e = finishArtifactRestore(p, j); e != nil {
 		return e
 	}
@@ -130,11 +135,16 @@ func publishLayout(p Paths, stage string, l Layout, artifacts ...artifactRestore
 		j.ArtifactRestore = true
 		j.Artifacts = artifacts[0].Files
 		j.ArtifactStage = artifacts[0].Stage
+		j.NativeStage = artifacts[0].NativeStage
+		j.NativeFiles = artifacts[0].NativeFiles
 	}
 	if e := atomicJSON(journal, j); e != nil {
 		return e
 	}
 	if e := os.Rename(stage, p.Database); e != nil {
+		return e
+	}
+	if e := finishNativeRestore(p, j); e != nil {
 		return e
 	}
 	if e := finishArtifactRestore(p, j); e != nil {
@@ -164,7 +174,7 @@ func (p Paths) RestoreSet(source string) error {
 	if _, e = os.Stat(filepath.Join(p.Data, "storage-layout.json")); !os.IsNotExist(e) {
 		return fmt.Errorf("restore requires an empty instance")
 	}
-	if m.Version == 2 {
+	if m.Version >= 2 {
 		if _, e = os.Lstat(filepath.Join(p.Data, "agent-artifacts")); !os.IsNotExist(e) {
 			return fmt.Errorf("restore requires an absent artifact destination")
 		}
@@ -184,6 +194,9 @@ func (p Paths) RestoreSet(source string) error {
 			if artifactPlan.Stage != "" {
 				os.RemoveAll(artifactPlan.Stage)
 			}
+			if artifactPlan.NativeStage != "" {
+				os.RemoveAll(artifactPlan.NativeStage)
+			}
 		}
 	}()
 	for _, d := range c.Databases {
@@ -191,7 +204,7 @@ func (p Paths) RestoreSet(source string) error {
 			return e
 		}
 	}
-	if m.Version == 2 {
+	if m.Version >= 2 {
 		fileStage, stageErr := os.MkdirTemp(p.Data, ".agent-artifacts-restore-*")
 		if stageErr != nil {
 			return stageErr
@@ -215,6 +228,28 @@ func (p Paths) RestoreSet(source string) error {
 			return e
 		}
 	}
+	if m.Version == 3 {
+		if _, e = os.Lstat(filepath.Join(p.Home, "agents", "native")); !os.IsNotExist(e) {
+			return fmt.Errorf("restore requires an absent native destination")
+		}
+		nativeStage, err := os.MkdirTemp(p.Home, ".native-session-restore-*")
+		if err != nil {
+			return err
+		}
+		artifactPlan.NativeStage = nativeStage
+		artifactPlan.NativeFiles = m.NativeFiles
+		if e = os.MkdirAll(filepath.Join(nativeStage, "agents", "native"), 0700); e != nil {
+			return e
+		}
+		if e = syncNativeDirectories(filepath.Join(nativeStage, "agents", "native"), nativeStage); e != nil {
+			return e
+		}
+		for _, entry := range m.NativeFiles {
+			if e = transferNativeFile(filepath.Join(source, "native-files"), nativeStage, entry); e != nil {
+				return e
+			}
+		}
+	}
 	c.DataRoot = p.Data
 	m.Layout.Paths = p
 	if e = atomicJSON(filepath.Join(stage, "catalog.json"), c); e != nil {
@@ -222,7 +257,7 @@ func (p Paths) RestoreSet(source string) error {
 	}
 	// Once the durable journal exists, leave staging for --recover after interruption.
 	published = true
-	if m.Version == 2 {
+	if m.Version >= 2 {
 		return publishLayout(p, stage, m.Layout, artifactPlan)
 	}
 	return publishLayout(p, stage, m.Layout)
@@ -327,6 +362,9 @@ func (p Paths) MigrateLayout(offline bool) error {
 	artifactPlan, artifactError := backupLayoutArtifacts(p.Data, backup, &manifest)
 	if artifactError != nil {
 		return artifactError
+	}
+	if e = backupNativeFiles(p.Home, backup, &manifest); e != nil {
+		return e
 	}
 	if e = atomicJSON(filepath.Join(backup, "catalog.json"), c); e != nil {
 		return e

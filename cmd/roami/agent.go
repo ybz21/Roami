@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
@@ -19,6 +20,22 @@ import (
 )
 
 func runAgent(args []string) int {
+	if len(args) == 1 && args[0] == "installed-status" {
+		if err := agentInstalledStatus(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
+	if len(args) > 0 && args[0] == "install-probe" {
+		return runAgentInstallProbe(args[1:])
+	}
+	if len(args) > 0 && (args[0] == "prepare-upgrade" || args[0] == "resume-upgrade") {
+		return runAgentUpgrade(args)
+	}
+	if len(args) > 0 && args[0] == "install-bundle" {
+		return runAgentBundle(args[1:])
+	}
 	if len(args) > 0 && args[0] == "capability" {
 		return runAgentCapability(args[1:])
 	}
@@ -38,7 +55,7 @@ func runAgent(args []string) int {
 		return runAgentTrace(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
 		return 0
 	}
 	sub := args[0]
@@ -70,6 +87,12 @@ func runAgent(args []string) int {
 			return fail(err)
 		}
 		if sub == "setup" {
+			if _, e := os.Stat(filepath.Join(dir, "requirements.txt")); e == nil {
+				if e = setupBundledAgent(dir); e != nil {
+					return fail(e)
+				}
+				return 0
+			}
 			cmd := exec.Command("uv", "sync", "--frozen", "--project", dir)
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 			if err = cmd.Run(); err != nil {
@@ -214,7 +237,8 @@ func agentRuntimeDir(explicit string) (string, error) {
 		return p, nil
 	}
 	exe, _ := os.Executable()
-	for _, dir := range []string{filepath.Join(filepath.Dir(exe), "agent-runtime"), "agent-runtime"} {
+	exe, _ = filepath.EvalSymlinks(exe)
+	for _, dir := range []string{filepath.Join(filepath.Dir(exe), "..", "runtime"), filepath.Join(filepath.Dir(exe), "agent-runtime"), "agent-runtime"} {
 		if _, e := os.Stat(filepath.Join(dir, "pyproject.toml")); e == nil {
 			return filepath.Abs(dir)
 		}
@@ -261,21 +285,30 @@ func initializeAgent(dir string) error {
 	return p.Register(paths.Descriptor("ready"))
 }
 
-func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
+func agentPythonCommand(dir string, p agentruntime.Paths, initialize bool) (*exec.Cmd, error) {
 	python := os.Getenv("ROAMI_AGENT_PYTHON")
 	if python == "" {
 		python = filepath.Join(dir, ".venv", "bin", "python")
 	}
 	if _, err := exec.LookPath(python); err != nil {
-		return fmt.Errorf("AGENT_DEPENDENCIES_MISSING: run roami agent setup --runtime-dir %q", dir)
+		return nil, fmt.Errorf("AGENT_DEPENDENCIES_MISSING: run roami agent setup --runtime-dir %q", dir)
 	}
 	args := agentRuntimeArgs(p, initialize, buildChannel)
 	cmd := exec.Command(python, args...)
+	cmd.Env = agentEnvironment()
 	if binary, err := os.Executable(); err == nil {
-		cmd.Env = append(os.Environ(), "ROAMI_AGENT_CLI="+binary)
+		cmd.Env = append(cmd.Env, "ROAMI_AGENT_CLI="+binary, "ROAMI_AGENT_VERSION="+version)
 	}
 	cmd.Dir = dir
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return cmd, nil
+}
+
+func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
+	cmd, err := agentPythonCommand(dir, p, initialize)
+	if err != nil {
+		return err
+	}
 	return cmd.Run()
 }
 
@@ -313,6 +346,11 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	marketRequest := strings.HasPrefix(path, "/v1/capability-markets")
+	if marketRequest || method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
+		cancel()
+		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+	}
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, "http://roami-agent"+path, bytes.NewReader(data))
 	if err != nil {
@@ -321,6 +359,9 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Roami-Owner", "local")
 	transport := agentruntime.Transport(socket)
+	if marketRequest || method == "POST" && strings.HasPrefix(path, "/v1/tool-directory/") && strings.HasSuffix(path, "/call") {
+		transport.ResponseHeaderTimeout = 100 * time.Second
+	}
 	defer transport.CloseIdleConnections()
 	response, err := (&http.Client{Transport: transport}).Do(req)
 	if err != nil {

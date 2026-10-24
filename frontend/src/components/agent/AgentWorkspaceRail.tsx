@@ -17,13 +17,13 @@ export default function AgentWorkspaceRail({ cid, connected, actions, inbox, tab
 }) {
   const { t } = useI18n()
   const label = (key: WorkspaceTab, icon: ReactNode) => <span className="agent-workspace-tab">{icon}{t('agent.workspace.' + key)}</span>
-  return <aside className="agent-workspace-rail" aria-label={t('agent.workspace.title')}>
+  return <aside className="agent-workspace-rail" data-tab={tab} aria-label={t('agent.workspace.title')}>
     <Tabs activeKey={tab} onChange={key => change(key as WorkspaceTab)} tabBarExtraContent={{ right: <div className="agent-workspace-toolbar">
       <span className="agent-workspace-connection" data-connected={connected} role="img" aria-label={t(connected ? 'agent.workspace.connected' : 'agent.workspace.reconnecting')} title={t(connected ? 'agent.workspace.connected' : 'agent.workspace.reconnecting')} />
       {actions}
       <button type="button" className="tt-act" aria-label={t('agent.workspace.close')} title={t('agent.workspace.close')} onClick={close}><PanelRightIcon size={18} /></button>
     </div> }} destroyInactiveTabPane items={[
-      { key: 'tasks', label: label('tasks', <ChecklistIcon size={15} />), children: <AgentTasks compact cid={cid} selectedTask={task} onSelectTask={onTask} onSession={onSession} onChanged={onChanged} /> },
+      { key: 'tasks', label: label('tasks', <ChecklistIcon size={15} />), children: <AgentTasks projects={projects} compact cid={cid} selectedTask={task} onSelectTask={onTask} onSession={onSession} onChanged={onChanged} /> },
       { key: 'messages', label: <>{label('messages', <BellIcon size={15} />)}{!!inbox.unread && <span className="agent-workspace-unread">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</>, children: <AgentInbox inbox={inbox} select={select} /> },
       { key: 'memory', label: label('memory', <NotebookIcon size={15} />), children: <AgentMemory compact cid={cid} defaultGroup="all" projects={projects} select={select} /> },
     ]} />

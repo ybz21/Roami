@@ -43,6 +43,10 @@ export function invalidateAgentData(key: string) {
   entries.set(key, { value: entry.value, bytes: entry.bytes, updated: entry.updated, stale: true })
 }
 
+export function invalidateAgentDataPrefix(prefix: string) {
+  for (const key of entries.keys()) if (key.startsWith(prefix)) invalidateAgentData(key)
+}
+
 export function clearAgentDataCache() {
   epoch++
   for (const entry of entries.values()) entry.abort?.abort()

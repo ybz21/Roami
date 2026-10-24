@@ -1,0 +1,20 @@
+.native-session { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; }
+.native-session-head { flex:none; padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.native-session-head h2 { font-size:var(--fs-lg); overflow-wrap:anywhere; }
+.native-session-head .agent-task-actions { flex-wrap:wrap; }
+.native-session-messages { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4); display:flex; flex-direction:column; gap:var(--sp-4); }
+.native-session-messages .agent-message { max-width:100%; }
+.native-session-composer { flex:none; display:flex; flex-wrap:wrap; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); border-top:1px solid var(--border-subtle); padding-bottom:calc(var(--sp-3) + var(--safe-b)); }
+.native-session-composer textarea { flex:1; min-width:0; }
+.native-session-composer p { flex-basis:100%; margin:0; font-size:var(--fs-sm); color:var(--text-dim); }
+.agent-mobile-page.agent-session-page { overflow:hidden; padding:0; }
+.agent-task-entry { min-width:0; }
+.agent-task-entry-actions { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); padding-inline:var(--sp-2); padding-bottom:var(--sp-2); }
+.agent-task-entry-actions:empty { display:none; }
+.agent-task-entry-actions > .tt-act { font-size:var(--fs-meta); }
+
+.agent-native-workspace .native-session { flex:1; height:auto; }
+.agent-native-workspace-nav { flex:none; display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); min-height:calc(var(--sp-5) * 2); border-bottom:1px solid var(--border-subtle); font-size:var(--fs-body); }
+.agent-native-workspace-nav > .tt-act { min-height:var(--tap); padding:var(--sp-1) var(--sp-2); }
+html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-btn { position:relative; }
+html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-btn::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }

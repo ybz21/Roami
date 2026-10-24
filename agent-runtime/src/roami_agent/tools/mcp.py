@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 import httpx
 from jsonschema import Draft202012Validator
 from mcp import ClientSession, StdioServerParameters, types
+from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
@@ -36,6 +37,8 @@ def validate_servers(configs):
         ):
             raise DomainError("INVALID_MCP_CONFIG")
         transport = config.get("transport", "stdio")
+        if not isinstance(transport, str):
+            raise DomainError("INVALID_MCP_CONFIG")
         if transport == "stdio":
             if not isinstance(config.get("command"), str) or not config["command"]:
                 raise DomainError("INVALID_MCP_CONFIG")
@@ -43,7 +46,9 @@ def validate_servers(configs):
                 isinstance(arg, str) for arg in config.get("args", [])
             ):
                 raise DomainError("INVALID_MCP_CONFIG")
-        elif transport == "streamable_http":
+        elif transport in {"sse", "streamable_http"}:
+            if not isinstance(config.get("url"), str):
+                raise DomainError("INVALID_MCP_CONFIG")
             parsed = urlsplit(config.get("url", ""))
             if (
                 parsed.scheme not in {"http", "https"}
@@ -147,6 +152,7 @@ class MCPConnections:
                         {"server": {"type": "string", "enum": list(self.connections)}}, ["server"]
                     ),
                     self.discover,
+                    main=True,
                 )
             )
 
@@ -204,7 +210,9 @@ class MCPConnections:
                     raise DomainError("MCP_OUTCOME_UNKNOWN") from None
 
             prepared.append(
-                Tool(alias, description, schema, invoke, effect=effect, source="external")
+                Tool(
+                    alias, description, schema, invoke, effect=effect, source="external", main=True
+                )
             )
             names[alias] = remote.name
         version = hashlib.sha256(encoded(sorted(names)).encode()).hexdigest()
@@ -312,16 +320,21 @@ class MCPConnections:
                         headers["Authorization"] = (
                             "Bearer " + self._environment({"key": config["key_env"]})["key"]
                         )
-                    client = await stack.enter_async_context(
-                        httpx.AsyncClient(
-                            headers=headers,
-                            timeout=httpx.Timeout(None, connect=10),
-                            follow_redirects=False,
+                    if config["transport"] == "sse":
+                        streams = await stack.enter_async_context(
+                            sse_client(config["url"], headers=headers, timeout=10)
                         )
-                    )
-                    streams = await stack.enter_async_context(
-                        streamable_http_client(config["url"], http_client=client)
-                    )
+                    else:
+                        client = await stack.enter_async_context(
+                            httpx.AsyncClient(
+                                headers=headers,
+                                timeout=httpx.Timeout(None, connect=10),
+                                follow_redirects=False,
+                            )
+                        )
+                        streams = await stack.enter_async_context(
+                            streamable_http_client(config["url"], http_client=client)
+                        )
 
                 async def changed(notification):
                     if isinstance(notification, Exception):

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { openEventStream } from '../../api'
 import { agentCacheEpoch, agentDataKey, invalidateAgentData, loadAgentData, peekAgentData, storeAgentData } from './agent-data-cache'
+import { publishMemoryEvent } from './agent-memory-events'
 import { publishTaskEvent } from './agent-task-events'
 import { agentEvents, projectAgentEvent, type AgentSnapshot } from './agent-protocol'
 
@@ -59,7 +60,7 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
         void snapshot(5000).catch(() => {})
         for await (const event of agentEvents(response)) {
           if (stopped || !view) break
-          if (event.id > view.snapshotCursor && scope === agentDataKey(messages)) publishTaskEvent(event)
+          if (event.id > view.snapshotCursor && scope === agentDataKey(messages)) { publishTaskEvent(event); publishMemoryEvent(event) }
           const projected = projectAgentEvent(view, event)
           view = projected.view; publish()
           if (projected.reload) schedule()

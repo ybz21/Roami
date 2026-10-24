@@ -69,3 +69,49 @@ func TestAgentModelHTTPPrivateApplyAndConflicts(t *testing.T) {
 		t.Fatalf("unknown kind: %d", bad.Code)
 	}
 }
+
+func TestAgentModelOptionsHTTP(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	secret := "fixture-model-" + "credential"
+	denied := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" || r.Header.Get("Authorization") != "Bearer "+secret {
+			t.Error("invalid upstream request")
+		}
+		if denied {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(secret))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"model-b"},{"id":"model-a"}]}`))
+	}))
+	defer upstream.Close()
+	a := &API{AgentProviders: agentproviders.NewStore(t.TempDir())}
+	r := gin.New()
+	r.POST("/:kind/model-options", a.AgentModelOptions)
+	request := func(kind, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		out := httptest.NewRecorder()
+		r.ServeHTTP(out, httptest.NewRequest("POST", "/"+kind+"/model-options", strings.NewReader(body)))
+		return out
+	}
+	input, _ := json.Marshal(agentproviders.ModelQuery{ProfileInput: agentproviders.ProfileInput{BaseURL: upstream.URL + "/v1", Protocol: "openai-responses", APIKey: &secret}})
+	result := request("codex", string(input))
+	if result.Code != 200 || result.Body.String() != `{"models":["model-a","model-b"]}` {
+		t.Fatalf("options: %d %s", result.Code, result.Body)
+	}
+	denied = true
+	result = request("codex", string(input))
+	if result.Code != 502 || !strings.Contains(result.Body.String(), "MODEL_LIST_UNAUTHORIZED") || strings.Contains(result.Body.String(), secret) {
+		t.Fatalf("upstream error: %d %s", result.Code, result.Body)
+	}
+	for _, body := range []string{`{"unknown":"` + secret + `"}`, `{} {}`, `{"apiKey":"` + strings.Repeat("x", 65536) + `"}`} {
+		result = request("codex", body)
+		if result.Code < 400 || strings.Contains(result.Body.String(), secret) {
+			t.Fatalf("invalid query: %d %s", result.Code, result.Body)
+		}
+	}
+	if result = request("other", string(input)); result.Code != 400 {
+		t.Fatalf("invalid kind: %d", result.Code)
+	}
+}

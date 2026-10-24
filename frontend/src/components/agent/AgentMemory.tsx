@@ -1,97 +1,120 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Modal, Select, Spin, Tabs } from 'antd'
-import { api } from '../../api'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { App, Button, Dropdown, Input, Select } from 'antd'
 import { useI18n } from '../../i18n'
-import { GearIcon, OpenInIcon, SearchIcon } from '../../icons'
-import Markdown from '../markdown/Markdown'
-import AgentMemoryCard, { type MemoryRecord as Memory } from './AgentMemoryCard'
-import './agent-memory.css'
+import { useLayout } from '../../layout'
+import { ChevronLeft, GearIcon, MoreIcon, OpenInIcon, SearchIcon } from '../../icons'
+import MobileSubPage from '../MobileSubPage'
+import { api } from '../../api'
+import { useAgentData } from './useAgentData'
+import { memoryEventScope, publishMemoryChanges, subscribeMemoryChanges } from './agent-memory-events'
+import { useMemoryCatalog } from './useMemoryCatalog'
+import { useMemoryRoute } from './memory-browser-route'
+import { dailyMemory, memoryScope, type MemoryDetail as Detail, type MemoryRecord, type MemoryScope } from './memory-record'
+import { agentPagePath } from './agent-page-route'
+import MemoryList from './MemoryList'
+import MemoryDetail from './MemoryDetail'
+import './memory-browser.css'
 
-type Evidence = { sourceKey: string; text?: string; unchanged?: boolean; available?: boolean; conversationId?: string; branchId?: string; messageId?: string; kind?: string; createdMs?: number }
-type Group = 'all' | 'personal' | 'task' | 'conversation' | 'project' | 'preference'
-
-function today(timezone: string, date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
-  return ['year', 'month', 'day'].map((name) => parts.find((part) => part.type === name)?.value).join('-')
+const positions = new Map<string, number>()
+function rememberScroll(key: string, value: number) { positions.delete(key); positions.set(key, value); if (positions.size > 64) positions.delete(positions.keys().next().value) }
+function localDay(timezone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+  return ['year', 'month', 'day'].map(name => parts.find(part => part.type === name)?.value).join('-')
 }
-
-export default function AgentMemory({ cid = '', projects, select, fullPage = false, defaultGroup, compact = false }: { cid?: string; fullPage?: boolean; compact?: boolean; defaultGroup?: Group; projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void }) {
-  const { t, locale } = useI18n(), { message, modal } = App.useApp()
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [category, setCategory] = useState<'knowledge' | 'activity'>('knowledge')
-  const [group, setGroup] = useState<Group>(defaultGroup || (cid ? 'conversation' : 'all')), [state, setState] = useState('active')
-  const [page, setPage] = useState(0), [total, setTotal] = useState(0)
-  const [query, setQuery] = useState(''), [project, setProject] = useState(''), [task, setTask] = useState('')
-  const [date, setDate] = useState(''), [timezone, setTimezone] = useState('')
-  const [tasks, setTasks] = useState<{ id: string; intent_json: string }[]>([]), [items, setItems] = useState<Memory[]>([])
-  const [loading, setLoading] = useState(false), [failed, setFailed] = useState(false), [version, setVersion] = useState(0)
-  const [busy, setBusy] = useState(''), busyRef = useRef(false)
-  const [evidenceTitle, setEvidenceTitle] = useState('')
-  const [evidence, setEvidence] = useState<Evidence[] | null>(null), [sourceLoading, setSourceLoading] = useState(false), sourceRequest = useRef(0)
-  useEffect(() => {
-    const abort = new AbortController()
-    setTask(''); setTasks([])
-    void api('GET', '/agent/status', undefined, { signal: abort.signal }).then(({ data }) => { if (abort.signal.aborted) return; setTimezone(data.memoryTimezone || 'UTC') }).catch(() => { if (!abort.signal.aborted) setFailed(true) })
-    if (cid) void api('GET', '/agent/tasks?conversationId=' + encodeURIComponent(cid), undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setTasks(data) }).catch(() => {})
-    return () => { abort.abort(); sourceRequest.current++ }
-  }, [cid])
-  useEffect(() => {
-    const abort = new AbortController()
-    setFailed(false); setItems([]); setTotal(0); setLoading(false)
-    if (category === 'knowledge' && ((group === 'project' && !project) || (group === 'task' && !task))) return () => abort.abort()
-    const params = new URLSearchParams({ query, state, category, limit: '20', offset: String(page * 20) })
-    if (category === 'knowledge' && group === 'personal') params.set('personalOnly', 'true')
-    if (category === 'knowledge' && group === 'conversation') params.set('conversationId', cid)
-    if (category === 'knowledge' && group === 'task') params.set('taskId', task)
-    if (project && (category === 'activity' || group === 'project')) params.set('projectId', project)
-    if (category === 'knowledge' && group === 'preference') params.set('kind', 'preference')
-    if (category === 'activity' && date) { params.set('dayKey', date); if (timezone) params.set('timezone', timezone) }
-    setLoading(true)
-    const timer = setTimeout(() => {
-      void api('GET', '/agent/memories/catalog?' + params, undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) { setItems(data.items); setTotal(data.total) } }).catch(() => { if (!abort.signal.aborted) setFailed(true) }).finally(() => { if (!abort.signal.aborted) setLoading(false) })
-    }, 150)
-    return () => { clearTimeout(timer); abort.abort() }
-  }, [cid, category, group, query, state, date, timezone, project, task, version, page])
-  const mutate = async (item: Memory, method: string, suffix = '', body?: unknown) => {
-    if (busyRef.current) return
-    busyRef.current = true; setBusy(item.id)
-    try { await api(method, '/agent/memories/' + encodeURIComponent(item.id) + suffix, body); setPage(0); setVersion((value) => value + 1) }
-    catch { message.error(t('agent.requestFailed')) }
-    finally { busyRef.current = false; setBusy('') }
+export default function AgentMemory({ cid = '', projects, select, fullPage = false, compact = false, defaultGroup = 'all', onBack }: {
+  cid?: string; projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void
+  fullPage?: boolean; compact?: boolean; defaultGroup?: MemoryScope; onBack?: () => void
+}) {
+  const { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
+  const navigation = useMemoryRoute(defaultGroup), route = navigation.value
+  const catalog = useMemoryCatalog(route, cid, defaultGroup === 'conversation')
+  const status = useAgentData<{ memoryTimezone: string }>('/agent/status', 60_000)
+  const detailPath = route.id ? '/agent/memories/' + encodeURIComponent(route.id) + '/detail' : null
+  const detail = useAgentData<Detail>(detailPath, 5000)
+  const [filters, setFilters] = useState(false), [busy, setBusy] = useState(false), [mobileMenu, setMobileMenu] = useState(false), [mutationError, setMutationError] = useState(''), [revision, setRevision] = useState(0)
+  const busyRef = useRef(false), alive = useRef(true), currentScope = useRef(catalog.scope), currentId = useRef(route.id)
+  currentScope.current = catalog.scope; currentId.current = route.id
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const refresh = useRef(() => {})
+  refresh.current = () => { catalog.refresh(); catalog.facets.refresh(); detail.refresh(); setRevision(value => value + 1) }
+  useEffect(() => subscribeMemoryChanges(() => refresh.current()), [catalog.scope])
+  useEffect(() => { setMutationError(''); setMobileMenu(false) }, [route.id, catalog.scope])
+  const items = catalog.value?.items || [], total = catalog.value?.total || 0
+  const record = detail.value?.record?.id === route.id ? detail.value.record : items.find(item => item.id === route.id)
+  const data = detail.value?.record?.id === route.id ? detail.value : undefined
+  const missing = ['MEMORY_NOT_FOUND', 'MEMORY_SOURCE_NOT_FOUND'].includes(detail.errorCode || '')
+  const timezone = record?.timezone || status.value?.memoryTimezone || 'UTC'
+  const date = (value: number | string, full = false) => new Intl.DateTimeFormat(locale, { timeZone: timezone, month: 'short', day: 'numeric', ...(full ? { year: 'numeric', hour: '2-digit', minute: '2-digit' } as const : {}) }).format(new Date(value))
+  const scope = (item: MemoryRecord) => {
+    const daily = dailyMemory(item), project = item.project_id || daily?.scopeKey
+    if (daily) return !project || project === 'unassigned' ? t('agent.memoryUnassigned') : projects.find(p => p.id === project)?.name || t('agent.memoryBrowse.projectUnavailable')
+    const kind = memoryScope(item)
+    if (kind === 'personal') return t('agent.memoryBrowse.personal')
+    const name = kind === 'project' ? projects.find(p => p.id === item.project_id)?.name : kind === 'task' ? item.task_title : item.conversation_title
+    return t('agent.memoryScope.' + kind, { name: name || t('agent.memoryBrowse.' + kind + 'Unavailable') })
   }
-  const sources = async (item: Memory) => {
-    const version = ++sourceRequest.current
-    setEvidenceTitle(item.title); setEvidence([]); setSourceLoading(true)
-    try { const { data } = await api('GET', '/agent/memories/' + encodeURIComponent(item.id) + '/sources'); if (version === sourceRequest.current) setEvidence(data) }
-    catch { if (version === sourceRequest.current) { setEvidence(null); message.error(t('agent.requestFailed')) } }
-    finally { if (version === sourceRequest.current) setSourceLoading(false) }
+  const scroll = useRef<HTMLDivElement>(null), scrollKey = catalog.scope + ':' + route.view + ':' + route.scope + ':' + route.entity + ':' + route.kind + ':' + route.query + ':' + route.page + ':' + route.date
+  const saveScroll = () => { if (!route.id && scroll.current) rememberScroll(scrollKey, scroll.current.scrollTop) }
+  useLayoutEffect(() => { if (scroll.current && !route.id) scroll.current.scrollTop = positions.get(scrollKey) || 0 }, [scrollKey, route.id, catalog.value])
+  const choose = (id: string) => { if (scroll.current) rememberScroll(scrollKey, scroll.current.scrollTop); navigation.change({ id }, true) }
+  const clear = () => navigation.change({ query: '', scope: 'all', kind: 'all', entity: '', page: 0, date: '', id: '' })
+  const mutate = async (item: MemoryRecord, suffix: string, body?: unknown) => {
+    if (busyRef.current) return false
+    busyRef.current = true; setBusy(true); setMutationError('')
+    const eventScope = memoryEventScope(), ownedScope = currentScope.current
+    try {
+      await api(body ? 'POST' : 'DELETE', '/agent/memories/' + encodeURIComponent(item.id) + suffix, body)
+      publishMemoryChanges(eventScope)
+      if (alive.current && currentScope.current === ownedScope) {
+        if (currentId.current === item.id) navigation.back()
+        message.success(t(body ? 'agent.memoryBrowse.reviewed' : 'agent.memoryBrowse.removed'))
+      }
+      return true
+    } catch (error: any) {
+      if (alive.current && currentScope.current === ownedScope) setMutationError(t(['MEMORY_CURRENT_CHANGED', 'MEMORY_CANDIDATE_ALREADY_RESOLVED'].includes(error?.apiError?.code) ? 'agent.memoryBrowse.currentChanged' : error?.apiError?.code === 'MEMORY_SOURCE_CHANGED' || error?.apiError?.code === 'MEMORY_FORGOTTEN' ? 'agent.memoryBrowse.sourceChanged' : 'agent.requestFailed'))
+      return false
+    } finally { busyRef.current = false; if (alive.current) setBusy(false) }
   }
-  const dayKey = (item: Memory) => category === 'activity' ? item.day_key : compact && item.updated_ms && Number.isFinite(item.updated_ms) && item.updated_ms > 0 ? today(timezone || 'UTC', new Date(item.updated_ms)) : ''
-  const changeGroup = (value: Group) => { setGroup(value); setPage(0) }
-  return <div className={`agent-memory${fullPage ? ' agent-memory-full' : ''}${compact ? ' agent-memory-compact' : ''}`}>
-    {compact ? <div className="agent-memory-toolbar">
-      <Select aria-label={t('agent.workspace.memoryView')} value={category} onChange={key => { setCategory(key); setPage(0) }} options={['knowledge', 'activity'].map(key => ({ value: key, label: t('agent.memoryView.' + key) }))} />
-      <div><button type="button" className="tt-act" aria-expanded={filtersOpen} data-active={group !== 'all' || state !== 'active' || !!project || !!task || !!date} onClick={() => setFiltersOpen(value => !value)}><GearIcon size={14} />{t('agent.workspace.filters')}</button><a className="tt-act" href="#/settings/agent/memory" aria-label={t('agent.workspace.manageMemory')} title={t('agent.workspace.manageMemory')}><OpenInIcon size={14} /></a></div>
-    </div> : <>
-      <Tabs tabBarExtraContent={!fullPage && <a className="tt-act agent-memory-manage" href="#/settings/agent/memory" aria-label={t('agent.memoryCenter')}><GearIcon size={16} /></a>} activeKey={category} onChange={key => { setCategory(key as 'knowledge' | 'activity'); setPage(0) }} items={['knowledge', 'activity'].map(key => ({ key, label: t('agent.memoryView.' + key) }))} />
-    </>}
-    <div className="agent-memory-filters" hidden={compact && !filtersOpen}>
-      {category === 'knowledge' && <Select aria-label={t('agent.memoryGroup')} value={group} onChange={changeGroup} options={(['all', 'personal', 'preference', 'project', ...(cid ? ['conversation', 'task'] : [])] as Group[]).map((value) => ({ value, label: t('agent.memoryGroup.' + value), disabled: (value === 'conversation' || value === 'task') && !cid }))} />}
-      <Select aria-label={t('agent.memoryState')} value={state} onChange={(value) => { setState(value); setPage(0) }} options={['active', 'candidate', 'conflict'].map((value) => ({ value, label: t('agent.memoryState.' + value) }))} />
-      {(group === 'project' || category === 'activity') && <Select aria-label={t('agent.memoryGroup.project')} value={category === 'activity' ? project : project || undefined} placeholder={t('agent.chooseProject')} onChange={(value) => { setProject(value); setPage(0) }} options={[...(category === 'activity' ? [{ value: '', label: t('agent.memoryAllProjects') }] : []), ...projects.map((p) => ({ value: p.id, label: p.name }))]} />}
-      {category === 'knowledge' && group === 'task' && <Select aria-label={t('agent.memoryGroup.task')} value={task || undefined} placeholder={t('agent.chooseTask')} onChange={(value) => { setTask(value); setPage(0) }} options={tasks.map((task) => ({ value: task.id, label: JSON.parse(task.intent_json).goal }))} />}
-      {category === 'activity' && <><Input type="date" aria-label={t('agent.memoryDate')} value={date} disabled={!timezone} onChange={(e) => { setDate(e.target.value); setPage(0) }} /><button type="button" className="tt-act" disabled={!timezone} onClick={() => { setDate(today(timezone)); setPage(0) }}>{t('agent.memoryToday')}</button>{date && <button type="button" className="tt-act" onClick={() => { setDate(''); setPage(0) }}>{t('agent.memoryAllDates')}</button>}<span className="agent-muted">{timezone}</span></>}
+  const confirm = async () => {
+    if (!record || !data?.canConfirm) return
+    const body = { accepted: true, expectedCurrentId: data.currentVersionId ?? data.current?.id ?? '' }
+    if (data.current && data.current.body !== record.body) {
+      modal.confirm({ title: t('agent.memoryBrowse.replace'), content: t('agent.memoryBrowse.replaceHint'), okText: t('agent.memoryBrowse.replace'), cancelText: t('common.cancel'), onOk: async () => { if (!await mutate(record, '/confirm', body)) throw new Error('MEMORY_CONFIRM_FAILED') } })
+    } else await mutate(record, '/confirm', body)
+  }
+  const remove = (forget: boolean) => {
+    if (!record) return
+    modal.confirm({ title: t(forget ? 'agent.memoryForgetTitle' : 'agent.memoryDelete'), content: t(forget ? 'agent.memoryForgetBody' : 'agent.memoryDeleteConfirm'), okText: t(forget ? 'agent.memoryForget' : 'agent.memoryDelete'), cancelText: t('common.cancel'), okButtonProps: { danger: true }, onOk: async () => { if (!await mutate(record, '?forgetSources=' + forget)) throw new Error('MEMORY_DELETE_FAILED') } })
+  }
+  const menu = { items: [{ key: 'delete', label: t('agent.memoryDelete'), danger: true }, { key: 'forget', label: t('agent.memoryForget'), danger: true }], onClick: ({ key }: { key: string }) => { setMobileMenu(false); remove(key === 'forget') } }
+  const more = record?.state === 'active' && !missing && <Dropdown trigger={['click']} menu={menu}><button type="button" className="memory-icon tt-act" disabled={busy} aria-label={t('agent.memoryMore', { title: record.title })}><MoreIcon size={20} /></button></Dropdown>
+  const panel = !fullPage || phone
+  const entityKind = route.view === 'activity' ? 'project' : route.scope
+  const options = ['project', 'conversation', 'task'].includes(entityKind) ? (catalog.facets.value?.[entityKind] || []).map(item => ({ value: item.id, label: entityKind === 'project' ? projects.find(p => p.id === item.id)?.name || t('agent.memoryBrowse.projectUnavailable') : item.name || t('agent.memoryBrowse.' + entityKind + 'Unavailable') })) : []
+  if (route.entity && !options.some(option => option.value === route.entity)) options.push({ value: route.entity, label: t('agent.memoryBrowse.entityUnavailable') })
+  const filtered = !!(route.query || route.scope !== 'all' || route.entity || route.kind !== 'all' || route.date)
+  const list = <section className="memory-list-pane" aria-label={t('agent.memory')}>
+    <div className="memory-tabs" role="tablist" aria-label={t('agent.memory')}>
+      {(['saved', 'review', 'activity'] as const).map(view => <button type="button" role="tab" aria-selected={route.view === view} key={view} onClick={() => navigation.change({ view, id: '', page: 0, entity: '', query: '', date: '' })}>{t(view === 'activity' ? 'agent.memoryView.activity' : 'agent.memoryBrowse.' + view)}{view === 'review' && (catalog.facets.value?.reviewCount || 0) > 0 && <span className="memory-number">{new Intl.NumberFormat(locale).format(catalog.facets.value.reviewCount)}</span>}</button>)}
+      {compact && <a className="memory-icon tt-act" href={'#/' + agentPagePath('memory', cid ? 'home/' + encodeURIComponent(cid) : 'home') + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')} aria-label={t('agent.memoryBrowse.browse')}><OpenInIcon size={18} /></a>}
     </div>
-    <Input type="search" prefix={<SearchIcon size={16} />} allowClear className="agent-memory-search" aria-label={t('agent.searchMemory')} placeholder={t('agent.searchMemory')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0) }} maxLength={1000} />
-    {loading && <Spin size="small" />}{failed && <p role="alert">{t('agent.requestFailed')} <Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button></p>}
-    {!loading && !failed && total > 0 && <div className="agent-memory-results-label" role="status">{t('agent.memoryTotal', { count: new Intl.NumberFormat(locale).format(total) })}</div>}
-    <div className="agent-memory-list" aria-busy={loading}>{!items.length && !loading && !failed && <div className="agent-memory-empty" role="status"><strong>{t(category === 'knowledge' ? 'agent.noMemories' : 'agent.memoryNoActivity')}</strong></div>}{items.map((item, index) => <Fragment key={item.id}>
-      {(compact || category === 'activity') && dayKey(item) && dayKey(item) !== (items[index - 1] ? dayKey(items[index - 1]) : '') && <h3 className="agent-memory-day-heading">{dayKey(item) === today(timezone || 'UTC') ? t('agent.workspace.today') : dayKey(item)}</h3>}
-      <AgentMemoryCard compact={compact} item={item} projects={projects} timezone={timezone} busy={!!busy} sources={() => { void sources(item) }} mutate={action => { if (action === 'delete') void mutate(item, 'DELETE', '?forgetSources=false'); else void mutate(item, 'POST', '/confirm', { accepted: action === 'confirm' }) }} forget={() => modal.confirm({ title: t('agent.memoryForgetTitle'), content: t('agent.memoryForgetBody'), okText: t('agent.memoryForget'), cancelText: t('common.cancel'), onOk: () => mutate(item, 'DELETE', '?forgetSources=true') })} />
-    </Fragment>)}</div>
-    {!loading && !failed && (total > 20 || page > 0) && <div className="agent-memory-pagination"><span>{t('agent.memoryPage', { page: page + 1 })}</span><Button disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t('agent.memoryPrevious')}</Button><Button disabled={(page + 1) * 20 >= total} onClick={() => setPage(value => value + 1)}>{t('agent.memoryNext')}</Button></div>}
-    <Modal destroyOnClose open={evidence !== null} title={t('agent.memorySourcesFor', { title: evidenceTitle })} footer={null} onCancel={() => { sourceRequest.current++; setEvidence(null); setSourceLoading(false) }}>
-      {sourceLoading && <Spin size="small" />}<div className="agent-memory agent-memory-evidence">{evidence?.map((source) => <article className="agent-memory-card" key={source.sourceKey}>{source.available === false ? <p>{t('agent.memorySourceMissing')}</p> : <>{source.kind && <b>{t('agent.memorySource.' + source.kind)}</b>}{source.createdMs && <time className="agent-muted">{new Date(source.createdMs).toLocaleString(locale, { timeZone: timezone || 'UTC' })}</time>}<Markdown>{source.text || ''}</Markdown>{source.unchanged === false && <p className="agent-muted">{t('agent.memorySourceChanged')}</p>}{source.conversationId && <Button onClick={() => select(source.conversationId!, source.branchId, source.messageId)}>{t('agent.memoryOpenSource')}</Button>}</>}</article>)}</div>
-    </Modal>
+    <div className="memory-searchbar"><Input type="search" allowClear maxLength={1000} value={route.query} onChange={event => navigation.change({ query: event.target.value, page: 0, id: '' })} prefix={<SearchIcon size={18} />} placeholder={t('agent.searchMemory')} aria-label={t('agent.searchMemory')} /><button type="button" className="memory-icon tt-act" aria-expanded={filters} data-active={route.kind !== 'all' || !!route.date} aria-label={t('agent.memoryBrowse.filters')} onClick={() => setFilters(value => !value)}><GearIcon size={18} /></button></div>
+    <div className="memory-filterbar">
+      {route.view !== 'activity' && <Select aria-label={t('agent.memoryBrowse.scope')} value={route.scope} onChange={scope => navigation.change({ scope, entity: '', page: 0, id: '' })} options={(['all', 'personal', 'project', 'conversation', 'task'] as MemoryScope[]).map(value => ({ value, label: t(value === 'all' ? 'agent.memoryBrowse.allScopes' : value === 'personal' ? 'agent.memoryBrowse.personal' : 'agent.memoryGroup.' + value) }))} />}
+      {(route.view === 'activity' || ['project', 'conversation', 'task'].includes(route.scope)) && <Select loading={catalog.facets.loading} showSearch optionFilterProp="label" aria-label={t('agent.memoryGroup.' + entityKind)} value={route.entity} onChange={entity => navigation.change({ entity, page: 0, id: '' })} options={[{ value: '', label: t(entityKind === 'project' ? 'agent.memoryBrowse.allProjects' : 'agent.memoryGroup.all') }, ...options]} />}
+    </div>
+    {filters && <div className="memory-filters">{route.view !== 'activity' ? <label>{t('agent.memoryBrowse.type')}<Select aria-label={t('agent.memoryBrowse.type')} value={route.kind} onChange={kind => navigation.change({ kind, page: 0, id: '' })} options={['all', 'preference', 'decision', 'fact', 'summary'].map(value => ({ value, label: t(value === 'all' ? 'agent.memoryBrowse.allTypes' : 'agent.memoryKind.' + value) }))} /></label> : <label>{t('agent.memoryDate')}<Input type="date" aria-label={t('agent.memoryDate')} value={route.date} onChange={event => navigation.change({ date: event.target.value, page: 0, id: '' })} /></label>}{route.view === 'activity' && <button type="button" className="tt-act" disabled={!status.value?.memoryTimezone} onClick={() => navigation.change({ date: localDay(status.value.memoryTimezone), page: 0, id: '' })}>{t('agent.memoryToday')}</button>}<button type="button" className="tt-act" onClick={clear}>{t('agent.memoryBrowse.clear')}</button></div>}
+    {catalog.failed && <div className="memory-alert" role="alert"><p>{t('agent.memoryBrowse.loadFailed')}</p><Button onClick={catalog.refresh}>{t('agent.retry')}</Button></div>}
+    {catalog.facets.failed && <div className="memory-alert" role="alert"><p>{t('agent.memoryBrowse.filtersFailed')}</p><Button onClick={catalog.facets.refresh}>{t('agent.retry')}</Button></div>}
+    <MemoryList activity={route.view === 'activity'} items={items} loading={catalog.loading} failed={catalog.failed} selected={route.id} total={total} page={route.page} date={date} scope={scope} choose={choose} changePage={page => navigation.change({ page, id: '' })} filtered={filtered} clear={clear} scroll={scroll} onScroll={saveScroll} />
+  </section>
+  const body = <div className={`memory-browser${route.id ? ' has-selection' : ''}${panel ? ' is-panel' : ''}`}>
+    {list}<section className="memory-detail-pane" aria-label={t('agent.memoryBrowse.detail')}>
+      {mutationError && <div className="memory-alert" role="alert"><p>{mutationError}</p><Button onClick={() => { setMutationError(''); detail.refresh() }}>{t('agent.retry')}</Button></div>}
+      <MemoryDetail id={route.id} record={record} data={data} loading={detail.loading} failed={detail.failed} missing={missing} retry={detail.refresh} scope={scope} date={date} select={select} panel={panel} back={navigation.back} more={more} busy={busy} confirm={confirm} reject={() => record && mutate(record, '/confirm', { accepted: false })} revision={revision} />
+    </section>
   </div>
+  if (phone && fullPage && onBack) return <>{record?.state === 'active' && !missing && <Dropdown open={mobileMenu} onOpenChange={setMobileMenu} menu={menu} trigger={['click']}><span className="memory-mobile-menu-anchor" /></Dropdown>}<MobileSubPage title={route.id ? t(record?.day_key ? 'agent.memoryBrowse.activityDetail' : 'agent.memoryBrowse.detail') : t('agent.memory')} manageHistory={false} keepBottomNav search={false} onBack={route.id ? navigation.back : onBack} action={record?.state === 'active' && !missing ? { label: t('agent.memoryMore', { title: record.title }), icon: <MoreIcon size={20} />, onClick: () => setMobileMenu(value => !value) } : undefined}>{body}</MobileSubPage></>
+  if (fullPage) return <section className="memory-page"><header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={18} />{t('common.back')}</button></div>}</header>{body}</section>
+  return <div className={compact ? 'memory-panel' : 'memory-dialog'}>{body}</div>
 }

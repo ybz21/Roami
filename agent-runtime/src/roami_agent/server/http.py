@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
@@ -15,7 +16,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import (
     CloseTaskSession,
     Compact,
-    Confirm,
+    ConfirmMemory,
     ConfirmTask,
     CreateConversation,
     CreateReminder,
@@ -31,6 +32,7 @@ from roami_agent.protocol.http import (
     SessionReport,
     SteerTask,
 )
+from roami_agent.server.installation import Installation
 from roami_agent.server.model_settings import ModelSettings
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
@@ -49,6 +51,26 @@ def create_app(runtime, *, manage_lifecycle=True):
         title="Roami Agent", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
     )
 
+    installation = Installation(runtime)
+
+    @app.middleware("http")
+    async def installation_fence(request, call_next):
+        if (
+            installation.active
+            and request.method not in {"GET", "HEAD"}
+            and request.url.path != "/internal/installation/quiesce"
+        ):
+            return JSONResponse({"error": {"code": "AGENT_UPGRADE_IN_PROGRESS"}}, status_code=503)
+        return await call_next(request)
+
+    @app.post("/internal/installation/quiesce")
+    async def quiesce(request: Request, owner: Owner):
+        try:
+            body = await request.json()
+        except ValueError:
+            raise DomainError("INVALID_REQUEST") from None
+        return {"data": await installation.quiesce(owner, body)}
+
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):
         return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status)
@@ -62,15 +84,17 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.capability_settings.view(owner)
         return {"data": {"available": True, "maxBytes": 65536, "kinds": ["skills", "cli", "mcp"]}}
 
-    async def capability_payload(request):
+    async def capability_payload(request, maximum=65536):
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > 65536:
+            if len(body) > maximum:
                 raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
         try:
             return json.loads(body)
         except (ValueError, RecursionError):
+            if len(body) > 65536:
+                raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413) from None
             raise DomainError("INVALID_CAPABILITY_IMPORT") from None
 
     @app.post("/v1/capability-imports/{kind}")
@@ -80,7 +104,9 @@ def create_app(runtime, *, manage_lifecycle=True):
         ModelSettings.owner(owner)
         return {
             "data": await runtime.capability_imports.save(
-                owner, kind, await capability_payload(request)
+                owner,
+                kind,
+                await capability_payload(request, 600_000 if kind == "skills" else 65536),
             )
         }
 
@@ -91,7 +117,10 @@ def create_app(runtime, *, manage_lifecycle=True):
         ModelSettings.owner(owner)
         return {
             "data": await runtime.capability_imports.save(
-                owner, kind, await capability_payload(request), name
+                owner,
+                kind,
+                await capability_payload(request, 600_000 if kind == "skills" else 65536),
+                name,
             )
         }
 
@@ -123,6 +152,53 @@ def create_app(runtime, *, manage_lifecycle=True):
     ):
         runtime.capability_settings.view(owner)
         return {"data": runtime.tools.directory.list(query, kind, limit, "worker", offset=offset)}
+
+    @app.get("/v1/capability-markets")
+    async def markets(owner: Owner):
+        return {"data": runtime.capability_markets.view(owner)}
+
+    @app.put("/v1/capability-markets")
+    async def save_markets(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.save(owner, await capability_payload(request))
+        }
+
+    @app.get("/v1/capability-markets/{source}/search")
+    async def search_market(
+        source: str,
+        owner: Owner,
+        query: str = Query(min_length=1, max_length=200),
+        cursor: str = Query(default="", max_length=1000),
+    ):
+        return {"data": await runtime.capability_markets.search(owner, source, query, cursor)}
+
+    @app.post("/v1/capability-markets/preview")
+    async def preview_market(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.preview(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/prepare")
+    async def prepare_market_install(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.prepare(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/install")
+    async def install_market_option(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.install(
+                owner, await capability_payload(request)
+            )
+        }
 
     @app.get("/v1/traces")
     async def execution_trace(
@@ -321,6 +397,8 @@ def create_app(runtime, *, manage_lifecycle=True):
             payload = json.loads(body)
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
+        if isinstance(payload, dict) and "executionContext" in payload:
+            return {"data": await runtime.professional_capabilities.call(name, payload, owner)}
         return {"data": await runtime.cli_commands.call(name, payload, owner)}
 
     @app.get("/v1/capability-settings")
@@ -455,6 +533,9 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def status(owner: Owner):
         return {
             "data": {
+                "managed": getattr(runtime, "managed_parent", False),
+                "pid": os.getpid(),
+                "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "memoryTimezone": runtime.memory.daily.timezone,
@@ -604,6 +685,9 @@ def create_app(runtime, *, manage_lifecycle=True):
         result = await runtime.context.project(owner, cid, branch_id=branch)
         return {
             "data": {
+                "managed": getattr(runtime, "managed_parent", False),
+                "pid": os.getpid(),
+                "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 **{k: v for k, v in result.items() if k != "messages"},
             }
@@ -643,6 +727,36 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/tasks")
     async def tasks(owner: Owner, conversationId: str | None = None):
         return {"data": await runtime.tasks.list(owner, conversationId)}
+
+    @app.get("/v1/native-sessions")
+    async def native_sessions(owner: Owner, projectId: str | None = None):
+        return {"data": await runtime.native_sessions.list(owner, project_id=projectId)}
+
+    @app.get("/v1/native-sessions/{session_id}")
+    async def native_session(session_id: str, owner: Owner):
+        return {"data": await runtime.native_sessions.get(owner, session_id)}
+
+    @app.get("/v1/native-sessions/{session_id}/conversation")
+    async def native_conversation(
+        session_id: str,
+        owner: Owner,
+        before: int | None = Query(None, ge=1),
+        limit: int = Query(80, ge=1, le=200),
+    ):
+        return {
+            "data": await runtime.native_sessions.conversation(
+                owner, session_id, before=before, limit=limit
+            )
+        }
+
+    @app.get("/v1/native-sessions/{session_id}/events")
+    async def native_events(
+        session_id: str,
+        owner: Owner,
+        after: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=200),
+    ):
+        return {"data": await runtime.native_sessions.events(owner, session_id, after, limit)}
 
     @app.get("/v1/tasks/{task_id}")
     async def task_detail(task_id: str, owner: Owner):
@@ -771,7 +885,7 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def memory_catalog(
         owner: Owner,
         query: str = Query("", max_length=1000),
-        state: Literal["active", "candidate", "conflict"] = "active",
+        state: Literal["active", "candidate", "conflict", "review"] = "active",
         conversationId: str | None = None,
         projectId: str | None = None,
         taskId: str | None = None,
@@ -779,6 +893,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         timezone: str | None = None,
         kind: Literal["fact", "decision", "preference", "summary"] | None = None,
         personalOnly: bool = False,
+        scope: Literal["all", "personal", "project", "conversation", "task"] = "all",
         category: Literal["all", "knowledge", "activity"] = "all",
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
@@ -798,11 +913,28 @@ def create_app(runtime, *, manage_lifecycle=True):
                 timezone=timezone,
                 kind=kind,
                 personal_only=personalOnly,
+                scope=scope,
                 category=category,
                 limit=limit,
                 offset=offset,
             )
         }
+
+    @app.get("/v1/memories/facets")
+    async def memory_facets(
+        owner: Owner,
+        state: Literal["active", "review"] = "active",
+        category: Literal["knowledge", "activity"] = "knowledge",
+    ):
+        return {"data": await runtime.memory.catalog.facets(owner, state=state, category=category)}
+
+    @app.get("/v1/memories/{memory_id}/detail")
+    async def memory_detail(memory_id: str, owner: Owner):
+        return {"data": await runtime.memory.details.get(owner, memory_id)}
+
+    @app.get("/v1/memories/{memory_id}/history")
+    async def memory_history(memory_id: str, owner: Owner):
+        return {"data": await runtime.memory.details.history(owner, memory_id)}
 
     @app.get("/v1/memories/{memory_id}")
     async def get_memory(memory_id: str, owner: Owner):
@@ -829,8 +961,12 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.memory.forget(owner, memory_id, forget_sources=forgetSources)}
 
     @app.post("/v1/memories/{memory_id}/confirm")
-    async def confirm_memory(memory_id: str, body: Confirm, owner: Owner):
-        return {"data": await runtime.memory.confirm(owner, memory_id, body.accepted)}
+    async def confirm_memory(memory_id: str, body: ConfirmMemory, owner: Owner):
+        return {
+            "data": await runtime.memory.confirm(
+                owner, memory_id, body.accepted, expected_current_id=body.expectedCurrentId
+            )
+        }
 
     @app.get("/v1/memories/{memory_id}/sources")
     async def memory_sources(memory_id: str, owner: Owner):

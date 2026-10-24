@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import AgentTasks from './AgentTasks'
+import NativeSession from './NativeSession'
 import { clearAgentDataCache } from './agent-data-cache'
 import { api } from '../../api'
 
@@ -512,4 +513,83 @@ it('keeps the completed professional session reachable and closes it only after 
   expect(screen.queryByRole('button', { name: 'agent.openSession' })).toBeNull()
   expect(screen.getByRole('button', { name: 'agent.task.continue' }).hasAttribute('disabled')).toBe(true)
   expect(screen.getByText('Result one')).toBeTruthy()
+})
+
+it('keeps filters across remounts and exposes original session and project as separate actions', async () => {
+  const openSession = vi.fn()
+  const native = { ...task('native'), projectId: 'project-a', nativeSession: { id: 'native-identity', conversationId: 'child' } }
+  const professional = { ...task('codex'), latestAttempt: { state: 'succeeded', executorKind: 'cli', sessionId: 'original-codex', agentConversationId: 'provider-context' } }
+  vi.mocked(api).mockResolvedValue({ data: [native, professional] })
+  const first = render(<AgentTasks cid="conversation" projects={[{ id: 'project-a', name: 'Roami' }]} onSession={openSession} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: /Goal native/ })
+  expect(screen.getByRole('link', { name: 'Roami' }).getAttribute('href')).toBe('#/projects/project-a')
+  const buttons = screen.getAllByRole('button', { name: 'agent.task.enterSession' })
+  fireEvent.click(buttons[0]); expect(openSession).toHaveBeenCalledWith('original-codex')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.open' }))
+  first.unmount()
+  render(<AgentTasks cid="conversation" onSession={openSession} onChanged={vi.fn()} />)
+  expect(screen.getByRole('button', { name: 'agent.task.filter.open' }).getAttribute('aria-pressed')).toBe('true')
+  fireEvent.click(screen.getAllByRole('button', { name: 'agent.task.enterSession' })[1])
+  expect(location.hash).toContain('/session/')
+  expect(decodeURIComponent(location.hash)).toContain('native-identity')
+})
+
+
+it('hides empty native tool replies while retaining real content and the active reply', async () => {
+  const messages = [
+    { id: 'user', role: 'user', status: 'completed', seq: 1, content: { text: 'Update the presentation' } },
+    ...Array.from({ length: 13 }, (_, i) => ({ id: 'tool-' + i, role: 'assistant', status: 'completed', seq: i + 2, content: { text: '', tool_calls: [{ id: 'call-' + i }] } })),
+    { id: 'result', role: 'tool', status: 'completed', seq: 15, content: { text: 'Internal tool result' } },
+    { id: 'answer', role: 'assistant', status: 'completed', seq: 16, content: { text: 'Working on the presentation' } },
+    { id: 'active', role: 'assistant', status: 'streaming', seq: 17, content: { text: '' } },
+  ]
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path.endsWith('/conversation')) return { data: { messages, before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: detail('original') }
+  })
+  const page = render(<NativeSession id="native-id" node={null} projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Working on the presentation')
+  expect(screen.getAllByText('agent.task.subagent')).toHaveLength(2)
+  expect(page.container.querySelectorAll('.agent-typing')).toHaveLength(1)
+  expect(screen.queryByText('Internal tool result')).toBeNull()
+  expect(screen.getByText('Update the presentation')).toBeTruthy()
+})
+
+it('refreshes a fast native continuation without Main events and stops reading after it settles', async () => {
+  let phase = 0
+  const nativeTask = { ...task('original'), nativeSession: { id: 'native-id', conversationId: 'native-conversation' } }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') { phase = 1; return { data: { state: 'stopping' } } }
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path.endsWith('/conversation')) return { data: { messages: [{ id: 'reply-' + phase, role: 'assistant', status: 'completed', seq: phase + 1, content: { text: phase === 2 ? 'Updated answer' : 'Original answer' } }], before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('original'), task: { ...nativeTask, revision: phase === 2 ? 2 : 1 }, attempts: [{ id: phase === 2 ? 'second' : 'first', revision: phase === 2 ? 2 : 1, state: 'succeeded', finishedMs: phase === 2 ? 200 : 100 }], steering: phase ? { operationId: 'steering', state: phase === 2 ? 'applied' : 'stopping', revision: 1 } : null } }
+  })
+  render(<NativeSession id="native-id" node="selected" projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Original answer')
+  vi.useFakeTimers()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Add the owner' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' })); await Promise.resolve() })
+  phase = 2
+  await act(async () => { await vi.advanceTimersByTimeAsync(3100) })
+  expect(screen.getByText('Updated answer')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.some(([method, path, body]: any[]) => method === 'POST' && path === '/agent/tasks/original/steer' && body.text === 'Add the owner' && body.revision === 1)).toBe(true)
+  const count = vi.mocked(api).mock.calls.length
+  await act(async () => { await vi.advanceTimersByTimeAsync(6500) })
+  expect(vi.mocked(api).mock.calls.length).toBe(count)
+})
+
+
+it('keeps a running professional session visible while its provider context is still being registered', async () => {
+  const starting = { ...task('starting'), state: 'running', latestAttempt: { state: 'running', executorKind: 'cli', sessionId: 'original-session', agentConversationId: null } }
+  vi.mocked(api).mockResolvedValue({ data: [starting] })
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('button', { name: /Goal starting/ })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.open' }))
+  expect(screen.getByRole('button', { name: /Goal starting/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'agent.task.enterSession' })).toBeTruthy()
 })

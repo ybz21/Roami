@@ -76,3 +76,8 @@ it('returns from a task trace to the task detail instead of replacing it with th
   backAgentPage({ view: 'debug', origin, task: 'task:task' })
   expect(back).toHaveBeenCalledOnce()
 })
+
+it('restores native session deep links without treating the session ID as a Main conversation', () => {
+  const path = agentPagePath('session', 'home/original-main/branch', '20261022T120000000Z-abcdef123456')
+  expect(readAgentPage(path)).toEqual({ view: 'session', origin: 'home/original-main/branch', task: '20261022T120000000Z-abcdef123456' })
+})

@@ -319,7 +319,9 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 source_assistant_message_id=binding["assistantMessageId"],
                 parent_task_id=binding.get("taskId"),
                 executor=executor,
-                target=args.get("target"),
+                target=decision["targetRef"]
+                if decision and decision["action"] == "new_task"
+                else args.get("target"),
                 from_message_id=args.get("fromMessageId"),
                 origin_message_id=binding["originMessageId"],
                 **routing_args,
@@ -624,6 +626,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "Other targets return queued background_task/taskId, not completion. Task/native-branch IDs are not session IDs. "
             "Edits, additions and missing deliverables of tracked work use task_steer, even after completion; "
             "do not delegate a new task into its workspace. The original executor choice remains bound without a fresh quote. "
+            "New coding tasks resolve real Roami projects; Git projects use worktrees. "
+            "Recall scoped work habits; workspacePreference references active memoryId/revision/quote with optional quoted base/remote. "
             "fromMessageId forks completed checkpoints only.",
             object_schema(
                 {

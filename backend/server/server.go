@@ -118,6 +118,7 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/agent/professional/:kind/check", h.CheckProfessionalAgent)
 		g.POST("/agent/professional/:kind/upgrade", h.UpgradeProfessionalAgent)
 		g.GET("/agent/professional/:kind/models", h.AgentModelProfiles)
+		g.POST("/agent/professional/:kind/model-options", h.AgentModelOptions)
 		g.POST("/agent/professional/:kind/models", h.SaveAgentModelProfile)
 		g.PUT("/agent/professional/:kind/models/:profile", h.SaveAgentModelProfile)
 		g.DELETE("/agent/professional/:kind/models/:profile", h.DeleteAgentModelProfile)

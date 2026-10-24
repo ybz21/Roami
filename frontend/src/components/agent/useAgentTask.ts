@@ -50,7 +50,7 @@ export function useAgentTask(id: string) {
     })
     return () => { cancelled = true; pending.current = false }
   }, [id, version, scope])
-  const ended = stateScope === scope && !!detail.value && ['succeeded', 'failed', 'cancelled', 'interrupted'].includes(detail.value.task.state)
+  const ended = stateScope === scope && !!detail.value && ['succeeded', 'failed', 'cancelled', 'interrupted', 'waiting_user'].includes(detail.value.task.state) && detail.value.steering?.state !== 'stopping'
   useEffect(() => {
     if (ended) return
     const timer = setInterval(() => {

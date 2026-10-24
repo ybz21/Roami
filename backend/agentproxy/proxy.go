@@ -7,11 +7,27 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 )
+
+type capabilityTransport struct {
+	standard, marketplace *http.Transport
+}
+
+func (t capabilityTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	// Bundle downloads and MCP initialization exceed the ordinary API header budget.
+	if strings.HasPrefix(r.URL.Path, "/v1/capability-markets") ||
+		(strings.HasPrefix(r.URL.Path, "/v1/capability-imports/mcp/") && strings.HasSuffix(r.URL.Path, "/connect")) {
+		return t.marketplace.RoundTrip(r)
+	}
+	return t.standard.RoundTrip(r)
+}
 
 // Proxy is mounted only under the existing authenticated API group.
 func Proxy(socket string) http.Handler {
 	target := &url.URL{Scheme: "http", Host: "roami-agent"}
+	marketplace := agentruntime.Transport(socket)
+	marketplace.ResponseHeaderTimeout = 100 * time.Second
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(target)
@@ -23,7 +39,7 @@ func Proxy(socket string) http.Handler {
 			// Roami's current login is single-user; never accept identity from browser headers.
 			r.Out.Header.Set("X-Roami-Owner", "local")
 		},
-		Transport: agentruntime.Transport(socket), FlushInterval: -1,
+		Transport: capabilityTransport{agentruntime.Transport(socket), marketplace}, FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

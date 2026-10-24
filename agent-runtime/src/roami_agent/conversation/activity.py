@@ -3,6 +3,7 @@
 import json
 import re
 
+from roami_agent.conversation.professional_activity import professional_activity
 from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import public_error_code
 from roami_agent.storage.database import rows
@@ -185,6 +186,7 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                 else None,
             }
         )
+    activities.extend(professional_activity(db, scope, anchor))
     failures = (
         []
         if task_id

@@ -12,7 +12,7 @@ export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
 export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
 export type AgentNotice = { id: number; read?: boolean | number; message_id?: string; conversation_id: string; branch_id: string; title: string; content_json: string; created_ms: number }
-export type AgentTask = { id: string; state: string; revision: number; parent_task_id?: string | null; intent_json: string; created_ms?: number; updated_ms?: number; latestAttempt?: { sessionId?: string; agentConversationId?: string | null; executorKind?: string; summary?: string | null; workspace?: { directory: string; branch?: string }; state: string } | null }
+export type AgentTask = { projectId?: string | null; nativeSession?: { id: string; conversationId: string } | null; sessionClosure?: { state: string } | null; id: string; state: string; revision: number; parent_task_id?: string | null; intent_json: string; created_ms?: number; updated_ms?: number; latestAttempt?: { sessionId?: string; agentConversationId?: string | null; executorKind?: string; summary?: string | null; workspace?: { directory: string; branch?: string }; state: string } | null }
 
 export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { view: AgentSnapshot; reload: boolean } {
   if (event.id <= view.snapshotCursor) return { view, reload: false }
@@ -25,9 +25,14 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
       .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
     return { view: next, reload: event.kind === 'task.steered' }
   }
-  if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted') {
-    next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: event.kind.slice(5) } : turn)
-    next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: event.kind.slice(5) } : message)
+  if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted' || event.kind === 'turn.deferred') {
+    const deferred = event.kind === 'turn.deferred'
+    next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: deferred ? 'queued' : event.kind.slice(5) } : turn)
+    next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: deferred ? 'interrupted' : event.kind.slice(5) } : message)
+    return { view: next, reload: true }
+  }
+  if (event.kind === 'message.tool_calls') {
+    next.messages = view.messages.map(message => message.id === data.messageId ? { ...message, status: 'completed', content: { ...message.content, tool_calls: data.calls } } : message)
     return { view: next, reload: true }
   }
   if (event.kind === 'message.started') {

@@ -85,6 +85,9 @@ func main() {
 		defer release()
 	}
 	bin, err := os.Executable()
+	if err == nil {
+		bin, err = filepath.EvalSymlinks(bin)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,6 +170,7 @@ func main() {
 	// standard 下**本机监听口照常对外**——上云和局域网直连是两条并行的入口，不是二选一。
 	var r *gin.Engine
 	stopBrowserRecovery := func() {}
+	stopAgent := func() {}
 	if conf.Cluster.Mode == "hub" {
 		log.Printf("以「中心」模式启动（只做入口 + 机器注册表 + 控制台，不跑本机业务）")
 		r = server.NewHub(cfg)
@@ -186,6 +190,14 @@ func main() {
 			}
 		}
 		cfg.NodeClient = cl
+		stopAgent, err = startAgentSupervisor()
+		if err != nil {
+			log.Printf("智能体服务不可用: %v", err)
+			if _, bundled := os.Stat(filepath.Join(filepath.Dir(bin), "..", "manifest.json")); bundled == nil {
+				log.Fatal("完整安装包的智能体服务启动失败")
+			}
+		}
+		defer stopAgent()
 		r = server.New(cfg)
 		stopBrowserRecovery = browser.StartRecovery(context.Background())
 		go maintainPluginDaemon(context.Background(), bin, 15*time.Second)
@@ -202,6 +214,7 @@ func main() {
 	go func() {
 		<-sig
 		stopBrowserRecovery()
+		stopAgent()
 		browser.Shutdown()
 		os.Exit(0)
 	}()

@@ -133,13 +133,13 @@ class TaskDeliverables:
             observed = await self.artifacts.db.call(
                 lambda db, attempt=attempt: rows(
                     db,
-                    "SELECT DISTINCT x.tool_name,json_extract(x.arguments_json,'$.path') AS path "
+                    "SELECT DISTINCT x.tool_name,json_extract(native_content(x.arguments_json),'$.path') AS path "
                     "FROM tool_calls x JOIN turns u ON u.id=x.turn_id "
                     "JOIN task_attempts a ON a.native_branch_id=u.branch_id "
                     "JOIN tasks t ON t.id=a.task_id "
                     "WHERE a.id=? AND t.id=? AND t.owner_id=? AND x.state='succeeded' "
                     "AND (x.tool_name='file_read' OR (x.tool_name='file_write' "
-                    "AND json_type(x.arguments_json,'$.expectedSha256')='null')) LIMIT 24",
+                    "AND json_type(native_content(x.arguments_json),'$.expectedSha256')='null')) LIMIT 24",
                     (attempt["id"], task["id"], owner),
                 )
             )

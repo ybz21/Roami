@@ -53,12 +53,14 @@ from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
 from roami_agent.server.capability_imports import CapabilityImports
+from roami_agent.server.capability_markets import CapabilityMarkets
 from roami_agent.server.capability_settings import CapabilitySettings
 from roami_agent.server.configuration import Settings
 from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, load_model_settings
 from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
+from roami_agent.storage.native_sessions import NativeSessions
 from roami_agent.storage.task_deliverables import TaskDeliverables
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
@@ -70,7 +72,9 @@ from roami_agent.tools.files import register_file_tools
 from roami_agent.tools.foundations import register_foundations
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
+from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
+from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.web_research import register_research_tools
@@ -168,6 +172,8 @@ class Runtime:
         self.brief_monitor = None
         self.artifact_monitor = None
         self.native_reconciliation_monitor = None
+        self.native_session_monitor = None
+        self.native_sessions = NativeSessions(database)
         self.native_reconciliation = NativeWorkspaceReconciliation(
             database, self.settings, resources=self.resources
         )
@@ -277,6 +283,11 @@ class Runtime:
         self.model_settings = ModelSettings(self, configured_provider)
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
+        self.capability_markets = CapabilityMarkets(self)
+        register_market_commands(self.tools, self.capability_markets)
+        self.professional_capabilities = ProfessionalCapabilities(self)
+        if isinstance(self.executor, CodingExecutor):
+            self.executor.capabilities = self.professional_capabilities
 
     async def run_turn(self, turn, *args, **kwargs):
         if self.improvement is None or not self.improvement.ledger.path.exists():
@@ -307,12 +318,14 @@ class Runtime:
             policy_binding.reset(token)
 
     async def start(self):
+        await self.professional_capabilities.recover()
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
         await self.resources.recover()
         await self.dispatch.recover()
         await self.briefs.recover()
+        await self.native_sessions.recover()
         if self.settings.proactive_enabled:
             await self.proactive.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
@@ -324,6 +337,7 @@ class Runtime:
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
         self.brief_monitor = asyncio.create_task(self._monitor_briefs())
         self.artifact_monitor = asyncio.create_task(self._monitor_artifacts())
+        self.native_session_monitor = asyncio.create_task(self._monitor_native_sessions())
         if self.db.managed:
             self.native_reconciliation_monitor = asyncio.create_task(
                 self._monitor_native_reconciliation()
@@ -340,6 +354,14 @@ class Runtime:
 
             self.improvement.research_worker = ResearchWorker(self, self.improvement)
             await self.improvement.research_worker.start()
+
+    async def _monitor_native_sessions(self):
+        while not self.stopping:
+            try:
+                await self.native_sessions.maintain()
+            except (DomainError, OSError, ValueError):
+                log.exception("Native session projection failed")
+            await asyncio.sleep(5)
 
     async def _monitor_native_reconciliation(self):
         while not self.stopping:
@@ -470,10 +492,16 @@ class Runtime:
         if self.control_monitor:
             self.control_monitor.cancel()
             await asyncio.gather(self.control_monitor, return_exceptions=True)
+        if self.native_session_monitor:
+            self.native_session_monitor.cancel()
+            await asyncio.gather(self.native_session_monitor, return_exceptions=True)
         running = [item["handle"] for item in self.active.values()]
         for handle in running:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
+        await self.native_sessions.flush()
+        await self.professional_capabilities.close()
+        await self.capability_markets.close()
         await self.mcp.close()
         await self.desktop.close()
         await self.files.close()
@@ -520,8 +548,9 @@ async def serve(args):
         settings=settings,
         worker_model=worker,
         executor=CodingExecutor(database, settings),
-        development_rsi=args.development_rsi,
+        development_rsi=getattr(args, "development_rsi", False),
     )
+    runtime.managed_parent = getattr(args, "parent_fd", None) is not None
     try:
         args.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(args.socket.parent, 0o700)
@@ -550,7 +579,22 @@ async def serve(args):
                     timeout_graceful_shutdown=3,
                 )
             )
-            await server.serve(sockets=[bound])
+            parent_fd = getattr(args, "parent_fd", None)
+            loop = asyncio.get_running_loop()
+            if parent_fd is not None:
+
+                def parent_closed():
+                    if not os.read(parent_fd, 1):
+                        server.should_exit = True
+                        loop.remove_reader(parent_fd)
+
+                loop.add_reader(parent_fd, parent_closed)
+            try:
+                await server.serve(sockets=[bound])
+            finally:
+                if parent_fd is not None:
+                    loop.remove_reader(parent_fd)
+                    os.close(parent_fd)
     finally:
         await runtime.close()
         await provider.close()
@@ -569,6 +613,7 @@ def main():
     parser.add_argument("--socket", type=Path)
     parser.add_argument("--initialize", action="store_true")
     parser.add_argument("--development-rsi", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--parent-fd", type=int)
     args = parser.parse_args()
     if not args.initialize and not args.socket:
         parser.error("--socket is required when serving")
