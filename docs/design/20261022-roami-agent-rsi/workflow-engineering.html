@@ -1,71 +1,52 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>实验 / RSI · Workflow 工程设计</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"><style>.engineering-flow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:var(--sp-3);list-style:none;padding:0}.engineering-flow button{width:100%;height:100%;padding:var(--sp-3);background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:var(--r-xs);color:var(--text-bright);font:inherit;cursor:pointer}.engineering-flow button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}.engineering-flow small{display:block;color:var(--text-dim)}#node-config{width:100%;min-height:12em;background:var(--bg-container);color:var(--text-bright);border:1px solid var(--border-subtle);padding:var(--sp-3);font:var(--fs-sm)/1.6 monospace}svg{max-width:100%;height:auto}td code{white-space:normal;overflow-wrap:anywhere}#config-message{color:var(--text-dim)}@media(max-width:700px){.engineering-flow{grid-template-columns:repeat(2,minmax(0,1fr))}}</style></head><body><main><article class="rsi-overview">
-<nav><a href="#product">定位</a><a href="#runtime">运行架构</a><a href="#defaults">默认值</a><a href="#storage">状态与存储</a><a href="#trial">10项验证</a><a href="automation-roles.html">角色与闭环</a></nav>
-<header><h1>实验 / RSI · Workflow 工程设计</h1><p class="rsi-lead">程序负责触发和推进，Codex负责复盘与修复；每次运行有自己的配置、状态与产物。</p></header>
-<section id="product"><h2>产品设计与用户故事</h2><pre>设置
-  跟着我走
-  这台机器
-  实验              与“这台机器”同级，仅开发版可见
-    RSI             本次实现的实验入口
-    …               后续注册OKR等实验；未实现的不放空入口
-  整个集群</pre><p>用户先配置下一次 Workflow，再查看某一次 Run。点节点看该次状态、耗时、用量、重试和产物；历史Run只读，不随新配置变化。旧“设置/实验”链接继续进入RSI。</p></section>
-<section id="runtime"><h2>运行架构</h2>
-<svg viewBox="0 0 1080 330" role="img" aria-label="配置版本冻结为一次运行，程序调度节点，数据库记录状态，文件系统记录产物"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L7 4L0 8" fill="none" stroke="var(--text-dim)"/></marker></defs>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RSI · 运行与问题闭环</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"></head><body><main><article class="rsi-overview">
+<header><h1>RSI · 运行与问题闭环</h1><p class="rsi-lead">设置 → 实验 → RSI。仅开发版注册接口和 Worker，普通安装不启动 RSI。</p></header>
+<section><h2>产品设计与用户故事</h2><p>配置下次流水线；选择一次运行，查看每个节点的职责、状态、历史尝试和文件。点击本地问题可回到最近运行；“复测同组 Case”沿用 Case 清单，重新冻结当前配置，不覆盖旧记录。</p></section>
+<section><h2>架构</h2><svg viewBox="0 0 1080 330" role="img" aria-label="配置版本冻结为一次运行，程序调度节点，数据库记录状态，文件系统记录产物"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L7 4L0 8" fill="none" stroke="var(--text-dim)"/></marker></defs>
 <g fill="var(--bg-container)" stroke="var(--border)"><rect x="8" y="16" width="250" height="86"/><rect x="305" y="16" width="300" height="86"/><rect x="652" y="16" width="420" height="86"/><rect x="8" y="182" width="322" height="110"/><rect x="378" y="182" width="322" height="110"/><rect x="748" y="182" width="324" height="110"/></g>
 <g fill="var(--text-bright)" font-family="system-ui,sans-serif" font-size="18"><text x="24" y="47">实验注册表 / 定义版本</text><text x="24" y="78">RSI；以后可注册 OKR</text><text x="321" y="47">Run：冻结配置、源码、Case</text><text x="321" y="78">手动 / 每日定时，幂等触发</text><text x="668" y="47">节点调度器：依赖、预算、租约</text><text x="668" y="78">Roami Agent / Codex / 独立程序</text><text x="24" y="216">同一 SQLite 事务</text><text x="24" y="247">Run / Attempt / Event / Outbox</text><text x="394" y="216">私有文件产物库</text><text x="394" y="247">不可变文件 + SHA256 + 类型</text><text x="764" y="216">按 Run 查询与预览</text><text x="764" y="247">该次节点状态、产物和报告</text></g>
 <g fill="none" stroke="var(--text-dim)" stroke-width="2" marker-end="url(#a)"><path d="M258 59H297"/><path d="M605 59H644"/><path d="M862 102V142H170V174"/><path d="M862 142H540V174"/><path d="M330 237H370"/><path d="M700 237H740"/></g></svg>
-<p>触发器是常驻程序，不让Agent自己记时间。单台无版本差异60次；有候选同机配对120次。多机先展开评测，复盘按Case核对，汇总Issue每Run一个；修复/验证可按待修点展开子节点，保留父Run。</p>
-<pre>评测 ──无论成功/失败/阻塞──→ Codex复盘 → Issue
-                                       │
-              发布确认 + 有证据可行动的问题 + 用量可对账
-                                       ↓
-              Codex修复 → 独立验收 → 草稿PR → 开发版观察</pre>
-<p>失败也要有诊断报告和Issue；缺分、缺日志、未知用量不阻止提出问题，但禁止冒充质量通过或自动晋级。UI必须选择Run后再画状态，禁止拼接不同Run各节点的“最新一条”。</p></section>
-<section id="defaults"><h2>每节点初始值与产出合同</h2><p>这是下一版工程合同；可编辑项受Schema约束，冻结门槛和执行权限不可调低。<code>null / []</code> 表示明确的“待配置”，首次启动显示阻塞，不猜仓库、机器或隐藏集。</p>
-<ol class="engineering-flow" id="workflow-nodes"></ol><label for="node-config">节点配置草稿（设计原型，不执行任务）</label><textarea id="node-config" spellcheck="false"></textarea><div><button type="button" id="save-node">保存草稿</button> <button type="button" id="reset-node">恢复初始值</button> <a href="workflow-contract.json" download>下载默认合同</a></div><p id="config-message" role="status"></p>
-<details><summary>展开7节点完整默认值与产物合同</summary><div class="tablewrap"><table><thead><tr><th>节点 / 执行者</th><th>默认初始值</th><th>重点产物</th></tr></thead><tbody><tr><td><strong>评测</strong><br>Roami Agent + 独立判定器</td><td><code>{&quot;mode&quot;: &quot;daily&quot;, &quot;cases&quot;: 60, &quot;timezone&quot;: &quot;Asia/Shanghai&quot;, &quot;hour&quot;: 3, &quot;schedule_enabled&quot;: false, &quot;daily_tokens&quot;: 0, &quot;episodes&quot;: 120, &quot;suite_id&quot;: null, &quot;machines&quot;: [], &quot;candidate_search&quot;: false}</code></td><td>manifest.json、results.json、每Case产物、模型/工具日志、Token明细<details><summary>进入条件</summary>测试集、机器、模型与预算齐全；正式产物评分须真实校准</details></td></tr><tr><td><strong>复盘</strong><br>Codex</td><td><code>{&quot;batch_cases&quot;: 4, &quot;admission_tokens&quot;: 64000, &quot;timeout_seconds&quot;: 180, &quot;on&quot;: &quot;evaluate.terminal&quot;, &quot;review_metrics&quot;: true, &quot;review_logs&quot;: true}</code></td><td>review.md、findings.json、逐Case复核覆盖表<details><summary>进入条件</summary>评测已结束；失败或阻塞也要复盘，缺失项明确列出</details></td></tr><tr><td><strong>汇总 Issue</strong><br>Codex + GitHub outbox</td><td><code>{&quot;one_issue_per_run&quot;: true, &quot;publication&quot;: &quot;github&quot;, &quot;repository&quot;: null, &quot;include_raw_logs&quot;: false, &quot;idempotency&quot;: &quot;owner+experiment+run_id&quot;}</code></td><td>issue-plan.json、issue.md、GitHub回执或待对账记录<details><summary>进入条件</summary>复盘已落盘；质量不完整时只提诊断Issue，不派未经证实的修复</details></td></tr><tr><td><strong>修复</strong><br>Codex + 隔离 worktree</td><td><code>{&quot;max_attempts&quot;: 2, &quot;admission_tokens&quot;: 64000, &quot;timeout_seconds&quot;: 180, &quot;allowed_paths&quot;: [], &quot;base_commit&quot;: null, &quot;one_candidate_at_a_time&quot;: true}</code></td><td>patch.diff、change.md、源码hash、worktree与候选引用<details><summary>进入条件</summary>Issue发布确认、待修点有证据、源码范围与基线已配置</details></td></tr><tr><td><strong>独立验收</strong><br>独立验证程序</td><td><code>{&quot;targeted_regression&quot;: true, &quot;frozen_daily_cases&quot;: 60, &quot;paired&quot;: true, &quot;private_validation&quot;: true, &quot;quality_gate&quot;: &quot;frozen&quot;, &quot;required&quot;: true}</code></td><td>verification.json、A/B指标与日志、回归结果、受保护证据hash<details><summary>进入条件</summary>候选已封存；验证器和隐藏集不允许修复者改写</details></td></tr><tr><td><strong>提交 PR</strong><br>GitHub outbox</td><td><code>{&quot;draft&quot;: true, &quot;base&quot;: &quot;main&quot;, &quot;remote&quot;: &quot;origin&quot;, &quot;auto_merge&quot;: false, &quot;quality_checks&quot;: [&quot;quick&quot;, &quot;full&quot;]}</code></td><td>pr-plan.json、PR回执、提交hash、检查记录与截图<details><summary>进入条件</summary>独立验收与质量门禁通过；本机可信发布目标已配置</details></td></tr><tr><td><strong>观察</strong><br>日周期控制器</td><td><code>{&quot;days&quot;: 2, &quot;distinct_full_days&quot;: true, &quot;target&quot;: &quot;development_eval_only&quot;, &quot;rollback_on_regression&quot;: true}</code></td><td>observation.json、每日证据引用、回滚或关闭Issue回执<details><summary>进入条件</summary>开发评测实例已绑定候选；两个后续合格日，不能用同日重复凑数</details></td></tr></tbody></table></div>
-</details><p>图的依赖顺序首版固定，节点参数可以配置；不做任意shell或可绕过验收的自由连线编辑器。后续支持DAG时，端口Schema、环检测、必经验收和权限检查仍由程序强制执行。</p></section>
-<section id="storage"><h2>一次运行的数据与状态</h2><div class="tablewrap"><table><thead><tr><th>实体</th><th>必须保存</th><th>唯一性 / 约束</th></tr></thead><tbody>
-<tr><td>experiment_definitions</td><td>实验kind、revision、节点默认值与覆盖、边、Schema版本</td><td>owner + kind + revision；CAS保存，旧版本保留</td></tr>
-<tr><td>workflow_runs</td><td>Run ID、触发来源、定义快照、选中Case/hash、机器/模型/源码/评分版本、权限与预算、开始/结束</td><td>owner + kind + trigger_id 幂等；运行中改配置只影响下次</td></tr>
-<tr><td>node_attempts</td><td>run_id、node_id、attempt、父条目、状态、租约、起止、耗时、用量、阻塞原因、输入/输出引用</td><td>run + node + item + attempt；按lease与revision完成，旧worker不可回写</td></tr>
-<tr><td>artifacts</td><td>artifact_id、相对路径、SHA256、字节数、类型、可见性、生产者attempt、是否完整</td><td>绑定owner和Run；隐藏答案永不返回前端，原始记录不公开到GitHub</td></tr>
-<tr><td>events / effects</td><td>状态事件、GitHub/模型调用意图、稳定幂等key、请求hash、原始回执与未知标记</td><td>同DB事务落状态和outbox；未知副作用先对账，不盲重放</td></tr>
-</tbody></table></div>
-<pre>pending → queued → running → succeeded
-                       ├→ failed / blocked
-                       ├→ unknown（付费或远端结果不确定，先对账）
-                       └→ cancelled
-不满足诊断模式权限的后续节点 → skipped（必须有原因；不是成功）
-失败重试新增attempt，保留旧记录；节点汇总不覆盖历史。</pre>
-<details><summary>落盘与恢复协议</summary><ol><li>先创建Run与7个pending节点、冻结配置，再允许第一次模型调用。</li><li>产物写临时文件，fsync后原子rename；随后同SQL事务登记hash、节点终态和后继节点。UI只有在产物存在且hash吻合时显示成功。</li><li>文件/数据库不是跨介质原子事务：崩溃留下的孤儿文件等待回收；数据库引用缺失/损坏文件时节点转blocked，不能假装成功。</li><li>租约过期：仅确定无副作用且账单已结算的工作可重试；付费调用、Issue或PR结果未知，先查询或人工对账。幂等key=run/node/item/attempt/operation。</li><li>取消只停止本Run明确拥有的进程与资源；保留已产生的partial产物，后续节点取消或跳过。</li></ol></details>
-<pre>data_root/agents/experiments/
-  ledger.sqlite3
-  runs/&lt;owner-hash&gt;/&lt;run-id&gt;/
-    manifest.json
-    evaluate/&lt;case-id&gt;/ 产物、trial、metrics、execution-log、model-log
-    review/review.md + findings.json
-    issue/issue-plan.json + receipt.json
-    repair/&lt;item&gt;/patch.diff
-    verify/&lt;item&gt;/verification.json
-    publish/&lt;item&gt;/receipt.json
-    observe/observation.json</pre>
-<p>目录0700、账本/文件0600。预览通过所有者鉴权与artifact_id访问，不接受任意绝对路径；不跟随符号链接，检查边界与hash。Run状态不由执行器自报覆盖，验收器给证据才能进入后继阶段。</p></section>
-<details><summary>代码落点与接口设计</summary><div class="tablewrap"><table><thead><tr><th>层</th><th>已有 / 设计的接入点</th></tr></thead><tbody>
-<tr><td>实验目录与配置</td><td>已有Settings registry与有限配置API；新增按kind的Definition Schema与revision。RSI先注册，OKR以后独立注册处理器。</td></tr>
-<tr><td>控制器</td><td>复用ImprovementControl / EvaluationWorker / ResearchWorker；用run_id关联已有requests、cycles、actions，不新建第二套执行器。</td></tr>
-<tr><td>状态持久化</td><td>现有SQLite记录执行与复盘；下一步在同账本加Run/Attempt/Artifact投影和outbox，业务状态与投影同事务提交。</td></tr>
-<tr><td>文件产物</td><td>复用已有隔离目录、模型/工具日志、review_report、patch与GitHub回执；加类型化manifest和完整性索引。</td></tr>
-<tr><td>前端</td><td>ExperimentWorkflow保留图；新增Run选择与只读快照、逐节点Attempt/产物详情。配置视图与运行视图分开。</td></tr>
-</tbody></table></div>
-<pre>GET /experiments                        实验注册表
-GET /experiments/rsi/definition          默认值与当前版本
-PUT /experiments/rsi/definition          expected_revision + 受限节点配置
-POST /experiments/rsi/runs               definition_revision + mode + trigger_key
-GET /experiments/rsi/runs/{run_id}       该Run的节点、Attempt、指标和产物引用
-GET /experiments/rsi/artifacts/{id}      鉴权后的安全预览/下载</pre>
-<p>以上通用接口为本设计合同，尚未声称已接入正式每日调度。当前已有 /agent/improvement 的执行接口保留为适配层；普通发行版均不注册实验接口。10项试跑用独立SQLite原型验证Run、节点和文件产物合同，不冒充正式控制器已完成迁移。</p></details>
-<section id="trial"><h2>今天先验证10项</h2><p>6个真实任务覆盖编程、数据、文档、Demo、资讯和公开财务题，4个零模型机制Case覆盖记忆、上下文、工具和预算。保留原题与判定合同，单独冻结诊断套件；正式60项库存不变。</p><pre>冻结10项 / Run配置 → 真实评测与日志 → 程序逐项检查
-→ Codex复盘 → Issue草稿文件
-修复 / 验收候选 / 发PR / 观察：本次skipped，不假装跑完闭环。</pre><p>诊断预算：生成准入30万Token，Codex复盘与Issue草稿各预留6.4万（合计12.8万）；完成后报告原生用量，未知则停止后续付费，CLI准入不是供应商硬截断。为验证轻量配置，记忆输出上限512，其他模型输出2048，每Case诊断时限120秒、最多16次请求，作为本次快照记录，不与先前成绩直接比较。7项复杂产物的缺校准仍标待评分，不降低正式门槛。轻量输出上限是实验变量，不作为正式默认推荐；结构化输出截断算失败，不能以少输出冒充节省。</p><p>验收：数据库先有7节点默认状态；每个Case有结果/阻塞原因与日志索引；复盘与Issue草稿可打开；未知用量不记0；重启后读取同Run可恢复状态；没有正式全量或晋级结论。</p><p><a href="light-run-20261024.html">打开本次10项实际产出</a>（运行完成后填入，未出结果前不视为通过）</p></section>
-</article></main><script>
-const definitions=[{"id": "evaluate", "name": "评测", "executor": "Roami Agent + 独立判定器", "config": {"mode": "daily", "cases": 60, "timezone": "Asia/Shanghai", "hour": 3, "schedule_enabled": false, "daily_tokens": 0, "episodes": 120, "suite_id": null, "machines": [], "candidate_search": false}, "output": "manifest.json、results.json、每Case产物、模型/工具日志、Token明细", "ready": "测试集、机器、模型与预算齐全；正式产物评分须真实校准"}, {"id": "review", "name": "复盘", "executor": "Codex", "config": {"batch_cases": 4, "admission_tokens": 64000, "timeout_seconds": 180, "on": "evaluate.terminal", "review_metrics": true, "review_logs": true}, "output": "review.md、findings.json、逐Case复核覆盖表", "ready": "评测已结束；失败或阻塞也要复盘，缺失项明确列出"}, {"id": "issue", "name": "汇总 Issue", "executor": "Codex + GitHub outbox", "config": {"one_issue_per_run": true, "publication": "github", "repository": null, "include_raw_logs": false, "idempotency": "owner+experiment+run_id"}, "output": "issue-plan.json、issue.md、GitHub回执或待对账记录", "ready": "复盘已落盘；质量不完整时只提诊断Issue，不派未经证实的修复"}, {"id": "repair", "name": "修复", "executor": "Codex + 隔离 worktree", "config": {"max_attempts": 2, "admission_tokens": 64000, "timeout_seconds": 180, "allowed_paths": [], "base_commit": null, "one_candidate_at_a_time": true}, "output": "patch.diff、change.md、源码hash、worktree与候选引用", "ready": "Issue发布确认、待修点有证据、源码范围与基线已配置"}, {"id": "verify", "name": "独立验收", "executor": "独立验证程序", "config": {"targeted_regression": true, "frozen_daily_cases": 60, "paired": true, "private_validation": true, "quality_gate": "frozen", "required": true}, "output": "verification.json、A/B指标与日志、回归结果、受保护证据hash", "ready": "候选已封存；验证器和隐藏集不允许修复者改写"}, {"id": "publish", "name": "提交 PR", "executor": "GitHub outbox", "config": {"draft": true, "base": "main", "remote": "origin", "auto_merge": false, "quality_checks": ["quick", "full"]}, "output": "pr-plan.json、PR回执、提交hash、检查记录与截图", "ready": "独立验收与质量门禁通过；本机可信发布目标已配置"}, {"id": "observe", "name": "观察", "executor": "日周期控制器", "config": {"days": 2, "distinct_full_days": true, "target": "development_eval_only", "rollback_on_regression": true}, "output": "observation.json、每日证据引用、回滚或关闭Issue回执", "ready": "开发评测实例已绑定候选；两个后续合格日，不能用同日重复凑数"}];let drafts=structuredClone(definitions),selected=0;const area=document.querySelector('#node-config'),message=document.querySelector('#config-message');function show(){area.value=JSON.stringify(drafts[selected].config,null,2);document.querySelectorAll('#workflow-nodes button').forEach((b,i)=>b.setAttribute('aria-pressed',String(i===selected)));message.textContent='设计原型：只修改页面内草稿，不调用模型或写GitHub。'}definitions.forEach((node,i)=>{const li=document.createElement('li'),button=document.createElement('button');button.type='button';const title=document.createElement('strong');title.textContent=(i+1)+' '+node.name;const caption=document.createElement('small');caption.textContent=node.executor;button.append(title,caption);button.onclick=()=>{selected=i;show()};li.append(button);document.querySelector('#workflow-nodes').append(li)});document.querySelector('#save-node').onclick=()=>{try{const value=JSON.parse(area.value);if(!value||Array.isArray(value)||typeof value!=='object')throw Error();drafts[selected].config=value;message.textContent='本节点草稿已保存；正式服务仍需Schema、权限和revision验证。'}catch{message.textContent='请输入JSON对象，当前输入已保留。'}};document.querySelector('#reset-node').onclick=()=>{drafts[selected]=structuredClone(definitions[selected]);show()};show();</script></body></html>
+<pre>程序每天触发完整60项 / 用户手动诊断10项
+                   ↓
+         Roami Agent + 容器外判定器
+                   ↓ 失败、阻塞也记录
+     Codex复盘 → Codex问题排序 → GitHub汇总Issue
+                   ↓ 有正式证据与可信源码配置
+     Codex修复 → 程序独立A/B验收 → 草稿PR → 两日观察</pre>
+<p>诊断模式只生成报告与Issue，不跳过正式验收而自动改线上代码。源码修复沿用独立 ResearchWorker；手工修复版本也可通过同组复测追踪问题。</p></section>
+<section><h2>节点执行手段</h2><div class="tablewrap"><table><thead><tr><th>节点 / 执行者</th><th>做什么</th><th>保存什么</th></tr></thead><tbody>
+<tr><td>评测 / 程序与Roami Agent</td><td>冻结Case/hash和预算，隔离运行；逐项独立判定</td><td>Case结果、用量、工具/角色日志、产物、镜像指纹</td></tr>
+<tr><td>复盘 / Codex</td><td>逐项检查指标和行为，区分事实与根因假设</td><td>review.md、调用计量与原始回执</td></tr>
+<tr><td>Issue / Codex与程序</td><td>Codex排序已确认问题；程序生成脱敏清单并自动发布</td><td>issue-plan.json、issue.md、GitHub回执</td></tr>
+<tr><td>修复 / Codex</td><td>在可信源码范围内、独立worktree产生候选</td><td>源码差异、候选hash、修改说明</td></tr>
+<tr><td>验收 / 独立程序</td><td>回归与正式冻结Case配对；缺分和未知用量不能晋级</td><td>验证报告、A/B指标与证据hash</td></tr>
+<tr><td>发布 / 程序</td><td>质量门禁通过后创建草稿PR，不自动合入用户版本</td><td>提交hash、PR与检查回执</td></tr>
+<tr><td>观察 / 程序</td><td>两个后续完整合格日，回归则撤回评测候选</td><td>按日证据、关闭或回滚回执</td></tr>
+</tbody></table></div></section>
+<section><h2>工程实现</h2><pre>SettingsPage / AgentImprovement / PipelineRuns
+                  ↓ 登录与owner鉴权
+Go /api/agent/improvement/pipeline/* → Python私有HTTP
+                  ↓
+ImprovementControl + EvaluationWorker（共用单执行队列）
+RunRecords（SQLite）+ PipelineReportWorker（Codex / GitHub）
+ResearchWorker（正式复盘 / Codex修复 / 验证 / 发布 / 观察）
+                  ↓
+data_root/agents/improvement/
+  ledger.sqlite3                   Run / Attempt / Case / Issue / Observation / Effect
+  pipeline-artifacts/owner-hash/run-id/stage/  不可变文件 + SHA256
+  pipeline-artifacts/owner-hash/run-id/case-hash/  私有运行原始记录</pre>
+<p>Run与7个节点先同事务落库，再开始模型调用。配置CAS保存，运行冻结快照。每个Run、节点、文件均按owner查验；文件限制大小、边界与hash，只作为文本预览，不执行HTML。GitHub稳定标记按owner+Run生成；POST结果未知时先查远端，禁止盲重提。付费用量未知也不自动重放。取消排队立即结束，取消运行只停该Run拥有的资源，保留已产生证据。</p>
+<pre>GET  /api/agent/improvement                         配置、运行列表、本地问题
+PUT  /api/agent/improvement/pipeline/settings        CAS配置诊断预算与自动发布
+POST /api/agent/improvement/pipeline/requests        诊断 / 同组复测，幂等key
+GET  /api/agent/improvement/pipeline/runs/{id}       该次节点、Case、问题、文件索引
+GET  /api/agent/improvement/pipeline/runs/{id}/artifacts/{id}
+POST /api/agent/improvement/pipeline/runs/{id}/resume   仅恢复已对账的报告节点
+POST /api/agent/improvement/pipeline/runs/{id}/publish  明确发布或对账</pre></section>
+<section><h2>如何确认修好</h2><div class="tablewrap"><table><thead><tr><th>本次状态</th><th>程序依据</th></tr></thead><tbody>
+<tr><td>仍存在</td><td>同Case再次观测到相同错误码或失败检查</td></tr>
+<tr><td>本次未复现</td><td>相同Case合同通过，评分非待定、用量已知；仍不自动关闭Issue</td></tr>
+<tr><td>未验证 / 未覆盖</td><td>失败、阻塞、待评分、未知用量 / 本次没有运行该Case</td></tr>
+<tr><td>不可比较</td><td>Case合同hash变化；不借改题获得“修复”</td></tr>
+</tbody></table></div><p>页面分别显示真实任务与零模型机制回归。失败耗时不当成速度提升，未知Token不记0；提高输出上限等配置变化写入快照，不能据此宣称Token节省。</p></section>
+<section><h2>本机验收与边界</h2><p>已将历史10项导入正式Run存储并自动发布 <a href="https://github.com/ybz21/Roami/issues/445">Issue #445</a>。本轮修复工作区委派与执行器来源误传，使用相同10项复测并逐问题记录。本轮默认诊断：生成30万、Codex每角色6.4万、输出8192、记忆2048；本机复测明确配置生成50万，与旧2048/512输出快照分别保存。</p><p>正式库存仍为60项。7项复杂产物尚缺真实校准评分，正式每日自动调度保持关闭，不能把诊断或机制通过当作完整60项验收。本文描述已实现的运行页面和报告发布；正式自动修复晋级仍服从原验收与观察门禁。</p><p><a href="light-run-20261024.html">前一轮10项原始验收记录</a> · <a href="automation-roles.html">正式自动修复职责</a></p></section>
+</article></main></body></html>

@@ -222,6 +222,26 @@ class ImprovementControl:
                 "INSERT OR IGNORE INTO rsi_requests VALUES(?,?,?,?, 'queued',?,?,NULL,NULL,NULL,?)",
                 (request_id, owner, machine_id, kind, now_ms(), now_ms(), json.dumps(payload)),
             )
+            from roami_agent.improvement.run_records import DEFAULTS as PIPELINE_DEFAULTS
+            from roami_agent.improvement.run_records import RunRecords
+            from roami_agent.improvement.workflow import DEFAULTS as RESEARCH_DEFAULTS
+
+            pipeline = db.execute(
+                "SELECT value_json FROM rsi_pipeline_settings WHERE owner=?", (owner,)
+            ).fetchone()
+            research = db.execute(
+                "SELECT config_json FROM rsi_research_settings WHERE owner=?", (owner,)
+            ).fetchone()
+            snapshot = {
+                "pipeline": {**PIPELINE_DEFAULTS, **(json.loads(pipeline[0]) if pipeline else {})},
+                "research": {**RESEARCH_DEFAULTS, **(json.loads(research[0]) if research else {})},
+                "preferences": prefs,
+                "machine_id": machine_id,
+                "suite_hash": suite["content_hash"],
+                "case_ids": [],
+                "formal_daily": False,
+            }
+            RunRecords.create_tx(db, owner, request_id, request_id, kind, snapshot)
         return {"id": request_id, "state": "queued"}
 
     def schedule(self):
@@ -337,4 +357,13 @@ class ImprovementControl:
                 "UPDATE rsi_requests SET state=?,updated_ms=? WHERE owner=? AND id=?",
                 (state, now_ms(), owner, request_id),
             )
+            if state == "interrupted":
+                db.execute(
+                    "UPDATE rsi_pipeline_runs SET state='cancelled',updated_ms=? WHERE owner=? AND id=? AND state='queued'",
+                    (now_ms(), owner, request_id),
+                )
+                db.execute(
+                    "UPDATE rsi_pipeline_nodes SET state='skipped',error_code='RSI_CANCELLED',finished_ms=? WHERE run_id IN (SELECT id FROM rsi_pipeline_runs WHERE id=? AND owner=? AND state='cancelled') AND state='pending'",
+                    (now_ms(), request_id, owner),
+                )
             return {"id": request_id, "state": state}

@@ -57,6 +57,9 @@ async def test_release_has_no_rsi_routes_workers_policy_binding_or_ledger_writes
             assert status.json()["data"]["developmentRsi"] is False
             for method, path in [
                 ("GET", "/v1/improvement"),
+                ("GET", "/v1/improvement/pipeline/runs/fake"),
+                ("POST", "/v1/improvement/pipeline/requests"),
+                ("PUT", "/v1/improvement/pipeline/settings"),
                 ("POST", "/v1/improvement/requests"),
                 ("PUT", "/v1/improvement/preferences"),
                 ("POST", "/v1/improvement/research/fake/resume"),

@@ -5,10 +5,10 @@ import AgentImprovement from './AgentImprovement'
 import zhCN from '../../i18n/locales/zh-CN'
 import { api } from '../../api'
 
-const state = vi.hoisted(() => ({ overview: null as any, refresh: vi.fn() }))
+const state = vi.hoisted(() => ({ overview: null as any, refresh: vi.fn(), detail: null as any }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
-vi.mock('./useAgentData', () => ({ useAgentData: () => ({ value: state.overview, loading: false, failed: false, refresh: state.refresh }) }))
+vi.mock('./useAgentData', () => ({ useAgentData: (path: string) => ({ value: path.includes('/pipeline/runs/') ? state.detail : state.overview, loading: false, failed: false, refresh: state.refresh }) }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ locale: 'zh-CN', t: (key: string, vars: Record<string, string | number> = {}) => ((zhCN as Record<string, string>)[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(vars[name])) }) }))
 vi.mock('antd', () => ({
   Button: ({ children, onClick, disabled }: any) => <button type="button" onClick={onClick} disabled={disabled}>{children}</button>,
@@ -148,4 +148,12 @@ it('stops enqueueing remaining machines when the experiment page is unmounted', 
   finish({ data: {} })
   await new Promise(resolve => setTimeout(resolve, 0))
   expect(api).toHaveBeenCalledTimes(1)
+})
+
+it('opens a run deep link on first mount without resetting to workflow', async () => {
+  state.overview = { ...overview(), pipeline: { settings: { revision: 0, auto_publish: false, daily_tokens: 1000000, generation_tokens: 300000, codex_tokens: 64000, output_tokens: 8192, memory_output_tokens: 2048 }, runs: [], issues: [] } }
+  state.detail = { id: 'saved-run', mode: 'diagnostic', state: 'completed', created_ms: 1, updated_ms: 1, summary: {}, issue: null, snapshot: { case_ids: [] }, nodes: [], cases: [], artifacts: [], issues: [] }
+  render(<AgentImprovement node={null} workflow runId="saved-run" />)
+  expect(await screen.findByRole('button', { name: '复测同组 Case' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '诊断 10 项' })).toBeNull()
 })

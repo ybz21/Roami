@@ -71,6 +71,7 @@ class ContainerExecutor:
         source_root=None,
         regression_root=None,
         artifact_reviewer=None,
+        output_caps=None,
     ):
         self.settings, self.image = settings, image
         self.artifact_reviewer = artifact_reviewer
@@ -91,6 +92,16 @@ class ContainerExecutor:
         self.provider_factory = provider_factory
         self.source_root = Path(source_root).resolve() if source_root is not None else None
         self.regression_root = regression_root
+        self.output_caps = output_caps or {}
+        require(
+            all(
+                k in {"main", "worker", "memory"} and type(v) is int and 512 <= v <= 16384
+                for k, v in self.output_caps.items()
+            ),
+            "RSI_POLICY_OUT_OF_RANGE",
+        )
+        if self.output_caps:
+            self.model_hash = digest([self.model_hash, self.output_caps])
 
     def source_mounts(self):
         if self.source_root is None:
@@ -300,7 +311,7 @@ class ContainerExecutor:
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))
         view["prompt"] += (
-            "\n本任务在无网络的独立容器中执行，工作目录为/workspace。需要委派时明确使用native Worker，target={kind:new_session,directory:/workspace}；不连接专业CLI、其他节点或现用会话。小型文件操作仍可直接完成。最终产物由容器外独立判定器在模型退出后验收，内部任务等待验收不代表最终得分。"
+            "\n本任务在无网络的独立容器中执行，文件位于/workspace。Main没有可直接执行shell的工作区上下文，不要尝试或重试Main的bash。涉及代码、脚本或批处理时直接委派默认Worker，target={kind:new_session,directory:/workspace}。环境使用native是执行器元信息，不是用户明确指定执行器：routing.explicitExecutor=null，不填写userQuote。不要连接专业CLI、其他节点或现用会话。文件读取和小型写入可直接完成。最终产物由容器外独立判定器验收，内部任务等待验收不代表最终得分。"
         )
         view["followups"] = case.get("followups", [])
         private_json(state / "request.json", {"case": view, "policy": policy})
@@ -311,7 +322,7 @@ class ContainerExecutor:
         for role in ("main", "worker", "memory"):
             actual = "main" if role == "main" else "worker"
             route = self.settings.route(actual)
-            cap = min(4096, route.parameters.get("max_tokens", 4096))
+            cap = self.output_caps.get(role, min(4096, route.parameters.get("max_tokens", 4096)))
             route = replace(route, max_retries=0, parameters=dict(route.parameters, max_tokens=cap))
             settings = settings_with_route(self.settings, actual, route)
             provider = (

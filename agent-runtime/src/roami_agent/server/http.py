@@ -241,6 +241,69 @@ def create_app(runtime, *, manage_lifecycle=True):
         async def improvement_overview(owner: Owner):
             return {"data": await runtime.improvement.overview(owner)}
 
+        @app.put("/v1/improvement/pipeline/settings")
+        async def pipeline_settings(request: Request, owner: Owner):
+            from roami_agent.improvement.github_publication import publication_profile
+
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if (
+                payload.get("auto_publish")
+                and publication_profile(runtime.improvement.ledger.path.parent, owner) is None
+            ):
+                raise DomainError("RSI_PUBLICATION_SETUP_REQUIRED")
+            return {
+                "data": await asyncio.to_thread(runtime.improvement.runs.configure, owner, payload)
+            }
+
+        @app.post("/v1/improvement/pipeline/requests")
+        async def pipeline_request(request: Request, owner: Owner):
+            from roami_agent.improvement.pipeline_runner import enqueue_diagnostic
+
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                enqueue_diagnostic, runtime.improvement, owner, await improvement_payload(request)
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}")
+        async def pipeline_run(run_id: str, owner: Owner):
+            return {"data": await asyncio.to_thread(runtime.improvement.runs.get, owner, run_id)}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}/artifacts/{artifact_id}")
+        async def pipeline_artifact(run_id: str, artifact_id: str, owner: Owner):
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.runs.read_artifact, owner, run_id, artifact_id
+                )
+            }
+
+        @app.post("/v1/improvement/pipeline/runs/{run_id}/resume")
+        async def pipeline_resume(run_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            return {"data": await asyncio.to_thread(runtime.improvement.runs.resume, owner, run_id)}
+
+        @app.post("/v1/improvement/pipeline/runs/{run_id}/publish")
+        async def pipeline_publish(run_id: str, owner: Owner):
+            from roami_agent.improvement.pipeline_reports import publish_run_issue
+
+            ModelSettings.owner(owner)
+            records = runtime.improvement.runs
+            value = await asyncio.to_thread(records.get, owner, run_id)
+            plan = next((a for a in value["artifacts"] if a["name"] == "issue-plan.json"), None)
+            if plan is None or not any(a["name"] == "review.md" for a in value["artifacts"]):
+                raise DomainError("RSI_REVIEW_REPORT_UNAVAILABLE")
+            body = await asyncio.to_thread(records.read_artifact, owner, run_id, plan["id"])
+            receipt = await publish_run_issue(records, owner, run_id, json.loads(body["text"]))
+            records.node(owner, run_id, "issue", "succeeded")
+            if value["mode"] in {"diagnostic", "imported"} and value["state"] in {
+                "completed",
+                "blocked",
+            }:
+                records.set_state(owner, run_id, "completed")
+            return {"data": receipt}
+
         @app.get("/v1/improvement/research")
         async def improvement_research(owner: Owner):
             return {"data": await asyncio.to_thread(runtime.improvement.research.snapshot, owner)}

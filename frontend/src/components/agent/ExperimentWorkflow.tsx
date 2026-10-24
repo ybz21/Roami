@@ -5,27 +5,30 @@ export const EXPERIMENT_STAGES = ['evaluate', 'review', 'issue', 'repair', 'veri
 export type ExperimentStage = typeof EXPERIMENT_STAGES[number]
 export type ExperimentView = 'workflow' | 'runs' | 'issues'
 
-export default function ExperimentWorkflow({ stage, view, onStage, onView, states }: {
+export default function ExperimentWorkflow({ stage, view, onStage, onView, states, tabs = true, caption, stateLabel }: {
   stage: ExperimentStage
   view: ExperimentView
   onStage: (value: ExperimentStage) => void
   onView: (value: ExperimentView) => void
   states: Partial<Record<ExperimentStage, string>>
+  tabs?: boolean
+  caption?: string
+  stateLabel?: (state: string) => string
 }) {
   const { t } = useI18n()
   return <>
-    <div className="agent-experiment-tabs" aria-label={t('agent.experiment.title')}>
+    {tabs && <div className="agent-experiment-tabs" aria-label={t('agent.experiment.title')}>
       {(['workflow', 'runs', 'issues'] as const).map(value => <button type="button" className="tt-act" key={value} aria-pressed={view === value} onClick={() => onView(value)}>{t('agent.experiment.' + value)}</button>)}
-    </div>
+    </div>}
     {view === 'workflow' && <>
-      <div className="agent-experiment-caption"><strong>{t('agent.experiment.pipeline')}</strong><span>{t('agent.experiment.daily')}</span></div>
+      <div className="agent-experiment-caption"><strong>{t('agent.experiment.pipeline')}</strong><span>{caption || t('agent.experiment.daily')}</span></div>
       <ol className="agent-experiment-flow" aria-label={t('agent.experiment.pipeline')}>
         {EXPERIMENT_STAGES.map((value, index) => <li key={value}>
           <button type="button" className="agent-experiment-node" aria-pressed={stage === value} onClick={() => onStage(value)}>
             <span className="agent-experiment-step">{index + 1}</span>
             <strong>{t('agent.experiment.stage.' + value)}</strong>
             <span>{t('agent.experiment.actor.' + value)}</span>
-            <small data-state={states[value] || 'idle'}>{t(states[value] ? 'agent.rsi.state.' + states[value] : 'agent.experiment.idle')}</small>
+            <small data-state={states[value] || 'idle'}>{stateLabel ? stateLabel(states[value] || 'pending') : t(states[value] ? 'agent.rsi.state.' + states[value] : 'agent.experiment.idle')}</small>
           </button>
         </li>)}
       </ol>

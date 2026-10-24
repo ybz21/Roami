@@ -5,6 +5,7 @@ import { useI18n } from '../../i18n'
 import { useAgentData } from './useAgentData'
 import Markdown from '../markdown/Markdown'
 import './agent-improvement.css'
+import PipelineRuns, { type PipelineOverview } from './PipelineRuns'
 import ExperimentWorkflow, { type ExperimentStage, type ExperimentView } from './ExperimentWorkflow'
 
 type Preferences = { revision: number; enabled: boolean; timezone: string; hour: number; daily_tokens: number; daily_episodes: number; cases_per_day: number; suite_id: string; machine_ids: string[]; auto_candidates: boolean; candidate_policy: Record<string, number> }
@@ -14,12 +15,13 @@ type Request = { id: string; machine_id: string; state: string; error_code: stri
 type ResearchSettings = { revision: number; enabled: boolean; model_tokens: number; model_seconds: number; max_attempts: number; observation_days: number }
 type Preview = { cases: number; machines: number; episodes: number; reservation_tokens: number | null; next_run: string | null; blockers: string[]; codex_tokens_per_operation: number }
 type Research = { reports?: { cycle_id: string; day: string; points: number; issueUrl: string | null }[]; review_coverage?: { cycle_id: string; reviewed: number }[]; model_cost?: { total_tokens: number | null }; settings: ResearchSettings; actions: { id: string; kind: string; state: string; error_code: string | null }[]; improvements: { id: string; title: string; state: string; reviewUrl?: string | null }[] }
-type Overview = { research?: Research; preferences: Preferences; catalog: { machines: { id: string; label: string; mode: string }[]; suites: { id: string; count: number; splits: Record<string, number> }[] }; cycles: Cycle[]; requests: Request[]; releases: { seq: number; active: string | null; history: { seq: number; release_id: string | null; action: string; created_ms: number }[] } }
+type Overview = { pipeline?: PipelineOverview; research?: Research; preferences: Preferences; catalog: { machines: { id: string; label: string; mode: string }[]; suites: { id: string; count: number; splits: Record<string, number> }[] }; cycles: Cycle[]; requests: Request[]; releases: { seq: number; active: string | null; history: { seq: number; release_id: string | null; action: string; created_ms: number }[] } }
 
-export default function AgentImprovement({ node, workflow = false }: { node: string | null; workflow?: boolean }) {
+export default function AgentImprovement({ node, workflow = false, runId = '', onRun }: { node: string | null; workflow?: boolean; runId?: string; onRun?: (id: string) => void }) {
   const { t, locale } = useI18n()
   const [stage, setStage] = useState<ExperimentStage>('evaluate')
-  const [view, setView] = useState<ExperimentView>('workflow')
+  const [view, setView] = useState<ExperimentView>(runId ? 'runs' : 'workflow')
+  useEffect(() => { if (runId) setView('runs') }, [runId])
   const [researchDraft, setResearchDraft] = useState<ResearchSettings | null>(null)
   const [researchDirty, setResearchDirty] = useState(false)
   const [preview, setPreview] = useState<Preview | null>(null)
@@ -32,10 +34,11 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
   const pendingRun = useRef(''), running = useRef(false), mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const scope = useRef(node); scope.current = node
-  useEffect(() => { setDraft(null); setDirty(false); setSelected([]); setDetail(''); setError(''); setDocuments({}); setResearchDraft(null); setResearchDirty(false); setPreview(null); setStage('evaluate'); setView('workflow'); pendingRun.current = '' }, [node])
+  useEffect(() => { setDraft(null); setDirty(false); setSelected([]); setDetail(''); setError(''); setDocuments({}); setResearchDraft(null); setResearchDirty(false); setPreview(null); setStage('evaluate'); setView(runId ? 'runs' : 'workflow'); pendingRun.current = '' }, [node])
   useEffect(() => { if (data.value && !dirty) setDraft({ ...data.value.preferences, cases_per_day: 60 }) }, [data.value, dirty])
   useEffect(() => {
-    const active = data.value?.requests.some(r => ['queued', 'running', 'cancelling'].includes(r.state)) || data.value?.research?.actions.some(a => ['queued', 'running'].includes(a.state))
+    const pipelineActive = data.value?.pipeline?.runs.some(r => ['running', 'queued', 'reviewing', 'report_queued'].includes(r.state))
+    const active = pipelineActive || data.value?.requests.some(r => ['queued', 'running', 'cancelling'].includes(r.state)) || data.value?.research?.actions.some(a => ['queued', 'running'].includes(a.state))
     setPoll(active ? 2000 : (data.value?.preferences.enabled || data.value?.research?.settings.enabled) ? 30000 : 0)
   }, [data.value])
   useEffect(() => { if (data.value?.research && !researchDirty) setResearchDraft(data.value.research.settings) }, [data.value, researchDirty])
@@ -93,19 +96,14 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
   const selectedCycle = value.cycles.find(c => c.id === detail)
   const errorText = error ? t('agent.rsi.error.' + error, {}) : ''
   const changeResearch = (patch: Partial<ResearchSettings>) => { setPreview(null); setResearchDirty(true); setResearchDraft(current => current && ({ ...current, ...patch })) }
-  const stageStates: Partial<Record<ExperimentStage, string>> = {}
-  for (const action of value.research?.actions || []) {
-    const actionStage = ({ sync_issue: 'issue', activate: 'observe' } as Record<string, string>)[action.kind] || action.kind
-    if (!stageStates[actionStage as ExperimentStage]) stageStates[actionStage as ExperimentStage] = action.state
-  }
-  if (value.requests.length) stageStates.evaluate = value.requests[0].state
   const showWorkflow = !workflow || view === 'workflow'
   const showRuns = !workflow || view === 'runs'
   const showIssues = !workflow || view === 'issues'
-  const actions = value.research?.actions.filter(action => (stage === 'observe' ? action.kind === 'activate' : stage === 'issue' ? ['issue', 'sync_issue'].includes(action.kind) : action.kind === stage)) || []
+  const actions = (workflow && value.pipeline ? [] : value.research?.actions)?.filter(action => (stage === 'observe' ? action.kind === 'activate' : stage === 'issue' ? ['issue', 'sync_issue'].includes(action.kind) : action.kind === stage)) || []
   return <div className="agent-rsi">
     {workflow && (dirty || researchDirty) && <p role="status" className="agent-rsi-muted">{t('agent.experiment.unsaved')}</p>}
-    {workflow && <ExperimentWorkflow stage={stage} view={view} onStage={setStage} onView={setView} states={stageStates} />}
+    {workflow && <ExperimentWorkflow stage={stage} view={view} onStage={setStage} onView={setView} states={{}} />}
+    {workflow && <PipelineRuns data={value.pipeline} view={view} node={node} runId={runId} onRun={id => { setView('runs'); if (onRun) onRun(id); else location.hash = '#/settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : '') }} refresh={data.refresh} eligible={!!draft.suite_id && !!draft.machine_ids.length} />}
     {workflow && showWorkflow && stage !== 'evaluate' && <section className="agent-rsi-section agent-experiment-config">
       <h3>{t('agent.experiment.stage.' + stage)}</h3>
       <p className="agent-rsi-muted">{t('agent.experiment.hint.' + stage)}</p>
@@ -123,7 +121,7 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
       {!actions.length && <p className="agent-rsi-muted">{t('agent.experiment.idle')}</p>}
       {actions.map(action => <div className="agent-rsi-row" key={action.id}><span>{state(action.state)}{action.error_code && <small>{t('agent.rsi.failureCode', { code: action.error_code })}</small>}</span>{['blocked', 'waiting_budget'].includes(action.state) && <Button disabled={!!busy} onClick={() => void mutate('resume', '/research/' + action.id + '/resume')}>{t('agent.rsi.retry')}</Button>}</div>)}
     </section>}
-    {(!workflow || showRuns) && <>
+    {(!workflow || (showRuns && !value.pipeline)) && <>
     <div className="agent-rsi-summary" aria-label={t('agent.rsi.results')}>
       <div><span>{t('agent.rsi.quality')}</span><strong>{latest ? number(latest.quality_delta) : t('agent.rsi.unknown')}</strong></div>
       <div><span>{t('agent.rsi.elapsed')}</span><strong>{ratio(latest?.paired_elapsed_ratio_p50)}</strong></div>
@@ -158,7 +156,7 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
       <p className="agent-rsi-muted">{t('agent.experiment.previewHint')}</p>
       {!!preview.blockers.length && <ul>{preview.blockers.map(code => <li key={code}>{t('agent.rsi.error.' + code).startsWith('agent.rsi.error.') ? t('agent.rsi.operationFailed', { code }) : t('agent.rsi.error.' + code)}</li>)}</ul>}
     </section>}
-    {showRuns && !!value.requests.length && <section className="agent-rsi-section"><h3>{t('agent.rsi.execution')}</h3>{value.requests.map(request => <div className="agent-rsi-row" key={request.id}><span>{value.catalog.machines.find(m => m.id === request.machine_id)?.label || request.machine_id}<small>{state(request.state)}{request.error_code && t('agent.rsi.failureCode', { code: request.error_code })}</small></span>{['queued', 'running'].includes(request.state) && <button type="button" className="tt-act" disabled={!!busy} onClick={() => mutate('cancel', '/requests/' + request.id + '/cancel')}>{t('agent.rsi.cancel')}</button>}</div>)}</section>}
+    {showRuns && !value.pipeline && !!value.requests.length && <section className="agent-rsi-section"><h3>{t('agent.rsi.execution')}</h3>{value.requests.map(request => <div className="agent-rsi-row" key={request.id}><span>{value.catalog.machines.find(m => m.id === request.machine_id)?.label || request.machine_id}<small>{state(request.state)}{request.error_code && t('agent.rsi.failureCode', { code: request.error_code })}</small></span>{['queued', 'running'].includes(request.state) && <button type="button" className="tt-act" disabled={!!busy} onClick={() => mutate('cancel', '/requests/' + request.id + '/cancel')}>{t('agent.rsi.cancel')}</button>}</div>)}</section>}
     {showIssues && value.research && (workflow || value.research.settings.enabled || !!value.research.improvements.length || !!value.research.reports?.length) && <section className="agent-rsi-section">
       <h3>{t('agent.rsi.research')}</h3>
       {value.research.reports?.map(report => <div key={report.cycle_id}>
@@ -169,7 +167,7 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
       {value.research.improvements.map(item => <div className="agent-rsi-row" key={item.id}><span>{item.title}<small>{state(item.state)}</small></span>{item.reviewUrl?.startsWith('https://github.com/') && <a className="tt-act" href={item.reviewUrl} target="_blank" rel="noopener noreferrer">{t('agent.rsi.reviewPullRequest')}</a>}</div>)}
       <details><summary>{t('agent.rsi.researchSteps')}</summary>{value.research.model_cost && <p className="agent-rsi-muted">{t('agent.rsi.researchTokens', { count: value.research.model_cost.total_tokens == null ? t('agent.rsi.unknown') : number(value.research.model_cost.total_tokens) })}</p>}{value.research.actions.map(action => <div className="agent-rsi-row" key={action.id}><span>{t('agent.rsi.stage.' + action.kind)}<small>{state(action.state)}{action.error_code && t('agent.rsi.failureCode', { code: action.error_code })}</small></span>{['blocked', 'waiting_budget'].includes(action.state) && <button type="button" className="tt-act" disabled={!!busy} onClick={() => mutate('resume', '/research/' + action.id + '/resume')}>{t('agent.rsi.retry')}</button>}</div>)}</details>
     </section>}
-    {showRuns && <section className="agent-rsi-section">
+    {showRuns && !value.pipeline && <section className="agent-rsi-section">
       <div className="agent-rsi-heading"><h3>{t('agent.rsi.cycles')}</h3>{!!selected.length && <Button disabled={!!busy || chosen.some(c => c.state !== 'completed')} onClick={() => mutate('release', '/releases', { cycle_ids: selected, expected_seq: value.releases.seq, request_key: key() })}>{t('agent.rsi.publish')}</Button>}</div>
       {!value.cycles.length && <p className="agent-rsi-muted">{t('agent.rsi.empty')}</p>}
       {value.cycles.map(cycle => <div className="agent-rsi-row" key={cycle.id}>
@@ -182,6 +180,6 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
         {selectedCycle.report?.comparison ? <><dl>{Object.entries(selectedCycle.report.counts || {}).map(([arm, counts]) => <div key={arm}><dt>{t('agent.rsi.arm.' + arm)}</dt><dd>{t('agent.rsi.passCount', { passed: number(counts.passed), total: number(counts.executed), deliveries: number(counts.verified_deliveries) })}</dd></div>)}</dl><p>{selectedCycle.report.comparison.eligible_for_promotion ? t('agent.rsi.eligible') : t('agent.rsi.ineligible')}</p><ul>{selectedCycle.report.comparison.reasons.map(reason => <li key={reason}>{t('agent.rsi.reason.' + reason)}</li>)}</ul><details><summary>{t('agent.rsi.evidence')}</summary><code>{selectedCycle.id}</code><ul>{selectedCycle.report.comparison.release_blockers.map((reason, i) => <li key={i}>{reason}</li>)}</ul></details></> : <p>{t('agent.rsi.noResult')}</p>}
       </div>}
     </section>}
-    {showRuns && <section className="agent-rsi-section"><div className="agent-rsi-heading"><h3>{t('agent.rsi.releases')}</h3>{value.releases.active && <Button disabled={!!busy} onClick={() => mutate('rollback', '/rollback', { expected_seq: value.releases.seq, request_key: key() })}>{t('agent.rsi.rollback')}</Button>}</div><p className="agent-rsi-muted">{value.releases.active ? t('agent.rsi.activeHint') : t('agent.rsi.baselineHint')}</p>{value.releases.history.map(release => <div className="agent-rsi-row" key={release.seq}><span>{t('agent.rsi.action.' + release.action)}<small>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(release.created_ms))}</small></span><code>{release.release_id?.slice(0, 12) || t('agent.rsi.baseline')}</code></div>)}</section>}
+    {showRuns && !value.pipeline && <section className="agent-rsi-section"><div className="agent-rsi-heading"><h3>{t('agent.rsi.releases')}</h3>{value.releases.active && <Button disabled={!!busy} onClick={() => mutate('rollback', '/rollback', { expected_seq: value.releases.seq, request_key: key() })}>{t('agent.rsi.rollback')}</Button>}</div><p className="agent-rsi-muted">{value.releases.active ? t('agent.rsi.activeHint') : t('agent.rsi.baselineHint')}</p>{value.releases.history.map(release => <div className="agent-rsi-row" key={release.seq}><span>{t('agent.rsi.action.' + release.action)}<small>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(release.created_ms))}</small></span><code>{release.release_id?.slice(0, 12) || t('agent.rsi.baseline')}</code></div>)}</section>}
   </div>
 }

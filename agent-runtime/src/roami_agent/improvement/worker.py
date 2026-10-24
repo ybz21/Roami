@@ -1,6 +1,7 @@
 """Independent evaluation slot; never enters Main's model or task queue."""
 
 import asyncio
+import json
 import logging
 import platform
 from datetime import datetime
@@ -77,7 +78,15 @@ class EvaluationWorker:
         from roami_agent.improvement.cycle import run_cycle
         from roami_agent.improvement.executors import ExternalExecutor, NativeFilesExecutor
 
+        if hasattr(self.service, "runs"):
+            await asyncio.to_thread(self.service.runs.begin_request, request)
         try:
+            if "diagnostic" in json.loads(request["payload_json"]):
+                from roami_agent.improvement.pipeline_runner import execute_diagnostic
+
+                await execute_diagnostic(self.runtime, self.service, request)
+                await asyncio.to_thread(self.service.control.finish, request, "completed")
+                return
             prefs, machine, source = await asyncio.to_thread(self.service.control.profiles, request)
             suite = load_suite(Path(source["path"]))
             require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
@@ -189,4 +198,9 @@ class EvaluationWorker:
                 else "RSI_ENVIRONMENT_UNAVAILABLE",
             )
         finally:
+            if hasattr(self.service, "runs"):
+                try:
+                    await asyncio.to_thread(self.service.runs.capture_request, request)
+                except (DomainError, OSError, ValueError, KeyError):
+                    log.exception("RSI run capture failed")
             self.service.wakeup.set()

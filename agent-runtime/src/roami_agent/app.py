@@ -354,6 +354,10 @@ class Runtime:
 
             self.improvement.research_worker = ResearchWorker(self, self.improvement)
             await self.improvement.research_worker.start()
+            from roami_agent.improvement.pipeline_reports import PipelineReportWorker
+
+            self.improvement.report_worker = PipelineReportWorker(self.improvement)
+            await self.improvement.report_worker.start()
 
     async def _monitor_native_sessions(self):
         while not self.stopping:
@@ -457,6 +461,8 @@ class Runtime:
 
     async def close(self):
         self.stopping = True
+        if self.improvement is not None and self.improvement.report_worker:
+            await self.improvement.report_worker.close()
         if self.improvement is not None and self.improvement.research_worker:
             await self.improvement.research_worker.close()
         if self.improvement is not None and self.improvement.worker:

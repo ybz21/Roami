@@ -113,6 +113,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const browserRestart = useRef<(() => Promise<void>) | null>(null)
   const registerBrowserRestart = useRef((run: (() => Promise<void>) | null) => { browserRestart.current = run }).current
   const nodeLabel = nodes.find((n) => n.id === nodeId)?.name || ''
+  const runId = sub?.startsWith('experiments/rsi/') ? sub.slice('experiments/rsi/'.length) : ''
   const model = useMemo(() => buildSettings({
     t, theme: mode, setTheme: setMode, locale, setLocale, prefs, setPrefs,
     setWorkspace: saveWorkspace, nodeLabel, isHub: false, onLogout,
@@ -122,10 +123,11 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
       await browserRestart.current()
     },
     onEnvPush: pushEnv,
-    developmentRsi: channel.value?.developmentRsi === true, nodeId,
-  }), [t, mode, locale, prefs, nodeLabel, onLogout, nodeId, channel.value?.developmentRsi])
+    developmentRsi: channel.value?.developmentRsi === true, nodeId, experimentRunId: runId,
+    onExperimentRun: id => { const route = 'settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : ''); if (onNav) onNav(route); else location.hash = '#/' + route },
+  }), [t, mode, locale, prefs, nodeLabel, onLogout, nodeId, channel.value?.developmentRsi, runId, onNav])
 
-  const routed = pageFromRoute(sub || '')
+  const routed = pageFromRoute(runId ? 'experiments/rsi' : sub || '')
   const current = model.pages[routed] ? routed : DEFAULT_PAGE
   const go = (id: string) => {
     setQ('')
@@ -246,7 +248,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           </div>
         )}
         {openSub && (
-          <MobileSubPage title={openSub.name} onBack={() => (onNav ? onNav('settings') : (location.hash = '#/settings'))} manageHistory={false} keepBottomNav>
+          <MobileSubPage title={openSub.name} onBack={() => { const route = runId ? 'settings/experiments/rsi' : 'settings'; if (onNav) onNav(route); else location.hash = '#/' + route }} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
               <PaneHead page={openSub} model={model} compact />
               {saveStatus}

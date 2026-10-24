@@ -91,6 +91,9 @@ class Ledger:
             from roami_agent.improvement.workflow import SCHEMA as RESEARCH_SCHEMA
 
             db.executescript(RESEARCH_SCHEMA)
+            from roami_agent.improvement.run_records import SCHEMA as PIPELINE_SCHEMA
+
+            db.executescript(PIPELINE_SCHEMA)
             db.execute("DELETE FROM rsi_schema WHERE version IN (1,2)")
             db.execute("INSERT OR IGNORE INTO rsi_schema VALUES (3)")
             yield db

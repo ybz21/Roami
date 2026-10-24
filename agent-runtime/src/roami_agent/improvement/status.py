@@ -6,6 +6,7 @@ import json
 from roami_agent.improvement.control import ImprovementControl
 from roami_agent.improvement.ledger import Ledger
 from roami_agent.improvement.releases import Releases
+from roami_agent.improvement.run_records import RunRecords
 from roami_agent.improvement.workflow import ResearchWorkflow
 
 
@@ -18,6 +19,8 @@ class ImprovementStatus:
         self.worker = None
         self.research = ResearchWorkflow(self.ledger)
         self.research_worker = None
+        self.runs = RunRecords(self.ledger)
+        self.report_worker = None
 
     async def overview(self, owner):
         def read():
@@ -28,6 +31,7 @@ class ImprovementStatus:
                 "requests": self.control.requests(owner),
                 "cycles": self.ledger.list(owner),
                 "research": self.research.snapshot(owner),
+                "pipeline": self.runs.view(owner),
             }
 
         return await asyncio.to_thread(read)
