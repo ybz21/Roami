@@ -823,7 +823,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <h3>产品设计</h3><p>复盘、Issue、修复固定三个Codex角色。完整复盘列全部待修点，全机完成后每天只发一个GitHub Issue，确认回执后按条目修复。独立验收后发回链草稿PR，两个后续完整周期观察通过才勾选，全部完成关Issue，退化回滚重开。普通安装版不运行。</p>
 <h3>用户故事</h3><p>按每日自动执行要求，每天03:00完整跑60项；人查看每日报告、Issue和PR，审阅合并，不逐日派任务。未确认预算与评分校准之前保持停用。</p>
 <h3>技术设计</h3><p>behavior_observer最多4项一批，保护题隔离；codex_roles使用只读无工具的原生CLI，记录thread ID、JSONL与用量。review_report和ResearchWorkflow持久保存全量文档与全机汇总；github_issues对账、发布确认并同步清单，source_revision只应用校验补丁。一次只观察一个源码候选，防止后续修复覆盖观察版本。CLI无供应商侧总Token硬截断保证，超额或未知调用阻止后续付费执行。</p>
-<p><a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；本轮quick/full通过（Python1138项），前端923项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；合并主线后quick/full通过（Python1232项），前端952项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
 </section>
 
 <section id="professional-agent-model-picker" lang="zh-CN">
