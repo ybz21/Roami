@@ -24,14 +24,14 @@ def authored_suite(seed):
             "category": spec["category"],
             "layer": "mechanism" if spec["kind"] == "mechanism_regression" else "authored_real",
             "split": "development",
-            "prompt": spec["prompt"],
+            "prompt": spec["prompt"] + "\n已知条件：" + spec["preconditions"],
             "counts_as_delivery": spec["counts_as_delivery"],
             "limits": limits[spec["limit_profile"]],
             "grading_profile": spec["grading_profile"],
             "cluster": "roami:" + spec["id"],
             "decision_domains": spec["decision_domains"],
             "files": {},
-            "origin": {"kind": "roami_authored", "recipe_revision": "authored-v5"},
+            "origin": {"kind": "roami_authored", "recipe_revision": "authored-v6"},
         }
         if case["layer"] == "mechanism":
             case.update(
@@ -50,7 +50,7 @@ def authored_suite(seed):
             case["prompt"] += data["prompt_suffix"]
         cases.append(case)
     return freeze_suite(
-        "roami-authored-40-v5",
+        "roami-authored-40-v6",
         cases,
         fixture_seed_hash=digest(seed),
         composition={"authored_real": 20, "mechanism_regression_variants": 20},
@@ -60,7 +60,7 @@ def authored_suite(seed):
 def prepare_corpus(service, owner):
     root = service.ledger.path.parent / "corpus"
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = root / "authored-40-v5.json"
+    path = root / "authored-40-v6.json"
     if not path.exists():
         private_json(path, authored_suite(secrets.token_hex(24)))
     summary = service.control.register_suite(owner, path)

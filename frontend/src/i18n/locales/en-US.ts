@@ -3840,6 +3840,10 @@ const enUS = {
   'agent.pipeline.publishIssue': "Publish GitHub issue",
   'agent.experiment.hint.evaluate': "Evaluate in isolation and save artifacts, scores and call records.",
 
+  'agent.pipeline.setting.memory_model': 'Memory model',
+  'agent.pipeline.setting.memory_reasoning_effort': 'Memory reasoning effort',
+  'agent.pipeline.workerDefault': 'Use Worker settings',
+  'agent.pipeline.artifactTokens': 'Artifact rating usage: {count} tokens',
 }
 
 export default enUS

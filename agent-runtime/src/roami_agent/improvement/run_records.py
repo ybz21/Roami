@@ -20,6 +20,8 @@ DEFAULTS = {
     "codex_tokens": 64000,
     "output_tokens": 8192,
     "memory_output_tokens": 2048,
+    "memory_model": None,
+    "memory_reasoning_effort": None,
 }
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rsi_pipeline_settings(owner TEXT PRIMARY KEY, value_json TEXT NOT NULL);
@@ -192,7 +194,26 @@ class RunRecords:
             return {**DEFAULTS, **(json.loads(row[0]) if row else {})}
 
     def configure(self, owner, value):
-        require(isinstance(value, dict) and set(value) == set(DEFAULTS), "RSI_INVALID_SETTINGS")
+        require(
+            isinstance(value, dict)
+            and set(DEFAULTS) - {"memory_model", "memory_reasoning_effort"}
+            <= set(value)
+            <= set(DEFAULTS),
+            "RSI_INVALID_SETTINGS",
+        )
+        value = {**DEFAULTS, **value}
+        require(
+            value["memory_model"] is None
+            or isinstance(value["memory_model"], str)
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}", value["memory_model"]),
+            "RSI_INVALID_SETTINGS",
+        )
+        from roami_agent.providers.reasoning_effort import EFFORTS
+
+        require(
+            value["memory_reasoning_effort"] is None or value["memory_reasoning_effort"] in EFFORTS,
+            "RSI_INVALID_SETTINGS",
+        )
         require(type(value["auto_publish"]) is bool)
         for key, lower, upper in (
             ("daily_tokens", 10000, 100000000),

@@ -341,3 +341,45 @@ async def test_old_mechanism_selection_is_rejected_before_container_execution(tm
     executor = SimpleNamespace(regression_root=Path(__file__).parent)
     with pytest.raises(DomainError, match="REGRESSION_PACK_CHANGED"):
         await run_mechanism(case, {}, tmp_path, executor)
+
+
+async def test_rater_output_budget_is_explicit_and_labels_are_advertised():
+    raw = profile()
+    raw["output_tokens"] = 4096
+    observed = []
+
+    def factory(settings, role):
+        observed.append(settings.route("main").parameters["max_tokens"])
+        return ProtocolFixtureModel([{"text": json.dumps(rating())}])
+
+    judge = ArtifactReviewer(Settings(), raw, provider_factory=factory, calibrated=False)
+    journal = []
+    await judge.rate(pack(), judge.budget(), journal)
+    assert observed == [4096, 4096]
+    sent = json.loads(journal[0]["messages"][-1]["content"][0]["text"])
+    assert set(sent["allowed_labels"]) == {"plan.md", "rendered page"}
+    changed = ArtifactReviewer(Settings(), profile(), calibrated=False)
+    assert changed.route_hashes != judge.route_hashes
+
+
+async def test_renderer_cannot_replace_the_agent_under_test(monkeypatch):
+    from types import SimpleNamespace
+
+    from roami_agent.improvement import containers
+
+    agent_image = "sha256:" + "a" * 64
+    renderer_image = "sha256:" + "b" * 64
+
+    async def docker(*args, **kwargs):
+        assert args[:2] == ("image", "inspect")
+        return json.dumps(
+            [{"Id": agent_image if args[2] == containers.IMAGE else renderer_image}]
+        ).encode()
+
+    monkeypatch.setattr(containers, "docker_command", docker)
+    reviewer = SimpleNamespace(profile={"renderer_image": renderer_image}, content_hash="reviewer")
+    executor = containers.ContainerExecutor(Settings(), artifact_reviewer=reviewer)
+    result = await executor.preflight()
+    assert executor.image == containers.IMAGE and executor.image_id == agent_image
+    assert executor.artifact_renderer.image_id == renderer_image
+    assert result["artifact_renderer_image_id"] == renderer_image

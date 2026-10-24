@@ -342,7 +342,13 @@ class MemoryJobs:
                     "MEMORY_FORGOTTEN",
                     "MEMORY_SOURCE_NOT_FOUND",
                     "MEMORY_EXTRACTION_INVALID_SOURCE",
+                    "MODEL_OUTPUT_LENGTH",
+                    "MODEL_OUTPUT_CONTENT_FILTER",
+                    "MODEL_IMAGES_UNSUPPORTED",
+                    "MEMORY_EXTRACTION_OUTPUT_LIMIT",
+                    "MEMORY_EXTRACTION_INVALID",
                 }
+                or isinstance(exc, (ValueError, ValidationError))
                 or job["attempts"] >= 3
             )
             await self.db.call(

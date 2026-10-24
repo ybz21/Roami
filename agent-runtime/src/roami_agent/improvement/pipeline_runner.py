@@ -3,6 +3,7 @@
 import asyncio
 import copy
 import json
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -27,7 +28,7 @@ LIGHT_CASES = (
 )
 
 
-def enqueue_diagnostic(service, owner, payload):
+def enqueue_diagnostic(service, owner, payload, settings=None):
     require(
         isinstance(payload, dict) and set(payload) <= {"request_key", "case_ids", "baseline_run"},
         "RSI_INVALID_REQUEST",
@@ -42,6 +43,23 @@ def enqueue_diagnostic(service, owner, payload):
         "RSI_INVALID_REQUEST",
     )
     records = service.runs
+    with service.ledger.connection() as db:
+        prior = db.execute(
+            "SELECT id FROM rsi_pipeline_runs WHERE owner=? AND request_key=?", (owner, key)
+        ).fetchone()
+        if prior:
+            return {"id": prior[0]}
+    from roami_agent.improvement.artifact_review import ArtifactReviewer, needs_artifact_review
+
+    reviewer = (
+        ArtifactReviewer.load(settings, service.ledger.path.parent, owner)
+        if settings is not None
+        else None
+    )
+    profile_path = (
+        service.ledger.path.parent / "artifact-review" / digest(owner)[:24] / "profile.json"
+    )
+    require(settings is not None or not profile_path.exists(), "RSI_ARTIFACT_SETTINGS_REQUIRED")
     config = records.settings(owner)
     prefs = service.control.preferences(owner)
     baseline = records.get(owner, payload["baseline_run"]) if payload.get("baseline_run") else None
@@ -56,6 +74,12 @@ def enqueue_diagnostic(service, owner, payload):
     require(prefs["suite_id"] and prefs["machine_ids"], "RSI_SETUP_REQUIRED")
     with service.ledger.connection() as db:
         db.execute("BEGIN IMMEDIATE")
+        require(
+            not db.execute(
+                "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND state='unknown'", (owner,)
+            ).fetchone(),
+            "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
+        )
         machine = db.execute(
             "SELECT profile_json FROM rsi_machines WHERE owner=? AND id=?",
             (owner, prefs["machine_ids"][0]),
@@ -74,7 +98,14 @@ def enqueue_diagnostic(service, owner, payload):
         if prior:
             return {"id": prior[0]}
         today = datetime.now(ZoneInfo(prefs["timezone"])).date().isoformat()
-        reserve = config["generation_tokens"] + config["codex_tokens"] * 2
+        suite = load_suite(Path(source["path"]))
+        require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
+        require(set(case_ids) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
+        artifact_count = sum(
+            needs_artifact_review(c) for c in suite["cases"] if c["id"] in case_ids
+        )
+        artifact_reservation = reviewer.profile["max_tokens"] * artifact_count if reviewer else 0
+        reserve = config["generation_tokens"] + config["codex_tokens"] * 2 + artifact_reservation
         db.execute(
             "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
             (owner, today, config["daily_tokens"], 10000),
@@ -92,7 +123,12 @@ def enqueue_diagnostic(service, owner, payload):
             "preferences": prefs,
             "machine": profile,
             "suite": dict(source),
-            "diagnostic": {"case_ids": case_ids, "config": config, "run_id": run_id},
+            "diagnostic": {
+                "case_ids": case_ids,
+                "config": config,
+                "run_id": run_id,
+                "artifact_review_hash": reviewer.content_hash if reviewer else None,
+            },
         }
         snapshot = {
             "case_ids": case_ids,
@@ -101,6 +137,10 @@ def enqueue_diagnostic(service, owner, payload):
             "pipeline": config,
             "baseline_run": baseline["id"] if baseline else None,
             "formal_daily": False,
+            "artifact_review": {
+                "hash": reviewer.content_hash if reviewer else None,
+                "reservation_tokens": artifact_reservation,
+            },
         }
         RunRecords.create_tx(db, owner, run_id, key, "diagnostic", snapshot)
         db.execute(
@@ -125,8 +165,17 @@ async def execute_diagnostic(runtime, service, request):
     require(suite["content_hash"] == payload["suite"]["content_hash"], "RSI_SUITE_HASH_MISMATCH")
     require(set(spec["case_ids"]) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
     settings = runtime.settings.current
+    from roami_agent.improvement.artifact_review import ArtifactReviewer
+
+    artifact_reviewer = ArtifactReviewer.load(settings, service.ledger.path.parent, owner)
+    require(
+        (artifact_reviewer.content_hash if artifact_reviewer else None)
+        == spec.get("artifact_review_hash"),
+        "RSI_ARTIFACT_PROFILE_CHANGED",
+    )
     budget = EpisodeBudget(
-        {"tokens": config["generation_tokens"], "seconds": 14400, "requests": 300}
+        {"tokens": config["generation_tokens"], "seconds": 14400, "requests": 300},
+        observation_id=run_id,
     )
     journal = []
 
@@ -142,8 +191,21 @@ async def execute_diagnostic(runtime, service, request):
             journal=journal,
         )
 
+    memory_route = (
+        replace(settings.route("worker"), name=config["memory_model"])
+        if config.get("memory_model")
+        else None
+    )
+    generation_overrides = (
+        {"memory": {"reasoning_effort": config["memory_reasoning_effort"]}}
+        if config.get("memory_reasoning_effort")
+        else {}
+    )
     executor = ContainerExecutor(
         settings,
+        memory_route=memory_route,
+        artifact_reviewer=artifact_reviewer,
+        generation_overrides=generation_overrides,
         provider_factory=provider,
         output_caps={
             "main": config["output_tokens"],
@@ -156,12 +218,13 @@ async def execute_diagnostic(runtime, service, request):
     policy = {k: getattr(settings, k) for k in BOUNDS}
     directory = records.directory(owner, run_id)
     outcomes = []
+    artifact_tokens = 0
     for case_id in spec["case_ids"]:
         original = next(c for c in suite["cases"] if c["id"] == case_id)
         case = copy.deepcopy(original)
         target = directory / ("case-" + digest(case_id)[:20])
         target.mkdir(mode=0o700)
-        if budget.unknown and case["judge"]["kind"] != "mechanism":
+        if (budget.unknown or artifact_tokens is None) and case["judge"]["kind"] != "mechanism":
             result = {
                 "grade": {"passed": False, "reason": "RSI_USAGE_UNKNOWN"},
                 "metrics": {"tokens": None, "token_coverage": "unknown"},
@@ -177,6 +240,12 @@ async def execute_diagnostic(runtime, service, request):
                     },
                     "metrics": {"tokens": None, "token_coverage": "unknown"},
                 }
+        review_tokens = result.get("metrics", {}).get("artifact_review_tokens", 0)
+        artifact_tokens = (
+            artifact_tokens + review_tokens
+            if artifact_tokens is not None and review_tokens is not None
+            else None
+        )
         summary = trial_summary(original, result, target)
         records.case(owner, run_id, summary)
         outcomes.append(summary)
@@ -210,8 +279,8 @@ async def execute_diagnostic(runtime, service, request):
         owner,
         run_id,
         "evaluate",
-        "blocked" if budget.unknown else "succeeded",
-        "RSI_USAGE_UNKNOWN" if budget.unknown else None,
+        "blocked" if budget.unknown or artifact_tokens is None else "succeeded",
+        "RSI_USAGE_UNKNOWN" if budget.unknown or artifact_tokens is None else None,
     )
     records.set_state(
         owner,
@@ -223,6 +292,7 @@ async def execute_diagnostic(runtime, service, request):
             "pending": sum(c["pending"] for c in outcomes),
             "generation_tokens": budget.metrics()["tokens"],
             "known_generation_tokens": budget.used,
+            "artifact_review_tokens": artifact_tokens,
             "provider_requests": len(budget.requests),
         },
     )
