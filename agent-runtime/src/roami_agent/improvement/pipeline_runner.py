@@ -47,6 +47,12 @@ def enqueue_diagnostic(service, owner, payload):
     baseline = records.get(owner, payload["baseline_run"]) if payload.get("baseline_run") else None
     if baseline:
         case_ids = baseline["snapshot"]["case_ids"]
+        require(
+            isinstance(case_ids, list)
+            and 1 <= len(case_ids) <= 60
+            and all(isinstance(c, str) and c for c in case_ids),
+            "RSI_CASES_UNAVAILABLE",
+        )
     require(prefs["suite_id"] and prefs["machine_ids"], "RSI_SETUP_REQUIRED")
     with service.ledger.connection() as db:
         db.execute("BEGIN IMMEDIATE")

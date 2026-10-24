@@ -84,6 +84,7 @@ def trial_summary(case, result, root=None):
     checks = {code(k): v for k, v in grade.get("checks", {}).items() if type(v) is bool}
     signals.update("check:" + k for k, v in checks.items() if not v)
     tools, roles, files = [], {}, []
+    execution_log_found = False
     if root:
         root = Path(root)
         for name in ("state/execution-log.json", "execution-log.json"):
@@ -91,6 +92,7 @@ def trial_summary(case, result, root=None):
             if not path.is_file():
                 continue
             data = json.loads(path.read_text())
+            execution_log_found = True
             for item in data.get("tool_calls", []):
                 error = None
                 if item.get("state") == "failed":
@@ -171,7 +173,7 @@ def trial_summary(case, result, root=None):
             for k in ("tokens", "token_coverage", "model_calls", "elapsed_ms", "model_ms")
         },
         "tools": tools,
-        "tool_calls": len(tools) if root else metrics.get("tool_calls"),
+        "tool_calls": len(tools) if execution_log_found else metrics.get("tool_calls"),
         "roles": roles,
         "files": files,
     }
@@ -592,6 +594,28 @@ class RunRecords:
             self.create_tx(db, owner, run_id, run_id, request["kind"], snapshot)
         self.node(owner, run_id, "evaluate", "running")
         self.set_state(owner, run_id, "running")
+
+    def freeze_cases(self, owner, run_id, suite):
+        with self.ledger.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT snapshot_json FROM rsi_pipeline_runs WHERE owner=? AND id=?",
+                (owner, run_id),
+            ).fetchone()
+            require(row is not None, "RSI_RUN_NOT_FOUND")
+            snapshot = json.loads(row[0])
+            require(snapshot["suite_hash"] == suite["content_hash"], "RSI_SUITE_HASH_MISMATCH")
+            ids = [c["id"] for c in suite["cases"]]
+            require(
+                not snapshot.get("case_ids") or snapshot["case_ids"] == ids, "RSI_CASES_CHANGED"
+            )
+            snapshot.update(
+                case_ids=ids, source_case_hashes={c["id"]: digest(c) for c in suite["cases"]}
+            )
+            db.execute(
+                "UPDATE rsi_pipeline_runs SET snapshot_json=? WHERE owner=? AND id=?",
+                (json.dumps(snapshot), owner, run_id),
+            )
 
     def queue_report(self, owner, run_id, summary, *, reserve=False):
         value = self.get(owner, run_id)

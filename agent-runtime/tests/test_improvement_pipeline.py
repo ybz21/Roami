@@ -195,3 +195,33 @@ async def test_pipeline_http_is_owner_scoped_and_publication_requires_target(sto
             json={**records.settings("local"), "auto_publish": True},
         )
         assert response.json()["error"]["code"] == "RSI_PUBLICATION_SETUP_REQUIRED"
+
+
+def test_formal_case_contract_survives_preflight_and_missing_logs_are_unknown(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    suite = {"content_hash": "frozen", "cases": [{"id": "a"}, {"id": "b"}]}
+    run_id = service.runs.create(
+        "local",
+        "formal",
+        "daily",
+        {"pipeline": service.runs.settings("local"), "suite_hash": "frozen", "case_ids": []},
+    )
+    service.runs.freeze_cases("local", run_id, suite)
+    assert service.runs.get("local", run_id)["snapshot"]["case_ids"] == ["a", "b"]
+    with pytest.raises(DomainError, match="CASES_CHANGED"):
+        service.runs.freeze_cases("local", run_id, {**suite, "cases": [{"id": "b"}]})
+    value = trial_summary(
+        {"id": "a"}, {"grade": {"passed": False}, "metrics": {"tokens": None}}, tmp_path / "missing"
+    )
+    assert value["tool_calls"] is None
+
+
+def test_empty_baseline_is_rejected_before_diagnostic_admission(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    run_id = service.runs.create(
+        "local", "old-empty", "daily", {"pipeline": service.runs.settings("local"), "case_ids": []}
+    )
+    with pytest.raises(DomainError, match="CASES_UNAVAILABLE"):
+        enqueue_diagnostic(service, "local", {"request_key": "bad", "baseline_run": run_id})
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0

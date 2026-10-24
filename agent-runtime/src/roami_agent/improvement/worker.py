@@ -90,6 +90,10 @@ class EvaluationWorker:
             prefs, machine, source = await asyncio.to_thread(self.service.control.profiles, request)
             suite = load_suite(Path(source["path"]))
             require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
+            if hasattr(self.service, "runs"):
+                await asyncio.to_thread(
+                    self.service.runs.freeze_cases, request["owner"], request["id"], suite
+                )
             if request["kind"] == "daily":
                 from roami_agent.improvement.daily_suite import daily_coverage
 
