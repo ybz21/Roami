@@ -3772,6 +3772,8 @@ const zhCN = {
   'agent.rsi.error.RSI_EPISODE_BUDGET': "执行次数预算不足，请为每台机器预留完整评测的次数。",
   'agent.rsi.error.RSI_SUITE_NOT_FOUND': "请选择已登记的完整评测集。",
   'agent.rsi.error.RSI_PUBLICATION_SETUP_REQUIRED': "请先在开发机配置 GitHub 发布目标。",
+  'agent.experiment.rsi': "RSI",
+
 }
 
 export default zhCN

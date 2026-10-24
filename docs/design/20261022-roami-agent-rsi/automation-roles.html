@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Roami RSI · Codex 复盘与修复</title><link rel="stylesheet" href="design.css"><link rel="stylesheet" href="rsi-overview.css"></head>
 <body><main><article class="rsi-overview">
-<nav aria-label="设计章节"><a href="#architecture">架构</a><a href="#roles">执行</a><a href="#closure">闭环</a><a href="index.html">详细方案</a></nav>
+<nav aria-label="设计章节"><a href="#architecture">架构</a><a href="#roles">执行</a><a href="workflow-engineering.html">Workflow工程设计</a><a href="#closure">闭环</a><a href="index.html">详细方案</a></nav>
 <header><h1>Roami Agent RSI</h1><p class="rsi-lead">自动测试，Codex 复盘、汇总 Issue、修复；人查看复盘、问题与 PR。</p><p class="rsi-status">仅开发版。每天 03:00（上海时间）完整跑 60 项；当前预算为 0、质量校准未齐，付费日程尚未开启。</p></header>
 <section id="architecture"><h2>架构</h2><figure><picture><source media="(max-width: 599px)" srcset="architecture-mobile.svg"><img src="architecture.svg" alt="控制器定时全量测试，Codex 复盘、汇总单个 Issue、隔离修复，程序独立验收和观察后回写 Issue。"></picture><figcaption>被测者是 Roami Agent；复盘、Issue、修复三个角色全部使用独立 Codex 上下文。</figcaption></figure></section>
 <section id="workflow"><h2>设置 / 实验：Workflow</h2>

@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "experiment_kind": "rsi",
+  "definition_revision": 1,
+  "scope": "development_only",
+  "default_nodes": [
+    {
+      "id": "evaluate",
+      "name": "评测",
+      "executor": "Roami Agent + 独立判定器",
+      "config": {
+        "mode": "daily",
+        "cases": 60,
+        "timezone": "Asia/Shanghai",
+        "hour": 3,
+        "schedule_enabled": false,
+        "daily_tokens": 0,
+        "episodes": 120,
+        "suite_id": null,
+        "machines": [],
+        "candidate_search": false
+      },
+      "output": "manifest.json、results.json、每Case产物、模型/工具日志、Token明细",
+      "ready": "测试集、机器、模型与预算齐全；正式产物评分须真实校准"
+    },
+    {
+      "id": "review",
+      "name": "复盘",
+      "executor": "Codex",
+      "config": {
+        "batch_cases": 4,
+        "admission_tokens": 64000,
+        "timeout_seconds": 180,
+        "on": "evaluate.terminal",
+        "review_metrics": true,
+        "review_logs": true
+      },
+      "output": "review.md、findings.json、逐Case复核覆盖表",
+      "ready": "评测已结束；失败或阻塞也要复盘，缺失项明确列出"
+    },
+    {
+      "id": "issue",
+      "name": "汇总 Issue",
+      "executor": "Codex + GitHub outbox",
+      "config": {
+        "one_issue_per_run": true,
+        "publication": "github",
+        "repository": null,
+        "include_raw_logs": false,
+        "idempotency": "owner+experiment+run_id"
+      },
+      "output": "issue-plan.json、issue.md、GitHub回执或待对账记录",
+      "ready": "复盘已落盘；质量不完整时只提诊断Issue，不派未经证实的修复"
+    },
+    {
+      "id": "repair",
+      "name": "修复",
+      "executor": "Codex + 隔离 worktree",
+      "config": {
+        "max_attempts": 2,
+        "admission_tokens": 64000,
+        "timeout_seconds": 180,
+        "allowed_paths": [],
+        "base_commit": null,
+        "one_candidate_at_a_time": true
+      },
+      "output": "patch.diff、change.md、源码hash、worktree与候选引用",
+      "ready": "Issue发布确认、待修点有证据、源码范围与基线已配置"
+    },
+    {
+      "id": "verify",
+      "name": "独立验收",
+      "executor": "独立验证程序",
+      "config": {
+        "targeted_regression": true,
+        "frozen_daily_cases": 60,
+        "paired": true,
+        "private_validation": true,
+        "quality_gate": "frozen",
+        "required": true
+      },
+      "output": "verification.json、A/B指标与日志、回归结果、受保护证据hash",
+      "ready": "候选已封存；验证器和隐藏集不允许修复者改写"
+    },
+    {
+      "id": "publish",
+      "name": "提交 PR",
+      "executor": "GitHub outbox",
+      "config": {
+        "draft": true,
+        "base": "main",
+        "remote": "origin",
+        "auto_merge": false,
+        "quality_checks": [
+          "quick",
+          "full"
+        ]
+      },
+      "output": "pr-plan.json、PR回执、提交hash、检查记录与截图",
+      "ready": "独立验收与质量门禁通过；本机可信发布目标已配置"
+    },
+    {
+      "id": "observe",
+      "name": "观察",
+      "executor": "日周期控制器",
+      "config": {
+        "days": 2,
+        "distinct_full_days": true,
+        "target": "development_eval_only",
+        "rollback_on_regression": true
+      },
+      "output": "observation.json、每日证据引用、回滚或关闭Issue回执",
+      "ready": "开发评测实例已绑定候选；两个后续合格日，不能用同日重复凑数"
+    }
+  ],
+  "edges": [
+    {
+      "from": "evaluate",
+      "to": "review",
+      "condition": "terminal"
+    },
+    {
+      "from": "review",
+      "to": "issue",
+      "condition": "succeeded"
+    },
+    {
+      "from": "issue",
+      "to": "repair",
+      "condition": "published_and_actionable"
+    },
+    {
+      "from": "repair",
+      "to": "verify",
+      "condition": "sealed"
+    },
+    {
+      "from": "verify",
+      "to": "publish",
+      "condition": "passed"
+    },
+    {
+      "from": "publish",
+      "to": "observe",
+      "condition": "published"
+    }
+  ],
+  "light_override": {
+    "mode": "diagnostic",
+    "cases": 10,
+    "publication": "draft_files",
+    "repair_enabled": false,
+    "promotion_enabled": false,
+    "observation_enabled": false
+  },
+  "status_values": [
+    "pending",
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "blocked",
+    "unknown",
+    "cancelled",
+    "skipped"
+  ]
+}

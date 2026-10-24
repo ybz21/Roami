@@ -3763,6 +3763,8 @@ const enUS = {
   'agent.rsi.error.RSI_EPISODE_BUDGET': "Increase the episode budget to cover the complete suite on every machine.",
   'agent.rsi.error.RSI_SUITE_NOT_FOUND': "Select a registered full evaluation suite.",
   'agent.rsi.error.RSI_PUBLICATION_SETUP_REQUIRED': "Configure the GitHub publication target on the development machine.",
+  'agent.experiment.rsi': "RSI",
+
 }
 
 export default enUS
