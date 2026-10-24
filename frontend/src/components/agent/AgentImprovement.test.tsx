@@ -136,3 +136,16 @@ it('reuses the same manual request key after a partial multi-machine failure', a
   await waitFor(() => expect(api).toHaveBeenCalledTimes(4))
   expect(vi.mocked(api).mock.calls.every(call => call[2].request_key === requestKey)).toBe(true)
 })
+
+it('stops enqueueing remaining machines when the experiment page is unmounted', async () => {
+  state.overview = { ...workflowOverview(), preferences: { ...workflowOverview().preferences, daily_tokens: 100000, machine_ids: ['a', 'b'] } }
+  let finish!: (value: any) => void
+  vi.mocked(api).mockReturnValue(new Promise(resolve => { finish = resolve }))
+  const page = render(<AgentImprovement node="a" workflow />)
+  fireEvent.click(screen.getByRole('button', { name: '运行一次' }))
+  expect(api).toHaveBeenCalledTimes(1)
+  page.unmount()
+  finish({ data: {} })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(api).toHaveBeenCalledTimes(1)
+})

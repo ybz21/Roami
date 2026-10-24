@@ -29,7 +29,8 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
   const [busy, setBusy] = useState(''), [error, setError] = useState('')
   const [selected, setSelected] = useState<string[]>([]), [detail, setDetail] = useState('')
   const [documents, setDocuments] = useState<Record<string, string>>({})
-  const pendingRun = useRef(''), running = useRef(false)
+  const pendingRun = useRef(''), running = useRef(false), mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const scope = useRef(node); scope.current = node
   useEffect(() => { setDraft(null); setDirty(false); setSelected([]); setDetail(''); setError(''); setDocuments({}); setResearchDraft(null); setResearchDirty(false); setPreview(null); setStage('evaluate'); setView('workflow'); pendingRun.current = '' }, [node])
   useEffect(() => { if (data.value && !dirty) setDraft({ ...data.value.preferences, cases_per_day: 60 }) }, [data.value, dirty])
@@ -72,12 +73,12 @@ export default function AgentImprovement({ node, workflow = false }: { node: str
     setBusy('run'); setError('')
     try {
       for (const machine_id of draft.machine_ids) {
-        if (scope.current !== owner) return
+        if (!mounted.current || scope.current !== owner) return
         await api('POST', '/agent/improvement/requests', { machine_id, request_key })
       }
       if (scope.current === owner) pendingRun.current = ''
     } catch (e: any) { if (scope.current === owner) setError(e.apiError?.code || 'RSI_OPERATION_FAILED') }
-    finally { running.current = false; if (scope.current === owner) { setBusy(''); data.refresh() } }
+    finally { running.current = false; if (mounted.current && scope.current === owner) { setBusy(''); data.refresh() } }
   }
   const number = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)
   const ratio = (value: number | null | undefined) => value == null ? t('agent.rsi.unknown') : new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(value - 1)

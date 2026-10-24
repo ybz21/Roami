@@ -1135,5 +1135,5 @@ conversation/professional_activity.py
 → development-only HTTP → ImprovementControl / ResearchWorkflow
 POST preview：只读预估最大配对预留；PUT research：限额字段与修订号校验</pre>
 <p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
-<p>验收：前端132文件/959项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
+<p>验收：quick/full通过，Python1238项、前端132文件/960项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
 </section>
