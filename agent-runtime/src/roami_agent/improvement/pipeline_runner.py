@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, identifier, load_suite, require
 from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
+from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.policy import BOUNDS
 from roami_agent.improvement.run_records import RunRecords, trial_summary
 from roami_agent.protocol.identity import now_ms
@@ -74,12 +75,7 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
     require(prefs["suite_id"] and prefs["machine_ids"], "RSI_SETUP_REQUIRED")
     with service.ledger.connection() as db:
         db.execute("BEGIN IMMEDIATE")
-        require(
-            not db.execute(
-                "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND state='unknown'", (owner,)
-            ).fetchone(),
-            "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
-        )
+        assert_operation_costs_settled(db, owner)
         machine = db.execute(
             "SELECT profile_json FROM rsi_machines WHERE owner=? AND id=?",
             (owner, prefs["machine_ids"][0]),
@@ -150,7 +146,7 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
     return {"id": run_id}
 
 
-async def execute_diagnostic(runtime, service, request):
+async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     from roami_agent.app import configured_provider
     from roami_agent.improvement.containers import ContainerExecutor
     from roami_agent.protocol.errors import DomainError
@@ -185,31 +181,43 @@ async def execute_diagnostic(runtime, service, request):
             configured_provider(settings_, actual),
             budget,
             role,
-            output_cap=config["memory_output_tokens"]
-            if role == "memory"
-            else config["output_tokens"],
+            output_cap=settings_.route(actual).parameters["max_tokens"],
             journal=journal,
         )
 
+    main_route = (
+        replace(settings.route("main"), name=config["main_model"])
+        if config.get("main_model")
+        else None
+    )
+    worker_route = (
+        replace(settings.route("worker"), name=config["worker_model"])
+        if config.get("worker_model")
+        else None
+    )
     memory_route = (
-        replace(settings.route("worker"), name=config["memory_model"])
+        replace(worker_route or settings.route("worker"), name=config["memory_model"])
         if config.get("memory_model")
         else None
     )
-    generation_overrides = (
-        {"memory": {"reasoning_effort": config["memory_reasoning_effort"]}}
-        if config.get("memory_reasoning_effort")
-        else {}
-    )
+    generation_overrides = {
+        role: {"reasoning_effort": config[role + "_reasoning_effort"]}
+        for role in ("main", "worker", "memory")
+        if config.get(role + "_reasoning_effort")
+    }
     executor = ContainerExecutor(
         settings,
+        **({"image": executor_image} if executor_image else {}),
         memory_route=memory_route,
+        worker_route=worker_route,
+        main_route=main_route,
         artifact_reviewer=artifact_reviewer,
         generation_overrides=generation_overrides,
         provider_factory=provider,
+        shared_budget=budget,
         output_caps={
-            "main": config["output_tokens"],
-            "worker": config["output_tokens"],
+            "main": config.get("main_output_tokens", config["output_tokens"]),
+            "worker": config.get("worker_output_tokens", config["output_tokens"]),
             "memory": config["memory_output_tokens"],
         },
     )
@@ -219,9 +227,31 @@ async def execute_diagnostic(runtime, service, request):
     directory = records.directory(owner, run_id)
     outcomes = []
     artifact_tokens = 0
+    real_cases = sum(
+        c["judge"]["kind"] != "mechanism" for c in suite["cases"] if c["id"] in spec["case_ids"]
+    )
+    minimum_start = min(32000, config["generation_tokens"] // max(1, real_cases))
+    remaining_real = real_cases
+    records.artifact(
+        owner,
+        run_id,
+        "evaluate",
+        "budget-plan.json",
+        {
+            "minimum_start_tokens": minimum_start,
+            "real_cases": real_cases,
+            "total": config["generation_tokens"],
+        },
+    )
     for case_id in spec["case_ids"]:
         original = next(c for c in suite["cases"] if c["id"] == case_id)
         case = copy.deepcopy(original)
+        if case["judge"]["kind"] != "mechanism":
+            remaining_real -= 1
+            budget.limits["tokens"] = config["generation_tokens"] - remaining_real * minimum_start
+            case["limits"]["tokens"] = min(
+                case["limits"]["tokens"], max(1, budget.limits["tokens"] - budget.used)
+            )
         target = directory / ("case-" + digest(case_id)[:20])
         target.mkdir(mode=0o700)
         if (budget.unknown or artifact_tokens is None) and case["judge"]["kind"] != "mechanism":

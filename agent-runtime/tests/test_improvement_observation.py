@@ -87,3 +87,89 @@ async def test_nested_meters_share_one_upstream_request_identity():
         pass
     assert inner_journal[0]["request_id"] == outer_journal[0]["request_id"]
     assert model_observation.get() is None
+
+
+@pytest.mark.asyncio
+async def test_closed_stream_is_not_an_invented_model_failure():
+    from roami_agent.protocol.models import ModelEvent
+
+    class Provider:
+        model = "fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 7,
+                    "outputTokens": 1,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+            yield ModelEvent("text", "unused")
+
+    journal = []
+    budget = EpisodeBudget({"tokens": 10000, "seconds": 10, "requests": 1})
+    stream = MeteredModel(Provider(), budget, "worker", journal=journal).stream([], [])
+    await anext(stream)
+    await stream.aclose()
+    assert journal[0]["termination"] == "closed"
+    assert "error_code" not in journal[0]
+    assert budget.metrics()["tokens"] == 8
+
+
+@pytest.mark.asyncio
+async def test_nested_admission_rejection_is_known_zero_and_never_reaches_provider():
+    from roami_agent.protocol.errors import DomainError
+    from roami_agent.protocol.models import ModelEvent
+
+    class Provider:
+        model = "fixture"
+
+        async def stream(self, messages, tools):
+            raise AssertionError("must not send a provider request")
+            yield ModelEvent("text", "unused")
+
+    outer_budget = EpisodeBudget({"tokens": 1, "seconds": 10, "requests": 1})
+    inner_budget = EpisodeBudget({"tokens": 10000, "seconds": 10, "requests": 1})
+    journal = []
+    model = MeteredModel(
+        MeteredModel(Provider(), outer_budget, "worker"), inner_budget, "worker", journal=journal
+    )
+    with pytest.raises(DomainError, match="RSI_TOKEN_BUDGET"):
+        async for _ in model.stream([], []):
+            pass
+    assert not inner_budget.unknown and not outer_budget.unknown
+    assert journal[0]["admission_rejected"] is True
+    assert inner_budget.metrics()["tokens"] == 0
+    assert inner_budget.metrics()["request_attempts"] == 0
+
+
+@pytest.mark.asyncio
+async def test_stream_closed_by_another_task_does_not_leak_context():
+    import asyncio
+
+    from roami_agent.protocol.models import ModelEvent
+
+    class Provider:
+        model = "fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 1,
+                    "outputTokens": 1,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+            yield ModelEvent("text", "unused")
+
+    budget = EpisodeBudget({"tokens": 10000, "seconds": 10, "requests": 1})
+    stream = MeteredModel(Provider(), budget, "worker").stream([], [])
+    await anext(stream)
+    assert model_observation.get() is None
+    await asyncio.create_task(stream.aclose())
+    assert budget.metrics()["tokens"] == 2
+    assert model_observation.get() is None

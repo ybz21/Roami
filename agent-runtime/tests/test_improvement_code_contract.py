@@ -87,3 +87,21 @@ async def test_local_suite_registration_and_settings_cli(tmp_path):
     )
     assert not result["enabled"]
     assert control.catalog("other")["suites"] == []
+
+
+async def test_native_only_evaluation_keeps_complex_routing_without_cli_discovery(store):
+    from test_routing_policy import request, setup
+
+    from roami_agent.improvement.evaluation_tasks import NATIVE_TASK_REQUEST
+
+    runtime, targets, router, _, binding = await setup(store, user=NATIVE_TASK_REQUEST)
+    try:
+        targets.installed.clear()
+        decision = await router.decide(
+            request("complex", explicitExecutor="native", userQuote=NATIVE_TASK_REQUEST), binding
+        )
+        assert decision["executor"] == "native" and decision["complexity"] == "complex"
+        assert decision["reasonCode"] == "explicit_executor"
+        assert targets.catalog_calls == 0
+    finally:
+        await runtime.close()

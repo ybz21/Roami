@@ -9,14 +9,12 @@ import time
 from dataclasses import asdict, replace
 from pathlib import Path
 
-from roami_agent.app import configured_provider
 from roami_agent.improvement.contracts import agent_view, digest, load_json, require
 from roami_agent.improvement.executors import NativeFilesExecutor, materialize, private_json
 from roami_agent.improvement.grading import judge_case
-from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
+from roami_agent.improvement.measurements import EpisodeBudget
 from roami_agent.improvement.model_gateway import ModelGateway
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.model_routes import settings_with_route
 
 IMAGE = "roami-rsi-eval:local"
 
@@ -74,6 +72,9 @@ class ContainerExecutor:
         output_caps=None,
         generation_overrides=None,
         memory_route=None,
+        worker_route=None,
+        main_route=None,
+        shared_budget=None,
     ):
         self.settings, self.image = settings, image
         self.artifact_reviewer = artifact_reviewer
@@ -81,21 +82,29 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v2-main-worker",
+                "container-uds-v4-explicit-native",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
+        self.main_route = main_route
+        if main_route is not None:
+            self.model_hash = digest([self.model_hash, asdict(main_route)])
+        self.worker_route = worker_route
+        if worker_route is not None:
+            self.model_hash = digest([self.model_hash, asdict(worker_route)])
         self.memory_route = memory_route
         if memory_route is not None:
             self.model_hash = digest([self.model_hash, asdict(memory_route)])
         self.image_id = None
         self.provider_factory = provider_factory
+        self.shared_budget = shared_budget
         self.source_root = Path(source_root).resolve() if source_root is not None else None
         self.regression_root = regression_root
         self.output_caps = output_caps or {}
         require(
             all(
-                k in {"main", "worker", "memory"} and type(v) is int and 512 <= v <= 16384
+                k in {"main", "worker", "memory"}
+                and (v is None or type(v) is int and 512 <= v <= 1_000_000)
                 for k, v in self.output_caps.items()
             ),
             "RSI_POLICY_OUT_OF_RANGE",
@@ -330,9 +339,22 @@ class ContainerExecutor:
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         state.mkdir(mode=0o700)
         view = agent_view(case, Path("/workspace"))
+        from roami_agent.improvement.evaluation_tasks import NATIVE_TASK_REQUEST
+
         view["prompt"] += (
-            "\n本任务在无网络的独立容器中执行，文件位于/workspace。Main没有可直接执行shell的工作区上下文，不要尝试或重试Main的bash。涉及代码、脚本或批处理时直接委派默认Worker，target={kind:new_session,directory:/workspace}。环境使用native是执行器元信息，不是用户明确指定执行器：routing.explicitExecutor=null，不填写userQuote。不要连接专业CLI、其他节点或现用会话。文件读取和小型写入可直接完成。最终产物由容器外独立判定器验收，内部任务等待验收不代表最终得分。"
+            "\n"
+            + NATIVE_TASK_REQUEST
+            + "本任务在无网络的独立容器中执行，文件位于/workspace。涉及代码、脚本或批处理时直接委派Worker，target={kind:new_session,directory:/workspace}，routing.explicitExecutor=native，userQuote引用上面的明确指令；如实填写复杂度，不要为了选择Native而把复杂任务说成有界任务。不要连接专业CLI、其他节点或现用会话。Main不执行项目shell操作；文件读取和小型写入可直接完成。最终产物由容器外独立判定器验收，内部任务等待验收不代表最终得分。"
         )
+        input_names = sorted(set(case.get("files", {})) | set(case.get("asset_files", {})))
+        visible_inputs = []
+        for filename in input_names:
+            if len(json.dumps(visible_inputs + [filename], ensure_ascii=False).encode()) > 8000:
+                break
+            visible_inputs.append(filename)
+        view["prompt"] += "\n输入文件目录：" + json.dumps(visible_inputs, ensure_ascii=False)
+        if len(visible_inputs) < len(input_names):
+            view["prompt"] += "（目录已截断；其余输入由Worker在工作区检索。）"
         view["followups"] = case.get("followups", [])
         private_json(state / "request.json", {"case": view, "policy": policy})
         setup_ms = (time.monotonic() - started) * 1000
@@ -342,28 +364,31 @@ class ContainerExecutor:
         for role in ("main", "worker", "memory"):
             actual = "main" if role == "main" else "worker"
             route = (
-                self.memory_route
+                self.main_route
+                if role == "main" and self.main_route is not None
+                else self.memory_route
                 if role == "memory" and self.memory_route is not None
+                else self.worker_route
+                if actual == "worker" and self.worker_route is not None
                 else self.settings.route(actual)
             )
-            cap = self.output_caps.get(role, min(4096, route.parameters.get("max_tokens", 4096)))
+            from roami_agent.improvement.request_model import RequestBudgetModel
+
             route = replace(
                 route,
                 max_retries=0,
-                parameters={
-                    **route.parameters,
-                    **self.generation_overrides.get(role, {}),
-                    "max_tokens": cap,
-                },
+                parameters={**route.parameters, **self.generation_overrides.get(role, {})},
             )
-            settings = settings_with_route(self.settings, actual, route)
-            provider = (
-                self.provider_factory(settings, role)
-                if self.provider_factory
-                else configured_provider(settings, actual)
+            models[role] = RequestBudgetModel(
+                self.settings,
+                route,
+                budget,
+                role,
+                cap=self.output_caps.get(role),
+                factory=self.provider_factory,
+                journal=journal,
+                shared_budget=self.shared_budget,
             )
-            providers.append(provider)
-            models[role] = MeteredModel(provider, budget, role, output_cap=cap, journal=journal)
         name = "roami-rsi-agent-" + secrets.token_hex(10)
         failure = None
         response = {}

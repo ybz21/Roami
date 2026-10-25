@@ -9,9 +9,18 @@ from roami_agent.tools.registry import Tools
 from roami_agent.tools.shell import register_shell
 
 
-@pytest.mark.parametrize("method", ["write", "shell", "shell-only"])
+@pytest.mark.parametrize(
+    "method,filename",
+    [
+        ("write", "summary.txt"),
+        ("shell", "summary.txt"),
+        ("shell-only", "summary.txt"),
+        ("write", "answer.py"),
+        ("shell-only", "answer.py"),
+    ],
+)
 async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
-    store, tmp_path, method
+    store, tmp_path, method, filename
 ):
     from contextlib import asynccontextmanager
 
@@ -28,6 +37,27 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
         model = "bare-main-report"
 
         async def stream(self, messages, tools):
+            evidence = next(
+                (
+                    m["content"].split("Executor evidence: ", 1)[1]
+                    for m in messages
+                    if isinstance(m.get("content"), str) and "Executor evidence: " in m["content"]
+                ),
+                None,
+            )
+            if filename.endswith(".py") and evidence:
+                completion = json.JSONDecoder().raw_decode(evidence)[0]
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "deliver",
+                        "function": {
+                            "name": "task_reply",
+                            "arguments": json.dumps({"taskId": completion["taskId"]}),
+                        },
+                    },
+                )
+                return
             yield ModelEvent("text", "File saved.")
 
     class Worker:
@@ -47,7 +77,7 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
                                     "argv": [
                                         sys.executable,
                                         "-c",
-                                        "from pathlib import Path; Path('summary.txt').write_text('验收完成')",
+                                        f"from pathlib import Path; Path({filename!r}).write_text('验收完成')",
                                     ]
                                 }
                             ),
@@ -61,16 +91,16 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
                         "id": "readback",
                         "function": {
                             "name": "read",
-                            "arguments": json.dumps({"path": "summary.txt"}),
+                            "arguments": json.dumps({"path": filename}),
                         },
                     },
                 )
             elif observed:
                 yield ModelEvent(
                     "text",
-                    f"验收完成，文件 {workspace / 'summary.txt'} 已保存。"
+                    f"验收完成，文件 {workspace / filename} 已保存。"
                     if method == "shell-only"
-                    else "验收完成，文件 summary.txt 已保存。",
+                    else f"验收完成，文件 {filename} 已保存。",
                 )
             else:
                 yield ModelEvent(
@@ -81,7 +111,7 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
                             "name": "write",
                             "arguments": json.dumps(
                                 {
-                                    "path": "summary.txt",
+                                    "path": filename,
                                     "expectedSha256": None,
                                     "content": "验收完成",
                                 }
@@ -102,7 +132,7 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
         task = await runtime.tasks.create(
             "alice",
             conversation["id"],
-            "Save summary.txt",
+            f"Save {filename}",
             key="save",
             target={"kind": "new_session", "directory": str(workspace)},
             record_intent=True,
@@ -117,10 +147,16 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
             ),
         )
         references = await runtime.artifacts.list("alice", task_id=task["id"])
-        assert len(references) == 1 and references[0]["name"] == "summary.txt"
+        assert len(references) == 1 and references[0]["name"] == filename
         messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
         assert references[0]["downloadUrl"] in messages[-1]["content"]["text"]
-        (workspace / "summary.txt").unlink()
+        (workspace / filename).unlink()
+        if filename.endswith(".py"):
+            assert not await store.call(
+                lambda db: row(
+                    db, "SELECT id FROM tool_calls WHERE state='failed' AND tool_name='task_reply'"
+                )
+            )
         assert (await runtime.artifacts.read("alice", references[0]["id"]))[
             1
         ].decode() == "验收完成"

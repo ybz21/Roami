@@ -10,6 +10,10 @@ from roami_agent.protocol.identity import identity
 from roami_agent.protocol.model_observation import model_observation
 
 
+class BudgetAdmissionRejected(DomainError):
+    """No provider request was sent by this admission attempt."""
+
+
 class EpisodeBudget:
     def __init__(self, limits, *, observation_id=None):
         self.limits = limits
@@ -23,21 +27,21 @@ class EpisodeBudget:
 
     def check(self):
         if time.monotonic() - self.started >= self.limits["seconds"]:
-            raise DomainError("RSI_TIME_BUDGET")
+            raise BudgetAdmissionRejected("RSI_TIME_BUDGET")
         if self.unknown:
-            raise DomainError("RSI_USAGE_UNKNOWN")
+            raise BudgetAdmissionRejected("RSI_USAGE_UNKNOWN")
 
     async def admit(self, messages, tools, output_cap):
         async with self.lock:
             self.check()
             if len(self.requests) >= self.limits["requests"]:
-                raise DomainError("RSI_REQUEST_BUDGET")
+                raise BudgetAdmissionRejected("RSI_REQUEST_BUDGET")
             # This is a conservative local admission estimate, not provider billing.
             estimate = (
                 len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096 + output_cap
             )
             if self.used + self.reserved + estimate > self.limits["tokens"]:
-                raise DomainError("RSI_TOKEN_BUDGET")
+                raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
             entry = {
                 "inputTokens": None,
                 "outputTokens": None,
@@ -98,14 +102,12 @@ class MeteredModel:
         entry["role"] = self.role
         started, usage = time.monotonic(), {}
         observation = model_observation.get()
-        observation_token = None
         if observation is None:
             observation = {
                 "session": self.budget.observation_id,
                 "request": identity(),
                 "role": self.role,
             }
-            observation_token = model_observation.set(observation)
         record = None
         if self.journal is not None:
             record = {
@@ -113,6 +115,7 @@ class MeteredModel:
                 "observation_id": observation["session"],
                 "request_id": observation["request"],
                 "model": self.model,
+                "output_cap": self.output_cap,
                 "role": self.role,
                 "messages": json.loads(json.dumps(messages)),
                 "tools": json.loads(json.dumps(tools)),
@@ -120,23 +123,49 @@ class MeteredModel:
                 "measurement": entry,
             }
             self.journal.append(record)
+        stream = self.provider.stream(messages, tools)
         try:
-            async for event in self.provider.stream(messages, tools):
+            while True:
+                token = model_observation.set(observation)
+                try:
+                    event = await anext(stream)
+                except StopAsyncIteration:
+                    break
+                finally:
+                    model_observation.reset(token)
                 if record is not None and event.kind in {"text", "tool", "usage", "telemetry"}:
                     record["events"].append({"kind": event.kind, "value": event.value})
                 if event.kind == "usage":
                     usage = dict(event.value)
                 yield event
         except BaseException as exc:
+            if isinstance(exc, BudgetAdmissionRejected):
+                usage = {
+                    "inputTokens": 0,
+                    "outputTokens": 0,
+                    "requestAttempts": 0,
+                    "retryUsageKnown": True,
+                }
+                if record is not None:
+                    record["admission_rejected"] = True
             if record is not None:
-                record["error_code"] = getattr(exc, "code", type(exc).__name__)
+                if isinstance(exc, (GeneratorExit, asyncio.CancelledError)):
+                    record["termination"] = (
+                        "closed" if isinstance(exc, GeneratorExit) else "cancelled"
+                    )
+                else:
+                    record["error_code"] = getattr(exc, "code", type(exc).__name__)
             raise
         finally:
             try:
-                await self.budget.settle(entry, estimate, usage, time.monotonic() - started)
+                if hasattr(stream, "aclose"):
+                    token = model_observation.set(observation)
+                    try:
+                        await stream.aclose()
+                    finally:
+                        model_observation.reset(token)
             finally:
-                if observation_token is not None:
-                    model_observation.reset(observation_token)
+                await self.budget.settle(entry, estimate, usage, time.monotonic() - started)
 
 
 def trace_metrics(trace):

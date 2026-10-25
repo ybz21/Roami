@@ -3,6 +3,7 @@
 import asyncio
 import json
 import re
+from contextlib import aclosing
 
 from roami_agent.protocol.errors import DomainError
 
@@ -58,34 +59,40 @@ class ModelGateway:
             )
             sent = True
             index = 0
-            async for event in self.models[match[1]].stream(
-                body["messages"], body.get("tools", [])
-            ):
-                if event.kind == "text":
-                    data = {"choices": [{"index": 0, "delta": {"content": event.value}}]}
-                elif event.kind == "tool":
-                    data = {
-                        "choices": [
-                            {"index": 0, "delta": {"tool_calls": [{"index": index, **event.value}]}}
-                        ]
-                    }
-                    index += 1
-                elif event.kind == "usage":
-                    usage = event.value
-                    data = {
-                        "choices": [],
-                        "usage": {
-                            "prompt_tokens": usage.get("inputTokens"),
-                            "completion_tokens": usage.get("outputTokens"),
-                            "prompt_tokens_details": {
-                                "cached_tokens": usage.get("cacheReadTokens")
+            async with aclosing(
+                self.models[match[1]].stream(body["messages"], body.get("tools", []))
+            ) as events:
+                async for event in events:
+                    if event.kind == "text":
+                        data = {"choices": [{"index": 0, "delta": {"content": event.value}}]}
+                    elif event.kind == "tool":
+                        data = {
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {"tool_calls": [{"index": index, **event.value}]},
+                                }
+                            ]
+                        }
+                        index += 1
+                    elif event.kind == "usage":
+                        usage = event.value
+                        data = {
+                            "choices": [],
+                            "usage": {
+                                "prompt_tokens": usage.get("inputTokens"),
+                                "completion_tokens": usage.get("outputTokens"),
+                                "prompt_tokens_details": {
+                                    "cached_tokens": usage.get("cacheReadTokens")
+                                },
                             },
-                        },
-                    }
-                else:
-                    continue
-                writer.write(b"data: " + json.dumps(data, ensure_ascii=False).encode() + b"\n\n")
-                await writer.drain()
+                        }
+                    else:
+                        continue
+                    writer.write(
+                        b"data: " + json.dumps(data, ensure_ascii=False).encode() + b"\n\n"
+                    )
+                    await writer.drain()
             writer.write(
                 b'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
             )

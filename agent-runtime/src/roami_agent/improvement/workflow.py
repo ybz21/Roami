@@ -7,6 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, require
+from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
 from roami_agent.protocol.identity import now_ms
 
 SCHEMA = """
@@ -575,13 +576,7 @@ class ResearchWorkflow:
                     prior["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION"
                 )
                 return json.loads(prior["result_json"])
-            require(
-                not db.execute(
-                    "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state!='completed' OR json_extract(result_json,'$.value.metrics.tokens')>reserved)",
-                    (owner,),
-                ).fetchone(),
-                "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
-            )
+            assert_operation_costs_settled(db, owner)
             budget = db.execute(
                 "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
             ).fetchone()
@@ -600,13 +595,29 @@ class ResearchWorkflow:
         return None
 
     def settle_operation(self, owner, key, result):
+        tokens = result.get("value", {}).get("metrics", {}).get("tokens")
+        require(tokens is None or type(tokens) is int and tokens >= 0, "RSI_INVALID_MEASUREMENT")
         with self.ledger.connection() as db:
-            changed = db.execute(
-                "UPDATE rsi_operation_costs SET state='completed',result_json=? "
-                "WHERE owner=? AND id=? AND state='running'",
-                (json.dumps(result, allow_nan=False), owner, key),
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT reserved,day FROM rsi_operation_costs WHERE owner=? AND id=? AND state='running'",
+                (owner, key),
+            ).fetchone()
+            require(row is not None, "RSI_OPERATION_CONFLICT")
+            if tokens is not None:
+                db.execute(
+                    "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
+                    (tokens - row["reserved"], owner, row["day"]),
+                )
+            db.execute(
+                "UPDATE rsi_operation_costs SET state=?,result_json=? WHERE owner=? AND id=? AND state='running'",
+                (
+                    "completed" if tokens is not None else "unknown",
+                    json.dumps(result, allow_nan=False),
+                    owner,
+                    key,
+                ),
             )
-            require(changed.rowcount == 1, "RSI_OPERATION_CONFLICT")
 
     def review_saved(self, owner, cycle_id):
         with self.ledger.connection() as db:

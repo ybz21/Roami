@@ -31,6 +31,23 @@ OUTPUT_SUFFIXES = {
     ".webm",
     ".wav",
     ".mp3",
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".sh",
+    ".bash",
+    ".css",
+    ".scss",
+    ".sql",
 }
 
 
@@ -50,8 +67,7 @@ def reported_paths(text, root=None):
     return list(dict.fromkeys(paths))[:12]
 
 
-def read_output(root, path, maximum, destination=None):
-    root = Path(root).resolve(strict=True)
+def output_path(root, path):
     if path.startswith("/api/file/raw?"):
         path = parse_qs(urlsplit(path).query).get("path", [""])[0]
     elif path.startswith("/api/file/serve/"):
@@ -60,7 +76,13 @@ def read_output(root, path, maximum, destination=None):
         path = unquote(path)
     path = Path(path)
     if not path.is_absolute():
-        path = root / path
+        path = Path(root) / path
+    return path
+
+
+def read_output(root, path, maximum, destination=None):
+    root = Path(root).resolve(strict=True)
+    path = output_path(root, path)
     relative = path.relative_to(root)
     if not relative.parts or any(p.startswith(".") for p in relative.parts):
         raise ValueError("unsafe path")
@@ -156,23 +178,50 @@ class TaskDeliverables:
                     or source.startswith("#")
                 ):
                     continue
-                metadata = {"runId": attempt["id"], "sourcePath": source, "kind": "deliverable"}
-                existing = next((a for a in stored if a.get("metadata") == metadata), None)
+                canonical = (
+                    str(output_path(root, source)) if isinstance(root, str) and root else source
+                )
+                metadata = {
+                    "runId": attempt["id"],
+                    "sourcePath": source,
+                    "sourceFile": canonical,
+                    "kind": "deliverable",
+                }
+
+                def same_source(metadata, run_id=attempt["id"], root=root, canonical=canonical):
+                    return (
+                        metadata.get("runId") == run_id
+                        and isinstance(metadata.get("sourcePath"), str)
+                        and isinstance(root, str)
+                        and (
+                            metadata.get("sourceFile")
+                            or str(output_path(root, metadata["sourcePath"]))
+                        )
+                        == canonical
+                    )
+
+                existing = next((a for a in stored if same_source(a.get("metadata", {}))), None)
                 if existing:
-                    references.append(existing)
+                    if existing not in references:
+                        references.append(existing)
                     continue
                 try:
                     if not isinstance(root, str) or not root:
                         raise ValueError("workspace binding missing")
                     deleted = await self.artifacts.db.call(
-                        lambda db, attempt=attempt, source=source: row(
+                        lambda db, attempt=attempt: rows(
                             db,
-                            "SELECT id FROM artifacts WHERE owner_id=? AND task_id=? AND deleted_ms IS NOT NULL "
-                            "AND json_extract(metadata_json,'$.runId')=? AND json_extract(metadata_json,'$.sourcePath')=? LIMIT 1",
-                            (owner, task["id"], attempt["id"], source),
+                            "SELECT metadata_json FROM artifacts WHERE owner_id=? AND task_id=? AND deleted_ms IS NOT NULL "
+                            "AND json_extract(metadata_json,'$.runId')=?",
+                            (owner, task["id"], attempt["id"]),
                         )
                     )
-                    if deleted or remaining is not None and remaining <= 0 or len(references) >= 12:
+                    if (
+                        any(same_source(json.loads(item["metadata_json"])) for item in deleted)
+                        or remaining is not None
+                        and remaining <= 0
+                        or len(references) >= 12
+                    ):
                         raise ValueError("output unavailable")
                     with tempfile.TemporaryDirectory(
                         prefix=".deliverable-", dir=self.artifacts.data_root
