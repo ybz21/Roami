@@ -8,7 +8,7 @@ from test_task_continuation_affinity import seed
 
 from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.protocol.errors import DomainError
-from roami_agent.storage.database import row
+from roami_agent.storage.database import row, rows
 
 
 async def prepare(store):
@@ -42,6 +42,9 @@ async def test_explicit_close_accepts_waiting_result_and_preserves_history(store
             detail["sessionClosure"]["state"] == "closed" and detail["task"]["state"] == "succeeded"
         )
         assert detail["attempts"][0]["result"]["summary"] == "Design files exist"
+        assert not await store.call(
+            lambda db: rows(db, "SELECT id FROM turns WHERE trigger_kind='completion'")
+        )
         with pytest.raises(DomainError, match="TASK_SESSION_CLOSED"):
             await runtime.tasks.revisions.request("alice", task["id"], "More work", 1, "later")
     finally:
