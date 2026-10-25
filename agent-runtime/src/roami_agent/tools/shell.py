@@ -1,6 +1,7 @@
-"""Shell argv execution within the trusted task workspace or configured roots."""
+"""Explicit host execution and shell execution in trusted workspaces."""
 
 import codecs
+from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,6 +12,23 @@ from roami_agent.tools.process import execute
 
 def register_shell(registry, settings, artifacts=None):
     async def shell(args, binding):
+        with ExitStack() as resources:
+            if args.get("scope", "workspace") == "host":
+                if (
+                    binding.get("role") != "main"
+                    or binding.get("taskId")
+                    or binding.get("workspace")
+                ):
+                    raise DomainError("HOST_SCOPE_UNAVAILABLE")
+                if "cwd" in args:
+                    raise DomainError("HOST_SCOPE_CWD_NOT_ALLOWED")
+                # A host operation must not inherit the service's code/data directory.
+                cwd = Path(resources.enter_context(TemporaryDirectory(prefix="roami-host-")))
+            else:
+                cwd = workspace_directory(args, binding)
+            return await run(args, binding, cwd)
+
+    def workspace_directory(args, binding):
         workspace = binding.get("workspace")
         if binding.get("taskId") and not workspace:
             raise DomainError("TASK_WORKSPACE_REQUIRED")
@@ -24,6 +42,9 @@ def register_shell(registry, settings, artifacts=None):
         roots = [Path(workspace["directory"]).resolve()] if workspace else settings.shell_roots
         if not any(cwd == root or root in cwd.parents for root in roots):
             raise DomainError("WORKSPACE_OUTSIDE_CONFIGURED_ROOTS")
+        return cwd
+
+    async def run(args, binding, cwd):
         if not artifacts:
             return await execute(
                 args["argv"],
@@ -75,7 +96,7 @@ def register_shell(registry, settings, artifacts=None):
     registry.add(
         Tool(
             "shell",
-            "Execute an argv in the prepared task workspace (default cwd) or configured roots; no implicit shell.",
+            "Execute argv in a prepared workspace or configured roots; Main may explicitly select host scope without a workspace.",
             object_schema(
                 {
                     "argv": {
@@ -84,6 +105,7 @@ def register_shell(registry, settings, artifacts=None):
                         "minItems": 1,
                     },
                     "cwd": {"type": "string"},
+                    "scope": {"enum": ["workspace", "host"], "default": "workspace"},
                     "timeout": {"type": "integer", "minimum": 0},
                 },
                 ["argv"],

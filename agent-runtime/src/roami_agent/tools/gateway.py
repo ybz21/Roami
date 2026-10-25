@@ -293,8 +293,8 @@ class ToolGateway:
                     "This call was rejected before execution. "
                     + (
                         "Research has no standalone shell: do not probe with echo, curl or Python. "
-                        "If this task is local process diagnostics, report the profile mismatch to Main; "
-                        "Main can use roami agent host processes --input {} without a workspace. "
+                        "For a local machine operation, report the profile mismatch to Main; "
+                        "Main can use bash scope=host within the user's authorized scope. "
                         "Read skill://browser_use and use roami chrome help for admitted browser commands. "
                         if role == "research"
                         else "Use tool_list to find a registered operation available in this role. "
@@ -326,10 +326,9 @@ class ToolGateway:
             }:
                 value["recovery"] = (
                     "Main has no shell workspace for this operation. Do not retry shell commands or guess cwd. "
-                    "For local process/CPU/memory/load diagnostics use bash argv "
-                    "[roami,agent,host,processes,--input,{}] (last argv is a JSON string). "
-                    "It is read-only and requires no workspace or delegation. resourceOnly is browser-only, "
-                    "not a profile for local read-only commands. "
+                    "For a user-authorized local machine operation independent of project files, "
+                    "use bash scope=host without cwd. Host scope is general execution, not read-only; "
+                    "it requires no project or delegation. resourceOnly is browser-only. "
                     "An error affects only this attempted operation: preserve every other part of the current request. "
                     "Resolve project/session metadata through target_search/target_resolve; a project edit still needs its own handoff. "
                     "Keep requestComplete=false until all requested parts have been handled or handed off. Do not reduce a mixed request to its lookup part. "
@@ -340,6 +339,18 @@ class ToolGateway:
                     "target={kind:new_session,resourceOnly:true} with bounded routing; complex work goes to a professional executor with concrete routing evidence. For bounded file deliverables use "
                     "target={kind:new_session,directory:the_user_requested_directory}. "
                     "The worker loads the requested Skills and executes the task."
+                )
+            if value["error"] in {
+                "HOST_SCOPE_UNAVAILABLE",
+                "HOST_SCOPE_CWD_NOT_ALLOWED",
+                "HOST_SCOPE_REGISTERED_COMMAND",
+            }:
+                value.update(
+                    executionStarted=False,
+                    recovery="Host scope is available only in Main without a task, workspace or cwd. "
+                    "Keep task work in its bound workspace; report a profile mismatch to Main. "
+                    "For registered Roami operations omit scope=host and use their admitted command schemas. "
+                    "Do not change scope to bypass a denied or disabled operation.",
                 )
             state = (
                 "unknown"

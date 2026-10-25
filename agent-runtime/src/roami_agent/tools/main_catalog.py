@@ -671,7 +671,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                                 "archived": {"type": "boolean"},
                                 "resourceOnly": {
                                     "type": "boolean",
-                                    "description": "Browser navigation/observation only, not all read-only work. For local process/CPU/memory diagnostics call roami agent host processes directly; no task or directory required.",
+                                    "description": "Browser navigation/observation only, not all read-only work. User-authorized local machine operations independent of project files use bash scope=host in Main, without a task or directory.",
                                 },
                                 "state": {"type": "string", "enum": ["live"]},
                             },
