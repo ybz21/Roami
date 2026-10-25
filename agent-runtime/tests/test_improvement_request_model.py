@@ -168,3 +168,67 @@ async def test_context_capacity_and_unknown_shared_usage_block_before_factory():
         async for _ in model.stream([], []):
             pass
     assert not case_budget.requests and not run_budget.requests
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["main", "worker", "memory"])
+async def test_budget_status_uses_shared_allowance_without_mutating_history(role):
+    settings = Settings()
+    case = EpisodeBudget({"tokens": 100000, "seconds": 10, "requests": 3})
+    shared = EpisodeBudget({"tokens": 20000, "seconds": 10, "requests": 3})
+    shared.used = 12000
+    original = [{"role": "user", "content": "Keep the supplied task unchanged."}]
+    received = []
+
+    class Provider:
+        model = "fixture"
+
+        async def stream(self, messages, tools):
+            received.append(messages)
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 100,
+                    "outputTokens": 20,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+
+    model = RequestBudgetModel(
+        settings,
+        settings.route("worker"),
+        case,
+        role,
+        factory=lambda *_: Provider(),
+        shared_budget=shared,
+    )
+    async for _ in model.stream(original, []):
+        pass
+    assert len(original) == 1 and received[0][0] == original[0]
+    if role == "memory":
+        assert received[0] == original
+    else:
+        assert received[0][-1]["role"] == "system"
+        assert "8000 metered tokens remain" in received[0][-1]["content"]
+        assert "Budget pressure" in received[0][-1]["content"]
+    assert case.used == 120 and case.reserved == 0 and not case.unknown
+
+
+@pytest.mark.asyncio
+async def test_budget_notice_is_funded_before_provider_creation():
+    settings = Settings()
+    calls = []
+
+    def forbidden(*args):
+        calls.append(args)
+        raise AssertionError("notice must fit before provider creation")
+
+    budget = EpisodeBudget({"tokens": 5500, "seconds": 10, "requests": 1})
+    model = RequestBudgetModel(
+        settings, settings.route("worker"), budget, "worker", factory=forbidden
+    )
+    with pytest.raises(BudgetAdmissionRejected, match="RSI_TOKEN_BUDGET"):
+        async for _ in model.stream([], []):
+            pass
+    assert not calls and not budget.requests and not budget.unknown

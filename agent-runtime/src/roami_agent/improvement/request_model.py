@@ -29,17 +29,32 @@ class RequestBudgetModel:
     async def stream(self, messages, tools):
         from roami_agent.app import configured_provider
 
-        overhead = len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
-        available = 1_000_000
+        input_reserve = len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
+        remaining = 100_000_000
         for budget in (self.budget, self.shared_budget):
             if budget is None:
                 continue
             async with budget.lock:
                 budget.check()
-                available = min(
-                    available,
-                    budget.limits["tokens"] - budget.used - budget.reserved - overhead,
+                remaining = min(remaining, budget.limits["tokens"] - budget.used - budget.reserved)
+        if self.role in {"main", "worker"}:
+            pressure = remaining < 2 * (input_reserve + 512)
+            notice = (
+                f"Execution allowance: at most {remaining} metered tokens remain across roles "
+                f"and shared limits. This request's input needs a conservative reserve of "
+                f"{input_reserve} units before this notice (serialized bytes plus margin, not billed tokens). "
+                "Each later request also needs its input and output reserve. Keep tool output bounded; "
+                "return requested files and verified findings when ready, and state unverified requirements "
+                "or failed/unknown outcomes plainly. This allowance is not evidence of task completion."
+            )
+            if pressure:
+                notice += (
+                    " Budget pressure: another round-trip at this context size may not fit. "
+                    "Prioritize essential work and a concise handoff over new verification infrastructure."
                 )
+            messages = [*messages, {"role": "system", "content": notice}]
+        overhead = len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
+        available = min(1_000_000, remaining - overhead)
         if self.route.context_window:
             available = min(available, self.route.context_window - overhead)
         preferred = self.cap if self.cap is not None else self.route.parameters.get("max_tokens")

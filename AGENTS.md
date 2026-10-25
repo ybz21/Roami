@@ -1344,3 +1344,19 @@ Research → 原浏览器导航／观察协议</pre>
   <p>quick 门禁通过：Go 全量、Python 1342 项测试、格式与静态检查、前端 typecheck／i18n（3814 个键）／hover、秘密扫描与文件策略。新增 18 项回归覆盖 ps／df／uname、任意程序与管道、凭证过滤、角色与工作区拒绝、禁用策略、输出所有者隔离、取消／失败清理和通用恢复。真实模型 deepseek-4.1-flash 对磁盘、系统架构、时间时区、网卡名称四类请求均直接选择 host、执行真实命令，未产生后台任务。全部使用隔离临时数据；没有前端界面变更，未部署现用服务。</p>
   <p>证据位于 /tmp/host-execution-20261025：targeted.log、live-main.json、validation.html／png、quick.log；完整门禁与提交钩子回执见 full.log、commit.log，结果随 PR 提供。</p>
 </section>
+
+<section id="rsi-verification-scope-20261026" lang="zh-CN">
+  <h2>RSI 验证范围修订 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>Worker 用直接覆盖用户验收条件的检查验证产物；临时探针与产品分开，已有浏览器或测试工具足够时不另造验证驱动。区分检查脚本错误与产品缺陷，完成必要验证后交付真实文件和结果，未验证项明确保留。</p>
+  <h3>User Stories</h3>
+  <p>用户收到请求的页面和运行说明，不会混入临时自测界面；已有回归测试继续保留。维护者能对照同路由、同题目和同额度的独立执行记录，判断任务是否真正完成。</p>
+  <h3>Technical Design</h3>
+  <p>修改 server/configuration.py 的 WORKER_INSTRUCTIONS，不改变判定器、预算准入、任务状态、模型路由或冻结题目。没有新增固定步数与时限；达到用户验收条件才结束，检查未完成不冒充成功。隔离容器继续从真实任务状态和容器外判定取得结果。</p>
+  <p>improvement.Dockerfile 固定已验收的 Playwright 1.64.1，并按<a href="https://playwright.dev/python/docs/browsers">官方浏览器安装方式</a>安装匹配的 Chromium headless shell。PLAYWRIGHT_BROWSERS_PATH 指向公共只读目录，构建时验证默认 chromium.launch()，移除不能配置 Python 默认启动路径的 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH。运行时仍无网络、非 root 且根文件系统只读；冻结评分渲染器不变。</p>
+  <p>RequestBudgetModel 向 Main／Worker 提供当前已计量的剩余额度及输入保守预留估计，在余量接近当前请求成本时提示优先必要工作与真实交接。提示本身计入准入预留，额度不足或用量未知仍在创建提供方之前拒绝；Memory 的结构化输入不加提示，调用方历史不修改。预算信息不含判定器、参考答案或完成证明。评测输入变化单列为 container-uds-v5-budget-status；不把 v5 与旧 v4 的用量差当成同合同优化收益。</p>
+  <h3>验收状态</h3>
+  <p>修改前主分支 5775296 的 DeepSeek Main/Worker 基线在原 384,000 Token Case 额度内仍因 RSI_TOKEN_BUDGET 失败，实际 326,601 Token／22 次请求。修改指令后的两次同条件复测分别用 180,961／182,290 Token、各 19 次请求完成 Native 执行并保存 HTML 与 README；初始 5 卡、新增、拖移及刷新保留硬检查均通过。两次均 hard_passed=true、pending=true、passed=false，质量尚未评分，不作为正式全套或稳定收益证明。</p>
+  <p>浏览器零模型对照：旧镜像默认启动失败、指定系统 Chromium 可用；新镜像默认启动及键盘操作可用，三次均为非 root、只读根文件系统、无网络容器。v4 组合镜像仍出现一次预算失败（297,815 Token／20 次请求），页面检查通过不掩盖任务失败。</p>
+  <p>v5 两次独立诊断分别使用 289,200 Token／25 次请求、240,676 Token／21 次请求；Native Attempt 均 succeeded，任务等待验收，两份必要文件的已存储 SHA 均匹配工作区最终文件。功能硬检查全部通过，但 hard_passed=true、pending=true、passed=false，未计为正式质量通过。新增预算提示在受压调用中实际出现；角色隔离、共享预留、提示开销和未知用量边界回归通过，最新 full 共 Python 1,346 项、Go、前端检查与生产构建通过。校准、正式全套验收与连续观察仍独立保留，#443／#445／#446 不因本轮诊断关闭。</p>
+</section>

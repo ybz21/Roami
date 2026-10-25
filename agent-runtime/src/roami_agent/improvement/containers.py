@@ -82,7 +82,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v4-explicit-native",
+                "container-uds-v5-budget-status",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
