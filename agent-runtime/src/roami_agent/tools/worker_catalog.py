@@ -5,12 +5,14 @@ from tempfile import TemporaryDirectory
 import httpx
 
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.host_processes import register_host_processes
 from roami_agent.tools.shell import register_shell
 from roami_agent.tools.skills import register_skills
 
 
 def add_worker_tools(registry, settings, artifacts=None):
     register_shell(registry, settings, artifacts)
+    register_host_processes(registry)
 
     for name, config in settings.http_tools.items():
 

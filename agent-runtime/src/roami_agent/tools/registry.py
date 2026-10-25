@@ -62,6 +62,7 @@ class Tools:
                 wire = deepcopy(wire)
                 wire["function"]["description"] = (
                     "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
+                    "Local process/CPU/memory diagnostics use roami agent host processes --input {} without a workspace. "
                     "For code, scripts or batch file work, delegate to a worker with the existing "
                     "user-requested directory; do not probe with shell commands here. "
                     "Registered permissions and execution receipts remain enforced."
