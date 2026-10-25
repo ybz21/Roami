@@ -2080,7 +2080,7 @@ const enUS = {
   'session.gitSetup.errorDetails': 'Error details',
   'session.gitSetup.retry': 'Try again',
   'session.gitSetup.checking': 'Checking Git…',
-  'session.gitSetup.checkFailed': 'Could not check Git. Try again.',
+  'session.gitSetup.checkFailed': 'Could not check Git. Work will start in the current directory.',
   'session.gitSetup.plain': 'Git is not initialized. Work in this directory, or initialize Git to use worktrees.',
   'session.gitSetup.empty': 'This project has no commits. Work in this directory, or create the first commit to use worktrees.',
   'session.gitSetup.initAction': 'Initialize Git',

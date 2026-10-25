@@ -2082,7 +2082,7 @@ const zhCN = {
   'session.gitSetup.errorDetails': '错误详情',
   'session.gitSetup.retry': '重试',
   'session.gitSetup.checking': '正在检查 Git…',
-  'session.gitSetup.checkFailed': '无法检查 Git，请重试。',
+  'session.gitSetup.checkFailed': '无法检查 Git，将在当前目录开工。',
   'session.gitSetup.plain': '项目尚未初始化 Git，可直接在此目录开工，或初始化后使用 worktree。',
   'session.gitSetup.empty': '项目还没有提交，可直接在此目录开工，或创建首次提交后使用 worktree。',
   'session.gitSetup.initAction': '初始化 Git',
