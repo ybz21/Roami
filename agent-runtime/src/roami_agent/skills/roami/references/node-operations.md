@@ -20,11 +20,14 @@ project/auth 的 --server URL 或 ROAMI_SERVER 选择服务，不把别的节点
 
 ## 登录和诊断
 
-查询当前机器的进程、CPU、内存、swap 和负载，Main 可直接通过 `bash` 调用
-`roami agent host processes --input '{"limit":10}'`。这是受管只读入口，不需要目录、项目或后台任务。
-返回当前 Agent 运行节点／进程命名空间的快照，不是手机或其他节点；进程仅含名称，不含命令参数和环境变量。
-CPU 百分比来自 ps 的进程生命周期平均值，100% 代表一个核，不当作瞬时占用或持续异常证据。
-整体内存与 swap 当前从 Linux /proc 读取；不可用指标返回 null，不推测。resourceOnly 仅限网页导航，不代表所有只读操作。
+与项目文件无关、已获用户授权的本机操作，Main 直接调用 `bash`，设置 `scope:"host"`，不传 `cwd`。
+例如 `{"argv":["df","-h"],"scope":"host"}`；同一入口支持系统命令和脚本，不需要为每类查询添加工具。
+命令运行在当前 Agent 节点的临时工作目录，结束即删除；这是通用本机执行，不是只读沙箱，不限制绝对路径访问。
+遵守用户授权，不用它绕过任务工作区、禁用能力或受管资源协议。通用命令保守记录为 write，不按命令名猜测只读。
+项目文件任务保留原目录与执行器；需保留的产物使用原工作区。resourceOnly 仍仅限浏览器导航与观察。
+
+`roami agent host processes --input '{"limit":10}'` 保留为可选结构化只读快照，不承担通用本机路由。
+它只返回进程名称和资源指标；CPU 为 ps 生命周期平均值，100% 代表一个核；Linux 内存／swap 来自 /proc，未知值为 null。
 
 ```bash
 roami version
@@ -66,7 +69,7 @@ roami db migrate --layout --dry-run
 | 现象 | 下一步 |
 | --- | --- |
 | USE_REGISTERED_CLI_CAPABILITY | 搜索受管能力或交给具备完整 CLI 环境的专业 Agent；不套 Shell 绕过 |
-| WORKSPACE_REQUIRED | 本机进程诊断直接用 host processes；代码任务发现 / 复用目录；纯网页研究用 resourceOnly |
+| WORKSPACE_REQUIRED | 与项目无关的授权本机操作用 bash scope=host；代码任务复用工作区；网页研究用 resourceOnly |
 | TOOL_UNAVAILABLE / 能力空目录 | 核对角色、节点配置和真正已注册的入口，不反复猜工具名 |
 | 目标歧义 | 查询完整归属，用选择题列候选，选定后直接执行 |
 | queued / running 没有最终回报 | 区分受跟踪任务与旧会话投递，查询现有回执 / 状态，不重复创建 |

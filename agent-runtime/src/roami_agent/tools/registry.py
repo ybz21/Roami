@@ -62,11 +62,16 @@ class Tools:
                 wire = deepcopy(wire)
                 wire["function"]["description"] = (
                     "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
-                    "Local process/CPU/memory diagnostics use roami agent host processes --input {} without a workspace. "
-                    "For code, scripts or batch file work, delegate to a worker with the existing "
-                    "user-requested directory; do not probe with shell commands here. "
+                    "For user-authorized local machine operations, set scope=host and omit cwd; "
+                    "host scope is general execution in a temporary working directory, not a read-only sandbox. "
+                    "For project code or file deliverables, keep workspace scope and delegate to a worker "
+                    "with the existing user-requested directory. "
                     "Registered permissions and execution receipts remain enforced."
                 )
+            elif role == "worker" and self.directory and tool.name == "bash":
+                wire = deepcopy(wire)
+                if "scope" in wire["function"]["parameters"]["properties"]:
+                    wire["function"]["parameters"]["properties"]["scope"]["enum"] = ["workspace"]
             if role == "research":
                 wire = deepcopy(wire)
                 parameters = wire["function"]["parameters"]

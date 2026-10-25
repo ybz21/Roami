@@ -142,11 +142,6 @@ class ToolDirectory:
             "天气": "web research weather forecast",
             "股价": "web research stock quote",
             "新闻": "web research news",
-            "进程": "host processes cpu memory",
-            "本机": "host processes",
-            "机器": "host processes",
-            "内存": "host processes memory",
-            "负载": "host processes load",
             "统计": "workspace overview",
             "总量": "workspace overview",
             "取消": "task cancel reminder",
@@ -372,6 +367,14 @@ class ToolDirectory:
             return replace(self.registry.registry[name], main=True), args
         elif tool.name == "bash":
             argv = self.argv(args)
+            if args.get("scope") == "host":
+                if role != "main":
+                    raise DomainError("HOST_SCOPE_UNAVAILABLE")
+                if "cwd" in args:
+                    raise DomainError("HOST_SCOPE_CWD_NOT_ALLOWED")
+                if argv and argv[0] in {"roami", self.settings.cli_bin}:
+                    raise DomainError("HOST_SCOPE_REGISTERED_COMMAND")
+                return tool, args
             if (
                 argv
                 and argv[0] in {"roami", self.settings.cli_bin}
@@ -512,6 +515,11 @@ def register_foundations(registry, settings):
             "argv": argv_schema,
             "command": {"type": "string", "minLength": 1, "maxLength": 100000},
             "cwd": {"type": "string"},
+            "scope": {
+                "enum": ["workspace", "host"],
+                "default": "workspace",
+                "description": "Host scope is for user-authorized local machine operations in Main, without cwd or a task workspace. It is general execution, not a read-only sandbox. Workspace scope preserves configured roots and bound task directories.",
+            },
             "timeout": {"type": "integer", "minimum": 0},
         }
     )
@@ -522,7 +530,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "bash",
-            "Execute Roami CLI argv discovered by tool_list, or shell commands in a prepared workspace. Use roami or roami chrome command families from tool_list; load their associated Skill as needed. Registered read/write effects and receipts are enforced by runtime. General shell needs cwd inside allowed roots; no implicit code workspace is created.",
+            "Execute registered Roami CLI operations or shell commands. Workspace scope uses a bound directory or cwd within configured roots. Main may explicitly use scope=host for user-authorized machine operations without cwd; this uses a temporary working directory, not a sandbox. General commands retain write effects, cancellation and receipts. Use registered Roami commands for managed resources.",
             schema,
             bash,
             main=True,

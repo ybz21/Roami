@@ -77,7 +77,7 @@ async def test_diagnostics_are_discoverable_read_only_and_need_no_workspace(stor
     monkeypatch.setattr("roami_agent.tools.host_processes.linux_memory", lambda: None)
     monkeypatch.setattr("os.getloadavg", lambda: (1.0, 2.0, 3.0))
     try:
-        for query in ["machine process system status node", "进程占用", "本机内存负载"]:
+        for query in ["host_processes", "machine process system status node"]:
             items = runtime.tools.directory.list(query, "cli", 20, "main")["items"]
             assert any(
                 command["argv"] == ["roami", "agent", "host", "processes", "--input", "JSON"]
@@ -161,7 +161,7 @@ async def test_main_recovers_from_ps_rejection_without_delegating_or_borrowing_a
             elif self.step == 2:
                 error = json.loads(messages[-1]["content"])
                 assert error["error"] == "WORKSPACE_REQUIRED"
-                assert "host,processes" in error["recovery"]
+                assert "scope=host" in error["recovery"]
                 wire = host_call()
             else:
                 result = json.loads(messages[-1]["content"])
