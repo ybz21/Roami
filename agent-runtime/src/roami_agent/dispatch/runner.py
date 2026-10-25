@@ -529,7 +529,8 @@ class TaskDispatcher:
                 if job_id:
                     db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
                 return
-            if row(
+            # Acceptance records the user's decision without repeating the result in Main.
+            if (confirmation and state == "succeeded") or row(
                 db,
                 "SELECT id FROM jobs WHERE kind='task.steer' AND aggregate_id=? AND state='queued'",
                 (task["id"],),
