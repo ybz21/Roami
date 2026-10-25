@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import httpx
@@ -23,6 +24,34 @@ def cli(name, args):
         "bash",
         {"argv": ["roami", "agent", "capability", "call", name, "--input", json.dumps(args)]},
     )
+
+
+async def test_bash_command_preserves_workspace_environment_without_login_profiles(
+    store, tmp_path, monkeypatch
+):
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    probe = binary / "rsi-path-probe"
+    probe.write_text('#!/bin/sh\nprintf "workspace-environment"\n')
+    probe.chmod(0o700)
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = tmp_path / "login-profile-ran"
+    (home / ".bash_profile").write_text(f"touch '{marker}'\n")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("PATH", str(binary) + os.pathsep + os.environ["PATH"])
+    monkeypatch.delenv("BASH_ENV", raising=False)
+    runtime = Runtime(store, ConversationModel(), settings=Settings(shell_roots=(tmp_path,)))
+    try:
+        result = await runtime.tools.invoke(
+            call("bash", {"command": "rsi-path-probe"}),
+            "worker",
+            {"owner": "alice", "workspace": {"directory": str(tmp_path)}},
+        )
+        assert result["exitCode"] == 0 and result["stdout"] == "workspace-environment"
+        assert not marker.exists()
+    finally:
+        await runtime.close()
 
 
 async def test_actual_catalog_and_settings_have_only_seven_tools(store):

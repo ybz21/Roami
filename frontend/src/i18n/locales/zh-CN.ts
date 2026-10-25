@@ -3849,9 +3849,16 @@ const zhCN = {
   'agent.pipeline.publishIssue': "发布 GitHub Issue",
   'agent.experiment.hint.evaluate': "在隔离环境中测试，保存产物、评分和调用记录。",
 
+  'agent.pipeline.autoOutput': '按模型与任务剩余额度',
+  'agent.pipeline.setting.main_output_tokens': '主 Agent 单次输出额度',
+  'agent.pipeline.setting.worker_output_tokens': 'Worker 单次输出额度',
+  'agent.pipeline.setting.main_model': '主 Agent 模型',
+  'agent.pipeline.setting.main_reasoning_effort': '主 Agent 推理强度',
+  'agent.pipeline.setting.worker_model': 'Worker 模型',
+  'agent.pipeline.setting.worker_reasoning_effort': 'Worker 推理强度',
   'agent.pipeline.setting.memory_model': '记忆模型',
   'agent.pipeline.setting.memory_reasoning_effort': '记忆推理强度',
-  'agent.pipeline.workerDefault': '沿用 Worker 配置',
+  'agent.pipeline.workerDefault': '沿用默认配置',
   'agent.pipeline.artifactTokens': '产物评分用量：{count} Token',
 }
 

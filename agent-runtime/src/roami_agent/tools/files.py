@@ -9,7 +9,7 @@ def register_file_tools(registry, files):
     registry.add(
         Tool(
             "file_read",
-            "Read a prepared workspace file in bounded byte pages, returning its full content hash. Non-UTF-8 pages are base64. This is not an OS sandbox.",
+            "Read one file, not a directory, in bounded byte pages, returning its full content hash. Main: if only a directory is known, delegate repository/code work to a Worker there; do not guess filenames. Non-UTF-8 pages are base64. This is not an OS sandbox.",
             object_schema(
                 {
                     "path": path,

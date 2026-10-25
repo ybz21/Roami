@@ -170,5 +170,44 @@ def test_public_preconditions_are_presented_without_exposing_oracle():
     suite = authored_suite("independent-fairness-check")
     case = next(c for c in suite["cases"] if c["id"] == "CODE-01")
     assert "默认每页 5 条" in case["prompt"] and "页码从 1 开始" in case["prompt"]
-    assert case["origin"]["recipe_revision"] == "authored-v6"
+    assert case["origin"]["recipe_revision"] == "authored-v7"
     assert "expected" not in case["prompt"]
+
+
+def test_public_contract_exposes_types_and_cost_rules_without_oracle_values():
+    cases = {c["id"]: c for c in authored_suite("visible-contract")["cases"]}
+    assert "source_receipt" in cases["DOC-05"]["prompt"]
+    assert "stories和acceptance为需求ID到文字的对象" in cases["DOC-05"]["prompt"]
+    assert "open*(1+slippage)" in cases["QUANT-01"]["prompt"]
+    assert "equity数值数组" in cases["QUANT-01"]["prompt"]
+    assert (
+        str(cases["QUANT-01"]["judge"]["expected"]["equity"][-1]) not in cases["QUANT-01"]["prompt"]
+    )
+
+
+async def test_pagination_metadata_is_allowed_only_by_the_revised_contract(tmp_path):
+    case = next(c for c in authored_suite("response-contract")["cases"] if c["id"] == "CODE-01")
+    workspace = tmp_path / "work"
+    materialize(case, workspace)
+    (workspace / "test_items.py").write_text("independent fixture tests")
+    items = sorted(case["judge"]["items"], key=lambda x: x["name"])
+
+    class Probe:
+        async def sandbox(self, *args, **kwargs):
+            return json.dumps(
+                {
+                    "responses": [
+                        [200, {"items": items[:5], "total": 12, "page": 1}],
+                        [200, {"items": items[10:], "total": 12, "page": 3}],
+                        [200, {"items": [], "total": 12, "page": 99}],
+                        *[[400, {}] for _ in range(4)],
+                        [200, {}],
+                    ],
+                    "tests_passed": True,
+                    "test_count": 3,
+                }
+            ).encode()
+
+    assert (await grade_authored(case, workspace, Probe()))["hard_passed"]
+    case["judge"].pop("pagination_metadata")
+    assert not (await grade_authored(case, workspace, Probe()))["hard_passed"]

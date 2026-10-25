@@ -446,7 +446,7 @@ def register_foundations(registry, settings):
             )
             return result
         shell_args = {key: value for key, value in args.items() if key != "command"}
-        shell_args["argv"] = ["bash", "-lc", args["command"]] if "command" in args else argv
+        shell_args["argv"] = ["bash", "-c", args["command"]] if "command" in args else argv
         return await registry.registry["shell"].handler(shell_args, binding)
 
     async def resolved_only(args, binding):

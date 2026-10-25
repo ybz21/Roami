@@ -32,6 +32,16 @@ def resolve(base, value):
 
 
 async def execute(args):
+    if args.command == "quarantine-operation":
+        from roami_agent.improvement.operation_accounting import quarantine_operation
+
+        return quarantine_operation(
+            Ledger(args.ledger),
+            args.owner,
+            args.operation,
+            reason=args.reason,
+            evidence=args.evidence,
+        )
     if args.command == "configure-review-publication":
         from roami_agent.improvement.github_publication import configure_publication
 
@@ -423,6 +433,12 @@ async def execute(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    p = commands.add_parser("quarantine-operation")
+    p.add_argument("--ledger", required=True, type=Path)
+    p.add_argument("--owner", required=True)
+    p.add_argument("--operation", required=True)
+    p.add_argument("--reason", required=True)
+    p.add_argument("--evidence", required=True, type=Path)
     p = commands.add_parser("smoke")
     p.add_argument("--output-root", required=True, type=Path)
     for name in ("cycle", "watch"):

@@ -304,6 +304,19 @@ class NativeFilesExecutor:
         except (DomainError, TimeoutError) as error:
             failure = error.code if isinstance(error, DomainError) else "RSI_TIME_BUDGET"
         finally:
+            if self.settle_maintenance:
+                try:
+                    async with asyncio.timeout(
+                        max(0, case["limits"]["seconds"] - (time.monotonic() - started))
+                    ):
+                        while await database.call(
+                            lambda db: db.execute(
+                                "SELECT COUNT(*) FROM jobs WHERE state='running'"
+                            ).fetchone()[0]
+                        ):
+                            await asyncio.sleep(0.02)
+                except TimeoutError:
+                    pass
             await runtime.close()
             for provider in providers:
                 if hasattr(provider, "close"):

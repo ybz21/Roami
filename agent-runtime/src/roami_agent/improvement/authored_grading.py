@@ -84,6 +84,13 @@ async def grade_authored(case, workspace, executor):
             )
             expected_items = sorted(spec["items"], key=lambda i: i["name"])
             responses = output["responses"]
+            if spec.get("pagination_metadata"):
+                responses = [
+                    [r[0], {key: r[1].get(key) for key in ("items", "total")}]
+                    if isinstance(r[1], dict) and r[0] == 200
+                    else r
+                    for r in responses
+                ]
             checks["default_page"] = responses[0] == [
                 200,
                 {"items": expected_items[:5], "total": 12},
@@ -143,9 +150,13 @@ async def grade_authored(case, workspace, executor):
             checks["constraints"] = all(data.get(k) == v for k, v in expected.items() if k != "new")
             ids = {"project_path", "budget", "immutable_api", "mobile", "offline_recovery"}
             checks["stories_acceptance"] = (
-                set(data.get("requirements", [])) == ids
-                and set(data.get("stories", {})) == ids
-                and set(data.get("acceptance", {})) == ids
+                isinstance(data.get("requirements"), list)
+                and all(isinstance(v, str) for v in data["requirements"])
+                and set(data["requirements"]) == ids
+                and isinstance(data.get("stories"), dict)
+                and set(data["stories"]) == ids
+                and isinstance(data.get("acceptance"), dict)
+                and set(data["acceptance"]) == ids
                 and data.get("interfaces") == ["/v1/report"]
             )
             checks["architecture"] = "<svg" in read_file(workspace, "architecture.svg") and all(

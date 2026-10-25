@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from roami_agent.improvement.codex_roles import codex_json
 from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.github_publication import command, publication_profile
+from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.run_records import STAGES
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -59,12 +60,7 @@ class RunCosts:
                 ),
                 "RSI_USAGE_UNKNOWN",
             )
-            require(
-                not db.execute(
-                    "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND state='unknown'", (owner,)
-                ).fetchone(),
-                "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
-            )
+            assert_operation_costs_settled(db, owner)
             require(not snapshot.get("imported"), "RSI_DAILY_BUDGET")
             rows = db.execute(
                 "SELECT * FROM rsi_pipeline_costs WHERE owner=? AND run_id=?", (owner, self.run_id)

@@ -10,3 +10,6 @@
 .pipeline-code, .pipeline-artifact pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-meta); padding: var(--sp-3); background: var(--bg-container); }
 .pipeline-run-detail details > summary { cursor: pointer; padding-block: var(--sp-2); }
 html[data-pointer="coarse"] .pipeline-run-detail summary { min-height: var(--tap); }
+.pipeline-role-form { display: grid; gap: var(--sp-3); min-width: 0; }
+html[data-pointer="coarse"] .pipeline-settings + .agent-rsi-actions .ant-btn { position: relative; }
+html[data-pointer="coarse"] .pipeline-settings + .agent-rsi-actions .ant-btn::after { content: ''; position: absolute; left: calc(-1 * var(--sp-1)); right: calc(-1 * var(--sp-1)); top: 50%; height: var(--tap); transform: translateY(-50%); }

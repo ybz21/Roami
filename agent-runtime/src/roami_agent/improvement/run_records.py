@@ -19,7 +19,13 @@ DEFAULTS = {
     "generation_tokens": 300000,
     "codex_tokens": 64000,
     "output_tokens": 8192,
+    "main_output_tokens": None,
+    "worker_output_tokens": None,
     "memory_output_tokens": 2048,
+    "main_model": None,
+    "main_reasoning_effort": None,
+    "worker_model": None,
+    "worker_reasoning_effort": None,
     "memory_model": None,
     "memory_reasoning_effort": None,
 }
@@ -196,24 +202,42 @@ class RunRecords:
     def configure(self, owner, value):
         require(
             isinstance(value, dict)
-            and set(DEFAULTS) - {"memory_model", "memory_reasoning_effort"}
+            and set(DEFAULTS)
+            - {
+                "main_output_tokens",
+                "worker_output_tokens",
+                "main_model",
+                "main_reasoning_effort",
+                "worker_model",
+                "worker_reasoning_effort",
+                "memory_model",
+                "memory_reasoning_effort",
+            }
             <= set(value)
             <= set(DEFAULTS),
             "RSI_INVALID_SETTINGS",
         )
-        value = {**DEFAULTS, **value}
-        require(
-            value["memory_model"] is None
-            or isinstance(value["memory_model"], str)
-            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}", value["memory_model"]),
-            "RSI_INVALID_SETTINGS",
-        )
+        value = {**self.settings(owner), **value}
+        for role in ("main", "worker"):
+            cap = value[role + "_output_tokens"]
+            require(
+                cap is None or type(cap) is int and 512 <= cap <= 1_000_000,
+                "RSI_POLICY_OUT_OF_RANGE",
+            )
         from roami_agent.providers.reasoning_effort import EFFORTS
 
-        require(
-            value["memory_reasoning_effort"] is None or value["memory_reasoning_effort"] in EFFORTS,
-            "RSI_INVALID_SETTINGS",
-        )
+        for role in ("main", "worker", "memory"):
+            model, effort = value[role + "_model"], value[role + "_reasoning_effort"]
+            require(
+                model is None
+                or isinstance(model, str)
+                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}", model),
+                "RSI_INVALID_SETTINGS",
+            )
+            require(
+                effort is None or isinstance(effort, str) and effort in EFFORTS,
+                "RSI_INVALID_SETTINGS",
+            )
         require(type(value["auto_publish"]) is bool)
         for key, lower, upper in (
             ("daily_tokens", 10000, 100000000),

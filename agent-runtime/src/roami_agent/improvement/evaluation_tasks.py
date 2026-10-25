@@ -8,6 +8,8 @@ from pathlib import Path
 from roami_agent.improvement.contracts import require
 from roami_agent.protocol.errors import DomainError
 
+NATIVE_TASK_REQUEST = "本次任务明确使用内置Native Worker执行。"
+
 
 def bind_evaluation_tasks(runtime, workspace):
     root = workspace.resolve()

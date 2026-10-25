@@ -327,6 +327,7 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
     )
     base = load_suite(suite_file(tmp_path))["cases"][0]
+    base["limits"]["tokens"] = 200000
     path = tmp_path / "two.json"
     path.write_text(json.dumps(freeze_suite("two", [{**base, "id": name} for name in ("a", "b")])))
     service.control.register_suite("local", path)
@@ -344,7 +345,7 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
             return {}
 
         async def run(self, case, policy, target):
-            calls.append(case["id"])
+            calls.append((case["id"], case["limits"]["tokens"]))
             return {
                 "grade": {"passed": False},
                 "metrics": {"tokens": None, "artifact_review_tokens": None},
@@ -357,7 +358,96 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
         service.control.claim(),
     )
     value = service.runs.get("local", run["id"])
-    assert calls == ["a"]
+    assert calls == [("a", 200000)]
     assert value["summary"]["artifact_review_tokens"] is None
     assert value["cases"][1]["signals"] == ["RSI_USAGE_UNKNOWN"]
     assert next(n for n in value["nodes"] if n["node"] == "evaluate")["state"] == "blocked"
+
+
+def test_quarantine_keeps_full_cost_unknown_and_cannot_replay(tmp_path):
+    from roami_agent.improvement.operation_accounting import quarantine_operation
+
+    service = ImprovementStatus(tmp_path)
+    evidence = tmp_path / "receipt.json"
+    evidence.write_text('{"error":"MODEL_DEADLINE","requests":1,"local_process_ended":true}')
+    with service.ledger.connection() as db:
+        db.execute("INSERT INTO rsi_budgets VALUES('local','today',1000000,20,100000,0)")
+        db.execute(
+            "INSERT INTO rsi_operation_costs VALUES('old','local','today',100000,'unknown',?)",
+            (json.dumps({"value": {"metrics": {"tokens": None}}}),),
+        )
+    workflow = service.research
+    with pytest.raises(DomainError, match="RECONCILIATION"):
+        workflow.reserve_operation("local", "today", "new", 10000)
+    with pytest.raises(DomainError, match="NOT_FOUND"):
+        quarantine_operation(
+            service.ledger,
+            "other",
+            "old",
+            reason="Ended local request; retain full reservation",
+            evidence=evidence,
+        )
+    receipt = quarantine_operation(
+        service.ledger,
+        "local",
+        "old",
+        reason="Ended local request; retain full reservation",
+        evidence=evidence,
+    )
+    assert receipt["reservation_retained"] == 100000
+    assert workflow.reserve_operation("local", "today", "new", 10000) is None
+    with pytest.raises(DomainError, match="RECONCILIATION"):
+        workflow.reserve_operation("local", "today", "old", 100000)
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 110000
+        result = json.loads(
+            db.execute("SELECT result_json FROM rsi_operation_costs WHERE id='old'").fetchone()[0]
+        )
+        assert result["value"]["metrics"]["tokens"] is None
+
+
+def test_missing_optional_fields_preserve_saved_role_routes(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    settings = service.runs.settings("local")
+    saved = service.runs.configure(
+        "local", {**settings, "worker_model": "glm-5.3-flash", "worker_reasoning_effort": "low"}
+    )
+    legacy = {
+        k: v
+        for k, v in saved.items()
+        if not k.startswith(("worker_", "memory_model", "memory_reasoning"))
+    }
+    assert service.runs.configure("local", legacy)["worker_model"] == "glm-5.3-flash"
+
+
+def test_known_operation_settles_actual_admission_and_unknown_keeps_reservation(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    with service.ledger.connection() as db:
+        db.execute("INSERT INTO rsi_budgets VALUES('local','today',100000,20,0,0)")
+    workflow = service.research
+    workflow.reserve_operation("local", "today", "one", 50000)
+    workflow.settle_operation("local", "one", {"value": {"metrics": {"tokens": 1000}}})
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 1000
+    with pytest.raises(DomainError, match="CONFLICT"):
+        workflow.settle_operation("local", "one", {"value": {"metrics": {"tokens": 1000}}})
+    workflow.reserve_operation("local", "today", "two", 50000)
+    workflow.settle_operation("local", "two", {"value": {"metrics": {"tokens": None}}})
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 51000
+        assert (
+            db.execute("SELECT state FROM rsi_operation_costs WHERE id='two'").fetchone()[0]
+            == "unknown"
+        )
+
+
+def test_legacy_completed_record_with_unknown_usage_still_blocks_new_work(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    with service.ledger.connection() as db:
+        db.execute("INSERT INTO rsi_budgets VALUES('local','today',100000,20,50000,0)")
+        db.execute(
+            "INSERT INTO rsi_operation_costs VALUES('legacy','local','today',50000,'completed',?)",
+            (json.dumps({"value": {"metrics": {"tokens": None}}}),),
+        )
+    with pytest.raises(DomainError, match="RECONCILIATION"):
+        service.research.reserve_operation("local", "today", "new", 1000)

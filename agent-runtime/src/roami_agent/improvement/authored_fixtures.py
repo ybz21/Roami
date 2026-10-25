@@ -127,9 +127,10 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
 """
         required = ["app.py", "test_items.py"]
         schema = {
-            "contract": "app.py 从PORT读端口；/health保持200；非法page/pageSize返回400，pageSize上限100；补unittest测试。"
+            "contract": "app.py 从PORT读端口；/health保持200；非法page/pageSize返回400，pageSize上限100；响应必要字段为items与total，可附带page/pageSize元数据；补unittest测试。"
         }
         judge["items"] = rows
+        judge["pagination_metadata"] = True
     elif case_id == "OPS-04":
         rows = [{"id": i, "value": nonce + str(i)} for i in range(100)]
         files["source/database.json"] = json.dumps({"schema": 1, "records": rows})
@@ -164,6 +165,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         files["previous-plan.json"] = json.dumps(inputs)
         required = ["plan.md", "architecture.svg", "result.json"]
         schema = {
+            "contract": "result.json顶层保留previous-plan.json的project_path、budget、immutable_api、source_receipt，字段值和类型不变。requirements为需求ID字符串数组；stories和acceptance为需求ID到文字的对象；interfaces为字符串数组。",
             "requirements": [
                 "project_path",
                 "budget",
@@ -396,7 +398,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             expected = {**backtest(data["bars"]), "receipt": nonce}
             required += ["trades.csv", "equity.svg"]
             schema = {
-                "contract": "MA3/MA5：已有5个收盘价后，MA3>MA5持有一倍现货多头，否则空仓；下一bar开盘成交，全现金含买入费买入或全部卖出；不强制期末平仓；小数股可用；result.json含trades（signal_bar/execution_bar/side/price/quantity/fee）、逐bar equity与receipt；另存trades.csv、equity.svg。误差1e-5。analysis.py重跑产生同结果。"
+                "contract": "MA3/MA5：已有5个收盘价后，MA3>MA5持有一倍现货多头，否则空仓；下一bar开盘成交，全现金含买入费买入或全部卖出；不强制期末平仓；小数股可用；result.json含trades（signal_bar/execution_bar/side/price/quantity/fee）、逐bar equity数值数组与原始receipt字符串（不得改成对象），只包含这三个顶层字段；买入价=open*(1+slippage)，卖出价=open*(1-slippage)，费用和滑点均取prices.json。另存trades.csv、equity.svg。误差1e-5。analysis.py重跑产生同结果。"
             }
         elif case_id == "QUANT-02":
             data.update(
@@ -519,7 +521,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
     prompt += (
         "\n必要产物："
         + ", ".join(required)
-        + "。如有result.json，字段按合同给出，不添加未证实信息。报告引用输入文件与receipt。"
+        + "。如有result.json，字段按合同给出，不添加未证实信息。报告引用输入文件并原样包含输入的receipt字符串；有source_receipt时同样原样保留。"
     )
     editable = {"app.py", "index.html", "existing.js"}
     protected = sorted(set(protected) | (set(files) - editable))

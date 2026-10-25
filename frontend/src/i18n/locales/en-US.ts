@@ -3840,9 +3840,16 @@ const enUS = {
   'agent.pipeline.publishIssue': "Publish GitHub issue",
   'agent.experiment.hint.evaluate': "Evaluate in isolation and save artifacts, scores and call records.",
 
+  'agent.pipeline.autoOutput': 'Use model and remaining task budget',
+  'agent.pipeline.setting.main_output_tokens': 'Main output allowance',
+  'agent.pipeline.setting.worker_output_tokens': 'Worker output allowance',
+  'agent.pipeline.setting.main_model': 'Main agent model',
+  'agent.pipeline.setting.main_reasoning_effort': 'Main agent reasoning effort',
+  'agent.pipeline.setting.worker_model': 'Worker model',
+  'agent.pipeline.setting.worker_reasoning_effort': 'Worker reasoning effort',
   'agent.pipeline.setting.memory_model': 'Memory model',
   'agent.pipeline.setting.memory_reasoning_effort': 'Memory reasoning effort',
-  'agent.pipeline.workerDefault': 'Use Worker settings',
+  'agent.pipeline.workerDefault': 'Use default settings',
   'agent.pipeline.artifactTokens': 'Artifact rating usage: {count} tokens',
 }
 
