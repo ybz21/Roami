@@ -327,7 +327,7 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
     )
     base = load_suite(suite_file(tmp_path))["cases"][0]
-    base["limits"]["tokens"] = 200000
+    base["limits"]["tokens"] = 384000
     path = tmp_path / "two.json"
     path.write_text(json.dumps(freeze_suite("two", [{**base, "id": name} for name in ("a", "b")])))
     service.control.register_suite("local", path)
@@ -358,7 +358,16 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
         service.control.claim(),
     )
     value = service.runs.get("local", run["id"])
-    assert calls == [("a", 200000)]
+    assert calls == [("a", 268000)]
+    budgets = [
+        json.loads(service.runs.read_artifact("local", run["id"], a["id"])["text"])
+        for a in value["artifacts"]
+        if a["name"].startswith("budget-") and a["name"] != "budget-plan.json"
+    ]
+    first = next(b for b in budgets if b["case_id"] == "a")
+    assert first["original_limits"]["tokens"] == 384000
+    assert first["effective_limits"]["tokens"] == 268000
+    assert first["reserved_for_later_cases"] == 32000
     assert value["summary"]["artifact_review_tokens"] is None
     assert value["cases"][1]["signals"] == ["RSI_USAGE_UNKNOWN"]
     assert next(n for n in value["nodes"] if n["node"] == "evaluate")["state"] == "blocked"

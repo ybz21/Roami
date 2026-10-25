@@ -471,7 +471,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "read",
-            "Read a file, skill://NAME workflow, skill://NAME/references/FILE.md, or artifact://ID. Load only relevant skill references. File access uses the bound workspace or configured roots.",
+            "Read a file, skill://NAME workflow, skill://NAME/references/FILE.md, or artifact://ID. Load only relevant skill references. File access uses the bound workspace or configured roots. Image file reads return metadata, not visual input; use an image-capable observation to inspect pixels.",
             registry.registry["file_read"].schema,
             resolved_only,
             main=True,

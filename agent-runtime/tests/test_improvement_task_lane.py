@@ -155,7 +155,17 @@ async def test_runtime_failure_is_exported_even_when_output_preexists(tmp_path):
     assert result["grade"]["reason"] in result["release_blockers"]
 
 
-async def test_container_failure_zeroes_score_despite_correct_artifact(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "blocker,reason",
+    [
+        ("RSI_NATIVE_TASK_FAILED", "RSI_RUNTIME_REPORTED_FAILURE"),
+        ("RSI_TOKEN_BUDGET", "RSI_TOKEN_BUDGET"),
+        ("private arbitrary error text", "RSI_RUNTIME_REPORTED_FAILURE"),
+    ],
+)
+async def test_container_failure_zeroes_score_despite_correct_artifact(
+    tmp_path, monkeypatch, blocker, reason
+):
     from roami_agent.improvement import containers
 
     class Unused:
@@ -164,7 +174,7 @@ async def test_container_failure_zeroes_score_despite_correct_artifact(tmp_path,
     async def docker(*args, **kwargs):
         if args[0] == "start":
             (tmp_path / "state" / "response.json").write_text(
-                json.dumps({"output": "", "release_blockers": ["RSI_NATIVE_TASK_FAILED"]})
+                json.dumps({"output": "", "release_blockers": [blocker]})
             )
         return b""
 
@@ -182,3 +192,40 @@ async def test_container_failure_zeroes_score_despite_correct_artifact(tmp_path,
     assert result["grade"]["quality"] == 0
     assert not result["grade"]["passed"] and not result["grade"]["hard_passed"]
     assert not result["verified_delivery"]
+    assert result["grade"]["reason"] == reason
+
+
+@pytest.mark.parametrize(
+    "summary,current,expected",
+    [
+        ("RSI_TOKEN_BUDGET", True, "RSI_TOKEN_BUDGET"),
+        ("RSI_TIME_BUDGET", True, "RSI_TIME_BUDGET"),
+        ("RSI_USAGE_UNKNOWN", True, "RSI_USAGE_UNKNOWN"),
+        ("RSI_REQUEST_BUDGET", True, "RSI_REQUEST_BUDGET"),
+        ("private error text", True, "RSI_NATIVE_TASK_FAILED"),
+        (["RSI_TOKEN_BUDGET"], True, "RSI_NATIVE_TASK_FAILED"),
+        ("RSI_TOKEN_BUDGET", False, "RSI_NATIVE_TASK_FAILED"),
+    ],
+)
+async def test_native_failure_preserves_only_current_attempt_budget_codes(
+    store, summary, current, expected
+):
+    from test_routing_policy import setup
+    from test_task_delivery_benchmark import admit, mark
+
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        task = await admit(runtime, binding, "Save output", "budget")
+        await mark(runtime, task, result={"state": "failed", "summary": summary})
+        if not current:
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE tasks SET revision=revision+1 WHERE id=?", (task["id"],)
+                ),
+                write=True,
+            )
+        with pytest.raises(DomainError) as failure:
+            await settle_evaluation_tasks(store)
+        assert failure.value.code == expected
+    finally:
+        await runtime.close()

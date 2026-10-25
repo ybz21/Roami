@@ -61,7 +61,7 @@ def reported_paths(text, root=None):
             re.escape(root.rstrip("/"))
             + r"/[^\r\n]*?(?:"
             + suffixes
-            + r")(?=$|[\s\"'`<>()[\]{}，。；：！？、])",
+            + r")(?=$|[\s\"'`<>()[\]{}*，。；：！？、（）]|\\[nr])",
             text,
         )
     return list(dict.fromkeys(paths))[:12]

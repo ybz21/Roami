@@ -461,7 +461,16 @@ class ContainerExecutor:
                     if gateway.errors:
                         failure = gateway.errors[0]
                     elif response["release_blockers"]:
-                        failure = "RSI_RUNTIME_REPORTED_FAILURE"
+                        from roami_agent.improvement.evaluation_tasks import NATIVE_BUDGET_FAILURES
+
+                        failure = next(
+                            (
+                                c
+                                for c in response["release_blockers"]
+                                if isinstance(c, str) and c in NATIVE_BUDGET_FAILURES
+                            ),
+                            "RSI_RUNTIME_REPORTED_FAILURE",
+                        )
                 if project is not None and any(
                     r["state"] in {"running", "unknown"} for r in project.records
                 ):

@@ -94,3 +94,37 @@ async def test_literal_percent_and_space_in_source_names_remain_distinct(store, 
         assert len(references) == 2
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("separator", ["\n", r"\n"])
+async def test_bold_reported_outputs_with_cjk_notes_are_both_delivered(store, tmp_path, separator):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        task = await admit(runtime, binding, "Create demo", "demo", executor="codex")
+        page, readme = tmp_path / "index.html", tmp_path / "README.md"
+        page.write_text("<!doctype html><title>Demo</title>")
+        readme.write_text("Open index.html offline.")
+        summary = separator.join(
+            [f"**{page}**（可直接 `file://{page}` 打开）", f"**{readme}**（运行入口）"]
+        )
+        assert reported_paths(summary, str(tmp_path)) == [str(page), str(readme)]
+        assert reported_paths(separator.join([str(page), str(readme)]), str(tmp_path)) == [
+            str(page),
+            str(readme),
+        ]
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {"state": "succeeded", "summary": summary, "workspace": {"directory": str(tmp_path)}},
+        )
+        detail = await runtime.tasks.get("alice", task["id"])
+        artifacts = detail["delivery"]["artifacts"]
+        assert {a["name"] for a in artifacts} == {"index.html", "README.md"}
+        assert not detail["delivery"]["unavailable"]
+        page.unlink()
+        readme.unlink()
+        for a in artifacts:
+            assert (await runtime.artifacts.read("alice", a["id"]))[1]
+    finally:
+        await runtime.close()
