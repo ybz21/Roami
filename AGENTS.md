@@ -427,6 +427,8 @@ agent-runtime/src/roami_agent/tools/
   </ul>
 </section>
 
+
+
 <section id="rsi-source-delivery-20261025" lang="zh-CN">
 <h2>RSI源码文件交付修复 · 2026-10-25</h2>
 <h3>Product Design</h3><p>原生与专业任务显式生成的Python、TypeScript、Go等源码和脚本，与文档一样保留可下载原件。不同路径写法指向同一份产物时只展示一份，用户已删除的文件不因换用链接写法重新导入。</p>
@@ -1200,6 +1202,16 @@ Operation：running → completed（实际结算） / unknown → 本机显式qu
 <p>Worker执行环境修订：普通bash命令使用非登录shell，继承已准备的PATH及虚拟环境；避免登录配置覆盖渲染依赖。回归测试运行PATH中的真实可执行文件，并确认未读取登录profile。显式argv仍允许调用者选择登录shell。</p>
 <p>2026-10-25实证：Native机制20/20通过；真实CODE-01通过独立检查，79,420 Token/16次请求，Main/Worker自动输出额度超过8192并随余额变化，过程仍保留TASK_RESULT_REQUIRED与WORKSPACE_REQUIRED恢复记录。OpenCode加deepseek-4.1-flash完成真实文件创建、3项独立测试、重复启动幂等和原对话续接，成功轮42,958 Token/8次请求；本轮含两次失败尝试共169,683 Token，全部结算。前端966项及生产构建通过；桌面7档宽度、中英深浅主题与Redmi真机确认保存、键盘、滚动、返回及44px按钮命中区。原10项的两份产物仍待独立评分，人工参考分未确认，Issue #446未关闭；合同修订不作为旧题收益证据。汇总证据位于/tmp/roami-rsi-continue-report/，未部署现用服务。</p>
 <p>最终整仓full门禁通过，包含Go测试、运行时1281项、前端检查和生产构建。首次整仓检查遇到Xvfb在5秒内未就绪，独立桌面组6项通过后，在降低并发负载的完整重跑中未再出现该错误；保留两次检查日志，不修改或跳过该测试。</p>
+</section>
+
+<section id="rsi-conflict-recovery-20261025" lang="zh-CN">
+<h2>RSI冲突恢复与预算证据 · 2026-10-25</h2>
+<h3>Product Design</h3><p>文件冲突返回明确的恢复步骤：重新读取、核对当前内容和hash后修改，保留其他人的编辑，不用shell绕过校验。诊断运行同时记录原题额度和本轮实际分配额度，避免把共享预算压缩误判为原题预算不足。</p>
+<h3>User Stories</h3><p>Worker误用新建模式或遇到并发修改时，能读回最新内容后继续完成原任务。维护者能区分Token、调用次数、时限和未知用量阻塞，而不是只看到委派失败；失败仍阻止成绩通过。</p>
+<h3>Technical Design</h3><p>ToolGateway对FILE_CHANGED补充恢复指令；仅文件写入冲突标记writePublished=false，源hash校验保持原样。模型侧图片文件read仅返回hash、大小和分页元信息，contentOmitted=true，不把base64字节当作可视输入塞进模型上下文；底层WorkspaceFiles读取和受控视觉观察保持原有接口。Worker指令要求自行读取现有文件；无图像观察能力时使用DOM、布局和行为检查并报告限制。PipelineRunner在evaluate产物中保存每个Case的原始／有效limits、已知用量、共享上限和后续Case预留。evaluation_tasks只从当前修订的最新失败Attempt提取四种已知预算错误，ContainerExecutor保留该根因；任意模型文本仍只产生通用失败。</p>
+<p>产物路径识别同时支持Markdown加粗、中文括注、真实换行及模型输出的转义换行，避免把说明文字并入路径或遗漏README；仍使用原有工作区和文件类型边界。</p>
+<p>版本绑定修订：同一任务、修订和Attempt的Main完成回合如果通过文件工具修正了产物，TaskDeliverables按成功工具回执中的sha256创建新的私有快照，保留旧版历史。文件内容不匹配回执时拒绝发布；其他任务的回合、未记录的外部修改以及已删除产物不能借此替换或恢复。使用文件线程池校验暂存内容，不增加后台轮询。</p>
+<p>定向112项通过，包含两次文件冲突及并发修改保护、图片元信息与底层原字节接口、当前修订预算根因保留、任意错误文本隔离、原始384,000／有效268,000额度证据，以及加粗路径的两份文件持久交付。上一轮DEMO两项补测实际分配208,000而原题为384,000；已纠正PR #448及Issue #446中的“原Case上限”说法。完整384,000额度下DeepSeek轮仍失败，用量323,370，保留失败；图片元信息修订后以GLM Worker和180,000诊断额度完成，118,408 Token／18请求，容器外硬检查通过、质量待评。路由与额度不同，不据此宣称同条件收益。使用真实生成文件做零模型调用的交付适配器回放，HTML和README在工作区删除后仍可按原hash读取。评分校准仍要求人工参考分。</p>
 </section>
 
 <section id="native-session-experience-20261025" lang="zh-CN">

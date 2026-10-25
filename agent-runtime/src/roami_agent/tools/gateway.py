@@ -3,6 +3,7 @@
 import asyncio
 import math
 import time
+from pathlib import PurePath
 
 import httpx
 from jsonschema import ValidationError
@@ -168,6 +169,18 @@ class ToolGateway:
             value = await self.tools.invoke(
                 call, role, dict(binding, progress=progress, assistantMessageId=mid)
             )
+            if (
+                operation_name == "file_read"
+                and isinstance(value, dict)
+                and PurePath(args["path"]).suffix.lower()
+                in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+            ):
+                value = {
+                    **value,
+                    "data": "",
+                    "contentOmitted": True,
+                    "recovery": "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Use an available image-capable observation, or check layout and behavior programmatically and report that visual inspection is unavailable.",
+                }
             state = (
                 "failed"
                 if isinstance(value, dict)
@@ -177,6 +190,12 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] == "FILE_CHANGED":
+                value["recovery"] = (
+                    "Read the same file again with read, review its current contents, then use that read's exact sha256 as expectedSha256. JSON null is only for creating a missing file. Preserve unrelated changes; do not retry the stale edit or bypass the check with shell redirection."
+                )
+                if operation_name in {"file_write", "file_patch"}:
+                    value["writePublished"] = False
             if value["error"] in {"TASK_RESULT_REQUIRED", "TASK_REPLY_TASK_MISMATCH"}:
                 value["recovery"] = (
                     "This is a completion report for one task. Deliver its actual requested findings, "

@@ -103,6 +103,8 @@ MAIN_INSTRUCTIONS = (
 )
 WORKER_INSTRUCTIONS = (
     "Complete the delegated goal using read, bash, edit, write and tool_list as available. "
+    "Read existing files yourself before editing and use the returned sha256; a coordinator's description is not an observed hash. "
+    "After FILE_CHANGED, reread and reconcile the current contents before editing; never bypass the conflict with shell redirection. "
     "Use known Skills and CLI operations directly; use tool_list only for unfamiliar capabilities. Read skill://NAME as needed, then run CLI argv "
     "with bash. Roami capabilities preserve observations, resource leases and durable receipts. "
     "For browser work read skill://browser_use and use the roami chrome family through bash. "
@@ -139,6 +141,8 @@ WORKER_INSTRUCTIONS = (
     "For visual deliverables, render with an available local tool and inspect the target viewport before delivery. "
     "For SVG, check that text bounds fit the viewBox; fix clipped or overlapping labels by wrapping or changing the layout. "
     "If rendering is unavailable, report that limitation instead of claiming visual verification. "
+    "Reading a screenshot as base64 text is not visual inspection. Use an available image-capable observation; "
+    "otherwise verify DOM/layout bounds and behavior programmatically, and report that visual inspection remains unavailable. "
     "Automatic browser/desktop captures are internal evidence, not default attachments. Include "
     "their real downloadUrl in the final report only when a capture is a requested deliverable; "
     "ordinary lookups return text and source links. Browser observations already "

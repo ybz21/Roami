@@ -254,6 +254,20 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             )
         target = directory / ("case-" + digest(case_id)[:20])
         target.mkdir(mode=0o700)
+        records.artifact(
+            owner,
+            run_id,
+            "evaluate",
+            "budget-" + digest(case_id)[:20] + ".json",
+            {
+                "case_id": case_id,
+                "original_limits": original["limits"],
+                "effective_limits": case["limits"],
+                "run_tokens_used": budget.used,
+                "run_token_limit": budget.limits["tokens"],
+                "reserved_for_later_cases": remaining_real * minimum_start,
+            },
+        )
         if (budget.unknown or artifact_tokens is None) and case["judge"]["kind"] != "mechanism":
             result = {
                 "grade": {"passed": False, "reason": "RSI_USAGE_UNKNOWN"},

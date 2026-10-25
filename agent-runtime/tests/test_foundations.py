@@ -346,6 +346,107 @@ async def test_malformed_cli_arguments_have_an_executable_recovery_example(store
         await runtime.close()
 
 
+async def test_file_conflict_recovery_rereads_and_preserves_concurrent_edit(store, tmp_path):
+    source = tmp_path / "answer.txt"
+    source.write_text("original")
+
+    class Repair:
+        model = "file-conflict-recovery"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            if self.calls in {2, 4}:
+                failure = json.loads(messages[-1]["content"])
+                assert failure["error"] == "FILE_CHANGED"
+                assert failure["writePublished"] is False
+                assert "read" in failure["recovery"] and "shell redirection" in failure["recovery"]
+                assert source.read_text() == ("original" if self.calls == 2 else "human edit")
+                arguments, name = {"path": str(source)}, "read"
+            elif self.calls in {1, 3, 5}:
+                observed = json.loads(messages[-1]["content"]) if self.calls != 1 else None
+                if self.calls == 3:
+                    source.write_text("human edit")
+                arguments, name = (
+                    {
+                        "path": str(source),
+                        "expectedSha256": observed["sha256"] if observed else None,
+                        "content": observed["data"] + " + fix" if observed else "replace",
+                    },
+                    "write",
+                )
+            else:
+                assert source.read_text() == "human edit + fix"
+                yield ModelEvent("text", "Saved the corrected file.")
+                return
+            wire = call(name, arguments)
+            wire["id"] = "step-" + str(self.calls)
+            yield ModelEvent("tool", wire)
+
+    model = Repair()
+    runtime = Runtime(store, model, settings=Settings(shell_roots=(tmp_path,)))
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        receipt = await runtime.chat.submit("alice", conversation["id"], "fix", "Fix the file")
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (receipt["turnId"],)
+            ),
+        )
+        assert source.read_text() == "human edit + fix"
+    finally:
+        await runtime.close()
+
+
+async def test_model_image_read_keeps_hash_without_sending_binary_text(store, tmp_path):
+    import hashlib
+
+    from PIL import Image
+
+    image = tmp_path / "preview.png"
+    Image.new("RGB", (80, 60), color="red").save(image)
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+
+    class Reader:
+        model = "image-file-read"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                yield ModelEvent("tool", call("read", {"path": str(image)}))
+            else:
+                value = json.loads(messages[-1]["content"])
+                assert value["data"] == "" and value["contentOmitted"] is True
+                assert value["sha256"] == digest and value["sizeBytes"] == image.stat().st_size
+                assert "not a visual observation" in value["recovery"]
+                yield ModelEvent("text", "The file is saved; visual inspection is unavailable.")
+
+    model = Reader()
+    runtime = Runtime(store, model, settings=Settings(shell_roots=(tmp_path,)))
+    await runtime.start()
+    try:
+        raw = await runtime.files.read({"path": str(image)}, {})
+        assert raw["encoding"] == "base64" and raw["data"]
+        conversation = await runtime.conversations.create("alice")
+        receipt = await runtime.chat.submit(
+            "alice", conversation["id"], "image", "Inspect the file"
+        )
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (receipt["turnId"],)
+            ),
+        )
+        messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
+        assert raw["data"] not in json.dumps(messages)
+        assert model.calls == 2
+    finally:
+        await runtime.close()
+
+
 async def test_exact_task_status_filters_before_page_limit_and_preserves_scope(store):
     runtime = Runtime(store, ConversationModel())
     try:

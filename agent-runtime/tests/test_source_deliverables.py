@@ -5,6 +5,8 @@ import pytest
 from test_routing_policy import setup
 from test_task_delivery_benchmark import admit, mark
 
+from roami_agent.server.configuration import Settings
+from roami_agent.storage.database import row
 from roami_agent.storage.task_deliverables import read_output, reported_paths
 
 
@@ -92,5 +94,130 @@ async def test_literal_percent_and_space_in_source_names_remain_distinct(store, 
         references = detail["delivery"]["artifacts"]
         assert {r["name"] for r in references} == set(names)
         assert len(references) == 2
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("separator", ["\n", r"\n"])
+async def test_bold_reported_outputs_with_cjk_notes_are_both_delivered(store, tmp_path, separator):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        task = await admit(runtime, binding, "Create demo", "demo", executor="codex")
+        page, readme = tmp_path / "index.html", tmp_path / "README.md"
+        page.write_text("<!doctype html><title>Demo</title>")
+        readme.write_text("Open index.html offline.")
+        summary = separator.join(
+            [f"**{page}**（可直接 `file://{page}` 打开）", f"**{readme}**（运行入口）"]
+        )
+        assert reported_paths(summary, str(tmp_path)) == [str(page), str(readme)]
+        assert reported_paths(separator.join([str(page), str(readme)]), str(tmp_path)) == [
+            str(page),
+            str(readme),
+        ]
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {"state": "succeeded", "summary": summary, "workspace": {"directory": str(tmp_path)}},
+        )
+        detail = await runtime.tasks.get("alice", task["id"])
+        artifacts = detail["delivery"]["artifacts"]
+        assert {a["name"] for a in artifacts} == {"index.html", "README.md"}
+        assert not detail["delivery"]["unavailable"]
+        page.unlink()
+        readme.unlink()
+        for a in artifacts:
+            assert (await runtime.artifacts.read("alice", a["id"]))[1]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("mode", ["same_task", "external_edit", "deleted", "other_task"])
+async def test_completion_edit_publishes_exact_new_snapshot_only_for_its_task(
+    store, tmp_path, mode
+):
+    runtime, _, _, _, binding = await setup(
+        store, settings=Settings(shell_roots=(tmp_path,), coding_directory=tmp_path)
+    )
+    try:
+        task = await admit(runtime, binding, "Create page", "page", executor="codex")
+        source = tmp_path / "index.html"
+        source.write_text("old")
+        result = {
+            "state": "succeeded",
+            "summary": str(source),
+            "workspace": {"directory": str(tmp_path)},
+        }
+        await mark(runtime, task, "waiting_user", result)
+        original = (await runtime.tasks.get("alice", task["id"]))["delivery"]["artifacts"][0]
+        callback_task = task
+        if mode == "other_task":
+            callback_task = await admit(runtime, binding, "Another task", "other", executor="codex")
+            await mark(runtime, callback_task, "waiting_user", result)
+        raw_task = await store.call(
+            lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (callback_task["id"],))
+        )
+        attempt = await store.call(
+            lambda db: row(
+                db, "SELECT * FROM task_attempts WHERE task_id=?", (callback_task["id"],)
+            )
+        )
+        await runtime.dispatch.complete(raw_task, attempt, result, "waiting_user")
+        job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.runId')=?",
+                (attempt["id"],),
+            )
+        )
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE turns SET state='completed' WHERE id=?", (binding["turnId"],)
+            ),
+            write=True,
+        )
+        turn = await runtime.mailbox.claim(job)
+        mid = await runtime.journal.start(turn)
+        observed = await runtime.files.read({"path": str(source)}, {})
+        value = await runtime.gateway.invoke(
+            turn,
+            mid,
+            {
+                "id": "correction",
+                "function": {
+                    "name": "edit",
+                    "arguments": json.dumps(
+                        {
+                            "path": str(source),
+                            "expectedSha256": observed["sha256"],
+                            "oldText": "old",
+                            "newText": "new",
+                        }
+                    ),
+                },
+            },
+            "main",
+            {**binding, "turnId": turn["id"], "assistantMessageId": mid},
+        )
+        assert "sha256" in value
+        if mode == "external_edit":
+            source.write_text("untracked change")
+        if mode == "deleted":
+            await runtime.artifacts.delete("alice", original["id"])
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        if mode in {"external_edit", "deleted"}:
+            assert delivery["artifacts"] == [] and delivery["unavailable"]
+        elif mode == "other_task":
+            assert delivery["artifacts"][0]["id"] == original["id"]
+        else:
+            current = delivery["artifacts"][0]
+            assert current["id"] != original["id"] and current["sha256"] == value["sha256"]
+            assert current["metadata"]["sourceUpdate"]["turnId"] == turn["id"]
+            assert (await runtime.artifacts.read("alice", original["id"]))[1] == b"old"
+            source.unlink()
+            assert (await runtime.artifacts.read("alice", current["id"]))[1] == b"new"
+            assert (await runtime.tasks.get("alice", task["id"]))["delivery"]["artifacts"][0][
+                "id"
+            ] == current["id"]
     finally:
         await runtime.close()
