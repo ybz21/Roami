@@ -497,3 +497,75 @@ async def test_native_close_database_failure_rolls_back_the_input_fence(store, m
     assert (
         await store.call(lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],)))
     )["state"] == "failed"
+
+
+async def test_native_conversation_interleaves_tool_results_and_redacts_payloads(store):
+    service, session, _, _ = await native(store)
+
+    def prepare(db):
+        turn = "native-inline-turn"
+        db.execute(
+            "INSERT INTO turns(id,conversation_id,branch_id,trigger_kind,state,created_ms) "
+            "VALUES(?,?,?,'continuation','completed',1)",
+            (turn, session["conversation_id"], session["branch_id"]),
+        )
+        call = {
+            "id": "provider-call",
+            "function": {
+                "name": "bash",
+                "arguments": json.dumps({"command": "node build.mjs", "authorization": "hdr-123"}),
+            },
+        }
+        assistant = message(
+            db,
+            session["conversation_id"],
+            session["branch_id"],
+            "assistant",
+            {"text": "First I will build the report.", "tool_calls": [call]},
+            turn_id=turn,
+        )
+        result = message(
+            db,
+            session["conversation_id"],
+            session["branch_id"],
+            "tool",
+            {
+                "tool_call_id": "provider-call",
+                "text": json.dumps({"stdout": "Build passed", "password": "pwd-123"}),
+            },
+            turn_id=turn,
+        )
+        db.execute(
+            "INSERT INTO tool_calls(id,turn_id,assistant_message_id,result_message_id,tool_name,"
+            "arguments_json,effect,state,idempotency_key,created_ms,updated_ms) "
+            "VALUES(?,?,?,?,'bash','{}','write','succeeded',?,1,1)",
+            ("native-inline-call", turn, assistant, result, turn + ":provider-call"),
+        )
+        message(
+            db,
+            session["conversation_id"],
+            session["branch_id"],
+            "assistant",
+            {"text": "The report is ready."},
+            turn_id=turn,
+        )
+
+    await store.call(prepare, write=True)
+    transcript = await service.conversation("alice", session["id"])
+    messages = transcript["messages"]
+    assert [item["role"] for item in messages] == ["user", "assistant", "tool", "assistant"]
+    assert messages[1]["content"]["text"] == "First I will build the report."
+    assert messages[2]["content"]["toolState"] == "succeeded"
+    assert messages[2]["content"]["tool_call_id"] == "provider-call"
+    assert "Build passed" in messages[2]["content"]["text"]
+    assert "hdr-123" not in json.dumps(transcript)
+    assert "pwd-123" not in json.dumps(transcript)
+    assert "[redacted]" in messages[1]["content"]["tool_calls"][0]["function"]["arguments"]
+    tail = await service.conversation("alice", session["id"], limit=2)
+    assert [item["role"] for item in tail["messages"]] == ["tool", "assistant"]
+    earlier = await service.conversation("alice", session["id"], before=tail["before"], limit=2)
+    assert earlier["messages"][-1]["content"]["tool_calls"][0]["id"] == "provider-call"
+    await service.archive("alice", session["id"])
+    assert (await service.conversation("alice", session["id"]))["messages"] == messages
+    with pytest.raises(DomainError, match="NATIVE_SESSION_NOT_FOUND"):
+        await service.conversation("bob", session["id"])

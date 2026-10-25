@@ -8,6 +8,7 @@ import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
 import { taskExecutor, taskGoal, taskInstructions } from './agent-task-protocol'
 import AgentTaskRecord from './AgentTaskRecord'
+import TaskDescription from './TaskDescription'
 import { taskTopic } from './task-topic'
 import { taskOutcome, taskReportLinks } from './task-outcome'
 import { useAgentData } from './useAgentData'
@@ -107,22 +108,6 @@ function TaskRow({ task, compact, select, projects, onSession }: { projects: { i
     </div></div>
 }
 
-function TaskDescription({ content }: { content: string }) {
-  const { t } = useI18n()
-  const [expanded, setExpanded] = useState(false), [overflowing, setOverflowing] = useState(false)
-  const text = useRef<HTMLParagraphElement>(null)
-  useEffect(() => {
-    const element = text.current
-    if (!element) return
-    const measure = () => { if (!expanded) setOverflowing(element.scrollHeight > element.clientHeight + 1) }
-    measure()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [content, expanded])
-  return <section className="agent-task-section"><h4>{t('agent.task.description')}</h4><p ref={text} className={'agent-task-description' + (expanded ? '' : ' clipped')}>{content || t('agent.task.noDetails')}</p>{(overflowing || expanded) && <button type="button" className="tt-act agent-task-disclosure" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{t(expanded ? 'agent.task.collapseContent' : 'agent.task.expandContent')}</button>}</section>
-}
 
 function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession, onChanged }: { projects?: { id: string; name: string }[]; id: string; hideBack?: boolean; onBack: () => void; select: (id: string) => void; onSession: (id: string) => void; onChanged: () => void }) {
   const { t, locale } = useI18n()

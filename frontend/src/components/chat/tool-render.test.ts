@@ -106,3 +106,8 @@ describe('shortPath', () => {
     expect(shortPath('')).toBe('')
   })
 })
+
+
+it('reads native file replacements with the same diff fields', () => {
+  expect(editParts('Edit', { path: '/work/plan.md', oldText: 'draft', newText: 'ready' })).toEqual({ path: '/work/plan.md', oldText: 'draft', newText: 'ready', isNew: false })
+})

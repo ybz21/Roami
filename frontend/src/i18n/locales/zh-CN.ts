@@ -3611,6 +3611,15 @@ const zhCN = {
   'agent.task.filter.active': '进行中',
   'agent.task.filter.ended': '已结束',
   'agent.task.filter.empty': '暂无匹配任务',
+  'agent.task.downloadNamed': '下载 {name}',
+  'agent.task.currentArtifacts': '本次执行',
+  'agent.task.previousArtifacts': '历史执行',
+  'agent.task.otherArtifacts': '其他文件',
+  'agent.task.artifactStatus': '任务状态：{state}。文件可供查看，不代表已通过验收。',
+  'agent.task.sessionTab.conversation': '对话',
+  'agent.task.sessionTab.process': '执行过程',
+  'agent.task.sessionTab.artifacts': '产物',
+  'agent.task.sessionViews': '会话内容',
   'agent.workspace.native': '内置智能体',
   'agent.task.viewRecord': '查看执行记录',
   'agent.task.archivedRecord': '执行已结束。以下为留存的结果与日志，不依赖工作会话存活。',
@@ -3860,6 +3869,23 @@ const zhCN = {
   'agent.pipeline.setting.memory_reasoning_effort': '记忆推理强度',
   'agent.pipeline.workerDefault': '沿用默认配置',
   'agent.pipeline.artifactTokens': '产物评分用量：{count} Token',
+  'composer.nativeModelHint': '这里修改后续本地任务的默认模型与思考强度。',
+  'composer.effort.default': '默认',
+  'composer.effort.none': '关闭',
+  'composer.effort.minimal': '极低',
+  'composer.effort.low': '低',
+  'composer.effort.medium': '中',
+  'composer.effort.high': '高',
+  'composer.effort.xhigh': '极高',
+  'composer.effort.max': '最高',
+
+  'composer.transcribing': '转写中…',
+  'composer.transcribingHint': '识别结果会加入草稿',
+
+  'composer.mainModelHint': '用于首页对话；任务执行器的模型在对应会话中选择。',
+  'composer.taskPlaceholder': '描述要交办的任务…',
+  'composer.createTask': '创建任务',
+
 }
 
 export default zhCN

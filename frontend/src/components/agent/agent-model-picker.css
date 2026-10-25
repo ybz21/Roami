@@ -25,4 +25,3 @@
 html:is([data-size="compact"],[data-size="medium"]) .agent-model-picker-wrap .agent-model-picker-dialog { left:0; right:0; bottom:0; width:100% !important; max-width:none; }
 html:is([data-size="compact"],[data-size="medium"]) .agent-model-picker-dialog .ant-modal-content { border-radius:var(--r-card) var(--r-card) 0 0; padding-bottom:max(var(--safe-b),var(--kb)); }
 html:is([data-size="compact"],[data-size="medium"]) .agent-model-picker-content { max-height:calc(100dvh - var(--safe-t) - var(--safe-b) - var(--kb) - var(--mobile-topbar-h)); }
-html[data-size="compact"] .agent-composer .agent-model-trigger { max-width:calc(var(--sp-5) * 6); }

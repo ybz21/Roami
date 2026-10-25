@@ -6,6 +6,7 @@ import { App as AntApp, Tooltip } from 'antd'
 import { useLayout } from '../../layout'
 import { api, transcribe } from '../../api'
 import { useI18n } from '../../i18n'
+import { MicrophoneIcon } from '../../icons'
 import { isHotkeyKeyUp, matchHotkey, useKeybindings } from '../shell/keybindings'
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'transcribing'
@@ -30,7 +31,7 @@ const HOLD_MS = 350
  * 只有当前视图的那枚传 true，不然一个键按下去几路一起录。
  * 键盘开的录音没有「松手」：再按一次识别，Esc 取消。
  */
-export function VoiceInput({ accent, onResult, inline = false, toolbar = false, hotkey = false }: { accent: string; onResult: (text: string) => void; inline?: boolean; toolbar?: boolean; hotkey?: boolean }) {
+export function VoiceInput({ accent, onResult, inline = false, toolbar = false, hotkey = false, disabled = false, scope = '' }: { accent: string; onResult: (text: string) => void; inline?: boolean; toolbar?: boolean; hotkey?: boolean; disabled?: boolean; scope?: string }) {
   const { t } = useI18n()
   const { message } = AntApp.useApp()
   const kb = useKeybindings().voice
@@ -62,10 +63,18 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   const byKeyRef = useRef(false)     // 这段录音是快捷键开的：覆盖层文案不同，结束靠再按一次
   const [byKey, setByKey] = useState(false)
   const timerRef = useRef<number | undefined>(undefined)
+  const generation = useRef(0), resultRef = useRef(onResult)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const owner = useRef({ scope, disabled })
+  if (owner.current.scope !== scope || owner.current.disabled !== disabled) { generation.current++; owner.current = { scope, disabled } }
+  resultRef.current = onResult
 
   // 探测后端是否已配置可用的 ASR 服务商，未配置则按钮置灰提示去设置。
   useEffect(() => {
-    api('GET', '/speech/config').then((r) => {
+    const abort = new AbortController()
+    setConfigured(false)
+    api('GET', '/speech/config', undefined, { signal: abort.signal }).then((r) => {
+      if (abort.signal.aborted) return
       const c = r?.data || {}
       const ok = c.provider === 'openai'
         ? !!c.openai?.apiKey
@@ -73,11 +82,21 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
           ? !!(c.volcano?.apiKey || (c.volcano?.appId && c.volcano?.accessToken))
           : false
       setConfigured(ok)
-    }).catch(() => setConfigured(false))
-  }, [])
+    }).catch(() => { if (!abort.signal.aborted) setConfigured(false) })
+    return () => abort.abort()
+  }, [scope])
 
   // 卸载时兜底释放麦克风。
-  useEffect(() => () => { stopTracks(); if (timerRef.current) clearInterval(timerRef.current) }, [])
+  useEffect(() => {
+    setPhase('idle')
+    return () => {
+      generation.current++; pressedRef.current = false; cancelRef.current = true
+      if (recRef.current) { recRef.current.onstop = null; recRef.current.ondataavailable = null; try { recRef.current.stop() } catch {} }
+      stopTracks()
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (maxTimer.current) clearTimeout(maxTimer.current)
+    }
+  }, [scope, disabled])
 
   const stopTracks = () => {
     streamRef.current?.getTracks().forEach((tk) => tk.stop())
@@ -85,7 +104,8 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   }
 
   const begin = async (clientY: number, viaKey = false) => {
-    if (phase !== 'idle') return
+    if (disabled || phase !== 'idle') return
+    const ticket = generation.current
     byKeyRef.current = viaKey
     setByKey(viaKey)
     if (!micUsable) { message.error(micHint); return }
@@ -99,19 +119,20 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
+      if (ticket !== generation.current) return
       pressedRef.current = false
       setPhase('idle')
       message.error(t('voice.micDenied'))
       return
     }
-    if (!pressedRef.current) { stream.getTracks().forEach((tk) => tk.stop()); setPhase('idle'); return } // 授权期间已松手
+    if (ticket !== generation.current || !pressedRef.current) { stream.getTracks().forEach((tk) => tk.stop()); if (ticket === generation.current) setPhase('idle'); return }
     streamRef.current = stream
     chunksRef.current = []
     let rec: MediaRecorder
     try { rec = new MediaRecorder(stream) }
     catch { stopTracks(); pressedRef.current = false; setPhase('idle'); message.error(t('voice.unsupported')); return }
-    rec.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data) }
-    rec.onstop = () => { stopTracks(); finish() }
+    rec.ondataavailable = (e) => { if (ticket === generation.current && e.data.size) chunksRef.current.push(e.data) }
+    rec.onstop = () => { stopTracks(); void finish(ticket) }
     recRef.current = rec
     rec.start()
     startTsRef.current = Date.now()
@@ -147,10 +168,14 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   const downAt = useRef(0)
   const holding = useRef(false)
   useEffect(() => {
-    if (!hotkey) return
+    if (!hotkey || disabled) return
     const onDown = (e: KeyboardEvent) => {
       if (e.repeat) return
       if (matchHotkey(e, hkRef.current)) {
+        const candidates = [...document.querySelectorAll<HTMLButtonElement>('[data-voice-hotkey="true"]')].filter(button => button.getClientRects().length && !button.disabled)
+        const composer = document.activeElement?.closest('.conversation-composer')
+        const target = candidates.find(button => button.classList.contains('rec')) || candidates.find(button => composer?.contains(button)) || candidates[0]
+        if (target !== triggerRef.current) return
         e.preventDefault(); e.stopPropagation()
         if (phaseRef.current === 'idle') { downAt.current = Date.now(); holding.current = true; void beginRef.current(0, true) }
         else if (phaseRef.current === 'recording' || phaseRef.current === 'requesting') { holding.current = false; endRef.current() }
@@ -176,10 +201,11 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
       window.removeEventListener('keydown', onDown, { capture: true } as any)
       window.removeEventListener('keyup', onUp, { capture: true } as any)
     }
-  }, [hotkey])
+  }, [hotkey, disabled])
 
   // 录音停止后：取消 / 太短 / 正常识别。
-  const finish = async () => {
+  const finish = async (ticket: number) => {
+    if (ticket !== generation.current) return
     const dur = Date.now() - startTsRef.current
     const blob = new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'audio/webm' })
     if (cancelRef.current) { setPhase('idle'); return }
@@ -187,13 +213,15 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     setPhase('transcribing')
     try {
       const wav = await toWav16k(blob)
+      if (ticket !== generation.current) return
       const text = await transcribe(wav)
-      if (text.trim()) { onResult(text.trim()); message.success(t('voice.recognized')) }
+      if (ticket !== generation.current) return
+      if (text.trim()) { resultRef.current(text.trim()); message.success(t('voice.recognized')) }
       else message.info(t('voice.empty'))
     } catch (e: any) {
-      message.error(t('voice.failed', { message: e.message || String(e) }))
+      if (ticket === generation.current) message.error(t('voice.failed', { message: e.message || String(e) }))
     } finally {
-      setPhase('idle')
+      if (ticket === generation.current) setPhase('idle')
     }
   }
 
@@ -208,7 +236,8 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
 
   return (
     <>
-      {active && (
+      {inline && (active || phase === 'transcribing') && <div className={'conversation-voice-state' + (cancelArmed ? ' is-cancelling' : '')} role="status"><MicrophoneIcon size={16} /><span><b>{phase === 'transcribing' ? t('composer.transcribing') : `${mm}:${ss}`}</b><small>{phase === 'requesting' ? t('voice.starting') : phase === 'transcribing' ? t('composer.transcribingHint') : byKey || clickMode ? t('voice.clickStop', { key: HOTKEY_LABEL }) : cancelArmed ? t('voice.releaseCancel') : t('voice.releaseSend')}</small></span></div>}
+      {!inline && active && (
         <div style={{
           position: 'fixed', left: '50%', bottom: 130, transform: 'translateX(-50%)', zIndex: 60,
           minWidth: 220, padding: '16px 22px', borderRadius: 14, textAlign: 'center',
@@ -218,7 +247,7 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
         }}>
           <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'center' }}>
             <span className="cc-pulse" style={{ display: 'inline-flex', filter: cancelArmed ? 'grayscale(1) brightness(1.4)' : undefined }}>
-              <MicIcon size={34} />
+              <MicrophoneIcon size={32} />
             </span>
           </div>
           <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 18, marginBottom: 6 }}>{mm}:{ss}</div>
@@ -228,11 +257,14 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
         </div>
       )}
       {wrapTip(<button
+        ref={triggerRef}
+        data-voice-hotkey={hotkey && !disabled ? 'true' : undefined}
+        data-cancelling={cancelArmed || undefined}
         type="button"
         className={toolbar ? `tt-tbtn tt-mic${active ? ' rec' : ''}` : inline ? `tt-pill ico tt-mic${active ? ' rec' : ''}` : undefined}
         title={tipped ? undefined : !micUsable ? micHint : configured ? t(clickMode ? 'voice.clickToTalk' : 'voice.holdToTalk') : t('voice.notConfigured')}
         aria-label={t(clickMode ? 'voice.clickToTalk' : 'voice.holdToTalk')}
-        disabled={phase === 'transcribing'}
+        disabled={disabled || phase === 'transcribing'}
         onContextMenu={(e) => e.preventDefault()}
         {...(clickMode
           ? { onClick: () => { if (phase === 'idle') void begin(0); else if (active) end() } }
@@ -245,7 +277,7 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
         style={toolbar ? { touchAction: 'none' } : inline
           // 内联：控制条上的一枚 pill——静息时安静，按住说话才亮成强调色（.tt-mic.rec）。
           // 从前它静息就是一整块实心强调色，跟旁边那颗实心发送键抢，一条控制条两个"主动作"。
-          ? { background: cancelArmed ? 'var(--danger)' : undefined, touchAction: 'none' }
+          ? { touchAction: 'none' }
           : {
             // 悬浮模式：右下角「微信式」麦克风。
             // bottom 用变量：手机上方向簇（13 §5.3）就落在这个角，不让开就会压住 ↓ / →
@@ -259,27 +291,11 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
             opacity: (configured && micUsable) ? 1 : 0.92,
           }}>
         <span className={(phase === 'recording' || phase === 'transcribing') ? 'cc-pulse' : undefined} style={{ display: 'inline-flex' }}>
-          <MicIcon size={toolbar ? 14 : inline ? 15 : 26} silver={!(inline || toolbar) || active} />
+          <MicrophoneIcon size={toolbar || inline ? 16 : 24} />
         </span>
         {toolbar && <span>{t('voice.input')}</span>}
       </button>)}
     </>
-  )
-}
-
-// 纯银色话筒图标（单一银色，无高光/暗部渐变，非 emoji）。
-function MicIcon({ size = 26, silver: bright = true }: { size?: number; silver?: boolean }) {
-  // 悬浮那颗坐在实心强调色上，得用银色才看得清；控制条上那枚是安静 pill，跟着文字色走
-  const silver = bright ? '#c4c8d0' : 'currentColor'
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      {/* 话筒头 */}
-      <rect x="9" y="2" width="6" height="11" rx="3" fill={silver} />
-      {/* 支架 + 底座 */}
-      <path d="M6 11a6 6 0 0 0 12 0" fill="none" stroke={silver} strokeWidth="2" strokeLinecap="round" />
-      <line x1="12" y1="17" x2="12" y2="21" stroke={silver} strokeWidth="2" strokeLinecap="round" />
-      <line x1="8" y1="21.2" x2="16" y2="21.2" stroke={silver} strokeWidth="2" strokeLinecap="round" />
-    </svg>
   )
 }
 

@@ -127,6 +127,7 @@ export const BotIcon = ({ size = 14 }: P) => line(
 export const UserIcon = ({ size = 14 }: P) => line(<><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></>, size)
 export const ClockIcon = ({ size = 13 }: P) => line(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5.2l3.2 2" /></>, size)
 export const CircleIcon = ({ size = 13 }: P) => line(<circle cx="12" cy="12" r="8" />, size)
+export const MicrophoneIcon = ({ size = 16 }: P) => line(<><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" /></>, size)
 export const DotIcon = ({ size = 13 }: P) => solid(<circle cx="12" cy="12" r="4.5" />, size)
 /** 指挥/领队：原来写作 ◆ */
 export const DiamondIcon = ({ size = 13 }: P) => solid(<path d="m12 3.5 8.5 8.5-8.5 8.5L3.5 12Z" />, size)

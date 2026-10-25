@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest'
 import AgentTasks from './AgentTasks'
 import NativeSession from './NativeSession'
+import NativeSessionArtifacts from './NativeSessionArtifacts'
+import NativeProjectSessions from './NativeProjectSessions'
 import { clearAgentDataCache } from './agent-data-cache'
 import { api } from '../../api'
 
@@ -11,11 +13,12 @@ vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), locale: 'en-US' }) }))
 vi.mock('../cluster/node-url', () => ({ currentNodeId: () => 'selected', nodeApi: (path: string) => '/n/selected/api' + path }))
 vi.mock('antd', () => ({
+  Dropdown: ({ children }: any) => <>{children}</>,
   App: { useApp: () => ({ message: { error: vi.fn() } }) },
   Button: ({ children, loading: _loading, danger: _danger, ...props }: any) => <button {...props}>{children}</button>,
-  Input: { TextArea: ({ autoSize: _auto, ...props }: any) => <textarea {...props} /> },
+  Input: { TextArea: ({ autoSize: _auto, onPressEnter: _enter, ...props }: any) => <textarea {...props} /> },
   Spin: () => <span role="progressbar" />,
-  Modal: ({ open, title, children, okText, cancelText, onOk, onCancel }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button><button onClick={onCancel}>{cancelText}</button></div> : null,
+  Modal: ({ open, title, children, okText, cancelText, onOk, onCancel }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button><button onClick={onCancel}>{cancelText || 'common.cancel'}</button></div> : null,
   Segmented: ({ value, options, onChange }: any) => <div role="tablist">{options.map((item: any) => <button type="button" role="tab" key={item.value} aria-selected={value === item.value} onClick={() => onChange(item.value)}>{item.label}</button>)}</div>,
   Select: ({ value, options, onChange, ...props }: any) => <select {...props} value={value} onChange={e => onChange(e.target.value)}>{options.map((item: any) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>,
 }))
@@ -552,7 +555,7 @@ it('hides empty native tool replies while retaining real content and the active 
   })
   const page = render(<NativeSession id="native-id" node={null} projects={[]} onChanged={vi.fn()} />)
   await screen.findByText('Working on the presentation')
-  expect(screen.getAllByText('agent.task.subagent')).toHaveLength(2)
+  expect(page.container.querySelectorAll('.cc-msg')).toHaveLength(2)
   expect(page.container.querySelectorAll('.agent-typing')).toHaveLength(1)
   expect(screen.queryByText('Internal tool result')).toBeNull()
   expect(screen.getByText('Update the presentation')).toBeTruthy()
@@ -592,4 +595,88 @@ it('keeps a running professional session visible while its provider context is s
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.open' }))
   expect(screen.getByRole('button', { name: /Goal starting/ })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'agent.task.enterSession' })).toBeTruthy()
+})
+
+it('loads native execution steps on demand and retains the draft across tabs and failed continuation', async () => {
+  let reject = true
+  const posts: any[] = []
+  vi.mocked(api).mockImplementation(async (method, path, body) => {
+    if (method === 'POST') { posts.push(body); if (reject) throw { apiError: { code: 'TASK_REVISION_CHANGED' } }; return { data: {} } }
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path.endsWith('/conversation')) return { data: { messages: [], before: null } }
+    if (path.endsWith('/activities')) return { data: [{ id: 'step', kind: 'tool', name: 'shell', state: 'succeeded', startedMs: 1000, updatedMs: 2000 }] }
+    if (path.endsWith('/activities/step')) return { data: { input: { text: 'node build.mjs', truncated: false }, output: { text: 'Build passed', truncated: false } } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: detail('original') }
+  })
+  render(<NativeSession id="native-id" node="selected" projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Goal original')
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/activities'))).toBe(false)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep the draft' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.task.sessionTab.process' }))
+  await screen.findByText('agent.activity.shell shell')
+  fireEvent.click(screen.getByRole('button', { name: /agent.activity.shell/ }))
+  await screen.findByText(/node build.mjs/)
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.task.sessionTab.artifacts' }))
+  await screen.findByText('agent.task.noArtifacts')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep the draft')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
+  await screen.findByRole('alert')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep the draft')
+  reject = false
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.task.sessionTab.conversation' }))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'agent.task.continue' }) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
+  await waitFor(() => expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(''))
+  expect(posts).toHaveLength(2)
+  expect(posts[1]).toMatchObject({ text: 'Keep the draft', revision: 1 })
+})
+
+it('separates native deliverables by execution and keeps task failure visible during preview', async () => {
+  const current = { ...artifact('current'), metadata: { runId: 'attempt-original' } }
+  const previous = { ...artifact('previous'), metadata: { runId: 'older' } }
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path.endsWith('/conversation')) return { data: { messages: [], before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [current, previous, { ...artifact('archive'), mimeType: 'application/zip' }] }
+    return { data: { ...detail('original'), task: { ...task('original'), state: 'failed' }, delivery: { artifacts: [current], unavailable: [{ sourcePath: '/work/missing.pdf' }] } } }
+  })
+  render(<NativeSession id="native-id" node="selected" projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Goal original')
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.task.sessionTab.artifacts' }))
+  await screen.findByText('agent.task.currentArtifacts')
+  expect(screen.getByText('agent.task.previousArtifacts')).toBeTruthy()
+  expect(screen.getByText('agent.task.otherArtifacts')).toBeTruthy()
+  expect(screen.getAllByText('current.png')).toHaveLength(1)
+  expect(screen.getByText('agent.task.artifactStatus agent.state.failed')).toBeTruthy()
+  expect(screen.getByText('/work/missing.pdf')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'agent.task.downloadNamed archive.png' }).getAttribute('href')).toBe('/n/selected/api/agent/artifacts/archive/content?dl=1')
+  expect(screen.queryByRole('button', { name: 'agent.task.previewNamed archive.png' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.previewNamed current.png' }))
+  expect(screen.getByRole('img', { name: 'current.png' }).getAttribute('src')).toBe('/n/selected/api/agent/artifacts/current/content')
+  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+
+it('opens a native project row directly without per-row detail requests', () => {
+  render(<NativeProjectSessions projectId="project-a" entries={[{ nativeSessionId: 'native-list-entry', title: 'Review the delivery', taskState: 'waiting_user', createdAt: new Date().toISOString() }]} />)
+  expect(screen.getByText('agent.state.waiting_user')).toBeTruthy()
+  expect(screen.queryByText('agent.task.enterSession')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /Review the delivery/ }))
+  expect(decodeURIComponent(location.hash)).toContain('/native-list-entry')
+  expect(api).not.toHaveBeenCalled()
+})
+
+
+it('does not present an earlier revision as the current delivery while continuation is queued', () => {
+  const prior = { ...artifact('prior'), metadata: { runId: 'attempt-original' } }
+  const snapshot = { ...detail('original'), task: { ...task('original', undefined, 2), state: 'queued' } }
+  render(<NativeSessionArtifacts detail={snapshot as any} artifacts={[prior]} failed={false} retry={vi.fn()} />)
+  expect(screen.queryByText('agent.task.currentArtifacts')).toBeNull()
+  expect(screen.queryByText('Result original')).toBeNull()
+  expect(screen.getByText('agent.task.previousArtifacts')).toBeTruthy()
+  expect(screen.getByText('prior.png')).toBeTruthy()
 })
