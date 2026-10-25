@@ -293,6 +293,8 @@ class ToolGateway:
                     "This call was rejected before execution. "
                     + (
                         "Research has no standalone shell: do not probe with echo, curl or Python. "
+                        "If this task is local process diagnostics, report the profile mismatch to Main; "
+                        "Main can use roami agent host processes --input {} without a workspace. "
                         "Read skill://browser_use and use roami chrome help for admitted browser commands. "
                         if role == "research"
                         else "Use tool_list to find a registered operation available in this role. "
@@ -324,6 +326,10 @@ class ToolGateway:
             }:
                 value["recovery"] = (
                     "Main has no shell workspace for this operation. Do not retry shell commands or guess cwd. "
+                    "For local process/CPU/memory/load diagnostics use bash argv "
+                    "[roami,agent,host,processes,--input,{}] (last argv is a JSON string). "
+                    "It is read-only and requires no workspace or delegation. resourceOnly is browser-only, "
+                    "not a profile for local read-only commands. "
                     "An error affects only this attempted operation: preserve every other part of the current request. "
                     "Resolve project/session metadata through target_search/target_resolve; a project edit still needs its own handoff. "
                     "Keep requestComplete=false until all requested parts have been handled or handed off. Do not reduce a mixed request to its lookup part. "
@@ -376,7 +382,7 @@ class ToolGateway:
             if role == "main" and value["error"] == "INVALID_RESOURCE_ONLY_TARGET":
                 value["recovery"] = (
                     "resourceOnly is a web/navigation-only profile and cannot include a directory, "
-                    "project or workspace. For public lookup/chat-only work, KEEP resourceOnly=true "
+                    "project or workspace. For public browser lookups, KEEP resourceOnly=true "
                     "and remove directory/workspace fields; do not drop read-only scope to repair arguments. "
                     "Use a regular Native workspace only for actual filesystem work authorized by the user."
                 )

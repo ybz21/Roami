@@ -43,7 +43,7 @@ func commandFamilyHelp(args []string) bool {
 		return false
 	}
 	prefix := args[:len(args)-1]
-	if !slices.Equal(prefix, []string{"agent", "task"}) && !slices.Equal(prefix, []string{"agent", "memory"}) && !slices.Equal(prefix, []string{"agent", "target"}) {
+	if !slices.Equal(prefix, []string{"agent", "task"}) && !slices.Equal(prefix, []string{"agent", "memory"}) && !slices.Equal(prefix, []string{"agent", "target"}) && !slices.Equal(prefix, []string{"agent", "host"}) {
 		return false
 	}
 	var lines []string

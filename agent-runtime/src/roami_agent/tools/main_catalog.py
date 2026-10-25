@@ -669,7 +669,10 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                                 "nodeId": {"type": "string", "enum": ["local"]},
                                 "label": {"type": "string", "maxLength": 160},
                                 "archived": {"type": "boolean"},
-                                "resourceOnly": {"type": "boolean"},
+                                "resourceOnly": {
+                                    "type": "boolean",
+                                    "description": "Browser navigation/observation only, not all read-only work. For local process/CPU/memory diagnostics call roami agent host processes directly; no task or directory required.",
+                                },
                                 "state": {"type": "string", "enum": ["live"]},
                             },
                             ["kind"],

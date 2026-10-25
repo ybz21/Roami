@@ -1,4 +1,5 @@
 {
+  "host_processes": ["agent", "host", "processes"],
   "market_sources": ["agent", "capability", "market", "sources"],
   "market_search": ["agent", "capability", "market", "search"],
   "market_preview": ["agent", "capability", "market", "preview"],
