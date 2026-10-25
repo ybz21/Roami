@@ -11,7 +11,7 @@ vi.mock('../../layout', () => ({ useLayout: () => state.layout }))
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: { error: vi.fn() } }) },
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Dropdown: ({ children, menu }: any) => { state.menuItems = menu.items; return children },
+  Dropdown: ({ children, menu }: any) => { if (menu.items.some((item: any) => item.key === 'debug')) state.menuItems = menu.items; return children },
   Input: Object.assign((props: any) => <input {...props} />, { TextArea: ({ variant: _variant, autoSize: _autoSize, ...props }: any) => <textarea {...props} /> }),
   Modal: () => null, Spin: () => null,
 }))
@@ -21,6 +21,7 @@ vi.mock('./useAgentAttachments', () => ({ useAgentAttachments: () => ({ ids: [],
 vi.mock('./useAgentModels', () => ({ useAgentModels: () => ({}) }))
 vi.mock('./useVisibleAgentReads', () => ({ useVisibleAgentReads: () => {} }))
 vi.mock('./useAgentMessageFocus', () => ({ useAgentMessageFocus: () => {} }))
+vi.mock('../chat/VoiceInput', () => ({ default: () => null }))
 vi.mock('./AgentContextUsage', () => ({ default: () => null }))
 vi.mock('./AgentComposerPlus', () => ({ default: () => null }))
 vi.mock('./AgentMessageView', async () => ({ default: (await import('react')).memo(state.renderMessage) }))

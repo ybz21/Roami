@@ -167,8 +167,8 @@ export function editParts(name: string, o: any): EditParts | null {
   if (!o) return null
   const path = s(o.file_path ?? o.path ?? o.notebook_path)
   const isNew = name === 'Write' || name === 'write' || name === 'create_file'
-  const oldText = isNew ? '' : s(o.old_string ?? o.oldString ?? o.old_str)
-  const newText = isNew ? s(o.content) : s(o.new_string ?? o.newString ?? o.new_str ?? o.new_source)
+  const oldText = isNew ? '' : s(o.old_string ?? o.oldString ?? o.old_str ?? o.oldText)
+  const newText = isNew ? s(o.content) : s(o.new_string ?? o.newString ?? o.new_str ?? o.new_source ?? o.newText)
   if (!path && !oldText && !newText) return null
   return { path, oldText, newText, isNew }
 }

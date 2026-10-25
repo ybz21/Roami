@@ -27,7 +27,7 @@ function configure() {
 }
 it('switches models in one tap, resets effort atomically, and picks effort separately', async () => {
   configure(); render(<Composer />)
-  await screen.findByText('agent.reasoning.low')
+  await screen.findByText('composer.effort.low')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
   fireEvent.click(await screen.findByRole('option', { name: 'gpt-6.1-sol' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -37,12 +37,12 @@ it('switches models in one tap, resets effort atomically, and picks effort separ
   fireEvent.click(screen.getByRole('menuitemradio', { name: 'agent.reasoning.medium' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { main: { model: 'gpt-6.1-sol', reasoningEffort: 'medium' } })
-  expect(screen.getByText('agent.reasoning.medium')).toBeTruthy()
+  expect(screen.getByText('composer.effort.medium')).toBeTruthy()
   expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')).toHaveLength(2)
 })
 
 it('closing model search or choosing the current model makes no write', async () => {
-  configure(); render(<Composer />); await screen.findByText('agent.reasoning.low')
+  configure(); render(<Composer />); await screen.findByText('composer.effort.low')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
   await screen.findByRole('option', { name: 'gpt-6.1-sol' })
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'custom/model-name' } })
@@ -59,7 +59,7 @@ it('keeps the confirmed effort when saving fails and retries the same choice', a
     if (method === 'PUT' && reject) return Promise.reject({ apiError: { code: 'MODEL_CONFIGURATION_BUSY' } })
     return modelApi(method, path, ...rest)
   })
-  render(<Composer />); await screen.findByText('agent.reasoning.low')
+  render(<Composer />); await screen.findByText('composer.effort.low')
   fireEvent.click(screen.getByRole('button', { name: 'agent.reasoning.picker' }))
   fireEvent.click(screen.getByRole('menuitemradio', { name: 'agent.reasoning.high' }))
   await screen.findByRole('alert')
@@ -67,7 +67,7 @@ it('keeps the confirmed effort when saving fails and retries the same choice', a
   expect(screen.getByRole('menuitemradio', { name: 'agent.reasoning.high' }).getAttribute('aria-checked')).toBe('false')
   reject = false; fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(screen.getByText('agent.reasoning.high')).toBeTruthy()
+  expect(screen.getByText('composer.effort.high')).toBeTruthy()
   const writes = vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')
   expect(writes).toHaveLength(2); expect(writes[0]).toEqual(writes[1])
 })
@@ -77,7 +77,7 @@ it('writes once on rapid taps and can close while that selection saves', async (
   let finish!: () => void
   const pending = new Promise<void>(resolve => { finish = resolve })
   vi.mocked(api).mockImplementation(async (method, path, ...rest) => { if (method === 'PUT') await pending; return modelApi(method, path, ...rest) })
-  render(<Composer />); await screen.findByText('agent.reasoning.low')
+  render(<Composer />); await screen.findByText('composer.effort.low')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
   const option = await screen.findByRole('option', { name: 'gpt-6.1-sol' })
   fireEvent.click(option); fireEvent.click(option)
@@ -89,7 +89,7 @@ it('writes once on rapid taps and can close while that selection saves', async (
 
 it('opens a full mobile model page, pins the current model, and returns without saving', async () => {
   layout.phone = true; configure(); render(<Composer />)
-  await screen.findByText('agent.reasoning.low')
+  await screen.findByText('composer.effort.low')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
   await screen.findByRole('option', { name: 'gpt-6.1-sol' })
   expect(screen.queryByRole('dialog')).toBeNull()
@@ -171,4 +171,19 @@ it('retries the settings read when the initial settings request failed', async (
   await act(async () => { await view.result.current.load() })
   await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
   expect(view.result.current.error).toBeNull()
+})
+
+it('loads and updates the worker defaults without writing the main model', async () => {
+  const worker = { ...role, model: 'worker-model' }
+  vi.mocked(api).mockImplementation(async (method, path, data) => {
+    if (path === '/agent/models?role=worker') return { data: { models: ['worker-model', 'worker-new'] } }
+    return { data: { main: role, worker: method === 'PUT' ? { ...worker, ...data.worker } : worker } }
+  })
+  const view = renderHook(() => useAgentModels(null, 'worker'))
+  await waitFor(() => expect(view.result.current.settings?.worker.model).toBe('worker-model'))
+  await act(async () => { await view.result.current.load() })
+  expect(api).toHaveBeenCalledWith('GET', '/agent/models?role=worker')
+  await act(async () => { await view.result.current.apply('worker-new', 'high') })
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { worker: { model: 'worker-new', reasoningEffort: 'high' } })
+  expect(view.result.current.settings?.main.model).toBe(role.model)
 })

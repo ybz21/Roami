@@ -33,7 +33,7 @@ export default function AgentTaskRecord({ id, active, attempts, truncated, artif
   </div>
 }
 
-function TaskProcess({ id, active, onSession }: { id: string; active: boolean; onSession: (id: string) => void }) {
+export function TaskProcess({ id, active, onSession }: { id: string; active: boolean; onSession: (id: string) => void }) {
   const { t } = useI18n()
   const data = useAgentData<AgentActivityItem[]>('/agent/tasks/' + encodeURIComponent(id) + '/activities', 0, active ? 3000 : 0)
   const steps = (data.value || []).filter(item => item.kind === 'tool' || item.parentTaskId)
@@ -58,7 +58,7 @@ function TaskConversation({ id, active, attempts, currentRun, onAnswer, canAnswe
     {data.loading && <Spin size="small" />}
     {data.failed && <p role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={data.refresh}>{t('agent.retry')}</button></p>}
     {messages.length > shown && <button type="button" className="tt-act" onClick={() => show(shown + 24)}>{t('agent.task.moreConversation')}</button>}
-    <div className="agent-task-conversation">{messages.slice(-shown).map(item => <AgentMessageView key={item.id} item={item} node={currentNodeId()} readOnly author={t('agent.task.subagent')} focused={false} remember={() => {}} canAnswer={canAnswer && current && item.seq > latestUser} answer={onAnswer} />)}</div>
+    <div className="agent-task-conversation">{messages.slice(-shown).map(item => <AgentMessageView key={item.id} item={item} node={currentNodeId()} readOnly focused={false} remember={() => {}} canAnswer={canAnswer && current && item.seq > latestUser} answer={onAnswer} />)}</div>
     {!data.loading && !data.failed && !messages.length && <p className="agent-muted">{t('agent.task.noConversation')}</p>}
   </>
 }
