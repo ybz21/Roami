@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { BotIcon, ChevronRight, WarnIcon } from '../../icons'
+import { BotIcon, RoamiLogo, ChevronRight, WarnIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { activityReason, activityState } from './AgentActivity'
 import type { AgentActivityItem } from './agent-protocol'
@@ -11,7 +11,7 @@ function AgentTaskActivity({ items, onTask }: { items: AgentActivityItem[]; onTa
     const failed = ['failed', 'unknown', 'interrupted'].includes(state)
     const label = task ? item.title || t('agent.task.untitled') : t(item.kind === 'turn' ? 'agent.activity.reply' : 'agent.activity.unconfirmed')
     return <section key={item.id} className={`agent-task-progress${failed ? ' is-failed' : ''}`} data-activity-id={item.id} data-state={state}>
-      <div className="agent-task-progress-line">{failed ? <WarnIcon size={16} /> : <BotIcon size={16} />}<strong>{label}</strong><span>{t('agent.state.' + state)}</span>{item.taskId && <button type="button" className="tt-act" aria-label={t('agent.task.viewNamed', { name: label })} onClick={() => onTask(item.taskId!)}><ChevronRight size={18} /></button>}</div>
+      <div className="agent-task-progress-line">{failed ? <WarnIcon size={16} /> : task && item.name !== 'native' ? <BotIcon size={16} /> : <RoamiLogo size={16} />}<strong>{label}</strong><span>{t('agent.state.' + state)}</span>{item.taskId && <button type="button" className="tt-act" aria-label={t('agent.task.viewNamed', { name: label })} onClick={() => onTask(item.taskId!)}><ChevronRight size={18} /></button>}</div>
       {failed && <p role="status">{state === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t)}</p>}
     </section>
   })}</>
