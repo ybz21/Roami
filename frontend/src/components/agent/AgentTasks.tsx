@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { Button, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
 import { agentName, isAgentKind } from '../../agent-kind'
-import { AgentLogo, BotIcon, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, FolderIcon, TerminalIcon, ChevronLeft, ChevronRight } from '../../icons'
+import { AgentLogo, BotIcon, RoamiLogo, ChecklistIcon, CheckIcon, CircleIcon, ClockIcon, CloseIcon, QuestionIcon, WarnIcon, FolderIcon, TerminalIcon, ChevronLeft, ChevronRight } from '../../icons'
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
@@ -99,7 +99,7 @@ function TaskRow({ task, compact, select, projects, onSession }: { projects: { i
     <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>
     <span className="agent-task-row-copy">
       <b>{taskTopic(task) || t('agent.task.untitled')}</b>
-      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
+      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : executor === 'native' ? <RoamiLogo size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
     </span>
   </button>
     {task.projectId && <a className="tt-act agent-task-project" href={'#/projects/' + encodeURIComponent(task.projectId)}><FolderIcon size={14} /><span>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</span></a>}

@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { api } from '../../api'
-import { BotIcon, ChevronDown, ChevronRight, ClockIcon, TerminalIcon } from '../../icons'
+import { BotIcon, RoamiLogo, ChevronDown, ChevronRight, ClockIcon, TerminalIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import type { AgentActivityItem } from './agent-protocol'
 import './agent-activity.css'
@@ -45,7 +45,7 @@ function ActivityStep({ item, onSession, conversationId, branchId, taskScope }: 
   const failed = attention.has(status)
   return <section className={`agent-activity is-${active.has(status) ? 'running' : failed ? 'failed' : status}`} aria-label={t('agent.activity.title')} data-activity-id={item.id} data-state={status}>
     <button type="button" className="agent-activity-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-      {item.kind === 'task' ? <BotIcon size={16} /> : item.name === 'shell' ? <TerminalIcon size={16} /> : <ClockIcon size={16} />}
+      {item.kind === 'task' ? item.name === 'native' ? <RoamiLogo size={16} /> : <BotIcon size={16} /> : item.name === 'shell' ? <TerminalIcon size={16} /> : <ClockIcon size={16} />}
       <span className="agent-activity-name">{name}</span><time dateTime={new Date(item.startedMs).toISOString()}>{formatTime(item.startedMs)}</time><span className="agent-activity-summary">{state}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
     </button>
     {failed && <p className="agent-activity-failure" role="status">{state}{t('agent.activity.separator')}{status === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t)}</p>}

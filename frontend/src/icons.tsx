@@ -203,6 +203,8 @@ export const AppLaunchIcon = ({ size = 13 }: P) => line(
   <><rect x="3.5" y="3.5" width="17" height="17" rx="3" /><path d="M9 12h6" /><path d="m12.5 9 3 3-3 3" /></>, size)
 
 // ── Agent 品牌标 ──
+export const RoamiLogo = ({ size = 13 }: P) => <img src="/logo-mark.svg" width={size} height={size} alt="" aria-hidden style={{ flexShrink: 0 }} />
+
 // Claude / Codex 的会话标记原来是手画的两枚几何件（三线星 + 同心圆），既不是品牌标
 // 也认不出来；这里换成官方 mark 的官方路径（取自 simple-icons 的 claude / openai，
 // 24×24 viewBox、实心）。品牌标是全站唯一不继承父级颜色的图标：画法和颜色都按人家的来，

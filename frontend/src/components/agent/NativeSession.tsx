@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Dropdown, Modal, Spin } from 'antd'
-import { BotIcon, ChevronRight, PlusIcon } from '../../icons'
+import { RoamiLogo, ChevronRight, PlusIcon } from '../../icons'
 import ConversationComposer from '../chat/ConversationComposer'
 import VoiceInput from '../chat/VoiceInput'
 import AgentModelPicker from './AgentModelPicker'
@@ -111,7 +111,7 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
   const artifacts = snapshot.artifacts.value || []
   const switchTab = (value: string) => { if (scroll.current) positions.current[tab] = scroll.current.scrollTop; setTab(value) }
   return <div className="native-session">
-    <header className="tt-pagehead native-session-head"><span className="native-session-mark"><BotIcon size={20} /></span><div className="native-session-identity"><h2>{task ? taskTopic(task) || t('agent.task.untitled') : t('agent.session')}</h2><div className="native-session-meta">{task && <span className="agent-task-state" data-state={task.state} role="status">{t(closed ? 'agent.task.sessionClosed' : 'agent.state.' + task.state)}</span>}{projectId && <a href={'#/projects/' + encodeURIComponent(projectId)}>{projects.find(project => project.id === projectId)?.name || t('agent.task.project')}</a>}</div></div><button type="button" className="tt-act native-session-details" onClick={() => openAgentPage('tasks', metadata.taskId)}>{t('agent.task.details')}<ChevronRight size={14} /></button></header>
+    <header className="tt-pagehead native-session-head"><span className="native-session-mark"><RoamiLogo size={20} /></span><div className="native-session-identity"><h2>{task ? taskTopic(task) || t('agent.task.untitled') : t('agent.session')}</h2><div className="native-session-meta">{task && <span className="agent-task-state" data-state={task.state} role="status">{t(closed ? 'agent.task.sessionClosed' : 'agent.state.' + task.state)}</span>}{projectId && <a href={'#/projects/' + encodeURIComponent(projectId)}>{projects.find(project => project.id === projectId)?.name || t('agent.task.project')}</a>}</div></div><button type="button" className="tt-act native-session-details" onClick={() => openAgentPage('tasks', metadata.taskId)}>{t('agent.task.details')}<ChevronRight size={14} /></button></header>
     <div className="native-session-tabs" role="tablist" aria-label={t('agent.task.sessionViews')}>{['conversation', 'process', 'artifacts'].map(value => <button key={value} type="button" role="tab" id={'native-tab-' + value} aria-controls="native-session-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} onClick={() => switchTab(value)} onKeyDown={event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
       event.preventDefault()
