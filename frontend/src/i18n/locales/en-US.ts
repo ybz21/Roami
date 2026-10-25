@@ -3602,6 +3602,15 @@ const enUS = {
   'agent.task.filter.active': 'In progress',
   'agent.task.filter.ended': 'Ended',
   'agent.task.filter.empty': 'No matching tasks',
+  'agent.task.downloadNamed': 'Download {name}',
+  'agent.task.currentArtifacts': 'Current execution',
+  'agent.task.previousArtifacts': 'Previous executions',
+  'agent.task.otherArtifacts': 'Other files',
+  'agent.task.artifactStatus': 'Task status: {state}. Available files do not imply acceptance.',
+  'agent.task.sessionTab.conversation': 'Conversation',
+  'agent.task.sessionTab.process': 'Execution',
+  'agent.task.sessionTab.artifacts': 'Artifacts',
+  'agent.task.sessionViews': 'Session content',
   'agent.workspace.native': 'Built-in agent',
   'agent.task.viewRecord': 'View execution record',
   'agent.task.archivedRecord': 'Execution has ended. Retained results and logs remain available independently of the working session.',
@@ -3851,6 +3860,23 @@ const enUS = {
   'agent.pipeline.setting.memory_reasoning_effort': 'Memory reasoning effort',
   'agent.pipeline.workerDefault': 'Use default settings',
   'agent.pipeline.artifactTokens': 'Artifact rating usage: {count} tokens',
+  'composer.nativeModelHint': 'Changes the default model and effort for future local tasks.',
+  'composer.effort.default': 'Default',
+  'composer.effort.none': 'Off',
+  'composer.effort.minimal': 'Minimal',
+  'composer.effort.low': 'Low',
+  'composer.effort.medium': 'Medium',
+  'composer.effort.high': 'High',
+  'composer.effort.xhigh': 'Extra high',
+  'composer.effort.max': 'Max',
+
+  'composer.transcribing': 'Transcribing…',
+  'composer.transcribingHint': 'The transcript will be added to your draft',
+
+  'composer.mainModelHint': 'Used for Home chat. Choose executor models in their own sessions.',
+  'composer.taskPlaceholder': 'Describe the task to delegate…',
+  'composer.createTask': 'Create task',
+
 }
 
 export default enUS

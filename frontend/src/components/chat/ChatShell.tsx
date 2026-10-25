@@ -3,7 +3,7 @@
 // Claude、Codex 共用，差异只在 accent、占位文案与消息渲染(renderMessage)。
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { appendPaths, atPath } from '../../agent-paths'
-import { Button, Input, App as AntApp } from 'antd'
+import { Button, App as AntApp } from 'antd'
 import { api, upload, makeClipboardImageFile } from '../../api'
 import { PromptPanel } from '../prompt'
 import { useI18n } from '../../i18n'
@@ -13,12 +13,13 @@ import { groupRuns } from './runs'
 import { ToolRun } from './ToolRun'
 import { LiveTail } from './LiveTail'
 import { useLayout } from '../../layout'
-import { ArrowToBottom, ArrowUp, FileTextIcon, PaperclipIcon, StopIcon, TerminalIcon, AgentLogo } from '../../icons'
+import { ArrowToBottom, ArrowUp, ChevronDown, FileTextIcon, PaperclipIcon, TerminalIcon } from '../../icons'
 import { SESSION_MIME, buildIntro, canDrop, readDrag, type SessionDrag } from '../shell/session-drop'
 import { currentNodeId } from '../cluster/node-url'
 import { sessionDisplay } from '../sessions/session-label'
 import { ChatActionsProvider } from './actions'
 import type { TaskIndex } from './tasks'
+import ConversationComposer from './ConversationComposer'
 import { ComposerPlus } from './ComposerPlus'
 import { StatusBar, type StatusActions } from './StatusBar'
 import type { AgentStatus } from './status'
@@ -272,21 +273,6 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   }
 
   /**
-   * 回车发送——但输入法正在组合时那记回车是「上屏候选词」，不是「发送」。
-   *
-   * 不挡的话：打一句中文按回车上屏，消息当场就发出去了，而且缺了还没上屏的那半截；
-   * send() 清的是 React 态，浏览器随后把组合前的值写回 DOM，于是刚粘贴的那段文件路径
-   * 又冒回输入框里（看着像"又粘了一遍"）。keyCode 229 是 Chrome 组合态的老写法，
-   * 跟 isComposing 一起判，两代浏览器都盖住。
-   */
-  const onEnter = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const ne = e.nativeEvent as KeyboardEvent
-    if (e.shiftKey || ne.isComposing || ne.keyCode === 229) return
-    e.preventDefault()
-    send()
-  }
-
-  /**
    * 中断生成，两级。
    *
    * 第一下发 Esc——Claude / Codex 都按它打断当前回合，也是最温和的一档（TUI 回到输入行，
@@ -318,10 +304,12 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     coolTimer.current = setTimeout(() => setStopCooling(false), 2500)
   }
 
+  const effort = status?.effort || 'default', effortLabel = t('composer.effort.' + effort)
+  const effortText = effortLabel.startsWith('composer.effort.') ? effort : effortLabel
   const errMsg = sendErr || error
   // 工具行里的路径要能点开：用 context 送到最里层，不然要一路穿过工具注册表
   const actions = useMemo(() => ({ openFile: onOpenFile, tasks }), [onOpenFile, tasks])
-  const hasStatus = !!(status && (status.mode || status.context || status.tasks || status.quota != null || status.branch || status.errors))
+  const hasStatus = !!(status && (status.tasks || status.quota != null || status.branch || status.errors))
 
   // 状态条上每一格自己那件事。三件都落在这一层：这里既有会话名（能注入按键、能发消息），
   // 又有滚动容器（能定位到某条消息），再往上传反而绕。
@@ -351,7 +339,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
 
   return (
     <ChatActionsProvider value={actions}>
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-term)' }}>
+    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-base)' }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}
         onDragEnter={(e) => { e.preventDefault() }}
         onDragOver={(e) => {
@@ -382,7 +370,8 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
           </div>
         )}
         <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
-          <div ref={boxRef} onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '8px 12px' }}>
+          <div ref={boxRef} onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: 'var(--sp-2) var(--sp-4)' }}>
+            <div className="conversation-transcript">
             {messages.length === 0 && !pending && <div style={{ color: 'var(--text-dim)', textAlign: 'center', marginTop: 30 }}>{emptyHint || t('chat.loadingTranscript')}</div>}
             {(hidden > 0 || hasEarlier) && (
               <div style={{ textAlign: 'center', margin: '2px 0 8px' }}>
@@ -408,10 +397,11 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
               </div>
             ))}
             {live && (busy ? <LiveTail name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
+            </div>
           </div>
           {/* 「回到底部」已并进下方状态条（带未读数）；状态条一个字段都没有时（刚进页面、
               转录还没扫出状态）才退回这颗悬浮钮，免得离底了没处点。 */}
-          {showJump && !hasStatus && (
+          {showJump && !hasStatus && !unread && (
             <button onClick={jump} title={t('chat.jumpToBottom')}
               style={{ position: 'absolute', right: 14, bottom: 12, width: 34, height: 34, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-container)', color: accent, cursor: 'pointer', boxShadow: 'var(--card-hover-shadow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ArrowToBottom size={16} />
@@ -420,64 +410,19 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
         </div>
         {/* 状态条在选择框之上：选择框要人立刻动手，得离输入框更近 */}
         {(hasStatus || unread > 0) && (
-          <StatusBar status={status || {}} accent={accent} unread={unread} onJump={jump} actions={statusActions} />
+          <StatusBar hideModel status={status || {}} accent={accent} unread={unread} onJump={jump} actions={statusActions} />
         )}
         {/* 交互式选择框（权限确认/选项菜单）：检测到才显示，可点选 */}
         <PromptPanel name={name} accent={accent} />
         {errMsg && <div style={{ color: '#f85149', fontSize: 12, padding: '2px 12px' }}>{errMsg}</div>}
-        {/* 输入卡：与项目页「下任务」同一套词汇（.tt-composer / .tt-cbar / .tt-pill / .tt-send）。
-            手机和桌面是同一棵树，差的只有文本框最多长几行——两套 JSX 各写一遍的结果是
-            改一处忘一处（回车不挡输入法那个 bug 就在两份里各躺了一份）。
-            语音钮也收进这条控制条：桌面端原来是 bottom:54 的悬浮麦克风，输入框一涨到
-            两行就压住发送键，点上去变成录音。 */}
-        <div style={{ padding: 10, borderTop: '1px solid var(--border)' }}>
-          <input ref={fileRef} type="file" multiple style={{ display: 'none' }}
-            onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; e.target.value = ''; if (fs.length) doUpload(fs) }} />
-          <div className="tt-composer">
-            <Input.TextArea
-              value={input} onChange={(e) => setInput(e.target.value)}
-              autoSize={{ minRows: 1, maxRows: isMobile ? 6 : 8 }} placeholder={placeholder}
-              variant="borderless"
-              onPressEnter={onEnter}
-              onPaste={onPaste}
-            />
-            <div className="tt-cbar">
-              <span className="tt-cgrp">
-                {/* 「+」：带什么进去（文件）、这一轮怎么干（权限模式 / 模型 / 压缩上下文）。
-                    输入行上只留最高频的两件事：说话和发送 */}
-                <ComposerPlus name={name} agent={agent} status={status} uploading={uploading} onMouseDown={noBlur}
-                  onFiles={() => fileRef.current?.click()} onCycleMode={cycleMode}
-                  onCommand={sendCommand} onOpenGit={onOpenGit} />
-                {agent && (
-                  <span className="tt-pill on" aria-label={agent === 'claude' ? 'Claude' : agent === 'codex' ? 'Codex' : 'OpenCode'}>
-                    <AgentLogo kind={agent} size={12} />{agent === 'claude' ? 'Claude' : agent === 'codex' ? 'Codex' : 'OpenCode'}
-                  </span>
-                )}
-              </span>
-              <span className="tt-cend">
-                {/* 话筒贴着发送键：pill 是「带什么」，话筒是「怎么说」，分开放（22 设计 §3.3） */}
-                <VoiceInput inline hotkey={live} accent={accent} onResult={appendText} />
-                {/* agent 在跑、又没在打字：那枚圆钮就是「停止」；打了字它又是「发送」（可以边跑边排队）。
-                    不另摆一枚「停止」pill——同一个位置一钮两用，和别的对话产品一个习惯 */}
-                {busy && !input.trim() ? (
-                  // 同一枚钮两档：Esc → Ctrl+C。图标不换（同一件事，AGENTS.md「同一动作同一图标」），
-                  // 换的是颜色和名字，让人知道下一下按出去的分量不一样。
-                  <button type="button" className={`tt-send stop${forceStop ? ' force' : ''}`}
-                    aria-label={forceStop ? t('chat.forceStop') : t('chat.stop')}
-                    title={forceStop ? t('chat.forceStopTitle') : t('chat.stopTitle')}
-                    disabled={stopCooling}
-                    onMouseDown={noBlur} onClick={stop}>
-                    <StopIcon size={12} />
-                  </button>
-                ) : (
-                  <button type="button" className="tt-send" aria-label={t('common.send')} title={t('common.send')}
-                    disabled={sending || !input.trim()} onMouseDown={noBlur} onClick={send}>
-                    <ArrowUp size={16} />
-                  </button>
-                )}
-              </span>
-            </div>
-          </div>
+        <div className="conversation-composer-dock">
+          <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; if (files.length) void doUpload(files) }} />
+          <ConversationComposer value={input} onChange={setInput} label={placeholder} placeholder={placeholder} onPaste={onPaste}
+            send={{ label: t('common.send'), disabled: sending || !input.trim(), pending: sending, onClick: send }}
+            stop={busy ? { label: t(forceStop ? 'chat.forceStop' : 'chat.stop'), disabled: stopCooling, force: forceStop, onClick: stop } : undefined}
+            leading={<ComposerPlus name={name} agent={agent} status={status} uploading={uploading} onMouseDown={noBlur} onFiles={() => fileRef.current?.click()} onCycleMode={cycleMode} onCommand={sendCommand} onOpenGit={onOpenGit} />}
+            settings={agent && <><button type="button" className="tt-pill conversation-model" aria-label={t('chat.modelPick')} onClick={() => sendCommand('/model')}><span>{status?.model || t('chat.model')}</span><ChevronDown size={14} /></button>{(agent === 'codex' || agent === 'claude' || status?.effort) && <button type="button" className="tt-pill conversation-thinking" aria-label={t('agent.reasoning.picker', { effort: effortText })} onClick={() => sendCommand(agent === 'claude' ? '/effort' : '/model')}><span>{effortText}</span></button>}</>}
+            voice={<VoiceInput inline scope={name + ':' + currentNodeId()} hotkey={live} disabled={!live} accent={accent} onResult={appendText} />} />
         </div>
       </div>
     </div>

@@ -60,7 +60,8 @@ export type StatusActions = {
   onCompact?: () => void
 }
 
-export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
+export function StatusBar({ status, accent, unread, onJump, actions = {}, hideModel = false }: {
+  hideModel?: boolean
   status: AgentStatus
   accent: string
   unread: number
@@ -92,13 +93,13 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
     return () => ro.disconnect()
   }, [syncFade, status])
 
-  const ctx = status.context
+  const ctx = hideModel ? undefined : status.context
   // 上下文接近满了要变色：85% 起黄，95% 起红。这是唯一会「越用越糟」的指标。
   const tight = !!ctx && ctx.percent >= CTX_TIGHT
   const ctxColor = !ctx ? accent : ctx.percent >= CTX_FULL ? 'var(--danger)' : tight ? 'var(--warn)' : accent
   const quotaColor = status.quota != null && status.quota >= CTX_FULL ? 'var(--danger)'
     : status.quota != null && status.quota >= CTX_TIGHT ? 'var(--warn)' : accent
-  const hasAny = status.mode || ctx || status.tasks || status.quota || status.branch || status.errors || unread > 0
+  const hasAny = (!hideModel && status.mode) || ctx || status.tasks || status.quota || status.branch || status.errors || unread > 0
   if (!hasAny) return null
 
   const modeLabel = status.mode ? t(modeKey(status.mode.id)) : ''
@@ -113,7 +114,7 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
         data-l={fade.l ? '' : undefined} data-r={fade.r ? '' : undefined}>
         {/* 条头是模型名，点了换模型；权限模式（auto / plan …）只在信息面板里列——
             条上一枚写着「auto」的 pill 没人看得懂是什么的 auto */}
-        {(status.model || actions.onPickModel) && (
+        {!hideModel && (status.model || actions.onPickModel) && (
           <button type="button" className={`cc-st-pill${actions.onPickModel ? ' is-btn' : ''}`}
             style={status.mode ? { color: MODE_COLOR[status.mode.tone] } : undefined} disabled={!actions.onPickModel}
             onClick={actions.onPickModel} title={actions.onPickModel ? t('chat.modelPick') : t('chat.model')}>

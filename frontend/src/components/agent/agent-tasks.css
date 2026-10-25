@@ -91,7 +91,6 @@ html[data-pointer="coarse"] .agent-task-filters > button::after { content:''; po
 .agent-task-conversation .agent-message { max-width:100%; }
 html[data-pointer="coarse"] .agent-task-record .ant-segmented-item-label { min-height:var(--tap); display:flex; align-items:center; justify-content:center; }
 
-.native-project-sessions { padding:var(--sp-3); }
 
 .agent-task-entry-actions { grid-column:2; grid-row:1 / span 2; display:flex; align-items:center; }
 .agent-task-entry-actions:empty { display:none; }

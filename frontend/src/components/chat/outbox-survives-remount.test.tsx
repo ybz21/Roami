@@ -47,7 +47,7 @@ describe('排队中气泡扛得住手机切会话式的卸载重挂', () => {
     const view = render(shell('s1'))
     const box = await screen.findByPlaceholderText('说点什么')
     fireEvent.change(box, { target: { value: '先跑一下测试' } })
-    fireEvent.keyDown(box, { key: 'Enter', code: 'Enter', keyCode: 13 })
+    fireEvent.click(screen.getByRole('button', { name: '发送' }))
     await waitFor(() => expect(screen.getByText('先跑一下测试')).toBeTruthy())
     expect(screen.getByText('排队中，等它忙完')).toBeTruthy()
 
@@ -69,7 +69,7 @@ describe('排队中气泡扛得住手机切会话式的卸载重挂', () => {
     const view = render(shell('s1'))
     const box = await screen.findByPlaceholderText('说点什么')
     fireEvent.change(box, { target: { value: '跑一下测试' } })
-    fireEvent.keyDown(box, { key: 'Enter', code: 'Enter', keyCode: 13 })
+    fireEvent.click(screen.getByRole('button', { name: '发送' }))
     await waitFor(() => expect(screen.getByText('排队中，等它忙完')).toBeTruthy())
     view.unmount()
 

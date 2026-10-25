@@ -31,7 +31,7 @@ export default function AgentHomePage({ page, node, inbox, projects, select, onS
     <section className={'agent-mobile-page' + (page.view === 'session' ? ' agent-session-page' : '')} aria-label={title}>
       {page.view === 'tasks' && <AgentTasks projects={projects} cid={cid} hideBack selectedTask={page.task} onSelectTask={id => { if (id) { openAgentPage('tasks', id) } else backAgentPage(page) }} onSession={onSession} onChanged={onChanged} />}
       {page.view === 'notifications' && <AgentInbox inbox={inbox} select={select} />}
-      {page.view === 'session' && <NativeSession id={page.task} node={node} projects={projects} onChanged={onChanged} />}
+      {page.view === 'session' && <NativeSession id={page.task} node={node} projects={projects} onSession={onSession} onChanged={onChanged} />}
       {page.view === 'debug' && <AgentDebug cid={cid} branch={parts[2] ? decodeURIComponent(parts[2]) : ''} node={node} selected={page.task} unavailable={inbox.unavailable} onSelect={value => openAgentPage('debug', value)} />}
       {page.view === 'improvement' && rsi.value?.developmentRsi === true && <AgentImprovement node={node} />}
     </section>

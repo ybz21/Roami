@@ -1,16 +1,68 @@
-.native-session { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; }
-.native-session-head { flex:none; padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
-.native-session-head h2 { font-size:var(--fs-lg); overflow-wrap:anywhere; }
-.native-session-head .agent-task-actions { flex-wrap:wrap; }
-.native-session-messages { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4); display:flex; flex-direction:column; gap:var(--sp-4); }
+.native-session { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; background:var(--bg-base); }
+.native-session-head { flex:none; display:flex; align-items:center; flex-wrap:nowrap; gap:var(--sp-3); padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.native-session-mark { display:grid; place-items:center; flex:none; color:var(--text-dim); }
+.native-session-identity { flex:1; min-width:0; }
+.native-session .native-session-head h2 { font-size:var(--fs-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; }
+.native-session-meta { display:flex; align-items:center; gap:var(--sp-2); margin-top:var(--sp-1); min-width:0; font-size:var(--fs-meta); }
+.native-session .native-session-meta .agent-task-state { padding:0; background:none; }
+.native-session-meta a { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.native-session-details { flex:none; display:flex; align-items:center; gap:var(--sp-1); }
+.native-session .tt-act { min-height:var(--tap); min-width:var(--tap); padding:var(--sp-1) var(--sp-2); }
+.native-session-tabs { display:flex; flex:none; padding-inline:var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.native-session-tabs button { flex:1; min-width:0; min-height:var(--tap); border:0; border-bottom:2px solid transparent; background:none; font:inherit; font-size:var(--fs-sm); color:var(--text-dim); cursor:pointer; padding:var(--sp-2); }
+.native-session-tabs button[aria-selected="true"] { border-bottom-color:var(--accent); color:var(--accent); }
+.native-session-tabs button:focus-visible { outline:2px solid var(--accent-border); outline-offset:-2px; }
+:where(html[data-pointer="fine"]) .native-session-tabs button:hover { background:var(--list-hover); }
+.native-session-content { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4); }
+.native-session-process,.native-session-artifacts { display:flex; flex-direction:column; gap:var(--sp-4); max-width:calc(var(--sp-5) * 32); width:100%; margin-inline:auto; min-width:0; }
 .native-session-messages .agent-message { max-width:100%; }
-.native-session-composer { flex:none; display:flex; flex-wrap:wrap; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); border-top:1px solid var(--border-subtle); padding-bottom:calc(var(--sp-3) + var(--safe-b)); }
-.native-session-composer textarea { flex:1; min-width:0; }
-.native-session-composer p { flex-basis:100%; margin:0; font-size:var(--fs-sm); color:var(--text-dim); }
+.native-session-messages .agent-collapsed-message p { margin:0; }
+.agent-collapsed-message .agent-task-disclosure { display:block; margin-top:var(--sp-1); }
+.native-session-composer > p { margin:0 0 var(--sp-2); font-size:var(--fs-sm); color:var(--text-dim); }
 .agent-mobile-page.agent-session-page { overflow:hidden; padding:0; }
-
+.native-session-process > details { border-top:1px solid var(--border-subtle); }
+.native-artifact-result h3,.native-artifact-group h3 { font-size:var(--fs-sm); font-weight:500; margin:0 0 var(--sp-2); }
+.native-artifact-result p { margin:0; overflow-wrap:anywhere; white-space:pre-wrap; }
+.native-artifact-row { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); padding-block:var(--sp-3); border-bottom:1px solid var(--border-subtle); }
+.native-artifact-row > svg { flex:none; color:var(--text-dim); }
+.native-artifact-info { flex:1; min-width:0; }
+.native-artifact-info b { font-size:var(--fs-body); font-weight:500; overflow-wrap:anywhere; }
+.native-artifact-info small { display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+.native-artifact-info small > span:first-child { overflow-wrap:anywhere; }
+.native-artifact-preview { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:auto; max-height:70dvh; }
+.native-artifact-preview-actions { display:flex; justify-content:flex-end; padding:var(--sp-2) var(--sp-4); }
+.native-artifact-preview-actions .tt-act { display:flex; align-items:center; min-height:var(--tap); }
+.native-artifact-preview .agent-task-preview { max-height:none; border-radius:0; }
+.native-artifact-preview .agent-task-document { flex:1; max-height:none; background:var(--bg-base); }
+.native-artifact-preview .agent-task-document pre { max-height:none; }
+html[data-size="compact"] .native-artifact-preview,html[data-size="medium"] .native-artifact-preview { flex:1; max-height:none; }
+.native-project-sessions { padding:0; min-width:0; }
+.native-project-sessions .tt-msess-row.native-project-session { border:0; border-bottom:1px solid var(--border-subtle); border-radius:0; margin:0; padding:var(--sp-3) 0; background:transparent; min-height:calc(var(--tap) + var(--sp-2)); }
+.native-project-session .ic { color:var(--text-dim); }
+:where(html[data-pointer="fine"]) .native-project-session:hover { background:var(--list-hover); }
+.native-project-session:focus-visible { outline:2px solid var(--accent-border); outline-offset:-2px; }
 .agent-native-workspace .native-session { flex:1; height:auto; }
 .agent-native-workspace-nav { flex:none; display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); min-height:calc(var(--sp-5) * 2); border-bottom:1px solid var(--border-subtle); font-size:var(--fs-body); }
 .agent-native-workspace-nav > .tt-act { min-height:var(--tap); padding:var(--sp-1) var(--sp-2); }
 html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-btn { position:relative; }
 html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-btn::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
+.native-project-session-desktop { display:flex; align-items:flex-start; gap:var(--sp-3); width:100%; text-align:left; color:var(--text-bright); font:inherit; border:0; margin:0; background:transparent; padding:var(--sp-2) var(--sp-3); min-height:var(--tap); border-radius:var(--r-sm); }
+.native-project-session-desktop .ic { display:grid; place-items:center; flex:none; width:var(--sp-5); height:var(--sp-5); }
+.native-project-session-desktop .t { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-1); }
+.native-project-session-desktop b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:var(--fs-body); font-weight:700; }
+.native-project-session-desktop .st { font-size:var(--fs-meta); color:var(--text-dim); }
+.native-project-session-desktop .st i,.native-project-session-desktop em { font-style:normal; }
+.native-project-session-desktop em { font-size:var(--fs-meta); color:var(--text-dim); flex:none; }
+
+.native-project-title { display:flex; align-items:center; gap:var(--sp-2); min-width:0; }
+.native-project-title b { min-width:0; }
+.native-project-title .tt-agentmark { flex:none; }
+.native-project-status { width:var(--sp-2); height:var(--sp-2); flex:none; margin-top:var(--sp-2); border-radius:var(--r-pill); background:var(--text-dimmer); }
+.native-project-status[data-state="running"] { background:var(--ok); }
+.native-project-status[data-state="waiting_user"],.native-project-status[data-state="interrupted"] { background:var(--warn); }
+.native-project-status[data-state="failed"] { background:var(--danger); }
+
+.native-artifact-download { display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); }
+html[data-pointer="coarse"] .native-session-meta > a { position:relative; }
+html[data-pointer="coarse"] .native-session-meta > a::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
+.native-session-messages .cc-msg .agent-collapsed-message .tt-act { color:inherit; }
