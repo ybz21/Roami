@@ -63,6 +63,8 @@ async def test_daily_and_model_totals_reconcile_without_double_counting_cache(st
         "requests": 7,
         "charges": [{"currency": "CNY", "amount": "0.002"}, {"currency": "USD", "amount": "0.004"}],
         "estimatedCharges": [],
+        "localCharges": [],
+        "localEstimated": 0,
         "unknown": 2,
         "pending": 1,
         "failed": 1,
@@ -359,7 +361,7 @@ async def test_daily_and_hourly_model_parts_reconcile_with_totals_and_currencies
                 "missingUsage",
             ):
                 assert sum(part[field] for part in point["models"]) == point[field]
-            for field in ("charges", "estimatedCharges"):
+            for field in ("charges", "localCharges", "estimatedCharges"):
                 totals = {}
                 for part in point["models"]:
                     for charge in part[field]:

@@ -65,15 +65,16 @@ async def consume(model):
     ]
 
 
-def test_tokens_and_legacy_configuration_never_determine_a_fee():
+def test_tokens_and_legacy_price_currency_are_validated():
     assert usage_counts(USAGE) == (1000, 100, 400)
     assert usage_counts({**USAGE, "prompt_tokens_details": {"cached_tokens": 1001}}) is None
     assert usage_counts({**USAGE, "prompt_tokens": True}) is None
     assert proxy_configuration({"prices": {"fixture": PRICES}, "dailyLimit": 1}) == {
         "currency": "CNY",
         "dailyLimit": 1,
+        "prices": {"fixture": {**PRICES, "currency": "CNY"}},
     }
-    assert proxy_configuration() == {"currency": "USD", "dailyLimit": None}
+    assert proxy_configuration() == {"currency": "USD", "dailyLimit": None, "prices": {}}
 
 
 @pytest.mark.parametrize(
@@ -295,10 +296,26 @@ async def test_settings_http_owner_boundary_persistence_and_invalid_save(store):
     async with httpx.AsyncClient(
         transport=transport, base_url="http://private", headers={"X-Roami-Owner": "local"}
     ) as client:
-        config = {"dailyLimit": 10, "currency": "USD"}
+        config = {
+            "dailyLimit": 10,
+            "currency": "USD",
+            "prices": {"fixture": {**PRICES, "currency": "CNY"}},
+        }
         saved = await client.put("/v1/model-settings", json={"proxy": config})
         assert saved.status_code == 200 and saved.json()["data"]["proxy"] == config
+        partial = await client.put("/v1/model-settings", json={"proxy": {"currency": "EUR"}})
+        assert (
+            partial.status_code == 200
+            and partial.json()["data"]["proxy"]["prices"] == config["prices"]
+        )
+        assert partial.json()["data"]["proxy"]["dailyLimit"] == 10
         before = settings_path(store.data_root).read_bytes()
+        bad_prices = await client.put(
+            "/v1/model-settings", json={"proxy": {"prices": {"fixture": {"input": 1}}}}
+        )
+        assert (
+            bad_prices.status_code == 400 and settings_path(store.data_root).read_bytes() == before
+        )
         invalid = await client.put("/v1/model-settings", json={"proxy": {"dailyLimit": -2}})
         assert invalid.status_code == 400 and settings_path(store.data_root).read_bytes() == before
         assert (await client.get("/v1/model-usage")).json()["data"]["requests"] == 0
@@ -418,7 +435,7 @@ async def test_nonstream_receipt_survives_missing_tokens_and_exact_decimal(store
 
 
 async def test_final_usage_without_cost_clears_provisional_receipt(store):
-    proxy, _ = proxy_for(store)
+    proxy, _ = proxy_for(store, prices=False)
     body = EVENTS.replace(
         b"data: [DONE]",
         b'data: {"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\ndata: [DONE]',

@@ -23,7 +23,7 @@ it('keeps one shared key and stages model selection before saving separate roles
   fireEvent.click(await screen.findByText('other'))
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { proxy: { dailyLimit: null, currency: 'USD' }, connection: { baseUrl: role.baseUrl }, main: { model: 'other', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { proxy: { dailyLimit: null, currency: 'USD', prices: {} }, connection: { baseUrl: role.baseUrl }, main: { model: 'other', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
 })
 it('supports a custom searched model and discards unsaved changes without writing', async () => {
   vi.mocked(api).mockImplementation(async method => ({ data: method === 'POST' ? { models: ['fast', 'strong'] } : settings }))
@@ -88,10 +88,10 @@ it('saves a currency and daily limit atomically, preserving input after a failed
   expect(screen.getByText('agent.proxy.costUnknown')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
 })
-it('rejects invalid limits and has no local model price fields', async () => {
+it('rejects invalid limits while keeping optional model prices blank', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/agent/model-usage' ? usage : settings }))
   setup(); await screen.findByRole('tab', { name: 'agent.proxy.tab' }); fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' })); await screen.findByLabelText('agent.proxy.dailyLimit')
-  expect(document.querySelectorAll('input[id^="agent-price-"]')).toHaveLength(0)
+  expect(document.querySelector<HTMLInputElement>('#agent-price-0-input')?.value).toBe('')
   fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '0' } })
   expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '0.1' } })
@@ -118,4 +118,39 @@ it('opens model configuration first and preserves both drafts across tabs before
   expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('12')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   await waitFor(() => expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).toMatchObject({ connection: { apiKey: 'draft-fixture-key' }, proxy: { dailyLimit: 12 } }))
+})
+
+it('saves fallback model prices with the limit and preserves them after a failed save', async () => {
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'PUT') throw new Error('MODEL_CONFIGURATION_BUSY')
+    return {data:path === '/agent/model-usage' ? usage : settings}
+  })
+  setup();await screen.findByRole('tab',{name:'agent.proxy.tab'});fireEvent.click(screen.getByRole('tab',{name:'agent.proxy.tab'}));fireEvent.click(screen.getByText('agent.proxy.prices'))
+  fireEvent.change(document.querySelector('#agent-price-0-input')!,{target:{value:'2'}})
+  expect((screen.getByRole('button',{name:'agent.models.save'}) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.change(document.querySelector('#agent-price-0-output')!,{target:{value:'8'}})
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'),{target:{value:'10'}})
+  fireEvent.click(screen.getByRole('button',{name:'agent.models.save'}))
+  await screen.findByText('agent.models.busy')
+  expect(vi.mocked(api).mock.calls.find(call=>call[0]==='PUT')?.[2]).toMatchObject({proxy:{dailyLimit:10,currency:'USD',prices:{fast:{currency:'USD',input:2,output:8,cacheRead:null}}}})
+  expect((document.querySelector('#agent-price-0-input') as HTMLInputElement).value).toBe('2')
+  fireEvent.click(screen.getByRole('button',{name:'agent.models.discard'}))
+  expect((document.querySelector('#agent-price-0-input') as HTMLInputElement).value).toBe('')
+})
+
+it('supports free fallback rates, preserves price drafts across tabs and can remove saved prices', async () => {
+  const configured={...settings,proxy:{dailyLimit:null,currency:'USD',prices:{fast:{currency:'CNY',input:2,output:8,cacheRead:0.2}}}}
+  vi.mocked(api).mockImplementation(async (_method,path)=>({data:path==='/agent/model-usage'?usage:configured}))
+  setup();await screen.findByRole('tab',{name:'agent.proxy.tab'});fireEvent.click(screen.getByRole('tab',{name:'agent.proxy.tab'}));fireEvent.click(screen.getByText('agent.proxy.prices'))
+  fireEvent.change(document.querySelector('#agent-price-0-input')!,{target:{value:'0'}})
+  fireEvent.change(document.querySelector('#agent-price-0-output')!,{target:{value:'0'}})
+  fireEvent.change(document.querySelector('#agent-price-0-cacheRead')!,{target:{value:''}})
+  expect((screen.getByRole('button',{name:'agent.models.save'}) as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('tab',{name:'agent.models.configurationTab'}));fireEvent.click(screen.getByRole('tab',{name:'agent.proxy.tab'}))
+  expect((document.querySelector('#agent-price-0-input') as HTMLInputElement).value).toBe('0')
+  fireEvent.click(screen.getByRole('button',{name:'agent.models.discard'}))
+  expect((document.querySelector('#agent-price-0-input') as HTMLInputElement).value).toBe('2')
+  fireEvent.click(screen.getByRole('button',{name:'agent.proxy.removePrice'}))
+  fireEvent.click(screen.getByRole('button',{name:'agent.models.save'}))
+  await waitFor(()=>expect(vi.mocked(api).mock.calls.find(call=>call[0]==='PUT')?.[2]).toMatchObject({proxy:{prices:{}}}))
 })

@@ -3,7 +3,7 @@ import { Input, Select } from 'antd'
 import { useI18n } from '../../i18n'
 import { ModelCharges, type ModelCharge } from './model-charges'
 
-export type UsageTotals = { requests: number; charges: ModelCharge[]; estimatedCharges: ModelCharge[]; totalTokens: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; unknown: number; pending: number; failed: number; estimated: number; missingUsage: number }
+export type UsageTotals = { requests: number; charges: ModelCharge[]; localCharges?: ModelCharge[]; localEstimated?: number; estimatedCharges: ModelCharge[]; totalTokens: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; unknown: number; pending: number; failed: number; estimated: number; missingUsage: number }
 export type UsageModelPart = UsageTotals & { model: string | null }
 export type UsagePoint = UsageTotals & { models?: UsageModelPart[] }
 export type UsageStatistics = { days: number; startDay: string; endDay: string; dailyStartDay: string; total: UsageTotals; daily: (UsagePoint & { day: string })[]; hourly?: (UsagePoint & { hour: number })[]; seriesModels?: string[]; seriesTruncated?: boolean; models: (UsageTotals & { model: string })[]; modelsTruncated: boolean }
@@ -23,7 +23,7 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
   const points = hourly ? (statistics.hourly || []).map(row => ({ ...row, key: String(row.hour), label: time(row.hour) })) : (statistics?.daily || []).map(row => ({ ...row, key: row.day, label: day(row.day) }))
   const max = Math.max(0, ...points.map(metricValue)) || 1
   const metricLabel = selectedMetric === 'totalTokens' ? t('agent.proxy.tokens') : selectedMetric === 'requests' ? t('agent.proxy.requests') : t('agent.usage.cost') + ' · ' + selectedMetric
-  const fees = (row: UsageTotals) => <ModelCharges charges={row.charges} estimatedCharges={row.estimatedCharges} incomplete={row.unknown > 0 || row.pending > 0} />
+  const fees = (row: UsageTotals) => <ModelCharges charges={row.charges} localCharges={row.localCharges} estimatedCharges={row.estimatedCharges} incomplete={row.unknown > 0 || row.pending > 0} />
   const seriesNames = statistics?.seriesModels || statistics?.models.slice(0, 4).map(row => row.model) || []
   const colorIndices = new Map<string, number>(), usedColors = new Set<number>()
   for (const name of seriesNames) {

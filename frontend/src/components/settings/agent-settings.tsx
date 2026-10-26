@@ -87,7 +87,7 @@ function AgentSettingsForm() {
         })}</div>
         <p className="agent-settings-hint">{t('agent.reasoning.hint')}</p>
       </div> },
-      { key: 'proxy', label: t('agent.proxy.tab'), forceRender: true, children: <ModelProxySettings value={draft.proxy} active={tab === 'proxy'} disabled={saving || tab !== 'proxy'} onChange={proxy => setDraft(current => current ? { ...current, proxy } : current)} snapshot={saved} /> },
+      { key: 'proxy', label: t('agent.proxy.tab'), forceRender: true, children: <ModelProxySettings value={draft.proxy} models={[draft.main.model, draft.worker.model]} active={tab === 'proxy'} disabled={saving || tab !== 'proxy'} onChange={proxy => setDraft(current => current ? { ...current, proxy } : current)} snapshot={saved} /> },
     ]} />
     {error && <p className="agent-settings-error" role="alert">{error}</p>}
     <div className="agent-settings-save"><span role="status">{t(dirty ? 'agent.models.unsaved' : 'agent.models.savedState')}</span><Button disabled={!dirty || saving || loadingModels} onClick={() => { if (saved) { invalidateCatalog(); hydrate(saved); setError('') } }}>{t('agent.models.discard')}</Button><Button type="primary" htmlType="submit" loading={saving} disabled={!dirty || loadingModels || !validProxyDraft(draft.proxy) || !draft.main.model.trim() || !draft.worker.model.trim()}>{t('agent.models.save')}</Button><small>{t('agent.models.applyHint')}</small></div>

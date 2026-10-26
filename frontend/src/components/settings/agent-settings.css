@@ -117,3 +117,10 @@ html[data-pointer="coarse"] .agent-usage-filters input[type="date"] { min-height
 .agent-usage-model-detail th { color:var(--text-dim); font-weight:400; }
 .agent-usage-daily .tt-act { font-size:inherit; white-space:normal; text-align:left; }
 html[data-pointer="coarse"] .agent-usage-daily .tt-act { min-height:var(--tap); }
+
+.agent-proxy-prices { display:flex; flex-direction:column; gap:var(--sp-4); padding:var(--sp-3) 0; }
+.agent-proxy-price { display:flex; flex-direction:column; gap:var(--sp-2); min-width:0; }
+.agent-proxy-price > .agent-usage-toolbar > strong { overflow-wrap:anywhere; font-size:var(--fs-sm); }
+.agent-proxy-price-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--sp-3); }
+html[data-size="compact"] .agent-proxy-price-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+html[data-pointer="coarse"] .agent-proxy-price .tt-act,html[data-pointer="coarse"] .agent-proxy-price .ant-select-selector { min-height:var(--tap); }
