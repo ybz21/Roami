@@ -336,3 +336,59 @@ async def test_earliest_valid_calendar_date_has_an_empty_hourly_view(store):
     stats = (await billing.view(day="0001-01-01"))["statistics"]
     assert stats["startDay"] == stats["endDay"] == "0001-01-01"
     assert stats["total"]["requests"] == 0 and len(stats["hourly"]) == 24
+
+
+async def test_daily_and_hourly_model_parts_reconcile_with_totals_and_currencies(store):
+    from decimal import Decimal
+
+    await seed_usage(store)
+    for days in (1, 7, 0):
+        stats = await store.call(lambda db, period=days: usage_statistics(db, "2026-10-26", period))
+        assert len(stats["seriesModels"]) <= 4
+        for point in [*stats["daily"], *stats["hourly"]]:
+            for field in (
+                "requests",
+                "totalTokens",
+                "inputTokens",
+                "outputTokens",
+                "cacheReadTokens",
+                "unknown",
+                "pending",
+                "failed",
+                "estimated",
+                "missingUsage",
+            ):
+                assert sum(part[field] for part in point["models"]) == point[field]
+            for field in ("charges", "estimatedCharges"):
+                totals = {}
+                for part in point["models"]:
+                    for charge in part[field]:
+                        totals[charge["currency"]] = totals.get(
+                            charge["currency"], Decimal(0)
+                        ) + Decimal(charge["amount"])
+                assert totals == {
+                    charge["currency"]: Decimal(charge["amount"]) for charge in point[field]
+                }
+    stats = await store.call(lambda db: usage_statistics(db, "2026-10-26", 7))
+    day20 = stats["daily"][0]
+    assert {part["model"]: part["totalTokens"] for part in day20["models"]} == {"a": 110, "b": 220}
+    assert stats["seriesTruncated"] is False
+
+
+async def test_chart_groups_additional_models_without_losing_any_tokens_or_fees(store):
+    await store.call(
+        lambda db: db.executemany(
+            "INSERT INTO model_proxy_calls(id,day,timezone,role,model,started_ms,state,input_tokens,output_tokens,cache_read_tokens,cost_source,cost_amount,cost_currency) VALUES(?,'2026-10-26','UTC','main',?,0,'known',1,1,0,'upstream','0.1','USD')",
+            [(str(index), f"model-{index:03}") for index in range(205)],
+        ),
+        write=True,
+    )
+    stats = await store.call(lambda db: usage_statistics(db, "2026-10-26", 1))
+    assert stats["seriesModels"] == [f"model-{i:03}" for i in range(4)]
+    assert stats["seriesTruncated"] is True and stats["modelsTruncated"] is True
+    for point in [stats["daily"][0], stats["hourly"][0]]:
+        assert len(point["models"]) == 5
+        other = next(part for part in point["models"] if part["model"] is None)
+        assert other["requests"] == 201 and other["totalTokens"] == 402
+        assert other["charges"] == [{"currency": "USD", "amount": "20.1"}]
+        assert sum(part["requests"] for part in point["models"]) == point["requests"] == 205

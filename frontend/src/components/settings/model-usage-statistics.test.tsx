@@ -139,3 +139,40 @@ it('ignores a stale day response after selecting another date', async () => {
   responses.get('/agent/model-usage?days=1&day=2026-10-24')!({data:{...usage,statistics:{...statistics,days:1,hourly:[],models:[{...totals,model:'stale-day'}]}}})
   await waitFor(() => expect(screen.queryByRole('article',{name:'stale-day'})).toBeNull())
 })
+
+it('stacks model tokens into a total, keeps model colors when ranking changes and expands exact daily values', () => {
+  const first = {...totals, requests:3, totalTokens:60, unknown:0, pending:0, charges:[{currency:'USD',amount:'0.02'}], model:'a'}
+  const second = {...first, requests:2, totalTokens:40, charges:[{currency:'USD',amount:'0.08'}], model:'b'}
+  const aggregate = {...first, requests:5, totalTokens:100, charges:[{currency:'USD',amount:'0.10'}]}
+  const stacked = {...statistics, seriesModels:['a','b'], total:aggregate, daily:[{...aggregate, day:'2026-10-26', models:[first,second]}], models:[first,second]}
+  const onDayChange=vi.fn(), onDaysChange=vi.fn()
+  const view=render(<ModelUsageStatistics statistics={stacked} days={7} onDaysChange={onDaysChange} onDayChange={onDayChange} loading={false} disabled={false} />)
+  const segments=()=>[...document.querySelectorAll('.agent-usage-stack > span')]
+  expect(segments().map(el=>el.getAttribute('style'))).toEqual([expect.stringContaining('height: 60%'),expect.stringContaining('height: 40%')])
+  const red=document.querySelector('.agent-usage-legend [data-model="a"] > span')?.getAttribute('style')
+  const green=document.querySelector('.agent-usage-legend [data-model="b"] > span')?.getAttribute('style')
+  expect(red).toContain('--usage-series-0');expect(green).toContain('--usage-series-1')
+  view.rerender(<ModelUsageStatistics statistics={{...stacked,seriesModels:['b','a']}} days={7} onDaysChange={onDaysChange} onDayChange={onDayChange} loading={false} disabled={false} />)
+  expect(document.querySelector('.agent-usage-legend [data-model="a"] > span')?.getAttribute('style')).toBe(red)
+  expect(document.querySelector('.agent-usage-legend [data-model="b"] > span')?.getAttribute('style')).toBe(green)
+  fireEvent.click(screen.getByText('agent.usage.dailyDetails'))
+  fireEvent.click(screen.getByRole('button',{name:'agent.usage.expandPoint'}))
+  expect(document.querySelectorAll('.agent-usage-model-detail')).toHaveLength(2)
+  expect(within(screen.getByRole('table')).getByText('60')).toBeTruthy()
+  expect(within(screen.getByRole('table')).getByText('40')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'agent.usage.viewDayModels'}))
+  expect(onDayChange).toHaveBeenCalledWith('2026-10-26');expect(onDaysChange).toHaveBeenCalledWith(1)
+  fireEvent.mouseDown(screen.getByRole('combobox',{name:'agent.usage.chartMetric'}))
+  fireEvent.click(screen.getByText('agent.usage.cost · USD',{selector:'.ant-select-item-option-content'}))
+  expect(document.querySelector('.agent-usage-stack [data-model="a"]')?.getAttribute('style')).toContain('height: 20%')
+  expect(document.querySelector('.agent-usage-stack [data-model="b"]')?.getAttribute('style')).toContain('height: 80%')
+})
+
+it('includes Other models in the stack and the legend without losing the total', () => {
+  const first={...totals,requests:1,totalTokens:20,model:'a'}
+  const other={...totals,requests:4,totalTokens:80,model:null}
+  render(<ModelUsageStatistics statistics={{...statistics,seriesModels:['a'],seriesTruncated:true,daily:[{...totals,requests:5,totalTokens:100,day:'2026-10-26',models:[first,other]}]}} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  expect(within(screen.getByRole('list',{name:'agent.usage.legend'})).getByText('agent.usage.otherModels')).toBeTruthy()
+  expect(document.querySelector('.agent-usage-stack [data-model=""]')?.getAttribute('style')).toContain('height: 80%')
+  expect(screen.getByText('agent.usage.seriesLimit')).toBeTruthy()
+})

@@ -61,9 +61,10 @@ def add_row_charges(group, row):
             )
 
 
-def hourly_statistics(db, day, fields):
+def hourly_statistics(db, day, fields, chart_models):
     hours = [{"hour": hour, **dict.fromkeys(fields, 0)} for hour in range(24)]
     fees = [({}, {}) for _ in hours]
+    model_hours = [{} for _ in hours]
     for row in db.execute("SELECT * FROM model_proxy_calls WHERE day=?", (day,)):
         hour = datetime.fromtimestamp(row["started_ms"] / 1000, ZoneInfo(row["timezone"])).hour
         source, state = row["cost_source"], row["state"]
@@ -86,14 +87,32 @@ def hourly_statistics(db, day, fields):
         for field, value in counts.items():
             hours[hour][field] += value
         add_row_charges(fees[hour], row)
+        model = row["model"] if row["model"] in chart_models else None
+        part, costs = model_hours[hour].setdefault(model, (dict.fromkeys(fields, 0), ({}, {})))
+        for field, value in counts.items():
+            part[field] += value
+        add_row_charges(costs, row)
     return [
-        {**row, "charges": charge_list(fee[0]), "estimatedCharges": charge_list(fee[1])}
-        for row, fee in zip(hours, fees, strict=True)
+        {
+            **row,
+            "charges": charge_list(fee[0]),
+            "estimatedCharges": charge_list(fee[1]),
+            "models": [
+                {
+                    "model": model,
+                    **counts,
+                    "charges": charge_list(cost[0]),
+                    "estimatedCharges": charge_list(cost[1]),
+                }
+                for model, (counts, cost) in parts.items()
+            ],
+        }
+        for row, fee, parts in zip(hours, fees, model_hours, strict=True)
     ]
 
 
-def money_records(db, where, parameters, *, models=(), daily_start=None):
-    total, by_model, by_day = ({}, {}), {}, {}
+def money_records(db, where, parameters, *, models=(), daily_start=None, chart_models=()):
+    total, by_model, by_day, daily_models = ({}, {}), {}, {}, {}
     for row in db.execute(
         f"SELECT model,day,cost_source,cost_amount,cost_currency,cost_nano FROM model_proxy_calls WHERE {where} AND cost_source IN ('upstream','estimate')",
         parameters,
@@ -103,6 +122,8 @@ def money_records(db, where, parameters, *, models=(), daily_start=None):
             groups.append(by_model.setdefault(row["model"], ({}, {})))
         if daily_start is not None and row["day"] >= daily_start:
             groups.append(by_day.setdefault(row["day"], ({}, {})))
+            model = row["model"] if row["model"] in chart_models else None
+            groups.append(daily_models.setdefault((row["day"], model), ({}, {})))
         for group in groups:
             add_row_charges(group, row)
 
@@ -113,6 +134,7 @@ def money_records(db, where, parameters, *, models=(), daily_start=None):
         "total": view(total),
         "models": {key: view(value) for key, value in by_model.items()},
         "daily": {key: view(value) for key, value in by_day.items()},
+        "dailyModels": {key: view(value) for key, value in daily_models.items()},
     }
 
 
@@ -139,14 +161,31 @@ def usage_statistics(db, day, days):
         f"SELECT model,{USAGE_COLUMNS} FROM model_proxy_calls WHERE {where} GROUP BY model ORDER BY requests DESC,model LIMIT 201",
         parameters,
     ).fetchall()
+    chart_models = [row["model"] for row in models[:4]]
     costs = money_records(
         db,
         where,
         parameters,
         models={row["model"] for row in models[:200]},
         daily_start=daily_start,
+        chart_models=chart_models,
     )
     no_cost = {"charges": [], "estimatedCharges": []}
+    placeholders = ",".join("?" for _ in chart_models) or "NULL"
+    parts = db.execute(
+        f"SELECT day,CASE WHEN model IN ({placeholders}) THEN model ELSE NULL END AS series_model,{USAGE_COLUMNS} FROM model_proxy_calls WHERE day>=? AND day<=? GROUP BY day,series_model ORDER BY day,series_model",
+        [*chart_models, daily_start, day],
+    ).fetchall()
+    daily_models = {}
+    for part in parts:
+        model = part["series_model"]
+        daily_models.setdefault(part["day"], []).append(
+            {
+                "model": model,
+                **usage_totals(part),
+                **costs["dailyModels"].get((part["day"], model), no_cost),
+            }
+        )
     indexed = {
         row["day"]: {**usage_totals(row), **costs["daily"].get(row["day"], no_cost)}
         for row in daily_rows
@@ -155,7 +194,9 @@ def usage_statistics(db, day, days):
     daily, current = [], date.fromisoformat(daily_start)
     while current <= end:
         name = current.isoformat()
-        daily.append({"day": name, **indexed.get(name, empty)})
+        daily.append(
+            {"day": name, **indexed.get(name, empty), "models": daily_models.get(name, [])}
+        )
         current += timedelta(days=1)
     return {
         "days": days,
@@ -164,7 +205,11 @@ def usage_statistics(db, day, days):
         "dailyStartDay": daily_start,
         "total": {**usage_totals(total), **costs["total"]},
         "daily": daily,
-        "hourly": hourly_statistics(db, day, usage_totals(total)) if days == 1 else [],
+        "hourly": hourly_statistics(db, day, usage_totals(total), chart_models)
+        if days == 1
+        else [],
+        "seriesModels": chart_models,
+        "seriesTruncated": len(models) > 4,
         "models": [
             {
                 "model": row["model"],

@@ -258,6 +258,10 @@ authority, it just no longer moves the layout under the user a beat after load.
   <p>用户选择“按天分时”与日期，查看该日 24 个本地钟点的请求数、Token 和分币种费用趋势、可展开分时明细，以及同日总计和分模型统计。日期由节点的今日日期初始化，可查询历史日期；统计选择不会改写限额草稿。请求按账本保存的归属日、发起时间和时区归集；跨小时或跨日请求归入开始时段，夏令时重复钟点合并，不丢失费用。</p>
   <p>GET /agent/model-usage?day=YYYY-MM-DD 返回选定日期的单日 statistics 与 24 档 hourly，顶部今日摘要仍为当前日。非法、非标准或未来日期拒绝；所有者校验不变。money_records 与 hourly_statistics 复用同一费用累加，未知与历史估算不混入实际金额。原生日期输入复用 antd Input 和项目令牌；更改日期会取消旧查询，防止晚到结果覆盖新选择，不增加轮询。</p>
   <p>分时定向后端 66 项与前端全量 1,009 项通过。隔离生产包完成日期切换、24 时段、分时表格、分币种趋势、历史空日、跨 Tab 与日期保留限额草稿、七档宽度中英深浅主题及命中检查；报告 hourly-checks.json，截图 hourly-desktop.png／hourly-details.png／hourly-narrow-dark.png／hourly-narrow-light.png。真实手机仍为安全锁屏，未宣称真机验收通过。</p>
+  <h4>模型构成堆叠修订</h4>
+  <p>产品与用户故事：用户能看每天或每小时的合计，以及各模型占了多少。柱高代表总量，色块代表模型，图例同时显示模型名；展开时段明细可核对各模型数字，并从日期明细进入当天全部模型。Token、请求与指定币种费用共用同一构成视图，未知费用及历史估算仍单独标明。</p>
+  <p>技术设计：statistics 增加 seriesModels／seriesTruncated，daily 和 hourly 的 models 携带分模型聚合；图表保留周期请求最多的四个模型，其余以 model=null 合为“其他”，不丢失 200 模型目录之外的调用。日模型分组在 SQLite 聚合，费用复用 Decimal 扫描，每小时模型分组复用原日内扫描；最多五组乘 90 天，不额外轮询。全部模型的单日目录沿用现有 day 查询。前端复用已有 --danger、--ok-solid、--accent-solid、--warn、--text-dim，分别别名为 --usage-series-0..3／other；这些色块标识模型而非状态，名称图例和可展开数值同时提供含义。页面保留相同模型的颜色偏好，周期请求排名改变时不直接重排已有颜色。</p>
+  <p>验收：定向后端 68 项、前端全量 1,011 项通过；新增回归逐项核对日／小时模型切片与合计的请求、Token、未知、历史估算及分币种金额，并验证 205 模型归并不丢数、分段比例、颜色在排名变动后保留、每日明细展开和进入完整单日模型。隔离生产包完成红绿等颜色图例、堆叠高度合计、每日与分时切换、指定币种图、明细及七档宽度／中英／深浅主题检查，报告 stacked-checks.json，截图 stacked-daily.png／stacked-hourly.png／stacked-daily-details.png／stacked-narrow-dark.png／stacked-narrow-light.png。真实 Android 仍为安全锁屏，真机验收待完成；未部署现用服务。</p>
 </section>
 
 ## Refresh Budgets

@@ -85,7 +85,8 @@ html[data-pointer="coarse"] .agent-settings-tabs > .ant-tabs-nav .ant-tabs-tab {
 .agent-usage-figure { margin:0; min-width:0; }
 .agent-usage-chart { display:flex; align-items:stretch; gap:var(--sp-1); height:calc(var(--sp-5) * 6); border-bottom:1px solid var(--border-subtle); }
 .agent-usage-bar-column { display:flex; align-items:flex-end; flex:1; min-width:0; }
-.agent-usage-bar-column > span { display:block; width:100%; background:var(--accent-solid); border-radius:var(--r-xs) var(--r-xs) 0 0; }
+.agent-usage-stack { display:flex; flex-direction:column-reverse; width:100%; border-radius:var(--r-xs) var(--r-xs) 0 0; overflow:hidden; }
+.agent-usage-stack > span { display:block; width:100%; flex-shrink:0; }
 .agent-usage-figure figcaption { display:flex; justify-content:space-between; flex-wrap:wrap; gap:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); margin-top:var(--sp-2); }
 .agent-usage-daily table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:var(--fs-meta); }
 .agent-usage-daily th,.agent-usage-daily td { padding:var(--sp-2) var(--sp-1); text-align:right; overflow-wrap:anywhere; border-bottom:1px solid var(--border-subtle); }
@@ -108,3 +109,11 @@ html[data-pointer="coarse"] .agent-usage-toolbar .ant-select-selector { min-heig
 .agent-usage-filters { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); max-width:100%; }
 .agent-usage-filters input[type="date"] { width:calc(var(--sp-5) * 7); }
 html[data-pointer="coarse"] .agent-usage-filters input[type="date"] { min-height:var(--tap); }
+
+.agent-usage-statistics { --usage-series-0:var(--danger); --usage-series-1:var(--ok-solid); --usage-series-2:var(--accent-solid); --usage-series-3:var(--warn); --usage-series-other:var(--text-dim); }
+.agent-usage-legend { display:flex; flex-wrap:wrap; gap:var(--sp-2) var(--sp-4); margin:0; padding:0; list-style:none; font-size:var(--fs-meta); }
+.agent-usage-legend li { display:flex; align-items:center; gap:var(--sp-2); min-width:0; overflow-wrap:anywhere; }
+.agent-usage-swatch { display:inline-block; flex-shrink:0; width:var(--sp-3); height:var(--sp-3); border-radius:var(--r-xs); margin-right:var(--sp-1); }
+.agent-usage-model-detail th { color:var(--text-dim); font-weight:400; }
+.agent-usage-daily .tt-act { font-size:inherit; white-space:normal; text-align:left; }
+html[data-pointer="coarse"] .agent-usage-daily .tt-act { min-height:var(--tap); }
