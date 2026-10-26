@@ -8,7 +8,7 @@ import re
 import stat
 import tempfile
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row, rows
@@ -67,7 +67,7 @@ def reported_paths(text, root=None):
             text,
         )
         paths += [
-            name
+            quote(name, safe="/")
             for name in re.findall(r"(?<!`)`([^`\s]+)`(?!`)", text)
             if not Path(name).is_absolute()
             and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", name)
@@ -80,7 +80,7 @@ def output_path(root, path):
     if path.startswith("/api/file/raw?"):
         path = parse_qs(urlsplit(path).query).get("path", [""])[0]
     elif path.startswith("/api/file/serve/"):
-        path = unquote(path.removeprefix("/api/file/serve"))
+        path = "/" + unquote(path.removeprefix("/api/file/serve/")).lstrip("/")
     else:
         path = unquote(path)
     path = Path(path)

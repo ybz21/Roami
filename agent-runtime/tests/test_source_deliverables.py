@@ -70,7 +70,36 @@ async def test_source_aliases_share_one_artifact_and_deleted_aliases_cannot_rest
         await runtime.close()
 
 
-async def test_literal_percent_and_space_in_source_names_remain_distinct(store, tmp_path):
+@pytest.mark.parametrize("form", ["segments", "encoded", "extra_slash"])
+async def test_svg_serve_aliases_keep_one_snapshot(store, tmp_path, form):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        task = await admit(runtime, binding, "Create plot", "plot", executor="native")
+        source = tmp_path / "equity.svg"
+        source.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+        paths = {
+            "segments": "/api/file/serve" + quote(str(source), safe="/"),
+            "encoded": "/api/file/serve/" + quote(str(source), safe=""),
+            "extra_slash": "/api/file/serve/" + str(source),
+        }
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {
+                "state": "succeeded",
+                "summary": f"[plot]({paths[form]}) and `{source}`",
+                "workspace": {"directory": str(tmp_path)},
+            },
+        )
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        assert len(delivery["artifacts"]) == 1 and not delivery["unavailable"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("relative", [False, True])
+async def test_literal_percent_and_space_in_source_names_remain_distinct(store, tmp_path, relative):
     runtime, _, _, _, binding = await setup(store)
     try:
         task = await admit(runtime, binding, "Create sources", "sources", executor="codex")
@@ -79,7 +108,11 @@ async def test_literal_percent_and_space_in_source_names_remain_distinct(store, 
         for name in names:
             path = tmp_path / name
             path.write_text(name)
-            links.append(f"[{name}](/api/file/raw?path={quote(str(path), safe='')})")
+            links.append(
+                f"`{name}`"
+                if relative and " " not in name
+                else f"[{name}](/api/file/raw?path={quote(str(path), safe='')})"
+            )
         await mark(
             runtime,
             task,
