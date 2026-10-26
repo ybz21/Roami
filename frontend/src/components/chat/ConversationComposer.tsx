@@ -11,16 +11,17 @@ type Props = {
   disabled?: boolean; maxLength?: number; id?: string; className?: string
   send: Action; stop?: Action; hasAttachments?: boolean
   leading?: ReactNode; settings?: ReactNode; voice?: ReactNode; attachments?: ReactNode
-  suggestions?: ReactNode; status?: ReactNode; options?: ReactNode
+  header?: ReactNode; suggestions?: ReactNode; status?: ReactNode; options?: ReactNode
   onPaste?: ClipboardEventHandler<HTMLTextAreaElement>; onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>
 }
 
-export default function ConversationComposer({ value, onChange, label, placeholder, disabled, maxLength, id, className = '', send, stop, hasAttachments, leading, settings, voice, attachments, suggestions, status, options, onPaste, onKeyDown }: Props) {
+export default function ConversationComposer({ value, onChange, label, placeholder, disabled, maxLength, id, className = '', send, stop, hasAttachments, leading, settings, voice, attachments, header, suggestions, status, options, onPaste, onKeyDown }: Props) {
   const { phone, landscape } = useLayout(), composing = useRef(false)
   const stopOnly = !!stop && !value.trim() && !hasAttachments
   const submit = () => { if (!disabled && !send.disabled && !send.pending && (value.trim() || hasAttachments)) send.onClick() }
   const keepKeyboard = (event: React.MouseEvent) => { if (phone) event.preventDefault() }
   return <form className={'tt-composer conversation-composer ' + className} onSubmit={event => { event.preventDefault(); submit() }}>
+    {header}
     {attachments}
     <Input.TextArea id={id} variant="borderless" aria-label={label} placeholder={placeholder} value={value} disabled={disabled} maxLength={maxLength} autoSize={{ minRows: phone && landscape ? 1 : 2, maxRows: phone ? landscape ? 1 : 5 : 8 }} onChange={event => onChange(event.target.value)} onPaste={onPaste}
       onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }}
