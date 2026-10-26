@@ -167,6 +167,17 @@ async def test_http_usage_range_validation_and_owner_isolation(store):
         assert response.status_code == 200
         assert len(response.json()["data"]["statistics"]["daily"]) == 30
         assert (await client.get("/v1/model-usage?days=0")).status_code == 200
+        picked = await client.get("/v1/model-usage?day=2026-01-01")
+        assert (
+            picked.status_code == 200
+            and picked.json()["data"]["statistics"]["endDay"] == "2026-01-01"
+        )
+        assert len(picked.json()["data"]["statistics"]["hourly"]) == 24
+        assert (await client.get("/v1/model-usage?day=2026-02-30")).status_code == 400
+        assert (await client.get("/v1/model-usage?day=20261026000")).status_code == 422
+        assert (
+            await client.get("/v1/model-usage?day=2026-01-01", headers={"X-Roami-Owner": "other"})
+        ).status_code == 403
         assert (await client.get("/v1/model-usage?days=91")).status_code == 422
         assert (await client.get("/v1/model-usage?days=bad")).status_code == 422
         assert (
@@ -241,3 +252,87 @@ async def test_large_totals_retain_all_fractional_digits(store):
     assert (await billing.view())["charges"] == [
         {"currency": "USD", "amount": "100999999911.469135690246913478"}
     ]
+
+
+async def test_selected_day_has_24_hour_buckets_and_matching_model_totals(store):
+    from decimal import Decimal
+
+    from roami_agent.providers.upstream_costs import UpstreamCharge
+
+    instant = datetime(2026, 10, 25, 16, 30, tzinfo=UTC)
+    billing = ModelBilling(
+        store, dict, lambda: "Asia/Shanghai", clock=lambda: int(instant.timestamp() * 1000)
+    )
+    first = await billing.admit("main", "a")
+    await billing.settle(first, (100, 20, 10), charge=UpstreamCharge(Decimal("0.1"), "USD"))
+    instant = datetime(2026, 10, 26, 15, 59, tzinfo=UTC)
+    last = await billing.admit("worker", "b")
+    await billing.settle(last, (200, 30, 20), charge=UpstreamCharge(Decimal("0.2"), "CNY"))
+    instant = datetime(2026, 10, 26, 16, 5, tzinfo=UTC)
+    tomorrow = await billing.admit("main", "a")
+    await billing.settle(tomorrow, (100, 10, 0))
+    view = await billing.view(day="2026-10-26")
+    assert view["day"] == "2026-10-27" and view["requests"] == 1
+    stats = view["statistics"]
+    assert stats["days"] == 1 and stats["startDay"] == stats["endDay"] == "2026-10-26"
+    hours = stats["hourly"]
+    assert len(hours) == 24 and hours[0]["requests"] == hours[23]["requests"] == 1
+    assert hours[0]["charges"] == [{"currency": "USD", "amount": "0.1"}]
+    assert hours[23]["charges"] == [{"currency": "CNY", "amount": "0.2"}]
+    assert all(row["requests"] == 0 and row["charges"] == [] for row in hours[1:23])
+    for field in (
+        "requests",
+        "totalTokens",
+        "inputTokens",
+        "outputTokens",
+        "cacheReadTokens",
+        "unknown",
+        "pending",
+        "failed",
+        "estimated",
+        "missingUsage",
+    ):
+        assert sum(row[field] for row in hours) == stats["total"][field]
+        assert sum(row[field] for row in stats["models"]) == stats["total"][field]
+
+
+async def test_repeated_dst_hour_is_combined_without_losing_a_charge(store):
+    from decimal import Decimal
+
+    from roami_agent.providers.upstream_costs import UpstreamCharge
+
+    instant = datetime(2026, 11, 1, 5, 30, tzinfo=UTC)
+    billing = ModelBilling(
+        store, dict, lambda: "America/New_York", clock=lambda: int(instant.timestamp() * 1000)
+    )
+    for hour in (5, 6):
+        instant = instant.replace(hour=hour)
+        call = await billing.admit("main", "a")
+        await billing.settle(call, None, charge=UpstreamCharge(Decimal("0.1"), "USD"))
+    stats = (await billing.view(day="2026-11-01"))["statistics"]
+    assert len(stats["hourly"]) == 24
+    assert stats["hourly"][1]["requests"] == 2
+    assert (
+        stats["hourly"][1]["charges"]
+        == stats["total"]["charges"]
+        == [{"currency": "USD", "amount": "0.2"}]
+    )
+
+
+@pytest.mark.parametrize("day", ["2026-02-30", "20261026", "", "2026-10-27", "not-a-date"])
+async def test_invalid_or_future_day_is_rejected(store, day):
+    billing = ModelBilling(
+        store,
+        dict,
+        lambda: "UTC",
+        clock=lambda: int(datetime(2026, 10, 26, tzinfo=UTC).timestamp() * 1000),
+    )
+    with pytest.raises(DomainError, match="INVALID_MODEL_USAGE_DAY"):
+        await billing.view(day=day)
+
+
+async def test_earliest_valid_calendar_date_has_an_empty_hourly_view(store):
+    billing = ModelBilling(store, dict, lambda: "UTC")
+    stats = (await billing.view(day="0001-01-01"))["statistics"]
+    assert stats["startDay"] == stats["endDay"] == "0001-01-01"
+    assert stats["total"]["requests"] == 0 and len(stats["hourly"]) == 24

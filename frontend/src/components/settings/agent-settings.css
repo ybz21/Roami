@@ -104,3 +104,7 @@ html[data-pointer="coarse"] .agent-usage-toolbar .ant-select-selector { min-heig
 
 .agent-model-charges { display:inline-flex; flex-direction:column; gap:var(--sp-1); overflow-wrap:anywhere; }
 .agent-model-charges small { color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; }
+
+.agent-usage-filters { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); max-width:100%; }
+.agent-usage-filters input[type="date"] { width:calc(var(--sp-5) * 7); }
+html[data-pointer="coarse"] .agent-usage-filters input[type="date"] { min-height:var(--tap); }

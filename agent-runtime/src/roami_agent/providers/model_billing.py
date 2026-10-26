@@ -1,7 +1,7 @@
 """Provider-reported charges and node-local daily admission; estimates are historical only."""
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -134,24 +134,32 @@ class ModelBilling:
             write=True,
         )
 
-    async def view(self, *, days=7):
-        day, zone = self.period()
+    async def view(self, *, days=7, day=None):
+        today, zone = self.period()
+        selected = day or today
+        if day is not None:
+            try:
+                if date.fromisoformat(day).isoformat() != day or day > today:
+                    raise ValueError
+            except (TypeError, ValueError) as error:
+                raise DomainError("INVALID_MODEL_USAGE_DAY") from error
+            days = 1
 
         def read(db):
             total = db.execute(
-                f"SELECT {USAGE_COLUMNS} FROM model_proxy_calls WHERE day=?", (day,)
+                f"SELECT {USAGE_COLUMNS} FROM model_proxy_calls WHERE day=?", (today,)
             ).fetchone()
-            costs = money_records(db, "day=?", [day])
+            costs = money_records(db, "day=?", [today])
             recent = db.execute(
                 "SELECT id,role,model,started_ms,state,input_tokens,output_tokens,cache_read_tokens,cost_nano,cost_amount,cost_currency,cost_source,error_code FROM model_proxy_calls WHERE day=? ORDER BY started_ms DESC,id DESC LIMIT 20",
-                (day,),
+                (today,),
             ).fetchall()
             return {
-                "day": day,
+                "day": today,
                 "timezone": zone,
                 **usage_totals(total),
                 **costs["total"],
-                "statistics": usage_statistics(db, day, days),
+                "statistics": usage_statistics(db, selected, days),
                 "recent": [{**dict(row), **row_charges(row)} for row in recent],
             }
 

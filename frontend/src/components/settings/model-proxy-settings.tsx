@@ -15,15 +15,17 @@ export const validProxyDraft = (draft: ModelProxyDraft) => (draft.dailyLimit ===
 
 export function ModelProxySettings({ value, disabled, onChange, snapshot, active }: { active: boolean; value: ModelProxyDraft; disabled: boolean; onChange: (value: ModelProxyDraft) => void; snapshot: unknown }) {
   const { t, locale } = useI18n()
+  const [selectedDay, setSelectedDay] = useState('')
   const [days, setDays] = useState(7), [loading, setLoading] = useState(false)
   const [usage, setUsage] = useState<Usage | null>(null), [failed, setFailed] = useState(false), [retry, setRetry] = useState(0)
   useEffect(() => {
     if (!active) return
     const abort = new AbortController()
     setFailed(false); setLoading(true)
-    void api('GET', days === 7 ? '/agent/model-usage' : `/agent/model-usage?days=${days}`, undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) Array.isArray(data?.charges) ? setUsage(data) : setFailed(true) }).catch(() => { if (!abort.signal.aborted) setFailed(true) }).finally(() => { if (!abort.signal.aborted) setLoading(false) })
+    const path = days === 7 ? '/agent/model-usage' : `/agent/model-usage?days=${days}${days === 1 && selectedDay ? '&day=' + encodeURIComponent(selectedDay) : ''}`
+    void api('GET', path, undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) Array.isArray(data?.charges) ? setUsage(data) : setFailed(true) }).catch(() => { if (!abort.signal.aborted) setFailed(true) }).finally(() => { if (!abort.signal.aborted) setLoading(false) })
     return () => abort.abort()
-  }, [active, snapshot, retry, days])
+  }, [active, snapshot, retry, days, selectedDay])
   const count = (amount: number) => new Intl.NumberFormat(locale).format(amount)
   return <fieldset className="agent-model-proxy" disabled={disabled}>
     <legend>{t('agent.proxy.title')}</legend>
@@ -40,7 +42,7 @@ export function ModelProxySettings({ value, disabled, onChange, snapshot, active
       {usage.recent.length > 0 && <details className="agent-model-advanced"><summary>{t('agent.proxy.recent')}</summary><ul className="agent-proxy-calls">{usage.recent.map(call => <li key={call.id}><div><strong>{call.model}</strong><span>{t('agent.models.role.' + call.role)} · {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: usage.timezone }).format(call.started_ms)}</span></div><span>{t(call.cost_source === 'estimate' ? 'agent.proxy.estimate' : 'agent.proxy.state.' + call.state)}</span><strong>{call.cost_source === 'not_sent' ? t('agent.proxy.notSent') : <ModelCharges charges={call.charges} estimatedCharges={call.estimatedCharges} />}</strong></li>)}</ul></details>}
     </> : !failed && <Spin size="small" />}
     {failed && <div role="alert"><p>{t('agent.proxy.loadFailed')}</p><Button onClick={() => setRetry(v => v + 1)}>{t('agent.retry')}</Button></div>}
-    <ModelUsageStatistics statistics={usage?.statistics} days={days} onDaysChange={setDays} loading={loading} disabled={disabled} />
+    <ModelUsageStatistics statistics={usage?.statistics} days={days} onDaysChange={setDays} selectedDay={selectedDay || usage?.day} today={usage?.day} onDayChange={setSelectedDay} loading={loading} disabled={disabled} />
     <div className="agent-settings-field"><label htmlFor="agent-proxy-limit">{t('agent.proxy.dailyLimit')}</label><Input id="agent-proxy-limit" type="number" min="0.000001" max={1000000} step="0.000001" value={value.dailyLimit} onChange={event => onChange({ ...value, dailyLimit: event.target.value })} placeholder={t('agent.proxy.unlimited')} disabled={disabled} /></div>
     <div className="agent-settings-field"><label htmlFor="agent-proxy-currency">{t('agent.proxy.currency')}</label><Select id="agent-proxy-currency" aria-label={t('agent.proxy.currency')} value={value.currency} disabled={disabled} virtual={false} options={Array.from(new Set(['USD', 'CNY', 'EUR', 'GBP', 'JPY', value.currency, ...(usage?.charges.map(charge => charge.currency) || [])])).sort().map(currency => ({ value: currency, label: currency }))} onChange={currency => onChange({ ...value, currency })} /></div>
     <p className="agent-settings-hint">{t('agent.proxy.limitHint')}</p>

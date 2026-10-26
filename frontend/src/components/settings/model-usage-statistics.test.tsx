@@ -97,3 +97,45 @@ it('keeps currencies and historical estimates separate in totals, daily rows and
   fireEvent.click(screen.getByText('agent.usage.cost · CNY', {selector: '.ant-select-item-option-content'}))
   expect(document.querySelector('.agent-usage-bar-column > span')?.getAttribute('style')).toBe('height: 100%;')
 })
+
+it('shows 24 hourly buckets for a selected date and keeps the budget draft across date changes', async () => {
+  const hour = { ...totals, requests: 2, unknown: 0, failed: 0, charges: [{currency: 'USD', amount: '0.2'}] }
+  const hours = Array.from({length: 24}, (_, index) => ({...hour, hour: index, requests: index === 14 ? 2 : 0, totalTokens: index === 14 ? 715 : 0, charges: index === 14 ? hour.charges : []}))
+  const dayStatistics = { ...statistics, days: 1, hourly: hours }
+  vi.mocked(api).mockImplementation(async (_method, path) => ({data: path === '/agent/model-settings' ? configuration : path.includes('days=1') ? {...usage, statistics: dayStatistics} : usage}))
+  await openProxy(); await screen.findByRole('article', {name: 'model-a'})
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), {target: {value: '9'}})
+  await range(1)
+  await screen.findByText('agent.usage.hourly')
+  expect(document.querySelectorAll('.agent-usage-bar-column')).toHaveLength(24)
+  fireEvent.click(screen.getByText('agent.usage.hourlyDetails'))
+  expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(25)
+  expect(within(screen.getByRole('table')).getByText('14:00')).toBeTruthy()
+  fireEvent.mouseDown(screen.getByRole('combobox', {name: 'agent.usage.chartMetric'}))
+  fireEvent.click(screen.getByText('agent.proxy.requests', {selector: '.ant-select-item-option-content'}))
+  const bars = document.querySelectorAll('.agent-usage-bar-column > span')
+  expect(bars[14].getAttribute('style')).toBe('height: 100%;')
+  expect(bars[13].getAttribute('style')).toBe('height: 0%;')
+  fireEvent.change(screen.getByLabelText('agent.usage.day'), {target: {value: '2026-10-25'}})
+  await waitFor(() => expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-usage?days=1&day=2026-10-25')).toBe(true))
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('9')
+  fireEvent.click(screen.getByRole('button', {name: 'agent.models.discard'}))
+})
+
+it('ignores a stale day response after selecting another date', async () => {
+  const responses = new Map<string, (value: unknown) => void>()
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('&day=')) return await new Promise(resolve => responses.set(path, resolve))
+    return {data: path === '/agent/model-settings' ? configuration : usage}
+  })
+  await openProxy(); await screen.findByRole('article', {name: 'model-a'}); await range(1)
+  const input = screen.getByLabelText('agent.usage.day')
+  fireEvent.change(input, {target: {value:'2026-10-24'}})
+  await waitFor(() => expect(responses.has('/agent/model-usage?days=1&day=2026-10-24')).toBe(true))
+  fireEvent.change(input, {target: {value:'2026-10-25'}})
+  await waitFor(() => expect(responses.has('/agent/model-usage?days=1&day=2026-10-25')).toBe(true))
+  responses.get('/agent/model-usage?days=1&day=2026-10-25')!({data:{...usage,statistics:{...statistics,days:1,hourly:[],models:[{...totals,model:'current-day'}]}}})
+  await screen.findByRole('article',{name:'current-day'})
+  responses.get('/agent/model-usage?days=1&day=2026-10-24')!({data:{...usage,statistics:{...statistics,days:1,hourly:[],models:[{...totals,model:'stale-day'}]}}})
+  await waitFor(() => expect(screen.queryByRole('article',{name:'stale-day'})).toBeNull())
+})

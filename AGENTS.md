@@ -254,6 +254,10 @@ authority, it just no longer moves the layout under the user a beat after load.
   <p>schema 14 增加 cost_amount／cost_currency／cost_source，保留旧 cost_nano 和 prices_json 供历史审计。旧价格配置可读取但不再用于计算；旧限额保持 CNY，新配置默认 USD。Go 恢复同步接受 schema 14。model_usage.py 为总计、每日和模型返回分币种 charges 及独立 estimatedCharges，模型按请求数排序，避免跨币种费用排名。费用字符串在前端精确格式化，图表仅在选定币种内比较。上游依据为 https://openrouter.ai/docs/cookbook/administration/usage-accounting；当前 llm-gateway 未返回逐请求费用时仍显示未知，不改造其上游协议。</p>
   <h4>验收记录</h4>
   <p>Go 全量与 Python 1,402 项、前端 1,007 项测试通过；定向 58 项后端回归覆盖上游金额与币种、精确十进制、多币种分组、显式零费用、缺回执、流中断、限额并发、取消、恢复和 schema 13 历史迁移。生产包在隔离 HTTPS 服务验证 USD 0.125 直接入账、达到限额后上游请求数不变、币种限额保存、未知费用与历史估算分开展示，并完成 320–1920 七档宽度、中英文与深浅主题的实际命中及溢出检查。证据位于 /tmp/upstream-model-billing-20261026/index.html。Redmi Note 8 仍处于安全锁屏，真机触控与软键盘验收未完成；未调用真实付费模型、未部署现用服务。</p>
+  <h4>日内分时修订</h4>
+  <p>用户选择“按天分时”与日期，查看该日 24 个本地钟点的请求数、Token 和分币种费用趋势、可展开分时明细，以及同日总计和分模型统计。日期由节点的今日日期初始化，可查询历史日期；统计选择不会改写限额草稿。请求按账本保存的归属日、发起时间和时区归集；跨小时或跨日请求归入开始时段，夏令时重复钟点合并，不丢失费用。</p>
+  <p>GET /agent/model-usage?day=YYYY-MM-DD 返回选定日期的单日 statistics 与 24 档 hourly，顶部今日摘要仍为当前日。非法、非标准或未来日期拒绝；所有者校验不变。money_records 与 hourly_statistics 复用同一费用累加，未知与历史估算不混入实际金额。原生日期输入复用 antd Input 和项目令牌；更改日期会取消旧查询，防止晚到结果覆盖新选择，不增加轮询。</p>
+  <p>分时定向后端 66 项与前端全量 1,009 项通过。隔离生产包完成日期切换、24 时段、分时表格、分币种趋势、历史空日、跨 Tab 与日期保留限额草稿、七档宽度中英深浅主题及命中检查；报告 hourly-checks.json，截图 hourly-desktop.png／hourly-details.png／hourly-narrow-dark.png／hourly-narrow-light.png。真实手机仍为安全锁屏，未宣称真机验收通过。</p>
 </section>
 
 ## Refresh Budgets
