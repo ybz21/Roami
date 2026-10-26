@@ -21,5 +21,5 @@ export function modelLabel(name: string): string {
 }
 
 export function modelProxyFailureKey(code: unknown): string | undefined {
-  return typeof code === 'string' ? ({ MODEL_PROXY_DAILY_LIMIT: 'agent.proxy.limitReached', MODEL_PROXY_PRICE_REQUIRED: 'agent.proxy.priceRequired', MODEL_PROXY_USAGE_UNKNOWN: 'agent.proxy.usageUnknown' } as Record<string, string>)[code] : undefined
+  return typeof code === 'string' ? ({ MODEL_PROXY_DAILY_LIMIT: 'agent.proxy.limitReached', MODEL_PROXY_CURRENCY_MISMATCH: 'agent.proxy.currencyMismatch', MODEL_PROXY_USAGE_UNKNOWN: 'agent.proxy.usageUnknown' } as Record<string, string>)[code] : undefined
 }

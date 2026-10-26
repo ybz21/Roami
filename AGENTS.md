@@ -246,6 +246,22 @@ authority, it just no longer moves the layout under the user a beat after load.
   <p>代理新增 25 项回归通过，覆盖缓存不重复计费、压缩与分片 SSE、重试逐笔入账、主／后台限额串行准入、跨日重置、未知费用阻断、磁盘重新打开、取消和所有者隔离。全量 Python 1,367 项与 Go 测试通过，前端 996 项测试通过，新增交互覆盖限额／价格原子保存、失败保留输入、未填齐价格和显式免费。新增账表使用 schema 13，Go 备份恢复同步接受该版本并继续拒绝更新的版本。</p>
   <p>独立 HTTPS 服务与本地 HTTP 测试上游完成主／后台真实传输、记账和限额拦截：1,200 输入、80 输出、400 缓存命中在测试单价 2／8／0.2 下费用为 ¥0.00232，拒绝后上游请求数未增加。桌面完成保存、刷新恢复、320／390／820／1100／1280／1600／1920 宽度、中英和深浅主题检查，无文档溢出。证据入口 /tmp/local-model-proxy-20261026/index.html；未使用真实付费模型，未部署现用服务。Redmi Note 8 当前为安全锁屏，真机触控和软键盘验收待解锁，不能据桌面缩窄宣称手机验收通过。</p>
   <p>full 质量门禁通过。实际 Go CLI 备份后恢复到另一个隔离目录，3 笔调用的身份、日期、角色、模型、状态、单价快照、Token 和费用逐项一致，合计 10,160,000 纳元；恢复库 schema 为 13，证据为 backup-checks.json。测试服务与插件守护进程通过记录过身份的隔离启动器清理，未清理现用 tmux 服务器。</p>
+  <h3>上游费用回执修订 · 2026-10-26</h3>
+  <h4>产品设计与用户故事</h4>
+  <p>费用使用上游已有回执，不再维护模型单价。用户可直接看到已知金额、币种和未知费用；今日、周期、每日与分模型费用按币种分别展示，不换汇。旧账保留为“历史估算”，不混入上游费用。每日限额选择币种；未知费用、未结算、历史估算或不同币种使后续限额请求暂停，最后一笔仍可能超额。</p>
+  <h4>技术设计</h4>
+  <p>providers/upstream_costs.py 读取 usage.cost 与现有 usage.currency；精确主机 openrouter.ai 依据官方约定使用 USD credits，不读取 cost_details.upstream_inference_cost。其他网关缺币种时不猜测。只接受有限非负数值，金额最多 18 位小数；流式回执须完整结束，后续 usage 缺金额会清除早先临时费用。金额与 Token 独立验证，缺 Token 不覆盖有效费用。金额有值但币种不明时不计入已知费用，已证实未发送的失败不会阻断后续限额请求。金额原样转十进制字符串入库，Decimal 精确累加，无浮点计费。</p>
+  <p>schema 14 增加 cost_amount／cost_currency／cost_source，保留旧 cost_nano 和 prices_json 供历史审计。旧价格配置可读取但不再用于计算；旧限额保持 CNY，新配置默认 USD。Go 恢复同步接受 schema 14。model_usage.py 为总计、每日和模型返回分币种 charges 及独立 estimatedCharges，模型按请求数排序，避免跨币种费用排名。费用字符串在前端精确格式化，图表仅在选定币种内比较。上游依据为 https://openrouter.ai/docs/cookbook/administration/usage-accounting；当前 llm-gateway 未返回逐请求费用时仍显示未知，不改造其上游协议。</p>
+  <h4>验收记录</h4>
+  <p>Go 全量与 Python 1,402 项、前端 1,007 项测试通过；定向 58 项后端回归覆盖上游金额与币种、精确十进制、多币种分组、显式零费用、缺回执、流中断、限额并发、取消、恢复和 schema 13 历史迁移。生产包在隔离 HTTPS 服务验证 USD 0.125 直接入账、达到限额后上游请求数不变、币种限额保存、未知费用与历史估算分开展示，并完成 320–1920 七档宽度、中英文与深浅主题的实际命中及溢出检查。证据位于 /tmp/upstream-model-billing-20261026/index.html。Redmi Note 8 仍处于安全锁屏，真机触控与软键盘验收未完成；未调用真实付费模型、未部署现用服务。</p>
+  <h4>日内分时修订</h4>
+  <p>用户选择“按天分时”与日期，查看该日 24 个本地钟点的请求数、Token 和分币种费用趋势、可展开分时明细，以及同日总计和分模型统计。日期由节点的今日日期初始化，可查询历史日期；统计选择不会改写限额草稿。请求按账本保存的归属日、发起时间和时区归集；跨小时或跨日请求归入开始时段，夏令时重复钟点合并，不丢失费用。</p>
+  <p>GET /agent/model-usage?day=YYYY-MM-DD 返回选定日期的单日 statistics 与 24 档 hourly，顶部今日摘要仍为当前日。非法、非标准或未来日期拒绝；所有者校验不变。money_records 与 hourly_statistics 复用同一费用累加，未知与历史估算不混入实际金额。原生日期输入复用 antd Input 和项目令牌；更改日期会取消旧查询，防止晚到结果覆盖新选择，不增加轮询。</p>
+  <p>分时定向后端 66 项与前端全量 1,009 项通过。隔离生产包完成日期切换、24 时段、分时表格、分币种趋势、历史空日、跨 Tab 与日期保留限额草稿、七档宽度中英深浅主题及命中检查；报告 hourly-checks.json，截图 hourly-desktop.png／hourly-details.png／hourly-narrow-dark.png／hourly-narrow-light.png。真实手机仍为安全锁屏，未宣称真机验收通过。</p>
+  <h4>模型构成堆叠修订</h4>
+  <p>产品与用户故事：用户能看每天或每小时的合计，以及各模型占了多少。柱高代表总量，色块代表模型，图例同时显示模型名；展开时段明细可核对各模型数字，并从日期明细进入当天全部模型。Token、请求与指定币种费用共用同一构成视图，未知费用及历史估算仍单独标明。</p>
+  <p>技术设计：statistics 增加 seriesModels／seriesTruncated，daily 和 hourly 的 models 携带分模型聚合；图表保留周期请求最多的四个模型，其余以 model=null 合为“其他”，不丢失 200 模型目录之外的调用。日模型分组在 SQLite 聚合，费用复用 Decimal 扫描，每小时模型分组复用原日内扫描；最多五组乘 90 天，不额外轮询。全部模型的单日目录沿用现有 day 查询。前端复用已有 --danger、--ok-solid、--accent-solid、--warn、--text-dim，分别别名为 --usage-series-0..3／other；这些色块标识模型而非状态，名称图例和可展开数值同时提供含义。页面保留相同模型的颜色偏好，周期请求排名改变时不直接重排已有颜色。</p>
+  <p>验收：定向后端 68 项、前端全量 1,011 项通过；新增回归逐项核对日／小时模型切片与合计的请求、Token、未知、历史估算及分币种金额，并验证 205 模型归并不丢数、分段比例、颜色在排名变动后保留、每日明细展开和进入完整单日模型。隔离生产包完成红绿等颜色图例、堆叠高度合计、每日与分时切换、指定币种图、明细及七档宽度／中英／深浅主题检查，报告 stacked-checks.json，截图 stacked-daily.png／stacked-hourly.png／stacked-daily-details.png／stacked-narrow-dark.png／stacked-narrow-light.png。真实 Android 仍为安全锁屏，真机验收待完成；未部署现用服务。</p>
 </section>
 
 ## Refresh Budgets
