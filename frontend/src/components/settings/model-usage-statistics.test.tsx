@@ -7,9 +7,9 @@ import { ModelUsageStatistics, type UsageStatistics, type UsageTotals } from './
 import { api } from '../../api'
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
-vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t, locale: 'en-US' }) } })
+vi.mock('../../i18n', () => { const t = (key: string, values?: Record<string, string>) => key + (values?.amount ? ' ' + values.amount : ''); return { useI18n: () => ({ t, locale: 'en-US' }) } })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
-const totals: UsageTotals = { requests: 3, knownCost: 0.006, totalTokens: 715, inputTokens: 650, outputTokens: 65, cacheReadTokens: 160, unknown: 1, pending: 0, failed: 1, unpriced: 1, missingUsage: 0 }
+const totals: UsageTotals = { requests: 3, charges: [{ currency: 'USD', amount: '0.006' }], estimatedCharges: [], totalTokens: 715, inputTokens: 650, outputTokens: 65, cacheReadTokens: 160, unknown: 1, pending: 0, failed: 1, estimated: 0, missingUsage: 0 }
 const statistics: UsageStatistics = { days: 7, startDay: '2026-10-20', endDay: '2026-10-26', dailyStartDay: '2026-10-20', total: totals, daily: [{ ...totals, day: '2026-10-26' }], models: [{ ...totals, model: 'model-a' }], modelsTruncated: false }
 const role = { baseUrl: 'https://models.example/v1', model: 'model-a', keyConfigured: false, images: false }
 const configuration = { connection: { baseUrl: role.baseUrl, keyConfigured: false }, main: role, worker: role }
@@ -25,7 +25,7 @@ it('shows aggregate and model usage with separate input, output and cache counts
   expect(within(model).getByText('65')).toBeTruthy()
   expect(within(model).getByText('160')).toBeTruthy()
   expect(within(model).getByText(/agent.usage.unknown/)).toBeTruthy()
-  expect(within(model).getByText('agent.usage.partialCost')).toBeTruthy()
+  expect(within(model).getByText(/agent.usage.partialCost/)).toBeTruthy()
   fireEvent.click(screen.getByText('agent.usage.dailyDetails'))
   expect(screen.getByRole('table')).toBeTruthy()
   expect(screen.getByText('agent.usage.accountingHint')).toBeTruthy()
@@ -70,7 +70,7 @@ it('keeps existing totals and the draft after a statistics failure', async () =>
 })
 
 it('shows one empty-period message without an empty chart or model list', () => {
-  const empty = Object.fromEntries(Object.keys(totals).map(key => [key, 0])) as UsageTotals
+  const empty = { ...Object.fromEntries(Object.keys(totals).map(key => [key, 0])), charges: [], estimatedCharges: [] } as UsageTotals
   render(<ModelUsageStatistics statistics={{ ...statistics, total: empty, models: [], daily: [] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
   expect(screen.getByText('agent.usage.empty')).toBeTruthy()
   expect(screen.queryByRole('img')).toBeNull()
@@ -78,9 +78,22 @@ it('shows one empty-period message without an empty chart or model list', () => 
 })
 
 it('shows unknown instead of zero cost when a model has no settled known charges', () => {
-  const unknown = { ...totals, requests: 1, knownCost: 0, unknown: 1, pending: 0, failed: 0, unpriced: 1 }
+  const unknown = { ...totals, requests: 1, charges: [], unknown: 1, pending: 0, failed: 0, estimated: 0 }
   render(<ModelUsageStatistics statistics={{ ...statistics, models: [{ ...unknown, model: 'unpriced-model' }] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
   const model = screen.getByRole('article', { name: 'unpriced-model' })
   expect(within(model).getByText('agent.proxy.costUnknown')).toBeTruthy()
   expect(within(model).queryByText(/CN¥0\.00/)).toBeNull()
+})
+
+
+it('keeps currencies and historical estimates separate in totals, daily rows and model fees', () => {
+  const mixed = { ...totals, charges: [{currency: 'USD', amount: '0.1'}, {currency: 'CNY', amount: '2'}], estimatedCharges: [{currency: 'CNY', amount: '9'}] }
+  render(<ModelUsageStatistics statistics={{ ...statistics, total: mixed, daily: [{...mixed, day: '2026-10-26'}], models: [{...mixed, model: 'mixed'}] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  const model = screen.getByRole('article', {name: 'mixed'})
+  expect(within(model).getByText(/agent.usage.partialCost/)).toBeTruthy()
+  expect(within(model).getByText(/agent.proxy.historicalEstimate.*CNY.*9/)).toBeTruthy()
+  expect(within(model).getByText(/agent.usage.partialCost.*USD.*0.10.*CNY.*2.00/)).toBeTruthy()
+  fireEvent.mouseDown(screen.getByRole('combobox', {name: 'agent.usage.chartMetric'}))
+  fireEvent.click(screen.getByText('agent.usage.cost · CNY', {selector: '.ant-select-item-option-content'}))
+  expect(document.querySelector('.agent-usage-bar-column > span')?.getAttribute('style')).toBe('height: 100%;')
 })
