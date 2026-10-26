@@ -3,17 +3,18 @@ import type { ReactNode } from 'react'
 import { Suspense } from 'react'
 import { type AgentKind } from '../agent-kind'
 import { useAgentInbox } from '../components/agent/useAgentInbox'
-import FilesPage from '../components/files/FilesPage'
 import { lazyRetry } from '../components/lazy-retry'
 import MobileSubPage from '../components/MobileSubPage'
-import Sessions from '../components/sessions/Sessions'
-import SettingsPage from '../components/settings/SettingsPage'
+import Projects from '../components/projects/Projects'
 import { type TreeSrc } from '../components/shell/task-tree-snapshot'
 import { useLayout } from '../layout'
 import { backAgentPage } from '../components/agent/agent-page-route'
 import { useI18n } from '../i18n'
 import type { AppRoute } from './useAppRoute'
 import type { TaskWorkspace } from './useTaskWorkspace'
+const FilesPage = lazyRetry(() => import('../components/files/FilesPage'))
+const Sessions = lazyRetry(() => import('../components/sessions/Sessions'))
+const SettingsPage = lazyRetry(() => import('../components/settings/SettingsPage'))
 const CapabilitiesPage = lazyRetry(() => import('../components/capabilities/CapabilitiesPage'))
 const MobileSessions = lazyRetry(() => import('../components/mobile/MobileSessions'))
 const MobileHome = lazyRetry(() => import('../components/mobile/MobileHome'))
@@ -22,7 +23,6 @@ const MobileTools = lazyRetry(() => import('../components/mobile/MobileTools'))
 const BrowserView = lazyRetry(() => import('../components/mirror/BrowserView'))
 const PhoneView = lazyRetry(() => import('../components/mirror/PhoneView'))
 const Swarm = lazyRetry(() => import('../components/swarm/Swarm'))
-const Projects = lazyRetry(() => import('../components/projects/Projects'))
 const HubPage = lazyRetry(() => import('../components/cluster/HubPage'))
 const AgentHomePage = lazyRetry(() => import('../components/agent/AgentHomePage'))
 const AgentChat = lazyRetry(() => import('../components/agent/AgentChat'))

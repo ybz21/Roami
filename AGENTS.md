@@ -1376,3 +1376,16 @@ Research → 原浏览器导航／观察协议</pre>
   <p>quick 门禁通过：Go 全量、Python 1342 项测试、格式与静态检查、前端 typecheck／i18n（3814 个键）／hover、秘密扫描与文件策略。新增 18 项回归覆盖 ps／df／uname、任意程序与管道、凭证过滤、角色与工作区拒绝、禁用策略、输出所有者隔离、取消／失败清理和通用恢复。真实模型 deepseek-4.1-flash 对磁盘、系统架构、时间时区、网卡名称四类请求均直接选择 host、执行真实命令，未产生后台任务。全部使用隔离临时数据；没有前端界面变更，未部署现用服务。</p>
   <p>证据位于 /tmp/host-execution-20261025：targeted.log、live-main.json、validation.html／png、quick.log；完整门禁与提交钩子回执见 full.log、commit.log，结果随 PR 提供。</p>
 </section>
+
+<section id="first-load-performance-20261026" lang="zh-CN">
+  <h2>首屏加载预算 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>保留现有页面、导航、消息徽标和加载反馈。非首页不预取主对话历史、任务及聊天页面模块；文件、会话和设置页面使用已有路由懒加载与失败重试。主对话可见时继续提前读取历史，历史分支由当前视图按需读取。</p>
+  <h3>User Stories</h3>
+  <p>用户打开项目或工具时，无需为尚未查看的聊天记录付出下载和缓存成本；进入首页仍可读取完整历史，切换设置、文件和会话页面保持原有入口与操作。</p>
+  <h3>Technical Design</h3>
+  <p>app/AppShell.tsx 根据路由控制 useAgentInbox 的 preloadMain；useAgentInbox.ts 保留主会话和通知请求及节点缓存隔离，移除页面模块的无条件预取。app/AppRoutes.tsx 将 FilesPage、Sessions、SettingsPage 接入 lazyRetry 与现有 Suspense；Projects 已因新建项目弹窗静态引用而进入首屏包，直接渲染以移除无效的异步边界。agent-data-cache.test.tsx 验证非首页徽标独立可用、打开主对话后才预取、慢通知不阻塞主对话。认证与节点引导顺序不变，不修改接口、刷新周期或历史分页语义。</p>
+  <h3>验收记录</h3>
+  <p>基线 f3622829。生产构建静态依赖闭包从 3,257,797 降至 3,010,849 字节（减少 7.6%），gzip 从 945,913 降至 883,881 字节（减少 6.6%）。受控生产包项目页验证少发两条聊天数据请求，500 条示例历史时避免约 1.09 MB 无关响应；响应大小随真实历史变化。现有 loading 为 Spin，动态页只有一个边界；活动页项目占位固定四行，未发现大体积骨架证据，保持现状。</p>
+  <p>full 门禁与前端 1,006 项测试通过；Python 无相关改动，按范围规则跳过。请求明细、生产包对比、浏览器结果与限制保存在任务工作区 tmp/first-load-evidence。计时属于受控示例，不代表线上耗时、CPU 或内存降幅。Redmi 真机仍为安全锁屏，手机触控、软键盘及原生 WebView 冷启动验收未完成；项目、蜂群与注解的跨消费者重复读取留待后续独立优化。</p>
+</section>
