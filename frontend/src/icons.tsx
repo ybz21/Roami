@@ -23,6 +23,15 @@ const solid = (d: ReactNode, size: number) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>{d}</svg>
 )
 
+export function UsageRing({ percent, color = 'currentColor', size = 16 }: P & { percent: number; color?: string }) {
+  const circumference = 2 * Math.PI * 10
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth="1.8" aria-hidden>
+    <circle cx="12" cy="12" r="10" stroke="var(--border)" />
+    <circle cx="12" cy="12" r="10" stroke={color} strokeLinecap="round" transform="rotate(-90 12 12)"
+      strokeDasharray={circumference} strokeDashoffset={circumference * (1 - Math.max(0, Math.min(1, percent / 100)))} />
+  </svg>
+}
+
 // ── 基础动作 ──
 export const CloseIcon = ({ size = 14 }: P) => line(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, size, 2)
 export const CheckIcon = ({ size = 14 }: P) => line(<path d="m5 12.5 4.5 4.5L19 7" />, size, 2.2)

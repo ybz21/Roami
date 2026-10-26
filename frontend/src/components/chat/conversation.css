@@ -1,5 +1,6 @@
 .conversation-composer.tt-composer { position:relative; width:100%; max-width:calc(var(--sp-5) * 34); margin-inline:auto; box-sizing:border-box; padding:var(--sp-3); margin-block:0; border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-container); box-shadow:none; }
 .conversation-composer.tt-composer:focus-within { border-color:var(--accent-border); box-shadow:none; }
+.conversation-composer > .cc-statusbar { padding:0; margin-bottom:var(--sp-2); border-top:0; font-size:var(--fs-meta); }
 .conversation-composer.tt-composer textarea { min-width:0; resize:none; padding:var(--sp-1) var(--sp-1) var(--sp-3) !important; font-size:var(--fs-body) !important; line-height:1.6 !important; min-height:calc(var(--sp-5) * 3); }
 .conversation-composer.tt-composer textarea::placeholder { color:var(--text-dim); }
 .conversation-composer .conversation-composer-settings { display:flex; flex:1; align-items:center; gap:var(--sp-1); min-width:0; }

@@ -309,7 +309,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   const errMsg = sendErr || error
   // 工具行里的路径要能点开：用 context 送到最里层，不然要一路穿过工具注册表
   const actions = useMemo(() => ({ openFile: onOpenFile, tasks }), [onOpenFile, tasks])
-  const hasStatus = !!(status && (status.tasks || status.quota != null || status.branch || status.errors))
+  const hasStatus = !!(status && (status.tasks || status.quota != null || status.elapsed != null || status.branch || status.errors))
 
   // 状态条上每一格自己那件事。三件都落在这一层：这里既有会话名（能注入按键、能发消息），
   // 又有滚动容器（能定位到某条消息），再往上传反而绕。
@@ -408,16 +408,13 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
             </button>
           )}
         </div>
-        {/* 状态条在选择框之上：选择框要人立刻动手，得离输入框更近 */}
-        {(hasStatus || unread > 0) && (
-          <StatusBar hideModel status={status || {}} accent={accent} unread={unread} onJump={jump} actions={statusActions} />
-        )}
         {/* 交互式选择框（权限确认/选项菜单）：检测到才显示，可点选 */}
         <PromptPanel name={name} accent={accent} />
         {errMsg && <div style={{ color: '#f85149', fontSize: 12, padding: '2px 12px' }}>{errMsg}</div>}
         <div className="conversation-composer-dock">
           <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; if (files.length) void doUpload(files) }} />
           <ConversationComposer value={input} onChange={setInput} label={placeholder} placeholder={placeholder} onPaste={onPaste}
+            header={(hasStatus || unread > 0) && <StatusBar hideModel status={status || {}} accent={accent} unread={unread} onJump={jump} actions={statusActions} />}
             send={{ label: t('common.send'), disabled: sending || !input.trim(), pending: sending, onClick: send }}
             stop={busy ? { label: t(forceStop ? 'chat.forceStop' : 'chat.stop'), disabled: stopCooling, force: forceStop, onClick: stop } : undefined}
             leading={<ComposerPlus name={name} agent={agent} status={status} uploading={uploading} onMouseDown={noBlur} onFiles={() => fileRef.current?.click()} onCycleMode={cycleMode} onCommand={sendCommand} onOpenGit={onOpenGit} />}
