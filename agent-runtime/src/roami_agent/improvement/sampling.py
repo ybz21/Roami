@@ -5,9 +5,32 @@ import json
 import random
 import re
 from collections import defaultdict
+from decimal import Decimal, localcontext
 
 from roami_agent.improvement.contracts import digest, freeze_suite, number, require
 from roami_agent.improvement.daily_suite import daily_coverage
+
+
+def displayed_numeric_reference(answer):
+    if type(answer) in {int, float}:
+        answer = str(answer)
+    if not isinstance(answer, str) or len(answer) > 200:
+        return None
+    match = re.fullmatch(
+        r"\s*([-+]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\s*(%)?\s*",
+        answer,
+    )
+    if not match:
+        return None
+    value = Decimal(match[1].replace(",", ""))
+    if abs(value.as_tuple().exponent) > 200:
+        return None
+    with localcontext() as context:
+        context.prec = 256
+        unit = Decimal(1).scaleb(value.as_tuple().exponent)
+        if match[2]:
+            value, unit = value / 100, unit / 100
+        return value, unit / 2
 
 
 def stratified_sample(records, count, *, seed):
@@ -64,6 +87,19 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
         if not usable:
             excluded.append({"id": identity, "reason": "unsupported_non_numeric_or_missing_oracle"})
             continue
+        if not conversational:
+            displayed = displayed_numeric_reference(qa.get("answer"))
+            if displayed is None:
+                excluded.append({"id": identity, "reason": "unsupported_displayed_numeric_answer"})
+                continue
+            with localcontext() as context:
+                context.prec = 256
+                consistent = abs(Decimal(str(answers[0])) - displayed[0]) <= displayed[1]
+            if not consistent:
+                excluded.append(
+                    {"id": identity, "reason": "inconsistent_displayed_execution_answer"}
+                )
+                continue
         operations = sum(str(p).count("(") for p in programs)
         stratum = ("multi" if operations > 2 else "short") + (
             "_large_table" if len(item.get("table", [])) > 6 else "_small_table"
@@ -86,7 +122,13 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
         inputs = {key: item.get(key, []) for key in ("pre_text", "table", "post_text")}
         instructions = (
             "Read the supplied financial report and answer the question. Return only one number; "
-            "express percentages as decimal ratios (10% as 0.1). No percent sign, units or explanation.\n"
+            "express percentages as decimal ratios (10% as 0.1). No percent sign, units or explanation."
+            + (
+                " Keep enough precision for an absolute error of at most 0.0001."
+                if not conversational
+                else ""
+            )
+            + "\n"
         )
         questions = [instructions + q for q in sample["questions"]]
         prompt = json.dumps(inputs, ensure_ascii=False) + "\n" + questions[0]
@@ -96,7 +138,9 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
             "revision": revision,
             "source_split": source_split,
             "input_sha256": digest(inputs),
-            "adapter_revision": "financial-numeric-v1",
+            "adapter_revision": "financial-numeric-v1"
+            if conversational
+            else "financial-numeric-v2-consistent-reference",
             "adapted": True,
             "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation.",
         }
@@ -141,7 +185,11 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
         "selected": locks,
         "official_leaderboard_comparable": False,
     }
-    return freeze_suite(benchmark + "-sample-v1", cases, sampling_lock=metadata)
+    return freeze_suite(
+        benchmark + ("-sample-v1" if conversational else "-sample-v2"),
+        cases,
+        sampling_lock=metadata,
+    )
 
 
 def catalog_readiness(case_bank, sampling_plan, suites):

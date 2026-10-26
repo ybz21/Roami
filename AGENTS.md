@@ -1611,3 +1611,15 @@ Research → 原浏览器导航／观察协议</pre>
   <h3>验证边界</h3>
   <p>原 Sol 成品的四项功能检查、提交时校验控制组通过；换错重试键及清空输入反例失败。更新取证脚本完成六张图和七段文本的零模型采集，原源码 SHA 保持。无提供方调用，不自行打分；四份修订样本人工参考及新协议校准仍待完成。旧 v6 全套结果及父 issue 状态保持。</p>
 </section>
+
+<section id="rsi-financial-reference-consistency-20261026" lang="zh-CN">
+  <h2>FinQA 参考一致性门禁 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>新版 FinQA 先核验原始显示答案与执行答案，二者必须在显示精度的舍入区间内一致；明确百分数换算为十进制比例。无法解析或互相矛盾的参考单列隔离原因，再按原种子与分层数量抽样，不能把互相矛盾的标注当作 Agent 错误，也不能改写参考答案迎合输出。</p>
+  <h3>User Stories</h3>
+  <p>用户看到可核验的数值验收，明确知道0.0001绝对误差要求；材料不足时完整数量准入失败，不静默少题。维护者可以追溯被隔离的上游记录、版本及原始 SHA，旧运行与旧分数继续保留。</p>
+  <h3>Technical Design</h3>
+  <p>sampling.displayed_numeric_reference 仅解析有限长度的纯数字、合法千分组、科学记数及显式百分号，以 Decimal 的末位精度界定舍入区间。单轮 FinQA 原生数值与显示值不一致或显示答案不可核验时在抽样前排除；沿用原分层随机抽样与数量硬检查。FinQA ID 和 adapter 升为 sample-v2 / financial-numeric-v2-consistent-reference；不向 Agent 提供显示答案、程序或 gold_inds。ConvFinQA 的标注、版本与题面保持。协议单列 container-uds-v15-financial-reference-consistency，旧固定 v11 库不覆盖。</p>
+  <h3>验证证据</h3>
+  <p>42 项回归通过，包含舍入、百分数、符号冲突、格式／大指数拒绝、来源不改写、确定性抽样、数量不足拒绝与答案不泄漏。固定<a href="https://github.com/czyssrs/FinQA/blob/0f16e2867befa6840783e58be38c9efb9229d742/dataset/dev.json">上游 dev 数据</a>中租金题的 answer 为215.33、exe_ans为324.5；提供的231、205、210三年数据平均为646/3。原 Agent 输出与显示答案一致，旧冻结失败仍保留。零模型重导入隔离矛盾样本，并取得完整3项新样本；这是源标注质量修复，不是旧题重新通过或同合同收益证明。人工参考、当前质量协议校准和后续完整日观察仍未完成。</p>
+</section>

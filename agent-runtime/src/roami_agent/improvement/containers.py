@@ -82,7 +82,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v14-csv-evidence-states",
+                "container-uds-v15-financial-reference-consistency",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
