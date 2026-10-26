@@ -37,6 +37,7 @@ type Spec struct {
 	Base           string `json:"base,omitempty"`
 	Remote         string `json:"remote,omitempty"`
 	Prompt         string `json:"prompt"`
+	Title          string `json:"title,omitempty"`
 	Model          string `json:"model,omitempty"`
 	Permission     string `json:"permission,omitempty"`
 	TimeoutSeconds int    `json:"timeoutSeconds"`
@@ -200,7 +201,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		return Status{}, err
 	}
 	command := "exec " + quote(s.Executable) + " agent execution run --key " + quote(spec.Key)
-	opt := runtime.CreateOpts{Label: spec.Executor + ": " + truncate(strings.Join(strings.Fields(spec.Prompt), " "), 60), Dir: workspace.Directory, Extra: []string{
+	opt := runtime.CreateOpts{Label: executionTitle(spec), Dir: workspace.Directory, Extra: []string{
 		"-e", "ROAMI_HOME=" + s.Runtime.HomeDir, "-e", "ROAMI_DATA=" + s.Runtime.DataDir,
 		"-e", "TMUX_BIN=" + s.Runtime.TmuxBin, "-e", "PATH=" + os.Getenv("PATH"),
 		"-e", "ROAMI_AGENT_LAUNCH=" + hash, command,
@@ -221,6 +222,14 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		return Status{}, err
 	}
 	return s.Status(spec.Key)
+}
+
+func executionTitle(spec Spec) string {
+	title := strings.Join(strings.Fields(spec.Title), " ")
+	if title == "" {
+		title = strings.Join(strings.Fields(spec.Prompt), " ")
+	}
+	return truncate(title, 80)
 }
 
 func (s Service) Status(key string) (status Status, err error) {

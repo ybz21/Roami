@@ -300,6 +300,14 @@ class AgentLoop:
                                 "TASK_RESULT_REQUIRED",
                                 "TASK_REPLY_TASK_MISMATCH",
                                 "TASK_COMPLETION_RESTART_FORBIDDEN",
+                                "REQUEST_COVERAGE_REQUIRED",
+                                "REQUEST_COVERAGE_SOURCE_REQUIRED",
+                                "REQUEST_OUTCOME_DROPPED",
+                                "REQUEST_OUTCOMES_PENDING",
+                                "REQUEST_HANDOFF_REQUIRED",
+                                "REQUEST_BLOCKER_REQUIRED",
+                                "REQUEST_HANDOFF_SCOPE_REQUIRED",
+                                "TASK_STEER_SOURCE_REQUIRED",
                             }
                         ):
                             rejected_arguments = call["function"].get("arguments", "")
