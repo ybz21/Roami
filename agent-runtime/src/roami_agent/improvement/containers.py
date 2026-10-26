@@ -82,7 +82,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v12-input-roundtrip-and-request-identity",
+                "container-uds-v13-csv-validation-states",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )

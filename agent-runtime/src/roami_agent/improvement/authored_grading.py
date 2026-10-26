@@ -346,9 +346,19 @@ try:
   except Exception:time.sleep(.05)
  with sync_playwright() as p:
   b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto(f"http://127.0.0.1:{port}");file=page.get_by_test_id("csv-input");button=page.get_by_test_id("import")
-  file.set_input_files("/workspace/valid.csv");button.click();page.wait_for_timeout(300);first=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"))["rows"]==2
-  file.set_input_files("/workspace/invalid.csv");button.click();page.wait_for_timeout(100);missing=bool(page.get_by_test_id("error").inner_text())
-  file.set_input_files("/workspace/valid.csv");button.click();page.wait_for_timeout(300);preserved=file.evaluate("e=>e.files.length===1") and bool(page.get_by_test_id("error").inner_text());button.click();page.wait_for_timeout(300)
-  stats=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"));print(json.dumps({"valid_import":first,"missing_column":missing,"input_preserved":preserved,"exactly_once_retry":stats["rows"]==4 and stats["attempts"]==3}));b.close()
+  def submit():
+   with page.expect_response(lambda response: response.request.method=="POST" and response.url==f"http://127.0.0.1:{port}/import") as response:button.click()
+   response.value.finished()
+  file.set_input_files("/workspace/valid.csv");submit();first=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"))["rows"]==2
+  file.set_input_files("/workspace/invalid.csv")
+  page.wait_for_function("() => !document.querySelector('[data-testid=import]').disabled || Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+  if button.is_enabled():button.click()
+  page.wait_for_function("() => Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+  missing=bool(page.get_by_test_id("error").inner_text())
+  file.set_input_files("/workspace/valid.csv");submit()
+  page.wait_for_function("() => Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+  preserved=file.evaluate("e=>e.files.length===1") and bool(page.get_by_test_id("error").inner_text())
+  if preserved:submit()
+  stats=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"));print(json.dumps({"valid_import":first,"missing_column":missing,"input_preserved":preserved,"exactly_once_retry":preserved and stats["rows"]==4 and stats["attempts"]==3}));b.close()
 finally:proc.terminate();proc.wait()
 """
