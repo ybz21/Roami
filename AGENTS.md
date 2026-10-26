@@ -526,6 +526,19 @@ agent-runtime/src/roami_agent/tools/
   <p>64 项准入、计量、错误透传相关回归通过，覆盖共享预留、完整扣账、前缀变化／多模态回退、未知用量、失败响应不建立前缀及容器侧持久计量；另有 25 项流水线回归通过，包含先诊断再正式预留和每日例数上限。DeepSeek none 的四次记忆探针共 2,237 Token，但空提取语义断言失败，未采用；GLM low 的四种语义输入均通过，共 2,104 Token。RSI 配置保存为 Main／Worker DeepSeek low、Memory GLM low，Memory 输出上限仍为 2,048，自动调度关闭；不表示部署或改配现用 Agent 服务。</p>
 </section>
 
+<section id="rsi-integrated-verification-20261026" lang="zh-CN">
+  <h2>RSI 合并验证与完整运行 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>请求进入预算准入前固定消息与工具内容，等待预算锁期间调用方的修改不能改变已评估的输入；实际费用仍逐次完整结算。完整案例结果逐项保留，内容检查通过、任务文件持久化和产物质量评分分别给出证据。</p>
+  <h3>User Stories</h3>
+  <p>用户能分辨已经验证的链路修复与仍失败或待评的案例，不因部分成功而丢失失败记录，也不因运行已启动而收到通过或关单结论。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>RequestBudgetModel 与 MeteredModel 在准入前复制 JSON 请求，预算等待竞争的两个新增回归验证提供方收到原快照，调用方修改仍保留。91 项计量、准入、错误透传和流水线检查通过。同步 main f3622829 后 quick/full 通过，Python 1,427 项，Go、前端静态检查与生产构建通过；本 PR 没有新增前端产品改动。</p>
+  <p>合并后源码 hash 为 9f7efc03377f6edc5b2f44a5317e17b9b4f3a49bc24f3615dfd1cb7b82c4dc0d，镜像为 sha256:2abc59f835a7b97659c908f8def82a41f29cc01cd57afb88b0dc9cb21d2cc66e。该镜像冻结机制回归 20/20 通过，零模型调用；不作为真实模型能力或正式全套通过。</p>
+  <p>此前 v6 三项真实独立检查通过，共 287,402 Token／40 请求；CODE 两份和 QUANT 五份文件快照 SHA 匹配。NEWS 由 Main 直接写入，两份文件没有任务快照，因此不称为三项 Native 完整交付。原失败与已知 DeepSeek Memory 截断保留，RSI Memory 使用经四种语义输入验证的 GLM low；现用服务未部署或改配。</p>
+  <p>该合并源码启动单版本完整 60 项运行 c2728007454ed423bbe3a3a6be147ac8b07918f540a9274882b4932bd0bd8c5b，生成预留 12,032,000 Token；同时保留 7 项评分所需的 1,260,000 额度，日上限仍为用户授权的 20,000,000。最初八项为五通过、三失败：DEMO-02 真实预算失败及 OSWorld、FinQA 检查失败均保留。运行尚未结束，四份修订样本人工参考分未确认，产物评分与后续完整日观察未完成，父 issue 不关闭，自动日程保持关闭。</p>
+</section>
+
 <section id="composer-usage-indicator-20261026" lang="zh-CN">
   <h2>输入框用量组件 · 2026-10-26</h2>
   <h3>产品设计</h3>
