@@ -539,6 +539,17 @@ agent-runtime/src/roami_agent/tools/
   <p>该合并源码启动单版本完整 60 项运行 c2728007454ed423bbe3a3a6be147ac8b07918f540a9274882b4932bd0bd8c5b，生成预留 12,032,000 Token；同时保留 7 项评分所需的 1,260,000 额度，日上限仍为用户授权的 20,000,000。最初八项为五通过、三失败：DEMO-02 真实预算失败及 OSWorld、FinQA 检查失败均保留。运行尚未结束，四份修订样本人工参考分未确认，产物评分与后续完整日观察未完成，父 issue 不关闭，自动日程保持关闭。</p>
 </section>
 
+<section id="rsi-main-turn-failure-20261026" lang="zh-CN">
+  <h2>Main 失败预算归因 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>评测报告保留 Main 已记录的预算根因，不能把准入前拒绝折叠为通用运行时失败。错误归因修正不改变失败状态、费用、原始成绩或判定器。</p>
+  <h3>User Stories</h3>
+  <p>维护者看到长记忆任务真正因 Token 预算失败，能区分模型能力、费用未知和执行器异常；历史失败记录仍可核对。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>evaluation_tasks.evaluation_turn_failure 只读取当前 turn、conversation 和对应终态事件的最新记录，仅保留既有四个 RSI 预算码，其余仍使用原 RSI_TURN_FAILED／INTERRUPTED；不导出任意错误文本。NativeFilesExecutor 在 Main 终态失败分支调用它，容器继续沿用已有有界预算码映射。</p>
+  <p>51 项隔离回归通过，新增六种终止码和跨回合／会话／事件类型隔离。对完整运行中 longmemeval-v2:4ed01379 的真实数据库执行只读、零模型重放，得到 RSI_TOKEN_BUDGET；原 trial 的通用失败及 SHA 保持，案例仍失败。该补丁只修正诊断归因，不声称解决预算耗尽或新增真实模型通过；正在运行的镜像与源码版本保持冻结。</p>
+</section>
+
 <section id="composer-usage-indicator-20261026" lang="zh-CN">
   <h2>输入框用量组件 · 2026-10-26</h2>
   <h3>产品设计</h3>

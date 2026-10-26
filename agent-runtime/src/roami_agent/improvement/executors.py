@@ -234,7 +234,9 @@ class NativeFilesExecutor:
                         await runtime.traces.get("rsi-evaluation", turn_id=receipt["turnId"])
                     )
                     if turn["state"] != "completed":
-                        failure = "RSI_TURN_" + turn["state"].upper()
+                        from roami_agent.improvement.evaluation_tasks import evaluation_turn_failure
+
+                        failure = await evaluation_turn_failure(database, turn)
                         break
                     if self.allow_tasks:
                         from roami_agent.improvement.evaluation_tasks import settle_evaluation_tasks

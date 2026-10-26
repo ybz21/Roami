@@ -14,6 +14,22 @@ NATIVE_BUDGET_FAILURES = frozenset(
 )
 
 
+async def evaluation_turn_failure(database, turn):
+    failure = await database.call(
+        lambda db: db.execute(
+            "SELECT json_extract(payload_json,'$.error') FROM events "
+            "WHERE turn_id=? AND conversation_id=? AND kind=? ORDER BY rowid DESC LIMIT 1",
+            (turn["id"], turn["conversation_id"], "turn." + turn["state"]),
+        ).fetchone()
+    )
+    code = failure[0] if failure else None
+    return (
+        code
+        if isinstance(code, str) and code in NATIVE_BUDGET_FAILURES
+        else "RSI_TURN_" + turn["state"].upper()
+    )
+
+
 def bind_evaluation_tasks(runtime, workspace):
     root = workspace.resolve()
 

@@ -229,3 +229,60 @@ async def test_native_failure_preserves_only_current_attempt_budget_codes(
         assert failure.value.code == expected
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "code,expected",
+    [
+        ("RSI_TOKEN_BUDGET", "RSI_TOKEN_BUDGET"),
+        ("RSI_REQUEST_BUDGET", "RSI_REQUEST_BUDGET"),
+        ("RSI_TIME_BUDGET", "RSI_TIME_BUDGET"),
+        ("RSI_USAGE_UNKNOWN", "RSI_USAGE_UNKNOWN"),
+        ("MODEL_HTTP_401", "RSI_TURN_FAILED"),
+        ("private arbitrary error text", "RSI_TURN_FAILED"),
+    ],
+)
+async def test_main_failure_preserves_only_budget_codes(tmp_path, code, expected):
+    from roami_agent.improvement.measurements import BudgetAdmissionRejected
+
+    class Rejected:
+        model = "fixture-admission"
+
+        async def stream(self, messages, tools):
+            raise BudgetAdmissionRejected(code)
+            yield ModelEvent("text", "unreachable")
+
+    case = protocol_suite()["cases"][0]
+    case["files"]["output.json"] = '{"sum":40}'
+    result = await NativeFilesExecutor(Settings(), provider_factory=lambda *_: Rejected()).run(
+        case, {}, tmp_path
+    )
+    assert result["grade"]["reason"] == expected
+    assert expected in result["release_blockers"]
+    assert not result["verified_delivery"] and not result["grade"]["passed"]
+
+
+async def test_turn_failure_ignores_other_turns_conversations_and_event_kinds(store):
+    from roami_agent.improvement.evaluation_tasks import evaluation_turn_failure
+    from roami_agent.storage.database import event
+
+    runtime = Runtime(store, SimpleNamespace(model="unused"))
+    first = await runtime.conversations.create("owner")
+    second = await runtime.conversations.create("other")
+    one = await runtime.conversations.accept("owner", first["id"], "one", "First")
+    two = await runtime.conversations.accept("owner", first["id"], "two", "Second")
+    current = {"id": one["turnId"], "conversation_id": first["id"], "state": "failed"}
+
+    def write(db):
+        for conversation, turn, kind in [
+            (first["id"], two["turnId"], "turn.failed"),
+            (second["id"], one["turnId"], "turn.failed"),
+            (first["id"], one["turnId"], "turn.interrupted"),
+        ]:
+            event(db, conversation, kind, {"error": "RSI_TOKEN_BUDGET"}, turn_id=turn)
+
+    try:
+        await store.call(write, write=True)
+        assert await evaluation_turn_failure(store, current) == "RSI_TURN_FAILED"
+    finally:
+        await runtime.close()
