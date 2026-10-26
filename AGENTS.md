@@ -550,6 +550,17 @@ agent-runtime/src/roami_agent/tools/
   <p>51 项隔离回归通过，新增六种终止码和跨回合／会话／事件类型隔离。对完整运行中 longmemeval-v2:4ed01379 的真实数据库执行只读、零模型重放，得到 RSI_TOKEN_BUDGET；原 trial 的通用失败及 SHA 保持，案例仍失败。该补丁只修正诊断归因，不声称解决预算耗尽或新增真实模型通过；正在运行的镜像与源码版本保持冻结。</p>
 </section>
 
+<section id="rsi-process-tool-contract-20261026" lang="zh-CN">
+  <h2>执行工具的进程生命周期合同 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>工具说明明确既有生命周期：一次调用结束会清理其进程组。临时服务与客户端检查在同一次调用内完成，按已捕获的子进程 PID 清理，不按命令文本匹配进程。</p>
+  <h3>User Stories</h3>
+  <p>Worker 不再假定后台服务能跨工具调用存活，避免连接失败后反复改探针或用广泛匹配的清理命令终止自身验证步骤。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>压缩并补齐 foundations 的 bash 和底层 shell 说明，保留工作区、授权主机操作、非沙箱、写入、取消、回执及托管资源边界；不修改 process.execute 的清理或权限行为。工具输入文本变化单列 container-uds-v7-process-lifetime，不能与 v6 混算同合同收益。</p>
+  <p>40 项工具、上下文边界和评测通道回归通过。零模型独立对照确认临时 HTTP 服务在当前调用内可访问，进程组清理后后续调用无法复用；服务器与客户端同一调用、按子 PID 收尾的路径成功，未作用于其他进程。对照只证明工具合同，不改写正在运行的 v6 真实案例或声称预算失败已全部解决。</p>
+</section>
+
 <section id="composer-usage-indicator-20261026" lang="zh-CN">
   <h2>输入框用量组件 · 2026-10-26</h2>
   <h3>产品设计</h3>
