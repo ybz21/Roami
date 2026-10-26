@@ -116,6 +116,7 @@ class MeteredModel:
         return getattr(self.provider, name)
 
     async def stream(self, messages, tools):
+        messages, tools = json.loads(json.dumps([messages, tools], ensure_ascii=False))
         snapshot = None
         input_reserve, basis = self.input_reserve, self.reservation_basis
         if input_reserve is None:

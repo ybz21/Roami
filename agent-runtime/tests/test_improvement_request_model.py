@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import replace
 
 import pytest
@@ -427,3 +428,57 @@ async def test_persistent_guest_meter_uses_the_same_known_prefix_bound():
         {"inputTokens": 0, "outputTokens": 0, "requestAttempts": 0, "retryUsageKnown": True},
         0,
     )
+
+
+@pytest.mark.parametrize("wrapper", ["role", "meter"])
+async def test_admitted_input_is_immutable_while_waiting_on_budget(wrapper):
+    settings = Settings()
+    budget = EpisodeBudget({"tokens": 30000, "seconds": 30, "requests": 3})
+    received = []
+
+    class Provider:
+        model = "frozen-input"
+
+        async def stream(self, messages, tools):
+            received.append((messages, tools))
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 100,
+                    "outputTokens": 10,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+
+    model = (
+        RequestBudgetModel(
+            settings,
+            settings.route("worker"),
+            budget,
+            "worker",
+            cap=1024,
+            factory=lambda *_: Provider(),
+        )
+        if wrapper == "role"
+        else MeteredModel(Provider(), budget, "worker", output_cap=1024)
+    )
+    messages = [{"role": "user", "content": "original"}]
+    tools = [{"type": "function", "function": {"name": "original", "parameters": {}}}]
+
+    async def consume():
+        async for _ in model.stream(messages, tools):
+            pass
+
+    await budget.lock.acquire()
+    pending = asyncio.create_task(consume())
+    try:
+        await asyncio.sleep(0)
+        messages[0]["content"] = "changed after admission"
+        tools[0]["function"]["name"] = "changed"
+    finally:
+        budget.lock.release()
+    await pending
+    assert received[0][0][0]["content"] == "original"
+    assert received[0][1][0]["function"]["name"] == "original"
+    assert messages[0]["content"] == "changed after admission"

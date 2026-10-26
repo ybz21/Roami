@@ -1,5 +1,6 @@
 """Allocate each request's output from role settings and the remaining episode budget."""
 
+import json
 from contextlib import aclosing
 from dataclasses import replace
 
@@ -30,6 +31,7 @@ class RequestBudgetModel:
     async def stream(self, messages, tools):
         from roami_agent.app import configured_provider
 
+        messages, tools = json.loads(json.dumps([messages, tools], ensure_ascii=False))
         original_bytes = input_bytes(messages, tools)
         input_reserve, snapshot, basis = self.input_reservation.estimate(messages, tools)
         remaining = 100_000_000
@@ -91,7 +93,7 @@ class RequestBudgetModel:
             async with aclosing(model.stream(messages, tools)) as events:
                 async for event in events:
                     if event.kind == "usage":
-                        usage = event.value
+                        usage = dict(event.value)
                     yield event
             self.input_reservation.observe(snapshot, usage)
         finally:
