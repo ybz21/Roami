@@ -1,4 +1,12 @@
 const zhCN = {
+  'agent.prices.limit': '最多配置 32 个模型的单价；添加前请先移除一项。',
+  'agent.prices.search': '搜索模型',
+  'agent.prices.add': '添加模型',
+  'agent.prices.choose': '搜索或输入模型名称',
+  'agent.prices.narrowSearch': '继续输入名称可缩小结果范围。',
+  'agent.prices.configured': '已定价',
+  'agent.prices.incomplete': '待补全',
+  'agent.prices.empty': '没有匹配的模型。',
   'agent.proxy.priceCurrencyLabel': '{model} · 单价币种',
   'agent.proxy.prices': "模型单价",
   'agent.proxy.priceHint': "仅上游无可用费用回执时使用，单位为所选币种 / 百万 Token。填齐输入与输出价，0 表示免费；缓存留空沿用输入价。仅影响新请求。",

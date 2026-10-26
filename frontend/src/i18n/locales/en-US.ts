@@ -1,4 +1,12 @@
 const enUS = {
+  'agent.prices.limit': 'Up to 32 models can have prices. Remove one before adding another.',
+  'agent.prices.search': 'Search models',
+  'agent.prices.add': 'Add model',
+  'agent.prices.choose': 'Search or enter a model name',
+  'agent.prices.narrowSearch': 'Type more of the name to narrow the results.',
+  'agent.prices.configured': 'Priced',
+  'agent.prices.incomplete': 'Incomplete',
+  'agent.prices.empty': 'No matching models.',
   'agent.proxy.priceCurrencyLabel': '{model} price currency',
   'agent.proxy.prices': "Model prices",
   'agent.proxy.priceHint': "Used only when upstream has no usable charge receipt. Prices are per million tokens in the selected currency. Set input and output prices; 0 means free. Blank cache price uses input price. Applies to new requests only.",
