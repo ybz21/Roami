@@ -1506,3 +1506,15 @@ Research → 原浏览器导航／观察协议</pre>
   <p>浏览器零模型对照：旧镜像默认启动失败、指定系统 Chromium 可用；新镜像默认启动及键盘操作可用，三次均为非 root、只读根文件系统、无网络容器。v4 组合镜像仍出现一次预算失败（297,815 Token／20 次请求），页面检查通过不掩盖任务失败。</p>
   <p>v5 两次独立诊断分别使用 289,200 Token／25 次请求、240,676 Token／21 次请求；Native Attempt 均 succeeded，任务等待验收，两份必要文件的已存储 SHA 均匹配工作区最终文件。功能硬检查全部通过，但 hard_passed=true、pending=true、passed=false，未计为正式质量通过。新增预算提示在受压调用中实际出现；角色隔离、共享预留、提示开销和未知用量边界回归通过，最新 full 共 Python 1,346 项、Go、前端检查与生产构建通过。校准、正式全套验收与连续观察仍独立保留，#443／#445／#446 不因本轮诊断关闭。</p>
 </section>
+
+<section id="rsi-quant-correction-replay-20261026" lang="zh-CN">
+  <h2>RSI 修正结果重跑合同 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>独立验证器按原题区分静态诊断与程序生成的修正结果。QUANT-03 的 analysis.py 只须重新生成 corrected.json；result.json 的诊断字段仍独立校验，不增加题目没有要求的重生条件。其他量化题仍要求重新生成 result.json，修正文件的提交值与重跑值仍须同时符合冻结数值合同。</p>
+  <h3>User Stories</h3>
+  <p>实现符合原题时，不会因静态诊断没有被程序重写而误报验证中断；修正结果错误、缺失、与提交不一致时仍失败。维护者看到允许公开的验证失败码，不会收到任意异常文本或凭证。</p>
+  <h3>Technical Design</h3>
+  <p>authored_grading.RERUN_ANALYSIS 对未重生的输出返回空值；QUANT-03 的 reproducible_code 对比 corrected_expected，其他题仍对比 expected。corrected_run_verified、冻结材料保护、报告来源与数值误差均保持。验证异常只额外保留四个既有白名单代码；其他异常只记录类型。评测协议单列 container-uds-v9-quant-correction-replay，不篡改旧 trial 或复用旧版完整成绩。</p>
+  <h3>验收证据</h3>
+  <p>真实子进程回归覆盖只生成 corrected.json 的合法程序、错误修正值、提交值与重跑值不一致、静态诊断保留、其他量化题仍须重生主结果，以及异常代码白名单与私有文本隔离；定向 40 项通过。冻结 v6 QUANT-03 产物的零模型重放已从文件缺失中断进入真实数值检查，但其 corrected 结果仍不合格，案例继续失败，原 trial SHA 不变。另行尝试的 v8 操作序列指令候选两项仍预算失败，已拒绝采纳，原 Worker 指令恢复；547,016 Token / 38 请求全部已知并结算。正式评分与连续观察仍未完成，父 issue 保持开放。</p>
+</section>

@@ -82,7 +82,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v7-process-lifetime",
+                "container-uds-v9-quant-correction-replay",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )

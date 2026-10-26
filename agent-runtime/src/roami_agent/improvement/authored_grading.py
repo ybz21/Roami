@@ -180,7 +180,11 @@ async def grade_authored(case, workspace, executor):
                 .decode()
                 .splitlines()[-1]
             )
-            checks["reproducible_code"] = close_json(output["result"], spec["expected"])
+            checks["reproducible_code"] = (
+                close_json(output["corrected"], spec["corrected_expected"])
+                if identifier == "QUANT-03"
+                else close_json(output["result"], spec["expected"])
+            )
             if identifier == "QUANT-01":
                 trades = list(csv.DictReader(read_file(workspace, "trades.csv").splitlines()))
                 normalized = [
@@ -231,7 +235,15 @@ async def grade_authored(case, workspace, executor):
         zipfile.BadZipFile,
     ) as error:
         checks["verification_completed"] = False
-        evidence.append({"verification_error": type(error).__name__})
+        failure = {"verification_error": type(error).__name__}
+        if isinstance(error, DomainError) and error.code in {
+            "RSI_DOCKER_COMMAND_FAILED",
+            "RSI_DOCKER_OUTPUT_LIMIT",
+            "RSI_TIME_BUDGET",
+            "RSI_ARTIFACT_UNAVAILABLE",
+        }:
+            failure["verification_error_code"] = error.code
+        evidence.append(failure)
     hard_passed = bool(checks) and all(checks.values())
     pending = hard_passed and spec.get("rubric", False)
     grade = quality(
@@ -301,7 +313,7 @@ with tempfile.TemporaryDirectory() as d:
   if path.is_file():shutil.copy2(path,root/path.name)
  for name in ["result.json","corrected.json","trades.csv","equity.svg","selection-log.json"]:(root/name).unlink(missing_ok=True)
  subprocess.run([sys.executable,"analysis.py"],cwd=root,check=True,capture_output=True,timeout=30)
- print(json.dumps({"result":json.loads((root/"result.json").read_text()),"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
+ print(json.dumps({"result":json.loads((root/"result.json").read_text()) if (root/"result.json").exists() else None,"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
 """
 
 BOARD_PROBE = r"""import json,pathlib
