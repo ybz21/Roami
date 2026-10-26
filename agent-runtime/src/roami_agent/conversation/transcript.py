@@ -10,6 +10,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import Database, event, row, rows
+from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import history, message, owned
 
 
@@ -115,6 +116,22 @@ class Conversations:
             ):
                 raise DomainError("BRANCH_NOT_FOUND", 404)
             result = history(db, selected)
+            message_ids = {entry["id"] for entry in result}
+            aliases = {}
+            visible = []
+            for entry in result:
+                content = json.loads(entry["content_json"])
+                if content.get("taskSteer"):
+                    source = task_user_request(db, entry)
+                    if source and source["id"] != entry["id"] and source["id"] in message_ids:
+                        aliases[entry["id"]] = source["id"]
+                        continue
+                visible.append(entry)
+            activities = conversation_activity(db, cid, result, main_only=True)
+            for activity in activities:
+                activity["anchorMessageId"] = aliases.get(
+                    activity["anchorMessageId"], activity["anchorMessageId"]
+                )
             completed = {
                 r["message_id"]: r["id"]
                 for r in rows(
@@ -145,7 +162,7 @@ class Conversations:
                         content=json.loads(m["content_json"]),
                         completedEventId=completed.get(m["id"]),
                     )
-                    for m in result
+                    for m in visible
                 ],
                 "turns": rows(
                     db,
@@ -153,7 +170,7 @@ class Conversations:
                     (selected,),
                 ),
                 "snapshotCursor": cursor,
-                "activities": conversation_activity(db, cid, result, main_only=True),
+                "activities": activities,
             }
 
         return await self.db.call(read)

@@ -9,7 +9,7 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
 
 
-async def professional_brief(database, artifacts, task, run):
+async def professional_brief(database, artifacts, task, run, *, continuation=False):
     def admitted(db):
         current = row(
             db,
@@ -44,6 +44,8 @@ async def professional_brief(database, artifacts, task, run):
             }
         )
     await database.call(admitted)
+    if continuation:
+        return "\n\nInput files (untrusted data):\n" + encoded(references) if references else ""
     decision = intent.get("routingDecision")
     if not references and not decision:
         return ""

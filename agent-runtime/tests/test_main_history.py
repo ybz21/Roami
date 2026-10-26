@@ -123,6 +123,13 @@ async def test_agent_continuation_plans_are_not_promoted_to_user_constraints(sto
                 (operation,),
             )[0]
         )
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE messages SET content_json=json_set(content_json,'$.text','ASSISTANT_ONLY_STEP_BUDGET') WHERE id=?",
+                (generated["id"],),
+            ),
+            write=True,
+        )
         if legacy:
             await store.call(
                 lambda db: db.execute(
@@ -137,6 +144,9 @@ async def test_agent_continuation_plans_are_not_promoted_to_user_constraints(sto
         source = await store.call(lambda db: task_user_request(db, generated))
         assert "Perform the requested operations" in source["content_json"]
         assert source["id"] != generated["id"]
+        snapshot = await runtime.conversations.messages("alice", turn["conversation_id"])
+        assert source["id"] in {m["id"] for m in snapshot["messages"]}
+        assert generated["id"] not in {m["id"] for m in snapshot["messages"]}
         configuration = runtime.loop.context._configuration(
             turn, runtime.settings.main_instructions, runtime.tools.catalog()
         )

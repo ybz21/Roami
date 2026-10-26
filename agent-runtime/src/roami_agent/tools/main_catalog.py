@@ -9,12 +9,21 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import validate_answer
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
+from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
 from roami_agent.storage.task_continuation import continuation_candidates
 from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
 
 def register_main_tools(registry, tasks, memory, targets, router=None):
+    async def coverage(args, binding, *, handoff=False):
+        return await tasks.db.call(lambda db: check_coverage(db, binding, args, handoff=handoff))
+
+    async def record(binding, outcomes, receipt=None):
+        if outcomes is None:
+            return
+        await tasks.db.call(lambda db: record_coverage(db, binding, outcomes, receipt), write=True)
+
     async def reply_source(binding):
         source = await tasks.db.call(
             lambda db: row(
@@ -30,7 +39,10 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         return json.loads(source["content_json"]).get("text", "") if source else ""
 
     async def reply(args, binding):
-        return {"reply": validate_answer(args, await reply_source(binding))}
+        outcomes = await coverage(args, binding)
+        result = {"reply": validate_answer(args, await reply_source(binding))}
+        await record(binding, outcomes)
+        return result
 
     registry.add(
         Tool(
@@ -43,6 +55,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             object_schema(
                 {
                     "text": {"type": "string", "minLength": 1},
+                    "requestCoverage": coverage_schema(),
                     "mode": {"type": "string", "enum": ["brief", "detailed", "debug"]},
                     "language": {"type": "string", "enum": ["zh", "en"]},
                     "scopeQuote": {"type": "string", "minLength": 1},
@@ -273,6 +286,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def delegate(args, binding):
+        outcomes = await coverage(args, binding, handoff=True)
         decision = await router.decide(args, binding) if args.get("routing") and router else None
         executor = decision["executor"] if decision else args.get("executor", "native")
         target = args.get("target") or {}
@@ -325,6 +339,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 from_message_id=args.get("fromMessageId"),
                 origin_message_id=binding["originMessageId"],
                 **routing_args,
+                **(
+                    {"independent_project_outcome": True}
+                    if outcomes and any(item["status"] == "delegated" for item in outcomes)
+                    else {}
+                ),
             )
         except DomainError as exc:
             if exc.code == "TASK_CONTINUATION_REQUIRED":
@@ -367,7 +386,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 "a corrected continuation must use task_steer on the existing task after user direction.",
             }
         stored_decision = json.loads(task["intent_json"]).get("routingDecision")
-        return {
+        receipt = {
             "id": task["id"],
             "taskId": task["id"],
             "kind": "background_task",
@@ -379,6 +398,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             **({"requestComplete": args["requestComplete"]} if "requestComplete" in args else {}),
             **({"routingDecision": public_routing(stored_decision)} if stored_decision else {}),
         }
+        await record(binding, outcomes, receipt)
+        return receipt
 
     async def status(args, binding):
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
@@ -474,6 +495,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         return await tasks.db.call(annotate)
 
     async def progress_reply(args, binding):
+        outcomes = await coverage(args, binding)
+
         def callback_result(db):
             callback = row(
                 db,
@@ -506,6 +529,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             args.get("language", "zh"),
             args.get("languageQuote"),
         )
+        await record(binding, outcomes)
         return [dict(item, replyLanguage=language) for item in items]
 
     registry.add(
@@ -646,6 +670,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "type": "boolean",
                         "description": "Required for the whole user message: false while any independent part remains (including target discovery); true only on the last handoff. Never wait or poll after acceptance.",
                     },
+                    "requestCoverage": coverage_schema(),
                     "routing": routing_schema(),
                     "executor": {
                         "type": "string",
@@ -690,6 +715,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def steer_task(args, binding):
+        outcomes = await coverage(args, binding, handoff=True)
+        source_quote = args.get("sourceQuote")
+        if outcomes:
+            current_quote = next(item["quote"] for item in outcomes if item["status"] == "current")
+            if source_quote and source_quote != current_quote:
+                raise DomainError("REQUEST_HANDOFF_SCOPE_REQUIRED")
+            source_quote = current_quote
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
         if args["taskId"] in handoffs:
             raise DomainError("TASK_ALREADY_HANDED_OFF", 409)
@@ -701,13 +733,16 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             binding["turnId"] + ":" + binding["toolCallId"],
             source_turn_id=binding["turnId"],
             source_conversation_id=binding["conversation"],
+            source_quote=source_quote,
         )
-        return {
+        result = {
             **receipt,
             "acceptedOnly": receipt["state"] in {"stopping", "applied"},
             "kind": "task_continuation",
             **({"requestComplete": args["requestComplete"]} if "requestComplete" in args else {}),
         }
+        await record(binding, outcomes, result)
+        return result
 
     registry.add(
         Tool(
@@ -722,6 +757,12 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "description": "Required: applies to the ENTIRE current user message, not this task alone. false while ANY other requested part remains unhandled; true only on the final handoff. Never wait or poll for delegated work.",
                     },
                     "text": {"type": "string", "minLength": 1},
+                    "sourceQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact current user wording for this task only; omit independent outcomes being handled separately. Sent verbatim to the existing executor. Do not expand merge permission into release or deployment permission.",
+                    },
+                    "requestCoverage": coverage_schema(),
                 },
                 ["taskId", "revision", "text", "requestComplete"],
             ),

@@ -420,6 +420,94 @@ async def test_accepted_steering_cannot_be_replaced_with_another_task_in_the_sam
         await runtime.close()
 
 
+async def test_separate_user_outcome_can_start_another_worktree_before_steering_advances(store):
+    runtime, _, _, _, binding = await setup(store, user="合入代码，并修复报告链接")
+    try:
+        task = await admit(
+            runtime,
+            binding,
+            "Original implementation",
+            "original",
+            executor="codex",
+            target={"kind": "project", "projectId": "p"},
+        )
+        await mark(runtime, task, "succeeded", {"state": "succeeded", "summary": "PR ready"})
+        turn = await active_turn(store, binding)
+        accepted = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "steer",
+                "task_steer",
+                {
+                    "taskId": task["id"],
+                    "revision": 1,
+                    "text": "合入代码",
+                    "sourceQuote": "合入代码",
+                    "requestComplete": False,
+                    "requestCoverage": [
+                        {"quote": "合入代码", "status": "current"},
+                        {"quote": "修复报告链接", "status": "pending"},
+                    ],
+                },
+            ),
+            "main",
+            binding,
+        )
+        assert accepted["acceptedOnly"] is True
+        independent = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "independent",
+                "delegate",
+                {
+                    "goal": "修复报告链接",
+                    "executor": "codex",
+                    "target": {"kind": "project", "projectId": "p"},
+                    "requestComplete": True,
+                    "requestCoverage": [
+                        {"quote": "合入代码", "status": "delegated", "taskId": task["id"]},
+                        {"quote": "修复报告链接", "status": "current"},
+                    ],
+                },
+            ),
+            "main",
+            {**binding, "toolCallId": "independent"},
+        )
+        assert independent["acceptedOnly"] is True
+        assert independent["taskId"] != task["id"]
+        original = (await runtime.tasks.get("alice", task["id"]))["task"]
+        assert original["revision"] == 1
+        assert json.loads(original["intent_json"])["target"]["kind"] == "project"
+        duplicate = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "duplicate",
+                "delegate",
+                {
+                    "goal": "Repeat merge",
+                    "requestComplete": True,
+                    "requestCoverage": [
+                        {"quote": "合入代码", "status": "current"},
+                        {
+                            "quote": "修复报告链接",
+                            "status": "delegated",
+                            "taskId": independent["taskId"],
+                        },
+                    ],
+                },
+            ),
+            "main",
+            {**binding, "toolCallId": "duplicate"},
+        )
+        assert duplicate["error"] == "TASK_ALREADY_HANDED_OFF"
+        assert len(await runtime.tasks.list("alice")) == 2
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("executor", ["opencode", "pi"])
 async def test_untracked_user_executor_is_explained_and_cannot_be_hidden_in_native_wrapper(
     store, executor

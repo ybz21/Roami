@@ -190,6 +190,23 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] in {
+                "REQUEST_COVERAGE_REQUIRED",
+                "REQUEST_COVERAGE_SOURCE_REQUIRED",
+                "REQUEST_OUTCOME_DROPPED",
+                "REQUEST_OUTCOMES_PENDING",
+                "REQUEST_HANDOFF_REQUIRED",
+                "REQUEST_BLOCKER_REQUIRED",
+                "REQUEST_HANDOFF_SCOPE_REQUIRED",
+            }:
+                value.update(
+                    executionStarted=False,
+                    recovery="Reconcile every independent outcome in the current user message with requestCoverage. "
+                    "Keep prior quotes; use only exact source quotes and actual accepted taskIds. "
+                    "Hand off pending repairs before ending; acknowledgements and promises are not delivery. "
+                    "Exactly ONE independent outcome is current per handoff; keep others pending. sourceQuote must equal that current quote. "
+                    "Do not repeat already accepted work. Use requestComplete=false while another part remains.",
+                )
             if value["error"] == "FILE_CHANGED":
                 value["recovery"] = (
                     "Read the same file again with read, review its current contents, then use that read's exact sha256 as expectedSha256. JSON null is only for creating a missing file. Preserve unrelated changes; do not retry the stale edit or bypass the check with shell redirection."

@@ -338,6 +338,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
 ):
     """Real isolated tmux and Go runners; fake agent binaries avoid paid/account calls."""
     import shlex
+    import sqlite3
 
     if not shutil.which("tmux"):
         pytest.skip("tmux required for coding executor integration")
@@ -409,6 +410,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
             spec = {
                 "key": kind,
                 "executor": kind,
+                "title": "修复报告链接",
                 "directory": str(binary_dir),
                 "prompt": "literal $(touch SHOULD_NOT_EXIST) `uname` ' 中文\nnext line",
                 "timeoutSeconds": 20,
@@ -418,6 +420,11 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
             result = await finished(kind)
             assert result["result"]["state"] == "succeeded"
             assert result["result"]["summary"] == "Answer: " + spec["prompt"]
+            with sqlite3.connect(tmp_path / "home/database/meta.db") as metadata:
+                label = metadata.execute(
+                    "SELECT label FROM sessions WHERE id=?", (first["session"],)
+                ).fetchone()[0]
+            assert label == "修复报告链接"
             assert not (binary_dir / "SHOULD_NOT_EXIST").exists()
             assert await cli("launch", "--file", "-", spec=spec) == result
             assert "LAUNCH_KEY_CONFLICT" in await cli(

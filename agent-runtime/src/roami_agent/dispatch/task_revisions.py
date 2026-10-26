@@ -29,7 +29,7 @@ class TaskRevisions:
             "state": payload.get("status", "stopping"),
             "revision": payload.get("appliedRevision", payload["expectedRevision"]),
             "errorCode": payload.get("errorCode"),
-            "text": payload["text"],
+            "text": payload.get("executionText", payload["text"]),
         }
 
     async def get(self, owner, task_id, operation_id):
@@ -56,6 +56,7 @@ class TaskRevisions:
         *,
         source_turn_id=None,
         source_conversation_id=None,
+        source_quote=None,
     ):
         if (
             not isinstance(text, str)
@@ -69,6 +70,10 @@ class TaskRevisions:
         ):
             raise DomainError("INVALID_TASK_STEER")
         spec = {"expectedRevision": expected_revision, "text": text}
+        if source_quote is not None:
+            if not isinstance(source_quote, str) or not source_quote.strip():
+                raise DomainError("INVALID_TASK_STEER")
+            spec["sourceQuote"] = source_quote
 
         def write(db):
             if source_turn_id:
@@ -147,32 +152,50 @@ class TaskRevisions:
                             key="navigation-recovery:" + run["id"],
                         )
             intent = json.loads(task["intent_json"])
-            goal = intent["goal"] + "\n\nAdditional user requirements:\n" + text
             operation = identity()
             source_user = (
                 row(
                     db,
-                    "SELECT id FROM messages WHERE turn_id=? AND role='user' AND deleted_ms IS NULL ORDER BY seq LIMIT 1",
+                    "SELECT id,content_json FROM messages WHERE turn_id=? AND role='user' AND deleted_ms IS NULL ORDER BY seq LIMIT 1",
                     (source_turn_id,),
                 )
                 if source_turn_id
                 else None
             )
+            if source_user:
+                # The coordinator may resolve references, but cannot add authorization.
+                source_text = json.loads(source_user["content_json"]).get("text", "")
+                if source_quote is not None and source_quote not in source_text:
+                    raise DomainError("TASK_STEER_SOURCE_REQUIRED")
+                text_for_execution = source_quote or (text if text in source_text else source_text)
+            else:
+                if source_quote is not None:
+                    raise DomainError("TASK_STEER_SOURCE_REQUIRED")
+                text_for_execution = text
+            attachments = (
+                json.loads(source_user["content_json"]).get("attachments", [])
+                if source_user
+                else []
+            )
+            goal = intent["goal"] + "\n\nAdditional user requirements:\n" + text_for_execution
             mid = message(
                 db,
                 task["origin_conversation_id"],
                 task["origin_branch_id"],
                 "user",
                 {
-                    "text": text,
+                    "text": text_for_execution,
                     "taskSteer": task_id,
                     "operationId": operation,
                     "taskRevision": expected_revision,
                     **({"sourceUserMessageId": source_user["id"]} if source_user else {}),
+                    **({"attachments": attachments} if attachments else {}),
                 },
             )
             payload = {
                 **spec,
+                "executionText": text_for_execution,
+                "attachments": attachments,
                 "goal": goal,
                 "messageId": mid,
                 "status": "stopping",
@@ -341,6 +364,7 @@ class TaskRevisions:
                     or bool(unfinished_children)
                 )
                 intent["continuation"] = {
+                    "text": payload.get("executionText", payload["text"]),
                     "verifiedThroughRevision": verified_through,
                     "requiresAcceptance": requires_acceptance,
                     "runId": run["id"],
@@ -393,10 +417,14 @@ class TaskRevisions:
                         run["native_branch_id"],
                         "user",
                         {
-                            "text": "Continue the existing task; preserve completed work and inspect current state before changes. Updated goal:\n"
-                            + payload["goal"],
+                            "text": payload.get("executionText", payload["text"]),
                             "taskRevision": revision,
-                            "displayText": payload["text"],
+                            "displayText": payload.get("executionText", payload["text"]),
+                            **(
+                                {"attachments": payload["attachments"]}
+                                if payload.get("attachments")
+                                else {}
+                            ),
                         },
                     )
                 db.execute(
