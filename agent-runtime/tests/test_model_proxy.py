@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -9,14 +10,17 @@ import pytest
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.chat_completions import ChatCompletions
-from roami_agent.providers.model_billing import cost_nano, proxy_configuration, usage_counts
+from roami_agent.providers.model_billing import proxy_configuration, usage_counts
 from roami_agent.providers.model_proxy import ModelProxy
+from roami_agent.providers.upstream_costs import UpstreamCharge, upstream_charge
 from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
 from roami_agent.server.model_settings import settings_path
 
 PRICES = {"input": 2, "output": 8, "cacheRead": 0.2}
 USAGE = {
+    "cost": 0.00208,
+    "currency": "USD",
     "prompt_tokens": 1000,
     "completion_tokens": 100,
     "prompt_tokens_details": {"cached_tokens": 400},
@@ -47,7 +51,11 @@ def provider(proxy, handler, role="main"):
 
 
 def proxy_for(store, *, limit=None, prices=True):
-    config = {"dailyLimit": limit, "prices": {"fixture": dict(PRICES)} if prices else {}}
+    config = {
+        "dailyLimit": limit,
+        "currency": "USD",
+        "prices": {"fixture": dict(PRICES)} if prices else {},
+    }
     return ModelProxy(store, lambda: config, lambda: "Asia/Shanghai"), config
 
 
@@ -57,11 +65,15 @@ async def consume(model):
     ]
 
 
-def test_cache_tokens_are_not_charged_twice_and_cost_is_fixed_precision():
-    assert cost_nano(PRICES, usage_counts(USAGE)) == 2_080_000
-    assert cost_nano({"input": 0.000001, "output": 0, "cacheRead": 0}, (1, 0, 0)) == 1
+def test_tokens_and_legacy_configuration_never_determine_a_fee():
+    assert usage_counts(USAGE) == (1000, 100, 400)
     assert usage_counts({**USAGE, "prompt_tokens_details": {"cached_tokens": 1001}}) is None
     assert usage_counts({**USAGE, "prompt_tokens": True}) is None
+    assert proxy_configuration({"prices": {"fixture": PRICES}, "dailyLimit": 1}) == {
+        "currency": "CNY",
+        "dailyLimit": 1,
+    }
+    assert proxy_configuration() == {"currency": "USD", "dailyLimit": None}
 
 
 @pytest.mark.parametrize(
@@ -74,9 +86,9 @@ def test_cache_tokens_are_not_charged_twice_and_cost_is_fixed_precision():
         {"dailyLimit": "2"},
         {"dailyLimit": 0.0000001},
         {"prices": []},
-        {"prices": {"fixture": {"input": 1}}},
-        {"prices": {"fixture": {**PRICES, "output": -1}}},
-        {"prices": {"fixture": {**PRICES, "output": float("inf")}}},
+        {"currency": "usd"},
+        {"currency": "USD/CNY"},
+        {"currency": None},
         {"enabled": True},
     ],
 )
@@ -101,27 +113,36 @@ async def test_fragmented_stream_preserves_content_and_settles_once(store, compr
     await model.close()
     usage = await proxy.billing.view()
     assert usage["requests"] == 1 and usage["unknown"] == usage["pending"] == 0
-    assert usage["knownCost"] == 0.00208 and usage["cacheReadTokens"] == 400
+    assert (
+        usage["charges"] == [{"currency": "USD", "amount": "0.00208"}]
+        and usage["cacheReadTokens"] == 400
+    )
     rows = await store.call(
         lambda db: [dict(row) for row in db.execute("SELECT * FROM model_proxy_calls")]
     )
     assert "private prompt" not in json.dumps(rows)
     config["prices"]["fixture"]["input"] = 900
-    assert (await proxy.billing.view())["knownCost"] == usage["knownCost"]
+    assert (await proxy.billing.view())["charges"] == usage["charges"]
 
 
 async def test_price_snapshot_idempotence_and_recovery_survive_new_proxy(store):
     proxy, config = proxy_for(store)
     await proxy.ready()
-    call, rates = await proxy.billing.admit("worker", "fixture")
+    call = await proxy.billing.admit("worker", "fixture")
     config["prices"] = {}
-    await proxy.billing.settle(call, rates, (1000, 100, 400))
-    await proxy.billing.settle(call, rates, (999999, 100, 0))
-    pending, _ = await proxy.billing.admit("main", "fixture")
+    await proxy.billing.settle(
+        call, (1000, 100, 400), charge=UpstreamCharge(Decimal("0.00208"), "USD")
+    )
+    await proxy.billing.settle(call, (999999, 100, 0), charge=UpstreamCharge(Decimal(99), "USD"))
+    pending = await proxy.billing.admit("main", "fixture")
     recovered, _ = proxy_for(store)
     await recovered.ready()
     usage = await recovered.billing.view()
-    assert usage["knownCost"] == 0.00208 and usage["unknown"] == 1 and usage["pending"] == 0
+    assert (
+        usage["charges"] == [{"currency": "USD", "amount": "0.00208"}]
+        and usage["unknown"] == 1
+        and usage["pending"] == 0
+    )
     assert next(row for row in usage["recent"] if row["id"] == pending)["state"] == "unknown"
 
 
@@ -190,25 +211,26 @@ async def test_missing_usage_or_truncated_stream_is_unknown_and_blocks_limited_c
     )
     await consume(model)
     usage = await proxy.billing.view()
-    assert usage["unknown"] == 1 and usage["recent"][0]["cost"] is None
+    assert usage["unknown"] == 1 and usage["recent"][0]["charges"] == []
     with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
         await consume(model)
     await model.close()
 
 
-async def test_unpriced_model_is_unknown_without_limit_and_refused_with_limit(store):
-    proxy, config = proxy_for(store, prices=False)
+async def test_no_price_required_and_missing_upstream_cost_blocks_next_limited_call(store):
+    proxy, _ = proxy_for(store, limit=1, prices=False)
+    body = EVENTS.replace(b'"cost": 0.00208, ', b"")
     model = provider(
         proxy,
         lambda request: httpx.Response(
-            200, headers={"content-type": "text/event-stream"}, content=EVENTS
+            200, headers={"content-type": "text/event-stream"}, content=body
         ),
     )
     await consume(model)
     usage = await proxy.billing.view()
     assert usage["unknown"] == 1 and usage["inputTokens"] == 1000
-    config["dailyLimit"] = 1
-    with pytest.raises(DomainError, match="MODEL_PROXY_PRICE_REQUIRED"):
+    assert usage["charges"] == []
+    with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
         await consume(model)
     await model.close()
 
@@ -230,7 +252,7 @@ async def test_rejected_attempt_and_retry_have_independent_receipts(store):
     model.max_retries, model.sleep = 1, lambda _: asyncio.sleep(0)
     await consume(model)
     usage = await proxy.billing.view()
-    assert usage["requests"] == 2 and usage["knownCost"] == 0.00208
+    assert usage["requests"] == 2 and usage["charges"] == [{"currency": "USD", "amount": "0.00208"}]
     assert {row["state"] for row in usage["recent"]} == {"failed", "known"}
     assert "private error body" not in json.dumps(usage)
     await model.close()
@@ -273,7 +295,7 @@ async def test_settings_http_owner_boundary_persistence_and_invalid_save(store):
     async with httpx.AsyncClient(
         transport=transport, base_url="http://private", headers={"X-Roami-Owner": "local"}
     ) as client:
-        config = {"dailyLimit": 10, "prices": {"fixture": PRICES}}
+        config = {"dailyLimit": 10, "currency": "USD"}
         saved = await client.put("/v1/model-settings", json={"proxy": config})
         assert saved.status_code == 200 and saved.json()["data"]["proxy"] == config
         before = settings_path(store.data_root).read_bytes()
@@ -291,8 +313,10 @@ async def test_disk_reopen_preserves_receipts_and_marks_inflight_unknown(store):
 
     proxy, _ = proxy_for(store)
     await proxy.ready()
-    known, rates = await proxy.billing.admit("main", "fixture")
-    await proxy.billing.settle(known, rates, (1000, 100, 400))
+    known = await proxy.billing.admit("main", "fixture")
+    await proxy.billing.settle(
+        known, (1000, 100, 400), charge=UpstreamCharge(Decimal("0.00208"), "USD")
+    )
     await proxy.billing.admit("worker", "fixture")
     await store.close()
     reopened = Database(store.path, store.data_root, managed=False)
@@ -301,7 +325,9 @@ async def test_disk_reopen_preserves_receipts_and_marks_inflight_unknown(store):
         restored, _ = proxy_for(reopened, limit=10)
         await restored.ready()
         usage = await restored.billing.view()
-        assert usage["requests"] == 2 and usage["knownCost"] == 0.00208
+        assert usage["requests"] == 2 and usage["charges"] == [
+            {"currency": "USD", "amount": "0.00208"}
+        ]
         assert usage["unknown"] == 1 and usage["pending"] == 0
         with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
             await restored.billing.admit("main", "fixture")
@@ -331,4 +357,104 @@ async def test_cancellation_during_admission_never_sends_or_leaves_pending(store
     assert not proxy.admission.locked()
     assert usage["requests"] == 1 and usage["unknown"] == usage["pending"] == 0
     assert usage["recent"][0]["state"] == "failed"
+    await model.close()
+
+
+@pytest.mark.parametrize(
+    "usage,endpoint,expected",
+    [
+        ({"cost": 0}, "https://openrouter.ai/api/v1/chat/completions", ("0", "USD")),
+        (
+            {"cost": Decimal("0.123456789012345678")},
+            "https://openrouter.ai/api/v1",
+            ("0.123456789012345678", "USD"),
+        ),
+        ({"cost": 2, "currency": "CNY"}, "https://gateway.example/v1", ("2", "CNY")),
+        ({"cost": 1}, "https://gateway.example/v1", None),
+        ({"cost": 1}, "https://openrouter.ai.example/v1", None),
+        ({"cost": 1, "currency": "CNY"}, "https://openrouter.ai/api/v1", None),
+        ({"cost_details": {"upstream_inference_cost": 3}}, "https://openrouter.ai/api/v1", None),
+        ({"cost": True, "currency": "USD"}, "http://gateway", None),
+        ({"cost": "1", "currency": "USD"}, "http://gateway", None),
+        ({"cost": -1, "currency": "USD"}, "http://gateway", None),
+        ({"cost": float("nan"), "currency": "USD"}, "http://gateway", None),
+        ({"cost": float("inf"), "currency": "USD"}, "http://gateway", None),
+    ],
+)
+def test_existing_charge_receipts_require_valid_amount_and_documented_currency(
+    usage, endpoint, expected
+):
+    receipt = upstream_charge(usage, endpoint)
+    assert ((str(receipt.amount), receipt.currency) if receipt else None) == expected
+
+
+async def test_currency_mismatch_does_not_convert_or_admit_more_requests(store):
+    proxy, config = proxy_for(store, limit=1)
+    await proxy.ready()
+    call = await proxy.billing.admit("main", "fixture")
+    await proxy.billing.settle(call, None, charge=UpstreamCharge(Decimal("0.01"), "CNY"))
+    with pytest.raises(DomainError, match="MODEL_PROXY_CURRENCY_MISMATCH"):
+        await proxy.billing.admit("main", "fixture")
+    config["currency"] = "CNY"
+    await proxy.billing.admit("main", "fixture")
+
+
+async def test_nonstream_receipt_survives_missing_tokens_and_exact_decimal(store):
+    proxy, _ = proxy_for(store, limit=1)
+    model = provider(
+        proxy,
+        lambda request: httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=b'{"usage":{"cost":0.123456789012345678,"currency":"USD"}}',
+        ),
+    )
+    response = await model.client.post("http://127.0.0.1/v1/chat/completions")
+    assert response.json()["usage"]["currency"] == "USD"
+    usage = await proxy.billing.view()
+    assert usage["charges"] == [{"currency": "USD", "amount": "0.123456789012345678"}]
+    assert usage["unknown"] == 0 and usage["missingUsage"] == 1
+    await model.close()
+
+
+async def test_final_usage_without_cost_clears_provisional_receipt(store):
+    proxy, _ = proxy_for(store)
+    body = EVENTS.replace(
+        b"data: [DONE]",
+        b'data: {"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\ndata: [DONE]',
+    )
+    model = provider(
+        proxy,
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=body
+        ),
+    )
+    await consume(model)
+    usage = await proxy.billing.view()
+    assert usage["charges"] == [] and usage["unknown"] == 1
+    await model.close()
+
+
+async def test_zero_cost_and_connect_failures_allow_limited_retry_without_price_table(store):
+    proxy, _ = proxy_for(store, limit=1, prices=False)
+    attempt = 0
+
+    def handler(request):
+        nonlocal attempt
+        attempt += 1
+        if attempt == 1:
+            raise httpx.ConnectError("unreachable", request=request)
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=EVENTS.replace(b'"cost": 0.00208', b'"cost": 0'),
+        )
+
+    model = provider(proxy, handler)
+    model.max_retries, model.sleep = 1, lambda _: asyncio.sleep(0)
+    await consume(model)
+    await consume(model)
+    view = await proxy.billing.view()
+    assert view["requests"] == 3 and view["unknown"] == 0
+    assert view["charges"] == [{"currency": "USD", "amount": "0"}]
     await model.close()

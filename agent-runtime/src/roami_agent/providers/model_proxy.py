@@ -2,10 +2,12 @@
 
 import asyncio
 import json
+from decimal import Decimal
 
 import httpx
 
 from roami_agent.providers.model_billing import ModelBilling, proxy_configuration, usage_counts
+from roami_agent.providers.upstream_costs import upstream_charge
 
 
 class ModelProxy:
@@ -53,13 +55,13 @@ class ProxyTransport(httpx.AsyncBaseTransport):
                 held = True
             admission = asyncio.create_task(self.proxy.billing.admit(self.role, self.model))
             try:
-                call_id, prices = await asyncio.shield(admission)
+                call_id = await asyncio.shield(admission)
             except asyncio.CancelledError:
-                call_id, prices = await admission
+                call_id = await admission
                 raise
             sent = True
             response = await self.upstream.send(request, stream=True, follow_redirects=False)
-            stream = MeteredStream(response, self.proxy, call_id, prices, held)
+            stream = MeteredStream(response, self.proxy, call_id, request.url, held)
             held = False
             headers = response.headers.copy()
             # The inner client decodes compression before metering; do not decode twice.
@@ -76,9 +78,9 @@ class ProxyTransport(httpx.AsyncBaseTransport):
                 await finish(
                     self.proxy.billing.settle(
                         call_id,
-                        prices,
                         None,
-                        failed=not sent
+                        failed=True,
+                        not_sent=not sent
                         or isinstance(
                             error, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
                         ),
@@ -95,11 +97,12 @@ class ProxyTransport(httpx.AsyncBaseTransport):
 
 
 class MeteredStream(httpx.AsyncByteStream):
-    def __init__(self, response, proxy, call_id, prices, held):
-        self.response, self.proxy, self.call_id, self.prices = response, proxy, call_id, prices
+    def __init__(self, response, proxy, call_id, endpoint, held):
+        self.response, self.proxy, self.call_id, self.endpoint = response, proxy, call_id, endpoint
         self.held, self.closed = held, False
         self.buffer = bytearray()
         self.counts = None
+        self.charge = None
         self.invalid = False
         self.complete = False
         self.sse = "text/event-stream" in response.headers.get("content-type", "")
@@ -113,16 +116,13 @@ class MeteredStream(httpx.AsyncByteStream):
             self.invalid = True
             return
         try:
-            value = json.loads(raw)
+            value = json.loads(raw, parse_float=Decimal)
         except (ValueError, UnicodeError):
             self.invalid = True
             return
         if isinstance(value, dict) and value.get("usage") is not None:
-            counts = usage_counts(value["usage"])
-            if counts is None:
-                self.invalid = True
-            else:
-                self.counts = counts
+            self.counts = usage_counts(value["usage"])
+            self.charge = upstream_charge(value["usage"], self.endpoint)
 
     async def __aiter__(self):
         try:
@@ -159,8 +159,8 @@ class MeteredStream(httpx.AsyncByteStream):
                 await finish(
                     self.proxy.billing.settle(
                         self.call_id,
-                        self.prices,
                         None if self.invalid or not self.complete else self.counts,
+                        charge=self.charge if self.complete and not self.invalid else None,
                         failed=not self.success,
                         error=None
                         if self.success

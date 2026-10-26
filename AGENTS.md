@@ -246,6 +246,22 @@ authority, it just no longer moves the layout under the user a beat after load.
   <p>代理新增 25 项回归通过，覆盖缓存不重复计费、压缩与分片 SSE、重试逐笔入账、主／后台限额串行准入、跨日重置、未知费用阻断、磁盘重新打开、取消和所有者隔离。全量 Python 1,367 项与 Go 测试通过，前端 996 项测试通过，新增交互覆盖限额／价格原子保存、失败保留输入、未填齐价格和显式免费。新增账表使用 schema 13，Go 备份恢复同步接受该版本并继续拒绝更新的版本。</p>
   <p>独立 HTTPS 服务与本地 HTTP 测试上游完成主／后台真实传输、记账和限额拦截：1,200 输入、80 输出、400 缓存命中在测试单价 2／8／0.2 下费用为 ¥0.00232，拒绝后上游请求数未增加。桌面完成保存、刷新恢复、320／390／820／1100／1280／1600／1920 宽度、中英和深浅主题检查，无文档溢出。证据入口 /tmp/local-model-proxy-20261026/index.html；未使用真实付费模型，未部署现用服务。Redmi Note 8 当前为安全锁屏，真机触控和软键盘验收待解锁，不能据桌面缩窄宣称手机验收通过。</p>
   <p>full 质量门禁通过。实际 Go CLI 备份后恢复到另一个隔离目录，3 笔调用的身份、日期、角色、模型、状态、单价快照、Token 和费用逐项一致，合计 10,160,000 纳元；恢复库 schema 为 13，证据为 backup-checks.json。测试服务与插件守护进程通过记录过身份的隔离启动器清理，未清理现用 tmux 服务器。</p>
+  <h3>上游费用回执修订 · 2026-10-26</h3>
+  <h4>产品设计与用户故事</h4>
+  <p>费用使用上游已有回执，不再维护模型单价。用户可直接看到已知金额、币种和未知费用；今日、周期、每日与分模型费用按币种分别展示，不换汇。旧账保留为“历史估算”，不混入上游费用。每日限额选择币种；未知费用、未结算、历史估算或不同币种使后续限额请求暂停，最后一笔仍可能超额。</p>
+  <h4>技术设计</h4>
+  <p>providers/upstream_costs.py 读取 usage.cost 与现有 usage.currency；精确主机 openrouter.ai 依据官方约定使用 USD credits，不读取 cost_details.upstream_inference_cost。其他网关缺币种时不猜测。只接受有限非负数值，金额最多 18 位小数；流式回执须完整结束，后续 usage 缺金额会清除早先临时费用。金额与 Token 独立验证，缺 Token 不覆盖有效费用。金额有值但币种不明时不计入已知费用，已证实未发送的失败不会阻断后续限额请求。金额原样转十进制字符串入库，Decimal 精确累加，无浮点计费。</p>
+  <p>schema 14 增加 cost_amount／cost_currency／cost_source，保留旧 cost_nano 和 prices_json 供历史审计。旧价格配置可读取但不再用于计算；旧限额保持 CNY，新配置默认 USD。Go 恢复同步接受 schema 14。model_usage.py 为总计、每日和模型返回分币种 charges 及独立 estimatedCharges，模型按请求数排序，避免跨币种费用排名。费用字符串在前端精确格式化，图表仅在选定币种内比较。上游依据为 https://openrouter.ai/docs/cookbook/administration/usage-accounting；当前 llm-gateway 未返回逐请求费用时仍显示未知，不改造其上游协议。</p>
+  <h4>验收记录</h4>
+  <p>Go 全量与 Python 1,402 项、前端 1,007 项测试通过；定向 58 项后端回归覆盖上游金额与币种、精确十进制、多币种分组、显式零费用、缺回执、流中断、限额并发、取消、恢复和 schema 13 历史迁移。生产包在隔离 HTTPS 服务验证 USD 0.125 直接入账、达到限额后上游请求数不变、币种限额保存、未知费用与历史估算分开展示，并完成 320–1920 七档宽度、中英文与深浅主题的实际命中及溢出检查。证据位于 /tmp/upstream-model-billing-20261026/index.html。Redmi Note 8 仍处于安全锁屏，真机触控与软键盘验收未完成；未调用真实付费模型、未部署现用服务。</p>
+  <h4>日内分时修订</h4>
+  <p>用户选择“按天分时”与日期，查看该日 24 个本地钟点的请求数、Token 和分币种费用趋势、可展开分时明细，以及同日总计和分模型统计。日期由节点的今日日期初始化，可查询历史日期；统计选择不会改写限额草稿。请求按账本保存的归属日、发起时间和时区归集；跨小时或跨日请求归入开始时段，夏令时重复钟点合并，不丢失费用。</p>
+  <p>GET /agent/model-usage?day=YYYY-MM-DD 返回选定日期的单日 statistics 与 24 档 hourly，顶部今日摘要仍为当前日。非法、非标准或未来日期拒绝；所有者校验不变。money_records 与 hourly_statistics 复用同一费用累加，未知与历史估算不混入实际金额。原生日期输入复用 antd Input 和项目令牌；更改日期会取消旧查询，防止晚到结果覆盖新选择，不增加轮询。</p>
+  <p>分时定向后端 66 项与前端全量 1,009 项通过。隔离生产包完成日期切换、24 时段、分时表格、分币种趋势、历史空日、跨 Tab 与日期保留限额草稿、七档宽度中英深浅主题及命中检查；报告 hourly-checks.json，截图 hourly-desktop.png／hourly-details.png／hourly-narrow-dark.png／hourly-narrow-light.png。真实手机仍为安全锁屏，未宣称真机验收通过。</p>
+  <h4>模型构成堆叠修订</h4>
+  <p>产品与用户故事：用户能看每天或每小时的合计，以及各模型占了多少。柱高代表总量，色块代表模型，图例同时显示模型名；展开时段明细可核对各模型数字，并从日期明细进入当天全部模型。Token、请求与指定币种费用共用同一构成视图，未知费用及历史估算仍单独标明。</p>
+  <p>技术设计：statistics 增加 seriesModels／seriesTruncated，daily 和 hourly 的 models 携带分模型聚合；图表保留周期请求最多的四个模型，其余以 model=null 合为“其他”，不丢失 200 模型目录之外的调用。日模型分组在 SQLite 聚合，费用复用 Decimal 扫描，每小时模型分组复用原日内扫描；最多五组乘 90 天，不额外轮询。全部模型的单日目录沿用现有 day 查询。前端复用已有 --danger、--ok-solid、--accent-solid、--warn、--text-dim，分别别名为 --usage-series-0..3／other；这些色块标识模型而非状态，名称图例和可展开数值同时提供含义。页面保留相同模型的颜色偏好，周期请求排名改变时不直接重排已有颜色。</p>
+  <p>验收：定向后端 68 项、前端全量 1,011 项通过；新增回归逐项核对日／小时模型切片与合计的请求、Token、未知、历史估算及分币种金额，并验证 205 模型归并不丢数、分段比例、颜色在排名变动后保留、每日明细展开和进入完整单日模型。隔离生产包完成红绿等颜色图例、堆叠高度合计、每日与分时切换、指定币种图、明细及七档宽度／中英／深浅主题检查，报告 stacked-checks.json，截图 stacked-daily.png／stacked-hourly.png／stacked-daily-details.png／stacked-narrow-dark.png／stacked-narrow-light.png。真实 Android 仍为安全锁屏，真机验收待完成；未部署现用服务。</p>
 </section>
 
 ## Refresh Budgets
@@ -559,6 +575,21 @@ agent-runtime/src/roami_agent/tools/
   <h3>Technical Design 与验证</h3>
   <p>压缩并补齐 foundations 的 bash 和底层 shell 说明，保留工作区、授权主机操作、非沙箱、写入、取消、回执及托管资源边界；不修改 process.execute 的清理或权限行为。工具输入文本变化单列 container-uds-v7-process-lifetime，不能与 v6 混算同合同收益。</p>
   <p>40 项工具、上下文边界和评测通道回归通过。零模型独立对照确认临时 HTTP 服务在当前调用内可访问，进程组清理后后续调用无法复用；服务器与客户端同一调用、按子 PID 收尾的路径成功，未作用于其他进程。对照只证明工具合同，不改写正在运行的 v6 真实案例或声称预算失败已全部解决。</p>
+</section>
+
+<section id="codex-completion-reconciliation-20261026" lang="zh-CN">
+  <h2>Codex 完成回报与观察恢复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>Codex 真实完成后回报主会话，交付物与未完成的验收一起呈现；不能长期停在“待对账”或把执行器自述直接变成用户验收通过。已有工作的结果未知时先对账，不重新派发。</p>
+  <h3>User Stories</h3>
+  <p>用户从主会话取得 Codex 的最终总结与 PR 链接。观察恢复时，状态自动更新；再次失去观察时仍明确提示。真正未结束的工具或后台写进程继续阻止完成确认。</p>
+  <h3>Technical Design</h3>
+  <p>session-code-mode.go 仅识别原始已绑定 Codex 进程的直接子进程：可执行文件必须与同安装目录的 codex-code-mode-host 为同一文件，父子 PID 启动标识与原绑定一致。它可作为 TUI 的常驻辅助进程继续存在，其子进程仍按原规则阻止任务完成；同名程序、其他目录、其他提供方和 PID 复用不接受。</p>
+  <p>session-codex-completion.go 在已有状态查询中恢复丢失的完成回报，不增加轮询或重发输入。只读取已绑定 UUID 的唯一、本机所有者持有、不可全局写入且无软链接的 Codex 会话文件；上限 64 MiB，活动记录先检查至多 256 KiB 的末尾。完整对账核对会话、目录、最后回合、原始请求 hash、所有工具调用的结果、final_answer 与 task_complete，以及读取前后文件身份和时间。终止、其他输入、未完成调用或不一致记录保持未知；原始转录不修改。</p>
+  <p>确认后以已有私有原子写入记录 completion-source.json 和 result.json，仍执行进程停止与取消检查，再交给 Python 原有 report、verify 和 Main completion 流程。该转录回退按当前 Codex 0.164.0 的实际记录验证，不宣称跨版本私有格式稳定。正常回调仍沿用 <a href="https://learn.chatgpt.com/docs/hooks">OpenAI Hooks</a> 的回合与工具身份字段。</p>
+  <p>CodingExecutor 对 unknown／running 的真实状态转移各发一次活动事件，恢复后再次未知仍有事件，不修改任务的验收结论。前端既有 task.* 投影直接接收，无新增界面、产品文案或请求。</p>
+  <h3>验证记录</h3>
+  <p>隔离进程测试覆盖可信辅助进程、同名冒充、其他提供方、PID 标识变化和真实工作子进程；转录对照覆盖不同会话／回合／请求、缺失工具结果、其他用户输入、非最终回复、终止、重复文件、软链接、可全局写入、截断及证据冲突，保留原未知和取消保护。真实会话先进行零模型只读校验，再通过限定执行键的正常查询恢复回执，未重跑 Codex。原任务已进入 waiting_user，主会话补发最终总结，原 PR 保持草稿，未将未完成的真机验收记为通过。</p>
 </section>
 
 <section id="composer-usage-indicator-20261026" lang="zh-CN">
@@ -1529,4 +1560,30 @@ Research → 原浏览器导航／观察协议</pre>
   <p>NativeFilesExecutor 对 Main、Worker、Memory 设置 min(Case 秒数, 显式 route.timeout_seconds 或 Case 秒数)，移除隐含 60 秒回退；原外层整个执行、任务及容器期限保持。模型合同 hash 纳入提供方超时，评测协议单列 container-uds-v10-explicit-request-deadline；不把新期限下的成绩拼入旧 v6/v9。</p>
   <h3>验证与边界</h3>
   <p>定向 26 项通过，覆盖未配置、显式短期限、长期限被 Case 截断、Main/Worker 不同设置、Memory 继承及期限进入合同 hash。本次 v9 Sol Worker 候选因隐含请求期限失败，实际 42,904 Token / 8 请求全部已知并结算，未改现用配置；候选与延迟代理对照的最终结果另附 PR。先前完整 60 项与质量评分、连续观察状态保持。</p>
+</section>
+
+<section id="first-load-performance-20261026" lang="zh-CN">
+  <h2>首屏加载预算 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>保留现有页面、导航、消息徽标和加载反馈。非首页不预取主对话历史、任务及聊天页面模块；文件、会话和设置页面使用已有路由懒加载与失败重试。主对话可见时继续提前读取历史，历史分支由当前视图按需读取。</p>
+  <h3>User Stories</h3>
+  <p>用户打开项目或工具时，无需为尚未查看的聊天记录付出下载和缓存成本；进入首页仍可读取完整历史，切换设置、文件和会话页面保持原有入口与操作。</p>
+  <h3>Technical Design</h3>
+  <p>app/AppShell.tsx 根据路由控制 useAgentInbox 的 preloadMain；useAgentInbox.ts 保留主会话和通知请求及节点缓存隔离，移除页面模块的无条件预取。app/AppRoutes.tsx 将 FilesPage、Sessions、SettingsPage 接入 lazyRetry 与现有 Suspense；Projects 已因新建项目弹窗静态引用而进入首屏包，直接渲染以移除无效的异步边界。agent-data-cache.test.tsx 验证非首页徽标独立可用、打开主对话后才预取、慢通知不阻塞主对话。认证与节点引导顺序不变，不修改接口、刷新周期或历史分页语义。</p>
+  <h3>验收记录</h3>
+  <p>基线 f3622829。生产构建静态依赖闭包从 3,257,797 降至 3,010,849 字节（减少 7.6%），gzip 从 945,913 降至 883,881 字节（减少 6.6%）。受控生产包项目页验证少发两条聊天数据请求，500 条示例历史时避免约 1.09 MB 无关响应；响应大小随真实历史变化。现有 loading 为 Spin，动态页只有一个边界；活动页项目占位固定四行，未发现大体积骨架证据，保持现状。</p>
+  <p>full 门禁与前端 1,006 项测试通过；Python 无相关改动，按范围规则跳过。请求明细、生产包对比、浏览器结果与限制保存在任务工作区 tmp/first-load-evidence。计时属于受控示例，不代表线上耗时、CPU 或内存降幅。Redmi 真机仍为安全锁屏，手机触控、软键盘及原生 WebView 冷启动验收未完成；项目、蜂群与注解的跨消费者重复读取留待后续独立优化。</p>
+</section>
+
+<section id="rsi-input-roundtrip-request-identity-20261026" lang="zh-CN">
+  <h2>RSI 输入往返精度与请求身份 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>表格保存验证区分分数数值的序列化尾差与真实改值。两个有限非整数值仅允许 2e-15 相对误差，不设绝对容差；整数、零值、文本、布尔与缺失仍精确比较。比较策略写进评分结果和新版公开合同，adapter 标为 spreadsheet-values-v2-fractional-roundtrip，不是官方排行榜分数。</p>
+  <p>CSV 题公开说明原判定器已有的新操作与重试语义：重新选文件发起新导入，内容相同也使用新键；同次请求遇503后直接重试才保留原键。服务、断言和额度不变。只有该题 recipe 升为 authored-v8-csv-request-identity；语料使用新的 v8 ID 与文件，旧冻结语料不覆盖。</p>
+  <h3>User Stories</h3>
+  <p>用户只取消合并并保存表格时，不因浮点表示尾差被记为改动其他数据，真实数值变化仍失败。Agent 从题面知道新导入与重试的界线，维护者能区分合同修订与旧题复验。</p>
+  <h3>Technical Design</h3>
+  <p>spreadsheet.same_cell_value 仅供该适配器的目标值及输入保存校验，不改全局 same_json 或量化误差。非整数相对界限是对<a href="https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/floating-point-arithmetic-inaccurate-result">Microsoft 浮点与 15 位精度说明</a>的保守工程处理，整数及跨类型值不走近似。authored_fixtures 补公开请求身份说明，corpus 版本与缓存地址升级。评测协议单列 container-uds-v12-input-roundtrip-and-request-identity，不重写旧 v6 记录、题面、产物或成绩。</p>
+  <h3>验证证据</h3>
+  <p>67 项表格和语料／量化回归通过。原 spreadsheetbench:38703 的21处差异均是分数数值尾差，最大5.56e-16；新比较策略下重放通过，主动修改一个数值的反例仍失败，原 trial 和产物 SHA 不变。这是验证器重放，不是新增 Agent 通过或同合同性能收益。整数长编号、布尔、文本、零附近差异、非有限值和较大数值变化仍拒绝。缓存回归证明旧 v7 文件保留，新 v8 文件独立登记。CSV 新版仍需真实隔离执行，人工评分与后续完整日观察未完成，父 issue 保持开放。</p>
 </section>

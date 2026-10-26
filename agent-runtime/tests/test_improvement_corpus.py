@@ -262,6 +262,24 @@ def test_public_preconditions_are_presented_without_exposing_oracle():
     assert "expected" not in case["prompt"]
 
 
+def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path):
+    from roami_agent.improvement.corpus import prepare_corpus
+    from roami_agent.improvement.status import ImprovementStatus
+
+    service = ImprovementStatus(tmp_path)
+    root = service.ledger.path.parent / "corpus"
+    root.mkdir(mode=0o700, parents=True)
+    previous = root / "authored-40-v7.json"
+    previous.write_bytes(b"original frozen suite evidence")
+    prepare_corpus(service, "owner")
+    assert previous.read_bytes() == b"original frozen suite evidence"
+    revised = json.loads((root / "authored-40-v8.json").read_text())
+    assert len(revised["cases"]) == 40
+    identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
+    assert identities["DEMO-02"] == "authored-v8-csv-request-identity"
+    assert all(v == "authored-v7" for k, v in identities.items() if k != "DEMO-02")
+
+
 def test_public_contract_exposes_types_and_cost_rules_without_oracle_values():
     cases = {c["id"]: c for c in authored_suite("visible-contract")["cases"]}
     assert "source_receipt" in cases["DOC-05"]["prompt"]

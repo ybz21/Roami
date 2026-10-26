@@ -1,16 +1,20 @@
-"""Node-local CNY accounting; unknown provider charges remain unknown."""
+"""Provider-reported charges and node-local daily admission; estimates are historical only."""
 
-import json
-from datetime import datetime
-from decimal import ROUND_CEILING, Decimal
+import re
+from datetime import date, datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
-from roami_agent.providers.model_usage import usage_statistics
-
-NANO = 1_000_000_000
-PRICE_FIELDS = {"input", "output", "cacheRead"}
+from roami_agent.providers.model_usage import (
+    USAGE_COLUMNS,
+    money_records,
+    row_charges,
+    usage_statistics,
+    usage_totals,
+)
+from roami_agent.providers.upstream_costs import add_amounts
 
 
 def amount(value):
@@ -24,28 +28,19 @@ def amount(value):
 
 def proxy_configuration(raw=None):
     if raw is None:
-        return {"dailyLimit": None, "prices": {}}
-    if not isinstance(raw, dict) or set(raw) - {"dailyLimit", "prices"}:
+        return {"dailyLimit": None, "currency": "USD"}
+    if not isinstance(raw, dict) or set(raw) - {"dailyLimit", "currency", "prices"}:
+        raise DomainError("INVALID_MODEL_PROXY_CONFIG")
+    # Legacy price tables are ignored; retained files must not restart local estimation.
+    if "prices" in raw and (not isinstance(raw["prices"], dict) or len(raw["prices"]) > 32):
         raise DomainError("INVALID_MODEL_PROXY_CONFIG")
     limit = raw.get("dailyLimit")
     if limit is not None and amount(limit) <= 0:
         raise DomainError("INVALID_MODEL_PROXY_CONFIG")
-    prices = raw.get("prices", {})
-    if not isinstance(prices, dict) or len(prices) > 32:
+    currency = raw.get("currency", "CNY")
+    if not isinstance(currency, str) or re.fullmatch(r"[A-Z]{3}", currency) is None:
         raise DomainError("INVALID_MODEL_PROXY_CONFIG")
-    for model, rate in prices.items():
-        if (
-            not isinstance(model, str)
-            or not model.strip()
-            or len(model) > 200
-            or any(ord(char) < 32 for char in model)
-            or not isinstance(rate, dict)
-            or set(rate) != PRICE_FIELDS
-        ):
-            raise DomainError("INVALID_MODEL_PROXY_CONFIG")
-        for value in rate.values():
-            amount(value)
-    return {"dailyLimit": limit, "prices": prices}
+    return {"dailyLimit": limit, "currency": currency}
 
 
 def usage_counts(raw):
@@ -62,17 +57,6 @@ def usage_counts(raw):
     if any(type(value) is not int or not 0 <= value <= 100_000_000 for value in counts):
         return None
     return counts if counts[2] <= counts[0] else None
-
-
-def cost_nano(prices, counts):
-    prompt, output, cached = counts
-    # OpenAI includes cache hits in prompt_tokens; charge each input token once.
-    total = (
-        Decimal(prompt - cached) * amount(prices["input"])
-        + Decimal(output) * amount(prices["output"])
-        + Decimal(cached) * amount(prices["cacheRead"])
-    ) * 1000
-    return int(total.to_integral_value(rounding=ROUND_CEILING))
 
 
 class ModelBilling:
@@ -100,49 +84,49 @@ class ModelBilling:
     async def admit(self, role, model):
         config = proxy_configuration(self.configuration())
         day, zone = self.period()
-        configured = config["prices"].get(model)
-        prices = dict(configured) if configured is not None else None
         call_id, started = identity(), self.clock()
 
         def insert(db):
             if config["dailyLimit"] is not None:
-                if prices is None:
-                    raise DomainError("MODEL_PROXY_PRICE_REQUIRED", 409)
-                current = db.execute(
-                    "SELECT COALESCE(SUM(cost_nano),0),SUM(state IN ('pending','unknown')) FROM model_proxy_calls WHERE day=?",
+                spent = Decimal(0)
+                for row in db.execute(
+                    "SELECT state,cost_source,cost_amount,cost_currency FROM model_proxy_calls WHERE day=?",
                     (day,),
-                ).fetchone()
-                if current[1]:
-                    raise DomainError("MODEL_PROXY_USAGE_UNKNOWN", 409)
-                if current[0] >= amount(config["dailyLimit"]) * NANO:
+                ):
+                    if row["state"] == "pending" or row["cost_source"] not in {
+                        "upstream",
+                        "not_sent",
+                    }:
+                        raise DomainError("MODEL_PROXY_USAGE_UNKNOWN", 409)
+                    if row["cost_source"] == "upstream":
+                        if row["cost_currency"] != config["currency"]:
+                            raise DomainError("MODEL_PROXY_CURRENCY_MISMATCH", 409)
+                        spent = add_amounts(spent, Decimal(row["cost_amount"]))
+                if spent >= amount(config["dailyLimit"]):
                     raise DomainError("MODEL_PROXY_DAILY_LIMIT", 409)
             db.execute(
-                "INSERT INTO model_proxy_calls(id,day,timezone,role,model,started_ms,state,prices_json) VALUES(?,?,?,?,?,?,'pending',?)",
-                (
-                    call_id,
-                    day,
-                    zone,
-                    role,
-                    model,
-                    started,
-                    json.dumps(prices) if prices is not None else None,
-                ),
+                "INSERT INTO model_proxy_calls(id,day,timezone,role,model,started_ms,state) VALUES(?,?,?,?,?,?,'pending')",
+                (call_id, day, zone, role, model, started),
             )
 
         await self.db.call(insert, write=True)
-        return call_id, prices
+        return call_id
 
-    async def settle(self, call_id, prices, counts, *, failed=False, error=None):
-        cost = cost_nano(prices, counts) if prices is not None and counts is not None else None
-        state = "failed" if failed else "known" if cost is not None else "unknown"
+    async def settle(
+        self, call_id, counts, *, charge=None, failed=False, not_sent=False, error=None
+    ):
+        source = "upstream" if charge is not None else "not_sent" if not_sent else "unknown"
+        state = "failed" if failed else "known" if charge is not None else "unknown"
         await self.db.call(
             lambda db: db.execute(
-                "UPDATE model_proxy_calls SET state=?,finished_ms=?,input_tokens=?,output_tokens=?,cache_read_tokens=?,cost_nano=?,error_code=? WHERE id=? AND state='pending'",
+                "UPDATE model_proxy_calls SET state=?,finished_ms=?,input_tokens=?,output_tokens=?,cache_read_tokens=?,cost_amount=?,cost_currency=?,cost_source=?,error_code=? WHERE id=? AND state='pending'",
                 (
                     state,
                     self.clock(),
                     *(counts or (None, None, None)),
-                    0 if failed else cost,
+                    format(charge.amount, "f") if charge is not None else None,
+                    charge.currency if charge is not None else None,
+                    source,
                     error,
                     call_id,
                 ),
@@ -150,37 +134,33 @@ class ModelBilling:
             write=True,
         )
 
-    async def view(self, *, days=7):
-        day, zone = self.period()
+    async def view(self, *, days=7, day=None):
+        today, zone = self.period()
+        selected = day or today
+        if day is not None:
+            try:
+                if date.fromisoformat(day).isoformat() != day or day > today:
+                    raise ValueError
+            except (TypeError, ValueError) as error:
+                raise DomainError("INVALID_MODEL_USAGE_DAY") from error
+            days = 1
 
         def read(db):
             total = db.execute(
-                "SELECT COUNT(*) AS requests,COALESCE(SUM(cost_nano),0) AS cost,SUM(state='unknown') AS unknown,SUM(state='pending') AS pending,COALESCE(SUM(input_tokens),0) AS input,COALESCE(SUM(output_tokens),0) AS output,COALESCE(SUM(cache_read_tokens),0) AS cache FROM model_proxy_calls WHERE day=?",
-                (day,),
+                f"SELECT {USAGE_COLUMNS} FROM model_proxy_calls WHERE day=?", (today,)
             ).fetchone()
+            costs = money_records(db, "day=?", [today])
             recent = db.execute(
-                "SELECT id,role,model,started_ms,state,input_tokens,output_tokens,cache_read_tokens,cost_nano,error_code FROM model_proxy_calls WHERE day=? ORDER BY started_ms DESC,id DESC LIMIT 20",
-                (day,),
+                "SELECT id,role,model,started_ms,state,input_tokens,output_tokens,cache_read_tokens,cost_nano,cost_amount,cost_currency,cost_source,error_code FROM model_proxy_calls WHERE day=? ORDER BY started_ms DESC,id DESC LIMIT 20",
+                (today,),
             ).fetchall()
             return {
-                "day": day,
+                "day": today,
                 "timezone": zone,
-                "currency": "CNY",
-                "statistics": usage_statistics(db, day, days),
-                "requests": total["requests"],
-                "knownCost": total["cost"] / NANO,
-                "unknown": total["unknown"] or 0,
-                "pending": total["pending"] or 0,
-                "inputTokens": total["input"],
-                "outputTokens": total["output"],
-                "cacheReadTokens": total["cache"],
-                "recent": [
-                    {
-                        **dict(row),
-                        "cost": row["cost_nano"] / NANO if row["cost_nano"] is not None else None,
-                    }
-                    for row in recent
-                ],
+                **usage_totals(total),
+                **costs["total"],
+                "statistics": usage_statistics(db, selected, days),
+                "recent": [{**dict(row), **row_charges(row)} for row in recent],
             }
 
         return await self.db.call(read)

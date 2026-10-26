@@ -60,7 +60,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const [prefs] = usePreferences()
   const { phone: isMobile, desktop: hasSider } = useLayout()
   const curNodeId = useCurrentNodeId()
-  const agentInbox = useAgentInbox(true, curNodeId)
+  const agentInbox = useAgentInbox(true, curNodeId, tab === 'home' && !routing.agentPage && !routing.agentBranch)
   const data = useSessionDirectory()
   const workspace = useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: hasSider, mobile: isMobile, page: tab, navigate: go })
   const { terms, active, curFile, activeTask, space, taskView, overlay, noTabs, returnToTask, openFileTab } = workspace

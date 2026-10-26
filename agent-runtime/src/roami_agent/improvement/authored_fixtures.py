@@ -214,7 +214,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             files["server.py"] = CSV_SERVER
             protected.append("server.py")
             schema = {
-                "contract": "服务由grader以PORT启动server.py，禁止修改。UI data-testid: csv-input文件、import按钮、error错误、rows结果列表。先本地检查name/amount列；POST /import JSON {rows:[{name,amount}]}携带Idempotency-Key，503后保留文件与同一幂等键；GET /stats提供真实统计。"
+                "contract": "服务由grader以PORT启动server.py，禁止修改。UI data-testid: csv-input文件、import按钮、error错误、rows结果列表。先本地检查name/amount列；POST /import JSON {rows:[{name,amount}]}携带Idempotency-Key。重新选择文件开始一次新导入，即使文件内容与已成功导入的内容相同也用新键；同一次导入遇503后保留文件、内容与原键，直接点击重试沿用原键，不重复写入。不按文件内容永久去重。GET /stats提供真实统计。"
             }
         judge.update(rubric=True)
     elif case_id.startswith("NEWS-"):

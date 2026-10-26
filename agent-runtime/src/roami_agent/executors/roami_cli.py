@@ -214,6 +214,7 @@ class CodingExecutor:
                         run["task_revision"],
                     ),
                 )
+            was_preparing = False
             if state == "running" and receipt.get("session"):
                 was_preparing = row(
                     db,
@@ -236,16 +237,27 @@ class CodingExecutor:
                 "UPDATE task_attempts SET session_id=COALESCE(?,session_id),state=? WHERE id=?",
                 (receipt.get("session"), state or current["state"], run["id"]),
             )
-            if state == "unknown" and not row(
-                db, "SELECT id FROM events WHERE event_key=?", ("observation-unknown:" + run["id"],)
-            ):
+            recovered = (
+                state == "running"
+                and current["state"] == "unknown"
+                and bool(receipt.get("session") or current["session_id"])
+                and not was_preparing
+            )
+            uncertain = state == "unknown" and current["state"] != "unknown"
+            if recovered or uncertain:
+                updated = db.execute(
+                    "UPDATE tasks SET updated_ms=? WHERE id=? AND revision=? "
+                    "AND state IN ('preparing','running','cancelling')",
+                    (now_ms(), task["id"], run["task_revision"]),
+                )
+                if updated.rowcount != 1:
+                    return
                 event(
                     db,
                     task["origin_conversation_id"],
-                    "task.observation_unknown",
+                    "task.observation_recovered" if recovered else "task.observation_unknown",
                     {"taskId": task["id"], "runId": run["id"]},
                     task_id=task["id"],
-                    key="observation-unknown:" + run["id"],
                 )
 
         await self.db.call(write, write=True)

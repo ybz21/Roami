@@ -118,7 +118,7 @@ it('publishes the main conversation and preloads messages/tasks before slow noti
     if (path === '/agent/main-conversation') return { data: { id: 'main', active_branch_id: 'branch' } }
     return { data: [] }
   })
-  const hook = renderHook(() => useAgentInbox(true, 'one'))
+  const hook = renderHook(() => useAgentInbox(true, 'one', true))
   await waitFor(() => expect(hook.result.current.conversations[0]?.id).toBe('main'))
   await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/conversations/main/messages', undefined, expect.anything()))
   expect(api).toHaveBeenCalledWith('GET', '/agent/tasks?conversationId=main', undefined, expect.anything())
@@ -127,6 +127,22 @@ it('publishes the main conversation and preloads messages/tasks before slow noti
   await waitFor(() => expect(hook.result.current.unread).toBe(1))
   act(() => hook.result.current.refresh())
   await waitFor(() => expect(vi.mocked(api).mock.calls.filter(call => call[1].includes('/notifications'))).toHaveLength(2))
+  expect(vi.mocked(api).mock.calls.filter(call => call[1] === '/agent/main-conversation')).toHaveLength(1)
+})
+
+it('keeps badges available without loading history/tasks until main chat is opened', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/main-conversation') return { data: { id: 'main', active_branch_id: 'branch' } }
+    if (path.includes('/notifications')) return { data: { items: [{ id: 1 }], unread: 1 } }
+    return { data: [] }
+  })
+  const hook = renderHook(({ preload }) => useAgentInbox(true, 'one', preload), { initialProps: { preload: false } })
+  await waitFor(() => expect(hook.result.current.unread).toBe(1))
+  expect(hook.result.current.conversations[0]?.id).toBe('main')
+  expect(vi.mocked(api).mock.calls.map(call => call[1])).toEqual(['/agent/main-conversation', '/agent/notifications?includeRead=true'])
+  hook.rerender({ preload: true })
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/conversations/main/messages', undefined, expect.anything()))
+  expect(api).toHaveBeenCalledWith('GET', '/agent/tasks?conversationId=main', undefined, expect.anything())
   expect(vi.mocked(api).mock.calls.filter(call => call[1] === '/agent/main-conversation')).toHaveLength(1)
 })
 

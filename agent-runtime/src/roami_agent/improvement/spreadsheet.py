@@ -15,6 +15,20 @@ from roami_agent.protocol.errors import DomainError
 
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+FRACTIONAL_CELL_TOLERANCE = 2e-15
+
+
+def same_cell_value(actual, expected):
+    from roami_agent.improvement.grading import same_json
+
+    if type(actual) in {int, float} and type(expected) in {int, float}:
+        if not math.isfinite(actual) or not math.isfinite(expected):
+            return False
+        if float(actual).is_integer() or float(expected).is_integer():
+            return actual == expected
+        # XLSX time values can gain binary tail bits when an editor saves them again.
+        return math.isclose(actual, expected, rel_tol=FRACTIONAL_CELL_TOLERANCE, abs_tol=0)
+    return same_json(actual, expected)
 
 
 def workbook(data):
@@ -117,7 +131,7 @@ def import_spreadsheet(metadata, source, golden, *, revision, upstream_revision)
         + sheet
         + "!"
         + record["answer_position"]
-        + "; write computed values or formulas with correct cached values. This is a single-workbook adaptation, not the official benchmark score.",
+        + "; write computed values or formulas with correct cached values. Fractional numeric cells allow relative rounding error up to 2e-15 with no absolute tolerance; integral numbers, text and booleans remain exact. This is a single-workbook adaptation, not the official benchmark score.",
         "counts_as_delivery": True,
         "files": {},
         "asset_files": {"input.xlsx": inputs},
@@ -130,7 +144,7 @@ def import_spreadsheet(metadata, source, golden, *, revision, upstream_revision)
             "upstream_revision": upstream_revision,
             "source_split": "verified_400",
             "input_sha256": digest({"record": record, "input": inputs}),
-            "adapter_revision": "spreadsheet-values-v1",
+            "adapter_revision": "spreadsheet-values-v2-fractional-roundtrip",
             "adapted": True,
             "adaptation": "One workbook; saved target values, preserved input cells and unmerged cells; no formula recalculation or official OJ comparability.",
         },
@@ -144,7 +158,6 @@ def grade_workbook(case, workspace):
     checks = {}
     try:
         from roami_agent.improvement.contracts import relative_file
-        from roami_agent.improvement.grading import same_json
 
         spec = case["judge"]
         path = relative_file(workspace, spec["path"])
@@ -153,10 +166,11 @@ def grade_workbook(case, workspace):
         initial = workbook(base64.b64decode(case["asset_files"]["input.xlsx"]))
         checks["sheets_preserved"] = actual.keys() == initial.keys()
         checks["target_values"] = all(
-            same_json(actual[spec["sheet"]]["cells"].get(p), v) for p, v in spec["expected"].items()
+            same_cell_value(actual[spec["sheet"]]["cells"].get(p), v)
+            for p, v in spec["expected"].items()
         )
         checks["input_values_preserved"] = all(
-            same_json(actual.get(name, {}).get("cells", {}).get(p), v)
+            same_cell_value(actual.get(name, {}).get("cells", {}).get(p), v)
             for name, sheet in initial.items()
             for p, v in sheet["cells"].items()
             if name != spec["sheet"] or p not in spec["expected"]
@@ -178,5 +192,10 @@ def grade_workbook(case, workspace):
         **quality(dict.fromkeys(DIMENSIONS, 3 if passed else 0), hard_passed=passed),
         "checks": checks,
         "grade_scope": "adapted_workbook_values",
+        "numeric_comparison": {
+            "fractional_relative_tolerance": FRACTIONAL_CELL_TOLERANCE,
+            "absolute_tolerance": 0,
+            "integral_values_exact": True,
+        },
         "official_leaderboard_comparable": False,
     }

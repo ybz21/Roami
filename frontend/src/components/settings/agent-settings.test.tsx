@@ -23,7 +23,7 @@ it('keeps one shared key and stages model selection before saving separate roles
   fireEvent.click(await screen.findByText('other'))
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { proxy: { dailyLimit: null, prices: {} }, connection: { baseUrl: role.baseUrl }, main: { model: 'other', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { proxy: { dailyLimit: null, currency: 'USD' }, connection: { baseUrl: role.baseUrl }, main: { model: 'other', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
 })
 it('supports a custom searched model and discards unsaved changes without writing', async () => {
   vi.mocked(api).mockImplementation(async method => ({ data: method === 'POST' ? { models: ['fast', 'strong'] } : settings }))
@@ -65,9 +65,9 @@ it('identifies an unavailable local runtime and retries the settings request', a
   await screen.findByLabelText('agent.models.baseUrl')
 })
 
-const usage = { day: '2026-10-26', timezone: 'Asia/Shanghai', requests: 2, knownCost: 1.25, unknown: 1, pending: 0, inputTokens: 1000, outputTokens: 50, cacheReadTokens: 400, recent: [{ id: 'call', role: 'main', model: 'fast', started_ms: 1792971000000, state: 'unknown', input_tokens: 1000, output_tokens: 50, cost: null }] }
-it('saves prices and a daily limit atomically, preserving input after a failed save', async () => {
-  const configured = { ...settings, proxy: { dailyLimit: null, prices: {} } }
+const usage = { day: '2026-10-26', timezone: 'Asia/Shanghai', requests: 2, charges: [{ currency: 'USD', amount: '1.25' }], estimatedCharges: [], unknown: 1, pending: 0, inputTokens: 1000, outputTokens: 50, cacheReadTokens: 400, recent: [{ id: 'call', role: 'main', model: 'fast', started_ms: 1792971000000, state: 'unknown', input_tokens: 1000, output_tokens: 50, charges: [], estimatedCharges: [], cost_source: 'unknown' }] }
+it('saves a currency and daily limit atomically, preserving input after a failed save', async () => {
+  const configured = { ...settings, proxy: { dailyLimit: null, currency: 'USD' } }
   vi.mocked(api).mockImplementation(async (method, path) => {
     if (path === '/agent/model-usage') return { data: usage }
     if (method === 'PUT') throw new Error('MODEL_CONFIGURATION_BUSY')
@@ -78,27 +78,26 @@ it('saves prices and a daily limit atomically, preserving input after a failed s
   fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' }))
   await screen.findByLabelText('agent.proxy.dailyLimit')
   fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '10' } })
-  const fields = screen.getAllByRole('spinbutton')
-  const rateFields = fields.filter(field => field.getAttribute('id')?.startsWith('agent-price-0-'))
-  rateFields.forEach((field, index) => fireEvent.change(field, { target: { value: ['2', '8', '0.2'][index] } }))
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.proxy.currency' }))
+  fireEvent.click(await screen.findByText('EUR', { selector: '.ant-select-item-option-content' }))
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   await screen.findByText('agent.models.busy')
   expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('10')
-  expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).toMatchObject({ proxy: { dailyLimit: 10, prices: { fast: { input: 2, output: 8, cacheRead: 0.2 } } } })
+  expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).toMatchObject({ proxy: { dailyLimit: 10, currency: 'EUR' } })
   expect(screen.getByText('agent.proxy.unknown')).toBeTruthy()
   expect(screen.getByText('agent.proxy.costUnknown')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
 })
-it('keeps partial prices unsaved and allows an explicit zero price', async () => {
+it('rejects invalid limits and has no local model price fields', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/agent/model-usage' ? usage : settings }))
   setup(); await screen.findByRole('tab', { name: 'agent.proxy.tab' }); fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' })); await screen.findByLabelText('agent.proxy.dailyLimit')
-  const fields = [...document.querySelectorAll<HTMLInputElement>('input[id^="agent-price-0-"]')]
-  fireEvent.change(fields[0], { target: { value: '0' } })
+  expect(document.querySelectorAll('input[id^="agent-price-"]')).toHaveLength(0)
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '0' } })
   expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
-  fields.slice(1).forEach(field => fireEvent.change(field, { target: { value: '0' } }))
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '0.1' } })
   expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
-  expect(fields[0].value).toBe('')
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('')
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
 })
 
