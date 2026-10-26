@@ -511,6 +511,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def model_settings(owner: Owner):
         return {"data": runtime.model_settings.view(owner)}
 
+    @app.get("/v1/model-usage")
+    async def model_usage(owner: Owner, days: int = Query(default=7, ge=0, le=90)):
+        ModelSettings.owner(owner)
+        await runtime.model_proxy.ready()
+        return {"data": await runtime.model_proxy.billing.view(days=days)}
+
     @app.put("/v1/model-settings")
     async def save_model_settings(request: Request, owner: Owner):
         body = bytearray()

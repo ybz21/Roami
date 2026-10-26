@@ -1,0 +1,86 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { App } from 'antd'
+import { afterEach, expect, it, vi } from 'vitest'
+import { AgentSettings } from './agent-settings'
+import { ModelUsageStatistics, type UsageStatistics, type UsageTotals } from './model-usage-statistics'
+import { api } from '../../api'
+vi.mock('../../api', () => ({ api: vi.fn() }))
+vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
+vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t, locale: 'en-US' }) } })
+afterEach(() => { cleanup(); vi.clearAllMocks() })
+const totals: UsageTotals = { requests: 3, knownCost: 0.006, totalTokens: 715, inputTokens: 650, outputTokens: 65, cacheReadTokens: 160, unknown: 1, pending: 0, failed: 1, unpriced: 1, missingUsage: 0 }
+const statistics: UsageStatistics = { days: 7, startDay: '2026-10-20', endDay: '2026-10-26', dailyStartDay: '2026-10-20', total: totals, daily: [{ ...totals, day: '2026-10-26' }], models: [{ ...totals, model: 'model-a' }], modelsTruncated: false }
+const role = { baseUrl: 'https://models.example/v1', model: 'model-a', keyConfigured: false, images: false }
+const configuration = { connection: { baseUrl: role.baseUrl, keyConfigured: false }, main: role, worker: role }
+const usage = { ...totals, day: '2026-10-26', timezone: 'Asia/Shanghai', recent: [], statistics }
+const openProxy = async () => { render(<App><AgentSettings /></App>); await screen.findByRole('tab', { name: 'agent.proxy.tab' }); fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' })) }
+const range = async (days: number) => { fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.range' })); fireEvent.click(await screen.findByText(`agent.usage.range.${days}`)) }
+
+it('shows aggregate and model usage with separate input, output and cache counts', () => {
+  render(<ModelUsageStatistics statistics={statistics} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  expect(within(screen.getByText('agent.usage.totalTokens').parentElement!).getByText('715')).toBeTruthy()
+  const model = screen.getByRole('article', { name: 'model-a' })
+  expect(within(model).getByText('650')).toBeTruthy()
+  expect(within(model).getByText('65')).toBeTruthy()
+  expect(within(model).getByText('160')).toBeTruthy()
+  expect(within(model).getByText(/agent.usage.unknown/)).toBeTruthy()
+  expect(within(model).getByText('agent.usage.partialCost')).toBeTruthy()
+  fireEvent.click(screen.getByText('agent.usage.dailyDetails'))
+  expect(screen.getByRole('table')).toBeTruthy()
+  expect(screen.getByText('agent.usage.accountingHint')).toBeTruthy()
+})
+
+it('switches periods without losing budget drafts and ignores an old period response', async () => {
+  const responses = new Map<string, (value: unknown) => void>()
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-settings') return { data: configuration }
+    if (path === '/agent/model-usage') return { data: usage }
+    return await new Promise(resolve => responses.set(path, resolve))
+  })
+  await openProxy()
+  await screen.findByRole('article', { name: 'model-a' })
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '23' } })
+  await range(30)
+  await waitFor(() => expect(responses.has('/agent/model-usage?days=30')).toBe(true))
+  await range(90)
+  await waitFor(() => expect(responses.has('/agent/model-usage?days=90')).toBe(true))
+  responses.get('/agent/model-usage?days=90')!({ data: { ...usage, statistics: { ...statistics, days: 90, models: [{ ...totals, model: 'current-90' }] } } })
+  await screen.findByRole('article', { name: 'current-90' })
+  responses.get('/agent/model-usage?days=30')!({ data: { ...usage, statistics: { ...statistics, days: 30, models: [{ ...totals, model: 'stale-30' }] } } })
+  await waitFor(() => expect(screen.queryByRole('article', { name: 'stale-30' })).toBeNull())
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('23')
+  expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
+})
+
+it('keeps existing totals and the draft after a statistics failure', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?days=')) throw new Error('HTTP 503')
+    return { data: path === '/agent/model-settings' ? configuration : usage }
+  })
+  await openProxy()
+  await screen.findByRole('article', { name: 'model-a' })
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '13' } })
+  await range(0)
+  await screen.findByText('agent.proxy.loadFailed')
+  expect(screen.getByRole('article', { name: 'model-a' })).toBeTruthy()
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('13')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
+})
+
+it('shows one empty-period message without an empty chart or model list', () => {
+  const empty = Object.fromEntries(Object.keys(totals).map(key => [key, 0])) as UsageTotals
+  render(<ModelUsageStatistics statistics={{ ...statistics, total: empty, models: [], daily: [] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  expect(screen.getByText('agent.usage.empty')).toBeTruthy()
+  expect(screen.queryByRole('img')).toBeNull()
+  expect(screen.queryByRole('article')).toBeNull()
+})
+
+it('shows unknown instead of zero cost when a model has no settled known charges', () => {
+  const unknown = { ...totals, requests: 1, knownCost: 0, unknown: 1, pending: 0, failed: 0, unpriced: 1 }
+  render(<ModelUsageStatistics statistics={{ ...statistics, models: [{ ...unknown, model: 'unpriced-model' }] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  const model = screen.getByRole('article', { name: 'unpriced-model' })
+  expect(within(model).getByText('agent.proxy.costUnknown')).toBeTruthy()
+  expect(within(model).queryByText(/CN¥0\.00/)).toBeNull()
+})

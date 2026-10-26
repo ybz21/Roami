@@ -1,3 +1,4 @@
+import { modelProxyFailureKey } from './agent-models'
 const reasons: Record<string, string> = {
   BROWSER_DRIVER_UNAVAILABLE: 'browser', BROWSER_DRIVER_PROTOCOL_INVALID: 'browser',
   WEB_RETRIEVAL_EVIDENCE_MISSING: 'retrieval',
@@ -14,6 +15,7 @@ const reasons: Record<string, string> = {
 }
 
 export function taskFailureKey(code: unknown): string | undefined {
+  if (modelProxyFailureKey(code)) return modelProxyFailureKey(code)
   if (typeof code !== 'string') return undefined
   const reason = reasons[code] || (code.includes('OUTCOME_UNKNOWN') || code.includes('RELEASE_UNKNOWN') ? 'unknown' : '')
   return reason ? 'agent.task.failure.' + reason : undefined

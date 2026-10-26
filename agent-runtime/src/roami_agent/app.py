@@ -48,6 +48,7 @@ from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_binding
 from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.providers.model_proxy import ModelProxy
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
@@ -98,6 +99,17 @@ class Runtime:
     ):
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
+        self.model_proxy = ModelProxy(
+            database,
+            lambda: self.model_settings.saved.get("proxy"),
+            lambda: self.settings.memory_timezone,
+        )
+        if isinstance(model, ChatCompletions):
+            self.model_proxy.attach(model, "main")
+        if isinstance(worker_model, ChatCompletions) and worker_model is not model:
+            self.model_proxy.attach(worker_model, "worker")
+        if isinstance(memory_model, ChatCompletions) and memory_model not in (model, worker_model):
+            self.model_proxy.attach(memory_model, "worker")
         self.reconfiguring = False
         self.memory_uses_worker = memory_model is None
         self.worker_model = worker_model or model
@@ -280,7 +292,12 @@ class Runtime:
             self.turn_tasks,
             self.loop.preempt,
         )
-        self.model_settings = ModelSettings(self, configured_provider)
+        self.model_settings = ModelSettings(
+            self,
+            lambda settings, role: self.model_proxy.attach(
+                configured_provider(settings, role), role
+            ),
+        )
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
         self.capability_markets = CapabilityMarkets(self)
@@ -543,11 +560,7 @@ async def serve(args):
         return
 
     provider = configured_provider(settings, "main")
-    worker = (
-        provider
-        if settings.route("main") == settings.route("worker")
-        else configured_provider(settings, "worker")
-    )
+    worker = configured_provider(settings, "worker")
     runtime = Runtime(
         database,
         provider,
