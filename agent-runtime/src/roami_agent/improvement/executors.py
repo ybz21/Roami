@@ -111,6 +111,7 @@ class NativeFilesExecutor:
                     "cache": r.cache,
                     "context_window": r.context_window,
                     "retries": r.max_retries,
+                    "timeout_seconds": r.timeout_seconds,
                 }
                 for r in routes
             ]
@@ -155,7 +156,10 @@ class NativeFilesExecutor:
                     route,
                     parameters=dict(route.parameters, max_tokens=output_cap),
                     max_retries=0,
-                    timeout_seconds=min(case["limits"]["seconds"], route.timeout_seconds or 60),
+                    timeout_seconds=min(
+                        case["limits"]["seconds"],
+                        route.timeout_seconds or case["limits"]["seconds"],
+                    ),
                 )
                 configured = settings_with_route(settings, actual_role, route)
                 provider = (

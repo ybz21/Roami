@@ -1518,3 +1518,15 @@ Research → 原浏览器导航／观察协议</pre>
   <h3>验收证据</h3>
   <p>真实子进程回归覆盖只生成 corrected.json 的合法程序、错误修正值、提交值与重跑值不一致、静态诊断保留、其他量化题仍须重生主结果，以及异常代码白名单与私有文本隔离；定向 40 项通过。冻结 v6 QUANT-03 产物的零模型重放已从文件缺失中断进入真实数值检查，但其 corrected 结果仍不合格，案例继续失败，原 trial SHA 不变。另行尝试的 v8 操作序列指令候选两项仍预算失败，已拒绝采纳，原 Worker 指令恢复；547,016 Token / 38 请求全部已知并结算。正式评分与连续观察仍未完成，父 issue 保持开放。</p>
 </section>
+
+<section id="rsi-explicit-request-deadline-20261026" lang="zh-CN">
+  <h2>RSI 模型请求期限修订 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>评测沿用显式提供方请求超时与 Case 总期限；未设置请求超时不能暗中变成 60 秒。容器网关保持同一取消、用量结算与未知保护，长请求不得绕过原题期限或 Token 上限。</p>
+  <h3>User Stories</h3>
+  <p>请求在题目期限内持续生成时不会被未配置的短超时截断；用户设置的 30 秒等短期限继续生效。已经失败的尝试保留，先核对宿主真实用量再决定独立候选复验。</p>
+  <h3>Technical Design</h3>
+  <p>NativeFilesExecutor 对 Main、Worker、Memory 设置 min(Case 秒数, 显式 route.timeout_seconds 或 Case 秒数)，移除隐含 60 秒回退；原外层整个执行、任务及容器期限保持。模型合同 hash 纳入提供方超时，评测协议单列 container-uds-v10-explicit-request-deadline；不把新期限下的成绩拼入旧 v6/v9。</p>
+  <h3>验证与边界</h3>
+  <p>定向 26 项通过，覆盖未配置、显式短期限、长期限被 Case 截断、Main/Worker 不同设置、Memory 继承及期限进入合同 hash。本次 v9 Sol Worker 候选因隐含请求期限失败，实际 42,904 Token / 8 请求全部已知并结算，未改现用配置；候选与延迟代理对照的最终结果另附 PR。先前完整 60 项与质量评分、连续观察状态保持。</p>
+</section>
