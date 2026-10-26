@@ -1,7 +1,7 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 UPGRADES = {
     2: "0002_artifact_metadata.sql",
     3: "0003_resource_controls.sql",
@@ -14,6 +14,7 @@ UPGRADES = {
     10: "0010_browser_groups.sql",
     11: "0011_task_session_closures.sql",
     12: "0012_native_sessions.sql",
+    13: "0013_model_proxy.sql",
 }
 
 

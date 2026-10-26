@@ -1,3 +1,4 @@
+import { modelProxyFailureKey } from './agent-models'
 import { memo, useEffect, useState } from 'react'
 import { api } from '../../api'
 import { BotIcon, RoamiLogo, ChevronDown, ChevronRight, ClockIcon, TerminalIcon } from '../../icons'
@@ -11,6 +12,7 @@ const toolNames: Record<string, string> = { session_send: 'send', target_search:
 const reasons: Record<string, string> = { MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired' }
 
 export function activityReason(code: string | null | undefined, t: (key: string) => string) {
+  if (modelProxyFailureKey(code)) return t(modelProxyFailureKey(code)!)
   return t('agent.activity.' + (code && reasons[code] || 'failedReason'))
 }
 

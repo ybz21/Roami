@@ -23,7 +23,7 @@ it('keeps one shared key and stages model selection before saving separate roles
   fireEvent.click(await screen.findByText('other'))
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { connection: { baseUrl: role.baseUrl }, main: { model: 'other', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { proxy: { dailyLimit: null, prices: {} }, connection: { baseUrl: role.baseUrl }, main: { model: 'other', images: false, contextWindow: null, reasoningEffort: null }, worker: { model: 'strong', images: false, contextWindow: null, reasoningEffort: null } }))
 })
 it('supports a custom searched model and discards unsaved changes without writing', async () => {
   vi.mocked(api).mockImplementation(async method => ({ data: method === 'POST' ? { models: ['fast', 'strong'] } : settings }))
@@ -63,4 +63,60 @@ it('identifies an unavailable local runtime and retries the settings request', a
   expect(screen.queryByText('agent.models.failed')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
   await screen.findByLabelText('agent.models.baseUrl')
+})
+
+const usage = { day: '2026-10-26', timezone: 'Asia/Shanghai', requests: 2, knownCost: 1.25, unknown: 1, pending: 0, inputTokens: 1000, outputTokens: 50, cacheReadTokens: 400, recent: [{ id: 'call', role: 'main', model: 'fast', started_ms: 1792971000000, state: 'unknown', input_tokens: 1000, output_tokens: 50, cost: null }] }
+it('saves prices and a daily limit atomically, preserving input after a failed save', async () => {
+  const configured = { ...settings, proxy: { dailyLimit: null, prices: {} } }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (path === '/agent/model-usage') return { data: usage }
+    if (method === 'PUT') throw new Error('MODEL_CONFIGURATION_BUSY')
+    return { data: configured }
+  })
+  setup()
+  await screen.findByRole('tab', { name: 'agent.proxy.tab' })
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' }))
+  await screen.findByLabelText('agent.proxy.dailyLimit')
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '10' } })
+  const fields = screen.getAllByRole('spinbutton')
+  const rateFields = fields.filter(field => field.getAttribute('id')?.startsWith('agent-price-0-'))
+  rateFields.forEach((field, index) => fireEvent.change(field, { target: { value: ['2', '8', '0.2'][index] } }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await screen.findByText('agent.models.busy')
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('10')
+  expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).toMatchObject({ proxy: { dailyLimit: 10, prices: { fast: { input: 2, output: 8, cacheRead: 0.2 } } } })
+  expect(screen.getByText('agent.proxy.unknown')).toBeTruthy()
+  expect(screen.getByText('agent.proxy.costUnknown')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
+})
+it('keeps partial prices unsaved and allows an explicit zero price', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/agent/model-usage' ? usage : settings }))
+  setup(); await screen.findByRole('tab', { name: 'agent.proxy.tab' }); fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' })); await screen.findByLabelText('agent.proxy.dailyLimit')
+  const fields = [...document.querySelectorAll<HTMLInputElement>('input[id^="agent-price-0-"]')]
+  fireEvent.change(fields[0], { target: { value: '0' } })
+  expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
+  fields.slice(1).forEach(field => fireEvent.change(field, { target: { value: '0' } }))
+  expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
+  expect(fields[0].value).toBe('')
+  expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
+})
+
+it('opens model configuration first and preserves both drafts across tabs before one save', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/agent/model-usage' ? usage : settings }))
+  setup()
+  await screen.findByLabelText('agent.models.baseUrl')
+  expect(screen.getByRole('tab', { name: 'agent.models.configurationTab' }).getAttribute('aria-selected')).toBe('true')
+  expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-usage')).toBe(false)
+  fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'draft-fixture-key' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.proxy.tab' }))
+  expect(screen.queryByRole('combobox', { name: 'agent.models.role.main agent.composer.model' })).toBeNull()
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '12' } })
+  await waitFor(() => expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-usage')).toBe(true))
+  fireEvent.click(screen.getByRole('tab', { name: 'agent.models.configurationTab' }))
+  expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('draft-fixture-key')
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).disabled).toBe(true)
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('12')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).toMatchObject({ connection: { apiKey: 'draft-fixture-key' }, proxy: { dailyLimit: 12 } }))
 })
