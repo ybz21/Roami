@@ -132,6 +132,75 @@ async def test_bold_reported_outputs_with_cjk_notes_are_both_delivered(store, tm
         await runtime.close()
 
 
+@pytest.mark.parametrize("executor", ["native", "codex"])
+async def test_grouped_relative_generated_outputs_survive_workspace_removal(
+    store, tmp_path, executor
+):
+    runtime, _, _, _, binding = await setup(store)
+    bodies = {
+        "analysis.py": b"print('finished')\n",
+        "result.json": b'{"result":42}\n',
+        "trades.csv": b"side,quantity\nbuy,1\n",
+        "equity.svg": b'<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 1L1 0"/></svg>',
+        "report.md": b"Verified local outputs.\n",
+    }
+    try:
+        task = await admit(
+            runtime, binding, "Create analysis outputs", "grouped", executor=executor
+        )
+        for name, body in bodies.items():
+            (tmp_path / name).write_bytes(body)
+        summary = f"Files in `{tmp_path}`: " + ", ".join(f"`{name}`" for name in bodies)
+        summary += "\nRun `python analysis.py`; do not execute `https://example.test/x.json`."
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {"state": "succeeded", "summary": summary, "workspace": {"directory": str(tmp_path)}},
+        )
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        assert not delivery["unavailable"]
+        artifacts = delivery["artifacts"]
+        assert {a["name"] for a in artifacts} == set(bodies)
+        assert (
+            next(a for a in artifacts if a["name"] == "equity.svg")["mimeType"] == "image/svg+xml"
+        )
+        for name in bodies:
+            (tmp_path / name).unlink()
+        for artifact in artifacts:
+            assert (await runtime.artifacts.read("alice", artifact["id"]))[1] == bodies[
+                artifact["name"]
+            ]
+        assert len((await runtime.tasks.get("alice", task["id"]))["delivery"]["artifacts"]) == 5
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("name", ["../outside.json", "linked.csv", ".hidden.json"])
+async def test_relative_reported_outputs_keep_workspace_boundaries(store, tmp_path, name):
+    runtime, _, _, _, binding = await setup(store)
+    outside = tmp_path.parent / "outside.json"
+    outside.write_text("outside")
+    (tmp_path / "linked.csv").symlink_to(outside)
+    (tmp_path / ".hidden.json").write_text("hidden")
+    try:
+        task = await admit(runtime, binding, "Report output", "bounded", executor="codex")
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {
+                "state": "succeeded",
+                "summary": f"Output `{name}`",
+                "workspace": {"directory": str(tmp_path)},
+            },
+        )
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        assert not delivery["artifacts"] and delivery["unavailable"]
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("mode", ["same_task", "external_edit", "deleted", "other_task"])
 async def test_completion_edit_publishes_exact_new_snapshot_only_for_its_task(
     store, tmp_path, mode

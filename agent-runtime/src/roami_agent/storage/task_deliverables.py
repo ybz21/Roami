@@ -48,6 +48,7 @@ OUTPUT_SUFFIXES = {
     ".bash",
     ".css",
     ".scss",
+    ".svg",
     ".sql",
 }
 
@@ -65,6 +66,13 @@ def reported_paths(text, root=None):
             + r")(?=$|[\s\"'`<>()[\]{}*，。；：！？、（）]|\\[nr])",
             text,
         )
+        paths += [
+            name
+            for name in re.findall(r"(?<!`)`([^`\s]+)`(?!`)", text)
+            if not Path(name).is_absolute()
+            and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", name)
+            and Path(name).suffix.lower() in OUTPUT_SUFFIXES
+        ]
     return list(dict.fromkeys(paths))[:12]
 
 
