@@ -366,3 +366,81 @@ async def test_restored_loose_task_does_not_fall_back_when_directory_field_is_wr
                 pytest.fail("Invalid task reached the workspace")
         else:
             await CodingExecutor(store, settings).run(task, {})
+
+
+async def test_observation_recovery_updates_feed_and_later_uncertainty_without_relaunch(store):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "work",
+        key="observation-recovery",
+        executor="codex",
+        record_intent=True,
+    )
+    executor = CodingExecutor(store, Settings())
+    calls = []
+    receipt = {"state": "unknown"}
+
+    async def command(*args, **kwargs):
+        calls.append(args)
+        return receipt
+
+    executor.command = command
+
+    def launched(db):
+        db.execute("UPDATE tasks SET state='running' WHERE id=?", (task["id"],))
+        db.execute("UPDATE task_attempts SET state='running' WHERE task_id=?", (task["id"],))
+        db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (task["id"],))
+
+    await store.call(launched, write=True)
+    await executor.poll(tasks)
+    receipt = {"state": "running", "session": "observed-session"}
+    await executor.poll(tasks)
+    await executor.poll(tasks)
+    events = await conversations.events("alice", conversation["id"])
+    resumed = [e for e in events if e["kind"] == "task.observation_recovered"]
+    assert len(resumed) == 1
+    assert resumed[0]["payload"]["activity"]["state"] == "running"
+    assert not resumed[0]["payload"]["activity"]["errorCode"]
+    assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "running"
+    receipt = {"state": "unknown"}
+    await executor.poll(tasks)
+    await executor.poll(tasks)
+    events = await conversations.events("alice", conversation["id"])
+    unknown = [e for e in events if e["kind"] == "task.observation_unknown"]
+    assert len(unknown) == 2 and unknown[-1]["id"] > resumed[0]["id"]
+    assert unknown[-1]["payload"]["activity"]["state"] == "unknown"
+    assert all(call[0] == "status" for call in calls)
+    assert (await tasks.list("alice"))[0]["state"] == "running"
+
+
+async def test_unknown_preparing_execution_is_visible_without_ending_task(store):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "work",
+        key="preparing-observation",
+        executor="codex",
+        record_intent=True,
+    )
+    await store.call(
+        lambda db: db.execute("UPDATE tasks SET state='preparing' WHERE id=?", (task["id"],)),
+        write=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings())
+    await executor.record(task, run, {"state": "unknown"})
+    await executor.record(task, run, {"state": "unknown"})
+    events = await conversations.events("alice", conversation["id"])
+    unknown = [e for e in events if e["kind"] == "task.observation_unknown"]
+    assert len(unknown) == 1
+    assert unknown[0]["payload"]["activity"]["state"] == "unknown"
+    assert (await tasks.list("alice"))[0]["state"] == "preparing"

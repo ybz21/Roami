@@ -21,6 +21,7 @@ def activity_event(db, cid, kind, payload, *, key=None, **refs):
         "task.waiting_user",
         "task.cancelling",
         "task.observation_unknown",
+        "task.observation_recovered",
         "task.steered",
         "task.steer_cancelled",
     }
