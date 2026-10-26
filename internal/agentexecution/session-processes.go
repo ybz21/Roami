@@ -96,6 +96,9 @@ func sessionProcessesStopped(binding SessionBinding) bool {
 	}
 	for pid, token := range scoped {
 		if !ancestors[pid] && binding.Processes[pid] != token {
+			if codexCodeModeHost(binding, snapshot, pid) {
+				continue
+			}
 			foreign := false
 			seen := map[int]bool{}
 			for current := pid; current > 0 && !seen[current]; current = snapshot[current].Parent {

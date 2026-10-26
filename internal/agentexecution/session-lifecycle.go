@@ -406,13 +406,32 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if err != nil {
 		return status, err
 	}
+	unlock, err := lock(filepath.Join(filepath.Dir(path), "state.lock"))
+	if err != nil {
+		return status, err
+	}
+	defer unlock()
+	dir, _ := s.directory(key)
+	var completed Result
+	if resultErr := readJSON(filepath.Join(dir, "result.json"), &completed); resultErr == nil {
+		status.State, status.Result = completed.State, &completed
+		return status, nil
+	} else if !errors.Is(resultErr, os.ErrNotExist) {
+		return status, resultErr
+	}
 	var state sessionLifecycle
-	if readJSON(path, &state) != nil || state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
+	if readJSON(path, &state) != nil {
+		status.State = "unknown"
+		return status, nil
+	}
+	if recovered, ok, problem := s.reconcileCodexCompletion(key, status, &state, path); ok || problem != nil {
+		return recovered, problem
+	}
+	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State = "unknown"
 		return status, nil
 	}
 	status.State = "running"
-	dir, _ := s.directory(key)
 	if _, err := os.Stat(filepath.Join(dir, "cancel.json")); err == nil {
 		status.State = "cancelling"
 	}
