@@ -1,0 +1,36 @@
+.cc-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.cc-usage-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.cc-usage-item svg { flex: 0 0 auto; }
+button.cc-usage-item { cursor: pointer; }
+:where(html[data-pointer="fine"]) button.cc-usage-item:hover { background: var(--list-hover); }
+button.cc-usage-item:focus-visible { outline: 2px solid var(--accent); }
+
+html[data-pointer="coarse"] .cc-usage { min-height: var(--tap); }
+html[data-pointer="coarse"] button.cc-usage-item::after {
+  content: '';
+  position: absolute;
+  inset: 50% calc(-1 * var(--sp-1)) auto;
+  height: var(--tap);
+  transform: translateY(-50%);
+}
