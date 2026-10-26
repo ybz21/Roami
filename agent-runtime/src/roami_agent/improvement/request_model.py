@@ -1,9 +1,9 @@
 """Allocate each request's output from role settings and the remaining episode budget."""
 
-import json
 from contextlib import aclosing
 from dataclasses import replace
 
+from roami_agent.improvement.input_reservation import InputReservation, input_bytes
 from roami_agent.improvement.measurements import BudgetAdmissionRejected, MeteredModel
 from roami_agent.protocol.model_routes import settings_with_route
 
@@ -25,11 +25,13 @@ class RequestBudgetModel:
         self.cap, self.factory, self.journal = cap, factory, journal
         self.shared_budget = shared_budget
         self.model = route.name
+        self.input_reservation = InputReservation()
 
     async def stream(self, messages, tools):
         from roami_agent.app import configured_provider
 
-        input_reserve = len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
+        original_bytes = input_bytes(messages, tools)
+        input_reserve, snapshot, basis = self.input_reservation.estimate(messages, tools)
         remaining = 100_000_000
         for budget in (self.budget, self.shared_budget):
             if budget is None:
@@ -42,7 +44,7 @@ class RequestBudgetModel:
             notice = (
                 f"Execution allowance: at most {remaining} metered tokens remain across roles "
                 f"and shared limits. This request's input needs a conservative reserve of "
-                f"{input_reserve} units before this notice (serialized bytes plus margin, not billed tokens). "
+                f"{input_reserve} units before this notice ({basis['kind']} plus margin, not billed tokens). "
                 "Each later request also needs its input and output reserve. Keep tool output bounded; "
                 "return requested files and verified findings when ready, and state unverified requirements "
                 "or failed/unknown outcomes plainly. This allowance is not evidence of task completion."
@@ -53,7 +55,7 @@ class RequestBudgetModel:
                     "Prioritize essential work and a concise handoff over new verification infrastructure."
                 )
             messages = [*messages, {"role": "system", "content": notice}]
-        overhead = len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
+        overhead = input_reserve + input_bytes(messages, tools) - original_bytes
         available = min(1_000_000, remaining - overhead)
         if self.route.context_window:
             available = min(available, self.route.context_window - overhead)
@@ -77,11 +79,21 @@ class RequestBudgetModel:
         )
         try:
             model = MeteredModel(
-                provider, self.budget, self.role, output_cap=available, journal=self.journal
+                provider,
+                self.budget,
+                self.role,
+                output_cap=available,
+                journal=self.journal,
+                input_reserve=overhead,
+                reservation_basis=basis,
             )
+            usage = None
             async with aclosing(model.stream(messages, tools)) as events:
                 async for event in events:
+                    if event.kind == "usage":
+                        usage = event.value
                     yield event
+            self.input_reservation.observe(snapshot, usage)
         finally:
             if hasattr(provider, "close"):
                 await provider.close()

@@ -22,6 +22,23 @@ from roami_agent.providers.request_policy import (
     retry_delay,
 )
 
+STREAM_ERROR_CODES = frozenset(
+    {
+        "MODEL_OUTPUT_LENGTH",
+        "MODEL_OUTPUT_CONTENT_FILTER",
+        "MODEL_IMAGES_UNSUPPORTED",
+        "MODEL_TOOLS_UNSUPPORTED",
+        "MODEL_DEADLINE",
+        "MODEL_TRANSPORT_FAILED",
+        "MODEL_STREAM_INVALID",
+        "MODEL_STREAM_INCOMPLETE",
+        "RSI_TOKEN_BUDGET",
+        "RSI_REQUEST_BUDGET",
+        "RSI_TIME_BUDGET",
+        "RSI_USAGE_UNKNOWN",
+    }
+)
+
 
 class RetryableResponse(Exception):
     def __init__(self, status, delay):
@@ -215,6 +232,15 @@ class ChatCompletions:
                     if not isinstance(data["usage"], dict):
                         raise DomainError("MODEL_USAGE_INVALID", 502)
                     yield ModelEvent("usage", normalized_usage(data["usage"], attempt + 1))
+                if data.get("error") is not None:
+                    error = data["error"]
+                    code = error.get("code") if isinstance(error, dict) else None
+                    raise DomainError(
+                        code
+                        if isinstance(code, str) and code in STREAM_ERROR_CODES
+                        else "MODEL_STREAM_INVALID",
+                        502,
+                    )
                 choices = data.get("choices", [])
                 if not isinstance(choices, list):
                     raise DomainError("MODEL_STREAM_INVALID", 502)

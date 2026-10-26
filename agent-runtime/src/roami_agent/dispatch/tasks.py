@@ -414,8 +414,10 @@ class Tasks:
                         child_content.update(
                             text=seed
                             + "\n\nComplete only the delegated part. Original user contracts override conflicting "
-                            "coordinator interpretations. Coordinator-added schemas, formulas or checks "
-                            "are not user requirements.",
+                            "coordinator interpretations. If the user supplied an output schema, keep its "
+                            "exact fields/types; extra factual metadata belongs in a requested report unless "
+                            "the user allowed extensions. Coordinator-added formulas or checks are proposals, "
+                            "not user requirements.",
                             displayText=goal,
                         )
                 if source_content.get("attachments"):

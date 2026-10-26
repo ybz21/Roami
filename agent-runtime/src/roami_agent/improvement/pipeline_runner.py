@@ -104,12 +104,16 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
         reserve = config["generation_tokens"] + config["codex_tokens"] * 2 + artifact_reservation
         db.execute(
             "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
-            (owner, today, config["daily_tokens"], 10000),
+            (owner, today, config["daily_tokens"], prefs["daily_episodes"] or 10000),
         )
         budget = db.execute(
             "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, today)
         ).fetchone()
         require(budget["tokens_reserved"] + reserve <= budget["tokens_limit"], "RSI_DAILY_BUDGET")
+        require(
+            budget["episodes_reserved"] + len(case_ids) <= budget["episodes_limit"],
+            "RSI_DAILY_EPISODE_BUDGET",
+        )
         db.execute(
             "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+?,episodes_reserved=episodes_reserved+? WHERE owner=? AND day=?",
             (reserve, len(case_ids), owner, today),

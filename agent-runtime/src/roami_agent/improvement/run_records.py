@@ -668,6 +668,8 @@ class RunRecords:
             from datetime import datetime
             from zoneinfo import ZoneInfo
 
+            from roami_agent.improvement.control import DEFAULTS as EVALUATION_DEFAULTS
+
             config = value["snapshot"]["pipeline"]
             prefs = value["snapshot"].get("preferences", {})
             day = datetime.now(ZoneInfo(prefs.get("timezone", "Asia/Shanghai"))).date().isoformat()
@@ -675,7 +677,12 @@ class RunRecords:
                 db.execute("BEGIN IMMEDIATE")
                 db.execute(
                     "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
-                    (owner, day, prefs.get("daily_tokens") or config["daily_tokens"], 10000),
+                    (
+                        owner,
+                        day,
+                        prefs.get("daily_tokens") or config["daily_tokens"],
+                        prefs.get("daily_episodes", EVALUATION_DEFAULTS["daily_episodes"]) or 10000,
+                    ),
                 )
                 budget = db.execute(
                     "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
