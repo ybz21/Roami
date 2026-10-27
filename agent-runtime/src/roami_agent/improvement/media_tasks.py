@@ -176,10 +176,18 @@ async def grade_media(case, workspace, executor):
         checks.update(result["checks"])
     score = result["reward"]
     require(type(score) in {int, float} and math.isfinite(score) and 0 <= score <= 1)
-    passed = all(checks.values()) and score >= spec["minimum_reward"]
+    verified = all(checks.values())
+    checks["native_metric_threshold"] = score >= spec["minimum_reward"]
+    passed = all(checks.values())
     return {
         **quality(dict.fromkeys(DIMENSIONS, 3 if passed else 0), hard_passed=passed),
         "native_metric": score,
+        "native_metric_minimum": spec["minimum_reward"],
+        "reason": "assertions_passed"
+        if passed
+        else "native_metric_below_threshold"
+        if verified
+        else "assertion_failed",
         "grade_scope": "original_media_verifier_plus_frozen_delivery_checks",
         "checks": checks,
         "evidence": evidence,

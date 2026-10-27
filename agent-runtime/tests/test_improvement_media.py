@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import wave
 import zipfile
 
@@ -75,7 +76,18 @@ async def test_wrong_audio_shape_and_modified_input_do_not_reach_native_judge(tm
     assert not grade["passed"] and not grade["checks"]["source:materials/noisy.wav"]
 
 
-async def test_native_reward_and_delivery_contract_must_both_pass(tmp_path):
+@pytest.mark.parametrize(
+    "score,exited,expected,reason",
+    [
+        (0.7, True, False, "native_metric_below_threshold"),
+        (0.8, True, True, "assertions_passed"),
+        (1.0, True, True, "assertions_passed"),
+        (0.9, False, False, "assertion_failed"),
+    ],
+)
+async def test_native_reward_and_delivery_contract_must_both_pass(
+    tmp_path, score, exited, expected, reason
+):
     source = wav(64)
     case = {
         "files": {},
@@ -95,7 +107,10 @@ async def test_native_reward_and_delivery_contract_must_both_pass(tmp_path):
 
     class Scored:
         async def sandbox(self, *args, **kwargs):
-            return b'{"reward":0.7,"checks":{"verifier_exited":true}}'
+            return json.dumps({"reward": score, "checks": {"verifier_exited": exited}}).encode()
 
     grade = await grade_media(case, tmp_path / "work", Scored())
-    assert not grade["passed"] and grade["native_metric"] == 0.7
+    assert grade["passed"] is expected and grade["native_metric"] == score
+    assert grade["native_metric_minimum"] == 0.8
+    assert grade["checks"]["native_metric_threshold"] is (score >= 0.8)
+    assert grade["reason"] == reason

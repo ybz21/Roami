@@ -1678,3 +1678,13 @@ Research → 原浏览器导航／观察协议</pre>
   <h3>验收证据</h3>
   <p>定向 136 项通过，覆盖持仓未平与已平两种现金流及矛盾摘要、错误交易、布尔冒充数值和未知字段。真实 v19 Native 候选经 Docker 零模型重放全部通过；五组篡改对照拒绝，冻结 v6 的错误结果仍失败；原产物和结果 SHA 不变。v19 同组 STOCK-01、QUANT-02、LAB-05 已真实独立通过，前组 STOCK-03 通过；CSV 硬检查通过仍待质量。四份人工参考分、有效校准与后续日观察不因这些结果自动完成。</p>
 </section>
+
+<section id="rsi-native-metric-diagnostics-20261027" lang="zh-CN">
+  <h2>RSI 媒体原生分数诊断 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>媒体验证器正常退出、文件检查通过，但原生分数低于公开门槛时，报告明确记录低于门槛，不再只显示所有检查通过和无原因失败。验证器未正常退出仍归为验证失败，不伪装成质量分低。</p>
+  <h3>User Stories</h3>
+  <p>用户能区分真实音频质量不足与文件或验证环境故障；维护者看到实际原生分数和最小要求，不需要猜测红色状态的原因。</p>
+  <h3>Technical Design</h3>
+  <p>media_tasks.grade_media 在 checks 增加 native_metric_threshold，并返回 native_metric_minimum 及有限 reason。判定与原 all(checks) and score&gt;=minimum_reward 等价，原生验证器、输入、门槛和输出均不变。回归覆盖低分、恰好达标、满分和验证器失败但分数达标；冻结 v20 全套仍使用其独立旧源码，新增诊断单列，不改写原 trial。</p>
+</section>
