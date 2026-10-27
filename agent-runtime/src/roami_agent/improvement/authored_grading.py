@@ -42,6 +42,37 @@ def close_json(actual, expected, tolerance=1e-5):
     return actual == expected
 
 
+def corrected_backtest_matches(actual, expected, prices):
+    if not isinstance(actual, dict) or not isinstance(actual.get("strategy"), dict):
+        return False
+    strategy = actual["strategy"]
+    reference = expected["strategy"]
+    cash, quantity = prices["initial_cash"], 0
+    for trade in reference["trades"]:
+        sign = 1 if trade["side"] == "buy" else -1
+        quantity += sign * trade["quantity"]
+        cash -= sign * trade["quantity"] * trade["price"] + trade["fee"]
+    summaries = {
+        "initial_cash": prices["initial_cash"],
+        "fee": prices["fee"],
+        "slippage": prices["slippage"],
+        "final_cash": cash,
+        "final_quantity": quantity,
+        "final_equity": reference["equity"][-1],
+    }
+    extras = strategy.keys() - reference.keys()
+    if not extras <= summaries.keys() | {"description"}:
+        return False
+    for key in extras:
+        if key == "description":
+            if not isinstance(strategy[key], str) or not strategy[key].strip():
+                return False
+        elif not close_json(strategy[key], summaries[key]):
+            return False
+    normalized = {**actual, "strategy": {k: v for k, v in strategy.items() if k not in extras}}
+    return close_json(normalized, expected)
+
+
 def read_file(workspace, name, *, binary=False):
     path = relative_file(workspace, name)
     if not path.is_file() or path.stat().st_size > 16_000_000:
@@ -204,13 +235,14 @@ async def grade_authored(case, workspace, executor):
             )
             checks.update({"browser:" + k: bool(v) for k, v in output.items()})
         elif identifier.startswith("QUANT-"):
+            prices = json.loads(read_file(workspace, "prices.json"))
             output = json.loads(
                 (await executor.sandbox(workspace, RERUN_ANALYSIS, timeout=60))
                 .decode()
                 .splitlines()[-1]
             )
             checks["reproducible_code"] = (
-                close_json(output["corrected"], spec["corrected_expected"])
+                corrected_backtest_matches(output["corrected"], spec["corrected_expected"], prices)
                 if identifier == "QUANT-03"
                 else close_json(output["result"], spec["expected"])
             )
@@ -229,9 +261,13 @@ async def grade_authored(case, workspace, executor):
                     and log.get("test_used_for_selection") is False
                 )
             if identifier == "QUANT-03":
-                checks["corrected_run_verified"] = close_json(
-                    json.loads(read_file(workspace, "corrected.json")), spec["corrected_expected"]
-                ) and close_json(output["corrected"], spec["corrected_expected"])
+                checks["corrected_run_verified"] = corrected_backtest_matches(
+                    json.loads(read_file(workspace, "corrected.json")),
+                    spec["corrected_expected"],
+                    prices,
+                ) and corrected_backtest_matches(
+                    output["corrected"], spec["corrected_expected"], prices
+                )
                 code = read_file(workspace, "analysis.py")
                 checks["no_original_future_signal"] = not re.search(r"\.shift\s*\(\s*-1\s*\)", code)
         elif identifier == "LAB-05":

@@ -61,7 +61,7 @@ def authored_suite(seed):
             case["prompt"] += data["prompt_suffix"]
         cases.append(case)
     return freeze_suite(
-        "roami-authored-40-v10",
+        "roami-authored-40-v11",
         cases,
         fixture_seed_hash=digest(seed),
         composition={"authored_real": 20, "mechanism_regression_variants": 20},
@@ -71,7 +71,7 @@ def authored_suite(seed):
 def prepare_corpus(service, owner):
     root = service.ledger.path.parent / "corpus"
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = root / "authored-40-v10.json"
+    path = root / "authored-40-v11.json"
     if not path.exists():
         private_json(path, authored_suite(secrets.token_hex(24)))
     summary = service.control.register_suite(owner, path)

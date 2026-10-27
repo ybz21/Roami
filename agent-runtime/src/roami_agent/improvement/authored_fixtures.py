@@ -465,6 +465,9 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             schema = {
                 "contract": "result.json含receipt、biases=[lookahead,survivorship]、old_claim_valid=false、delisted_included=true；报告定位flawed.py两行。analysis.py重跑生成corrected.json：receipt、universe=[REGULAR,DELISTED]、strategy（REGULAR的因果MA3/MA5回测，已有5个收盘价后MA3>MA5持有一倍现货多头，否则空仓；收盘信号下一bar开盘全现金含买入费买入或全部卖出，小数股可用，初始10000，费用与滑点取prices.json，买入价=open*(1+slippage)、卖出价=open*(1-slippage)；含trades和逐bar equity数值数组，不强制期末平仓）、delisted_final_equity=2000、portfolio_final_equity（两资产初始各10000、等权归一至10000，取两者末净值平均）。trades每项字段为signal_bar/execution_bar/side/price/quantity/fee；receipt原样保留字符串。不能只写已修复。"
             }
+            schema["contract"] += (
+                "strategy的必要字段为trades、equity；可附description及initial_cash、fee、slippage、final_cash、final_quantity、final_equity摘要，数值必须与输入和逐笔交易、净值一致，不接受其他额外字段。"
+            )
             required.append("corrected.json")
         elif case_id == "QUANT-04":
             data = {
@@ -559,7 +562,13 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         "prompt_suffix": prompt,
         "fixture_receipt": nonce,
         "fixture_revision": "roami-authored-v3",
-        "contract_revision": "authored-v10-separated-instructions" if instructions else None,
+        "contract_revision": (
+            "authored-v11-verified-backtest-summaries"
+            if case_id == "QUANT-03"
+            else "authored-v10-separated-instructions"
+        )
+        if instructions
+        else None,
     }
 
 

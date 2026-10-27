@@ -1666,3 +1666,15 @@ Research → 原浏览器导航／观察协议</pre>
   <h3>Technical Design</h3>
   <p>authored_fixtures 在序列化字段说明前提取 contract，将其列为“执行要求（不是结果字段）”；返回显式 contract_revision，corpus 为受影响案例绑定 authored-v10-separated-instructions，缓存使用 authored-40-v10.json，其他案例版本保留。LAB-05 对 output/stdout 所有已提供字段同时做类型和原始输出一致性检查，不用一个字段掩盖冲突。协议单列 container-uds-v19-separated-contract-instructions；新增冻结库存和复测不覆盖原案例或原生成失败。</p>
 </section>
+
+<section id="rsi-verified-backtest-summaries-20261027" lang="zh-CN">
+  <h2>RSI 可核对回测摘要 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>QUANT-03 的 strategy 必须保留准确的 trades 与 equity；允许描述和输入／交易可以独立推导的初始资金、费率、滑点、期末现金、持仓与净值摘要。附加摘要不能与核心结果矛盾，未知字段继续拒绝，不用额外文字覆盖交易或净值验证。</p>
+  <h3>User Stories</h3>
+  <p>用户同时提供完整交易明细、净值和准确摘要时，不会因多给了可核对的结果而被误拒绝；错误现金、费率、净值或虚构保证收益仍失败。原来的失败产物和新候选均保留，不将验证器重放记作新生成。</p>
+  <h3>Technical Design</h3>
+  <p>authored_grading.corrected_backtest_matches 以冻结逐笔交易推导现金和数量，以冻结净值与输入核对其余数值摘要，之后严格比较原有核心字段；提交文件与重跑输出分别检查。QUANT-01 及其他结构化合同不变。公开可选字段的 QUANT-03 recipe 标为 authored-v11-verified-backtest-summaries，语料使用 authored-40-v11.json；协议单列 container-uds-v20-verified-backtest-summaries。</p>
+  <h3>验收证据</h3>
+  <p>定向 136 项通过，覆盖持仓未平与已平两种现金流及矛盾摘要、错误交易、布尔冒充数值和未知字段。真实 v19 Native 候选经 Docker 零模型重放全部通过；五组篡改对照拒绝，冻结 v6 的错误结果仍失败；原产物和结果 SHA 不变。v19 同组 STOCK-01、QUANT-02、LAB-05 已真实独立通过，前组 STOCK-03 通过；CSV 硬检查通过仍待质量。四份人工参考分、有效校准与后续日观察不因这些结果自动完成。</p>
+</section>

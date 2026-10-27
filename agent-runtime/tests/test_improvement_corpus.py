@@ -273,13 +273,14 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     previous.write_bytes(b"original frozen suite evidence")
     prepare_corpus(service, "owner")
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v10.json").read_text())
+    revised = json.loads((root / "authored-40-v11.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"
     assert identities["STOCK-03"] == "authored-v9-stock-evidence-contract"
     assert all(
-        c["origin"]["recipe_revision"] == "authored-v10-separated-instructions"
+        c["origin"]["recipe_revision"]
+        in {"authored-v10-separated-instructions", "authored-v11-verified-backtest-summaries"}
         for c in revised["cases"]
         if "执行要求（不是结果字段）" in c["prompt"]
     )
