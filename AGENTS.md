@@ -1805,7 +1805,7 @@ frontend/src/theme.tsx / layout.ts   复用主题、Ant Design 配置与 useLayo
 <section id="rsi-layered-architecture-20261027" lang="zh-CN">
   <h1>RSI 分层与 Case 材料 · 2026-10-27</h1>
   <h2>Product Design</h2>
-  <p>保留已有工作流、运行汇总和 Issue 查询行为。把规则、外部适配、评测、持久化、流程、展示和入口分层，避免流程直接操作账本或展示查询隐式更新研究记录。每个 Case 明确说明数据、工具与判定来源，不把公开来源引用或合成输入描述成真实任务已通过。</p>
+  <p>保留已有工作流、运行汇总和 Issue 查询行为。把规则、外部适配、评测、持久化、流程、展示和入口分层，避免流程直接操作账本，并让查询前的研究同步显式由装配层协调。每个 Case 明确说明数据、工具与判定来源，不把公开来源引用或合成输入描述成真实任务已通过。</p>
   <h2>User Stories</h2>
   <ul>
     <li>维护者能找到流程编排、账本事务和展示查询各自的模块；新增代码跨层依赖时回归测试报错。</li>
@@ -1826,4 +1826,5 @@ cases/case-N-id/             CASE.md、case.json、materials.json 与显式资�
   <p>箭头表示允许向右侧层依赖，可以跳过中间层。RunRepository 分离 RunArtifacts、RunCosts 与 ResearchProjection；ResearchRepository 分离配置、成本与报告。流程和展示不执行账本 SQL；所有者、租约和发布 outbox 事务由持久层封装。原公开命令保留入口转发，私有导入直接迁移。provider 构造下沉到 providers/factory.py，避免导入应用装配。</p>
   <p>Case 资源只允许目录内普通文件；新 authored v13 套件记录资源 SHA256。QUANT-02 读取公开行情后添加每次运行 receipt，宿主答案不进入 Agent 工作区。原数据库结构、历史冻结套件和运行产物不重写。判定指纹覆盖拆出的 domain 与 evaluation 规则。</p>
   <p>验收包括依赖方向、无跨层 SQL、无领域 IO、无展示层写操作、规则指纹、资源路径边界、QUANT 输入与生成器一致性、完整回归及 wheel/sdist 安装后的材料读取。本次不改前端页面，原有独立质量和手机验收 Issue 不因分层重构关闭。</p>
+  <p>实测：wheel 安装和 sdist 独立源码加载均找到 60 个 Case 与材料清单，QUANT 输入与标准库生成器及运行输入一致；替换区间、候选参数和成本后判定读取替换值。真实无网络容器完成 Native Worker 文件写入及宿主判定，镜像内无 authored_fixtures、authored_grading、corpus 模块。容器验证使用已有依赖层复制最终运行时代码及新清理指令，模型为脚本夹具，不作为能力评分。</p>
 </section>

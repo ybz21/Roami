@@ -106,3 +106,13 @@ def test_api_views_do_not_start_work_or_update_research_projections():
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
                 assert node.func.attr not in forbidden, (path, node.lineno)
+
+
+def test_container_recipe_excludes_the_relocated_host_fixture_and_answer_modules():
+    dockerfile = (ROOT.parents[2] / "improvement.Dockerfile").read_text()
+    removal = dockerfile.split("RUN rm -f ", 1)[1].split("\nRUN ", 1)[0]
+    for name in ("authored_fixtures", "corpus", "authored_grading"):
+        path = f"src/roami_agent/improvement/evaluation/{name}.py"
+        assert path in removal
+        assert (ROOT / "evaluation" / f"{name}.py").is_file()
+    assert "ROAMI_RSI_CONTAINER_BUILD=1" in dockerfile

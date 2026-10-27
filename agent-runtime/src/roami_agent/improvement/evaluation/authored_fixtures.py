@@ -416,26 +416,31 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             data = json.loads(case_resource(case_id, "inputs/prices.json").read_text())
             data["receipt"] = nonce
             files["tools.json"] = case_resource(case_id, "tools.json").read_text()
-            data.update(
-                train=[0, 100],
-                validation=[100, 140],
-                test=[140, 180],
-                candidates=[[3, 5], [3, 8], [5, 10]],
-            )
+            validation_start, validation_end = data["validation"]
+            test_start, test_end = data["test"]
+            costs = {"fee": data["fee"], "slip": data["slippage"]}
             scores = []
             for fast, slow in data["candidates"]:
                 scores.append(
-                    (backtest(data["bars"][100:140], fast, slow)["equity"][-1], fast, slow)
+                    (
+                        backtest(
+                            data["bars"][validation_start:validation_end], fast, slow, **costs
+                        )["equity"][-1],
+                        fast,
+                        slow,
+                    )
                 )
             best = min(scores, key=lambda x: (-x[0], x[1], x[2]))
             expected = {
                 "receipt": nonce,
                 "selected": [best[1], best[2]],
                 "tried": data["candidates"],
-                "selection_range": [100, 140],
-                "test_range": [140, 180],
+                "selection_range": data["validation"],
+                "test_range": data["test"],
                 "test_used_for_selection": False,
-                "test_final_equity": backtest(data["bars"][140:], best[1], best[2])["equity"][-1],
+                "test_final_equity": backtest(
+                    data["bars"][test_start:test_end], best[1], best[2], **costs
+                )["equity"][-1],
             }
             schema = {
                 "receipt": "string",

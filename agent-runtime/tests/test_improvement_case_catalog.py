@@ -199,3 +199,31 @@ def test_declared_resources_cannot_escape_the_case_directory(tmp_path):
     )
     with pytest.raises(DomainError):
         read_definition(folder)
+
+
+def test_quant_selection_uses_the_declared_input_ranges_candidates_and_costs(tmp_path, monkeypatch):
+    from roami_agent.improvement.evaluation.authored_fixtures import backtest, recipe
+    from roami_agent.improvement.evaluation.case_catalog import case_resource
+
+    public = json.loads(case_resource("QUANT-02", "inputs/prices.json").read_text())
+    public.update(
+        validation=[60, 120], test=[120, 175], candidates=[[2, 6]], fee=0.003, slippage=0.002
+    )
+    path = tmp_path / "prices.json"
+    path.write_text(json.dumps(public))
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.case_catalog.case_resource",
+        lambda case_id, name: (
+            path if name == "inputs/prices.json" else case_resource(case_id, name)
+        ),
+    )
+    fixture = recipe("QUANT-02", "resource-variation")
+    actual = json.loads(fixture["files"]["prices.json"])
+    assert {key: value for key, value in actual.items() if key != "receipt"} == public
+    expected = fixture["judge"]["expected"]
+    assert expected["selected"] == [2, 6] and expected["tried"] == [[2, 6]]
+    assert expected["selection_range"] == [60, 120] and expected["test_range"] == [120, 175]
+    assert (
+        expected["test_final_equity"]
+        == backtest(public["bars"][120:175], 2, 6, fee=0.003, slip=0.002)["equity"][-1]
+    )
