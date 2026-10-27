@@ -37,10 +37,24 @@ class RunCosts:
     def day(self, owner):
         return datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
 
+    def operation_result(self, owner, key):
+        with self.ledger.connection() as db:
+            row = db.execute(
+                "SELECT state,result_json FROM rsi_pipeline_costs WHERE owner=? AND id=?",
+                (owner, key),
+            ).fetchone()
+        if row is None:
+            return None
+        require(row["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION")
+        return json.loads(row["result_json"])
+
     def reserve_operation(self, owner, day, key, tokens):
         require(owner == self.owner, "RSI_RUN_NOT_FOUND")
         value = self.records.get(owner, self.run_id)
         snapshot = value["snapshot"]
+        from roami_agent.providers.model_proxy import model_proxy_context
+
+        centralized = model_proxy_context.get() is not None
         cap = snapshot["pipeline"]["codex_tokens"] * 2
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -68,12 +82,18 @@ class RunCosts:
             require(
                 all(
                     r["state"] == "completed"
-                    and json.loads(r["result_json"])["value"]["metrics"]["tokens"] <= r["reserved"]
+                    and (
+                        centralized
+                        or json.loads(r["result_json"])["value"]["metrics"]["tokens"]
+                        <= r["reserved"]
+                    )
                     for r in rows
                 ),
                 "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
             )
-            require(sum(r["reserved"] for r in rows) + tokens <= cap, "RSI_TOKEN_BUDGET")
+            require(
+                centralized or sum(r["reserved"] for r in rows) + tokens <= cap, "RSI_TOKEN_BUDGET"
+            )
             db.execute(
                 "INSERT INTO rsi_pipeline_costs VALUES(?,?,?,?,'running',NULL)",
                 (key, owner, self.run_id, tokens),
@@ -242,6 +262,12 @@ class PipelineReportWorker:
             await asyncio.sleep(3)
 
     async def execute(self, action):
+        from roami_agent.providers.model_proxy import model_accounting
+
+        with model_accounting(getattr(self.service, "model_proxy", None)):
+            return await self._execute(action)
+
+    async def _execute(self, action):
         owner, run_id = action["owner"], action["id"]
         value = self.records.get(owner, run_id)
         config = value["snapshot"]["pipeline"]

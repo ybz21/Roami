@@ -57,6 +57,7 @@ export default defineConfig({
           if (id.includes('@xterm')) return 'xterm'
           // react-redux/redux 等是 @hello-pangea/dnd 的专属依赖，跟着 dnd 走。
           if (/hello-pangea|react-redux|hoist-non-react-statics|[\\/]redux[\\/]|css-box-model|raf-schd|use-memo-one|memoize-one/.test(id)) return 'dnd'
+          if (/[\\/]node_modules[\\/](echarts|zrender)[\\/]/.test(id)) return 'usage-charts'
           if (/antd|@ant-design|rc-/.test(id)) return 'antd'
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react'
           return 'vendor'

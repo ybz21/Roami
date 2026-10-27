@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Input, InputNumber, Select, Spin, Switch } from 'antd'
+import { Button, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import Markdown from '../markdown/Markdown'
@@ -15,47 +15,28 @@ type RunDetail = Run & { snapshot: { case_ids: string[]; baseline_run?: string; 
 
 export default function PipelineRuns({ data, view, node, runId = '', onRun, refresh, eligible }: { data?: PipelineOverview; view: string; node: string | null; runId?: string; onRun: (id: string) => void; refresh: () => void; eligible: boolean }) {
   const { t, locale } = useI18n()
-  const [draft, setDraft] = useState<PipelineSettings | null>(null), [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(''), [error, setError] = useState('')
   const requestKey = useRef(''), active = useRef(true)
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
-  useEffect(() => { if (data && !dirty) setDraft(current => current && current.revision > data.settings.revision ? current : data.settings) }, [data, dirty])
-  const change = (patch: Partial<PipelineSettings>) => { setDirty(true); setDraft(value => value && ({ ...value, ...patch })) }
   const mutate = async (key: string, path: string, body?: unknown, method = 'POST') => {
     setBusy(key); setError('')
     try {
       const response = await api(method, (path.startsWith('/cancel/') ? '/agent/improvement/requests/' + path.slice(8) + '/cancel' : '/agent/improvement/pipeline' + path), body)
       if (!active.current) return
-      if (key === 'save') { setDraft(response.data); setDirty(false) }
       if (key === 'start') { requestKey.current = ''; onRun(response.data.id) }
       refresh()
     } catch (e: any) { if (active.current) setError(e.apiError?.code || 'RSI_OPERATION_FAILED') }
     finally { if (active.current) setBusy('') }
   }
-  const start = (baseline?: string) => { requestKey.current ||= crypto.randomUUID(); void mutate('start', '/requests', { request_key: requestKey.current, ...(baseline ? { baseline_run: baseline } : {}) }) }
+  const start = (baseline?: string) => { if (!eligible || busy) return; requestKey.current ||= crypto.randomUUID(); void mutate('start', '/requests', { request_key: requestKey.current, ...(baseline ? { baseline_run: baseline } : {}) }) }
   const date = (value: number) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
-  if (!data || !draft) return null
+  if (!data) return null
   return <>
     {error && <p className="agent-rsi-error" role="alert">{t('agent.rsi.operationFailed', { code: error })}</p>}
-    {view === 'workflow' && <section className="agent-rsi-section">
-      <h3>{t('agent.pipeline.settings')}</h3>
-      <p className="agent-rsi-muted">{data.publication?.repository ? t('agent.pipeline.repository', { name: data.publication.repository }) : t('agent.pipeline.configureRepository')}</p>
-      <div className="agent-rsi-form pipeline-settings">
-        <label>{t('agent.pipeline.autoPublish')}<Switch checked={draft.auto_publish} disabled={!!busy} onChange={auto_publish => change({ auto_publish })} /></label>
-        {(['daily_tokens', 'generation_tokens', 'codex_tokens', 'memory_output_tokens'] as const).map(key => <label key={key}>{t('agent.pipeline.setting.' + key)}<InputNumber value={draft[key]} min={key === 'codex_tokens' ? 20000 : key === 'memory_output_tokens' ? 1024 : 10000} max={key === 'memory_output_tokens' ? 8192 : key === 'codex_tokens' ? 100000 : key === 'generation_tokens' ? 2000000 : 100000000} onChange={value => value != null && change({ [key]: value })} /></label>)}
-        {(['main', 'worker', 'memory'] as const).map(role => <div className="pipeline-role-form" key={role}>
-          <label>{t('agent.pipeline.setting.' + role + '_model')}<Input value={draft[`${role}_model`] || ''} placeholder={t('agent.pipeline.workerDefault')} onChange={event => change({ [`${role}_model`]: event.target.value || null })} /></label>
-          {role !== 'memory' && <label>{t('agent.pipeline.setting.' + role + '_output_tokens')}<InputNumber value={draft[`${role}_output_tokens`]} min={512} max={1000000} placeholder={t('agent.pipeline.autoOutput')} onChange={value => change({ [`${role}_output_tokens`]: value })} /></label>}
-          <label>{t('agent.pipeline.setting.' + role + '_reasoning_effort')}<Select value={draft[`${role}_reasoning_effort`] || ''} options={[{ value: '', label: t('agent.pipeline.workerDefault') }, ...['low', 'medium', 'high'].map(value => ({ value, label: t('agent.reasoning.' + value) }))]} onChange={value => change({ [`${role}_reasoning_effort`]: value || null })} /></label>
-        </div>)}
-      </div>
-      <div className="agent-rsi-actions"><Button disabled={!dirty || !!busy} loading={busy === 'save'} onClick={() => void mutate('save', '/settings', draft, 'PUT')}>{t('agent.rsi.save')}</Button><Button disabled={dirty || !!busy || !eligible} loading={busy === 'start'} onClick={() => start()}>{t('agent.pipeline.startTen')}</Button></div>
-      <p className="agent-rsi-muted">{t('agent.pipeline.diagnosticHint')}</p>
-    </section>}
     {view === 'runs' && <section className="agent-rsi-section">
       {runId ? <>
         <button type="button" className="tt-act" onClick={() => onRun('')}>{t('agent.pipeline.allRuns')}</button>
-        <PipelineRunDetail key={node + ':' + runId} runId={runId} onCancel={() => mutate('cancel', '/cancel/' + runId)} onRetry={() => mutate('resume', '/runs/' + runId + '/resume')} onPublish={() => mutate('publish', '/runs/' + runId + '/publish')} onRerun={() => start(runId)} busy={busy || (dirty ? 'dirty' : '')} refresh={refresh} />
+        <PipelineRunDetail key={node + ':' + runId} runId={runId} onCancel={() => mutate('cancel', '/cancel/' + runId)} onRetry={() => mutate('resume', '/runs/' + runId + '/resume')} onPublish={() => mutate('publish', '/runs/' + runId + '/publish')} onRerun={() => start(runId)} busy={busy || (!eligible ? 'dirty' : '')} refresh={refresh} />
       </> : <>
         <h3>{t('agent.pipeline.runs')}</h3>
         {!data.runs.length && <p className="agent-rsi-muted">{t('agent.pipeline.noRuns')}</p>}

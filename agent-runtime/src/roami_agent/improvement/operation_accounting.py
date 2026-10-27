@@ -41,9 +41,18 @@ def quarantine_operation(ledger, owner, operation, *, reason, evidence):
 
 
 def assert_operation_costs_settled(db, owner):
+    from roami_agent.providers.model_proxy import model_proxy_context
+
+    ceiling = (
+        ""
+        if model_proxy_context.get() is not None
+        else " OR json_extract(result_json,'$.value.metrics.tokens')>reserved"
+    )
     require(
         not db.execute(
-            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer' OR json_extract(result_json,'$.value.metrics.tokens')>reserved)))",
+            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer'"
+            + ceiling
+            + ")))",
             (owner,),
         ).fetchone(),
         "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",

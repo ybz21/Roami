@@ -15,15 +15,6 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 const settings = { revision: 3, auto_publish: false, daily_tokens: 1000000, generation_tokens: 300000, codex_tokens: 64000, output_tokens: 8192, memory_output_tokens: 2048 }
 const data = { settings, runs: [], issues: [], publication: { repository: 'example/test' } }
 
-it('waits for pipeline settings and preserves dirty input during refresh', async () => {
-  const { rerender } = render(<PipelineRuns view="workflow" node={null} onRun={() => {}} refresh={() => {}} eligible />)
-  expect(screen.queryByRole('spinbutton')).toBeNull()
-  rerender(<PipelineRuns data={data} view="workflow" node={null} onRun={() => {}} refresh={() => {}} eligible />)
-  fireEvent.change(await screen.findByLabelText('每次诊断生成预算'), { target: { value: '350000' } })
-  rerender(<PipelineRuns data={{ ...data, settings: { ...settings, revision: 4 } }} view="workflow" node={null} onRun={() => {}} refresh={() => {}} eligible />)
-  expect((screen.getByLabelText('每次诊断生成预算') as HTMLInputElement).value).toBe('350000')
-  expect((screen.getByRole('button', { name: '诊断 10 项' }) as HTMLButtonElement).disabled).toBe(true)
-})
 it('renders one run with isolated stages and never labels an unverified issue fixed', async () => {
   state.detail = { id: 'run', mode: 'diagnostic', state: 'completed', created_ms: 1, updated_ms: 2, summary: { generation_tokens: null }, issue: null, snapshot: { case_ids: ['a'] }, nodes: [{ node: 'evaluate', attempt: 1, state: 'succeeded', config: {}, error_code: null }, { node: 'review', attempt: 1, state: 'blocked', config: {}, error_code: 'RSI_USAGE_UNKNOWN' }], cases: [{ case_id: 'a', state: 'blocked', kind: 'task', passed: false, quality: 0, metrics: { tokens: null }, signals: ['RSI_USAGE_UNKNOWN'], tool_calls: 0 }], artifacts: [], issues: [{ id: 'i', case_id: 'a', code: 'WORKSPACE_REQUIRED', status: 'unverified' }] }
   const navigate = vi.fn()
@@ -35,34 +26,4 @@ it('renders one run with isolated stages and never labels an unverified issue fi
   fireEvent.click(screen.getByRole('button', { name: '复测同组 Case' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/improvement/pipeline/requests', expect.objectContaining({ baseline_run: 'run' })))
   await waitFor(() => expect(navigate).toHaveBeenCalledWith('second'))
-})
-
-it('saves an explicit memory model and effort without changing the worker', async () => {
-  vi.mocked(api).mockResolvedValue({ data: { ...settings, revision: 4, memory_model: 'glm-5.3-flash', memory_reasoning_effort: 'low' } })
-  render(<PipelineRuns data={data} view="workflow" node={null} onRun={() => {}} refresh={() => {}} eligible />)
-  fireEvent.change(await screen.findByLabelText('记忆模型'), { target: { value: 'glm-5.3-flash' } })
-  fireEvent.change(screen.getByLabelText('记忆推理强度'), { target: { value: 'low' } })
-  fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/pipeline/settings', expect.objectContaining({ memory_model: 'glm-5.3-flash', memory_reasoning_effort: 'low' })))
-})
-
-it('keeps diagnostic admission closed until role settings are saved', async () => {
-  let finish: (value: any) => void = () => {}
-  vi.mocked(api).mockImplementation(() => new Promise(resolve => { finish = resolve }))
-  render(<PipelineRuns data={data} view="workflow" node={null} onRun={() => {}} refresh={() => {}} eligible />)
-  fireEvent.change(await screen.findByLabelText('主 Agent 模型'), { target: { value: 'glm-5.3-flash' } })
-  expect((screen.getByRole('button', { name: '诊断 10 项' }) as HTMLButtonElement).disabled).toBe(true)
-  fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/pipeline/settings', expect.objectContaining({ main_model: 'glm-5.3-flash' })))
-  finish({ data: { ...settings, revision: 4, main_model: 'glm-5.3-flash' } })
-  await waitFor(() => expect((screen.getByRole('button', { name: '诊断 10 项' }) as HTMLButtonElement).disabled).toBe(false))
-})
-
-it('saves independent output caps and lets a cleared worker cap use automatic allocation', async () => {
-  vi.mocked(api).mockResolvedValue({ data: { ...settings, revision: 4, main_output_tokens: 16384, worker_output_tokens: null } })
-  render(<PipelineRuns data={{ ...data, settings: { ...settings, main_output_tokens: null, worker_output_tokens: 32768 } }} view="workflow" node={null} onRun={() => {}} refresh={() => {}} eligible />)
-  fireEvent.change(await screen.findByLabelText('主 Agent 单次输出额度'), { target: { value: '16384' } })
-  fireEvent.change(screen.getByLabelText('Worker 单次输出额度'), { target: { value: '' } })
-  fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/pipeline/settings', expect.objectContaining({ main_output_tokens: 16384, worker_output_tokens: null, output_tokens: 8192 })))
 })

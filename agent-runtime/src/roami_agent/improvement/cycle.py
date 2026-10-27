@@ -93,8 +93,11 @@ async def run_cycle(
     costs = {case["id"]: reservation(case) for case in cases}
     require(all(type(cost) is int and cost >= 0 for cost in costs.values()))
     tokens = len(trial_arms) * sum(costs.values())
+    from roami_agent.providers.model_proxy import model_proxy_context
+
     require(
-        tokens <= daily_tokens and len(trial_arms) * len(cases) <= daily_episodes,
+        model_proxy_context.get() is not None
+        or (tokens <= daily_tokens and len(trial_arms) * len(cases) <= daily_episodes),
         "RSI_FULL_SUITE_BUDGET",
     )
     manifest = {
@@ -123,6 +126,7 @@ async def run_cycle(
         if policy_id(candidate) != policy_id(baseline)
         else "baseline_stability",
         "seed": seed,
+        "billing_mode": "model_daily" if model_proxy_context.get() is not None else "legacy_tokens",
         "reserved_tokens": tokens,
         "reserved_episodes": len(trial_arms) * len(cases),
         "trial_arms": trial_arms,

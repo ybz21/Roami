@@ -16,7 +16,10 @@ class BudgetAdmissionRejected(DomainError):
 
 class EpisodeBudget:
     def __init__(self, limits, *, observation_id=None):
+        from roami_agent.providers.model_proxy import model_proxy_context
+
         self.limits = limits
+        self.enforce_tokens = model_proxy_context.get() is None
         self.observation_id = observation_id or "rsi-" + identity()
         self.started = time.monotonic()
         self.requests = []
@@ -40,7 +43,7 @@ class EpisodeBudget:
             estimate = (
                 len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096 + output_cap
             )
-            if self.used + self.reserved + estimate > self.limits["tokens"]:
+            if self.enforce_tokens and self.used + self.reserved + estimate > self.limits["tokens"]:
                 raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
             entry = {
                 "inputTokens": None,
@@ -68,7 +71,7 @@ class EpisodeBudget:
                 self.unknown = True
             else:
                 self.used += entry["inputTokens"] + entry["outputTokens"]
-                if self.used > self.limits["tokens"]:
+                if self.enforce_tokens and self.used > self.limits["tokens"]:
                     raise DomainError("RSI_TOKEN_BUDGET")
 
     def metrics(self):
@@ -139,7 +142,11 @@ class MeteredModel:
                     usage = dict(event.value)
                 yield event
         except BaseException as exc:
-            if isinstance(exc, BudgetAdmissionRejected):
+            if isinstance(exc, BudgetAdmissionRejected) or getattr(exc, "code", None) in {
+                "MODEL_PROXY_DAILY_LIMIT",
+                "MODEL_PROXY_USAGE_UNKNOWN",
+                "MODEL_PROXY_CURRENCY_MISMATCH",
+            }:
                 usage = {
                     "inputTokens": 0,
                     "outputTokens": 0,

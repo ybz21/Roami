@@ -5,17 +5,19 @@ import { useI18n } from '../../i18n'
 import { useAgentData } from './useAgentData'
 import Markdown from '../markdown/Markdown'
 import './agent-improvement.css'
+import { RsiWorkspace } from './RsiWorkspace'
+import type { ModelCharge } from '../settings/model-charges'
 import PipelineRuns, { type PipelineOverview } from './PipelineRuns'
 import ExperimentWorkflow, { type ExperimentStage, type ExperimentView } from './ExperimentWorkflow'
 
-type Preferences = { revision: number; enabled: boolean; timezone: string; hour: number; daily_tokens: number; daily_episodes: number; cases_per_day: number; suite_id: string; machine_ids: string[]; auto_candidates: boolean; candidate_policy: Record<string, number> }
+export type Preferences = { revision: number; enabled: boolean; timezone: string; hour: number; daily_tokens: number; daily_episodes: number; cases_per_day: number; suite_id: string; machine_ids: string[]; auto_candidates: boolean; candidate_policy: Record<string, number> }
 type Comparison = { pairs: number; quality_delta: number; paired_elapsed_ratio_p50: number | null; paired_success_token_ratio_p50: number | null; eligible_for_promotion: boolean; reasons: string[]; release_blockers: string[]; strata: { layer: string; category: string; n: number; baseline_passes: number; candidate_passes: number }[] }
 type Cycle = { id: string; day: string; state: string; machine_id: string; report: { comparison?: Comparison; review?: { complete: boolean; expected_trials: number; metrics_reviewed: number; logs_reviewed: number }; counts?: Record<string, { executed: number; passed: number; verified_deliveries: number }> } | null }
 type Request = { id: string; machine_id: string; state: string; error_code: string | null; cycle_id: string | null }
-type ResearchSettings = { revision: number; enabled: boolean; model_tokens: number; model_seconds: number; max_attempts: number; observation_days: number }
+export type ResearchSettings = { revision: number; enabled: boolean; model_tokens: number; model_seconds: number; max_attempts: number; observation_days: number }
 type Preview = { cases: number; machines: number; episodes: number; reservation_tokens: number | null; next_run: string | null; blockers: string[]; codex_tokens_per_operation: number }
 type Research = { reports?: { cycle_id: string; day: string; points: number; issueUrl: string | null }[]; review_coverage?: { cycle_id: string; reviewed: number }[]; model_cost?: { total_tokens: number | null }; settings: ResearchSettings; actions: { id: string; kind: string; state: string; error_code: string | null }[]; improvements: { id: string; title: string; state: string; reviewUrl?: string | null }[] }
-type Overview = { pipeline?: PipelineOverview; research?: Research; preferences: Preferences; catalog: { machines: { id: string; label: string; mode: string }[]; suites: { id: string; count: number; splits: Record<string, number> }[] }; cycles: Cycle[]; requests: Request[]; releases: { seq: number; active: string | null; history: { seq: number; release_id: string | null; action: string; created_ms: number }[] } }
+export type Overview = { billing?: { dailyLimit: number | null; currency: string; charges: ModelCharge[]; localCharges: ModelCharge[]; unknown: number; pending: number }; pipeline?: PipelineOverview; research?: Research; preferences: Preferences; catalog: { machines: { id: string; label: string; mode: string }[]; suites: { id: string; count: number; splits: Record<string, number> }[] }; cycles: Cycle[]; requests: Request[]; releases: { seq: number; active: string | null; history: { seq: number; release_id: string | null; action: string; created_ms: number }[] } }
 
 export default function AgentImprovement({ node, workflow = false, runId = '', onRun }: { node: string | null; workflow?: boolean; runId?: string; onRun?: (id: string) => void }) {
   const { t, locale } = useI18n()
@@ -91,6 +93,7 @@ export default function AgentImprovement({ node, workflow = false, runId = '', o
   if (data.failed && !data.value) return <div className="agent-rsi-error"><p>{t('agent.rsi.loadFailed')}</p><Button onClick={data.refresh}>{t('agent.rsi.retry')}</Button></div>
   const value = data.value
   if (!value || !draft) return null
+  if (value.pipeline) return <RsiWorkspace key={node || 'local'} value={value} node={node} runId={runId} onRun={onRun} refresh={data.refresh} failed={data.failed} />
   const latest = value.cycles.find(c => c.report?.comparison)?.report?.comparison
   const chosen = value.cycles.filter(c => selected.includes(c.id))
   const selectedCycle = value.cycles.find(c => c.id === detail)
@@ -111,8 +114,6 @@ export default function AgentImprovement({ node, workflow = false, runId = '', o
         {['review', 'issue', 'repair'].includes(stage) && <div>{t('agent.experiment.executor')}: <strong>Codex</strong></div>}
         {stage === 'review' && <div className="agent-rsi-form">
           <label>{t('agent.experiment.automate')}<Switch checked={researchDraft.enabled} disabled={!!busy} onChange={enabled => changeResearch({ enabled })} /></label>
-          <label>{t('agent.experiment.operationTokens')}<InputNumber min={10000} max={100000} value={researchDraft.model_tokens} onChange={model_tokens => model_tokens != null && changeResearch({ model_tokens })} /></label>
-          <label>{t('agent.experiment.operationSeconds')}<InputNumber min={10} max={600} value={researchDraft.model_seconds} onChange={model_seconds => model_seconds != null && changeResearch({ model_seconds })} /></label>
         </div>}
         {stage === 'repair' && <label>{t('agent.experiment.attempts')}<InputNumber min={1} max={3} value={researchDraft.max_attempts} onChange={max_attempts => max_attempts != null && changeResearch({ max_attempts })} /></label>}
         {stage === 'observe' && <label>{t('agent.experiment.observationDays')}<InputNumber min={2} max={14} value={researchDraft.observation_days} onChange={observation_days => observation_days != null && changeResearch({ observation_days })} /></label>}
@@ -136,23 +137,19 @@ export default function AgentImprovement({ node, workflow = false, runId = '', o
         <label>{t('agent.rsi.machines')}<Select mode="multiple" value={draft.machine_ids} onChange={machine_ids => change({ machine_ids })} options={value.catalog.machines.map(m => ({ value: m.id, label: m.label }))} /></label>
         <label>{t('agent.rsi.hour')}<InputNumber min={0} max={23} value={draft.hour} onChange={hour => hour != null && change({ hour })} /></label>
         <label>{t('agent.rsi.timezone')}<Input value={draft.timezone} onChange={e => change({ timezone: e.target.value })} /></label>
-        <label>{t('agent.rsi.dailyTokens')}<InputNumber min={0} max={100000000} value={draft.daily_tokens} onChange={daily_tokens => daily_tokens != null && change({ daily_tokens })} /></label>
-        <label>{t('agent.rsi.dailyEpisodes')}<InputNumber min={0} max={10000} value={draft.daily_episodes} onChange={daily_episodes => daily_episodes != null && change({ daily_episodes })} /></label>
-        <label>{t('agent.rsi.dailyCases')}<InputNumber value={60} readOnly /></label>
         <Checkbox checked={draft.auto_candidates} onChange={e => change({ auto_candidates: e.target.checked })}>{t('agent.rsi.autoCandidates')}</Checkbox>
         {!draft.auto_candidates && <details><summary>{t('agent.rsi.candidatePolicy')}</summary>{Object.entries({ memory_recall_limit: 8, memory_recall_tokens: 2000, tool_directory_page_size: 10, keep_recent_tokens: 20000 }).map(([name, fallback]) => <label key={name}>{t('agent.rsi.parameter.' + name)}<InputNumber min={1} value={draft.candidate_policy[name] ?? fallback} onChange={next => next != null && change({ candidate_policy: { ...draft.candidate_policy, [name]: next } })} /></label>)}</details>}
       </div>
       <div className="agent-rsi-actions">
         {workflow && <Button loading={busy === 'preview'} disabled={dirty || researchDirty || !!busy} onClick={() => void loadPreview()}>{t('agent.experiment.preview')}</Button>}
         <Button type="primary" loading={busy === 'save'} disabled={!dirty || !!busy} onClick={() => mutate('save', '/preferences', draft, 'PUT')}>{t('agent.rsi.save')}</Button>
-        <Button loading={busy === 'run'} disabled={dirty || researchDirty || !!busy || !draft.machine_ids.length || !draft.daily_tokens} onClick={() => void run()}>{t('agent.rsi.run')}</Button>
+        <Button loading={busy === 'run'} disabled={dirty || researchDirty || !!busy || !draft.machine_ids.length} onClick={() => void run()}>{t('agent.rsi.run')}</Button>
         {!value.catalog.suites.length && <Button loading={busy === 'prepare'} disabled={!!busy} onClick={() => mutate('prepare', '/prepare')}>{t('agent.rsi.prepare')}</Button>}
         {!value.catalog.machines.length && <Button disabled={!!busy} onClick={() => mutate('machine', '/machines', { id: 'local-container', label: t('agent.rsi.localMachine'), mode: 'container' })}>{t('agent.rsi.addLocal')}</Button>}
       </div>
-      {!draft.daily_tokens && <p className="agent-rsi-muted">{t('agent.rsi.budgetHint')}</p>}
     </section>}
     {workflow && showWorkflow && preview && <section className="agent-rsi-section" aria-label={t('agent.experiment.preview')}>
-      <dl className="agent-experiment-preview">{Object.entries({ cases: number(preview.cases), machines: number(preview.machines), episodes: number(preview.episodes), reservation: preview.reservation_tokens == null ? t('agent.rsi.unknown') : number(preview.reservation_tokens), nextRun: preview.next_run ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: draft.timezone }).format(new Date(preview.next_run)) : t('agent.experiment.scheduleOff'), operationTokens: number(preview.codex_tokens_per_operation) }).map(([name, text]) => <div key={name}><dt>{t('agent.experiment.preview.' + name)}</dt><dd>{text}</dd></div>)}</dl>
+      <dl className="agent-experiment-preview">{Object.entries({ cases: number(preview.cases), machines: number(preview.machines), episodes: number(preview.episodes), nextRun: preview.next_run ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: draft.timezone }).format(new Date(preview.next_run)) : t('agent.experiment.scheduleOff') }).map(([name, text]) => <div key={name}><dt>{t('agent.experiment.preview.' + name)}</dt><dd>{text}</dd></div>)}</dl>
       <p className="agent-rsi-muted">{t('agent.experiment.previewHint')}</p>
       {!!preview.blockers.length && <ul>{preview.blockers.map(code => <li key={code}>{t('agent.rsi.error.' + code).startsWith('agent.rsi.error.') ? t('agent.rsi.operationFailed', { code }) : t('agent.rsi.error.' + code)}</li>)}</ul>}
     </section>}
