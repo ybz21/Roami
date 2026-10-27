@@ -39,3 +39,6 @@ line-length = 100
 
 [tool.hatch.build.targets.wheel.force-include]
 "migrations" = "roami_agent/migrations"
+
+[tool.hatch.build.hooks.custom]
+path = "case_build.py"

@@ -530,7 +530,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "bash",
-            "Execute registered Roami CLI operations or shell commands. Workspace scope uses a bound directory or cwd within configured roots. Main may explicitly use scope=host for user-authorized machine operations without cwd; this uses a temporary working directory, not a sandbox. General commands retain write effects, cancellation and receipts. Use registered Roami commands for managed resources.",
+            "Execute Roami CLI or shell with write effects, cancellation and receipts. Workspace uses a bound directory or configured-root cwd. Main scope=host needs user-authorized machine work and no cwd; its temporary cwd is not a sandbox. Use registered commands for managed resources. Calls reap process groups: test temporary server/client in one call; clean up captured child PIDs, not command patterns.",
             schema,
             bash,
             main=True,

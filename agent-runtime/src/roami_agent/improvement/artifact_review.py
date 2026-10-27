@@ -49,6 +49,7 @@ def needs_artifact_review(case):
 class ArtifactReviewer:
     def __init__(self, settings, profile, *, provider_factory=None, calibrated=True):
         self.settings, self.profile, self.provider_factory = settings, profile, provider_factory
+        self.shared_daily_limit = False
         require(isinstance(profile, dict) and profile.get("schema_version") == 1)
         require(
             set(profile)
@@ -121,7 +122,7 @@ class ArtifactReviewer:
         )
 
     @classmethod
-    def load(cls, settings, root, owner):
+    def load(cls, settings, root, owner, *, provider_factory=None):
         directory = Path(root) / "artifact-review" / digest(owner)[:24]
         profile_path = directory / "profile.json"
         if not profile_path.exists():
@@ -137,7 +138,10 @@ class ArtifactReviewer:
         from roami_agent.improvement.contracts import relative_file
 
         certificate = private_document(relative_file(directory, profile.pop("certificate_file")))
-        return cls(settings, {**profile, "certificate": certificate})
+        reviewer = cls(settings, {**profile, "certificate": certificate})
+        reviewer.provider_factory = provider_factory
+        reviewer.shared_daily_limit = provider_factory is not None
+        return reviewer
 
     def budget(self):
         return EpisodeBudget(
@@ -145,7 +149,8 @@ class ArtifactReviewer:
                 "tokens": self.profile["max_tokens"],
                 "seconds": self.profile["seconds"],
                 "requests": 2,
-            }
+            },
+            shared_daily_limit=self.shared_daily_limit,
         )
 
     async def rate(self, pack, budget, journal):

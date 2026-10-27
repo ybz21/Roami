@@ -7,7 +7,9 @@ import re
 import secrets
 from pathlib import Path
 
+from roami_agent.improvement.case_catalog import case_identity
 from roami_agent.improvement.contracts import digest, require
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -149,11 +151,11 @@ def trial_summary(case, result, root=None):
             "RSI_TOKEN_BUDGET",
             "RSI_DAILY_BUDGET",
             "RSI_REQUEST_BUDGET",
+            "UPSTREAM_USAGE_UNKNOWN",
+            "RSI_USAGE_UNKNOWN",
             "MODEL_PROXY_DAILY_LIMIT",
             "MODEL_PROXY_USAGE_UNKNOWN",
             "MODEL_PROXY_CURRENCY_MISMATCH",
-            "UPSTREAM_USAGE_UNKNOWN",
-            "RSI_USAGE_UNKNOWN",
         }
     )
     state = (
@@ -165,8 +167,11 @@ def trial_summary(case, result, root=None):
         if grade.get("passed")
         else "failed"
     )
+    identity = case_identity(case)
     return {
         "case_id": case["id"],
+        "name": identity["name"],
+        "description": identity["description"],
         "category": case.get("category", ""),
         "kind": "mechanism"
         if case.get("layer") == "mechanism" or case.get("judge", {}).get("kind") == "mechanism"
@@ -203,6 +208,18 @@ class RunRecords:
             return {**DEFAULTS, **(json.loads(row[0]) if row else {})}
 
     def configure(self, owner, value):
+        shared = uses_shared_model_limit(self.ledger)
+        if shared:
+            require(
+                isinstance(value, dict)
+                and {"revision", "auto_publish"} <= set(value) <= set(DEFAULTS),
+                "RSI_INVALID_SETTINGS",
+            )
+            value = {
+                **self.settings(owner),
+                "revision": value["revision"],
+                "auto_publish": value["auto_publish"],
+            }
         require(
             isinstance(value, dict) and {"revision"} <= set(value) <= set(DEFAULTS),
             "RSI_INVALID_SETTINGS",
@@ -239,6 +256,10 @@ class RunRecords:
             require(
                 type(value[key]) is int and lower <= value[key] <= upper, "RSI_POLICY_OUT_OF_RANGE"
             )
+        require(
+            value["generation_tokens"] + 2 * value["codex_tokens"] <= value["daily_tokens"],
+            "RSI_DAILY_BUDGET",
+        )
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             old = db.execute(
@@ -249,12 +270,39 @@ class RunRecords:
                 type(value["revision"]) is int and value["revision"] == prior["revision"],
                 "RSI_SETTINGS_CONFLICT",
             )
+            if value["daily_tokens"] != prior["daily_tokens"] and not getattr(
+                self.ledger, "shared_daily_limit", False
+            ):
+                from datetime import datetime
+                from zoneinfo import ZoneInfo
+
+                prefs = db.execute(
+                    "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
+                ).fetchone()
+                timezone = (
+                    json.loads(prefs[0]).get("timezone", "Asia/Shanghai")
+                    if prefs
+                    else "Asia/Shanghai"
+                )
+                day = datetime.now(ZoneInfo(timezone)).date().isoformat()
+                budget = db.execute(
+                    "SELECT tokens_reserved FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
+                ).fetchone()
+                require(not budget or budget[0] <= value["daily_tokens"], "RSI_DAILY_BUDGET")
+                db.execute(
+                    "UPDATE rsi_budgets SET tokens_limit=? WHERE owner=? AND day=?",
+                    (value["daily_tokens"], owner, day),
+                )
             result = {**value, "revision": value["revision"] + 1}
             db.execute(
                 "INSERT OR REPLACE INTO rsi_pipeline_settings VALUES(?,?)",
                 (owner, json.dumps(result)),
             )
-        return result
+        return {
+            key: val
+            for key, val in result.items()
+            if not shared or key in {"revision", "auto_publish"}
+        }
 
     @staticmethod
     def create_tx(db, owner, run_id, request_key, mode, snapshot):
@@ -403,18 +451,18 @@ class RunRecords:
     def observations(self, owner, run_id):
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
-            require(
-                db.execute(
-                    "SELECT 1 FROM rsi_pipeline_runs WHERE id=? AND owner=?", (run_id, owner)
-                ).fetchone(),
-                "RSI_RUN_NOT_FOUND",
-            )
+            run = db.execute(
+                "SELECT created_ms FROM rsi_pipeline_runs WHERE id=? AND owner=?", (run_id, owner)
+            ).fetchone()
+            require(run is not None, "RSI_RUN_NOT_FOUND")
             cases = {
                 r["case_id"]: json.loads(r["result_json"])
                 for r in db.execute("SELECT * FROM rsi_pipeline_cases WHERE run_id=?", (run_id,))
             }
             for case in cases.values():
                 for signal in case["signals"]:
+                    if signal == "MODEL_PROXY_DAILY_LIMIT":
+                        continue
                     ident = digest([owner, case["case_id"], signal])
                     db.execute(
                         "INSERT INTO rsi_pipeline_issues VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET updated_ms=excluded.updated_ms",
@@ -425,16 +473,29 @@ class RunRecords:
             ).fetchall():
                 case = cases.get(issue["case_id"])
                 prior = db.execute(
-                    "SELECT c.source_hash FROM rsi_pipeline_observations o JOIN rsi_pipeline_cases c ON c.run_id=o.run_id AND c.case_id=? JOIN rsi_pipeline_runs r ON r.id=o.run_id WHERE o.issue_id=? AND o.run_id!=? ORDER BY r.created_ms DESC LIMIT 1",
-                    (issue["case_id"], issue["id"], run_id),
+                    "SELECT c.source_hash FROM rsi_pipeline_observations o JOIN rsi_pipeline_cases c ON c.run_id=o.run_id AND c.case_id=? JOIN rsi_pipeline_runs r ON r.id=o.run_id WHERE o.issue_id=? AND r.owner=? AND (r.created_ms<? OR (r.created_ms=? AND r.id<?)) ORDER BY r.created_ms DESC,r.id DESC LIMIT 1",
+                    (
+                        issue["case_id"],
+                        issue["id"],
+                        owner,
+                        run["created_ms"],
+                        run["created_ms"],
+                        run_id,
+                    ),
                 ).fetchone()
+                if prior is None and (case is None or issue["code"] not in case["signals"]):
+                    db.execute(
+                        "DELETE FROM rsi_pipeline_observations WHERE run_id=? AND issue_id=?",
+                        (run_id, issue["id"]),
+                    )
+                    continue
                 status = (
                     "not_tested"
                     if case is None
-                    else "not_comparable"
-                    if prior and prior[0] != case["source_hash"]
                     else "present"
                     if issue["code"] in case["signals"]
+                    else "not_comparable"
+                    if prior and prior[0] != case["source_hash"]
                     else "not_reproduced"
                     if case["passed"]
                     and not case["pending"]
@@ -478,7 +539,11 @@ class RunRecords:
         except (DomainError, OSError, ValueError):
             publication = None
         return {
-            "settings": self.settings(owner),
+            "settings": {
+                key: val
+                for key, val in self.settings(owner).items()
+                if not uses_shared_model_limit(self.ledger) or key in {"revision", "auto_publish"}
+            },
             "runs": runs,
             "issues": issues,
             "publication": {"repository": publication["repository"] if publication else None},
@@ -615,16 +680,50 @@ class RunRecords:
             require(row is not None, "RSI_RUN_NOT_FOUND")
             snapshot = json.loads(row[0])
             require(snapshot["suite_hash"] == suite["content_hash"], "RSI_SUITE_HASH_MISMATCH")
-            ids = [c["id"] for c in suite["cases"]]
+            cases = {case["id"]: case for case in suite["cases"]}
+            ids = snapshot.get("case_ids") or list(cases)
             require(
-                not snapshot.get("case_ids") or snapshot["case_ids"] == ids, "RSI_CASES_CHANGED"
+                len(set(ids)) == len(ids)
+                and set(ids) <= set(cases)
+                and (not snapshot.get("formal_daily") or ids == list(cases)),
+                "RSI_CASES_CHANGED",
             )
             snapshot.update(
-                case_ids=ids, source_case_hashes={c["id"]: digest(c) for c in suite["cases"]}
+                case_ids=ids,
+                source_case_hashes={ident: digest(cases[ident]) for ident in ids},
             )
+            if "case_definitions" not in snapshot:
+                snapshot["case_definitions"] = {ident: case_identity(cases[ident]) for ident in ids}
             db.execute(
                 "UPDATE rsi_pipeline_runs SET snapshot_json=? WHERE owner=? AND id=?",
                 (json.dumps(snapshot), owner, run_id),
+            )
+
+    def freeze_context(self, owner, run_id, context):
+        require(set(context) == {"source_hash", "model_hash", "environment_hash", "judge_hash"})
+        require(
+            all(
+                isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value)
+                for value in context.values()
+            )
+        )
+        with self.ledger.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT snapshot_json FROM rsi_pipeline_runs WHERE id=? AND owner=?",
+                (run_id, owner),
+            ).fetchone()
+            require(row is not None, "RSI_RUN_NOT_FOUND")
+            snapshot = json.loads(row[0])
+            require(
+                "comparison_context" not in snapshot or snapshot["comparison_context"] == context,
+                "RSI_COMPARISON_CONTEXT_CHANGED",
+            )
+            snapshot["comparison_context"] = context
+            snapshot.setdefault("context_frozen_ms", now_ms())
+            db.execute(
+                "UPDATE rsi_pipeline_runs SET snapshot_json=? WHERE id=? AND owner=?",
+                (json.dumps(snapshot), run_id, owner),
             )
 
     def queue_report(self, owner, run_id, summary, *, reserve=False):
@@ -633,6 +732,8 @@ class RunRecords:
             from datetime import datetime
             from zoneinfo import ZoneInfo
 
+            from roami_agent.improvement.control import DEFAULTS as EVALUATION_DEFAULTS
+
             config = value["snapshot"]["pipeline"]
             prefs = value["snapshot"].get("preferences", {})
             day = datetime.now(ZoneInfo(prefs.get("timezone", "Asia/Shanghai"))).date().isoformat()
@@ -640,13 +741,21 @@ class RunRecords:
                 db.execute("BEGIN IMMEDIATE")
                 db.execute(
                     "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
-                    (owner, day, prefs.get("daily_tokens") or config["daily_tokens"], 10000),
+                    (
+                        owner,
+                        day,
+                        prefs.get("daily_tokens") or config["daily_tokens"],
+                        prefs.get("daily_episodes", EVALUATION_DEFAULTS["daily_episodes"]) or 10000,
+                    ),
                 )
                 budget = db.execute(
                     "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
                 ).fetchone()
                 amount = config["codex_tokens"] * 2
-                if budget["tokens_reserved"] + amount > budget["tokens_limit"]:
+                if (
+                    not uses_shared_model_limit(self.ledger)
+                    and budget["tokens_reserved"] + amount > budget["tokens_limit"]
+                ):
                     db.execute(
                         "UPDATE rsi_pipeline_runs SET state='blocked',summary_json=? WHERE id=? AND owner=?",
                         (json.dumps(summary), run_id, owner),
@@ -814,6 +923,7 @@ class RunRecords:
 
     def sync_research(self, owner):
         documents = []
+        receipts = []
         with self.ledger.connection() as db:
             runs = db.execute(
                 "SELECT id,cycle_id,state FROM rsi_pipeline_runs WHERE owner=? AND mode!='diagnostic' AND cycle_id IS NOT NULL",
@@ -865,14 +975,42 @@ class RunRecords:
                         state = (
                             "blocked"
                             if states & {"blocked", "waiting_budget"}
+                            else "failed"
+                            if states & {"failed"}
+                            else "unknown"
+                            if states & {"unknown"}
                             else "running"
                             if states & {"running", "queued"}
                             else "succeeded"
+                            if states <= {"done", "completed"}
+                            else "pending"
                         )
                         db.execute(
                             "UPDATE rsi_pipeline_nodes SET state=? WHERE run_id=? AND node=?",
                             (state, run["id"], stage),
                         )
+                        for action in found:
+                            result = json.loads(action["result_json"] or "{}")
+                            receipt = {
+                                "action_id": action["id"],
+                                "kind": kind,
+                                "state": action["state"],
+                                "error_code": action["error_code"],
+                                "created_ms": action["created_ms"],
+                                "result": {
+                                    key: result[key]
+                                    for key in (
+                                        "verified_by",
+                                        "verification_cycles",
+                                        "verification_context",
+                                        "regression_output_hash",
+                                        "base_build_hash",
+                                        "candidate_build_hash",
+                                    )
+                                    if key in result
+                                },
+                            }
+                            receipts.append((run["id"], stage, receipt))
                 for report in matched:
                     data = json.loads(report["report_json"])
                     if report["issue_json"]:
@@ -893,7 +1031,7 @@ class RunRecords:
                     }
                     observation = (
                         "succeeded"
-                        if states and states <= {"closed", "rejected"}
+                        if states and states <= {"closed", "closed_fixed", "rejected"}
                         else "running"
                         if "observing" in states
                         else "pending"
@@ -902,7 +1040,7 @@ class RunRecords:
                         "UPDATE rsi_pipeline_nodes SET state=? WHERE run_id=? AND node='observe'",
                         (observation, run["id"]),
                     )
-                    if states and states <= {"closed", "rejected"}:
+                    if states and states <= {"closed", "closed_fixed", "rejected"}:
                         db.execute(
                             "UPDATE rsi_pipeline_runs SET state='completed' WHERE id=?",
                             (run["id"],),
@@ -918,3 +1056,5 @@ class RunRecords:
                 )
             except DomainError:
                 pass
+        for run_id, stage, receipt in receipts:
+            self.artifact(owner, run_id, stage, "action-" + digest(receipt)[:20] + ".json", receipt)

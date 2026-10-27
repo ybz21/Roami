@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-19",
+  "kind": "public_source_reference",
+  "category": "DOC",
+  "source_case_id": "the-agent-company:hr-make-slides-introduce-leadership",
+  "origin": {
+    "benchmark": "the_agent_company",
+    "task_id": "hr-make-slides-introduce-leadership",
+    "revision": "98b68ef82a47690c316f42fddb05baafaab56851"
+  },
+  "execution": "registered_suite"
+}

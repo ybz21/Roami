@@ -36,7 +36,9 @@ async def test_native_identity_is_separate_from_main_and_idempotent(store):
     directory = service.root / session["id"]
     records = [json.loads(line) for line in (directory / ".chat.jsonl").read_text().splitlines()]
     assert [r["type"] for r in records] == ["session.created", "message.committed"]
-    assert records[-1]["payload"]["content"]["text"] == "Research"
+    assert records[-1]["payload"]["content"]["displayText"] == "Research"
+    view = await service.conversation("alice", session["id"])
+    assert view["messages"][0]["content"]["text"] == "Research"
     assert directory.stat().st_mode & 0o777 == 0o700
     assert (directory / ".chat.jsonl").stat().st_mode & 0o777 == 0o600
     assert (

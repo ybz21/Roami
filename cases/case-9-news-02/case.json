@@ -1,0 +1,91 @@
+{
+  "id": "NEWS-02",
+  "kind": "real_workload",
+  "category": "NEWS",
+  "category_label": "新闻与技术调研",
+  "prompt": "核实一项产品发布的时间和地点，以最新有效官方更正为准。",
+  "preconditions": "原公告为22日A馆，更正为23日B馆，二者均在固定来源集中。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "核实结论与引用"
+  ],
+  "hard_assertions": [
+    {
+      "id": "NEWS-02-H1",
+      "rule": "最终采用23日B馆",
+      "evidence": [
+        "source_snapshot",
+        "observed_urls",
+        "publication_times",
+        "claim_evidence"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "NEWS-02-H2",
+      "rule": "指出更正关系",
+      "evidence": [
+        "source_snapshot",
+        "observed_urls",
+        "publication_times",
+        "claim_evidence"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "NEWS-02-H3",
+      "rule": "链接实际读取过且不引用错误内容作最终事实。",
+      "evidence": [
+        "source_snapshot",
+        "observed_urls",
+        "publication_times",
+        "claim_evidence"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "TL",
+    "TE",
+    "TR",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "research",
+  "research_inspiration": [
+    "OfficeBench",
+    "TheAgentCompany"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "关键事实和时间窗口准确",
+    "completeness": "主题、冲突、限制与问题覆盖",
+    "usability": "结构清楚，结论可用于下一步决定",
+    "grounding": "引用真实可读，区分事实、推断与未知"
+  },
+  "excellence_candidates": [
+    "关键证据链及反证条件清晰且无遗漏",
+    "结论简洁，适合预定读者直接使用"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "gaia",
+    "browsecomp"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

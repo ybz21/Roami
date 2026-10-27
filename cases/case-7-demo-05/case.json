@@ -1,0 +1,89 @@
+{
+  "id": "DEMO-05",
+  "kind": "real_workload",
+  "category": "DEMO",
+  "category_label": "Demo 与产品原型",
+  "prompt": "把已有桌面Demo改为手机可用，保持已有功能和输入。",
+  "preconditions": "已有筛选与草稿；320、390、820宽度及coarse触控夹具。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "Demo补丁",
+    "触控核验"
+  ],
+  "hard_assertions": [
+    {
+      "id": "DEMO-05-H1",
+      "rule": "原功能保留",
+      "evidence": [
+        "browser_interactions",
+        "source_snapshot",
+        "console",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "DEMO-05-H2",
+      "rule": "无横向溢出且控件可点",
+      "evidence": [
+        "browser_interactions",
+        "source_snapshot",
+        "console",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "DEMO-05-H3",
+      "rule": "键盘与返回后草稿不丢。",
+      "evidence": [
+        "browser_interactions",
+        "source_snapshot",
+        "console",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "MR",
+    "CT",
+    "TE",
+    "VD"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "demo",
+  "research_inspiration": [
+    "OSWorld",
+    "Harbor"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "核心交互和数据正确",
+    "completeness": "指定流程、错误与恢复覆盖",
+    "usability": "可运行，触控/键盘可到达，状态能恢复",
+    "grounding": "演示与实际源码行为一致，样例数据标清"
+  },
+  "excellence_candidates": [
+    "预登记的连续操作与恢复变体无误",
+    "交互一致且用户无需额外解释即可完成任务"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

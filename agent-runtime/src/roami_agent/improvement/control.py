@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from roami_agent.improvement.contracts import digest, identifier, load_suite, require
 from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.policy import validate_policy
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -41,6 +42,17 @@ class ImprovementControl:
             }
 
     def save(self, owner, raw):
+        shared = uses_shared_model_limit(self.ledger)
+        if shared:
+            public = {*DEFAULTS, "revision"} - {"daily_tokens", "daily_episodes"}
+            require(
+                isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
+                "RSI_INVALID_SETTINGS",
+            )
+            raw = {
+                **self.preferences(owner),
+                **{key: value for key, value in raw.items() if key in public},
+            }
         require(
             isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
             "RSI_INVALID_SETTINGS",
@@ -107,7 +119,21 @@ class ImprovementControl:
                 (owner, revision + 1, json.dumps(value), now_ms()),
             )
             db.execute("COMMIT")
-        return {"revision": revision + 1, **value}
+        result = {"revision": revision + 1, **value}
+        return {
+            key: val
+            for key, val in result.items()
+            if not shared or key not in {"daily_tokens", "daily_episodes"}
+        }
+
+    def preferences_view(self, owner):
+        value = self.preferences(owner)
+        return {
+            key: val
+            for key, val in value.items()
+            if not uses_shared_model_limit(self.ledger)
+            or key not in {"daily_tokens", "daily_episodes"}
+        }
 
     def register_machine(self, owner, raw, *, local_only=False):
         require(isinstance(raw, dict))
@@ -209,6 +235,11 @@ class ImprovementControl:
                 (owner, prefs["suite_id"]),
             ).fetchone()
             require(machine and suite, "RSI_SETUP_REQUIRED")
+            require(
+                not uses_shared_model_limit(self.ledger)
+                or json.loads(machine[0])["mode"] in {"container", "native_files"},
+                "RSI_SHARED_MODEL_GATEWAY_REQUIRED",
+            )
             payload = {
                 "period_key": request_key,
                 "preferences": prefs,

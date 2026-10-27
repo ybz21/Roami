@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-05",
+  "kind": "public_source_reference",
+  "category": "DATA",
+  "source_case_id": "dsbench:00000018:question24",
+  "origin": {
+    "benchmark": "dsbench",
+    "task_id": "00000018:question24",
+    "revision": "1196d6553ec200e1262841efc89cda5954ffe89f"
+  },
+  "execution": "registered_suite"
+}

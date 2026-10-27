@@ -15,6 +15,7 @@ from roami_agent.improvement.contracts import (
     require,
 )
 from roami_agent.improvement.policy import BOUNDS, next_candidate
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -112,6 +113,12 @@ class EvaluationWorker:
                     "RSI_FORMAL_SUITE_INCOMPLETE",
                 )
             settings = self.runtime.settings.current
+            provider_factory = getattr(self.service, "provider_factory", None)
+            shared = uses_shared_model_limit(self.service.ledger)
+            require(
+                not shared or machine["mode"] in {"container", "native_files"},
+                "RSI_SHARED_MODEL_GATEWAY_REQUIRED",
+            )
             if machine["mode"] in {"native_files", "container"}:
                 require(settings.endpoint and settings.model, "MODEL_NOT_CONFIGURED")
                 if machine["mode"] == "container":
@@ -122,17 +129,30 @@ class EvaluationWorker:
                     from roami_agent.improvement.containers import ContainerExecutor
 
                     reviewer = ArtifactReviewer.load(
-                        settings, self.service.ledger.path.parent, request["owner"]
+                        settings,
+                        self.service.ledger.path.parent,
+                        request["owner"],
+                        provider_factory=provider_factory,
                     )
                     require(
                         reviewer is not None
                         or not any(needs_artifact_review(c) for c in suite["cases"]),
                         "RSI_ARTIFACT_REVIEW_REQUIRED",
                     )
-                    executor = ContainerExecutor(settings, artifact_reviewer=reviewer)
+                    executor = ContainerExecutor(
+                        settings,
+                        artifact_reviewer=reviewer,
+                        provider_factory=provider_factory,
+                        shared_daily_limit=shared,
+                    )
                     fingerprint = await executor.preflight()
                 else:
-                    executor = NativeFilesExecutor(settings, settle_maintenance=True)
+                    executor = NativeFilesExecutor(
+                        settings,
+                        settle_maintenance=True,
+                        provider_factory=provider_factory,
+                        shared_daily_limit=shared,
+                    )
                     fingerprint = {}
                 machine = {
                     **machine,
@@ -167,11 +187,31 @@ class EvaluationWorker:
                 from roami_agent.improvement.candidate_checks import CodePairExecutor
 
                 require(machine["mode"] == "container", "RSI_CODE_CONTAINER_REQUIRED")
-                executor = CodePairExecutor(settings, release, artifact_reviewer=reviewer)
+                executor = CodePairExecutor(
+                    settings,
+                    release,
+                    artifact_reviewer=reviewer,
+                    provider_factory=provider_factory,
+                    shared_daily_limit=shared,
+                )
                 fingerprint = await executor.preflight()
                 machine = {**machine, **fingerprint}
                 source_builds = executor.builds
                 candidate = baseline
+            if hasattr(self.service, "runs"):
+                from roami_agent.improvement.comparison_context import comparison_context
+
+                await asyncio.to_thread(
+                    self.service.runs.freeze_context,
+                    request["owner"],
+                    request["id"],
+                    comparison_context(
+                        suite,
+                        executor,
+                        machine,
+                        source_hash=source_builds["candidate"] if source_builds else None,
+                    ),
+                )
             result = await run_cycle(
                 ledger=self.service.ledger,
                 owner=request["owner"],

@@ -4,13 +4,16 @@ import asyncio
 import copy
 import json
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, identifier, load_suite, require
 from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
 from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.policy import BOUNDS
 from roami_agent.improvement.run_records import RunRecords, trial_summary
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.identity import now_ms
 
 LIGHT_CASES = (
@@ -42,6 +45,7 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
         "RSI_INVALID_REQUEST",
     )
     records = service.runs
+    shared = uses_shared_model_limit(service.ledger)
     with service.ledger.connection() as db:
         prior = db.execute(
             "SELECT id FROM rsi_pipeline_runs WHERE owner=? AND request_key=?", (owner, key)
@@ -73,7 +77,7 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
     require(prefs["suite_id"] and prefs["machine_ids"], "RSI_SETUP_REQUIRED")
     with service.ledger.connection() as db:
         db.execute("BEGIN IMMEDIATE")
-        assert_operation_costs_settled(db, owner)
+        assert_operation_costs_settled(db, owner, shared=shared)
         machine = db.execute(
             "SELECT profile_json FROM rsi_machines WHERE owner=? AND id=?",
             (owner, prefs["machine_ids"][0]),
@@ -98,6 +102,30 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
             needs_artifact_review(c) for c in suite["cases"] if c["id"] in case_ids
         )
         artifact_reservation = reviewer.profile["max_tokens"] * artifact_count if reviewer else 0
+        if not shared:
+            today = datetime.now(ZoneInfo(prefs["timezone"])).date().isoformat()
+            reserve = (
+                config["generation_tokens"] + config["codex_tokens"] * 2 + artifact_reservation
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
+                (owner, today, config["daily_tokens"], prefs["daily_episodes"] or 10000),
+            )
+            budget = db.execute(
+                "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, today)
+            ).fetchone()
+            require(
+                shared or budget["tokens_reserved"] + reserve <= budget["tokens_limit"],
+                "RSI_DAILY_BUDGET",
+            )
+            require(
+                shared or budget["episodes_reserved"] + len(case_ids) <= budget["episodes_limit"],
+                "RSI_DAILY_EPISODE_BUDGET",
+            )
+            db.execute(
+                "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+?,episodes_reserved=episodes_reserved+? WHERE owner=? AND day=?",
+                (reserve, len(case_ids), owner, today),
+            )
         request = {
             "period_key": key,
             "preferences": prefs,
@@ -111,13 +139,13 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
             },
         }
         snapshot = {
+            "spending_policy": "shared_model_daily" if shared else "frozen_protocol",
             "case_ids": case_ids,
             "suite_hash": source["content_hash"],
             "machine_id": profile["id"],
             "pipeline": config,
             "baseline_run": baseline["id"] if baseline else None,
             "formal_daily": False,
-            "billing_mode": "model_daily",
             "artifact_review": {
                 "hash": reviewer.content_hash if reviewer else None,
                 "reservation_tokens": artifact_reservation,
@@ -139,16 +167,21 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     payload = json.loads(request["payload_json"])
     spec = payload["diagnostic"]
     owner, run_id, config = request["owner"], spec["run_id"], spec["config"]
+    shared = uses_shared_model_limit(service.ledger)
     records = service.runs
     records.set_state(owner, run_id, "running")
     records.node(owner, run_id, "evaluate", "running")
     suite = await asyncio.to_thread(load_suite, Path(payload["suite"]["path"]))
     require(suite["content_hash"] == payload["suite"]["content_hash"], "RSI_SUITE_HASH_MISMATCH")
     require(set(spec["case_ids"]) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
+    await asyncio.to_thread(records.freeze_cases, owner, run_id, suite)
     settings = runtime.settings.current
     from roami_agent.improvement.artifact_review import ArtifactReviewer
 
-    artifact_reviewer = ArtifactReviewer.load(settings, service.ledger.path.parent, owner)
+    shared_provider = getattr(service, "provider_factory", None)
+    artifact_reviewer = ArtifactReviewer.load(
+        settings, service.ledger.path.parent, owner, provider_factory=shared_provider
+    )
     require(
         (artifact_reviewer.content_hash if artifact_reviewer else None)
         == spec.get("artifact_review_hash"),
@@ -157,13 +190,16 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     budget = EpisodeBudget(
         {"tokens": config["generation_tokens"], "seconds": 14400, "requests": 300},
         observation_id=run_id,
+        shared_daily_limit=shared,
     )
     journal = []
 
     def provider(settings_, role):
         actual = "main" if role == "main" else "worker"
         return MeteredModel(
-            configured_provider(settings_, actual),
+            shared_provider(settings_, role)
+            if shared_provider
+            else configured_provider(settings_, actual),
             budget,
             role,
             output_cap=settings_.route(actual).parameters["max_tokens"],
@@ -172,23 +208,23 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
 
     main_route = (
         replace(settings.route("main"), name=config["main_model"])
-        if config.get("main_model")
+        if config.get("main_model") and not shared
         else None
     )
     worker_route = (
         replace(settings.route("worker"), name=config["worker_model"])
-        if config.get("worker_model")
+        if config.get("worker_model") and not shared
         else None
     )
     memory_route = (
         replace(worker_route or settings.route("worker"), name=config["memory_model"])
-        if config.get("memory_model")
+        if config.get("memory_model") and not shared
         else None
     )
     generation_overrides = {
         role: {"reasoning_effort": config[role + "_reasoning_effort"]}
         for role in ("main", "worker", "memory")
-        if config.get(role + "_reasoning_effort")
+        if config.get(role + "_reasoning_effort") and not shared
     }
     executor = ContainerExecutor(
         settings,
@@ -200,8 +236,21 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         generation_overrides=generation_overrides,
         provider_factory=provider,
         shared_budget=budget,
+        shared_daily_limit=shared,
+        output_caps={}
+        if shared
+        else {
+            "main": config.get("main_output_tokens", config["output_tokens"]),
+            "worker": config.get("worker_output_tokens", config["output_tokens"]),
+            "memory": config["memory_output_tokens"],
+        },
     )
     fingerprint = await executor.preflight()
+    from roami_agent.improvement.comparison_context import comparison_context
+
+    await asyncio.to_thread(
+        records.freeze_context, owner, run_id, comparison_context(suite, executor, fingerprint)
+    )
     records.artifact(owner, run_id, "evaluate", "environment.json", fingerprint)
     policy = {k: getattr(settings, k) for k in BOUNDS}
     directory = records.directory(owner, run_id)
@@ -218,6 +267,12 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         "evaluate",
         "budget-plan.json",
         {
+            "spending_policy": "shared_model_daily",
+            "admission": "model_proxy",
+            "technical_timeout_seconds": 14400,
+        }
+        if shared
+        else {
             "minimum_start_tokens": minimum_start,
             "real_cases": real_cases,
             "total": config["generation_tokens"],
@@ -226,7 +281,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     for case_id in spec["case_ids"]:
         original = next(c for c in suite["cases"] if c["id"] == case_id)
         case = copy.deepcopy(original)
-        if budget.enforce_tokens and case["judge"]["kind"] != "mechanism":
+        if case["judge"]["kind"] != "mechanism" and not shared:
             remaining_real -= 1
             budget.limits["tokens"] = config["generation_tokens"] - remaining_real * minimum_start
             case["limits"]["tokens"] = min(

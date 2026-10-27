@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 
 import pytest
 
@@ -193,6 +194,8 @@ class NestedModel(ConversationModel):
 
     async def stream(self, messages, tools):
         last = messages[-1]
+        goals = re.findall(r"\nDelegated goal[^\n]*:\n(parent|leaf)(?:\n|$)", last["content"])
+        assigned = goals[-1] if goals else last["content"]
         if last["role"] == "tool":
             yield ModelEvent("text", "Delegated; awaiting descendants.")
         elif any(m["content"].startswith("Background task result") for m in messages):
@@ -204,7 +207,7 @@ class NestedModel(ConversationModel):
                 )
             )
             yield ModelEvent("text", "All delegated work is joined.")
-        elif last["content"] == "root":
+        elif assigned == "root":
             yield ModelEvent(
                 "tool",
                 {
@@ -216,7 +219,7 @@ class NestedModel(ConversationModel):
                     },
                 },
             )
-        elif last["content"] == "parent":
+        elif assigned == "parent":
             yield ModelEvent(
                 "tool",
                 {
@@ -228,7 +231,7 @@ class NestedModel(ConversationModel):
                     },
                 },
             )
-        elif last["content"] == "leaf":
+        elif assigned == "leaf":
             self.leaf_started.set()
             await self.leaf_release.wait()
             yield ModelEvent("text", "Leaf evidence.")

@@ -486,6 +486,120 @@ agent-runtime/src/roami_agent/tools/
   </ul>
 </section>
 
+<section id="rsi-memory-evidence-20261026" lang="zh-CN">
+  <h2>RSI 记忆证据修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>记忆提取读取用户原话、助手可见文本与既有任务／产物证据；助手工具调用参数仅表示执行意图，不作为已观察事实送入提取器。没有可用证据时直接完成空提取，不调用模型。完整转录仍保留工具参数。</p>
+  <h3>User Stories</h3>
+  <p>用户要求的项目习惯保持原会话／项目范围，不因助手的委派指令扩展为全局偏好。维护者可以用原始来源哈希复核记忆，模型引用已排除的来源时仍明确失败。</p>
+  <h3>Technical Design</h3>
+  <p>memory/jobs.py 仅在构造模型输入时移除 assistant 内容中的 tool_calls；保留其他字段和原文，排除空助手证据。来源白名单以实际提供的证据生成，写入仍使用原始来源 SHA 并执行既有所有者、遗忘、作用域与激活校验。空证据分支明确记录零请求与零用量；任何已发出的未知用量不走此分支。模型路由、输出限额、重试策略和原始转录不改变。</p>
+  <h3>验证记录与剩余问题</h3>
+  <p>60 项记忆管线回归通过，覆盖参数排除、可见文本保留、原始来源哈希、已排除来源拒绝、无证据零模型调用。真实低推理 DeepSeek 对照中，原输入以 2,048 个纯推理 Token 截断；投影输入一次得到有效 JSON，隔离 MemoryJobs 复测原任务仍出现同类截断。显式项目偏好样本完成提取，激活记录保留会话范围，无全局激活。两组四次请求共 9,159 Token，用量均已知，失败记录保留；不能据此宣称 MODEL_OUTPUT_LENGTH 或 #443 历史未知流中断已经解决。正式 GLM Memory 路由、质量校准和完整验收仍需各自验证。</p>
+  <p>本轮诊断配置的 GLM Memory 路由另作隔离运行验证：原任务与显式偏好两种输入均由真实 MemoryJobs 完成，共 984 Token／两次请求，无重试、无未知用量；项目偏好激活保持会话范围。此结果单列路由，不抵消 DeepSeek 的已知截断失败，也不表示现用服务已部署或改配。</p>
+  <p>后续修订提取指令：一次性任务验收清单和未执行计划不属于可复用记忆，不为凑满条数拆分要求；持久事实、已观察结果／决策及长期偏好继续提取。仍使用原 DeepSeek low、2,048 输出上限、20 秒运行时限且不重试，原 CODE-01 输入完成空提取；显式项目偏好保留会话范围，持久部署事实与发布结果分别生成事实候选。四次真实 MemoryJobs 共 3,009 Token，用量完整，原始失败保留。这是四种输入的修复验证，不能替代全套或历史未知流中断的根因证明。</p>
+  <p>用户随后授权将每日上限改为 20,000,000 Token；已同时保存运行和评测配置，自动调度仍关闭，原 Case 上限保持。原全套单轮预留 13,292,000 Token 的预算阻塞已解除；四份修订样本人工参考分和完整验收仍独立待完成。</p>
+  <p>相同 DeepSeek low 路由的真实 NEWS-01／QUANT-01 回归，六个 MemoryJobs 均完成且无异常码。QUANT-01 独立验收通过；NEWS-01 五条事件字段值与合同一致，但擅增顶层元数据而失败。两项合计 178,183 Token／26 次请求，原失败继续保留。</p>
+</section>
+
+<section id="rsi-structured-delivery-20261026" lang="zh-CN">
+  <h2>结构化交付合同修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>用户给出结构化输出合同时，文件和回复遵守约定字段与类型；只有明确允许扩展才添加字段。说明、来源和诊断信息写入另行请求的报告，不擅自扩展机器消费的结构。</p>
+  <h3>User Stories</h3>
+  <p>用户获得能由既定消费者读取的结构化文件；可读报告仍保留依据与限制，不为补充说明破坏接口。</p>
+  <h3>Technical Design</h3>
+  <p>replies/delivery_policy.py 的交付指令由 Main 与 Worker 共用。规则仅描述用户已经提供的合同，不含案例名称、参考答案或评分字段；不修改题目、判定器、用量核算与 Case 上限。原始错误输出与验收失败记录保留，新版本单独复测。</p>
+  <p>初版交付指令过长触发两项上下文边界回归；压缩共用文案并保留原有交付约束，27 项上下文与文件交付回归通过，不放宽上下文上限或测试断言。较早的同镜像 NEWS-01、CODE-01、QUANT-01 独立硬检查均通过，但随后发现 QUANT-01 仅保存两份文件快照，因此硬检查不作为完整交付通过。</p>
+</section>
+
+<section id="rsi-relative-deliverables-20261026" lang="zh-CN">
+  <h2>相对文件名与 SVG 交付修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>用户收到请求的全部文件，包括脚本生成的数据和图形；任务摘要用代码格式列出的相对文件名按已绑定工作区收集。保存后不依赖原目录继续存在，不以工作区中存在文件替代可下载快照。</p>
+  <h3>User Stories</h3>
+  <p>任务列出 analysis.py、result.json、report.md、trades.csv、equity.svg 时，五份文件都能在任务产物中读取；工作区移除后仍可下载原始字节。路径越界、软链接和隐藏文件不能借相对名称进入产物。</p>
+  <h3>Technical Design</h3>
+  <p>storage/task_deliverables.py 扩展既有摘要路径解析，仅在有工作区绑定时接受带支持后缀的单个代码格式文件名，跳过命令和 URI，不扫描目录。SVG 纳入已有文件类型集合，继续使用逐层 no-follow、目录边界、文件大小、所有者、删除标记和 12 项上限。下载仍为 attachment，沿用 nosniff 与 sandbox CSP，不增加内联执行入口。</p>
+  <h3>验证记录</h3>
+  <p>62 项文件／任务交付与产物回归通过，新增 Native／专业执行器五文件保存、删除工作区后读取，以及父目录、软链接和隐藏文件边界。对真实 QUANT-01 的原始文件与最终摘要作零模型隔离重放，五份快照 SHA 均匹配原文件，复制目录移除后仍可读，SVG 附件头、CSP 与跨所有者拒绝通过；原 trial 和原文件未修改。该重放只证明持久化修复，不作为新的 Native 执行或正式评分。</p>
+  <p>进一步保留代码格式文件名中的字面百分号，避免与空格文件名混淆；归一 /api/file/serve 的分段、全路径编码与额外首斜线形式，避免同一 SVG 已保存却因别名误报不可用。归一后仍执行原目录边界与 no-follow 校验，不将 URL 当作新的文件权限。</p>
+</section>
+
+<section id="rsi-delegation-contract-20261026" lang="zh-CN">
+  <h2>委派合同保真修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>Main 原样传递用户明确的合同与约束，不把解释过程产生的公式或验收条件当作用户要求。数值工作按用户约束做手算样例及守恒／边界检查，不能仅用复制了同一公式的第二份代码声称独立验证。</p>
+  <h3>User Stories</h3>
+  <p>用户要求在现金额度内完成含费用的计算时，委派不会变成先花光现金再扣费。用户能区分原合同、已观察结果与执行器自检；错误自检不覆盖独立验收失败。</p>
+  <h3>Technical Design</h3>
+  <p>压缩 configuration.py 中既有交付说明，补入 Main 的合同原文传递和 Worker 的数值验证原则；不包含具体案例、公式答案或判定器信息。当前短交付文案仍保留显式输出合同、用户语言、真实链接、未知状态与可用交付要求。</p>
+  <h3>问题证据</h3>
+  <p>ff9c38a1 对应版本的三项独立检查为 CODE-01、NEWS-01 通过，QUANT-01 失败；三项共 334,118 Token／45 次请求，用量完整。失败原因为 Main 把“含买入费用的全现金买入”改成“数量等于现金除价格，另扣费用”，Worker 按改写后的规则执行，自检复制同一错误。该失败与原产物保留，不以此前较早版本通过抵消；合同修复后另作真实执行验证。</p>
+  <p>仅增加 Main 保真指令的下一版，CODE-01 与 QUANT-01 通过，NEWS-01 仍因 Main 自行扩展结构而失败；三项共 345,331 Token／50 次请求，用量完整。这说明指令不足以保证原合同到达 Worker，不能把单次通过当成问题消失。</p>
+</section>
+
+<section id="rsi-native-original-request-20261026" lang="zh-CN">
+  <h2>Native 原始用户合同传递 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>普通 Native 任务与已有浏览器研究任务一样，执行上下文同时保留用户原文和协调目标。用户原合同定义事实与约束，Main 目标只限定本次分工，不能覆盖原合同或扩展到未分派的其他事项。</p>
+  <h3>User Stories</h3>
+  <p>即使协调者把结构或数值规则转述错了，Worker 仍能读取未经改写的用户原话。用户继续在会话中看到原有任务目标；执行记录保存完整来源，跨所有者和已遗忘来源仍不可读。</p>
+  <h3>Technical Design</h3>
+  <p>dispatch/tasks.py 在已有事务和来源校验内构造 Native 种子消息，普通任务加入原始 source_content.text，再明确合同优先级和分工范围。displayText 保留原目标，模型读取完整 text，存档保留两者；resourceOnly 保持既有显示与输入形式。附件继续沿用原所有者和完整性校验，不增加文件权限或新执行器。</p>
+  <p>显式从已完成检查点派生的普通 Native 分支保留原继承边界，不再附入检查点之后的新消息；其历史已有该检查点的用户约束。嵌套执行测试模型按简报中的分工目标工作，原有后代汇合、Main 容量预留和分支隔离断言保留，74 项相关回归通过。另有 95 项路由、Native 工作区、存档、研究和续派回归通过；四个新增场景验证原合同、显示目标、跨所有者和遗忘边界。</p>
+  <p>后续真实执行再次暴露原 DeepSeek low／2,048 Memory 输出限制，以及 NEWS-01 在额度内尚未满足结构合同的失败；319,577 Token／48 次请求，用量已知，结果保留。原文传递不是所有错误已解决的证明；另补充显式输出结构不得因元数据真实而扩展的说明，并验证下述预算及流错误修复。</p>
+</section>
+
+<section id="rsi-metered-prefix-20261026" lang="zh-CN">
+  <h2>已计量前缀预留与流错误保真 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>预算准入继续保守预留，但已成功计量、序列化完全相同的文本前缀不再每次按全部 UTF-8 字节估计。每次请求仍扣完整实际输入与输出；没有费用折扣、未知用量补零或 Case 上限提高。已知生成失败保留原异常码，不能伪装成可重试的流不完整。</p>
+  <h3>User Stories</h3>
+  <p>用户不会因重复上下文的过大预估而提前失去必要的收尾调用，也不会为已经明确达到输出上限的记忆提取重复付费。提供方用量未知、上下文变化或工具变化时保持原拒绝与保守回退。</p>
+  <h3>Technical Design</h3>
+  <p>input_reservation.py 保存单个角色实例最近成功、单次请求且输入／输出用量完整的文本指纹与用量。只有消息严格追加、原前缀逐项序列化指纹及工具指纹相同才采用“原完整输入 Token + 新增序列化字节 + 既有 4,096 预留”；图片、编辑、前置插入、工具变化或不完整响应回退。RequestBudgetModel 另计新预算提示的全部字节，双层 MeteredModel 共用同一预留，容器内持久 MeteredModel 也执行相同规则。实际结算与未知用量熔断不变，预留依据写入私有日志。</p>
+  <p>ChatCompletions 识别 SSE error 帧，先保留已到达的用量，仅透传有限的协议异常码，其他格式归为 MODEL_STREAM_INVALID，不回显提供方内容。部分工具调用不发布；ModelGateway 的 MODEL_OUTPUT_LENGTH 等终止码到达 MemoryJobs 后一次失败，不再降格成 MODEL_STREAM_INCOMPLETE 并重试。协议标为 container-uds-v6-prefix-reservation，不与 v5 混算同合同收益。</p>
+  <p>诊断和报告首次建立当日预算时使用已配置的每日例数，诊断同时检查例数余额，避免原先 10,000 占位值阻塞后续 120 例配置的正式准入。现用当日预算在确认没有正式 cycle、已用例数为 0 后，从占位值收紧到既有 120；Token 上限仍为用户授权的 20,000,000，用量与预留计数均保留。</p>
+  <h3>验证与角色配置</h3>
+  <p>64 项准入、计量、错误透传相关回归通过，覆盖共享预留、完整扣账、前缀变化／多模态回退、未知用量、失败响应不建立前缀及容器侧持久计量；另有 25 项流水线回归通过，包含先诊断再正式预留和每日例数上限。DeepSeek none 的四次记忆探针共 2,237 Token，但空提取语义断言失败，未采用；GLM low 的四种语义输入均通过，共 2,104 Token。RSI 配置保存为 Main／Worker DeepSeek low、Memory GLM low，Memory 输出上限仍为 2,048，自动调度关闭；不表示部署或改配现用 Agent 服务。</p>
+</section>
+
+<section id="rsi-integrated-verification-20261026" lang="zh-CN">
+  <h2>RSI 合并验证与完整运行 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>请求进入预算准入前固定消息与工具内容，等待预算锁期间调用方的修改不能改变已评估的输入；实际费用仍逐次完整结算。完整案例结果逐项保留，内容检查通过、任务文件持久化和产物质量评分分别给出证据。</p>
+  <h3>User Stories</h3>
+  <p>用户能分辨已经验证的链路修复与仍失败或待评的案例，不因部分成功而丢失失败记录，也不因运行已启动而收到通过或关单结论。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>RequestBudgetModel 与 MeteredModel 在准入前复制 JSON 请求，预算等待竞争的两个新增回归验证提供方收到原快照，调用方修改仍保留。91 项计量、准入、错误透传和流水线检查通过。同步 main f3622829 后 quick/full 通过，Python 1,427 项，Go、前端静态检查与生产构建通过；本 PR 没有新增前端产品改动。</p>
+  <p>合并后源码 hash 为 9f7efc03377f6edc5b2f44a5317e17b9b4f3a49bc24f3615dfd1cb7b82c4dc0d，镜像为 sha256:2abc59f835a7b97659c908f8def82a41f29cc01cd57afb88b0dc9cb21d2cc66e。该镜像冻结机制回归 20/20 通过，零模型调用；不作为真实模型能力或正式全套通过。</p>
+  <p>此前 v6 三项真实独立检查通过，共 287,402 Token／40 请求；CODE 两份和 QUANT 五份文件快照 SHA 匹配。NEWS 由 Main 直接写入，两份文件没有任务快照，因此不称为三项 Native 完整交付。原失败与已知 DeepSeek Memory 截断保留，RSI Memory 使用经四种语义输入验证的 GLM low；现用服务未部署或改配。</p>
+  <p>该合并源码启动单版本完整 60 项运行 c2728007454ed423bbe3a3a6be147ac8b07918f540a9274882b4932bd0bd8c5b，生成预留 12,032,000 Token；同时保留 7 项评分所需的 1,260,000 额度，日上限仍为用户授权的 20,000,000。最初八项为五通过、三失败：DEMO-02 真实预算失败及 OSWorld、FinQA 检查失败均保留。运行尚未结束，四份修订样本人工参考分未确认，产物评分与后续完整日观察未完成，父 issue 不关闭，自动日程保持关闭。</p>
+</section>
+
+<section id="rsi-main-turn-failure-20261026" lang="zh-CN">
+  <h2>Main 失败预算归因 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>评测报告保留 Main 已记录的预算根因，不能把准入前拒绝折叠为通用运行时失败。错误归因修正不改变失败状态、费用、原始成绩或判定器。</p>
+  <h3>User Stories</h3>
+  <p>维护者看到长记忆任务真正因 Token 预算失败，能区分模型能力、费用未知和执行器异常；历史失败记录仍可核对。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>evaluation_tasks.evaluation_turn_failure 只读取当前 turn、conversation 和对应终态事件的最新记录，仅保留既有四个 RSI 预算码，其余仍使用原 RSI_TURN_FAILED／INTERRUPTED；不导出任意错误文本。NativeFilesExecutor 在 Main 终态失败分支调用它，容器继续沿用已有有界预算码映射。</p>
+  <p>51 项隔离回归通过，新增六种终止码和跨回合／会话／事件类型隔离。对完整运行中 longmemeval-v2:4ed01379 的真实数据库执行只读、零模型重放，得到 RSI_TOKEN_BUDGET；原 trial 的通用失败及 SHA 保持，案例仍失败。该补丁只修正诊断归因，不声称解决预算耗尽或新增真实模型通过；正在运行的镜像与源码版本保持冻结。</p>
+</section>
+
+<section id="rsi-process-tool-contract-20261026" lang="zh-CN">
+  <h2>执行工具的进程生命周期合同 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>工具说明明确既有生命周期：一次调用结束会清理其进程组。临时服务与客户端检查在同一次调用内完成，按已捕获的子进程 PID 清理，不按命令文本匹配进程。</p>
+  <h3>User Stories</h3>
+  <p>Worker 不再假定后台服务能跨工具调用存活，避免连接失败后反复改探针或用广泛匹配的清理命令终止自身验证步骤。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>压缩并补齐 foundations 的 bash 和底层 shell 说明，保留工作区、授权主机操作、非沙箱、写入、取消、回执及托管资源边界；不修改 process.execute 的清理或权限行为。工具输入文本变化单列 container-uds-v7-process-lifetime，不能与 v6 混算同合同收益。</p>
+  <p>40 项工具、上下文边界和评测通道回归通过。零模型独立对照确认临时 HTTP 服务在当前调用内可访问，进程组清理后后续调用无法复用；服务器与客户端同一调用、按子 PID 收尾的路径成功，未作用于其他进程。对照只证明工具合同，不改写正在运行的 v6 真实案例或声称预算失败已全部解决。</p>
+</section>
+
 <section id="codex-completion-reconciliation-20261026" lang="zh-CN">
   <h2>Codex 完成回报与观察恢复 · 2026-10-26</h2>
   <h3>Product Design</h3>
@@ -536,12 +650,12 @@ agent-runtime/src/roami_agent/tools/
   <p>用户能查看跨机评测证据、具体策略差异和三目标变化，在允许范围内应用或恢复策略，日常会话与测试环境隔离。</p>
   <h2>技术设计</h2>
   <p>复用运行时 trace、任务验收、调度与存储；已实现隔离评测、每日worker、规则回顾和有限参数发布底座。现已接入ResearchWorker、语义复盘、持久工单、隔离补丁、源码A/B和专用评测实例观察；真实每日评测尚未启用。完整模块、协议、接口和验收标准见设计正文。</p>
-  <p>调研与评价修订：<a href="docs/design/20261022-roami-agent-rsi/research.html">开源做法与源码核对</a>、<a href="docs/design/20261022-roami-agent-rsi/evaluation.html">程序员工作 / 业余任务的 80 项候选规格与评价标准</a>。80项仅为候选池，正式库存已调整为60项（公开20、自有真实20、机制回归20）；尚无真实模型全量成绩，权重、断言和资源上限均有版本记录。</p>
-  <p>自动化闭环修订：常驻RSI服务使用内部持久动作队列推进Codex复盘、Codex汇总GitHub Issue、Codex修复、独立验证、专用实例应用、观察与关闭/重开。Codex执行采用预算准入、原生用量与超时，CLI不保证供应商侧硬Token截断。GitHub Issue确认后才派修复，独立验收后发草稿PR；状态、幂等outbox、预算及关闭证据契约见<a href="docs/design/20261022-roami-agent-rsi/index.html#closed-loop">详细设计</a>。</p>
-  <p>参与者与交接修订：<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">图表版架构与执行设计</a>以架构图、执行手段表和闭环条件明确角色；运行边界与模块折叠展示。控制器发起，被测Agent做题，Codex复盘并输出文档，Codex汇总Issue，Codex隔离修改，独立服务验收应用，后续两个合格日周期后控制器关单。本地角色链已接入，正式运行仍待用例和机器配置；总方案的历史技术契约保留在折叠附录。</p>
+  <p>调研与评价修订：<a href="docs/design/20261022-roami-agent-rsi/research/research.html">开源做法与源码核对</a>、<a href="docs/design/20261022-roami-agent-rsi/evaluation/evaluation.html">程序员工作 / 业余任务的 80 项候选规格与评价标准</a>。80项仅为候选池，正式库存已调整为60项（公开20、自有真实20、机制回归20）；尚无真实模型全量成绩，权重、断言和资源上限均有版本记录。</p>
+  <p>自动化闭环修订：常驻RSI服务使用内部持久动作队列推进Codex复盘、Codex汇总GitHub Issue、Codex修复、独立验证、专用实例应用、观察与关闭/重开。Codex执行采用预算准入、原生用量与超时，CLI不保证供应商侧硬Token截断。GitHub Issue确认后才派修复，独立验收后发草稿PR；状态、幂等outbox、预算及关闭证据契约见<a href="docs/design/20261022-roami-agent-rsi/architecture/overview.html#closed-loop">详细设计</a>。</p>
+  <p>参与者与交接修订：<a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html">图表版架构与执行设计</a>以架构图、执行手段表和闭环条件明确角色；运行边界与模块折叠展示。控制器发起，被测Agent做题，Codex复盘并输出文档，Codex汇总Issue，Codex隔离修改，独立服务验收应用，后续两个合格日周期后控制器关单。本地角色链已接入，正式运行仍待用例和机器配置；总方案的历史技术契约保留在折叠附录。</p>
   <h3>首批实施记录 · 2026-10-23</h3>
   <p>范围修订：正式任务库存为60项（公开20、自有真实20、机制回归20），每天完整执行60项，并回顾所有指标与具体日志；新想法作为剩余预算内的额外开发实验，不替换正式题。机制回归优先使用无模型测试，不预占模型Token；所有测试机共享日预算。主动观察和源码补丁已接入，正式场景与真实模型验收仍未完成。</p>
-  <p>已实现评测CLI、隔离文件运行、独立判定、成对比较、预算账本、每日worker与有限参数候选队列。4条公开财务组件合同已锁定，2条确定性设施任务已完成A/B；正式测试机、真实模型收益、完整60例及线上发布未完成。详见 <a href="docs/design/20261022-roami-agent-rsi/implementation.html">实施记录</a> 和 <a href="docs/development/agent-rsi.md">运行手册</a>。</p>
+  <p>已实现评测CLI、隔离文件运行、独立判定、成对比较、预算账本、每日worker与有限参数候选队列。4条公开财务组件合同已锁定，2条确定性设施任务已完成A/B；正式测试机、真实模型收益、完整60例及线上发布未完成。详见 <a href="docs/design/20261022-roami-agent-rsi/records/implementation.html">实施记录</a> 和 <a href="docs/development/agent-rsi.md">运行手册</a>。</p>
   <p>每日全量修订：规则回顾已逐项接入模型/工具具体日志，缺日志或覆盖不足不能记为当日完成。rsi-v1.3要求正式60项每天全跑，A/B共120次执行；预算不足不静默缩题。quick门禁915项Python通过，最终专项51项、前端910项及生产构建通过；手机组件使用隔离示例数据验证触控与回顾覆盖，真实模型成绩和完整自主源码修改仍未交付。</p>
   <p>验收：仓库quick门禁通过（896项Python测试、全量Go与前端静态检查）；最终记忆结算修订后专项50项通过。独立tmux实例已按身份清理，无真实模型收益分数。</p>
 
@@ -903,7 +1017,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <section id="roami-rsi-development-only" lang="zh-CN">
 <h2>RSI开发版边界修订 · 2026-10-23</h2>
 <p>RSI仅在显式development编译通道运行；普通安装版不构造服务、worker、接口或策略绑定，旧enabled设置不生效，入口由当前节点状态控制。改进只应用于开发评测实例，经正常审阅发布后交付用户。无版本差异每日60次，候选对照120次；全部指标与日志仍逐次复盘。</p>
-<p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
+<p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/records/implementation.html">当前实施与验收</a>。</p>
 <p>本轮验收：Go与full门禁通过，Python1086项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
 </section>
 
@@ -915,7 +1029,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 → github_publication（重验证据、quick/full、专用分支、草稿PR与截图）
 → release_observation（开发评测实例、后续全量观察、关闭/回滚）</pre>
 <p>GitHub配置位于账本旁的私有review-publication目录，缺省不向外写入。创建请求断线先读远端对账，未确认结果不重复POST；不自动合并，不上传原始日志、隐藏答案或凭证。OpenCode和Pi托管任务采用原生JSON进程加常驻控制器，续聊绑定原生ID；完成确认进程退出与无额外写进程。OpenCode2额外核对精确会话导出的提示词、完成状态与时间，禁止用旧结果冒充新完成。</p>
-<p>7项复杂产物已接离线渲染和独立双评分，但本机容器runner已登记，真实校准和日预算尚未齐，不能宣称每日评测已经启用。详见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#first-version">首版运行图表</a>及<a href="docs/development/agent-rsi.md#daily-v1">操作手册</a>。</p>
+<p>7项复杂产物已接离线渲染和独立双评分，但本机容器runner已登记，真实校准和日预算尚未齐，不能宣称每日评测已经启用。详见<a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html#first-version">首版运行图表</a>及<a href="docs/development/agent-rsi.md#daily-v1">操作手册</a>。</p>
 </section>
 
 <section id="roami-rsi-codex-period" lang="zh-CN">
@@ -923,7 +1037,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <h3>产品设计</h3><p>复盘、Issue、修复固定三个Codex角色。完整复盘列全部待修点，全机完成后每天只发一个GitHub Issue，确认回执后按条目修复。独立验收后发回链草稿PR，两个后续完整周期观察通过才勾选，全部完成关Issue，退化回滚重开。普通安装版不运行。</p>
 <h3>用户故事</h3><p>按每日自动执行要求，每天03:00完整跑60项；人查看每日报告、Issue和PR，审阅合并，不逐日派任务。未确认预算与评分校准之前保持停用。</p>
 <h3>技术设计</h3><p>behavior_observer最多4项一批，保护题隔离；codex_roles使用只读无工具的原生CLI，记录thread ID、JSONL与用量。review_report和ResearchWorkflow持久保存全量文档与全机汇总；github_issues对账、发布确认并同步清单，source_revision只应用校验补丁。一次只观察一个源码候选，防止后续修复覆盖观察版本。CLI无供应商侧总Token硬截断保证，超额或未知调用阻止后续付费执行。</p>
-<p><a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；合并主线后quick/full通过（Python1232项），前端952项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；合并主线后quick/full通过（Python1232项），前端952项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
 </section>
 
 <section id="professional-agent-model-picker" lang="zh-CN">
@@ -1234,11 +1348,11 @@ conversation/professional_activity.py
 <pre>SettingsPage → ExperimentWorkflow / AgentImprovement → 所有者Go网关
 → development-only HTTP → ImprovementControl / ResearchWorkflow
 POST preview：只读预估最大配对预留；PUT research：限额字段与修订号校验</pre>
-<p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
+<p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
 <p>验收：quick/full通过，Python1238项、前端132文件/960项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
 </section>
 
-<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
+<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
 
 <section id="rsi-pipeline-delivery-20261024" lang="zh-CN">
 <h2>RSI运行闭环 · 2026-10-24</h2>
@@ -1246,7 +1360,7 @@ POST preview：只读预估最大配对预留；PUT research：限额字段与�
 <p>开发版设置的实验/RSI提供独立运行地址、逐节点职责/状态/文件、GitHub汇总Issue及本地问题列表；从历史运行复测相同Case，区分仍存在、未复现、未验证、未覆盖和合同变化。普通安装不启用。</p>
 <h3>Technical Design</h3>
 <p>RunRecords在同一私有SQLite保存Run/Attempt/Case/Issue/Observation/Effect；EvaluationWorker复用单队列，PipelineReportWorker用Codex复盘和问题排序、程序脱敏并幂等发布GitHub。PipelineRuns按Run读取状态和hash校验产物，结束记录不轮询。正式源码修复沿用ResearchWorker与独立验证、发布、观察门禁。</p>
-<p><a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组10项复测真实任务0/6、机制4/4；Issue #446保留19项仍存在、8项未验证。全仓full门禁通过，Python1249项、前端963项、桌面9档和Android真机触控/滚动通过。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组10项复测真实任务0/6、机制4/4；Issue #446保留19项仍存在、8项未验证。全仓full门禁通过，Python1249项、前端963项、桌面9档和Android真机触控/滚动通过。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
 <section id="background-task-list-20261024" lang="zh-CN">
   <h1>后台任务列表整理 · 2026-10-24</h1>
   <h2>产品设计</h2>
@@ -1431,6 +1545,46 @@ Research → 原浏览器导航／观察协议</pre>
   <p>证据位于 /tmp/host-execution-20261025：targeted.log、live-main.json、validation.html／png、quick.log；完整门禁与提交钩子回执见 full.log、commit.log，结果随 PR 提供。</p>
 </section>
 
+<section id="rsi-verification-scope-20261026" lang="zh-CN">
+  <h2>RSI 验证范围修订 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>Worker 用直接覆盖用户验收条件的检查验证产物；临时探针与产品分开，已有浏览器或测试工具足够时不另造验证驱动。区分检查脚本错误与产品缺陷，完成必要验证后交付真实文件和结果，未验证项明确保留。</p>
+  <h3>User Stories</h3>
+  <p>用户收到请求的页面和运行说明，不会混入临时自测界面；已有回归测试继续保留。维护者能对照同路由、同题目和同额度的独立执行记录，判断任务是否真正完成。</p>
+  <h3>Technical Design</h3>
+  <p>修改 server/configuration.py 的 WORKER_INSTRUCTIONS，不改变判定器、预算准入、任务状态、模型路由或冻结题目。没有新增固定步数与时限；达到用户验收条件才结束，检查未完成不冒充成功。隔离容器继续从真实任务状态和容器外判定取得结果。</p>
+  <p>improvement.Dockerfile 固定已验收的 Playwright 1.64.1，并按<a href="https://playwright.dev/python/docs/browsers">官方浏览器安装方式</a>安装匹配的 Chromium headless shell。PLAYWRIGHT_BROWSERS_PATH 指向公共只读目录，构建时验证默认 chromium.launch()，移除不能配置 Python 默认启动路径的 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH。运行时仍无网络、非 root 且根文件系统只读；冻结评分渲染器不变。</p>
+  <p>RequestBudgetModel 向 Main／Worker 提供当前已计量的剩余额度及输入保守预留估计，在余量接近当前请求成本时提示优先必要工作与真实交接。提示本身计入准入预留，额度不足或用量未知仍在创建提供方之前拒绝；Memory 的结构化输入不加提示，调用方历史不修改。预算信息不含判定器、参考答案或完成证明。评测输入变化单列为 container-uds-v5-budget-status；不把 v5 与旧 v4 的用量差当成同合同优化收益。</p>
+  <h3>验收状态</h3>
+  <p>修改前主分支 5775296 的 DeepSeek Main/Worker 基线在原 384,000 Token Case 额度内仍因 RSI_TOKEN_BUDGET 失败，实际 326,601 Token／22 次请求。修改指令后的两次同条件复测分别用 180,961／182,290 Token、各 19 次请求完成 Native 执行并保存 HTML 与 README；初始 5 卡、新增、拖移及刷新保留硬检查均通过。两次均 hard_passed=true、pending=true、passed=false，质量尚未评分，不作为正式全套或稳定收益证明。</p>
+  <p>浏览器零模型对照：旧镜像默认启动失败、指定系统 Chromium 可用；新镜像默认启动及键盘操作可用，三次均为非 root、只读根文件系统、无网络容器。v4 组合镜像仍出现一次预算失败（297,815 Token／20 次请求），页面检查通过不掩盖任务失败。</p>
+  <p>v5 两次独立诊断分别使用 289,200 Token／25 次请求、240,676 Token／21 次请求；Native Attempt 均 succeeded，任务等待验收，两份必要文件的已存储 SHA 均匹配工作区最终文件。功能硬检查全部通过，但 hard_passed=true、pending=true、passed=false，未计为正式质量通过。新增预算提示在受压调用中实际出现；角色隔离、共享预留、提示开销和未知用量边界回归通过，最新 full 共 Python 1,346 项、Go、前端检查与生产构建通过。校准、正式全套验收与连续观察仍独立保留，#443／#445／#446 不因本轮诊断关闭。</p>
+</section>
+
+<section id="rsi-quant-correction-replay-20261026" lang="zh-CN">
+  <h2>RSI 修正结果重跑合同 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>独立验证器按原题区分静态诊断与程序生成的修正结果。QUANT-03 的 analysis.py 只须重新生成 corrected.json；result.json 的诊断字段仍独立校验，不增加题目没有要求的重生条件。其他量化题仍要求重新生成 result.json，修正文件的提交值与重跑值仍须同时符合冻结数值合同。</p>
+  <h3>User Stories</h3>
+  <p>实现符合原题时，不会因静态诊断没有被程序重写而误报验证中断；修正结果错误、缺失、与提交不一致时仍失败。维护者看到允许公开的验证失败码，不会收到任意异常文本或凭证。</p>
+  <h3>Technical Design</h3>
+  <p>authored_grading.RERUN_ANALYSIS 对未重生的输出返回空值；QUANT-03 的 reproducible_code 对比 corrected_expected，其他题仍对比 expected。corrected_run_verified、冻结材料保护、报告来源与数值误差均保持。验证异常只额外保留四个既有白名单代码；其他异常只记录类型。评测协议单列 container-uds-v9-quant-correction-replay，不篡改旧 trial 或复用旧版完整成绩。</p>
+  <h3>验收证据</h3>
+  <p>真实子进程回归覆盖只生成 corrected.json 的合法程序、错误修正值、提交值与重跑值不一致、静态诊断保留、其他量化题仍须重生主结果，以及异常代码白名单与私有文本隔离；定向 40 项通过。冻结 v6 QUANT-03 产物的零模型重放已从文件缺失中断进入真实数值检查，但其 corrected 结果仍不合格，案例继续失败，原 trial SHA 不变。另行尝试的 v8 操作序列指令候选两项仍预算失败，已拒绝采纳，原 Worker 指令恢复；547,016 Token / 38 请求全部已知并结算。正式评分与连续观察仍未完成，父 issue 保持开放。</p>
+</section>
+
+<section id="rsi-explicit-request-deadline-20261026" lang="zh-CN">
+  <h2>RSI 模型请求期限修订 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>评测沿用显式提供方请求超时与 Case 总期限；未设置请求超时不能暗中变成 60 秒。容器网关保持同一取消、用量结算与未知保护，长请求不得绕过原题期限或 Token 上限。</p>
+  <h3>User Stories</h3>
+  <p>请求在题目期限内持续生成时不会被未配置的短超时截断；用户设置的 30 秒等短期限继续生效。已经失败的尝试保留，先核对宿主真实用量再决定独立候选复验。</p>
+  <h3>Technical Design</h3>
+  <p>NativeFilesExecutor 对 Main、Worker、Memory 设置 min(Case 秒数, 显式 route.timeout_seconds 或 Case 秒数)，移除隐含 60 秒回退；原外层整个执行、任务及容器期限保持。模型合同 hash 纳入提供方超时，评测协议单列 container-uds-v10-explicit-request-deadline；不把新期限下的成绩拼入旧 v6/v9。</p>
+  <h3>验证与边界</h3>
+  <p>定向 26 项通过，覆盖未配置、显式短期限、长期限被 Case 截断、Main/Worker 不同设置、Memory 继承及期限进入合同 hash。本次 v9 Sol Worker 候选因隐含请求期限失败，实际 42,904 Token / 8 请求全部已知并结算，未改现用配置；候选与延迟代理对照的最终结果另附 PR。先前完整 60 项与质量评分、连续观察状态保持。</p>
+</section>
+
 <section id="first-load-performance-20261026" lang="zh-CN">
   <h2>首屏加载预算 · 2026-10-26</h2>
   <h3>Product Design</h3>
@@ -1444,6 +1598,196 @@ Research → 原浏览器导航／观察协议</pre>
   <p>full 门禁与前端 1,006 项测试通过；Python 无相关改动，按范围规则跳过。请求明细、生产包对比、浏览器结果与限制保存在任务工作区 tmp/first-load-evidence。计时属于受控示例，不代表线上耗时、CPU 或内存降幅。Redmi 真机仍为安全锁屏，手机触控、软键盘及原生 WebView 冷启动验收未完成；项目、蜂群与注解的跨消费者重复读取留待后续独立优化。</p>
 </section>
 
+<section id="rsi-input-roundtrip-request-identity-20261026" lang="zh-CN">
+  <h2>RSI 输入往返精度与请求身份 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>表格保存验证区分分数数值的序列化尾差与真实改值。两个有限非整数值仅允许 2e-15 相对误差，不设绝对容差；整数、零值、文本、布尔与缺失仍精确比较。比较策略写进评分结果和新版公开合同，adapter 标为 spreadsheet-values-v2-fractional-roundtrip，不是官方排行榜分数。</p>
+  <p>CSV 题公开说明原判定器已有的新操作与重试语义：重新选文件发起新导入，内容相同也使用新键；同次请求遇503后直接重试才保留原键。服务、断言和额度不变。只有该题 recipe 升为 authored-v8-csv-request-identity；语料使用新的 v8 ID 与文件，旧冻结语料不覆盖。</p>
+  <h3>User Stories</h3>
+  <p>用户只取消合并并保存表格时，不因浮点表示尾差被记为改动其他数据，真实数值变化仍失败。Agent 从题面知道新导入与重试的界线，维护者能区分合同修订与旧题复验。</p>
+  <h3>Technical Design</h3>
+  <p>spreadsheet.same_cell_value 仅供该适配器的目标值及输入保存校验，不改全局 same_json 或量化误差。非整数相对界限是对<a href="https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/floating-point-arithmetic-inaccurate-result">Microsoft 浮点与 15 位精度说明</a>的保守工程处理，整数及跨类型值不走近似。authored_fixtures 补公开请求身份说明，corpus 版本与缓存地址升级。评测协议单列 container-uds-v12-input-roundtrip-and-request-identity，不重写旧 v6 记录、题面、产物或成绩。</p>
+  <h3>验证证据</h3>
+  <p>67 项表格和语料／量化回归通过。原 spreadsheetbench:38703 的21处差异均是分数数值尾差，最大5.56e-16；新比较策略下重放通过，主动修改一个数值的反例仍失败，原 trial 和产物 SHA 不变。这是验证器重放，不是新增 Agent 通过或同合同性能收益。整数长编号、布尔、文本、零附近差异、非有限值和较大数值变化仍拒绝。缓存回归证明旧 v7 文件保留，新 v8 文件独立登记。CSV 新版仍需真实隔离执行，人工评分与后续完整日观察未完成，父 issue 保持开放。</p>
+</section>
+
+<section id="rsi-csv-validation-states-20261026" lang="zh-CN">
+  <h2>CSV 验证状态探针修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>CSV 页面可以选文件时立即校验并禁用非法提交，也可以提交时校验。验证器等待真实页面与请求状态，支持两种流程；失败仍须保留文件与内容，同次重试保留请求身份并只写入一次。</p>
+  <h3>User Stories</h3>
+  <p>用户选到缺列文件时收到清楚错误，禁用导入按钮不会让验证器误报超时。异步文件读取和请求完成可由观察确认，不用固定等待300毫秒猜完成。</p>
+  <h3>Technical Design</h3>
+  <p>CSV_PROBE 等待按钮可用或错误出现；已经展示错误并禁用的按钮不再强制点击。导入与重试等待实际 POST /import 响应完成，移除固定页面延迟；文件丢失时明确失败，不再强点不可重试的操作。原服务端4行／3次请求断言、冻结输入保护和必要文件检查保持。协议单列 container-uds-v13-csv-validation-states，既有失败不覆盖。</p>
+  <h3>验证证据</h3>
+  <p>真实只读容器／Chromium 对照：原 v12 Sol 候选产物四项功能检查通过、质量待评；独立的提交时校验脚本也通过；改错重试键、503时清空文件两个反例均失败。四组对照零外部提供方调用、零实际Token。原 Native 无 release_blockers、两份产物与旧 trial 保留。此为修正判定器重放及脚本控制组，不是新的完整 Agent 生成或正式全套成绩；人工参考、独立质量评分与后续完整日观察仍未完成。</p>
+</section>
+
+<section id="rsi-csv-evidence-states-20261026" lang="zh-CN">
+  <h2>CSV 质量证据采集修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>质量取证与功能验证支持相同的即时／提交时校验流程：非法文件已显示错误并禁用导入按钮时直接记录现场，导入、503保留与成功恢复按真实响应和绘制帧取证。真实成品与脚本控制组分开，成品功能通过不等于已获质量分。</p>
+  <h3>User Stories</h3>
+  <p>维护者能看到合法即时校验页面的六张真实截图和恢复过程，不因取证脚本点击禁用按钮而一直缺少质量证据。用户参考分和视觉模型评分继续绑定确切材料，旧校准不能替代新协议的校准。</p>
+  <h3>Technical Design</h3>
+  <p>artifact_evidence.PROGRAM 的 CSV 分支等待按钮或错误状态，以实际 POST 响应完成及浏览器绘制帧捕获画面。冻结渲染镜像仍为 sha256:80e04db9…；PROGRAM 是 PROTOCOL_HASH 的组成部分，因此旧证书和旧模型评分不复用，必须在人工参考确认后重新进行双模型校准。旧材料、分数和请求保留。评测协议单列 container-uds-v14-csv-evidence-states。</p>
+  <h3>验证边界</h3>
+  <p>原 Sol 成品的四项功能检查、提交时校验控制组通过；换错重试键及清空输入反例失败。更新取证脚本完成六张图和七段文本的零模型采集，原源码 SHA 保持。无提供方调用，不自行打分；四份修订样本人工参考及新协议校准仍待完成。旧 v6 全套结果及父 issue 状态保持。</p>
+</section>
+
+<section id="rsi-financial-reference-consistency-20261026" lang="zh-CN">
+  <h2>FinQA 参考一致性门禁 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>新版 FinQA 先核验原始显示答案与执行答案，二者必须在显示精度的舍入区间内一致；明确百分数换算为十进制比例。无法解析或互相矛盾的参考单列隔离原因，再按原种子与分层数量抽样，不能把互相矛盾的标注当作 Agent 错误，也不能改写参考答案迎合输出。</p>
+  <h3>User Stories</h3>
+  <p>用户看到可核验的数值验收，明确知道0.0001绝对误差要求；材料不足时完整数量准入失败，不静默少题。维护者可以追溯被隔离的上游记录、版本及原始 SHA，旧运行与旧分数继续保留。</p>
+  <h3>Technical Design</h3>
+  <p>sampling.displayed_numeric_reference 仅解析有限长度的纯数字、合法千分组、科学记数及显式百分号，以 Decimal 的末位精度界定舍入区间。单轮 FinQA 原生数值与显示值不一致或显示答案不可核验时在抽样前排除；沿用原分层随机抽样与数量硬检查。FinQA ID 和 adapter 升为 sample-v2 / financial-numeric-v2-consistent-reference；不向 Agent 提供显示答案、程序或 gold_inds。ConvFinQA 的标注、版本与题面保持。协议单列 container-uds-v15-financial-reference-consistency，旧固定 v11 库不覆盖。</p>
+  <h3>验证证据</h3>
+  <p>42 项回归通过，包含舍入、百分数、符号冲突、格式／大指数拒绝、来源不改写、确定性抽样、数量不足拒绝与答案不泄漏。固定<a href="https://github.com/czyssrs/FinQA/blob/0f16e2867befa6840783e58be38c9efb9229d742/dataset/dev.json">上游 dev 数据</a>中租金题的 answer 为215.33、exe_ans为324.5；提供的231、205、210三年数据平均为646/3。原 Agent 输出与显示答案一致，旧冻结失败仍保留。零模型重导入隔离矛盾样本，并取得完整3项新样本；这是源标注质量修复，不是旧题重新通过或同合同收益证明。人工参考、当前质量协议校准和后续完整日观察仍未完成。</p>
+</section>
+
+<section id="rsi-native-execution-proof-20261027" lang="zh-CN">
+  <h2>RSI Native 执行凭证 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>评测已经明确要求 Native Worker，Main 不得通过 host shell 绕过委派。文件内容正确与执行合同完成分别验收；没有实际 Worker、只有旧版本成功记录或最后一次执行未成功，都不能算作当前 Native 交付。</p>
+  <h3>User Stories</h3>
+  <p>用户要求 Native 执行时，评测能证明工作由当前任务版本的 Native 完成。协调器不再自己反复扫描大目录消耗整个任务额度；普通产品中的 Main 主机执行能力保持原有授权与作用域。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation_tasks.bind_evaluation_tasks 仅在隔离评测 Runtime 将 bash 的 Main 可用标记关闭，Worker 的工作区 shell 保持可用，直接 shell 入口原本也不向 Main 开放。NativeFilesExecutor 在生成结束后检查每个任务当前 revision 的最后 attempt：必须存在、executor_kind=native、attempt succeeded，任务 waiting_user 或 succeeded。独立文件检查仍继续执行，执行合同失败仍阻止通过。原 trial 与费用不重写，评测协议单列 container-uds-v16-native-execution-required。</p>
+  <h3>验证计划</h3>
+  <p>覆盖 Main 的 bash/shell 两入口和 host/workspace 两作用域执行前拒绝、Worker 真实文件写入、空任务、错误执行器、旧 revision、运行中 attempt、未完成任务、较新失败 attempt，以及真实 Native 委派成功。新协议复测单列，不冒充冻结 v6 全套通过，评分与连续日观察继续保留。</p>
+</section>
+
+<section id="rsi-stock-result-contract-20261027" lang="zh-CN">
+  <h2>RSI 金融证据字段合同 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>STOCK-03 允许题面要求的 scenarios 与 falsification 字段，并分别检查至少两个非空条件情景及非空反证。固定事实、凭证、未知订单与目标价保持严格比较，其他额外字段仍拒绝。STOCK-01 公开声明 facts/commentary 数组使用来源 id，而不是正文，避免把未公开的字段语义当作模型能力失败。</p>
+  <h3>User Stories</h3>
+  <p>用户同时提供事实、条件情景和反证时，结果不会因为满足题面而被当作多余字段拒绝；虚构目标价、未来来源、错误分类或缺少条件继续失败。维护者保留原失败记录，修正验证器的原产物重放与新题面生成分开记录。</p>
+  <h3>Technical Design</h3>
+  <p>authored_grading 仅对 STOCK-03 剥离两个已声明的动态字段后精确比较固定结果；独立验证动态内容，其他题的 close_json 不变。authored_fixtures 明确两个金融案例的公开字段语义，corpus 将两题 recipe 升为 authored-v9-stock-evidence-contract，新缓存 authored-40-v9.json 不覆盖 v8。合并 Native 执行凭证后协议单列 container-uds-v17-native-and-stock-contract，原输入、额度与评分隔离保持。</p>
+</section>
+
+<section id="rsi-nested-history-document-20261027" lang="zh-CN">
+  <h2>RSI 历史引用的文档归属 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>长记忆检索的邮件操作引用属于其所在的 User 表单，不要求整个浏览器的第一行标题就是该表单。统一导航外层下的 Main Content 嵌套文档保持有效；其他表单的同名按钮不能借用外层或相邻 User 页面证明引用。</p>
+  <h3>User Stories</h3>
+  <p>用户给出准确答案、原始树引用和真实邮件按钮时，不会因导航容器的标题被误判失败。维护者仍能拒绝错误页面、虚构引用、改动历史及额外答案，不放松原生指标。</p>
+  <h3>Technical Design</h3>
+  <p>long_memory.PROGRAM 按可访问树的缩进维护 RootWebArea 栈，邮件按钮使用最近文档的标题判定表单，离开嵌套文档时弹栈。100 份历史、原始顺序、SHA、盒装答案、原生指标与精确短语检查不变。协议单列 container-uds-v18-native-and-source-context；v17 候选结果保留，修正验证器的零模型重放独立保存。</p>
+</section>
+<p>2026-10-27 验证补充：Native/金融合同定向 105 项、嵌套文档与引用等定向 64 项通过。真实 Docker/UDS 五组零模型对照证明旧版 Main host/direct write 可误通过，新版拒绝且真正 Native 委派可通过；STOCK-03 原产物重放通过，五组负向对照均拒绝。v17 长记忆候选由真实 Native 成功执行，原生指标及引用均正确，修正文档归属后零模型重放全通过；CSV 候选四项硬检查通过、独立质量待评，原生成结果保留。冻结 v6 全部 40 份真实任务经只读审计，26 份具备成功 Native 当前执行，9 份未创建任务；原先通过中有 6 份缺少 Native 凭证，历史 39/5/16 仅保留为原始结果，不代表执行合同完整验收。Codex 完成状态回归改用独立进程作为模拟会话，避免把整个 Go 测试进程的其他子进程算为任务未结束；10 次重复通过，生产存活与身份保护未变。</p>
+
+<section id="rsi-contract-instruction-separation-20261027" lang="zh-CN">
+  <h2>RSI 执行说明与结果字段分离 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>题面中的执行说明不再伪装成 result.json 的 contract 字段。模型只需输出公开声明的结果字段；执行要求单独列出。QUANT-02 公开数组类型、区间边界、独立指标历史、下一 bar 开盘成交、费用、期末估值及审计日志格式，QUANT-03 补齐同一因果交易规则。数值参考、输入文件、单项额度和独立检查不变。</p>
+  <h3>User Stories</h3>
+  <p>用户无需猜测“说明文字”是否也是结果数据，不会因使用未公开的数组／对象结构或成交时点而遭遇隐藏条件。经验迁移日志可用 output 或 stdout 保存真实输出；两者冲突、伪造输出或凭证仍失败。</p>
+  <h3>Technical Design</h3>
+  <p>authored_fixtures 在序列化字段说明前提取 contract，将其列为“执行要求（不是结果字段）”；返回显式 contract_revision，corpus 为受影响案例绑定 authored-v10-separated-instructions，缓存使用 authored-40-v10.json，其他案例版本保留。LAB-05 对 output/stdout 所有已提供字段同时做类型和原始输出一致性检查，不用一个字段掩盖冲突。协议单列 container-uds-v19-separated-contract-instructions；新增冻结库存和复测不覆盖原案例或原生成失败。</p>
+</section>
+
+<section id="rsi-verified-backtest-summaries-20261027" lang="zh-CN">
+  <h2>RSI 可核对回测摘要 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>QUANT-03 的 strategy 必须保留准确的 trades 与 equity；允许描述和输入／交易可以独立推导的初始资金、费率、滑点、期末现金、持仓与净值摘要。附加摘要不能与核心结果矛盾，未知字段继续拒绝，不用额外文字覆盖交易或净值验证。</p>
+  <h3>User Stories</h3>
+  <p>用户同时提供完整交易明细、净值和准确摘要时，不会因多给了可核对的结果而被误拒绝；错误现金、费率、净值或虚构保证收益仍失败。原来的失败产物和新候选均保留，不将验证器重放记作新生成。</p>
+  <h3>Technical Design</h3>
+  <p>authored_grading.corrected_backtest_matches 以冻结逐笔交易推导现金和数量，以冻结净值与输入核对其余数值摘要，之后严格比较原有核心字段；提交文件与重跑输出分别检查。QUANT-01 及其他结构化合同不变。公开可选字段的 QUANT-03 recipe 标为 authored-v11-verified-backtest-summaries，语料使用 authored-40-v11.json；协议单列 container-uds-v20-verified-backtest-summaries。</p>
+  <h3>验收证据</h3>
+  <p>定向 136 项通过，覆盖持仓未平与已平两种现金流及矛盾摘要、错误交易、布尔冒充数值和未知字段。真实 v19 Native 候选经 Docker 零模型重放全部通过；五组篡改对照拒绝，冻结 v6 的错误结果仍失败；原产物和结果 SHA 不变。v19 同组 STOCK-01、QUANT-02、LAB-05 已真实独立通过，前组 STOCK-03 通过；CSV 硬检查通过仍待质量。四份人工参考分、有效校准与后续日观察不因这些结果自动完成。</p>
+</section>
+
+<section id="rsi-native-metric-diagnostics-20261027" lang="zh-CN">
+  <h2>RSI 媒体原生分数诊断 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>媒体验证器正常退出、文件检查通过，但原生分数低于公开门槛时，报告明确记录低于门槛，不再只显示所有检查通过和无原因失败。验证器未正常退出仍归为验证失败，不伪装成质量分低。</p>
+  <h3>User Stories</h3>
+  <p>用户能区分真实音频质量不足与文件或验证环境故障；维护者看到实际原生分数和最小要求，不需要猜测红色状态的原因。</p>
+  <h3>Technical Design</h3>
+  <p>media_tasks.grade_media 在 checks 增加 native_metric_threshold，并返回 native_metric_minimum 及有限 reason。判定与原 all(checks) and score&gt;=minimum_reward 等价，原生验证器、输入、门槛和输出均不变。回归覆盖低分、恰好达标、满分和验证器失败但分数达标；冻结 v20 全套仍使用其独立旧源码，新增诊断单列，不改写原 trial。</p>
+</section>
+
+<section id="rsi-native-failure-diagnostics-20261027" lang="zh-CN">
+  <h2>RSI Native 执行失败原因 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>未创建 Native 任务、执行器不符、当前执行未完成时，报告保留明确的失败原因，不再统一显示为运行失败。其他未知异常继续泛化，不能借诊断输出任意供应商文本。</p>
+  <h3>User Stories</h3>
+  <p>用户能区分漏委派、执行未完成与产物数值错误；维护者可以针对真实原因改进协调，不把已有答案文件当作 Native 执行证明。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation_tasks 声明有限 NATIVE_EXECUTION_FAILURES，包含原四个预算代码及三个既有执行合同代码；ContainerExecutor 仅透传集合内的 release_blocker，其他字符串仍映射 RSI_RUNTIME_REPORTED_FAILURE。评分、执行条件、费用与冻结 v20 结果不变。回归同时验证允许代码透传及私有任意文本不泄漏。</p>
+</section>
+
+<section id="rsi-simple-design-20261027" lang="zh-CN">
+  <h1>RSI 配置、运行结果与修复追踪 · 2026-10-27</h1>
+  <p>本轮先交付 HTML 交互原型供确认，不修改实际 RSI 调度与额度策略。原型使用隔离演示数据，所有运行、修复、保存操作仅在页面内演示。</p>
+  <p>生成：<code>cd frontend &amp;&amp; node scripts/build-rsi-design.mjs</code>；输出 <a href="docs/design/20261022-roami-agent-rsi/prototypes/roami-rsi-design.html">设计与原型</a>、<a href="docs/design/20261022-roami-agent-rsi/prototypes/roami-rsi-prototype.html">独立原型</a>。</p>
+  <h2 id="rsi-simple-product">产品设计</h2>
+  <p>首页以选定的一次 Workflow 运行为中心，先展示 Case 和 Issue 汇总，再查看折叠的单项详情。三个主 Tab 为工作流、运行结果、Issue，默认打开运行结果；页头保留“运行评测”和“设置”。选择本次运行与更早的对比运行，历史结果不受当前设置或其他运行的状态覆盖。运行前选择快速检查 10 项或完整评测 60 项。运行中的进度与停止动作直接可见，停止保留已完成结果。</p>
+  <p>保留七环节工作流，取消每个环节的大型配置卡与分散表单。工作流 Tab 直接展示七个环节的状态及一句执行摘要；点击环节查看执行者、输入、实际执行情况、产物与下一步，技术日志按需展开。手机使用纵向步骤与就地展开的详情。尚未执行的环节说明等待条件，不伪造产物。结果详情先展示通过、失败、待评分和报告，再展示具体问题、交付物与运行过程；待评分不计为通过，派活完成不等于修复通过。</p>
+  <p>设置集中为自动评测、评测范围、问题跟进、模型与费用四组。自动评测关闭时隐藏时间和时区；开启后设置每日时间。问题跟进保留自动修复与自动创建 GitHub Issue，修复之后必须独立验收。自动提交 PR、合入和关闭 Issue 不因开关而获得新的默认授权。</p>
+  <p>RSI 不再提供每日 Token、每次诊断 Token、每次 Codex Token、请求次数、角色输出上限等独立额度配置。主控、执行与记忆模型沿用模型页配置；RSI 设置仅展示共享每日金额限额与“模型页”入口。额度仅在模型页编辑。达到每日限额或费用未知时，说明暂停原因并给出模型页入口，保留已经产生的结果和记录。</p>
+  <p>桌面保持现有设置导航、基础底色和单线分隔。手机使用等高返回栏与单一内容滚动容器，长设置与运行详情是整页，不使用长弹窗；保存栏在滚动区之外并避让键盘，底部保留首页、项目、工具、设置。原型支持中英文、深浅主题、桌面与手机预览，以及有待处理、运行中、修复中、全部通过、尚无记录、每日限额、费用待核对七种状态；“修复中”展示已完成的复盘、Issue 清单和正在执行的修复。</p>
+  <h3>按运行查看结果与多轮问题追踪</h3>
+  <p>本轮先显示 Case 的计划数、通过、失败、待评分、未执行和运行中数量，并按公开、自有、机制分组。点指标或展开 Case 明细后，用折叠行查看原始结果、证据、跨轮轨迹与关联 Issue。未运行、待评分和模型费用未知不能算通过；Case 由失败变为通过只是本例结果变化，不直接判定整个 Issue 已解决。</p>
+  <p>Issue 汇总先显示已验证修复、已关闭和仍待解决数量，再显示本轮新增、验证修复、关闭、持续通过、再次出现、仍遗留、未验证与未覆盖。汇总数从同一份 Case 和 Issue 观察记录推导。反复出现的同一问题串联多次运行，一次运行的多条日志只计一次命中。折叠详情展示类型、优先级分析、首次出现、最近失败、关联 Case、验收条件、修复证据和各轮状态。</p>
+  <p>类型区分 fix 与 feature：fix 违反已有要求，feature 增加能力或覆盖；feature 不混入失败 Case 数。优先级说明保留依据：P0 涉及整体阻断、账目或费用安全；P1 影响核心功能、交付或正确性；P2 为一般缺陷与能力补充；P3 为体验优化。可按本轮变化、类型和优先级筛选，原型展示分级依据，不凭关键词宣称完成自动诊断。</p>
+  <p>修复必须有绑定当前版本的独立验收回执。已验证修复与已关闭分别统计，至少两个后续完整且同口径的周期无复现才可关闭。再次失败立即重开；待评分、快速检查、部分执行和未覆盖不能累计完整观察次数。比较只覆盖双方相同 Case，评测集、判定器、模型和环境不同则停止自动判定修复或退化，保留原始结果供查看。</p>
+  <p>运行选择区的折叠记录展示每轮 Case 结果和 Issue 变化；点击可回到该轮汇总。跨轮问题页展示截至选定运行的历史，不泄露未来运行的修复或失败。七环节 Workflow 保留在独立工作流 Tab，阶段摘要、产物文件名和内容均绑定该轮，不再对多轮历史复用全局最新状态。展开项、选择的运行和基准在查看产物后保留。</p>
+  <h2 id="rsi-simple-stories">用户故事</h2>
+  <ol>
+    <li>我打开 RSI 就能知道最近评测通过多少、哪些未通过、哪些仍待评分，并能直接查看对应问题。</li>
+    <li>我不用理解流水线节点就能开始一次快速或完整评测，运行中可以停止，并保留已完成的结果。</li>
+    <li>我只在模型页维护每日限额；RSI 告知共用额度和暂停原因，不要求再次填写 Token 数。</li>
+    <li>我在一个设置页开启每日评测、选择时间和测试环境，修改失败保留输入，离开前提示未保存更改。</li>
+    <li>我点开问题能看到验证情况和下一步修复动作；交给 Codex 后显示修复中，只有独立验证通过才进入观察，不提前宣称解决。</li>
+    <li>我在手机上能通过真实点按完成设置、保存、查看结果和返回，操作按钮不依赖悬停提示。</li>
+    <li>我能看到全部七环节的实际状态；点击环节查看谁执行、用了哪些输入、做了什么、产出了什么，以及接下来等待什么，打开产物后返回仍保留选择。</li>
+    <li>我选择某次运行和对比基准，先看 Case、Issue 总量与变化，再折叠展开单项结果和证据。</li>
+    <li>我能知道同一问题在哪几轮出现、哪次通过验收、是否再次失败，以及为什么还没关闭；未覆盖不会被误算成已修复。</li>
+    <li>我能按 fix / feature 和 P0 至 P3 筛选，展开查看影响与分级依据，而不是只看到没有解释的标签。</li>
+  </ol>
+  <h2 id="rsi-simple-technical">技术设计</h2>
+  <pre>frontend/prototypes/rsi.tsx          隔离状态、路由式整页、表单与运行演示
+frontend/prototypes/rsi-run-history.ts 冻结的演示运行、Case、Issue 观察与对比规则
+frontend/prototypes/rsi-run-results.tsx 汇总优先、折叠明细、筛选、轨迹与跨轮对比
+frontend/prototypes/rsi-run-results.css 运行结果与多轮追踪布局
+frontend/prototypes/rsi-workflow.tsx 七环节状态、按次快照与产物详情
+frontend/prototypes/rsi.css          使用现有设计令牌与 data-size / data-pointer
+frontend/scripts/build-rsi-design.mjs 单文件 HTML 与内嵌原型生成
+frontend/src/i18n/locales/*          原型文案，复用 I18nProvider
+frontend/src/theme.tsx / layout.ts   复用主题、Ant Design 配置与 useLayout</pre>
+  <p>原型由 Vite 构建为无外部依赖的单文件 HTML，设计总稿内嵌 sandbox iframe，可切换视口、主题、语言、状态。偏好写入被原型本地响应截获；不调用真实 RSI 接口、不发模型请求、不创建 GitHub Issue。正式页面由 AgentImprovement 接入 RsiWorkspace，复用运行记录及恢复接口；配置集中保存，逐段确认成功版本，失败保留未保存输入和原始运行快照。</p>
+  <p>正式落地时，模型调用必须经同一个 ModelProxy / ModelBilling，覆盖评测容器网关、复盘、独立评分和其他模型调用。金额限额由模型页现有配置决定，停止新增请求的判定沿用实际费用、币种与未知回执处理。删除 RSI 额度准入校验和动态 Token 压力提示，同时保留实际用量记录、取消机制及隔离执行的必要技术边界；历史额度记录和未知账目不清零、不伪造退款。共享限额运行时已接入，原型本身仍不访问实际模型或账本；落地边界见本节的实现记录。</p>
+  <p>验收关注：所有场景的主要动作可达；默认页面无独立 Token 输入；模型页修改限额后 RSI 展示同一份值；失败保留输入；完成记录不轮询；桌面及手机无横向和文档滚动；手机返回栏、底栏、保存栏与触控命中正确。</p>
+  <h2>资料目录整理 · 2026-10-27</h2>
+  <p>目录根部只保留 index.html 作为入口。prototypes 保存当前交互稿，architecture 保存总体方案和工作流合同，evaluation 保存评测标准、样本和材料锁，research 保存研究与来源，records 保存历史实施与试跑，assets 保存样式、图与可编辑源文件。所有历史材料保留，JSON 合同、材料锁和图源内容不变；随迁移更新页面相对链接、AGENTS.md、运行手册、生成脚本和读取清单的测试路径。</p>
+  <h2>原型检查</h2>
+  <p>浏览器完成共享限额更新、保存失败保留输入、折叠执行记录、派活后仍待验证、额度耗尽与未知费用恢复入口、空态、运行态、全部通过、中英文与深浅主题等交互检查。390px 手机预览已修正横向溢出；真实 Android 当前锁屏，本次不声称已完成真机触控验收。前端 typecheck、i18n、hover、140 个测试文件的 1012 个用例与生产构建通过。这是原型阶段检查记录；后续运行时额度整合与正式页面替换见实现记录。用户补充要求已落实到原型：工作流入口始终可见，各环节在专属 Tab 查看执行情况和产物；原先仅在折叠记录里显示步骤的方案已替换。</p>
+  <p>目录迁移后，本地链接检查通过，17 份 JSON、样式与图源逐字节保留。清单路径相关的 41 项测试通过；七环节的浏览器交互检查 27 项、原有原型回归检查 16 项通过，覆盖未执行无产物、修复不冒充独立验收、PR 待审阅不冒充合入、产物整页查看及返回保留选择。前端完整检查仍为 140 文件、1012 项测试通过。</p>
+  <p>多轮原型使用 R01 至 R05 的明确演示记录：四次完整评测和一次有未覆盖、待评分项的快速检查。稳定 Issue 身份与失败签名用于关联；输入、模型、环境、判定器版本作为比较分组。运行汇总使用冻结记录重算，优先级和验收回执分开保存。这是原型演示记录，演示分级和修复结论不代表真实仓库 Issue 的最新状态。</p>
+  <p>运行结果修订验收：新增 12 项跨轮聚合规则测试，前端共 141 个测试文件、1024 项用例通过；浏览器 22 项检查覆盖按次汇总、折叠明细、历史无未来泄漏、分类与优先级筛选、未覆盖不算修复、产物与运行绑定及返回保留选择。问题复现会使当前修复结论失效，但保留上次独立验收所在运行供追溯。</p>
+  <h3>分 Tab 查看 · 2026-10-27</h3>
+  <p>三个主 Tab 分别为工作流、运行结果、Issue。工作流查看七环节的实际状态、执行情况及产物；运行结果只呈现 Case 汇总和折叠明细；Issue 查看汇总、分级、修复变化、共性与折叠详情。三个 Tab 共用本次运行、对比运行和冻结快照，切换不清空筛选、展开项或工作流环节选择。多次运行记录收在运行选择区下方，不增加第四个主 Tab。键盘方向键及 Home / End 可切换 Tab，手机保持一条内容滚动区。</p>
+  <p>分 Tab 修订通过 16 项浏览器检查，覆盖三视图内容隔离、共享运行与基准、Case / Issue / 运行记录的展开状态保留、产物返回、工作流选择及键盘切换；前端 141 个测试文件的 1024 项用例与类型、国际化、hover、生产构建通过。手机预览检查通过，真实 Android 仍未完成触控验收。</p>
+  <h3>正式页面与共享限额实现 · 2026-10-27</h3>
+  <p>AgentImprovement 接入 RsiWorkspace；RsiRunResults、RsiWorkflow 与 rsi-history 分别负责汇总与明细、七环节、跨轮比较。示例原型复用这些组件，仅替换数据源。正式结果从所有者隔离的 pipeline/runs/{id}/results 读取，按选中运行截断历史，保留冻结的 Case 名称与合同；旧记录缺少比较身份时不伪造可比性。历史最多取 100 次，窗口不完整会明确显示，不能据此确认新增或修复。复发信号与同条件比较分别统计，不推断共同根因。</p>
+  <p>配置只保留日程、任务范围、工作流自动化和模型页共享金额限额。运行时 Main、Worker、Memory、独立判定和 Codex Responses 代理统一经 ModelProxy / ModelBilling 准入与结算；旧 Token、请求数和角色输出额度不再用于实时 RSI 准入。冻结协议及独立 CLI 仍保留原合同，历史预留与未知回执不清零。隔离执行的时间、进程、文件和独立评分协议边界继续生效；不能接入共享网关的 external 执行器拒绝启动。</p>
+  <p>本次未复现不等于修复。只有 host_code_verifier_v1 的独立源码对照回执，且 Case 合同、修复源码、模型、环境和判定器全部匹配，才显示已验收；缺失执行日志、未来回执、未知用量和再次失败均不通过。关闭还须实际 observation.closed_fixed 事件与匹配的完整观察周期，界面不会因同一天点两次复测而自动关闭。工作流的 repair、verify、publish、observe 等环节按实际动作状态生成只含允许字段的回执，不展示私有答案或修复提示词。</p>
+  <p>结束运行不定时请求详情，活跃运行复用可见性轮询；切换节点或运行后旧响应不覆盖当前界面。设置按需读取模型限额，加载失败不显示无限额。三个 Tab 共用选择与筛选；产物在手机全屏二级页查看，返回保留上下文。</p>
+  <p>验收边界：真实 Codex CLI 已对本机模拟 Responses 服务完成一轮协议检查，确认请求进入共享计量，未访问外部付费模型。实际 Go 网关与 Python 服务使用隔离示例数据验证页面，示例运行明确标识，不作为能力提升或真实 Issue 关闭依据。真实 Android 仍锁屏，尚未完成仓库要求的真机触控验收；四份人工评分锚点和正式完整日观察也未补齐。</p>
+  <p>正式实现检查：运行时全量 1615 项、前端 140 个测试文件的 1016 项用例通过；typecheck、i18n、hover 与生产构建通过。中文深色、英文浅色各检查 320、390、820、1100、1280、1600、1920 宽度及三个 Tab，共 42 组布局无文档或内容横向溢出；实际接口检查 9 项覆盖冻结元数据、待独立验证、七环节产物、文件完整性、返回保留上下文、无独立 Token 配置和结束记录不轮询。环境或判定器变化、未来回执、复发及不完整验收均有反向回归。手机浏览器预览不替代真机验收。</p>
+  <h3>Case 目录与元数据 · 2026-10-27</h3>
+  <p>任务定义统一放在仓库根部 cases/case-序号-标识/，编号保持稳定。每个目录允许多个文件及子目录：CASE.md 是 name、description 的唯一展示来源，case.json 保存执行合同；input/、公开验收说明和脚本按需添加，附件须经执行定义或任务装配明确引用后随套件冻结，不因存在于目录而自动执行。40 个自有和机制任务的合同保持原样，20 个公开任务仅保存来源引用，不把未运行标为通过。</p>
+  <p>运行记录冻结名称和描述，后续修改不会覆盖已冻结元数据。隐藏集不展示任务描述。打包将 cases/ 随运行时分发；目录、必填字段、重复元数据、合同身份和来源边界均做校验。历史套件文件继续保留，新生成自有套件使用 v12。</p>
+  <p>Case 目录验收：相关 82 项测试通过；全量运行时回归 1577 项、前端回归 1024 项通过。源码包与从源码包重建的安装包均包含 60 个 CASE.md 和 60 个 case.json；不带宿主 Case 的隔离镜像构建上下文能正常构建运行时包。Python 检查范围已包含根部 cases/ 的增删改。</p>
+  <h3>与模型费用改造合并 · 2026-10-27</h3>
+  <p>保留 main 的模型单价兜底、ECharts 用量图表、任务续办与会话归属修复。spending_policy 同时识别 Runtime 显式绑定和 model_accounting 继承作用域，ModelProxy.attach 对同一代理保持幂等；Codex 经 Responses 网关逐次计费，完成的缓存结果不重新准入或扣费，原生请求和 Codex 共用金额门禁。无上游费用但有完整用量时使用模型页单价估算；缺失用量仍为未知。历史共享调用超过旧 Token 预留不被错误隔离，已知用量之外的状态不能借此放行。</p>
+  <p>正式配置和记录统一由 RsiWorkspace、RsiRunResults、RsiWorkflow 承担，替换早期 RsiSettings 与 PipelineRuns；跳转模型页直接打开费用 Tab。实时诊断不新增旧 Token 预算行，显式离线协议仍保留冻结额度语义。HTML 原型继续复用正式结果与工作流组件。用户已明确要求合入代码；真机、人工评分与连续日观察的缺口仍按原记录保留，不据合入自动关闭能力评测 Issue。</p>
 <section id="rsi-shared-billing-and-interactive-usage-20261027" lang="zh-CN">
   <h2>RSI 统一限额与交互用量 · 2026-10-27</h2>
   <h3>Product Design</h3>
@@ -1452,7 +1796,7 @@ Research → 原浏览器导航／观察协议</pre>
   <p>用户不再为 RSI 和模型页维护两份预算；原生生成、记忆、评分与 Codex 复盘均进入当前节点同一本账。每日趋势和分时图使用 ECharts 堆叠柱形，鼠标悬停显示精确值，点击或触屏点按后保留总计及分模型明细，可继续查看当天分时。键盘用户可通过日期／时段选择器访问相同数据，未知费用与本地估算仍明确显示。</p>
   <h3>Technical Design</h3>
   <p>model_proxy_context 只绑定 RSI 执行任务，configured_provider 在该作用域接入既有 ModelProxy，跨角色模型与容器内 UDS 请求由宿主代理准入及结算。Codex 以明确模型身份和完整回合用量进入同一准入锁、价格快照、费用估算与未知状态流程；重复的已完成操作不重复记账，缺失回执不假设免费。旧 RSI Token 配置与账本保留作历史证据，现代运行不再以其作为费用门禁；测试语料、复测身份、未知操作不重放和独立验收约束保留。</p>
-  <p>RsiWorkspace、RsiSettings 分担概览导航及统一草稿保存，PipelineRuns 保留真实运行记录和按需产物。ModelUsageChart 惰性加载 usage-chart-renderer，只引入 ECharts 柱形、坐标轴、提示和 Canvas；独立 usage-charts 构建块避免进入首屏。颜色、字体、空间和主题取现有令牌，点击明细保留 React 可访问文本，不依赖悬停提示或画布读取。</p>
+  <p>本段为 #464 的原实现记录；合并后的 RsiWorkspace 管理统一草稿与三个 Tab，RsiRunResults 保留真实运行记录和按需产物，见 RSI 简化方案的合入修订。ModelUsageChart 惰性加载 usage-chart-renderer，只引入 ECharts 柱形、坐标轴、提示和 Canvas；独立 usage-charts 构建块避免进入首屏。颜色、字体、空间和主题取现有令牌，点击明细保留 React 可访问文本，不依赖悬停提示或画布读取。</p>
   <h3>验收记录</h3>
   <p>full 质量门禁通过：Python 1462 项、Go 全量、静态与格式检查；最终前端 142 个文件、1023 项测试及 typecheck／i18n／hover／生产构建通过。9 项新增费用回归覆盖共用限额、Codex 本地定价、拒绝后重试、幂等、防重放、取消和未知回执。生产图表块 gzip 为 166164 字节，未进入首屏静态依赖闭包；不据此推断 CPU 或内存改善。</p>
   <p>独立实例通过真实浏览器验证点击选日、分时下钻、模型计费深链、草稿跨 Tab 保留、保存及刷新恢复；中深色／英浅色各检查 320、390、820、1100、1280、1600、1920 宽度，无文档溢出。粗指针模拟验证触屏点按及开关扩展命中区。界面使用示例 API 数据，费用回归使用隔离数据库与上游／CLI 测试替身，无付费调用。Android 真机仍锁屏，真实触控、键盘和安全区尚待验收；未部署现用服务。前后截图与日志见 /tmp/rsi-usage-20261027/index.html。</p>

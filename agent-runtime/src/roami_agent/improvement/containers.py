@@ -75,6 +75,7 @@ class ContainerExecutor:
         worker_route=None,
         main_route=None,
         shared_budget=None,
+        shared_daily_limit=False,
     ):
         self.settings, self.image = settings, image
         self.artifact_reviewer = artifact_reviewer
@@ -82,7 +83,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v4-explicit-native",
+                "container-uds-v20-verified-backtest-summaries",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -98,6 +99,9 @@ class ContainerExecutor:
         self.image_id = None
         self.provider_factory = provider_factory
         self.shared_budget = shared_budget
+        self.shared_daily_limit = shared_daily_limit
+        if shared_daily_limit:
+            self.model_hash = digest([self.model_hash, "shared_model_daily_limit"])
         self.source_root = Path(source_root).resolve() if source_root is not None else None
         self.regression_root = regression_root
         self.output_caps = output_caps or {}
@@ -358,7 +362,7 @@ class ContainerExecutor:
         view["followups"] = case.get("followups", [])
         private_json(state / "request.json", {"case": view, "policy": policy})
         setup_ms = (time.monotonic() - started) * 1000
-        budget = EpisodeBudget(case["limits"])
+        budget = EpisodeBudget(case["limits"], shared_daily_limit=self.shared_daily_limit)
         budget.started = started
         providers, models, journal = [], {}, []
         for role in ("main", "worker", "memory"):
@@ -461,13 +465,15 @@ class ContainerExecutor:
                     if gateway.errors:
                         failure = gateway.errors[0]
                     elif response["release_blockers"]:
-                        from roami_agent.improvement.evaluation_tasks import NATIVE_BUDGET_FAILURES
+                        from roami_agent.improvement.evaluation_tasks import (
+                            NATIVE_EXECUTION_FAILURES,
+                        )
 
                         failure = next(
                             (
                                 c
                                 for c in response["release_blockers"]
-                                if isinstance(c, str) and c in NATIVE_BUDGET_FAILURES
+                                if isinstance(c, str) and c in NATIVE_EXECUTION_FAILURES
                             ),
                             "RSI_RUNTIME_REPORTED_FAILURE",
                         )

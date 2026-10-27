@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-13",
+  "kind": "public_source_reference",
+  "category": "DOC",
+  "source_case_id": "osworld:05dd4c1d-c489-4c85-8389-a7836c4f0567",
+  "origin": {
+    "benchmark": "osworld",
+    "task_id": "05dd4c1d-c489-4c85-8389-a7836c4f0567",
+    "revision": "04718eab9327856efe8192cc58161acc7a7627e2"
+  },
+  "execution": "registered_suite"
+}

@@ -1,0 +1,90 @@
+{
+  "id": "STOCK-03",
+  "kind": "real_workload",
+  "category": "STOCK",
+  "category_label": "股票新闻与公司研究",
+  "prompt": "研究一个产品事件对样本公司的可能影响，列证据、情景和反证。",
+  "preconditions": "有产品公告和业务占比，但没有订单或利润增量数据。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "事件研究报告"
+  ],
+  "hard_assertions": [
+    {
+      "id": "STOCK-03-H1",
+      "rule": "事实与情景推断明确区分",
+      "evidence": [
+        "point_in_time_snapshot",
+        "filings",
+        "claim_evidence",
+        "calculation_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "STOCK-03-H2",
+      "rule": "至少列一个可证伪条件",
+      "evidence": [
+        "point_in_time_snapshot",
+        "filings",
+        "claim_evidence",
+        "calculation_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "STOCK-03-H3",
+      "rule": "不编造目标价、订单和确定收益。",
+      "evidence": [
+        "point_in_time_snapshot",
+        "filings",
+        "claim_evidence",
+        "calculation_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "MR",
+    "CT",
+    "MB",
+    "VD"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "finance_research",
+  "research_inspiration": [
+    "FinRobot"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "截至时点的事实、数字和单位准确",
+    "completeness": "公告、新闻、缺口与情景覆盖",
+    "usability": "研究结论可复核，观察条件明确",
+    "grounding": "事实与推断分开，陈旧价格不冒充实时"
+  },
+  "excellence_candidates": [
+    "证据链、冲突和情景触发条件特别清楚",
+    "预登记的报告期与币种变体仍准确"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "finqa",
+    "convfinqa"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

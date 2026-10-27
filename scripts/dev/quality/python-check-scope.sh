@@ -27,7 +27,7 @@ fi
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    agent-runtime/src/*|agent-runtime/tests/*|agent-runtime/agent.example.toml|*.py|pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|pytest.ini|*/pytest.ini|tox.ini|*/tox.ini|ruff.toml|*/ruff.toml|.ruff.toml|*/.ruff.toml|.python-version|*/.python-version|requirements*.txt|*/requirements*.txt)
+    cases/*|agent-runtime/src/*|agent-runtime/tests/*|agent-runtime/agent.example.toml|*.py|pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|pytest.ini|*/pytest.ini|tox.ini|*/tox.ini|ruff.toml|*/ruff.toml|.ruff.toml|*/.ruff.toml|.python-version|*/.python-version|requirements*.txt|*/requirements*.txt)
       echo true
       exit 0
       ;;

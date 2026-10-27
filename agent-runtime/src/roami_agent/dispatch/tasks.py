@@ -410,17 +410,27 @@ class Tasks:
                     "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
                 )
                 register_native_session(db, tid, child, branch_id)
-                seed = goal
-                if (spec.get("target") or {}).get("resourceOnly"):
-                    original = json.loads(origin["content_json"]).get("text", "")
+                source_content = json.loads(origin["content_json"])
+                resource_only = (spec.get("target") or {}).get("resourceOnly")
+                child_content = {"text": goal}
+                if not fork_point or resource_only:
                     seed = (
                         "Original user request (defines the requested facts and scope):\n"
-                        + original
+                        + source_content.get("text", "")
                         + "\n\nDelegated goal (context only; do not broaden or change the original request):\n"
                         + goal
                     )
-                source_content = json.loads(origin["content_json"])
-                child_content = {"text": seed}
+                    child_content["text"] = seed
+                    if not resource_only:
+                        child_content.update(
+                            text=seed
+                            + "\n\nComplete only the delegated part. Original user contracts override conflicting "
+                            "coordinator interpretations. If the user supplied an output schema, keep its "
+                            "exact fields/types; extra factual metadata belongs in a requested report unless "
+                            "the user allowed extensions. Coordinator-added formulas or checks are proposals, "
+                            "not user requirements.",
+                            displayText=goal,
+                        )
                 if source_content.get("attachments"):
                     child_content["attachments"] = source_content["attachments"]
                 message(db, child, branch_id, "user", child_content)

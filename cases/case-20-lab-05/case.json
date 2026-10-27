@@ -1,0 +1,93 @@
+{
+  "id": "LAB-05",
+  "kind": "real_workload",
+  "category": "LAB",
+  "category_label": "前沿技术与个人实验",
+  "prompt": "第一次处理陌生项目时记录已验证经验，再在未见任务中继续。",
+  "preconditions": "训练轮发现特殊测试入口和过期命令；后续任务换输入且不重给入口。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "两轮任务产物",
+    "经验与trace"
+  ],
+  "hard_assertions": [
+    {
+      "id": "LAB-05-H1",
+      "rule": "经验有来源且不是答案背诵",
+      "evidence": [
+        "primary_sources",
+        "experiment_manifest",
+        "execution_output",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "LAB-05-H2",
+      "rule": "新任务使用正确入口",
+      "evidence": [
+        "primary_sources",
+        "experiment_manifest",
+        "execution_output",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "LAB-05-H3",
+      "rule": "关键配置变化时重新核查，不继续沿用失效经验。",
+      "evidence": [
+        "primary_sources",
+        "experiment_manifest",
+        "execution_output",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "MG",
+    "MR",
+    "CT",
+    "SK"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "experiment",
+  "research_inspiration": [
+    "GEPA",
+    "ACE",
+    "LongMemEval-V2"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "复现或实验的行为和测量正确",
+    "completeness": "版本、环境、基线与局限齐全",
+    "usability": "最小实验可运行，产物可读",
+    "grounding": "自己的结果与作者声明分开，不能造复现"
+  },
+  "excellence_candidates": [
+    "预登记的未见任务验证可迁移",
+    "明确解释失败与适用范围，复现材料无需返工"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "mlagentbench",
+    "terminal_bench"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

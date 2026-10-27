@@ -261,6 +261,7 @@ def test_public_finance_import_is_pinned_and_does_not_feed_gold_evidence(tmp_pat
             "table": [["year", "value"]],
             "qa": {
                 "question": "What is growth?",
+                "answer": str(i + 0.1),
                 "exe_ans": i + 0.1,
                 "program": "divide(1,2)",
                 "gold_inds": {"secret": "oracle"},

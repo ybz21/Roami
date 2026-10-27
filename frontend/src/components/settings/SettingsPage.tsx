@@ -250,7 +250,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
         {openSub && (
           <MobileSubPage title={openSub.name} onBack={() => { const route = runId ? 'settings/experiments/rsi' : 'settings'; if (onNav) onNav(route); else location.hash = '#/' + route }} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
-              <PaneHead page={openSub} model={model} compact />
+              {openSub.id !== 'experiments.rsi' && <PaneHead page={openSub} model={model} compact />}
               {saveStatus}
               <div className="rows">{openSub.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>
             </div>
@@ -308,7 +308,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
         </div>
         {query ? results : (
           <div className="tt-set-pane scroll">
-            <PaneHead page={page} model={model} />
+            {page.id !== 'experiments.rsi' && <PaneHead page={page} model={model} />}
             <div className="rows">{page.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>
           </div>
         )}

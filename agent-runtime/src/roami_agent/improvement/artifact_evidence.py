@@ -61,9 +61,22 @@ with tempfile.TemporaryDirectory() as td:
      if spec['web']:texts.append({'label':'rendered text '+str(width),'text':page.locator('body').inner_text()[:10000],'truncated':len(page.locator('body').inner_text())>10000})
     if spec['id']=='DEMO-02':
      file=page.get_by_test_id('csv-input');button=page.get_by_test_id('import')
-     for label,name in [('valid result','valid.csv'),('missing column','invalid.csv'),('retry with preserved input','valid.csv')]:
-      file.set_input_files(str(root/name));button.click();page.wait_for_timeout(300);add(label,page.screenshot());texts.append({'label':label,'text':page.locator('body').inner_text(),'truncated':False})
-     button.click();page.wait_for_timeout(300);add('recovered result',page.screenshot())
+     def submit():
+      with page.expect_response(lambda response: response.request.method=='POST' and response.url==origin+'/import') as response:button.click()
+      response.value.finished()
+     def capture(label):
+      page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+      add(label,page.screenshot());texts.append({'label':label,'text':page.locator('body').inner_text(),'truncated':False})
+     file.set_input_files(str(root/'valid.csv'));submit();capture('valid result')
+     file.set_input_files(str(root/'invalid.csv'))
+     page.wait_for_function("() => !document.querySelector('[data-testid=import]').disabled || Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+     if button.is_enabled():button.click()
+     page.wait_for_function("() => Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+     capture('missing column')
+     file.set_input_files(str(root/'valid.csv'));submit()
+     page.wait_for_function("() => Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+     if not file.evaluate('e=>e.files.length===1'):raise ValueError('retry input unavailable')
+     capture('retry with preserved input');submit();capture('recovered result')
     browser.close()
   finally:
    if proc is not None:proc.terminate();proc.wait(timeout=5)

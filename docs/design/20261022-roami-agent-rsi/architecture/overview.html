@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roami Agent RSI · 设计方案</title><link rel="stylesheet" href="../assets/design.css"><link rel="stylesheet" href="../assets/rsi-overview.css"></head>
+<body><main><article class="rsi-overview">
+<p><a href="../index.html">RSI 资料目录</a></p>
+<nav aria-label="方案章节"><a href="automation-roles.html">架构与执行</a><a href="../evaluation/evaluation.html">Case与标准</a><a href="../evaluation/sampling-plan.html">60项清单</a><a href="../records/implementation.html">实施记录</a></nav>
+<h1>Roami Agent RSI</h1><p class="rsi-lead">全60项 → Codex复盘 → Codex汇总Issue → Codex修复 → 独立验收与观察。</p>
+<p class="rsi-status">仅开发版运行RSI，普通安装版无入口、接口或后台任务。60/60项合同已备；7项产物已接入双盲评分，真实校准待完成，日程尚未启用。</p>
+<figure><picture><source media="(max-width: 599px)" srcset="../assets/architecture-mobile.svg"><img src="../assets/architecture.svg" alt="RSI架构：程序调度，被测Agent做题，复盘Agent提问，修复Agent改代码，独立验收并应用观察。"></picture></figure>
+<p><a href="automation-roles.html#roles">看执行手段与职责表</a> · <a href="automation-roles.html#closure">看失败处理与关单条件</a> · <a href="../assets/architecture.excalidraw" download>下载可编辑图</a></p>
+<section id="product"><h2>目标与评定</h2>
+<div class="tablewrap"><table><thead><tr><th>目标</th><th>第二层指标</th><th>通过条件</th></tr></thead><tbody>
+<tr><td>效果</td><td>正确、完整、可用、证据可信；真实交付率</td><td>先过硬断言，再做独立产物评分；待评分不算通过</td></tr>
+<tr><td>时间</td><td>排队、模型、工具、验证；交付P50，样本足够再看P95</td><td>同机同模型配对；失败不能算更快交付</td></tr>
+<tr><td>Token</td><td>Main、Worker、记忆、重试；复盘与修复另列</td><td>全部尝试总量/成功交付；未知用量不能记0</td></tr>
+</tbody></table></div>
+<p>每周期固定公开20项、自有真实任务20项、机制20项，无版本差异时稳定版全跑一次，共60次；参数候选或源码版本对照时各跑一次，共120次。另有私有验证24项、隐藏30项，用于晋级；当前私有集只覆盖代码契约。新想法作为额外实验，不替换正式题目。</p>
+<details><summary>改进范围与晋级门槛</summary>
+<p>改进范围：记忆生成/检索、上下文、工具发现/执行/回执、Skill流程、规划委派、模型预算、验证停止。工具次数和重复读取用于定位问题，不能取代效果评分。</p>
+<p>冻结标准：质量差95%区间下限≥−1分，交付率差下限≥−2个百分点；至少质量+3分、交付P50−10%或单位成功Token−10%之一达标，其余效率退化≤5%。按独立任务家族重采样，样本不足不晋级。不同机器、模型与缓存档分别比较。</p>
+<p><a href="../evaluation/evaluation-standard.json">完整指标契约</a> · <a href="../evaluation/evaluation.html">任务与评分锚点</a> · <a href="../evaluation/sampling-plan.html">正式套件覆盖</a> · <a href="../research/research.html">开源研究</a> · <a href="../evaluation/public-benchmarks.html">公开数据集</a></p>
+</details></section>
+<section id="stories"><h2>用户能看到什么</h2>
+<p>开发版配置完成后，关闭聊天仍每天测试；首页展示执行、出分和复盘覆盖，正在修的问题、补丁、前后对比、当前阻塞及下一步。每项成功和失败都能追溯到具体日志。</p></section>
+<section id="closed-loop"><h2>闭环规则</h2>
+<p>程序每天03:00发起 → 全机完整做题 → Codex复盘文档 → Codex汇总一个GitHub Issue → Codex按条目生成隔离补丁 → 程序独立验收 → 草稿PR → 开发评测实例 → 两个后续完整周期观察 → 回写条目并关Issue。人工查看每日报告、Issue与PR，审阅合并；退化回滚重开。</p>
+<p>动作、预算和租约持久化；未知执行先对账，不自动重放付费调用。每轮完整60项、全部出分、完整计量、规则扫描和逐条语义复盘缺一不可。改进仅应用于开发评测实例；普通安装版不运行、不读取RSI策略，改进通过正常版本发布交付。</p>
+<p><a href="automation-roles.html">职责、执行手段与异常处理</a></p></section>
+<section id="technical"><h2>代码架构</h2>
+<div class="tablewrap"><table><thead><tr><th>模块</th><th>职责与保存的数据</th><th>隔离边界</th></tr></thead><tbody>
+<tr><td>EvaluationWorker / cycle</td><td>开发版幂等计划、60项观察/120次对照、指标与日志hash</td><td>私有SQLite账本；全角色共用日预算</td></tr>
+<tr><td>ContainerExecutor / evaluation_tasks</td><td>Main→Native Worker；任务、各角色轨迹；退出后判定产物</td><td>无网络、只挂载本题；答案仅宿主机可见</td></tr>
+<tr><td>ResearchWorkflow / behavior_observer</td><td>逐条语义复盘、证据、去重工单、持久派发</td><td>保护题不进入修改上下文；缺复盘不算完成</td></tr>
+<tr><td>source_revision / candidate_checks</td><td>独立worktree补丁、冻结回归、全量与私有配对</td><td>修复者不能修改判定器、隐藏集或自行验收</td></tr>
+<tr><td>review_report / github_issues</td><td>全机完整文档、Codex汇总单个Issue、回写清单与关单/重开</td><td>发布确认后才派发修复；公开正文不含私有原始日志</td></tr>
+<tr><td>codex_roles</td><td>三个Codex角色；原生ID、JSONL、用量与超时；最多4项一批</td><td>只读证据包，无个人hooks/MCP/执行工具；用量未知不重放</td></tr>
+<tr><td>github_publication</td><td>独立证据重验、quick/full、专用分支、草稿PR与截图；断线对账</td><td>显式配置仓库；不上传原始轨迹/隐藏题，不自动合并</td></tr>
+<tr><td>release_observation</td><td>版本绑定、后续观察、关闭/回滚/重开</td><td>当前只应用到已配置的专用评测实例</td></tr>
+</tbody></table></div>
+<p>代码：<code>agent-runtime/src/roami_agent/improvement/</code>。配置、工单和运行日志保存在节点私有数据目录；套件、标准、镜像及源码版本均记录hash。</p>
+<p><a href="../../../development/agent-rsi.md">配置与运行命令</a> · <a href="../records/implementation.html">真实验收与未完成项</a></p>
+</section></article></main></body></html>

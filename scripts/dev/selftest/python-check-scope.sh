@@ -11,11 +11,12 @@ git init -q -b main
 git config user.name 'Scope Test'
 git config user.email 'scope-test@example.invalid'
 git config core.hooksPath /dev/null
-mkdir -p frontend agent-runtime/src
+mkdir -p frontend agent-runtime/src cases/case-1-example
 printf 'initial\n' > frontend/page.tsx
 printf 'initial\n' > agent-runtime/src/agent.py
 printf '{}\n' > agent-runtime/src/commands.json
 printf 'lock\n' > agent-runtime/uv.lock
+printf 'name: Example\ndescription: Runtime case\n' > cases/case-1-example/CASE.md
 printf 'initial\n' > python-tool.py
 git add .
 git commit -qm initial
@@ -64,6 +65,15 @@ rm python-tool.txt
 printf 'resource\n' >> agent-runtime/src/commands.json
 git add agent-runtime/src/commands.json
 expect true quick 'runtime resource'
+git reset -q HEAD
+git restore .
+printf 'metadata\n' >> cases/case-1-example/CASE.md
+git add cases/case-1-example/CASE.md
+expect true quick 'case metadata resource'
+git reset -q HEAD
+git restore .
+git rm -q cases/case-1-example/CASE.md
+expect true quick 'deleted case resource'
 git reset -q HEAD
 git restore .
 printf 'dependency\n' >> agent-runtime/uv.lock

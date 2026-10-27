@@ -42,6 +42,37 @@ def close_json(actual, expected, tolerance=1e-5):
     return actual == expected
 
 
+def corrected_backtest_matches(actual, expected, prices):
+    if not isinstance(actual, dict) or not isinstance(actual.get("strategy"), dict):
+        return False
+    strategy = actual["strategy"]
+    reference = expected["strategy"]
+    cash, quantity = prices["initial_cash"], 0
+    for trade in reference["trades"]:
+        sign = 1 if trade["side"] == "buy" else -1
+        quantity += sign * trade["quantity"]
+        cash -= sign * trade["quantity"] * trade["price"] + trade["fee"]
+    summaries = {
+        "initial_cash": prices["initial_cash"],
+        "fee": prices["fee"],
+        "slippage": prices["slippage"],
+        "final_cash": cash,
+        "final_quantity": quantity,
+        "final_equity": reference["equity"][-1],
+    }
+    extras = strategy.keys() - reference.keys()
+    if not extras <= summaries.keys() | {"description"}:
+        return False
+    for key in extras:
+        if key == "description":
+            if not isinstance(strategy[key], str) or not strategy[key].strip():
+                return False
+        elif not close_json(strategy[key], summaries[key]):
+            return False
+    normalized = {**actual, "strategy": {k: v for k, v in strategy.items() if k not in extras}}
+    return close_json(normalized, expected)
+
+
 def read_file(workspace, name, *, binary=False):
     path = relative_file(workspace, name)
     if not path.is_file() or path.stat().st_size > 16_000_000:
@@ -69,8 +100,37 @@ async def grade_authored(case, workspace, executor):
         identifier = spec["case_id"]
         if "expected" in spec:
             actual = json.loads(read_file(workspace, "result.json"))
+            compared = actual
+            if identifier == "STOCK-03":
+                scenario_fields = {"scenarios", "falsification"}
+                compared = (
+                    {k: v for k, v in actual.items() if k not in scenario_fields}
+                    if isinstance(actual, dict)
+                    else actual
+                )
+                scenarios = actual.get("scenarios") if isinstance(actual, dict) else None
+                falsification = actual.get("falsification") if isinstance(actual, dict) else None
+                checks["conditional_scenarios"] = (
+                    isinstance(scenarios, list)
+                    and len(scenarios) >= 2
+                    and all(
+                        isinstance(s, str)
+                        and bool(s.strip())
+                        or isinstance(s, dict)
+                        and isinstance(s.get("condition"), str)
+                        and bool(s["condition"].strip())
+                        for s in scenarios
+                    )
+                )
+                checks["falsification_conditions"] = (
+                    isinstance(falsification, str)
+                    and bool(falsification.strip())
+                    or isinstance(falsification, list)
+                    and bool(falsification)
+                    and all(isinstance(s, str) and bool(s.strip()) for s in falsification)
+                )
             checks["structured_result"] = close_json(
-                actual, spec["expected"], spec.get("numeric_tolerance", 1e-5)
+                compared, spec["expected"], spec.get("numeric_tolerance", 1e-5)
             )
         if "report.md" in spec["required"]:
             report = read_file(workspace, "report.md")
@@ -175,12 +235,17 @@ async def grade_authored(case, workspace, executor):
             )
             checks.update({"browser:" + k: bool(v) for k, v in output.items()})
         elif identifier.startswith("QUANT-"):
+            prices = json.loads(read_file(workspace, "prices.json"))
             output = json.loads(
                 (await executor.sandbox(workspace, RERUN_ANALYSIS, timeout=60))
                 .decode()
                 .splitlines()[-1]
             )
-            checks["reproducible_code"] = close_json(output["result"], spec["expected"])
+            checks["reproducible_code"] = (
+                corrected_backtest_matches(output["corrected"], spec["corrected_expected"], prices)
+                if identifier == "QUANT-03"
+                else close_json(output["result"], spec["expected"])
+            )
             if identifier == "QUANT-01":
                 trades = list(csv.DictReader(read_file(workspace, "trades.csv").splitlines()))
                 normalized = [
@@ -196,9 +261,13 @@ async def grade_authored(case, workspace, executor):
                     and log.get("test_used_for_selection") is False
                 )
             if identifier == "QUANT-03":
-                checks["corrected_run_verified"] = close_json(
-                    json.loads(read_file(workspace, "corrected.json")), spec["corrected_expected"]
-                ) and close_json(output["corrected"], spec["corrected_expected"])
+                checks["corrected_run_verified"] = corrected_backtest_matches(
+                    json.loads(read_file(workspace, "corrected.json")),
+                    spec["corrected_expected"],
+                    prices,
+                ) and corrected_backtest_matches(
+                    output["corrected"], spec["corrected_expected"], prices
+                )
                 code = read_file(workspace, "analysis.py")
                 checks["no_original_future_signal"] = not re.search(r"\.shift\s*\(\s*-1\s*\)", code)
         elif identifier == "LAB-05":
@@ -208,8 +277,10 @@ async def grade_authored(case, workspace, executor):
                 experience.get("source") == "project/README.md"
                 and experience.get("entry") == "python verify_current.py"
             )
-            checks["actual_entry_output"] = (
-                log.get("output", "").strip() == "VERIFIED:" + case["fixture_receipt"]
+            outputs = [log[key] for key in ("output", "stdout") if key in log]
+            checks["actual_entry_output"] = bool(outputs) and all(
+                isinstance(value, str) and value.strip() == "VERIFIED:" + case["fixture_receipt"]
+                for value in outputs
             )
         if identifier.startswith("NEWS-"):
             json.loads(read_file(workspace, "sources.json"))
@@ -231,7 +302,15 @@ async def grade_authored(case, workspace, executor):
         zipfile.BadZipFile,
     ) as error:
         checks["verification_completed"] = False
-        evidence.append({"verification_error": type(error).__name__})
+        failure = {"verification_error": type(error).__name__}
+        if isinstance(error, DomainError) and error.code in {
+            "RSI_DOCKER_COMMAND_FAILED",
+            "RSI_DOCKER_OUTPUT_LIMIT",
+            "RSI_TIME_BUDGET",
+            "RSI_ARTIFACT_UNAVAILABLE",
+        }:
+            failure["verification_error_code"] = error.code
+        evidence.append(failure)
     hard_passed = bool(checks) and all(checks.values())
     pending = hard_passed and spec.get("rubric", False)
     grade = quality(
@@ -301,7 +380,7 @@ with tempfile.TemporaryDirectory() as d:
   if path.is_file():shutil.copy2(path,root/path.name)
  for name in ["result.json","corrected.json","trades.csv","equity.svg","selection-log.json"]:(root/name).unlink(missing_ok=True)
  subprocess.run([sys.executable,"analysis.py"],cwd=root,check=True,capture_output=True,timeout=30)
- print(json.dumps({"result":json.loads((root/"result.json").read_text()),"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
+ print(json.dumps({"result":json.loads((root/"result.json").read_text()) if (root/"result.json").exists() else None,"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
 """
 
 BOARD_PROBE = r"""import json,pathlib
@@ -334,9 +413,19 @@ try:
   except Exception:time.sleep(.05)
  with sync_playwright() as p:
   b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto(f"http://127.0.0.1:{port}");file=page.get_by_test_id("csv-input");button=page.get_by_test_id("import")
-  file.set_input_files("/workspace/valid.csv");button.click();page.wait_for_timeout(300);first=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"))["rows"]==2
-  file.set_input_files("/workspace/invalid.csv");button.click();page.wait_for_timeout(100);missing=bool(page.get_by_test_id("error").inner_text())
-  file.set_input_files("/workspace/valid.csv");button.click();page.wait_for_timeout(300);preserved=file.evaluate("e=>e.files.length===1") and bool(page.get_by_test_id("error").inner_text());button.click();page.wait_for_timeout(300)
-  stats=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"));print(json.dumps({"valid_import":first,"missing_column":missing,"input_preserved":preserved,"exactly_once_retry":stats["rows"]==4 and stats["attempts"]==3}));b.close()
+  def submit():
+   with page.expect_response(lambda response: response.request.method=="POST" and response.url==f"http://127.0.0.1:{port}/import") as response:button.click()
+   response.value.finished()
+  file.set_input_files("/workspace/valid.csv");submit();first=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"))["rows"]==2
+  file.set_input_files("/workspace/invalid.csv")
+  page.wait_for_function("() => !document.querySelector('[data-testid=import]').disabled || Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+  if button.is_enabled():button.click()
+  page.wait_for_function("() => Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+  missing=bool(page.get_by_test_id("error").inner_text())
+  file.set_input_files("/workspace/valid.csv");submit()
+  page.wait_for_function("() => Boolean(document.querySelector('[data-testid=error]').textContent.trim())")
+  preserved=file.evaluate("e=>e.files.length===1") and bool(page.get_by_test_id("error").inner_text())
+  if preserved:submit()
+  stats=json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/stats"));print(json.dumps({"valid_import":first,"missing_column":missing,"input_preserved":preserved,"exactly_once_retry":preserved and stats["rows"]==4 and stats["attempts"]==3}));b.close()
 finally:proc.terminate();proc.wait()
 """

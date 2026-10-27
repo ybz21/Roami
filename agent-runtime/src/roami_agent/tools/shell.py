@@ -96,7 +96,7 @@ def register_shell(registry, settings, artifacts=None):
     registry.add(
         Tool(
             "shell",
-            "Execute argv in a prepared workspace or configured roots; Main may explicitly select host scope without a workspace.",
+            "Execute argv in bound/configured roots; Main host scope has no cwd. Process groups end per call: test server/client together and clean up captured child PIDs.",
             object_schema(
                 {
                     "argv": {

@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-17",
+  "kind": "public_source_reference",
+  "category": "CODE",
+  "source_case_id": "terminal_bench:cancel-async-tasks",
+  "origin": {
+    "benchmark": "terminal_bench",
+    "task_id": "cancel-async-tasks",
+    "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6"
+  },
+  "execution": "registered_suite"
+}

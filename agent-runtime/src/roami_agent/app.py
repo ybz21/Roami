@@ -301,6 +301,13 @@ class Runtime:
                 configured_provider(settings, role), role
             ),
         )
+        if self.improvement is not None:
+            self.improvement.ledger.shared_daily_limit = True
+            self.improvement.model_proxy = self.model_proxy
+            self.improvement.provider_factory = self.improvement_provider
+            self.improvement.research.model_proxy = self.model_proxy
+            self.improvement.research.provider_factory = self.improvement_provider
+            self.improvement.runs.model_proxy = self.model_proxy
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
         self.capability_markets = CapabilityMarkets(self)
@@ -308,6 +315,10 @@ class Runtime:
         self.professional_capabilities = ProfessionalCapabilities(self)
         if isinstance(self.executor, CodingExecutor):
             self.executor.capabilities = self.professional_capabilities
+
+    def improvement_provider(self, settings, role):
+        actual = "main" if role == "main" or role.startswith("artifact_") else "worker"
+        return self.model_proxy.attach(configured_provider(settings, actual), "rsi_" + role)
 
     async def run_turn(self, turn, *args, **kwargs):
         if self.improvement is None or not self.improvement.ledger.path.exists():

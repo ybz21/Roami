@@ -88,6 +88,7 @@ class NativeFilesExecutor:
         allow_tasks=False,
         workspace=None,
         provider_factory=None,
+        shared_daily_limit=False,
     ):
         self.settings, self.fixture = settings, fixture
         self.settle_maintenance = settle_maintenance
@@ -95,6 +96,7 @@ class NativeFilesExecutor:
         self.allow_tasks = allow_tasks
         require(not allow_tasks or allow_shell, "RSI_CONTAINER_REQUIRED")
         self.provider_factory = provider_factory
+        self.shared_daily_limit = shared_daily_limit
         require(
             not allow_shell
             or (Path("/.dockerenv").exists() and os.environ.get("ROAMI_RSI_CONTAINER") == "1"),
@@ -111,11 +113,14 @@ class NativeFilesExecutor:
                     "cache": r.cache,
                     "context_window": r.context_window,
                     "retries": r.max_retries,
+                    "timeout_seconds": r.timeout_seconds,
                 }
                 for r in routes
             ]
             + [settings.main_instructions, settings.worker_instructions, fixture]
         )
+        if shared_daily_limit:
+            self.model_hash = digest([self.model_hash, "shared_model_daily_limit"])
 
     async def run(self, case, policy, root):
         workspace = self.workspace or root / "workspace"
@@ -135,7 +140,7 @@ class NativeFilesExecutor:
             professional_executor="",
             proactive_enabled=False,
         )
-        budget = EpisodeBudget(case["limits"])
+        budget = EpisodeBudget(case["limits"], shared_daily_limit=self.shared_daily_limit)
         providers = []
         for role in ("main", "worker", "memory"):
             if self.fixture:
@@ -150,12 +155,22 @@ class NativeFilesExecutor:
             else:
                 actual_role = "main" if role == "main" else "worker"
                 route = settings.route(actual_role)
-                output_cap = min(2048, route.parameters.get("max_tokens", 2048))
+                output_cap = (
+                    route.parameters.get("max_tokens")
+                    if self.shared_daily_limit
+                    else min(2048, route.parameters.get("max_tokens", 2048))
+                )
                 route = replace(
                     route,
-                    parameters=dict(route.parameters, max_tokens=output_cap),
+                    parameters={
+                        **route.parameters,
+                        **({"max_tokens": output_cap} if output_cap is not None else {}),
+                    },
                     max_retries=0,
-                    timeout_seconds=min(case["limits"]["seconds"], route.timeout_seconds or 60),
+                    timeout_seconds=min(
+                        case["limits"]["seconds"],
+                        route.timeout_seconds or case["limits"]["seconds"],
+                    ),
                 )
                 configured = settings_with_route(settings, actual_role, route)
                 provider = (
@@ -205,7 +220,7 @@ class NativeFilesExecutor:
             bind_evaluation_tasks(runtime, workspace)
         runtime.tools.disabled_tools.update(set(runtime.tools.registry) - allowed)
         output, trace, failure = "", None, None
-        turn_grades, traces, tool_records = [], [], []
+        turn_grades, traces, tool_records, native_execution = [], [], [], []
         started = time.monotonic()
         verified_ms = None
         deferred_jobs = 0
@@ -234,7 +249,9 @@ class NativeFilesExecutor:
                         await runtime.traces.get("rsi-evaluation", turn_id=receipt["turnId"])
                     )
                     if turn["state"] != "completed":
-                        failure = "RSI_TURN_" + turn["state"].upper()
+                        from roami_agent.improvement.evaluation_tasks import evaluation_turn_failure
+
+                        failure = await evaluation_turn_failure(database, turn)
                         break
                     if self.allow_tasks:
                         from roami_agent.improvement.evaluation_tasks import settle_evaluation_tasks
@@ -266,6 +283,9 @@ class NativeFilesExecutor:
                 ]
                 output = final[-1]["content"]["text"] if final else ""
                 if self.allow_tasks:
+                    from roami_agent.improvement.evaluation_tasks import verify_native_execution
+
+                    native_execution = await verify_native_execution(database)
                     turns = await database.call(
                         lambda db: [
                             r[0] for r in db.execute("SELECT id FROM turns ORDER BY created_ms,id")
@@ -348,6 +368,7 @@ class NativeFilesExecutor:
                     "failure": failure,
                     "output": output,
                     "tasks": task_records,
+                    "native_execution": native_execution,
                     "runtime_profile": "main_and_native_worker"
                     if self.allow_tasks
                     else "file_tools_only",

@@ -81,6 +81,7 @@ def test_recurrence_requires_same_contract_and_known_pass(
 
 def test_diagnostic_queue_is_idempotent_and_admission_is_atomic(tmp_path):
     service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
     control = service.control
     control.register_machine(
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
@@ -246,6 +247,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
     from roami_agent.server.configuration import Settings
 
     service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
     service.control.register_machine(
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
     )
@@ -335,11 +337,13 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
     calls = []
 
     class Executor:
+        model_hash = "b" * 64
+
         def __init__(self, *args, **kwargs):
             pass
 
         async def preflight(self):
-            return {}
+            return {"environment_hash": "a" * 64}
 
         async def run(self, case, policy, target):
             calls.append((case["id"], case["limits"]["tokens"]))
@@ -457,3 +461,58 @@ def test_legacy_completed_record_with_unknown_usage_still_blocks_new_work(tmp_pa
         )
     with pytest.raises(DomainError, match="RECONCILIATION"):
         service.research.reserve_operation("local", "today", "new", 1000)
+
+
+def test_diagnostic_header_allows_later_formal_budget_reservation(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    control = service.control
+    control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    control.register_suite("local", suite_file(tmp_path))
+    control.save(
+        "local", {**control.preferences("local"), "suite_id": "data", "machine_ids": ["a"]}
+    )
+    enqueue_diagnostic(service, "local", {"request_key": "diagnostic", "case_ids": ["a"]})
+    day = service.research.day("local")
+    with service.ledger.connection() as db:
+        budget = dict(db.execute("SELECT * FROM rsi_budgets").fetchone())
+    assert budget["episodes_limit"] == control.preferences("local")["daily_episodes"] == 120
+    cycle, admitted = service.ledger.reserve(
+        "local",
+        day,
+        {
+            "reserved_tokens": 1000,
+            "reserved_episodes": 1,
+            "machine": {"id": "a"},
+            "request_key": "formal-budget-check",
+        },
+        tokens_limit=budget["tokens_limit"],
+        episodes_limit=120,
+    )
+    assert admitted and cycle
+
+
+def test_diagnostics_respect_configured_episode_cap(tmp_path):
+    service = ImprovementStatus(tmp_path)
+    control = service.control
+    control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    control.register_suite("local", suite_file(tmp_path))
+    control.save(
+        "local",
+        {
+            **control.preferences("local"),
+            "suite_id": "data",
+            "machine_ids": ["a"],
+            "daily_episodes": 2,
+        },
+    )
+    service.runs.configure("local", {**service.runs.settings("local"), "daily_tokens": 2000000})
+    for key in ["one", "two"]:
+        enqueue_diagnostic(service, "local", {"request_key": key, "case_ids": ["a"]})
+    with pytest.raises(DomainError, match="RSI_DAILY_EPISODE_BUDGET"):
+        enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT episodes_reserved FROM rsi_budgets").fetchone()[0] == 2

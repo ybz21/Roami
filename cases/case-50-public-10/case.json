@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-10",
+  "kind": "public_source_reference",
+  "category": "LAB",
+  "source_case_id": "longmemeval-v2:4ed01379",
+  "origin": {
+    "benchmark": "longmemeval_v2",
+    "task_id": "4ed01379",
+    "revision": "f152293e235517d504809563c833d7190b8c713b"
+  },
+  "execution": "registered_suite"
+}

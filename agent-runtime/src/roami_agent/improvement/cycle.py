@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.behavior_review import review_cycle, review_trial
 from roami_agent.improvement.comparison import compare
+from roami_agent.improvement.comparison_context import grading_hash
 from roami_agent.improvement.contracts import (
     VERSION,
     digest,
@@ -19,6 +20,7 @@ from roami_agent.improvement.contracts import (
 from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.policy import policy_id, propose, validate_policy
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 
 
@@ -93,14 +95,17 @@ async def run_cycle(
     costs = {case["id"]: reservation(case) for case in cases}
     require(all(type(cost) is int and cost >= 0 for cost in costs.values()))
     tokens = len(trial_arms) * sum(costs.values())
-    from roami_agent.providers.model_proxy import model_proxy_context
-
     require(
-        model_proxy_context.get() is not None
-        or (tokens <= daily_tokens and len(trial_arms) * len(cases) <= daily_episodes),
+        uses_shared_model_limit(ledger)
+        or tokens <= daily_tokens
+        and len(trial_arms) * len(cases) <= daily_episodes,
         "RSI_FULL_SUITE_BUDGET",
     )
     manifest = {
+        "judge_hash": grading_hash(suite, executor),
+        "spending_policy": "shared_model_daily"
+        if uses_shared_model_limit(ledger)
+        else "frozen_protocol",
         "schedule_period": schedule_period,
         "period_machines": period_machines,
         "runner_version": VERSION,
@@ -126,7 +131,6 @@ async def run_cycle(
         if policy_id(candidate) != policy_id(baseline)
         else "baseline_stability",
         "seed": seed,
-        "billing_mode": "model_daily" if model_proxy_context.get() is not None else "legacy_tokens",
         "reserved_tokens": tokens,
         "reserved_episodes": len(trial_arms) * len(cases),
         "trial_arms": trial_arms,

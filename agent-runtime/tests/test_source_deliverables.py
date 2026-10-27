@@ -70,7 +70,36 @@ async def test_source_aliases_share_one_artifact_and_deleted_aliases_cannot_rest
         await runtime.close()
 
 
-async def test_literal_percent_and_space_in_source_names_remain_distinct(store, tmp_path):
+@pytest.mark.parametrize("form", ["segments", "encoded", "extra_slash"])
+async def test_svg_serve_aliases_keep_one_snapshot(store, tmp_path, form):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        task = await admit(runtime, binding, "Create plot", "plot", executor="native")
+        source = tmp_path / "equity.svg"
+        source.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+        paths = {
+            "segments": "/api/file/serve" + quote(str(source), safe="/"),
+            "encoded": "/api/file/serve/" + quote(str(source), safe=""),
+            "extra_slash": "/api/file/serve/" + str(source),
+        }
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {
+                "state": "succeeded",
+                "summary": f"[plot]({paths[form]}) and `{source}`",
+                "workspace": {"directory": str(tmp_path)},
+            },
+        )
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        assert len(delivery["artifacts"]) == 1 and not delivery["unavailable"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("relative", [False, True])
+async def test_literal_percent_and_space_in_source_names_remain_distinct(store, tmp_path, relative):
     runtime, _, _, _, binding = await setup(store)
     try:
         task = await admit(runtime, binding, "Create sources", "sources", executor="codex")
@@ -79,7 +108,11 @@ async def test_literal_percent_and_space_in_source_names_remain_distinct(store, 
         for name in names:
             path = tmp_path / name
             path.write_text(name)
-            links.append(f"[{name}](/api/file/raw?path={quote(str(path), safe='')})")
+            links.append(
+                f"`{name}`"
+                if relative and " " not in name
+                else f"[{name}](/api/file/raw?path={quote(str(path), safe='')})"
+            )
         await mark(
             runtime,
             task,
@@ -128,6 +161,75 @@ async def test_bold_reported_outputs_with_cjk_notes_are_both_delivered(store, tm
         readme.unlink()
         for a in artifacts:
             assert (await runtime.artifacts.read("alice", a["id"]))[1]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("executor", ["native", "codex"])
+async def test_grouped_relative_generated_outputs_survive_workspace_removal(
+    store, tmp_path, executor
+):
+    runtime, _, _, _, binding = await setup(store)
+    bodies = {
+        "analysis.py": b"print('finished')\n",
+        "result.json": b'{"result":42}\n',
+        "trades.csv": b"side,quantity\nbuy,1\n",
+        "equity.svg": b'<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 1L1 0"/></svg>',
+        "report.md": b"Verified local outputs.\n",
+    }
+    try:
+        task = await admit(
+            runtime, binding, "Create analysis outputs", "grouped", executor=executor
+        )
+        for name, body in bodies.items():
+            (tmp_path / name).write_bytes(body)
+        summary = f"Files in `{tmp_path}`: " + ", ".join(f"`{name}`" for name in bodies)
+        summary += "\nRun `python analysis.py`; do not execute `https://example.test/x.json`."
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {"state": "succeeded", "summary": summary, "workspace": {"directory": str(tmp_path)}},
+        )
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        assert not delivery["unavailable"]
+        artifacts = delivery["artifacts"]
+        assert {a["name"] for a in artifacts} == set(bodies)
+        assert (
+            next(a for a in artifacts if a["name"] == "equity.svg")["mimeType"] == "image/svg+xml"
+        )
+        for name in bodies:
+            (tmp_path / name).unlink()
+        for artifact in artifacts:
+            assert (await runtime.artifacts.read("alice", artifact["id"]))[1] == bodies[
+                artifact["name"]
+            ]
+        assert len((await runtime.tasks.get("alice", task["id"]))["delivery"]["artifacts"]) == 5
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("name", ["../outside.json", "linked.csv", ".hidden.json"])
+async def test_relative_reported_outputs_keep_workspace_boundaries(store, tmp_path, name):
+    runtime, _, _, _, binding = await setup(store)
+    outside = tmp_path.parent / "outside.json"
+    outside.write_text("outside")
+    (tmp_path / "linked.csv").symlink_to(outside)
+    (tmp_path / ".hidden.json").write_text("hidden")
+    try:
+        task = await admit(runtime, binding, "Report output", "bounded", executor="codex")
+        await mark(
+            runtime,
+            task,
+            "waiting_user",
+            {
+                "state": "succeeded",
+                "summary": f"Output `{name}`",
+                "workspace": {"directory": str(tmp_path)},
+            },
+        )
+        delivery = (await runtime.tasks.get("alice", task["id"]))["delivery"]
+        assert not delivery["artifacts"] and delivery["unavailable"]
     finally:
         await runtime.close()
 

@@ -6,12 +6,16 @@ import os
 import shutil
 import time
 import tomllib
-from contextlib import nullcontext
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from roami_agent.improvement.codex_proxy import codex_route
 from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.executors import private_json
+from roami_agent.improvement.operation_accounting import archive_rejected_admission
+from roami_agent.improvement.spending_policy import model_proxy_for, uses_shared_model_limit
+from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import identity
 from roami_agent.tools.process import execute
 
 
@@ -62,10 +66,7 @@ def codex_configuration():
                     and all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()),
                     "RSI_CODEX_PROVIDER_CONFIG_UNSUPPORTED",
                 )
-                for header, variable in value.items():
-                    selected[f"model_providers.{name}.env_http_headers.{json.dumps(header)}"] = (
-                        variable
-                    )
+                selected[f"model_providers.{name}.env_http_headers"] = value
             else:
                 selected[f"model_providers.{name}.{key}"] = value
         for key in ("request_max_retries", "stream_max_retries"):
@@ -94,14 +95,7 @@ def codex_configuration():
 
 
 def completed_result(raw):
-    try:
-        events = [json.loads(line) for line in raw.splitlines() if line.strip()]
-    except ValueError:
-        require(False, "RSI_CODEX_TURN_INCOMPLETE")
-    require(
-        all(isinstance(event, dict) and isinstance(event.get("type"), str) for event in events),
-        "RSI_CODEX_TURN_INCOMPLETE",
-    )
+    events = [json.loads(line) for line in raw.splitlines() if line.strip()]
     threads = [e.get("thread_id") for e in events if e.get("type") == "thread.started"]
     completed = [e for e in events if e.get("type") == "turn.completed"]
     require(
@@ -115,7 +109,13 @@ def completed_result(raw):
     observed_items = [e["item"] for e in events if e.get("type", "").startswith("item.")]
     require(
         all(
-            isinstance(i, dict) and i.get("type") in {"agent_message", "reasoning"}
+            isinstance(i, dict)
+            and (
+                i.get("type") in {"agent_message", "reasoning"}
+                or i.get("type") == "error"
+                and set(i) <= {"id", "type", "message"}
+                and isinstance(i.get("message"), str)
+            )
             for i in observed_items
         ),
         "RSI_UNEXPECTED_MODEL_TOOL",
@@ -127,7 +127,6 @@ def completed_result(raw):
         "RSI_INVALID_MODEL_OUTPUT",
     )
     usage = completed[0].get("usage", {})
-    require(isinstance(usage, dict), "RSI_USAGE_UNKNOWN")
     require(
         all(type(usage.get(k)) is int and usage[k] >= 0 for k in ("input_tokens", "output_tokens")),
         "RSI_USAGE_UNKNOWN",
@@ -137,6 +136,7 @@ def completed_result(raw):
     return {
         "text": messages[0],
         "thread_id": threads[0],
+        "diagnostics": [i["message"][:1024] for i in items if i.get("type") == "error"][:16],
         "metrics": {
             "tokens": usage["input_tokens"] + usage["output_tokens"],
             "input_tokens": usage["input_tokens"],
@@ -148,26 +148,6 @@ def completed_result(raw):
             "tool_calls": 0,
         },
     }
-
-
-def codex_usage(raw):
-    from roami_agent.providers.model_billing import usage_counts
-
-    try:
-        events = [json.loads(line) for line in raw.splitlines() if line.strip()]
-        completed = [e for e in events if e.get("type") == "turn.completed"]
-        if len(completed) != 1:
-            return None
-        usage = completed[0].get("usage", {})
-        return usage_counts(
-            {
-                "prompt_tokens": usage.get("input_tokens"),
-                "completion_tokens": usage.get("output_tokens"),
-                "prompt_tokens_details": {"cached_tokens": usage.get("cached_input_tokens", 0)},
-            }
-        )
-    except (ValueError, TypeError, AttributeError):
-        return None
 
 
 async def run_codex(argv, *, cwd, timeout, max_bytes, **kwargs):
@@ -207,39 +187,77 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
         + " role. Use only the supplied evidence. Do not call tools. Return the requested JSON object.\n"
         + json.dumps(messages, ensure_ascii=False)
     )
-    from roami_agent.providers.model_proxy import model_proxy_context
-
-    proxy = model_proxy_context.get()
-    if proxy is None:
-        require(len(prompt.encode()) + 8192 <= config["model_tokens"], "RSI_TOKEN_BUDGET")
+    shared = uses_shared_model_limit(workflow.ledger)
+    require(shared or len(prompt.encode()) + 8192 <= config["model_tokens"], "RSI_TOKEN_BUDGET")
     selected, env = codex_configuration()
-    model = selected.get("model")
+    proxy = model_proxy_for(workflow)
     if proxy is not None:
-        require(isinstance(model, str) and 0 < len(model) <= 200, "RSI_CODEX_MODEL_REQUIRED")
+        require(
+            isinstance(selected.get("model"), str) and 0 < len(selected["model"]) <= 200,
+            "RSI_CODEX_MODEL_REQUIRED",
+        )
+
     request_hash = digest([action["kind"], messages, selected])
     # CLI usage is reported at turn completion, not a provider-enforced token ceiling.
     saved = (
         await asyncio.to_thread(workflow.operation_result, action["owner"], operation)
         if proxy is not None
-        else await asyncio.to_thread(
+        else None
+    )
+    if proxy is not None and (saved is None or saved.get("value", {}).get("admission_rejected")):
+        await proxy.ready()
+        await proxy.billing.check()
+    if saved is None:
+        saved = await asyncio.to_thread(
             workflow.reserve_operation,
             action["owner"],
             workflow.day(action["owner"]),
             operation,
             config["model_tokens"],
         )
-    )
     if saved is not None:
         value = saved["value"]
         require(value.get("request_hash") == request_hash, "RSI_OPERATION_CONTEXT_CHANGED")
-        require(
-            proxy is not None or value["metrics"]["tokens"] <= config["model_tokens"],
-            "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
-        )
-        return value
-    root = workflow.ledger.path.parent / "codex-roles" / digest([action["owner"], operation])
+        if value.get("admission_rejected") is True:
+            await asyncio.to_thread(
+                archive_rejected_admission,
+                workflow.ledger,
+                action["owner"],
+                operation,
+                pipeline=hasattr(workflow, "run_id"),
+            )
+            saved = await asyncio.to_thread(
+                workflow.reserve_operation,
+                action["owner"],
+                workflow.day(action["owner"]),
+                operation,
+                config["model_tokens"],
+            )
+            if saved is not None:
+                require(
+                    saved["value"].get("request_hash") == request_hash,
+                    "RSI_OPERATION_CONTEXT_CHANGED",
+                )
+                if saved["value"].get("admission_rejected"):
+                    raise DomainError(saved["value"]["error_code"])
+                return saved["value"]
+        else:
+            require(
+                shared or value["metrics"]["tokens"] <= config["model_tokens"],
+                "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
+            )
+            return value
+    root = (
+        workflow.ledger.path.parent
+        / "codex-roles"
+        / digest([action["owner"], operation])
+        / identity()
+    )
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     require(not root.is_symlink(), "RSI_PRIVATE_OUTPUT_REQUIRED")
+    private_json(
+        root / "request.json", {"role": action["kind"], "operation": operation, "prompt": prompt}
+    )
     args = [
         "codex",
         "exec",
@@ -266,48 +284,59 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
             "features.code_mode.enabled": False,
         }
     )
-    for name, value in selected.items():
-        args.extend(["-c", name + "=" + json.dumps(value)])
-    args.append("-")
     started = time.monotonic()
-    async with (
-        proxy.external_turn("worker", model) if proxy is not None else nullcontext(None)
-    ) as receipt:
-        if receipt is not None:
-            prior = await asyncio.to_thread(
-                workflow.reserve_operation,
-                action["owner"],
-                workflow.day(action["owner"]),
-                operation,
-                config["model_tokens"],
-            )
-            if prior is not None:
-                require(
-                    prior["value"].get("request_hash") == request_hash,
-                    "RSI_OPERATION_CONTEXT_CHANGED",
+    outcome = {}
+    async with codex_route(proxy, selected, env, action["kind"], outcome=outcome) as (
+        routed,
+        environment,
+    ):
+        for name, value in routed.items():
+            encoded = (
+                "{ "
+                + ", ".join(
+                    json.dumps(key) + " = " + json.dumps(item) for key, item in value.items()
                 )
-                return prior["value"]
-        private_json(
-            root / "request.json",
-            {"role": action["kind"], "operation": operation, "prompt": prompt},
-        )
-        if receipt is not None:
-            receipt["sent"] = True
+                + " }"
+                if isinstance(value, dict)
+                else json.dumps(value)
+            )
+            args.extend(["-c", name + "=" + encoded])
+        args.append("-")
         result = await runner(
             args,
             cwd=root,
-            env=env,
+            env=environment,
             timeout=config["model_seconds"],
             input_data=prompt.encode(),
             max_bytes=2_000_000,
         )
-        private_json(root / "process.json", result)
-        if receipt is not None:
-            receipt["counts"] = codex_usage(result["stdout"])
-        require(result["exitCode"] == 0, "RSI_CODEX_EXEC_FAILED")
-        value = completed_result(result["stdout"])
+    private_json(root / "process.json", result)
+    blocked = outcome.get("error_code")
+    if (
+        result["exitCode"] != 0
+        and not outcome.get("attempts")
+        and blocked
+        in {"MODEL_PROXY_DAILY_LIMIT", "MODEL_PROXY_USAGE_UNKNOWN", "MODEL_PROXY_CURRENCY_MISMATCH"}
+    ):
+        await asyncio.to_thread(
+            workflow.settle_operation,
+            action["owner"],
+            operation,
+            {
+                "value": {
+                    "request_hash": request_hash,
+                    "admission_rejected": True,
+                    "error_code": blocked,
+                    "metrics": {"tokens": 0},
+                }
+            },
+        )
+        raise DomainError(blocked)
+    require(result["exitCode"] == 0, "RSI_CODEX_EXEC_FAILED")
+    value = completed_result(result["stdout"])
     value["metrics"]["elapsed_ms"] = round((time.monotonic() - started) * 1000)
     value.update(
+        spending_policy="shared_model_daily" if shared else "frozen_protocol",
         executor="codex",
         role=action["kind"],
         request_hash=request_hash,
@@ -315,7 +344,7 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
     )
     await asyncio.to_thread(workflow.settle_operation, action["owner"], operation, {"value": value})
     require(
-        proxy is not None or value["metrics"]["tokens"] <= config["model_tokens"],
+        shared or value["metrics"]["tokens"] <= config["model_tokens"],
         "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
     )
     return value

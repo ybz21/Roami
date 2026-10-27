@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.identity import now_ms
 
 SCHEMA = """
@@ -29,6 +30,9 @@ CREATE TABLE IF NOT EXISTS rsi_improvement_events (
  seq INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT NOT NULL, improvement_id TEXT,
  action_id TEXT NOT NULL, event TEXT NOT NULL, data_json TEXT NOT NULL, created_ms INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS rsi_verify_receipts ON rsi_improvement_events(
+ owner,json_extract(data_json,'$.verification_context.source_hash'),created_ms
+) WHERE event='verify.completed';
 CREATE TABLE IF NOT EXISTS rsi_operation_costs (
  id TEXT PRIMARY KEY, owner TEXT NOT NULL, day TEXT NOT NULL, reserved INTEGER NOT NULL,
  state TEXT NOT NULL, result_json TEXT
@@ -135,6 +139,14 @@ class ResearchWorkflow:
 
     def configure_experiment(self, owner, raw):
         fields = {"enabled", "model_tokens", "model_seconds", "max_attempts", "observation_days"}
+        if uses_shared_model_limit(self.ledger):
+            public = fields - {"model_tokens"} | {"revision"}
+            require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
+            value = self.configure(
+                owner,
+                {**self.settings(owner), **{key: val for key, val in raw.items() if key in public}},
+            )
+            return {key: val for key, val in value.items() if key in public}
         require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
         return self.configure(owner, {**self.settings(owner), **raw})
 
@@ -168,19 +180,19 @@ class ResearchWorkflow:
         for owner in owners:
             day = self.day(owner)
             with self.ledger.connection() as db:
-                centralized = getattr(self, "model_proxy", None) is not None
-                budget_condition = (
-                    ""
-                    if centralized
-                    else "AND EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?)"
-                )
                 db.execute(
                     "UPDATE rsi_actions SET state='queued',error_code=NULL,due_ms=? "
                     "WHERE owner=? AND state='waiting_budget' AND json_extract(payload_json,'$.budget_day')!=? "
-                    + budget_condition,
-                    (self.clock(), owner, day)
-                    if centralized
-                    else (self.clock(), owner, day, owner, day),
+                    "AND (? OR EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?))",
+                    (
+                        self.clock(),
+                        owner,
+                        day,
+                        getattr(self, "model_proxy", None) is not None
+                        or uses_shared_model_limit(self.ledger),
+                        owner,
+                        day,
+                    ),
                 )
         with self.ledger.connection() as db:
             cycles = [
@@ -201,9 +213,8 @@ class ResearchWorkflow:
             self.enqueue_review(c["owner"], c["id"])
 
     def day(self, owner):
-        proxy = getattr(self, "model_proxy", None)
-        if proxy is not None:
-            return proxy.billing.period()[0]
+        if getattr(self, "model_proxy", None) is not None:
+            return self.model_proxy.billing.period()[0]
         with self.ledger.connection() as db:
             row = db.execute(
                 "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
@@ -598,21 +609,20 @@ class ResearchWorkflow:
                     prior["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION"
                 )
                 return json.loads(prior["result_json"])
-            assert_operation_costs_settled(db, owner)
-            from roami_agent.providers.model_proxy import model_proxy_context
-
-            if model_proxy_context.get() is None:
-                budget = db.execute(
-                    "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-                ).fetchone()
-                require(
-                    budget and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
-                    "RSI_DAILY_BUDGET",
-                )
-                db.execute(
-                    "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
-                    (tokens, owner, day),
-                )
+            assert_operation_costs_settled(db, owner, shared=uses_shared_model_limit(self.ledger))
+            budget = db.execute(
+                "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
+            ).fetchone()
+            require(
+                uses_shared_model_limit(self.ledger)
+                or budget
+                and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
+                "RSI_DAILY_BUDGET",
+            )
+            db.execute(
+                "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
+                (tokens, owner, day),
+            )
             db.execute(
                 "INSERT INTO rsi_operation_costs VALUES(?,?,?,?,'running',NULL)",
                 (key, owner, day, tokens),
@@ -629,9 +639,7 @@ class ResearchWorkflow:
                 (owner, key),
             ).fetchone()
             require(row is not None, "RSI_OPERATION_CONFLICT")
-            from roami_agent.providers.model_proxy import model_proxy_context
-
-            if tokens is not None and model_proxy_context.get() is None:
+            if tokens is not None:
                 db.execute(
                     "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
                     (tokens - row["reserved"], owner, row["day"]),
@@ -674,7 +682,13 @@ class ResearchWorkflow:
                 (owner, day),
             ).fetchone()
             return {
-                "settings": settings,
+                "settings": {
+                    key: val
+                    for key, val in settings.items()
+                    if not uses_shared_model_limit(self.ledger)
+                    or key
+                    in {"revision", "enabled", "model_seconds", "max_attempts", "observation_days"}
+                },
                 "model_cost": {
                     "day": day,
                     "reserved_tokens": cost["reserved"],

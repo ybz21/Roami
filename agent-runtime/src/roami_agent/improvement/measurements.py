@@ -5,6 +5,8 @@ import json
 import time
 
 from roami_agent.improvement.contracts import require
+from roami_agent.improvement.input_reservation import InputReservation
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.model_observation import model_observation
@@ -15,11 +17,10 @@ class BudgetAdmissionRejected(DomainError):
 
 
 class EpisodeBudget:
-    def __init__(self, limits, *, observation_id=None):
-        from roami_agent.providers.model_proxy import model_proxy_context
-
+    def __init__(self, limits, *, observation_id=None, shared_daily_limit=False):
         self.limits = limits
-        self.enforce_tokens = model_proxy_context.get() is None
+        self.shared_daily_limit = shared_daily_limit or uses_shared_model_limit()
+        self.enforce_tokens = not self.shared_daily_limit
         self.observation_id = observation_id or "rsi-" + identity()
         self.started = time.monotonic()
         self.requests = []
@@ -34,16 +35,22 @@ class EpisodeBudget:
         if self.unknown:
             raise BudgetAdmissionRejected("RSI_USAGE_UNKNOWN")
 
-    async def admit(self, messages, tools, output_cap):
+    async def admit(self, messages, tools, output_cap, *, input_reserve=None):
         async with self.lock:
             self.check()
-            if len(self.requests) >= self.limits["requests"]:
+            if not self.shared_daily_limit and len(self.requests) >= self.limits["requests"]:
                 raise BudgetAdmissionRejected("RSI_REQUEST_BUDGET")
             # This is a conservative local admission estimate, not provider billing.
-            estimate = (
-                len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096 + output_cap
-            )
-            if self.enforce_tokens and self.used + self.reserved + estimate > self.limits["tokens"]:
+            if input_reserve is None:
+                input_reserve = (
+                    len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
+                )
+            require(type(input_reserve) is int and input_reserve >= 4096)
+            estimate = input_reserve + output_cap
+            if (
+                not self.shared_daily_limit
+                and self.used + self.reserved + estimate > self.limits["tokens"]
+            ):
                 raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
             entry = {
                 "inputTokens": None,
@@ -71,7 +78,7 @@ class EpisodeBudget:
                 self.unknown = True
             else:
                 self.used += entry["inputTokens"] + entry["outputTokens"]
-                if self.enforce_tokens and self.used > self.limits["tokens"]:
+                if not self.shared_daily_limit and self.used > self.limits["tokens"]:
                     raise DomainError("RSI_TOKEN_BUDGET")
 
     def metrics(self):
@@ -91,17 +98,38 @@ class EpisodeBudget:
 
 
 class MeteredModel:
-    def __init__(self, provider, budget, role, *, output_cap=2048, journal=None):
+    def __init__(
+        self,
+        provider,
+        budget,
+        role,
+        *,
+        output_cap=2048,
+        journal=None,
+        input_reserve=None,
+        reservation_basis=None,
+    ):
         self.provider, self.budget, self.role = provider, budget, role
         self.model = provider.model
         self.output_cap = output_cap
         self.journal = journal
+        self.input_reserve, self.reservation_basis = input_reserve, reservation_basis
+        self.input_reservation = InputReservation()
+        if input_reserve is not None and isinstance(provider, MeteredModel):
+            provider.input_reserve, provider.reservation_basis = input_reserve, reservation_basis
 
     def __getattr__(self, name):
         return getattr(self.provider, name)
 
     async def stream(self, messages, tools):
-        entry, estimate = await self.budget.admit(messages, tools, self.output_cap)
+        messages, tools = json.loads(json.dumps([messages, tools], ensure_ascii=False))
+        snapshot = None
+        input_reserve, basis = self.input_reserve, self.reservation_basis
+        if input_reserve is None:
+            input_reserve, snapshot, basis = self.input_reservation.estimate(messages, tools)
+        entry, estimate = await self.budget.admit(
+            messages, tools, self.output_cap, input_reserve=input_reserve
+        )
         entry["role"] = self.role
         started, usage = time.monotonic(), {}
         observation = model_observation.get()
@@ -119,6 +147,8 @@ class MeteredModel:
                 "request_id": observation["request"],
                 "model": self.model,
                 "output_cap": self.output_cap,
+                "input_reserve": estimate - self.output_cap,
+                "reservation_basis": basis,
                 "role": self.role,
                 "messages": json.loads(json.dumps(messages)),
                 "tools": json.loads(json.dumps(tools)),
@@ -141,12 +171,10 @@ class MeteredModel:
                 if event.kind == "usage":
                     usage = dict(event.value)
                 yield event
+            if self.input_reserve is None:
+                self.input_reservation.observe(snapshot, usage)
         except BaseException as exc:
-            if isinstance(exc, BudgetAdmissionRejected) or getattr(exc, "code", None) in {
-                "MODEL_PROXY_DAILY_LIMIT",
-                "MODEL_PROXY_USAGE_UNKNOWN",
-                "MODEL_PROXY_CURRENCY_MISMATCH",
-            }:
+            if isinstance(exc, BudgetAdmissionRejected):
                 usage = {
                     "inputTokens": 0,
                     "outputTokens": 0,

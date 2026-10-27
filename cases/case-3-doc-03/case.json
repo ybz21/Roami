@@ -1,0 +1,95 @@
+{
+  "id": "DOC-03",
+  "kind": "real_workload",
+  "category": "DOC",
+  "category_label": "文档与 PPT",
+  "prompt": "只更新第3页指标和第5页计划，保持其他页。",
+  "preconditions": "6页PPTX，目标指标由120更新为135，计划日期由5日改为8日。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "修改后PPTX",
+    "差异预览"
+  ],
+  "hard_assertions": [
+    {
+      "id": "DOC-03-H1",
+      "rule": "指定内容准确更新",
+      "evidence": [
+        "source_snapshot",
+        "artifact_structure",
+        "rendered_pages",
+        "download_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "DOC-03-H2",
+      "rule": "其他页面语义与渲染保持",
+      "evidence": [
+        "source_snapshot",
+        "artifact_structure",
+        "rendered_pages",
+        "download_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "DOC-03-H3",
+      "rule": "页数、可编辑对象和资源引用不丢。",
+      "evidence": [
+        "source_snapshot",
+        "artifact_structure",
+        "rendered_pages",
+        "download_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "TL",
+    "TR",
+    "VD"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "presentation",
+  "research_inspiration": [
+    "TheAgentCompany",
+    "OfficeBench",
+    "OSWorld"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "事实、统计、图表与源材料一致",
+    "completeness": "规定页数、内容与讲稿齐全",
+    "usability": "文件可编辑可打开，渲染可读，无截断重叠",
+    "grounding": "来源和修改范围可追溯，未实现功能不宣传"
+  },
+  "excellence_candidates": [
+    "盲评中层次、对比、图表可读性均达优秀锚点",
+    "无需修改即可按既定受众直接展示"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "the_agent_company",
+    "officebench",
+    "osworld",
+    "slidesbench"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

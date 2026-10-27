@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-01",
+  "kind": "public_source_reference",
+  "category": "VIDEO",
+  "source_case_id": "agentic_vbench:agentic-vbench-assembly-task1",
+  "origin": {
+    "benchmark": "agentic_vbench",
+    "task_id": "agentic-vbench-assembly-task1",
+    "revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793"
+  },
+  "execution": "registered_suite"
+}

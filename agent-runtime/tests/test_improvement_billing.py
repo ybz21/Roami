@@ -2,6 +2,7 @@ import asyncio
 import json
 from dataclasses import replace
 from decimal import Decimal
+from itertools import pairwise
 
 import httpx
 import pytest
@@ -10,6 +11,7 @@ from test_improvement_workflow import setup
 from test_model_proxy import EVENTS, consume, proxy_for
 
 from roami_agent.app import configured_provider
+from roami_agent.improvement.codex_proxy import CodexProxy
 from roami_agent.improvement.codex_roles import codex_json
 from roami_agent.improvement.measurements import EpisodeBudget
 from roami_agent.protocol.errors import DomainError
@@ -17,6 +19,52 @@ from roami_agent.protocol.model_routes import settings_with_route
 from roami_agent.providers.model_proxy import model_accounting
 from roami_agent.providers.upstream_costs import UpstreamCharge
 from roami_agent.server.configuration import Settings
+
+
+@pytest.fixture
+def codex_responses(monkeypatch):
+    original = CodexProxy.__init__
+
+    def handler(request):
+        assert request.url.path.endswith("/responses")
+        complete = json.loads(request.content).get("complete", True)
+        event = {
+            "type": "response.completed" if complete else "response.in_progress",
+            "response": {
+                "status": "completed" if complete else "in_progress",
+                "usage": {
+                    "input_tokens": 100,
+                    "output_tokens": 20,
+                    "input_tokens_details": {"cached_tokens": 10},
+                },
+            },
+        }
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=("data: " + json.dumps(event) + "\n\n").encode(),
+        )
+
+    def initialize(self, *args, **kwargs):
+        kwargs["upstream_client"] = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        original(self, *args, **kwargs)
+
+    monkeypatch.setattr(CodexProxy, "__init__", initialize)
+
+    async def request(argv, env, *, complete=True):
+        settings = dict(value.split("=", 1) for flag, value in pairwise(argv) if flag == "-c")
+        address = next(
+            json.loads(value) for key, value in settings.items() if key.endswith(".base_url")
+        )
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.post(
+                address + "/responses",
+                headers={"X-Roami-Rsi-Key": env["ROAMI_RSI_CODEX_PROXY_KEY"]},
+                json={"complete": complete},
+            )
+        assert response.status_code == 200
+
+    return request
 
 
 async def test_rsi_provider_ignores_legacy_token_admission_but_shares_the_daily_cost_limit(store):
@@ -60,7 +108,7 @@ async def test_rsi_provider_ignores_legacy_token_admission_but_shares_the_daily_
 
 
 async def test_codex_turns_are_priced_once_and_limit_rejection_does_not_poison_the_operation(
-    store, tmp_path, monkeypatch
+    store, tmp_path, monkeypatch, codex_responses
 ):
     workflow, config, *_ = await setup(tmp_path)
     home = tmp_path / "codex-settings"
@@ -70,8 +118,9 @@ async def test_codex_turns_are_priced_once_and_limit_rejection_does_not_poison_t
     proxy, pricing = proxy_for(store, limit=0.0003)
     calls = []
 
-    async def runner(*args, **kwargs):
+    async def runner(argv, **kwargs):
         calls.append(1)
+        await codex_responses(argv, kwargs["env"])
         return {"stdout": codex_events(), "stderr": "", "exitCode": 0}
 
     action = {"id": "priced-codex", "owner": "owner", "kind": "review"}
@@ -122,7 +171,9 @@ async def test_native_spending_also_stops_codex_before_process_launch(store, tmp
     assert calls == []
 
 
-async def test_missing_codex_usage_stays_unknown_and_cannot_replay(store, tmp_path, monkeypatch):
+async def test_missing_codex_usage_stays_unknown_and_cannot_replay(
+    store, tmp_path, monkeypatch, codex_responses
+):
     workflow, config, *_ = await setup(tmp_path)
     home = tmp_path / "codex-settings"
     home.mkdir()
@@ -131,8 +182,9 @@ async def test_missing_codex_usage_stays_unknown_and_cannot_replay(store, tmp_pa
     proxy, _ = proxy_for(store, limit=1)
     calls = []
 
-    async def interrupted(*args, **kwargs):
+    async def interrupted(argv, **kwargs):
         calls.append(1)
+        await codex_responses(argv, kwargs["env"], complete=False)
         raise TimeoutError
 
     action = {"id": "unknown-codex", "owner": "owner", "kind": "review"}
@@ -147,7 +199,9 @@ async def test_missing_codex_usage_stays_unknown_and_cannot_replay(store, tmp_pa
     assert (await proxy.billing.daily_summary())["unknown"] == 1
 
 
-async def test_invalid_codex_content_still_accounts_completed_usage(store, tmp_path, monkeypatch):
+async def test_invalid_codex_content_still_accounts_completed_usage(
+    store, tmp_path, monkeypatch, codex_responses
+):
     workflow, config, *_ = await setup(tmp_path)
     home = tmp_path / "codex-settings"
     home.mkdir()
@@ -155,7 +209,8 @@ async def test_invalid_codex_content_still_accounts_completed_usage(store, tmp_p
     monkeypatch.setenv("CODEX_HOME", str(home))
     proxy, _ = proxy_for(store)
 
-    async def runner(*args, **kwargs):
+    async def runner(argv, **kwargs):
+        await codex_responses(argv, kwargs["env"])
         events = [json.loads(line) for line in codex_events().splitlines()]
         events = [event for event in events if event["type"] != "item.completed"]
         return {

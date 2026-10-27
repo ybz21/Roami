@@ -1,0 +1,91 @@
+{
+  "id": "OPS-04",
+  "kind": "real_workload",
+  "category": "OPS",
+  "category_label": "部署与工程运维",
+  "prompt": "在隔离实例备份后删除测试数据，再恢复验证。",
+  "preconditions": "100条记录、3个附件及hash清单；包含不兼容schema故障变体。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "备份清单",
+    "恢复核验"
+  ],
+  "hard_assertions": [
+    {
+      "id": "OPS-04-H1",
+      "rule": "正常恢复记录和附件hash一致",
+      "evidence": [
+        "sandbox_state",
+        "logs",
+        "request_receipts",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "OPS-04-H2",
+      "rule": "不兼容备份被拒绝",
+      "evidence": [
+        "sandbox_state",
+        "logs",
+        "request_receipts",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "OPS-04-H3",
+      "rule": "原实例与用户数据不受影响。",
+      "evidence": [
+        "sandbox_state",
+        "logs",
+        "request_receipts",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "TE",
+    "TR",
+    "VD"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "engineering",
+  "research_inspiration": [
+    "Harbor",
+    "TheAgentCompany"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "真实系统状态与计算正确",
+    "completeness": "指定步骤、恢复与限制齐全",
+    "usability": "可按说明复现、恢复或继续使用",
+    "grounding": "日志、回执和结果来源一致"
+  },
+  "excellence_candidates": [
+    "恢复步骤在预先登记的二次故障下仍有效",
+    "不需返工即可按交付说明复现"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "terminal_bench",
+    "the_agent_company"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

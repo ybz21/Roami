@@ -32,7 +32,7 @@ def eval_from_spec(spec, prediction, expected):
 """
 
 
-def source_files(tmp_path):
+def source_files(tmp_path, tree=None):
     ids = [f"{i:08x}" for i in range(100)]
     paths = {
         name: tmp_path / (name + ".json")
@@ -61,7 +61,8 @@ def source_files(tmp_path):
                     "states": [
                         {
                             "state_index": 0,
-                            "accessibility_tree": "RootWebArea 'New Record | User | ServiceNow'\nbutton 'Send an email to this address', visible",
+                            "accessibility_tree": tree
+                            or "RootWebArea 'New Record | User | ServiceNow'\n\tbutton 'Send an email to this address', visible",
                             "action": None,
                             "screenshot": "unavailable.png",
                         }
@@ -97,8 +98,8 @@ class LocalGrader:
         return out
 
 
-def prepared(tmp_path):
-    paths = source_files(tmp_path)
+def prepared(tmp_path, tree=None):
+    paths = source_files(tmp_path, tree)
     case = imported(paths)["cases"][0]
     work = tmp_path / "work"
     materialize(case, work)
@@ -116,6 +117,56 @@ def prepared(tmp_path):
         )
     )
     return case, work
+
+
+@pytest.mark.parametrize(
+    "tree,expected",
+    [
+        (
+            (
+                "RootWebArea 'Classic | Unified Navigation App | ServiceNow'\n"
+                "\t[a] Iframe 'Main Content', visible\n"
+                "\t\tRootWebArea 'New Record | User | ServiceNow'\n"
+                "\t\t\t[a321] button 'Send an email to this address', visible"
+            ),
+            True,
+        ),
+        (
+            (
+                "RootWebArea 'New Record | User | ServiceNow'\n"
+                "\tRootWebArea 'New Record | Incident | ServiceNow'\n"
+                "\t\tbutton 'Send an email to this address', visible"
+            ),
+            False,
+        ),
+        (
+            (
+                "RootWebArea 'Classic | Unified Navigation App | ServiceNow'\n"
+                "\tRootWebArea 'New Record | User | ServiceNow'\n"
+                "\t\theading 'User New record'\n"
+                "\tRootWebArea 'New Record | Incident | ServiceNow'\n"
+                "\t\tbutton 'Send an email to this address', visible"
+            ),
+            False,
+        ),
+        (
+            (
+                "RootWebArea 'New Record | Incident | ServiceNow'\n"
+                "\tStaticText 'User'\n"
+                "\tbutton 'Send an email to this address', visible"
+            ),
+            False,
+        ),
+    ],
+)
+async def test_email_citation_uses_its_nested_document_not_the_navigation_title(
+    tmp_path, tree, expected
+):
+    case, work = prepared(tmp_path, tree)
+    grade = await grade_long_memory(case, work, LocalGrader())
+    assert grade["checks"]["valid_source_citations"]
+    assert grade["checks"]["cited_affordance"] is expected
+    assert grade["passed"] is expected
 
 
 def test_import_preserves_all_hundred_in_original_order_without_exposing_oracle(tmp_path):

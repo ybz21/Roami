@@ -96,6 +96,10 @@ def observe_code(workflow, owner, cycle_id):
         cycle["manifest"].get(k) != verified_manifest.get(k) for k in ("model_hash", "suite_hash")
     ):
         return {"state": "observing", "reason": "model_changed"}
+    if cycle["manifest"].get("judge_hash") != verified_manifest.get("judge_hash") or cycle[
+        "manifest"
+    ]["machine"].get("environment_hash") != verified_manifest["machine"].get("environment_hash"):
+        return {"state": "observing", "reason": "evaluation_context_changed"}
     semantic = workflow.review_saved(owner, cycle_id)
     if len(semantic) != 120 or not all(r.get("reviewed") for r in semantic.values()):
         return {"state": "observing", "reason": "semantic_review_incomplete"}

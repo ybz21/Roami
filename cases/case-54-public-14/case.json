@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-14",
+  "kind": "public_source_reference",
+  "category": "DATA",
+  "source_case_id": "spreadsheetbench:38703",
+  "origin": {
+    "benchmark": "spreadsheetbench",
+    "task_id": "verified400:38703",
+    "revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4"
+  },
+  "execution": "registered_suite"
+}
