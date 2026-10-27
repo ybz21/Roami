@@ -4,7 +4,35 @@ import json
 from pathlib import Path
 
 from roami_agent.improvement.contracts import digest, require
-from roami_agent.protocol.identity import now_ms
+from roami_agent.protocol.identity import identity, now_ms
+
+
+def archive_rejected_admission(ledger, owner, operation, *, pipeline=False):
+    table = "rsi_pipeline_costs" if pipeline else "rsi_operation_costs"
+    with ledger.connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            f"SELECT * FROM {table} WHERE id=? AND owner=?", (operation, owner)
+        ).fetchone()
+        if row is None or row["state"] != "completed":
+            return
+        value = json.loads(row["result_json"]).get("value", {})
+        require(
+            value.get("admission_rejected") is True and value.get("metrics", {}).get("tokens") == 0,
+            "RSI_OPERATION_CONFLICT",
+        )
+        values = dict(row)
+        values["id"] = operation + ":admission:" + identity()
+        columns = list(values)
+        db.execute(
+            f"INSERT INTO {table} ("
+            + ",".join(columns)
+            + ") VALUES("
+            + ",".join("?" for _ in columns)
+            + ")",
+            tuple(values.values()),
+        )
+        db.execute(f"DELETE FROM {table} WHERE id=? AND owner=?", (operation, owner))
 
 
 def quarantine_operation(ledger, owner, operation, *, reason, evidence):
@@ -43,7 +71,7 @@ def quarantine_operation(ledger, owner, operation, *, reason, evidence):
 def assert_operation_costs_settled(db, owner):
     require(
         not db.execute(
-            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer' OR json_extract(result_json,'$.value.metrics.tokens')>reserved)))",
+            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer' OR (json_extract(result_json,'$.value.metrics.tokens')>reserved AND COALESCE(json_extract(result_json,'$.value.spending_policy'),'frozen_protocol')!='shared_model_daily'))))",
             (owner,),
         ).fetchone(),
         "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",

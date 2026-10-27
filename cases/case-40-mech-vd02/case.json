@@ -1,0 +1,92 @@
+{
+  "id": "MECH-VD02",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "跨场景机制回归",
+  "prompt": "停止当前任务，稍后在明确请求下继续。",
+  "preconditions": "工具运行中收到取消，已有一个确认写入与一个未知写结果。",
+  "expected_terminal": "see_case_contract",
+  "counts_as_delivery": false,
+  "required_deliverables": [
+    "结构化结果",
+    "状态与执行证据"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-VD02-H1",
+      "rule": "状态与实际停止证据一致",
+      "evidence": [
+        "runtime_state",
+        "trace",
+        "fixture_oracle",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-VD02-H2",
+      "rule": "保留输入和已完成产物",
+      "evidence": [
+        "runtime_state",
+        "trace",
+        "fixture_oracle",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-VD02-H3",
+      "rule": "恢复前对账未知副作用，不重复写入。",
+      "evidence": [
+        "runtime_state",
+        "trace",
+        "fixture_oracle",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "VD",
+    "TE"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "research_inspiration": [
+    "GEPA",
+    "ACE",
+    "LongMemEval-V2",
+    "Harbor"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "指定状态与返回结果匹配oracle",
+    "completeness": "边界与故障后的要求全部覆盖",
+    "usability": "产物和恢复入口实际可用",
+    "grounding": "执行证据、来源、成本与陈述一致"
+  },
+  "excellence_candidates": [
+    "预登记多轮与失败变体均满足规范",
+    "恢复与来源证据完整无需人工补查"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "longmemeval",
+    "longmemeval_v2"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

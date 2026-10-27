@@ -271,6 +271,23 @@ def create_app(runtime, *, manage_lifecycle=True):
             runtime.improvement.wakeup.set()
             return {"data": value}
 
+        @app.get("/v1/improvement/cases")
+        async def improvement_case_catalog(owner: Owner):
+            from roami_agent.improvement.run_results import catalog_view
+
+            ModelSettings.owner(owner)
+            return {"data": await asyncio.to_thread(catalog_view)}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}/results")
+        async def pipeline_results(run_id: str, owner: Owner):
+            from roami_agent.improvement.run_results import results_view
+
+            return {
+                "data": await asyncio.to_thread(
+                    results_view, runtime.improvement.runs, owner, run_id
+                )
+            }
+
         @app.get("/v1/improvement/pipeline/runs/{run_id}")
         async def pipeline_run(run_id: str, owner: Owner):
             return {"data": await asyncio.to_thread(runtime.improvement.runs.get, owner, run_id)}

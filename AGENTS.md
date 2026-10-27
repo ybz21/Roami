@@ -627,12 +627,12 @@ agent-runtime/src/roami_agent/tools/
   <p>用户能查看跨机评测证据、具体策略差异和三目标变化，在允许范围内应用或恢复策略，日常会话与测试环境隔离。</p>
   <h2>技术设计</h2>
   <p>复用运行时 trace、任务验收、调度与存储；已实现隔离评测、每日worker、规则回顾和有限参数发布底座。现已接入ResearchWorker、语义复盘、持久工单、隔离补丁、源码A/B和专用评测实例观察；真实每日评测尚未启用。完整模块、协议、接口和验收标准见设计正文。</p>
-  <p>调研与评价修订：<a href="docs/design/20261022-roami-agent-rsi/research.html">开源做法与源码核对</a>、<a href="docs/design/20261022-roami-agent-rsi/evaluation.html">程序员工作 / 业余任务的 80 项候选规格与评价标准</a>。80项仅为候选池，正式库存已调整为60项（公开20、自有真实20、机制回归20）；尚无真实模型全量成绩，权重、断言和资源上限均有版本记录。</p>
-  <p>自动化闭环修订：常驻RSI服务使用内部持久动作队列推进Codex复盘、Codex汇总GitHub Issue、Codex修复、独立验证、专用实例应用、观察与关闭/重开。Codex执行采用预算准入、原生用量与超时，CLI不保证供应商侧硬Token截断。GitHub Issue确认后才派修复，独立验收后发草稿PR；状态、幂等outbox、预算及关闭证据契约见<a href="docs/design/20261022-roami-agent-rsi/index.html#closed-loop">详细设计</a>。</p>
-  <p>参与者与交接修订：<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">图表版架构与执行设计</a>以架构图、执行手段表和闭环条件明确角色；运行边界与模块折叠展示。控制器发起，被测Agent做题，Codex复盘并输出文档，Codex汇总Issue，Codex隔离修改，独立服务验收应用，后续两个合格日周期后控制器关单。本地角色链已接入，正式运行仍待用例和机器配置；总方案的历史技术契约保留在折叠附录。</p>
+  <p>调研与评价修订：<a href="docs/design/20261022-roami-agent-rsi/research/research.html">开源做法与源码核对</a>、<a href="docs/design/20261022-roami-agent-rsi/evaluation/evaluation.html">程序员工作 / 业余任务的 80 项候选规格与评价标准</a>。80项仅为候选池，正式库存已调整为60项（公开20、自有真实20、机制回归20）；尚无真实模型全量成绩，权重、断言和资源上限均有版本记录。</p>
+  <p>自动化闭环修订：常驻RSI服务使用内部持久动作队列推进Codex复盘、Codex汇总GitHub Issue、Codex修复、独立验证、专用实例应用、观察与关闭/重开。Codex执行采用预算准入、原生用量与超时，CLI不保证供应商侧硬Token截断。GitHub Issue确认后才派修复，独立验收后发草稿PR；状态、幂等outbox、预算及关闭证据契约见<a href="docs/design/20261022-roami-agent-rsi/architecture/overview.html#closed-loop">详细设计</a>。</p>
+  <p>参与者与交接修订：<a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html">图表版架构与执行设计</a>以架构图、执行手段表和闭环条件明确角色；运行边界与模块折叠展示。控制器发起，被测Agent做题，Codex复盘并输出文档，Codex汇总Issue，Codex隔离修改，独立服务验收应用，后续两个合格日周期后控制器关单。本地角色链已接入，正式运行仍待用例和机器配置；总方案的历史技术契约保留在折叠附录。</p>
   <h3>首批实施记录 · 2026-10-23</h3>
   <p>范围修订：正式任务库存为60项（公开20、自有真实20、机制回归20），每天完整执行60项，并回顾所有指标与具体日志；新想法作为剩余预算内的额外开发实验，不替换正式题。机制回归优先使用无模型测试，不预占模型Token；所有测试机共享日预算。主动观察和源码补丁已接入，正式场景与真实模型验收仍未完成。</p>
-  <p>已实现评测CLI、隔离文件运行、独立判定、成对比较、预算账本、每日worker与有限参数候选队列。4条公开财务组件合同已锁定，2条确定性设施任务已完成A/B；正式测试机、真实模型收益、完整60例及线上发布未完成。详见 <a href="docs/design/20261022-roami-agent-rsi/implementation.html">实施记录</a> 和 <a href="docs/development/agent-rsi.md">运行手册</a>。</p>
+  <p>已实现评测CLI、隔离文件运行、独立判定、成对比较、预算账本、每日worker与有限参数候选队列。4条公开财务组件合同已锁定，2条确定性设施任务已完成A/B；正式测试机、真实模型收益、完整60例及线上发布未完成。详见 <a href="docs/design/20261022-roami-agent-rsi/records/implementation.html">实施记录</a> 和 <a href="docs/development/agent-rsi.md">运行手册</a>。</p>
   <p>每日全量修订：规则回顾已逐项接入模型/工具具体日志，缺日志或覆盖不足不能记为当日完成。rsi-v1.3要求正式60项每天全跑，A/B共120次执行；预算不足不静默缩题。quick门禁915项Python通过，最终专项51项、前端910项及生产构建通过；手机组件使用隔离示例数据验证触控与回顾覆盖，真实模型成绩和完整自主源码修改仍未交付。</p>
   <p>验收：仓库quick门禁通过（896项Python测试、全量Go与前端静态检查）；最终记忆结算修订后专项50项通过。独立tmux实例已按身份清理，无真实模型收益分数。</p>
 
@@ -994,7 +994,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <section id="roami-rsi-development-only" lang="zh-CN">
 <h2>RSI开发版边界修订 · 2026-10-23</h2>
 <p>RSI仅在显式development编译通道运行；普通安装版不构造服务、worker、接口或策略绑定，旧enabled设置不生效，入口由当前节点状态控制。改进只应用于开发评测实例，经正常审阅发布后交付用户。无版本差异每日60次，候选对照120次；全部指标与日志仍逐次复盘。</p>
-<p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/implementation.html">当前实施与验收</a>。</p>
+<p>当前60/60项正式合同已备：公开20、自有40；75份来源材料固定hash。公司原生RocketChat/ownCloud与GAIA官方课程公开样本已接通，退出后状态、正确/错误产物及Main/Worker日志验收通过。7项复杂产物（自有5、公司2）仍待独立质量评分；测试机与日预算未绑定，尚无真实完整日或收益结论。详见<a href="docs/design/20261022-roami-agent-rsi/records/implementation.html">当前实施与验收</a>。</p>
 <p>本轮验收：Go与full门禁通过，Python1086项，前端918项及生产构建通过；桌面和Redmi真机验证普通版无入口、深链回退且不请求RSI接口，开发版可进入。界面检查使用隔离数据，不计作真实Agent成绩。</p>
 </section>
 
@@ -1006,7 +1006,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 → github_publication（重验证据、quick/full、专用分支、草稿PR与截图）
 → release_observation（开发评测实例、后续全量观察、关闭/回滚）</pre>
 <p>GitHub配置位于账本旁的私有review-publication目录，缺省不向外写入。创建请求断线先读远端对账，未确认结果不重复POST；不自动合并，不上传原始日志、隐藏答案或凭证。OpenCode和Pi托管任务采用原生JSON进程加常驻控制器，续聊绑定原生ID；完成确认进程退出与无额外写进程。OpenCode2额外核对精确会话导出的提示词、完成状态与时间，禁止用旧结果冒充新完成。</p>
-<p>7项复杂产物已接离线渲染和独立双评分，但本机容器runner已登记，真实校准和日预算尚未齐，不能宣称每日评测已经启用。详见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#first-version">首版运行图表</a>及<a href="docs/development/agent-rsi.md#daily-v1">操作手册</a>。</p>
+<p>7项复杂产物已接离线渲染和独立双评分，但本机容器runner已登记，真实校准和日预算尚未齐，不能宣称每日评测已经启用。详见<a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html#first-version">首版运行图表</a>及<a href="docs/development/agent-rsi.md#daily-v1">操作手册</a>。</p>
 </section>
 
 <section id="roami-rsi-codex-period" lang="zh-CN">
@@ -1014,7 +1014,7 @@ frontend/src/agent-registry.ts               升级及模型配置的节点感�
 <h3>产品设计</h3><p>复盘、Issue、修复固定三个Codex角色。完整复盘列全部待修点，全机完成后每天只发一个GitHub Issue，确认回执后按条目修复。独立验收后发回链草稿PR，两个后续完整周期观察通过才勾选，全部完成关Issue，退化回滚重开。普通安装版不运行。</p>
 <h3>用户故事</h3><p>按每日自动执行要求，每天03:00完整跑60项；人查看每日报告、Issue和PR，审阅合并，不逐日派任务。未确认预算与评分校准之前保持停用。</p>
 <h3>技术设计</h3><p>behavior_observer最多4项一批，保护题隔离；codex_roles使用只读无工具的原生CLI，记录thread ID、JSONL与用量。review_report和ResearchWorkflow持久保存全量文档与全机汇总；github_issues对账、发布确认并同步清单，source_revision只应用校验补丁。一次只观察一个源码候选，防止后续修复覆盖观察版本。CLI无供应商侧总Token硬截断保证，超额或未知调用阻止后续付费执行。</p>
-<p><a href="docs/design/20261022-roami-agent-rsi/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；合并主线后quick/full通过（Python1232项），前端952项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html">精简图表设计</a> · <a href="docs/development/agent-rsi.md#codex-roles">配置、预算与恢复</a>。本机真实Codex协议检查已获得原生完成与用量，未执行完整60项；合并主线后quick/full通过（Python1232项），前端952项及生产构建通过；桌面与Redmi真机验证完整复盘、Issue链接、44px触控、单返回栏与无溢出。GitHub写入为固定响应设施验收，真实完整60项和正式日程仍未启用。</p>
 </section>
 
 <section id="professional-agent-model-picker" lang="zh-CN">
@@ -1325,11 +1325,11 @@ conversation/professional_activity.py
 <pre>SettingsPage → ExperimentWorkflow / AgentImprovement → 所有者Go网关
 → development-only HTTP → ImprovementControl / ResearchWorkflow
 POST preview：只读预估最大配对预留；PUT research：限额字段与修订号校验</pre>
-<p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
+<p>固定每日完整60项、Codex三角色、冻结验收和最少两天观察。可信仓库、命令和源码范围不从Web改写；部分入队失败重用请求键，模型异常记录脱敏error_code。图表及真实诊断边界见<a href="docs/design/20261022-roami-agent-rsi/architecture/automation-roles.html#workflow">具体设计</a>；诊断问题已汇总为<a href="https://github.com/ybz21/Roami/issues/443">Issue #443</a>。原始60项尝试未形成有效全套成绩，机制补测20/20；日程未启用。</p>
 <p>验收：quick/full通过，Python1238项、前端132文件/960项通过；新增预览、有限配置、流异常及发行隔离的定向Python39项通过。桌面320–1920宽度与Redmi Note 8真触控验证节点点选、配置保存、预算预览、单返回栏与零溢出；普通版深链不请求RSI。界面验收使用隔离示例配置，与真实诊断成绩分开。</p>
 </section>
 
-<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
+<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
 
 <section id="rsi-pipeline-delivery-20261024" lang="zh-CN">
 <h2>RSI运行闭环 · 2026-10-24</h2>
@@ -1337,7 +1337,7 @@ POST preview：只读预估最大配对预留；PUT research：限额字段与�
 <p>开发版设置的实验/RSI提供独立运行地址、逐节点职责/状态/文件、GitHub汇总Issue及本地问题列表；从历史运行复测相同Case，区分仍存在、未复现、未验证、未覆盖和合同变化。普通安装不启用。</p>
 <h3>Technical Design</h3>
 <p>RunRecords在同一私有SQLite保存Run/Attempt/Case/Issue/Observation/Effect；EvaluationWorker复用单队列，PipelineReportWorker用Codex复盘和问题排序、程序脱敏并幂等发布GitHub。PipelineRuns按Run读取状态和hash校验产物，结束记录不轮询。正式源码修复沿用ResearchWorker与独立验证、发布、观察门禁。</p>
-<p><a href="docs/design/20261022-roami-agent-rsi/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组10项复测真实任务0/6、机制4/4；Issue #446保留19项仍存在、8项未验证。全仓full门禁通过，Python1249项、前端963项、桌面9档和Android真机触控/滚动通过。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
+<p><a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-engineering.html">架构图、执行合同与验收边界</a>。历史10项已自动发布Issue #445；同组10项复测真实任务0/6、机制4/4；Issue #446保留19项仍存在、8项未验证。全仓full门禁通过，Python1249项、前端963项、桌面9档和Android真机触控/滚动通过。复杂产物校准未完成，正式每日调度不冒充已验收。</p>
 <section id="background-task-list-20261024" lang="zh-CN">
   <h1>后台任务列表整理 · 2026-10-24</h1>
   <h2>产品设计</h2>
@@ -1687,4 +1687,79 @@ Research → 原浏览器导航／观察协议</pre>
   <p>用户能区分真实音频质量不足与文件或验证环境故障；维护者看到实际原生分数和最小要求，不需要猜测红色状态的原因。</p>
   <h3>Technical Design</h3>
   <p>media_tasks.grade_media 在 checks 增加 native_metric_threshold，并返回 native_metric_minimum 及有限 reason。判定与原 all(checks) and score&gt;=minimum_reward 等价，原生验证器、输入、门槛和输出均不变。回归覆盖低分、恰好达标、满分和验证器失败但分数达标；冻结 v20 全套仍使用其独立旧源码，新增诊断单列，不改写原 trial。</p>
+</section>
+
+<section id="rsi-native-failure-diagnostics-20261027" lang="zh-CN">
+  <h2>RSI Native 执行失败原因 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>未创建 Native 任务、执行器不符、当前执行未完成时，报告保留明确的失败原因，不再统一显示为运行失败。其他未知异常继续泛化，不能借诊断输出任意供应商文本。</p>
+  <h3>User Stories</h3>
+  <p>用户能区分漏委派、执行未完成与产物数值错误；维护者可以针对真实原因改进协调，不把已有答案文件当作 Native 执行证明。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation_tasks 声明有限 NATIVE_EXECUTION_FAILURES，包含原四个预算代码及三个既有执行合同代码；ContainerExecutor 仅透传集合内的 release_blocker，其他字符串仍映射 RSI_RUNTIME_REPORTED_FAILURE。评分、执行条件、费用与冻结 v20 结果不变。回归同时验证允许代码透传及私有任意文本不泄漏。</p>
+</section>
+
+<section id="rsi-simple-design-20261027" lang="zh-CN">
+  <h1>RSI 配置、运行结果与修复追踪 · 2026-10-27</h1>
+  <p>本轮先交付 HTML 交互原型供确认，不修改实际 RSI 调度与额度策略。原型使用隔离演示数据，所有运行、修复、保存操作仅在页面内演示。</p>
+  <p>生成：<code>cd frontend &amp;&amp; node scripts/build-rsi-design.mjs</code>；输出 <a href="docs/design/20261022-roami-agent-rsi/prototypes/roami-rsi-design.html">设计与原型</a>、<a href="docs/design/20261022-roami-agent-rsi/prototypes/roami-rsi-prototype.html">独立原型</a>。</p>
+  <h2 id="rsi-simple-product">产品设计</h2>
+  <p>首页以选定的一次 Workflow 运行为中心，先展示 Case 和 Issue 汇总，再查看折叠的单项详情。三个主 Tab 为工作流、运行结果、Issue，默认打开运行结果；页头保留“运行评测”和“设置”。选择本次运行与更早的对比运行，历史结果不受当前设置或其他运行的状态覆盖。运行前选择快速检查 10 项或完整评测 60 项。运行中的进度与停止动作直接可见，停止保留已完成结果。</p>
+  <p>保留七环节工作流，取消每个环节的大型配置卡与分散表单。工作流 Tab 直接展示七个环节的状态及一句执行摘要；点击环节查看执行者、输入、实际执行情况、产物与下一步，技术日志按需展开。手机使用纵向步骤与就地展开的详情。尚未执行的环节说明等待条件，不伪造产物。结果详情先展示通过、失败、待评分和报告，再展示具体问题、交付物与运行过程；待评分不计为通过，派活完成不等于修复通过。</p>
+  <p>设置集中为自动评测、评测范围、问题跟进、模型与费用四组。自动评测关闭时隐藏时间和时区；开启后设置每日时间。问题跟进保留自动修复与自动创建 GitHub Issue，修复之后必须独立验收。自动提交 PR、合入和关闭 Issue 不因开关而获得新的默认授权。</p>
+  <p>RSI 不再提供每日 Token、每次诊断 Token、每次 Codex Token、请求次数、角色输出上限等独立额度配置。主控、执行与记忆模型沿用模型页配置；RSI 设置仅展示共享每日金额限额与“模型页”入口。额度仅在模型页编辑。达到每日限额或费用未知时，说明暂停原因并给出模型页入口，保留已经产生的结果和记录。</p>
+  <p>桌面保持现有设置导航、基础底色和单线分隔。手机使用等高返回栏与单一内容滚动容器，长设置与运行详情是整页，不使用长弹窗；保存栏在滚动区之外并避让键盘，底部保留首页、项目、工具、设置。原型支持中英文、深浅主题、桌面与手机预览，以及有待处理、运行中、修复中、全部通过、尚无记录、每日限额、费用待核对七种状态；“修复中”展示已完成的复盘、Issue 清单和正在执行的修复。</p>
+  <h3>按运行查看结果与多轮问题追踪</h3>
+  <p>本轮先显示 Case 的计划数、通过、失败、待评分、未执行和运行中数量，并按公开、自有、机制分组。点指标或展开 Case 明细后，用折叠行查看原始结果、证据、跨轮轨迹与关联 Issue。未运行、待评分和模型费用未知不能算通过；Case 由失败变为通过只是本例结果变化，不直接判定整个 Issue 已解决。</p>
+  <p>Issue 汇总先显示已验证修复、已关闭和仍待解决数量，再显示本轮新增、验证修复、关闭、持续通过、再次出现、仍遗留、未验证与未覆盖。汇总数从同一份 Case 和 Issue 观察记录推导。反复出现的同一问题串联多次运行，一次运行的多条日志只计一次命中。折叠详情展示类型、优先级分析、首次出现、最近失败、关联 Case、验收条件、修复证据和各轮状态。</p>
+  <p>类型区分 fix 与 feature：fix 违反已有要求，feature 增加能力或覆盖；feature 不混入失败 Case 数。优先级说明保留依据：P0 涉及整体阻断、账目或费用安全；P1 影响核心功能、交付或正确性；P2 为一般缺陷与能力补充；P3 为体验优化。可按本轮变化、类型和优先级筛选，原型展示分级依据，不凭关键词宣称完成自动诊断。</p>
+  <p>修复必须有绑定当前版本的独立验收回执。已验证修复与已关闭分别统计，至少两个后续完整且同口径的周期无复现才可关闭。再次失败立即重开；待评分、快速检查、部分执行和未覆盖不能累计完整观察次数。比较只覆盖双方相同 Case，评测集、判定器、模型和环境不同则停止自动判定修复或退化，保留原始结果供查看。</p>
+  <p>运行选择区的折叠记录展示每轮 Case 结果和 Issue 变化；点击可回到该轮汇总。跨轮问题页展示截至选定运行的历史，不泄露未来运行的修复或失败。七环节 Workflow 保留在独立工作流 Tab，阶段摘要、产物文件名和内容均绑定该轮，不再对多轮历史复用全局最新状态。展开项、选择的运行和基准在查看产物后保留。</p>
+  <h2 id="rsi-simple-stories">用户故事</h2>
+  <ol>
+    <li>我打开 RSI 就能知道最近评测通过多少、哪些未通过、哪些仍待评分，并能直接查看对应问题。</li>
+    <li>我不用理解流水线节点就能开始一次快速或完整评测，运行中可以停止，并保留已完成的结果。</li>
+    <li>我只在模型页维护每日限额；RSI 告知共用额度和暂停原因，不要求再次填写 Token 数。</li>
+    <li>我在一个设置页开启每日评测、选择时间和测试环境，修改失败保留输入，离开前提示未保存更改。</li>
+    <li>我点开问题能看到验证情况和下一步修复动作；交给 Codex 后显示修复中，只有独立验证通过才进入观察，不提前宣称解决。</li>
+    <li>我在手机上能通过真实点按完成设置、保存、查看结果和返回，操作按钮不依赖悬停提示。</li>
+    <li>我能看到全部七环节的实际状态；点击环节查看谁执行、用了哪些输入、做了什么、产出了什么，以及接下来等待什么，打开产物后返回仍保留选择。</li>
+    <li>我选择某次运行和对比基准，先看 Case、Issue 总量与变化，再折叠展开单项结果和证据。</li>
+    <li>我能知道同一问题在哪几轮出现、哪次通过验收、是否再次失败，以及为什么还没关闭；未覆盖不会被误算成已修复。</li>
+    <li>我能按 fix / feature 和 P0 至 P3 筛选，展开查看影响与分级依据，而不是只看到没有解释的标签。</li>
+  </ol>
+  <h2 id="rsi-simple-technical">技术设计</h2>
+  <pre>frontend/prototypes/rsi.tsx          隔离状态、路由式整页、表单与运行演示
+frontend/prototypes/rsi-run-history.ts 冻结的演示运行、Case、Issue 观察与对比规则
+frontend/prototypes/rsi-run-results.tsx 汇总优先、折叠明细、筛选、轨迹与跨轮对比
+frontend/prototypes/rsi-run-results.css 运行结果与多轮追踪布局
+frontend/prototypes/rsi-workflow.tsx 七环节状态、按次快照与产物详情
+frontend/prototypes/rsi.css          使用现有设计令牌与 data-size / data-pointer
+frontend/scripts/build-rsi-design.mjs 单文件 HTML 与内嵌原型生成
+frontend/src/i18n/locales/*          原型文案，复用 I18nProvider
+frontend/src/theme.tsx / layout.ts   复用主题、Ant Design 配置与 useLayout</pre>
+  <p>原型由 Vite 构建为无外部依赖的单文件 HTML，设计总稿内嵌 sandbox iframe，可切换视口、主题、语言、状态。偏好写入被原型本地响应截获；不调用真实 RSI 接口、不发模型请求、不创建 GitHub Issue。正式页面由 AgentImprovement 接入 RsiWorkspace，复用运行记录及恢复接口；配置集中保存，逐段确认成功版本，失败保留未保存输入和原始运行快照。</p>
+  <p>正式落地时，模型调用必须经同一个 ModelProxy / ModelBilling，覆盖评测容器网关、复盘、独立评分和其他模型调用。金额限额由模型页现有配置决定，停止新增请求的判定沿用实际费用、币种与未知回执处理。删除 RSI 额度准入校验和动态 Token 压力提示，同时保留实际用量记录、取消机制及隔离执行的必要技术边界；历史额度记录和未知账目不清零、不伪造退款。共享限额运行时已接入，原型本身仍不访问实际模型或账本；落地边界见本节的实现记录。</p>
+  <p>验收关注：所有场景的主要动作可达；默认页面无独立 Token 输入；模型页修改限额后 RSI 展示同一份值；失败保留输入；完成记录不轮询；桌面及手机无横向和文档滚动；手机返回栏、底栏、保存栏与触控命中正确。</p>
+  <h2>资料目录整理 · 2026-10-27</h2>
+  <p>目录根部只保留 index.html 作为入口。prototypes 保存当前交互稿，architecture 保存总体方案和工作流合同，evaluation 保存评测标准、样本和材料锁，research 保存研究与来源，records 保存历史实施与试跑，assets 保存样式、图与可编辑源文件。所有历史材料保留，JSON 合同、材料锁和图源内容不变；随迁移更新页面相对链接、AGENTS.md、运行手册、生成脚本和读取清单的测试路径。</p>
+  <h2>原型检查</h2>
+  <p>浏览器完成共享限额更新、保存失败保留输入、折叠执行记录、派活后仍待验证、额度耗尽与未知费用恢复入口、空态、运行态、全部通过、中英文与深浅主题等交互检查。390px 手机预览已修正横向溢出；真实 Android 当前锁屏，本次不声称已完成真机触控验收。前端 typecheck、i18n、hover、140 个测试文件的 1012 个用例与生产构建通过。这是原型阶段检查记录；后续运行时额度整合与正式页面替换见实现记录。用户补充要求已落实到原型：工作流入口始终可见，各环节在专属 Tab 查看执行情况和产物；原先仅在折叠记录里显示步骤的方案已替换。</p>
+  <p>目录迁移后，本地链接检查通过，17 份 JSON、样式与图源逐字节保留。清单路径相关的 41 项测试通过；七环节的浏览器交互检查 27 项、原有原型回归检查 16 项通过，覆盖未执行无产物、修复不冒充独立验收、PR 待审阅不冒充合入、产物整页查看及返回保留选择。前端完整检查仍为 140 文件、1012 项测试通过。</p>
+  <p>多轮原型使用 R01 至 R05 的明确演示记录：四次完整评测和一次有未覆盖、待评分项的快速检查。稳定 Issue 身份与失败签名用于关联；输入、模型、环境、判定器版本作为比较分组。运行汇总使用冻结记录重算，优先级和验收回执分开保存。这是原型演示记录，演示分级和修复结论不代表真实仓库 Issue 的最新状态。</p>
+  <p>运行结果修订验收：新增 12 项跨轮聚合规则测试，前端共 141 个测试文件、1024 项用例通过；浏览器 22 项检查覆盖按次汇总、折叠明细、历史无未来泄漏、分类与优先级筛选、未覆盖不算修复、产物与运行绑定及返回保留选择。问题复现会使当前修复结论失效，但保留上次独立验收所在运行供追溯。</p>
+  <h3>分 Tab 查看 · 2026-10-27</h3>
+  <p>三个主 Tab 分别为工作流、运行结果、Issue。工作流查看七环节的实际状态、执行情况及产物；运行结果只呈现 Case 汇总和折叠明细；Issue 查看汇总、分级、修复变化、共性与折叠详情。三个 Tab 共用本次运行、对比运行和冻结快照，切换不清空筛选、展开项或工作流环节选择。多次运行记录收在运行选择区下方，不增加第四个主 Tab。键盘方向键及 Home / End 可切换 Tab，手机保持一条内容滚动区。</p>
+  <p>分 Tab 修订通过 16 项浏览器检查，覆盖三视图内容隔离、共享运行与基准、Case / Issue / 运行记录的展开状态保留、产物返回、工作流选择及键盘切换；前端 141 个测试文件的 1024 项用例与类型、国际化、hover、生产构建通过。手机预览检查通过，真实 Android 仍未完成触控验收。</p>
+  <h3>正式页面与共享限额实现 · 2026-10-27</h3>
+  <p>AgentImprovement 接入 RsiWorkspace；RsiRunResults、RsiWorkflow 与 rsi-history 分别负责汇总与明细、七环节、跨轮比较。示例原型复用这些组件，仅替换数据源。正式结果从所有者隔离的 pipeline/runs/{id}/results 读取，按选中运行截断历史，保留冻结的 Case 名称与合同；旧记录缺少比较身份时不伪造可比性。历史最多取 100 次，窗口不完整会明确显示，不能据此确认新增或修复。复发信号与同条件比较分别统计，不推断共同根因。</p>
+  <p>配置只保留日程、任务范围、工作流自动化和模型页共享金额限额。运行时 Main、Worker、Memory、独立判定和 Codex Responses 代理统一经 ModelProxy / ModelBilling 准入与结算；旧 Token、请求数和角色输出额度不再用于实时 RSI 准入。冻结协议及独立 CLI 仍保留原合同，历史预留与未知回执不清零。隔离执行的时间、进程、文件和独立评分协议边界继续生效；不能接入共享网关的 external 执行器拒绝启动。</p>
+  <p>本次未复现不等于修复。只有 host_code_verifier_v1 的独立源码对照回执，且 Case 合同、修复源码、模型、环境和判定器全部匹配，才显示已验收；缺失执行日志、未来回执、未知用量和再次失败均不通过。关闭还须实际 observation.closed_fixed 事件与匹配的完整观察周期，界面不会因同一天点两次复测而自动关闭。工作流的 repair、verify、publish、observe 等环节按实际动作状态生成只含允许字段的回执，不展示私有答案或修复提示词。</p>
+  <p>结束运行不定时请求详情，活跃运行复用可见性轮询；切换节点或运行后旧响应不覆盖当前界面。设置按需读取模型限额，加载失败不显示无限额。三个 Tab 共用选择与筛选；产物在手机全屏二级页查看，返回保留上下文。</p>
+  <p>验收边界：真实 Codex CLI 已对本机模拟 Responses 服务完成一轮协议检查，确认请求进入共享计量，未访问外部付费模型。实际 Go 网关与 Python 服务使用隔离示例数据验证页面，示例运行明确标识，不作为能力提升或真实 Issue 关闭依据。真实 Android 仍锁屏，尚未完成仓库要求的真机触控验收；四份人工评分锚点和正式完整日观察也未补齐。</p>
+  <p>正式实现检查：运行时全量 1615 项、前端 140 个测试文件的 1016 项用例通过；typecheck、i18n、hover 与生产构建通过。中文深色、英文浅色各检查 320、390、820、1100、1280、1600、1920 宽度及三个 Tab，共 42 组布局无文档或内容横向溢出；实际接口检查 9 项覆盖冻结元数据、待独立验证、七环节产物、文件完整性、返回保留上下文、无独立 Token 配置和结束记录不轮询。环境或判定器变化、未来回执、复发及不完整验收均有反向回归。手机浏览器预览不替代真机验收。</p>
+  <h3>Case 目录与元数据 · 2026-10-27</h3>
+  <p>任务定义统一放在仓库根部 cases/case-序号-标识/，编号保持稳定。每个目录允许多个文件及子目录：CASE.md 是 name、description 的唯一展示来源，case.json 保存执行合同；input/、公开验收说明和脚本按需添加，附件须经执行定义或任务装配明确引用后随套件冻结，不因存在于目录而自动执行。40 个自有和机制任务的合同保持原样，20 个公开任务仅保存来源引用，不把未运行标为通过。</p>
+  <p>运行记录冻结名称和描述，后续修改不会覆盖已冻结元数据。隐藏集不展示任务描述。打包将 cases/ 随运行时分发；目录、必填字段、重复元数据、合同身份和来源边界均做校验。历史套件文件继续保留，新生成自有套件使用 v12。</p>
+  <p>Case 目录验收：相关 82 项测试通过；全量运行时回归 1577 项、前端回归 1024 项通过。源码包与从源码包重建的安装包均包含 60 个 CASE.md 和 60 个 case.json；不带宿主 Case 的隔离镜像构建上下文能正常构建运行时包。Python 检查范围已包含根部 cases/ 的增删改。</p>
 </section>

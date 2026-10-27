@@ -46,12 +46,13 @@ def proxy_configuration(raw=None):
 def usage_counts(raw):
     if not isinstance(raw, dict):
         return None
-    details = raw.get("prompt_tokens_details") or {}
+    responses = "input_tokens" in raw or "output_tokens" in raw
+    details = raw.get("input_tokens_details" if responses else "prompt_tokens_details") or {}
     if not isinstance(details, dict):
         return None
     counts = (
-        raw.get("prompt_tokens"),
-        raw.get("completion_tokens"),
+        raw.get("input_tokens" if responses else "prompt_tokens"),
+        raw.get("output_tokens" if responses else "completion_tokens"),
         details.get("cached_tokens", 0),
     )
     if any(type(value) is not int or not 0 <= value <= 100_000_000 for value in counts):

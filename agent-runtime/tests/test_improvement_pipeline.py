@@ -338,11 +338,13 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
     calls = []
 
     class Executor:
+        model_hash = "b" * 64
+
         def __init__(self, *args, **kwargs):
             pass
 
         async def preflight(self):
-            return {}
+            return {"environment_hash": "a" * 64}
 
         async def run(self, case, policy, target):
             calls.append((case["id"], case["limits"]["tokens"]))

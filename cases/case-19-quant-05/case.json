@@ -1,0 +1,88 @@
+{
+  "id": "QUANT-05",
+  "kind": "real_workload",
+  "category": "QUANT",
+  "category_label": "策略研究与回测",
+  "prompt": "处理停牌、缺bar、复权和时区，无法确定时拒绝伪造完整回测。",
+  "preconditions": "缺失2个bar、一次拆股和已知停牌，提供可用与不可用价格标记。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "数据质量报告",
+    "受限回测"
+  ],
+  "hard_assertions": [
+    {
+      "id": "QUANT-05-H1",
+      "rule": "不在不可成交时点交易",
+      "evidence": [
+        "point_in_time_dataset",
+        "split_manifest",
+        "trades",
+        "oracle_equity_curve"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "QUANT-05-H2",
+      "rule": "复权与原始价格用途分明",
+      "evidence": [
+        "point_in_time_dataset",
+        "split_manifest",
+        "trades",
+        "oracle_equity_curve"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "QUANT-05-H3",
+      "rule": "无法复算的结果明确未完成而非填造。",
+      "evidence": [
+        "point_in_time_dataset",
+        "split_manifest",
+        "trades",
+        "oracle_equity_curve"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "TL",
+    "TR",
+    "MB",
+    "VD"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "quant",
+  "research_inspiration": [
+    "FinRL"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "信号、成交、净值、指标可复算",
+    "completeness": "分段、成本、风险与基准覆盖",
+    "usability": "代码可运行，逐笔交易与报告齐全",
+    "grounding": "无未来数据和测试集调参，不隐藏失败与亏损"
+  },
+  "excellence_candidates": [
+    "预登记成本和缺失数据敏感性分析完整",
+    "逐笔审计和复现清晰，结果无需返工"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

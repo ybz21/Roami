@@ -143,7 +143,7 @@ class FixtureCodeExecutor(FixtureExecutor):
 
     async def preflight(self):
         assert source_hash(self.candidate["candidate_root"]) == self.builds["candidate"]
-        return {"environment_hash": digest("frozen-environment")}
+        return {"environment_hash": MACHINE["environment_hash"]}
 
     async def regression(self, root):
         # Actual independent readback; the repair provider's success statement is unused.
@@ -378,6 +378,32 @@ async def test_full_research_handoff_isolated_patch_independent_gate_and_two_day
             daily_tokens=20000000,
             daily_episodes=1000,
         )
+        if observation == 0:
+            manifest = w.ledger.get("owner", result["cycle_id"])["manifest"]
+            for changed in (
+                {**manifest, "judge_hash": digest("different-judge")},
+                {
+                    **manifest,
+                    "machine": {
+                        **manifest["machine"],
+                        "environment_hash": digest("different-environment"),
+                    },
+                },
+            ):
+                with w.ledger.connection() as db:
+                    db.execute(
+                        "UPDATE rsi_cycles SET manifest_json=? WHERE id=?",
+                        (json.dumps(changed), result["cycle_id"]),
+                    )
+                assert (
+                    observe_code(w, "owner", result["cycle_id"])["reason"]
+                    == "evaluation_context_changed"
+                )
+            with w.ledger.connection() as db:
+                db.execute(
+                    "UPDATE rsi_cycles SET manifest_json=? WHERE id=?",
+                    (json.dumps(manifest), result["cycle_id"]),
+                )
         w.discover()
         review = w.claim()
         assert review["kind"] == "review"

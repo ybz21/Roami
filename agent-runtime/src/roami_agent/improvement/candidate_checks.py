@@ -32,7 +32,16 @@ def problem_improved(finding, baseline, candidate):
 
 
 class CodePairExecutor:
-    def __init__(self, settings, candidate, *, provider_factory=None, artifact_reviewer=None):
+    def __init__(
+        self,
+        settings,
+        candidate,
+        *,
+        provider_factory=None,
+        artifact_reviewer=None,
+        shared_daily_limit=False,
+    ):
+        self.artifact_reviewer = artifact_reviewer
         tests = Path(candidate["baseline_root"]) / "agent-runtime/tests"
         self.executors = {
             arm: ContainerExecutor(
@@ -41,6 +50,7 @@ class CodePairExecutor:
                 regression_root=tests,
                 provider_factory=provider_factory,
                 artifact_reviewer=artifact_reviewer,
+                shared_daily_limit=shared_daily_limit,
             )
             for arm in ("baseline", "candidate")
         }
@@ -145,13 +155,25 @@ async def verify_candidate(
     if executor_factory is CodePairExecutor:
         from roami_agent.improvement.artifact_review import ArtifactReviewer, needs_artifact_review
 
-        reviewer = ArtifactReviewer.load(settings, workflow.ledger.path.parent, action["owner"])
+        provider_factory = getattr(workflow, "provider_factory", None)
+        reviewer = ArtifactReviewer.load(
+            settings,
+            workflow.ledger.path.parent,
+            action["owner"],
+            provider_factory=provider_factory,
+        )
         require(
             reviewer is not None
             or not any(needs_artifact_review(c) for s in suites for c in s["cases"]),
             "RSI_ARTIFACT_REVIEW_REQUIRED",
         )
-        executor = executor_factory(settings, candidate, artifact_reviewer=reviewer)
+        executor = executor_factory(
+            settings,
+            candidate,
+            artifact_reviewer=reviewer,
+            provider_factory=provider_factory,
+            shared_daily_limit=getattr(workflow.ledger, "shared_daily_limit", False),
+        )
     else:
         executor = executor_factory(settings, candidate)
     fingerprint = await executor.preflight()
@@ -163,7 +185,8 @@ async def verify_candidate(
         needed = 2 * sum(executor.reservation_tokens(c) for s in suites for c in s["cases"])
         episodes = 2 * sum(len(s["cases"]) for s in suites)
         require(
-            budget
+            getattr(workflow.ledger, "shared_daily_limit", False)
+            or budget
             and budget["tokens_reserved"] + needed <= budget["tokens_limit"]
             and budget["episodes_reserved"] + episodes <= budget["episodes_limit"],
             "RSI_DAILY_BUDGET",
@@ -184,8 +207,8 @@ async def verify_candidate(
             baseline=policy,
             candidate=policy,
             output_root=workflow.ledger.path.parent / "runs",
-            daily_tokens=budget["tokens_limit"],
-            daily_episodes=budget["episodes_limit"],
+            daily_tokens=budget["tokens_limit"] if budget else 0,
+            daily_episodes=budget["episodes_limit"] if budget else 0,
             request_key=action["id"] + ":" + str(i),
             source_builds=executor.builds,
         )
@@ -201,10 +224,19 @@ async def verify_candidate(
         "RSI_ORIGINAL_PROBLEM_UNRESOLVED",
     )
     require(comparison["eligible_for_promotion"], "RSI_PROMOTION_REJECTED")
+    from roami_agent.improvement.comparison_context import comparison_context
+    from roami_agent.improvement.issue_verification import case_signals
+
     return {
         **candidate,
         "verification_cycles": cycles,
         "comparison": comparison,
         "regression_output_hash": digest(checks),
         "verified_by": "host_code_verifier_v1",
+        "verification_context": comparison_context(
+            suites[0], executor, machine, source_hash=candidate["candidate_build_hash"]
+        ),
+        "verified_case_signals": case_signals(
+            workflow.ledger, action["owner"], formal, candidate["finding"]["case_id"]
+        ),
     }

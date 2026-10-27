@@ -1,0 +1,89 @@
+{
+  "id": "DEMO-02",
+  "kind": "real_workload",
+  "category": "DEMO",
+  "category_label": "Demo 与产品原型",
+  "prompt": "做一个导入CSV的Demo，错误时保留输入并能纠正后重试。",
+  "preconditions": "一份合法CSV、一份缺列CSV；第二次请求模拟503。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "Demo源码",
+    "交互结果"
+  ],
+  "hard_assertions": [
+    {
+      "id": "DEMO-02-H1",
+      "rule": "合法导入结果正确",
+      "evidence": [
+        "browser_interactions",
+        "source_snapshot",
+        "console",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "DEMO-02-H2",
+      "rule": "缺列提示具体",
+      "evidence": [
+        "browser_interactions",
+        "source_snapshot",
+        "console",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "DEMO-02-H3",
+      "rule": "网络失败保留选择与内容，重试后只导入一次。",
+      "evidence": [
+        "browser_interactions",
+        "source_snapshot",
+        "console",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "TE",
+    "TR",
+    "VD"
+  ],
+  "limit_profile": "long",
+  "grading_profile": "demo",
+  "research_inspiration": [
+    "OSWorld",
+    "Harbor"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "核心交互和数据正确",
+    "completeness": "指定流程、错误与恢复覆盖",
+    "usability": "可运行，触控/键盘可到达，状态能恢复",
+    "grounding": "演示与实际源码行为一致，样例数据标清"
+  },
+  "excellence_candidates": [
+    "预登记的连续操作与恢复变体无误",
+    "交互一致且用户无需额外解释即可完成任务"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}

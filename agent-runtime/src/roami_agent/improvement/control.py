@@ -41,6 +41,17 @@ class ImprovementControl:
             }
 
     def save(self, owner, raw):
+        shared = getattr(self.ledger, "shared_daily_limit", False)
+        if shared:
+            public = {*DEFAULTS, "revision"} - {"daily_tokens", "daily_episodes"}
+            require(
+                isinstance(raw, dict) and public <= set(raw) <= {*DEFAULTS, "revision"},
+                "RSI_INVALID_SETTINGS",
+            )
+            raw = {
+                **self.preferences(owner),
+                **{key: value for key, value in raw.items() if key in public},
+            }
         require(
             isinstance(raw, dict) and set(raw) == {*DEFAULTS, "revision"}, "RSI_INVALID_SETTINGS"
         )
@@ -74,7 +85,9 @@ class ImprovementControl:
             )
             if value["enabled"]:
                 require(
-                    value["daily_tokens"] > 0 and value["daily_episodes"] >= 2,
+                    getattr(self.ledger, "shared_daily_limit", False)
+                    or value["daily_tokens"] > 0
+                    and value["daily_episodes"] >= 2,
                     "RSI_BUDGET_REQUIRED",
                 )
                 require(
@@ -109,7 +122,21 @@ class ImprovementControl:
                 (owner, revision + 1, json.dumps(value), now_ms()),
             )
             db.execute("COMMIT")
-        return {"revision": revision + 1, **value}
+        result = {"revision": revision + 1, **value}
+        return {
+            key: val
+            for key, val in result.items()
+            if not shared or key not in {"daily_tokens", "daily_episodes"}
+        }
+
+    def preferences_view(self, owner):
+        value = self.preferences(owner)
+        return {
+            key: val
+            for key, val in value.items()
+            if not getattr(self.ledger, "shared_daily_limit", False)
+            or key not in {"daily_tokens", "daily_episodes"}
+        }
 
     def register_machine(self, owner, raw, *, local_only=False):
         require(isinstance(raw, dict))
@@ -198,7 +225,12 @@ class ImprovementControl:
         identifier(request_key)
         require(kind in {"manual", "daily"})
         prefs = self.preferences(owner)
-        require(prefs["daily_tokens"] > 0 and prefs["daily_episodes"] >= 2, "RSI_BUDGET_REQUIRED")
+        require(
+            getattr(self.ledger, "shared_daily_limit", False)
+            or prefs["daily_tokens"] > 0
+            and prefs["daily_episodes"] >= 2,
+            "RSI_BUDGET_REQUIRED",
+        )
         require(
             machine_id in prefs["machine_ids"] and bool(prefs["suite_id"]), "RSI_SETUP_REQUIRED"
         )
@@ -212,6 +244,11 @@ class ImprovementControl:
                 (owner, prefs["suite_id"]),
             ).fetchone()
             require(machine and suite, "RSI_SETUP_REQUIRED")
+            require(
+                not getattr(self.ledger, "shared_daily_limit", False)
+                or json.loads(machine[0])["mode"] in {"container", "native_files"},
+                "RSI_SHARED_MODEL_GATEWAY_REQUIRED",
+            )
             payload = {
                 "period_key": request_key,
                 "preferences": prefs,

@@ -105,9 +105,10 @@ class Ledger:
             os.close(lock)
 
     def reserve(self, owner, day, manifest, *, tokens_limit, episodes_limit):
+        shared = getattr(self, "shared_daily_limit", False)
         require(isinstance(owner, str) and 0 < len(owner) <= 200)
-        require(type(tokens_limit) is int and tokens_limit > 0)
-        require(type(episodes_limit) is int and 0 < episodes_limit <= 10000)
+        require(shared or type(tokens_limit) is int and tokens_limit > 0)
+        require(shared or type(episodes_limit) is int and 0 < episodes_limit <= 10000)
         cycle_id = digest([owner, day, manifest])
         tokens = manifest["reserved_tokens"]
         episodes = manifest["reserved_episodes"]
@@ -131,12 +132,14 @@ class Ledger:
                 "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
             ).fetchone()
             require(
-                budget["tokens_limit"] == tokens_limit
+                shared
+                or budget["tokens_limit"] == tokens_limit
                 and budget["episodes_limit"] == episodes_limit,
                 "RSI_DAILY_BUDGET_ALREADY_FROZEN",
             )
             require(
-                budget["tokens_reserved"] + tokens <= tokens_limit
+                shared
+                or budget["tokens_reserved"] + tokens <= tokens_limit
                 and budget["episodes_reserved"] + episodes <= episodes_limit,
                 "RSI_DAILY_BUDGET",
             )

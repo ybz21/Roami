@@ -133,7 +133,8 @@ async def prefetch_reviews(workflow, action, settings, config, packets, saved):
         if group and (
             next(iter(group.values()))["protected"] != packet["protected"]
             or len(proposed) > 4
-            or len(json.dumps(proposed, ensure_ascii=False).encode()) + 18000
+            or not getattr(workflow.ledger, "shared_daily_limit", False)
+            and len(json.dumps(proposed, ensure_ascii=False).encode()) + 18000
             > config["model_tokens"]
         ):
             groups.append(group)

@@ -16,7 +16,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	gate := auth.New("test-only-login", "", "", 5, 30, nil)
 	group := router.Group("/api", gate.Middleware())
 	mountAgentRuntime(group, Config{DataDir: t.TempDir()})
-	for _, path := range []string{"/api/agent/improvement/cycles", "/api/agent/improvement/cycles/probe"} {
+	for _, path := range []string{"/api/agent/improvement/cycles", "/api/agent/improvement/cycles/probe", "/api/agent/improvement/cases", "/api/agent/improvement/pipeline/runs/probe/results"} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest("GET", path, nil))
 		if recorder.Code != http.StatusUnauthorized {

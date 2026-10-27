@@ -9,8 +9,12 @@ import tomllib
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from roami_agent.improvement.codex_proxy import codex_route
 from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.executors import private_json
+from roami_agent.improvement.operation_accounting import archive_rejected_admission
+from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import identity
 from roami_agent.tools.process import execute
 
 
@@ -61,10 +65,7 @@ def codex_configuration():
                     and all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()),
                     "RSI_CODEX_PROVIDER_CONFIG_UNSUPPORTED",
                 )
-                for header, variable in value.items():
-                    selected[f"model_providers.{name}.env_http_headers.{json.dumps(header)}"] = (
-                        variable
-                    )
+                selected[f"model_providers.{name}.env_http_headers"] = value
             else:
                 selected[f"model_providers.{name}.{key}"] = value
         for key in ("request_max_retries", "stream_max_retries"):
@@ -107,7 +108,13 @@ def completed_result(raw):
     observed_items = [e["item"] for e in events if e.get("type", "").startswith("item.")]
     require(
         all(
-            isinstance(i, dict) and i.get("type") in {"agent_message", "reasoning"}
+            isinstance(i, dict)
+            and (
+                i.get("type") in {"agent_message", "reasoning"}
+                or i.get("type") == "error"
+                and set(i) <= {"id", "type", "message"}
+                and isinstance(i.get("message"), str)
+            )
             for i in observed_items
         ),
         "RSI_UNEXPECTED_MODEL_TOOL",
@@ -128,6 +135,7 @@ def completed_result(raw):
     return {
         "text": messages[0],
         "thread_id": threads[0],
+        "diagnostics": [i["message"][:1024] for i in items if i.get("type") == "error"][:16],
         "metrics": {
             "tokens": usage["input_tokens"] + usage["output_tokens"],
             "input_tokens": usage["input_tokens"],
@@ -178,7 +186,8 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
         + " role. Use only the supplied evidence. Do not call tools. Return the requested JSON object.\n"
         + json.dumps(messages, ensure_ascii=False)
     )
-    require(len(prompt.encode()) + 8192 <= config["model_tokens"], "RSI_TOKEN_BUDGET")
+    shared = getattr(workflow.ledger, "shared_daily_limit", False)
+    require(shared or len(prompt.encode()) + 8192 <= config["model_tokens"], "RSI_TOKEN_BUDGET")
     selected, env = codex_configuration()
     request_hash = digest([action["kind"], messages, selected])
     # CLI usage is reported at turn completion, not a provider-enforced token ceiling.
@@ -192,11 +201,41 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
     if saved is not None:
         value = saved["value"]
         require(value.get("request_hash") == request_hash, "RSI_OPERATION_CONTEXT_CHANGED")
-        require(
-            value["metrics"]["tokens"] <= config["model_tokens"], "RSI_CODEX_TOKEN_LIMIT_EXCEEDED"
-        )
-        return value
-    root = workflow.ledger.path.parent / "codex-roles" / digest([action["owner"], operation])
+        if value.get("admission_rejected") is True:
+            await asyncio.to_thread(
+                archive_rejected_admission,
+                workflow.ledger,
+                action["owner"],
+                operation,
+                pipeline=hasattr(workflow, "run_id"),
+            )
+            saved = await asyncio.to_thread(
+                workflow.reserve_operation,
+                action["owner"],
+                workflow.day(action["owner"]),
+                operation,
+                config["model_tokens"],
+            )
+            if saved is not None:
+                require(
+                    saved["value"].get("request_hash") == request_hash,
+                    "RSI_OPERATION_CONTEXT_CHANGED",
+                )
+                if saved["value"].get("admission_rejected"):
+                    raise DomainError(saved["value"]["error_code"])
+                return saved["value"]
+        else:
+            require(
+                shared or value["metrics"]["tokens"] <= config["model_tokens"],
+                "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
+            )
+            return value
+    root = (
+        workflow.ledger.path.parent
+        / "codex-roles"
+        / digest([action["owner"], operation])
+        / identity()
+    )
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     require(not root.is_symlink(), "RSI_PRIVATE_OUTPUT_REQUIRED")
     private_json(
@@ -228,28 +267,66 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
             "features.code_mode.enabled": False,
         }
     )
-    for name, value in selected.items():
-        args.extend(["-c", name + "=" + json.dumps(value)])
-    args.append("-")
     started = time.monotonic()
-    result = await runner(
-        args,
-        cwd=root,
-        env=env,
-        timeout=config["model_seconds"],
-        input_data=prompt.encode(),
-        max_bytes=2_000_000,
-    )
+    outcome = {}
+    async with codex_route(
+        getattr(workflow, "model_proxy", None), selected, env, action["kind"], outcome=outcome
+    ) as (routed, environment):
+        for name, value in routed.items():
+            encoded = (
+                "{ "
+                + ", ".join(
+                    json.dumps(key) + " = " + json.dumps(item) for key, item in value.items()
+                )
+                + " }"
+                if isinstance(value, dict)
+                else json.dumps(value)
+            )
+            args.extend(["-c", name + "=" + encoded])
+        args.append("-")
+        result = await runner(
+            args,
+            cwd=root,
+            env=environment,
+            timeout=config["model_seconds"],
+            input_data=prompt.encode(),
+            max_bytes=2_000_000,
+        )
     private_json(root / "process.json", result)
+    blocked = outcome.get("error_code")
+    if (
+        result["exitCode"] != 0
+        and not outcome.get("attempts")
+        and blocked
+        in {"MODEL_PROXY_DAILY_LIMIT", "MODEL_PROXY_USAGE_UNKNOWN", "MODEL_PROXY_CURRENCY_MISMATCH"}
+    ):
+        await asyncio.to_thread(
+            workflow.settle_operation,
+            action["owner"],
+            operation,
+            {
+                "value": {
+                    "request_hash": request_hash,
+                    "admission_rejected": True,
+                    "error_code": blocked,
+                    "metrics": {"tokens": 0},
+                }
+            },
+        )
+        raise DomainError(blocked)
     require(result["exitCode"] == 0, "RSI_CODEX_EXEC_FAILED")
     value = completed_result(result["stdout"])
     value["metrics"]["elapsed_ms"] = round((time.monotonic() - started) * 1000)
     value.update(
+        spending_policy="shared_model_daily" if shared else "frozen_protocol",
         executor="codex",
         role=action["kind"],
         request_hash=request_hash,
         log=str(root / "process.json"),
     )
     await asyncio.to_thread(workflow.settle_operation, action["owner"], operation, {"value": value})
-    require(value["metrics"]["tokens"] <= config["model_tokens"], "RSI_CODEX_TOKEN_LIMIT_EXCEEDED")
+    require(
+        shared or value["metrics"]["tokens"] <= config["model_tokens"],
+        "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
+    )
     return value

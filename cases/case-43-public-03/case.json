@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-03",
+  "kind": "public_source_reference",
+  "category": "FINANCE_QA",
+  "source_case_id": "convfinqa:85d9a548c6a57df1",
+  "origin": {
+    "benchmark": "convfinqa",
+    "task_id": "Double_KHC/2016/page_23.pdf",
+    "revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6"
+  },
+  "execution": "registered_suite"
+}

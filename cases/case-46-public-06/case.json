@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-06",
+  "kind": "public_source_reference",
+  "category": "FINANCE_QA",
+  "source_case_id": "finqa:88dabae584587913",
+  "origin": {
+    "benchmark": "finqa",
+    "task_id": "MS/2017/page_74.pdf-1",
+    "revision": "0f16e2867befa6840783e58be38c9efb9229d742"
+  },
+  "execution": "registered_suite"
+}

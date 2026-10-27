@@ -25,7 +25,7 @@ class ImprovementStatus:
     async def overview(self, owner):
         def read():
             return {
-                "preferences": self.control.preferences(owner),
+                "preferences": self.control.preferences_view(owner),
                 "catalog": self.control.catalog(owner),
                 "releases": self.releases.list(owner),
                 "requests": self.control.requests(owner),

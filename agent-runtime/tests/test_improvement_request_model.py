@@ -482,3 +482,43 @@ async def test_admitted_input_is_immutable_while_waiting_on_budget(wrapper):
     assert received[0][0][0]["content"] == "original"
     assert received[0][1][0]["function"]["name"] == "original"
     assert messages[0]["content"] == "changed after admission"
+
+
+async def test_shared_daily_policy_keeps_model_settings_without_rsi_pressure_or_caps():
+    settings = Settings()
+    route = replace(settings.route("worker"), parameters={"max_tokens": 32768})
+    observed = []
+
+    class Provider:
+        model = "fixture"
+
+        async def stream(self, messages, tools):
+            observed.append(messages)
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 20000,
+                    "outputTokens": 1000,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+
+        async def close(self):
+            pass
+
+    def factory(frozen, role):
+        assert frozen.route("worker").parameters["max_tokens"] == 32768
+        return Provider()
+
+    budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 10}, shared_daily_limit=True)
+    model = RequestBudgetModel(settings, route, budget, "worker", cap=512, factory=factory)
+    for _ in range(2):
+        async for _ in model.stream([{"role": "user", "content": "task"}], []):
+            pass
+    assert len(observed) == 2 and budget.used == 42000
+    assert all(messages == [{"role": "user", "content": "task"}] for messages in observed)
+    budget.unknown = True
+    with pytest.raises(BudgetAdmissionRejected, match="USAGE_UNKNOWN"):
+        async for _ in model.stream([], []):
+            pass

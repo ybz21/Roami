@@ -1,17 +1,16 @@
 """Materialize the agreed authored suite without publishing private evaluation inputs."""
 
-import json
 import secrets
-from pathlib import Path
 
 from roami_agent.improvement.authored_fixtures import recipe
+from roami_agent.improvement.case_catalog import authored_cases
 from roami_agent.improvement.contracts import digest, freeze_suite
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.mechanisms import nodes
 
 
 def authored_suite(seed):
-    specs = json.loads(Path(__file__).with_name("case_specs.json").read_text())
+    specs = authored_cases()
     cases = []
     limits = {
         "simple": {"seconds": 60, "tokens": 32000, "requests": 8},
@@ -21,6 +20,8 @@ def authored_suite(seed):
     for spec in specs:
         case = {
             "id": spec["id"],
+            "name": spec["name"],
+            "description": spec["description"],
             "category": spec["category"],
             "layer": "mechanism" if spec["kind"] == "mechanism_regression" else "authored_real",
             "split": "development",
@@ -61,7 +62,7 @@ def authored_suite(seed):
             case["prompt"] += data["prompt_suffix"]
         cases.append(case)
     return freeze_suite(
-        "roami-authored-40-v11",
+        "roami-authored-40-v12",
         cases,
         fixture_seed_hash=digest(seed),
         composition={"authored_real": 20, "mechanism_regression_variants": 20},
@@ -71,7 +72,7 @@ def authored_suite(seed):
 def prepare_corpus(service, owner):
     root = service.ledger.path.parent / "corpus"
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = root / "authored-40-v11.json"
+    path = root / "authored-40-v12.json"
     if not path.exists():
         private_json(path, authored_suite(secrets.token_hex(24)))
     summary = service.control.register_suite(owner, path)

@@ -254,6 +254,9 @@ async def test_runtime_failure_is_exported_even_when_output_preexists(tmp_path):
     [
         ("RSI_NATIVE_TASK_FAILED", "RSI_RUNTIME_REPORTED_FAILURE"),
         ("RSI_TOKEN_BUDGET", "RSI_TOKEN_BUDGET"),
+        ("RSI_NATIVE_TASK_REQUIRED", "RSI_NATIVE_TASK_REQUIRED"),
+        ("RSI_NATIVE_EXECUTOR_REQUIRED", "RSI_NATIVE_EXECUTOR_REQUIRED"),
+        ("RSI_NATIVE_TASK_INCOMPLETE", "RSI_NATIVE_TASK_INCOMPLETE"),
         ("private arbitrary error text", "RSI_RUNTIME_REPORTED_FAILURE"),
     ],
 )

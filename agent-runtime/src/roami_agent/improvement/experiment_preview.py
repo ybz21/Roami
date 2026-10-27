@@ -11,6 +11,7 @@ from roami_agent.protocol.errors import DomainError
 
 def preview(service, owner, settings):
     prefs = service.control.preferences(owner)
+    shared = getattr(service.ledger, "shared_daily_limit", False)
     catalog = service.control.catalog(owner)
     selected = next((s for s in catalog["suites"] if s["id"] == prefs["suite_id"]), None)
     blockers, tokens, artifact_count = [], None, 0
@@ -42,14 +43,15 @@ def preview(service, owner, settings):
             blockers.append("RSI_SUITE_NOT_FOUND")
             tokens = None
     machines = len(prefs["machine_ids"])
-    episodes = 120 * machines
+    episodes = (60 if shared else 120) * machines
     if not machines:
         blockers.append("RSI_MACHINE_NOT_FOUND")
-    if prefs["daily_episodes"] < episodes:
+    if not shared and prefs["daily_episodes"] < episodes:
         blockers.append("RSI_EPISODE_BUDGET")
     reservation = tokens * 2 * machines if tokens is not None and machines else None
-    if not prefs["daily_tokens"] or (
-        reservation is not None and prefs["daily_tokens"] < reservation
+    if not shared and (
+        not prefs["daily_tokens"]
+        or (reservation is not None and prefs["daily_tokens"] < reservation)
     ):
         blockers.append("RSI_BUDGET_REQUIRED")
     if not settings.endpoint or not settings.model:
@@ -63,12 +65,13 @@ def preview(service, owner, settings):
         "cases": 60,
         "machines": machines,
         "episodes": episodes,
-        "reservation_tokens": reservation,
+        "reservation_tokens": None if shared else reservation,
+        "spending_policy": "shared_model_daily" if shared else "frozen_protocol",
         "artifact_cases": artifact_count,
         "schedule_enabled": prefs["enabled"],
         "next_run": next_run.isoformat() if prefs["enabled"] else None,
         "research_enabled": research["enabled"],
-        "codex_tokens_per_operation": research["model_tokens"],
+        "codex_tokens_per_operation": None if shared else research["model_tokens"],
         "blockers": list(dict.fromkeys(blockers)),
         "runtime_preflight_required": True,
     }

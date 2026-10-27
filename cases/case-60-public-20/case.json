@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-20",
+  "kind": "public_source_reference",
+  "category": "LIFE",
+  "source_case_id": "the-agent-company:ds-stock-analysis-slides",
+  "origin": {
+    "benchmark": "the_agent_company",
+    "task_id": "ds-stock-analysis-slides",
+    "revision": "98b68ef82a47690c316f42fddb05baafaab56851"
+  },
+  "execution": "registered_suite"
+}

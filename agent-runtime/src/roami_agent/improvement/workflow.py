@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS rsi_improvement_events (
  seq INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT NOT NULL, improvement_id TEXT,
  action_id TEXT NOT NULL, event TEXT NOT NULL, data_json TEXT NOT NULL, created_ms INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS rsi_verify_receipts ON rsi_improvement_events(
+ owner,json_extract(data_json,'$.verification_context.source_hash'),created_ms
+) WHERE event='verify.completed';
 CREATE TABLE IF NOT EXISTS rsi_operation_costs (
  id TEXT PRIMARY KEY, owner TEXT NOT NULL, day TEXT NOT NULL, reserved INTEGER NOT NULL,
  state TEXT NOT NULL, result_json TEXT
@@ -135,6 +138,14 @@ class ResearchWorkflow:
 
     def configure_experiment(self, owner, raw):
         fields = {"enabled", "model_tokens", "model_seconds", "max_attempts", "observation_days"}
+        if getattr(self.ledger, "shared_daily_limit", False):
+            public = fields - {"model_tokens"} | {"revision"}
+            require(isinstance(raw, dict) and public <= set(raw) <= fields | {"revision"})
+            value = self.configure(
+                owner,
+                {**self.settings(owner), **{key: val for key, val in raw.items() if key in public}},
+            )
+            return {key: val for key, val in value.items() if key in public}
         require(isinstance(raw, dict) and set(raw) == fields | {"revision"})
         return self.configure(owner, {**self.settings(owner), **raw})
 
@@ -193,6 +204,10 @@ class ResearchWorkflow:
             self.enqueue_review(c["owner"], c["id"])
 
     def day(self, owner):
+        if getattr(self, "model_proxy", None) is not None and getattr(
+            self.ledger, "shared_daily_limit", False
+        ):
+            return self.model_proxy.billing.period()[0]
         with self.ledger.connection() as db:
             row = db.execute(
                 "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
@@ -323,7 +338,7 @@ class ResearchWorkflow:
             self._owned_action(db, action)
             state = (
                 "waiting_budget"
-                if code in {"RSI_DAILY_BUDGET", "RSI_FULL_SUITE_BUDGET"}
+                if code in {"RSI_DAILY_BUDGET", "RSI_FULL_SUITE_BUDGET", "MODEL_PROXY_DAILY_LIMIT"}
                 else "blocked"
             )
             db.execute(
@@ -581,7 +596,9 @@ class ResearchWorkflow:
                 "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
             ).fetchone()
             require(
-                budget and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
+                getattr(self.ledger, "shared_daily_limit", False)
+                or budget
+                and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
                 "RSI_DAILY_BUDGET",
             )
             db.execute(
@@ -647,7 +664,13 @@ class ResearchWorkflow:
                 (owner, day),
             ).fetchone()
             return {
-                "settings": settings,
+                "settings": {
+                    key: val
+                    for key, val in settings.items()
+                    if not getattr(self.ledger, "shared_daily_limit", False)
+                    or key
+                    in {"revision", "enabled", "model_seconds", "max_attempts", "observation_days"}
+                },
                 "model_cost": {
                     "day": day,
                     "reserved_tokens": cost["reserved"],

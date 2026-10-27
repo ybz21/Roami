@@ -94,4 +94,5 @@ async def test_preview_and_visual_settings_are_development_only(store, developme
         result = await client.put("/v1/improvement/research", headers=headers, json=fields)
         assert result.status_code == (200 if development else 404)
         if development:
-            assert result.json()["data"]["model_tokens"] == 32000
+            assert "model_tokens" not in result.json()["data"]
+            assert runtime.improvement.research.settings("local")["model_tokens"] == 64000

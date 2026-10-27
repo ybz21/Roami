@@ -4,9 +4,9 @@
 
 ## 每次运行与本地问题
 
-开发版入口为“设置 → 实验 → RSI”。Workflow页配置下一次预算与自动GitHub发布；运行记录进入独立URL，显示7节点状态、职责、尝试、配置快照及可校验文件；每日Issue页列出本地逐项问题并链接最近运行。完整工程图和接口见 [运行闭环](../design/20261022-roami-agent-rsi/workflow-engineering.html)。
+开发版入口为“设置 → 实验 → RSI”。页面分工作流、运行结果、Issue 三个 Tab，共用选中运行和对比运行。先看 Case / Issue 汇总，再展开单个详情；七节点显示真实状态、职责与可校验文件。配置集中管理日程、任务范围、自动修复和 GitHub 发布，金额限额沿用模型页。完整工程图和接口见 [运行闭环](../design/20261022-roami-agent-rsi/architecture/workflow-engineering.html)。
 
-“诊断10项”和“复测同组Case”共用正式执行队列与日账本，启动前预留生成和两个Codex角色预算。诊断默认生成30万、复盘/Issue各6.4万，输出8192、记忆2048；普通安装不注册这些接口。开启自动发布前须由本机维护者配置可信GitHub仓库；发布只公开固定问题码与统计，原始日志留在本机。远端响应未知先对账，不重复创建Issue。
+“快速检查”和“复测同组 Case”共用正式执行队列与模型日账本。实时 RSI 不再配置或执行独立 Token、请求数、角色输出及每日 episode 额度；Main、Worker、Memory 和 Codex 调用统一经过模型页的金额准入，保留实际用量与未知回执。历史冻结合同和独立 CLI 协议内的额度字段仍用于审计或协议重放，不会清零旧账目。普通安装不注册这些接口。开启自动发布前须由本机维护者配置可信GitHub仓库；发布只公开固定问题码与统计，原始日志留在本机。远端响应未知先对账，不重复创建Issue。
 
 问题身份为owner+Case+错误码，逐次保存观测。只有同合同、已知用量、非待评分的通过才标“本次未复现”；缺测、失败、阻塞和合同变化分别保留，单次未复现不自动关Issue。历史10项可用受信任CLI `python -m roami_agent.improvement.import_diagnostic --data-root … --owner local --source …` 迁移；HTTP不接受任意目录导入。
 
@@ -55,7 +55,9 @@ uv run --frozen roami-agent-evaluate import-finance --conversational \
 
 Agent 只看到完整原始表格、正文和问题，不接收 gold rows、参考程序、答案或抽样锁中的判定数据。百分比按小数比例作答；ConvFinQA 不注入参考历史答案，每一轮都必须通过。这个改编分数是**组件的数值回答准确率**，不是上游程序执行准确率或官方榜单分数。
 
-## 配置测试机和每日预算
+## 独立评测 CLI 的测试机与冻结预算
+
+以下为离线评测 CLI 的显式协议配置；运行中的 RSI 页面使用模型页每日金额限额。
 
 复制 [machine.example.json](../../scripts/dev/agent-evaluation/machine.example.json)，提供独立 `evaluation-agent.toml`、冻结 suite、机器 ID、可信环境指纹与模型凭证的环境变量引用。所有相对路径相对配置文件；凭证不写进 JSON。`output_root` 目录必须私有，文件与账本权限为 0600。
 
@@ -127,7 +129,7 @@ worker 每条 trial 更新心跳。超时周期恢复为 interrupted，保留已
 
 ## 自动研发运行
 
-[图表版架构与执行](../design/20261022-roami-agent-rsi/automation-roles.html)。定时worker负责每轮正式全60项，每天03:00；ResearchWorker自动消费已完成每日周期，Codex逐项复盘、Codex汇总一个GitHub Issue、Codex隔离补丁、独立源码验证、绑定专用评测实例，再观察两个后续完整周期。所有阶段持久化，带租约和幂等键；付费调用结果未知时不重放。当前尚未启用正式运行。
+[图表版架构与执行](../design/20261022-roami-agent-rsi/architecture/automation-roles.html)。定时worker负责每轮正式全60项，每天03:00；ResearchWorker自动消费已完成每日周期，Codex逐项复盘、Codex汇总一个GitHub Issue、Codex隔离补丁、独立源码验证、绑定专用评测实例，再观察两个后续完整周期。所有阶段持久化，带租约和幂等键；付费调用结果未知时不重放。当前尚未启用正式运行。
 
 | 执行环节 | 当前手段 |
 | --- | --- |
@@ -164,7 +166,7 @@ GET /api/agent/improvement/research可查看阶段与工单；POST /api/agent/im
 公开20个task ID与合同已齐；公司2项产物仍待独立质量评分。GAIA使用官方课程公开样本，无需访问受限整库。来源合同锁与可执行套件分别记录，不能混算。源材料只下载到私有目录，含原始参考答案的包不得直接挂载给Agent：
 
 ```bash
-python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/public-materials-lock.json --output-root /path/to/private/materials --max-total-bytes 1500000000
+python3 scripts/dev/agent-evaluation/fetch-public.py --lock docs/design/20261022-roami-agent-rsi/evaluation/public-materials-lock.json --output-root /path/to/private/materials --max-total-bytes 1500000000
 ```
 
 下载器核对长度与SHA256，默认总量上限256MB；完整材料现含1.2GB轨迹池，须显式指定上面的大文件额度，可用`--only mlagentbench`筛选来源。它不执行上游脚本、注册套件或接受受限访问条件。SpreadsheetBench适配显式检查单工作簿保存值、原有单元格和取消合并；不自动重算公式、不称作官方OJ成绩。
@@ -422,3 +424,9 @@ agent-runtime/.venv/bin/roami-agent-evaluate quarantine-operation \
 Main在同一任务完成回合中通过文件工具修正产物后，下载项绑定该回合最新成功写入的实际hash，保留旧版快照历史。必须同时匹配所有者、任务、修订和Attempt；复制的当前内容还须匹配回执。未记录的外部修改不会成为新产物，删除保护仍有效。
 
 每次诊断在评测节点保存 `budget-<Case摘要>.json`：`original_limits` 是冻结题额度，`effective_limits` 是本轮共享预算分配后的额度，另有本轮已知用量、可用上限和留给后续Case的预留。复测必须同时说明两种额度；有效额度更低的失败不能直接证明原题额度不足。Native当前修订的最新失败尝试若因Token、次数、时限或未知用量阻塞，容器回执保留对应错误码；未识别的错误文本仍只标为执行失败。
+
+## Case 目录
+
+任务定义维护在仓库根部 [`cases/`](../../cases/README.md)，目录名为 `case-<序号>-<标识>/`，一个目录可包含多个文件及子目录。`CASE.md` 的 `name:` 和 `description:` 必填，`case.json` 保存执行合同；输入、公开验收说明与脚本按需放入同目录。附件须由执行定义或任务装配明确引用后随套件冻结。
+
+40 个自有和机制任务从目录读取；20 个公开任务保存来源引用，输入与判定器仍来自已登记套件。新运行冻结名称与描述；修改 Case 不覆盖历史套件或历史运行快照。普通安装包及源码包均包含这些目录，隔离 Agent 镜像不包含宿主评测材料。

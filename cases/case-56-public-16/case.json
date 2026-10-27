@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-16",
+  "kind": "public_source_reference",
+  "category": "CODE",
+  "source_case_id": "swe_verified:scikit-learn__scikit-learn-13496",
+  "origin": {
+    "benchmark": "swe_verified",
+    "task_id": "scikit-learn__scikit-learn-13496",
+    "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3"
+  },
+  "execution": "registered_suite"
+}

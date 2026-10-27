@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-11",
+  "kind": "public_source_reference",
+  "category": "LAB",
+  "source_case_id": "mlagentbench:vectorization",
+  "origin": {
+    "benchmark": "mlagentbench",
+    "task_id": "vectorization",
+    "revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31"
+  },
+  "execution": "registered_suite"
+}

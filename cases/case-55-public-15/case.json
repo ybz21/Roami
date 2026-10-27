@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-15",
+  "kind": "public_source_reference",
+  "category": "CODE",
+  "source_case_id": "swe_verified:pylint-dev__pylint-6903",
+  "origin": {
+    "benchmark": "swe_verified",
+    "task_id": "pylint-dev__pylint-6903",
+    "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3"
+  },
+  "execution": "registered_suite"
+}

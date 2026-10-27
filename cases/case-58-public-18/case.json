@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-18",
+  "kind": "public_source_reference",
+  "category": "OPS",
+  "source_case_id": "terminal_bench:db-wal-recovery",
+  "origin": {
+    "benchmark": "terminal_bench",
+    "task_id": "db-wal-recovery",
+    "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6"
+  },
+  "execution": "registered_suite"
+}

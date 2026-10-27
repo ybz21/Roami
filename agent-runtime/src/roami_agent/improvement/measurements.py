@@ -16,8 +16,9 @@ class BudgetAdmissionRejected(DomainError):
 
 
 class EpisodeBudget:
-    def __init__(self, limits, *, observation_id=None):
+    def __init__(self, limits, *, observation_id=None, shared_daily_limit=False):
         self.limits = limits
+        self.shared_daily_limit = shared_daily_limit
         self.observation_id = observation_id or "rsi-" + identity()
         self.started = time.monotonic()
         self.requests = []
@@ -35,7 +36,7 @@ class EpisodeBudget:
     async def admit(self, messages, tools, output_cap, *, input_reserve=None):
         async with self.lock:
             self.check()
-            if len(self.requests) >= self.limits["requests"]:
+            if not self.shared_daily_limit and len(self.requests) >= self.limits["requests"]:
                 raise BudgetAdmissionRejected("RSI_REQUEST_BUDGET")
             # This is a conservative local admission estimate, not provider billing.
             if input_reserve is None:
@@ -44,7 +45,10 @@ class EpisodeBudget:
                 )
             require(type(input_reserve) is int and input_reserve >= 4096)
             estimate = input_reserve + output_cap
-            if self.used + self.reserved + estimate > self.limits["tokens"]:
+            if (
+                not self.shared_daily_limit
+                and self.used + self.reserved + estimate > self.limits["tokens"]
+            ):
                 raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
             entry = {
                 "inputTokens": None,
@@ -72,7 +76,7 @@ class EpisodeBudget:
                 self.unknown = True
             else:
                 self.used += entry["inputTokens"] + entry["outputTokens"]
-                if self.used > self.limits["tokens"]:
+                if not self.shared_daily_limit and self.used > self.limits["tokens"]:
                     raise DomainError("RSI_TOKEN_BUDGET")
 
     def metrics(self):

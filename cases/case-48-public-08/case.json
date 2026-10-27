@@ -1,0 +1,12 @@
+{
+  "id": "PUBLIC-08",
+  "kind": "public_source_reference",
+  "category": "FINANCE_QA",
+  "source_case_id": "finqa:6db35f5f25b0d831",
+  "origin": {
+    "benchmark": "finqa",
+    "task_id": "ETR/2002/page_86.pdf-4",
+    "revision": "0f16e2867befa6840783e58be38c9efb9229d742"
+  },
+  "execution": "registered_suite"
+}

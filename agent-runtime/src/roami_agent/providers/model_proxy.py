@@ -40,8 +40,9 @@ async def finish(operation):
 
 
 class ProxyTransport(httpx.AsyncBaseTransport):
-    def __init__(self, proxy, upstream, role, model):
+    def __init__(self, proxy, upstream, role, model, *, on_attempt=None):
         self.proxy, self.upstream, self.role, self.model = proxy, upstream, role, model
+        self.on_attempt = on_attempt
 
     async def handle_async_request(self, request):
         await self.proxy.ready()
@@ -60,6 +61,8 @@ class ProxyTransport(httpx.AsyncBaseTransport):
                 call_id = await admission
                 raise
             sent = True
+            if self.on_attempt is not None:
+                self.on_attempt()
             response = await self.upstream.send(request, stream=True, follow_redirects=False)
             stream = MeteredStream(response, self.proxy, call_id, request.url, held)
             held = False
@@ -120,6 +123,16 @@ class MeteredStream(httpx.AsyncByteStream):
         except (ValueError, UnicodeError):
             self.invalid = True
             return
+        terminal = {
+            "response.completed": "completed",
+            "response.failed": "failed",
+            "response.incomplete": "incomplete",
+        }
+        if isinstance(value, dict) and value.get("type") in terminal:
+            response = value.get("response")
+            if isinstance(response, dict) and response.get("status") == terminal[value["type"]]:
+                self.complete = True
+                value = response
         if isinstance(value, dict) and value.get("usage") is not None:
             self.counts = usage_counts(value["usage"])
             self.charge = upstream_charge(value["usage"], self.endpoint)

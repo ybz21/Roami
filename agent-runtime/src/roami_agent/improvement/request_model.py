@@ -34,44 +34,55 @@ class RequestBudgetModel:
         messages, tools = json.loads(json.dumps([messages, tools], ensure_ascii=False))
         original_bytes = input_bytes(messages, tools)
         input_reserve, snapshot, basis = self.input_reservation.estimate(messages, tools)
-        remaining = 100_000_000
-        for budget in (self.budget, self.shared_budget):
-            if budget is None:
-                continue
-            async with budget.lock:
-                budget.check()
-                remaining = min(remaining, budget.limits["tokens"] - budget.used - budget.reserved)
-        if self.role in {"main", "worker"}:
-            pressure = remaining < 2 * (input_reserve + 512)
-            notice = (
-                f"Execution allowance: at most {remaining} metered tokens remain across roles "
-                f"and shared limits. This request's input needs a conservative reserve of "
-                f"{input_reserve} units before this notice ({basis['kind']} plus margin, not billed tokens). "
-                "Each later request also needs its input and output reserve. Keep tool output bounded; "
-                "return requested files and verified findings when ready, and state unverified requirements "
-                "or failed/unknown outcomes plainly. This allowance is not evidence of task completion."
-            )
-            if pressure:
-                notice += (
-                    " Budget pressure: another round-trip at this context size may not fit. "
-                    "Prioritize essential work and a concise handoff over new verification infrastructure."
-                )
-            messages = [*messages, {"role": "system", "content": notice}]
-        overhead = input_reserve + input_bytes(messages, tools) - original_bytes
-        available = min(1_000_000, remaining - overhead)
-        if self.route.context_window:
-            available = min(available, self.route.context_window - overhead)
-        preferred = self.cap if self.cap is not None else self.route.parameters.get("max_tokens")
-        if preferred is not None:
-            available = min(available, preferred)
+        if self.budget.shared_daily_limit:
+            overhead = input_reserve
+            available = self.route.parameters.get("max_tokens") or 0
+            route = self.route
         else:
-            available //= 2
-        model_limit = self.route.capabilities.get("max_output_tokens")
-        if type(model_limit) is int and model_limit > 0:
-            available = min(available, model_limit)
-        if available < 512:
-            raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
-        route = replace(self.route, parameters={**self.route.parameters, "max_tokens": available})
+            remaining = 100_000_000
+            for budget in (self.budget, self.shared_budget):
+                if budget is None:
+                    continue
+                async with budget.lock:
+                    budget.check()
+                    remaining = min(
+                        remaining, budget.limits["tokens"] - budget.used - budget.reserved
+                    )
+            if self.role in {"main", "worker"}:
+                pressure = remaining < 2 * (input_reserve + 512)
+                notice = (
+                    f"Execution allowance: at most {remaining} metered tokens remain across roles "
+                    f"and shared limits. This request's input needs a conservative reserve of "
+                    f"{input_reserve} units before this notice ({basis['kind']} plus margin, not billed tokens). "
+                    "Each later request also needs its input and output reserve. Keep tool output bounded; "
+                    "return requested files and verified findings when ready, and state unverified requirements "
+                    "or failed/unknown outcomes plainly. This allowance is not evidence of task completion."
+                )
+                if pressure:
+                    notice += (
+                        " Budget pressure: another round-trip at this context size may not fit. "
+                        "Prioritize essential work and a concise handoff over new verification infrastructure."
+                    )
+                messages = [*messages, {"role": "system", "content": notice}]
+            overhead = input_reserve + input_bytes(messages, tools) - original_bytes
+            available = min(1_000_000, remaining - overhead)
+            if self.route.context_window:
+                available = min(available, self.route.context_window - overhead)
+            preferred = (
+                self.cap if self.cap is not None else self.route.parameters.get("max_tokens")
+            )
+            if preferred is not None:
+                available = min(available, preferred)
+            else:
+                available //= 2
+            model_limit = self.route.capabilities.get("max_output_tokens")
+            if type(model_limit) is int and model_limit > 0:
+                available = min(available, model_limit)
+            if available < 512:
+                raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
+            route = replace(
+                self.route, parameters={**self.route.parameters, "max_tokens": available}
+            )
         actual = "main" if self.role == "main" else "worker"
         settings = settings_with_route(self.settings, actual, route)
         provider = (

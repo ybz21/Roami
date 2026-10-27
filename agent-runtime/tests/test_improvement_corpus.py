@@ -53,7 +53,8 @@ def public_suite():
 def test_daily_contract_matches_frozen_design_plan():
     plan = json.loads(
         (
-            Path(__file__).parents[2] / "docs/design/20261022-roami-agent-rsi/sampling-plan.json"
+            Path(__file__).parents[2]
+            / "docs/design/20261022-roami-agent-rsi/evaluation/sampling-plan.json"
         ).read_text()
     )
     own = authored_suite("fixture-only")
@@ -273,7 +274,7 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     previous.write_bytes(b"original frozen suite evidence")
     prepare_corpus(service, "owner")
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v11.json").read_text())
+    revised = json.loads((root / "authored-40-v12.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"

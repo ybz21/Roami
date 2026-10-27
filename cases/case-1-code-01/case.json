@@ -1,0 +1,92 @@
+{
+  "id": "CODE-01",
+  "kind": "real_workload",
+  "category": "CODE",
+  "category_label": "编码实现",
+  "prompt": "给附件仓库增加 GET /items，支持 page、pageSize 和 name 升序，返回 total；补测试。",
+  "preconditions": "12 条记录，默认每页 5 条，页码从 1 开始。",
+  "expected_terminal": "completed",
+  "counts_as_delivery": true,
+  "required_deliverables": [
+    "代码补丁",
+    "测试记录"
+  ],
+  "hard_assertions": [
+    {
+      "id": "CODE-01-H1",
+      "rule": "默认返回5条且total=12",
+      "evidence": [
+        "repository",
+        "test_results",
+        "diff",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "CODE-01-H2",
+      "rule": "第3页返回2条，越界返回空",
+      "evidence": [
+        "repository",
+        "test_results",
+        "diff",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "CODE-01-H3",
+      "rule": "排序、非法页码和原有接口测试通过。",
+      "evidence": [
+        "repository",
+        "test_results",
+        "diff",
+        "artifact_readback"
+      ],
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "TL",
+    "TE",
+    "PL",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "coding",
+  "research_inspiration": [
+    "Harbor",
+    "DGM"
+  ],
+  "fixture_status": "contract_defined_not_materialized",
+  "execution_status": "specified_not_run",
+  "quality_anchors_3": {
+    "correctness": "所有指定行为和测试正确",
+    "completeness": "需求与边界全部覆盖",
+    "usability": "代码可运行，补丁可应用，回归有实际证据",
+    "grounding": "声称与真实测试、diff和状态一致"
+  },
+  "excellence_candidates": [
+    "补丁在预先登记的扩展边界用例同样正确",
+    "接口说明和兼容性说明无歧义"
+  ],
+  "judge_notes": "优秀项须在该轮执行前选定并冻结；未选定时相应维度最高3档。不以更长答案或更多工具调用判优秀。",
+  "variants": [
+    "canonical",
+    "boundary_or_fault",
+    "long_history_or_large_catalog",
+    "current_instruction_or_state_change"
+  ],
+  "variant_note": "变体须根据本case语义具体生成并冻结；同模板变体不算独立隐藏任务。",
+  "provenance": {
+    "origin": "roami_authored_spec",
+    "upstream_sample_id": null,
+    "upstream_benchmark": null
+  },
+  "public_benchmark_candidates": [
+    "swe_verified",
+    "terminal_bench"
+  ],
+  "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
+  "selected_in_mixed_suite_v1": true
+}
