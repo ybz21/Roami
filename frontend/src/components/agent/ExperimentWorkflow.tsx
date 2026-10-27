@@ -22,7 +22,7 @@ export default function ExperimentWorkflow({ stage, view, onStage, onView, state
     </div>}
     {view === 'workflow' && <>
       <div className="agent-experiment-caption"><strong>{t('agent.experiment.pipeline')}</strong><span>{caption || t('agent.experiment.daily')}</span></div>
-      <ol className="agent-experiment-flow" aria-label={t('agent.experiment.pipeline')}>
+      <ol className={'agent-experiment-flow' + (!tabs ? ' agent-experiment-flow-compact' : '')} aria-label={t('agent.experiment.pipeline')}>
         {EXPERIMENT_STAGES.map((value, index) => <li key={value}>
           <button type="button" className="agent-experiment-node" aria-pressed={stage === value} onClick={() => onStage(value)}>
             <span className="agent-experiment-step">{index + 1}</span>
@@ -32,7 +32,7 @@ export default function ExperimentWorkflow({ stage, view, onStage, onView, state
           </button>
         </li>)}
       </ol>
-      <p className="agent-rsi-muted">{t('agent.experiment.selectHint')}</p>
+      {tabs && <p className="agent-rsi-muted">{t('agent.experiment.selectHint')}</p>}
     </>}
   </>
 }

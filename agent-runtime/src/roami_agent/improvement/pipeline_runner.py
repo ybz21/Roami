@@ -4,9 +4,7 @@ import asyncio
 import copy
 import json
 from dataclasses import replace
-from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, identifier, load_suite, require
 from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
@@ -93,7 +91,6 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
         ).fetchone()
         if prior:
             return {"id": prior[0]}
-        today = datetime.now(ZoneInfo(prefs["timezone"])).date().isoformat()
         suite = load_suite(Path(source["path"]))
         require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
         require(set(case_ids) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
@@ -101,19 +98,6 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
             needs_artifact_review(c) for c in suite["cases"] if c["id"] in case_ids
         )
         artifact_reservation = reviewer.profile["max_tokens"] * artifact_count if reviewer else 0
-        reserve = config["generation_tokens"] + config["codex_tokens"] * 2 + artifact_reservation
-        db.execute(
-            "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
-            (owner, today, config["daily_tokens"], 10000),
-        )
-        budget = db.execute(
-            "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, today)
-        ).fetchone()
-        require(budget["tokens_reserved"] + reserve <= budget["tokens_limit"], "RSI_DAILY_BUDGET")
-        db.execute(
-            "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+?,episodes_reserved=episodes_reserved+? WHERE owner=? AND day=?",
-            (reserve, len(case_ids), owner, today),
-        )
         request = {
             "period_key": key,
             "preferences": prefs,
@@ -133,6 +117,7 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
             "pipeline": config,
             "baseline_run": baseline["id"] if baseline else None,
             "formal_daily": False,
+            "billing_mode": "model_daily",
             "artifact_review": {
                 "hash": reviewer.content_hash if reviewer else None,
                 "reservation_tokens": artifact_reservation,
@@ -215,11 +200,6 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         generation_overrides=generation_overrides,
         provider_factory=provider,
         shared_budget=budget,
-        output_caps={
-            "main": config.get("main_output_tokens", config["output_tokens"]),
-            "worker": config.get("worker_output_tokens", config["output_tokens"]),
-            "memory": config["memory_output_tokens"],
-        },
     )
     fingerprint = await executor.preflight()
     records.artifact(owner, run_id, "evaluate", "environment.json", fingerprint)
@@ -246,7 +226,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     for case_id in spec["case_ids"]:
         original = next(c for c in suite["cases"] if c["id"] == case_id)
         case = copy.deepcopy(original)
-        if case["judge"]["kind"] != "mechanism":
+        if budget.enforce_tokens and case["judge"]["kind"] != "mechanism":
             remaining_real -= 1
             budget.limits["tokens"] = config["generation_tokens"] - remaining_real * minimum_start
             case["limits"]["tokens"] = min(

@@ -71,9 +71,9 @@ def test_opt_in_and_frozen_request_survive_settings_edits(tmp_path):
         c.save("local", settings)
 
 
-def test_start_without_budget_and_remote_command_via_web_are_rejected(tmp_path):
+def test_formal_suite_and_remote_command_boundaries_remain_without_token_budgets(tmp_path):
     c, settings = control(tmp_path)
-    with pytest.raises(DomainError, match="BUDGET_REQUIRED"):
+    with pytest.raises(DomainError, match="FORMAL_SUITE_INCOMPLETE"):
         c.save("local", {**settings, "enabled": True, "daily_tokens": 0})
     with pytest.raises(DomainError, match="MACHINE_MODE"):
         c.register_machine(

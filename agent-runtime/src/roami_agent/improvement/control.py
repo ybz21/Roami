@@ -42,9 +42,11 @@ class ImprovementControl:
 
     def save(self, owner, raw):
         require(
-            isinstance(raw, dict) and set(raw) == {*DEFAULTS, "revision"}, "RSI_INVALID_SETTINGS"
+            isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
+            "RSI_INVALID_SETTINGS",
         )
-        value = {k: raw[k] for k in DEFAULTS}
+        prior_values = self.preferences(owner)
+        value = {k: raw.get(k, prior_values[k]) for k in DEFAULTS}
         validate_policy(value["candidate_policy"])
         require(type(value["enabled"]) is bool and type(value["auto_candidates"]) is bool)
         require(type(value["hour"]) is int and 0 <= value["hour"] <= 23)
@@ -73,10 +75,6 @@ class ImprovementControl:
                 "RSI_SETTINGS_CONFLICT",
             )
             if value["enabled"]:
-                require(
-                    value["daily_tokens"] > 0 and value["daily_episodes"] >= 2,
-                    "RSI_BUDGET_REQUIRED",
-                )
                 require(
                     bool(value["machine_ids"]) and bool(value["suite_id"]), "RSI_SETUP_REQUIRED"
                 )
@@ -198,7 +196,6 @@ class ImprovementControl:
         identifier(request_key)
         require(kind in {"manual", "daily"})
         prefs = self.preferences(owner)
-        require(prefs["daily_tokens"] > 0 and prefs["daily_episodes"] >= 2, "RSI_BUDGET_REQUIRED")
         require(
             machine_id in prefs["machine_ids"] and bool(prefs["suite_id"]), "RSI_SETUP_REQUIRED"
         )

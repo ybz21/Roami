@@ -10,7 +10,7 @@ vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('./useAgentData', () => ({ useAgentData: (path: string) => ({ value: path.includes('/pipeline/runs/') ? state.detail : state.overview, loading: false, failed: false, refresh: state.refresh }) }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ locale: 'zh-CN', t: (key: string, vars: Record<string, string | number> = {}) => ((zhCN as Record<string, string>)[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(vars[name])) }) }))
-vi.mock('antd', () => ({
+vi.mock('antd', () => ({ Tabs: ({ items, activeKey, onChange }: any) => <><div role="tablist">{items.map((item: any) => <button type="button" role="tab" key={item.key} onClick={() => onChange(item.key)}>{item.label}</button>)}</div>{items.filter((item: any) => item.forceRender || item.key === activeKey).map((item: any) => <div key={item.key} hidden={item.key !== activeKey}>{item.children}</div>)}</>,
   Button: ({ children, onClick, disabled }: any) => <button type="button" onClick={onClick} disabled={disabled}>{children}</button>,
   Checkbox: ({ children, checked, onChange, ...props }: any) => <label><input type="checkbox" checked={checked} onChange={onChange} {...props} />{children}</label>,
   Switch: ({ checked, onChange, ...props }: any) => <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} {...props} />,
@@ -33,9 +33,7 @@ it('shows a fixed full daily suite and saves 60 even when old cached preferences
   state.overview = overview()
   vi.mocked(api).mockResolvedValue({ data: {} })
   render(<AgentImprovement node={null} />)
-  const count = await screen.findByLabelText('每日完整评测（项）') as HTMLInputElement
-  expect(count.value).toBe('60')
-  expect(count.readOnly).toBe(true)
+  expect(screen.queryByLabelText('每日完整评测（项）')).toBeNull()
   fireEvent.change(screen.getByLabelText('开始时间（小时）'), { target: { value: '5' } })
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/preferences', expect.objectContaining({ cases_per_day: 60, hour: 5 })))
@@ -73,7 +71,7 @@ it('keeps a full daily suite and links the aggregated Issue with a private repor
   state.overview = { ...overview(), research: { settings: { enabled: true }, actions: [{ id: 'issue-role', kind: 'issue', state: 'done', error_code: null }], improvements: [], reports: [{ cycle_id: 'period-test', day: '2026-10-24', points: 2, issueUrl: 'https://github.com/example/rsi-test/issues/3' }] } }
   vi.mocked(api).mockResolvedValue({ data: { review_document: '# Codex 复盘\n\n本轮完整证据。' } })
   render(<AgentImprovement node={null} />)
-  expect((await screen.findByLabelText('每日完整评测（项）') as HTMLInputElement).value).toBe('60')
+  expect(screen.queryByLabelText('每日完整评测（项）')).toBeNull()
   const issue = screen.getByRole('link', { name: '查看 Issue' })
   expect(issue.getAttribute('href')).toBe('https://github.com/example/rsi-test/issues/3')
   expect(issue.getAttribute('rel')).toContain('noopener')
@@ -96,9 +94,9 @@ it('configures a selected workflow node without sending trusted source targets',
   expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(5)
   fireEvent.click(screen.getByRole('button', { name: /2 复盘/ }))
   expect(screen.getByText('Codex 逐项回顾指标、调用过程和日志，生成每日复盘文档。')).toBeTruthy()
-  fireEvent.change(screen.getByLabelText('Codex 每次准入预算（Token）'), { target: { value: '32000' } })
+  fireEvent.click(screen.getByLabelText('自动复盘、提 Issue 和修复'))
   fireEvent.click(screen.getByRole('button', { name: '保存' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/research', { revision: 2, enabled: false, model_tokens: 32000, model_seconds: 180, max_attempts: 2, observation_days: 2 }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/improvement/research', { revision: 2, enabled: true, model_tokens: 64000, model_seconds: 180, max_attempts: 2, observation_days: 2 }))
 })
 it('previews admission without enqueueing work and keeps daily issue access in its own tab', async () => {
   state.overview = workflowOverview()
@@ -156,4 +154,35 @@ it('opens a run deep link on first mount without resetting to workflow', async (
   render(<AgentImprovement node={null} workflow runId="saved-run" />)
   expect(await screen.findByRole('button', { name: '复测同组 Case' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '诊断 10 项' })).toBeNull()
+})
+
+
+it('opens RSI with overview, records and settings, retaining an unsaved model across tabs', async () => {
+  state.overview = { ...workflowOverview(), pipeline: { settings: { revision: 1, auto_publish: false }, runs: [], issues: [] } }
+  render(<AgentImprovement node={null} workflow />)
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['概览', '运行记录', '设置'])
+  expect(screen.queryByText('每日 Token 准入预算')).toBeNull()
+  expect(screen.queryByText('每次诊断生成预算')).toBeNull()
+  expect(document.querySelector('.agent-experiment-flow')).toBeNull()
+  fireEvent.click(screen.getByRole('tab', {name:'设置'}))
+  fireEvent.click(screen.getByText('独立模型（可选）'))
+  fireEvent.change(screen.getByLabelText('主 Agent 模型'), {target:{value:'unsaved-model'}})
+  fireEvent.click(screen.getByRole('tab', {name:'概览'}))
+  expect((screen.getByRole('button', {name:'完整评测 60 项'}) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('tab', {name:'设置'}))
+  expect((screen.getByLabelText('主 Agent 模型') as HTMLInputElement).value).toBe('unsaved-model')
+  fireEvent.click(screen.getByRole('button', {name:'还原更改'}))
+})
+
+it('runs without a separate token budget and preserves the multi-machine request identity on retry', async () => {
+  const data = workflowOverview()
+  state.overview = { ...data, preferences: { ...data.preferences, daily_tokens: 0, daily_episodes: 0, machine_ids: ['a', 'b'] }, pipeline: { settings: { revision: 1, auto_publish: false }, runs: [], issues: [] } }
+  vi.mocked(api).mockResolvedValueOnce({data:{}}).mockRejectedValueOnce({apiError:{code:'RSI_OPERATION_FAILED'}}).mockResolvedValue({data:{}})
+  render(<AgentImprovement node={null} workflow />)
+  fireEvent.click(screen.getByRole('button', {name:'完整评测 60 项'}))
+  await screen.findByRole('alert')
+  const requestKey = vi.mocked(api).mock.calls[0][2].request_key
+  fireEvent.click(screen.getByRole('button', {name:'完整评测 60 项'}))
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(4))
+  expect(vi.mocked(api).mock.calls.every(call => call[2].request_key === requestKey)).toBe(true)
 })

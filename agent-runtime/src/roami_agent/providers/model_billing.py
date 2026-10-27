@@ -55,6 +55,8 @@ class ModelBilling:
         self.db, self.configuration, self.timezone = database, configuration, timezone
         self.clock = clock
         self.recovered = False
+        self.revision = 0
+        self.summary_cache = None
 
     def period(self):
         zone = self.timezone()
@@ -71,6 +73,55 @@ class ModelBilling:
                 write=True,
             )
             self.recovered = True
+            self.revision += 1
+
+    @staticmethod
+    def assert_admission(db, config, day):
+        if config["dailyLimit"] is not None:
+            spent = Decimal(0)
+            for row in db.execute(
+                "SELECT state,cost_source,cost_amount,cost_currency FROM model_proxy_calls WHERE day=?",
+                (day,),
+            ):
+                billable = (
+                    row["cost_source"] in {"upstream", "estimate"}
+                    and row["cost_amount"] is not None
+                )
+                if row["state"] == "pending" or not (billable or row["cost_source"] == "not_sent"):
+                    raise DomainError("MODEL_PROXY_USAGE_UNKNOWN", 409)
+                if billable:
+                    if row["cost_currency"] != config["currency"]:
+                        raise DomainError("MODEL_PROXY_CURRENCY_MISMATCH", 409)
+                    spent = add_amounts(spent, Decimal(row["cost_amount"]))
+            if spent >= amount(config["dailyLimit"]):
+                raise DomainError("MODEL_PROXY_DAILY_LIMIT", 409)
+
+    async def check(self):
+        config = proxy_configuration(self.configuration())
+        day, _ = self.period()
+        await self.db.call(lambda db: self.assert_admission(db, config, day))
+
+    async def daily_summary(self):
+        day, zone = self.period()
+        key = (day, zone, self.revision)
+        if self.summary_cache is not None and self.summary_cache[0] == key:
+            return self.summary_cache[1]
+
+        def read(db):
+            total = db.execute(
+                f"SELECT {USAGE_COLUMNS} FROM model_proxy_calls WHERE day=?", (day,)
+            ).fetchone()
+            return {
+                "day": day,
+                "timezone": zone,
+                **usage_totals(total),
+                **money_records(db, "day=?", [day])["total"],
+            }
+
+        value = await self.db.call(read)
+        if self.revision == key[2]:
+            self.summary_cache = (key, value)
+        return value
 
     async def admit(self, role, model):
         config = proxy_configuration(self.configuration())
@@ -78,26 +129,7 @@ class ModelBilling:
         call_id, started = identity(), self.clock()
 
         def insert(db):
-            if config["dailyLimit"] is not None:
-                spent = Decimal(0)
-                for row in db.execute(
-                    "SELECT state,cost_source,cost_amount,cost_currency FROM model_proxy_calls WHERE day=?",
-                    (day,),
-                ):
-                    billable = (
-                        row["cost_source"] in {"upstream", "estimate"}
-                        and row["cost_amount"] is not None
-                    )
-                    if row["state"] == "pending" or not (
-                        billable or row["cost_source"] == "not_sent"
-                    ):
-                        raise DomainError("MODEL_PROXY_USAGE_UNKNOWN", 409)
-                    if billable:
-                        if row["cost_currency"] != config["currency"]:
-                            raise DomainError("MODEL_PROXY_CURRENCY_MISMATCH", 409)
-                        spent = add_amounts(spent, Decimal(row["cost_amount"]))
-                if spent >= amount(config["dailyLimit"]):
-                    raise DomainError("MODEL_PROXY_DAILY_LIMIT", 409)
+            self.assert_admission(db, config, day)
             db.execute(
                 "INSERT INTO model_proxy_calls(id,day,timezone,role,model,started_ms,state,prices_json) VALUES(?,?,?,?,?,?,'pending',?)",
                 (
@@ -112,6 +144,7 @@ class ModelBilling:
             )
 
         await self.db.call(insert, write=True)
+        self.revision += 1
         return call_id
 
     async def settle(
@@ -150,6 +183,7 @@ class ModelBilling:
             )
 
         await self.db.call(write, write=True)
+        self.revision += 1
 
     async def view(self, *, days=7, day=None):
         today, zone = self.period()

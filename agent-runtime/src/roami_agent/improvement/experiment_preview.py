@@ -45,13 +45,7 @@ def preview(service, owner, settings):
     episodes = 120 * machines
     if not machines:
         blockers.append("RSI_MACHINE_NOT_FOUND")
-    if prefs["daily_episodes"] < episodes:
-        blockers.append("RSI_EPISODE_BUDGET")
     reservation = tokens * 2 * machines if tokens is not None and machines else None
-    if not prefs["daily_tokens"] or (
-        reservation is not None and prefs["daily_tokens"] < reservation
-    ):
-        blockers.append("RSI_BUDGET_REQUIRED")
     if not settings.endpoint or not settings.model:
         blockers.append("MODEL_NOT_CONFIGURED")
     now = datetime.now(ZoneInfo(prefs["timezone"]))

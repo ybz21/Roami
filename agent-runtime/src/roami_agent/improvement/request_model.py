@@ -32,7 +32,7 @@ class RequestBudgetModel:
         overhead = len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
         available = 1_000_000
         for budget in (self.budget, self.shared_budget):
-            if budget is None:
+            if budget is None or not budget.enforce_tokens:
                 continue
             async with budget.lock:
                 budget.check()

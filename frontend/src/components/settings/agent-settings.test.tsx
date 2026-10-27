@@ -7,7 +7,7 @@ import { api } from '../../api'
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
 vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t }) } })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); history.replaceState(null, '', '#/') })
 const role = { baseUrl: 'https://models.example/v1', keyConfigured: true, model: 'fast', images: false }
 const settings = { connection: { baseUrl: role.baseUrl, keyConfigured: true }, main: role, worker: { ...role, model: 'strong' } }
 const mainModel = () => screen.getByRole('combobox', { name: 'agent.models.role.main agent.composer.model' })
@@ -219,4 +219,16 @@ it('allows manual pricing after catalog failure and keeps incomplete prices inva
   expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.discard' }))
   expect(screen.queryByRole('button', { name: /^custom-priced-model / })).toBeNull()
+})
+
+
+it('opens the billing deep link and retains workspace parameters while changing tabs', async () => {
+  history.replaceState(null, '', '#/settings/agent/runtime?modelTab=proxy&terms=none')
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/agent/model-usage' ? usage : settings }))
+  setup(); await screen.findByLabelText('agent.proxy.dailyLimit')
+  expect(screen.getByRole('tab', {name:'agent.proxy.tab'}).getAttribute('aria-selected')).toBe('true')
+  fireEvent.click(screen.getByRole('tab', {name:'agent.proxy.prices'}))
+  const params = new URLSearchParams(location.hash.split('?')[1])
+  expect(params.get('modelTab')).toBe('prices')
+  expect(params.get('terms')).toBe('none')
 })

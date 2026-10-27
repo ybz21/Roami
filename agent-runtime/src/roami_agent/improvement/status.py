@@ -34,7 +34,22 @@ class ImprovementStatus:
                 "pipeline": self.runs.view(owner),
             }
 
-        return await asyncio.to_thread(read)
+        result = await asyncio.to_thread(read)
+        proxy = getattr(self, "model_proxy", None)
+        if proxy is not None:
+            from roami_agent.providers.model_billing import proxy_configuration
+
+            usage = await proxy.billing.daily_summary()
+            config = proxy_configuration(proxy.billing.configuration())
+            result["billing"] = {
+                "dailyLimit": config["dailyLimit"],
+                "currency": config["currency"],
+                **{
+                    key: usage[key]
+                    for key in ("day", "timezone", "charges", "localCharges", "unknown", "pending")
+                },
+            }
+        return result
 
     async def list(self, owner, limit=20):
         return {

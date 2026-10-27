@@ -27,3 +27,9 @@ html[data-size="compact"] .agent-experiment-node > span:nth-of-type(2) { grid-co
 html[data-size="compact"] .agent-experiment-node small { grid-column: 3; grid-row: 1 / 3; }
 html[data-size="compact"] .agent-experiment-flow li + li::before { width: 0; height: var(--sp-3); right: auto; left: var(--sp-5); top: auto; bottom: 100%; border-top: 0; border-left: 1px solid var(--border-subtle); }
 html[data-pointer="coarse"] .agent-experiment-tabs button { min-height: var(--tap); }
+
+.agent-experiment-flow-compact { display:flex; flex-wrap:wrap; overflow:visible; gap:var(--sp-2); }
+.agent-experiment-flow-compact li { flex:1; min-width:calc(var(--sp-5) * 4); }
+html[data-size] .agent-experiment-flow-compact li + li::before { display:none; }
+.agent-experiment-flow-compact .agent-experiment-node { min-height:var(--tap); padding:var(--sp-2); gap:var(--sp-1); border-radius:var(--r-xs); }
+.agent-experiment-flow-compact .agent-experiment-node > span:not(.agent-experiment-step) { display:none; }

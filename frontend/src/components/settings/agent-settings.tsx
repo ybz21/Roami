@@ -9,6 +9,7 @@ import { modelFailure, saveAgentModels, type AgentModelSettings } from '../agent
 import { genericReasoningEfforts, reasoningValue } from '../agent/agent-reasoning'
 import { ModelProxySettings, proxyConfig, proxyDraft, validProxyDraft, type ModelProxyDraft } from './model-proxy-settings'
 import { ModelPriceSettings } from './model-price-settings'
+import { readModelSettingsTab, writeModelSettingsTab, type ModelSettingsTab } from './model-settings-route'
 import './agent-settings.css'
 
 type Draft = { proxy: ModelProxyDraft; connection: { baseUrl: string; apiKey: string; keyConfigured: boolean }; main: AgentModelSettings['main']; worker: AgentModelSettings['worker'] }
@@ -22,7 +23,12 @@ export function AgentSettings() {
 function AgentSettingsForm() {
   const { t } = useI18n(), { message } = App.useApp()
   const [draft, setDraft] = useState<Draft | null>(null), [saved, setSaved] = useState<AgentModelSettings | null>(null)
-  const [tab, setTab] = useState('models')
+  const [tab, setTab] = useState<ModelSettingsTab>(readModelSettingsTab)
+  useEffect(() => {
+    const change = () => setTab(readModelSettingsTab())
+    window.addEventListener('hashchange', change)
+    return () => window.removeEventListener('hashchange', change)
+  }, [])
   const [error, setError] = useState(''), [saving, setSaving] = useState(false), [version, setVersion] = useState(0)
   const [efforts, setEfforts] = useState<Record<string, string[]>>({}), [models, setModels] = useState<string[] | null>(null)
   const [loadingModels, setLoadingModels] = useState(false), [catalogError, setCatalogError] = useState(''), [queries, setQueries] = useState({ main: '', worker: '' })
@@ -61,7 +67,7 @@ function AgentSettingsForm() {
   const dirty = !!saved && JSON.stringify(modelConfiguration(draft)) !== JSON.stringify(modelConfiguration(settingsDraft(saved)))
   return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void save() }}>
     {draftNotice}
-    <Tabs className="agent-settings-tabs" activeKey={tab} onChange={setTab} items={[
+    <Tabs className="agent-settings-tabs" activeKey={tab} onChange={key => { const next = key as ModelSettingsTab; setTab(next); writeModelSettingsTab(next) }} items={[
       { key: 'models', label: t('agent.models.configurationTab'), forceRender: true, children: <div className="agent-settings-tab">
         <fieldset className="agent-settings-connection" disabled={saving || tab !== 'models'}>
           <legend>{t('agent.models.connection')}</legend><p className="agent-settings-hint">{t('agent.models.connectionHint')}</p>

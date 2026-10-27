@@ -149,6 +149,9 @@ def trial_summary(case, result, root=None):
             "RSI_TOKEN_BUDGET",
             "RSI_DAILY_BUDGET",
             "RSI_REQUEST_BUDGET",
+            "MODEL_PROXY_DAILY_LIMIT",
+            "MODEL_PROXY_USAGE_UNKNOWN",
+            "MODEL_PROXY_CURRENCY_MISMATCH",
             "UPSTREAM_USAGE_UNKNOWN",
             "RSI_USAGE_UNKNOWN",
         }
@@ -201,20 +204,7 @@ class RunRecords:
 
     def configure(self, owner, value):
         require(
-            isinstance(value, dict)
-            and set(DEFAULTS)
-            - {
-                "main_output_tokens",
-                "worker_output_tokens",
-                "main_model",
-                "main_reasoning_effort",
-                "worker_model",
-                "worker_reasoning_effort",
-                "memory_model",
-                "memory_reasoning_effort",
-            }
-            <= set(value)
-            <= set(DEFAULTS),
+            isinstance(value, dict) and {"revision"} <= set(value) <= set(DEFAULTS),
             "RSI_INVALID_SETTINGS",
         )
         value = {**self.settings(owner), **value}
@@ -249,10 +239,6 @@ class RunRecords:
             require(
                 type(value[key]) is int and lower <= value[key] <= upper, "RSI_POLICY_OUT_OF_RANGE"
             )
-        require(
-            value["generation_tokens"] + 2 * value["codex_tokens"] <= value["daily_tokens"],
-            "RSI_DAILY_BUDGET",
-        )
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             old = db.execute(
@@ -263,27 +249,6 @@ class RunRecords:
                 type(value["revision"]) is int and value["revision"] == prior["revision"],
                 "RSI_SETTINGS_CONFLICT",
             )
-            if value["daily_tokens"] != prior["daily_tokens"]:
-                from datetime import datetime
-                from zoneinfo import ZoneInfo
-
-                prefs = db.execute(
-                    "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
-                ).fetchone()
-                timezone = (
-                    json.loads(prefs[0]).get("timezone", "Asia/Shanghai")
-                    if prefs
-                    else "Asia/Shanghai"
-                )
-                day = datetime.now(ZoneInfo(timezone)).date().isoformat()
-                budget = db.execute(
-                    "SELECT tokens_reserved FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-                ).fetchone()
-                require(not budget or budget[0] <= value["daily_tokens"], "RSI_DAILY_BUDGET")
-                db.execute(
-                    "UPDATE rsi_budgets SET tokens_limit=? WHERE owner=? AND day=?",
-                    (value["daily_tokens"], owner, day),
-                )
             result = {**value, "revision": value["revision"] + 1}
             db.execute(
                 "INSERT OR REPLACE INTO rsi_pipeline_settings VALUES(?,?)",

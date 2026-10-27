@@ -135,7 +135,7 @@ class ResearchWorkflow:
 
     def configure_experiment(self, owner, raw):
         fields = {"enabled", "model_tokens", "model_seconds", "max_attempts", "observation_days"}
-        require(isinstance(raw, dict) and set(raw) == fields | {"revision"})
+        require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
         return self.configure(owner, {**self.settings(owner), **raw})
 
     def _enqueue(self, db, owner, kind, subject, payload):
@@ -168,11 +168,19 @@ class ResearchWorkflow:
         for owner in owners:
             day = self.day(owner)
             with self.ledger.connection() as db:
+                centralized = getattr(self, "model_proxy", None) is not None
+                budget_condition = (
+                    ""
+                    if centralized
+                    else "AND EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?)"
+                )
                 db.execute(
                     "UPDATE rsi_actions SET state='queued',error_code=NULL,due_ms=? "
                     "WHERE owner=? AND state='waiting_budget' AND json_extract(payload_json,'$.budget_day')!=? "
-                    "AND EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?)",
-                    (self.clock(), owner, day, owner, day),
+                    + budget_condition,
+                    (self.clock(), owner, day)
+                    if centralized
+                    else (self.clock(), owner, day, owner, day),
                 )
         with self.ledger.connection() as db:
             cycles = [
@@ -193,6 +201,9 @@ class ResearchWorkflow:
             self.enqueue_review(c["owner"], c["id"])
 
     def day(self, owner):
+        proxy = getattr(self, "model_proxy", None)
+        if proxy is not None:
+            return proxy.billing.period()[0]
         with self.ledger.connection() as db:
             row = db.execute(
                 "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
@@ -323,7 +334,7 @@ class ResearchWorkflow:
             self._owned_action(db, action)
             state = (
                 "waiting_budget"
-                if code in {"RSI_DAILY_BUDGET", "RSI_FULL_SUITE_BUDGET"}
+                if code in {"RSI_DAILY_BUDGET", "RSI_FULL_SUITE_BUDGET", "MODEL_PROXY_DAILY_LIMIT"}
                 else "blocked"
             )
             db.execute(
@@ -565,6 +576,17 @@ class ResearchWorkflow:
                     db, owner, "sync_issue", report[0] + ":" + cycle_id, {"cycle_id": report[0]}
                 )
 
+    def operation_result(self, owner, key):
+        with self.ledger.connection() as db:
+            row = db.execute(
+                "SELECT state,result_json FROM rsi_operation_costs WHERE owner=? AND id=?",
+                (owner, key),
+            ).fetchone()
+        if row is None:
+            return None
+        require(row["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION")
+        return json.loads(row["result_json"])
+
     def reserve_operation(self, owner, day, key, tokens):
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -577,17 +599,20 @@ class ResearchWorkflow:
                 )
                 return json.loads(prior["result_json"])
             assert_operation_costs_settled(db, owner)
-            budget = db.execute(
-                "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-            ).fetchone()
-            require(
-                budget and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
-                "RSI_DAILY_BUDGET",
-            )
-            db.execute(
-                "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
-                (tokens, owner, day),
-            )
+            from roami_agent.providers.model_proxy import model_proxy_context
+
+            if model_proxy_context.get() is None:
+                budget = db.execute(
+                    "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
+                ).fetchone()
+                require(
+                    budget and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
+                    "RSI_DAILY_BUDGET",
+                )
+                db.execute(
+                    "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
+                    (tokens, owner, day),
+                )
             db.execute(
                 "INSERT INTO rsi_operation_costs VALUES(?,?,?,?,'running',NULL)",
                 (key, owner, day, tokens),
@@ -604,7 +629,9 @@ class ResearchWorkflow:
                 (owner, key),
             ).fetchone()
             require(row is not None, "RSI_OPERATION_CONFLICT")
-            if tokens is not None:
+            from roami_agent.providers.model_proxy import model_proxy_context
+
+            if tokens is not None and model_proxy_context.get() is None:
                 db.execute(
                     "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
                     (tokens - row["reserved"], owner, row["day"]),

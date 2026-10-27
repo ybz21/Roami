@@ -5,10 +5,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { AgentSettings } from './agent-settings'
 import { ModelUsageStatistics, type UsageStatistics, type UsageTotals } from './model-usage-statistics'
 import { api } from '../../api'
+vi.mock('./model-usage-chart', () => ({ ModelUsageChart: ({ points, onSelect, label }: any) => <div role="img" aria-label={label}>{points.map((point: any) => <button type="button" key={point.key} aria-label={'chart-' + point.key} onClick={() => onSelect(point.key)}>{point.label}</button>)}</div> }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
 vi.mock('../../i18n', () => { const t = (key: string, values?: Record<string, string>) => key + (values?.amount ? ' ' + values.amount : ''); return { useI18n: () => ({ t, locale: 'en-US' }) } })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); history.replaceState(null, '', '#/') })
 const totals: UsageTotals = { requests: 3, charges: [{ currency: 'USD', amount: '0.006' }], estimatedCharges: [], totalTokens: 715, inputTokens: 650, outputTokens: 65, cacheReadTokens: 160, unknown: 1, pending: 0, failed: 1, estimated: 0, missingUsage: 0 }
 const statistics: UsageStatistics = { days: 7, startDay: '2026-10-20', endDay: '2026-10-26', dailyStartDay: '2026-10-20', total: totals, daily: [{ ...totals, day: '2026-10-26' }], models: [{ ...totals, model: 'model-a' }], modelsTruncated: false }
 const role = { baseUrl: 'https://models.example/v1', model: 'model-a', keyConfigured: false, images: false }
@@ -95,7 +96,7 @@ it('keeps currencies and historical estimates separate in totals, daily rows and
   expect(within(model).getByText(/agent.usage.partialCost.*USD.*0.10.*CNY.*2.00/)).toBeTruthy()
   fireEvent.mouseDown(screen.getByRole('combobox', {name: 'agent.usage.chartMetric'}))
   fireEvent.click(screen.getByText('agent.usage.cost · CNY', {selector: '.ant-select-item-option-content'}))
-  expect(document.querySelector('.agent-usage-bar-column > span')?.getAttribute('style')).toBe('height: 100%;')
+  expect(within(screen.getByRole('region', { name: 'agent.usage.pointDetails' })).getAllByText(/CNY.*2.00/).length).toBeGreaterThan(0)
 })
 
 it('shows 24 hourly buckets for a selected date and keeps the budget draft across date changes', async () => {
@@ -107,15 +108,16 @@ it('shows 24 hourly buckets for a selected date and keeps the budget draft acros
   fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), {target: {value: '9'}})
   await range(1)
   await screen.findByText('agent.usage.hourly')
-  expect(document.querySelectorAll('.agent-usage-bar-column')).toHaveLength(24)
+  expect(within(screen.getByRole('img')).getAllByRole('button')).toHaveLength(24)
   fireEvent.click(screen.getByText('agent.usage.hourlyDetails'))
   expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(25)
   expect(within(screen.getByRole('table')).getByText('14:00')).toBeTruthy()
   fireEvent.mouseDown(screen.getByRole('combobox', {name: 'agent.usage.chartMetric'}))
   fireEvent.click(screen.getByText('agent.proxy.requests', {selector: '.ant-select-item-option-content'}))
-  const bars = document.querySelectorAll('.agent-usage-bar-column > span')
-  expect(bars[14].getAttribute('style')).toBe('height: 100%;')
-  expect(bars[13].getAttribute('style')).toBe('height: 0%;')
+  fireEvent.click(screen.getByRole('button', {name:'chart-14'}))
+  expect(within(screen.getByRole('region', {name:'agent.usage.pointDetails'})).getByText('715')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', {name:'chart-13'}))
+  expect(within(screen.getByRole('region', {name:'agent.usage.pointDetails'})).getAllByText('0').length).toBeGreaterThan(0)
   fireEvent.change(screen.getByLabelText('agent.usage.day'), {target: {value: '2026-10-25'}})
   await waitFor(() => expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-usage?days=1&day=2026-10-25')).toBe(true))
   expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('9')
@@ -147,8 +149,10 @@ it('stacks model tokens into a total, keeps model colors when ranking changes an
   const stacked = {...statistics, seriesModels:['a','b'], total:aggregate, daily:[{...aggregate, day:'2026-10-26', models:[first,second]}], models:[first,second]}
   const onDayChange=vi.fn(), onDaysChange=vi.fn()
   const view=render(<ModelUsageStatistics statistics={stacked} days={7} onDaysChange={onDaysChange} onDayChange={onDayChange} loading={false} disabled={false} />)
-  const segments=()=>[...document.querySelectorAll('.agent-usage-stack > span')]
-  expect(segments().map(el=>el.getAttribute('style'))).toEqual([expect.stringContaining('height: 60%'),expect.stringContaining('height: 40%')])
+  const point = screen.getByRole('region', {name:'agent.usage.pointDetails'})
+  expect(within(point).getByText('100')).toBeTruthy()
+  expect(within(point).getByText('a')).toBeTruthy()
+  expect(within(point).getByText('b')).toBeTruthy()
   const red=document.querySelector('.agent-usage-legend [data-model="a"] > span')?.getAttribute('style')
   const green=document.querySelector('.agent-usage-legend [data-model="b"] > span')?.getAttribute('style')
   expect(red).toContain('--usage-series-0');expect(green).toContain('--usage-series-1')
@@ -160,12 +164,12 @@ it('stacks model tokens into a total, keeps model colors when ranking changes an
   expect(document.querySelectorAll('.agent-usage-model-detail')).toHaveLength(2)
   expect(within(screen.getByRole('table')).getByText('60')).toBeTruthy()
   expect(within(screen.getByRole('table')).getByText('40')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button',{name:'agent.usage.viewDayModels'}))
+  fireEvent.click(within(screen.getByRole('region',{name:'agent.usage.pointDetails'})).getByRole('button',{name:'agent.usage.viewDayModels'}))
   expect(onDayChange).toHaveBeenCalledWith('2026-10-26');expect(onDaysChange).toHaveBeenCalledWith(1)
   fireEvent.mouseDown(screen.getByRole('combobox',{name:'agent.usage.chartMetric'}))
   fireEvent.click(screen.getByText('agent.usage.cost · USD',{selector:'.ant-select-item-option-content'}))
-  expect(document.querySelector('.agent-usage-stack [data-model="a"]')?.getAttribute('style')).toContain('height: 20%')
-  expect(document.querySelector('.agent-usage-stack [data-model="b"]')?.getAttribute('style')).toContain('height: 80%')
+  expect(within(point).getByText(/USD.*0.02/)).toBeTruthy()
+  expect(within(point).getByText(/USD.*0.08/)).toBeTruthy()
 })
 
 it('includes Other models in the stack and the legend without losing the total', () => {
@@ -173,6 +177,6 @@ it('includes Other models in the stack and the legend without losing the total',
   const other={...totals,requests:4,totalTokens:80,model:null}
   render(<ModelUsageStatistics statistics={{...statistics,seriesModels:['a'],seriesTruncated:true,daily:[{...totals,requests:5,totalTokens:100,day:'2026-10-26',models:[first,other]}]}} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
   expect(within(screen.getByRole('list',{name:'agent.usage.legend'})).getByText('agent.usage.otherModels')).toBeTruthy()
-  expect(document.querySelector('.agent-usage-stack [data-model=""]')?.getAttribute('style')).toContain('height: 80%')
+  expect(within(screen.getByRole('region',{name:'agent.usage.pointDetails'})).getByText('agent.usage.otherModels')).toBeTruthy()
   expect(screen.getByText('agent.usage.seriesLimit')).toBeTruthy()
 })
