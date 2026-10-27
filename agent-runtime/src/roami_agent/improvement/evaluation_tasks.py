@@ -32,6 +32,8 @@ async def evaluation_turn_failure(database, turn):
 
 def bind_evaluation_tasks(runtime, workspace):
     root = workspace.resolve()
+    # Host scope must not bypass this lane's explicit Native handoff.
+    runtime.tools.registry["bash"].main = False
 
     @asynccontextmanager
     async def prepared(settings, task, run, *, stopped=None):
@@ -52,6 +54,30 @@ def bind_evaluation_tasks(runtime, workspace):
                 require(await stopped(), "RSI_TASK_WRITE_UNKNOWN")
 
     runtime.dispatch.native_executor.workspace_factory = prepared
+
+
+async def verify_native_execution(database):
+    attempts = await database.call(
+        lambda db: [
+            dict(r)
+            for r in db.execute(
+                "SELECT t.id,t.state AS task_state,a.executor_kind,a.state AS attempt_state "
+                "FROM tasks t LEFT JOIN task_attempts a ON a.task_id=t.id "
+                "AND a.task_revision=t.revision AND a.attempt_no=(SELECT MAX(last.attempt_no) "
+                "FROM task_attempts last WHERE last.task_id=t.id AND last.task_revision=t.revision)"
+            )
+        ]
+    )
+    require(bool(attempts), "RSI_NATIVE_TASK_REQUIRED")
+    require(all(a["executor_kind"] == "native" for a in attempts), "RSI_NATIVE_EXECUTOR_REQUIRED")
+    require(
+        all(
+            a["task_state"] in {"waiting_user", "succeeded"} and a["attempt_state"] == "succeeded"
+            for a in attempts
+        ),
+        "RSI_NATIVE_TASK_INCOMPLETE",
+    )
+    return attempts
 
 
 async def settle_evaluation_tasks(database):

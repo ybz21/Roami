@@ -35,6 +35,8 @@ def authored_suite(seed):
                 "kind": "roami_authored",
                 "recipe_revision": "authored-v8-csv-request-identity"
                 if spec["id"] == "DEMO-02"
+                else "authored-v9-stock-evidence-contract"
+                if spec["id"] in {"STOCK-01", "STOCK-03"}
                 else "authored-v7",
             },
         }
@@ -51,11 +53,15 @@ def authored_suite(seed):
             case["limits"] = {"seconds": 120, "tokens": 32000, "requests": 8}
         else:
             data = recipe(spec["id"], seed)
-            case.update({k: v for k, v in data.items() if k != "prompt_suffix"})
+            case.update(
+                {k: v for k, v in data.items() if k not in {"prompt_suffix", "contract_revision"}}
+            )
+            if data["contract_revision"]:
+                case["origin"]["recipe_revision"] = data["contract_revision"]
             case["prompt"] += data["prompt_suffix"]
         cases.append(case)
     return freeze_suite(
-        "roami-authored-40-v8",
+        "roami-authored-40-v10",
         cases,
         fixture_seed_hash=digest(seed),
         composition={"authored_real": 20, "mechanism_regression_variants": 20},
@@ -65,7 +71,7 @@ def authored_suite(seed):
 def prepare_corpus(service, owner):
     root = service.ledger.path.parent / "corpus"
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path = root / "authored-40-v8.json"
+    path = root / "authored-40-v10.json"
     if not path.exists():
         private_json(path, authored_suite(secrets.token_hex(24)))
     summary = service.control.register_suite(owner, path)

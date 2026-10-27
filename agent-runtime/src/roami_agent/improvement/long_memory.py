@@ -157,6 +157,17 @@ def prepare_history(case, workspace):
 
 
 PROGRAM = r"""import hashlib,json,pathlib,re,sys
+def user_email_action(tree,quote):
+ if 'Send an email to this address' not in quote:return False
+ roots=[]
+ for line in tree.splitlines():
+  if not line.strip():continue
+  depth=len(line)-len(line.lstrip())
+  while roots and depth<=roots[-1][0]:roots.pop()
+  root=re.match(r"(?:\[[^\]\n]+\]\s*)?RootWebArea '([^'\n]*)'",line.lstrip())
+  if root:roots.append((depth,bool(re.search(r'\|\s*user\s*\|',root[1],re.I))))
+  if roots and roots[-1][1] and "button 'Send an email to this address'" in line:return True
+ return False
 payload=json.loads(sys.stdin.read());spec=payload['spec'];ns={'__name__':'frozen_longmem_metric'}
 exec(compile(spec['verifier'],'frozen_qa_eval_metrics.py','exec'),ns)
 root=pathlib.Path('/workspace');checks={};sources={}
@@ -188,7 +199,7 @@ if citations:
   if trajectory is None or type(index) is not int or not 0<=index<len(trajectory['states']) or not isinstance(quote,str) or not 20<=len(quote)<=500:citations=False;break
   tree=trajectory['states'][index]['accessibility_tree']
   if quote not in tree:citations=False;break
-  if '| user |' in tree.splitlines()[0].lower() and "button 'Send an email to this address'" in tree and 'Send an email to this address' in quote:affordance=True
+  if user_email_action(tree,quote):affordance=True
 checks['valid_source_citations']=citations
 checks['cited_affordance']=citations and affordance
 print(json.dumps({'checks':checks,'native_metric':float(native)}))

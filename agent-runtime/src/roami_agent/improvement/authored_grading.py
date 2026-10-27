@@ -69,8 +69,37 @@ async def grade_authored(case, workspace, executor):
         identifier = spec["case_id"]
         if "expected" in spec:
             actual = json.loads(read_file(workspace, "result.json"))
+            compared = actual
+            if identifier == "STOCK-03":
+                scenario_fields = {"scenarios", "falsification"}
+                compared = (
+                    {k: v for k, v in actual.items() if k not in scenario_fields}
+                    if isinstance(actual, dict)
+                    else actual
+                )
+                scenarios = actual.get("scenarios") if isinstance(actual, dict) else None
+                falsification = actual.get("falsification") if isinstance(actual, dict) else None
+                checks["conditional_scenarios"] = (
+                    isinstance(scenarios, list)
+                    and len(scenarios) >= 2
+                    and all(
+                        isinstance(s, str)
+                        and bool(s.strip())
+                        or isinstance(s, dict)
+                        and isinstance(s.get("condition"), str)
+                        and bool(s["condition"].strip())
+                        for s in scenarios
+                    )
+                )
+                checks["falsification_conditions"] = (
+                    isinstance(falsification, str)
+                    and bool(falsification.strip())
+                    or isinstance(falsification, list)
+                    and bool(falsification)
+                    and all(isinstance(s, str) and bool(s.strip()) for s in falsification)
+                )
             checks["structured_result"] = close_json(
-                actual, spec["expected"], spec.get("numeric_tolerance", 1e-5)
+                compared, spec["expected"], spec.get("numeric_tolerance", 1e-5)
             )
         if "report.md" in spec["required"]:
             report = read_file(workspace, "report.md")
@@ -212,8 +241,10 @@ async def grade_authored(case, workspace, executor):
                 experience.get("source") == "project/README.md"
                 and experience.get("entry") == "python verify_current.py"
             )
-            checks["actual_entry_output"] = (
-                log.get("output", "").strip() == "VERIFIED:" + case["fixture_receipt"]
+            outputs = [log[key] for key in ("output", "stdout") if key in log]
+            checks["actual_entry_output"] = bool(outputs) and all(
+                isinstance(value, str) and value.strip() == "VERIFIED:" + case["fixture_receipt"]
+                for value in outputs
             )
         if identifier.startswith("NEWS-"):
             json.loads(read_file(workspace, "sources.json"))

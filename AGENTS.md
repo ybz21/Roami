@@ -1623,3 +1623,46 @@ Research → 原浏览器导航／观察协议</pre>
   <h3>验证证据</h3>
   <p>42 项回归通过，包含舍入、百分数、符号冲突、格式／大指数拒绝、来源不改写、确定性抽样、数量不足拒绝与答案不泄漏。固定<a href="https://github.com/czyssrs/FinQA/blob/0f16e2867befa6840783e58be38c9efb9229d742/dataset/dev.json">上游 dev 数据</a>中租金题的 answer 为215.33、exe_ans为324.5；提供的231、205、210三年数据平均为646/3。原 Agent 输出与显示答案一致，旧冻结失败仍保留。零模型重导入隔离矛盾样本，并取得完整3项新样本；这是源标注质量修复，不是旧题重新通过或同合同收益证明。人工参考、当前质量协议校准和后续完整日观察仍未完成。</p>
 </section>
+
+<section id="rsi-native-execution-proof-20261027" lang="zh-CN">
+  <h2>RSI Native 执行凭证 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>评测已经明确要求 Native Worker，Main 不得通过 host shell 绕过委派。文件内容正确与执行合同完成分别验收；没有实际 Worker、只有旧版本成功记录或最后一次执行未成功，都不能算作当前 Native 交付。</p>
+  <h3>User Stories</h3>
+  <p>用户要求 Native 执行时，评测能证明工作由当前任务版本的 Native 完成。协调器不再自己反复扫描大目录消耗整个任务额度；普通产品中的 Main 主机执行能力保持原有授权与作用域。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation_tasks.bind_evaluation_tasks 仅在隔离评测 Runtime 将 bash 的 Main 可用标记关闭，Worker 的工作区 shell 保持可用，直接 shell 入口原本也不向 Main 开放。NativeFilesExecutor 在生成结束后检查每个任务当前 revision 的最后 attempt：必须存在、executor_kind=native、attempt succeeded，任务 waiting_user 或 succeeded。独立文件检查仍继续执行，执行合同失败仍阻止通过。原 trial 与费用不重写，评测协议单列 container-uds-v16-native-execution-required。</p>
+  <h3>验证计划</h3>
+  <p>覆盖 Main 的 bash/shell 两入口和 host/workspace 两作用域执行前拒绝、Worker 真实文件写入、空任务、错误执行器、旧 revision、运行中 attempt、未完成任务、较新失败 attempt，以及真实 Native 委派成功。新协议复测单列，不冒充冻结 v6 全套通过，评分与连续日观察继续保留。</p>
+</section>
+
+<section id="rsi-stock-result-contract-20261027" lang="zh-CN">
+  <h2>RSI 金融证据字段合同 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>STOCK-03 允许题面要求的 scenarios 与 falsification 字段，并分别检查至少两个非空条件情景及非空反证。固定事实、凭证、未知订单与目标价保持严格比较，其他额外字段仍拒绝。STOCK-01 公开声明 facts/commentary 数组使用来源 id，而不是正文，避免把未公开的字段语义当作模型能力失败。</p>
+  <h3>User Stories</h3>
+  <p>用户同时提供事实、条件情景和反证时，结果不会因为满足题面而被当作多余字段拒绝；虚构目标价、未来来源、错误分类或缺少条件继续失败。维护者保留原失败记录，修正验证器的原产物重放与新题面生成分开记录。</p>
+  <h3>Technical Design</h3>
+  <p>authored_grading 仅对 STOCK-03 剥离两个已声明的动态字段后精确比较固定结果；独立验证动态内容，其他题的 close_json 不变。authored_fixtures 明确两个金融案例的公开字段语义，corpus 将两题 recipe 升为 authored-v9-stock-evidence-contract，新缓存 authored-40-v9.json 不覆盖 v8。合并 Native 执行凭证后协议单列 container-uds-v17-native-and-stock-contract，原输入、额度与评分隔离保持。</p>
+</section>
+
+<section id="rsi-nested-history-document-20261027" lang="zh-CN">
+  <h2>RSI 历史引用的文档归属 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>长记忆检索的邮件操作引用属于其所在的 User 表单，不要求整个浏览器的第一行标题就是该表单。统一导航外层下的 Main Content 嵌套文档保持有效；其他表单的同名按钮不能借用外层或相邻 User 页面证明引用。</p>
+  <h3>User Stories</h3>
+  <p>用户给出准确答案、原始树引用和真实邮件按钮时，不会因导航容器的标题被误判失败。维护者仍能拒绝错误页面、虚构引用、改动历史及额外答案，不放松原生指标。</p>
+  <h3>Technical Design</h3>
+  <p>long_memory.PROGRAM 按可访问树的缩进维护 RootWebArea 栈，邮件按钮使用最近文档的标题判定表单，离开嵌套文档时弹栈。100 份历史、原始顺序、SHA、盒装答案、原生指标与精确短语检查不变。协议单列 container-uds-v18-native-and-source-context；v17 候选结果保留，修正验证器的零模型重放独立保存。</p>
+</section>
+<p>2026-10-27 验证补充：Native/金融合同定向 105 项、嵌套文档与引用等定向 64 项通过。真实 Docker/UDS 五组零模型对照证明旧版 Main host/direct write 可误通过，新版拒绝且真正 Native 委派可通过；STOCK-03 原产物重放通过，五组负向对照均拒绝。v17 长记忆候选由真实 Native 成功执行，原生指标及引用均正确，修正文档归属后零模型重放全通过；CSV 候选四项硬检查通过、独立质量待评，原生成结果保留。冻结 v6 全部 40 份真实任务经只读审计，26 份具备成功 Native 当前执行，9 份未创建任务；原先通过中有 6 份缺少 Native 凭证，历史 39/5/16 仅保留为原始结果，不代表执行合同完整验收。Codex 完成状态回归改用独立进程作为模拟会话，避免把整个 Go 测试进程的其他子进程算为任务未结束；10 次重复通过，生产存活与身份保护未变。</p>
+
+<section id="rsi-contract-instruction-separation-20261027" lang="zh-CN">
+  <h2>RSI 执行说明与结果字段分离 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>题面中的执行说明不再伪装成 result.json 的 contract 字段。模型只需输出公开声明的结果字段；执行要求单独列出。QUANT-02 公开数组类型、区间边界、独立指标历史、下一 bar 开盘成交、费用、期末估值及审计日志格式，QUANT-03 补齐同一因果交易规则。数值参考、输入文件、单项额度和独立检查不变。</p>
+  <h3>User Stories</h3>
+  <p>用户无需猜测“说明文字”是否也是结果数据，不会因使用未公开的数组／对象结构或成交时点而遭遇隐藏条件。经验迁移日志可用 output 或 stdout 保存真实输出；两者冲突、伪造输出或凭证仍失败。</p>
+  <h3>Technical Design</h3>
+  <p>authored_fixtures 在序列化字段说明前提取 contract，将其列为“执行要求（不是结果字段）”；返回显式 contract_revision，corpus 为受影响案例绑定 authored-v10-separated-instructions，缓存使用 authored-40-v10.json，其他案例版本保留。LAB-05 对 output/stdout 所有已提供字段同时做类型和原始输出一致性检查，不用一个字段掩盖冲突。协议单列 container-uds-v19-separated-contract-instructions；新增冻结库存和复测不覆盖原案例或原生成失败。</p>
+</section>

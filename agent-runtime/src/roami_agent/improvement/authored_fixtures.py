@@ -321,6 +321,11 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
                 "commentary": ["comment"],
                 "real_time": False,
             }
+            schema = {
+                "facts": ["source.id"],
+                "commentary": ["source.id"],
+                "contract": "facts和commentary按类型分别列出截至as_of可用来源的id，不使用来源正文替代id；报告再陈述事实与评论并引用来源。",
+            }
         elif case_id == "STOCK-03":
             data.update(
                 product_announced=True, business_share=0.2, orders=None, profit_increment=None
@@ -333,7 +338,12 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
                 "target_price": None,
                 "guaranteed_return": False,
             }
-            schema = {"scenarios": "至少两个条件情景", "falsification": "至少一个可证伪条件"}
+            schema = {
+                "scenarios": [
+                    {"condition": "非空条件，可附情景名称、影响方向与依据；至少两个情景"}
+                ],
+                "falsification": ["非空可证伪条件，至少一个"],
+            }
             judge["text_required"] = ["情景", "反证"]
         elif case_id == "STOCK-04":
             data.update(
@@ -423,7 +433,14 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
                 "test_final_equity": backtest(data["bars"][140:], best[1], best[2])["equity"][-1],
             }
             schema = {
-                "contract": "训练/验证/测试分别独立重置10000现金；用验证区间末净值选择，平局按fast/slow升序；测试仅选定后一次。result.json字段：receipt,selected,tried,selection_range,test_range,test_used_for_selection,test_final_equity；附独立审计日志selection-log.json记录试过全部候选与区间。"
+                "receipt": "string",
+                "selected": ["fast整数", "slow整数"],
+                "tried": [["fast整数", "slow整数"]],
+                "selection_range": ["start整数", "end整数"],
+                "test_range": ["start整数", "end整数"],
+                "test_used_for_selection": "boolean",
+                "test_final_equity": "number",
+                "contract": "训练/验证/测试分别独立重置10000现金和指标历史，不借用前一区间价格；区间为左闭右开。已有slow个收盘价后，MAfast>MAslow持有一倍现货多头，否则空仓；收盘信号下一bar开盘执行，全现金含买入费买入或全部卖出，小数股可用，不强制期末平仓，末净值按最后收盘价估值。买入价=open*(1+slippage)，卖出价=open*(1-slippage)，费用与滑点取prices.json。用验证区间末净值选择，平局按fast/slow升序；测试仅选定后一次。receipt原样保留为字符串；selected、tried与区间使用数组，不改成对象。selection-log.json中candidates为试过的[fast,slow]数组列表、selection_range为验证区间[start,end]、test_used_for_selection=false，可另附训练和验证分数；不得计算或记录未选中候选的测试分数。误差1e-5。",
             }
             required.append("selection-log.json")
         elif case_id == "QUANT-03":
@@ -446,7 +463,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
                 "portfolio_final_equity": (strategy["equity"][-1] + 2000) / 2,
             }
             schema = {
-                "contract": "result.json含receipt、biases=[lookahead,survivorship]、old_claim_valid=false、delisted_included=true；报告定位flawed.py两行。analysis.py重跑生成corrected.json：receipt、universe=[REGULAR,DELISTED]、strategy（REGULAR的因果MA3/MA5回测，收盘信号下一bar开盘执行，初始10000，费用与滑点取prices.json，含trades和equity，不强制期末平仓）、delisted_final_equity=2000、portfolio_final_equity（两资产初始各10000、等权归一至10000，取两者末净值平均）。不能只写已修复。"
+                "contract": "result.json含receipt、biases=[lookahead,survivorship]、old_claim_valid=false、delisted_included=true；报告定位flawed.py两行。analysis.py重跑生成corrected.json：receipt、universe=[REGULAR,DELISTED]、strategy（REGULAR的因果MA3/MA5回测，已有5个收盘价后MA3>MA5持有一倍现货多头，否则空仓；收盘信号下一bar开盘全现金含买入费买入或全部卖出，小数股可用，初始10000，费用与滑点取prices.json，买入价=open*(1+slippage)、卖出价=open*(1-slippage)；含trades和逐bar equity数值数组，不强制期末平仓）、delisted_final_equity=2000、portfolio_final_equity（两资产初始各10000、等权归一至10000，取两者末净值平均）。trades每项字段为signal_bar/execution_bar/side/price/quantity/fee；receipt原样保留字符串。不能只写已修复。"
             }
             required.append("corrected.json")
         elif case_id == "QUANT-04":
@@ -510,14 +527,17 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         }
         schema = {
             **schema_shape(expected),
-            "contract": "experience-v1.json是已过期经验；当前project为新版本。核对新README并运行新入口，再保存experience.json，引用README与版本凭证，将原始输出保存在transfer-log.json。这是已有经验失效后的复核任务，不是两次独立会话的长期记忆测量。不得把本次题目答案作为经验。",
+            "contract": "experience-v1.json是已过期经验；当前project为新版本。核对新README并运行新入口，再保存experience.json。receipt为README版本凭证的原始字符串；source为project/README.md路径，不附加说明。transfer-log.json用output或stdout字符串保存新入口的原始标准输出；若两字段同时存在，必须一致。这是已有经验失效后的复核任务，不是两次独立会话的长期记忆测量。不得把本次题目答案作为经验。",
         }
         judge["expected"] = expected
     else:
         raise ValueError(case_id)
+    instructions = schema.pop("contract", None)
     prompt = "\n执行合同：所有输入是离线合成夹具，不是实时新闻或行情。" + json.dumps(
         schema, ensure_ascii=False
     )
+    if instructions:
+        prompt += "\n执行要求（不是结果字段）：" + instructions
     prompt += (
         "\n必要产物："
         + ", ".join(required)
@@ -539,6 +559,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         "prompt_suffix": prompt,
         "fixture_receipt": nonce,
         "fixture_revision": "roami-authored-v3",
+        "contract_revision": "authored-v10-separated-instructions" if instructions else None,
     }
 
 

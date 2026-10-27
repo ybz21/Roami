@@ -258,7 +258,7 @@ def test_public_preconditions_are_presented_without_exposing_oracle():
     suite = authored_suite("independent-fairness-check")
     case = next(c for c in suite["cases"] if c["id"] == "CODE-01")
     assert "默认每页 5 条" in case["prompt"] and "页码从 1 开始" in case["prompt"]
-    assert case["origin"]["recipe_revision"] == "authored-v7"
+    assert case["origin"]["recipe_revision"] == "authored-v10-separated-instructions"
     assert "expected" not in case["prompt"]
 
 
@@ -269,15 +269,20 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     service = ImprovementStatus(tmp_path)
     root = service.ledger.path.parent / "corpus"
     root.mkdir(mode=0o700, parents=True)
-    previous = root / "authored-40-v7.json"
+    previous = root / "authored-40-v8.json"
     previous.write_bytes(b"original frozen suite evidence")
     prepare_corpus(service, "owner")
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v8.json").read_text())
+    revised = json.loads((root / "authored-40-v10.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
-    assert identities["DEMO-02"] == "authored-v8-csv-request-identity"
-    assert all(v == "authored-v7" for k, v in identities.items() if k != "DEMO-02")
+    assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"
+    assert identities["STOCK-03"] == "authored-v9-stock-evidence-contract"
+    assert all(
+        c["origin"]["recipe_revision"] == "authored-v10-separated-instructions"
+        for c in revised["cases"]
+        if "执行要求（不是结果字段）" in c["prompt"]
+    )
 
 
 def test_public_contract_exposes_types_and_cost_rules_without_oracle_values():
@@ -286,6 +291,11 @@ def test_public_contract_exposes_types_and_cost_rules_without_oracle_values():
     assert "stories和acceptance为需求ID到文字的对象" in cases["DOC-05"]["prompt"]
     assert "open*(1+slippage)" in cases["QUANT-01"]["prompt"]
     assert "equity数值数组" in cases["QUANT-01"]["prompt"]
+    assert '"selected": ["fast整数", "slow整数"]' in cases["QUANT-02"]["prompt"]
+    assert "不借用前一区间价格" in cases["QUANT-02"]["prompt"]
+    assert "下一bar开盘执行" in cases["QUANT-02"]["prompt"]
+    assert '"contract":' not in cases["QUANT-02"]["prompt"]
+    assert "执行要求（不是结果字段）" in cases["QUANT-02"]["prompt"]
     assert (
         str(cases["QUANT-01"]["judge"]["expected"]["equity"][-1]) not in cases["QUANT-01"]["prompt"]
     )

@@ -209,7 +209,7 @@ class NativeFilesExecutor:
             bind_evaluation_tasks(runtime, workspace)
         runtime.tools.disabled_tools.update(set(runtime.tools.registry) - allowed)
         output, trace, failure = "", None, None
-        turn_grades, traces, tool_records = [], [], []
+        turn_grades, traces, tool_records, native_execution = [], [], [], []
         started = time.monotonic()
         verified_ms = None
         deferred_jobs = 0
@@ -272,6 +272,9 @@ class NativeFilesExecutor:
                 ]
                 output = final[-1]["content"]["text"] if final else ""
                 if self.allow_tasks:
+                    from roami_agent.improvement.evaluation_tasks import verify_native_execution
+
+                    native_execution = await verify_native_execution(database)
                     turns = await database.call(
                         lambda db: [
                             r[0] for r in db.execute("SELECT id FROM turns ORDER BY created_ms,id")
@@ -354,6 +357,7 @@ class NativeFilesExecutor:
                     "failure": failure,
                     "output": output,
                     "tasks": task_records,
+                    "native_execution": native_execution,
                     "runtime_profile": "main_and_native_worker"
                     if self.allow_tasks
                     else "file_tools_only",

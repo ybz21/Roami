@@ -7,7 +7,11 @@ from types import SimpleNamespace
 import pytest
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.evaluation_tasks import bind_evaluation_tasks, settle_evaluation_tasks
+from roami_agent.improvement.evaluation_tasks import (
+    bind_evaluation_tasks,
+    settle_evaluation_tasks,
+    verify_native_execution,
+)
 from roami_agent.improvement.executors import NativeFilesExecutor
 from roami_agent.improvement.protocol_suite import protocol_suite
 from roami_agent.protocol.errors import DomainError
@@ -108,13 +112,17 @@ async def test_main_handoff_waits_for_worker_artifact_and_completion(store, tmp_
         assert worker.calls == 2 and main.calls >= 2
         task = await store.call(lambda db: row(db, "SELECT * FROM tasks"))
         assert task["state"] == "waiting_user"
+        assert (await verify_native_execution(store))[0]["executor_kind"] == "native"
     finally:
         await runtime.close()
 
 
 async def test_task_lane_rejects_foreign_workspace_and_unknown_writes(tmp_path):
     native = SimpleNamespace()
-    runtime = SimpleNamespace(dispatch=SimpleNamespace(native_executor=native))
+    runtime = SimpleNamespace(
+        dispatch=SimpleNamespace(native_executor=native),
+        tools=SimpleNamespace(registry={"bash": SimpleNamespace(main=True)}),
+    )
     bind_evaluation_tasks(runtime, tmp_path)
     task = {
         "intent_json": json.dumps(
@@ -136,6 +144,92 @@ async def test_task_lane_rejects_foreign_workspace_and_unknown_writes(tmp_path):
             None, task, {"id": "one"}, stopped=unknown
         ) as workspace:
             assert workspace["directory"] == str(tmp_path)
+
+
+@pytest.mark.parametrize("name", ["bash", "shell"])
+@pytest.mark.parametrize("scope", ["host", "workspace"])
+async def test_evaluation_main_cannot_execute_shell_but_worker_can(store, tmp_path, name, scope):
+    runtime = Runtime(
+        store, SimpleNamespace(model="unused"), settings=Settings(shell_roots=(tmp_path,))
+    )
+    bind_evaluation_tasks(runtime, tmp_path)
+    try:
+        assert "bash" not in {t["function"]["name"] for t in runtime.tools.catalog("main")}
+        assert "bash" in {t["function"]["name"] for t in runtime.tools.catalog("worker")}
+        call = {
+            "function": {
+                "name": name,
+                "arguments": json.dumps({"argv": ["touch", "main-started"], "scope": scope}),
+            }
+        }
+        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
+            await runtime.tools.invoke(call, "main", {"owner": "owner"})
+        assert not (tmp_path / "main-started").exists()
+        call["function"]["arguments"] = json.dumps(
+            {"argv": ["touch", "worker-started"], "scope": "workspace"}
+        )
+        result = await runtime.tools.invoke(
+            call, "worker", {"owner": "owner", "workspace": {"directory": str(tmp_path)}}
+        )
+        assert result["exitCode"] == 0 and (tmp_path / "worker-started").is_file()
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "fault,error",
+    [
+        (None, None),
+        ("no_task", "RSI_NATIVE_TASK_REQUIRED"),
+        ("foreign_executor", "RSI_NATIVE_EXECUTOR_REQUIRED"),
+        ("stale_revision", "RSI_NATIVE_EXECUTOR_REQUIRED"),
+        ("running_attempt", "RSI_NATIVE_TASK_INCOMPLETE"),
+        ("queued_task", "RSI_NATIVE_TASK_INCOMPLETE"),
+        ("newer_failed_attempt", "RSI_NATIVE_TASK_INCOMPLETE"),
+    ],
+)
+async def test_native_execution_requires_current_successful_attempt(store, fault, error):
+    from test_routing_policy import setup
+    from test_task_delivery_benchmark import admit, mark
+
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        if fault != "no_task":
+            task = await admit(runtime, binding, "Deliver required files", "native-proof")
+            await mark(runtime, task, "waiting_user", {"state": "succeeded"})
+
+            def alter(db):
+                if fault == "foreign_executor":
+                    db.execute("UPDATE task_attempts SET executor_kind='cli'")
+                elif fault == "stale_revision":
+                    db.execute("UPDATE tasks SET revision=revision+1")
+                elif fault == "running_attempt":
+                    db.execute("UPDATE task_attempts SET state='running'")
+                elif fault == "queued_task":
+                    db.execute("UPDATE tasks SET state='queued'")
+                elif fault == "newer_failed_attempt":
+                    attempt = dict(db.execute("SELECT * FROM task_attempts").fetchone())
+                    attempt.update(
+                        id="newer-attempt", launch_id="newer-launch", attempt_no=2, state="failed"
+                    )
+                    db.execute(
+                        "INSERT INTO task_attempts ("
+                        + ",".join(attempt)
+                        + ") VALUES ("
+                        + ",".join("?" for _ in attempt)
+                        + ")",
+                        tuple(attempt.values()),
+                    )
+
+            await store.call(alter, write=True)
+        if error:
+            with pytest.raises(DomainError, match=error):
+                await verify_native_execution(store)
+        else:
+            proof = await verify_native_execution(store)
+            assert len(proof) == 1 and proof[0]["attempt_state"] == "succeeded"
+    finally:
+        await runtime.close()
 
 
 async def test_runtime_failure_is_exported_even_when_output_preexists(tmp_path):

@@ -3,7 +3,9 @@ package agentexecution
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -153,6 +155,20 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			cancelled := mode == "cancelled"
 			s, binding := sessionFixture(t)
+			// The pane must not own unrelated subprocesses of the Go test runner.
+			pane := exec.Command("sleep", "120")
+			if err := pane.Start(); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				_ = pane.Process.Kill()
+				_ = pane.Wait()
+			})
+			binding.PID = pane.Process.Pid
+			identity := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%d\t%s\n", binding.Name, binding.TmuxID, binding.Created, binding.Server, binding.Pane, binding.PID, binding.Directory)
+			if err := os.WriteFile(filepath.Join(s.Runtime.DataDir, "identity"), []byte(identity), 0600); err != nil {
+				t.Fatal(err)
+			}
 			if err := s.applySessionEvent("codex", binding, SessionEvent{Hook: "UserPromptSubmit", ProviderID: completionThread, TurnID: "seed", Prompt: "manual"}); err != nil {
 				t.Fatal(err)
 			}
