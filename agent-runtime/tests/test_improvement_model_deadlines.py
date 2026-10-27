@@ -4,8 +4,8 @@ from dataclasses import replace
 
 import pytest
 
-from roami_agent.improvement.executors import NativeFilesExecutor
-from roami_agent.improvement.protocol_suite import protocol_suite
+from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
+from roami_agent.improvement.evaluation.protocol_suite import protocol_suite
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings

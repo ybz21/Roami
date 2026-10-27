@@ -8,5 +8,8 @@
     "task_id": "ETR/2002/page_86.pdf-4",
     "revision": "0f16e2867befa6840783e58be38c9efb9229d742"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

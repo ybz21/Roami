@@ -7,8 +7,8 @@ import httpx
 import pytest
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.control import ImprovementControl
-from roami_agent.improvement.ledger import Ledger
+from roami_agent.improvement.persistence.control import ImprovementControl
+from roami_agent.improvement.persistence.ledger import Ledger
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.http import create_app
 
@@ -40,8 +40,10 @@ async def test_release_has_no_rsi_routes_workers_policy_binding_or_ledger_writes
         raise AssertionError("Release runtime must not construct RSI services or workers")
 
     monkeypatch.setattr("roami_agent.app.ImprovementStatus", forbidden)
-    monkeypatch.setattr("roami_agent.improvement.worker.EvaluationWorker", forbidden)
-    monkeypatch.setattr("roami_agent.improvement.research_worker.ResearchWorker", forbidden)
+    monkeypatch.setattr("roami_agent.improvement.workflows.worker.EvaluationWorker", forbidden)
+    monkeypatch.setattr(
+        "roami_agent.improvement.workflows.research_worker.ResearchWorker", forbidden
+    )
     runtime = Runtime(store, Model())
     assert runtime.improvement is None
     store.managed = True

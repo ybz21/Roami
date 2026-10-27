@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-CT01",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_context_provider.py::test_compaction_persists_summary_preserves_transcript_and_appends",
+      "test_context_provider.py::test_context_of_turn_does_not_include_later_user_messages"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_context_provider.py::test_compaction_persists_summary_preserves_transcript_and_appends",
+      "test_context_provider.py::test_context_of_turn_does_not_include_later_user_messages"
+    ]
+  }
+}

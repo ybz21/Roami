@@ -7,10 +7,10 @@ import html
 import json
 from pathlib import Path
 
-from roami_agent.improvement.artifact_evidence import PROGRAM
-from roami_agent.improvement.containers import ContainerExecutor
-from roami_agent.improvement.contracts import DIMENSIONS, digest
-from roami_agent.improvement.executors import private_json
+from roami_agent.improvement.evaluation.artifact_evidence import PROGRAM
+from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
+from roami_agent.improvement.domain.contracts import DIMENSIONS, digest
+from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.server.configuration import Settings
 
 parser = argparse.ArgumentParser(description=__doc__)

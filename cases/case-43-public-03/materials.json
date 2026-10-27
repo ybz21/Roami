@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "PUBLIC-03",
+  "data": {
+    "kind": "upstream_registered_suite",
+    "source": {
+      "benchmark": "convfinqa",
+      "task_id": "Double_KHC/2016/page_23.pdf",
+      "revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6"
+    },
+    "source_case_id": "convfinqa:85d9a548c6a57df1",
+    "local_inputs": false,
+    "load_from": "Registered frozen suite files/asset_files after the benchmark importer completes. Source registration alone does not include or execute the dataset."
+  },
+  "tools": {
+    "kind": "benchmark_environment",
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+  },
+  "acceptance": {
+    "kind": "upstream_adapter",
+    "load_from": "The frozen registered suite judge; not an answer file in this folder."
+  }
+}

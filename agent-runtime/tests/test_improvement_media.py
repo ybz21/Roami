@@ -6,9 +6,10 @@ import zipfile
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view, digest
-from roami_agent.improvement.executors import materialize
-from roami_agent.improvement.media_tasks import grade_media, import_media
+from roami_agent.improvement.domain.contracts import digest
+from roami_agent.improvement.evaluation.benchmarks.media_tasks import grade_media, import_media
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.integrations.artifact_files import materialize
 from roami_agent.protocol.errors import DomainError
 
 

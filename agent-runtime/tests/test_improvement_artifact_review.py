@@ -8,16 +8,16 @@ import json
 
 import pytest
 
-from roami_agent.improvement.artifact_review import (
+from roami_agent.improvement.domain.contracts import DIMENSIONS, digest
+from roami_agent.improvement.evaluation.artifact_review import (
     PROTOCOL_HASH,
     ArtifactReviewer,
     calibrate_artifacts,
     episode_metrics,
     validate_calibration,
 )
-from roami_agent.improvement.contracts import DIMENSIONS, digest
-from roami_agent.improvement.executors import ProtocolFixtureModel
-from roami_agent.improvement.measurements import EpisodeBudget
+from roami_agent.improvement.evaluation.execution.executors import ProtocolFixtureModel
+from roami_agent.improvement.integrations.measurements import EpisodeBudget
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
@@ -225,7 +225,7 @@ async def test_no_paid_output_replay_or_fabricated_evidence(fault):
 async def test_hard_evidence_retained_and_rating_disagreement_stays_pending(
     monkeypatch, tmp_path, disagree
 ):
-    from roami_agent.improvement import artifact_review
+    from roami_agent.improvement.evaluation import artifact_review
 
     async def evidence(*args):
         return pack()
@@ -263,7 +263,7 @@ async def test_hard_evidence_retained_and_rating_disagreement_stays_pending(
 
 
 async def test_cancellation_persists_unknown_usage(monkeypatch, tmp_path):
-    from roami_agent.improvement import artifact_review
+    from roami_agent.improvement.evaluation import artifact_review
 
     async def evidence(*args):
         return pack()
@@ -335,7 +335,7 @@ async def test_old_mechanism_selection_is_rejected_before_container_execution(tm
     from pathlib import Path
     from types import SimpleNamespace
 
-    from roami_agent.improvement.mechanisms import nodes, run_mechanism
+    from roami_agent.improvement.evaluation.mechanisms import nodes, run_mechanism
 
     case = {"id": "MECH-PL01", "judge": {"kind": "mechanism", "selectors": nodes("MECH-PL01")[:-1]}}
     executor = SimpleNamespace(regression_root=Path(__file__).parent)
@@ -365,7 +365,7 @@ async def test_rater_output_budget_is_explicit_and_labels_are_advertised():
 async def test_renderer_cannot_replace_the_agent_under_test(monkeypatch):
     from types import SimpleNamespace
 
-    from roami_agent.improvement import containers
+    from roami_agent.improvement.evaluation.execution import containers
 
     agent_image = "sha256:" + "a" * 64
     renderer_image = "sha256:" + "b" * 64

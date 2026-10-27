@@ -7,16 +7,19 @@ import time
 
 import pytest
 
-from roami_agent.improvement import containers
-from roami_agent.improvement.project_runtime import ProjectRuntime
-from roami_agent.improvement.project_snapshot import copy_project_snapshot, unpack_project
-from roami_agent.improvement.protocol_suite import protocol_suite
-from roami_agent.improvement.swe_tasks import (
+from roami_agent.improvement.evaluation.benchmarks.swe_tasks import (
     canonical_archive,
     parse_test_statuses,
     patch_paths,
     prepare_project,
 )
+from roami_agent.improvement.evaluation.execution import containers
+from roami_agent.improvement.evaluation.execution.project_runtime import ProjectRuntime
+from roami_agent.improvement.evaluation.execution.project_snapshot import (
+    copy_project_snapshot,
+    unpack_project,
+)
+from roami_agent.improvement.evaluation.protocol_suite import protocol_suite
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 

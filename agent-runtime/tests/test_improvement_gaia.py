@@ -4,9 +4,13 @@ import json
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view
-from roami_agent.improvement.executors import materialize
-from roami_agent.improvement.gaia_tasks import TASK_ID, grade_gaia_course, import_gaia_course
+from roami_agent.improvement.evaluation.benchmarks.gaia_tasks import (
+    TASK_ID,
+    grade_gaia_course,
+    import_gaia_course,
+)
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.integrations.artifact_files import materialize
 from roami_agent.protocol.errors import DomainError
 
 QUESTION = """Given this table defining * on S = {a, b, c, d, e}

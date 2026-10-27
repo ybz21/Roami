@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MB01",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_runtime.py::test_runtime_streams_committed_reply_and_usage",
+      "test_generation_parameters.py::test_invalid_parameters_fail_before_any_provider_request"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_runtime.py::test_runtime_streams_committed_reply_and_usage",
+      "test_generation_parameters.py::test_invalid_parameters_fail_before_any_provider_request"
+    ]
+  }
+}

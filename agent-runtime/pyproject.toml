@@ -18,7 +18,7 @@ dependencies = [
 
 [project.scripts]
 roami-agent = "roami_agent.app:main"
-roami-agent-evaluate = "roami_agent.improvement.cli:main"
+roami-agent-evaluate = "roami_agent.improvement.entrypoints.cli:main"
 
 [build-system]
 requires = ["hatchling"]

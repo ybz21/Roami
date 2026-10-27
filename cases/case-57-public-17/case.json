@@ -8,5 +8,8 @@
     "task_id": "cancel-async-tasks",
     "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

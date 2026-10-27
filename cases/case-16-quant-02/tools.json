@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "environment": "isolated_container",
+  "workspace": "/workspace",
+  "network": "disabled",
+  "executor": "native",
+  "coordinator": ["read", "delegate", "task_status", "task_reply", "reply"],
+  "worker": ["read", "write", "edit", "bash"],
+  "commands": ["python3"],
+  "libraries": ["Python 3 standard library"],
+  "policy": "Requirements describe the task environment; they do not grant capabilities. The executor owns the actual allowlist, Native handoff and network isolation."
+}

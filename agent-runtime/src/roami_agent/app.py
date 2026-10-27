@@ -38,8 +38,8 @@ from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
-from roami_agent.improvement.policy import BOUNDS
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.domain.policy import BOUNDS
+from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
 from roami_agent.observability.execution_debug import ExecutionDebug
@@ -48,6 +48,7 @@ from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_binding
 from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.providers.factory import configured_provider
 from roami_agent.providers.model_proxy import ModelProxy
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
@@ -377,15 +378,15 @@ class Runtime:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
         if self.db.managed and self.improvement is not None:
-            from roami_agent.improvement.worker import EvaluationWorker
+            from roami_agent.improvement.workflows.worker import EvaluationWorker
 
             self.improvement.worker = EvaluationWorker(self, self.improvement)
             await self.improvement.worker.start()
-            from roami_agent.improvement.research_worker import ResearchWorker
+            from roami_agent.improvement.workflows.research_worker import ResearchWorker
 
             self.improvement.research_worker = ResearchWorker(self, self.improvement)
             await self.improvement.research_worker.start()
-            from roami_agent.improvement.pipeline_reports import PipelineReportWorker
+            from roami_agent.improvement.workflows.pipeline_reports import PipelineReportWorker
 
             self.improvement.report_worker = PipelineReportWorker(self.improvement)
             await self.improvement.report_worker.start()
@@ -545,25 +546,6 @@ class Runtime:
         await self.artifact_retention.close()
         await self.artifacts.close()
         await self.model_settings.close()
-
-
-def configured_provider(settings, role, *, client=None):
-    route = settings.route(role)
-    provider = ChatCompletions(
-        route.endpoint,
-        route.name,
-        settings.credentials(role),
-        timeout=route.timeout_seconds,
-        max_retries=route.max_retries,
-        capabilities=route.capabilities,
-        cache=route.cache,
-        parameters=route.parameters,
-        client=client,
-    )
-    from roami_agent.providers.model_proxy import model_proxy_context
-
-    proxy = model_proxy_context.get()
-    return proxy.attach(provider, role) if proxy is not None else provider
 
 
 async def serve(args):

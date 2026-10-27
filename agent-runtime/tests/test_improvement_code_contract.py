@@ -4,12 +4,12 @@ import json
 
 import pytest
 
-from roami_agent.improvement.cli import execute
-from roami_agent.improvement.code_contract import grade_code_contract
-from roami_agent.improvement.contracts import agent_view, freeze_suite
-from roami_agent.improvement.control import ImprovementControl
-from roami_agent.improvement.grading import judge_case
-from roami_agent.improvement.ledger import Ledger
+from roami_agent.improvement.entrypoints.cli import execute
+from roami_agent.improvement.evaluation.code_contract import grade_code_contract
+from roami_agent.improvement.evaluation.contracts import agent_view, freeze_suite
+from roami_agent.improvement.evaluation.grading import judge_case
+from roami_agent.improvement.persistence.control import ImprovementControl
+from roami_agent.improvement.persistence.ledger import Ledger
 from roami_agent.protocol.errors import DomainError
 
 
@@ -92,7 +92,7 @@ async def test_local_suite_registration_and_settings_cli(tmp_path):
 async def test_native_only_evaluation_keeps_complex_routing_without_cli_discovery(store):
     from test_routing_policy import request, setup
 
-    from roami_agent.improvement.evaluation_tasks import NATIVE_TASK_REQUEST
+    from roami_agent.improvement.evaluation.execution.evaluation_tasks import NATIVE_TASK_REQUEST
 
     runtime, targets, router, _, binding = await setup(store, user=NATIVE_TASK_REQUEST)
     try:

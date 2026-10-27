@@ -11,9 +11,9 @@ from test_improvement_workflow import setup
 from test_model_proxy import EVENTS, consume, proxy_for
 
 from roami_agent.app import configured_provider
-from roami_agent.improvement.codex_proxy import CodexProxy
-from roami_agent.improvement.codex_roles import codex_json
-from roami_agent.improvement.measurements import EpisodeBudget
+from roami_agent.improvement.integrations.codex_proxy import CodexProxy
+from roami_agent.improvement.integrations.measurements import EpisodeBudget
+from roami_agent.improvement.workflows.codex_roles import codex_json
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.model_routes import settings_with_route
 from roami_agent.providers.model_proxy import model_accounting

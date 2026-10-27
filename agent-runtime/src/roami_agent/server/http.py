@@ -243,7 +243,7 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         @app.put("/v1/improvement/pipeline/settings")
         async def pipeline_settings(request: Request, owner: Owner):
-            from roami_agent.improvement.github_publication import publication_profile
+            from roami_agent.improvement.integrations.github_client import publication_profile
 
             ModelSettings.owner(owner)
             payload = await improvement_payload(request)
@@ -258,7 +258,7 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         @app.post("/v1/improvement/pipeline/requests")
         async def pipeline_request(request: Request, owner: Owner):
-            from roami_agent.improvement.pipeline_runner import enqueue_diagnostic
+            from roami_agent.improvement.workflows.pipeline_runner import enqueue_diagnostic
 
             ModelSettings.owner(owner)
             value = await asyncio.to_thread(
@@ -273,14 +273,14 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         @app.get("/v1/improvement/cases")
         async def improvement_case_catalog(owner: Owner):
-            from roami_agent.improvement.run_results import catalog_view
+            from roami_agent.improvement.presentation.run_results import catalog_view
 
             ModelSettings.owner(owner)
             return {"data": await asyncio.to_thread(catalog_view)}
 
         @app.get("/v1/improvement/pipeline/runs/{run_id}/results")
         async def pipeline_results(run_id: str, owner: Owner):
-            from roami_agent.improvement.run_results import results_view
+            from roami_agent.improvement.presentation.run_results import results_view
 
             return {
                 "data": await asyncio.to_thread(
@@ -307,7 +307,7 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         @app.post("/v1/improvement/pipeline/runs/{run_id}/publish")
         async def pipeline_publish(run_id: str, owner: Owner):
-            from roami_agent.improvement.pipeline_reports import publish_run_issue
+            from roami_agent.improvement.workflows.pipeline_reports import publish_run_issue
 
             ModelSettings.owner(owner)
             records = runtime.improvement.runs
@@ -342,7 +342,7 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         @app.post("/v1/improvement/preview")
         async def improvement_preview(owner: Owner):
-            from roami_agent.improvement.experiment_preview import preview
+            from roami_agent.improvement.presentation.experiment_preview import preview
 
             ModelSettings.owner(owner)
             return {
@@ -429,7 +429,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         @app.post("/v1/improvement/prepare")
         async def prepare_improvement(owner: Owner):
             ModelSettings.owner(owner)
-            from roami_agent.improvement.corpus import prepare_corpus
+            from roami_agent.improvement.evaluation.corpus import prepare_corpus
 
             return {"data": await asyncio.to_thread(prepare_corpus, runtime.improvement, owner)}
 

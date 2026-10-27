@@ -5,9 +5,12 @@ import json
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view
-from roami_agent.improvement.grading import judge_case
-from roami_agent.improvement.terminal_tasks import grade_terminal, import_terminal
+from roami_agent.improvement.evaluation.benchmarks.terminal_tasks import (
+    grade_terminal,
+    import_terminal,
+)
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.evaluation.grading import judge_case
 from roami_agent.protocol.errors import DomainError
 
 
