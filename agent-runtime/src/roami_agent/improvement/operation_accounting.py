@@ -68,11 +68,11 @@ def quarantine_operation(ledger, owner, operation, *, reason, evidence):
     return receipt
 
 
-def assert_operation_costs_settled(db, owner):
+def assert_operation_costs_settled(db, owner, *, shared=False):
     require(
         not db.execute(
-            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer' OR (json_extract(result_json,'$.value.metrics.tokens')>reserved AND COALESCE(json_extract(result_json,'$.value.spending_policy'),'frozen_protocol')!='shared_model_daily'))))",
-            (owner,),
+            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer' OR (json_extract(result_json,'$.value.metrics.tokens')>reserved AND COALESCE(json_extract(result_json,'$.value.spending_policy'),'frozen_protocol')!='shared_model_daily' AND ?))))",
+            (owner, not shared),
         ).fetchone(),
         "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
     )

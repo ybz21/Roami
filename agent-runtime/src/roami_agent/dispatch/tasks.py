@@ -70,6 +70,7 @@ class Tasks:
         source_assistant_message_id=None,
         routing_decision=None,
         title=None,
+        independent_project_outcome=False,
     ):
         if (
             not key
@@ -233,9 +234,19 @@ class Tasks:
                         (previous_id, owner),
                     )
                     old_target = json.loads(previous["intent_json"])["target"] if previous else {}
-                    if previous_id in goal or any(
-                        target.get(key) and target.get(key) == old_target.get(key)
-                        for key in ("projectId", "sessionId", "directory")
+                    same_project = (
+                        target.get("kind") == "project"
+                        and target.get("projectId")
+                        and target.get("projectId") == old_target.get("projectId")
+                        and not target.get("workspaceId")
+                    )
+                    if (
+                        previous_id in goal
+                        or (same_project and not independent_project_outcome)
+                        or any(
+                            target.get(key) and target.get(key) == old_target.get(key)
+                            for key in ("workspaceId", "sessionId", "directory")
+                        )
                     ):
                         raise DomainError("TASK_CONTINUATION_ALREADY_REQUESTED", 409)
             path_key = {"new_session": "directory", "new_project": "baseDir"}.get(target["kind"])

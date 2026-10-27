@@ -12,6 +12,7 @@ from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.github_publication import command, publication_profile
 from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.run_records import STAGES
+from roami_agent.improvement.spending_policy import model_proxy_for, uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -33,18 +34,31 @@ DESCRIPTIONS = {
 class RunCosts:
     def __init__(self, records, owner, run_id):
         self.records, self.ledger, self.owner, self.run_id = records, records.ledger, owner, run_id
-        self.model_proxy = getattr(records, "model_proxy", None)
+        self.model_proxy = model_proxy_for(records)
 
     def day(self, owner):
-        if self.model_proxy is not None and getattr(self.ledger, "shared_daily_limit", False):
+        if self.model_proxy is not None:
             return self.model_proxy.billing.period()[0]
         return datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+
+    def operation_result(self, owner, key):
+        require(owner == self.owner, "RSI_RUN_NOT_FOUND")
+        with self.ledger.connection() as db:
+            row = db.execute(
+                "SELECT run_id,state,result_json FROM rsi_pipeline_costs WHERE owner=? AND id=?",
+                (owner, key),
+            ).fetchone()
+        if row is None:
+            return None
+        require(row["run_id"] == self.run_id, "RSI_RUN_NOT_FOUND")
+        require(row["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION")
+        return json.loads(row["result_json"])
 
     def reserve_operation(self, owner, day, key, tokens):
         require(owner == self.owner, "RSI_RUN_NOT_FOUND")
         value = self.records.get(owner, self.run_id)
         snapshot = value["snapshot"]
-        shared = getattr(self.ledger, "shared_daily_limit", False)
+        shared = uses_shared_model_limit(self.ledger)
         cap = snapshot["pipeline"]["codex_tokens"] * 2
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -65,7 +79,7 @@ class RunCosts:
                 ),
                 "RSI_USAGE_UNKNOWN",
             )
-            assert_operation_costs_settled(db, owner)
+            assert_operation_costs_settled(db, owner, shared=uses_shared_model_limit(self.ledger))
             require(not snapshot.get("imported"), "RSI_DAILY_BUDGET")
             rows = db.execute(
                 "SELECT * FROM rsi_pipeline_costs WHERE owner=? AND run_id=?", (owner, self.run_id)

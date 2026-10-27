@@ -81,6 +81,7 @@ def test_recurrence_requires_same_contract_and_known_pass(
 
 def test_diagnostic_queue_is_idempotent_and_admission_is_atomic(tmp_path):
     service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
     control = service.control
     control.register_machine(
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
@@ -94,15 +95,12 @@ def test_diagnostic_queue_is_idempotent_and_admission_is_atomic(tmp_path):
     control.cancel("local", first["id"])
     assert service.runs.get("local", first["id"])["state"] == "cancelled"
     enqueue_diagnostic(service, "local", {"request_key": "two", "case_ids": ["a"]})
-    with pytest.raises(DomainError, match="DAILY_BUDGET"):
-        enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
-    with service.ledger.connection() as db:
-        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 856000
-        assert db.execute("SELECT COUNT(*) FROM rsi_pipeline_runs").fetchone()[0] == 2
-    service.runs.configure("local", {**service.runs.settings("local"), "daily_tokens": 2000000})
     enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
-    with pytest.raises(DomainError, match="DAILY_BUDGET"):
-        service.runs.configure("local", {**service.runs.settings("local"), "daily_tokens": 1000000})
+    with service.ledger.connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM rsi_pipeline_runs").fetchone()[0] == 3
+    service.runs.configure("local", {"revision": 0, "auto_publish": True})
+    assert service.runs.settings("local")["auto_publish"]
 
 
 def test_unknown_codex_cost_prevents_paid_replay(tmp_path):
@@ -249,6 +247,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
     from roami_agent.server.configuration import Settings
 
     service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
     service.control.register_machine(
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
     )
@@ -277,7 +276,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
         "reservation_tokens": 100000,
     }
     with service.ledger.connection() as db:
-        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 528000
+        assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
         db.execute(
             "INSERT INTO rsi_operation_costs VALUES('unknown','local','today',100,'unknown',NULL)"
         )
@@ -292,7 +291,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
             service, "local", {"request_key": "new", "case_ids": ["DOC-05"]}, Settings()
         )
     with service.ledger.connection() as db:
-        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 528000
+        assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
 
 
 @pytest.mark.parametrize("field", ["generation_tokens", "artifact_review_tokens"])

@@ -6,6 +6,7 @@ import time
 
 from roami_agent.improvement.contracts import require
 from roami_agent.improvement.input_reservation import InputReservation
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.model_observation import model_observation
@@ -18,7 +19,8 @@ class BudgetAdmissionRejected(DomainError):
 class EpisodeBudget:
     def __init__(self, limits, *, observation_id=None, shared_daily_limit=False):
         self.limits = limits
-        self.shared_daily_limit = shared_daily_limit
+        self.shared_daily_limit = shared_daily_limit or uses_shared_model_limit()
+        self.enforce_tokens = not self.shared_daily_limit
         self.observation_id = observation_id or "rsi-" + identity()
         self.started = time.monotonic()
         self.requests = []

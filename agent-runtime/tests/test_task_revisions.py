@@ -418,7 +418,10 @@ async def test_continuation_cannot_bypass_unaccepted_writes_but_accepted_history
         async def stream(self, messages, tools):
             if messages[-1]["role"] == "tool":
                 yield ModelEvent("text", "Created the proof file")
-            elif messages[-1]["content"].startswith("Continue the existing task"):
+            elif messages[-1]["content"] in {
+                "Answer a follow-up without writing",
+                "Another read-only follow-up",
+            }:
                 yield ModelEvent("text", "Read-only follow-up answer")
             else:
                 yield ModelEvent(

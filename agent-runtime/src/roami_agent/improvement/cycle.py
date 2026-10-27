@@ -20,6 +20,7 @@ from roami_agent.improvement.contracts import (
 from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.policy import policy_id, propose, validate_policy
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 
 
@@ -95,7 +96,7 @@ async def run_cycle(
     require(all(type(cost) is int and cost >= 0 for cost in costs.values()))
     tokens = len(trial_arms) * sum(costs.values())
     require(
-        getattr(ledger, "shared_daily_limit", False)
+        uses_shared_model_limit(ledger)
         or tokens <= daily_tokens
         and len(trial_arms) * len(cases) <= daily_episodes,
         "RSI_FULL_SUITE_BUDGET",
@@ -103,7 +104,7 @@ async def run_cycle(
     manifest = {
         "judge_hash": grading_hash(suite, executor),
         "spending_policy": "shared_model_daily"
-        if getattr(ledger, "shared_daily_limit", False)
+        if uses_shared_model_limit(ledger)
         else "frozen_protocol",
         "schedule_period": schedule_period,
         "period_machines": period_machines,

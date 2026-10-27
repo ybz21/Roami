@@ -13,7 +13,7 @@ from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
 
 
-def test_preview_checks_full_pair_budget_without_spending_or_writing(tmp_path):
+def test_preview_checks_setup_without_requiring_an_independent_token_budget(tmp_path):
     service = ImprovementStatus(tmp_path)
     control = service.control
     control.register_machine("local", {"id": "a", "label": "A", "mode": "container"})
@@ -27,7 +27,8 @@ def test_preview_checks_full_pair_budget_without_spending_or_writing(tmp_path):
     result = preview(service, "local", Settings())
     assert result["cases"] == 60 and result["episodes"] == 120
     assert result["reservation_tokens"] == 20000
-    assert {"RSI_FORMAL_SUITE_INCOMPLETE", "RSI_BUDGET_REQUIRED"} <= set(result["blockers"])
+    assert "RSI_FORMAL_SUITE_INCOMPLETE" in result["blockers"]
+    assert "RSI_BUDGET_REQUIRED" not in result["blockers"]
     assert result["next_run"] is None and result["runtime_preflight_required"]
     with service.ledger.connection() as db:
         assert list(db.iterdump()) == before

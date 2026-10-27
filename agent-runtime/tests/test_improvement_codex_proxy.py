@@ -106,7 +106,7 @@ async def test_untrusted_loopback_request_cannot_spend_or_forward_credentials(st
 async def test_incomplete_or_unpriced_codex_receipt_blocks_following_calls(
     store, complete, charged
 ):
-    proxy, _ = proxy_for(store, limit=1)
+    proxy, _ = proxy_for(store, limit=1, prices=False)
     requests = []
 
     def handler(request):

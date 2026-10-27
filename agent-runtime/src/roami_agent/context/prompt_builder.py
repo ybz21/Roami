@@ -18,6 +18,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.request_coverage import latest_coverage
 from roami_agent.storage.task_context import recent_task_context
 from roami_agent.storage.task_request import task_user_request
 
@@ -261,28 +262,30 @@ class PromptBuilder:
                     "for missing/stale details or older tasks: " + encoded(recent_tasks)
                 )
             if not completion and not turn.get("executionRunId"):
+                outcomes = await self.db.call(lambda db: latest_coverage(db, turn["id"]))
                 prompt.insert(
                     1 + plan["currentTurnStart"],
                     {
                         "role": "system",
-                        "content": "Current request boundary: handle the next user message and its tool round. "
-                        "Earlier unanswered requests resume separately: preserve their work, but do not "
-                        "delegate them here. Keep needed references. This grants no new permissions. "
-                        "A request to look up current external facts requires retrieval after this request, "
-                        "even when the user repeats a recently answered question. Earlier assistant claims, "
-                        "task success and remembered quota/price tables are not fresh evidence. Dispatch or "
-                        "continue the same tracked task for new retrieval; only recall old results when the "
-                        "user asks for a recap/status rather than a lookup. Preserve the current user's scope: "
-                        "do not copy assistant-invented source restrictions, result counts, step limits or stop-on-block rules "
-                        "from earlier delegated goals. If a source blocks access, use another relevant public "
-                        "source when the user's scope permits; mark unverified facts plainly. "
-                        "Before a handoff, inventory ALL independent outcomes requested in this user message. "
-                        "requestComplete applies to the WHOLE message, not just the submitted goal. "
-                        "If any outcome still needs work or target discovery, set requestComplete=false and handle that outcome next. "
-                        "For mixed lookup and project-edit requests, hand off both; never finish after only the lookup. "
-                        "Every delegate/task_steer requires requestComplete: true only on the final handoff, then end without polling. "
-                        "An accepted/queued/running task is still pending: do not present earlier results "
-                        "as this request's completed answer.",
+                        "content": "Current request boundary: handle this user message; older unanswered requests resume separately. "
+                        "Preserve prior work/references; do not redelegate. "
+                        "External facts need retrieval after this request, even on repeat; history/task success/"
+                        "memory are not fresh evidence. Recall only for a recap/status rather than a lookup. "
+                        "Preserve user scope, not assistant-invented source restrictions, counts or step/stop limits; "
+                        "try other relevant public sources when allowed and mark gaps. "
+                        "requestCoverage lists ALL outcomes: exact quote + pending/answered/current/"
+                        "delegated(taskId)/blocked(reason). For 'give report + open Roami task about broken delivery', continue the report "
+                        "and create a product-repair task, never a second report task or a note. "
+                        "For direct report + repair, delegate repair with requestComplete=false then reply with report. "
+                        "Continue tasks using only new user sourceQuote/text; never replay old briefs or expand merge into release/deployment. "
+                        "requestComplete covers the WHOLE message: false until all parts, including discovery, are handled; "
+                        "true only on the final delegate/task_steer then stop without polling. "
+                        "Accepted is pending, not completed."
+                        + (
+                            "\nPersisted outcome inventory for this request: " + encoded(outcomes)
+                            if outcomes
+                            else ""
+                        ),
                     },
                 )
             if turn.get("executionProfile") == "research":

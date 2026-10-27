@@ -13,6 +13,7 @@ from roami_agent.improvement.codex_proxy import codex_route
 from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.operation_accounting import archive_rejected_admission
+from roami_agent.improvement.spending_policy import model_proxy_for, uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.tools.process import execute
@@ -186,18 +187,34 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
         + " role. Use only the supplied evidence. Do not call tools. Return the requested JSON object.\n"
         + json.dumps(messages, ensure_ascii=False)
     )
-    shared = getattr(workflow.ledger, "shared_daily_limit", False)
+    shared = uses_shared_model_limit(workflow.ledger)
     require(shared or len(prompt.encode()) + 8192 <= config["model_tokens"], "RSI_TOKEN_BUDGET")
     selected, env = codex_configuration()
+    proxy = model_proxy_for(workflow)
+    if proxy is not None:
+        require(
+            isinstance(selected.get("model"), str) and 0 < len(selected["model"]) <= 200,
+            "RSI_CODEX_MODEL_REQUIRED",
+        )
+
     request_hash = digest([action["kind"], messages, selected])
     # CLI usage is reported at turn completion, not a provider-enforced token ceiling.
-    saved = await asyncio.to_thread(
-        workflow.reserve_operation,
-        action["owner"],
-        workflow.day(action["owner"]),
-        operation,
-        config["model_tokens"],
+    saved = (
+        await asyncio.to_thread(workflow.operation_result, action["owner"], operation)
+        if proxy is not None
+        else None
     )
+    if proxy is not None and (saved is None or saved.get("value", {}).get("admission_rejected")):
+        await proxy.ready()
+        await proxy.billing.check()
+    if saved is None:
+        saved = await asyncio.to_thread(
+            workflow.reserve_operation,
+            action["owner"],
+            workflow.day(action["owner"]),
+            operation,
+            config["model_tokens"],
+        )
     if saved is not None:
         value = saved["value"]
         require(value.get("request_hash") == request_hash, "RSI_OPERATION_CONTEXT_CHANGED")
@@ -269,9 +286,10 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
     )
     started = time.monotonic()
     outcome = {}
-    async with codex_route(
-        getattr(workflow, "model_proxy", None), selected, env, action["kind"], outcome=outcome
-    ) as (routed, environment):
+    async with codex_route(proxy, selected, env, action["kind"], outcome=outcome) as (
+        routed,
+        environment,
+    ):
         for name, value in routed.items():
             encoded = (
                 "{ "

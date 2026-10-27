@@ -12,6 +12,7 @@ from roami_agent.improvement.cycle import run_cycle
 from roami_agent.improvement.daily_suite import daily_coverage, validate_private_separation
 from roami_agent.improvement.executors import private_json
 from roami_agent.improvement.source_revision import allowed, source_hash
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 
 
 def problem_improved(finding, baseline, candidate):
@@ -172,7 +173,7 @@ async def verify_candidate(
             candidate,
             artifact_reviewer=reviewer,
             provider_factory=provider_factory,
-            shared_daily_limit=getattr(workflow.ledger, "shared_daily_limit", False),
+            shared_daily_limit=uses_shared_model_limit(workflow.ledger),
         )
     else:
         executor = executor_factory(settings, candidate)
@@ -185,7 +186,7 @@ async def verify_candidate(
         needed = 2 * sum(executor.reservation_tokens(c) for s in suites for c in s["cases"])
         episodes = 2 * sum(len(s["cases"]) for s in suites)
         require(
-            getattr(workflow.ledger, "shared_daily_limit", False)
+            uses_shared_model_limit(workflow.ledger)
             or budget
             and budget["tokens_reserved"] + needed <= budget["tokens_limit"]
             and budget["episodes_reserved"] + episodes <= budget["episodes_limit"],

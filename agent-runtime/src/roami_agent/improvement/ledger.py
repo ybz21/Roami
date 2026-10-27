@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from roami_agent.improvement.contracts import digest, require
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 
 SCHEMA = """
@@ -105,7 +106,7 @@ class Ledger:
             os.close(lock)
 
     def reserve(self, owner, day, manifest, *, tokens_limit, episodes_limit):
-        shared = getattr(self, "shared_daily_limit", False)
+        shared = uses_shared_model_limit(self)
         require(isinstance(owner, str) and 0 < len(owner) <= 200)
         require(shared or type(tokens_limit) is int and tokens_limit > 0)
         require(shared or type(episodes_limit) is int and 0 < episodes_limit <= 10000)

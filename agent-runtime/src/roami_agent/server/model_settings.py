@@ -205,7 +205,10 @@ class ModelSettings:
             raise DomainError("INVALID_MODEL_CONFIG")
         saved = {role: dict(value) for role, value in self.saved.items()}
         if "proxy" in patch:
-            saved["proxy"] = proxy_configuration(patch["proxy"])
+            changes = patch["proxy"]
+            if isinstance(changes, dict) and self.saved.get("proxy") is not None:
+                changes = {**proxy_configuration(self.saved["proxy"]), **changes}
+            saved["proxy"] = proxy_configuration(changes)
         if "connection" in patch:
             changes = patch["connection"]
             if not isinstance(changes, dict) or set(changes) - {"baseUrl", "apiKey"}:

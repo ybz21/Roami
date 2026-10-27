@@ -5,13 +5,18 @@ import { useI18n } from '../../i18n'
 import { ModelCharges, type ModelCharge } from './model-charges'
 import { ModelUsageStatistics, type UsageStatistics } from './model-usage-statistics'
 
-export type ModelProxyConfig = { dailyLimit: number | null; currency: string }
-export type ModelProxyDraft = { dailyLimit: string; currency: string }
-type Usage = { statistics?: UsageStatistics; day: string; timezone: string; requests: number; charges: ModelCharge[]; estimatedCharges: ModelCharge[]; unknown: number; pending: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; recent: { id: string; role: string; model: string; started_ms: number; state: string; cost_source: string; charges: ModelCharge[]; estimatedCharges: ModelCharge[] }[] }
-export const proxyDraft = (config?: ModelProxyConfig): ModelProxyDraft => ({ dailyLimit: config?.dailyLimit?.toString() || '', currency: config?.currency || (config ? 'CNY' : 'USD') })
-export const proxyConfig = (draft: ModelProxyDraft): ModelProxyConfig => ({ dailyLimit: draft.dailyLimit === '' ? null : Number(draft.dailyLimit), currency: draft.currency })
-const validAmount = (text: string) => { const value = Number(text); return text !== '' && Number.isFinite(value) && value > 0 && value <= 1000000 && Number(value.toFixed(6)) === value }
-export const validProxyDraft = (draft: ModelProxyDraft) => (draft.dailyLimit === '' || validAmount(draft.dailyLimit)) && /^[A-Z]{3}$/.test(draft.currency)
+export type ModelPrice = { currency: string; input: number; output: number; cacheRead: number | null }
+export type ModelProxyConfig = { dailyLimit: number | null; currency: string; prices?: Record<string, ModelPrice> }
+export type PriceDraft = { currency: string; input: string; output: string; cacheRead: string }
+export type ModelProxyDraft = { dailyLimit: string; currency: string; prices: Record<string, PriceDraft> }
+type Usage = { statistics?: UsageStatistics; day: string; timezone: string; requests: number; charges: ModelCharge[]; localCharges?: ModelCharge[]; estimatedCharges: ModelCharge[]; unknown: number; pending: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; recent: { id: string; role: string; model: string; started_ms: number; state: string; cost_source: string; charges: ModelCharge[]; localCharges?: ModelCharge[]; estimatedCharges: ModelCharge[] }[] }
+export const proxyDraft = (config?: ModelProxyConfig): ModelProxyDraft => ({ dailyLimit: config?.dailyLimit?.toString() || '', currency: config?.currency || (config ? 'CNY' : 'USD'), prices: Object.fromEntries(Object.entries(config?.prices || {}).map(([model, price]) => [model, { currency: price.currency || config?.currency || 'CNY', input: String(price.input), output: String(price.output), cacheRead: price.cacheRead?.toString() ?? '' }])) })
+export const priceFields = ['input', 'output', 'cacheRead'] as const
+export const hasPrice = (price: PriceDraft) => priceFields.some(key => price[key] !== '')
+export const proxyConfig = (draft: ModelProxyDraft): ModelProxyConfig => ({ dailyLimit: draft.dailyLimit === '' ? null : Number(draft.dailyLimit), currency: draft.currency, prices: Object.fromEntries(Object.entries(draft.prices).filter(([, price]) => hasPrice(price)).map(([model, price]) => [model, { currency: price.currency, input: Number(price.input), output: Number(price.output), cacheRead: price.cacheRead === '' ? null : Number(price.cacheRead) }])) })
+const validAmount = (text: string) => { const value = Number(text); return text !== '' && Number.isFinite(value) && value >= 0 && value <= 1000000 && Number(value.toFixed(6)) === value }
+export const validPriceDraft = (price: PriceDraft) => !hasPrice(price) || /^[A-Z]{3}$/.test(price.currency) && validAmount(price.input) && validAmount(price.output) && (price.cacheRead === '' || validAmount(price.cacheRead))
+export const validProxyDraft = (draft: ModelProxyDraft) => (draft.dailyLimit === '' || validAmount(draft.dailyLimit) && Number(draft.dailyLimit) > 0) && /^[A-Z]{3}$/.test(draft.currency) && Object.values(draft.prices).filter(hasPrice).length <= 32 && Object.values(draft.prices).every(validPriceDraft)
 
 export function ModelProxySettings({ value, disabled, onChange, snapshot, active }: { active: boolean; value: ModelProxyDraft; disabled: boolean; onChange: (value: ModelProxyDraft) => void; snapshot: unknown }) {
   const { t, locale } = useI18n()
@@ -32,14 +37,14 @@ export function ModelProxySettings({ value, disabled, onChange, snapshot, active
     <p className="agent-settings-hint">{t('agent.proxy.scope')}</p>
     {usage && Array.isArray(usage.charges) ? <>
       <div className="agent-proxy-totals" role="status">
-        <div><span>{t('agent.proxy.todayCost')}</span><strong><ModelCharges charges={usage.charges} estimatedCharges={usage.estimatedCharges} incomplete={usage.unknown > 0 || usage.pending > 0} /></strong></div>
+        <div><span>{t('agent.proxy.todayCost')}</span><strong><ModelCharges charges={usage.charges} localCharges={usage.localCharges} estimatedCharges={usage.estimatedCharges} incomplete={usage.unknown > 0 || usage.pending > 0} /></strong></div>
         <div><span>{t('agent.proxy.requests')}</span><strong>{count(usage.requests)}</strong></div>
         <div><span>{t('agent.proxy.tokens')}</span><strong>{count(usage.inputTokens + usage.outputTokens)}</strong></div>
       </div>
       <p className="agent-settings-hint">{t('agent.proxy.period', { day: new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(usage.day + 'T00:00:00Z')), zone: usage.timezone })}</p>
       {usage.unknown > 0 && <p className="agent-settings-error" role="status">{t('agent.proxy.unknown', { count: count(usage.unknown) })}</p>}
       {usage.pending > 0 && <p className="agent-settings-hint">{t('agent.proxy.pending', { count: count(usage.pending) })}</p>}
-      {usage.recent.length > 0 && <details className="agent-model-advanced"><summary>{t('agent.proxy.recent')}</summary><ul className="agent-proxy-calls">{usage.recent.map(call => <li key={call.id}><div><strong>{call.model}</strong><span>{t(call.role.startsWith('rsi_codex_') ? 'agent.proxy.rsiCodex' : call.role.startsWith('rsi_') ? 'agent.proxy.rsi' : 'agent.models.role.' + call.role)} · {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: usage.timezone }).format(call.started_ms)}</span></div><span>{t(call.cost_source === 'estimate' ? 'agent.proxy.estimate' : 'agent.proxy.state.' + call.state)}</span><strong>{call.cost_source === 'not_sent' ? t('agent.proxy.notSent') : <ModelCharges charges={call.charges} estimatedCharges={call.estimatedCharges} />}</strong></li>)}</ul></details>}
+      {usage.recent.length > 0 && <details className="agent-model-advanced"><summary>{t('agent.proxy.recent')}</summary><ul className="agent-proxy-calls">{usage.recent.map(call => <li key={call.id}><div><strong>{call.model}</strong><span>{t(call.role.startsWith('rsi_codex_') ? 'agent.proxy.rsiCodex' : call.role.startsWith('rsi_') ? 'agent.proxy.rsi' : 'agent.models.role.' + call.role)} · {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: usage.timezone }).format(call.started_ms)}</span></div><span>{t(call.cost_source === 'estimate' ? (call.localCharges?.length ? 'agent.proxy.localEstimate' : 'agent.proxy.estimate') : 'agent.proxy.state.' + call.state)}</span><strong>{call.cost_source === 'not_sent' ? t('agent.proxy.notSent') : <ModelCharges charges={call.charges} localCharges={call.localCharges} estimatedCharges={call.estimatedCharges} />}</strong></li>)}</ul></details>}
     </> : !failed && <Spin size="small" />}
     {failed && <div role="alert"><p>{t('agent.proxy.loadFailed')}</p><Button onClick={() => setRetry(v => v + 1)}>{t('agent.retry')}</Button></div>}
     <ModelUsageStatistics statistics={usage?.statistics} days={days} onDaysChange={setDays} selectedDay={selectedDay || usage?.day} today={usage?.day} onDayChange={setSelectedDay} loading={loading} disabled={disabled} />

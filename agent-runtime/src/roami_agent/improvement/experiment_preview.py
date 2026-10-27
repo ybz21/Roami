@@ -6,12 +6,13 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.artifact_review import ArtifactReviewer, needs_artifact_review
 from roami_agent.improvement.contracts import load_suite, require
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 
 
 def preview(service, owner, settings):
     prefs = service.control.preferences(owner)
-    shared = getattr(service.ledger, "shared_daily_limit", False)
+    shared = uses_shared_model_limit(service.ledger)
     catalog = service.control.catalog(owner)
     selected = next((s for s in catalog["suites"] if s["id"] == prefs["suite_id"]), None)
     blockers, tokens, artifact_count = [], None, 0
@@ -46,14 +47,7 @@ def preview(service, owner, settings):
     episodes = (60 if shared else 120) * machines
     if not machines:
         blockers.append("RSI_MACHINE_NOT_FOUND")
-    if not shared and prefs["daily_episodes"] < episodes:
-        blockers.append("RSI_EPISODE_BUDGET")
     reservation = tokens * 2 * machines if tokens is not None and machines else None
-    if not shared and (
-        not prefs["daily_tokens"]
-        or (reservation is not None and prefs["daily_tokens"] < reservation)
-    ):
-        blockers.append("RSI_BUDGET_REQUIRED")
     if not settings.endpoint or not settings.model:
         blockers.append("MODEL_NOT_CONFIGURED")
     now = datetime.now(ZoneInfo(prefs["timezone"]))

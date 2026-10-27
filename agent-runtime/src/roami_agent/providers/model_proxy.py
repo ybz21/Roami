@@ -2,12 +2,25 @@
 
 import asyncio
 import json
+from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 from decimal import Decimal
 
 import httpx
 
 from roami_agent.providers.model_billing import ModelBilling, proxy_configuration, usage_counts
 from roami_agent.providers.upstream_costs import upstream_charge
+
+model_proxy_context = ContextVar("model_proxy_context", default=None)
+
+
+@contextmanager
+def model_accounting(proxy):
+    token = model_proxy_context.set(proxy)
+    try:
+        yield
+    finally:
+        model_proxy_context.reset(token)
 
 
 class ModelProxy:
@@ -17,17 +30,57 @@ class ModelProxy:
         self.recovery = asyncio.Lock()
 
     def attach(self, provider, role):
+        if getattr(provider, "_roami_model_proxy", None) is self:
+            return provider
         upstream = provider.client
         provider.client = httpx.AsyncClient(
             transport=ProxyTransport(self, upstream, role, provider.model),
             timeout=upstream.timeout,
             follow_redirects=False,
         )
+        provider._roami_model_proxy = self
         return provider
 
     async def ready(self):
         async with self.recovery:
             await self.billing.recover()
+
+    @asynccontextmanager
+    async def external_turn(self, role, model):
+        await self.ready()
+        limited = proxy_configuration(self.billing.configuration())["dailyLimit"] is not None
+        held, call_id = False, None
+        receipt = {"sent": False, "counts": None}
+        error = None
+        try:
+            if limited:
+                await self.admission.acquire()
+                held = True
+            admission = asyncio.create_task(self.billing.admit(role, model))
+            try:
+                call_id = await asyncio.shield(admission)
+            except asyncio.CancelledError:
+                call_id = await admission
+                raise
+            yield receipt
+        except BaseException as exc:
+            error = getattr(exc, "code", "MODEL_PROXY_EXTERNAL_FAILED")
+            raise
+        finally:
+            try:
+                if call_id is not None:
+                    await finish(
+                        self.billing.settle(
+                            call_id,
+                            receipt["counts"],
+                            failed=error is not None and receipt["counts"] is None,
+                            not_sent=not receipt["sent"],
+                            error=error,
+                        )
+                    )
+            finally:
+                if held:
+                    self.admission.release()
 
 
 async def finish(operation):

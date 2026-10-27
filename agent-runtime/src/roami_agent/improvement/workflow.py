@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.contracts import digest, require
 from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.identity import now_ms
 
 SCHEMA = """
@@ -138,15 +139,15 @@ class ResearchWorkflow:
 
     def configure_experiment(self, owner, raw):
         fields = {"enabled", "model_tokens", "model_seconds", "max_attempts", "observation_days"}
-        if getattr(self.ledger, "shared_daily_limit", False):
+        if uses_shared_model_limit(self.ledger):
             public = fields - {"model_tokens"} | {"revision"}
-            require(isinstance(raw, dict) and public <= set(raw) <= fields | {"revision"})
+            require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
             value = self.configure(
                 owner,
                 {**self.settings(owner), **{key: val for key, val in raw.items() if key in public}},
             )
             return {key: val for key, val in value.items() if key in public}
-        require(isinstance(raw, dict) and set(raw) == fields | {"revision"})
+        require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
         return self.configure(owner, {**self.settings(owner), **raw})
 
     def _enqueue(self, db, owner, kind, subject, payload):
@@ -182,8 +183,16 @@ class ResearchWorkflow:
                 db.execute(
                     "UPDATE rsi_actions SET state='queued',error_code=NULL,due_ms=? "
                     "WHERE owner=? AND state='waiting_budget' AND json_extract(payload_json,'$.budget_day')!=? "
-                    "AND EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?)",
-                    (self.clock(), owner, day, owner, day),
+                    "AND (? OR EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?))",
+                    (
+                        self.clock(),
+                        owner,
+                        day,
+                        getattr(self, "model_proxy", None) is not None
+                        or uses_shared_model_limit(self.ledger),
+                        owner,
+                        day,
+                    ),
                 )
         with self.ledger.connection() as db:
             cycles = [
@@ -204,9 +213,7 @@ class ResearchWorkflow:
             self.enqueue_review(c["owner"], c["id"])
 
     def day(self, owner):
-        if getattr(self, "model_proxy", None) is not None and getattr(
-            self.ledger, "shared_daily_limit", False
-        ):
+        if getattr(self, "model_proxy", None) is not None:
             return self.model_proxy.billing.period()[0]
         with self.ledger.connection() as db:
             row = db.execute(
@@ -580,6 +587,17 @@ class ResearchWorkflow:
                     db, owner, "sync_issue", report[0] + ":" + cycle_id, {"cycle_id": report[0]}
                 )
 
+    def operation_result(self, owner, key):
+        with self.ledger.connection() as db:
+            row = db.execute(
+                "SELECT state,result_json FROM rsi_operation_costs WHERE owner=? AND id=?",
+                (owner, key),
+            ).fetchone()
+        if row is None:
+            return None
+        require(row["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION")
+        return json.loads(row["result_json"])
+
     def reserve_operation(self, owner, day, key, tokens):
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -591,12 +609,12 @@ class ResearchWorkflow:
                     prior["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION"
                 )
                 return json.loads(prior["result_json"])
-            assert_operation_costs_settled(db, owner)
+            assert_operation_costs_settled(db, owner, shared=uses_shared_model_limit(self.ledger))
             budget = db.execute(
                 "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
             ).fetchone()
             require(
-                getattr(self.ledger, "shared_daily_limit", False)
+                uses_shared_model_limit(self.ledger)
                 or budget
                 and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
                 "RSI_DAILY_BUDGET",
@@ -667,7 +685,7 @@ class ResearchWorkflow:
                 "settings": {
                     key: val
                     for key, val in settings.items()
-                    if not getattr(self.ledger, "shared_daily_limit", False)
+                    if not uses_shared_model_limit(self.ledger)
                     or key
                     in {"revision", "enabled", "model_seconds", "max_attempts", "observation_days"}
                 },

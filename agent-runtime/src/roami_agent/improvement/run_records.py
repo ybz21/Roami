@@ -9,6 +9,7 @@ from pathlib import Path
 
 from roami_agent.improvement.case_catalog import case_identity
 from roami_agent.improvement.contracts import digest, require
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -207,7 +208,7 @@ class RunRecords:
             return {**DEFAULTS, **(json.loads(row[0]) if row else {})}
 
     def configure(self, owner, value):
-        shared = getattr(self.ledger, "shared_daily_limit", False)
+        shared = uses_shared_model_limit(self.ledger)
         if shared:
             require(
                 isinstance(value, dict)
@@ -220,20 +221,7 @@ class RunRecords:
                 "auto_publish": value["auto_publish"],
             }
         require(
-            isinstance(value, dict)
-            and set(DEFAULTS)
-            - {
-                "main_output_tokens",
-                "worker_output_tokens",
-                "main_model",
-                "main_reasoning_effort",
-                "worker_model",
-                "worker_reasoning_effort",
-                "memory_model",
-                "memory_reasoning_effort",
-            }
-            <= set(value)
-            <= set(DEFAULTS),
+            isinstance(value, dict) and {"revision"} <= set(value) <= set(DEFAULTS),
             "RSI_INVALID_SETTINGS",
         )
         value = {**self.settings(owner), **value}
@@ -554,8 +542,7 @@ class RunRecords:
             "settings": {
                 key: val
                 for key, val in self.settings(owner).items()
-                if not getattr(self.ledger, "shared_daily_limit", False)
-                or key in {"revision", "auto_publish"}
+                if not uses_shared_model_limit(self.ledger) or key in {"revision", "auto_publish"}
             },
             "runs": runs,
             "issues": issues,
@@ -766,7 +753,7 @@ class RunRecords:
                 ).fetchone()
                 amount = config["codex_tokens"] * 2
                 if (
-                    not getattr(self.ledger, "shared_daily_limit", False)
+                    not uses_shared_model_limit(self.ledger)
                     and budget["tokens_reserved"] + amount > budget["tokens_limit"]
                 ):
                     db.execute(

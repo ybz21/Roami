@@ -14,6 +14,7 @@ from roami_agent.improvement.contracts import (
     require,
 )
 from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.model_routes import settings_with_route
 
 INSTRUCTIONS = """You are Roami RSI's read-only behavior reviewer. Review the supplied trial's
@@ -133,7 +134,7 @@ async def prefetch_reviews(workflow, action, settings, config, packets, saved):
         if group and (
             next(iter(group.values()))["protected"] != packet["protected"]
             or len(proposed) > 4
-            or not getattr(workflow.ledger, "shared_daily_limit", False)
+            or not uses_shared_model_limit(workflow.ledger)
             and len(json.dumps(proposed, ensure_ascii=False).encode()) + 18000
             > config["model_tokens"]
         ):

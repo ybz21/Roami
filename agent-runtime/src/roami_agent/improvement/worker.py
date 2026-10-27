@@ -15,6 +15,7 @@ from roami_agent.improvement.contracts import (
     require,
 )
 from roami_agent.improvement.policy import BOUNDS, next_candidate
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -75,12 +76,22 @@ class EvaluationWorker:
                 pass
 
     async def execute(self, request):
+        from roami_agent.providers.model_proxy import model_accounting
+
+        with model_accounting(getattr(self.runtime, "model_proxy", None)):
+            return await self._execute(request)
+
+    async def _execute(self, request):
         from roami_agent.improvement.cycle import run_cycle
         from roami_agent.improvement.executors import ExternalExecutor, NativeFilesExecutor
 
         if hasattr(self.service, "runs"):
             await asyncio.to_thread(self.service.runs.begin_request, request)
         try:
+            proxy = getattr(self.runtime, "model_proxy", None)
+            if proxy is not None:
+                await proxy.ready()
+                await proxy.billing.check()
             if "diagnostic" in json.loads(request["payload_json"]):
                 from roami_agent.improvement.pipeline_runner import execute_diagnostic
 
@@ -103,7 +114,7 @@ class EvaluationWorker:
                 )
             settings = self.runtime.settings.current
             provider_factory = getattr(self.service, "provider_factory", None)
-            shared = getattr(self.service.ledger, "shared_daily_limit", False)
+            shared = uses_shared_model_limit(self.service.ledger)
             require(
                 not shared or machine["mode"] in {"container", "native_files"},
                 "RSI_SHARED_MODEL_GATEWAY_REQUIRED",

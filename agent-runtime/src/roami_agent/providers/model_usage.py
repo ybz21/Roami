@@ -9,10 +9,11 @@ from roami_agent.providers.upstream_costs import add_amounts
 
 USAGE_COLUMNS = """
 COUNT(*) AS requests,
-COALESCE(SUM(state!='pending' AND cost_source IN ('unknown','estimate')),0) AS unknown,
+COALESCE(SUM(state!='pending' AND (cost_source='unknown' OR (cost_source='estimate' AND cost_amount IS NULL))),0) AS unknown,
 COALESCE(SUM(state='pending'),0) AS pending,
 COALESCE(SUM(state='failed'),0) AS failed,
-COALESCE(SUM(cost_source='estimate'),0) AS estimated,
+COALESCE(SUM(cost_source='estimate' AND cost_amount IS NULL),0) AS estimated,
+COALESCE(SUM(cost_source='estimate' AND cost_amount IS NOT NULL),0) AS local_estimated,
 COALESCE(SUM(state!='pending' AND cost_source!='not_sent' AND (input_tokens IS NULL OR output_tokens IS NULL)),0) AS missing_usage,
 COALESCE(SUM(input_tokens),0) AS input,
 COALESCE(SUM(output_tokens),0) AS output,
@@ -27,6 +28,7 @@ def usage_totals(row):
         "pending": row["pending"],
         "failed": row["failed"],
         "estimated": row["estimated"],
+        "localEstimated": row["local_estimated"],
         "missingUsage": row["missing_usage"],
         "inputTokens": row["input"],
         "outputTokens": row["output"],
@@ -43,17 +45,25 @@ def charge_list(amounts):
 
 
 def row_charges(row):
-    actual, estimated = {}, {}
-    if row["cost_source"] == "upstream":
-        actual[row["cost_currency"]] = Decimal(row["cost_amount"])
+    billable, local, historical = {}, {}, {}
+    if row["cost_source"] == "upstream" or (
+        row["cost_source"] == "estimate" and row["cost_amount"] is not None
+    ):
+        billable[row["cost_currency"]] = Decimal(row["cost_amount"])
+        if row["cost_source"] == "estimate":
+            local[row["cost_currency"]] = Decimal(row["cost_amount"])
     elif row["cost_source"] == "estimate" and row["cost_nano"] is not None:
-        estimated["CNY"] = Decimal(row["cost_nano"]) / 1_000_000_000
-    return {"charges": charge_list(actual), "estimatedCharges": charge_list(estimated)}
+        historical["CNY"] = Decimal(row["cost_nano"]) / 1_000_000_000
+    return {
+        "charges": charge_list(billable),
+        "localCharges": charge_list(local),
+        "estimatedCharges": charge_list(historical),
+    }
 
 
 def add_row_charges(group, row):
     charges = row_charges(row)
-    for amounts, key in zip(group, ("charges", "estimatedCharges"), strict=True):
+    for amounts, key in zip(group, ("charges", "localCharges", "estimatedCharges"), strict=True):
         for charge in charges[key]:
             currency = charge["currency"]
             amounts[currency] = add_amounts(
@@ -63,17 +73,21 @@ def add_row_charges(group, row):
 
 def hourly_statistics(db, day, fields, chart_models):
     hours = [{"hour": hour, **dict.fromkeys(fields, 0)} for hour in range(24)]
-    fees = [({}, {}) for _ in hours]
+    fees = [({}, {}, {}) for _ in hours]
     model_hours = [{} for _ in hours]
     for row in db.execute("SELECT * FROM model_proxy_calls WHERE day=?", (day,)):
         hour = datetime.fromtimestamp(row["started_ms"] / 1000, ZoneInfo(row["timezone"])).hour
         source, state = row["cost_source"], row["state"]
         counts = {
             "requests": 1,
-            "unknown": int(state != "pending" and source in {"unknown", "estimate"}),
+            "unknown": int(
+                state != "pending"
+                and (source == "unknown" or (source == "estimate" and row["cost_amount"] is None))
+            ),
             "pending": int(state == "pending"),
             "failed": int(state == "failed"),
-            "estimated": int(source == "estimate"),
+            "estimated": int(source == "estimate" and row["cost_amount"] is None),
+            "localEstimated": int(source == "estimate" and row["cost_amount"] is not None),
             "missingUsage": int(
                 state != "pending"
                 and source != "not_sent"
@@ -88,7 +102,7 @@ def hourly_statistics(db, day, fields, chart_models):
             hours[hour][field] += value
         add_row_charges(fees[hour], row)
         model = row["model"] if row["model"] in chart_models else None
-        part, costs = model_hours[hour].setdefault(model, (dict.fromkeys(fields, 0), ({}, {})))
+        part, costs = model_hours[hour].setdefault(model, (dict.fromkeys(fields, 0), ({}, {}, {})))
         for field, value in counts.items():
             part[field] += value
         add_row_charges(costs, row)
@@ -96,13 +110,15 @@ def hourly_statistics(db, day, fields, chart_models):
         {
             **row,
             "charges": charge_list(fee[0]),
-            "estimatedCharges": charge_list(fee[1]),
+            "localCharges": charge_list(fee[1]),
+            "estimatedCharges": charge_list(fee[2]),
             "models": [
                 {
                     "model": model,
                     **counts,
                     "charges": charge_list(cost[0]),
-                    "estimatedCharges": charge_list(cost[1]),
+                    "localCharges": charge_list(cost[1]),
+                    "estimatedCharges": charge_list(cost[2]),
                 }
                 for model, (counts, cost) in parts.items()
             ],
@@ -112,23 +128,27 @@ def hourly_statistics(db, day, fields, chart_models):
 
 
 def money_records(db, where, parameters, *, models=(), daily_start=None, chart_models=()):
-    total, by_model, by_day, daily_models = ({}, {}), {}, {}, {}
+    total, by_model, by_day, daily_models = ({}, {}, {}), {}, {}, {}
     for row in db.execute(
         f"SELECT model,day,cost_source,cost_amount,cost_currency,cost_nano FROM model_proxy_calls WHERE {where} AND cost_source IN ('upstream','estimate')",
         parameters,
     ):
         groups = [total]
         if row["model"] in models:
-            groups.append(by_model.setdefault(row["model"], ({}, {})))
+            groups.append(by_model.setdefault(row["model"], ({}, {}, {})))
         if daily_start is not None and row["day"] >= daily_start:
-            groups.append(by_day.setdefault(row["day"], ({}, {})))
+            groups.append(by_day.setdefault(row["day"], ({}, {}, {})))
             model = row["model"] if row["model"] in chart_models else None
-            groups.append(daily_models.setdefault((row["day"], model), ({}, {})))
+            groups.append(daily_models.setdefault((row["day"], model), ({}, {}, {})))
         for group in groups:
             add_row_charges(group, row)
 
     def view(group):
-        return {"charges": charge_list(group[0]), "estimatedCharges": charge_list(group[1])}
+        return {
+            "charges": charge_list(group[0]),
+            "localCharges": charge_list(group[1]),
+            "estimatedCharges": charge_list(group[2]),
+        }
 
     return {
         "total": view(total),
@@ -170,7 +190,7 @@ def usage_statistics(db, day, days):
         daily_start=daily_start,
         chart_models=chart_models,
     )
-    no_cost = {"charges": [], "estimatedCharges": []}
+    no_cost = {"charges": [], "localCharges": [], "estimatedCharges": []}
     placeholders = ",".join("?" for _ in chart_models) or "NULL"
     parts = db.execute(
         f"SELECT day,CASE WHEN model IN ({placeholders}) THEN model ELSE NULL END AS series_model,{USAGE_COLUMNS} FROM model_proxy_calls WHERE day>=? AND day<=? GROUP BY day,series_model ORDER BY day,series_model",

@@ -7,12 +7,33 @@ import pytest
 from test_improvement_control import suite_file
 
 from roami_agent.app import Runtime
+from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.protocol.errors import DomainError
 from roami_agent.server.http import create_app
 
 
 class Model:
     model = "fixture"
+
+
+@pytest.mark.parametrize(
+    ("tokens", "shared", "accepted"), [(10, True, True), (None, True, False), (10, False, False)]
+)
+def test_legacy_known_receipts_can_exceed_old_reservations_only_under_shared_policy(
+    tmp_path, tokens, shared, accepted
+):
+    service = ImprovementStatus(tmp_path)
+    with service.ledger.connection() as db:
+        db.execute(
+            "INSERT INTO rsi_operation_costs VALUES('legacy','local','day',1,'completed',?)",
+            (json.dumps({"value": {"metrics": {"tokens": tokens}}}),),
+        )
+        if accepted:
+            assert_operation_costs_settled(db, "local", shared=shared)
+        else:
+            with pytest.raises(DomainError, match="UNKNOWN_OPERATION"):
+                assert_operation_costs_settled(db, "local", shared=shared)
 
 
 async def test_runtime_settings_omit_quota_fields_and_keep_legacy_audit_values(store, tmp_path):

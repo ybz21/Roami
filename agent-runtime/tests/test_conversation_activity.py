@@ -266,11 +266,13 @@ async def test_worker_process_and_conversation_are_task_scoped_not_main_chat(sto
         await runtime.close()
 
 
-async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery():
+async def test_delegate_receipt_does_not_repeat_goal_or_claim_delivery(store):
     from roami_agent.tools.main_catalog import register_main_tools
     from roami_agent.tools.registry import Tools
 
     class TaskStore:
+        db = store
+
         async def create(self, *args, **kwargs):
             return {
                 "id": "accepted-task",

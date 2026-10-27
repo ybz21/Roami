@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, ConfigProvider, Input, InputNumber, Select, Spin, Switch } from 'antd'
+import { modelSettingsHref } from '../settings/model-settings-route'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -118,7 +119,7 @@ export default function RsiWorkspace({ node, runId = '', onRun }: { node: string
     if (next.runId !== previous.runId) onRun?.(next.runId)
   }
   const proxy = models.value?.proxy
-  const modelLink = () => { location.hash = '#/settings/agent/runtime' }
+  const modelLink = () => { location.hash = modelSettingsHref('proxy') }
   const settings = draft ? <ConfigProvider componentDisabled={!!busy}>
     <div className="rsi-scroll"><div className="rsi-content">
       {error && <p role="alert" className="rsi-danger">{t('agent.rsi.operationFailed', { code: error })}</p>}

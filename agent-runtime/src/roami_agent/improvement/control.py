@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from roami_agent.improvement.contracts import digest, identifier, load_suite, require
 from roami_agent.improvement.daily_suite import daily_coverage
 from roami_agent.improvement.policy import validate_policy
+from roami_agent.improvement.spending_policy import uses_shared_model_limit
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 
@@ -41,11 +42,11 @@ class ImprovementControl:
             }
 
     def save(self, owner, raw):
-        shared = getattr(self.ledger, "shared_daily_limit", False)
+        shared = uses_shared_model_limit(self.ledger)
         if shared:
             public = {*DEFAULTS, "revision"} - {"daily_tokens", "daily_episodes"}
             require(
-                isinstance(raw, dict) and public <= set(raw) <= {*DEFAULTS, "revision"},
+                isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
                 "RSI_INVALID_SETTINGS",
             )
             raw = {
@@ -53,9 +54,11 @@ class ImprovementControl:
                 **{key: value for key, value in raw.items() if key in public},
             }
         require(
-            isinstance(raw, dict) and set(raw) == {*DEFAULTS, "revision"}, "RSI_INVALID_SETTINGS"
+            isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
+            "RSI_INVALID_SETTINGS",
         )
-        value = {k: raw[k] for k in DEFAULTS}
+        prior_values = self.preferences(owner)
+        value = {k: raw.get(k, prior_values[k]) for k in DEFAULTS}
         validate_policy(value["candidate_policy"])
         require(type(value["enabled"]) is bool and type(value["auto_candidates"]) is bool)
         require(type(value["hour"]) is int and 0 <= value["hour"] <= 23)
@@ -84,12 +87,6 @@ class ImprovementControl:
                 "RSI_SETTINGS_CONFLICT",
             )
             if value["enabled"]:
-                require(
-                    getattr(self.ledger, "shared_daily_limit", False)
-                    or value["daily_tokens"] > 0
-                    and value["daily_episodes"] >= 2,
-                    "RSI_BUDGET_REQUIRED",
-                )
                 require(
                     bool(value["machine_ids"]) and bool(value["suite_id"]), "RSI_SETUP_REQUIRED"
                 )
@@ -134,7 +131,7 @@ class ImprovementControl:
         return {
             key: val
             for key, val in value.items()
-            if not getattr(self.ledger, "shared_daily_limit", False)
+            if not uses_shared_model_limit(self.ledger)
             or key not in {"daily_tokens", "daily_episodes"}
         }
 
@@ -226,12 +223,6 @@ class ImprovementControl:
         require(kind in {"manual", "daily"})
         prefs = self.preferences(owner)
         require(
-            getattr(self.ledger, "shared_daily_limit", False)
-            or prefs["daily_tokens"] > 0
-            and prefs["daily_episodes"] >= 2,
-            "RSI_BUDGET_REQUIRED",
-        )
-        require(
             machine_id in prefs["machine_ids"] and bool(prefs["suite_id"]), "RSI_SETUP_REQUIRED"
         )
         request_id = digest([owner, machine_id, request_key, kind])
@@ -245,7 +236,7 @@ class ImprovementControl:
             ).fetchone()
             require(machine and suite, "RSI_SETUP_REQUIRED")
             require(
-                not getattr(self.ledger, "shared_daily_limit", False)
+                not uses_shared_model_limit(self.ledger)
                 or json.loads(machine[0])["mode"] in {"container", "native_files"},
                 "RSI_SHARED_MODEL_GATEWAY_REQUIRED",
             )

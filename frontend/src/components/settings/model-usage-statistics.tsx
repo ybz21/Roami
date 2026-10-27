@@ -1,16 +1,17 @@
 import { Fragment, useRef, useState } from 'react'
 import { Input, Select } from 'antd'
 import { useI18n } from '../../i18n'
-import { ModelCharges, type ModelCharge } from './model-charges'
+import { ModelCharges, chargeText, type ModelCharge } from './model-charges'
+import { ModelUsageChart } from './model-usage-chart'
 
-export type UsageTotals = { requests: number; charges: ModelCharge[]; estimatedCharges: ModelCharge[]; totalTokens: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; unknown: number; pending: number; failed: number; estimated: number; missingUsage: number }
+export type UsageTotals = { requests: number; charges: ModelCharge[]; localCharges?: ModelCharge[]; localEstimated?: number; estimatedCharges: ModelCharge[]; totalTokens: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; unknown: number; pending: number; failed: number; estimated: number; missingUsage: number }
 export type UsageModelPart = UsageTotals & { model: string | null }
 export type UsagePoint = UsageTotals & { models?: UsageModelPart[] }
 export type UsageStatistics = { days: number; startDay: string; endDay: string; dailyStartDay: string; total: UsageTotals; daily: (UsagePoint & { day: string })[]; hourly?: (UsagePoint & { hour: number })[]; seriesModels?: string[]; seriesTruncated?: boolean; models: (UsageTotals & { model: string })[]; modelsTruncated: boolean }
 
 export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedDay, today, onDayChange, loading, disabled }: { statistics?: UsageStatistics; days: number; onDaysChange: (days: number) => void; selectedDay?: string; today?: string; onDayChange?: (day: string) => void; loading: boolean; disabled: boolean }) {
   const { t, locale } = useI18n()
-  const [metric, setMetric] = useState('totalTokens'), [expandedPoint, setExpandedPoint] = useState('')
+  const [metric, setMetric] = useState('totalTokens'), [expandedPoint, setExpandedPoint] = useState(''), [selectedPoint, setSelectedPoint] = useState('')
   const previousColors = useRef(new Map<string, number>())
   const count = (value: number) => new Intl.NumberFormat(locale).format(value)
   const day = (value: string, full = false) => new Intl.DateTimeFormat(locale, { ...(full ? { year: 'numeric' as const } : {}), month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'))
@@ -18,12 +19,12 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
   const currencies = statistics?.total.charges.map(charge => charge.currency) || []
   const selectedMetric = ['requests', 'totalTokens', ...currencies].includes(metric) ? metric : 'totalTokens'
   const metricValue = (row: UsageTotals) => selectedMetric === 'totalTokens' || selectedMetric === 'requests' ? row[selectedMetric] : Number(row.charges.find(charge => charge.currency === selectedMetric)?.amount || 0)
+  const metricText = (row: UsageTotals) => selectedMetric === 'totalTokens' || selectedMetric === 'requests' ? count(row[selectedMetric]) : chargeText(row.charges.filter(charge => charge.currency === selectedMetric), locale) || (row.unknown > 0 || row.pending > 0 ? t('agent.proxy.costUnknown') : chargeText([{ currency: selectedMetric, amount: '0' }], locale))
   const hourly = statistics?.days === 1
   const time = (hour: number) => new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, hour)))
   const points = hourly ? (statistics.hourly || []).map(row => ({ ...row, key: String(row.hour), label: time(row.hour) })) : (statistics?.daily || []).map(row => ({ ...row, key: row.day, label: day(row.day) }))
-  const max = Math.max(0, ...points.map(metricValue)) || 1
   const metricLabel = selectedMetric === 'totalTokens' ? t('agent.proxy.tokens') : selectedMetric === 'requests' ? t('agent.proxy.requests') : t('agent.usage.cost') + ' · ' + selectedMetric
-  const fees = (row: UsageTotals) => <ModelCharges charges={row.charges} estimatedCharges={row.estimatedCharges} incomplete={row.unknown > 0 || row.pending > 0} />
+  const fees = (row: UsageTotals) => <ModelCharges charges={row.charges} localCharges={row.localCharges} estimatedCharges={row.estimatedCharges} incomplete={row.unknown > 0 || row.pending > 0} />
   const seriesNames = statistics?.seriesModels || statistics?.models.slice(0, 4).map(row => row.model) || []
   const colorIndices = new Map<string, number>(), usedColors = new Set<number>()
   for (const name of seriesNames) {
@@ -41,6 +42,7 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
     const parts = row.models || (row.requests ? [{ ...row, model: null }] : [])
     return [...parts].sort((a, b) => (a.model === null ? 4 : seriesNames.indexOf(a.model)) - (b.model === null ? 4 : seriesNames.indexOf(b.model)))
   }
+  const chosenPoint = points.find(point => point.key === selectedPoint) || [...points].reverse().find(point => point.requests > 0) || points[points.length - 1]
   const legend: (string | null)[] = [...seriesNames, ...(points.some(row => pointParts(row).some(part => part.model === null)) ? [null] : [])]
 
 
@@ -64,10 +66,15 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
         {hourly && <p className="agent-settings-hint">{t('agent.usage.hourlyHint')}</p>}
         <ul className="agent-usage-legend" aria-label={t('agent.usage.legend')}>{legend.map(model => <li key={JSON.stringify(model)} data-model={model ?? ''}><span className="agent-usage-swatch" style={{ background: seriesColor(model) }} aria-hidden="true" /><span>{seriesLabel(model)}</span></li>)}</ul>
         {statistics.seriesTruncated && <p className="agent-settings-hint">{t('agent.usage.seriesLimit')}</p>}
-        <figure className="agent-usage-figure">
-          <div className="agent-usage-chart" data-dense={points.length > 30} role="img" aria-label={t(hourly ? 'agent.usage.hourlyChartLabel' : 'agent.usage.chartLabel', { metric: metricLabel })}>{points.map(row => <div className="agent-usage-bar-column" key={row.key}><span className="agent-usage-stack" style={{ height: `${metricValue(row) / max * 100}%` }}>{pointParts(row).filter(part => metricValue(part) > 0).map(part => <span key={JSON.stringify(part.model)} data-model={part.model ?? ''} style={{ height: `${metricValue(part) / (metricValue(row) || 1) * 100}%`, background: seriesColor(part.model) }} />)}</span></div>)}</div>
-          <figcaption><span>{hourly ? time(0) : day(statistics.dailyStartDay, true)}</span><span>{hourly ? time(23) : day(statistics.endDay, true)}</span></figcaption>
-        </figure>
+        <ModelUsageChart integer={selectedMetric === 'totalTokens' || selectedMetric === 'requests'} points={points.map(row => ({ key: row.key, label: row.label, total: metricValue(row), totalText: metricText(row), valueTexts: legend.map(model => metricText(pointParts(row).find(part => part.model === model) || { ...row, totalTokens: 0, requests: 0, charges: [] })), values: legend.map(model => metricValue(pointParts(row).find(part => part.model === model) || { ...row, totalTokens: 0, requests: 0, charges: [] })) }))} series={legend.map(model => ({ label: seriesLabel(model), color: model === null ? '--usage-series-other' : `--usage-series-${colorIndices.get(model) ?? 0}` }))} selected={chosenPoint?.key || ''} label={t(hourly ? 'agent.usage.hourlyChartLabel' : 'agent.usage.chartLabel', { metric: metricLabel })} onSelect={setSelectedPoint} format={value => new Intl.NumberFormat(locale, { notation: value > 0 && value < 0.000001 ? 'scientific' : 'compact', maximumSignificantDigits: 3 }).format(value)} />
+        <p className="agent-settings-hint">{t('agent.usage.chartHint')}</p>
+        {chosenPoint && <section className="agent-usage-point" aria-label={t('agent.usage.pointDetails')}>
+          <div className="agent-usage-toolbar"><Select aria-label={t('agent.usage.point')} value={chosenPoint.key} disabled={disabled} virtual={false} options={points.map(point => ({ value: point.key, label: point.label }))} onChange={setSelectedPoint} />{!hourly && onDayChange && 'day' in chosenPoint && <button type="button" className="tt-act" onClick={() => { onDayChange(chosenPoint.day); onDaysChange(1) }}>{t('agent.usage.viewDayModels')}</button>}</div>
+          <div className="agent-proxy-totals"><div><span>{t('agent.proxy.tokens')}</span><strong>{count(chosenPoint.totalTokens)}</strong></div><div><span>{t('agent.proxy.requests')}</span><strong>{count(chosenPoint.requests)}</strong></div><div><span>{t('agent.usage.cost')}</span><strong>{chosenPoint.requests ? fees(chosenPoint) : t('agent.usage.noRate')}</strong></div></div>
+          <p className="agent-settings-hint">{t('agent.usage.tokenBreakdown', { input: count(chosenPoint.inputTokens), output: count(chosenPoint.outputTokens), cache: count(chosenPoint.cacheReadTokens) })}</p>
+          {status(chosenPoint) && <p className="agent-settings-hint">{status(chosenPoint)}</p>}
+          <ul className="agent-usage-point-models">{pointParts(chosenPoint).map(part => <li key={JSON.stringify(part.model)}><strong><span className="agent-usage-swatch" style={{ background: seriesColor(part.model) }} aria-hidden="true" />{seriesLabel(part.model)}</strong><span>{t('agent.usage.pointUsage', { tokens: count(part.totalTokens), requests: count(part.requests) })}</span>{fees(part)}</li>)}</ul>
+        </section>}
         <details className="agent-model-advanced agent-usage-daily"><summary>{t(hourly ? 'agent.usage.hourlyDetails' : 'agent.usage.dailyDetails')}</summary><table><thead><tr><th scope="col">{t(hourly ? 'agent.usage.time' : 'agent.usage.date')}</th><th scope="col">{t('agent.proxy.requests')}</th><th scope="col">{t('agent.proxy.tokens')}</th><th scope="col">{t('agent.usage.cost')}</th></tr></thead><tbody>{points.map(row => {
           const key = statistics.startDay + ':' + hourly + ':' + row.key, parts = pointParts(row), expanded = expandedPoint === key
           return <Fragment key={row.key}>

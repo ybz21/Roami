@@ -230,6 +230,9 @@ class Runtime:
         self.manifests = PromptManifests(database)
         self.traces = ExecutionTraces(database)
         self.improvement = ImprovementStatus(database.data_root) if development_rsi else None
+        if self.improvement is not None:
+            self.improvement.model_proxy = self.model_proxy
+            self.improvement.research.model_proxy = self.model_proxy
         self.debug = ExecutionDebug(database, self.context, self.settings, self.traces)
         self.dispatch = TaskDispatcher(
             database,
@@ -546,7 +549,7 @@ class Runtime:
 
 def configured_provider(settings, role, *, client=None):
     route = settings.route(role)
-    return ChatCompletions(
+    provider = ChatCompletions(
         route.endpoint,
         route.name,
         settings.credentials(role),
@@ -557,6 +560,10 @@ def configured_provider(settings, role, *, client=None):
         parameters=route.parameters,
         client=client,
     )
+    from roami_agent.providers.model_proxy import model_proxy_context
+
+    proxy = model_proxy_context.get()
+    return proxy.attach(provider, role) if proxy is not None else provider
 
 
 async def serve(args):
