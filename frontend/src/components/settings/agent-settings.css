@@ -117,3 +117,21 @@ html[data-pointer="coarse"] .agent-usage-filters input[type="date"] { min-height
 .agent-usage-model-detail th { color:var(--text-dim); font-weight:400; }
 .agent-usage-daily .tt-act { font-size:inherit; white-space:normal; text-align:left; }
 html[data-pointer="coarse"] .agent-usage-daily .tt-act { min-height:var(--tap); }
+
+.agent-settings-form .agent-price-settings { padding:0; border:0; border-radius:0; background:var(--bg-base); }
+.agent-price-toolbar,.agent-price-add { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); min-width:0; }
+.agent-price-toolbar > .ant-input-affix-wrapper,.agent-price-add > .ant-select { flex:1; min-width:calc(var(--sp-5) * 6); }
+.agent-price-add > p { flex-basis:100%; margin:0; }
+.agent-proxy-prices { display:flex; flex-direction:column; min-width:0; }
+.agent-proxy-price { min-width:0; border-bottom:1px solid var(--border-subtle); }
+.agent-price-toggle { display:flex; align-items:center; gap:var(--sp-3); width:100%; min-height:var(--tap); padding:var(--sp-3) 0; border:0; background:transparent; color:var(--text-bright); cursor:pointer; text-align:left; font-size:var(--fs-sm); }
+.agent-price-toggle > strong { flex:1; min-width:0; overflow-wrap:anywhere; }
+.agent-price-toggle > span { flex-shrink:0; color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-price-toggle > svg { flex-shrink:0; }
+.agent-price-toggle[aria-expanded="true"] > svg { transform:rotate(180deg); }
+.agent-price-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); border-radius:var(--r-xs); }
+:where(html[data-pointer="fine"]) .agent-price-toggle:hover { background:var(--list-hover); }
+.agent-price-editor { display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-3); padding-bottom:var(--sp-4); }
+.agent-proxy-price-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--sp-3); width:100%; }
+html[data-size="compact"] .agent-proxy-price-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+html[data-pointer="coarse"] .agent-proxy-price .tt-act,html[data-pointer="coarse"] .agent-proxy-price .ant-select-selector,html[data-pointer="coarse"] .agent-price-add .ant-select-selector { min-height:var(--tap); }
