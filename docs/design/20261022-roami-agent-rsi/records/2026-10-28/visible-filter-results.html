@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>筛选结果按可见卡片验收</title><link rel="stylesheet" href="../../assets/design.css"></head><body><main>
+<p><a href="../README.md">RSI 设计修订与验收记录</a></p>
+<h1>筛选结果按可见卡片验收 · 2026-10-28</h1>
+<h2>Product Design</h2>
+<p>DEMO-05 的公开要求是加载五张卡片，并按标题筛选。实现可以隐藏不匹配的卡片，也可以移除对应 DOM；用户看到的结果应一致。判定器不再把隐藏的四张卡片计为筛选结果，同时拒绝一开始缺卡、忽略筛选、显示错误标题或隐藏全部结果的实现。</p>
+<h2>User Stories</h2>
+<ul><li>正确隐藏卡片的实现不会被误报失败。</li><li>没有完整加载初始卡片或筛选错误的实现仍会失败。</li><li>旧运行、产物与失败回执原样保留，独立重放结果明确记录判定器已变更。</li></ul>
+<h2>Technical Design</h2>
+<p>改动限于 evaluation/authored_grading.py 的 RESPONSIVE_PROBE。记录筛选前五张可见卡片，刷新后检查一张可见卡片及其匹配标题；保留响应式、触控尺寸、草稿和筛选值持久化断言。没有修改案例输入或模型提示，也不改写运行记录。既有 grading_hash 自动覆盖判定器源码，新旧判定器不得混作同一轮性能改善。</p>
+<p>test_improvement_responsive_probe.py 使用冻结评测镜像实际执行浏览器程序，覆盖隐藏、移除 DOM、忽略筛选、错误结果、初始缺卡和空结果。设置 ROAMI_RSI_TEST_IMAGE 后可运行；无冻结镜像的环境明确跳过浏览器集成项，不把跳过称为浏览器验收通过。</p>
+<h2>证据与边界</h2>
+<p>对真实 DEMO-05 产物的副本零模型重放：DOM 中有五张卡片，只有 Card 1 可见；原判定器仅此一项误报。原产物哈希不变，未发送模型请求。新结果仅证明判定器更正，不代表模型能力提升，也不替代人工参考校准、正式整套验收或两次完整日观察。</p>
+</main></body></html>
