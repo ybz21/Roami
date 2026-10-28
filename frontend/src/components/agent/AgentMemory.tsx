@@ -21,9 +21,9 @@ function localDay(timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
   return ['year', 'month', 'day'].map(name => parts.find(part => part.type === name)?.value).join('-')
 }
-export default function AgentMemory({ cid = '', projects, select, fullPage = false, compact = false, defaultGroup = 'all', onBack }: {
+export default function AgentMemory({ cid = '', projects, select, fullPage = false, embedded = false, compact = false, defaultGroup = 'all', onBack }: {
   cid?: string; projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void
-  fullPage?: boolean; compact?: boolean; defaultGroup?: MemoryScope; onBack?: () => void
+  fullPage?: boolean; embedded?: boolean; compact?: boolean; defaultGroup?: MemoryScope; onBack?: () => void
 }) {
   const { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const navigation = useMemoryRoute(defaultGroup), route = navigation.value
@@ -115,6 +115,6 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
     </section>
   </div>
   if (phone && fullPage && onBack) return <>{record?.state === 'active' && !missing && <Dropdown open={mobileMenu} onOpenChange={setMobileMenu} menu={menu} trigger={['click']}><span className="memory-mobile-menu-anchor" /></Dropdown>}<MobileSubPage title={route.id ? t(record?.day_key ? 'agent.memoryBrowse.activityDetail' : 'agent.memoryBrowse.detail') : t('agent.memory')} manageHistory={false} keepBottomNav search={false} onBack={route.id ? navigation.back : onBack} action={record?.state === 'active' && !missing ? { label: t('agent.memoryMore', { title: record.title }), icon: <MoreIcon size={20} />, onClick: () => setMobileMenu(value => !value) } : undefined}>{body}</MobileSubPage></>
-  if (fullPage) return <section className="memory-page"><header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={18} />{t('common.back')}</button></div>}</header>{body}</section>
+  if (fullPage) return <section className="memory-page">{!embedded && <header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={18} />{t('common.back')}</button></div>}</header>}{body}</section>
   return <div className={compact ? 'memory-panel' : 'memory-dialog'}>{body}</div>
 }

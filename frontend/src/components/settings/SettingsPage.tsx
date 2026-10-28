@@ -1,14 +1,7 @@
-// 设置页：搜索框 + 两级分类树 + 一类一页。
-//
-// 右边只画选中的那一页，**不做长流**——翻页的位置由树决定，回来时那一页还是原样，
-// 而一条从主题滚到两步验证的长流只能靠肌肉记忆滚回去。代价是一页装不下就得拆二级
-// （registry 的 MAX_ROWS 在 dev 下会喊），收益是每一页都有地址：#/settings/node/browser
-// 可以直接发给别人，也可以被「去设置里打开它」的按钮直跳。
-//
-// 页头固定，各页内容独立滚动。
+// 分类共享同一份清单；页头固定，内容在页内滚动。
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { App as AntApp, Button, Modal } from 'antd'
-import { AppLaunchIcon, CloseIcon, SearchIcon } from '../../icons'
+import { App as AntApp, Button } from 'antd'
+import { ChevronRight, CloseIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { usePreferences, saveWorkspace, getPreferences, usePreferenceSaveState, flushPreferences } from '../../preferences'
@@ -18,25 +11,19 @@ import MobileSubPage from '../MobileSubPage'
 import MobilePageSearch from '../mobile/MobilePageSearch'
 import { SettingRow } from './SettingRow'
 import { useEnvPush } from './env-vars'
-import { buildSettings, itemText, rowCount, type SettingsModel, type SettingsPageDef } from './registry'
+import { buildSettings, itemText, type SettingsPageDef } from './registry'
 import { useAgentData } from '../agent/useAgentData'
 
-const DEFAULT_PAGE = 'common'
+const DEFAULT_PAGE = 'ui.look'
 
 /** 路由片段 ↔ 页 id：URL 里用 /，id 里用 . */
 export function pageFromRoute(sub: string): string { return sub === 'experiments' ? 'experiments.rsi' : sub.replace(/\//g, '.') }
 export function routeFromPage(id: string): string { return id.replace(/\./g, '/') }
 
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg className="cv" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
-      style={{ transform: open ? 'rotate(90deg)' : 'none' }}><path d="M9 5l7 7-7 7" /></svg>
-  )
-}
+function Chevron() { return <span className="cv"><ChevronRight size={12} /></span> }
 
-/** 页头：面包屑 + 标题 + 写入目标徽标 + 页级动作 */
-function PaneHead({ page, model, compact }: { page: SettingsPageDef; model: SettingsModel; compact?: boolean }) {
+/** 页头只展示分类、范围与当前动作。 */
+function PaneHead({ page, compact }: { page: SettingsPageDef; compact?: boolean }) {
   const { t } = useI18n()
   const { message } = AntApp.useApp()
   const [busy, setBusy] = useState(false)
@@ -47,17 +34,15 @@ function PaneHead({ page, model, compact }: { page: SettingsPageDef; model: Sett
     ? t('set.scopeCluster')
     : page.scope === 'node'
       ? (here ? t('set.scopeNodeNamed', { node: here.name || here.id }) : t('set.scopeNode'))
-      : t('set.scopeMine')
+      : t(page.scope === 'browser' ? 'set.scopeBrowser' : 'set.scopeMine')
   const act = page.action
-  void model
   if (compact && page.hideScope && !act && !page.note) return null
   return (
     <>
       {/* 手机上子页顶栏已经写了页名，这里不再写第二遍 */}
-      {!compact && page.parent && <div className="crumb">{`${page.parent} · ${page.name}`}</div>}
-      <div className="ptitle">
+      <div className="tt-pagehead ptitle">
         {!compact && <h2>{page.name}</h2>}
-        {!page.hideScope && <span className={`tt-set-badge${page.scope === 'node' ? ' node' : ''}`}>{where}</span>}
+        {!page.hideScope && <span className="tt-set-scope">{where}</span>}
         {act && (
           <>
             <span className="grow" />
@@ -83,20 +68,17 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   searchNonce?: number
 }) {
   const { t, locale, setLocale } = useI18n()
-  const { message, modal } = AntApp.useApp()
+  const { modal } = AntApp.useApp()
   const { mode, setMode } = useThemeMode()
   const [prefs, setPrefs] = usePreferences()
   const pushEnv = useEnvPush()
   const saveState = usePreferenceSaveState()
   const saveStatus = saveState === 'idle' ? null : <div role={saveState === 'failed' ? 'alert' : 'status'} className="tt-set-save-state">{t('settings.preference.' + saveState)}{saveState === 'failed' && <Button onClick={() => { void flushPreferences() }}>{t('agent.retry')}</Button>}</div>
-  const { size } = useLayout()
-  const compact = size === 'compact'
-  const nodes = useClusterNodes()
+  const { phone: compact } = useLayout()
   const nodeId = useCurrentNodeId()
   const [q, setQ] = useState('')
   const channel = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60000)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
-  const [openParents, setOpenParents] = useState<Record<string, boolean>>({})
   const searchRef = useRef<HTMLInputElement>(null)
   const lastSearchNonce = useRef(searchNonce)
   useEffect(() => {
@@ -112,20 +94,20 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
 
   const browserRestart = useRef<(() => Promise<void>) | null>(null)
   const registerBrowserRestart = useRef((run: (() => Promise<void>) | null) => { browserRestart.current = run }).current
-  const nodeLabel = nodes.find((n) => n.id === nodeId)?.name || ''
   const runId = sub?.startsWith('experiments/rsi/') ? sub.slice('experiments/rsi/'.length) : ''
   const model = useMemo(() => buildSettings({
     t, theme: mode, setTheme: setMode, locale, setLocale, prefs, setPrefs,
-    setWorkspace: saveWorkspace, nodeLabel, isHub: false, onLogout,
+    setWorkspace: saveWorkspace, onLogout, onInstall, fullscreen,
     onBrowserReady: registerBrowserRestart,
     onBrowserRestart: async () => {
       if (!browserRestart.current) throw new Error(t('settings.readFailed'))
       await browserRestart.current()
     },
     onEnvPush: pushEnv,
+    onMemoryBack: () => { if (onNav) onNav('settings'); else location.hash = '#/settings' },
     developmentRsi: channel.value?.developmentRsi === true, nodeId, experimentRunId: runId,
     onExperimentRun: id => { const route = 'settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : ''); if (onNav) onNav(route); else location.hash = '#/' + route },
-  }), [t, mode, locale, prefs, nodeLabel, onLogout, nodeId, channel.value?.developmentRsi, runId, onNav])
+  }), [t, mode, locale, prefs, onLogout, nodeId, channel.value?.developmentRsi, runId, onNav, onInstall, fullscreen?.active, fullscreen?.toggle])
 
   const routed = pageFromRoute(runId ? 'experiments/rsi' : sub || '')
   const current = model.pages[routed] ? routed : DEFAULT_PAGE
@@ -156,6 +138,10 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     ),
   })
 
+  const advanced = <details className="tt-set-advanced"><summary>{t('agent.models.advanced')}</summary>
+    <button type="button" className="tt-act" onClick={showJson}>{t('set.jsonButton')}</button>
+  </details>
+
   // 页名并进这一行，不另起眉标 + 大标题：眉标「SETTINGS」+ 22px 标题 + 第二行搜索是三层，
   // 而侧栏此刻正高亮着「设置」——它已经把「这是哪一页」说完了。会话页与项目页同一套
   // （.tt-pagename + .tt-pagedivider，见 index.css「页名并进工具条」）。
@@ -171,14 +157,13 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
             placeholder={t('set.searchPlaceholder')} aria-label={t('set.searchPlaceholder')}
             autoComplete="off" spellCheck={false}
           />
-          {query && <span className="count">{t('set.hitCount', { n: totalHits })}</span>}
+          {query && totalHits > 0 && <span className="count">{t('set.hitCount', { n: totalHits })}</span>}
           {q && (
             <button type="button" className="clr" aria-label={t('common.clear')} onClick={() => { setQ(''); searchRef.current?.focus() }}>
               <CloseIcon size={14} />
             </button>
           )}
         </div>
-        <button type="button" className="tt-act" onClick={showJson}>{t('set.jsonButton')}</button>
       </div>
     </div>
   )
@@ -218,41 +203,25 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
         {!openSub && saveStatus}
         {(mobileSearchOpen || q) && <div className="tt-set-mobile-head">
           <MobilePageSearch inputRef={searchRef} value={q} onChange={setQ}
-            placeholder={t('set.searchPlaceholder')} resultCount={query ? t('set.hitCount', { n: totalHits }) : undefined}
+            placeholder={t('set.searchPlaceholder')} resultCount={query && totalHits > 0 ? t('set.hitCount', { n: totalHits }) : undefined}
             onDismiss={() => { setQ(''); setMobileSearchOpen(false) }} />
         </div>}
         {query ? results : (
           <div className="tt-set-catlist">
-            {onInstall && <>
-              <div className="tt-set-sec">{t('mobile.settings.app')}</div>
-              <button type="button" className="tt-set-cat tt-set-cat-app" onClick={onInstall}>
-                <AppLaunchIcon size={20} />
-                <span className="copy"><b>{t('install.mobileEntryTitle')}</b><small>{t('install.mobileEntryHelp')}</small></span>
-                <Chevron open={false} />
-              </button>
-              {fullscreen && <button type="button" className="tt-set-cat" onClick={fullscreen.toggle}>
-                <span>{t(fullscreen.active ? 'common.exitFullscreen' : 'mobile.fullscreenHideStatus')}</span><Chevron open={false} />
-              </button>}
-            </>}
-            {model.nodes.map((n, i) => {
-              if (n.kind === 'section') return <div key={i} className="tt-set-sec">{n.title}</div>
-              const ids = n.kind === 'leaf' ? [n.page] : n.kids
-              return ids.map((id) => (
-                <button key={id} type="button" className="tt-set-cat" onClick={() => go(id)}>
-                  <span>{model.pages[id].name}</span>
-                  <Chevron open={false} />
-                </button>
-              ))
-            })}
-            <button type="button" className="tt-set-cat" onClick={showJson}><span>{t('set.jsonButton')}</span><Chevron open={false} /></button>
+            {model.groups.map(group => <section key={group.title}>
+              <h3 className="tt-set-sec">{group.title}</h3>
+              {group.pages.map(id => <button key={id} type="button" className="tt-set-cat" onClick={() => go(id)}>
+                <span>{model.pages[id].name}</span><Chevron />
+              </button>)}
+            </section>)}
           </div>
         )}
-        {openSub && (
+        {openSub?.id === 'agent.memory' ? <>{openSub.items.map(it => <SettingRow key={it.id} item={it} />)}</> : openSub && (
           <MobileSubPage title={openSub.name} onBack={() => { const route = runId ? 'settings/experiments/rsi' : 'settings'; if (onNav) onNav(route); else location.hash = '#/' + route }} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
-              {openSub.id !== 'experiments.rsi' && <PaneHead page={openSub} model={model} compact />}
+              {openSub.id !== 'experiments.rsi' && <PaneHead page={openSub} compact />}
               {saveStatus}
-              <div className="rows">{openSub.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>
+              <div className="rows">{openSub.items.map((it) => <SettingRow key={it.id} item={it} />)}{openSub.id === 'about' && advanced}</div>
             </div>
           </MobileSubPage>
         )}
@@ -266,50 +235,19 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
         {saveStatus}
       {head}
       <div className="tt-set-body">
-        <div className="tt-set-tree">
-          {model.nodes.map((n, i) => {
-            if (n.kind === 'section') {
-              return <div key={i} className="grp">{n.title}</div>
-            }
-            if (n.kind === 'leaf') {
-              const p = model.pages[n.page]
-              const hit = query ? hitsOf(n.page) : rowCount(p)
-              return (
-                <button key={n.page} type="button"
-                  className={`row solo${current === n.page && !query ? ' on' : ''}${query && !hit ? ' dim' : ''}`}
-                  onClick={() => go(n.page)}>
-                  <span>{p.name}</span>{(hit > 0 || !!query) && <span className="n">{hit}</span>}
-                </button>
-              )
-            }
-            const open = openParents[n.id] !== false
-            const kidHits = query ? n.kids.reduce((a, k) => a + hitsOf(k), 0) : 0
-            return (
-              <div key={n.id}>
-                <button type="button" className={`row${query && !kidHits ? ' dim' : ''}`}
-                  aria-expanded={open}
-                  onClick={() => setOpenParents((s) => ({ ...s, [n.id]: !open }))}>
-                  <Chevron open={open} /><span>{n.title}</span>
-                  {query && <span className="n">{kidHits}</span>}
-                </button>
-                {open && n.kids.map((k) => {
-                  const hit = query ? hitsOf(k) : rowCount(model.pages[k])
-                  return (
-                    <button key={k} type="button"
-                      className={`row kid${current === k && !query ? ' on' : ''}${query && !hit ? ' dim' : ''}`}
-                      onClick={() => go(k)}>
-                      <span>{model.pages[k].name}</span>{(hit > 0 || !!query) && <span className="n">{hit}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
+        <nav className="tt-set-tree" aria-label={t('nav.env')}>
+          {model.groups.map(group => <section key={group.title}>
+            <h3 className="grp">{group.title}</h3>
+            {group.pages.map(id => <button key={id} type="button"
+              aria-current={current === id && !query ? 'page' : undefined}
+              className={`row${current === id && !query ? ' on' : ''}${query && !hitsOf(id) ? ' dim' : ''}`}
+              onClick={() => go(id)}>{model.pages[id].name}</button>)}
+          </section>)}
+        </nav>
         {query ? results : (
-          <div className="tt-set-pane scroll">
-            {page.id !== 'experiments.rsi' && <PaneHead page={page} model={model} />}
-            <div className="rows">{page.items.map((it) => <SettingRow key={it.id} item={it} />)}</div>
+          <div className={`tt-set-pane scroll${page.id === 'agent.memory' ? ' tt-set-memory' : ''}`}>
+            {page.id !== 'experiments.rsi' && <PaneHead page={page} />}
+            <div className="rows">{page.items.map((it) => <SettingRow key={it.id} item={it} />)}{page.id === 'about' && advanced}</div>
           </div>
         )}
       </div>

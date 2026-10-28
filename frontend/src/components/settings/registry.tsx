@@ -1,12 +1,4 @@
-// 设置清单：**唯一**的设置出处。分类树、每一页的内容、搜索索引、手机端列表全从这里生成。
-//
-// 两条约束写在这里而不是文档里，因为只有在这里才拦得住：
-//   ① 一页 ≤ MAX_ROWS 项。一页装不下就是这一类该拆二级，而不是让它长出滚动条
-//      （设置页不做长流，翻页由树决定——见 docs/design/settings/index.html）。
-//      超了不是报错，是 dev 下 console.warn，因为 items 的条数依赖运行时（比如 iOS 只在 macOS 出现）。
-//   ② 页级动作（保存并重启浏览器、推送到会话）不占行数预算，摆在页头。
-//
-// 标签走 labelKey/descKey 而不是中文串：搜索索引必须在 t() 之后建，否则英文界面搜不到任何东西。
+// 分类、内容和搜索共用这份清单；生效范围独立于导航分组。
 import type { ReactNode } from 'react'
 import { PushSettings } from './push-settings'
 import { HotkeyRecorder } from './hotkey-recorder'
@@ -21,17 +13,16 @@ import { QuickCommandsSettings } from './quick-commands'
 import { ChangePasswordSettings, TwoFactorSettings, CertDownloadButton } from './security-settings'
 import { AboutSettings } from './about-settings'
 import { ClusterSettings } from '../cluster/ClusterSettings'
-import { StatusBarSettings } from './status-bar-settings'
 import { AgentMemorySettings } from './agent-memory-settings'
 import { AgentMessageSettings } from './agent-message-settings'
 import { AgentSettings } from './agent-settings'
-import { AccountActions } from './account-actions'
+import { FullscreenAction, LogoutAction, fullscreenSupported } from './account-actions'
 import AgentImprovement from '../agent/AgentImprovement'
 
 export const MAX_ROWS = 6
 
-/** 值写在哪——决定它落在树的哪一段，以及页头那枚徽标写什么 */
-export type Scope = 'mine' | 'node' | 'cluster'
+/** 生效范围。 */
+export type Scope = 'mine' | 'node' | 'cluster' | 'browser'
 
 export type Control =
   | { kind: 'switch'; get: () => boolean; set: (v: boolean) => void }
@@ -45,13 +36,12 @@ export interface SettingItem {
   label: string
   /** 一句话说后果，不复述控件。开关型可省，用 control 自带的说明 */
   desc?: string
-  /** 展示用键名（claudeCommand 这种）——既是搜索命中项，也是用户描述问题时的说法 */
+  /** 保留键名作为搜索别名。 */
   key?: string
   control: Control
   /** 偏离默认才挂：'exp' 实验性 / 'restart' 改完要重启 */
   badge?: 'exp' | 'restart'
-  /** 别名行：这一项真正的家（「常用」页用） */
-  from?: string
+  scope?: Scope
   /** 自定义块没有 label/desc 可索引，靠这个补搜索词 */
   keywords?: string
   /** 整页就这一块时置 true：页头已经写了标题与说明，块自己不再画一遍行头 */
@@ -61,7 +51,7 @@ export interface SettingItem {
 export interface SettingsPageDef {
   id: string
   name: string
-  /** 父级名字，面包屑用；叶子页没有父级时为空 */
+  /** 分类名称，用于搜索结果。 */
   parent?: string
   scope: Scope
   hideScope?: boolean
@@ -71,21 +61,12 @@ export interface SettingsPageDef {
   action?: { label: string; hint?: string; run: () => void | Promise<void> }
 }
 
-export type TreeNode =
-  | { kind: 'section'; title: string; note: string }
-  | { kind: 'leaf'; page: string }
-  | { kind: 'parent'; id: string; title: string; kids: string[] }
+export interface SettingsGroup { title: string; pages: string[] }
 
 export interface SettingsModel {
-  nodes: TreeNode[]
+  groups: SettingsGroup[]
   pages: Record<string, SettingsPageDef>
   order: string[]
-}
-
-/** 树上的条数：一页只有一个自定义块时不显示——「1」不是信息 */
-export function rowCount(p: SettingsPageDef): number {
-  const rows = p.items.filter((it) => it.control.kind !== 'custom').length
-  return rows || (p.items.length > 1 ? p.items.length : 0)
 }
 
 /** 这一页的所有可搜文本 */
@@ -109,8 +90,6 @@ export function buildSettings(deps: {
   setWorkspace: (p: any) => void
   /** 退出登录：原来在侧栏脚「当前设备」菜单里，22 设计把它并进设置页 */
   onLogout?: () => void
-  nodeLabel: string
-  isHub: boolean
   developmentRsi?: boolean
   nodeId?: string | null
   experimentRunId?: string
@@ -118,6 +97,9 @@ export function buildSettings(deps: {
   onBrowserReady?: (run: (() => Promise<void>) | null) => void
   onBrowserRestart: () => void
   onEnvPush: () => void
+  onMemoryBack?: () => void
+  onInstall?: () => void
+  fullscreen?: { active: boolean; toggle: () => void }
 }): SettingsModel {
   const { t, prefs } = deps
   const ws = prefs.workspace || {}
@@ -134,12 +116,6 @@ export function buildSettings(deps: {
     keywords: 'claude theme 主题 对比度',
     control: { kind: 'switch', get: () => prefs.claudeThemeSync !== false, set: (on) => deps.setPrefs({ claudeThemeSync: on }) },
   }
-  // 全屏 / 退出登录：原来挂在侧栏脚「当前设备」那枚账户菜单里（22 设计 §3.2 拍板：侧栏脚只留 设置 / 收起）
-  const accountItem: SettingItem = {
-    id: 'account', label: t('set.account'), desc: t('set.accountDesc'),
-    keywords: '全屏 退出 登录 fullscreen logout',
-    control: { kind: 'custom', node: <AccountActions onLogout={deps.onLogout} /> },
-  }
   const localeItem: SettingItem = {
     id: 'locale', label: t('settings.language'), desc: t('settings.languageHelp'), key: 'locale',
     control: {
@@ -148,11 +124,11 @@ export function buildSettings(deps: {
     },
   }
   const promptPopupItem: SettingItem = {
-    id: 'promptPopupOff', label: t('settings.promptPopupDefault'), desc: t('settings.promptPopupDefaultHelp'), key: 'promptPopupOff',
+    id: 'promptPopupOff', label: t('settings.promptPopupDefault'), desc: t('settings.promptPopupDefaultHelp'), key: 'promptPopupOff', keywords: 'new session 新会话',
     control: { kind: 'switch', get: () => !prefs.promptPopupOff, set: (on) => deps.setPrefs({ promptPopupOff: !on }) },
   }
   const pushItem: SettingItem = {
-    id: 'push', label: t('set.push'), desc: t('set.pushHelp'), key: 'push',
+    id: 'push', label: t('set.push'), desc: t('set.pushHelp'), key: 'push', scope: 'browser',
     keywords: '推送 通知 push notification 手机 锁屏',
     control: { kind: 'custom', node: <PushSettings /> },
   }
@@ -166,31 +142,20 @@ export function buildSettings(deps: {
       onChange={(v) => deps.setPrefs({ keybindings: { ...(prefs.keybindings || {}), [a]: v } })} /> },
   }))
   const voiceItem: SettingItem = {
-    id: 'showVoiceButton', label: t('set.voiceButton'), desc: t('set.voiceButtonHelp'), key: 'showVoiceButton',
+    id: 'showVoiceButton', label: t('set.voiceButton'), desc: t('set.voiceButtonHelp'), key: 'showVoiceButton', scope: 'mine',
     control: { kind: 'switch', get: () => prefs.showVoiceButton !== false, set: (on) => deps.setPrefs({ showVoiceButton: on }) },
   }
 
   const pages: SettingsPageDef[] = [
-    ...(deps.developmentRsi ? [{ id: 'experiments.rsi', name: t('agent.experiment.rsi'), parent: t('agent.experiment.title'), scope: 'node' as const, items: [{ id: 'rsiWorkflow', label: t('agent.experiment.title'), bare: true, control: { kind: 'custom' as const, node: <AgentImprovement key={deps.nodeId} node={deps.nodeId || null} workflow runId={deps.experimentRunId} onRun={deps.onExperimentRun} /> }, keywords: 'RSI workflow pipeline experiment 流水线 实验 每日 复盘 Issue Codex' }] }] : []),
-    { id: 'agent.messages', name: t('agent.notification.settings'), parent: t('set.groupAgent'), scope: 'node', items: [{ id: 'agentMessages', label: t('agent.notification.settings'), bare: true, control: { kind: 'custom', node: <AgentMessageSettings /> }, keywords: 'notifications reminders delivery quiet hours 通知 消息 免打扰 提醒 投递' }] },
-    { id: 'agent.runtime', name: t('agent.models.settings'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <AgentSettings /> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
-    { id: 'agent.memory', name: t('agent.memoryCenter'), parent: t('set.groupAgent'), scope: 'node', note: '', items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
+    ...(deps.developmentRsi ? [{ id: 'experiments.rsi', name: t('set.pageImprovement'), scope: 'node' as const, items: [{ id: 'rsiWorkflow', label: t('agent.experiment.title'), bare: true, control: { kind: 'custom' as const, node: <AgentImprovement key={deps.nodeId} node={deps.nodeId || null} workflow runId={deps.experimentRunId} onRun={deps.onExperimentRun} /> }, keywords: 'RSI workflow pipeline experiment 流水线 实验 每日 复盘 Issue Codex' }] }] : []),
+    { id: 'agent.messages', name: t('set.pageNotifications'), scope: 'node', items: [{ id: 'agentMessages', label: t('agent.notification.settings'), bare: true, control: { kind: 'custom', node: <AgentMessageSettings /> }, keywords: 'notifications reminders delivery quiet hours 通知 消息 免打扰 提醒 投递' }, pushItem] },
+    { id: 'agent.runtime', name: t('agent.models.settings'), scope: 'node', note: '', items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <AgentSettings /> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
+    { id: 'agent.memory', name: t('agent.memoryCenter'), scope: 'node', note: '', items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings onBack={deps.onMemoryBack} /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
     {
-      id: 'common', name: t('set.pageCommon'), scope: 'mine', note: t('set.pageCommonNote'),
-      items: [
-        { ...themeItem, from: `${t('set.groupUi')} · ${t('set.pageLook')}` },
-        { ...localeItem, from: `${t('set.groupUi')} · ${t('set.pageLook')}` },
-        { ...promptPopupItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
-        { ...pushItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
-        { ...voiceItem, from: `${t('set.groupAgent')} · ${t('set.pageNewSession')}` },
-      ],
-    },
-    {
-      id: 'ui.look', name: t('set.pageLook'), parent: t('set.groupUi'), scope: 'mine',
+      id: 'ui.look', name: t('set.pageLook'), scope: 'mine',
       items: [
         themeItem,
         claudeThemeItem,
-        accountItem,
         localeItem,
         {
           id: 'density', label: t('set.density'), desc: t('set.densityHelp'), key: 'workspace.density',
@@ -202,7 +167,7 @@ export function buildSettings(deps: {
       ],
     },
     {
-      id: 'ui.layout', name: t('set.pageLayout'), parent: t('set.groupUi'), scope: 'mine',
+      id: 'ui.layout', name: t('set.pageLayout'), scope: 'mine',
       items: [
         {
           id: 'navCollapsed', label: t('set.navRail'), desc: t('set.navRailHelp'), key: 'workspace.navCollapsed',
@@ -223,39 +188,29 @@ export function buildSettings(deps: {
             options: [{ value: 'left', label: t('set.dpadLeft') }, { value: 'right', label: t('set.dpadRight') }],
           },
         },
+        ...(deps.fullscreen || fullscreenSupported() ? [{
+          id: 'fullscreen', label: t('set.windowDisplay'), scope: 'browser' as const,
+          keywords: 'fullscreen 全屏 状态栏',
+          control: { kind: 'custom' as const, node: <FullscreenAction controller={deps.fullscreen} /> },
+        }] : []),
       ],
     },
     {
-      id: 'ui.keys', name: t('set.pageKeys'), parent: t('set.groupUi'), scope: 'mine', note: t('set.pageKeysNote'),
-      items: keyItems.slice(0, 6),
+      id: 'ui.keys', name: t('set.pageKeys'), scope: 'mine',
+      items: keyItems,
     },
     {
-      id: 'ui.keys.more', name: t('set.pageMoreKeys'), parent: t('set.groupUi'), scope: 'mine', note: t('set.pageKeysNote'),
-      items: keyItems.slice(6),
-    },
-    {
-      id: 'ui.status', name: t('status.settings'), parent: t('set.groupUi'), scope: 'mine',
-      note: t('status.settingsDesc'),
-      items: [{
-        id: 'statusBar', label: t('status.settings'), bare: true,
-        keywords: '状态条 status bar cpu 内存 memory 插件 plugin 主机 host',
-        control: { kind: 'custom', node: <StatusBarSettings /> },
-      }],
-    },
-    {
-      id: 'agent.new', name: t('set.pageNewSession'), parent: t('set.groupAgent'), scope: 'mine',
+      id: 'agent.new', name: t('set.pageNewSession'), scope: 'mine',
       items: [
         {
           id: 'quickCommands', label: t('settings.quickCommands'), desc: t('settings.quickCommandsHelp'),
           key: 'quickCommands', control: { kind: 'custom', node: <QuickCommandsSettings /> },
         },
-        pushItem,
         promptPopupItem,
-        voiceItem,
       ],
     },
     {
-      id: 'node.browser', name: t('settings.browser'), parent: t('set.groupNode'), scope: 'node',
+      id: 'node.browser', name: t('set.pageBrowser'), scope: 'node',
       note: t('settings.browserHelp'),
       items: [{
         id: 'browser', label: t('settings.browser'), bare: true, control: { kind: 'custom', node: <BrowserSettings onRestartReady={deps.onBrowserReady} /> },
@@ -263,29 +218,29 @@ export function buildSettings(deps: {
       }],
     },
     {
-      id: 'node.phone', name: t('settings.phoneTitle'), parent: t('set.groupNode'), scope: 'node',
+      id: 'node.phone', name: t('settings.phoneTitle'), scope: 'node',
       items: [{
         id: 'phone', label: t('settings.phoneTitle'), bare: true, control: { kind: 'custom', node: <PhoneSettings /> },
         keywords: 'android ios adb avd emulator 模拟器 真机 镜像',
       }],
     },
     {
-      id: 'node.speech', name: t('settings.speech'), parent: t('set.groupNode'), scope: 'node',
+      id: 'node.speech', name: t('settings.speech'), scope: 'node',
       note: t('settings.speechHelp'),
-      items: [{
+      items: [voiceItem, {
         id: 'speech', label: t('settings.speech'), bare: true, control: { kind: 'custom', node: <SpeechSettings /> },
         keywords: 'asr whisper openai volcano 火山 语音 识别 密钥 apikey',
       }],
     },
     {
-      id: 'node.p2p', name: t('set.pageTransfer'), parent: t('set.groupNode'), scope: 'node',
+      id: 'node.p2p', name: t('set.pageTransfer'), scope: 'mine',
       items: [{
         id: 'p2p', label: t('settings.p2p'), bare: true, control: { kind: 'custom', node: <P2PSettings /> },
         keywords: 'p2p stun ice webrtc 直连 中转 frp 超时 速率 下载 加速 网络 视频 图片 预览',
       }],
     },
     {
-      id: 'node.memory', name: t('set.pageMemory'), parent: t('set.groupNode'), scope: 'node',
+      id: 'node.memory', name: t('set.pageMemory'), scope: 'node',
       note: t('set.memoryNote'),
       items: [{
         id: 'sessionMemory', label: t('set.mem.limit'), bare: true,
@@ -294,7 +249,7 @@ export function buildSettings(deps: {
       }],
     },
     {
-      id: 'node.env', name: t('settings.tabEnv'), parent: t('set.groupNode'), scope: 'node',
+      id: 'node.env', name: t('settings.tabEnv'), scope: 'node',
       note: t('set.envHelp'),
       items: [{
         id: 'env', label: t('env.globalVariables'), bare: true,
@@ -303,7 +258,7 @@ export function buildSettings(deps: {
       action: { label: t('env.pushToSessions'), hint: t('set.envPushHint'), run: deps.onEnvPush },
     },
     {
-      id: 'cluster', name: t('settings.tabCluster'), scope: 'cluster',
+      id: 'cluster', name: t('set.pageCluster'), scope: 'cluster',
       items: [{
         id: 'cluster', label: t('settings.tabCluster'), bare: true, control: { kind: 'custom', node: <ClusterSettings /> },
         keywords: 'hub node 中心 节点 集群 多机 令牌 token 注册 证书',
@@ -315,12 +270,14 @@ export function buildSettings(deps: {
         { id: 'password', label: t('password.title'), desc: t('set.passwordHelp'), control: { kind: 'custom', node: <ChangePasswordSettings /> }, keywords: '口令 密码 password' },
         { id: 'totp', label: t('twoFactor.title'), key: 'totp', control: { kind: 'custom', node: <TwoFactorSettings /> }, keywords: '2fa totp 两步 动态码 authenticator' },
         { id: 'cert', label: t('install.downloadCert'), desc: t('set.certHelp'), control: { kind: 'custom', node: <CertDownloadButton /> }, keywords: 'https ca 证书 cert 安全上下文' },
+        ...(deps.onLogout ? [{ id: 'logout', label: t('set.account'), scope: 'browser' as const,
+          keywords: 'logout sign out 退出 登录 账户', control: { kind: 'custom' as const, node: <LogoutAction onLogout={deps.onLogout} /> } }] : []),
       ],
     },
     {
-      id: 'about', name: t('set.pageAbout'), scope: 'mine',
+      id: 'about', name: t('set.pageAbout'), scope: 'mine', hideScope: true,
       items: [{
-        id: 'about', label: t('set.pageAbout'), bare: true, control: { kind: 'custom', node: <AboutSettings /> },
+        id: 'about', label: t('set.pageAbout'), bare: true, control: { kind: 'custom', node: <AboutSettings onInstall={deps.onInstall} /> },
         keywords: 'pwa 安装 版本 更新 github 证书 关于',
       }],
     },
@@ -333,23 +290,15 @@ export function buildSettings(deps: {
   const byId: Record<string, SettingsPageDef> = {}
   pages.forEach((p) => { byId[p.id] = p })
 
-  // 段标题本身就把「值写在哪」说清了，不再挂第二行注解——那是设计稿里的解释文，
-  // 搬进产品就是每次开设置都要重读一遍的噪音。分段也跟着改：原来「整个集群 / 这台设备」
-  // 把两类硬塞进一个标题，才不得不写注解去解释。现在安全归「这台机器」（口令与两步验证
-  // 写的就是这台的 config.yaml），集群只剩多机，关于与安装挂在最后、不需要段标题。
-  const nodes: TreeNode[] = [
-    { kind: 'section', title: t('set.secMine'), note: '' },
-    { kind: 'leaf', page: 'common' },
-    { kind: 'parent', id: 'ui', title: t('set.groupUi'), kids: ['ui.look', 'ui.layout', 'ui.keys', 'ui.keys.more', 'ui.status'] },
-    { kind: 'parent', id: 'agent', title: t('set.groupAgent'), kids: ['agent.runtime', 'agent.messages', 'agent.memory', 'agent.new'] },
-    // 这一段的页直接摊平：段标题已经写了「这台机器」，再套一层同名的父节点是把同一件事说两遍
-    { kind: 'section', title: deps.nodeLabel ? t('set.secNode', { node: deps.nodeLabel }) : t('set.groupNode'), note: '' },
-    ...(['node.browser', 'node.phone', 'node.speech', 'node.p2p', 'node.env', 'sec'].map((page) => ({ kind: 'leaf', page } as TreeNode))),
-    ...(deps.developmentRsi ? [{ kind: 'section' as const, title: t('agent.experiment.title'), note: '' }, { kind: 'leaf' as const, page: 'experiments.rsi' }] : []),
-    { kind: 'section', title: t('set.secCluster'), note: '' },
-    { kind: 'leaf', page: 'cluster' },
-    { kind: 'leaf', page: 'about' },
+  const groups: SettingsGroup[] = [
+    { title: t('set.groupPreferences'), pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
+    { title: t('set.groupAgent'), pages: ['agent.runtime', 'agent.memory', ...(deps.developmentRsi ? ['experiments.rsi'] : [])] },
+    { title: t('set.groupNotifications'), pages: ['agent.messages', 'node.speech'] },
+    { title: t('set.groupDevices'), pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
+    { title: t('set.groupSystem'), pages: ['node.env', 'sec', 'about'] },
   ]
+  for (const group of groups) for (const id of group.pages) byId[id].parent = group.title
+  const order = groups.flatMap(group => group.pages)
 
   if (import.meta.env.DEV) {
     pages.forEach((p) => {
@@ -358,5 +307,5 @@ export function buildSettings(deps: {
     })
   }
 
-  return { nodes, pages: byId, order: pages.map((p) => p.id) }
+  return { groups, pages: byId, order }
 }

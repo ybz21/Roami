@@ -27,7 +27,7 @@ export function PushSettings() {
   }
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
-      <Switch checked={on} loading={busy} disabled={!pushSupported()} onChange={toggle} />
+      <Switch aria-label={t('set.push')} checked={on} loading={busy} disabled={!pushSupported()} onChange={toggle} />
       {on && <Button size="small" onClick={test}>{t('set.pushTest')}</Button>}
     </span>
   )

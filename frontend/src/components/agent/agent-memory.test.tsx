@@ -177,3 +177,31 @@ it('renders one empty state without zero totals or useless pagination and keeps 
   await screen.findByRole('button', { name: /agent.memoryUnassigned/ })
   expect(vi.mocked(api).mock.calls.some(call => call[1].includes('category=activity') && call[1].includes('offset=0'))).toBe(true)
 })
+
+it('embeds desktop memory without a second page header', async () => {
+  install()
+  history.replaceState({}, '', '#/settings/agent/memory')
+  render(<AgentMemory fullPage embedded projects={[]} select={vi.fn()} />)
+  await screen.findByText('Remembered preference')
+  expect(document.querySelector('.memory-page > .tt-pagehead')).toBeNull()
+  fireEvent.click(rows()[0])
+  await detail().findByText('Original user preference')
+  expect(location.hash.split('?')[0]).toBe('#/settings/agent/memory')
+})
+
+it('returns from mobile memory details to the list before leaving settings', async () => {
+  install()
+  mocks.layout.phone = true
+  history.replaceState({}, '', '#/settings/agent/memory?memoryId=memory&memoryQuery=concise')
+  const onBack = vi.fn()
+  render(<AgentMemory fullPage embedded onBack={onBack} projects={[]} select={vi.fn()} />)
+  await detail().findByText('Original user preference')
+  const back = within(document.querySelector('[data-mobile-page] > header') as HTMLElement).getByRole('button', { name: 'common.back' })
+  fireEvent.click(back)
+  await waitFor(() => expect(location.hash).not.toContain('memoryId='))
+  expect(location.hash).toContain('memoryQuery=concise')
+  expect(onBack).not.toHaveBeenCalled()
+  expect(document.querySelectorAll('[data-mobile-page]')).toHaveLength(1)
+  fireEvent.click(back)
+  expect(onBack).toHaveBeenCalledOnce()
+})
