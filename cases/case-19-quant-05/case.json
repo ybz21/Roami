@@ -85,5 +85,13 @@
   "selected_in_mixed_suite_v1": true,
   "resources": {
     "materials": "materials.json"
+  },
+  "output_format": {
+    "copy_input_fields": [
+      "receipt",
+      "execution_prices",
+      "signal_prices"
+    ],
+    "explanations": "report.md"
   }
 }

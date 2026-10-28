@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-28 | [QUANT-05 输入字段序列化合同](2026-10-28/quant-input-field-serialization.html) |
 | 2026-10-28 | [筛选结果按可见卡片验收](2026-10-28/visible-filter-results.html) |
 | 2026-10-28 | [正式评测的共享准入与首发阻塞](2026-10-28/formal-admission-blocking.html) |
 | 2026-10-28 | [记忆请求期限与准入拒绝计量 · 2026-10-28](2026-10-28/rsi-memory-admission-20261028.html) |
