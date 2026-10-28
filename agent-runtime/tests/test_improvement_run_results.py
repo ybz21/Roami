@@ -1,11 +1,40 @@
 """Run result views retain historical evidence without borrowing future outcomes."""
 
+import json
+
 import pytest
 
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
 from roami_agent.improvement.presentation.run_results import results_view
 from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.protocol.errors import DomainError
+
+
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ({"exitCode": 1, "stderr": "command failed"}, "TOOL_FAILED"),
+        ({"error": "FS_FAILED"}, "FS_FAILED"),
+        ({"error": "not a safe code"}, "TOOL_FAILED"),
+    ],
+)
+def test_failed_tool_without_valid_error_code_is_not_unknown(tmp_path, output, expected):
+    (tmp_path / "execution-log.json").write_text(
+        json.dumps(
+            {
+                "tool_calls": [
+                    {
+                        "tool_name": "bash",
+                        "state": "failed",
+                        "result_json": json.dumps({"text": json.dumps(output)}),
+                    }
+                ]
+            }
+        )
+    )
+    summary = trial_summary({"id": "failed-tool"}, {"grade": {"passed": False}}, tmp_path)
+    assert summary["signals"] == [expected]
+    assert summary["tools"] == [{"name": "bash", "state": "failed", "error": expected}]
 
 
 def run(records, key, timestamp, *, name="任务名称", case_state=None):
