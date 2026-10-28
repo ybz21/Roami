@@ -238,6 +238,7 @@ class PipelineReportWorker:
                         "tool_calls": c["tool_calls"],
                         "tools": c["tools"],
                         "roles": c["roles"],
+                        "execution_evidence": c.get("execution_evidence"),
                     }
                     for c in value["cases"]
                 ]

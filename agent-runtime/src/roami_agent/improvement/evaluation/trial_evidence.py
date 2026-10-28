@@ -7,6 +7,9 @@ from roami_agent.improvement.domain.admission_blocking import blocking_code
 from roami_agent.improvement.domain.contracts import digest
 from roami_agent.improvement.domain.run_configuration import code
 from roami_agent.improvement.evaluation.case_catalog import case_identity
+from roami_agent.improvement.evaluation.execution.interrupted_evidence import snapshot_metadata
+from roami_agent.improvement.integrations.artifact_paths import relative_file
+from roami_agent.protocol.errors import DomainError
 
 
 def cycle_usage(trials):
@@ -47,13 +50,28 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
     signals.update("check:" + k for k, v in checks.items() if not v)
     tools, roles, files = [], {}, []
     execution_log_found = False
+    execution_evidence = None
     if root:
         root = Path(root)
-        for name in ("state/execution-log.json", "execution-log.json"):
-            path = root / name
+        for name in (
+            "interrupted-execution-log.json",
+            "state/execution-log.json",
+            "execution-log.json",
+        ):
+            try:
+                path = relative_file(root, name)
+            except DomainError:
+                continue
             if not path.is_file():
                 continue
-            data = json.loads(path.read_text())
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict) or not isinstance(data.get("tool_calls"), list):
+                continue
+            if data.get("source") == "interrupted_runtime_snapshot":
+                execution_evidence = snapshot_metadata(data)
             execution_log_found = True
             for item in data.get("tool_calls", []):
                 error = None
@@ -61,6 +79,8 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
                     try:
                         output = item.get("result_json", {})
                         output = json.loads(output) if isinstance(output, str) else output
+                        if not isinstance(output, dict):
+                            raise TypeError("invalid_tool_result")
                         output = json.loads(output.get("text", "{}"))
                         error = code(output.get("error"))
                     except (TypeError, ValueError):
@@ -74,6 +94,17 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
                     }
                 )
             break
+        if execution_evidence is None and not execution_log_found:
+            error_path = relative_file(root, "interrupted-execution-error.json")
+            if error_path.is_file():
+                error = json.loads(error_path.read_text())
+                execution_evidence = {
+                    "source": "interrupted_runtime_snapshot",
+                    "complete": False,
+                    "recorded_tool_calls": None,
+                    "captured_tool_calls": 0,
+                    "error": code(error.get("error")),
+                }
         model = root / "model-log.json"
         if model.is_file():
             model_log = json.loads(model.read_text())
@@ -147,7 +178,12 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
             for k in ("tokens", "token_coverage", "model_calls", "elapsed_ms", "model_ms")
         },
         "tools": tools,
-        "tool_calls": len(tools) if execution_log_found else metrics.get("tool_calls"),
+        "tool_calls": execution_evidence["recorded_tool_calls"]
+        if execution_evidence
+        else len(tools)
+        if execution_log_found
+        else metrics.get("tool_calls"),
+        **({"execution_evidence": execution_evidence} if execution_evidence else {}),
         "roles": roles,
         "files": files,
     }
