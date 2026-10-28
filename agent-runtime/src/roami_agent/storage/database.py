@@ -13,6 +13,7 @@ from typing import TypeVar
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.conversation_events import ConversationEvents
 from roami_agent.storage.migrations import SCHEMA_VERSION, initial_schema, upgrade_schema
 
 T = TypeVar("T")
@@ -20,6 +21,7 @@ T = TypeVar("T")
 
 class NativeConnection(sqlite3.Connection):
     native_payloads = None
+    event_conversations = None
 
 
 class Database:
@@ -31,6 +33,7 @@ class Database:
         self.closed = False
         self.pending = 0
         self.instance_paths = None
+        self.conversation_events = ConversationEvents()
 
     async def open(self):
         try:
@@ -122,21 +125,30 @@ class Database:
         if self.pending >= 256:
             raise DomainError("WRITER_BUSY", 503)
         self.pending += 1
+        loop = asyncio.get_running_loop()
 
         def execute():
             try:
                 if write:
                     self.connection.execute("BEGIN IMMEDIATE")
+                    self.connection.event_conversations = set()
                 result = fn(self.connection)
                 if write:
                     self.connection.execute("COMMIT")
+                    if self.connection.event_conversations:
+                        loop.call_soon_threadsafe(
+                            self.conversation_events.publish, self.connection.event_conversations
+                        )
                 return result
             except BaseException:
                 if write and self.connection.in_transaction:
                     self.connection.execute("ROLLBACK")
                 raise
+            finally:
+                if write:
+                    self.connection.event_conversations = None
 
-        future = asyncio.get_running_loop().run_in_executor(self.pool, execute)
+        future = loop.run_in_executor(self.pool, execute)
         # A cancelled HTTP request must not release capacity while its transaction is running.
         future.add_done_callback(lambda _: setattr(self, "pending", self.pending - 1))
         return await asyncio.shield(future)
@@ -187,6 +199,9 @@ def event(connection, conversation_id: str, kind: str, payload, *, key=None, **r
     }
     keys = ",".join(fields)
     values = ",".join("?" for _ in fields)
-    return connection.execute(
+    cursor = connection.execute(
         f"INSERT INTO events ({keys}) VALUES ({values})", tuple(fields.values())
     ).lastrowid
+    if getattr(connection, "event_conversations", None) is not None:
+        connection.event_conversations.add(conversation_id)
+    return cursor

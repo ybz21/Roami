@@ -36,6 +36,7 @@ from roami_agent.server.installation import Installation
 from roami_agent.server.model_settings import ModelSettings
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
+EVENT_HEARTBEAT_SECONDS = 10
 
 
 def create_app(runtime, *, manage_lifecycle=True):
@@ -762,21 +763,22 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         async def stream():
             nonlocal cursor
-            idle = 0
-            yield ": connected\n\n"
-            while not await request.is_disconnected():
-                batch = await runtime.conversations.events(owner, cid, cursor)
-                for item in batch:
-                    cursor = item["id"]
-                    yield f"id: {cursor}\nevent: {item['kind']}\ndata: {json.dumps(item, ensure_ascii=False)}\n\n"
-                if batch:
-                    idle = 0
-                    continue
-                idle += 1
-                if idle >= 50:
-                    yield ": ping\n\n"
-                    idle = 0
-                await asyncio.sleep(0.2)
+            with runtime.db.conversation_events.subscribe(cid) as changed:
+                yield ": connected\n\n"
+                while not await request.is_disconnected():
+                    # Clear before reading so a commit during replay cannot lose its wakeup.
+                    changed.clear()
+                    batch = await runtime.conversations.events(owner, cid, cursor)
+                    for item in batch:
+                        cursor = item["id"]
+                        yield f"id: {cursor}\nevent: {item['kind']}\ndata: {json.dumps(item, ensure_ascii=False)}\n\n"
+                    if batch:
+                        continue
+                    while not changed.is_set():
+                        try:
+                            await asyncio.wait_for(changed.wait(), timeout=EVENT_HEARTBEAT_SECONDS)
+                        except TimeoutError:
+                            yield ": ping\n\n"
 
         return StreamingResponse(
             stream(),
