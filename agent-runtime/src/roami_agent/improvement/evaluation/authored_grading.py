@@ -1,12 +1,12 @@
 """Independent authored-case checks; student code runs only in disposable sandboxes."""
 
+import ast
 import base64
 import csv
 import hashlib
 import io
 import json
 import math
-import re
 import zipfile
 
 from pptx import Presentation
@@ -72,6 +72,32 @@ def corrected_backtest_matches(actual, expected, prices):
             return False
     normalized = {**actual, "strategy": {k: v for k, v in strategy.items() if k not in extras}}
     return close_json(normalized, expected)
+
+
+def has_future_shift(source):
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, RecursionError):
+        return True
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "shift"
+        ):
+            continue
+        period = (
+            node.args[0]
+            if node.args
+            else next((item.value for item in node.keywords if item.arg == "periods"), None)
+        )
+        try:
+            value = ast.literal_eval(period)
+        except (ValueError, TypeError, RecursionError):
+            continue
+        if type(value) in {int, float} and value < 0:
+            return True
+    return False
 
 
 def read_file(workspace, name, *, binary=False):
@@ -270,7 +296,7 @@ async def grade_authored(case, workspace, executor):
                     output["corrected"], spec["corrected_expected"], prices
                 )
                 code = read_file(workspace, "analysis.py")
-                checks["no_original_future_signal"] = not re.search(r"\.shift\s*\(\s*-1\s*\)", code)
+                checks["no_original_future_signal"] = not has_future_shift(code)
         elif identifier == "LAB-05":
             experience = json.loads(read_file(workspace, "experience.json"))
             log = json.loads(read_file(workspace, "transfer-log.json"))

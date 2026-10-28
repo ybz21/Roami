@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import httpx
 
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
 from roami_agent.providers.model_billing import ModelBilling, proxy_configuration, usage_counts
 from roami_agent.providers.upstream_costs import upstream_charge
 
@@ -113,6 +114,8 @@ class ProxyTransport(httpx.AsyncBaseTransport):
             except asyncio.CancelledError:
                 call_id = await admission
                 raise
+            except DomainError as error:
+                raise ModelAdmissionRejected(error.code, error.status) from error
             sent = True
             if self.on_attempt is not None:
                 self.on_attempt()

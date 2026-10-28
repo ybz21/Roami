@@ -3,6 +3,7 @@
 import asyncio
 import copy
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -11,7 +12,10 @@ from roami_agent.improvement.domain.policy import BOUNDS
 from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
+from roami_agent.improvement.integrations.spending_policy import (
+    MODEL_ADMISSION_BLOCKERS,
+    uses_shared_model_limit,
+)
 from roami_agent.improvement.persistence.diagnostic_requests import (
     enqueue_diagnostic_request,
     existing_request,
@@ -123,7 +127,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             else configured_provider(settings_, actual),
             budget,
             role,
-            output_cap=settings_.route(actual).parameters["max_tokens"],
+            output_cap=settings_.route(actual).parameters.get("max_tokens") or 0,
             journal=journal,
         )
 
@@ -177,6 +181,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     directory = records.directory(owner, run_id)
     outcomes = []
     artifact_tokens = 0
+    usage_blocker = None
     real_cases = sum(
         c["judge"]["kind"] != "mechanism" for c in suite["cases"] if c["id"] in spec["case_ids"]
     )
@@ -224,10 +229,19 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
                 "reserved_for_later_cases": remaining_real * minimum_start,
             },
         )
-        if (budget.unknown or artifact_tokens is None) and case["judge"]["kind"] != "mechanism":
+        blocked_by = None
+        if usage_blocker is not None and case["judge"]["kind"] != "mechanism":
+            blocked_by = usage_blocker
             result = {
-                "grade": {"passed": False, "reason": "RSI_USAGE_UNKNOWN"},
-                "metrics": {"tokens": None, "token_coverage": "unknown"},
+                "grade": {"passed": False, "reason": usage_blocker["code"]},
+                "metrics": {
+                    "tokens": 0,
+                    "token_coverage": "complete",
+                    "model_calls": 0,
+                    "tool_calls": 0,
+                    "elapsed_ms": 0,
+                    "model_ms": 0,
+                },
             }
         else:
             try:
@@ -247,6 +261,18 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             else None
         )
         summary = trial_summary(original, result, target)
+        if blocked_by is not None:
+            summary["blocked_by"] = blocked_by
+        elif usage_blocker is None:
+            cause = None
+            if budget.unknown or artifact_tokens is None:
+                cause = "RSI_USAGE_UNKNOWN"
+            elif not summary["passed"]:
+                cause = next((c for c in MODEL_ADMISSION_BLOCKERS if c in summary["signals"]), None)
+            if cause:
+                usage_blocker = {"case_id": case_id, "code": cause}
+                summary["signals"] = sorted(set(summary["signals"]) | {cause})
+                summary["state"] = "blocked"
         records.case(owner, run_id, summary)
         outcomes.append(summary)
         if case["split"] == "development":
@@ -265,11 +291,16 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
                 old = original.get("files", {}).get(relative)
                 if old is not None and path.read_bytes() == old.encode():
                     continue
+                name = (
+                    digest([case_id, relative])[:20]
+                    + "-"
+                    + re.sub(r"[^A-Za-z0-9_.-]", "_", path.name)[:99]
+                )
                 records.artifact(
                     owner,
                     run_id,
                     "evaluate",
-                    digest(case_id)[:8] + "-" + path.name,
+                    name,
                     path.read_text(errors="replace"),
                 )
     records.artifact(owner, run_id, "evaluate", "results.json", outcomes)
@@ -279,20 +310,37 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         owner,
         run_id,
         "evaluate",
-        "blocked" if budget.unknown or artifact_tokens is None else "succeeded",
-        "RSI_USAGE_UNKNOWN" if budget.unknown or artifact_tokens is None else None,
+        "blocked" if usage_blocker else "succeeded",
+        usage_blocker["code"] if usage_blocker else None,
     )
     records.set_state(
         owner,
         run_id,
-        "report_queued",
+        "running",
         {
             "cases": len(outcomes),
-            "passed": sum(c["passed"] for c in outcomes),
+            "passed": sum(
+                c["state"] == "passed" and c["metrics"].get("tokens") is not None for c in outcomes
+            ),
             "pending": sum(c["pending"] for c in outcomes),
+            "blocked": sum(c["state"] == "blocked" for c in outcomes),
+            "not_run": sum("blocked_by" in c for c in outcomes),
+            "usage_blocker": usage_blocker,
             "generation_tokens": budget.metrics()["tokens"],
             "known_generation_tokens": budget.used,
             "artifact_review_tokens": artifact_tokens,
-            "provider_requests": len(budget.requests),
+            "provider_requests": budget.metrics()["request_attempts"],
+            "known_provider_requests": sum(r["requestAttempts"] or 0 for r in budget.requests),
         },
     )
+    from roami_agent.improvement.workflows.pipeline_reports import public_issue_body
+
+    records.artifact(
+        owner,
+        run_id,
+        "evaluate",
+        "evaluation-summary.md",
+        "本页由程序汇总，无需模型调用；Codex 复盘与独立验收以对应环节的回执为准。\n\n"
+        + public_issue_body(records.get(owner, run_id), {}),
+    )
+    records.set_state(owner, run_id, "report_queued")

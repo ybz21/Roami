@@ -86,7 +86,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v20-verified-backtest-summaries",
+                "container-uds-v23-native-coordinator-shared-daily",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -174,6 +174,12 @@ class ContainerExecutor:
             detail = json.loads(await docker_command("image", "inspect", self.image))[0]
         except (DomainError, ValueError):
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
+        if self.shared_daily_limit:
+            labels = detail.get("Config", {}).get("Labels") or {}
+            require(
+                labels.get("org.roami.rsi.shared-daily-policy") == "1",
+                "RSI_CONTAINER_IMAGE_REQUIRED",
+            )
         self.image_id = detail["Id"]
         renderer_id = None
         if self.artifact_reviewer:
@@ -366,7 +372,7 @@ class ContainerExecutor:
         view["prompt"] += (
             "\n"
             + NATIVE_TASK_REQUEST
-            + "本任务在无网络的独立容器中执行，文件位于/workspace。涉及代码、脚本或批处理时直接委派Worker，target={kind:new_session,directory:/workspace}，routing.explicitExecutor=native，userQuote引用上面的明确指令；如实填写复杂度，不要为了选择Native而把复杂任务说成有界任务。不要连接专业CLI、其他节点或现用会话。Main不执行项目shell操作；文件读取和小型写入可直接完成。最终产物由容器外独立判定器验收，内部任务等待验收不代表最终得分。"
+            + "本任务在无网络的独立容器中执行，文件位于/workspace。每个任务都先委派Worker，包括简单数值答案和小型文件；target={kind:new_session,directory:/workspace}，routing.explicitExecutor=native，userQuote引用上面的明确指令。如实填写复杂度，不要为了选择Native而把复杂任务说成有界任务。不要连接专业CLI、其他节点或现用会话。Main只协调和报告结果，不执行shell、计算答案或写入交付文件。最终产物由容器外独立判定器验收，内部任务等待验收不代表最终得分。"
         )
         input_names = sorted(set(case.get("files", {})) | set(case.get("asset_files", {})))
         visible_inputs = []
@@ -378,7 +384,10 @@ class ContainerExecutor:
         if len(visible_inputs) < len(input_names):
             view["prompt"] += "（目录已截断；其余输入由Worker在工作区检索。）"
         view["followups"] = case.get("followups", [])
-        private_json(state / "request.json", {"case": view, "policy": policy})
+        private_json(
+            state / "request.json",
+            {"case": view, "policy": policy, "shared_daily_limit": self.shared_daily_limit},
+        )
         setup_ms = (time.monotonic() - started) * 1000
         budget = EpisodeBudget(case["limits"], shared_daily_limit=self.shared_daily_limit)
         budget.started = started

@@ -38,9 +38,10 @@ EXTRACTION_PROMPT = (
 
 
 class MemoryJobs:
-    def __init__(self, database, model, memory, daily, *, artifacts=None):
+    def __init__(self, database, model, memory, daily, *, artifacts=None, timeout_seconds=20):
         self.db, self.model, self.memory, self.daily = database, model, memory, daily
         self.artifacts = artifacts
+        self.timeout_seconds = timeout_seconds
         self.cursor_key = "memory.scan:v1:" + daily.timezone
 
     async def recover(self):
@@ -275,7 +276,12 @@ class MemoryJobs:
                     }
                 else:
                     text = ""
-                    async with asyncio.timeout(20):
+                    timeout = (
+                        self.timeout_seconds()
+                        if callable(self.timeout_seconds)
+                        else self.timeout_seconds
+                    )
+                    async with asyncio.timeout(timeout or None):
                         async for event in self.model.stream(
                             [
                                 {"role": "system", "content": EXTRACTION_PROMPT},

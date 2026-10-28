@@ -38,7 +38,9 @@ async def evaluation_turn_failure(database, turn):
 def bind_evaluation_tasks(runtime, workspace):
     root = workspace.resolve()
     # Host scope must not bypass this lane's explicit Native handoff.
-    runtime.tools.registry["bash"].main = False
+    for name in ("bash", "write", "edit", "file_write", "file_patch"):
+        if name in runtime.tools.registry:
+            runtime.tools.registry[name].main = False
 
     @asynccontextmanager
     async def prepared(settings, task, run, *, stopped=None):

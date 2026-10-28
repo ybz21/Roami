@@ -86,5 +86,12 @@
   "selected_in_mixed_suite_v1": true,
   "resources": {
     "materials": "materials.json"
+  },
+  "output_format": {
+    "trade_side_values": [
+      "buy",
+      "sell"
+    ],
+    "trade_side_case": "lowercase"
   }
 }

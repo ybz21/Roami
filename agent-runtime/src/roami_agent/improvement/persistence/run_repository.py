@@ -218,6 +218,8 @@ class RunRepository:
                 for r in db.execute("SELECT * FROM rsi_pipeline_cases WHERE run_id=?", (run_id,))
             }
             for case in cases.values():
+                if case.get("blocked_by"):
+                    continue
                 for signal in case["signals"]:
                     if signal == "MODEL_PROXY_DAILY_LIMIT":
                         continue
@@ -250,6 +252,8 @@ class RunRepository:
                 status = (
                     "not_tested"
                     if case is None
+                    else "unverified"
+                    if case.get("blocked_by")
                     else "present"
                     if issue["code"] in case["signals"]
                     else "not_comparable"

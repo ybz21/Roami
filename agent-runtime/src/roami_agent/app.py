@@ -145,6 +145,7 @@ class Runtime:
             self.memory,
             self.memory.daily,
             artifacts=self.artifacts,
+            timeout_seconds=lambda: self.settings.route("worker").timeout_seconds,
         )
         self.notifications = Notifications(database)
         self.notification_policy = NotificationPolicy(

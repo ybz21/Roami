@@ -520,6 +520,10 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             }
             schema = schema_shape(expected)
         files["prices.json"] = json.dumps(data)
+        if case_id in {"QUANT-01", "QUANT-03"}:
+            schema["contract"] += (
+                " trades 中 side 必须是小写字符串 buy 或 sell，不使用大写或其他别名。"
+            )
         judge.update(expected=expected, numeric_tolerance=1e-5)
     elif case_id == "LAB-05":
         files["experience-v1.json"] = json.dumps(
@@ -573,7 +577,9 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         "fixture_receipt": nonce,
         "fixture_revision": "roami-authored-v3",
         "contract_revision": (
-            "authored-v13-visible-quant-inputs"
+            "authored-v14-explicit-trade-sides"
+            if case_id in {"QUANT-01", "QUANT-03"}
+            else "authored-v13-visible-quant-inputs"
             if case_id == "QUANT-02"
             else "authored-v11-verified-backtest-summaries"
             if case_id == "QUANT-03"

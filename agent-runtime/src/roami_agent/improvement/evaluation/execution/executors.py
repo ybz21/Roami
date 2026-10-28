@@ -121,6 +121,17 @@ class NativeFilesExecutor:
             professional_executor="",
             proactive_enabled=False,
         )
+        if self.allow_tasks:
+            settings = replace(
+                settings,
+                main_instructions=settings.main_instructions
+                + " This evaluation profile explicitly requires Native Worker for every task, "
+                "including simple numeric answers and small files. Delegate the complete request "
+                "first to the supplied workspace. Main coordinates and reports the result; "
+                "do not calculate or write the requested artifacts yourself. "
+                "Main has no shell or file-write capability in this profile. "
+                "The task card acknowledges acceptance; do not add an acknowledgement turn.",
+            )
         budget = EpisodeBudget(case["limits"], shared_daily_limit=self.shared_daily_limit)
         providers = []
         for role in ("main", "worker", "memory"):

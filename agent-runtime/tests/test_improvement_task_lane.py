@@ -385,3 +385,107 @@ async def test_turn_failure_ignores_other_turns_conversations_and_event_kinds(st
         assert await evaluation_turn_failure(store, current) == "RSI_TURN_FAILED"
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("shared", [False, True])
+async def test_container_request_preserves_the_shared_daily_policy(tmp_path, monkeypatch, shared):
+    from roami_agent.improvement.evaluation.execution import containers
+
+    class Unused:
+        model = "unused-fixture"
+
+    async def docker(*args, **kwargs):
+        if args[0] == "start":
+            request = json.loads((tmp_path / "state/request.json").read_text())
+            assert request.get("shared_daily_limit", False) is shared
+            (tmp_path / "state/response.json").write_text(
+                json.dumps({"output": "", "release_blockers": []})
+            )
+        return b""
+
+    async def remove(*args):
+        pass
+
+    monkeypatch.setattr(containers, "docker_command", docker)
+    executor = containers.ContainerExecutor(
+        Settings(), provider_factory=lambda *_: Unused(), shared_daily_limit=shared
+    )
+    executor.image_id = "fixture-image"
+    monkeypatch.setattr(executor, "remove", remove)
+    case = protocol_suite()["cases"][0]
+    case["files"]["output.json"] = '{"sum":40}'
+    result = await executor.run(case, {}, tmp_path)
+    assert result["grade"]["hard_passed"]
+
+
+@pytest.mark.parametrize("shared", [None, False, True])
+async def test_container_entry_uses_the_host_spending_policy(tmp_path, monkeypatch, shared):
+    from pathlib import Path
+
+    from roami_agent.improvement.evaluation.execution import container_agent
+
+    state = tmp_path / "state"
+    state.mkdir()
+    request = {"case": {"limits": {"seconds": 10}}, "policy": {}}
+    if shared is not None:
+        request["shared_daily_limit"] = shared
+    (state / "request.json").write_text(json.dumps(request))
+    captured = {}
+
+    def path(value):
+        value = str(value)
+        return (
+            tmp_path / value.lstrip("/")
+            if value.startswith(("/state", "/workspace"))
+            else Path(value)
+        )
+
+    path.home = lambda: tmp_path / "home"
+
+    class Executor:
+        def __init__(self, settings, **kwargs):
+            captured.update(kwargs)
+
+        async def run(self, case, policy, root):
+            return {"release_blockers": []}
+
+    monkeypatch.setattr(container_agent, "Path", path)
+    monkeypatch.setattr(container_agent, "NativeFilesExecutor", Executor)
+    await container_agent.main()
+    assert captured.get("shared_daily_limit", False) is (shared is True)
+    assert (state / "response.json").is_file()
+
+
+async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers(store, tmp_path):
+    runtime = Runtime(store, SimpleNamespace(model="profile-fixture"))
+    names = {"bash", "write", "edit", "file_write", "file_patch"}
+    before = {item["function"]["name"] for item in runtime.tools.catalog("worker")}
+    bind_evaluation_tasks(runtime, tmp_path)
+    main = {item["function"]["name"] for item in runtime.tools.catalog("main")}
+    worker = {item["function"]["name"] for item in runtime.tools.catalog("worker")}
+    assert not main & names
+    assert worker & names == before & names
+    assert {"bash", "write", "edit"} <= worker
+    assert "delegate" in main and "read" in main
+
+
+@pytest.mark.parametrize("shared", [False, True])
+@pytest.mark.parametrize("supported", [False, True])
+async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
+    tmp_path, monkeypatch, shared, supported
+):
+    from roami_agent.improvement.evaluation.execution import containers
+
+    async def docker(*args, **kwargs):
+        assert args[:2] == ("image", "inspect")
+        labels = {"org.roami.rsi.shared-daily-policy": "1"} if supported else None
+        return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
+
+    monkeypatch.setattr(containers, "docker_command", docker)
+    executor = containers.ContainerExecutor(Settings(), shared_daily_limit=shared)
+    if shared and not supported:
+        with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
+            await executor.preflight()
+        assert executor.image_id is None
+    else:
+        assert (await executor.preflight())["image_id"] == "fixture-image"
