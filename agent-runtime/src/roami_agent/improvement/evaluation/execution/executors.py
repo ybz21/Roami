@@ -28,6 +28,26 @@ from roami_agent.providers.factory import configured_provider
 from roami_agent.storage.database import Database, row
 
 
+def committed_answer(messages, *, turn_id=None):
+    """Task delivery notifications are separate from the Main turn's committed answer."""
+    answers = [
+        message
+        for message in reversed(messages)
+        if message["role"] == "assistant" and message["content"].get("text")
+    ]
+    main = next(
+        (
+            message
+            for message in answers
+            if message["content"].get("source") != "task"
+            and not message["content"].get("tool_calls")
+            and (turn_id is None or message.get("turn_id") == turn_id)
+        ),
+        None,
+    )
+    return (main or answers[0])["content"]["text"] if answers else ""
+
+
 class ProtocolFixtureModel:
     """Exercises real intake/tools/persistence, never estimates model capability."""
 
@@ -258,28 +278,18 @@ class NativeFilesExecutor:
                     view = await runtime.conversations.messages(
                         "rsi-evaluation", conversation["id"]
                     )
-                    answers = [
-                        m
-                        for m in view["messages"]
-                        if m["role"] == "assistant" and m["content"].get("text")
-                    ]
                     if "turn_judges" in case:
                         turn_grades.append(
                             judge_case(
                                 {**case, "judge": case["turn_judges"][index]},
-                                answers[-1]["content"]["text"] if answers else "",
+                                committed_answer(view["messages"], turn_id=receipt["turnId"]),
                                 workspace,
                             )
                         )
                 messages = await runtime.conversations.messages(
                     "rsi-evaluation", conversation["id"]
                 )
-                final = [
-                    m
-                    for m in messages["messages"]
-                    if m["role"] == "assistant" and m["content"].get("text")
-                ]
-                output = final[-1]["content"]["text"] if final else ""
+                output = committed_answer(messages["messages"], turn_id=receipt["turnId"])
                 if self.allow_tasks:
                     from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
                         verify_native_execution,

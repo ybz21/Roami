@@ -122,6 +122,16 @@ class NoSandbox:
 
 class AnalysisReplay:
     async def sandbox(self, directory, program, **kwargs):
+        import shutil
+        import tempfile
+
+        assert kwargs["copy_workspace"] is True
+        with tempfile.TemporaryDirectory() as temporary:
+            replay = Path(temporary) / "workspace"
+            shutil.copytree(directory, replay)
+            return await self.execute(replay, program, kwargs["timeout"])
+
+    async def execute(self, directory, program, timeout):
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             "-c",
@@ -130,7 +140,7 @@ class AnalysisReplay:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), kwargs["timeout"])
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout)
             assert process.returncode == 0, stderr.decode()
             return stdout
         finally:

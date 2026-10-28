@@ -264,7 +264,7 @@ async def grade_authored(case, workspace, executor):
         elif identifier.startswith("QUANT-"):
             prices = json.loads(read_file(workspace, "prices.json"))
             output = json.loads(
-                (await executor.sandbox(workspace, RERUN_ANALYSIS, timeout=60))
+                (await executor.sandbox(workspace, RERUN_ANALYSIS, timeout=60, copy_workspace=True))
                 .decode()
                 .splitlines()[-1]
             )
@@ -400,14 +400,11 @@ with tempfile.TemporaryDirectory() as d:
  print(json.dumps({"restored":restored,"incompatible_rejected":result.returncode!=0,"target_unchanged":before==after}))
 """
 
-RERUN_ANALYSIS = r"""import tempfile,pathlib,shutil,subprocess,sys,json
-with tempfile.TemporaryDirectory() as d:
- root=pathlib.Path(d)
- for path in pathlib.Path("/workspace").iterdir():
-  if path.is_file():shutil.copy2(path,root/path.name)
- for name in ["result.json","corrected.json","trades.csv","equity.svg","selection-log.json"]:(root/name).unlink(missing_ok=True)
- subprocess.run([sys.executable,"analysis.py"],cwd=root,check=True,capture_output=True,timeout=30)
- print(json.dumps({"result":json.loads((root/"result.json").read_text()) if (root/"result.json").exists() else None,"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
+RERUN_ANALYSIS = r"""import pathlib,subprocess,sys,json
+root=pathlib.Path("/workspace")
+for name in ["result.json","corrected.json","trades.csv","equity.svg","selection-log.json"]:(root/name).unlink(missing_ok=True)
+subprocess.run([sys.executable,"analysis.py"],cwd=root,check=True,capture_output=True,timeout=30)
+print(json.dumps({"result":json.loads((root/"result.json").read_text()) if (root/"result.json").exists() else None,"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
 """
 
 BOARD_PROBE = r"""import json,pathlib
