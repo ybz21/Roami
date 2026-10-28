@@ -3,12 +3,37 @@
 import json
 from pathlib import Path
 
+from roami_agent.improvement.domain.admission_blocking import blocking_code
 from roami_agent.improvement.domain.contracts import digest
 from roami_agent.improvement.domain.run_configuration import code
 from roami_agent.improvement.evaluation.case_catalog import case_identity
 
 
-def trial_summary(case, result, root=None):
+def cycle_usage(trials):
+    metrics = [trial.get("metrics", {}) for trial in trials]
+
+    def total(name, default=None):
+        values = [item.get(name, default) for item in metrics]
+        return sum(values) if values and all(type(v) is int and v >= 0 for v in values) else None
+
+    tokens, review = total("tokens"), total("artifact_review_tokens", 0)
+    observed = [
+        item["tokens"]
+        if type(item.get("tokens")) is int and item["tokens"] >= 0
+        else item.get("observed_tokens")
+        for item in metrics
+    ]
+    return {
+        "evaluation_tokens": tokens,
+        "known_evaluation_tokens": sum(v for v in observed if type(v) is int and v >= 0),
+        "generation_tokens": tokens - review
+        if tokens is not None and review is not None and tokens >= review
+        else None,
+        "artifact_review_tokens": review,
+    }
+
+
+def trial_summary(case, result, root=None, *, blocked_by=None):
     grade, metrics = result.get("grade", {}), result.get("metrics", {})
     signals = (
         {code(result.get("execution_error") or grade.get("reason"))}
@@ -16,6 +41,8 @@ def trial_summary(case, result, root=None):
         else set()
     )
     signals -= {"UNKNOWN", "assertions_passed"}
+    if cause := blocking_code(result):
+        signals.add(cause)
     checks = {code(k): v for k, v in grade.get("checks", {}).items() if type(v) is bool}
     signals.update("check:" + k for k, v in checks.items() if not v)
     tools, roles, files = [], {}, []
@@ -95,6 +122,7 @@ def trial_summary(case, result, root=None):
     identity = case_identity(case)
     return {
         "case_id": case["id"],
+        **({"blocked_by": blocked_by} if blocked_by else {}),
         "name": identity["name"],
         "description": identity["description"],
         "category": case.get("category", ""),

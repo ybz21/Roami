@@ -5,7 +5,7 @@ import json
 from roami_agent.improvement.domain.contracts import digest
 from roami_agent.improvement.domain.run_configuration import STAGES, code
 from roami_agent.improvement.evaluation.case_catalog import case_identity
-from roami_agent.improvement.evaluation.trial_evidence import trial_summary
+from roami_agent.improvement.evaluation.trial_evidence import cycle_usage, trial_summary
 from roami_agent.protocol.errors import DomainError
 
 
@@ -54,9 +54,7 @@ class RunLifecycle:
             self.runs.attach_cycle(owner, run_id, row["cycle_id"])
             by_case = {}
             for trial in cycle["trials"]:
-                if trial["case_id"] not in by_case or trial["arm"] == "candidate":
-                    by_case[trial["case_id"]] = trial
-            for case_id, trial in by_case.items():
+                case_id = trial["case_id"]
                 root = (
                     self.ledger.path.parent
                     / "runs"
@@ -72,26 +70,45 @@ class RunLifecycle:
                     },
                     trial,
                     root,
+                    blocked_by=trial.get("blocked_by"),
                 )
                 outcome["source_hash"] = trial["case_hash"]
                 outcome["arm"] = trial["arm"]
+                by_case.setdefault(case_id, {})[trial["arm"]] = outcome
+            report = cycle["report"] or {}
+            cause = report.get("usage_blocker") or {}
+            for case_id, arms in by_case.items():
+                selected = (
+                    cause["arm"]
+                    if cause.get("case_id") == case_id and cause.get("arm") in arms
+                    else "candidate"
+                    if "candidate" in arms
+                    else next(iter(arms))
+                )
+                outcome = dict(arms[selected])
+                if len(arms) > 1:
+                    outcome["arm_results"] = arms
                 self.runs.case(owner, run_id, outcome)
             self.runs.observations(owner, run_id)
-            report = cycle["report"] or {}
             self.runs.artifact(owner, run_id, "evaluate", "evaluation-report.json", report)
             self.runs.node(
                 owner,
                 run_id,
                 "evaluate",
                 "succeeded" if report.get("full_suite_complete") else "blocked",
-                row["error_code"],
+                cause.get("code") or row["error_code"],
             )
             summary = {
                 "cases": len(by_case),
                 "expected_cases": cycle["manifest"].get("expected_cases"),
                 "formal": cycle["manifest"].get("formal_daily_suite"),
                 "evaluation_complete": report.get("evaluation_complete", False),
+                "usage_blocker": report.get("usage_blocker"),
+                **cycle_usage(cycle["trials"]),
             }
+            from roami_agent.improvement.workflows.pipeline_reports import store_evaluation_summary
+
+            store_evaluation_summary(self.runs, owner, run_id, summary=summary)
             if report.get("evaluation_complete") and self.runs.research_enabled(owner):
                 self.runs.set_state(owner, run_id, "awaiting_research", summary)
                 return
@@ -122,6 +139,9 @@ class RunLifecycle:
             )
             self.runs.observations(owner, run_id)
             self.runs.node(owner, run_id, "evaluate", "blocked", error)
+            from roami_agent.improvement.workflows.pipeline_reports import store_evaluation_summary
+
+            store_evaluation_summary(self.runs, owner, run_id, summary={"error": error})
             self.runs.queue_report(
                 owner,
                 run_id,

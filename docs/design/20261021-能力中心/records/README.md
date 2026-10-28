@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-28 | [MCP 独立后台守护 · 2026-10-28](2026-10-28/mcp-independent-daemon-20261028.html) |
 | 2026-10-28 | [MCP 保活与中文名称 · 2026-10-28](2026-10-28/mcp-maintenance-metadata-20261028.html) |
 | 2026-10-23 | [开放能力市场与 MCP 传输接入 · 2026-10-23](2026-10-23/capability-markets-design.html) |
 | 2026-10-22 | [Agent 模型下拉选择 · 2026-10-22](2026-10-22/professional-agent-model-picker.html) |

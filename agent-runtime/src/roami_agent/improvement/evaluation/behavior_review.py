@@ -5,6 +5,10 @@ import json
 import statistics
 from collections import Counter
 
+from roami_agent.improvement.domain.admission_blocking import (
+    MODEL_ADMISSION_BLOCKERS,
+    blocking_code,
+)
 from roami_agent.improvement.domain.contracts import digest, evaluation_arms
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.protocol.errors import DomainError
@@ -15,8 +19,10 @@ LOGS = {
     "isolated_native_worker": ("model-log.json", "state/execution-log.json"),
     "runtime_regression_variant": ("regression.log",),
     "external_worker": ("execution-log.json",),
+    "admission_blocked": ("admission-blocked.json",),
 }
 ACTIONS = {
+    "admission_blocked": "核对首发用量或共享每日限额；后续未执行的 Case 不是新增独立缺陷。",
     "failed_assertion": "复现失败断言，核对实际产物和执行链，再修改执行逻辑；不得放宽评分标准。",
     "judge_pending": "补齐独立产物评分；不能把文件存在视为质量通过。",
     "usage_unknown": "核对各角色、重试和异步维护的用量；计量完整前不宣称节省Token。",
@@ -64,7 +70,14 @@ def review_trial(trial, root):
             reference = {"file": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
             if name.endswith(".json"):
                 value = json.loads(raw)
-                if name.endswith("model-log.json"):
+                if name == "admission-blocked.json":
+                    if value != {
+                        "case_id": trial["case_id"],
+                        "case_hash": trial["case_hash"],
+                        "blocked_by": trial["blocked_by"],
+                    }:
+                        raise ValueError("admission_evidence_changed")
+                elif name.endswith("model-log.json"):
                     records = value["requests"]
                     if not isinstance(records, list) or any(
                         not isinstance(r, dict) for r in records
@@ -82,6 +95,10 @@ def review_trial(trial, root):
                         requests.append(
                             {
                                 "role": record["role"],
+                                "admission_error": record.get("error_code")
+                                if record.get("error_code")
+                                in (*MODEL_ADMISSION_BLOCKERS, "RSI_USAGE_UNKNOWN")
+                                else None,
                                 "measurement": record["measurement"],
                                 "request_bytes": len(payload),
                                 "request_hash": hashlib.sha256(payload).hexdigest(),
@@ -143,10 +160,17 @@ def review_trial(trial, root):
             finding("log_unavailable", [{"file": name}])
 
     grade, metrics = trial["grade"], trial["metrics"]
+    admission = blocking_code(trial, [request["admission_error"] for request in requests])
     if "model-log.json" in names and len(requests) != metrics.get("model_calls"):
         complete = False
         finding("log_unavailable", [{"file": "model-log.json"}], reason="request_count_mismatch")
-    if not grade["passed"]:
+    if admission:
+        finding(
+            "admission_blocked",
+            [{"record": "blocked_by" if trial.get("blocked_by") else "grade"}],
+            reason=admission,
+        )
+    elif not grade["passed"]:
         finding(
             "judge_pending" if grade.get("pending") else "failed_assertion",
             [{"record": "grade"}],
@@ -173,6 +197,7 @@ def review_trial(trial, root):
             previous[key] = tool["evidence"]
     return {
         "complete": complete,
+        "admission_error": admission,
         "metrics_reviewed": True,
         "logs": evidence,
         "model_requests_reviewed": len(requests),
@@ -188,13 +213,20 @@ def review_cycle(manifest, trials):
     details, pair_findings = [], []
     expected = set(manifest["case_ids"])
     required_arms = evaluation_arms(manifest)
-    executed = {arm: {t["case_id"] for t in trials.get(arm, [])} for arm in required_arms}
-    full = all(ids == expected for ids in executed.values()) and not any(
-        trials.get(arm) for arm in set(trials) - set(required_arms)
+    executed = {
+        arm: {t["case_id"] for t in trials.get(arm, []) if not t.get("blocked_by")}
+        for arm in required_arms
+    }
+    full = (
+        all(ids == expected for ids in executed.values())
+        and not any(trials.get(arm) for arm in set(trials) - set(required_arms))
+        and not any(blocking_code(t) for items in trials.values() for t in items)
     )
     index = {arm: {t["case_id"]: t for t in items} for arm, items in trials.items()}
     for case_id in sorted(executed["baseline"] & executed.get("candidate", set())):
         a, b = index["baseline"][case_id], index["candidate"][case_id]
+        if blocking_code(a) or blocking_code(b):
+            continue
         codes = []
         if a["grade"]["passed"] and (
             not b["grade"]["passed"] or b["grade"]["quality"] < a["grade"]["quality"]
@@ -220,8 +252,8 @@ def review_cycle(manifest, trials):
             t["metrics"].get("tokens") is not None for t in items
         )
         tokens = sum(t["metrics"].get("tokens") or 0 for t in items)
-        passed = sum(t["grade"]["passed"] for t in items)
-        deliveries = sum(bool(t.get("verified_delivery")) for t in items)
+        passed = sum(t["grade"]["passed"] and not blocking_code(t) for t in items)
+        deliveries = sum(bool(t.get("verified_delivery")) and not blocking_code(t) for t in items)
         times = [
             t["metrics"]["elapsed_ms"]
             for t in items
@@ -234,6 +266,8 @@ def review_cycle(manifest, trials):
 
         layers, roles = {}, {}
         for trial in items:
+            if blocking_code(trial):
+                continue
             layer = layers.setdefault(
                 trial.get("layer", "unclassified"), {"trials": 0, "quality_sum": 0}
             )
@@ -255,7 +289,8 @@ def review_cycle(manifest, trials):
                         else None
                     )
         aggregates[arm] = {
-            "executed": len(items),
+            "executed": sum(not t.get("blocked_by") for t in items),
+            "not_run": sum(bool(t.get("blocked_by")) for t in items),
             "passed": passed,
             "total_tokens_including_failures": tokens if known else None,
             "observed_tokens": sum(

@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from roami_agent.improvement.domain.admission_blocking import blocked_result, blocking_code
 from roami_agent.improvement.domain.comparison import compare
 from roami_agent.improvement.domain.contracts import VERSION, digest, require
 from roami_agent.improvement.domain.policy import policy_id, propose, validate_policy
@@ -16,7 +17,10 @@ from roami_agent.improvement.evaluation.contracts import validate_suite
 from roami_agent.improvement.evaluation.daily_suite import daily_coverage
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.improvement.integrations.source_identity import implementation_hash
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
+from roami_agent.improvement.integrations.spending_policy import (
+    check_usage_admission,
+    uses_shared_model_limit,
+)
 from roami_agent.protocol.errors import DomainError
 
 
@@ -63,6 +67,7 @@ async def run_cycle(
     period_machines=None,
     source_builds=None,
     paired=True,
+    admission_check=None,
 ):
     validate_suite(suite)
     baseline = validate_policy(baseline)
@@ -149,6 +154,7 @@ async def run_cycle(
     private_json(cycle_root / "manifest.json", manifest)
     private_json(cycle_root / "suite.json", suite)
     trials = {arm: [] for arm in trial_arms}
+    usage_blocker = None
     try:
         for case in cases:
             # Order is balanced without learning the verifier or looking at either result.
@@ -158,14 +164,22 @@ async def run_cycle(
                 root = cycle_root / (digest(case["id"])[:20] + "-" + arm)
                 root.mkdir(mode=0o700)
                 try:
-                    if source_builds is not None:
+                    if usage_blocker and case["judge"]["kind"] != "mechanism":
+                        result = blocked_result(usage_blocker)
+                    elif source_builds is not None:
                         result = await executor.run_arm(
                             arm, case, baseline if arm == "baseline" else candidate, root
                         )
+                        result.pop("blocked_by", None)
+                        result.pop("admission_error", None)
+                        result.pop("shared_admission_checked", None)
                     else:
                         result = await executor.run(
                             case, baseline if arm == "baseline" else candidate, root
                         )
+                        result.pop("blocked_by", None)
+                        result.pop("admission_error", None)
+                        result.pop("shared_admission_checked", None)
                 except (DomainError, OSError, TimeoutError, ValueError) as error:
                     result = {
                         "grade": {
@@ -181,6 +195,12 @@ async def run_cycle(
                         "verified_delivery": False,
                         "release_blockers": ["worker_error"],
                     }
+                if (
+                    not result.get("blocked_by")
+                    and result.get("metrics", {}).get("tokens") is None
+                    and uses_shared_model_limit(ledger)
+                ):
+                    await check_usage_admission(result, admission_check)
                 trial = {
                     "case_id": case["id"],
                     "case_hash": digest(case),
@@ -198,6 +218,15 @@ async def run_cycle(
                 }
                 if source_builds is not None:
                     trial["agent_build_hash"] = source_builds[arm]
+                if trial.get("blocked_by"):
+                    private_json(
+                        root / "admission-blocked.json",
+                        {
+                            "case_id": trial["case_id"],
+                            "case_hash": trial["case_hash"],
+                            "blocked_by": trial["blocked_by"],
+                        },
+                    )
                 if machine["cache_mode"] == "uncontrolled":
                     trial["release_blockers"].append("cache_uncontrolled")
                 if manifest["baseline_id"] == manifest["candidate_id"] and (
@@ -205,6 +234,10 @@ async def run_cycle(
                 ):
                     trial["release_blockers"].append("no_policy_change")
                 trial["log_review"] = await asyncio.to_thread(review_trial, trial, root)
+                if code := trial["log_review"].get("admission_error"):
+                    trial["admission_error"] = code
+                    if usage_blocker is None:
+                        usage_blocker = {"case_id": case["id"], "arm": arm, "code": code}
                 if not trial["log_review"]["complete"]:
                     trial["release_blockers"].append("execution_logs_missing")
                 # Full outputs stay in the private trial file, outside the optimizer's proposal view.
@@ -226,7 +259,7 @@ async def run_cycle(
         development = [
             t
             for t in trials.get("candidate", trials["baseline"])
-            if t["split"] == "development" and t["layer"] != "smoke"
+            if t["split"] == "development" and t["layer"] != "smoke" and not blocking_code(t)
         ]
         proposals = propose(candidate, development) if development else []
         report = {
@@ -238,6 +271,7 @@ async def run_cycle(
             "experiment_kind": manifest["experiment_kind"],
             "implementation_hash": manifest["implementation_hash"],
             "budget_omitted_case_ids": [],
+            "usage_blocker": usage_blocker,
             "runner_version": VERSION,
             "comparison": comparison,
             "coverage": review["coverage"],
@@ -255,9 +289,12 @@ async def run_cycle(
             "report_phase": "evaluated_waiting_semantic_review",
             "counts": {
                 arm: {
-                    "executed": len(items),
-                    "passed": sum(t["grade"]["passed"] for t in items),
-                    "verified_deliveries": sum(t["verified_delivery"] for t in items),
+                    "executed": sum(not t.get("blocked_by") for t in items),
+                    "not_run": sum(bool(t.get("blocked_by")) for t in items),
+                    "passed": sum(t["grade"]["passed"] and not blocking_code(t) for t in items),
+                    "verified_deliveries": sum(
+                        t["verified_delivery"] and not blocking_code(t) for t in items
+                    ),
                 }
                 for arm, items in trials.items()
             },

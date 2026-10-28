@@ -86,7 +86,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v23-native-coordinator-shared-daily",
+                "container-uds-v24-shared-cost-admission",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -177,7 +177,7 @@ class ContainerExecutor:
         if self.shared_daily_limit:
             labels = detail.get("Config", {}).get("Labels") or {}
             require(
-                labels.get("org.roami.rsi.shared-daily-policy") == "1",
+                labels.get("org.roami.rsi.shared-daily-policy") == "2",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
         self.image_id = detail["Id"]
@@ -493,9 +493,18 @@ class ContainerExecutor:
                         isinstance(response.get("release_blockers"), list),
                         "RSI_RUNTIME_RESPONSE_INVALID",
                     )
+                    runtime_blockers = [
+                        code
+                        for code in response["release_blockers"]
+                        if not (
+                            self.shared_daily_limit
+                            and budget.unknown
+                            and code == "unknown_provider_usage"
+                        )
+                    ]
                     if gateway.errors:
                         failure = gateway.errors[0]
-                    elif response["release_blockers"]:
+                    elif runtime_blockers:
                         from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
                             NATIVE_EXECUTION_FAILURES,
                         )
@@ -503,7 +512,7 @@ class ContainerExecutor:
                         failure = next(
                             (
                                 c
-                                for c in response["release_blockers"]
+                                for c in runtime_blockers
                                 if isinstance(c, str) and c in NATIVE_EXECUTION_FAILURES
                             ),
                             "RSI_RUNTIME_REPORTED_FAILURE",

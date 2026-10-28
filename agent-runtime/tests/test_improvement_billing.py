@@ -407,3 +407,39 @@ async def test_retry_admission_rejection_preserves_the_first_unknown_request(sto
         assert summary["requests"] == 1 and summary["unknown"] == 1
     finally:
         await upstream.close()
+
+
+@pytest.mark.parametrize("prices", [False, True])
+async def test_shared_daily_admission_allows_known_zero_cost_without_token_usage(store, prices):
+    from roami_agent.improvement.integrations.measurements import MeteredModel
+
+    proxy, _ = proxy_for(store, limit=1, prices=prices)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b'data: {"choices":[{"delta":{"content":"done"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+        )
+
+    from test_model_proxy import provider
+
+    model = provider(proxy, handler)
+    budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 20}, shared_daily_limit=True)
+    metered = MeteredModel(model, budget, "main", output_cap=0)
+    try:
+        await consume(metered)
+        if prices:
+            with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
+                await consume(metered)
+        else:
+            await consume(metered)
+        assert len(calls) == (1 if prices else 2)
+        assert budget.unknown and budget.metrics()["tokens"] is None
+        summary = await proxy.billing.daily_summary()
+        assert summary["unknown"] == (1 if prices else 0)
+        assert summary["requests"] == len(calls)
+    finally:
+        await model.close()

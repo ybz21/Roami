@@ -224,6 +224,7 @@ class EvaluationWorker:
                 period_machines=prefs["machine_ids"],
                 source_builds=source_builds,
                 paired=baseline != candidate or source_builds is not None,
+                admission_check=proxy.billing.check if proxy is not None else None,
             )
             await asyncio.to_thread(
                 self.service.control.finish,
