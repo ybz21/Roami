@@ -122,7 +122,7 @@ async def test_native_csv_pass_still_requires_independent_quality(tmp_path, faul
                 {
                     "checks": {
                         "adapted_csv_values": fault != "wrong_csv",
-                        "five_slides_with_images": True,
+                        "five_plot_slides": True,
                         "nonempty_utf8_script": True,
                     },
                     "native_csv_equality": fault != "wrong_csv",
