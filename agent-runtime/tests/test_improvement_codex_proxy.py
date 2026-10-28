@@ -6,7 +6,7 @@ import httpx
 import pytest
 from test_model_proxy import Chunks, consume, provider, proxy_for
 
-from roami_agent.improvement.codex_proxy import CodexProxy, codex_route
+from roami_agent.improvement.integrations.codex_proxy import CodexProxy, codex_route
 from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.model_billing import usage_counts
 

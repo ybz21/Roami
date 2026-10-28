@@ -4,11 +4,11 @@ import json
 
 import pytest
 
-from roami_agent.improvement.behavior_review import review_cycle, review_trial
-from roami_agent.improvement.contracts import freeze_suite
-from roami_agent.improvement.cycle import run_cycle
-from roami_agent.improvement.executors import private_json
-from roami_agent.improvement.ledger import Ledger
+from roami_agent.improvement.evaluation.behavior_review import review_cycle, review_trial
+from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.integrations.artifact_files import private_json
+from roami_agent.improvement.persistence.ledger import Ledger
+from roami_agent.improvement.workflows.cycle import run_cycle
 from roami_agent.protocol.errors import DomainError
 
 
@@ -223,7 +223,7 @@ def test_review_includes_failure_costs_unknown_usage_and_paired_regressions(tmp_
 async def test_external_worker_log_limit_preserves_bounded_output_and_does_not_hang(tmp_path):
     import sys
 
-    from roami_agent.improvement.executors import ExternalExecutor
+    from roami_agent.improvement.evaluation.execution.executors import ExternalExecutor
 
     program = tmp_path / "noisy.py"
     program.write_text("import sys\nsys.stdout.write('x' * 5000000)\nsys.stdout.flush()\n")

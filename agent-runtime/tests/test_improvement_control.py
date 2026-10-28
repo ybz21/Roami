@@ -5,11 +5,13 @@ import httpx
 import pytest
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.contracts import digest, freeze_suite, implementation_hash
-from roami_agent.improvement.control import ImprovementControl
-from roami_agent.improvement.ledger import Ledger
-from roami_agent.improvement.policy import policy_id, validate_policy
-from roami_agent.improvement.releases import Releases
+from roami_agent.improvement.domain.contracts import digest
+from roami_agent.improvement.domain.policy import policy_id, validate_policy
+from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.integrations.source_identity import implementation_hash
+from roami_agent.improvement.persistence.control import ImprovementControl
+from roami_agent.improvement.persistence.ledger import Ledger
+from roami_agent.improvement.persistence.releases import Releases
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_binding
 from roami_agent.server.configuration import Settings
@@ -225,9 +227,9 @@ def test_release_requires_actual_log_reviews_instead_of_report_completion_flag(t
 async def test_no_new_candidate_still_runs_the_full_daily_suite(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
-    from roami_agent.improvement.corpus import authored_suite
-    from roami_agent.improvement.daily_suite import PUBLIC_QUOTAS, assemble_daily
-    from roami_agent.improvement.worker import EvaluationWorker
+    from roami_agent.improvement.evaluation.corpus import authored_suite
+    from roami_agent.improvement.evaluation.daily_suite import PUBLIC_QUOTAS, assemble_daily
+    from roami_agent.improvement.workflows.worker import EvaluationWorker
 
     c, settings = control(tmp_path)
     case = json.loads(suite_file(tmp_path).read_text())["cases"][0]
@@ -264,17 +266,17 @@ async def test_no_new_candidate_still_runs_the_full_daily_suite(tmp_path, monkey
         ran.update(arguments)
         return {"cycle_id": "proof", "full_suite_complete": True}
 
-    monkeypatch.setattr("roami_agent.improvement.worker.next_candidate", lambda *_: None)
-    monkeypatch.setattr("roami_agent.improvement.cycle.run_cycle", run)
+    monkeypatch.setattr("roami_agent.improvement.workflows.worker.next_candidate", lambda *_: None)
+    monkeypatch.setattr("roami_agent.improvement.workflows.cycle.run_cycle", run)
     runtime = SimpleNamespace(
         settings=SimpleNamespace(
             current=Settings(endpoint="http://evaluation.invalid/v1", model="fixture")
         )
     )
-    from roami_agent.improvement.workflow import ResearchWorkflow
+    from roami_agent.improvement.persistence.research_repository import ResearchRepository
 
     service = SimpleNamespace(
-        control=c, ledger=c.ledger, wakeup=asyncio.Event(), research=ResearchWorkflow(c.ledger)
+        control=c, ledger=c.ledger, wakeup=asyncio.Event(), research=ResearchRepository(c.ledger)
     )
     await EvaluationWorker(runtime, service).execute(c.claim())
     assert len(ran["suite"]["cases"]) == 60

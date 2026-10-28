@@ -8,5 +8,8 @@
     "task_id": "00000013:question19",
     "revision": "1196d6553ec200e1262841efc89cda5954ffe89f"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

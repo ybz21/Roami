@@ -7,15 +7,15 @@ import sys
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view
-from roami_agent.improvement.executors import materialize
-from roami_agent.improvement.long_memory import (
+from roami_agent.improvement.evaluation.benchmarks.long_memory import (
     EVAL_SPEC,
     QUESTION_ID,
     grade_long_memory,
     import_long_memory,
     prepare_history,
 )
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.integrations.artifact_files import materialize
 from roami_agent.protocol.errors import DomainError
 
 METRIC = r"""

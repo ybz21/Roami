@@ -56,8 +56,6 @@
   "research_inspiration": [
     "FinRobot"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "截至时点的事实、数字和单位准确",
     "completeness": "公告、新闻、缺口与情景覆盖",
@@ -86,5 +84,8 @@
     "convfinqa"
   ],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

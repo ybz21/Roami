@@ -56,8 +56,6 @@
     "OfficeBench",
     "TheAgentCompany"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "关键事实和时间窗口准确",
     "completeness": "主题、冲突、限制与问题覆盖",
@@ -86,5 +84,8 @@
     "browsecomp"
   ],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

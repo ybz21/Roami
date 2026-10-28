@@ -8,5 +8,8 @@
     "task_id": "Double_KHC/2016/page_23.pdf",
     "revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

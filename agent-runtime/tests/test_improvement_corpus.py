@@ -8,16 +8,17 @@ from pathlib import Path
 
 import pytest
 
-from roami_agent.improvement.authored_grading import grade_authored
-from roami_agent.improvement.contracts import digest, freeze_suite
-from roami_agent.improvement.corpus import authored_suite
-from roami_agent.improvement.daily_suite import (
+from roami_agent.improvement.domain.contracts import digest
+from roami_agent.improvement.evaluation.authored_grading import grade_authored
+from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.corpus import authored_suite
+from roami_agent.improvement.evaluation.daily_suite import (
     PUBLIC_QUOTAS,
     assemble_daily,
     daily_coverage,
     validate_private_separation,
 )
-from roami_agent.improvement.executors import materialize
+from roami_agent.improvement.integrations.artifact_files import materialize
 from roami_agent.protocol.errors import DomainError
 
 
@@ -264,8 +265,8 @@ def test_public_preconditions_are_presented_without_exposing_oracle():
 
 
 def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path):
-    from roami_agent.improvement.corpus import prepare_corpus
-    from roami_agent.improvement.status import ImprovementStatus
+    from roami_agent.improvement.evaluation.corpus import prepare_corpus
+    from roami_agent.improvement.service import ImprovementStatus
 
     service = ImprovementStatus(tmp_path)
     root = service.ledger.path.parent / "corpus"
@@ -274,14 +275,18 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     previous.write_bytes(b"original frozen suite evidence")
     prepare_corpus(service, "owner")
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v12.json").read_text())
+    revised = json.loads((root / "authored-40-v13.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"
     assert identities["STOCK-03"] == "authored-v9-stock-evidence-contract"
     assert all(
         c["origin"]["recipe_revision"]
-        in {"authored-v10-separated-instructions", "authored-v11-verified-backtest-summaries"}
+        in {
+            "authored-v10-separated-instructions",
+            "authored-v11-verified-backtest-summaries",
+            "authored-v13-visible-quant-inputs",
+        }
         for c in revised["cases"]
         if "执行要求（不是结果字段）" in c["prompt"]
     )

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "PUBLIC-13",
+  "data": {
+    "kind": "upstream_registered_suite",
+    "source": {
+      "benchmark": "osworld",
+      "task_id": "05dd4c1d-c489-4c85-8389-a7836c4f0567",
+      "revision": "04718eab9327856efe8192cc58161acc7a7627e2"
+    },
+    "source_case_id": "osworld:05dd4c1d-c489-4c85-8389-a7836c4f0567",
+    "local_inputs": false,
+    "load_from": "Registered frozen suite files/asset_files after the benchmark importer completes. Source registration alone does not include or execute the dataset."
+  },
+  "tools": {
+    "kind": "benchmark_environment",
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+  },
+  "acceptance": {
+    "kind": "upstream_adapter",
+    "load_from": "The frozen registered suite judge; not an answer file in this folder."
+  }
+}

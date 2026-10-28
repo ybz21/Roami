@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view
-from roami_agent.improvement.sampling import import_finqa
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.evaluation.sampling import import_finqa
 from roami_agent.protocol.errors import DomainError
 
 

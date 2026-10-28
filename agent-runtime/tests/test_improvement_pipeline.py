@@ -4,11 +4,12 @@ from types import SimpleNamespace
 import pytest
 from test_improvement_control import suite_file
 
-from roami_agent.improvement.github_publication import configure_publication
-from roami_agent.improvement.pipeline_reports import RunCosts, publish_run_issue
-from roami_agent.improvement.pipeline_runner import enqueue_diagnostic
-from roami_agent.improvement.run_records import trial_summary
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.evaluation.trial_evidence import trial_summary
+from roami_agent.improvement.integrations.github_client import configure_publication
+from roami_agent.improvement.persistence.run_costs import RunCosts
+from roami_agent.improvement.service import ImprovementStatus
+from roami_agent.improvement.workflows.pipeline_reports import publish_run_issue
+from roami_agent.improvement.workflows.pipeline_runner import enqueue_diagnostic
 from roami_agent.protocol.errors import DomainError
 
 
@@ -159,7 +160,7 @@ def test_cancelled_evaluation_never_queues_paid_report(tmp_path):
             "INSERT INTO rsi_requests VALUES(?,?,?,'manual','interrupted',1,1,NULL,NULL,'RSI_CANCELLED',?)",
             (run_id, "local", "a", json.dumps({"diagnostic": {}})),
         )
-    service.runs.capture_request({"owner": "local", "id": run_id})
+    service.run_lifecycle.capture_request({"owner": "local", "id": run_id})
     assert service.runs.get("local", run_id)["state"] == "cancelled"
     assert service.runs.claim_report() is None
 
@@ -204,10 +205,10 @@ def test_formal_case_contract_survives_preflight_and_missing_logs_are_unknown(tm
         "daily",
         {"pipeline": service.runs.settings("local"), "suite_hash": "frozen", "case_ids": []},
     )
-    service.runs.freeze_cases("local", run_id, suite)
+    service.run_lifecycle.freeze_cases("local", run_id, suite)
     assert service.runs.get("local", run_id)["snapshot"]["case_ids"] == ["a", "b"]
     with pytest.raises(DomainError, match="CASES_CHANGED"):
-        service.runs.freeze_cases("local", run_id, {**suite, "cases": [{"id": "b"}]})
+        service.run_lifecycle.freeze_cases("local", run_id, {**suite, "cases": [{"id": "b"}]})
     value = trial_summary(
         {"id": "a"}, {"grade": {"passed": False}, "metrics": {"tokens": None}}, tmp_path / "missing"
     )
@@ -243,7 +244,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
 ):
     from types import SimpleNamespace
 
-    from roami_agent.improvement.contracts import freeze_suite, load_suite
+    from roami_agent.improvement.evaluation.contracts import freeze_suite, load_suite
     from roami_agent.server.configuration import Settings
 
     service = ImprovementStatus(tmp_path)
@@ -259,7 +260,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
     prefs = service.control.preferences("local")
     service.control.save("local", {**prefs, "suite_id": "rated", "machine_ids": ["a"]})
     monkeypatch.setattr(
-        "roami_agent.improvement.artifact_review.ArtifactReviewer.load",
+        "roami_agent.improvement.evaluation.artifact_review.ArtifactReviewer.load",
         lambda *args: SimpleNamespace(
             content_hash="qualified-rater", profile={"max_tokens": 50000}
         ),
@@ -317,8 +318,8 @@ def test_unknown_calibration_blocks_paid_codex_review(tmp_path):
 
 @pytest.mark.asyncio
 async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monkeypatch):
-    from roami_agent.improvement.contracts import freeze_suite, load_suite
-    from roami_agent.improvement.pipeline_runner import execute_diagnostic
+    from roami_agent.improvement.evaluation.contracts import freeze_suite, load_suite
+    from roami_agent.improvement.workflows.pipeline_runner import execute_diagnostic
     from roami_agent.server.configuration import Settings
 
     service = ImprovementStatus(tmp_path)
@@ -352,7 +353,9 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
                 "metrics": {"tokens": None, "artifact_review_tokens": None},
             }
 
-    monkeypatch.setattr("roami_agent.improvement.containers.ContainerExecutor", Executor)
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.execution.containers.ContainerExecutor", Executor
+    )
     await execute_diagnostic(
         SimpleNamespace(settings=SimpleNamespace(current=Settings())),
         service,
@@ -375,7 +378,7 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
 
 
 def test_quarantine_keeps_full_cost_unknown_and_cannot_replay(tmp_path):
-    from roami_agent.improvement.operation_accounting import quarantine_operation
+    from roami_agent.improvement.persistence.operation_accounting import quarantine_operation
 
     service = ImprovementStatus(tmp_path)
     evidence = tmp_path / "receipt.json"

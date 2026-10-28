@@ -59,8 +59,6 @@
     "OfficeBench",
     "OSWorld"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "事实、统计、图表与源材料一致",
     "completeness": "规定页数、内容与讲稿齐全",
@@ -91,5 +89,8 @@
     "slidesbench"
   ],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

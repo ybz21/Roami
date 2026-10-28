@@ -8,5 +8,8 @@
     "task_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
     "revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

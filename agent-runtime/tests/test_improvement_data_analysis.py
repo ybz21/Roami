@@ -3,9 +3,9 @@ import zipfile
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view
-from roami_agent.improvement.data_analysis import import_data_analysis
-from roami_agent.improvement.grading import judge_case
+from roami_agent.improvement.evaluation.benchmarks.data_analysis import import_data_analysis
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.evaluation.grading import judge_case
 from roami_agent.protocol.errors import DomainError
 
 

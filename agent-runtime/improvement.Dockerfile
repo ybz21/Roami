@@ -17,7 +17,9 @@ COPY src ./src
 COPY migrations ./migrations
 # Evaluation cases stay on the host, outside the agent image build context.
 RUN ROAMI_RSI_CONTAINER_BUILD=1 uv sync --frozen --no-dev --inexact
-RUN rm -f src/roami_agent/improvement/authored_fixtures.py src/roami_agent/improvement/corpus.py src/roami_agent/improvement/case_specs.json src/roami_agent/improvement/authored_grading.py
+RUN rm -f src/roami_agent/improvement/evaluation/authored_fixtures.py \
+    src/roami_agent/improvement/evaluation/corpus.py \
+    src/roami_agent/improvement/evaluation/authored_grading.py
 RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*
 ENV PATH="/opt/roami-agent/.venv/bin:${PATH}" PYTHONUNBUFFERED=1
 ENTRYPOINT ["python", "-m", "roami_agent.improvement.container_agent"]

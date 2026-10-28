@@ -6,9 +6,13 @@ import zipfile
 
 import pytest
 
-from roami_agent.improvement.contracts import agent_view
-from roami_agent.improvement.grading import judge_case
-from roami_agent.improvement.spreadsheet import cell_range, import_spreadsheet, same_cell_value
+from roami_agent.improvement.evaluation.benchmarks.spreadsheet import (
+    cell_range,
+    import_spreadsheet,
+    same_cell_value,
+)
+from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.evaluation.grading import judge_case
 from roami_agent.protocol.errors import DomainError
 
 

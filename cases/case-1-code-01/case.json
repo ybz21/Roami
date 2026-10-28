@@ -58,8 +58,6 @@
     "Harbor",
     "DGM"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "所有指定行为和测试正确",
     "completeness": "需求与边界全部覆盖",
@@ -88,5 +86,8 @@
     "terminal_bench"
   ],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

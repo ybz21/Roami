@@ -9,8 +9,11 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from roami_agent.improvement.company_environment import CompanyEnvironment
-from roami_agent.improvement.company_runtime import CompanyRuntime, native_request
+from roami_agent.improvement.evaluation.execution.company_environment import CompanyEnvironment
+from roami_agent.improvement.evaluation.execution.company_runtime import (
+    CompanyRuntime,
+    native_request,
+)
 from roami_agent.protocol.errors import DomainError
 
 
@@ -106,7 +109,7 @@ async def test_unix_client_uses_only_case_service_without_receiving_authenticati
 async def test_native_services_have_private_network_memory_limits_and_identity_checked_cleanup(
     monkeypatch,
 ):
-    from roami_agent.improvement import company_environment, containers
+    from roami_agent.improvement.evaluation.execution import company_environment, containers
 
     digest = hashlib.sha256(b"snapshot").hexdigest()
     env = CompanyEnvironment(
@@ -176,7 +179,7 @@ async def test_native_checkpoint_success_does_not_prove_fresh_delivery_or_artifa
 ):
     import sys
 
-    from roami_agent.improvement.company_tasks import grade_company
+    from roami_agent.improvement.evaluation.benchmarks.company_tasks import grade_company
 
     work = tmp_path / "work"
     work.mkdir()
@@ -235,8 +238,8 @@ def grade_checkpoints():return Result()
 
 
 def test_company_import_keeps_database_answers_and_verifier_outside_agent_view(tmp_path):
-    from roami_agent.improvement.company_tasks import TASK_ID, import_company
-    from roami_agent.improvement.contracts import agent_view
+    from roami_agent.improvement.evaluation.benchmarks.company_tasks import TASK_ID, import_company
+    from roami_agent.improvement.evaluation.contracts import agent_view
 
     task = tmp_path / "workspaces/tasks" / TASK_ID
     task.mkdir(parents=True)
@@ -270,7 +273,7 @@ def test_company_import_keeps_database_answers_and_verifier_outside_agent_view(t
 
 
 async def test_service_cleanup_rejects_a_network_whose_identity_changed(monkeypatch):
-    from roami_agent.improvement import containers
+    from roami_agent.improvement.evaluation.execution import containers
 
     env = CompanyEnvironment({}, time.monotonic() + 10)
     env.network_created = True
@@ -324,7 +327,7 @@ async def test_profile_response_strips_credentials_even_if_native_service_ignore
 
 
 async def test_cleanup_removes_anonymous_database_volumes_after_identity_check(monkeypatch):
-    from roami_agent.improvement import containers
+    from roami_agent.improvement.evaluation.execution import containers
 
     commands = []
 

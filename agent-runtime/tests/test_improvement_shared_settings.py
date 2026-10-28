@@ -7,8 +7,8 @@ import pytest
 from test_improvement_control import suite_file
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.operation_accounting import assert_operation_costs_settled
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.persistence.operation_accounting import assert_operation_costs_settled
+from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.http import create_app
 
@@ -94,7 +94,7 @@ def test_research_action_keeps_actual_workflow_state(tmp_path, state, expected):
         db.execute("UPDATE rsi_pipeline_runs SET cycle_id='cycle' WHERE id=?", (ident,))
         action = service.research._enqueue(db, "local", "review", "cycle", {})
         db.execute("UPDATE rsi_actions SET state=? WHERE id=?", (state, action))
-    service.runs.sync_research("local")
+    service.run_lifecycle.sync_research("local")
     stage = next(
         node for node in service.runs.get("local", ident)["nodes"] if node["node"] == "review"
     )
@@ -103,7 +103,7 @@ def test_research_action_keeps_actual_workflow_state(tmp_path, state, expected):
     assert len(artifacts) == 1 and artifacts[0]["node"] == "review"
     receipt = json.loads(service.runs.read_artifact("local", ident, artifacts[0]["id"])["text"])
     assert receipt["state"] == state
-    service.runs.sync_research("local")
+    service.run_lifecycle.sync_research("local")
     assert len(service.runs.get("local", ident)["artifacts"]) == 1
 
 
@@ -126,7 +126,7 @@ def test_stage_receipt_omits_private_repair_payload(tmp_path):
                 action,
             ),
         )
-    service.runs.sync_research("local")
+    service.run_lifecycle.sync_research("local")
     artifacts = service.runs.get("local", ident)["artifacts"]
     receipt = json.loads(service.runs.read_artifact("local", ident, artifacts[0]["id"])["text"])
     assert receipt["result"] == {"candidate_build_hash": "c" * 64}

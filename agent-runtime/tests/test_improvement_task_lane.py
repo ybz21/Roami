@@ -7,13 +7,13 @@ from types import SimpleNamespace
 import pytest
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.evaluation_tasks import (
+from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
     bind_evaluation_tasks,
     settle_evaluation_tasks,
     verify_native_execution,
 )
-from roami_agent.improvement.executors import NativeFilesExecutor
-from roami_agent.improvement.protocol_suite import protocol_suite
+from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
+from roami_agent.improvement.evaluation.protocol_suite import protocol_suite
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
@@ -263,7 +263,7 @@ async def test_runtime_failure_is_exported_even_when_output_preexists(tmp_path):
 async def test_container_failure_zeroes_score_despite_correct_artifact(
     tmp_path, monkeypatch, blocker, reason
 ):
-    from roami_agent.improvement import containers
+    from roami_agent.improvement.evaluation.execution import containers
 
     class Unused:
         model = "unused-fixture"
@@ -340,7 +340,7 @@ async def test_native_failure_preserves_only_current_attempt_budget_codes(
     ],
 )
 async def test_main_failure_preserves_only_budget_codes(tmp_path, code, expected):
-    from roami_agent.improvement.measurements import BudgetAdmissionRejected
+    from roami_agent.improvement.integrations.measurements import BudgetAdmissionRejected
 
     class Rejected:
         model = "fixture-admission"
@@ -360,7 +360,9 @@ async def test_main_failure_preserves_only_budget_codes(tmp_path, code, expected
 
 
 async def test_turn_failure_ignores_other_turns_conversations_and_event_kinds(store):
-    from roami_agent.improvement.evaluation_tasks import evaluation_turn_failure
+    from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
+        evaluation_turn_failure,
+    )
     from roami_agent.storage.database import event
 
     runtime = Runtime(store, SimpleNamespace(model="unused"))

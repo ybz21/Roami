@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "PUBLIC-09",
+  "data": {
+    "kind": "upstream_registered_suite",
+    "source": {
+      "benchmark": "gaia",
+      "task_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+      "revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d"
+    },
+    "source_case_id": "gaia-course:6f37996b-2ac7-44b0-8e68-6d28256631b4",
+    "local_inputs": false,
+    "load_from": "Registered frozen suite files/asset_files after the benchmark importer completes. Source registration alone does not include or execute the dataset."
+  },
+  "tools": {
+    "kind": "benchmark_environment",
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+  },
+  "acceptance": {
+    "kind": "upstream_adapter",
+    "load_from": "The frozen registered suite judge; not an answer file in this folder."
+  }
+}

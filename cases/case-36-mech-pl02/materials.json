@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-PL02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_coordinator_handoff.py::test_read_then_two_handoffs_in_one_batch_end_without_extra_model_round",
+      "test_task_delivery_benchmark.py::test_B07_independent_tasks_in_one_request_are_allowed"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_coordinator_handoff.py::test_read_then_two_handoffs_in_one_batch_end_without_extra_model_round",
+      "test_task_delivery_benchmark.py::test_B07_independent_tasks_in_one_request_are_allowed"
+    ]
+  }
+}

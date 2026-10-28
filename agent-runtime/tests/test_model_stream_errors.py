@@ -6,7 +6,7 @@ from test_memory_pipeline import source
 from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.model_gateway import ModelGateway
+from roami_agent.improvement.integrations.model_gateway import ModelGateway
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.providers.chat_completions import ChatCompletions

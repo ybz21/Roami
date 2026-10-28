@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from roami_agent.improvement.authored_grading import corrected_backtest_matches
+from roami_agent.improvement.evaluation.authored_grading import corrected_backtest_matches
 
 
 @pytest.mark.parametrize("closed", [False, True])

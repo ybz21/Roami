@@ -1801,3 +1801,30 @@ frontend/src/theme.tsx / layout.ts   复用主题、Ant Design 配置与 useLayo
   <p>full 质量门禁通过：Python 1462 项、Go 全量、静态与格式检查；最终前端 142 个文件、1023 项测试及 typecheck／i18n／hover／生产构建通过。9 项新增费用回归覆盖共用限额、Codex 本地定价、拒绝后重试、幂等、防重放、取消和未知回执。生产图表块 gzip 为 166164 字节，未进入首屏静态依赖闭包；不据此推断 CPU 或内存改善。</p>
   <p>独立实例通过真实浏览器验证点击选日、分时下钻、模型计费深链、草稿跨 Tab 保留、保存及刷新恢复；中深色／英浅色各检查 320、390、820、1100、1280、1600、1920 宽度，无文档溢出。粗指针模拟验证触屏点按及开关扩展命中区。界面使用示例 API 数据，费用回归使用隔离数据库与上游／CLI 测试替身，无付费调用。Android 真机仍锁屏，真实触控、键盘和安全区尚待验收；未部署现用服务。前后截图与日志见 /tmp/rsi-usage-20261027/index.html。</p>
 </section>
+
+<section id="rsi-layered-architecture-20261027" lang="zh-CN">
+  <h1>RSI 分层与 Case 材料 · 2026-10-27</h1>
+  <h2>Product Design</h2>
+  <p>保留已有工作流、运行汇总和 Issue 查询行为。把规则、外部适配、评测、持久化、流程、展示和入口分层，避免流程直接操作账本，并让查询前的研究同步显式由装配层协调。每个 Case 明确说明数据、工具与判定来源，不把公开来源引用或合成输入描述成真实任务已通过。</p>
+  <h2>User Stories</h2>
+  <ul>
+    <li>维护者能找到流程编排、账本事务和展示查询各自的模块；新增代码跨层依赖时回归测试报错。</li>
+    <li>查看 QUANT-02 时能直接打开行情输入、生成器、工具要求和公开验收说明，并确认运行时使用同一份输入。</li>
+    <li>查看其余 Case 时能区分生成夹具、机制回归和待导入公开基准；历史运行仍使用自己的冻结套件。</li>
+  </ul>
+  <h2>Technical Design</h2>
+  <pre>entrypoints → service → presentation → workflows → persistence → evaluation → integrations → domain
+improvement/domain/          无 IO 的规则、评分、配置默认值
+improvement/integrations/    文件、进程、GitHub、Codex、模型与额度适配
+improvement/evaluation/      合同、夹具、判定、benchmarks/、execution/
+improvement/persistence/     schema、repository、projection、账本事务
+improvement/workflows/       运行生命周期、研究、观察、验证与发布编排
+improvement/presentation/    API 汇总与明细投影
+improvement/service.py       装配、查询前同步协调
+improvement/entrypoints/     CLI 解析与启动
+cases/case-N-id/             CASE.md、case.json、materials.json 与显式资源</pre>
+  <p>箭头表示允许向右侧层依赖，可以跳过中间层。RunRepository 分离 RunArtifacts、RunCosts 与 ResearchProjection；ResearchRepository 分离配置、成本与报告。流程和展示不执行账本 SQL；所有者、租约和发布 outbox 事务由持久层封装。原公开命令保留入口转发，私有导入直接迁移。provider 构造下沉到 providers/factory.py，避免导入应用装配。</p>
+  <p>Case 资源只允许目录内普通文件；新 authored v13 套件记录资源 SHA256。QUANT-02 读取公开行情后添加每次运行 receipt，宿主答案不进入 Agent 工作区。原数据库结构、历史冻结套件和运行产物不重写。判定指纹覆盖拆出的 domain 与 evaluation 规则。</p>
+  <p>验收包括依赖方向、无跨层 SQL、无领域 IO、无展示层写操作、规则指纹、资源路径边界、QUANT 输入与生成器一致性、完整回归及 wheel/sdist 安装后的材料读取。本次不改前端页面，原有独立质量和手机验收 Issue 不因分层重构关闭。</p>
+  <p>实测：wheel 安装和 sdist 独立源码加载均找到 60 个 Case 与材料清单，QUANT 输入与标准库生成器及运行输入一致；替换区间、候选参数和成本后判定读取替换值。真实无网络容器完成 Native Worker 文件写入及宿主判定，镜像内无 authored_fixtures、authored_grading、corpus 模块。容器验证使用已有依赖层复制最终运行时代码及新清理指令，模型为脚本夹具，不作为能力评分。</p>
+</section>

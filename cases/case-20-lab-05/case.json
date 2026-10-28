@@ -59,8 +59,6 @@
     "ACE",
     "LongMemEval-V2"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "复现或实验的行为和测量正确",
     "completeness": "版本、环境、基线与局限齐全",
@@ -89,5 +87,8 @@
     "terminal_bench"
   ],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

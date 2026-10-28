@@ -2,9 +2,9 @@
 
 import pytest
 
-from roami_agent.improvement.run_records import trial_summary
-from roami_agent.improvement.run_results import results_view
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.evaluation.trial_evidence import trial_summary
+from roami_agent.improvement.presentation.run_results import results_view
+from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.protocol.errors import DomainError
 
 
