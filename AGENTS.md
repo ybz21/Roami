@@ -299,3 +299,18 @@ PR 的图抹了）。
   how to respond.
 - The `babysit-pr` skill (`skills/babysit-pr/`) automates polling, deciding fix-vs-skip, replying,
   and resolving Codex review threads.
+
+<section id="mcp-independent-daemon-20261028" lang="zh-CN">
+  <h2>MCP 独立后台守护 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>MCP 连接交给节点上的独立后台服务持有，Web 与 Agent 只作为客户端。停止或重启这两者不会主动关闭上游连接；后台服务继续心跳、断线重连及读取新增配置。MCP 后台服务自身异常退出时由系统服务管理器自动恢复。保留中文名称、描述、工具引用和开关。</p>
+  <h3>User Stories</h3>
+  <ul><li>开启 MCP 后自动后台守护，关闭能力页面或停止 Web、Agent 后仍继续维护连接。</li><li>Agent 恢复后读取同一工具目录并立即调用，独立守护不可用时明确显示重连，不另起上游连接冒充独立运行。</li><li>服务重启不重放已经发出的工具调用；显式取消仍可发送取消请求，已有未知结果保留。</li></ul>
+  <h3>Technical Design</h3>
+  <p>server/mcp_daemon.py 独立运行既有 MCPConnections，读取节点配置及托管登记，通过单实例锁和 0600 Unix socket 提供目录、状态事件与一次调用流。tools/mcp_broker.py 在 Agent 中维护目录投影，以长轮询读取状态变化，进度和原始 MCP 结果通过本机流回传，由 Agent 原有产物及权限层处理。后台入口不依赖模型、Agent 数据库或 Web 网关；停用、移除及改配通过原子文件同步，已接收的调用结束前不截断上游。写入请求不作网络重试，重复调用 ID 在守护进程中拒绝。</p>
+  <p>roami agent mcp install／serve／status 提供节点级管理，Linux install 写入按实例命名的独立用户 systemd 单元和私有环境快照，启用后写入 MCP 客户端描述。单元不依赖、绑定或归属于 Web／Agent 单元，自动重启只作用于 MCP 自身。未安装独立服务的节点保持原运行方式；其他服务管理器可运行 serve，安装命令不伪报支持。Agent 关闭前标记生命周期结束，断开客户端时不发送远端取消；用户主动停止与调用超时仍沿用取消和未知结果语义。</p>
+  <h3>验收记录</h3>
+  <p>full 质量门禁通过：Go 全量、Python 1,698 项、静态与格式检查、前端 typecheck／i18n／hover／生产构建及秘密扫描；前端 142 文件／1,038 项通过，收尾 MCP／目录／产物定向 83 项通过。新增回归包含两个真实 Agent 进程先后接入同一守护、客户端关闭不取消已接收调用、显式取消、工具权限、图片与大文本产物及所有者隔离、配置损坏后拒绝调用、跨节点拒绝、私有文件和单实例保护。</p>
+  <p>真实独立用户 systemd 单元、Go Web／Agent 与 stdio 夹具完成验收：Web 和 Agent 同时停止后，上游进程及连接标识不变；无客户端时杀掉上游约 31.33 秒自动恢复并成功调用；客户端返回后别名保留。杀掉守护后系统自动重启，Agent 自动重新接入，已发出的写入没有重放。含空格及百分号的实例路径验证通过；服务命令显式固定实例根目录和 socket，就绪与客户端请求再校验节点身份。测试单元及私有 tmux 已按身份清理，零付费模型调用。证据入口 /tmp/mcp-daemon-20261028/index.html。</p>
+  <p>本轮未修改页面结构；新增产品错误提示均含中英文，终端命令与诊断文字按 i18n 标准的 CLI 例外保留英文。未重复宣称手机真机验收；Linux 安装依赖可用的用户 systemd，其他管理器使用 serve 配置独立监督服务。</p>
+</section>

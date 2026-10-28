@@ -500,6 +500,8 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.get("/v1/capability-settings")
     async def capabilities(owner: Owner):
+        ModelSettings.owner(owner)
+        await runtime.mcp.refresh()
         return {"data": runtime.capability_settings.view(owner)}
 
     @app.put("/v1/capability-settings")

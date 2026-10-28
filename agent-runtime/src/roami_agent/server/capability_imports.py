@@ -342,12 +342,15 @@ class CapabilityImports:
         if kind not in KINDS:
             raise DomainError("INVALID_CAPABILITY_IMPORT")
         async with self.lock, self.runtime.capability_settings.lock:
+            if kind == "mcp":
+                await self.runtime.mcp.refresh()
             if name is not None and name not in self.saved[kind]:
                 raise DomainError("MANAGED_CAPABILITY_NOT_FOUND", 404)
             if kind == "mcp" and name:
                 connection = self.runtime.mcp.connections[name]
                 if (
                     connection.current
+                    or connection.remote_busy
                     or not connection.queue.empty()
                     or (connection.ready and not connection.ready.done())
                 ):
@@ -393,6 +396,8 @@ class CapabilityImports:
                     self.install(kind, value)
             self.saved = updated
             self.runtime.capability_settings.apply()
+            if kind == "mcp":
+                await self.runtime.mcp.refresh(sync=True)
             return self.runtime.capability_settings.view(owner)
 
     async def connect_mcp(self, owner, name):

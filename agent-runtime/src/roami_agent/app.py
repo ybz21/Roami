@@ -76,6 +76,7 @@ from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
+from roami_agent.tools.mcp_broker import MCPBroker, node_socket
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
@@ -210,7 +211,15 @@ class Runtime:
         add_worker_tools(self.tools, self.settings, self.artifacts)
         register_file_tools(self.tools, self.files)
         register_artifact_tools(self.tools, self.artifacts)
-        self.mcp = MCPConnections(self.tools, self.settings.mcp_servers, self.artifacts)
+        mcp_socket = node_socket(database.data_root)
+        self.mcp = MCPConnections(
+            self.tools,
+            self.settings.mcp_servers,
+            self.artifacts,
+            broker=MCPBroker(Path(mcp_socket), data_root=database.data_root)
+            if mcp_socket
+            else None,
+        )
         self.browser = BrowserDriver(database, self.settings, self.resources, self.artifacts)
         if self.browser.config.get("enabled"):
             register_browser_tools(self.tools, self.browser)
@@ -352,6 +361,7 @@ class Runtime:
 
     async def start(self):
         self.mcp.start()
+        await self.mcp.refresh()
         await self.professional_capabilities.recover()
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
@@ -495,6 +505,7 @@ class Runtime:
 
     async def close(self):
         self.stopping = True
+        self.mcp.shutting_down = True
         if self.improvement is not None and self.improvement.report_worker:
             await self.improvement.report_worker.close()
         if self.improvement is not None and self.improvement.research_worker:

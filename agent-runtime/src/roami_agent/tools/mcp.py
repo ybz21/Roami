@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -119,6 +120,9 @@ class Connection:
     display_name: str = ""
     description: str = ""
     descriptions: dict = field(default_factory=dict)
+    remote_state: str | None = None
+    remote_busy: bool = False
+    connection_id: str = ""
 
 
 class TrackedStream:
@@ -140,14 +144,35 @@ class TrackedStream:
 
 
 class MCPConnections:
-    def __init__(self, registry, configs, artifacts=None):
+    def __init__(self, registry, configs, artifacts=None, *, broker=None):
         validate_servers(configs)
         self.results = MCPResults(artifacts)
         self.registry = registry
         self.connections = {name: Connection(name, config) for name, config in configs.items()}
         self.closed = False
         self.running = False
+        self.broker = broker
+        self.shutting_down = False
         self.register_discovery()
+
+    async def refresh(self, *, sync=False):
+        if self.broker:
+            await self.broker.refresh(self, sync=sync)
+
+    def state(self, connection):
+        if self.broker:
+            return connection.remote_state or (
+                "reconnecting" if connection.enabled else "not_connected"
+            )
+        return (
+            "connected"
+            if connection.session
+            else "reconnecting"
+            if connection.enabled
+            else "unavailable"
+            if connection.failures
+            else "not_connected"
+        )
 
     def register_discovery(self):
         self.registry.registry.pop("mcp_discover", None)
@@ -281,6 +306,9 @@ class MCPConnections:
 
     def start(self):
         self.running = True
+        if self.broker:
+            self.broker.start(self)
+            return
         for connection in self.connections.values():
             if connection.enabled:
                 self.activate(connection)
@@ -292,6 +320,9 @@ class MCPConnections:
             raise DomainError("TOOL_UNAVAILABLE")
         self.running = True
         connection.enabled = True
+        if self.broker:
+            self.broker.start(self)
+            return
         if connection.monitor is None or connection.monitor.done():
             connection.monitor = asyncio.create_task(
                 self._maintain(connection), name="mcp-maintain-" + connection.name
@@ -335,6 +366,12 @@ class MCPConnections:
         await asyncio.shield(connection.ready)
 
     async def _request(self, connection, operation, args):
+        if self.closed:
+            raise DomainError("MCP_CLOSED")
+        if self.connections.get(connection.name) is not connection:
+            raise DomainError("TOOL_UNAVAILABLE")
+        if self.broker:
+            return await self.broker.request(self, connection, operation, args)
         request = Request(operation, args, asyncio.get_running_loop().create_future())
         try:
             async with asyncio.timeout(connection.config.get("timeout_seconds", 0) or None):
@@ -436,6 +473,7 @@ class MCPConnections:
                     await session.initialize()
                     await self._catalog(connection, session)
                 connection.session = session
+                connection.connection_id = uuid.uuid4().hex
                 connection.failures = 0
                 if not connection.ready.done():
                     connection.ready.set_result(True)
@@ -482,6 +520,7 @@ class MCPConnections:
                 )
         finally:
             connection.session = None
+            connection.connection_id = ""
             connection.current = None
             self._remove(connection)
             connection.failures += 1
@@ -504,4 +543,6 @@ class MCPConnections:
 
     async def close(self):
         self.closed = True
+        if self.broker:
+            await self.broker.close()
         await asyncio.gather(*(self.stop(c) for c in self.connections.values()))

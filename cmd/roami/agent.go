@@ -20,6 +20,9 @@ import (
 )
 
 func runAgent(args []string) int {
+	if len(args) > 0 && args[0] == "mcp" {
+		return runAgentMCP(args[1:])
+	}
 	if len(args) == 1 && args[0] == "installed-status" {
 		if err := agentInstalledStatus(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -55,7 +58,7 @@ func runAgent(args []string) int {
 		return runAgentTrace(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|mcp|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
 		return 0
 	}
 	sub := args[0]
