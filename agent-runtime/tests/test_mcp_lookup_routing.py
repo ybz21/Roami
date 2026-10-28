@@ -1,4 +1,4 @@
-"""Requested MCP lookups use regular Native workers, preserving browser isolation."""
+"""All background profiles discover and invoke enabled extra capabilities."""
 
 import json
 
@@ -8,6 +8,7 @@ from test_runtime import ConversationModel, until
 from test_web_research import MemoryModel
 
 from roami_agent.app import Runtime
+from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.tools import Tool, object_schema
@@ -15,26 +16,36 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 
 NAME = "mcp_fixture_search"
-REQUEST = "Use the configured MCP to search for the public documentation."
 
 
-async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspace(store):
+@pytest.mark.parametrize("resource_only", [False, True])
+@pytest.mark.parametrize("source_kind", ["mcp", "cli", "http"])
+@pytest.mark.parametrize("effect", ["read", "write"])
+async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspace(
+    store, resource_only, source_kind, effect
+):
     invoked = []
+    name = source_kind + "_fixture_search"
+    kind = {"mcp": "mcp", "cli": "cli", "http": "tool"}[source_kind]
+    request = "Use the configured " + source_kind.upper() + " to search public documentation."
 
     class Main:
         model = "mcp-routing-main"
 
         async def stream(self, messages, tools):
-            if messages[-1]["content"] == REQUEST:
+            if messages[-1]["content"] == request:
                 yield ModelEvent(
                     "tool",
                     call(
                         "delegate",
                         {
-                            "goal": REQUEST,
+                            "goal": request,
                             "requestComplete": True,
                             "executor": "native",
-                            "target": {"kind": "new_session"},
+                            "target": {
+                                "kind": "new_session",
+                                **({"resourceOnly": True} if resource_only else {}),
+                            },
                         },
                     ),
                 )
@@ -48,13 +59,13 @@ async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspac
         async def stream(self, messages, tools):
             self.step += 1
             if self.step == 1:
-                discovery = call("tool_list", {"query": "fixture", "kind": "mcp"})
+                discovery = call("tool_list", {"query": "fixture", "kind": kind})
                 discovery["id"] = "discover-mcp"
                 yield ModelEvent("tool", discovery)
             elif self.step == 2:
                 catalog = json.loads(messages[-1]["content"])
-                assert [item["name"] for item in catalog["items"]] == [NAME]
-                search = cli(NAME, {"query": "public documentation"})
+                assert [item["name"] for item in catalog["items"]] == [name]
+                search = cli(name, {"query": "public documentation"})
                 search["id"] = "search-mcp"
                 yield ModelEvent("tool", search)
             else:
@@ -62,7 +73,7 @@ async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspac
                 yield ModelEvent("text", "Fixture documentation: https://example.org/docs")
 
     async def search(args, binding):
-        assert binding["role"] == "worker"
+        assert binding["role"] == ("research" if resource_only else "worker")
         assert not binding.get("workspace")
         invoked.append(args["query"])
         return {
@@ -81,11 +92,11 @@ async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspac
     )
     runtime.tools.add(
         Tool(
-            NAME,
+            name,
             "Fixture documentation search",
             object_schema({"query": {"type": "string"}}, ["query"]),
             search,
-            effect="read",
+            effect=effect,
             source="external",
             main=True,
         )
@@ -94,21 +105,79 @@ async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspac
     await runtime.start()
     try:
         conversation = await runtime.conversations.create("alice")
-        await runtime.chat.submit("alice", conversation["id"], "mcp-lookup", REQUEST)
+        await runtime.chat.submit("alice", conversation["id"], "mcp-lookup", request)
         await until(
-            store, lambda db: row(db, "SELECT id FROM tasks WHERE state IN ('succeeded','failed')")
+            store,
+            lambda db: row(
+                db, "SELECT id FROM tasks WHERE state IN ('succeeded','failed','waiting_user')"
+            ),
         )
         task = await store.call(
-            lambda db: row(db, "SELECT state,intent_json,target_json FROM tasks")
+            lambda db: row(db, "SELECT id,state,intent_json,target_json FROM tasks")
         )
-        assert task["state"] == "succeeded"
-        assert json.loads(task["intent_json"])["target"] == {"kind": "new_session"}
+        assert task["state"] == ("succeeded" if effect == "read" else "waiting_user")
+        if resource_only:
+            receipt = await store.call(
+                lambda db: row(
+                    db,
+                    "SELECT payload_json FROM events WHERE task_id=? AND kind=? ORDER BY id DESC LIMIT 1",
+                    (task["id"], "task." + task["state"]),
+                )
+            )
+            verification = json.loads(receipt["payload_json"])["result"]["verification"]
+            assert verification["state"] == "retrieved"
+            assert verification["sources"][0]["url"] == "https://example.org/docs"
+            current = await runtime.conversations.accept(
+                "alice", conversation["id"], "status", "Task status"
+            )
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE turns SET created_ms=? WHERE id=?",
+                    (verification["sources"][0]["retrievedMs"], current["turnId"]),
+                ),
+                write=True,
+            )
+            binding = {
+                "owner": "alice",
+                "conversation": conversation["id"],
+                "turnId": current["turnId"],
+            }
+            status = runtime.tools.registry["task_status"].handler
+            snapshot = await status({"taskId": task["id"]}, binding)
+            evidence = snapshot[0]["latestAttempt"]["retrievalEvidence"]
+            assert evidence["freshForCurrentRequest"] is True
+            future = await runtime.conversations.accept(
+                "alice", conversation["id"], "new-lookup", request
+            )
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE turns SET created_ms=? WHERE id=?",
+                    (evidence["lastRetrievedMs"] + 1, future["turnId"]),
+                ),
+                write=True,
+            )
+            snapshot = await status({"taskId": task["id"]}, {**binding, "turnId": future["turnId"]})
+            assert (
+                snapshot[0]["latestAttempt"]["retrievalEvidence"]["freshForCurrentRequest"] is False
+            )
+            assert (
+                await store.call(
+                    lambda db: retrieved_sources(
+                        db,
+                        {"id": task["id"], "origin_conversation_id": conversation["id"]},
+                        {"id": "another-run"},
+                        "https://example.org/docs",
+                    )
+                )
+                == []
+            )
+        assert json.loads(task["intent_json"])["target"].get("resourceOnly", False) == resource_only
         assert invoked == ["public documentation"]
         assert (
             await store.call(
                 lambda db: db.execute(
                     "SELECT count(*) FROM tool_calls WHERE tool_name=? AND state='succeeded'",
-                    (NAME,),
+                    (name,),
                 ).fetchone()[0]
             )
             == 1
@@ -117,12 +186,14 @@ async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspac
         await runtime.close()
 
 
-@pytest.mark.parametrize("restricted", ["research", "disabled"])
-async def test_mcp_lookup_keeps_browser_and_disabled_tool_boundaries(store, restricted):
+@pytest.mark.parametrize("role", ["worker", "research"])
+async def test_background_mcp_discovery_and_call_respect_the_enabled_switch(store, role):
     runtime = Runtime(store, ConversationModel())
+    calls = []
 
     async def search(args, binding):
-        pytest.fail("A filtered MCP must not execute")
+        calls.append(binding["role"])
+        return {"result": "fixture"}
 
     runtime.tools.add(
         Tool(
@@ -135,16 +206,45 @@ async def test_mcp_lookup_keeps_browser_and_disabled_tool_boundaries(store, rest
             main=True,
         )
     )
-    role = "research" if restricted == "research" else "worker"
-    if restricted == "disabled":
-        runtime.tools.disabled_tools.add(NAME)
     try:
-        catalog = runtime.tools.directory.list("fixture", "mcp", role=role)
-        assert catalog["items"] == []
-        if role == "research":
-            assert "browser-only" in catalog["hint"]
-            assert "do not report the server unavailable" in catalog["hint"]
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE|TOOL_DISABLED"):
+        catalog = await runtime.tools.invoke(
+            call("tool_list", {"query": "fixture", "kind": "mcp"}), role, {}
+        )
+        assert [item["name"] for item in catalog["items"]] == [NAME]
+        assert (await runtime.tools.invoke(cli(NAME, {}), role, {"owner": "alice"}))[
+            "result"
+        ] == "fixture"
+        runtime.tools.disabled_tools.add(NAME)
+        assert runtime.tools.directory.list("fixture", "mcp", role=role)["items"] == []
+        with pytest.raises(DomainError, match="TOOL_DISABLED"):
             await runtime.tools.invoke(cli(NAME, {}), role, {"owner": "alice"})
+        assert calls == [role]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("role", ["worker", "research"])
+async def test_background_skill_discovery_and_loading_respect_the_enabled_switch(
+    store, tmp_path, role
+):
+    package = tmp_path / "skills" / "fixture-workflow"
+    package.mkdir(parents=True)
+    (package / "SKILL.md").write_text("---\ndescription: Fixture workflow\n---\nFixture skill body")
+    runtime = Runtime(
+        store, ConversationModel(), settings=Settings(skill_roots=(tmp_path / "skills",))
+    )
+    try:
+        listing = await runtime.tools.invoke(
+            call("tool_list", {"query": "fixture-workflow", "kind": "skill"}), role, {}
+        )
+        assert [item["name"] for item in listing["items"]] == ["fixture-workflow"]
+        loaded = await runtime.tools.invoke(
+            call("read", {"path": "skill://fixture-workflow"}), role, {}
+        )
+        assert "Fixture skill body" in loaded["text"]
+        runtime.tools.disabled_skills.add("fixture-workflow")
+        assert not runtime.tools.directory.list("fixture-workflow", "skill", role=role)["items"]
+        with pytest.raises(DomainError, match="SKILL_DISABLED"):
+            await runtime.tools.invoke(call("read", {"path": "skill://fixture-workflow"}), role, {})
     finally:
         await runtime.close()

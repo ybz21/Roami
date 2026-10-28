@@ -2,7 +2,7 @@
 
 ## 动态发现
 
-Main 常驻 read/bash/edit/write/tool_list/delegate/ask_user 共 7 个；普通原生 Worker 5 个，研究 Worker 3 个。新 Skill、MCP、HTTP 或 CLI 业务命令不能无限增加模型常驻 schema。
+Main 直接提供基础工具；普通原生 Worker 与 research 共享 read/bash/edit/write/tool_list 五个基础工具。tool_list 名称和接口保持不变，用于发现额外的 Skill、MCP、CLI、HTTP 等能力，不负责获取已经直接提供的基础工具。新 Skill、MCP、HTTP 或 CLI 业务命令不能无限增加模型常驻 schema。
 
 ```bash
 roami agent capability list --query "发消息" --kind cli

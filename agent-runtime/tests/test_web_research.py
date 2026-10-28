@@ -158,24 +158,37 @@ async def test_disabled_browser_is_discovered_and_never_blindly_enqueued(store):
     assert await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
 
 
-async def test_research_catalog_and_invocation_deny_non_navigation_tools(store):
+async def test_research_catalog_and_invocation_share_background_capabilities(store):
     runtime = Runtime(store, MemoryModel(), settings=Settings(browser={"enabled": True}))
-    catalog = runtime.tools.catalog("research")
-    assert {tool["function"]["name"] for tool in catalog} == {"read", "bash", "tool_list"}
-    commands = runtime.tools.directory.list("browser", "cli", 10, "research")["items"]
-    assert {item["name"] for item in commands} == {"roami chrome"}
-    forms = [item["argv"][2] for item in commands[0]["commands"]]
-    assert "goto" in forms and "click" not in forms
-    for name, args in [
-        ("shell", {"argv": ["echo", "forbidden"]}),
-        ("browser_act", {"kind": "click", "observationId": "scene", "selector": "#buy"}),
-        ("browser_open", {"targetId": "user-owned"}),
-        ("skill_read", {"name": "roami"}),
-    ]:
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-            await runtime.tools.invoke(
-                {"function": {"name": name, "arguments": json.dumps(args)}}, "research", {}
-            )
+    try:
+        assert runtime.tools.catalog("research") == runtime.tools.catalog("worker")
+        assert runtime.tools.directory.list(
+            "browser", "cli", 10, "research"
+        ) == runtime.tools.directory.list("browser", "cli", 10, "worker")
+        commands = runtime.tools.directory.list("browser", "cli", 10, "research")["items"]
+        browser = next(item for item in commands if item["name"] == "roami chrome")
+        forms = [item["argv"][2] for item in browser["commands"]]
+        assert "goto" in forms and "click" in forms and "fill" in forms
+        skill = await runtime.tools.invoke(
+            {"function": {"name": "read", "arguments": json.dumps({"path": "skill://roami"})}},
+            "research",
+            {},
+        )
+        assert skill["text"]
+        tool, _ = runtime.tools.validate(
+            {
+                "function": {
+                    "name": "browser_act",
+                    "arguments": json.dumps(
+                        {"kind": "click", "observationId": "scene", "selector": "#next"}
+                    ),
+                }
+            },
+            "research",
+        )
+        assert tool.name == "browser_act"
+    finally:
+        await runtime.close()
 
 
 async def test_current_lookup_boundary_applies_to_custom_main_instructions_and_repeated_input(

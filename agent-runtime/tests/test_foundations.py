@@ -64,11 +64,9 @@ async def test_actual_catalog_and_settings_have_only_seven_tools(store):
         "write",
         "tool_list",
     }
-    assert {x["function"]["name"] for x in runtime.tools.catalog("research")} == {
-        "read",
-        "bash",
-        "tool_list",
-    }
+    assert runtime.tools.catalog("research") == runtime.tools.catalog("worker")
+    assert "tool_list" in runtime.tools.registry
+    assert "extra_tool_list" not in runtime.tools.registry
     view = runtime.capability_settings.view("local")
     assert {x["name"] for x in view["tools"]} == set(FOUNDATIONS)
     operations = {x["name"] for group in view["cli"] for x in group["commands"]}
@@ -178,19 +176,27 @@ async def test_bash_cli_records_actual_read_effect_and_timeline(store):
         await runtime.close()
 
 
-async def test_research_and_main_cannot_escape_cli_admission(store):
+async def test_background_roles_share_workspace_and_registered_cli_rules(store):
     runtime = Runtime(store, ConversationModel())
-    for wire in [
-        call("bash", {"command": "pwd"}),
-        call("read", {"path": "/etc/passwd"}),
-        cli("session_send", {"sessionId": "x", "text": "x"}),
-    ]:
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-            await runtime.tools.invoke(wire, "research", {})
-    with pytest.raises(DomainError, match="USE_REGISTERED_CLI_CAPABILITY"):
-        await runtime.tools.invoke(
-            call("bash", {"argv": ["roami", "session", "kill-session"]}), "main", {}
-        )
+    try:
+        for wire in [call("bash", {"command": "pwd"}), call("read", {"path": "/etc/passwd"})]:
+            errors = []
+            for role in ("worker", "research"):
+                with pytest.raises(DomainError) as rejected:
+                    await runtime.tools.invoke(wire, role, {})
+                errors.append(rejected.value.code)
+            assert errors[0] == errors[1] and errors[0] != "TOOL_UNAVAILABLE"
+        for role in ("worker", "research"):
+            tool, _ = runtime.tools.validate(
+                cli("session_send", {"sessionId": "x", "text": "x"}), role
+            )
+            assert tool.name == "session_send"
+        with pytest.raises(DomainError, match="USE_REGISTERED_CLI_CAPABILITY"):
+            await runtime.tools.invoke(
+                call("bash", {"argv": ["roami", "session", "kill-session"]}), "main", {}
+            )
+    finally:
+        await runtime.close()
 
 
 async def test_cli_directory_and_unbound_call_rejection(store):
@@ -279,9 +285,8 @@ async def test_tool_list_lists_categories_pages_and_removes_old_entry(store):
     assert not main_mcp["items"]
     assert main_mcp["scope"] == "current_role"
     assert "not web search results" in main_mcp["hint"]
-    assert not (await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {}))[
-        "items"
-    ]
+    research_mcp = await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {})
+    assert research_mcp["items"][0]["name"] == "mcp_fixture_echo"
     await runtime.capability_settings.save(
         "local", {"kind": "tools", "name": "mcp_fixture_echo", "enabled": False}
     )

@@ -74,20 +74,27 @@ async def test_named_memory_command_uses_owner_scope_and_real_read_effect(store)
     )
 
 
-async def test_research_help_and_public_commands_cannot_expand_role(store):
+async def test_research_public_commands_share_worker_admission(store):
     runtime = Runtime(store, ConversationModel(), settings=Settings(browser={"enabled": True}))
     help_result = await runtime.tools.invoke(bash("chrome", "help"), "research", {})
     assert help_result["name"] == "roami chrome"
-    assert not any(command["argv"][2] == "click" for command in help_result["commands"])
+    assert any(command["argv"][2] == "click" for command in help_result["commands"])
+    assert help_result == await runtime.tools.invoke(bash("chrome", "help"), "worker", {})
     for argv in [
         ("chrome", "click", "#buy", "--observation", "scene"),
         ("chrome", "observe", "--target", "user-tab"),
-        ("chrome", "eval", "document.cookie"),
-        ("chrome", "new", "https://example.com", "--cdp", "http://another-node"),
         ("agent", "memory", "search", "--input", '{"query":"private"}'),
     ]:
-        with pytest.raises(DomainError):
-            await runtime.tools.invoke(bash(*argv), "research", {})
+        assert runtime.tools.validate(bash(*argv), "research") == runtime.tools.validate(
+            bash(*argv), "worker"
+        )
+    for argv in [
+        ("chrome", "eval", "document.cookie"),
+        ("chrome", "new", "https://example.com", "--cdp", "http://another-node"),
+    ]:
+        for role in ("worker", "research"):
+            with pytest.raises(DomainError):
+                await runtime.tools.invoke(bash(*argv), role, {})
 
 
 async def test_builtin_aliases_read_current_content_without_duplicate_entries(store):

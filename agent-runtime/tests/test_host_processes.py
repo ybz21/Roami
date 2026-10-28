@@ -113,9 +113,10 @@ async def test_host_diagnostics_cannot_become_a_shell(store, args):
     try:
         with pytest.raises(DomainError, match="INVALID_TOOL_ARGUMENTS"):
             await runtime.tools.invoke(host_call(args), "main", {})
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-            await runtime.tools.invoke(host_call(), "research", {})
-        assert not any(
+        assert runtime.tools.validate(host_call(), "research") == runtime.tools.validate(
+            host_call(), "worker"
+        )
+        assert any(
             command["argv"][1:4] == ["agent", "host", "processes"]
             for item in runtime.tools.directory.list("", "cli", 20, "research")["items"]
             for command in item.get("commands", [])

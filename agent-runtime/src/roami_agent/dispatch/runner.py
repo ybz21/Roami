@@ -393,42 +393,20 @@ class TaskDispatcher:
                 sources = await self.db.call(
                     lambda db: retrieved_sources(db, task, run, result.get("summary", ""))
                 )
-                verified = bool(sources)
+                verified = bool(sources) and await self.native_result_verified(task, run, result)
                 result["verification"] = {
                     "kind": "browser_retrieval",
-                    "state": "retrieved" if verified else "missing",
+                    "state": "retrieved" if sources else "missing",
                     "sources": sources,
                 }
-                if not verified:
+                if not sources:
                     result = {
                         **result,
                         "state": "failed",
                         "errorCode": "WEB_RETRIEVAL_EVIDENCE_MISSING",
                     }
             else:
-                # Native read-only answers can finish; writes require explicit acceptance.
-                continuation = json.loads(task["intent_json"]).get("continuation", {})
-                verified_through = continuation.get("verifiedThroughRevision", 0)
-
-                def written(db):
-                    return row(
-                        db,
-                        "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id "
-                        "WHERE t.branch_id=? AND x.effect='write' AND x.tool_name!='delegate' "
-                        "AND (?=0 OR EXISTS(SELECT 1 FROM events e JOIN task_attempts a "
-                        "ON a.id=json_extract(e.payload_json,'$.runId') "
-                        "WHERE e.turn_id=x.turn_id AND e.kind IN ('task.started','task.preparing') "
-                        "AND a.task_id=? AND a.task_revision>?)) LIMIT 1",
-                        (run["native_branch_id"], verified_through, task["id"], verified_through),
-                    )
-
-                writes = await self.db.call(written)
-                verified = (
-                    run["executor_kind"] == "native"
-                    and not continuation.get("requiresAcceptance", False)
-                    and not writes
-                    and bool(result.get("summary", "").strip())
-                )
+                verified = await self.native_result_verified(task, run, result)
         state = (
             "interrupted"
             if uncertain_result
@@ -439,6 +417,40 @@ class TaskDispatcher:
             else "waiting_user"
         )
         await self.complete(task, run, result, state, job_id=job["id"])
+
+    async def native_result_verified(self, task, run, result):
+        # Native read-only answers can finish; writes require explicit acceptance.
+        continuation = json.loads(task["intent_json"]).get("continuation", {})
+        verified_through = continuation.get("verifiedThroughRevision", 0)
+        retrieval = json.loads(task["intent_json"]).get("target", {}).get("resourceOnly") is True
+
+        def written(db):
+            return row(
+                db,
+                "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id "
+                "WHERE t.branch_id=? AND x.effect='write' AND x.tool_name!='delegate' "
+                "AND (?=0 OR (x.tool_name!='browser_open' AND (x.tool_name!='browser_act' "
+                "OR COALESCE(json_extract(x.arguments_json,'$.kind'),'')!='goto'))) "
+                "AND (?=0 OR EXISTS(SELECT 1 FROM events e JOIN task_attempts a "
+                "ON a.id=json_extract(e.payload_json,'$.runId') "
+                "WHERE e.turn_id=x.turn_id AND e.kind IN ('task.started','task.preparing') "
+                "AND a.task_id=? AND a.task_revision>?)) LIMIT 1",
+                (
+                    run["native_branch_id"],
+                    retrieval,
+                    verified_through,
+                    task["id"],
+                    verified_through,
+                ),
+            )
+
+        writes = await self.db.call(written)
+        return (
+            run["executor_kind"] == "native"
+            and not continuation.get("requiresAcceptance", False)
+            and not writes
+            and bool(result.get("summary", "").strip())
+        )
 
     async def complete(
         self, task, run, result, state, *, job_id=None, unknown=False, confirmation=False
