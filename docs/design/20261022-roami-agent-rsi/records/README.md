@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [模型桥接传输与错误留证](2026-10-29/model-bridge-transport.html) |
 | 2026-10-28 | [静态页面的存储验收环境](2026-10-28/browser-storage-origin.html) |
 | 2026-10-28 | [交付原文、脚本退出与复盘超时](2026-10-28/task-answer-script-exit-and-report-timeout.html) |
 | 2026-10-28 | [已提交答案与工作区重跑](2026-10-28/committed-answer-workspace-replay.html) |

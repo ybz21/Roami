@@ -6,6 +6,7 @@ import os
 import secrets
 import tempfile
 import time
+from collections import Counter
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -86,7 +87,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v27-task-answer-provenance",
+                "container-uds-v28-image-transport-evidence",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -444,6 +445,7 @@ class ContainerExecutor:
         artifact_review_ms = 0
         generation_elapsed = None
         created = False
+        gateway_errors = []
         try:
             with tempfile.TemporaryDirectory(prefix="roami-rsi-gateway-") as directory:
                 from roami_agent.improvement.evaluation.execution.company_runtime import (
@@ -462,6 +464,7 @@ class ContainerExecutor:
                         case, directory, workspace, root, started + case["limits"]["seconds"]
                     ) as company,
                 ):
+                    gateway_errors = gateway.errors
                     setup_ms = (time.monotonic() - started) * 1000
                     await docker_command(
                         "create",
@@ -588,7 +591,17 @@ class ContainerExecutor:
             for provider in providers:
                 if hasattr(provider, "close"):
                     await provider.close()
-            private_json(root / "model-log.json", {"requests": journal, "source": "host_provider"})
+            private_json(
+                root / "model-log.json",
+                {
+                    "requests": journal,
+                    "source": "host_provider",
+                    "gateway_errors": [
+                        {"code": code, "count": count}
+                        for code, count in sorted(Counter(gateway_errors).items())
+                    ],
+                },
+            )
         from roami_agent.improvement.evaluation.artifact_review import episode_metrics
 
         metrics = episode_metrics(budget, review_budget)
