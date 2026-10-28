@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MR01",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_persistence.py::test_cjk_memory_scope_version_and_forgetting",
+      "test_memory_pipeline.py::test_retrieval_literal_or_scope_validity_and_bounded_character_fallback"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_persistence.py::test_cjk_memory_scope_version_and_forgetting",
+      "test_memory_pipeline.py::test_retrieval_literal_or_scope_validity_and_bounded_character_fallback"
+    ]
+  }
+}

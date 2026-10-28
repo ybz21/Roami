@@ -6,14 +6,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from roami_agent.improvement.github_publication import (
+from roami_agent.improvement.integrations.github_client import (
     configure_publication,
     profile_path,
     publication_profile,
-    publish_verified,
 )
-from roami_agent.improvement.ledger import Ledger
-from roami_agent.improvement.source_revision import git
+from roami_agent.improvement.integrations.source_workspace import git
+from roami_agent.improvement.persistence.ledger import Ledger
+from roami_agent.improvement.workflows.github_publication import publish_verified
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 
@@ -25,6 +25,12 @@ async def fixture(tmp_path):
     await git(repo, "remote", "add", "origin", "https://github.com/example/rsi-test.git")
     ledger = Ledger(tmp_path / "private/ledger.sqlite3")
     workflow = SimpleNamespace(ledger=ledger, _owned_action=lambda db, action: None)
+
+    def assert_action_owned(action):
+        with ledger.connection() as db:
+            workflow._owned_action(db, action)
+
+    workflow.assert_action_owned = assert_action_owned
     configure_publication(
         ledger.path.parent,
         "owner",
@@ -192,7 +198,7 @@ def test_publication_profiles_are_private_validated_and_disabled_by_absence(tmp_
 
 
 async def test_review_link_survives_in_owner_improvement_snapshot(tmp_path):
-    from roami_agent.improvement.workflow import ResearchWorkflow
+    from roami_agent.improvement.persistence.research_repository import ResearchRepository
 
     ledger = Ledger(tmp_path / "ledger.sqlite3")
     url = "https://github.com/example/rsi-test/pull/1"
@@ -204,8 +210,8 @@ async def test_review_link_survives_in_owner_improvement_snapshot(tmp_path):
                 json.dumps({"review_publication": {"url": url}}),
             ),
         )
-    assert ResearchWorkflow(ledger).snapshot("owner")["improvements"][0]["reviewUrl"] == url
-    assert ResearchWorkflow(ledger).snapshot("other")["improvements"] == []
+    assert ResearchRepository(ledger).snapshot("owner")["improvements"][0]["reviewUrl"] == url
+    assert ResearchRepository(ledger).snapshot("other")["improvements"] == []
 
 
 async def test_worker_hands_verified_result_to_publication_and_waits_on_failure(tmp_path):
@@ -216,7 +222,7 @@ async def test_worker_hands_verified_result_to_publication_and_waits_on_failure(
         setup,
     )
 
-    from roami_agent.improvement.research_worker import ResearchWorker
+    from roami_agent.improvement.workflows.research_worker import ResearchWorker
 
     workflow, _config, _clock, _repo, _cycle = await setup(tmp_path)
     workflow.discover()

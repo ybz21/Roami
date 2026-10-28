@@ -5,12 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from roami_agent.improvement import case_catalog
-from roami_agent.improvement.case_catalog import case_definitions, case_identity, read_definition
-from roami_agent.improvement.contracts import freeze_suite
-from roami_agent.improvement.corpus import authored_suite
-from roami_agent.improvement.run_records import trial_summary
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.evaluation import case_catalog
+from roami_agent.improvement.evaluation.case_catalog import (
+    case_definitions,
+    case_identity,
+    read_definition,
+)
+from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.corpus import authored_suite
+from roami_agent.improvement.evaluation.trial_evidence import trial_summary
+from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.protocol.errors import DomainError
 
 
@@ -98,14 +102,14 @@ def test_freezing_again_preserves_original_names_and_descriptions(tmp_path, monk
     run = service.runs.create(
         "local", "metadata", "diagnostic", {"suite_hash": suite["content_hash"]}
     )
-    service.runs.freeze_cases("local", run, suite)
+    service.run_lifecycle.freeze_cases("local", run, suite)
     before = service.runs.get("local", run)["snapshot"]["case_definitions"]
     monkeypatch.setattr(
         case_catalog,
         "case_definitions",
         lambda: ({"id": "CODE-01", "name": "新名称", "description": "新描述"},),
     )
-    service.runs.freeze_cases("local", run, suite)
+    service.run_lifecycle.freeze_cases("local", run, suite)
     assert service.runs.get("local", run)["snapshot"]["case_definitions"] == before
     assert case_identity(case)["name"] == "新名称"
 
@@ -149,3 +153,77 @@ async def test_http_catalog_requires_local_owner_and_exposes_readable_metadata(s
         assert cases[0]["name"] == "新增分页接口"
         assert cases[0]["description"]
         assert "prompt" not in cases[0] and "judge" not in cases[0]
+
+
+def test_visible_quant_inputs_are_the_actual_runtime_inputs_and_keep_receipts_private():
+    import hashlib
+    import runpy
+
+    from roami_agent.improvement.evaluation.case_catalog import case_resource
+
+    public = json.loads(case_resource("QUANT-02", "inputs/prices.json").read_text())
+    generated = runpy.run_path(str(case_resource("QUANT-02", "generate.py")))["inputs"]()
+    assert public == generated and len(public["bars"]) == 180 and "receipt" not in public
+    case = next(
+        value for value in authored_suite("resource-boundary")["cases"] if value["id"] == "QUANT-02"
+    )
+    runtime = json.loads(case["files"]["prices.json"])
+    assert {key: value for key, value in runtime.items() if key != "receipt"} == public
+    assert runtime["receipt"] and "tools.json" in case["files"]
+    assert "expected" not in case["files"] and "judge" not in case["files"]
+    assert (
+        case["origin"]["resources"]["inputs/prices.json"]
+        == hashlib.sha256(case_resource("QUANT-02", "inputs/prices.json").read_bytes()).hexdigest()
+    )
+
+
+def test_every_case_explains_its_data_tools_and_acceptance_without_claiming_execution():
+    from roami_agent.improvement.evaluation.case_catalog import case_resource
+
+    for definition in case_definitions():
+        manifest = json.loads(case_resource(definition["id"], "materials.json").read_text())
+        assert manifest["case_id"] == definition["id"]
+        assert (
+            manifest["data"]["kind"]
+            and manifest["tools"]["kind"]
+            and manifest["acceptance"]["kind"]
+        )
+        assert "execution_status" not in definition
+
+
+def test_declared_resources_cannot_escape_the_case_directory(tmp_path):
+    folder = directory(tmp_path)
+    value = json.loads((folder / "case.json").read_text())
+    (folder / "case.json").write_text(
+        json.dumps({**value, "resources": {"inputs": ["../outside.json"]}})
+    )
+    with pytest.raises(DomainError):
+        read_definition(folder)
+
+
+def test_quant_selection_uses_the_declared_input_ranges_candidates_and_costs(tmp_path, monkeypatch):
+    from roami_agent.improvement.evaluation.authored_fixtures import backtest, recipe
+    from roami_agent.improvement.evaluation.case_catalog import case_resource
+
+    public = json.loads(case_resource("QUANT-02", "inputs/prices.json").read_text())
+    public.update(
+        validation=[60, 120], test=[120, 175], candidates=[[2, 6]], fee=0.003, slippage=0.002
+    )
+    path = tmp_path / "prices.json"
+    path.write_text(json.dumps(public))
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.case_catalog.case_resource",
+        lambda case_id, name: (
+            path if name == "inputs/prices.json" else case_resource(case_id, name)
+        ),
+    )
+    fixture = recipe("QUANT-02", "resource-variation")
+    actual = json.loads(fixture["files"]["prices.json"])
+    assert {key: value for key, value in actual.items() if key != "receipt"} == public
+    expected = fixture["judge"]["expected"]
+    assert expected["selected"] == [2, 6] and expected["tried"] == [[2, 6]]
+    assert expected["selection_range"] == [60, 120] and expected["test_range"] == [120, 175]
+    assert (
+        expected["test_final_equity"]
+        == backtest(public["bars"][120:175], 2, 6, fee=0.003, slip=0.002)["equity"][-1]
+    )

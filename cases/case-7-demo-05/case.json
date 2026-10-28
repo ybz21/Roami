@@ -58,8 +58,6 @@
     "OSWorld",
     "Harbor"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "核心交互和数据正确",
     "completeness": "指定流程、错误与恢复覆盖",
@@ -85,5 +83,8 @@
   },
   "public_benchmark_candidates": [],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

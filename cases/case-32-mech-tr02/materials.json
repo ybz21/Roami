@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TR02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_routing_policy.py::test_external_or_invented_quote_cannot_override_the_user",
+      "test_foundations.py::test_research_and_main_cannot_escape_cli_admission"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_routing_policy.py::test_external_or_invented_quote_cannot_override_the_user",
+      "test_foundations.py::test_research_and_main_cannot_escape_cli_admission"
+    ]
+  }
+}

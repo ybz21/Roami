@@ -8,5 +8,8 @@
     "task_id": "exp-codec-restore-task01",
     "revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

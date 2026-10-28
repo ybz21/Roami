@@ -3,12 +3,12 @@ from dataclasses import replace
 
 import pytest
 
-from roami_agent.improvement.measurements import (
+from roami_agent.improvement.integrations.measurements import (
     BudgetAdmissionRejected,
     EpisodeBudget,
     MeteredModel,
 )
-from roami_agent.improvement.request_model import RequestBudgetModel
+from roami_agent.improvement.integrations.request_model import RequestBudgetModel
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
 

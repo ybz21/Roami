@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from roami_agent.improvement.authored_grading import grade_authored
-from roami_agent.improvement.corpus import authored_suite
-from roami_agent.improvement.executors import materialize
+from roami_agent.improvement.evaluation.authored_grading import grade_authored
+from roami_agent.improvement.evaluation.corpus import authored_suite
+from roami_agent.improvement.integrations.artifact_files import materialize
 
 
 @pytest.mark.parametrize(

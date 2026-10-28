@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "PUBLIC-07",
+  "data": {
+    "kind": "upstream_registered_suite",
+    "source": {
+      "benchmark": "finqa",
+      "task_id": "APD/2016/page_96.pdf-1",
+      "revision": "0f16e2867befa6840783e58be38c9efb9229d742"
+    },
+    "source_case_id": "finqa:4a00d7dc1848a85e",
+    "local_inputs": false,
+    "load_from": "Registered frozen suite files/asset_files after the benchmark importer completes. Source registration alone does not include or execute the dataset."
+  },
+  "tools": {
+    "kind": "benchmark_environment",
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+  },
+  "acceptance": {
+    "kind": "upstream_adapter",
+    "load_from": "The frozen registered suite judge; not an answer file in this folder."
+  }
+}

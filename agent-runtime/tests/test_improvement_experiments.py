@@ -6,8 +6,8 @@ from test_improvement_control import suite_file
 from test_improvement_workflow import make_suite
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.experiment_preview import preview
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.presentation.experiment_preview import preview
+from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app

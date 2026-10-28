@@ -8,5 +8,8 @@
     "task_id": "hr-make-slides-introduce-leadership",
     "revision": "98b68ef82a47690c316f42fddb05baafaab56851"
   },
-  "execution": "registered_suite"
+  "execution": "registered_suite",
+  "resources": {
+    "materials": "materials.json"
+  }
 }

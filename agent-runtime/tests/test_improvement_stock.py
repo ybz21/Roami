@@ -7,9 +7,14 @@ import time
 
 import pytest
 
-from roami_agent.improvement.stock_environment import FOLDER, OUTPUTS, SOURCE, StockEnvironment
-from roami_agent.improvement.stock_runtime import StockRuntime
-from roami_agent.improvement.stock_tasks import grade_stock
+from roami_agent.improvement.evaluation.benchmarks.stock_tasks import grade_stock
+from roami_agent.improvement.evaluation.execution.stock_environment import (
+    FOLDER,
+    OUTPUTS,
+    SOURCE,
+    StockEnvironment,
+)
+from roami_agent.improvement.evaluation.execution.stock_runtime import StockRuntime
 from roami_agent.protocol.errors import DomainError
 
 
@@ -133,7 +138,7 @@ async def test_native_csv_pass_still_requires_independent_quality(tmp_path, faul
 
 
 async def test_cleanup_removes_only_identity_checked_owned_data_volume(monkeypatch, tmp_path):
-    from roami_agent.improvement import containers
+    from roami_agent.improvement.evaluation.execution import containers
 
     env = StockEnvironment({}, time.monotonic() + 10, tmp_path, tmp_path)
     name = env.scope + "-owncloud"

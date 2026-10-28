@@ -58,8 +58,6 @@
     "LongMemEval-V2",
     "Harbor"
   ],
-  "fixture_status": "contract_defined_not_materialized",
-  "execution_status": "specified_not_run",
   "quality_anchors_3": {
     "correctness": "指定状态与返回结果匹配oracle",
     "completeness": "边界与故障后的要求全部覆盖",
@@ -88,5 +86,8 @@
     "longmemeval_v2"
   ],
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
-  "selected_in_mixed_suite_v1": true
+  "selected_in_mixed_suite_v1": true,
+  "resources": {
+    "materials": "materials.json"
+  }
 }

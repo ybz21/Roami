@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from roami_agent.improvement.issue_verification import for_run
-from roami_agent.improvement.run_records import trial_summary
-from roami_agent.improvement.status import ImprovementStatus
+from roami_agent.improvement.evaluation.trial_evidence import trial_summary
+from roami_agent.improvement.persistence.verification_receipts import for_run
+from roami_agent.improvement.service import ImprovementStatus
 
 CONTEXT = {
     key: str(index) * 64

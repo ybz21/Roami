@@ -13,14 +13,18 @@ from test_improvement_workflow import (
     setup,
 )
 
-from roami_agent.improvement.behavior_observer import observe_cycle
-from roami_agent.improvement.codex_roles import codex_configuration, codex_json, completed_result
-from roami_agent.improvement.contracts import digest
-from roami_agent.improvement.control import ImprovementControl
-from roami_agent.improvement.cycle import run_cycle
-from roami_agent.improvement.github_issues import publish_issue, sync_issue
-from roami_agent.improvement.github_publication import configure_publication
-from roami_agent.improvement.review_report import compose_issue, finding_id
+from roami_agent.improvement.domain.contracts import digest
+from roami_agent.improvement.integrations.github_client import configure_publication
+from roami_agent.improvement.persistence.control import ImprovementControl
+from roami_agent.improvement.workflows.behavior_observer import observe_cycle
+from roami_agent.improvement.workflows.codex_roles import (
+    codex_configuration,
+    codex_json,
+    completed_result,
+)
+from roami_agent.improvement.workflows.cycle import run_cycle
+from roami_agent.improvement.workflows.github_issues import publish_issue, sync_issue
+from roami_agent.improvement.workflows.review_report import compose_issue, finding_id
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 
@@ -343,7 +347,7 @@ async def test_production_review_batches_cover_all_sixty_and_resume_without_extr
         cached[key] = {"text": json.dumps(value)}
         return cached[key]
 
-    monkeypatch.setattr("roami_agent.improvement.behavior_observer.model_json", paid)
+    monkeypatch.setattr("roami_agent.improvement.workflows.behavior_observer.model_json", paid)
     await observe_cycle(w, action, Settings(), cfg)
     assert len(batches) == 15 and len(cached) == 16
     assert len(set.union(*batches)) == 60
@@ -369,7 +373,7 @@ async def test_daily_schedule_is_idempotent_expires_old_jobs_and_respects_stop(
         def now(cls, tz=None):
             return cls(2026, 10, 24, 3, 0, tzinfo=tz)
 
-    monkeypatch.setattr("roami_agent.improvement.control.datetime", DailyClock)
+    monkeypatch.setattr("roami_agent.improvement.persistence.control.datetime", DailyClock)
     w, _, _, _, _ = await setup(tmp_path, paired=False)
     control = ImprovementControl(w.ledger)
     control.save("owner", {**control.preferences("owner"), "enabled": True})
@@ -413,7 +417,7 @@ async def test_daily_admission_rejection_is_preserved_and_can_retry_without_repl
             "exitCode": 1 if len(attempts) == 1 else 0,
         }
 
-    monkeypatch.setattr("roami_agent.improvement.codex_roles.codex_route", route)
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.codex_route", route)
     messages = [{"role": "user", "content": "fixture"}]
     with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
         await codex_json(w, action, cfg, "packet", messages, runner=runner)
@@ -496,7 +500,7 @@ async def test_an_attempt_without_response_headers_is_not_archived_as_unspent(
     async def runner(argv, **kwargs):
         return {"stdout": "", "stderr": "", "exitCode": 1}
 
-    monkeypatch.setattr("roami_agent.improvement.codex_roles.codex_route", route)
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.codex_route", route)
     with pytest.raises(DomainError, match="RSI_CODEX_EXEC_FAILED"):
         await codex_json(w, action, cfg, "packet", [], runner=runner)
     with pytest.raises(DomainError, match="RECONCILIATION"):

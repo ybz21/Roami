@@ -3,8 +3,11 @@ import time
 
 import pytest
 
-from roami_agent.improvement.containers import ContainerExecutor
-from roami_agent.improvement.vectorization import grade_vectorization, skeleton
+from roami_agent.improvement.evaluation.benchmarks.vectorization import (
+    grade_vectorization,
+    skeleton,
+)
+from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 
@@ -38,7 +41,9 @@ async def test_artifact_verification_is_inside_total_delivery_deadline(tmp_path,
         await asyncio.sleep(0.1)
         return {"passed": True}
 
-    monkeypatch.setattr("roami_agent.improvement.code_contract.grade_code_contract", slow)
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.code_contract.grade_code_contract", slow
+    )
     executor = ContainerExecutor(Settings())
     case = {"limits": {"seconds": 1}, "judge": {"kind": "python_contract"}}
     with pytest.raises(TimeoutError):

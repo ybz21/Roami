@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "PUBLIC-16",
+  "data": {
+    "kind": "upstream_registered_suite",
+    "source": {
+      "benchmark": "swe_verified",
+      "task_id": "scikit-learn__scikit-learn-13496",
+      "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3"
+    },
+    "source_case_id": "swe_verified:scikit-learn__scikit-learn-13496",
+    "local_inputs": false,
+    "load_from": "Registered frozen suite files/asset_files after the benchmark importer completes. Source registration alone does not include or execute the dataset."
+  },
+  "tools": {
+    "kind": "benchmark_environment",
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+  },
+  "acceptance": {
+    "kind": "upstream_adapter",
+    "load_from": "The frozen registered suite judge; not an answer file in this folder."
+  }
+}

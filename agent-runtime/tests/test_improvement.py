@@ -7,22 +7,27 @@ import httpx
 import pytest
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.comparison import compare
-from roami_agent.improvement.containers import ContainerExecutor
-from roami_agent.improvement.contracts import agent_view, digest, freeze_suite, validate_suite
-from roami_agent.improvement.cycle import daily_selection, run_cycle
-from roami_agent.improvement.executors import ExternalExecutor, NativeFilesExecutor
-from roami_agent.improvement.grading import calibrated_grade, judge_case, quality
-from roami_agent.improvement.ledger import Ledger
-from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
-from roami_agent.improvement.policy import (
+from roami_agent.improvement.domain.comparison import compare
+from roami_agent.improvement.domain.contracts import digest
+from roami_agent.improvement.domain.policy import (
     apply_policy,
     next_candidate,
     policy_id,
     propose,
     validate_policy,
 )
-from roami_agent.improvement.sampling import import_finqa
+from roami_agent.improvement.domain.scoring import quality
+from roami_agent.improvement.evaluation.contracts import agent_view, freeze_suite, validate_suite
+from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
+from roami_agent.improvement.evaluation.execution.executors import (
+    ExternalExecutor,
+    NativeFilesExecutor,
+)
+from roami_agent.improvement.evaluation.grading import calibrated_grade, judge_case
+from roami_agent.improvement.evaluation.sampling import import_finqa
+from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
+from roami_agent.improvement.persistence.ledger import Ledger
+from roami_agent.improvement.workflows.cycle import daily_selection, run_cycle
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings

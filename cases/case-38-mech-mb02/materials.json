@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MB02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_improvement.py::test_missing_or_partial_retry_usage_is_unknown_and_blocks_next_request",
+      "test_improvement.py::test_episode_budget_counts_all_models_and_does_not_double_count_cache"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_improvement.py::test_missing_or_partial_retry_usage_is_unknown_and_blocks_next_request",
+      "test_improvement.py::test_episode_budget_counts_all_models_and_does_not_double_count_cache"
+    ]
+  }
+}

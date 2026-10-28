@@ -9,18 +9,32 @@ from types import SimpleNamespace
 
 import pytest
 
-from roami_agent.improvement.behavior_observer import model_json, observe_cycle, record_excerpt
-from roami_agent.improvement.candidate_checks import checked_evidence, verify_candidate
-from roami_agent.improvement.contracts import digest, freeze_suite
-from roami_agent.improvement.control import ImprovementControl
-from roami_agent.improvement.cycle import run_cycle
-from roami_agent.improvement.daily_suite import AUTHORED_IDS, MECHANISM_IDS, PUBLIC_QUOTAS
-from roami_agent.improvement.executors import private_json
-from roami_agent.improvement.ledger import Ledger
-from roami_agent.improvement.release_observation import activate_code, active_code, observe_code
-from roami_agent.improvement.research_worker import ResearchWorker
-from roami_agent.improvement.source_revision import SourceRevisions, git, source_hash
-from roami_agent.improvement.workflow import ResearchWorkflow
+from roami_agent.improvement.domain.contracts import digest
+from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.daily_suite import (
+    AUTHORED_IDS,
+    MECHANISM_IDS,
+    PUBLIC_QUOTAS,
+)
+from roami_agent.improvement.integrations.artifact_files import private_json
+from roami_agent.improvement.integrations.source_workspace import git, source_hash
+from roami_agent.improvement.persistence.control import ImprovementControl
+from roami_agent.improvement.persistence.ledger import Ledger
+from roami_agent.improvement.persistence.research_repository import ResearchRepository
+from roami_agent.improvement.workflows.behavior_observer import (
+    model_json,
+    observe_cycle,
+    record_excerpt,
+)
+from roami_agent.improvement.workflows.candidate_checks import checked_evidence, verify_candidate
+from roami_agent.improvement.workflows.cycle import run_cycle
+from roami_agent.improvement.workflows.release_observation import (
+    activate_code,
+    active_code,
+    observe_code,
+)
+from roami_agent.improvement.workflows.research_worker import ResearchWorker
+from roami_agent.improvement.workflows.source_revision import SourceRevisions
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
@@ -278,7 +292,7 @@ async def setup(tmp_path, *, paired=True):
     commit = (await git(repo, "rev-parse", "HEAD")).strip()
     ledger = Ledger(tmp_path / "private/ledger.sqlite3")
     clock = Clock()
-    workflow = ResearchWorkflow(ledger, clock=clock)
+    workflow = ResearchRepository(ledger, clock=clock)
     config = workflow.configure(
         "owner",
         {
@@ -478,7 +492,7 @@ async def test_lease_fencing_and_duplicate_dispatch_survive_restarts(tmp_path):
     first = w.claim(lease_ms=10)
     assert w.claim() is None
     clock.value += 11
-    restarted = ResearchWorkflow(w.ledger, clock=clock)
+    restarted = ResearchRepository(w.ledger, clock=clock)
     second = restarted.claim()
     assert first["id"] == second["id"] and first["lease"] != second["lease"]
     with pytest.raises(DomainError, match="LEASE_LOST"):
@@ -603,7 +617,7 @@ async def test_executor_success_cannot_close_issue_and_transactions_rollback(tmp
 
 
 async def test_source_mounts_keep_evaluation_oracles_outside_candidate_runtime(tmp_path):
-    from roami_agent.improvement.containers import ContainerExecutor
+    from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
 
     root = tmp_path / "version"
     package = root / "agent-runtime/src/roami_agent"

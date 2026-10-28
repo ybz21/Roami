@@ -4,12 +4,17 @@ import zipfile
 
 import pytest
 
-from roami_agent.improvement.contracts import freeze_suite, load_json, load_suite
-from roami_agent.improvement.control import ImprovementControl
-from roami_agent.improvement.executors import private_json
-from roami_agent.improvement.ledger import Ledger
-from roami_agent.improvement.protocol_suite import protocol_suite
-from roami_agent.improvement.slide_tasks import content_digest, package_parts, reference_delta
+from roami_agent.improvement.evaluation.benchmarks.slide_tasks import (
+    content_digest,
+    package_parts,
+    reference_delta,
+)
+from roami_agent.improvement.evaluation.contracts import freeze_suite, load_suite
+from roami_agent.improvement.evaluation.protocol_suite import protocol_suite
+from roami_agent.improvement.integrations.artifact_files import private_json
+from roami_agent.improvement.integrations.json_documents import load_json
+from roami_agent.improvement.persistence.control import ImprovementControl
+from roami_agent.improvement.persistence.ledger import Ledger
 from roami_agent.protocol.errors import DomainError
 
 

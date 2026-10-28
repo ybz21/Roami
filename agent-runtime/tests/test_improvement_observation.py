@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from roami_agent.improvement.measurements import EpisodeBudget, MeteredModel
+from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
 from roami_agent.protocol.model_observation import model_observation
 from roami_agent.providers.chat_completions import ChatCompletions
 
