@@ -12,15 +12,21 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.tools.process import execute
 
 
-def codex_configuration():
+def codex_configuration(*, shared_gateway=False):
     home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     path = home / "config.toml"
     config = tomllib.loads(path.read_text()) if path.exists() else {}
     # Preserve model routing/authentication, without loading personal hooks, MCPs or plugins.
     selected = {
-        k: config[k] for k in ("model", "model_provider", "model_reasoning_effort") if k in config
+        k: config[k]
+        for k in ("model", "model_provider", "model_reasoning_effort")
+        if k in config and not (shared_gateway and k == "model_provider")
     }
-    provider = config.get("model_providers", {}).get(config.get("model_provider"), {})
+    provider = (
+        {}
+        if shared_gateway
+        else config.get("model_providers", {}).get(config.get("model_provider"), {})
+    )
     allowed = {
         "name",
         "base_url",

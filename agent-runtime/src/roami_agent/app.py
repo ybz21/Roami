@@ -376,7 +376,9 @@ class Runtime:
             await self.improvement.research_worker.start()
             from roami_agent.improvement.workflows.pipeline_reports import PipelineReportWorker
 
-            self.improvement.report_worker = PipelineReportWorker(self.improvement)
+            self.improvement.report_worker = PipelineReportWorker(
+                self.improvement, settings=lambda: self.settings.current
+            )
             await self.improvement.report_worker.start()
 
     async def _monitor_native_sessions(self):
