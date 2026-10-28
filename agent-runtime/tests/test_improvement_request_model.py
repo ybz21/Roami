@@ -519,6 +519,7 @@ async def test_shared_daily_policy_keeps_model_settings_without_rsi_pressure_or_
     assert len(observed) == 2 and budget.used == 42000
     assert all(messages == [{"role": "user", "content": "task"}] for messages in observed)
     budget.unknown = True
-    with pytest.raises(BudgetAdmissionRejected, match="USAGE_UNKNOWN"):
-        async for _ in model.stream([], []):
-            pass
+    async for _ in model.stream([], []):
+        pass
+    assert len(observed) == 3 and budget.used == 63000
+    assert budget.metrics()["tokens"] is None

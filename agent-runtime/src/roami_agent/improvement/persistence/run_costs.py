@@ -48,7 +48,8 @@ class RunCosts:
                 return json.loads(row["result_json"])
             summary = value["summary"] or {}
             require(
-                all(
+                shared
+                or all(
                     summary.get(key, 0) is not None
                     for key in ("generation_tokens", "artifact_review_tokens")
                 ),

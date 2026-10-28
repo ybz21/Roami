@@ -32,7 +32,7 @@ class EpisodeBudget:
     def check(self):
         if time.monotonic() - self.started >= self.limits["seconds"]:
             raise BudgetAdmissionRejected("RSI_TIME_BUDGET")
-        if self.unknown:
+        if self.unknown and not self.shared_daily_limit:
             raise BudgetAdmissionRejected("RSI_USAGE_UNKNOWN")
 
     async def admit(self, messages, tools, output_cap, *, input_reserve=None):

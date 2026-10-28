@@ -61,7 +61,12 @@ def public_issue_body(run, priorities):
         )
     if not present:
         lines.append("本次未确认新的问题；未覆盖和未验证不等于修复通过。")
-    blocked = [case for case in run["cases"] if case.get("blocked_by")]
+    blocked = [
+        outcome
+        for case in run["cases"]
+        for outcome in case.get("arm_results", {"selected": case}).values()
+        if outcome.get("blocked_by")
+    ]
     if blocked:
         lines += [
             "",
@@ -69,12 +74,20 @@ def public_issue_body(run, priorities):
             "",
             "以下 Case 未执行，沿用首发阻塞，不计为新增独立缺陷。未发送调用为零；已有未知账不会因此结算或清除。",
             "",
-            "| Case | 首发 Case | 原因 |",
-            "| --- | --- | --- |",
         ]
+        paired = any("arm" in case for case in blocked)
+        lines += (
+            ["| Case | 评测臂 | 首发 Case | 首发臂 | 原因 |", "| --- | --- | --- | --- | --- |"]
+            if paired
+            else ["| Case | 首发 Case | 原因 |", "| --- | --- | --- |"]
+        )
         for case in blocked:
             cause = case["blocked_by"]
-            lines.append(f"| `{case['case_id']}` | `{cause['case_id']}` | `{cause['code']}` |")
+            lines.append(
+                f"| `{case['case_id']}` | `{case.get('arm', '')}` | `{cause['case_id']}` | `{cause.get('arm', '')}` | `{cause['code']}` |"
+                if paired
+                else f"| `{case['case_id']}` | `{cause['case_id']}` | `{cause['code']}` |"
+            )
     lines += ["", "### 复测结果", "", "| Case | 问题 | 本次状态 |", "| --- | --- | --- |"]
     for item in run["issues"]:
         lines.append(f"| `{item['case_id']}` | `{item['code']}` | `{item['status']}` |")
@@ -83,6 +96,20 @@ def public_issue_body(run, priorities):
         "`present` 表示仍存在；`not_reproduced` 仅表示本次未复现；阻塞、缺测或合同变化不能记为已修复。只有独立正式验收和观察通过才能关闭问题。",
     ]
     return "\n".join(lines)
+
+
+def store_evaluation_summary(records, owner, run_id, *, summary=None):
+    value = records.get(owner, run_id)
+    if summary is not None:
+        value["summary"] = summary
+    records.artifact(
+        owner,
+        run_id,
+        "evaluate",
+        "evaluation-summary.md",
+        "本页由程序汇总，无需模型调用；Codex 复盘与独立验收以对应环节的回执为准。\n\n"
+        + public_issue_body(value, {}),
+    )
 
 
 async def publish_run_issue(records, owner, run_id, priorities, *, run=command):

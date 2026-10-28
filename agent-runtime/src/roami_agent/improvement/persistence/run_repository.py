@@ -221,7 +221,7 @@ class RunRepository:
                 if case.get("blocked_by"):
                     continue
                 for signal in case["signals"]:
-                    if signal == "MODEL_PROXY_DAILY_LIMIT":
+                    if signal in {"MODEL_HTTP_402", "MODEL_PROXY_DAILY_LIMIT"}:
                         continue
                     ident = digest([owner, case["case_id"], signal])
                     db.execute(

@@ -402,7 +402,7 @@ async def test_unknown_generation_keeps_one_cause_and_a_free_summary(
     from roami_agent.server.configuration import Settings
 
     service = ImprovementStatus(tmp_path)
-    service.ledger.shared_daily_limit = True
+    service.ledger.shared_daily_limit = rejection is not None
     service.control.register_machine(
         "local", {"id": "container", "label": "Container", "mode": "container"}, local_only=True
     )

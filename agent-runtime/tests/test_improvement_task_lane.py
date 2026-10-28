@@ -470,22 +470,72 @@ async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers
 
 
 @pytest.mark.parametrize("shared", [False, True])
-@pytest.mark.parametrize("supported", [False, True])
+@pytest.mark.parametrize("version", [None, "1", "2"])
 async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
-    tmp_path, monkeypatch, shared, supported
+    tmp_path, monkeypatch, shared, version
 ):
     from roami_agent.improvement.evaluation.execution import containers
 
     async def docker(*args, **kwargs):
         assert args[:2] == ("image", "inspect")
-        labels = {"org.roami.rsi.shared-daily-policy": "1"} if supported else None
+        labels = {"org.roami.rsi.shared-daily-policy": version} if version else None
         return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
 
     monkeypatch.setattr(containers, "docker_command", docker)
     executor = containers.ContainerExecutor(Settings(), shared_daily_limit=shared)
-    if shared and not supported:
+    if shared and version != "2":
         with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
             await executor.preflight()
         assert executor.image_id is None
     else:
         assert (await executor.preflight())["image_id"] == "fixture-image"
+
+
+@pytest.mark.parametrize("host_unknown", [False, True])
+@pytest.mark.parametrize("runtime_failure", [False, True])
+async def test_shared_container_usage_gap_is_not_an_execution_failure(
+    tmp_path, monkeypatch, host_unknown, runtime_failure
+):
+    from roami_agent.improvement.evaluation.execution import containers
+
+    class Unused:
+        model = "unused-fixture"
+
+    class Budget(containers.EpisodeBudget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.unknown = host_unknown
+
+    async def docker(*args, **kwargs):
+        if args[0] == "start":
+            blockers = ["unknown_provider_usage"]
+            if runtime_failure:
+                blockers.append("RSI_NATIVE_TASK_INCOMPLETE")
+            (tmp_path / "state" / "response.json").write_text(
+                json.dumps({"output": "", "release_blockers": blockers})
+            )
+        return b""
+
+    async def remove(*args):
+        pass
+
+    monkeypatch.setattr(containers, "EpisodeBudget", Budget)
+    monkeypatch.setattr(containers, "docker_command", docker)
+    executor = containers.ContainerExecutor(
+        Settings(), provider_factory=lambda *_: Unused(), shared_daily_limit=True
+    )
+    executor.image_id = "fixture-image"
+    monkeypatch.setattr(executor, "remove", remove)
+    case = protocol_suite()["cases"][0]
+    case["files"]["output.json"] = '{"sum":40}'
+    result = await executor.run(case, {}, tmp_path)
+    if host_unknown and not runtime_failure:
+        assert result["grade"]["passed"]
+        assert result["verified_delivery"] == case["counts_as_delivery"]
+        assert result["metrics"]["tokens"] is None
+        assert result["release_blockers"] == ["unknown_provider_usage"]
+    else:
+        assert not result["grade"]["passed"] and not result["verified_delivery"]
+        assert result["grade"]["reason"] == (
+            "RSI_NATIVE_TASK_INCOMPLETE" if runtime_failure else "RSI_RUNTIME_REPORTED_FAILURE"
+        )

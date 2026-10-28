@@ -87,3 +87,13 @@ it('does not show a missing model configuration as unlimited', () => {
   expect(screen.queryByText('不限额')).toBeNull()
   expect(screen.getByText(zhCN['agent.rsi.loadFailed'])).toBeTruthy()
 })
+
+
+it('shows gateway quota recovery instead of an unknown-usage warning', () => {
+  state.detail.runs[1].blocker = 'MODEL_HTTP_402'
+  render(<AgentImprovement node={null} />)
+  expect(screen.getByRole('status').textContent).toContain(zhCN['agent.models.gatewayQuota'])
+  expect(screen.queryByText(zhCN['agent.rsiPrototype.usageUnknownHint'])).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: zhCN['agent.rsiPrototype.modelPage'] }))
+  expect(window.location.hash).toBe('#/settings/agent/runtime?modelTab=models')
+})

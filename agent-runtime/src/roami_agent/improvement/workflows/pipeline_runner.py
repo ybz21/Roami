@@ -7,13 +7,13 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
+from roami_agent.improvement.domain.admission_blocking import MODEL_ADMISSION_BLOCKERS
 from roami_agent.improvement.domain.contracts import digest, identifier, require
 from roami_agent.improvement.domain.policy import BOUNDS
 from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
 from roami_agent.improvement.integrations.spending_policy import (
-    MODEL_ADMISSION_BLOCKERS,
     uses_shared_model_limit,
 )
 from roami_agent.improvement.persistence.diagnostic_requests import (
@@ -194,7 +194,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         "budget-plan.json",
         {
             "spending_policy": "shared_model_daily",
-            "admission": "model_proxy",
+            "admission": "go_gateway",
             "technical_timeout_seconds": 14400,
         }
         if shared
@@ -260,13 +260,18 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             if artifact_tokens is not None and review_tokens is not None
             else None
         )
+        result.pop("shared_admission_managed", None)
+        if shared:
+            result["shared_admission_managed"] = True
         summary = trial_summary(original, result, target)
         if blocked_by is not None:
             summary["blocked_by"] = blocked_by
         elif usage_blocker is None:
             cause = None
-            if budget.unknown or artifact_tokens is None:
-                cause = "RSI_USAGE_UNKNOWN"
+            if (budget.unknown or artifact_tokens is None) and not result.get(
+                "shared_admission_managed"
+            ):
+                cause = result.get("admission_error") or "RSI_USAGE_UNKNOWN"
             elif not summary["passed"]:
                 cause = next((c for c in MODEL_ADMISSION_BLOCKERS if c in summary["signals"]), None)
             if cause:
@@ -333,14 +338,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             "known_provider_requests": sum(r["requestAttempts"] or 0 for r in budget.requests),
         },
     )
-    from roami_agent.improvement.workflows.pipeline_reports import public_issue_body
+    from roami_agent.improvement.workflows.pipeline_reports import store_evaluation_summary
 
-    records.artifact(
-        owner,
-        run_id,
-        "evaluate",
-        "evaluation-summary.md",
-        "本页由程序汇总，无需模型调用；Codex 复盘与独立验收以对应环节的回执为准。\n\n"
-        + public_issue_body(records.get(owner, run_id), {}),
-    )
+    store_evaluation_summary(records, owner, run_id)
     records.set_state(owner, run_id, "report_queued")

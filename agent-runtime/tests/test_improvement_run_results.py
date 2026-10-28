@@ -114,3 +114,21 @@ def test_incomplete_history_keeps_uncovered_older_issues_visible(tmp_path):
     assert view["runs"][0]["sequence"] == 3
     assert len(view["issues"]) == 1 and view["issues"][0]["originalRun"] == first
     assert view["issues"][0]["historyTruncated"] is True
+
+
+def test_gateway_quota_blocker_is_visible_without_creating_a_repair_issue(tmp_path):
+    records = ImprovementStatus(tmp_path).runs
+    ident = run(records, "quota", 100)
+    records.case(
+        "local",
+        ident,
+        trial_summary(
+            {"id": "a"}, {"grade": {"reason": "MODEL_HTTP_402"}, "metrics": {"tokens": None}}
+        ),
+    )
+    records.observations("local", ident)
+    records.node("local", ident, "evaluate", "blocked", "MODEL_HTTP_402")
+    value = results_view(records, "local", ident)
+    assert value["runs"][0]["blocker"] == "MODEL_HTTP_402"
+    assert value["runs"][0]["results"]["a"] == "blocked"
+    assert value["issues"] == []

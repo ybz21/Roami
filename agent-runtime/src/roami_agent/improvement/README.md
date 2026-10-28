@@ -55,6 +55,8 @@ old grader identity. Existing public `python -m ...improvement.cli`, `container_
 `import_diagnostic` entry points remain small shims; private imports use the actual new modules.
 
 Shared daily accounting requires rebuilding `improvement.Dockerfile` after upgrading. The image
-label `org.roami.rsi.shared-daily-policy=1` identifies support for forwarding the host policy into
-the Native executor. Shared-mode preflight rejects older images before model execution, so an old
-image cannot silently retain per-case token and request caps. Explicit legacy mode stays supported.
+label `org.roami.rsi.shared-daily-policy=2` identifies support for forwarding the host policy into
+the Native executor and deferring fee admission to the configured Go gateway. Missing token counts remain
+unknown evaluation evidence; they do not introduce a second spending gate when the configured Go gateway
+allows the request. Shared-mode preflight rejects older images before model execution, so an old
+image cannot silently retain per-case token, request or missing-usage caps. Explicit legacy mode stays supported.

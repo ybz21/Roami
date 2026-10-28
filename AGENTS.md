@@ -232,19 +232,6 @@ authority, it just no longer moves the layout under the user a beat after load.
 
 # Gates
 
-<section id="go-model-gateway-delegation-20261028" lang="zh-CN">
-  <h2>复用 Go LLM Gateway · 2026-10-28</h2>
-  <h3>Product Design</h3>
-  <p>直接复用 ~/codes/llm-gateway 的 Go 网关及现有模型连接。Agent 只处理对话和任务，主、后台、记忆及评测的 HTTP 模型连接直接请求网关，由 Go 网关统一定价、计费及额度拦截。模型设置只保留连接和模型选项，并提供网关入口；原本地价格、限额和统计入口撤下。外部专业 CLI 保持各自现有连接和登录配置。</p>
-  <h3>User Stories</h3>
-  <ul><li>旧的本地未知费用不会阻止新对话；真实额度不足由 Go 网关返回，界面显示恢复方向。</li><li>价格、消费和额度在同一 Go 网关管理，无需在 Agent 中重复配置。</li><li>失败事件立即显示，历史刷新失败也不会让回复状态消失。</li></ul>
-  <h3>Technical Design</h3>
-  <p>app.py 与 providers/factory.py 移除 ModelProxy 及其传输包装，工作流移除本地费用预检查和计费上下文。现有连接地址、密钥与模型路由继续由 ModelSettings 管理；旧 proxy 字段原样保留作历史材料，不参与配置验证和模型准入，新的设置写入不再接受该字段。原 model-usage 接口只读旧账并标为 archived，模型执行不再读写该账表。</p>
-  <p>费用与额度复用 llm-gateway/internal/observe/pricing.go 与 internal/billing/middleware.go 的实现，无单价按网关既有零默认值处理，402 作为普通模型 HTTP 错误传回。前端复用现有错误活动组件，turn.failed／turn.interrupted 在 SSE 投影时立即显示；首条回复创建前的失败同样保留终态；晚到的 POST 回执只补入对应用户消息，保留 SSE 已确认的轮次状态，不能重新排队。保留用户输入和局部输出，所有新文案进入中英文语言包，不新增配置或监听端口。</p>
-  <h3>验收记录</h3>
-  <p>full 门禁通过：Go 全量、Python 1769 项、前端 typecheck／i18n／hover／生产构建；前端独立全量 142 文件、1032 项通过。Go 网关源版本 1f1ffc1 的 observe／billing 包测试通过，未改动该仓库源码。隔离 HTTPS 实例实际经过此源码构建的 Go 网关，保留一笔旧本地未知账目，后续失败与成功请求均不写旧账；桌面 1920px 和 Redmi Note 8 真机 392px 验证历史 GET 失败仍显示错误、继续发送恢复回复、模型配置无计费 Tab、网关入口及无文档横向溢出。真机完成触摸输入、软键盘收起与底部导航返回。网关夹具关闭计费认证，额度拦截由 Go 包测试验证，不冒称真实扣款验收；无付费模型调用，未部署现用服务。证据入口 /tmp/chat-gateway-recovery-20261028/index.html。</p>
-</section>
-
 ## Refresh Budgets
 
 Session state consumers reuse `useAgentKinds` / `useSessionOverview` rather than polling each
@@ -312,18 +299,3 @@ PR 的图抹了）。
   how to respond.
 - The `babysit-pr` skill (`skills/babysit-pr/`) automates polling, deciding fix-vs-skip, replying,
   and resolving Codex review threads.
-
-<section id="mcp-independent-daemon-20261028" lang="zh-CN">
-  <h2>MCP 独立后台守护 · 2026-10-28</h2>
-  <h3>Product Design</h3>
-  <p>MCP 连接交给节点上的独立后台服务持有，Web 与 Agent 只作为客户端。停止或重启这两者不会主动关闭上游连接；后台服务继续心跳、断线重连及读取新增配置。MCP 后台服务自身异常退出时由系统服务管理器自动恢复。保留中文名称、描述、工具引用和开关。</p>
-  <h3>User Stories</h3>
-  <ul><li>开启 MCP 后自动后台守护，关闭能力页面或停止 Web、Agent 后仍继续维护连接。</li><li>Agent 恢复后读取同一工具目录并立即调用，独立守护不可用时明确显示重连，不另起上游连接冒充独立运行。</li><li>服务重启不重放已经发出的工具调用；显式取消仍可发送取消请求，已有未知结果保留。请求开始发送后，即使响应头尚未到达，超时也保留为结果未知。</li></ul>
-  <h3>Technical Design</h3>
-  <p>server/mcp_daemon.py 独立运行既有 MCPConnections，读取节点配置及托管登记，通过单实例锁和 0600 Unix socket 提供目录、状态事件与一次调用流。tools/mcp_broker.py 在 Agent 中维护目录投影，以长轮询读取状态变化，进度和原始 MCP 结果通过本机流回传，由 Agent 原有产物及权限层处理。连接循环同时检查显式关闭状态，避免协议层消化取消后继续循环。后台入口不依赖模型、Agent 数据库或 Web 网关；停用、移除及改配通过原子文件同步，已接收的调用结束前不截断上游。写入请求不作网络重试，重复调用 ID 在守护进程中拒绝。</p>
-  <p>roami agent mcp install／serve／status 提供节点级管理，Linux install 写入按实例命名的独立用户 systemd 单元和私有环境快照，启用后写入 MCP 客户端描述。单元不依赖、绑定或归属于 Web／Agent 单元，自动重启只作用于 MCP 自身。未安装独立服务的节点保持原运行方式；其他服务管理器可运行 serve，安装命令不伪报支持。Agent 关闭前标记生命周期结束，断开客户端时不发送远端取消；用户主动停止与调用超时仍沿用取消和未知结果语义。</p>
-  <h3>验收记录</h3>
-  <p>full 质量门禁通过：Go 全量、Python 1,698 项、静态与格式检查、前端 typecheck／i18n／hover／生产构建及秘密扫描；前端 142 文件／1,038 项通过，收尾 MCP／目录／产物定向 83 项通过。收尾 MCP 42 项回归通过，包含响应头延迟后的未知写入结果和协议心跳消化取消后的关闭完成；最终门禁结果随 PR 提供。新增回归包含两个真实 Agent 进程先后接入同一守护、客户端关闭不取消已接收调用、显式取消、工具权限、图片与大文本产物及所有者隔离、配置损坏后拒绝调用、跨节点拒绝、私有文件和单实例保护。</p>
-  <p>真实独立用户 systemd 单元、Go Web／Agent 与 stdio 夹具完成验收：Web 和 Agent 同时停止后，上游进程及连接标识不变；无客户端时杀掉上游约 31.33 秒自动恢复并成功调用；客户端返回后别名保留。杀掉守护后系统自动重启，Agent 自动重新接入，已发出的写入没有重放。含空格及百分号的实例路径验证通过；服务命令显式固定实例根目录和 socket，就绪与客户端请求再校验节点身份。测试单元及私有 tmux 已按身份清理，零付费模型调用。证据入口 /tmp/mcp-daemon-20261028/index.html。</p>
-  <p>本轮未修改页面结构；新增产品错误提示均含中英文，终端命令与诊断文字按 i18n 标准的 CLI 例外保留英文。未重复宣称手机真机验收；Linux 安装依赖可用的用户 systemd，其他管理器使用 serve 配置独立监督服务。</p>
-</section>
