@@ -18,7 +18,6 @@ from roami_agent.improvement.evaluation.daily_suite import daily_coverage
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.improvement.integrations.source_identity import implementation_hash
 from roami_agent.improvement.integrations.spending_policy import (
-    check_usage_admission,
     uses_shared_model_limit,
 )
 from roami_agent.protocol.errors import DomainError
@@ -67,7 +66,6 @@ async def run_cycle(
     period_machines=None,
     source_builds=None,
     paired=True,
-    admission_check=None,
 ):
     validate_suite(suite)
     baseline = validate_policy(baseline)
@@ -172,14 +170,14 @@ async def run_cycle(
                         )
                         result.pop("blocked_by", None)
                         result.pop("admission_error", None)
-                        result.pop("shared_admission_checked", None)
+                        result.pop("shared_admission_managed", None)
                     else:
                         result = await executor.run(
                             case, baseline if arm == "baseline" else candidate, root
                         )
                         result.pop("blocked_by", None)
                         result.pop("admission_error", None)
-                        result.pop("shared_admission_checked", None)
+                        result.pop("shared_admission_managed", None)
                 except (DomainError, OSError, TimeoutError, ValueError) as error:
                     result = {
                         "grade": {
@@ -195,12 +193,8 @@ async def run_cycle(
                         "verified_delivery": False,
                         "release_blockers": ["worker_error"],
                     }
-                if (
-                    not result.get("blocked_by")
-                    and result.get("metrics", {}).get("tokens") is None
-                    and uses_shared_model_limit(ledger)
-                ):
-                    await check_usage_admission(result, admission_check)
+                if uses_shared_model_limit(ledger):
+                    result["shared_admission_managed"] = True
                 trial = {
                     "case_id": case["id"],
                     "case_hash": digest(case),

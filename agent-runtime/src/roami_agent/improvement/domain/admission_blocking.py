@@ -1,6 +1,7 @@
 """Shared admission failures are incomplete evidence, not agent quality scores."""
 
 MODEL_ADMISSION_BLOCKERS = (
+    "MODEL_HTTP_402",
     "MODEL_PROXY_USAGE_UNKNOWN",
     "MODEL_PROXY_CURRENCY_MISMATCH",
     "MODEL_PROXY_DAILY_LIMIT",
@@ -13,10 +14,10 @@ def blocking_code(result, signals=()):
     grade = result.get("grade", {})
     for code in (result.get("admission_error"), result.get("execution_error"), grade.get("reason")):
         if code in MODEL_ADMISSION_BLOCKERS or (
-            code == "RSI_USAGE_UNKNOWN" and not result.get("shared_admission_checked")
+            code == "RSI_USAGE_UNKNOWN" and not result.get("shared_admission_managed")
         ):
             return code
-    if not result.get("shared_admission_checked") and set(result.get("release_blockers", [])) & {
+    if not result.get("shared_admission_managed") and set(result.get("release_blockers", [])) & {
         "unknown_provider_usage",
         "unknown_artifact_review_usage",
     }:

@@ -24,7 +24,7 @@ class RefusingExecutor:
     async def run(self, case, policy, root):
         self.calls.append(case["id"])
         mechanism = case["judge"]["kind"] == "mechanism"
-        unknown = self.reason == "RSI_USAGE_UNKNOWN" and not mechanism
+        unknown = self.reason in {"RSI_USAGE_UNKNOWN", "MODEL_HTTP_402"} and not mechanism
         if mechanism:
             (root / "regression.log").write_text("mechanism fixture passed\n")
         else:
@@ -117,7 +117,7 @@ def arguments(ledger, executor, output_root, *, paired=True, request_key="one"):
 @pytest.mark.parametrize("generic", [False, True])
 @pytest.mark.parametrize("paired", [False, True])
 @pytest.mark.parametrize(
-    "reason", ["RSI_USAGE_UNKNOWN", "MODEL_PROXY_USAGE_UNKNOWN", "MODEL_PROXY_DAILY_LIMIT"]
+    "reason", ["MODEL_HTTP_402", "MODEL_PROXY_USAGE_UNKNOWN", "MODEL_PROXY_DAILY_LIMIT"]
 )
 async def test_formal_cycle_stops_after_shared_blocker_and_keeps_mechanisms(
     tmp_path, reason, paired, generic
@@ -198,7 +198,7 @@ async def test_formal_capture_keeps_primary_arm_and_free_summary(tmp_path):
     request = service.control.claim()
     service.run_lifecycle.begin_request(request)
     service.run_lifecycle.freeze_cases("local", request["id"], suite())
-    executor = RefusingExecutor("RSI_USAGE_UNKNOWN")
+    executor = RefusingExecutor("MODEL_HTTP_402")
     report = await run_cycle(
         **arguments(service.ledger, executor, tmp_path / "runs", request_key=request["id"])
     )
@@ -221,34 +221,17 @@ async def test_formal_capture_keeps_primary_arm_and_free_summary(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("refused", [False, True])
-async def test_formal_usage_gaps_defer_admission_to_the_shared_fee_policy(tmp_path, refused):
-    from roami_agent.protocol.errors import DomainError
-
+@pytest.mark.parametrize("shared", [False, True])
+async def test_formal_usage_gaps_follow_gateway_admission_not_token_quota(tmp_path, shared):
     ledger = Ledger(tmp_path / "ledger.sqlite3")
-    ledger.shared_daily_limit = True
+    ledger.shared_daily_limit = shared
     executor = RefusingExecutor("RSI_USAGE_UNKNOWN")
-    checks = []
-
-    async def check():
-        checks.append(True)
-        if refused:
-            raise DomainError("MODEL_PROXY_USAGE_UNKNOWN")
-
-    params = arguments(ledger, executor, tmp_path / "runs")
-    report = await run_cycle(**params, admission_check=check)
+    report = await run_cycle(**arguments(ledger, executor, tmp_path / "runs"))
     real = [c for c in executor.calls if c.startswith("REAL-")]
-    assert len(real) == (1 if refused else 4)
-    assert len(checks) == len(real)
-    assert bool(report["usage_blocker"]) is refused
-    assert not report["evaluation_complete"] and not report["comparison"]["eligible_for_promotion"]
-    detail = ledger.get("local", report["cycle_id"])
-    for t in detail["trials"]:
-        if t["case_id"].startswith("REAL-") and not t.get("blocked_by"):
-            assert t["metrics"]["tokens"] is None
-            assert bool(t.get("shared_admission_checked")) is not refused
-    if refused:
-        assert report["usage_blocker"]["code"] == "MODEL_PROXY_USAGE_UNKNOWN"
+    assert len(real) == (4 if shared else 1)
+    assert bool(report["usage_blocker"]) is not shared
+    assert not report["evaluation_complete"]
+    assert not report["comparison"]["eligible_for_promotion"]
 
 
 @pytest.mark.parametrize(
@@ -280,14 +263,14 @@ def test_formal_usage_never_turns_missing_measurement_into_free_tokens(metrics, 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("prices", [False, True])
-async def test_diagnostic_usage_gaps_follow_actual_shared_billing(
-    store, tmp_path, monkeypatch, prices
+@pytest.mark.parametrize("refused", [False, True])
+async def test_diagnostic_usage_gaps_defer_to_gateway_http_admission(
+    store, tmp_path, monkeypatch, refused
 ):
     from types import SimpleNamespace
 
     import httpx
-    from test_model_proxy import consume, provider, proxy_for
+    from test_model_proxy import consume
 
     from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
     from roami_agent.improvement.persistence.run_costs import RunCosts
@@ -295,33 +278,45 @@ async def test_diagnostic_usage_gaps_follow_actual_shared_billing(
         enqueue_diagnostic,
         execute_diagnostic,
     )
-    from roami_agent.protocol.errors import DomainError
+    from roami_agent.providers.chat_completions import ChatCompletions
     from roami_agent.server.configuration import Settings
 
-    proxy, _ = proxy_for(store, limit=1, prices=prices)
+    await store.call(
+        lambda db: db.execute(
+            "INSERT INTO model_proxy_calls(id,day,timezone,role,model,started_ms,state,prices_json,cost_source) VALUES('archived','2026-10-28','UTC','main','fixture',0,'unknown',?,'unknown')",
+            (json.dumps({"currency": "CNY", "input": 1, "output": 4}),),
+        ),
+        write=True,
+    )
     service = ImprovementStatus(tmp_path)
     service.ledger.shared_daily_limit = True
-    service.model_proxy = service.runs.model_proxy = proxy
     calls, executed = [], []
 
     def handler(request):
         calls.append(request)
+        if refused:
+            return httpx.Response(402, json={"error": {"type": "insufficient_balance"}})
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
             content=b'data: {"choices":[{"delta":{"content":"done"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
         )
 
-    service.provider_factory = lambda settings, role: provider(proxy, handler, role)
-    path = tmp_path / "two.json"
-    path.write_text(json.dumps(freeze_suite("two", [case("a"), case("b")])))
+    service.provider_factory = lambda settings, role: ChatCompletions(
+        "https://gateway.example/v1",
+        "fixture",
+        max_retries=0,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    path = tmp_path / "three.json"
+    path.write_text(json.dumps(freeze_suite("three", [case("a"), case("b"), case("c")])))
     service.control.register_machine(
         "local", {"id": "container", "label": "Container", "mode": "container"}, local_only=True
     )
     service.control.register_suite("local", path)
     service.control.save(
         "local",
-        {**service.control.preferences("local"), "suite_id": "two", "machine_ids": ["container"]},
+        {**service.control.preferences("local"), "suite_id": "three", "machine_ids": ["container"]},
     )
     settings = Settings()
 
@@ -342,7 +337,7 @@ async def test_diagnostic_usage_gaps_follow_actual_shared_billing(
         "roami_agent.improvement.evaluation.execution.containers.ContainerExecutor", Executor
     )
     queued = enqueue_diagnostic(
-        service, "local", {"request_key": "shared-fees", "case_ids": ["a", "b"]}
+        service, "local", {"request_key": "gateway-fees", "case_ids": ["a", "b", "c"]}
     )
     await execute_diagnostic(
         SimpleNamespace(settings=SimpleNamespace(current=settings)),
@@ -350,30 +345,39 @@ async def test_diagnostic_usage_gaps_follow_actual_shared_billing(
         service.control.claim(),
     )
     run = service.runs.get("local", queued["id"])
-    assert len(calls) == len(executed) == (1 if prices else 2)
+    assert len(calls) == len(executed) == (1 if refused else 3)
     assert run["summary"]["generation_tokens"] is None
     assert run["summary"]["passed"] == 0
-    assert bool(run["summary"]["usage_blocker"]) is prices
-    usage = await proxy.billing.daily_summary()
-    assert usage["unknown"] == (1 if prices else 0)
-    if not prices:
-        await proxy.billing.check()
+    assert bool(run["summary"]["usage_blocker"]) is refused
+    if refused:
+        assert run["summary"]["usage_blocker"]["code"] == "MODEL_HTTP_402"
+        assert run["summary"]["not_run"] == 2
+        assert not any(i["code"] == "MODEL_HTTP_402" for i in run["issues"])
+    else:
         costs = RunCosts(service.runs, "local", run["id"])
         assert costs.reserve_operation("local", "today", "review", 64000) is None
-    else:
-        with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-            await proxy.billing.check()
+    archived = await store.call(
+        lambda db: [
+            dict(r) for r in db.execute("SELECT id,state,cost_amount FROM model_proxy_calls")
+        ]
+    )
+    assert archived == [{"id": "archived", "state": "unknown", "cost_amount": None}]
 
 
-def test_formal_unknown_usage_without_shared_billing_still_blocks_review(tmp_path):
+@pytest.mark.parametrize("shared", [False, True])
+def test_unknown_token_count_does_not_block_gateway_managed_review(tmp_path, shared):
     from roami_agent.improvement.persistence.run_costs import RunCosts
     from roami_agent.protocol.errors import DomainError
 
     service = ImprovementStatus(tmp_path)
-    service.ledger.shared_daily_limit = True
+    service.ledger.shared_daily_limit = shared
     ident = service.runs.create(
         "local", "unknown", "daily", {"pipeline": service.runs.settings("local")}
     )
     service.runs.set_state("local", ident, "report_queued", {"generation_tokens": None})
-    with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):
-        RunCosts(service.runs, "local", ident).reserve_operation("local", "today", "review", 64000)
+    costs = RunCosts(service.runs, "local", ident)
+    if shared:
+        assert costs.reserve_operation("local", "today", "review", 64000) is None
+    else:
+        with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):
+            costs.reserve_operation("local", "today", "review", 64000)

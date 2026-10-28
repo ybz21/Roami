@@ -1,20 +1,17 @@
 import { useSettingsDraft } from './settings-draft'
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Select, Spin, Switch, Tabs } from 'antd'
+import { App, Button, Input, Select, Spin, Switch } from 'antd'
 import { api } from '../../api'
 import { useCurrentNodeId } from '../cluster/node-url'
 import { RefreshIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { modelFailure, saveAgentModels, type AgentModelSettings } from '../agent/agent-models'
 import { genericReasoningEfforts, reasoningValue } from '../agent/agent-reasoning'
-import { ModelProxySettings, proxyConfig, proxyDraft, validProxyDraft, type ModelProxyDraft } from './model-proxy-settings'
-import { ModelPriceSettings } from './model-price-settings'
-import { readModelSettingsTab, writeModelSettingsTab, type ModelSettingsTab } from './model-settings-route'
 import './agent-settings.css'
 
-type Draft = { proxy: ModelProxyDraft; connection: { baseUrl: string; apiKey: string; keyConfigured: boolean }; main: AgentModelSettings['main']; worker: AgentModelSettings['worker'] }
-const settingsDraft = (data: AgentModelSettings): Draft => ({ proxy: proxyDraft(data.proxy), connection: { ...(data.connection || data.main), apiKey: '' }, main: { ...data.main }, worker: { ...data.worker } })
-const modelConfiguration = (draft: Draft) => ({ proxy: proxyConfig(draft.proxy), connection: { baseUrl: draft.connection.baseUrl.trim(), ...(draft.connection.apiKey.trim() ? { apiKey: draft.connection.apiKey.trim() } : {}) }, ...Object.fromEntries((['main', 'worker'] as const).map(role => [role, { model: draft[role].model.trim(), images: draft[role].images, contextWindow: draft[role].configuredContextWindow ?? null, reasoningEffort: draft[role].reasoningEffort ?? null }])) })
+type Draft = { connection: { baseUrl: string; apiKey: string; keyConfigured: boolean }; main: AgentModelSettings['main']; worker: AgentModelSettings['worker'] }
+const settingsDraft = (data: AgentModelSettings): Draft => ({ connection: { ...(data.connection || data.main), apiKey: '' }, main: { ...data.main }, worker: { ...data.worker } })
+const modelConfiguration = (draft: Draft) => ({ connection: { baseUrl: draft.connection.baseUrl.trim(), ...(draft.connection.apiKey.trim() ? { apiKey: draft.connection.apiKey.trim() } : {}) }, ...Object.fromEntries((['main', 'worker'] as const).map(role => [role, { model: draft[role].model.trim(), images: draft[role].images, contextWindow: draft[role].configuredContextWindow ?? null, reasoningEffort: draft[role].reasoningEffort ?? null }])) })
 
 export function AgentSettings() {
   const node = useCurrentNodeId()
@@ -23,12 +20,6 @@ export function AgentSettings() {
 function AgentSettingsForm() {
   const { t } = useI18n(), { message } = App.useApp()
   const [draft, setDraft] = useState<Draft | null>(null), [saved, setSaved] = useState<AgentModelSettings | null>(null)
-  const [tab, setTab] = useState<ModelSettingsTab>(readModelSettingsTab)
-  useEffect(() => {
-    const change = () => setTab(readModelSettingsTab())
-    window.addEventListener('hashchange', change)
-    return () => window.removeEventListener('hashchange', change)
-  }, [])
   const [error, setError] = useState(''), [saving, setSaving] = useState(false), [version, setVersion] = useState(0)
   const [efforts, setEfforts] = useState<Record<string, string[]>>({}), [models, setModels] = useState<string[] | null>(null)
   const [loadingModels, setLoadingModels] = useState(false), [catalogError, setCatalogError] = useState(''), [queries, setQueries] = useState({ main: '', worker: '' })
@@ -57,7 +48,7 @@ function AgentSettingsForm() {
     finally { if (!abort.signal.aborted) setLoadingModels(false) }
   }
   const save = async () => {
-    if (!draft || saving || loadingModels || !validProxyDraft(draft.proxy)) return
+    if (!draft || saving || loadingModels) return
     setSaving(true); setError('')
     try { hydrate(await saveAgentModels(modelConfiguration(draft))); message.success(t('agent.models.saved')) }
     catch (e) { setError(modelFailure(e, t)) } finally { setSaving(false) }
@@ -67,9 +58,8 @@ function AgentSettingsForm() {
   const dirty = !!saved && JSON.stringify(modelConfiguration(draft)) !== JSON.stringify(modelConfiguration(settingsDraft(saved)))
   return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void save() }}>
     {draftNotice}
-    <Tabs className="agent-settings-tabs" activeKey={tab} onChange={key => { const next = key as ModelSettingsTab; setTab(next); writeModelSettingsTab(next) }} items={[
-      { key: 'models', label: t('agent.models.configurationTab'), forceRender: true, children: <div className="agent-settings-tab">
-        <fieldset className="agent-settings-connection" disabled={saving || tab !== 'models'}>
+    <div className="agent-settings-tab">
+        <fieldset className="agent-settings-connection" disabled={saving}>
           <legend>{t('agent.models.connection')}</legend><p className="agent-settings-hint">{t('agent.models.connectionHint')}</p>
           <div className="agent-settings-connection-fields">
             <div className="agent-settings-field"><label htmlFor="agent-connection-url">{t('agent.models.baseUrl')}</label><Input id="agent-connection-url" type="url" value={draft.connection.baseUrl} onChange={event => { invalidateCatalog(); setDraft(current => current ? { ...current, connection: { ...current.connection, baseUrl: event.target.value }, main: { ...current.main, contextWindow: null, configuredContextWindow: null, reasoningEffort: null }, worker: { ...current.worker, contextWindow: null, configuredContextWindow: null, reasoningEffort: null } } : current) }} placeholder="https://api.example.com/v1" required maxLength={2000} /></div>
@@ -83,21 +73,20 @@ function AgentSettingsForm() {
           const query = queries[role].trim(), names = Array.from(new Set([...(draft[role].model ? [draft[role].model] : []), ...(models || [])]))
           const options = names.filter(name => name.toLowerCase().includes(query.toLowerCase())).map(value => ({ value, label: value, title: value }))
           if (query && !names.includes(query)) options.push({ value: query, label: t('agent.models.use', { name: query }), title: query })
-          return <fieldset className="agent-settings-role" key={role} disabled={saving || tab !== 'models'}>
+          return <fieldset className="agent-settings-role" key={role} disabled={saving}>
             <legend>{t('agent.models.role.' + role)}</legend><p className="agent-settings-hint">{t('agent.models.roleHint.' + role)}</p>
-            <div className="agent-settings-field"><label htmlFor={`agent-${role}-model`}>{t('agent.composer.model')}</label><Select id={`agent-${role}-model`} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.composer.model')} showSearch popupClassName="agent-model-settings-options" virtual={false} disabled={saving || tab !== 'models'} loading={loadingModels} value={draft[role].model || undefined} searchValue={queries[role]} filterOption={false} optionLabelProp="value" options={options} placeholder={t('agent.models.selectPlaceholder')} notFoundContent={t('agent.models.catalogEmpty')} onSearch={value => setQueries(current => ({ ...current, [role]: value.slice(0, 200) }))} onOpenChange={open => { setQueries(current => ({ ...current, [role]: '' })); if (open && models === null) void catalog() }} onChange={value => { update(role, { model: value, contextWindow: null, configuredContextWindow: null, reasoningEffort: null }); setQueries(current => ({ ...current, [role]: '' })) }} /></div>
-            <div className="agent-settings-field"><label htmlFor={`agent-${role}-effort`}>{t('agent.reasoning.title')}</label><Select id={`agent-${role}-effort`} disabled={saving || tab !== 'models'} virtual={false} aria-label={t('agent.reasoning.roleLabel', { role: t('agent.models.role.' + role) })} value={reasoningValue(draft[role].reasoningEffort)} options={['default', ...(efforts[draft[role].model] || genericReasoningEfforts)].map(value => ({ value, label: t('agent.reasoning.' + value) }))} onChange={value => update(role, { reasoningEffort: value === 'default' ? null : value })} /></div>
-            <details className="agent-model-advanced"><summary>{t('agent.models.advanced')}</summary><div className="agent-model-advanced-fields"><label htmlFor={`agent-${role}-window`}>{t('agent.models.contextWindow')}</label><Input id={`agent-${role}-window`} disabled={saving || tab !== 'models'} type="number" min={1} max={100000000} step={1} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.contextWindow')} value={draft[role].configuredContextWindow ?? ''} onChange={event => update(role, { configuredContextWindow: event.target.value ? Number(event.target.value) : null })} placeholder={t('agent.models.contextAuto')} />
+            <div className="agent-settings-field"><label htmlFor={`agent-${role}-model`}>{t('agent.composer.model')}</label><Select id={`agent-${role}-model`} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.composer.model')} showSearch popupClassName="agent-model-settings-options" virtual={false} disabled={saving} loading={loadingModels} value={draft[role].model || undefined} searchValue={queries[role]} filterOption={false} optionLabelProp="value" options={options} placeholder={t('agent.models.selectPlaceholder')} notFoundContent={t('agent.models.catalogEmpty')} onSearch={value => setQueries(current => ({ ...current, [role]: value.slice(0, 200) }))} onOpenChange={open => { setQueries(current => ({ ...current, [role]: '' })); if (open && models === null) void catalog() }} onChange={value => { update(role, { model: value, contextWindow: null, configuredContextWindow: null, reasoningEffort: null }); setQueries(current => ({ ...current, [role]: '' })) }} /></div>
+            <div className="agent-settings-field"><label htmlFor={`agent-${role}-effort`}>{t('agent.reasoning.title')}</label><Select id={`agent-${role}-effort`} disabled={saving} virtual={false} aria-label={t('agent.reasoning.roleLabel', { role: t('agent.models.role.' + role) })} value={reasoningValue(draft[role].reasoningEffort)} options={['default', ...(efforts[draft[role].model] || genericReasoningEfforts)].map(value => ({ value, label: t('agent.reasoning.' + value) }))} onChange={value => update(role, { reasoningEffort: value === 'default' ? null : value })} /></div>
+            <details className="agent-model-advanced"><summary>{t('agent.models.advanced')}</summary><div className="agent-model-advanced-fields"><label htmlFor={`agent-${role}-window`}>{t('agent.models.contextWindow')}</label><Input id={`agent-${role}-window`} disabled={saving} type="number" min={1} max={100000000} step={1} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.contextWindow')} value={draft[role].configuredContextWindow ?? ''} onChange={event => update(role, { configuredContextWindow: event.target.value ? Number(event.target.value) : null })} placeholder={t('agent.models.contextAuto')} />
               <p className="agent-settings-hint">{t('agent.models.contextHint')}{draft[role].contextWindow ? ' ' + t('agent.models.contextDetected', { count: draft[role].contextWindow }) : ''}</p>
-              <label className="agent-settings-switch"><span>{t('agent.models.images')}</span><Switch disabled={saving || tab !== 'models'} checked={draft[role].images} onChange={value => update(role, { images: value })} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.images')} /></label><p className="agent-settings-hint">{t('agent.models.imagesHint')}</p></div></details>
+              <label className="agent-settings-switch"><span>{t('agent.models.images')}</span><Switch disabled={saving} checked={draft[role].images} onChange={value => update(role, { images: value })} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.images')} /></label><p className="agent-settings-hint">{t('agent.models.imagesHint')}</p></div></details>
           </fieldset>
         })}</div>
         <p className="agent-settings-hint">{t('agent.reasoning.hint')}</p>
-      </div> },
-      { key: 'proxy', label: t('agent.proxy.tab'), forceRender: true, children: <ModelProxySettings value={draft.proxy} active={tab === 'proxy'} disabled={saving || tab !== 'proxy'} onChange={proxy => setDraft(current => current ? { ...current, proxy } : current)} snapshot={saved} /> },
-      { key: 'prices', label: t('agent.proxy.prices'), forceRender: true, children: <ModelPriceSettings value={draft.proxy} models={[draft.main.model, draft.worker.model]} catalog={models} loadingCatalog={loadingModels} catalogError={catalogError} loadCatalog={() => { void catalog() }} disabled={saving || tab !== 'prices'} onChange={proxy => setDraft(current => current ? { ...current, proxy } : current)} /> },
-    ]} />
+      <p className="agent-settings-hint">{t('agent.models.gatewayBilling')}</p>
+      {(() => { try { const url = new URL(draft.connection.baseUrl); if (!['http:', 'https:'].includes(url.protocol)) return null; url.username = ''; url.password = ''; url.pathname = '/'; url.search = ''; url.hash = ''; return <Button href={url.href} target="_blank" rel="noopener noreferrer">{t('agent.models.gatewayOpen')}</Button> } catch { return null } })()}
+    </div>
     {error && <p className="agent-settings-error" role="alert">{error}</p>}
-    <div className="agent-settings-save"><span role="status">{t(dirty ? 'agent.models.unsaved' : 'agent.models.savedState')}</span><Button disabled={!dirty || saving || loadingModels} onClick={() => { if (saved) { invalidateCatalog(); hydrate(saved); setError('') } }}>{t('agent.models.discard')}</Button><Button type="primary" htmlType="submit" loading={saving} disabled={!dirty || loadingModels || !validProxyDraft(draft.proxy) || !draft.main.model.trim() || !draft.worker.model.trim()}>{t('agent.models.save')}</Button><small>{t('agent.models.applyHint')}</small></div>
+    <div className="agent-settings-save"><span role="status">{t(dirty ? 'agent.models.unsaved' : 'agent.models.savedState')}</span><Button disabled={!dirty || saving || loadingModels} onClick={() => { if (saved) { invalidateCatalog(); hydrate(saved); setError('') } }}>{t('agent.models.discard')}</Button><Button type="primary" htmlType="submit" loading={saving} disabled={!dirty || loadingModels || !draft.main.model.trim() || !draft.worker.model.trim()}>{t('agent.models.save')}</Button><small>{t('agent.models.applyHint')}</small></div>
   </form>
 }

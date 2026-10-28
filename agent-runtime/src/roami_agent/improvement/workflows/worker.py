@@ -66,12 +66,6 @@ class EvaluationWorker:
                 pass
 
     async def execute(self, request):
-        from roami_agent.providers.model_proxy import model_accounting
-
-        with model_accounting(getattr(self.runtime, "model_proxy", None)):
-            return await self._execute(request)
-
-    async def _execute(self, request):
         from roami_agent.improvement.evaluation.execution.executors import (
             ExternalExecutor,
             NativeFilesExecutor,
@@ -81,10 +75,6 @@ class EvaluationWorker:
         if hasattr(self.service, "runs"):
             await asyncio.to_thread(self.service.run_lifecycle.begin_request, request)
         try:
-            proxy = getattr(self.runtime, "model_proxy", None)
-            if proxy is not None:
-                await proxy.ready()
-                await proxy.billing.check()
             if "diagnostic" in json.loads(request["payload_json"]):
                 from roami_agent.improvement.workflows.pipeline_runner import execute_diagnostic
 
@@ -224,7 +214,6 @@ class EvaluationWorker:
                 period_machines=prefs["machine_ids"],
                 source_builds=source_builds,
                 paired=baseline != candidate or source_builds is not None,
-                admission_check=proxy.billing.check if proxy is not None else None,
             )
             await asyncio.to_thread(
                 self.service.control.finish,

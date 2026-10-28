@@ -14,8 +14,6 @@ from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
 from roami_agent.improvement.integrations.spending_policy import (
-    check_usage_admission,
-    model_proxy_for,
     uses_shared_model_limit,
 )
 from roami_agent.improvement.persistence.diagnostic_requests import (
@@ -96,7 +94,6 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     owner, run_id, config = request["owner"], spec["run_id"], spec["config"]
     shared = uses_shared_model_limit(service.ledger)
     records = service.runs
-    proxy = model_proxy_for(service)
     records.set_state(owner, run_id, "running")
     records.node(owner, run_id, "evaluate", "running")
     suite = await asyncio.to_thread(load_suite, Path(payload["suite"]["path"]))
@@ -197,7 +194,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         "budget-plan.json",
         {
             "spending_policy": "shared_model_daily",
-            "admission": "model_proxy",
+            "admission": "go_gateway",
             "technical_timeout_seconds": 14400,
         }
         if shared
@@ -263,15 +260,16 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             if artifact_tokens is not None and review_tokens is not None
             else None
         )
-        if shared and proxy is not None and (budget.unknown or artifact_tokens is None):
-            await check_usage_admission(result, proxy.billing.check)
+        result.pop("shared_admission_managed", None)
+        if shared:
+            result["shared_admission_managed"] = True
         summary = trial_summary(original, result, target)
         if blocked_by is not None:
             summary["blocked_by"] = blocked_by
         elif usage_blocker is None:
             cause = None
             if (budget.unknown or artifact_tokens is None) and not result.get(
-                "shared_admission_checked"
+                "shared_admission_managed"
             ):
                 cause = result.get("admission_error") or "RSI_USAGE_UNKNOWN"
             elif not summary["passed"]:

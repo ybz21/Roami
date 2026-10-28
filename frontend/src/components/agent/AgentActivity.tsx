@@ -11,9 +11,9 @@ const attention = new Set(['failed', 'unknown', 'interrupted'])
 const toolNames: Record<string, string> = { session_send: 'send', target_search: 'find', target_resolve: 'resolve', workspace_overview: 'overview', delegate: 'delegate', task_status: 'status', shell: 'shell', memory_search: 'memory', memory_get: 'memory', browser_open: 'browserOpen', browser_act: 'browserAct', browser_observe: 'browserObserve' }
 const reasons: Record<string, string> = { MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired' }
 
-export function activityReason(code: string | null | undefined, t: (key: string) => string) {
+export function activityReason(code: string | null | undefined, t: (key: string) => string, fallback = 'agent.activity.failedReason') {
   if (modelProxyFailureKey(code)) return t(modelProxyFailureKey(code)!)
-  return t('agent.activity.' + (code && reasons[code] || 'failedReason'))
+  return t(code && reasons[code] ? 'agent.activity.' + reasons[code] : fallback)
 }
 
 const knownStates = new Set([...active, ...attention, 'succeeded', 'cancelled', 'waiting_user', 'accepted', 'delivered'])

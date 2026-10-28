@@ -86,7 +86,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v24-shared-cost-admission",
+                "container-uds-v25-go-gateway-admission",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )

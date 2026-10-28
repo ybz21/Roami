@@ -51,9 +51,6 @@ async def codex_json(workflow, action, config, key, messages, *, runner=run_code
         if proxy is not None
         else None
     )
-    if proxy is not None and (saved is None or saved.get("value", {}).get("admission_rejected")):
-        await proxy.ready()
-        await proxy.billing.check()
     if saved is None:
         saved = await asyncio.to_thread(
             workflow.reserve_operation,

@@ -115,6 +115,7 @@ def _run(records, owner, row, sequence, selected_id):
 
     verified, closed, verification_evidence = for_run(records, owner, value)
     blockers = {
+        "MODEL_HTTP_402",
         "MODEL_PROXY_DAILY_LIMIT",
         "MODEL_PROXY_USAGE_UNKNOWN",
         "MODEL_PROXY_CURRENCY_MISMATCH",

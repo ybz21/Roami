@@ -27,8 +27,23 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   }
   if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted' || event.kind === 'turn.deferred') {
     const deferred = event.kind === 'turn.deferred'
-    next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state: deferred ? 'queued' : event.kind.slice(5) } : turn)
+    const state = deferred ? 'queued' : event.kind.slice(5)
+    next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state } : turn)
+    if (typeof data.turnId === 'string' && !next.turns.some(turn => turn.id === data.turnId)) next.turns = [...next.turns, { id: data.turnId, state }]
     next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: deferred ? 'interrupted' : event.kind.slice(5) } : message)
+    if (!deferred) {
+      const messages = view.messages.filter(message => message.turn_id === data.turnId)
+      const anchor = messages[messages.length - 1]
+      const activity: AgentActivityItem = {
+        id: 'turn:' + data.turnId, kind: 'turn', name: 'reply',
+        anchorMessageId: anchor?.id || '', state: event.kind.slice(5),
+        startedMs: messages[0]?.created_ms ?? event.created_ms ?? 0,
+        updatedMs: event.created_ms ?? messages[0]?.created_ms ?? 0,
+        errorCode: typeof data.error === 'string' ? data.error : null,
+      }
+      next.activities = [...(view.activities || []).filter(item => item.id !== activity.id), activity]
+        .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
+    }
     return { view: next, reload: true }
   }
   if (event.kind === 'message.tool_calls') {

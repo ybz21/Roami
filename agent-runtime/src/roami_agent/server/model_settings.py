@@ -6,6 +6,7 @@ import os
 import stat
 import tempfile
 from contextlib import suppress
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,7 +14,6 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_value
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
-from roami_agent.providers.model_billing import proxy_configuration
 from roami_agent.providers.model_catalog import fetch_catalog
 from roami_agent.providers.reasoning_effort import reasoning_efforts, with_reasoning_effort
 
@@ -58,14 +58,12 @@ def read_saved(root):
         saved = json.loads(path.read_text())
         if not isinstance(saved, dict) or set(saved) - {"main", "worker", "connection", "proxy"}:
             raise ValueError
-        proxy_configuration(saved.get("proxy"))
         return saved
     except (ValueError, OSError):
         raise DomainError("MODEL_SETTINGS_INVALID", 503) from None
 
 
 def effective_settings(base, saved, *, credentials=True):
-    proxy_configuration(saved.get("proxy"))
     connection = saved.get("connection")
     if connection is not None and (
         not isinstance(connection, dict)
@@ -193,22 +191,17 @@ class ModelSettings:
             "baseUrl": result["main"]["baseUrl"],
             "keyConfigured": result["main"]["keyConfigured"],
         }
-        result["proxy"] = proxy_configuration(self.saved.get("proxy"))
+        result["gatewayManaged"] = True
         return result
 
     def merge(self, patch):
         if (
             not isinstance(patch, dict)
             or not patch
-            or set(patch) - {"main", "worker", "connection", "proxy"}
+            or set(patch) - {"main", "worker", "connection"}
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
-        saved = {role: dict(value) for role, value in self.saved.items()}
-        if "proxy" in patch:
-            changes = patch["proxy"]
-            if isinstance(changes, dict) and self.saved.get("proxy") is not None:
-                changes = {**proxy_configuration(self.saved["proxy"]), **changes}
-            saved["proxy"] = proxy_configuration(changes)
+        saved = deepcopy(self.saved)
         if "connection" in patch:
             changes = patch["connection"]
             if not isinstance(changes, dict) or set(changes) - {"baseUrl", "apiKey"}:

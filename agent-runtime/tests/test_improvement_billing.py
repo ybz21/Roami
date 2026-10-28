@@ -51,7 +51,7 @@ def codex_responses(monkeypatch):
 
     monkeypatch.setattr(CodexProxy, "__init__", initialize)
 
-    async def request(argv, env, *, complete=True):
+    async def request(argv, env, *, complete=True, expected=200):
         settings = dict(value.split("=", 1) for flag, value in pairwise(argv) if flag == "-c")
         address = next(
             json.loads(value) for key, value in settings.items() if key.endswith(".base_url")
@@ -62,7 +62,9 @@ def codex_responses(monkeypatch):
                 headers={"X-Roami-Rsi-Key": env["ROAMI_RSI_CODEX_PROXY_KEY"]},
                 json={"complete": complete},
             )
-        assert response.status_code == 200
+        if expected is not None:
+            assert response.status_code == expected
+        return response
 
     return request
 
@@ -120,8 +122,12 @@ async def test_codex_turns_are_priced_once_and_limit_rejection_does_not_poison_t
 
     async def runner(argv, **kwargs):
         calls.append(1)
-        await codex_responses(argv, kwargs["env"])
-        return {"stdout": codex_events(), "stderr": "", "exitCode": 0}
+        response = await codex_responses(argv, kwargs["env"], expected=None)
+        return {
+            "stdout": codex_events(),
+            "stderr": "",
+            "exitCode": 0 if response.status_code == 200 else 1,
+        }
 
     action = {"id": "priced-codex", "owner": "owner", "kind": "review"}
     with model_accounting(proxy):
@@ -134,17 +140,20 @@ async def test_codex_turns_are_priced_once_and_limit_rejection_does_not_poison_t
         assert first == cached and len(calls) == 1
         with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
             await codex_json(workflow, action, config, "two", [], runner=runner)
-        assert workflow.operation_result("owner", "priced-codex:two") is None
+        rejected = workflow.operation_result("owner", "priced-codex:two")["value"]
+        assert rejected["admission_rejected"] and rejected["metrics"]["tokens"] == 0
         pricing["dailyLimit"] = 1
         await codex_json(workflow, action, config, "two", [], runner=runner)
-    assert len(calls) == 2
+    assert len(calls) == 3
     summary = await proxy.billing.view(days=1)
     assert summary["localEstimated"] == 2 and summary["unknown"] == 0
     assert summary["localCharges"] == [{"currency": "USD", "amount": "0.000684"}]
     assert all(row["model"] == "fixture" for row in summary["recent"])
 
 
-async def test_native_spending_also_stops_codex_before_process_launch(store, tmp_path, monkeypatch):
+async def test_native_spending_is_rejected_by_the_legacy_transport(
+    store, tmp_path, monkeypatch, codex_responses
+):
     workflow, config, *_ = await setup(tmp_path)
     home = tmp_path / "codex-settings"
     home.mkdir()
@@ -156,8 +165,10 @@ async def test_native_spending_also_stops_codex_before_process_launch(store, tmp
     await proxy.billing.settle(call, (100, 20, 0), charge=UpstreamCharge(Decimal(1), "USD"))
     calls = []
 
-    async def runner(*args, **kwargs):
+    async def runner(argv, **kwargs):
         calls.append(1)
+        await codex_responses(argv, kwargs["env"], expected=429)
+        return {"stdout": "", "stderr": "Daily limit", "exitCode": 1}
 
     with model_accounting(proxy), pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
         await codex_json(
@@ -168,7 +179,7 @@ async def test_native_spending_also_stops_codex_before_process_launch(store, tmp
             [],
             runner=runner,
         )
-    assert calls == []
+    assert calls == [1]
 
 
 async def test_missing_codex_usage_stays_unknown_and_cannot_replay(

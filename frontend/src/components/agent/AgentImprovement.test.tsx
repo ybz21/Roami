@@ -22,7 +22,7 @@ vi.mock('antd', () => ({
 const id = 'a'.repeat(64), earlier = 'b'.repeat(64)
 beforeEach(() => {
   state.modelsFailed = false; state.requests = []
-  state.models = { proxy: { dailyLimit: 10, currency: 'USD' } }
+  state.models = { gatewayManaged: true }
   state.overview = {
     preferences: { revision: 1, enabled: true, timezone: 'Asia/Shanghai', hour: 3, daily_tokens: 0, daily_episodes: 120, cases_per_day: 60, suite_id: 'formal', machine_ids: ['a'], auto_candidates: false, candidate_policy: {} },
     catalog: { machines: [{ id: 'a', label: 'A', mode: 'container' }], suites: [{ id: 'formal', count: 60 }] },
@@ -59,7 +59,7 @@ it('retains case display metadata and expanded lists across tabs', () => {
 it('shows the model-page daily amount without RSI token fields', () => {
   render(<AgentImprovement node={null} />)
   fireEvent.click(screen.getByRole('button', { name: '设置' }))
-  expect(screen.getByText('US$10.00')).toBeTruthy()
+  expect(screen.getByText('由模型网关管理')).toBeTruthy()
   expect(screen.queryByLabelText(/Token/)).toBeNull()
   expect(screen.queryByText(/每次准入预算/)).toBeNull()
 })
@@ -86,4 +86,14 @@ it('does not show a missing model configuration as unlimited', () => {
   fireEvent.click(screen.getByRole('button', { name: '设置' }))
   expect(screen.queryByText('不限额')).toBeNull()
   expect(screen.getByText(zhCN['agent.rsi.loadFailed'])).toBeTruthy()
+})
+
+
+it('shows gateway quota recovery instead of an unknown-usage warning', () => {
+  state.detail.runs[1].blocker = 'MODEL_HTTP_402'
+  render(<AgentImprovement node={null} />)
+  expect(screen.getByRole('status').textContent).toContain(zhCN['agent.models.gatewayQuota'])
+  expect(screen.queryByText(zhCN['agent.rsiPrototype.usageUnknownHint'])).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: zhCN['agent.rsiPrototype.modelPage'] }))
+  expect(window.location.hash).toBe('#/settings/agent/runtime?modelTab=models')
 })

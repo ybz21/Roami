@@ -105,6 +105,7 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
             "RSI_REQUEST_BUDGET",
             "UPSTREAM_USAGE_UNKNOWN",
             "RSI_USAGE_UNKNOWN",
+            "MODEL_HTTP_402",
             "MODEL_PROXY_DAILY_LIMIT",
             "MODEL_PROXY_USAGE_UNKNOWN",
             "MODEL_PROXY_CURRENCY_MISMATCH",

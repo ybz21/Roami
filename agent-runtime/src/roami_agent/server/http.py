@@ -528,8 +528,16 @@ def create_app(runtime, *, manage_lifecycle=True):
         day: str | None = Query(default=None, max_length=10),
     ):
         ModelSettings.owner(owner)
-        await runtime.model_proxy.ready()
-        return {"data": await runtime.model_proxy.billing.view(days=days, day=day)}
+        from roami_agent.providers.model_billing import ModelBilling
+
+        history = ModelBilling(runtime.db, lambda: None, lambda: runtime.settings.memory_timezone)
+        return {
+            "data": {
+                **await history.view(days=days, day=day),
+                "archived": True,
+                "gatewayManaged": True,
+            }
+        }
 
     @app.put("/v1/model-settings")
     async def save_model_settings(request: Request, owner: Owner):
