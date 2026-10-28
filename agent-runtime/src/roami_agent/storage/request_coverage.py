@@ -6,6 +6,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.tools import object_schema
 from roami_agent.storage.database import event, row
+from roami_agent.storage.request_quotes import MAX_QUOTE_LENGTH, source_quote
 from roami_agent.storage.task_handoff import accepted_handoffs
 
 
@@ -14,10 +15,15 @@ def coverage_schema():
         "type": "array",
         "minItems": 1,
         "maxItems": 24,
-        "description": "All user outcomes. current=this handoff; delegated needs accepted taskId; answered=delivered.",
+        "description": "Independent outcomes; keep constraints together. current=handoff; delegated needs taskId.",
         "items": object_schema(
             {
-                "quote": {"type": "string", "minLength": 1, "maxLength": 8000},
+                "quote": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_QUOTE_LENGTH,
+                    "description": "Source text, punctuation and paths.",
+                },
                 "status": {
                     "type": "string",
                     "enum": ["pending", "answered", "current", "delegated", "blocked"],
@@ -62,8 +68,14 @@ def check_coverage(db, binding, args, *, handoff=False):
     if not source:
         raise DomainError("REQUEST_COVERAGE_SOURCE_REQUIRED")
     text = json.loads(source["content_json"]).get("text", "")
+    prior_quotes = [item["quote"] for item in previous]
+    outcomes = [
+        dict(item, quote=source_quote(text, item["quote"], prior_quotes)) for item in outcomes
+    ]
     quotes = [item["quote"] for item in outcomes]
-    if len(set(quotes)) != len(quotes) or any(not q.strip() or q not in text for q in quotes):
+    if len(set(quotes)) != len(quotes) or any(
+        q is None or len(q) > MAX_QUOTE_LENGTH for q in quotes
+    ):
         raise DomainError("REQUEST_COVERAGE_SOURCE_REQUIRED")
     if any(item["quote"] not in quotes for item in previous):
         raise DomainError("REQUEST_OUTCOME_DROPPED")

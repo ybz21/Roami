@@ -23,6 +23,7 @@ from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.transcript_repository import message
+from roami_agent.tools.request_coverage_recovery import request_coverage_recovery
 
 
 class ToolGateway:
@@ -201,11 +202,7 @@ class ToolGateway:
             }:
                 value.update(
                     executionStarted=False,
-                    recovery="Reconcile every independent outcome in the current user message with requestCoverage. "
-                    "Keep prior quotes; use only exact source quotes and actual accepted taskIds. "
-                    "Hand off pending repairs before ending; acknowledgements and promises are not delivery. "
-                    "Exactly ONE independent outcome is current per handoff; keep others pending. sourceQuote must equal that current quote. "
-                    "Do not repeat already accepted work. Use requestComplete=false while another part remains.",
+                    recovery=request_coverage_recovery(operation_name),
                 )
             if value["error"] == "FILE_CHANGED":
                 value["recovery"] = (
