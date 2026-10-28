@@ -400,3 +400,16 @@ rm -rf ~/.roami                                # 配置 + 数据 + 蜂群 meta.d
 | 浏览器标签连不上 | 确认装了 `google-chrome`；检查 `TTMUX_CHROME_CDP` 指向的端口。 |
 | 忘了口令 | 在控制台 **设置 → 修改密码** 里改；或编辑 `~/.roami/config.yaml` 的 `web.password` 后 `./start.sh stop && ./start.sh`。 |
 | 看后端日志 | `./start.sh logs`（默认 `/tmp/ttmux-web.log`）。 |
+
+### 独立 MCP 后台服务（Linux 用户级 systemd）
+
+MCP 可由节点上的独立进程维护。开启后即自动心跳和断线重连；Web 和 Agent 停止或重启不结束其上游连接。首次部署独立服务时，在同一节点环境中执行：
+
+```bash
+roami agent mcp install
+roami agent mcp status
+```
+
+源码安装可指定 `--runtime-dir /absolute/path/agent-runtime`。安装器将当前环境保存到节点的私有文件，用于解析 MCP 凭据引用；不要把该文件上传或提交。按实例命名的用户 systemd 单元独立启用并自动重启，不设置 Web/Agent 的依赖或联动停止关系。首次由原进程内模式切换时需重启一次 Agent 来采用本机客户端；以后添加、编辑、开启、停用或删除 MCP 都通过配置同步生效，不需要重启服务。
+
+独立服务自身升级或退出时，上游连接需要重新建立；已经发出的工具调用不会自动重放。守护不可用时 Agent 显示重连，不退回进程内模式另起连接。其他服务管理器可使用 `roami agent mcp serve` 并配置 `ROAMI_MCP_SOCKET`；`install` 仅支持用户级 systemd，不自动修改系统级服务或 launchd。

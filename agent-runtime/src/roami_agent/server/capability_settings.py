@@ -118,13 +118,7 @@ class CapabilitySettings:
                     "displayName": connection.display_name or name,
                     "description": connection.description,
                     "transport": connection.config.get("transport", "stdio"),
-                    "state": "connected"
-                    if connection.session
-                    else "reconnecting"
-                    if connection.enabled
-                    else "unavailable"
-                    if connection.failures
-                    else "not_connected",
+                    "state": self.runtime.mcp.state(connection),
                     "tools": len(connection.names),
                     "toolNames": sorted(connection.names),
                 }
