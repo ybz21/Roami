@@ -103,10 +103,11 @@ async def test_untrusted_loopback_request_cannot_spend_or_forward_credentials(st
 
 
 @pytest.mark.parametrize(("complete", "charged"), [(False, True), (True, False)])
-async def test_incomplete_or_unpriced_codex_receipt_blocks_following_calls(
-    store, complete, charged
+@pytest.mark.parametrize("priced", [False, True])
+async def test_codex_missing_receipt_uses_zero_default_or_configured_prices(
+    store, complete, charged, priced
 ):
-    proxy, _ = proxy_for(store, limit=1, prices=False)
+    proxy, _ = proxy_for(store, limit=1, prices=priced)
     requests = []
 
     def handler(request):
@@ -131,8 +132,16 @@ async def test_incomplete_or_unpriced_codex_receipt_blocks_following_calls(
         response = await client.post(
             bridge.url + "/responses", json={"input": "x"}, headers=headers
         )
-        assert response.json()["error"]["code"] == "MODEL_PROXY_USAGE_UNKNOWN"
-    assert len(requests) == 1 and (await proxy.billing.view())["unknown"] == 1
+        blocked = priced and not complete
+        if blocked:
+            assert response.json()["error"]["code"] == "MODEL_PROXY_USAGE_UNKNOWN"
+        else:
+            assert response.status_code == 200
+    view = await proxy.billing.view()
+    assert len(requests) == (1 if blocked else 2)
+    assert view["unknown"] == int(blocked)
+    if not priced:
+        assert view["charges"] == [{"currency": "USD", "amount": "0"}]
 
 
 async def test_route_is_ephemeral_and_keeps_original_settings_unmodified(store):

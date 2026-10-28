@@ -228,6 +228,18 @@ authority, it just no longer moves the layout under the user a beat after load.
 
 # Gates
 
+<section id="unpriced-model-zero-default-20261028" lang="zh-CN">
+  <h2>未配置模型单价按零使用 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>未配置单价的模型按零价兜底，不再因无费用回执被每日限额拦住。有效上游费用回执仍优先计费；已有非零单价、实际消费、历史估算与限额规则保持有效。零金额不因币种不同阻断后续调用。</p>
+  <h3>User Stories</h3>
+  <ul><li>不填写模型单价也能连续使用主、后台与记忆模型；缺用量、失败或流中断不会因默认零价锁住后续请求。</li><li>升级后，旧的无单价未知账目自动按零价估算恢复，保留已有 Token、错误及失败状态；上游真实消费仍计入每日限额。</li></ul>
+  <h3>Technical Design</h3>
+  <p>providers/model_billing.py 在准入时为没有单价的模型冻结当前限额币种的零价快照，结算优先采用有效上游回执，否则零价无需假设 Token 即可结算为本地零估算。model_pricing.py 提供零价判定，非零价格仍要求完整用量。恢复在原事务内处理缺快照或零价快照的未知记录，不改已有金额及历史估算，不新增 schema、接口、轮询或前端控件。</p>
+  <h3>验收记录</h3>
+  <p>代理、定价、统计与 Codex 代理定向 120 项通过，修复前代码在新增连续请求回归中因 MODEL_PROXY_USAGE_UNKNOWN 失败。隔离私有 tmux 环境内，真实本地 HTTP SSE 上游验证旧无价格未知记录恢复，主／后台连续三次请求均按零价记账；上游返回 USD 0.125 后保留原金额，限额 0.1 阻止第五次网络请求。证据入口 /tmp/unpriced-model-20261028/index.html；测试上游和私有 tmux 已清理，无付费模型调用，未修改现用服务。本次无前端代码及产品文案改动。</p>
+</section>
+
 <section id="task-followup-routing-20261026" lang="zh-CN">
   <h2>任务续办、完整交办与会话名称 · 2026-10-26</h2>
   <h3>Product Design</h3>

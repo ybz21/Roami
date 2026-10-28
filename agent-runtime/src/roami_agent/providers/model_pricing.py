@@ -55,6 +55,10 @@ class ConfiguredCharge:
     currency: str
 
 
+def is_zero_price(rate):
+    return rate.get("input") == rate.get("output") == 0 and rate.get("cacheRead") in {None, 0}
+
+
 def local_charge(rate, counts):
     input_tokens, output_tokens, cached_tokens = counts
     cached_rate = rate["input"] if rate["cacheRead"] is None else rate["cacheRead"]
