@@ -86,7 +86,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v25-go-gateway-admission",
+                "container-uds-v26-committed-answer-workspace-replay",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -177,7 +177,7 @@ class ContainerExecutor:
         if self.shared_daily_limit:
             labels = detail.get("Config", {}).get("Labels") or {}
             require(
-                labels.get("org.roami.rsi.shared-daily-policy") == "2",
+                labels.get("org.roami.rsi.shared-daily-policy") == "3",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
         self.image_id = detail["Id"]
@@ -202,10 +202,19 @@ class ContainerExecutor:
     async def remove(self, name, label):
         await remove_container(name, label)
 
-    async def sandbox(self, workspace, program, *, input=None, timeout=60, runtime=False):
+    async def sandbox(
+        self, workspace, program, *, input=None, timeout=60, runtime=False, copy_workspace=False
+    ):
         if not self.image_id:
             await self.preflight()
         name = "roami-rsi-grade-" + secrets.token_hex(10)
+        if copy_workspace:
+            # Copy inside the sandbox so artifact symlinks never traverse the host filesystem.
+            program = (
+                "import shutil\n"
+                'shutil.copytree("/replay-input", "/workspace", dirs_exist_ok=True, symlinks=True)\n'
+                + program
+            )
         await docker_command(
             "create",
             "--interactive",
@@ -235,7 +244,15 @@ class ContainerExecutor:
             "--shm-size",
             "256m",
             "--mount",
-            f"type=bind,src={workspace},dst=/workspace,readonly",
+            f"type=bind,src={workspace},dst={'/replay-input' if copy_workspace else '/workspace'},readonly",
+            *(
+                [
+                    "--tmpfs",
+                    f"/workspace:rw,size=536870912,mode=0700,uid={os.getuid()},gid={os.getgid()}",
+                ]
+                if copy_workspace
+                else []
+            ),
             "-e",
             "HOME=/tmp/home",
             "--workdir",

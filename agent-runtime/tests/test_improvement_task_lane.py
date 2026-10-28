@@ -470,7 +470,7 @@ async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers
 
 
 @pytest.mark.parametrize("shared", [False, True])
-@pytest.mark.parametrize("version", [None, "1", "2"])
+@pytest.mark.parametrize("version", [None, "1", "2", "3"])
 async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
     tmp_path, monkeypatch, shared, version
 ):
@@ -483,7 +483,7 @@ async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
 
     monkeypatch.setattr(containers, "docker_command", docker)
     executor = containers.ContainerExecutor(Settings(), shared_daily_limit=shared)
-    if shared and version != "2":
+    if shared and version != "3":
         with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
             await executor.preflight()
         assert executor.image_id is None

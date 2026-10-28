@@ -1,0 +1,15 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>已提交答案与工作区重跑</title><link rel="stylesheet" href="../../assets/design.css"></head><body><main>
+<p><a href="../README.md">RSI 设计修订与验收记录</a></p>
+<h1>已提交答案与工作区重跑 · 2026-10-28</h1>
+<h2>Product Design</h2>
+<p>验收任务最终提交的答案，自动产物通知单独保留。量化脚本在独立可写工作区重跑，支持公开的 /workspace 路径与本地模块；原始生成文件与失败记录保持不变。严格的数值和结构判定继续拒绝解释文字、错误结果和未重新生成的旧结果。</p>
+<h2>User Stories</h2>
+<ul><li>主智能体已正确回答数值题时，后续产物链接不会替换答案导致误判。</li><li>脚本使用 /workspace 绝对路径、相对路径或子目录模块时，都能按同一公开环境验证。</li><li>我能区分旧失败、适配修正的零模型重放和新的完整真实运行，不能将修正误判计为模型优化收益。</li></ul>
+<h2>Technical Design</h2>
+<p>evaluation/execution/executors.py 的 committed_answer 按当前 turn_id 和消息来源区分 content.source=task 的交付通知，排除带工具调用的中间消息，逐轮与最终评分复用相同选择。有本轮 Main 文本时优先使用；没有时沿用既有交付文本，不剥离链接或解释，数值判定器仍要求完整字符串为数值。</p>
+<p>containers.py 的 sandbox(copy_workspace=True) 将原目录只读挂载到 /replay-input，在容器私有、限额 512 MiB 的 tmpfs /workspace 中复制完整目录。复制在容器内部进行，保留符号链接，不在宿主机追踪产物链接。保持禁用网络、只读根文件系统、非 root 用户、无提权及原资源限制。QUANT 重跑从副本删除既有输出后执行 analysis.py，保留子目录模块与绝对路径语义，不能沿用旧结果。</p>
+<p>共享镜像标签升级为 org.roami.rsi.shared-daily-policy=3，拒绝旧子进程答案选择协议；执行器协议身份升级至 container-uds-v26-committed-answer-workspace-replay。镜像继续移除宿主 Case、输入生成及判定模块，不向执行模型提供答案。</p>
+<h2>验收证据</h2>
+<p>定向 123 项通过。实际冻结 Docker 验证绝对路径、相对路径、子目录模块、符号链接和空执行五种情况；原始目录哈希不变，空执行不会沿用既有结果。九组消息反例验证错误 Main 答案不会被正确任务通知覆盖、带解释的答案仍失败、仅交付通知时保留原严格判定，前轮 Main 不遮盖新一轮交付。</p>
+<p>真实 v18 QUANT-05 产物副本零模型重放全部客观检查通过；原文件及失败账目未改。FinQA 真实存储对话中 Main 的 0.5759312320916905 符合原 0.57593 容差，后续 task 通知附链接造成的旧误判可复现，按来源选择后通过。证据为 /tmp/roami-rsi-verification-proof-20261028/proof.json。两项不代表新完整套件通过，也不替代人工校准和完整日观察。</p>
+</main></body></html>
