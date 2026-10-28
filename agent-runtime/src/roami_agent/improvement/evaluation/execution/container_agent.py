@@ -3,15 +3,47 @@
 import asyncio
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
 
+from roami_agent.improvement.domain.contracts import require
 from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
 from roami_agent.improvement.integrations.artifact_files import private_json
+from roami_agent.protocol.image_limits import ImageLimits
 from roami_agent.protocol.model_routes import settings_with_route
 from roami_agent.providers.factory import configured_provider
 from roami_agent.server.configuration import Settings
+
+
+def container_settings(request):
+    settings = Settings(
+        endpoint="http://localhost/v1/main",
+        model="main",
+        key_env="RSI_NO_PROVIDER_KEY",
+        worker_model="worker",
+        model_retries=0,
+    )
+    image_input = request.get("worker_image_input")
+    if image_input is None:
+        return settings
+    require(
+        isinstance(image_input, dict)
+        and set(image_input) == {"enabled", "limits"}
+        and type(image_input["enabled"]) is bool,
+        "RSI_CONTAINER_MODEL_INPUT_INVALID",
+    )
+    ImageLimits.configured(image_input["limits"])
+    return settings_with_route(
+        settings,
+        "worker",
+        replace(
+            settings.route("worker"),
+            capabilities={"images": image_input["enabled"]},
+            image_limits=image_input["limits"],
+        ),
+    )
 
 
 async def main():
@@ -26,18 +58,10 @@ async def main():
         split="development",
         category="CONTAINER",
     )
-    settings = Settings(
-        endpoint="http://localhost/v1/main",
-        model="main",
-        key_env="RSI_NO_PROVIDER_KEY",
-        worker_model="worker",
-        model_retries=0,
-    )
+    settings = container_settings(request)
 
     # Configure each provider with a separate Unix-socket transport to the host's budget gateway.
     def via_gateway(settings_, role):
-        from dataclasses import replace
-
         actual = "main" if role == "main" else "worker"
         route = settings_.route(actual)
         route = replace(route, endpoint="http://localhost/v1/" + role, name=actual)
