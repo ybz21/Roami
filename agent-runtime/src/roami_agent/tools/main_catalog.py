@@ -3,6 +3,7 @@
 import json
 
 from roami_agent.dispatch.routing import public_routing, routing_schema
+from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
@@ -440,12 +441,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "runId"
                 ):
                     continue
-                captured = row(
-                    db,
-                    "SELECT MAX(captured_ms) AS latest FROM resource_observations WHERE task_id=? AND run_id=? "
-                    "AND length(trim(json_extract(body_json,'$.domText')))>0",
-                    (item["id"], attempt["runId"]),
-                )["latest"]
+                sources = retrieved_sources(db, item, {"id": attempt["runId"]})
+                captured = max((source["retrievedMs"] for source in sources), default=None)
                 completion_report = bool(turn and turn["trigger_kind"] == "completion")
                 fresh = bool(turn and captured and captured >= turn["created_ms"])
                 attempt["retrievalEvidence"] = {
@@ -696,7 +693,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                                 "archived": {"type": "boolean"},
                                 "resourceOnly": {
                                     "type": "boolean",
-                                    "description": "Browser navigation/observation only, not all read-only work. User-authorized local machine operations independent of project files use bash scope=host in Main, without a task or directory.",
+                                    "description": "External lookup without preparing a coding workspace. Enabled Skills, MCP and CLI remain available. User-authorized local host operations use bash scope=host in Main.",
                                 },
                                 "state": {"type": "string", "enum": ["live"]},
                             },

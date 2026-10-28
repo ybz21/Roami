@@ -8,7 +8,6 @@ from copy import deepcopy
 from dataclasses import replace
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.research import research_call_allowed
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
@@ -37,7 +36,6 @@ WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
     "task_queue_reply",
     "reply",
 }
-RESEARCH_FOUNDATIONS = {"read", "bash", "tool_list"}
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 
 
@@ -53,10 +51,6 @@ class ToolDirectory:
             and tool.name not in FILE_OPERATIONS
             and tool.name != "web_research"
             and (role != "main" or tool.main or tool.name == "artifact_read")
-            and (
-                role != "research"
-                or tool.name in {"browser_open", "browser_observe", "browser_act"}
-            )
         ]
 
     def list(self, query="", kind="all", limit=10, role="main", offset=0):
@@ -64,11 +58,7 @@ class ToolDirectory:
         entries = []
         if "read" not in self.registry.disabled_tools:
             for name, value in self.registry.skills.items():
-                if (
-                    name in self.registry.disabled_skills
-                    or role == "research"
-                    and name != "browser_use"
-                ):
+                if name in self.registry.disabled_skills:
                     continue
                 entries.append(
                     {
@@ -185,7 +175,7 @@ class ToolDirectory:
             "hint": (
                 "Local capabilities callable in this role only, not web search results. Zero matches "
                 "do not prove a worker lacks integrations or external services are unavailable. "
-                "For requested external facts, retrieve sources through a delegated browser lookup."
+                "For external facts, use the requested enabled MCP or an appropriate delegated browser lookup."
             ),
             "catalogVersion": version,
             "items": [item for _, _, item in selected[offset : offset + limit]],
@@ -253,16 +243,15 @@ class ToolDirectory:
                 ["screenshot", "--resource", "RESOURCE_ID"],
                 ["goto", "URL", "--observation", "OBSERVATION_ID"],
             ]
-            if role != "research":
-                browser_commands.extend(
-                    [
-                        ["observe", "--target", "TARGET_ID"],
-                        ["click", "SELECTOR", "--observation", "OBSERVATION_ID"],
-                        ["fill", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
-                        ["type", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
-                        ["press", "KEY", "--observation", "OBSERVATION_ID"],
-                    ]
-                )
+            browser_commands.extend(
+                [
+                    ["observe", "--target", "TARGET_ID"],
+                    ["click", "SELECTOR", "--observation", "OBSERVATION_ID"],
+                    ["fill", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
+                    ["type", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
+                    ["press", "KEY", "--observation", "OBSERVATION_ID"],
+                ]
+            )
             entries.append(
                 {
                     "id": "cli:roami chrome",
@@ -367,8 +356,6 @@ class ToolDirectory:
                     },
                 )
             else:
-                if role == "research":
-                    raise DomainError("TOOL_UNAVAILABLE")
                 return replace(self.registry.registry["file_read"], main=True), args
         elif tool.name in {"edit", "write"}:
             name = "file_patch" if tool.name == "edit" else "file_write"
@@ -391,8 +378,6 @@ class ToolDirectory:
                 return self.help_tool(argv, role)
             operation = self.operation(argv)
             if operation is None:
-                if role == "research":
-                    raise DomainError("TOOL_UNAVAILABLE")
                 argv = self.argv(args)
                 if (
                     argv
@@ -417,8 +402,6 @@ class ToolDirectory:
         if not original or name in self.registry.disabled_tools:
             raise DomainError("TOOL_DISABLED" if original else "TOOL_UNAVAILABLE")
         validate_tool_arguments(original.schema, args)
-        if role == "research" and not research_call_allowed(name, args):
-            raise DomainError("TOOL_UNAVAILABLE")
         return original, args
 
 
@@ -434,10 +417,7 @@ def register_foundations(registry, settings):
             binding.get("role", "main"),
             args.get("offset", 0),
         )
-        if binding.get("role", "main") != "research":
-            result["availability"] = await registry.registry["capability_overview"].handler(
-                {}, binding
-            )
+        result["availability"] = await registry.registry["capability_overview"].handler({}, binding)
         return result
 
     async def bash(args, binding):
@@ -468,10 +448,13 @@ def register_foundations(registry, settings):
     async def resolved_only(args, binding):
         raise DomainError("INVALID_TOOL_ARGUMENTS")
 
+    # Built-in tools are supplied directly; tool_list discovers extra capabilities.
     registry.add(
         Tool(
             "tool_list",
-            "List local MCP, Skill and CLI capabilities callable in this role, with name/intent/category filters and pagination. Returns skill:// paths or exact bash argv and schemas. Known operations can run directly. This is not web results or an external service/pricing directory; empty matches do not prevent delegated browser lookup.",
+            "Discover extra Skills, MCP and CLI capabilities; built-in tools are already supplied. "
+            "Filter by name/intent/category and paginate. Returns skill:// paths or exact bash argv and schemas. "
+            "Known operations can run directly. This is a local capability directory, not web results or service pricing.",
             object_schema(
                 {
                     "query": {"type": "string", "maxLength": 1000},

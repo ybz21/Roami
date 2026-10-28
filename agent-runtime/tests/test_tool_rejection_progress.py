@@ -50,7 +50,11 @@ class Calls:
 @pytest.mark.parametrize(
     "role,call,disabled",
     [
-        ("research", bash(["echo", "hello"]), False),
+        (
+            "research",
+            bash(["roami", "agent", "capability", "call", "unknown", "--input", "{}"]),
+            False,
+        ),
         ("main", bash(["echo", "hello"]), True),
         ("research", bash(["roami", "agent", "capability", "call", "browser_observe"]), False),
         ("main", {"name": "missing", "arguments": "{}"}, False),
@@ -87,18 +91,24 @@ def add_observer(runtime, effects):
 
 
 async def test_research_can_change_rejected_arguments_and_recover_to_a_registered_call(store):
-    model = Calls([bash(["echo", "hello"]), bash(["echo", "different"]), observe()])
+    model = Calls(
+        [
+            bash(["roami", "agent", "capability", "call", "unknown", "--input", "{}"]),
+            bash(["roami", "agent", "capability", "call", "different", "--input", "{}"]),
+            observe(),
+        ]
+    )
     runtime, effects = Runtime(store, model, worker_model=model), []
     add_observer(runtime, effects)
     try:
         assert await runtime.loop.run(await claimed_turn(runtime), "research") == "Done"
         assert model.calls == 4 and effects == ["owned"]
-        assert "roami chrome" in model.results[0]["recovery"]
+        assert "tool_list" in model.results[0]["recovery"]
     finally:
         await runtime.close()
 
 
-async def test_research_catalog_does_not_advertise_a_standalone_shell(store):
+async def test_research_catalog_exposes_the_same_workspace_shell_as_worker(store):
     runtime = Runtime(store, Calls([]))
     try:
         tool = next(
@@ -106,15 +116,13 @@ async def test_research_catalog_does_not_advertise_a_standalone_shell(store):
             for t in runtime.tools.catalog("research")
             if t["function"]["name"] == "bash"
         )
-        assert "command" not in tool["parameters"]["properties"]
-        assert tool["parameters"]["required"] == ["argv"]
-        assert "only" in tool["description"] and "browser" in tool["description"]
         worker = next(
             t["function"]
             for t in runtime.tools.catalog("worker")
             if t["function"]["name"] == "bash"
         )
         assert "command" in worker["parameters"]["properties"]
+        assert tool == worker
     finally:
         await runtime.close()
 

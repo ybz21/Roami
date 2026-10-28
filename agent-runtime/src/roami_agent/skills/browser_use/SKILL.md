@@ -11,7 +11,7 @@ Use `roami chrome` for browser work. The CLI catalog has one browser entry; open
 - [Managed tasks](references/managed-browser.md): native Worker commands, task resources and recovery.
 - [Terminal CLI](references/chrome-cli.md): professional Agent target selection, screenshots and recordings.
 
-Main delegates browser work with the current routing schema. Bounded public lookups or screenshots use `target={kind:"new_session",resourceOnly:true}`; this profile permits navigation and observation only. Interactions require a regular workspace task or a professional executor. Do not create a project for a lookup.
+Main delegates browser work with the current routing schema. Bounded public lookups or screenshots use `target={kind:"new_session",resourceOnly:true}`; this skips coding-workspace preparation. All background profiles share enabled tools; interactions use the normal resource, observation and action checks. Local file work needs a prepared workspace or configured roots. Do not create a project for a lookup.
 
 Native Workers use `bash` argv with `roami chrome` commands; discover `tool_list(kind="cli",query="browser")` only when needed. Professional Agents use the terminal CLI directly. Both use the existing Chrome driver; loading this Skill never expands role permissions.
 

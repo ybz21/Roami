@@ -4,10 +4,9 @@ from copy import deepcopy
 from jsonschema import Draft202012Validator, ValidationError
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.research import RESEARCH_TOOLS, research_call_allowed
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
-from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.protocol.tools import Tool
 
 
 class Tools:
@@ -31,27 +30,13 @@ class Tools:
             if self.directory:
                 from roami_agent.tools.foundations import (
                     FOUNDATIONS,
-                    RESEARCH_FOUNDATIONS,
                     WORKER_FOUNDATIONS,
                 )
 
-                names = (
-                    RESEARCH_FOUNDATIONS
-                    if role == "research"
-                    else WORKER_FOUNDATIONS
-                    if role != "main"
-                    else FOUNDATIONS
-                )
+                names = FOUNDATIONS if role == "main" else WORKER_FOUNDATIONS
                 if tool.name not in names:
                     continue
-            if (
-                tool.name in self.disabled_tools
-                or role == "main"
-                and not tool.main
-                or role == "research"
-                and not self.directory
-                and tool.name not in RESEARCH_TOOLS
-            ):
+            if tool.name in self.disabled_tools or role == "main" and not tool.main:
                 continue
             wire = tool.wire()
             if role == "main" and self.directory and tool.name == "delegate":
@@ -68,28 +53,10 @@ class Tools:
                     "with the existing user-requested directory. "
                     "Registered permissions and execution receipts remain enforced."
                 )
-            elif role == "worker" and self.directory and tool.name == "bash":
+            elif role != "main" and self.directory and tool.name == "bash":
                 wire = deepcopy(wire)
                 if "scope" in wire["function"]["parameters"]["properties"]:
                     wire["function"]["parameters"]["properties"]["scope"]["enum"] = ["workspace"]
-            if role == "research":
-                wire = deepcopy(wire)
-                parameters = wire["function"]["parameters"]
-                if tool.name == "bash" and self.directory:
-                    wire["function"]["description"] = (
-                        "Use only roami chrome browser navigation and observation commands through bash argv. "
-                        "Read skill://browser_use or roami chrome help. Research has no standalone shell, echo, curl or Python."
-                    )
-                    wire["function"]["parameters"] = object_schema(
-                        {"argv": parameters["properties"]["argv"]}, ["argv"]
-                    )
-                elif tool.name == "browser_act":
-                    parameters["properties"]["kind"]["enum"] = ["goto"]
-                    parameters["required"] = ["observationId", "kind", "url"]
-                elif tool.name == "browser_open":
-                    parameters["properties"].pop("targetId", None)
-                elif tool.name == "skill_read":
-                    parameters["properties"]["name"]["enum"] = ["browser_use", "web-research"]
             result.append(wire)
         return result
 
@@ -125,12 +92,6 @@ class Tools:
                 validate_tool_arguments(tool.schema, args)
             except ValidationError as exc:
                 raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
-        if (
-            role == "research"
-            and tool.name != "tool_list"
-            and not research_call_allowed(tool.name, args)
-        ):
-            raise DomainError("TOOL_UNAVAILABLE")
         return tool, args
 
     async def invoke(self, call, role, binding):

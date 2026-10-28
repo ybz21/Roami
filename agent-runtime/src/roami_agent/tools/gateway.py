@@ -283,7 +283,7 @@ class ToolGateway:
             ):
                 value["recovery"] = (
                     "This source could not be read. Do not reopen the same URL or repeat identical failed observations. "
-                    "If its read-only navigation input has stopped, use another relevant public URL in a task-owned tab. "
+                    "If its read-only navigation input has stopped, use another relevant public URL in a task-owned tab, or an enabled MCP or CLI. "
                     "Keep unknown outcomes and source limitations explicit; human takeover and unknown writes still stop input."
                 )
             if isinstance(exc, ToolArgumentsError):
@@ -308,15 +308,8 @@ class ToolGateway:
             elif tool is None and value["error"] in {"TOOL_UNAVAILABLE", "INVALID_CLI_ARGUMENTS"}:
                 value["recovery"] = (
                     "This call was rejected before execution. "
-                    + (
-                        "Research has no standalone shell: do not probe with echo, curl or Python. "
-                        "For a local machine operation, report the profile mismatch to Main; "
-                        "Main can use bash scope=host within the user's authorized scope. "
-                        "Read skill://browser_use and use roami chrome help for admitted browser commands. "
-                        if role == "research"
-                        else "Use tool_list to find a registered operation available in this role. "
-                    )
-                    + "Use the exact command argv returned by tool_list or command-family help, with "
+                    "Use tool_list to find a registered operation available in this role. "
+                    "Use the exact command argv returned by tool_list or command-family help, with "
                     "real returned resource/observation IDs. Correct the intended "
                     "call instead of repeating the rejected command."
                 )
@@ -345,7 +338,7 @@ class ToolGateway:
                     "Main has no shell workspace for this operation. Do not retry shell commands or guess cwd. "
                     "For a user-authorized local machine operation independent of project files, "
                     "use bash scope=host without cwd. Host scope is general execution, not read-only; "
-                    "it requires no project or delegation. resourceOnly is browser-only. "
+                    "it requires no project or delegation. resourceOnly skips coding-workspace preparation, not enabled capabilities. "
                     "An error affects only this attempted operation: preserve every other part of the current request. "
                     "Resolve project/session metadata through target_search/target_resolve; a project edit still needs its own handoff. "
                     "Keep requestComplete=false until all requested parts have been handled or handed off. Do not reduce a mixed request to its lookup part. "
@@ -409,9 +402,9 @@ class ToolGateway:
                 )
             if role == "main" and value["error"] == "INVALID_RESOURCE_ONLY_TARGET":
                 value["recovery"] = (
-                    "resourceOnly is a web/navigation-only profile and cannot include a directory, "
-                    "project or workspace. For public browser lookups, KEEP resourceOnly=true "
-                    "and remove directory/workspace fields; do not drop read-only scope to repair arguments. "
+                    "resourceOnly skips coding-workspace preparation and cannot include a directory, "
+                    "project or workspace. External lookups can use enabled MCP, CLI or browser tools; keep resourceOnly=true "
+                    "and remove directory/workspace fields instead of adding an unrelated coding workspace. "
                     "Use a regular Native workspace only for actual filesystem work authorized by the user."
                 )
             if role == "main" and value["error"] in {
@@ -495,7 +488,7 @@ class ToolGateway:
                     "Main has no bound file workspace for this turn. Dispatch the original file work "
                     "in the user's verified directory; for bounded work without an explicit executor "
                     "choice use a regular native worker with target.kind=new_session and target.directory. "
-                    "Do not use resourceOnly for file writes. Preserve explicit executor choices; complex "
+                    "Use a prepared workspace for local file edits. Preserve explicit executor choices; complex "
                     "work stays with a professional. Keep the exact requested file and read-back scope; "
                     "never guess hashes, substitute paths or create an unrelated project."
                 )

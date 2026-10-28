@@ -13,6 +13,15 @@
   <p>稳定 ASCII name 保留为工具引用，新中文名称由 displayName 承载；新建只填中文名时自动分配引用名。元信息编辑不重建连接，注册表的描述立即更新，别名摘要保持只取远程工具协议与权限。CapabilityEditor、CapabilityCatalog 复用现有控件、i18n 和 MobileSubPage，不增加页面轮询。</p>
   <h3>验收记录</h3>
   <p>验收：full 质量门禁通过（Go 全量、Python 全量 1683 项、静态与格式检查、前端 typecheck／i18n／hover／生产构建及秘密扫描）；最终 MCP／Agent／目录定向 67 项和前端 142 文件／1038 项通过；实际生产包 83 项检查覆盖七档宽度、中英文、深浅主题、编辑保存、刷新恢复与命中，无文档横向溢出。stdio 进程退出、心跳超时、Streamable HTTP 会话过期、运行时重启、未知调用不重放、工具权限保留及原子保存回归通过。隔离 HTTPS 服务实际杀掉夹具进程后约 31.2 秒恢复，运行时重启后自动恢复开启项；中文描述通过真实 CLI 查询返回 7 个目录项。目录回退规则保留同分类的直接文字匹配，避免中文元信息被其他分类的别名命中隐藏。证据入口 /tmp/mcp-keepalive-20261028/index.html。粗指针为桌面模拟；Redmi Note 8 仍处于安全锁屏，真机触控、软键盘和安全区验收未完成。未调用付费模型，未部署现用服务。</p>
+  <h3>后台工具开放与 Tool List 兼容 · 2026-10-28</h3>
+  <h4>Product Design</h4>
+  <p>research 与普通原生后台 Agent 使用相同基础工具和已启用的 Skill、MCP、CLI、HTTP 能力。resourceOnly 保留免准备代码工作区的用途，不再强制浏览器白名单。Tool List 仍叫 tool_list，保留输入接口，仅在注释和描述说明它发现额外工具；基础工具直接提供。用户指定 MCP 时按指定方法调用，不能把角色目录过滤误报为服务故障。</p>
+  <h4>User Stories</h4>
+  <ul><li>将检索交给后台后，Agent 可发现和调用已启用的 MCP，也可按需使用其他 Skill、CLI 或浏览器。</li><li>已有 tool_list 调用继续有效；关闭的能力仍不可调用，工作区、资源归属、人工接管与未知写入保护沿用原规则。</li><li>后台结果可引用本轮 MCP、CLI、HTTP 或浏览器检索的完整 URL；旧轮次、失败回执、目录说明和参数回显不算新检索。</li></ul>
+  <h4>Technical Design</h4>
+  <p>tools/registry.py 与 foundations.py 统一使用 WORKER_FOUNDATIONS，删除 protocol/research.py 的专用白名单，目录、校验与能力角色展示同步。模型指令及随包 Skill 文档保持一致。tool_list 不改名、不增加别名或参数。resourceOnly 的来源校验补充当前执行轮次成功的已登记 MCP、CLI、HTTP 回执，保留 browser_retrieval 回执类型及现有浏览器观测证据；只认可结果正文出现且最终报告逐字引用的 HTTP(S) URL。任务状态复用相同回执来源判断新鲜度，MCP 成功不会因没有浏览器观测而被误判为旧结果。涉及业务写入仍走普通后台验收，不因 research 自动放行。</p>
+  <h4>验收记录</h4>
+  <p>现用实例只读取证确认主对话 Exa 调用成功，而截图旧 research 目录 mcp=0，独立 MCP 守护正常。213 项工具／检索／资源／命令准入相关回归通过；覆盖两类后台无工作区发现并调用 MCP／CLI／HTTP、关闭能力拒绝、Skill 读取与路径边界、精确来源 URL、业务写入等待验收及浏览器恢复。当前配置 deepseek-4.1-flash 单次模型探针在 research 中选择模拟 Exa MCP 调用，未实际执行 Exa。没有前端组件改动；英文说明属于模型指令和工具协议。完整门禁结果见 PR。此轮有一次真实模型调用，不宣称零费用；未修改现用任务、服务、配置或账本。证据入口 /tmp/research-tools-20261028/index.html。</p>
 </section>
 
 <!-- archived-source:end -->

@@ -242,6 +242,6 @@ async def test_role_catalogs_expose_host_scope_only_to_main(store):
         }
         assert schemas["main"]["scope"]["enum"] == ["workspace", "host"]
         assert schemas["worker"]["scope"]["enum"] == ["workspace"]
-        assert "scope" not in schemas["research"] and "cwd" not in schemas["research"]
+        assert schemas["research"] == schemas["worker"]
     finally:
         await runtime.close()

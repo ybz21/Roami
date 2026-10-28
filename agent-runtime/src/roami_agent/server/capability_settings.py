@@ -11,7 +11,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.skill_names import skill_location
 from roami_agent.server.model_settings import ModelSettings
 from roami_agent.tools.command_families import operation_kind
-from roami_agent.tools.foundations import FOUNDATIONS, RESEARCH_FOUNDATIONS, WORKER_FOUNDATIONS
+from roami_agent.tools.foundations import FOUNDATIONS, WORKER_FOUNDATIONS
 
 
 class CapabilitySettings:
@@ -79,11 +79,10 @@ class CapabilitySettings:
                     "main": tool.main,
                     "roles": (["main"] if tool.main else [])
                     + (
-                        ["worker"]
+                        ["worker", "research"]
                         if tool.name in WORKER_FOUNDATIONS or operation_kind(tool) == "tool"
                         else []
-                    )
-                    + (["research"] if tool.name in RESEARCH_FOUNDATIONS else []),
+                    ),
                     "enabled": tool.name not in tools.disabled_tools,
                     "source": tool.source,
                     "mutable": tool.source == "external",

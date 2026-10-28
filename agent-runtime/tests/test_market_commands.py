@@ -105,8 +105,8 @@ async def test_native_agent_discovers_searches_reviews_and_installs_the_pinned_s
         package = Path(runtime.tools.skills["downloaded"]["packagePath"])
         assert (package / "references/guide.md").read_text() == "retained guide"
         assert await runtime.tools.invoke(install, "main", binding) == result
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-            await runtime.tools.invoke(install, "research", binding)
+        for role in ("worker", "research"):
+            assert await runtime.tools.invoke(install, role, binding) == result
         runtime.capability_imports.saved["skills"]["downloaded"]["text"] = "edited"
         with pytest.raises(DomainError, match="MARKET_INSTALL_CHANGED"):
             await runtime.tools.invoke(install, "main", binding)
