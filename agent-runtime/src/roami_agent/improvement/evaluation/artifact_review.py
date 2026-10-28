@@ -52,9 +52,11 @@ def needs_artifact_review(case):
 
 
 class ArtifactReviewer:
-    def __init__(self, settings, profile, *, provider_factory=None, calibrated=True):
+    def __init__(
+        self, settings, profile, *, provider_factory=None, calibrated=True, shared_daily_limit=False
+    ):
         self.settings, self.profile, self.provider_factory = settings, profile, provider_factory
-        self.shared_daily_limit = False
+        self.shared_daily_limit = shared_daily_limit
         require(isinstance(profile, dict) and profile.get("schema_version") == 1)
         require(
             set(profile)
@@ -72,16 +74,19 @@ class ArtifactReviewer:
             isinstance(profile.get("renderer_image"), str)
             and re.fullmatch(r"sha256:[a-f0-9]{64}", profile["renderer_image"])
         )
-        require(
-            type(profile.get("max_tokens")) is int and 16000 <= profile["max_tokens"] <= 4_000_000
-        )
+        if not shared_daily_limit:
+            require(
+                type(profile.get("max_tokens")) is int
+                and 16000 <= profile["max_tokens"] <= 4_000_000
+            )
         require(type(profile.get("seconds")) is int and 30 <= profile["seconds"] <= 600)
         require(isinstance(profile.get("reviewers"), list) and len(profile["reviewers"]) == 2)
-        self.output_tokens = profile.get("output_tokens", 1024)
-        require(
-            type(self.output_tokens) is int and 512 <= self.output_tokens <= 8192,
-            "RSI_POLICY_OUT_OF_RANGE",
-        )
+        self.output_tokens = 0 if shared_daily_limit else profile.get("output_tokens", 1024)
+        if not shared_daily_limit:
+            require(
+                type(self.output_tokens) is int and 512 <= self.output_tokens <= 8192,
+                "RSI_POLICY_OUT_OF_RANGE",
+            )
         self.routes = {}
         for row in profile["reviewers"]:
             require(isinstance(row, dict) and set(row) == {"id", "route"})
@@ -92,11 +97,15 @@ class ArtifactReviewer:
             )
             route = ModelRoute.worker(row["route"], settings.route("main"))
             require(route.capabilities.get("images") is True, "MODEL_IMAGES_UNSUPPORTED")
-            route = replace(
-                route,
-                max_retries=0,
-                parameters={**route.parameters, "max_tokens": self.output_tokens},
-            )
+            parameters = {**route.parameters}
+            if shared_daily_limit:
+                parameters.pop("max_tokens", None)
+                configured_cap = settings.route("main").parameters.get("max_tokens")
+                if configured_cap is not None:
+                    parameters["max_tokens"] = configured_cap
+            else:
+                parameters["max_tokens"] = self.output_tokens
+            route = replace(route, max_retries=0, parameters=parameters)
             self.routes[row["id"]] = route
         require(set(self.routes) == {"artifact_a", "artifact_b"})
         identities = {(r.endpoint, r.name) for r in self.routes.values()}
@@ -120,14 +129,14 @@ class ArtifactReviewer:
                 self.route_hashes,
                 PROTOCOL_HASH,
                 self.calibration_id,
-                profile["max_tokens"],
+                "shared_model_daily" if shared_daily_limit else profile["max_tokens"],
                 profile["seconds"],
                 profile["renderer_image"],
             ]
         )
 
     @classmethod
-    def load(cls, settings, root, owner, *, provider_factory=None):
+    def load(cls, settings, root, owner, *, provider_factory=None, shared_daily_limit=False):
         directory = Path(root) / "artifact-review" / digest(owner)[:24]
         profile_path = directory / "profile.json"
         if not profile_path.exists():
@@ -143,15 +152,18 @@ class ArtifactReviewer:
         from roami_agent.improvement.integrations.artifact_paths import relative_file
 
         certificate = private_document(relative_file(directory, profile.pop("certificate_file")))
-        reviewer = cls(settings, {**profile, "certificate": certificate})
+        reviewer = cls(
+            settings,
+            {**profile, "certificate": certificate},
+            shared_daily_limit=shared_daily_limit,
+        )
         reviewer.provider_factory = provider_factory
-        reviewer.shared_daily_limit = provider_factory is not None
         return reviewer
 
     def budget(self):
         return EpisodeBudget(
             {
-                "tokens": self.profile["max_tokens"],
+                "tokens": 0 if self.shared_daily_limit else self.profile["max_tokens"],
                 "seconds": self.profile["seconds"],
                 "requests": 2,
             },
@@ -203,7 +215,13 @@ class ArtifactReviewer:
                 else configured_provider(frozen, "main")
             )
             model = MeteredModel(
-                provider, budget, name, output_cap=self.output_tokens, journal=journal
+                provider,
+                budget,
+                name,
+                output_cap=(route.parameters.get("max_tokens") or 0)
+                if self.shared_daily_limit
+                else self.output_tokens,
+                journal=journal,
             )
             chunks = []
             try:
@@ -354,16 +372,32 @@ def validate_calibration(certificate, route_hashes):
 
 
 async def calibrate_artifacts(
-    settings, profile, anchors, root, *, token_limit, provider_factory=None
+    settings,
+    profile,
+    anchors,
+    root,
+    *,
+    token_limit=None,
+    provider_factory=None,
+    shared_daily_limit=False,
+    provider_mode=None,
 ):
     """A started anchor is never replayed automatically, including malformed paid output."""
-    require(type(token_limit) is int and 16000 <= token_limit <= 100_000_000)
+    if shared_daily_limit:
+        require(provider_factory is not None, "RSI_SHARED_MODEL_GATEWAY_REQUIRED")
+    else:
+        require(type(token_limit) is int and 16000 <= token_limit <= 100_000_000)
+    require(provider_mode in {None, "live_models", "protocol_fixture"})
     require(isinstance(anchors, list) and 12 <= len(anchors) <= 100)
     require(len({a["id"] for a in anchors}) == len(anchors))
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     require(not root.is_symlink() and root.stat().st_mode & 0o077 == 0)
     reviewer = ArtifactReviewer(
-        settings, profile, provider_factory=provider_factory, calibrated=False
+        settings,
+        profile,
+        provider_factory=provider_factory,
+        calibrated=False,
+        shared_daily_limit=shared_daily_limit,
     )
     results = []
     used = 0
@@ -381,7 +415,8 @@ async def calibrate_artifacts(
         )
         require(anchor["id"] not in FILES and isinstance(anchor["id"], str))
         pack = private_document(Path(anchor["evidence_file"]))
-        require(used + profile["max_tokens"] <= token_limit, "RSI_TOKEN_BUDGET")
+        if not shared_daily_limit:
+            require(used + profile["max_tokens"] <= token_limit, "RSI_TOKEN_BUDGET")
         location = root / digest(anchor["id"])[:24]
         location.mkdir(mode=0o700, exist_ok=True)
         private_json(
@@ -390,7 +425,10 @@ async def calibrate_artifacts(
                 "anchor_id": anchor["id"],
                 "evidence_hash": pack["content_hash"],
                 "route_hashes": reviewer.route_hashes,
-                "reserved_tokens": profile["max_tokens"],
+                "spending_policy": "shared_model_daily"
+                if shared_daily_limit
+                else "frozen_protocol",
+                "reserved_tokens": None if shared_daily_limit else profile["max_tokens"],
             },
         )
         budget = reviewer.budget()
@@ -418,7 +456,14 @@ async def calibrate_artifacts(
         "route_hashes": reviewer.route_hashes,
         "renderer_image": profile["renderer_image"],
         "anchors": results,
-        "provider_mode": "protocol_fixture" if provider_factory else "live_models",
+        "provider_mode": provider_mode
+        or ("protocol_fixture" if provider_factory else "live_models"),
+        "spending_policy": "shared_model_daily" if shared_daily_limit else "frozen_protocol",
+        **(
+            {"model_page_output_tokens": settings.route("main").parameters.get("max_tokens")}
+            if shared_daily_limit
+            else {}
+        ),
     }
     private_json(root / "calibration-result.json", certificate)
     validate_calibration(certificate, reviewer.route_hashes)

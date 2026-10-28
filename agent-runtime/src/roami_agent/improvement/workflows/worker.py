@@ -118,6 +118,7 @@ class EvaluationWorker:
                         self.service.ledger.path.parent,
                         request["owner"],
                         provider_factory=provider_factory,
+                        shared_daily_limit=shared,
                     )
                     require(
                         reviewer is not None

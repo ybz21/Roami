@@ -123,6 +123,7 @@ async def verify_candidate(
             workflow.ledger.path.parent,
             action["owner"],
             provider_factory=provider_factory,
+            shared_daily_limit=uses_shared_model_limit(workflow.ledger),
         )
         require(
             reviewer is not None
