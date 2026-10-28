@@ -185,7 +185,13 @@ class ToolDirectory:
             "hint": (
                 "Local capabilities callable in this role only, not web search results. Zero matches "
                 "do not prove a worker lacks integrations or external services are unavailable. "
-                "For requested external facts, retrieve sources through a delegated browser lookup."
+                "For external facts, use the requested enabled MCP or an appropriate delegated browser lookup."
+                + (
+                    " This role is browser-only and excludes MCP. A requested MCP belongs in Main or a regular "
+                    "Native worker; do not report the server unavailable or silently substitute browser research."
+                    if role == "research"
+                    else ""
+                )
             ),
             "catalogVersion": version,
             "items": [item for _, _, item in selected[offset : offset + limit]],
