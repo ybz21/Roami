@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [Worker 工作区图片快照](2026-10-29/workspace-image-observation.html) |
 | 2026-10-29 | [每日准入的评分与 Case 证据](2026-10-29/daily-admission-evidence.html) |
 | 2026-10-29 | [股票报告的五个图表页检查](2026-10-29/stock-presentation-structure.html) |
 | 2026-10-29 | [原文引用的换行对齐与交办恢复](2026-10-29/request-quote-alignment.html) |

@@ -359,7 +359,7 @@ class ModelSettings:
                 from roami_agent.context.vision_inputs import VisionInputs
 
                 runtime.loop.context.vision = (
-                    VisionInputs(runtime.db, runtime.artifacts)
+                    VisionInputs(runtime.db, runtime.artifacts, runtime.settings)
                     if settings.route("worker").capabilities.get("images") is True
                     else None
                 )

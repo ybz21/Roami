@@ -180,7 +180,9 @@ class ToolGateway:
                     **value,
                     "data": "",
                     "contentOmitted": True,
-                    "recovery": "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Use an available image-capable observation, or check layout and behavior programmatically and report that visual inspection is unavailable.",
+                    "recovery": "The workspace image snapshot is referenced below; do not page binary bytes."
+                    if value.get("fileImage", {}).get("artifactId")
+                    else "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Use an image-capable Worker and read from offset 0, or report that visual inspection is unavailable.",
                 }
             state = (
                 "failed"
