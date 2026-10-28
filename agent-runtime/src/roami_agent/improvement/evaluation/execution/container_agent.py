@@ -56,6 +56,7 @@ async def main():
         workspace=Path("/workspace"),
         settle_maintenance=True,
         provider_factory=via_gateway,
+        shared_daily_limit=request.get("shared_daily_limit") is True,
     )
     result = await executor.run(case, request["policy"], Path("/state"))
     private_json(Path("/state/response.json"), result)

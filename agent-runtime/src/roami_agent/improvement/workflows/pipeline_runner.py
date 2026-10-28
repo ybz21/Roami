@@ -3,6 +3,7 @@
 import asyncio
 import copy
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -123,7 +124,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             else configured_provider(settings_, actual),
             budget,
             role,
-            output_cap=settings_.route(actual).parameters["max_tokens"],
+            output_cap=settings_.route(actual).parameters.get("max_tokens") or 0,
             journal=journal,
         )
 
@@ -265,11 +266,16 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
                 old = original.get("files", {}).get(relative)
                 if old is not None and path.read_bytes() == old.encode():
                     continue
+                name = (
+                    digest([case_id, relative])[:20]
+                    + "-"
+                    + re.sub(r"[^A-Za-z0-9_.-]", "_", path.name)[:99]
+                )
                 records.artifact(
                     owner,
                     run_id,
                     "evaluate",
-                    digest(case_id)[:8] + "-" + path.name,
+                    name,
                     path.read_text(errors="replace"),
                 )
     records.artifact(owner, run_id, "evaluate", "results.json", outcomes)

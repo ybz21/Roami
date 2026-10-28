@@ -519,3 +519,145 @@ def test_diagnostics_respect_configured_episode_cap(tmp_path):
         enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
     with service.ledger.connection() as db:
         assert db.execute("SELECT episodes_reserved FROM rsi_budgets").fetchone()[0] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_limit", [None, 8192])
+async def test_shared_daily_diagnostic_accepts_optional_model_output_limit(
+    tmp_path, monkeypatch, output_limit
+):
+    from dataclasses import replace
+
+    from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
+    from roami_agent.improvement.workflows.pipeline_runner import execute_diagnostic
+    from roami_agent.protocol.model_routes import settings_with_route
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.server.configuration import Settings
+
+    service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
+    service.control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    service.control.register_suite("local", suite_file(tmp_path))
+    service.control.save(
+        "local", {**service.control.preferences("local"), "suite_id": "data", "machine_ids": ["a"]}
+    )
+    settings = Settings()
+    parameters = {} if output_limit is None else {"max_tokens": output_limit}
+    settings = settings_with_route(
+        settings, "main", replace(settings.route("main"), parameters=parameters)
+    )
+    received = []
+
+    class Provider:
+        model = "daily-limit-fixture"
+
+        async def stream(self, messages, tools):
+            received.append(messages)
+            yield ModelEvent("text", "2")
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 10,
+                    "outputTokens": 1,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+
+    service.provider_factory = lambda *args: Provider()
+
+    class Executor(ContainerExecutor):
+        async def preflight(self):
+            return {"environment_hash": "a" * 64}
+
+        async def run(self, case, policy, target):
+            provider = self.provider_factory(settings, "main")
+            events = [
+                event async for event in provider.stream([{"role": "user", "content": "2"}], [])
+            ]
+            assert any(event.kind == "text" and event.value == "2" for event in events)
+            return {
+                "grade": {"passed": True, "hard_passed": True, "pending": False, "quality": 80},
+                "metrics": self.shared_budget.metrics(),
+            }
+
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.execution.containers.ContainerExecutor", Executor
+    )
+    run = enqueue_diagnostic(service, "local", {"request_key": "optional-cap", "case_ids": ["a"]})
+    await execute_diagnostic(
+        SimpleNamespace(settings=SimpleNamespace(current=settings)),
+        service,
+        service.control.claim(),
+    )
+    value = service.runs.get("local", run["id"])
+    assert len(received) == 1 and value["cases"][0]["passed"]
+    assert value["summary"]["generation_tokens"] == 11
+    assert settings.route("main").parameters == parameters
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ["one/report.md", "two/report.md"],
+        ["方案.md", "notes.md"],
+        ["long-" + "x" * 115 + ".md", "notes.md"],
+    ],
+)
+async def test_diagnostic_archives_nested_unicode_and_long_output_names(
+    tmp_path, monkeypatch, paths
+):
+    from roami_agent.improvement.workflows.pipeline_runner import execute_diagnostic
+    from roami_agent.server.configuration import Settings
+
+    service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
+    service.control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    service.control.register_suite("local", suite_file(tmp_path))
+    service.control.save(
+        "local", {**service.control.preferences("local"), "suite_id": "data", "machine_ids": ["a"]}
+    )
+    contents = {name: "delivered-file:" + name for name in paths}
+
+    class Executor:
+        model_hash = "b" * 64
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def preflight(self):
+            return {"environment_hash": "a" * 64}
+
+        async def run(self, case, policy, target):
+            for name, content in contents.items():
+                path = target / "workspace" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+            return {"grade": {"passed": True}, "metrics": {"tokens": 0}}
+
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.execution.containers.ContainerExecutor", Executor
+    )
+    run = enqueue_diagnostic(service, "local", {"request_key": "archive", "case_ids": ["a"]})
+    await execute_diagnostic(
+        SimpleNamespace(settings=SimpleNamespace(current=Settings())),
+        service,
+        service.control.claim(),
+    )
+    value = service.runs.get("local", run["id"])
+    archived = [
+        service.runs.read_artifact("local", run["id"], artifact["id"])
+        for artifact in value["artifacts"]
+    ]
+    deliveries = [artifact for artifact in archived if artifact["text"] in contents.values()]
+    assert {artifact["text"] for artifact in deliveries} == set(contents.values())
+    assert len({artifact["name"] for artifact in deliveries}) == len(paths)
+    assert all(
+        artifact["name"].isascii() and len(artifact["name"]) <= 120 for artifact in deliveries
+    )
+    assert value["cases"][0]["passed"] and value["summary"]["cases"] == 1
