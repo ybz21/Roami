@@ -83,6 +83,8 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
                             raise TypeError("invalid_tool_result")
                         output = json.loads(output.get("text", "{}"))
                         error = code(output.get("error"))
+                        if error == "UNKNOWN":
+                            error = "TOOL_FAILED"
                     except (TypeError, ValueError):
                         error = "TOOL_FAILED"
                     signals.add(error)

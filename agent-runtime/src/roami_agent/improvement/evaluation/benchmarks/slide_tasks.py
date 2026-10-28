@@ -192,9 +192,17 @@ async def grade_slides(case, workspace, executor):
         result = json.loads(
             await executor.sandbox(workspace, PROGRAM, input=json.dumps(spec).encode(), timeout=180)
         )
+        checks["native_reference_match"] = any(v == 1 for v in result["results"])
     passed = all(checks.values()) and any(v == 1 for v in result["results"])
     return {
         **quality(dict.fromkeys(DIMENSIONS, 3 if passed else 0), hard_passed=passed),
+        "reason": "assertions_passed"
+        if passed
+        else "native_verifier_failed"
+        if result["errors"]
+        else "native_reference_mismatch"
+        if "native_reference_match" in checks
+        else "assertion_failed",
         "checks": checks,
         "native_metric": float(passed),
         "native_reference_results": result["results"],

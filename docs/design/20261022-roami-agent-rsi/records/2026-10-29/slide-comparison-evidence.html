@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>演示文稿比较失败的汇总证据</title><link rel="stylesheet" href="../../assets/design.css"></head><body><main>
+<p><a href="../README.md">RSI 设计修订与验收记录</a></p><h1>演示文稿比较失败的汇总证据 · 2026-10-29</h1>
+<h2>Product Design</h2><p>文件存在并不代表编辑符合要求。演示文稿比较失败时，Case 汇总需要列出失败的原生比较检查，并区分内容不符、比较器异常和文件缺失。原比较器、两个备选参考、原通过条件和历史成绩不变。</p>
+<h2>User Stories</h2><ul><li>我能看出为什么文件齐全但 Case 失败，不再只看到 UNKNOWN。</li><li>两个原参考任一通过仍为通过，不把另一个参考不匹配当作独立失败。</li><li>文件缺失时不声称原生比较已经执行；旧轮次仍保留原成绩。</li></ul>
+<h2>Technical Design</h2><p>evaluation/benchmarks/slide_tasks.py 在原比较运行后记录一个 native_reference_match 布尔检查，理由分别使用 native_reference_mismatch、native_verifier_failed 和既有 assertion_failed；通过仍为 assertions_passed。trial_evidence 对已确认失败、却没有有效错误码的工具使用既有 TOOL_FAILED，保留工具明细，避免非零退出误报 UNKNOWN；后续工作流沿现有检查及信号字段传播，不增加接口、数据库或展示层分支。原参考比较程序、参考数据与判定阈值未修改。</p>
+<h2>验收记录</h2><p>原完整轮次的两份 OSWorld 演示文稿均失败，但汇总三个文件检查全为 true、信号仅 UNKNOWN（另一份另有工具失败），缺少比较失败解释。回归覆盖两个参考都失败、比较器异常、第二参考通过、一个通过另一个异常、产物缺失不执行比较，以及失败工具缺少有效错误码。原产物通过隔离副本零模型复核，两份原比较均为 [0, 0]、无比较器异常，原文件哈希和历史 Case、轮次状态／总结不变；最终补充证据以 evaluate/slide-failure-evidence.json 单列，早期比较检查记录也保留。完整门禁和最终复核结果随 PR 留证，不据此宣称演示文稿内容已修复。</p></main></body></html>

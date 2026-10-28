@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [演示文稿比较失败的汇总证据](2026-10-29/slide-comparison-evidence.html) |
 | 2026-10-29 | [超时运行的工具证据恢复](2026-10-29/interrupted-execution-evidence.html) |
 | 2026-10-29 | [Codex 复盘接入统一模型网关](2026-10-29/codex-shared-model-gateway.html) |
 | 2026-10-29 | [模型桥接传输与错误留证](2026-10-29/model-bridge-transport.html) |
