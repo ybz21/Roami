@@ -5,21 +5,15 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.domain.contracts import require
-from roami_agent.improvement.integrations.spending_policy import (
-    model_proxy_for,
-    uses_shared_model_limit,
-)
+from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
 from roami_agent.improvement.persistence.operation_accounting import assert_operation_costs_settled
 
 
 class RunCosts:
     def __init__(self, records, owner, run_id):
         self.records, self.ledger, self.owner, self.run_id = records, records.ledger, owner, run_id
-        self.model_proxy = model_proxy_for(records)
 
     def day(self, owner):
-        if self.model_proxy is not None:
-            return self.model_proxy.billing.period()[0]
         return datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
 
     def operation_result(self, owner, key):

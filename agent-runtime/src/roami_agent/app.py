@@ -47,9 +47,7 @@ from roami_agent.observability.execution_traces import ExecutionTraces, origin_t
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_binding
-from roami_agent.providers.chat_completions import ChatCompletions
 from roami_agent.providers.factory import configured_provider
-from roami_agent.providers.model_proxy import ModelProxy
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
@@ -101,17 +99,6 @@ class Runtime:
     ):
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
-        self.model_proxy = ModelProxy(
-            database,
-            lambda: self.model_settings.saved.get("proxy"),
-            lambda: self.settings.memory_timezone,
-        )
-        if isinstance(model, ChatCompletions):
-            self.model_proxy.attach(model, "main")
-        if isinstance(worker_model, ChatCompletions) and worker_model is not model:
-            self.model_proxy.attach(worker_model, "worker")
-        if isinstance(memory_model, ChatCompletions) and memory_model not in (model, worker_model):
-            self.model_proxy.attach(memory_model, "worker")
         self.reconfiguring = False
         self.memory_uses_worker = memory_model is None
         self.worker_model = worker_model or model
@@ -241,9 +228,6 @@ class Runtime:
         self.manifests = PromptManifests(database)
         self.traces = ExecutionTraces(database)
         self.improvement = ImprovementStatus(database.data_root) if development_rsi else None
-        if self.improvement is not None:
-            self.improvement.model_proxy = self.model_proxy
-            self.improvement.research.model_proxy = self.model_proxy
         self.debug = ExecutionDebug(database, self.context, self.settings, self.traces)
         self.dispatch = TaskDispatcher(
             database,
@@ -306,19 +290,11 @@ class Runtime:
             self.turn_tasks,
             self.loop.preempt,
         )
-        self.model_settings = ModelSettings(
-            self,
-            lambda settings, role: self.model_proxy.attach(
-                configured_provider(settings, role), role
-            ),
-        )
+        self.model_settings = ModelSettings(self, configured_provider)
         if self.improvement is not None:
             self.improvement.ledger.shared_daily_limit = True
-            self.improvement.model_proxy = self.model_proxy
             self.improvement.provider_factory = self.improvement_provider
-            self.improvement.research.model_proxy = self.model_proxy
             self.improvement.research.provider_factory = self.improvement_provider
-            self.improvement.runs.model_proxy = self.model_proxy
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
         self.capability_markets = CapabilityMarkets(self)
@@ -329,7 +305,7 @@ class Runtime:
 
     def improvement_provider(self, settings, role):
         actual = "main" if role == "main" or role.startswith("artifact_") else "worker"
-        return self.model_proxy.attach(configured_provider(settings, actual), "rsi_" + role)
+        return configured_provider(settings, actual)
 
     async def run_turn(self, turn, *args, **kwargs):
         if self.improvement is None or not self.improvement.ledger.path.exists():
