@@ -5,7 +5,7 @@ from roami_agent.storage.database import event, row
 from roami_agent.storage.transcript_repository import history
 
 
-def activity_event(db, cid, kind, payload, *, key=None, **refs):
+def activity_event(db, cid, kind, payload, *, key=None, cascade=True, **refs):
     lifecycle = {
         "tool.started",
         "tool.completed",
@@ -42,7 +42,7 @@ def activity_event(db, cid, kind, payload, *, key=None, **refs):
         if turn and turn["conversation_id"] == cid
         else None
     )
-    ident = (
+    ident = payload.get("activityId") or (
         "tool:" + payload["toolCallId"]
         if payload.get("toolCallId")
         else "task:" + payload["taskId"]
@@ -58,7 +58,12 @@ def activity_event(db, cid, kind, payload, *, key=None, **refs):
             payload = {**payload, "activity": activity}
     event_id = event(db, cid, kind, payload, key=key, **refs)
     # Child lifecycle transitions belong in the originating Main Agent feed too.
-    if task and kind.startswith("task.") and kind != "task.activity":
+    if (
+        task
+        and cascade
+        and kind.startswith("task.")
+        and (kind != "task.activity" or payload.get("activityId"))
+    ):
         parent, seen = task, {cid}
         for _ in range(4):
             if not parent["parent_task_id"]:
@@ -72,8 +77,17 @@ def activity_event(db, cid, kind, payload, *, key=None, **refs):
                     db,
                     origin,
                     "task.activity",
-                    {"taskId": task["id"], "sourceKind": kind},
+                    {
+                        "taskId": task["id"],
+                        "sourceKind": kind,
+                        **(
+                            {"activityId": payload["activityId"]}
+                            if payload.get("activityId")
+                            else {}
+                        ),
+                    },
                     task_id=parent["id"],
+                    cascade=False,
                     key=key + ":" + origin if key else None,
                 )
                 seen.add(origin)

@@ -169,7 +169,7 @@ async def test_bash_cli_records_actual_read_effect_and_timeline(store):
             "succeeded",
         )
         view = await runtime.conversations.messages("alice", c["id"])
-        assert view["activities"] == []
+        assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])
         assert any(e["payload"].get("activity", {}).get("name") == "memory_search" for e in events)
     finally:

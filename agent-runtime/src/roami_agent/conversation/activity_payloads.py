@@ -1,41 +1,13 @@
 """Read bounded execution payloads only for activities visible in this conversation."""
 
 import json
-import re
 
 from roami_agent.conversation.activity import conversation_activity
+from roami_agent.conversation.activity_preview import preview
 from roami_agent.conversation.professional_activity import professional_payload
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import history, owned
-
-SENSITIVE = re.compile(
-    r"^(api[-_]?key|authorization|password|passwd|secret|access[-_]?token|refresh[-_]?token|cookie|set-cookie|.*base64)$",
-    re.IGNORECASE,
-)
-
-
-def preview(value):
-    def redact(item, depth=0):
-        if depth > 12:
-            return "[nested content omitted]"
-        if isinstance(item, dict):
-            return {
-                key: "[redacted]" if SENSITIVE.match(key) else redact(value, depth + 1)
-                for key, value in item.items()
-            }
-        if isinstance(item, list):
-            return [redact(value, depth + 1) for value in item]
-        if isinstance(item, str):
-            item = re.sub(r"sk-[A-Za-z0-9_-]{12,}", "[redacted]", item)
-            item = re.sub(r"(?i)Bearer\s+[A-Za-z0-9._~+/-]+=*", "Bearer [redacted]", item)
-            return re.sub(
-                r"data:image/[^;\s]+;base64,[A-Za-z0-9+/=]+", "[image data omitted]", item
-            )
-        return item
-
-    text = json.dumps(redact(value), ensure_ascii=False, indent=2)
-    return {"text": text[:16000], "truncated": len(text) > 16000}
 
 
 def activity_payload(db, owner, cid, aid, branch_id=None, *, task_id=None):

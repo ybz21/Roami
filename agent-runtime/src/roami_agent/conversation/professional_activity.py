@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.conversation.activity_preview import preview
 from roami_agent.protocol.errors import public_error_code
 from roami_agent.storage.database import row, rows
 
@@ -11,7 +12,7 @@ def professional_activity(db, scope, anchor):
         return []
     calls = rows(
         db,
-        "SELECT s.event_key,s.task_id,s.created_ms,a.state AS attempt_state,"
+        "SELECT s.event_key,s.task_id,s.created_ms,s.payload_json AS input_json,r.payload_json AS output_json,a.state AS attempt_state,"
         "json_extract(s.payload_json,'$.name') AS name,"
         "json_extract(r.payload_json,'$.state') AS state,"
         "json_extract(r.payload_json,'$.result.error') AS error,"
@@ -36,6 +37,12 @@ def professional_activity(db, scope, anchor):
                 "id": call["event_key"].removesuffix(":start"),
                 "kind": "tool",
                 "name": call["name"],
+                "preview": {
+                    "input": preview(json.loads(call["input_json"])["arguments"], limit=2000),
+                    "output": preview(json.loads(call["output_json"])["result"], limit=4000)
+                    if call["output_json"]
+                    else None,
+                },
                 "anchorMessageId": anchor(task),
                 "taskId": task["id"],
                 "parentTaskId": task["parent_task_id"],
