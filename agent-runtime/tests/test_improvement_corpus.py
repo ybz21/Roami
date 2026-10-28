@@ -400,16 +400,29 @@ def test_quant_data_quality_serialization_is_public_and_versioned():
     case = next(c for c in authored_suite("input-fields")["cases"] if c["id"] == "QUANT-05")
     assert "原样复制prices.json中的字符串字段" in case["prompt"]
     assert "解释放入report.md" in case["prompt"]
+    assert "实际发生的违规成交" in case["prompt"]
+    assert (
+        "不是不可交易bar的索引清单"
+        in definition["output_format"]["field_descriptions"]["trades_on_unavailable_bars"]
+    )
     assert all(field in case["prompt"] for field in fields)
     assert case["origin"]["recipe_revision"] == "authored-v15-input-field-serialization"
 
 
-@pytest.mark.parametrize("field", ["receipt", "execution_prices", "signal_prices"])
+@pytest.mark.parametrize(
+    "field", ["receipt", "execution_prices", "signal_prices", "trades_on_unavailable_bars"]
+)
 async def test_quant_data_quality_still_rejects_replaced_input_fields(tmp_path, field):
     case = next(c for c in authored_suite("strict-input-fields")["cases"] if c["id"] == "QUANT-05")
     workspace = tmp_path / "workspace"
     materialize(case, workspace)
-    wrong = {**case["judge"]["expected"], field: "explanation instead of original field"}
+    prices = json.loads(case["files"]["prices.json"])
+    replacement = (
+        prices["missing_bars"] + prices["halted_bars"]
+        if field == "trades_on_unavailable_bars"
+        else "explanation instead of original field"
+    )
+    wrong = {**case["judge"]["expected"], field: replacement}
     (workspace / "analysis.py").write_text("pass\n")
     (workspace / "result.json").write_text(json.dumps(wrong))
     (workspace / "report.md").write_text(

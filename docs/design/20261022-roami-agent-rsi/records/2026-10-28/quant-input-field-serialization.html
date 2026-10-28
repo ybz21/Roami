@@ -2,7 +2,7 @@
 <p><a href="../README.md">RSI 设计修订与验收记录</a></p>
 <h1>QUANT-05 输入字段序列化合同 · 2026-10-28</h1>
 <h2>Product Design</h2>
-<p>公开说明 result.json 的 receipt、execution_prices、signal_prices 原样复制 prices.json 对应字符串；分析解释放入 report.md。文件工具的哈希回执不能替代案例数据中的 receipt。保留原严格判定，不把旧输出中的说明句自动改成字段值。</p>
+<p>公开说明 result.json 的 receipt、execution_prices、signal_prices 原样复制 prices.json 对应字符串；分析解释放入 report.md。文件工具的哈希回执不能替代案例数据中的 receipt。trades_on_unavailable_bars 只报告实际发生的违规成交，不是禁用 bar 或被阻止信号的清单。保留原严格判定，不把旧输出中的说明句自动改成字段值。</p>
 <h2>User Stories</h2>
 <ul><li>执行器能从 Case 文件夹和公开任务看到字段来源，避免只有类型声明却按未说明的字符串等值规则判错。</li><li>用户能区分新合同下的独立生成、旧合同的原始失败和模型能力提升。</li><li>旧冻结套件保持原字节，错误替换字段的结果继续失败。</li></ul>
 <h2>Technical Design</h2>

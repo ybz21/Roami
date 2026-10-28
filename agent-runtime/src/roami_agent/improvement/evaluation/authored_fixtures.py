@@ -520,7 +520,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             }
             schema = {
                 **schema_shape(expected),
-                "contract": "result.json原样复制prices.json中的字符串字段receipt、execution_prices、signal_prices；不生成新的哈希凭证或在这些字段内附加说明，解释放入report.md。",
+                "contract": "result.json原样复制prices.json中的字符串字段receipt、execution_prices、signal_prices；不生成新的哈希凭证或在这些字段内附加说明，解释放入report.md。trades_on_unavailable_bars只记录实际发生的违规成交，不是不可交易bar的索引清单，也不是被阻止的信号列表。",
             }
         files["prices.json"] = json.dumps(data)
         if case_id in {"QUANT-01", "QUANT-03"}:

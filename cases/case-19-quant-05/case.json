@@ -92,6 +92,9 @@
       "execution_prices",
       "signal_prices"
     ],
-    "explanations": "report.md"
+    "explanations": "report.md",
+    "field_descriptions": {
+      "trades_on_unavailable_bars": "只记录实际发生的违规成交，不是不可交易bar的索引清单"
+    }
   }
 }
