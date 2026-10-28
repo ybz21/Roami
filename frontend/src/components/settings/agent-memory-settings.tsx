@@ -5,12 +5,12 @@ import { useI18n } from '../../i18n'
 import { useCurrentNodeId } from '../cluster/node-url'
 import AgentMemory from '../agent/AgentMemory'
 
-export function AgentMemorySettings() {
+export function AgentMemorySettings({ onBack }: { onBack?: () => void }) {
   const node = useCurrentNodeId()
-  return <MemoryCatalogPage key={node || 'local'} />
+  return <MemoryCatalogPage key={node || 'local'} onBack={onBack} />
 }
 
-function MemoryCatalogPage() {
+function MemoryCatalogPage({ onBack }: { onBack?: () => void }) {
   const { t } = useI18n()
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [failed, setFailed] = useState(false), [version, setVersion] = useState(0)
@@ -24,6 +24,6 @@ function MemoryCatalogPage() {
   }, [version])
   return <>
     {failed && <p role="alert">{t('agent.memoryProjectsFailed')} <Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button></p>}
-    <AgentMemory fullPage projects={projects} select={(cid, branch, message) => { location.hash = '#/home/' + [cid, branch, message].filter(Boolean).map(encodeURIComponent).join('/') }} />
+    <AgentMemory fullPage embedded onBack={onBack} projects={projects} select={(cid, branch, message) => { location.hash = '#/home/' + [cid, branch, message].filter(Boolean).map(encodeURIComponent).join('/') }} />
   </>
 }

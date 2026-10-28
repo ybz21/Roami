@@ -48,3 +48,11 @@ it('moves professional agent links into capabilities and preserves the selected 
   expect(normalizeRoute('settings/agent/bin')).toBe('capabilities/agents')
   expect(normalizeRoute('settings/agent/bin/codex')).toBe('capabilities/agents/codex')
 })
+
+it.each([
+  ['settings/common', 'settings/ui/look'],
+  ['settings/ui/status', 'settings/ui/look'],
+  ['settings/ui/keys/more', 'settings/ui/keys'],
+])('keeps retired settings links usable: %s', (old, current) => {
+  expect(normalizeRoute(old + '?node=n1')).toBe(current)
+})
