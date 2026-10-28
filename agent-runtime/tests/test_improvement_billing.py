@@ -326,3 +326,84 @@ async def test_overview_reuses_a_stable_daily_summary_until_usage_changes(store)
     settled = await proxy.billing.daily_summary()
     assert settled["pending"] == 0 and settled["localEstimated"] == 1
     assert await proxy.billing.daily_summary() is settled
+
+
+async def test_proxy_admission_rejection_is_known_zero_without_poisoning_rsi_usage(store):
+    from test_model_proxy import provider
+
+    from roami_agent.improvement.integrations.measurements import MeteredModel
+
+    proxy, _ = proxy_for(store, limit=0.002)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=EVENTS)
+
+    upstream = provider(proxy, handler)
+    budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 10}, shared_daily_limit=True)
+    journal = []
+    measured = MeteredModel(upstream, budget, "main", output_cap=0, journal=journal)
+    try:
+        await consume(measured)
+        with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
+            await consume(measured)
+        assert len(calls) == 1
+        metrics = budget.metrics()
+        assert metrics["tokens"] == 1100 and metrics["request_attempts"] == 1
+        assert not budget.unknown
+        assert journal[-1]["admission_rejected"] is True
+        assert journal[-1]["measurement"]["inputTokens"] == 0
+        summary = await proxy.billing.daily_summary()
+        assert summary["requests"] == 1 and summary["unknown"] == 0
+    finally:
+        await upstream.close()
+
+
+@pytest.mark.parametrize("code", ["MODEL_PROXY_DAILY_LIMIT", "MODEL_PROXY_USAGE_UNKNOWN"])
+async def test_error_text_alone_cannot_claim_an_unsent_free_request(code):
+    from roami_agent.improvement.integrations.measurements import MeteredModel
+
+    class Uncertain:
+        model = "uncertain-fixture"
+
+        async def stream(self, messages, tools):
+            raise DomainError(code)
+            yield
+
+    budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 10}, shared_daily_limit=True)
+    with pytest.raises(DomainError, match=code):
+        await consume(MeteredModel(Uncertain(), budget, "main", output_cap=0))
+    assert budget.unknown and budget.metrics()["tokens"] is None
+
+
+async def test_retry_admission_rejection_preserves_the_first_unknown_request(store):
+    from test_model_proxy import provider
+
+    from roami_agent.improvement.integrations.measurements import MeteredModel
+
+    proxy, _ = proxy_for(store, limit=1)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(503, text="fixture upstream failure")
+
+    async def no_delay(seconds):
+        pass
+
+    upstream = provider(proxy, handler)
+    upstream.max_retries = 1
+    upstream.sleep = no_delay
+    budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 10}, shared_daily_limit=True)
+    journal = []
+    try:
+        with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
+            await consume(MeteredModel(upstream, budget, "main", output_cap=0, journal=journal))
+        assert len(calls) == 1 and budget.unknown
+        assert budget.metrics()["tokens"] is None
+        assert not journal[-1].get("admission_rejected", False)
+        summary = await proxy.billing.daily_summary()
+        assert summary["requests"] == 1 and summary["unknown"] == 1
+    finally:
+        await upstream.close()

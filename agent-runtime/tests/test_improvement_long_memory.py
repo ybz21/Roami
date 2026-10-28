@@ -254,3 +254,24 @@ def test_prepare_rejects_archive_content_with_a_recomputed_outer_hash(tmp_path):
     materialize(case, work)
     with pytest.raises(DomainError, match="SOURCE_CHANGED"):
         prepare_history(case, work)
+
+
+@pytest.mark.parametrize(
+    ("answer", "passed"),
+    [
+        (r"\boxed{One; User form}", True),
+        (r"\boxed{one: User forms}", True),
+        (r"\boxed{One; User; Incident form}", False),
+        (r"\boxed{Two; User form}", False),
+        (r"\boxed{One; form}", False),
+    ],
+)
+async def test_form_qualifiers_do_not_count_as_additional_answers(tmp_path, answer, passed):
+    case, work = prepared(tmp_path)
+    (work / "answer.txt").write_text(answer)
+    grade = await grade_long_memory(case, work, LocalGrader())
+    assert grade["hard_passed"] is passed
+    assert grade["checks"]["valid_source_citations"]
+    assert grade["checks"]["history_unchanged"]
+    if passed:
+        assert grade["checks"]["native_metric"]

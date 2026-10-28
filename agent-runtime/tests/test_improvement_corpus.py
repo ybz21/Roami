@@ -273,9 +273,12 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     root.mkdir(mode=0o700, parents=True)
     previous = root / "authored-40-v8.json"
     previous.write_bytes(b"original frozen suite evidence")
+    v13 = root / "authored-40-v13.json"
+    v13.write_bytes(b"previous v13 frozen evidence")
     prepare_corpus(service, "owner")
+    assert v13.read_bytes() == b"previous v13 frozen evidence"
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v13.json").read_text())
+    revised = json.loads((root / "authored-40-v14.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"
@@ -286,6 +289,7 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
             "authored-v10-separated-instructions",
             "authored-v11-verified-backtest-summaries",
             "authored-v13-visible-quant-inputs",
+            "authored-v14-explicit-trade-sides",
         }
         for c in revised["cases"]
         if "执行要求（不是结果字段）" in c["prompt"]
@@ -334,3 +338,50 @@ async def test_pagination_metadata_is_allowed_only_by_the_revised_contract(tmp_p
     assert (await grade_authored(case, workspace, Probe()))["hard_passed"]
     case["judge"].pop("pagination_metadata")
     assert not (await grade_authored(case, workspace, Probe()))["hard_passed"]
+
+
+@pytest.mark.parametrize(
+    ("code", "causal"),
+    [
+        ('"""The removed bug was prices.shift(-1)."""\npass\n', True),
+        ("# Old implementation used prices.shift(-1)\npass\n", True),
+        ("example = 'prices.shift(-1)'\n", True),
+        ("prices.shift(1)\n", True),
+        ("prices.shift(-1)\n", False),
+        ("prices.shift(periods=-1)\n", False),
+        ("prices.shift(-2)\n", False),
+        ("prices.shift(\n", False),
+    ],
+)
+async def test_backtest_causality_checks_executable_calls_not_explanations(tmp_path, code, causal):
+    case = next(c for c in authored_suite("causality-source")["cases"] if c["id"] == "QUANT-03")
+    workspace = tmp_path / "workspace"
+    materialize(case, workspace)
+    (workspace / "analysis.py").write_text(code)
+    (workspace / "result.json").write_text(json.dumps(case["judge"]["expected"]))
+    (workspace / "corrected.json").write_text(json.dumps(case["judge"]["corrected_expected"]))
+    (workspace / "report.md").write_text(
+        "flawed.py:1 lookahead and survivorship " + case["fixture_receipt"]
+    )
+
+    class Replay:
+        async def sandbox(self, workspace, program, **kwargs):
+            return json.dumps({"corrected": case["judge"]["corrected_expected"]}).encode()
+
+    grade = await grade_authored(case, workspace, Replay())
+    assert grade["checks"]["corrected_run_verified"]
+    assert grade["checks"]["no_original_future_signal"] is causal
+
+
+@pytest.mark.parametrize("case_id", ["QUANT-01", "QUANT-03"])
+def test_trade_direction_serialization_is_public_and_versioned(case_id):
+    from roami_agent.improvement.evaluation.case_catalog import case_definitions
+
+    definition = next(c for c in case_definitions() if c["id"] == case_id)
+    assert definition["output_format"] == {
+        "trade_side_values": ["buy", "sell"],
+        "trade_side_case": "lowercase",
+    }
+    case = next(c for c in authored_suite("trade-sides")["cases"] if c["id"] == case_id)
+    assert "side 必须是小写字符串 buy 或 sell" in case["prompt"]
+    assert case["origin"]["recipe_revision"] == "authored-v14-explicit-trade-sides"

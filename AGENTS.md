@@ -1902,6 +1902,37 @@ cases/case-N-id/             CASE.md、case.json、materials.json 与显式资�
   <h3>User Stories</h3>
   <ul><li>用户不填写输出上限也能完成诊断，实际调用仍通过统一模型代理计费。</li><li>任务在不同目录生成同名报告，或使用中文及长文件名时，所有产物均能分别归档并生成汇总。</li><li>维护者能用保留的失败记录、当前版本定向复验和独立验收区分源码修复与正式能力通过。</li></ul>
   <h3>Technical Design</h3>
-  <p>workflows/pipeline_runner.py 的计量包装器读取可选 max_tokens；缺省时仅以 0 代表不追加输出预留，不向模型请求注入 0 或新增 RSI 输出限制。宿主将 shared_daily_limit 显式写入私有容器请求，容器入口只接受布尔 true 并传给 NativeFilesExecutor，使内部计量器沿用同一模式；旧请求缺省保留旧行为，执行协议指纹单列 v23。评测 Main 的系统指令与工具目录统一要求先委派 Native，移除仅限此隔离配置中 Main 的 shell／交付写入能力，Worker 能力不变，消除简单任务可绕过执行凭证的冲突提示。归档身份包含 Case ID 与完整相对路径的摘要，展示文件名部分规范成账本允许的 ASCII 并限长，保留原有账本名称边界；Case 运行记录中的原始文件路径不改写。测试从诊断队列到结果汇总覆盖缺省／显式输出参数、嵌套重名、中文与长文件名。</p>
+  <p>workflows/pipeline_runner.py 的计量包装器读取可选 max_tokens；缺省时仅以 0 代表不追加输出预留，不向模型请求注入 0 或新增 RSI 输出限制。宿主将 shared_daily_limit 显式写入私有容器请求，容器入口只接受布尔 true 并传给 NativeFilesExecutor，使内部计量器沿用同一模式；旧请求缺省保留旧行为，执行协议指纹单列 v23。镜像声明 org.roami.rsi.shared-daily-policy=1，统一限额模式预检会拒绝未支持该协议的旧镜像，避免更新宿主后容器静默沿用旧限制；显式旧模式仍兼容。评测 Main 的系统指令与工具目录统一要求先委派 Native，移除仅限此隔离配置中 Main 的 shell／交付写入能力，Worker 能力不变，消除简单任务可绕过执行凭证的冲突提示。归档身份包含 Case ID 与完整相对路径的摘要，展示文件名部分规范成账本允许的 ASCII 并限长，保留原有账本名称边界；Case 运行记录中的原始文件路径不改写。测试从诊断队列到结果汇总覆盖缺省／显式输出参数、嵌套重名、中文与长文件名。</p>
   <p>真实复验使用独立工作区、冻结输入和容器；模型调用使用模型页配置与同一每日计费账本，不重放历史未知费用、不启动自动日程。人工参考分仍由人工确认，不把代码回归、文件存在或脚本模型误记为独立质量验收。</p>
+</section>
+
+<section id="rsi-backtest-causality-20261028" lang="zh-CN">
+  <h2>回测因果检查与输出约定 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>脚本解释旧的未来函数错误时，不因注释或文档字符串中的示例被误判。实际执行的负周期 shift 仍拒绝，交易数值、成交时点、费用和净值继续独立核验。</p>
+  <h3>User Stories</h3>
+  <p>用户能在报告中说明删除了哪条错误语句；产物生成者能从公开要求看到交易方向必须使用小写 buy／sell，而不需要猜宿主判定器的字符串约定。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation/authored_grading.py 使用 Python AST 检查可执行 shift 调用，识别负数的位置参数与 periods 关键字；忽略注释、说明字符串，语法错误仍失败。保留 corrected_backtest_matches 的原数值、字段、方向和摘要检查，不接纳大写方向作为暗中放宽。QUANT-01／03 公开序列化约定，authored 套件升 v14，旧 v12／v13 冻结文件不覆盖。真实复验另存公开约定澄清后的 v16 清单，原始价格、judge 与技术期限不变；新合同与旧失败分别记录。</p>
+</section>
+
+<section id="rsi-long-history-answer-20261028" lang="zh-CN">
+  <h2>长历史表单答案的描述词 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>完整表单历史检索的答案可在表单名称后带 form／forms 类别词；数量、表单名称与来源证据仍必须正确，不能借此多答其他表单。</p>
+  <h3>User Stories</h3>
+  <p>用户得到正确数量和表单名称时，不因中性的类别描述词被误判；维护者仍可拒绝额外名称、错误数量、伪造引用或改动输入历史的产物。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation/benchmarks/long_memory.py 的附加最终答案检查按原生 normalize_phrase 分词，仅忽略独立类别词 form／forms。原上游评分、boxed 格式、完整 100 条历史及顺序哈希、引用与邮件按钮归属检查保留。新增正反对照覆盖描述词、额外表单、错误数量及缺少名称。旧运行失败保持原样，修复后的容器重放另列，不冒充一次新生成或正式整套通过。</p>
+</section>
+
+<section id="rsi-memory-admission-20261028" lang="zh-CN">
+  <h2>记忆请求期限与准入拒绝计量 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>后台记忆提取遵循当前后台模型的请求期限，不另加固定 20 秒截断。确定在发送前被拒绝的调用记为零请求；已经发送、缺少完整回执的调用保留未知状态与每日限额阻断。</p>
+  <h3>User Stories</h3>
+  <p>用户调整后台模型超时后，下一次记忆提取即按新值执行；模型页设为不限制请求期限时，记忆提取不提前截断。维护者能区分准入拒绝与真实中断，不能靠错误码文字把未知消费抹成零。</p>
+  <h3>Technical Design</h3>
+  <p>Runtime 为 MemoryJobs 注入读取当前 worker route timeout 的函数，零值映射为 asyncio.timeout(None)，单独构造 MemoryJobs 的旧默认保持兼容。协议新增 ModelAdmissionRejected，仅由可信 ProxyTransport 在账本准入失败、尚未发送请求时标记；MeteredModel 对此单次操作结算零请求、零 Token。ChatCompletions 已发生重试时移除该整个调用“未发送”保证，首个请求的未知计量继续保留。普通同名错误码不具有零消费保证。诊断的 Case 总期限、输出体积、来源与记忆作用域校验不变。</p>
+  <p>本次完整轮次保留原 60 项记录：21 项通过，OPS-04 中一笔记忆流于约 20 秒关闭，后续 38 项模型案例受未知用量阻断。上游本会话统计确认有两次 memory 调用，但中断调用没有可核验用量，不能用聚合中的零占位结算为免费；该账目保留待真实回执核对，后续付费复验暂停。局部诊断、重放和软件回归分别记录，四份人工参考分与独立质量验收不代签。</p>
 </section>

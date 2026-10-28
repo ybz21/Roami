@@ -10,7 +10,7 @@ from copy import deepcopy
 
 import httpx
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
 from roami_agent.protocol.model_observation import model_observation
 from roami_agent.protocol.models import ModelEvent, model_endpoint
 from roami_agent.protocol.serialization import encoded
@@ -107,6 +107,10 @@ class ChatCompletions:
                             emitted = emitted or event.kind != "telemetry"
                             yield event
                         return
+                    except ModelAdmissionRejected as exc:
+                        if attempt:
+                            raise DomainError(exc.code, exc.status) from exc
+                        raise
                     except RetryableResponse as exc:
                         code, delay = "MODEL_HTTP_" + str(exc.status), exc.delay
                     except (

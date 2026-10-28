@@ -174,6 +174,12 @@ class ContainerExecutor:
             detail = json.loads(await docker_command("image", "inspect", self.image))[0]
         except (DomainError, ValueError):
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
+        if self.shared_daily_limit:
+            labels = detail.get("Config", {}).get("Labels") or {}
+            require(
+                labels.get("org.roami.rsi.shared-daily-policy") == "1",
+                "RSI_CONTAINER_IMAGE_REQUIRED",
+            )
         self.image_id = detail["Id"]
         renderer_id = None
         if self.artifact_reviewer:

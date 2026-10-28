@@ -7,12 +7,12 @@ import time
 from roami_agent.improvement.domain.contracts import require
 from roami_agent.improvement.integrations.input_reservation import InputReservation
 from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.model_observation import model_observation
 
 
-class BudgetAdmissionRejected(DomainError):
+class BudgetAdmissionRejected(ModelAdmissionRejected):
     """No provider request was sent by this admission attempt."""
 
 
@@ -174,7 +174,7 @@ class MeteredModel:
             if self.input_reserve is None:
                 self.input_reservation.observe(snapshot, usage)
         except BaseException as exc:
-            if isinstance(exc, BudgetAdmissionRejected):
+            if isinstance(exc, ModelAdmissionRejected):
                 usage = {
                     "inputTokens": 0,
                     "outputTokens": 0,

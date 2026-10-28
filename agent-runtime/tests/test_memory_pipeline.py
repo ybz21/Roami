@@ -1149,3 +1149,65 @@ async def test_memory_with_only_tool_intents_never_calls_model(store):
         assert await runtime.memory.candidates("alice") == []
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("timeout_seconds", [0, 45])
+async def test_memory_extraction_follows_current_worker_timeout(
+    store, monkeypatch, timeout_seconds
+):
+    from dataclasses import replace
+
+    from roami_agent.protocol.model_routes import settings_with_route
+    from roami_agent.server.configuration import Settings
+
+    seen = []
+    original_timeout = asyncio.timeout
+
+    def observed_timeout(value):
+        seen.append(value)
+        return original_timeout(value)
+
+    monkeypatch.setattr(asyncio, "timeout", observed_timeout)
+
+    class Empty:
+        model = "memory-timeout-fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", '{"memories":[]}')
+
+    settings = Settings()
+    settings = settings_with_route(
+        settings, "worker", replace(settings.route("worker"), timeout_seconds=timeout_seconds)
+    )
+    runtime = Runtime(store, ConversationModel(), settings=settings, memory_model=Empty())
+    try:
+        for timeout in (timeout_seconds, 12):
+            runtime.settings.current = settings_with_route(
+                runtime.settings.current,
+                "worker",
+                replace(runtime.settings.route("worker"), timeout_seconds=timeout),
+            )
+            c, receipt, _ = await source(store, text="A one-off task needs no durable memory.")
+            await store.call(
+                lambda db, c=c, receipt=receipt: event(
+                    db, c["id"], "message.completed", {}, message_id=receipt["messageId"]
+                ),
+                write=True,
+            )
+            await runtime.memory_jobs.scan()
+            job = await store.call(
+                lambda db: row(
+                    db, "SELECT * FROM jobs WHERE kind='memory.extract' AND state='queued'"
+                )
+            )
+            assert job
+            seen.clear()
+            await runtime.memory_jobs.run(job)
+            assert (timeout or None) in seen
+            assert (
+                await store.call(
+                    lambda db, job=job: row(db, "SELECT state FROM jobs WHERE id=?", (job["id"],))
+                )
+            )["state"] == "done"
+    finally:
+        await runtime.close()

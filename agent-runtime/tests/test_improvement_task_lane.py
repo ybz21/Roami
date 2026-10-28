@@ -467,3 +467,25 @@ async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers
     assert worker & names == before & names
     assert {"bash", "write", "edit"} <= worker
     assert "delegate" in main and "read" in main
+
+
+@pytest.mark.parametrize("shared", [False, True])
+@pytest.mark.parametrize("supported", [False, True])
+async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
+    tmp_path, monkeypatch, shared, supported
+):
+    from roami_agent.improvement.evaluation.execution import containers
+
+    async def docker(*args, **kwargs):
+        assert args[:2] == ("image", "inspect")
+        labels = {"org.roami.rsi.shared-daily-policy": "1"} if supported else None
+        return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
+
+    monkeypatch.setattr(containers, "docker_command", docker)
+    executor = containers.ContainerExecutor(Settings(), shared_daily_limit=shared)
+    if shared and not supported:
+        with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
+            await executor.preflight()
+        assert executor.image_id is None
+    else:
+        assert (await executor.preflight())["image_id"] == "fixture-image"

@@ -186,7 +186,10 @@ checks['boxed_final_answer']=match is not None
 parsed=ns['extract_boxed_answer'](answer)
 native=bool(ns['eval_from_spec'](spec['eval_spec'],parsed,spec['expected']))
 checks['native_metric']=native
-checks['exact_final_phrases']=ns['normalize_phrase'](parsed)==ns['normalize_phrase'](spec['expected'])
+# Form/forms describes the answer category; other names and counts must still match exactly.
+def form_phrases(value):
+ return [word for word in ns['normalize_phrase'](value).split() if word not in {'form','forms'}]
+checks['exact_final_phrases']=form_phrases(parsed)==form_phrases(spec['expected'])
 evidence=payload['evidence'];citations=isinstance(evidence,list) and 1<=len(evidence)<=10;affordance=False
 if citations:
  for ref in evidence:
