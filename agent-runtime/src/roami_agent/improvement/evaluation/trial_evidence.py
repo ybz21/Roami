@@ -76,7 +76,11 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
             break
         model = root / "model-log.json"
         if model.is_file():
-            for item in json.loads(model.read_text()).get("requests", []):
+            model_log = json.loads(model.read_text())
+            for error in model_log.get("gateway_errors", []):
+                if type(error.get("count")) is int and error["count"] > 0:
+                    signals.add(code(error.get("code")))
+            for item in model_log.get("requests", []):
                 role = code(item.get("role"))
                 usage = item.get("measurement") or {}
                 row = roles.setdefault(

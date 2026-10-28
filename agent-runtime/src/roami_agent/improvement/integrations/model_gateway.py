@@ -5,7 +5,11 @@ import json
 import re
 from contextlib import aclosing
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, public_error_code
+
+# A supported 2 MiB image alone exceeds 2 MB after base64; keep transport bounds separate.
+MAX_REQUEST_BYTES = 16 * 1024 * 1024
+MAX_HEADER_BYTES = 64 * 1024
 
 
 class ModelGateway:
@@ -17,7 +21,7 @@ class ModelGateway:
 
     async def __aenter__(self):
         self.server = await asyncio.start_unix_server(
-            self.handle, path=str(self.socket), limit=2_100_000
+            self.handle, path=str(self.socket), limit=MAX_HEADER_BYTES
         )
         return self
 
@@ -47,11 +51,16 @@ class ModelGateway:
                 if method != "POST" or not match:
                     raise DomainError("RSI_GATEWAY_ROUTE")
                 length = re.search(r"(?im)^Content-Length:\s*(\d+)\s*$", headers)
-                if not length or not 0 < int(length[1]) <= 2_000_000:
+                if not length or not 0 < int(length[1]) <= MAX_REQUEST_BYTES:
                     raise DomainError("RSI_GATEWAY_SIZE")
-                body = json.loads(await reader.readexactly(int(length[1])))
-            if not isinstance(body.get("messages"), list) or not isinstance(
-                body.get("tools", []), list
+                try:
+                    body = json.loads(await reader.readexactly(int(length[1])))
+                except ValueError as error:
+                    raise DomainError("RSI_GATEWAY_INPUT") from error
+            if (
+                not isinstance(body, dict)
+                or not isinstance(body.get("messages"), list)
+                or not isinstance(body.get("tools", []), list)
             ):
                 raise DomainError("RSI_GATEWAY_INPUT")
             writer.write(
@@ -102,9 +111,16 @@ class ModelGateway:
             OSError,
             ValueError,
             asyncio.IncompleteReadError,
+            asyncio.LimitOverrunError,
             TimeoutError,
         ) as error:
-            code = error.code if isinstance(error, DomainError) else "RSI_GATEWAY_FAILED"
+            code = (
+                public_error_code(error.code) or "RSI_GATEWAY_FAILED"
+                if isinstance(error, DomainError)
+                else "RSI_GATEWAY_SIZE"
+                if isinstance(error, asyncio.LimitOverrunError)
+                else "RSI_GATEWAY_FAILED"
+            )
             self.errors.append(code)
             try:
                 data = json.dumps({"error": {"code": code}}).encode()
