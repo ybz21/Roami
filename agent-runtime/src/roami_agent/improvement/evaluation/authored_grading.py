@@ -423,12 +423,14 @@ with sync_playwright() as p:
 RESPONSIVE_PROBE = r"""import json
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto("file:///workspace/index.html");page.get_by_test_id("draft").fill("draft-preserved");page.get_by_test_id("filter").fill("Card 1")
+ b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto("file:///workspace/index.html");initial_five=page.locator('[data-testid="board-card"]:visible').count()==5;page.get_by_test_id("draft").fill("draft-preserved");page.get_by_test_id("filter").fill("Card 1")
  fits=True;touch=True
  for width in [320,390,820]:
   page.set_viewport_size({"width":width,"height":800});fits &= page.evaluate("document.documentElement.scrollWidth<=innerWidth");touch &= page.get_by_test_id("draft").bounding_box()["height"]>=44
  page.reload();page.wait_for_timeout(100)
- print(json.dumps({"responsive":fits,"touch":touch,"draft":page.get_by_test_id("draft").input_value()=="draft-preserved","filter":page.get_by_test_id("filter").input_value()=="Card 1","results":page.get_by_test_id("board-card").count()==1}));b.close()
+ visible=page.locator('[data-testid="board-card"]:visible')
+ results=visible.count()==1 and "Card 1" in visible.first.inner_text()
+ print(json.dumps({"initial_five":initial_five,"responsive":fits,"touch":touch,"draft":page.get_by_test_id("draft").input_value()=="draft-preserved","filter":page.get_by_test_id("filter").input_value()=="Card 1","results":results}));b.close()
 """
 
 CSV_PROBE = r"""import json,os,socket,subprocess,sys,time,urllib.request
