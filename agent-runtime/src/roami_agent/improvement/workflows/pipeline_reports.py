@@ -61,6 +61,20 @@ def public_issue_body(run, priorities):
         )
     if not present:
         lines.append("本次未确认新的问题；未覆盖和未验证不等于修复通过。")
+    blocked = [case for case in run["cases"] if case.get("blocked_by")]
+    if blocked:
+        lines += [
+            "",
+            "### 后续阻塞",
+            "",
+            "以下 Case 未执行，沿用首发阻塞，不计为新增独立缺陷。未发送调用为零；已有未知账不会因此结算或清除。",
+            "",
+            "| Case | 首发 Case | 原因 |",
+            "| --- | --- | --- |",
+        ]
+        for case in blocked:
+            cause = case["blocked_by"]
+            lines.append(f"| `{case['case_id']}` | `{cause['case_id']}` | `{cause['code']}` |")
     lines += ["", "### 复测结果", "", "| Case | 问题 | 本次状态 |", "| --- | --- | --- |"]
     for item in run["issues"]:
         lines.append(f"| `{item['case_id']}` | `{item['code']}` | `{item['status']}` |")
@@ -178,6 +192,7 @@ class PipelineReportWorker:
                         "case_id": c["case_id"],
                         "state": c["state"],
                         "signals": c["signals"],
+                        "blocked_by": c.get("blocked_by"),
                         "checks": c["checks"],
                         "metrics": c["metrics"],
                         "tool_calls": c["tool_calls"],

@@ -228,6 +228,17 @@ authority, it just no longer moves the layout under the user a beat after load.
 
 # Gates
 
+<section id="rsi-cascade-summary-20261028" lang="zh-CN">
+  <h2>RSI 首发原因、后续阻塞与无模型汇总 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>一次调用中断后，未执行的 Case 关联首发 Case，不分别制造同名新缺陷。评测结束即保存可读总结，后续 Codex 复盘被费用或用量保护阻止时，用户仍能查看结果和阻塞名单；程序汇总不冒充独立复盘或正式验收。</p>
+  <h3>User Stories</h3>
+  <p>用户能区分一项首发问题与多项连带阻塞；维护者看到确定未发送的 Case 用量为零，同时首发请求和整轮总量仍为未知。以前出现过的问题在本次未执行时保持未验证，不能据同名阻塞信号声称再次复现或修复。</p>
+  <h3>Technical Design</h3>
+  <p>workflows/pipeline_runner.py 在首次生成或产物评分用量未知，或失败 Case 遇到共享每日限额、未知账、币种准入拒绝时冻结 usage_blocker，后续跳过的模型 Case 由宿主附加 blocked_by，单项调用与 Token 记零；无模型机制 Case 继续执行。persistence/run_repository.py 不为这些连带阻塞新建问题，既有问题观察记为 unverified。历史运行及观察不重写。summary 增加 blocked／not_run 和首发来源，请求数使用真实 requestAttempts，缺失时显示未知并另列已知下界，不将计量包装器次数当成提供方次数。排入付费复盘前顺序保存 evaluation-summary.md，复用既有报告内容与附件入口。pipeline_reports.py 的本地／公开报告和 Codex 证据保留来源关系；报告文件内容沿用既有中文文档格式，不新增产品界面文案或前端模块。</p>
+  <p>原始 60 项运行保留：21 通过、首发及后续共 39 项 blocked，38 条连带 RSI_USAGE_UNKNOWN 被登记为独立问题。新增回归对照模拟中断与无模型机制执行，验证后续不调用、首发未知保留、问题去重、旧观察不变及付费复盘阻断时仍有可读总结；不将该回归称为真实模型整套通过。</p>
+</section>
+
 <section id="rsi-diagnostic-completion-20261028" lang="zh-CN">
   <h2>RSI 诊断收尾修复 · 2026-10-28</h2>
   <h3>Product Design</h3>

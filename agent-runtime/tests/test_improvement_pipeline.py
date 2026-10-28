@@ -374,7 +374,158 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
     assert first["reserved_for_later_cases"] == 32000
     assert value["summary"]["artifact_review_tokens"] is None
     assert value["cases"][1]["signals"] == ["RSI_USAGE_UNKNOWN"]
+    assert value["cases"][1]["blocked_by"] == {"case_id": "a", "code": "RSI_USAGE_UNKNOWN"}
+    assert value["cases"][1]["metrics"]["tokens"] == 0
+    assert value["cases"][1]["tool_calls"] == 0
+    assert value["summary"]["not_run"] == 1
+    assert not any(issue["case_id"] == "b" for issue in value["issues"])
     assert next(n for n in value["nodes"] if n["node"] == "evaluate")["state"] == "blocked"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "rejection",
+    [None, "MODEL_PROXY_USAGE_UNKNOWN", "MODEL_PROXY_DAILY_LIMIT", "MODEL_PROXY_CURRENCY_MISMATCH"],
+)
+async def test_unknown_generation_keeps_one_cause_and_a_free_summary(
+    tmp_path, monkeypatch, rejection
+):
+    from functools import partial
+
+    from roami_agent.improvement.evaluation.contracts import freeze_suite, load_suite
+    from roami_agent.improvement.evaluation.execution.containers import ContainerExecutor
+    from roami_agent.improvement.workflows.codex_roles import codex_json
+    from roami_agent.improvement.workflows.pipeline_reports import PipelineReportWorker
+    from roami_agent.improvement.workflows.pipeline_runner import execute_diagnostic
+    from roami_agent.protocol.errors import ModelAdmissionRejected
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.server.configuration import Settings
+
+    service = ImprovementStatus(tmp_path)
+    service.ledger.shared_daily_limit = True
+    service.control.register_machine(
+        "local", {"id": "container", "label": "Container", "mode": "container"}, local_only=True
+    )
+    base = load_suite(suite_file(tmp_path))["cases"][0]
+    cases = [{**base, "id": name} for name in ("root", "later-a", "later-b")]
+    cases.insert(2, {**base, "id": "mechanism", "judge": {"kind": "mechanism"}})
+    suite = tmp_path / "causal.json"
+    suite.write_text(json.dumps(freeze_suite("causal", cases)))
+    service.control.register_suite("local", suite)
+    service.control.save(
+        "local",
+        {
+            **service.control.preferences("local"),
+            "suite_id": "causal",
+            "machine_ids": ["container"],
+        },
+    )
+    settings, calls = Settings(), []
+
+    class Interrupted:
+        model = "interrupted-fixture"
+
+        async def stream(self, messages, tools):
+            if rejection:
+                raise ModelAdmissionRejected(rejection)
+            yield ModelEvent("text", "partial")
+
+    service.provider_factory = lambda *args: Interrupted()
+
+    class Executor(ContainerExecutor):
+        async def preflight(self):
+            return {"environment_hash": "a" * 64}
+
+        async def run(self, case, policy, target):
+            calls.append(case["id"])
+            if case["judge"]["kind"] == "mechanism":
+                return {"grade": {"passed": True}, "metrics": {"tokens": 0, "model_calls": 0}}
+            provider = self.provider_factory(settings, "memory")
+            reason = "RSI_USAGE_UNKNOWN"
+            try:
+                async for _ in provider.stream([{"role": "user", "content": "memory"}], []):
+                    pass
+            except ModelAdmissionRejected as exc:
+                reason = exc.code
+            return {
+                "grade": {"passed": False, "reason": reason},
+                "metrics": self.shared_budget.metrics(),
+            }
+
+    monkeypatch.setattr(
+        "roami_agent.improvement.evaluation.execution.containers.ContainerExecutor", Executor
+    )
+    receipt = enqueue_diagnostic(
+        service, "local", {"request_key": "causal", "case_ids": [c["id"] for c in cases]}
+    )
+    await execute_diagnostic(
+        SimpleNamespace(settings=SimpleNamespace(current=settings)),
+        service,
+        service.control.claim(),
+    )
+    value = service.runs.get("local", receipt["id"])
+    assert calls == ["root", "mechanism"]
+    cause = rejection or "RSI_USAGE_UNKNOWN"
+    assert value["summary"]["generation_tokens"] == (0 if rejection else None)
+    assert value["summary"]["provider_requests"] == (0 if rejection else None)
+    assert value["summary"]["blocked"] == 3 and value["summary"]["not_run"] == 2
+    assert value["summary"]["usage_blocker"] == {"case_id": "root", "code": cause}
+    assert all(i["case_id"] == "root" for i in value["issues"])
+    if rejection != "MODEL_PROXY_DAILY_LIMIT":
+        assert [(i["case_id"], i["code"]) for i in value["issues"]] == [("root", cause)]
+    for case in value["cases"]:
+        if case["case_id"].startswith("later-"):
+            assert case["state"] == "blocked" and not case["passed"]
+            assert case["metrics"]["tokens"] == case["metrics"]["model_calls"] == 0
+            assert case["blocked_by"]["case_id"] == "root"
+    artifact = next(a for a in value["artifacts"] if a["name"] == "evaluation-summary.md")
+    text = service.runs.read_artifact("local", receipt["id"], artifact["id"])["text"]
+    assert f"| `later-a` | `root` | `{cause}` |" in text
+    assert "Codex 复盘与独立验收以对应环节的回执为准" in text
+
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Unknown generation usage must block paid Codex before starting it")
+
+    monkeypatch.setattr(
+        "roami_agent.improvement.workflows.codex_roles.codex_configuration",
+        lambda: ({"model": "fixture"}, {}),
+    )
+    monkeypatch.setattr(
+        "roami_agent.improvement.workflows.pipeline_reports.codex_json",
+        partial(codex_json, runner=forbidden),
+    )
+    if rejection:
+
+        async def reject():
+            raise DomainError(rejection)
+
+        class Proxy:
+            billing = SimpleNamespace(check=reject)
+
+            async def ready(self):
+                pass
+
+        service.runs.model_proxy = Proxy()
+    await PipelineReportWorker(service).execute(service.runs.claim_report())
+    blocked = service.runs.get("local", receipt["id"])
+    assert blocked["state"] == "blocked"
+    assert next(n for n in blocked["nodes"] if n["node"] == "review")["error_code"] == cause
+    assert service.runs.read_artifact("local", receipt["id"], artifact["id"])["text"] == text
+    assert not any(a["name"] == "review.md" for a in blocked["artifacts"])
+
+
+def test_cascade_block_is_not_a_reproduction_of_an_older_issue(tmp_path):
+    service, first = setup_run(tmp_path)
+    records = service.runs
+    records.case("local", first, outcome(signal="RSI_USAGE_UNKNOWN"))
+    records.observations("local", first)
+    second = records.create("local", "second", "diagnostic", {"case_ids": ["a"]})
+    blocked = outcome(signal="RSI_USAGE_UNKNOWN", tokens=0)
+    blocked["blocked_by"] = {"case_id": "other", "code": "RSI_USAGE_UNKNOWN"}
+    records.case("local", second, blocked)
+    records.observations("local", second)
+    assert records.get("local", second)["issues"][0]["status"] == "unverified"
+    assert records.get("local", first)["issues"][0]["status"] == "present"
 
 
 def test_quarantine_keeps_full_cost_unknown_and_cannot_replay(tmp_path):

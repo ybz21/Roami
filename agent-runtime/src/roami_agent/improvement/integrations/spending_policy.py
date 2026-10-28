@@ -1,5 +1,11 @@
 """One spending policy for explicit runtime bindings and inherited model contexts."""
 
+MODEL_ADMISSION_BLOCKERS = (
+    "MODEL_PROXY_USAGE_UNKNOWN",
+    "MODEL_PROXY_CURRENCY_MISMATCH",
+    "MODEL_PROXY_DAILY_LIMIT",
+)
+
 
 def uses_shared_model_limit(ledger=None):
     from roami_agent.providers.model_proxy import model_proxy_context
