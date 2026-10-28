@@ -15,6 +15,7 @@ from pypdf.errors import PdfReadError
 
 from roami_agent.improvement.domain.contracts import DIMENSIONS, digest
 from roami_agent.improvement.domain.scoring import quality
+from roami_agent.improvement.evaluation.execution.browser_workspace import WORKSPACE_HTTP_SERVER
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.protocol.errors import DomainError
 
@@ -407,28 +408,36 @@ subprocess.run([sys.executable,"analysis.py"],cwd=root,check=True,capture_output
 print(json.dumps({"result":json.loads((root/"result.json").read_text()) if (root/"result.json").exists() else None,"corrected":json.loads((root/"corrected.json").read_text()) if (root/"corrected.json").exists() else None}))
 """
 
-BOARD_PROBE = r"""import json,pathlib
+BOARD_PROBE = (
+    WORKSPACE_HTTP_SERVER
+    + r"""import json,pathlib
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page(viewport={"width":1280,"height":900});page.set_default_timeout(5000);page.goto("file:///workspace/index.html");page.wait_for_timeout(200)
+ b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page(viewport={"width":1280,"height":900});page.set_default_timeout(5000);page.goto(workspace_url);page.wait_for_timeout(200)
  before=page.get_by_test_id("board-card").count();page.get_by_test_id("new-title").fill("RSI-added");page.get_by_test_id("add-card").click();added=page.get_by_test_id("board-card").count()==before+1
  card=page.get_by_test_id("board-card").filter(has_text="RSI-added");card.drag_to(page.locator('[data-status="done"]:not([data-testid="board-card"])').first)
  moved=card.get_attribute("data-status")=="done";page.reload();page.wait_for_timeout(100);persisted=page.get_by_test_id("board-card").filter(has_text="RSI-added").get_attribute("data-status")=="done"
  print(json.dumps({"initial_five":before==5,"added":added,"moved":moved,"persisted":persisted}));b.close()
 """
+)
 
-RESPONSIVE_PROBE = r"""import json
-from playwright.sync_api import sync_playwright
+RESPONSIVE_PROBE = (
+    WORKSPACE_HTTP_SERVER
+    + r"""import json
+from playwright.sync_api import sync_playwright,TimeoutError
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto("file:///workspace/index.html");initial_five=page.locator('[data-testid="board-card"]:visible').count()==5;page.get_by_test_id("draft").fill("draft-preserved");page.get_by_test_id("filter").fill("Card 1")
+ b=p.chromium.launch(executable_path="/usr/bin/chromium",headless=True,args=["--no-sandbox"]);page=b.new_page();page.set_default_timeout(5000);page.goto(workspace_url);initial_five=page.locator('[data-testid="board-card"]:visible').count()==5;page.get_by_test_id("draft").fill("draft-preserved");page.get_by_test_id("filter").fill("Card 1")
  fits=True;touch=True
  for width in [320,390,820]:
   page.set_viewport_size({"width":width,"height":800});fits &= page.evaluate("document.documentElement.scrollWidth<=innerWidth");touch &= page.get_by_test_id("draft").bounding_box()["height"]>=44
- page.reload();page.wait_for_timeout(100)
+ page.reload()
+ try:page.wait_for_function('document.querySelector(\'[data-testid="draft"]\').value==="draft-preserved" && document.querySelector(\'[data-testid="filter"]\').value==="Card 1"',timeout=5000)
+ except TimeoutError:pass
  visible=page.locator('[data-testid="board-card"]:visible')
  results=visible.count()==1 and "Card 1" in visible.first.inner_text()
  print(json.dumps({"initial_five":initial_five,"responsive":fits,"touch":touch,"draft":page.get_by_test_id("draft").input_value()=="draft-preserved","filter":page.get_by_test_id("filter").input_value()=="Card 1","results":results}));b.close()
 """
+)
 
 CSV_PROBE = r"""import json,os,socket,subprocess,sys,time,urllib.request
 from playwright.sync_api import sync_playwright
