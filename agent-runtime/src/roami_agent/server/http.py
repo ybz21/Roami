@@ -131,17 +131,7 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/capability-imports/mcp/{name}/connect")
     async def connect_capability(name: str, owner: Owner):
-        ModelSettings.owner(owner)
-        async with runtime.capability_imports.lock:
-            if name not in runtime.mcp.connections:
-                raise DomainError("CAPABILITY_NOT_FOUND", 404)
-            try:
-                async with asyncio.timeout(30):
-                    await runtime.mcp.discover({"server": name}, {})
-            except TimeoutError:
-                raise DomainError("MCP_TIMEOUT", 504) from None
-            runtime.capability_settings.apply()
-            return {"data": runtime.capability_settings.view(owner)}
+        return {"data": await runtime.capability_imports.connect_mcp(owner, name)}
 
     @app.get("/v1/tool-directory")
     async def tool_directory(

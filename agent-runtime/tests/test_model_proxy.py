@@ -135,6 +135,7 @@ async def test_price_snapshot_idempotence_and_recovery_survive_new_proxy(store):
         call, (1000, 100, 400), charge=UpstreamCharge(Decimal("0.00208"), "USD")
     )
     await proxy.billing.settle(call, (999999, 100, 0), charge=UpstreamCharge(Decimal(99), "USD"))
+    config["prices"] = {"fixture": PRICES}
     pending = await proxy.billing.admit("main", "fixture")
     recovered, _ = proxy_for(store)
     await recovered.ready()
@@ -218,7 +219,7 @@ async def test_missing_usage_or_truncated_stream_is_unknown_and_blocks_limited_c
     await model.close()
 
 
-async def test_no_price_required_and_missing_upstream_cost_blocks_next_limited_call(store):
+async def test_missing_price_defaults_to_zero_and_allows_next_limited_call(store):
     proxy, _ = proxy_for(store, limit=1, prices=False)
     body = EVENTS.replace(b'"cost": 0.00208, ', b"")
     model = provider(
@@ -228,11 +229,11 @@ async def test_no_price_required_and_missing_upstream_cost_blocks_next_limited_c
         ),
     )
     await consume(model)
+    await consume(model)
     usage = await proxy.billing.view()
-    assert usage["unknown"] == 1 and usage["inputTokens"] == 1000
-    assert usage["charges"] == []
-    with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-        await consume(model)
+    assert usage["unknown"] == 0 and usage["inputTokens"] == 2000
+    assert usage["charges"] == usage["localCharges"] == [{"currency": "USD", "amount": "0"}]
+    assert usage["requests"] == usage["localEstimated"] == 2
     await model.close()
 
 
@@ -448,7 +449,7 @@ async def test_final_usage_without_cost_clears_provisional_receipt(store):
     )
     await consume(model)
     usage = await proxy.billing.view()
-    assert usage["charges"] == [] and usage["unknown"] == 1
+    assert usage["charges"] == [{"currency": "USD", "amount": "0"}] and usage["unknown"] == 0
     await model.close()
 
 

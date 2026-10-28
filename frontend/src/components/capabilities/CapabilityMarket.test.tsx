@@ -71,7 +71,7 @@ it('imports an SSE type alias into a remote URL form and preserves user edits af
   expect((url as HTMLInputElement).value).toBe('https://example.test/sse')
   expect(screen.queryByRole('textbox', { name: 'capabilities.command' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'capabilities.confirmImport' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/capability-imports/mcp', { name: 'legacy', config: { transport: 'sse', url: 'https://example.test/sse', key_env: 'MCP_TOKEN' } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/capability-imports/mcp', { name: 'legacy', displayName: 'legacy', description: '', config: { transport: 'sse', url: 'https://example.test/sse', key_env: 'MCP_TOKEN' } }))
   expect((url as HTMLInputElement).value).toBe('https://example.test/sse')
 })
 
@@ -81,7 +81,7 @@ it('edits an existing SSE connection without requiring a local command', async (
   const save = screen.getByRole('button', { name: 'capabilities.saveChanges' })
   expect(save.hasAttribute('disabled')).toBe(false)
   fireEvent.click(save)
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-imports/mcp/legacy', { name: 'legacy', config: { transport: 'sse', url: 'https://example.test/sse' } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/capability-imports/mcp/legacy', { name: 'legacy', displayName: 'legacy', description: '', config: { transport: 'sse', url: 'https://example.test/sse' } }))
 })
 
 it('rejects conflicting MCP transport aliases before showing an editable configuration', async () => {

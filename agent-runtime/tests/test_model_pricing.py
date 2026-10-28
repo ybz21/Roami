@@ -72,9 +72,13 @@ async def test_fallback_uses_exact_cache_adjusted_price_and_enforces_daily_limit
 
 
 @pytest.mark.parametrize("upstream_fee", [0, 0.05])
-async def test_upstream_charge_including_zero_always_overrides_local_rates(store, upstream_fee):
-    proxy, config = proxy_for(store)
-    config["prices"]["fixture"] = {"currency": "CNY", "input": 999, "output": 999}
+@pytest.mark.parametrize("priced", [False, True])
+async def test_upstream_charge_including_zero_always_overrides_local_rates(
+    store, upstream_fee, priced
+):
+    proxy, config = proxy_for(store, prices=priced)
+    if priced:
+        config["prices"]["fixture"] = {"currency": "CNY", "input": 999, "output": 999}
     model = provider(
         proxy,
         lambda request: httpx.Response(
@@ -145,7 +149,7 @@ async def test_mixed_receipts_and_estimates_sum_without_hiding_local_source(stor
     assert view["statistics"]["models"][0]["charges"] == view["charges"]
 
 
-async def test_adding_prices_does_not_reprice_old_unknown_records(store):
+async def test_adding_prices_does_not_reprice_old_zero_default_records(store):
     proxy, config = proxy_for(store, prices=False)
     old = await proxy.billing.admit("main", "fixture")
     await proxy.billing.settle(old, (1000, 100, 400))
@@ -154,8 +158,8 @@ async def test_adding_prices_does_not_reprice_old_unknown_records(store):
     new = await proxy.billing.admit("main", "fixture")
     await proxy.billing.settle(new, (1000, 100, 400))
     view = await proxy.billing.view()
-    assert view["unknown"] == 1 and view["localEstimated"] == 1
-    assert next(row for row in view["recent"] if row["id"] == old)["cost_amount"] is None
+    assert view["unknown"] == 0 and view["localEstimated"] == 2
+    assert next(row for row in view["recent"] if row["id"] == old)["cost_amount"] == "0"
 
 
 async def test_fallback_currency_is_checked_against_limit_and_never_converted(store):
@@ -165,3 +169,129 @@ async def test_fallback_currency_is_checked_against_limit_and_never_converted(st
     await proxy.billing.settle(call, (1000, 100, 400))
     with pytest.raises(DomainError, match="MODEL_PROXY_CURRENCY_MISMATCH"):
         await proxy.billing.admit("main", "fixture")
+
+
+@pytest.mark.parametrize("role", ["main", "worker", "memory"])
+@pytest.mark.parametrize(
+    "body,status",
+    [
+        (no_receipt(), 200),
+        (b'data: {"choices":[]}\n\ndata: [DONE]\n\n', 200),
+        (no_receipt().replace(b"data: [DONE]\n\n", b""), 200),
+        (b"unavailable", 503),
+    ],
+)
+async def test_unpriced_calls_allow_retry_without_usage_or_after_interruption(
+    store, role, body, status
+):
+    proxy, _ = proxy_for(store, limit=1, prices=False)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(status, headers={"content-type": "text/event-stream"}, content=body)
+
+    model = provider(proxy, handler, role)
+    for _ in range(2):
+        response = await model.client.post("http://127.0.0.1/v1/chat/completions")
+        assert response.status_code == status and response.content == body
+    view = await proxy.billing.view(days=1)
+    assert len(calls) == view["requests"] == view["localEstimated"] == 2
+    assert view["unknown"] == view["pending"] == 0
+    assert view["failed"] == (2 if status == 503 else 0)
+    assert view["charges"] == [{"currency": "USD", "amount": "0"}]
+    assert view["statistics"]["total"]["charges"] == view["charges"]
+    assert view["statistics"]["models"][0]["localCharges"] == view["charges"]
+    await model.close()
+
+
+async def test_zero_price_snapshot_survives_new_prices_currency_change_and_restart(store):
+    proxy, config = proxy_for(store, prices=False)
+    await proxy.ready()
+    call = await proxy.billing.admit("main", "fixture")
+    config.update(currency="CNY", dailyLimit=1, prices={"fixture": PRICES})
+    restored, _ = proxy_for(store, limit=1)
+    restored.billing.configuration = lambda: config
+    await restored.ready()
+    view = await restored.billing.view()
+    row = next(row for row in view["recent"] if row["id"] == call)
+    assert row["charges"] == [{"currency": "USD", "amount": "0"}]
+    assert row["error_code"] == "MODEL_PROXY_INTERRUPTED"
+    assert view["unknown"] == view["pending"] == 0
+    await restored.billing.check()
+    await restored.billing.admit("worker", "fixture")
+
+
+@pytest.mark.parametrize("state", ["unknown", "failed", "pending"])
+async def test_restart_recovers_legacy_unpriced_unknown_calls_without_rewriting_receipts(
+    store, state
+):
+    proxy, config = proxy_for(store, prices=False)
+    await proxy.ready()
+    legacy = await proxy.billing.admit("main", "fixture")
+    await store.call(
+        lambda db: db.execute(
+            "UPDATE model_proxy_calls SET prices_json=NULL,state=?,input_tokens=1000,output_tokens=100,cache_read_tokens=400,error_code='OLD_ERROR' WHERE id=?",
+            (state, legacy),
+        ),
+        write=True,
+    )
+    known = await proxy.billing.admit("worker", "fixture")
+    await proxy.billing.settle(known, None, charge=UpstreamCharge(Decimal("0.25"), "USD"))
+    config.update(dailyLimit=1, prices={"fixture": PRICES})
+    restored, _ = proxy_for(store)
+    restored.billing.configuration = lambda: config
+    await restored.ready()
+    view = await restored.billing.view()
+    assert view["charges"] == [{"currency": "USD", "amount": "0.25"}]
+    assert view["unknown"] == view["pending"] == 0
+    assert view["inputTokens"] == 1000 and view["cacheReadTokens"] == 400
+    old = next(row for row in view["recent"] if row["id"] == legacy)
+    assert old["cost_source"] == "estimate" and old["cost_amount"] == "0"
+    assert old["state"] == ("failed" if state == "failed" else "known")
+    assert old["error_code"] == ("MODEL_PROXY_INTERRUPTED" if state == "pending" else "OLD_ERROR")
+    await restored.billing.admit("main", "fixture")
+
+
+async def test_priced_unknown_call_still_blocks_an_unpriced_model(store):
+    proxy, _ = proxy_for(store, limit=1)
+    await proxy.ready()
+    call = await proxy.billing.admit("main", "fixture")
+    await proxy.billing.settle(call, None)
+    with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
+        await proxy.billing.admit("worker", "unpriced")
+
+
+async def test_legacy_zero_price_snapshot_without_currency_uses_legacy_cny(store):
+    proxy, _ = proxy_for(store, prices=False)
+    await proxy.ready()
+    call = await proxy.billing.admit("main", "fixture")
+    await store.call(
+        lambda db: db.execute(
+            "UPDATE model_proxy_calls SET state='unknown',prices_json=? WHERE id=?",
+            (json.dumps({"input": 0, "output": 0}), call),
+        ),
+        write=True,
+    )
+    restored, _ = proxy_for(store, limit=1)
+    await restored.ready()
+    view = await restored.billing.view()
+    assert view["charges"] == [{"currency": "CNY", "amount": "0"}]
+    assert view["unknown"] == 0
+    await restored.billing.check()
+
+
+async def test_upstream_charge_on_unpriced_model_still_enforces_limit(store):
+    proxy, _ = proxy_for(store, limit=0.001, prices=False)
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=EVENTS)
+
+    model = provider(proxy, handler)
+    await consume(model)
+    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
+        await consume(model)
+    assert len(calls) == 1
+    await model.close()

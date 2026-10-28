@@ -1,5 +1,5 @@
 export type ManagedKind = 'skills' | 'cli' | 'mcp'
-export type ManagedEntry = { name: string; description?: string; text?: string; argv?: string[]; cwd?: string; schema?: unknown; config?: Record<string, unknown>; argumentMode?: 'json' | 'argv'; files?: Record<string, string>; origin?: { source: string; id: string; version: string; url: string } }
+export type ManagedEntry = { name: string; displayName?: string; description?: string; enabled?: boolean; text?: string; argv?: string[]; cwd?: string; schema?: unknown; config?: Record<string, unknown>; argumentMode?: 'json' | 'argv'; files?: Record<string, string>; origin?: { source: string; id: string; version: string; url: string } }
 export type ManagedCatalog = Record<ManagedKind, Record<string, ManagedEntry>>
 export const MAX_IMPORT_BYTES = 65536
 

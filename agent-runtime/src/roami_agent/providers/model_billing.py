@@ -7,7 +7,13 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
-from roami_agent.providers.model_pricing import amount, currency_value, local_charge, model_prices
+from roami_agent.providers.model_pricing import (
+    amount,
+    currency_value,
+    is_zero_price,
+    local_charge,
+    model_prices,
+)
 from roami_agent.providers.model_usage import (
     USAGE_COLUMNS,
     money_records,
@@ -67,12 +73,27 @@ class ModelBilling:
 
     async def recover(self):
         if not self.recovered:
-            await self.db.call(
-                lambda db: db.execute(
+            config = proxy_configuration(self.configuration())
+            zero_price = {"currency": config["currency"], "input": 0, "output": 0, "cacheRead": 0}
+
+            def recover(db):
+                db.execute(
                     "UPDATE model_proxy_calls SET state='unknown',error_code='MODEL_PROXY_INTERRUPTED' WHERE state='pending'"
-                ),
-                write=True,
-            )
+                )
+                # Old unpriced calls must not keep the daily limit locked after upgrading.
+                rows = db.execute(
+                    "SELECT id,prices_json FROM model_proxy_calls WHERE cost_source='unknown' AND cost_amount IS NULL AND state!='pending'"
+                ).fetchall()
+                for row in rows:
+                    rate = json.loads(row["prices_json"]) if row["prices_json"] else zero_price
+                    if is_zero_price(rate):
+                        rate = {"currency": "CNY", "cacheRead": None, **rate}
+                        db.execute(
+                            "UPDATE model_proxy_calls SET state=CASE WHEN state='unknown' THEN 'known' ELSE state END,prices_json=?,cost_amount='0',cost_currency=?,cost_source='estimate' WHERE id=?",
+                            (json.dumps(rate), rate["currency"], row["id"]),
+                        )
+
+            await self.db.call(recover, write=True)
             self.recovered = True
             self.revision += 1
 
@@ -91,6 +112,8 @@ class ModelBilling:
                 if row["state"] == "pending" or not (billable or row["cost_source"] == "not_sent"):
                     raise DomainError("MODEL_PROXY_USAGE_UNKNOWN", 409)
                 if billable:
+                    if Decimal(row["cost_amount"]) == 0:
+                        continue
                     if row["cost_currency"] != config["currency"]:
                         raise DomainError("MODEL_PROXY_CURRENCY_MISMATCH", 409)
                     spent = add_amounts(spent, Decimal(row["cost_amount"]))
@@ -140,7 +163,17 @@ class ModelBilling:
                     role,
                     model,
                     started,
-                    json.dumps(config["prices"][model]) if model in config["prices"] else None,
+                    json.dumps(
+                        config["prices"].get(
+                            model,
+                            {
+                                "currency": config["currency"],
+                                "input": 0,
+                                "output": 0,
+                                "cacheRead": 0,
+                            },
+                        )
+                    ),
                 ),
             )
 
@@ -159,15 +192,11 @@ class ModelBilling:
                 return
             receipt = charge
             source = "upstream" if receipt is not None else "not_sent" if not_sent else "unknown"
-            if (
-                receipt is None
-                and counts is not None
-                and not failed
-                and not not_sent
-                and row["prices_json"]
-            ):
-                receipt = local_charge(json.loads(row["prices_json"]), counts)
-                source = "estimate"
+            if receipt is None and not not_sent and row["prices_json"]:
+                rate = json.loads(row["prices_json"])
+                if is_zero_price(rate) or (counts is not None and not failed):
+                    receipt = local_charge(rate, counts or (0, 0, 0))
+                    source = "estimate"
             state = "failed" if failed else "known" if receipt is not None else "unknown"
             db.execute(
                 "UPDATE model_proxy_calls SET state=?,finished_ms=?,input_tokens=?,output_tokens=?,cache_read_tokens=?,cost_amount=?,cost_currency=?,cost_source=?,error_code=? WHERE id=? AND state='pending'",

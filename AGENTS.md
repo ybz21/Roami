@@ -283,6 +283,18 @@ authority, it just no longer moves the layout under the user a beat after load.
   <p>零模型容器对照：将模拟记忆响应延迟 21 秒，旧镜像失败，新镜像完成 Native 交付；同组原任务及明确偏好真实 MemoryJobs 复验曾分别完成且用量已知，未全局激活。后续完整轮次新增的真实未知账不因这些局部结果消除；准入拒绝零计量、重试后未知保留与动态超时均有独立正反回归。</p>
 </section>
 
+<section id="unpriced-model-zero-default-20261028" lang="zh-CN">
+  <h2>未配置模型单价按零使用 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>未配置单价的模型按零价兜底，不再因无费用回执被每日限额拦住。有效上游费用回执仍优先计费；已有非零单价、实际消费、历史估算与限额规则保持有效。零金额不因币种不同阻断后续调用。</p>
+  <h3>User Stories</h3>
+  <ul><li>不填写模型单价也能连续使用主、后台与记忆模型；缺用量、失败或流中断不会因默认零价锁住后续请求。</li><li>升级后，旧的无单价未知账目自动按零价估算恢复，保留已有 Token、错误及失败状态；上游真实消费仍计入每日限额。</li></ul>
+  <h3>Technical Design</h3>
+  <p>providers/model_billing.py 在准入时为没有单价的模型冻结当前限额币种的零价快照，结算优先采用有效上游回执，否则零价无需假设 Token 即可结算为本地零估算。model_pricing.py 提供零价判定，非零价格仍要求完整用量。恢复在原事务内处理缺快照或零价快照的未知记录，不改已有金额及历史估算，不新增 schema、接口、轮询或前端控件。</p>
+  <h3>验收记录</h3>
+  <p>代理、定价、统计与 Codex 代理定向 120 项通过，修复前代码在新增连续请求回归中因 MODEL_PROXY_USAGE_UNKNOWN 失败。隔离私有 tmux 环境内，真实本地 HTTP SSE 上游验证旧无价格未知记录恢复，主／后台连续三次请求均按零价记账；上游返回 USD 0.125 后保留原金额，限额 0.1 阻止第五次网络请求。证据入口 /tmp/unpriced-model-20261028/index.html；测试上游和私有 tmux 已清理，无付费模型调用，未修改现用服务。本次无前端代码及产品文案改动。</p>
+</section>
+
 <section id="task-followup-routing-20261026" lang="zh-CN">
   <h2>任务续办、完整交办与会话名称 · 2026-10-26</h2>
   <h3>Product Design</h3>
@@ -1948,6 +1960,19 @@ cases/case-N-id/             CASE.md、case.json、materials.json 与显式资�
   <p>Case 资源只允许目录内普通文件；新 authored v13 套件记录资源 SHA256。QUANT-02 读取公开行情后添加每次运行 receipt，宿主答案不进入 Agent 工作区。原数据库结构、历史冻结套件和运行产物不重写。判定指纹覆盖拆出的 domain 与 evaluation 规则。</p>
   <p>验收包括依赖方向、无跨层 SQL、无领域 IO、无展示层写操作、规则指纹、资源路径边界、QUANT 输入与生成器一致性、完整回归及 wheel/sdist 安装后的材料读取。本次不改前端页面，原有独立质量和手机验收 Issue 不因分层重构关闭。</p>
   <p>实测：wheel 安装和 sdist 独立源码加载均找到 60 个 Case 与材料清单，QUANT 输入与标准库生成器及运行输入一致；替换区间、候选参数和成本后判定读取替换值。真实无网络容器完成 Native Worker 文件写入及宿主判定，镜像内无 authored_fixtures、authored_grading、corpus 模块。容器验证使用已有依赖层复制最终运行时代码及新清理指令，模型为脚本夹具，不作为能力评分。</p>
+</section>
+
+<section id="mcp-maintenance-metadata-20261028" lang="zh-CN">
+  <h2>MCP 保活与中文名称 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>MCP 显式连接后保存开启状态，在运行时重启后自动连接。空闲连接通过协议心跳检测，失效后退避重连并重新发现工具；连接成功只在初始化和目录校验通过后显示。已经发出的工具调用不自动重放，未知结果仍需用户或任务自行确认。新建和编辑支持中文名称及描述，列表、详情、搜索和 Agent 工具目录都使用这些信息。</p>
+  <h3>User Stories</h3>
+  <ul><li>开启 MCP 后，无需保持能力页打开，Agent 可继续发现和调用工具；进程退出或远程会话失效后自动恢复。</li><li>修改中文名称和描述后，连接、工具引用和已保存的工具开关保留；保存失败时保留表单输入。</li><li>服务不可用时显示正在重连，不假报已连接；删除服务和关闭运行时后停止重连及子进程。</li></ul>
+  <h3>Technical Design</h3>
+  <p>tools/mcp.py 由每连接监护任务维护已有 SDK actor，空闲 30 秒发送 ping 并刷新工具目录，健康检查限时 10 秒、初始化限时 25 秒，失败按 1 至 30 秒退避。用户调用与心跳由同一 actor 串行，重连只恢复会话和目录，不重放调用。运行时启动恢复 enabled 项，卸载同时取消监护和 actor。capability_imports.json 沿用原子私有文件，新增 enabled、displayName 与 description；缺字段的旧登记仍兼容原名称与首次显式连接方式。</p>
+  <p>稳定 ASCII name 保留为工具引用，新中文名称由 displayName 承载；新建只填中文名时自动分配引用名。元信息编辑不重建连接，注册表的描述立即更新，别名摘要保持只取远程工具协议与权限。CapabilityEditor、CapabilityCatalog 复用现有控件、i18n 和 MobileSubPage，不增加页面轮询。</p>
+  <h3>验收记录</h3>
+  <p>验收：full 质量门禁通过（Go 全量、Python 全量 1683 项、静态与格式检查、前端 typecheck／i18n／hover／生产构建及秘密扫描）；最终 MCP／Agent／目录定向 67 项和前端 142 文件／1038 项通过；实际生产包 83 项检查覆盖七档宽度、中英文、深浅主题、编辑保存、刷新恢复与命中，无文档横向溢出。stdio 进程退出、心跳超时、Streamable HTTP 会话过期、运行时重启、未知调用不重放、工具权限保留及原子保存回归通过。隔离 HTTPS 服务实际杀掉夹具进程后约 31.2 秒恢复，运行时重启后自动恢复开启项；中文描述通过真实 CLI 查询返回 7 个目录项。目录回退规则保留同分类的直接文字匹配，避免中文元信息被其他分类的别名命中隐藏。证据入口 /tmp/mcp-keepalive-20261028/index.html。粗指针为桌面模拟；Redmi Note 8 仍处于安全锁屏，真机触控、软键盘和安全区验收未完成。未调用付费模型，未部署现用服务。</p>
 </section>
 
 <section id="conversation-stream-push-20261028" lang="zh-CN">
