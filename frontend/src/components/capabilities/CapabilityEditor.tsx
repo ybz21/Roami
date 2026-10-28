@@ -23,7 +23,8 @@ export default function CapabilityEditor({ kind, entry, draft, importing = false
   const [stage, setStage] = useState(importing ? 'upload' : 'edit')
   const [raw, setRaw] = useState('')
   const [fileName, setFileName] = useState('')
-  const [name, setName] = useState(initial?.name || '')
+  const [name, setName] = useState((kind === 'mcp' ? initial?.displayName : '') || initial?.name || '')
+  const [identifier, setIdentifier] = useState(initial?.name || '')
   const [description, setDescription] = useState(initial?.description || '')
   const [text, setText] = useState((initial?.text || '').replace(/^---\n[\s\S]*?\n---\n/, ''))
   const [preview, setPreview] = useState(false)
@@ -38,7 +39,7 @@ export default function CapabilityEditor({ kind, entry, draft, importing = false
   const [extras, setExtras] = useState<Partial<ManagedEntry>>({ ...(initial?.origin ? { origin: initial.origin } : {}), ...(initial?.files ? { files: initial.files } : {}), ...(initial?.argumentMode ? { argumentMode: initial.argumentMode } : {}) })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const title = entry ? t('capabilities.editNamed', { name: entry.name }) : t('capabilities.' + (stage === 'upload' ? 'importTitle.' : fileName || raw ? 'reviewTitle.' : 'createTitle.') + kind)
+  const title = entry ? t('capabilities.editNamed', { name: entry.displayName || entry.name }) : t('capabilities.' + (stage === 'upload' ? 'importTitle.' : fileName || raw ? 'reviewTitle.' : 'createTitle.') + kind)
   const report = (caught: any) => setError(capabilityError(caught instanceof SyntaxError ? 'INVALID_CAPABILITY_JSON' : caught.message, t))
   const loadImport = (value = raw) => {
     setError('')
@@ -51,11 +52,12 @@ export default function CapabilityEditor({ kind, entry, draft, importing = false
       } else {
         if (typeof parsed.name !== 'string' || !parsed.name) throw new Error('INVALID_CAPABILITY_NAME')
         if (parsed.description !== undefined && typeof parsed.description !== 'string') throw new Error('INVALID_CAPABILITY_IMPORT')
-        const allowed = kind === 'cli' ? ['name', 'description', 'argv', 'cwd', 'schema', 'argumentMode', 'origin'] : kind === 'mcp' ? ['name', 'config', 'origin'] : ['name', 'description', 'text', 'files', 'origin']
+        if (parsed.displayName !== undefined && typeof parsed.displayName !== 'string') throw new Error('INVALID_CAPABILITY_IMPORT')
+        const allowed = kind === 'cli' ? ['name', 'description', 'argv', 'cwd', 'schema', 'argumentMode', 'origin'] : kind === 'mcp' ? ['name', 'displayName', 'description', 'enabled', 'config', 'origin'] : ['name', 'description', 'text', 'files', 'origin']
         if (Object.keys(parsed).some(key => !allowed.includes(key))) throw new Error('INVALID_CAPABILITY_IMPORT')
         if (parsed.origin && (typeof parsed.origin !== 'object' || !['source', 'id', 'version', 'url'].every(key => typeof (parsed.origin as Record<string, unknown>)[key] === 'string') || !parsed.origin.url.startsWith('https://'))) throw new Error('INVALID_CAPABILITY_IMPORT')
         if (entry && entry.name !== parsed.name) throw new Error('INVALID_CAPABILITY_NAME')
-        setBatch(null); setName(parsed.name); setDescription(parsed.description || '')
+        setBatch(null); setIdentifier(parsed.name); setName((kind === 'mcp' ? parsed.displayName : '') || parsed.name); setDescription(parsed.description || '')
         setExtras({ ...(parsed.origin ? { origin: parsed.origin } : {}), ...(parsed.files ? { files: parsed.files } : {}), ...(parsed.argumentMode ? { argumentMode: parsed.argumentMode } : {}) })
         if (kind === 'skills') setText((parsed.text || '').replace(/^---\n[\s\S]*?\n---\n/, ''))
         if (kind === 'cli') {
@@ -87,7 +89,7 @@ export default function CapabilityEditor({ kind, entry, draft, importing = false
       if (batch) payload = parseCapability(kind, raw)
       else if (kind === 'skills') payload = { name: name.trim(), description: description.trim(), text }
       else if (kind === 'cli') payload = { name: name.trim(), description: description.trim(), argv: [command.trim(), ...parseArguments(args)], ...(cwd.trim() ? { cwd: cwd.trim() } : {}), ...(schema ? { schema } : {}) }
-      else payload = { name: name.trim(), config: { ...parseAdvanced(advanced), transport, ...(transport === 'stdio' ? { command: command.trim(), args: parseArguments(args) } : { url: url.trim() }) } }
+      else payload = { ...(identifier ? { name: identifier } : {}), displayName: name.trim(), description: description.trim(), config: { ...parseAdvanced(advanced), transport, ...(transport === 'stdio' ? { command: command.trim(), args: parseArguments(args) } : { url: url.trim() }) } }
       if (!batch) payload = { ...payload, ...extras }
       if (entry && payload.name !== entry.name) throw new Error('INVALID_CAPABILITY_NAME')
       const path = '/agent/capability-imports/' + kind + (entry ? '/' + encodeURIComponent(entry.name) : '')
@@ -123,8 +125,8 @@ export default function CapabilityEditor({ kind, entry, draft, importing = false
           <Form.Item label={t('capabilities.jsonConfig')}><Input.TextArea aria-label={t('capabilities.importContent')} value={raw} onChange={event => setRaw(event.target.value)} autoSize={{ minRows: 8, maxRows: 16 }} /></Form.Item>
         </> : <>
           <div className="tt-capability-identity-fields">
-            <Form.Item label={t('capabilities.name')} required extra={t(entry ? 'capabilities.nameFixed' : kind === 'mcp' ? 'capabilities.mcpNameHint' : 'capabilities.nameHint')}><Input maxLength={kind === 'mcp' ? 20 : 64} aria-label={t('capabilities.name')} disabled={!!entry} placeholder={t('capabilities.nameExample.' + kind)} value={name} onChange={event => setName(event.target.value)} autoComplete="off" /></Form.Item>
-            {kind !== 'mcp' && <Form.Item label={t('capabilities.description')}><Input aria-label={t('capabilities.description')} placeholder={t('capabilities.descriptionExample')} value={description} onChange={event => setDescription(event.target.value)} /></Form.Item>}
+            <Form.Item label={t('capabilities.name')} required extra={t(kind === 'mcp' ? 'capabilities.mcpNameHint' : entry ? 'capabilities.nameFixed' : 'capabilities.nameHint')}><Input maxLength={kind === 'mcp' ? 80 : 64} aria-label={t('capabilities.name')} disabled={!!entry && kind !== 'mcp'} placeholder={t('capabilities.nameExample.' + kind)} value={name} onChange={event => setName(event.target.value)} autoComplete="off" /></Form.Item>
+            <Form.Item label={t('capabilities.description')}><Input aria-label={t('capabilities.description')} maxLength={2000} placeholder={t('capabilities.descriptionExample')} value={description} onChange={event => setDescription(event.target.value)} /></Form.Item>
           </div>
           {kind === 'skills' && <div className="tt-capability-instructions">
             <div className="tt-capability-writing-head"><label htmlFor="capability-instructions">{t('capabilities.instructions')}</label><Segmented size="small" value={preview ? 'preview' : 'write'} onChange={value => setPreview(value === 'preview')} options={[{ value: 'write', label: t('capabilities.write') }, { value: 'preview', label: t('capabilities.preview') }]} /></div>

@@ -1,4 +1,4 @@
-"Lazy MCP connections; each actor owns its SDK task groups for their whole lifetime."
+"Supervised MCP connections; each actor owns its SDK task groups for their whole lifetime."
 
 import asyncio
 import hashlib
@@ -24,6 +24,9 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.mcp_results import MCPResults
 
 log = logging.getLogger(__name__)
+HEARTBEAT_SECONDS = 30
+HEALTH_TIMEOUT_SECONDS = 10
+CONNECT_TIMEOUT_SECONDS = 25
 
 
 def validate_servers(configs):
@@ -111,6 +114,11 @@ class Connection:
     failures: int = 0
     current: Request | None = None
     session: ClientSession | None = None
+    enabled: bool = False
+    monitor: asyncio.Task | None = None
+    display_name: str = ""
+    description: str = ""
+    descriptions: dict = field(default_factory=dict)
 
 
 class TrackedStream:
@@ -138,6 +146,7 @@ class MCPConnections:
         self.registry = registry
         self.connections = {name: Connection(name, config) for name, config in configs.items()}
         self.closed = False
+        self.running = False
         self.register_discovery()
 
     def register_discovery(self):
@@ -147,7 +156,10 @@ class MCPConnections:
                 Tool(
                     "mcp_discover",
                     "Discover or refresh configured MCP tools before use. Servers: "
-                    + ", ".join(self.connections),
+                    + "; ".join(
+                        f"{c.name} ({c.display_name or c.name}): {c.description[:200]}"
+                        for c in self.connections.values()
+                    ),
                     object_schema(
                         {"server": {"type": "string", "enum": list(self.connections)}}, ["server"]
                     ),
@@ -156,11 +168,25 @@ class MCPConnections:
                 )
             )
 
+    def update_metadata(self, connection, display_name, description):
+        connection.display_name, connection.description = display_name, description
+        for alias, remote_description in connection.descriptions.items():
+            if alias in self.registry.registry:
+                self.registry.registry[alias].description = self._description(
+                    connection, remote_description
+                )
+        self.register_discovery()
+
+    @staticmethod
+    def _description(connection, remote_description):
+        return f"{connection.display_name or connection.name}: {connection.description[:500]}\n{remote_description}"
+
     def _remove(self, connection):
         for name in connection.names:
             self.registry.registry.pop(name, None)
         connection.names = {}
         connection.version = ""
+        connection.descriptions = {}
 
     async def _catalog(self, connection, session):
         tools, cursor, seen = [], None, set()
@@ -177,7 +203,7 @@ class MCPConnections:
             seen.add(cursor)
         else:
             raise DomainError("MCP_CATALOG_LIMIT")
-        prepared, names, remote_names = [], {}, set()
+        prepared, names, descriptions, remote_names = [], {}, {}, set()
         for remote in tools:
             schema = remote.inputSchema
             if remote.name in remote_names or schema.get("type") != "object":
@@ -211,15 +237,23 @@ class MCPConnections:
 
             prepared.append(
                 Tool(
-                    alias, description, schema, invoke, effect=effect, source="external", main=True
+                    alias,
+                    self._description(connection, description),
+                    schema,
+                    invoke,
+                    effect=effect,
+                    source="external",
+                    main=True,
                 )
             )
             names[alias] = remote.name
+            descriptions[alias] = description
         version = hashlib.sha256(encoded(sorted(names)).encode()).hexdigest()
         self._remove(connection)
         for tool in sorted(prepared, key=lambda item: item.name):
             self.registry.add(tool)
         connection.names, connection.version = names, version
+        connection.descriptions = descriptions
         return self._view(connection)
 
     @classmethod
@@ -242,11 +276,55 @@ class MCPConnections:
 
     async def discover(self, args, binding):
         connection = self.connections[args["server"]]
+        self.activate(connection)
         return await self._request(connection, "discover", {})
+
+    def start(self):
+        self.running = True
+        for connection in self.connections.values():
+            if connection.enabled:
+                self.activate(connection)
+
+    def activate(self, connection):
+        if self.closed:
+            raise DomainError("MCP_CLOSED")
+        if self.connections.get(connection.name) is not connection:
+            raise DomainError("TOOL_UNAVAILABLE")
+        self.running = True
+        connection.enabled = True
+        if connection.monitor is None or connection.monitor.done():
+            connection.monitor = asyncio.create_task(
+                self._maintain(connection), name="mcp-maintain-" + connection.name
+            )
+
+    async def _maintain(self, connection):
+        while not self.closed and connection.enabled:
+            delay = connection.retry_after - time.monotonic()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            try:
+                await self._ensure(connection)
+                await asyncio.shield(connection.task)
+            except DomainError:
+                pass
+            except asyncio.CancelledError:
+                # A caller may cancel the actor while its monitor must keep running.
+                if asyncio.current_task().cancelling():
+                    raise
+
+    async def stop(self, connection):
+        connection.enabled = False
+        tasks = [t for t in (connection.monitor, connection.task) if t and not t.done()]
+        for task in tasks:
+            if not task.cancelling():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _ensure(self, connection):
         if self.closed:
             raise DomainError("MCP_CLOSED")
+        if self.connections.get(connection.name) is not connection:
+            raise DomainError("TOOL_UNAVAILABLE")
         if connection.task is None or connection.task.done():
             if time.monotonic() < connection.retry_after:
                 raise DomainError("MCP_RECONNECT_BACKOFF")
@@ -354,14 +432,23 @@ class MCPConnections:
                         message_handler=changed,
                     )
                 )
+                async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
+                    await session.initialize()
+                    await self._catalog(connection, session)
                 connection.session = session
-                await session.initialize()
-                await self._catalog(connection, session)
                 connection.failures = 0
                 if not connection.ready.done():
                     connection.ready.set_result(True)
                 while True:
-                    request = await connection.queue.get()
+                    request = None
+                    try:
+                        async with asyncio.timeout(HEARTBEAT_SECONDS):
+                            request = await connection.queue.get()
+                    except TimeoutError:
+                        async with asyncio.timeout(HEALTH_TIMEOUT_SECONDS):
+                            await session.send_ping()
+                            await self._catalog(connection, session)
+                        continue
                     if request.future.cancelled():
                         continue
                     connection.current = request
@@ -417,8 +504,4 @@ class MCPConnections:
 
     async def close(self):
         self.closed = True
-        tasks = [c.task for c in self.connections.values() if c.task and not c.task.done()]
-        for task in tasks:
-            if not task.cancelling():
-                task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*(self.stop(c) for c in self.connections.values()))
