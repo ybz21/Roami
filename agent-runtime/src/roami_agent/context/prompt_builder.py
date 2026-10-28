@@ -277,7 +277,7 @@ class PromptBuilder:
                         "delegated(taskId)/blocked(reason). For 'give report + open Roami task about broken delivery', continue the report "
                         "and create a product-repair task, never a second report task or a note. "
                         "For direct report + repair, delegate repair with requestComplete=false then reply with report. "
-                        "Continue tasks using only new user sourceQuote/text; never replay old briefs or expand merge into release/deployment. "
+                        "Continue tasks with task_steer using only new user text/sourceQuote; never replay old briefs or expand merge into release/deployment. "
                         "requestComplete covers the WHOLE message: false until all parts, including discovery, are handled; "
                         "true only on the final delegate/task_steer then stop without polling. "
                         "Accepted is pending, not completed."

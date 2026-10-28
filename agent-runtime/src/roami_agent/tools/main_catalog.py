@@ -11,6 +11,7 @@ from roami_agent.replies.answer_contract import validate_answer
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
+from roami_agent.storage.request_quotes import quote_text
 from roami_agent.storage.task_continuation import continuation_candidates
 from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
@@ -716,7 +717,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         source_quote = args.get("sourceQuote")
         if outcomes:
             current_quote = next(item["quote"] for item in outcomes if item["status"] == "current")
-            if source_quote and source_quote != current_quote:
+            if source_quote and quote_text(source_quote) != quote_text(current_quote):
                 raise DomainError("REQUEST_HANDOFF_SCOPE_REQUIRED")
             source_quote = current_quote
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
