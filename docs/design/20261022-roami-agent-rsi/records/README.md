@@ -4,6 +4,8 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-28 | [静态页面的存储验收环境](2026-10-28/browser-storage-origin.html) |
+| 2026-10-28 | [交付原文、脚本退出与复盘超时](2026-10-28/task-answer-script-exit-and-report-timeout.html) |
 | 2026-10-28 | [已提交答案与工作区重跑](2026-10-28/committed-answer-workspace-replay.html) |
 | 2026-10-28 | [QUANT-05 输入字段序列化合同](2026-10-28/quant-input-field-serialization.html) |
 | 2026-10-28 | [筛选结果按可见卡片验收](2026-10-28/visible-filter-results.html) |

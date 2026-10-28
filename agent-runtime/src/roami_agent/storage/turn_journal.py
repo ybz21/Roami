@@ -169,6 +169,8 @@ class TurnJournal:
                 content["question"] = question
             if completion:
                 content["source"] = "task"
+                if final:
+                    content["answerText"] = text
             db.execute(
                 "UPDATE messages SET content_json=?,status='completed' WHERE id=?",
                 (encoded(content), mid),

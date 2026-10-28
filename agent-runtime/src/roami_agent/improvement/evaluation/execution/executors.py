@@ -45,7 +45,12 @@ def committed_answer(messages, *, turn_id=None):
         ),
         None,
     )
-    return (main or answers[0])["content"]["text"] if answers else ""
+    if not answers:
+        return ""
+    content = (main or answers[0])["content"]
+    if content.get("source") == "task" and isinstance(content.get("answerText"), str):
+        return content["answerText"]
+    return content["text"]
 
 
 class ProtocolFixtureModel:

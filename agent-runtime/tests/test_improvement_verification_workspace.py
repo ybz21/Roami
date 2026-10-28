@@ -37,6 +37,29 @@ def assistant(text, *, turn_id="current", **content):
         ([assistant("0.57593"), assistant("0.1")], "0.1", False),
         ([assistant("0.57593", source="task")], "0.57593", True),
         (
+            [assistant("0.57593\n\n[answer.txt](/artifact)", source="task", answerText="0.57593")],
+            "0.57593",
+            True,
+        ),
+        (
+            [assistant("0.57593\n\n[answer.txt](/artifact)", source="task")],
+            "0.57593\n\n[answer.txt](/artifact)",
+            False,
+        ),
+        ([assistant("0.57593", source="task", answerText="0.1")], "0.1", False),
+        (
+            [assistant("0.57593", source="task", answerText="The answer is 0.57593")],
+            "The answer is 0.57593",
+            False,
+        ),
+        (
+            [assistant("0.1"), assistant("delivery", source="task", answerText="0.57593")],
+            "0.1",
+            False,
+        ),
+        ([assistant("0.1", answerText="0.57593")], "0.1", False),
+        ([assistant("0.57593", source="task", answerText="")], "", False),
+        (
             [
                 assistant("Working", tool_calls=[{"id": "call"}]),
                 assistant("0.57593", source="task"),
