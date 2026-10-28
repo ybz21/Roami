@@ -49,13 +49,13 @@ SHA256 values enter the new authored suite's origin; runtime receipts and privat
 remain separate. See [the Case format](../../../../cases/README.md).
 
 This refactor does not rewrite ledger schemas or historical run artifacts. New authored suites
-use `roami-authored-40-v15`; existing frozen v12/v13/v14 suites remain intact. Grader fingerprints include
+use `roami-authored-40-v16`; existing frozen v12/v13/v14/v15 suites remain intact. Grader fingerprints include
 all extracted domain and evaluation Python sources so a rule change cannot silently reuse an
 old grader identity. Existing public `python -m ...improvement.cli`, `container_agent` and
 `import_diagnostic` entry points remain small shims; private imports use the actual new modules.
 
 Shared daily accounting requires rebuilding `improvement.Dockerfile` after upgrading. The image
-label `org.roami.rsi.shared-daily-policy=3` identifies support for forwarding the host policy into
+label `org.roami.rsi.shared-daily-policy=4` identifies support for forwarding the host policy into
 the Native executor and deferring fee admission to the configured Go gateway. Missing token counts remain
 unknown evaluation evidence; they do not introduce a second spending gate when the configured Go gateway
 allows the request. Shared-mode preflight rejects older images before model execution, so an old

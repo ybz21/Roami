@@ -520,7 +520,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
             }
             schema = {
                 **schema_shape(expected),
-                "contract": "result.json原样复制prices.json中的字符串字段receipt、execution_prices、signal_prices；不生成新的哈希凭证或在这些字段内附加说明，解释放入report.md。trades_on_unavailable_bars只记录实际发生的违规成交，不是不可交易bar的索引清单，也不是被阻止的信号列表。",
+                "contract": "result.json原样复制prices.json中的字符串字段receipt、execution_prices、signal_prices；不生成新的哈希凭证或在这些字段内附加说明，解释放入report.md。trades_on_unavailable_bars只记录实际发生的违规成交，不是不可交易bar的索引清单，也不是被阻止的信号列表。analysis.py正常生成合同要求的结果和报告时以0退出；completed=false是业务结论，不是脚本执行失败，不把未解决项映射为非零退出码。",
             }
         files["prices.json"] = json.dumps(data)
         if case_id in {"QUANT-01", "QUANT-03"}:
@@ -580,7 +580,7 @@ if __name__=="__main__": HTTPServer(("127.0.0.1",int(os.getenv("PORT","8000"))),
         "fixture_receipt": nonce,
         "fixture_revision": "roami-authored-v3",
         "contract_revision": (
-            "authored-v15-input-field-serialization"
+            "authored-v16-analysis-exit-contract"
             if case_id == "QUANT-05"
             else "authored-v14-explicit-trade-sides"
             if case_id in {"QUANT-01", "QUANT-03"}

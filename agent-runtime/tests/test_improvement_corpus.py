@@ -287,11 +287,14 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     v13.write_bytes(b"previous v13 frozen evidence")
     v14 = root / "authored-40-v14.json"
     v14.write_bytes(b"previous v14 frozen evidence")
+    v15 = root / "authored-40-v15.json"
+    v15.write_bytes(b"previous v15 frozen evidence")
     prepare_corpus(service, "owner")
+    assert v15.read_bytes() == b"previous v15 frozen evidence"
     assert v14.read_bytes() == b"previous v14 frozen evidence"
     assert v13.read_bytes() == b"previous v13 frozen evidence"
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v15.json").read_text())
+    revised = json.loads((root / "authored-40-v16.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"
@@ -303,7 +306,7 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
             "authored-v11-verified-backtest-summaries",
             "authored-v13-visible-quant-inputs",
             "authored-v14-explicit-trade-sides",
-            "authored-v15-input-field-serialization",
+            "authored-v16-analysis-exit-contract",
         }
         for c in revised["cases"]
         if "执行要求（不是结果字段）" in c["prompt"]
@@ -416,7 +419,7 @@ def test_quant_data_quality_serialization_is_public_and_versioned():
         in definition["output_format"]["field_descriptions"]["trades_on_unavailable_bars"]
     )
     assert all(field in case["prompt"] for field in fields)
-    assert case["origin"]["recipe_revision"] == "authored-v15-input-field-serialization"
+    assert case["origin"]["recipe_revision"] == "authored-v16-analysis-exit-contract"
 
 
 @pytest.mark.parametrize(
@@ -448,3 +451,48 @@ async def test_quant_data_quality_still_rejects_replaced_input_fields(tmp_path, 
     assert not grade["hard_passed"]
     assert not grade["checks"]["structured_result"]
     assert not grade["checks"]["reproducible_code"]
+
+
+def test_quant_analysis_exit_contract_is_public_without_changing_expected_result():
+    from roami_agent.improvement.evaluation.case_catalog import case_definitions
+
+    definition = next(c for c in case_definitions() if c["id"] == "QUANT-05")
+    assert definition["output_format"]["success_exit_code"] == 0
+    case = next(c for c in authored_suite("analysis-exit")["cases"] if c["id"] == "QUANT-05")
+    assert "以0退出" in case["prompt"]
+    assert "completed=false是业务结论" in case["prompt"]
+    assert case["judge"]["expected"]["completed"] is False
+    assert case["judge"]["expected"]["unresolved"] is True
+
+
+@pytest.mark.parametrize("exit_code", [0, 2])
+async def test_unresolved_result_does_not_override_failed_analysis_process(tmp_path, exit_code):
+    case = next(c for c in authored_suite("exit-status")["cases"] if c["id"] == "QUANT-05")
+    workspace = tmp_path / "workspace"
+    materialize(case, workspace)
+    result = json.dumps(case["judge"]["expected"])
+    (workspace / "result.json").write_text(result)
+    (workspace / "report.md").write_text(
+        "Synthetic prices.json analysis remains unresolved without invented fills. "
+        + case["fixture_receipt"]
+    )
+    (workspace / "analysis.py").write_text(
+        "from pathlib import Path\nPath('result.json').write_text("
+        + repr(result)
+        + ")\nraise SystemExit("
+        + str(exit_code)
+        + ")\n"
+    )
+
+    class ExitReplay(AnalysisReplay):
+        async def sandbox(self, *args, **kwargs):
+            try:
+                return await super().sandbox(*args, **kwargs)
+            except AssertionError:
+                raise DomainError("RSI_DOCKER_COMMAND_FAILED") from None
+
+    grade = await grade_authored(case, workspace, ExitReplay())
+    assert grade["checks"]["structured_result"]
+    assert grade["hard_passed"] is (exit_code == 0)
+    if exit_code:
+        assert not grade["checks"]["verification_completed"]

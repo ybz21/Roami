@@ -7,6 +7,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from roami_agent.improvement.domain.contracts import require
+from roami_agent.improvement.integrations.artifact_files import private_json
+from roami_agent.protocol.errors import DomainError
 from roami_agent.tools.process import execute
 
 
@@ -103,6 +105,12 @@ async def run_codex(argv, *, cwd, timeout, max_bytes, **kwargs):
             "exitCode": result["exitCode"],
             **{k: result[k].read_text(errors="replace") for k in ("stdout", "stderr")},
         }
+    except TimeoutError:
+        private_json(
+            cwd / "process-failure.json",
+            {"code": "RSI_CODEX_TIMEOUT", "timeout_seconds": timeout, "usage": "unknown"},
+        )
+        raise DomainError("RSI_CODEX_TIMEOUT") from None
     finally:
         if not task.done():
             task.cancel()

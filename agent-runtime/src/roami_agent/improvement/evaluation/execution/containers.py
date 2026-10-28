@@ -86,7 +86,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v26-committed-answer-workspace-replay",
+                "container-uds-v27-task-answer-provenance",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -177,7 +177,7 @@ class ContainerExecutor:
         if self.shared_daily_limit:
             labels = detail.get("Config", {}).get("Labels") or {}
             require(
-                labels.get("org.roami.rsi.shared-daily-policy") == "3",
+                labels.get("org.roami.rsi.shared-daily-policy") == "4",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
         self.image_id = detail["Id"]

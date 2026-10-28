@@ -1,5 +1,5 @@
 FROM python:3.12-slim
-LABEL org.roami.rsi.shared-daily-policy="3"
+LABEL org.roami.rsi.shared-daily-policy="4"
 RUN apt-get update && apt-get install -y --no-install-recommends chromium ffmpeg libreoffice-impress fonts-noto-cjk fonts-liberation git && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir uv
 WORKDIR /opt/roami-agent
