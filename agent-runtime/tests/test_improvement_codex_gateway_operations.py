@@ -13,7 +13,7 @@ from test_improvement_pipeline import setup_run
 from roami_agent.improvement.integrations.codex_gateway import CodexTextGateway
 from roami_agent.improvement.persistence.run_costs import RunCosts
 from roami_agent.improvement.workflows.codex_roles import codex_json
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
 from roami_agent.protocol.models import ModelEvent
 
 
@@ -73,7 +73,9 @@ async def test_completed_receipt_uses_host_usage_and_reuses_without_catalog_or_s
     assert json.loads(receipt.read_text())["requests"][0]["role"] == "rsi_codex_review"
 
 
-async def test_quota_rejection_is_archived_without_replaying_paid_work(tmp_path, monkeypatch):
+async def test_trusted_admission_rejection_is_archived_without_replaying_paid_work(
+    tmp_path, monkeypatch
+):
     service, workflow = bind(monkeypatch, tmp_path)
     calls = []
 
@@ -82,7 +84,7 @@ async def test_quota_rejection_is_archived_without_replaying_paid_work(tmp_path,
 
         async def stream(self, messages, tools):
             calls.append("rejected")
-            raise DomainError("MODEL_HTTP_402")
+            raise ModelAdmissionRejected("MODEL_HTTP_402")
             yield
 
     async def resolve(*args, **kwargs):
@@ -124,6 +126,36 @@ async def test_unknown_provider_usage_never_replays(tmp_path, monkeypatch):
     assert len(calls) == 1
     receipt = next(service.ledger.path.parent.glob("codex-roles/*/*/gateway-usage.json"))
     assert json.loads(receipt.read_text())["metrics"]["tokens"] is None
+
+
+async def test_bare_http_402_does_not_certify_unspent_usage(tmp_path, monkeypatch):
+    service, workflow = bind(monkeypatch, tmp_path)
+    calls = []
+
+    class Uncertain:
+        model = "rr/gpt-6.1-sol"
+
+        async def stream(self, messages, tools):
+            calls.append(True)
+            raise DomainError("MODEL_HTTP_402")
+            yield
+
+    async def resolve(*args, **kwargs):
+        value = plan([])
+        value.factory = lambda *_: Uncertain()
+        return value
+
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.gateway_plan", resolve)
+    action = {"id": "uncertain-402", "kind": "review", "owner": "local"}
+    args = (workflow, action, {"model_tokens": 1, "model_seconds": 30}, "report", [])
+    with pytest.raises(DomainError, match="MODEL_HTTP_402"):
+        await codex_json(*args, settings=settings(), runner=invoke_local_gateway)
+    with pytest.raises(DomainError, match="UNKNOWN_OPERATION"):
+        await codex_json(*args, settings=settings(), runner=invoke_local_gateway)
+    receipt = next(service.ledger.path.parent.glob("codex-roles/*/*/gateway-usage.json"))
+    value = json.loads(receipt.read_text())
+    assert value["admission_rejected"] is False and value["metrics"]["tokens"] is None
+    assert calls == [True]
 
 
 async def test_shared_policy_cannot_fall_back_to_personal_cli(tmp_path, monkeypatch):

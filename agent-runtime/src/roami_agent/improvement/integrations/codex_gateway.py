@@ -153,7 +153,7 @@ class CodexTextGateway:
             )
         self.outcome.update(metrics=self.budget.metrics(), requests=requests, errors=self.errors)
         self.outcome["admission_rejected"] = bool(self.journal) and all(
-            (item.get("error_code") == "MODEL_HTTP_402" or item.get("admission_rejected") is True)
+            item.get("admission_rejected") is True
             and not any(e["kind"] in {"text", "tool", "usage"} for e in item["events"])
             for item in self.journal
         )
