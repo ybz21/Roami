@@ -41,3 +41,7 @@
 - 真实 Go CLI / tmux / Python 链路、离线专业执行器夹具：Codex 与 Claude 均保留初轮、手动修改和 Main 续改的供应商对话身份，明确关闭才结束。
 - Chrome 桌面与 Redmi Note 8 实际触屏通过打开、取消关闭、确认关闭和草稿保留；已有结束任务无额外轮询。
 - Python/Go 门禁、前端 126 文件 897 测试、typecheck、i18n、hover 与生产构建通过。完整报告保存在 `/tmp/task-continuation-affinity/index.html`，截图通过 PR 图分支提供。
+
+## 设计修订与验收记录
+
+[按日期查看记录](records/README.md)。

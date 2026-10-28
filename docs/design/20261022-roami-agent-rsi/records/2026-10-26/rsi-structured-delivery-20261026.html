@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>结构化交付合同修复 · 2026-10-26</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-structured-delivery-20261026" lang="zh-CN">
+  <h2>结构化交付合同修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>用户给出结构化输出合同时，文件和回复遵守约定字段与类型；只有明确允许扩展才添加字段。说明、来源和诊断信息写入另行请求的报告，不擅自扩展机器消费的结构。</p>
+  <h3>User Stories</h3>
+  <p>用户获得能由既定消费者读取的结构化文件；可读报告仍保留依据与限制，不为补充说明破坏接口。</p>
+  <h3>Technical Design</h3>
+  <p>replies/delivery_policy.py 的交付指令由 Main 与 Worker 共用。规则仅描述用户已经提供的合同，不含案例名称、参考答案或评分字段；不修改题目、判定器、用量核算与 Case 上限。原始错误输出与验收失败记录保留，新版本单独复测。</p>
+  <p>初版交付指令过长触发两项上下文边界回归；压缩共用文案并保留原有交付约束，27 项上下文与文件交付回归通过，不放宽上下文上限或测试断言。较早的同镜像 NEWS-01、CODE-01、QUANT-01 独立硬检查均通过，但随后发现 QUANT-01 仅保存两份文件快照，因此硬检查不作为完整交付通过。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

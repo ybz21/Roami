@@ -23,3 +23,7 @@
 CLI 能力修正：Main 新增 `workspace_overview` 短工具，通过一次 `roami project ls --json` 读取完整统计，区分项目内 / 散会话、存活 / 休眠，避免拿项目卡的前三条会话当总数。查询范围明确为当前节点。目标发现识别 CLI 的 JSON 未授权回执，保留可诊断的内部错误，回复用户时不要求用户执行内部工具或查找可自动发现的 ID。
 
 部署前需以 Agent 服务使用的同一 `ROAMI_HOME`、`ROAMI_CONFIG` 执行 `roami auth login --stdin --json`，并用 `roami auth status --json` 验证。登录输入通过私有标准输入传递，不能写入仓库或命令参数。现有 Web 登录签名在重启后变化，且 Cookie 有有效期，因此部署自动化必须在 Web 启动后及凭据过期时重新执行正常登录；不能只在首次安装时登录，也不能通过公网 Header 绕过 Go 鉴权。本机部署使用私有登录脚本和用户级 timer 检查恢复，模型和工具输出都接触不到 Web 密码或 TOTP 密钥。
+
+## 设计修订与验收记录
+
+[按日期查看记录](records/README.md)。

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Native 原始用户合同传递 · 2026-10-26</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-native-original-request-20261026" lang="zh-CN">
+  <h2>Native 原始用户合同传递 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>普通 Native 任务与已有浏览器研究任务一样，执行上下文同时保留用户原文和协调目标。用户原合同定义事实与约束，Main 目标只限定本次分工，不能覆盖原合同或扩展到未分派的其他事项。</p>
+  <h3>User Stories</h3>
+  <p>即使协调者把结构或数值规则转述错了，Worker 仍能读取未经改写的用户原话。用户继续在会话中看到原有任务目标；执行记录保存完整来源，跨所有者和已遗忘来源仍不可读。</p>
+  <h3>Technical Design</h3>
+  <p>dispatch/tasks.py 在已有事务和来源校验内构造 Native 种子消息，普通任务加入原始 source_content.text，再明确合同优先级和分工范围。displayText 保留原目标，模型读取完整 text，存档保留两者；resourceOnly 保持既有显示与输入形式。附件继续沿用原所有者和完整性校验，不增加文件权限或新执行器。</p>
+  <p>显式从已完成检查点派生的普通 Native 分支保留原继承边界，不再附入检查点之后的新消息；其历史已有该检查点的用户约束。嵌套执行测试模型按简报中的分工目标工作，原有后代汇合、Main 容量预留和分支隔离断言保留，74 项相关回归通过。另有 95 项路由、Native 工作区、存档、研究和续派回归通过；四个新增场景验证原合同、显示目标、跨所有者和遗忘边界。</p>
+  <p>后续真实执行再次暴露原 DeepSeek low／2,048 Memory 输出限制，以及 NEWS-01 在额度内尚未满足结构合同的失败；319,577 Token／48 次请求，用量已知，结果保留。原文传递不是所有错误已解决的证明；另补充显式输出结构不得因元数据真实而扩展的说明，并验证下述预算及流错误修复。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

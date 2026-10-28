@@ -171,8 +171,8 @@ Record acceptance evidence in the matching design directory.
 
 `AGENTS.md` contains durable repository rules only. Do not append design proposals, prototypes,
 acceptance logs, task status, or command output here. Link to the relevant document instead.
-Historical designs and acceptance records are in the
-[archive index](docs/design/20261028-agent-design-archive/README.md).
+Keep historical designs and acceptance records in the matching topic directory.
+See the [design index](docs/design/README.md).
 
 # Considerations
 
