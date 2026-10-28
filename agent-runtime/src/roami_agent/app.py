@@ -350,6 +350,7 @@ class Runtime:
             policy_binding.reset(token)
 
     async def start(self):
+        self.mcp.start()
         await self.professional_capabilities.recover()
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()

@@ -170,7 +170,15 @@ class ToolDirectory:
         ranked.sort(key=lambda entry: (-entry[0], entry[2]["id"]))
         selected = [entry for entry in ranked if kind == "all" or entry[2]["kind"] == kind]
         alternatives = [entry for entry in ranked if kind != "all" and entry[2]["kind"] != kind]
-        if alternatives and alternatives[0][1] and not any(entry[1] for entry in selected):
+        if (
+            alternatives
+            and alternatives[0][1]
+            and not any(entry[1] for entry in selected)
+            and not any(
+                normalize(query) in normalize(entry[2]["name"] + " " + entry[2]["description"])
+                for entry in selected
+            )
+        ):
             selected = []
         result = {
             "scope": "current_role",
