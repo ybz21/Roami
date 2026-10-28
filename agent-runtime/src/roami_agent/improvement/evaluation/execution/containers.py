@@ -162,6 +162,8 @@ class ContainerExecutor:
             if "selectors" in case["judge"]:
                 require(case["judge"]["selectors"] == selected, "RSI_REGRESSION_PACK_CHANGED")
             return 0
+        if self.shared_daily_limit:
+            return 0
         from roami_agent.improvement.evaluation.artifact_review import needs_artifact_review
 
         extra = (

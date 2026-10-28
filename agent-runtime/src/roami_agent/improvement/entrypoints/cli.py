@@ -57,7 +57,21 @@ async def execute(args):
 
         profile = private_document(args.profile)
         certificate = private_document(args.certificate)
-        reviewer = ArtifactReviewer(Settings(), {**profile, "certificate": certificate})
+        spending = certificate.get("spending_policy", "frozen_protocol")
+        require(spending in {"frozen_protocol", "shared_model_daily"})
+        shared = spending == "shared_model_daily"
+        parameters = {}
+        if shared:
+            require("model_page_output_tokens" in certificate)
+            cap = certificate["model_page_output_tokens"]
+            require(cap is None or (type(cap) is int and cap > 0))
+            if cap is not None:
+                parameters["max_tokens"] = cap
+        reviewer = ArtifactReviewer(
+            Settings(model_parameters=parameters),
+            {**profile, "certificate": certificate},
+            shared_daily_limit=shared,
+        )
         directory = args.ledger.parent / "artifact-review" / digest(args.owner)[:24]
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         require(not directory.is_symlink() and directory.stat().st_mode & 0o077 == 0)

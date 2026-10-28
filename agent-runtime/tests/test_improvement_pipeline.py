@@ -239,7 +239,7 @@ def test_memory_route_is_optional_frozen_and_validated(tmp_path):
         service.runs.configure("local", {**result, "memory_model": "bad\nmodel"})
 
 
-def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_again(
+def test_daily_artifact_admission_has_no_reservation_and_unknown_operations_do_not_spend_again(
     tmp_path, monkeypatch
 ):
     from types import SimpleNamespace
@@ -261,7 +261,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
     service.control.save("local", {**prefs, "suite_id": "rated", "machine_ids": ["a"]})
     monkeypatch.setattr(
         "roami_agent.improvement.evaluation.artifact_review.ArtifactReviewer.load",
-        lambda *args: SimpleNamespace(
+        lambda *args, **kwargs: SimpleNamespace(
             content_hash="qualified-rater", profile={"max_tokens": 50000}
         ),
     )
@@ -274,7 +274,7 @@ def test_artifact_admission_is_reserved_and_unknown_operations_do_not_spend_agai
     run = service.runs.get("local", first["id"])
     assert run["snapshot"]["artifact_review"] == {
         "hash": "qualified-rater",
-        "reservation_tokens": 100000,
+        "reservation_tokens": 0,
     }
     with service.ledger.connection() as db:
         assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
@@ -674,8 +674,9 @@ def test_diagnostics_respect_configured_episode_cap(tmp_path):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("output_limit", [None, 8192])
-async def test_shared_daily_diagnostic_accepts_optional_model_output_limit(
-    tmp_path, monkeypatch, output_limit
+@pytest.mark.parametrize("shared", [True, False])
+async def test_diagnostic_admission_evidence_matches_policy_and_keeps_model_output_limit(
+    tmp_path, monkeypatch, output_limit, shared
 ):
     from dataclasses import replace
 
@@ -686,7 +687,7 @@ async def test_shared_daily_diagnostic_accepts_optional_model_output_limit(
     from roami_agent.server.configuration import Settings
 
     service = ImprovementStatus(tmp_path)
-    service.ledger.shared_daily_limit = True
+    service.ledger.shared_daily_limit = shared
     service.control.register_machine(
         "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
     )
@@ -747,6 +748,26 @@ async def test_shared_daily_diagnostic_accepts_optional_model_output_limit(
     assert len(received) == 1 and value["cases"][0]["passed"]
     assert value["summary"]["generation_tokens"] == 11
     assert settings.route("main").parameters == parameters
+    budgets = [
+        json.loads(service.runs.read_artifact("local", run["id"], a["id"])["text"])
+        for a in value["artifacts"]
+        if a["name"].startswith("budget-") and a["name"] != "budget-plan.json"
+    ]
+    assert len(budgets) == 1
+    evidence = budgets[0]
+    original = evidence["original_limits"]
+    assert all(type(original[key]) is int for key in ("seconds", "tokens", "requests"))
+    assert evidence["effective_limits"]["seconds"] == original["seconds"]
+    assert evidence["spending_policy"] == ("shared_model_daily" if shared else "frozen_protocol")
+    if shared:
+        assert evidence["effective_limits"]["tokens"] is None
+        assert evidence["effective_limits"]["requests"] is None
+        assert evidence["run_token_limit"] is None
+        assert evidence["reserved_for_later_cases"] is None
+    else:
+        assert evidence["effective_limits"] == original
+        assert type(evidence["run_token_limit"]) is int and evidence["run_token_limit"] > 0
+        assert evidence["reserved_for_later_cases"] == 0
 
 
 @pytest.mark.asyncio

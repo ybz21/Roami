@@ -42,7 +42,9 @@ def enqueue_diagnostic_request(
         artifact_count = sum(
             needs_artifact_review(c) for c in suite["cases"] if c["id"] in case_ids
         )
-        artifact_reservation = reviewer.profile["max_tokens"] * artifact_count if reviewer else 0
+        artifact_reservation = (
+            reviewer.profile["max_tokens"] * artifact_count if reviewer and not shared else 0
+        )
         if not shared:
             today = datetime.now(ZoneInfo(prefs["timezone"])).date().isoformat()
             reserve = (

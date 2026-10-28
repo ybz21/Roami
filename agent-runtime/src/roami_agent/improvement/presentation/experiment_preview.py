@@ -35,9 +35,12 @@ def preview(service, owner, settings):
                 c["limits"]["tokens"] for c in suite["cases"] if c["judge"]["kind"] != "mechanism"
             )
             if artifact_count:
-                reviewer = ArtifactReviewer.load(settings, service.ledger.path.parent, owner)
+                reviewer = ArtifactReviewer.load(
+                    settings, service.ledger.path.parent, owner, shared_daily_limit=shared
+                )
                 require(reviewer is not None, "RSI_ARTIFACT_REVIEW_REQUIRED")
-                tokens += artifact_count * reviewer.profile["max_tokens"]
+                if not shared:
+                    tokens += artifact_count * reviewer.profile["max_tokens"]
         except DomainError as exc:
             blockers.append(exc.code)
             tokens = None

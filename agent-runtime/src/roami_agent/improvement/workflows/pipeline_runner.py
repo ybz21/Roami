@@ -59,7 +59,9 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
     )
 
     reviewer = (
-        ArtifactReviewer.load(settings, service.ledger.path.parent, owner)
+        ArtifactReviewer.load(
+            settings, service.ledger.path.parent, owner, shared_daily_limit=shared
+        )
         if settings is not None
         else None
     )
@@ -105,7 +107,11 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
 
     shared_provider = getattr(service, "provider_factory", None)
     artifact_reviewer = ArtifactReviewer.load(
-        settings, service.ledger.path.parent, owner, provider_factory=shared_provider
+        settings,
+        service.ledger.path.parent,
+        owner,
+        provider_factory=shared_provider,
+        shared_daily_limit=shared,
     )
     require(
         (artifact_reviewer.content_hash if artifact_reviewer else None)
@@ -222,11 +228,14 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             "budget-" + digest(case_id)[:20] + ".json",
             {
                 "case_id": case_id,
+                "spending_policy": "shared_model_daily" if shared else "frozen_protocol",
                 "original_limits": original["limits"],
-                "effective_limits": case["limits"],
+                "effective_limits": {**case["limits"], "tokens": None, "requests": None}
+                if shared
+                else case["limits"],
                 "run_tokens_used": budget.used,
-                "run_token_limit": budget.limits["tokens"],
-                "reserved_for_later_cases": remaining_real * minimum_start,
+                "run_token_limit": None if shared else budget.limits["tokens"],
+                "reserved_for_later_cases": None if shared else remaining_real * minimum_start,
             },
         )
         blocked_by = None
