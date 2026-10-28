@@ -477,7 +477,8 @@ class MCPConnections:
                 connection.failures = 0
                 if not connection.ready.done():
                     connection.ready.set_result(True)
-                while True:
+                # Protocol cleanup can consume cancellation; honor the explicit stop state too.
+                while not self.closed and connection.enabled:
                     request = None
                     try:
                         async with asyncio.timeout(HEARTBEAT_SECONDS):

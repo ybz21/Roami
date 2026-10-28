@@ -171,6 +171,7 @@ class MCPBroker:
         try:
             self.check_socket()
             async with asyncio.timeout(connection.config.get("timeout_seconds", 0) or None):
+                dispatched = True
                 async with self.client.stream(
                     "POST",
                     "/v1/calls",
@@ -183,7 +184,6 @@ class MCPBroker:
                     },
                     timeout=None,
                 ) as response:
-                    dispatched = True
                     if response.is_error:
                         await response.aread()
                         raise DomainError(

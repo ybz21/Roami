@@ -290,3 +290,41 @@ async def test_streamable_http_expired_session_reconnects_and_calls_agent_tool(m
             await pool.close()
             server.should_exit = True
             await serving
+
+
+async def test_pool_close_finishes_when_protocol_ping_consumes_cancellation(tmp_path, monkeypatch):
+    from roami_agent.tools import mcp
+
+    monkeypatch.setenv("FIXTURE_MCP_TOKEN", "fixture-token")
+    monkeypatch.setattr(mcp, "HEARTBEAT_SECONDS", 0.05)
+    pool = mcp.MCPConnections(Tools(), {"docs": spec(tmp_path)})
+    entered = asyncio.Event()
+    try:
+        await pool.discover({"server": "docs"}, {})
+        connection = pool.connections["docs"]
+
+        async def interrupted_ping():
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                return
+
+        session = connection.session
+        original_ping = session.send_ping
+        monkeypatch.setattr(session, "send_ping", interrupted_ping)
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        closing = asyncio.create_task(pool.close())
+        try:
+            done, _ = await asyncio.wait({closing}, timeout=2)
+            assert closing in done
+            assert connection.task.done()
+            assert connection.session is None
+        finally:
+            monkeypatch.setattr(session, "send_ping", original_ping)
+            if not connection.task.done():
+                os.kill(int((tmp_path / "pid").read_text()), signal.SIGTERM)
+                connection.task.cancel()
+            await asyncio.wait_for(closing, timeout=3)
+    finally:
+        await pool.close()

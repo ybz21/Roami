@@ -56,7 +56,16 @@ async def daemon(tmp_path, monkeypatch):
             yield owner, path, config, imports
         finally:
             server.should_exit = True
-            await serving
+            try:
+                await asyncio.wait_for(asyncio.shield(serving), timeout=8)
+            except TimeoutError:
+                for task in asyncio.all_tasks():
+                    task.print_stack()
+                for connection in owner.pool.connections.values():
+                    if connection.task:
+                        connection.task.cancel()
+                await asyncio.wait_for(serving, timeout=5)
+                raise
 
 
 async def client(path, config):
@@ -131,6 +140,41 @@ async def test_shutdown_does_not_cancel_an_admitted_remote_call(daemon, tmp_path
     assert owner.calls
     assert owner.pool.connections["docs"].session is upstream
     assert owner.pool.connections["docs"].current is not None
+
+
+async def test_timeout_before_response_headers_preserves_unknown_write_outcome(
+    daemon, tmp_path, monkeypatch
+):
+    owner, path, config, imports = daemon
+    config["timeout_seconds"] = 2
+    saved = json.loads(imports.read_text())
+    saved["mcp"]["docs"]["config"] = config
+    imports.write_text(json.dumps(saved))
+    await owner.reconcile()
+    await eventually(lambda: owner.pool.connections["docs"].session is not None)
+    accept = owner.call
+    release_headers, finished = asyncio.Event(), asyncio.Event()
+
+    async def delayed_headers(body):
+        response = await accept(body)
+        try:
+            await release_headers.wait()
+        finally:
+            finished.set()
+        return response
+
+    monkeypatch.setattr(owner, "call", delayed_headers)
+    pool, registry = await client(path, config)
+    try:
+        with pytest.raises(DomainError, match="MCP_OUTCOME_UNKNOWN"):
+            await registry.invoke(wire(named(registry, "changed")), "worker", {})
+        assert (tmp_path / "called-changed").exists()
+        assert json.loads((tmp_path / "state.json").read_text())["changed"] is True
+        assert len(owner.seen) == 1
+    finally:
+        release_headers.set()
+        await eventually(finished.is_set)
+        await pool.close()
 
 
 async def test_explicit_cancellation_still_stops_the_remote_call(daemon, tmp_path):
