@@ -2,6 +2,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useAgentThread } from './useAgentThread'
+import { agentTimeline } from './agent-timeline'
 import { agentDataKey, clearAgentDataCache, peekAgentData, storeAgentData } from './agent-data-cache'
 import { api, openEventStream } from '../../api'
 
@@ -64,4 +65,30 @@ it('renders warm history immediately and replays missed stream events from its c
   await waitFor(() => expect(hook.result.current.view?.messages[0].id).toBe('new-message'))
   hook.unmount()
   expect(peekAgentData<any>(agentDataKey('/agent/conversations/warm/messages'))?.snapshotCursor).toBe(2)
+})
+
+it.each([true, false])('keeps an immediate failure visible with a late receipt and failed history GET (assistant started: %s)', async started => {
+  let stream!: ReadableStreamDefaultController<Uint8Array>
+  vi.mocked(api).mockResolvedValueOnce({ data: snapshot('failed') }).mockRejectedValue(new Error('offline'))
+  vi.mocked(openEventStream).mockImplementation(async (_path, signal) => new Response(new ReadableStream({
+    start(controller) { stream = controller; signal.addEventListener('abort', () => controller.close(), { once: true }) },
+  })))
+  const hook = renderHook(() => useAgentThread('failed'))
+  await waitFor(() => expect(hook.result.current.connected).toBe(true))
+  await act(async () => {
+    for (const event of [
+      ...(started ? [{ id: 2, created_ms: 110, kind: 'message.started', payload: { messageId: 'empty', turnId: 'turn' } }] : []),
+      { id: 3, created_ms: 120, kind: 'turn.failed', payload: { turnId: 'turn', error: 'MODEL_PROXY_USAGE_UNKNOWN' } },
+    ]) stream.enqueue(new TextEncoder().encode('data: ' + JSON.stringify(event) + '\n\n'))
+  })
+  await waitFor(() => expect(hook.result.current.view?.activities?.[0]).toMatchObject({ state: 'failed', errorCode: 'MODEL_PROXY_USAGE_UNKNOWN' }))
+  act(() => hook.result.current.accepted({ messageId: 'late-user', turnId: 'turn' }, 'Try again'))
+  expect(hook.result.current.view?.turns).toEqual([{ id: 'turn', state: 'failed' }])
+  expect(hook.result.current.view?.messages.map(message => message.id)).toEqual(started ? ['late-user', 'empty'] : ['late-user'])
+  expect(hook.result.current.view?.messages.map(message => message.seq)).toEqual(started ? [1, 2] : [1])
+  const view = hook.result.current.view!
+  expect(agentTimeline(view.messages, view.activities || []).map(entry => entry.id)).toEqual(['late-user', 'turn:turn'])
+  await waitFor(() => expect(vi.mocked(api).mock.calls.length).toBeGreaterThan(1))
+  expect(hook.result.current.view?.activities).toHaveLength(1)
+  hook.unmount()
 })

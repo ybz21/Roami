@@ -42,12 +42,6 @@ class ResearchWorker:
             await asyncio.sleep(5)
 
     async def execute(self, action):
-        from roami_agent.providers.model_proxy import model_accounting
-
-        with model_accounting(getattr(self.runtime, "model_proxy", None)):
-            return await self._execute(action)
-
-    async def _execute(self, action):
         async def renew():
             while True:
                 await asyncio.sleep(15)

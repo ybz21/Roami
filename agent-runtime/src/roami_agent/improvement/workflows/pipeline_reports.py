@@ -185,6 +185,9 @@ class PipelineReportWorker:
         costs = RunCosts(self.records, owner, run_id)
         stage = "review"
         try:
+            blocker = (value["summary"] or {}).get("usage_blocker")
+            if blocker:
+                raise DomainError(blocker["code"])
             if not any(a["name"] == "review.md" for a in value["artifacts"]):
                 self.records.node(owner, run_id, stage, "running")
                 evidence = [

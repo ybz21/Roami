@@ -1,4 +1,4 @@
-"""Construct a configured model and attach inherited node accounting once."""
+"""Construct the protocol client for the configured Go model gateway."""
 
 from roami_agent.providers.chat_completions import ChatCompletions
 
@@ -16,7 +16,4 @@ def configured_provider(settings, role, *, client=None):
         parameters=route.parameters,
         client=client,
     )
-    from roami_agent.providers.model_proxy import model_proxy_context
-
-    proxy = model_proxy_context.get()
-    return proxy.attach(provider, role) if proxy is not None else provider
+    return provider

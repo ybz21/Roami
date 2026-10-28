@@ -9,6 +9,14 @@ afterEach(cleanup)
 const task: AgentActivityItem = { id: 'task:t', taskId: 't', kind: 'task', name: 'native', title: '查询天气', state: 'succeeded', anchorMessageId: 'm', startedMs: 1, updatedMs: 10 }
 const tool: AgentActivityItem = { ...task, id: 'tool:read', kind: 'tool', name: 'memory_search', state: 'failed' }
 
+it('gives failed replies a retry hint and forwards gateway quota errors', () => {
+  const { rerender } = render(<AgentTaskActivity items={[{ ...task, taskId: undefined, kind: 'turn', state: 'failed', errorCode: 'MODEL_HTTP_400' }]} onTask={vi.fn()} />)
+  expect(screen.getByRole('status').textContent).toBe('agent.requestFailed')
+  expect(screen.queryByRole('button')).toBeNull()
+  rerender(<AgentTaskActivity items={[{ ...task, taskId: undefined, kind: 'turn', state: 'failed', errorCode: 'MODEL_HTTP_402' }]} onTask={vi.fn()} />)
+  expect(screen.getByRole('status').textContent).toBe('agent.models.gatewayQuota')
+})
+
 it('keeps the task subject and exact detail destination without recovered tool errors, route explanations or internal IDs', () => {
   const open = vi.fn()
   const items = mainTaskActivities([task, tool, { ...tool, id: 'tool:next', state: 'succeeded' }])

@@ -297,19 +297,9 @@ async def test_settings_http_owner_boundary_persistence_and_invalid_save(store):
     async with httpx.AsyncClient(
         transport=transport, base_url="http://private", headers={"X-Roami-Owner": "local"}
     ) as client:
-        config = {
-            "dailyLimit": 10,
-            "currency": "USD",
-            "prices": {"fixture": {**PRICES, "currency": "CNY"}},
-        }
-        saved = await client.put("/v1/model-settings", json={"proxy": config})
-        assert saved.status_code == 200 and saved.json()["data"]["proxy"] == config
-        partial = await client.put("/v1/model-settings", json={"proxy": {"currency": "EUR"}})
-        assert (
-            partial.status_code == 200
-            and partial.json()["data"]["proxy"]["prices"] == config["prices"]
-        )
-        assert partial.json()["data"]["proxy"]["dailyLimit"] == 10
+        saved = await client.put("/v1/model-settings", json={"main": {"model": "fixture"}})
+        assert saved.status_code == 200 and saved.json()["data"]["gatewayManaged"]
+        assert "proxy" not in saved.json()["data"]
         before = settings_path(store.data_root).read_bytes()
         bad_prices = await client.put(
             "/v1/model-settings", json={"proxy": {"prices": {"fixture": {"input": 1}}}}
@@ -319,7 +309,7 @@ async def test_settings_http_owner_boundary_persistence_and_invalid_save(store):
         )
         invalid = await client.put("/v1/model-settings", json={"proxy": {"dailyLimit": -2}})
         assert invalid.status_code == 400 and settings_path(store.data_root).read_bytes() == before
-        assert (await client.get("/v1/model-usage")).json()["data"]["requests"] == 0
+        assert (await client.get("/v1/model-usage")).json()["data"]["archived"]
         assert (
             await client.get("/v1/model-usage", headers={"X-Roami-Owner": "other"})
         ).status_code == 403
