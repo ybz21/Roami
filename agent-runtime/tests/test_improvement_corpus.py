@@ -275,10 +275,13 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     previous.write_bytes(b"original frozen suite evidence")
     v13 = root / "authored-40-v13.json"
     v13.write_bytes(b"previous v13 frozen evidence")
+    v14 = root / "authored-40-v14.json"
+    v14.write_bytes(b"previous v14 frozen evidence")
     prepare_corpus(service, "owner")
+    assert v14.read_bytes() == b"previous v14 frozen evidence"
     assert v13.read_bytes() == b"previous v13 frozen evidence"
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v14.json").read_text())
+    revised = json.loads((root / "authored-40-v15.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"
@@ -290,6 +293,7 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
             "authored-v11-verified-backtest-summaries",
             "authored-v13-visible-quant-inputs",
             "authored-v14-explicit-trade-sides",
+            "authored-v15-input-field-serialization",
         }
         for c in revised["cases"]
         if "执行要求（不是结果字段）" in c["prompt"]
@@ -385,3 +389,52 @@ def test_trade_direction_serialization_is_public_and_versioned(case_id):
     case = next(c for c in authored_suite("trade-sides")["cases"] if c["id"] == case_id)
     assert "side 必须是小写字符串 buy 或 sell" in case["prompt"]
     assert case["origin"]["recipe_revision"] == "authored-v14-explicit-trade-sides"
+
+
+def test_quant_data_quality_serialization_is_public_and_versioned():
+    from roami_agent.improvement.evaluation.case_catalog import case_definitions
+
+    definition = next(c for c in case_definitions() if c["id"] == "QUANT-05")
+    fields = ["receipt", "execution_prices", "signal_prices"]
+    assert definition["output_format"]["copy_input_fields"] == fields
+    case = next(c for c in authored_suite("input-fields")["cases"] if c["id"] == "QUANT-05")
+    assert "原样复制prices.json中的字符串字段" in case["prompt"]
+    assert "解释放入report.md" in case["prompt"]
+    assert "实际发生的违规成交" in case["prompt"]
+    assert (
+        "不是不可交易bar的索引清单"
+        in definition["output_format"]["field_descriptions"]["trades_on_unavailable_bars"]
+    )
+    assert all(field in case["prompt"] for field in fields)
+    assert case["origin"]["recipe_revision"] == "authored-v15-input-field-serialization"
+
+
+@pytest.mark.parametrize(
+    "field", ["receipt", "execution_prices", "signal_prices", "trades_on_unavailable_bars"]
+)
+async def test_quant_data_quality_still_rejects_replaced_input_fields(tmp_path, field):
+    case = next(c for c in authored_suite("strict-input-fields")["cases"] if c["id"] == "QUANT-05")
+    workspace = tmp_path / "workspace"
+    materialize(case, workspace)
+    prices = json.loads(case["files"]["prices.json"])
+    replacement = (
+        prices["missing_bars"] + prices["halted_bars"]
+        if field == "trades_on_unavailable_bars"
+        else "explanation instead of original field"
+    )
+    wrong = {**case["judge"]["expected"], field: replacement}
+    (workspace / "analysis.py").write_text("pass\n")
+    (workspace / "result.json").write_text(json.dumps(wrong))
+    (workspace / "report.md").write_text(
+        "Input prices.json remains synthetic and unresolved; no complete backtest is claimed. "
+        + case["fixture_receipt"]
+    )
+
+    class Replay:
+        async def sandbox(self, *args, **kwargs):
+            return json.dumps({"result": wrong}).encode()
+
+    grade = await grade_authored(case, workspace, Replay())
+    assert not grade["hard_passed"]
+    assert not grade["checks"]["structured_result"]
+    assert not grade["checks"]["reproducible_code"]

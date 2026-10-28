@@ -85,5 +85,16 @@
   "selected_in_mixed_suite_v1": true,
   "resources": {
     "materials": "materials.json"
+  },
+  "output_format": {
+    "copy_input_fields": [
+      "receipt",
+      "execution_prices",
+      "signal_prices"
+    ],
+    "explanations": "report.md",
+    "field_descriptions": {
+      "trades_on_unavailable_bars": "只记录实际发生的违规成交，不是不可交易bar的索引清单"
+    }
   }
 }
