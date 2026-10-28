@@ -1894,3 +1894,17 @@ cases/case-N-id/             CASE.md、case.json、materials.json 与显式资�
   <p>验收包括依赖方向、无跨层 SQL、无领域 IO、无展示层写操作、规则指纹、资源路径边界、QUANT 输入与生成器一致性、完整回归及 wheel/sdist 安装后的材料读取。本次不改前端页面，原有独立质量和手机验收 Issue 不因分层重构关闭。</p>
   <p>实测：wheel 安装和 sdist 独立源码加载均找到 60 个 Case 与材料清单，QUANT 输入与标准库生成器及运行输入一致；替换区间、候选参数和成本后判定读取替换值。真实无网络容器完成 Native Worker 文件写入及宿主判定，镜像内无 authored_fixtures、authored_grading、corpus 模块。容器验证使用已有依赖层复制最终运行时代码及新清理指令，模型为脚本夹具，不作为能力评分。</p>
 </section>
+
+<section id="conversation-stream-push-20261028" lang="zh-CN">
+  <h2>首页对话提交即推送 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>首页回答的文本事件提交后立即通过原 SSE 与 Go 网关发送，不再每 200 毫秒查库批量转发。保留现有消息格式、持久化、断线游标与登录边界；不增加页面控件或前端轮询。</p>
+  <h3>User Stories</h3>
+  <ul><li>回答还在生成时即可看到已提交的文本片段。</li><li>连接空闲时只有保活帧，不为等待文字反复查询数据库；重连继续读取已提交记录。</li></ul>
+  <h3>Technical Design</h3>
+  <p>storage/conversation_events.py 管理活跃连接的按会话订阅。database.py 在 writer 事务中收集 event() 涉及的会话，COMMIT 成功后在事件循环中唤醒订阅者；回滚不发布，调用方取消也不丢弃已提交通知。通知只唤醒读取，SQLite 仍是事件及游标的唯一事实来源。http.py 在读取前订阅、清除信号，读完后等待提交通知；避免读取与等待之间丢唤醒。10 秒保活不查库，断开连接释放订阅。Go 复用现有 FlushInterval=-1。</p>
+  <h3>验收记录</h3>
+  <p>截图对应的原回答已记录 10 次 message.delta，生成时间约为 1.29～2.35 秒；该记录证明原先有分段落盘，不能将其描述为生成结束才存储。定向测试覆盖提交前不可见、回滚、跨会话隔离、多订阅、取消后提交、读取期间提交、保活不查库、实时文本、重连回放与断开清理。Go 的 Gin／Unix socket 回归要求两段文本均在上游结束前到达。</p>
+  <p>隔离本地 HTTP SSE 夹具经过实际 ChatCompletions、计费代理、Agent、Unix socket、Go agentproxy 与 Gin；三段文本均在模型结束前收到。这组对照中单段传输耗时由约 78～129 毫秒降至约 5～23 毫秒，不代表生产网络或首 Token 延迟。证据位于 /tmp/chat-streaming-20261028；零付费模型调用，未更新现用服务，无前端组件或文案改动。</p>
+  <p>quick 门禁通过：Go 全量、Python 静态／格式检查及 1,679 项测试、前端 typecheck／i18n／hover、秘密扫描与文件策略。最终读取竞争与保活修订另跑 8 项定向测试及静态／格式检查通过。新实时回归在原接口上因空闲查库计数增长按预期失败；隔离验证服务与私有 tmux 实例均已清理。报告入口 /tmp/chat-streaming-20261028/index.html。</p>
+</section>
