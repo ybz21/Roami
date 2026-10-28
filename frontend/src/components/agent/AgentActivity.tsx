@@ -8,7 +8,7 @@ import './agent-activity.css'
 
 const active = new Set(['planned', 'running', 'queued', 'preparing', 'starting', 'verifying', 'cancelling'])
 const attention = new Set(['failed', 'unknown', 'interrupted'])
-const toolNames: Record<string, string> = { session_send: 'send', target_search: 'find', target_resolve: 'resolve', workspace_overview: 'overview', delegate: 'delegate', task_status: 'status', shell: 'shell', memory_search: 'memory', memory_get: 'memory', browser_open: 'browserOpen', browser_act: 'browserAct', browser_observe: 'browserObserve' }
+const toolNames: Record<string, string> = { session_send: 'send', target_search: 'find', target_resolve: 'resolve', workspace_overview: 'overview', delegate: 'delegate', task_status: 'status', shell: 'shell', memory_search: 'memory', memory_get: 'memory', skill_read: 'skill', file_read: 'read', tool_list: 'discover', browser_open: 'browserOpen', browser_act: 'browserAct', browser_observe: 'browserObserve' }
 const reasons: Record<string, string> = { MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired' }
 
 export function activityReason(code: string | null | undefined, t: (key: string) => string, fallback = 'agent.activity.failedReason') {
@@ -77,15 +77,20 @@ function ActivityPayload({ conversationId, branchId, taskScope, item }: { conver
   const { t } = useI18n(), [detail, setDetail] = useState<ActivityDetail | null>(null), [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0)
   useEffect(() => {
     const abort = new AbortController()
-    setDetail(null); setFailed(false)
+    setFailed(false)
+    if (item.preview && attempt === 0) {
+      setDetail({ id: item.id, state: item.state, ...item.preview })
+      return () => abort.abort()
+    }
+    setDetail(null)
     void api('GET', taskScope ? `/agent/tasks/${encodeURIComponent(taskScope)}/activities/${encodeURIComponent(item.id)}` : `/agent/conversations/${encodeURIComponent(conversationId)}/activities/${encodeURIComponent(item.id)}${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''}`, undefined, { signal: abort.signal })
       .then(({ data }) => { if (!abort.signal.aborted) setDetail(data) })
       .catch(() => { if (!abort.signal.aborted) setFailed(true) })
     return () => abort.abort()
-  }, [conversationId, branchId, item.id, item.updatedMs, item.state, attempt, taskScope])
+  }, [conversationId, branchId, item.id, item.updatedMs, item.state, item.preview, attempt, taskScope])
   if (failed) return <div role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={() => setAttempt(attempt + 1)}>{t('agent.retry')}</button></div>
   if (!detail) return <p role="status">{t('agent.activity.loadingDetails')}</p>
-  return <div className="agent-activity-payloads">{(['input', 'output'] as const).map(kind => <details key={kind} open={kind === 'output'}><summary>{t(`agent.activity.${kind}`)}</summary>{detail[kind] ? <><pre>{detail[kind]!.text}</pre>{detail[kind]!.truncated && <p>{t('agent.activity.previewTruncated')}</p>}</> : <p>{t('agent.activity.noOutput')}</p>}</details>)}</div>
+  return <div className="agent-activity-payloads">{item.preview && attempt === 0 && (detail.input.truncated || detail.output?.truncated) && <button type="button" className="tt-act" onClick={() => setAttempt(attempt + 1)}>{t('agent.activity.loadMore')}</button>}{(['input', 'output'] as const).map(kind => <details key={kind} open={kind === 'output'}><summary>{t(`agent.activity.${kind}`)}</summary>{detail[kind] ? <><pre>{detail[kind]!.text}</pre>{detail[kind]!.truncated && <p>{t('agent.activity.previewTruncated')}</p>}</> : <p>{t('agent.activity.noOutput')}</p>}</details>)}</div>
 }
 
 export default memo(AgentActivity)

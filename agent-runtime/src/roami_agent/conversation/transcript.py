@@ -302,7 +302,7 @@ class Conversations:
     async def events(self, owner, cid, cursor=0):
         def read(db):
             owned(db, owner, cid)
-            return [
+            batch = [
                 dict(e, payload=json.loads(e["payload_json"]))
                 for e in rows(
                     db,
@@ -312,6 +312,19 @@ class Conversations:
                     (cid, cursor),
                 )
             ]
+            visible_by_branch = {}
+            for item in batch:
+                activity = item["payload"].get("activity")
+                if not activity or "preview" not in activity:
+                    continue
+                branch = item["branchId"]
+                if branch not in visible_by_branch:
+                    visible_by_branch[branch] = {
+                        entry["id"] for entry in conversation_activity(db, cid, history(db, branch))
+                    }
+                if activity["id"] not in visible_by_branch[branch]:
+                    item["payload"].pop("activity")
+            return batch
 
         return await self.db.call(read)
 

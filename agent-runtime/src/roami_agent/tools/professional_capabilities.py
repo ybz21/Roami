@@ -243,7 +243,7 @@ class ProfessionalCapabilities:
                 db,
                 task["origin_conversation_id"],
                 "task.activity",
-                {"taskId": task["id"]},
+                {"taskId": task["id"], "activityId": key},
                 task_id=task["id"],
             )
             return task, None
@@ -318,7 +318,7 @@ class ProfessionalCapabilities:
                 db,
                 task["origin_conversation_id"],
                 "task.activity",
-                {"taskId": task["id"]},
+                {"taskId": task["id"], "activityId": key},
                 task_id=task["id"],
             )
 

@@ -7,7 +7,8 @@ export type AgentMessage = {
   content: { question?: AgentQuestion; text?: string; tool_call_id?: string; toolState?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentRoutingDecision = { version: number; policyVersion: string; action: string; executor: string; complexity: 'bounded' | 'complex'; complexityBasis: Record<string, string>; routingExplanation: string; reasonCode: string; capabilityVerification?: string }
-export type AgentActivityItem = { id: string; kind: 'tool' | 'task' | 'turn'; routingDecision?: AgentRoutingDecision; name: string; title?: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
+export type AgentActivityPreview = { input: { text: string; truncated: boolean }; output: { text: string; truncated: boolean } | null }
+export type AgentActivityItem = { preview?: AgentActivityPreview; id: string; kind: 'tool' | 'task' | 'turn'; routingDecision?: AgentRoutingDecision; name: string; title?: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }
 export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
 export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
@@ -22,7 +23,7 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   if ((event.kind.startsWith('tool.') || event.kind.startsWith('task.')) && data.activity) {
     const item = data.activity as AgentActivityItem
     next.activities = mainTaskActivities([...(view.activities || []).filter(existing => existing.id !== item.id), item])
-      .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
+      .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id))
     return { view: next, reload: event.kind === 'task.steered' }
   }
   if (event.kind === 'turn.failed' || event.kind === 'turn.interrupted' || event.kind === 'turn.deferred') {
@@ -41,14 +42,15 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
         updatedMs: event.created_ms ?? messages[0]?.created_ms ?? 0,
         errorCode: typeof data.error === 'string' ? data.error : null,
       }
-      next.activities = [...(view.activities || []).filter(item => item.id !== activity.id), activity]
-        .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id)).slice(-200)
+      next.activities = mainTaskActivities([...(view.activities || []).filter(item => item.id !== activity.id), activity])
+        .sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id))
     }
     return { view: next, reload: true }
   }
   if (event.kind === 'message.tool_calls') {
+    if (!view.messages.some(message => message.id === data.messageId)) return { view: next, reload: true }
     next.messages = view.messages.map(message => message.id === data.messageId ? { ...message, status: 'completed', content: { ...message.content, tool_calls: data.calls } } : message)
-    return { view: next, reload: true }
+    return { view: next, reload: false }
   }
   if (event.kind === 'message.started') {
     if (!view.messages.some((m) => m.id === data.messageId)) next.messages = [...view.messages, {

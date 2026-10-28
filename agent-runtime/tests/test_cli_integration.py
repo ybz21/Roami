@@ -674,7 +674,7 @@ async def test_existing_legacy_codex_receives_main_message_through_real_go_cli(
                 await asyncio.sleep(0.05)
         assert received.read_text() == "Fix the layout"
         view = await runtime.conversations.messages("alice", c["id"])
-        assert view["activities"] == []
+        assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])
         delivery = next(
             e["payload"]["activity"]

@@ -123,6 +123,15 @@ async def test_professional_launch_reads_bundled_skill_and_executes_cli_in_bound
         activities = await runtime.tasks.activities("local", task["id"])
         activity = next(a for a in activities if a["name"] == "cli_echo")
         assert activity["state"] == "succeeded" and activity["kind"] == "tool"
+        events = await runtime.conversations.events("local", task["origin_conversation_id"])
+        streamed = [
+            e["payload"]["activity"]
+            for e in events
+            if e["payload"].get("activity", {}).get("id") == activity["id"]
+        ]
+        assert [item["state"] for item in streamed] == ["running", "succeeded"]
+        assert streamed[0]["preview"]["output"] is None
+        assert "stdout" in streamed[1]["preview"]["output"]["text"]
         detail = await runtime.tasks.activities("local", task["id"], activity["id"])
         assert "stdout" in detail["output"]["text"]
         with pytest.raises(DomainError, match="TASK_NOT_FOUND"):
@@ -274,5 +283,39 @@ async def test_running_call_is_not_replayed_and_stops_on_task_cancellation_or_sh
         assert stopped.is_set() and result["state"] == "unknown"
         activities = await runtime.tasks.activities("local", task["id"])
         assert next(a for a in activities if a["name"] == "market_wait")["state"] == "unknown"
+    finally:
+        await runtime.close()
+
+
+async def test_nested_professional_calls_stream_to_the_root_conversation(store):
+    runtime, task, _, context = await prepared(store)
+    try:
+        root = await runtime.conversations.create("local")
+        parent = await runtime.tasks.create(
+            "local", root["id"], "Parent task", key="parent", record_intent=True
+        )
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET parent_task_id=? WHERE id=?", (parent["id"], task["id"])
+            ),
+            write=True,
+        )
+        await runtime.professional_capabilities.call(
+            "skill_read", request(context, {"name": "browser_use"}), "local"
+        )
+        events = await runtime.conversations.events("local", root["id"])
+        steps = [
+            event["payload"]["activity"]
+            for event in events
+            if event["payload"].get("activity", {}).get("name") == "skill_read"
+        ]
+        assert [step["state"] for step in steps] == ["running", "succeeded"]
+        assert steps[1]["taskId"] == task["id"]
+        assert "browser_use" in steps[1]["preview"]["input"]["text"]
+        assert all(
+            event["branchId"] == root["active_branch_id"]
+            for event in events
+            if event["payload"].get("activityId")
+        )
     finally:
         await runtime.close()

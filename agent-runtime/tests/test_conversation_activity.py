@@ -11,9 +11,7 @@ from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import history
 
 
-async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed(
-    store, monkeypatch
-):
+async def test_tool_start_and_completion_replay_previews_before_the_final_reply(store, monkeypatch):
     entered, release = asyncio.Event(), asyncio.Event()
 
     async def query(argv, **kwargs):
@@ -41,7 +39,7 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
         await runtime.chat.submit("alice", c["id"], "activity", "Count projects")
         await asyncio.wait_for(entered.wait(), 3)
         snapshot = await runtime.conversations.messages("alice", c["id"])
-        assert snapshot["activities"] == []
+        assert len(snapshot["activities"]) == 1
         events = await runtime.conversations.events("alice", c["id"])
         started = next(e for e in events if e["kind"] == "tool.started")
         assert started["payload"]["activity"]["name"] == "workspace_overview"
@@ -52,7 +50,7 @@ async def test_tool_start_is_visible_before_result_and_raw_output_is_not_exposed
 
         await until(store, lambda db: row(db, "SELECT id FROM tool_calls WHERE state='succeeded'"))
         snapshot = await runtime.conversations.messages("alice", c["id"])
-        assert snapshot["activities"] == []
+        assert len(snapshot["activities"]) == 1
         assert "arguments_json" not in json.dumps(snapshot["activities"])
         replay = await runtime.conversations.events("alice", c["id"])
         assert (
@@ -143,7 +141,7 @@ async def test_conflicting_session_override_is_rejected_before_queueing(store):
     assert await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
 
 
-async def test_worker_process_and_conversation_are_task_scoped_not_main_chat(store):
+async def test_worker_tools_stream_into_main_with_task_scoped_details(store):
     entered, release = asyncio.Event(), asyncio.Event()
 
     class Model:
@@ -179,7 +177,7 @@ async def test_worker_process_and_conversation_are_task_scoped_not_main_chat(sto
         await runtime.chat.submit("alice", c["id"], "nested", "Delegate read only")
         await asyncio.wait_for(entered.wait(), 4)
         view = await runtime.conversations.messages("alice", c["id"])
-        assert not any(a["kind"] == "tool" for a in view["activities"])
+        assert any(a["name"] == "memory_search" for a in view["activities"])
         root = next(a for a in view["activities"] if a["kind"] == "task")
         records = await runtime.tasks.activities("alice", root["taskId"])
         child = next(a for a in records if a["name"] == "memory_search")
@@ -336,7 +334,7 @@ async def test_command_nonzero_exit_is_failed_in_live_events_and_history(store):
             c["id"],
             c["active_branch_id"],
             "tool",
-            {"text": json.dumps({"exitCode": 7, "stderr": "private output"})},
+            {"text": json.dumps({"exitCode": 7, "stderr": "fixture command error"})},
             turn_id=receipt["turnId"],
         )
         db.execute(
@@ -353,17 +351,17 @@ async def test_command_nonzero_exit_is_failed_in_live_events_and_history(store):
 
     await store.call(record, write=True)
     snapshot = await conversations.messages("alice", c["id"])
-    assert snapshot["activities"] == []
+    assert len(snapshot["activities"]) == 1
     events = await conversations.events("alice", c["id"])
     activity = events[-1]["payload"]["activity"]
     assert activity["state"] == "failed"
     assert activity["errorCode"] == "COMMAND_EXIT_NONZERO"
-    assert "private output" not in json.dumps(activity)
+    assert "fixture command error" in activity["preview"]["output"]["text"]
     events = await conversations.events("alice", c["id"])
     assert events[-1]["payload"]["activity"] == activity
 
 
-async def test_payload_details_are_owner_scoped_live_and_not_in_events(store, monkeypatch):
+async def test_payload_previews_stream_with_owner_scoped_full_details(store, monkeypatch):
     import httpx
     from test_runtime import until
 
@@ -396,7 +394,7 @@ async def test_payload_details_are_owner_scoped_live_and_not_in_events(store, mo
         await runtime.chat.submit("alice", conversation["id"], "details", "Count projects")
         await asyncio.wait_for(entered.wait(), 3)
         snapshot = await runtime.conversations.messages("alice", conversation["id"])
-        assert snapshot["activities"] == []
+        assert len(snapshot["activities"]) == 1
         events = await runtime.conversations.events("alice", conversation["id"])
         activity = next(e["payload"]["activity"] for e in events if e["kind"] == "tool.started")
         path = f"/v1/conversations/{conversation['id']}/activities/{activity['id']}"
@@ -419,9 +417,11 @@ async def test_payload_details_are_owner_scoped_live_and_not_in_events(store, mo
             )
             completed = (await client.get(path)).json()["data"]
             assert completed["state"] == "succeeded" and completed["output"] is not None
-            assert not any(
-                "input" in event["payload"].get("activity", {})
-                for event in await runtime.conversations.events("alice", conversation["id"])
+            replay = await runtime.conversations.events("alice", conversation["id"])
+            completed_event = next(e for e in replay if e["kind"] == "tool.completed")
+            assert completed_event["payload"]["activity"]["preview"]["input"] == completed["input"]
+            assert (
+                completed_event["payload"]["activity"]["preview"]["output"] == completed["output"]
             )
             await store.call(
                 lambda db: db.execute(
@@ -430,6 +430,8 @@ async def test_payload_details_are_owner_scoped_live_and_not_in_events(store, mo
                 write=True,
             )
             assert (await client.get(path)).status_code == 404
+            replay = await runtime.conversations.events("alice", conversation["id"])
+            assert not any(e["payload"].get("activity", {}).get("preview") for e in replay)
     finally:
         release.set()
         await runtime.close()
@@ -452,3 +454,53 @@ def test_payload_preview_redacts_credentials_and_bounds_large_content():
     assert "0123456789" not in result["text"]
     assert "ABCDEFGHIJKLMNOP" not in result["text"]
     assert result["truncated"] and len(result["text"]) == 16000
+
+
+async def test_streamed_previews_redact_and_bound_both_inputs_and_results(store):
+    from roami_agent.conversation.activity_events import activity_event
+    from roami_agent.conversation.transcript import Conversations
+    from roami_agent.storage.transcript_repository import message
+
+    conversations = Conversations(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "preview", "Inspect a fixture")
+
+    def record(db):
+        mid = message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "assistant",
+            {"text": "Inspecting"},
+            turn_id=receipt["turnId"],
+        )
+        arguments = {"Authorization": "private-input", "query": "x" * 5000}
+        output = {"Cookie": "private-output", "data": "x" * 10000}
+        result = message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "tool",
+            {"text": json.dumps(output)},
+            turn_id=receipt["turnId"],
+        )
+        db.execute(
+            "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,result_message_id,created_ms,updated_ms) VALUES('preview',?,?,'mcp_fixture',?,'read','succeeded','preview-key',?,1,2)",
+            (receipt["turnId"], mid, json.dumps(arguments), result),
+        )
+        activity_event(
+            db, c["id"], "tool.completed", {"toolCallId": "preview"}, turn_id=receipt["turnId"]
+        )
+
+    await store.call(record, write=True)
+    snapshot = await conversations.messages("alice", c["id"])
+    replay = await conversations.events("alice", c["id"])
+    preview = replay[-1]["payload"]["activity"]["preview"]
+    assert preview == snapshot["activities"][0]["preview"]
+    assert "private-input" not in json.dumps(preview) and "private-output" not in json.dumps(
+        preview
+    )
+    assert len(preview["input"]["text"]) == 2000 and preview["input"]["truncated"]
+    assert len(preview["output"]["text"]) == 4000 and preview["output"]["truncated"]
+    with pytest.raises(DomainError):
+        await conversations.events("bob", c["id"])

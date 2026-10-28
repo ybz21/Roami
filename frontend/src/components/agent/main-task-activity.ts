@@ -1,13 +1,18 @@
 import type { AgentActivityItem } from './agent-protocol'
 
-const settled = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
 export function mainTaskActivities(items: AgentActivityItem[]): AgentActivityItem[] {
-  const tasks = new Map(items.filter(item => item.kind === 'task').map(item => [item.taskId, item]))
-  return items.filter(item => {
-    if (item.kind === 'turn') return true
-    if (item.kind === 'tool') return item.state === 'unknown'
-    if (!item.parentTaskId) return true
-    const parent = tasks.get(item.parentTaskId)
-    return (item.state === 'waiting_user' || item.state === 'unknown') && (!parent || !settled.has(parent.state) || item.state === 'unknown')
-  })
+  return [
+    ...items.filter(item => item.kind !== 'tool').slice(-200),
+    ...items.filter(item => item.kind === 'tool').slice(-200),
+  ].sort((a, b) => a.startedMs - b.startedMs || a.id.localeCompare(b.id))
+}
+
+export function groupExecutionSteps(items: AgentActivityItem[]): AgentActivityItem[][] {
+  const groups: AgentActivityItem[][] = []
+  for (const item of items) {
+    const previous = groups[groups.length - 1]
+    if (previous && (previous[0].kind === 'tool') === (item.kind === 'tool')) previous.push(item)
+    else groups.push([item])
+  }
+  return groups
 }

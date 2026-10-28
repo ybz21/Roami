@@ -30,7 +30,8 @@ import ConversationComposer from '../chat/ConversationComposer'
 import VoiceInput from '../chat/VoiceInput'
 import AgentMessageView from './AgentMessageView'
 import AgentTaskActivity from './AgentTaskActivity'
-import { mainTaskActivities } from './main-task-activity'
+import AgentActivity from './AgentActivity'
+import { mainTaskActivities, groupExecutionSteps } from './main-task-activity'
 import { useAgentAttachments } from './useAgentAttachments'
 import { useAgentModels } from './useAgentModels'
 import { useAgentOutbox } from './useAgentOutbox'
@@ -264,7 +265,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
       <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current); history.expand() } }}>
-        <div className="agent-thread conversation-transcript">{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <AgentTaskActivity key={entry.id} items={entry.activities} onTask={id => { if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>
+        <div className="agent-thread conversation-transcript">{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <div key={entry.id} className="agent-execution-steps">{groupExecutionSteps(entry.activities).map(group => group[0].kind === 'tool' ? <AgentActivity key={group[0].id} items={group} onSession={onSession} conversationId={cid} branchId={thread.view?.branchId} /> : <AgentTaskActivity key={group[0].id} items={group} onTask={id => { if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>

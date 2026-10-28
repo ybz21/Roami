@@ -19,7 +19,7 @@ it('gives failed replies a retry hint and forwards gateway quota errors', () => 
 
 it('keeps the task subject and exact detail destination without recovered tool errors, route explanations or internal IDs', () => {
   const open = vi.fn()
-  const items = mainTaskActivities([task, tool, { ...tool, id: 'tool:next', state: 'succeeded' }])
+  const items = mainTaskActivities([task])
   render(<AgentTaskActivity items={items} onTask={open} />)
   expect(screen.getByText('查询天气')).toBeTruthy()
   expect(screen.getByText('agent.state.succeeded')).toBeTruthy()
@@ -30,9 +30,9 @@ it('keeps the task subject and exact detail destination without recovered tool e
   expect(open).toHaveBeenCalledWith('t')
 })
 
-it('retains unknown outcomes and child questions without duplicating ordinary child execution', () => {
+it('retains child execution and unknown outcomes', () => {
   const child = { ...task, id: 'task:child', taskId: 'child', parentTaskId: 't', state: 'running' }
-  expect(mainTaskActivities([task, child])).toEqual([task])
+  expect(mainTaskActivities([task, child])).toEqual(expect.arrayContaining([task, child]))
   expect(mainTaskActivities([{ ...task, state: 'running' }, { ...child, state: 'waiting_user' }])).toHaveLength(2)
   const items = mainTaskActivities([task, { ...tool, state: 'unknown' }])
   render(<AgentTaskActivity items={items} onTask={vi.fn()} />)
@@ -43,5 +43,7 @@ it('retains unknown outcomes and child questions without duplicating ordinary ch
 it('cannot evict the task card with hundreds of live internal tool events', () => {
   let view = { conversation: { id: 'c', title: '', active_branch_id: 'b', updated_ms: 0 }, branchId: 'b', messages: [], turns: [], activities: [task], snapshotCursor: 0 }
   for (let id = 1; id <= 300; id++) view = projectAgentEvent(view, { id, kind: 'task.activity', payload: { activity: { ...tool, id: 'tool:' + id } } }).view as typeof view
-  expect(view.activities).toEqual([task])
+  expect(view.activities).toHaveLength(201)
+  expect(view.activities).toContainEqual(task)
+  expect(view.activities.filter(item => item.kind === 'tool')).toHaveLength(200)
 })

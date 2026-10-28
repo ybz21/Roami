@@ -3,6 +3,7 @@
 import json
 import re
 
+from roami_agent.conversation.activity_preview import preview
 from roami_agent.conversation.professional_activity import professional_activity
 from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import public_error_code
@@ -115,13 +116,13 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
         )
     calls = rows(
         db,
-        "SELECT tc.*,m.content_json AS result_json FROM tool_calls tc JOIN turns t ON t.id=tc.turn_id LEFT JOIN messages m ON m.id=tc.result_message_id WHERE t.conversation_id=? ORDER BY tc.created_ms DESC LIMIT 200",
+        "SELECT tc.*,m.content_json AS result_json,m.deleted_ms AS output_deleted,m.status AS output_status FROM tool_calls tc JOIN turns t ON t.id=tc.turn_id LEFT JOIN messages m ON m.id=tc.result_message_id WHERE t.conversation_id=? ORDER BY tc.created_ms DESC LIMIT 200",
         (cid,),
     )
     if child_turns:
         calls += rows(
             db,
-            "SELECT tc.*,m.content_json AS result_json FROM tool_calls tc LEFT JOIN messages m ON m.id=tc.result_message_id WHERE tc.turn_id IN ("
+            "SELECT tc.*,m.content_json AS result_json,m.deleted_ms AS output_deleted,m.status AS output_status FROM tool_calls tc LEFT JOIN messages m ON m.id=tc.result_message_id WHERE tc.turn_id IN ("
             + ",".join("?" for _ in child_turns)
             + ") ORDER BY tc.created_ms DESC LIMIT 200",
             tuple(child_turns),
@@ -135,6 +136,8 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
         )
     }
     for call in calls:
+        if call.get("output_deleted") or call.get("output_status") == "deleted":
+            continue
         task = child_turns.get(call["turn_id"])
         if not task and (task_id or call["assistant_message_id"] not in visible):
             continue
@@ -164,6 +167,10 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                     else {}
                 ),
                 "name": call["tool_name"],
+                "preview": {
+                    "input": preview(json.loads(call["arguments_json"]), limit=2000),
+                    "output": preview(value, limit=4000) if call.get("result_json") else None,
+                },
                 "anchorMessageId": anchor(task) if task else call["assistant_message_id"],
                 "taskId": task["id"] if task else None,
                 "parentTaskId": task["parent_task_id"] if task else None,
@@ -218,15 +225,12 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                 "errorCode": public_error_code(json.loads(failure["payload_json"]).get("error")),
             }
         )
+    ordered = sorted(activities, key=lambda a: (a["startedMs"], a["id"]))
     if main_only:
-        activities = [
-            item
-            for item in activities
-            if item["kind"] == "turn"
-            or (
-                item["kind"] == "task"
-                and (not item["parentTaskId"] or item["state"] in {"waiting_user", "unknown"})
-            )
-            or (item["kind"] == "tool" and item["state"] == "unknown")
-        ]
-    return sorted(activities, key=lambda a: (a["startedMs"], a["id"]))[-200:]
+        # Tool bursts must not evict the task that owns their progress.
+        return sorted(
+            [item for item in ordered if item["kind"] != "tool"][-200:]
+            + [item for item in ordered if item["kind"] == "tool"][-200:],
+            key=lambda a: (a["startedMs"], a["id"]),
+        )
+    return ordered[-200:]

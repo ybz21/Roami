@@ -67,7 +67,7 @@ it('settles tool-call messages before the next reply starts while history is del
   const settled = projectAgentEvent(view, { id: 3, kind: 'message.tool_calls', payload: { messageId: 'tools', calls } })
   expect(settled.view.messages[0]).toMatchObject({ status: 'completed', content: { tool_calls: calls } })
   expect(settled.view.turns[0].state).toBe('running')
-  expect(settled.reload).toBe(true)
+  expect(settled.reload).toBe(false)
   view = projectAgentEvent(settled.view, { id: 4, kind: 'message.started', payload: { messageId: 'reply', turnId: 't' } }).view
   expect(agentTimeline(view.messages, []).map(entry => entry.id)).toEqual(['reply'])
 })
@@ -82,12 +82,12 @@ it('clears the old typing indicator immediately when a new message defers the tu
   expect(agentTimeline(next.messages, []).map(entry => entry.id)).toEqual(['new'])
 })
 
-it('hides routine tools while retaining unknown outcomes and replay ordering', () => {
+it('streams routine tools and unknown outcomes without reloading or duplicating replay', () => {
   const activity = { id: 'tool:one', kind: 'tool', name: 'shell', anchorMessageId: 'm', state: 'running', startedMs: 100, updatedMs: 100 }
   const start = { id: 2, kind: 'tool.started', branchId: 'b', payload: { activity } }
   const running = projectAgentEvent(snapshot(), start)
   expect(running.reload).toBe(false)
-  expect(running.view.activities).toEqual([])
+  expect(running.view.activities).toEqual([activity])
   const done = projectAgentEvent(running.view, { ...start, id: 3, kind: 'tool.completed', payload: { activity: { ...activity, state: 'unknown', updatedMs: 200 } } })
   expect(done.reload).toBe(false)
   expect(done.view.activities).toHaveLength(1)
