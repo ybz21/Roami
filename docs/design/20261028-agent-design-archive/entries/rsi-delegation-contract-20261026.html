@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>委派合同保真修复 · 2026-10-26</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-delegation-contract-20261026" lang="zh-CN">
+  <h2>委派合同保真修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>Main 原样传递用户明确的合同与约束，不把解释过程产生的公式或验收条件当作用户要求。数值工作按用户约束做手算样例及守恒／边界检查，不能仅用复制了同一公式的第二份代码声称独立验证。</p>
+  <h3>User Stories</h3>
+  <p>用户要求在现金额度内完成含费用的计算时，委派不会变成先花光现金再扣费。用户能区分原合同、已观察结果与执行器自检；错误自检不覆盖独立验收失败。</p>
+  <h3>Technical Design</h3>
+  <p>压缩 configuration.py 中既有交付说明，补入 Main 的合同原文传递和 Worker 的数值验证原则；不包含具体案例、公式答案或判定器信息。当前短交付文案仍保留显式输出合同、用户语言、真实链接、未知状态与可用交付要求。</p>
+  <h3>问题证据</h3>
+  <p>ff9c38a1 对应版本的三项独立检查为 CODE-01、NEWS-01 通过，QUANT-01 失败；三项共 334,118 Token／45 次请求，用量完整。失败原因为 Main 把“含买入费用的全现金买入”改成“数量等于现金除价格，另扣费用”，Worker 按改写后的规则执行，自检复制同一错误。该失败与原产物保留，不以此前较早版本通过抵消；合同修复后另作真实执行验证。</p>
+  <p>仅增加 Main 保真指令的下一版，CODE-01 与 QUANT-01 通过，NEWS-01 仍因 Main 自行扩展结构而失败；三项共 345,331 Token／50 次请求，用量完整。这说明指令不足以保证原合同到达 Worker，不能把单次通过当成问题消失。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

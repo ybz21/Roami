@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>标签池验收记录 · 2026-10-21</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="browser-tab-pool-acceptance" lang="zh-CN">
+  <h2>标签池验收记录 · 2026-10-21</h2>
+  <p>独立 profile / CDP / 数据目录的真实 Chrome 打开 20 个 Agent 页面后拒绝第 21 个；任务释放后，空闲回收关闭两个后台页，
+    保留正在前台查看的 Agent 页面和原有用户页面。测试浏览器与私有 tmux 由隔离启动器管理，现用服务未部署此变更。</p>
+  <p>数据库升级至 schema 9，Go 备份恢复兼容上限同步更新；升级过程保留原任务历史。
+    部署时需将显式 max_tabs=3 或 max_tabs=0 改为 20；新范围为 1..20，不能提前写入旧版不支持的配置。</p>
+  <p>合并最新 main 后保留观察失败与满额重试终止保护；843 个 Python 用例通过，覆盖重启后的重复满额拒绝和回收后继续开页。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

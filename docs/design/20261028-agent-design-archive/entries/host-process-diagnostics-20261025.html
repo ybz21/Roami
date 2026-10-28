@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>本机进程诊断路由修复 · 2026-10-25</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="host-process-diagnostics-20261025" lang="zh-CN">
+  <h1>本机进程诊断路由修复 · 2026-10-25</h1>
+  <h2>产品设计</h2>
+  <p>本机进程、CPU、内存与负载查询由 Main 直接调用受管只读快照，不要求用户提供目录、不新建项目或后台任务。resourceOnly 仍只允许浏览器导航与观察，不将“只读”误解为通用本机执行权限。快照只展示进程名称及资源指标，不返回命令参数和环境变量，不提供终止进程或修改系统的操作。</p>
+  <h2>用户故事</h2>
+  <p>用户询问“帮我看下当前机器的进程占用情况”时，能在原对话收到真实节点数据。没有代码工作区或其他任务占用工作区时仍可查询；采集失败明确报告不可用，不通过换目录、重复委派或网络检索修复。进程 CPU 百分比解释为 ps 生命周期平均值，单次快照不作为持续异常证据。</p>
+  <h2>技术设计</h2>
+  <pre>Main / Worker → bash argv: roami agent host processes --input {"limit":10}
+→ commands.json / ToolDirectory → host_processes（effect=read）
+→ 固定 ps argv + Linux /proc/meminfo + os.getloadavg
+→ CPU / RSS 排序、采集时间、指标口径和不可用字段 → 原对话 reply</pre>
+  <p>host_processes.py 独立负责采集和解析，worker_catalog 注册并允许 Main 调用；沿用工具上下文、所有者校验、禁用策略与执行回执。ps 使用最小环境、固定参数和 5 秒超时，不接收 cwd、任意 argv 或 shell 字符串；进程输出只读 comm。Linux 提供整体内存与 swap，其他环境无法读取的指标保持 null。工具发现增加本机语义词，主指令、bash 描述、resourceOnly 字段说明和 WORKSPACE_REQUIRED 恢复提示指向相同入口。Go 命令映射继续从同一 JSON 内嵌读取，不新增公开无认证接口或轮询。</p>
+  <p>问题证据：原请求先在 Main 因 WORKSPACE_REQUIRED 拒绝 ps，随后被委派到 resourceOnly 并以 TOOL_UNAVAILABLE 失败；换普通目录重试又撞到已跟踪任务的工作区。修复保持浏览器隔离与代码工作区锁，仅补齐本机只读诊断入口。</p>
+  <h2>验收记录</h2>
+  <p>52 项定向回归通过，覆盖目录发现、排序与单位、缺失指标、采集超时／失败、参数限制、Research 拒绝和禁用策略，以及原始 ps 失败后直接恢复、无后台任务的完整对话。独立临时数据库完成真实 ps 与 /proc 采集。当前配置的 deepseek-4.1-flash 对原问题连续三轮均直接调用 host_processes，回执为 read/succeeded、无后台任务、对话正常结束；没有模拟模型选择或系统输出。三轮使用隔离数据目录与禁用执行的 CLI 路径，不写现用任务、不启动专业会话。证据位于 /tmp/host-process-fix-20261025，未部署现用服务。</p>
+  <p>新增英文仅用于模型指令、工具协议定义和 CLI 帮助；遵循国际化规范中的协议字段、终端输出与开发文档例外，不新增界面文案。</p>
+  <p>最终 quick 质量门禁通过：Go 全量、Python 静态与格式检查及 1324 项测试、前端 typecheck／i18n（3814 个键）／hover、秘密扫描与文件策略。Research 恢复提示收尾后另跑 23 项相关回归通过；没有前端代码变更，未重复运行前端功能测试与构建。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>浏览器分组策略可配 · 2026-10-22</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="browser-group-config" lang="zh-CN">
+  <h2>浏览器分组策略可配 · 2026-10-22</h2>
+  <h3>产品设计与用户故事</h3>
+  <p>用户在浏览器设置中分别调整人工、智能体组的页数上限、休眠和自动关闭时间，无需改文件或重启。页数允许 0..1000，0 表示不限；默认智能体 20、人工不限。时间仍以分钟输入，0 关闭对应策略。降低上限只阻止超额新建和移入，不立即清空已有页面，保留现有回收保护。</p>
+  <h3>技术设计</h3>
+  <p>扩展 internal/browsertabs 的同一份 tabPolicies，新增两组 maxTabs，缺失字段兼容原有默认。Go REST、Node CLI 与原生 Python 容量检查读取同一策略；驱动 capabilities 返回当前策略，旧驱动保留 TOML 回落。界面字段失焦或回车后保存，新增中英文文案；校验拒绝负数、分数和超过 1000。验证配置迁移、热更新、两组新建与移组限制、无限模式、保护页及手机触控。</p>
+  <h3>验收记录</h3>
+  <p>真实 Chrome 验证人工独立容量、智能体增加到 22 页、降低上限不删页、超额新建及移组受限、0 不限和非法数值拒绝。桌面及 Redmi Note 8 真机验证页数输入、回车保存、刷新恢复、两组独立设置与无文档溢出；截图位于 /tmp/browser-capacity-desktop.png 与 /tmp/browser-capacity-phone.png。前端 124 个文件、883 个测试通过，Python 容量及驱动 52 个回归通过；运行仓库完整门禁与提交前 quick 检查。现用服务未部署本分支。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

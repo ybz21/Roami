@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>分组入口位置修订 · 2026-10-22</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="browser-group-navigation-placement" lang="zh-CN">
+  <h2>分组入口位置修订 · 2026-10-22</h2>
+  <h3>产品设计与用户故事</h3>
+  <p>按用户截图红框，分组控制固定在桌面网页标签栏右端，左边继续展示当前组标签；旁边“全部页面”打开可搜索的两组目录。原“智能体模式 / 手动模式”属于自动跟随行为，移入更多菜单，改为明确动作“暂停自动跟随 / 恢复自动跟随”，避免被理解为页面来源。手机沿用标签入口打开全屏目录；新建始终人工来源。用户能在固定位置找组、搜索、移组，并在各组恢复上次选择。</p>
+  <h3>技术设计</h3>
+  <p>TabStrip 的 mc-tabs-end 承载来源 Segmented 与全部页面按钮，标签区 flex 收缩和内部横滚。TabSheet 共用目录内容，桌面在 BrowserView 内呈现右侧非模态面板，手机复用 MobileSubPage。搜索和来源筛选不触发激活，批量关闭只作用于可见的同来源组。复用已有读取与修改接口，不新增轮询。样式使用令牌、粗指针命中区和中英文文案。</p>
+  <h3>验收记录</h3>
+  <p>真实隔离 Chrome 验证分组按钮位于标签条右端、恢复各组最近页面、目录同时展示两组、搜索不激活页面、REST 移组与更多菜单中的自动跟随。Redmi Note 8 真机验证搜索、移组、Android 返回、20 个智能体页面触控滚动，搜索和分组栏保持固定。320、390、820、1100、1280、1600、1920 宽度在中文深色与英文浅色下共 14 组验证无文档或横向溢出。前端 124 个测试文件、887 个用例通过，执行 full 与提交前 quick 门禁。截图位于 /tmp/browser-right-after.png、browser-right-directory.png、browser-right-phone.png、browser-right-phone-scroll.png；未部署到现用服务。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

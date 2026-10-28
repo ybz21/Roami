@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>浏览器分组验收 · 2026-10-22</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="browser-origin-groups-acceptance" lang="zh-CN">
+  <h2>浏览器分组验收 · 2026-10-22</h2>
+  <ul>
+    <li>Go 目录采用原子 JSON 和跨进程文件锁；CLI 默认智能体、界面显式人工，创建来源与当前分组分别保存。移组和固定跨服务重启保留，Chrome 恢复快照延续来源与分组。</li>
+    <li>真实 Chrome 验证后台计时器冻结、再次调用自动唤醒、未提交表单拒绝关闭、固定页保护；真实维护循环关闭过期智能体页、休眠并保留人工页，前台页保持打开。</li>
+    <li>真实 CLI 与 REST 验证智能体 20 页、第 21 页拒绝、满额仍可创建人工页、移入已满智能体组被拒绝、无来源的历史页归智能体，移组不改写创建来源。</li>
+    <li>完整质量门禁通过，Python 844 个用例通过；前端 124 个测试文件、882 个用例，typecheck、i18n、hover 和生产构建通过。后续小范围修订另通过对应 Go / Python 回归，提交钩子重跑 quick 门禁。</li>
+    <li>桌面检查 390、820、1280、1600、1920 宽度。Redmi Note 8 以真实触控完成分组、改组、20 页列表滚动、固定返回栏与分组栏、Android 返回键、策略保存及刷新恢复；392 CSS px、coarse，无文档或横向溢出。</li>
+    <li>截图和设计预览位于 /tmp，服务与 Chrome 使用独立数据目录及隔离 tmux；现用服务未部署此分支。自动维护依赖已启用浏览器工具的原生 Agent 服务，停止该服务时不执行自动休眠或关闭。</li>
+  </ul>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

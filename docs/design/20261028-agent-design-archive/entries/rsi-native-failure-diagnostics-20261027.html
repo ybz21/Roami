@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RSI Native 执行失败原因 · 2026-10-27</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-native-failure-diagnostics-20261027" lang="zh-CN">
+  <h2>RSI Native 执行失败原因 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>未创建 Native 任务、执行器不符、当前执行未完成时，报告保留明确的失败原因，不再统一显示为运行失败。其他未知异常继续泛化，不能借诊断输出任意供应商文本。</p>
+  <h3>User Stories</h3>
+  <p>用户能区分漏委派、执行未完成与产物数值错误；维护者可以针对真实原因改进协调，不把已有答案文件当作 Native 执行证明。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation_tasks 声明有限 NATIVE_EXECUTION_FAILURES，包含原四个预算代码及三个既有执行合同代码；ContainerExecutor 仅透传集合内的 release_blocker，其他字符串仍映射 RSI_RUNTIME_REPORTED_FAILURE。评分、执行条件、费用与冻结 v20 结果不变。回归同时验证允许代码透传及私有任意文本不泄漏。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

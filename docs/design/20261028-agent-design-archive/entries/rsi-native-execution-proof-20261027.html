@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RSI Native 执行凭证 · 2026-10-27</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-native-execution-proof-20261027" lang="zh-CN">
+  <h2>RSI Native 执行凭证 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>评测已经明确要求 Native Worker，Main 不得通过 host shell 绕过委派。文件内容正确与执行合同完成分别验收；没有实际 Worker、只有旧版本成功记录或最后一次执行未成功，都不能算作当前 Native 交付。</p>
+  <h3>User Stories</h3>
+  <p>用户要求 Native 执行时，评测能证明工作由当前任务版本的 Native 完成。协调器不再自己反复扫描大目录消耗整个任务额度；普通产品中的 Main 主机执行能力保持原有授权与作用域。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation_tasks.bind_evaluation_tasks 仅在隔离评测 Runtime 将 bash 的 Main 可用标记关闭，Worker 的工作区 shell 保持可用，直接 shell 入口原本也不向 Main 开放。NativeFilesExecutor 在生成结束后检查每个任务当前 revision 的最后 attempt：必须存在、executor_kind=native、attempt succeeded，任务 waiting_user 或 succeeded。独立文件检查仍继续执行，执行合同失败仍阻止通过。原 trial 与费用不重写，评测协议单列 container-uds-v16-native-execution-required。</p>
+  <h3>验证计划</h3>
+  <p>覆盖 Main 的 bash/shell 两入口和 host/workspace 两作用域执行前拒绝、Worker 真实文件写入、空任务、错误执行器、旧 revision、运行中 attempt、未完成任务、较新失败 attempt，以及真实 Native 委派成功。新协议复测单列，不冒充冻结 v6 全套通过，评分与连续日观察继续保留。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

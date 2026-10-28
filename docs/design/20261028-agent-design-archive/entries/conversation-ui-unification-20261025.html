@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>统一对话界面 · 2026-10-25</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="conversation-ui-unification-20261025" lang="zh-CN">
+  <h1>统一对话界面 · 2026-10-25</h1>
+  <h2>产品设计</h2>
+  <p>首页、Codex、Claude Code 与本地子智能体使用专业会话的消息气泡、工具行与输入卡。文字区、底部工具条、圆形发送／停止按钮、字体、留白与命中区共用组件和样式。工具条左侧提供添加与模式，右侧提供模型、已有语音功能与主动作；窄屏可换行，主动作始终可达。首页保留对话／任务选择、项目、执行器、模型与推理强度；专业会话保留真实权限模式、模型、文件和终端控制；子智能体继续原任务，任务详情、产物和关闭放在添加菜单。</p>
+  <h2>用户故事</h2>
+  <ul><li>用户在四类对话间切换时，输入、发送、停止和查看输出的位置与样式一致。</li><li>用户在首页直接选择对话或任务模式，并保留项目、执行器、模型、附件与排队；专业会话的权限与模型继续由原 CLI 确认。</li><li>手机用户使用 Enter 换行、可见按钮发送，输入法确认候选词不误发；失败保留草稿，弹出键盘后所有动作可点。</li></ul>
+  <h2>技术设计</h2>
+  <pre>chat/ConversationComposer.tsx + conversation.css
+  文本区、附件／提示／选项插槽、统一工具条、发送／停止与键盘规则
+  ← AgentChat / ChatShell（Codex、Claude Code、OpenCode）/ NativeSession
+chat/Message.tsx
+  共用正文、气泡与复制，开放消息附加动作
+  ← AgentMessageView（首页提问、附件、记忆与已读标记）/ NativeConversation / 专业会话
+ComposerPlus / AgentComposerPlus / AgentModelPicker
+  继续承担各自真实配置与接口，只统一触发控件和锚点</pre>
+  <p>网络请求、草稿、排队、附件与提交协议留在原控制器；公共输入组件不调用服务端。移除首页和本地会话重复的输入卡样式覆盖，布局只走 useLayout。验证覆盖中文输入法、手机 Enter、发送失败、停止两阶段、模式／模型操作、队列与消息已读，以及桌面和 Android 真触控、键盘和返回。</p>
+  <h3>验收记录</h3>
+  <p>quick 质量门禁通过（Go 全量、Python 静态检查／格式／1267 项测试、前端 typecheck／i18n／hover）；最终前端 136 个文件、982 项测试通过；生产构建及压缩成功，保留已有大块体积提示。公共输入回归覆盖输入法组合、桌面 Enter／Shift+Enter、手机 Enter、停止与发送并存、仅附件发送和模式控件不误提交；既有队列、失败草稿、提问、记忆与导航测试继续通过。</p>
+  <p>桌面与 Redmi Note 8 真机分别检查首页、Codex、Claude Code、本地子智能体。四类输入框的字体、行高、留白、背景、边框、圆角与发送尺寸通过实际计算样式比对；手机按真实能力换行，不增加无效控件。手机检查模式、模型返回、工具展开、手势滚动及原任务续聊；键盘实测 314px，发送按钮底边约 411px，位于键盘上方。桌面在 320、390、820、1100、1440、1920 宽度检查中英／深浅主题，无横向与文档滚动。</p>
+  <p>前后截图、生产包页面检查、真机键盘截图和请求回执位于 /tmp/conversation-unify-20261025，入口为 comparison.html。截图和执行内容使用隔离示例；未以示例回执声称真实模型或现用 tmux 会话执行通过。本轮改前快照包含此前已完成的本地会话改动。测试服务使用独立端口和隔离启动器。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

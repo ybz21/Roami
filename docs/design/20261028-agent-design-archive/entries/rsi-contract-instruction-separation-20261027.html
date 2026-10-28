@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RSI 执行说明与结果字段分离 · 2026-10-27</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-contract-instruction-separation-20261027" lang="zh-CN">
+  <h2>RSI 执行说明与结果字段分离 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>题面中的执行说明不再伪装成 result.json 的 contract 字段。模型只需输出公开声明的结果字段；执行要求单独列出。QUANT-02 公开数组类型、区间边界、独立指标历史、下一 bar 开盘成交、费用、期末估值及审计日志格式，QUANT-03 补齐同一因果交易规则。数值参考、输入文件、单项额度和独立检查不变。</p>
+  <h3>User Stories</h3>
+  <p>用户无需猜测“说明文字”是否也是结果数据，不会因使用未公开的数组／对象结构或成交时点而遭遇隐藏条件。经验迁移日志可用 output 或 stdout 保存真实输出；两者冲突、伪造输出或凭证仍失败。</p>
+  <h3>Technical Design</h3>
+  <p>authored_fixtures 在序列化字段说明前提取 contract，将其列为“执行要求（不是结果字段）”；返回显式 contract_revision，corpus 为受影响案例绑定 authored-v10-separated-instructions，缓存使用 authored-40-v10.json，其他案例版本保留。LAB-05 对 output/stdout 所有已提供字段同时做类型和原始输出一致性检查，不用一个字段掩盖冲突。协议单列 container-uds-v19-separated-contract-instructions；新增冻结库存和复测不覆盖原案例或原生成失败。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

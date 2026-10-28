@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>输入区控件重设计 · 2026-10-25</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="composer-controls-design-20261025" lang="zh-CN">
+  <h1>输入区控件重设计 · 2026-10-25</h1>
+  <h2>产品设计</h2>
+  <p>按用户修订，固定为正文与单排工具栏两层。正文留足输入空间；工具栏仅保留加号、模型、思考程度、语音与发送／停止。身份不重复展示；模式、项目和执行器进入加号。模型使用可收缩的剩余空间，动作固定宽度。输入卡使用既有表面、14 圆角与令牌留白，去掉聚焦时厚重的光晕；配置控件无常驻描边，只有主动作实心。桌面与手机使用同一结构，窄屏优先给模型分配剩余宽度，全文可在选择面板读取，不把发送挤到第三排。</p>
+  <p>按用户修订，不常驻显示上下文。首页与专业会话保留已有加号中的上下文／压缩入口，不增加 native 上下文接口或请求。</p>
+  <p>模型与思考选择共享克制的触发样式。首页使用 main 配置；native 使用 worker 默认配置，选择面板明确提示影响后续 native 任务，运行时禁止改配；不把全局默认值伪装成某条已结束执行的真实模型。专业会话沿用 CLI 的模型／思考选择，不在网页乐观伪报修改成功。输入区不显示 native 或内置智能体身份，身份沿用页头。</p>
+  <p>语音在四类输入框的同一位置，点击或按住录音、取消、转写沿用已有语音能力。识别只追加到当时的草稿，不自动发送、不覆盖后来输入，也不串到另一会话；未配置、非安全上下文、拒绝麦克风均给出已有恢复提示。语音快捷键优先交给正在录音或已聚焦的可见输入框，未聚焦时默认首个可见输入框；不会同时启动两路录音。</p>
+  <p><a href="/api/file/serve/tmp/composer-controls-20261025/design.html">打开交互设计稿</a>；稿内可切换手机／桌面、深浅主题、加号、模型、思考程度和录音状态。示例语音只演示状态，不访问麦克风。</p>
+  <h2>用户故事</h2>
+  <ul><li>我可以持续看到完整度足够的模型与当前思考程度；手机上话筒和发送位置稳定。</li><li>我可以在 native 里使用语音追加要求，确认文字后再发送；切换会话时不会把旧录音写入新草稿。</li><li>我可以从加号切换对话／交办任务、选择目标与执行器，需要时查看上下文；默认工具栏保持简洁。</li><li>我能明确区分首页配置、后续 native 默认配置和专业 CLI 会话设置，保存失败不改变当前确认值。</li></ul>
+  <h2>技术设计</h2>
+  <pre>chat/ConversationComposer + conversation.css：固定单排加号／配置／语音与主动作；沿用发送、停止、IME 与附件插槽
+agent/AgentComposerPlus：模式、项目与执行器进入加号；沿用按需上下文查询
+agent/useAgentModels + AgentModelPicker：显式 main／worker 作用域，保留原子保存与失败重试
+chat/ChatShell：转录状态映射模型、思考与上下文；原 CLI 命令及提示面板
+agent/AgentChat + NativeSession：各自原草稿控制器、语音追加与快捷键可见性
+chat/VoiceInput + icons：统一图标；disabled／会话切换时取消录音，异步结果防串会话
+</pre>
+  <p>不引入音频自动发送、不更改 CLI 凭证和默认权限。不新增上下文接口或轮询。样式验收覆盖 320／390／820／1100／1440／1920、深浅主题、中英文、粗指针 44px、软键盘与真实触控；协议回归覆盖 worker 修改不写 main、错误保留值、跨会话转写丢弃与模式选择保留草稿。</p>
+  <p>专业 Claude 思考入口采用官方交互命令，参考 <a href="https://academy.claude.com/tutorials/choosing-the-right-effort-level-in-claude-code">Claude Academy：effort 交互入口</a>；Codex 继续现有 /model 的模型和推理选择路径。</p>
+  <h3>验收记录</h3>
+  <p>最终功能回归为 137 个前端测试文件、988 项用例通过，包含 worker 修改不写 main、中文输入法、手机 Enter、队列与草稿、跨会话转写丢弃、延迟授权释放及共享快捷键只触发一个输入框。样式收尾后的语音 5 项回归、typecheck、i18n（3807 个键）、hover 与生产构建／压缩通过。保留已有大块体积提示。本轮只修改前端与设计文档；后端沿用上一轮已通过的 Go／Python 检查，不重复运行无关检查。</p>
+  <p>桌面和 Redmi Note 8 分别检查首页、Codex、Claude Code、本地子智能体：默认工具栏恰好五个控件，一排展示，没有身份与上下文重复；模式／目标／执行器进入加号且切换保留草稿。桌面检查 320、390、820、1100、1440、1920 宽度、中英和深浅主题；长模型与英文 Extra high 单独验证，所有控件中心可命中，无横向和文档滚动。手机验证粗指针 44px、模型与思考选择、真录音、转写加入原草稿、上滑取消、原任务续聊和软键盘；实测键盘 314px，发送按钮底边约 430px，位于键盘上方。</p>
+  <p>录音通过真实 MediaRecorder、WAV 转换与上传；Android 使用真机麦克风，桌面因浏览器麦克风访问被环境拒绝，先确认错误提示，再使用 WebAudio 测试音源验证录音链路。转写响应、模型配置及执行回执均使用隔离接口，不作为真实 ASR 准确率或模型执行证明。录音状态使用柔和强调色，发送保持工具栏唯一实心主动作。</p>
+  <p>证据位于 /tmp/composer-controls-20261025：设计稿 design.html，实际前后对比 comparison.html，桌面／手机 JSON、长模型和上滑取消检查、model-writes.jsonl、cli-commands.jsonl、生产包截图与语音链路回执。运行实例使用隔离启动器和独立端口，未修改现用服务。</p>
+  <p>合入前已同步 main 的 RSI 修复；复核补齐按 turn_id 隔离供应商工具调用 ID，防止不同轮次重名工具的结果与错误状态互相覆盖。更新后的前端全量 137 个文件、991 项用例通过；包含同名调用跨轮次回归。合入阶段的整仓门禁与审查记录随 PR 提供。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

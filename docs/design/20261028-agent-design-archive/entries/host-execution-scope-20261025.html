@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>通用本机执行作用域 · 2026-10-25</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="host-execution-scope-20261025" lang="zh-CN">
+  <h1>通用本机执行作用域 · 2026-10-25</h1>
+  <h2>产品设计</h2>
+  <p>修订 PR #452 的处理边界：目录是代码任务的上下文，不是所有本机操作的前提。与项目文件无关且已获用户授权的本机操作由 Main 显式调用 bash scope=host，不创建项目、不借用目录、不误派浏览器 Research。不按进程、磁盘、网络或服务名称增加专用路由。原 host_processes 保留为可选结构化只读接口，不再是提示与恢复的必经入口。</p>
+  <h2>用户故事</h2>
+  <ul>
+    <li>用户查询本机状态或要求执行与项目无关的命令时，没有项目也能取得真实命令结果。</li>
+    <li>用户继续代码任务时，保留原任务、目录和执行器；本机作用域不改变已有工作区绑定。</li>
+    <li>用户停止命令后，子进程被回收；大输出保留所有者隔离的完整记录。</li>
+  </ul>
+  <h2>技术设计</h2>
+  <pre>Main → bash {argv 或 command, scope:"host"} → ToolDirectory / Tools.validate
+→ shell（Main 且无 taskId / workspace / cwd）→ 临时当前目录 → 既有 process.execute
+→ 凭证过滤、进程组取消、完整输出外置 → tool_calls（scope、write、真实状态）
+Worker → bash scope:"workspace"（默认）→ 原目录绑定与根目录检查
+Research → 原浏览器导航／观察协议</pre>
+  <p>host 是执行作用域，不是只读权限或文件系统沙箱；通用命令一律保守记录 write，不根据命令名推断安全。用户授权仍由原会话与指令约束，不能从网页、记忆或工具结果取得新授权。临时当前目录只避免继承服务代码／数据目录，不限制绝对路径；需保留的文件产物继续使用真实工作区。Main 指令、工具描述、resourceOnly 说明和错误恢复统一描述作用域；移除本机诊断关键词路由。已注册 Roami 命令继续走原参数、角色和回执协议，不能同时指定 host。Worker／Research 不获得 host，运行时再校验 taskId 和 workspace，默认行为保持原工作区约束。</p>
+  <h2>验收记录</h2>
+  <p>quick 门禁通过：Go 全量、Python 1342 项测试、格式与静态检查、前端 typecheck／i18n（3814 个键）／hover、秘密扫描与文件策略。新增 18 项回归覆盖 ps／df／uname、任意程序与管道、凭证过滤、角色与工作区拒绝、禁用策略、输出所有者隔离、取消／失败清理和通用恢复。真实模型 deepseek-4.1-flash 对磁盘、系统架构、时间时区、网卡名称四类请求均直接选择 host、执行真实命令，未产生后台任务。全部使用隔离临时数据；没有前端界面变更，未部署现用服务。</p>
+  <p>证据位于 /tmp/host-execution-20261025：targeted.log、live-main.json、validation.html／png、quick.log；完整门禁与提交钩子回执见 full.log、commit.log，结果随 PR 提供。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

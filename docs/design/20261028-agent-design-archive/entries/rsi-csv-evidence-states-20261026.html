@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CSV 质量证据采集修复 · 2026-10-26</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-csv-evidence-states-20261026" lang="zh-CN">
+  <h2>CSV 质量证据采集修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>质量取证与功能验证支持相同的即时／提交时校验流程：非法文件已显示错误并禁用导入按钮时直接记录现场，导入、503保留与成功恢复按真实响应和绘制帧取证。真实成品与脚本控制组分开，成品功能通过不等于已获质量分。</p>
+  <h3>User Stories</h3>
+  <p>维护者能看到合法即时校验页面的六张真实截图和恢复过程，不因取证脚本点击禁用按钮而一直缺少质量证据。用户参考分和视觉模型评分继续绑定确切材料，旧校准不能替代新协议的校准。</p>
+  <h3>Technical Design</h3>
+  <p>artifact_evidence.PROGRAM 的 CSV 分支等待按钮或错误状态，以实际 POST 响应完成及浏览器绘制帧捕获画面。冻结渲染镜像仍为 sha256:80e04db9…；PROGRAM 是 PROTOCOL_HASH 的组成部分，因此旧证书和旧模型评分不复用，必须在人工参考确认后重新进行双模型校准。旧材料、分数和请求保留。评测协议单列 container-uds-v14-csv-evidence-states。</p>
+  <h3>验证边界</h3>
+  <p>原 Sol 成品的四项功能检查、提交时校验控制组通过；换错重试键及清空输入反例失败。更新取证脚本完成六张图和七段文本的零模型采集，原源码 SHA 保持。无提供方调用，不自行打分；四份修订样本人工参考及新协议校准仍待完成。旧 v6 全套结果及父 issue 状态保持。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

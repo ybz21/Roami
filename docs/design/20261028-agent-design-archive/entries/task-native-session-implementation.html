@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>native 会话托管实施 · 2026-10-22</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="task-native-session-implementation" lang="zh-CN">
+<h2>native 会话托管实施 · 2026-10-22</h2>
+<p>首页任务栏与详情直达原会话和项目；桌面在 Main 右侧打开 native，手机为全屏单返回栏。记住筛选、选择、位置及草稿；等待验收与终态详情不轮询。项目目录提供 native 入口，不移动首页任务主列表。</p>
+<p>schema 12 登记稳定 native 身份和父子关系，以同事务 outbox 生成私有 JSONL、校验 gzip 分段；七天前正文在无在途 turn、保留最近两轮且可精确恢复时改为认证引用。备份格式 3 同时包含数据库、native 目录和附件；关闭保留历史，恢复不重放工具。采用带来源、修订与有效范围的工作习惯，只影响新项目任务，续改保持原 Agent / branch / workspace。</p>
+<p>设计原型与真实实现的目录、接口和验收差异见上述实际实现 HTML；开发文档中文是 i18n 例外，产品文字均走 i18n。代码未部署。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

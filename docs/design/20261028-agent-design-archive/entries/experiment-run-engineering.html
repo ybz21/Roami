@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>实验分组与Workflow工程合同 · 2026-10-24</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="experiment-run-engineering" lang="zh-CN"><h2>实验分组与Workflow工程合同 · 2026-10-24</h2><h3>Product Design / User Stories</h3><p>实验与“这台机器”同级，RSI为其子页；未来OKR可注册，未实现入口不展示。用户分别配置下一次Workflow和查看指定Run；历史运行显示冻结配置、逐节点状态与产物，不能拼接全局最新动作。</p><h3>Technical Design</h3><p>定义版本 → Run快照 → 节点Attempt → 产物索引 / 状态事件 / 副作用outbox。复用已有评测和Codex执行器；主账本同事务关联requests/cycles/actions，不增加第二套调度状态来源。默认合同和恢复、权限、落盘协议见<a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-engineering.html">工程设计与交互原型</a>及<a href="docs/design/20261022-roami-agent-rsi/architecture/workflow-contract.json">机器可读默认合同</a>。前期10项用独立原型验证；现已迁移到RunRecords，按次运行页面和GitHub诊断发布见下节。已实际跑完：5项生成截断、1项预算阻塞、4项机制通过；生成与Codex共311,036 Token，7节点/9 Attempt及26份文件完整性复核通过，复盘首次准入阻塞后保留记录并压缩证据恢复。</p></section>
+
+<!-- archived-source:end -->
+</body></html>

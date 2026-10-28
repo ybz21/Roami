@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>一条命令安装 Roami · 2026-10-23</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="agent-runtime-distribution-design" lang="zh-CN">
+  <h1>一条命令安装 Roami · 2026-10-23</h1>
+  <p>状态：已实现，安装与守护验收见本节末尾；尚未合并发布到公开安装入口。</p>
+  <h2>产品设计</h2>
+  <h3>用户只执行一条命令</h3>
+  <pre><code>curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash</code></pre>
+  <p>沿用当前仓库与入口。macOS、Ubuntu 用户使用同一条命令；无需 clone 仓库，无需安装 Python、uv、pip、Node 或 Go，无需激活 venv 或手动拉起智能体服务。bash 不直接下载 URL，因此公开入口采用 curl 下载并交给 bash。模型服务凭证仍由用户在网页设置中填写。</p>
+  <p>安装器自动识别系统及 CPU，下载完整包，安装私有运行时，注册现有 systemd／launchd 服务，启动并验证本机模型设置接口。成功后只显示访问地址、首次设置登录口令的提示和日志位置。重复执行同一命令即升级；默认不要求用户选择安装类型或 Python 版本。</p>
+  <h3>推荐决策</h3>
+  <table>
+    <thead><tr><th>方式</th><th>用户体验</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td>完整包带 Python、应用 wheel 和依赖 wheel</td><td>一次下载；环境安装不再访问 PyPI</td><td>默认方案</td></tr>
+      <tr><td>安装器在线下载 uv／Python，再安装依赖</td><td>命令也只有一条，但依赖多个外部下载源</td><td>可作为开发路径，不作为默认发布安装</td></tr>
+      <tr><td>直接压缩构建机的 venv</td><td>携带绝对路径和平台绑定，换目录容易失效</td><td>不采用</td></tr>
+    </tbody>
+  </table>
+  <p>默认包携带固定版本的 CPython 独立发行版；在用户机器的最终安装目录创建 venv，再使用包内 wheel 离线安装。包体积、下载时间和安装磁盘占用由实际构建测量，本方案不预报数字。运行时环境准备完成后不再移动目录。</p>
+  <h3>边界与失败反馈</h3>
+  <p>“无需预装开发工具”限定为 Roami 与智能体运行时；现有会话功能所需 tmux 继续由安装器探测并按系统安装，必要时明确提示包管理器权限。Chrome、ADB、KVM 沿用可选功能策略，其安装失败不伪报智能体安装失败。完整包下载后，Python／依赖安装可断网完成，不等于 Chrome、tmux 等宿主工具也离线可装。</p>
+  <p>下载、校验、建环境或预检失败时保留现有版本，报出失败步骤和重试入口；首次安装失败不得打印“完成”。模型尚未配置时设置表单应可打开；服务故障与模型连接／认证错误分开显示。安装完成不声称用户已配置模型或可使用未登录的专业 Agent。</p>
+  <h2>用户故事</h2>
+  <ol>
+    <li>第一次安装的人复制一条命令，结束后直接打开网页填写模型地址和密钥。</li>
+    <li>没有 Python、uv、Node、Go 的 Mac 或 Ubuntu 机器，也能安装并打开智能体设置。</li>
+    <li>已有用户再次执行原命令升级，配置、登录口令、对话和模型密钥保留。</li>
+    <li>准备新版本时断网或依赖损坏，旧版本继续可用，重新执行命令能重试。</li>
+    <li>重启电脑或智能体进程崩溃后自动恢复，用户无需再运行第二条启动命令。</li>
+  </ol>
+  <h2>技术设计</h2>
+  <h3>发布资产</h3>
+  <p>发布四份完整资产：roami-linux-amd64.tar.gz、roami-linux-arm64.tar.gz、roami-darwin-amd64.tar.gz、roami-darwin-arm64.tar.gz。当前裸二进制保留为高级使用入口；安装器默认选择完整包，不悄悄退回缺少运行时的裸二进制。</p>
+  <pre>roami-&lt;os&gt;-&lt;arch&gt;.tar.gz
+  bin/roami                     Go 主程序，继续内嵌前端
+  runtime/python/               固定构建的 CPython 3.12 独立发行版
+  runtime/wheels/               roami_agent 及全部生产依赖 wheel
+  runtime/requirements.lock.txt  从 uv.lock 导出的构建输入与上游哈希
+  runtime/requirements.txt       当前平台实际 wheel 的精确版本与哈希
+  runtime/pyproject.toml         运行时识别与构建元数据
+  manifest.json                 版本、源提交、目标平台、文件哈希、Python 构建、协议版本
+  licenses/                     Python 与依赖发行许可
+  runtime/.venv/                目标机生成，不在压缩包中</pre>
+  <p>构建固定 Python 补丁版本与独立发行版构建号，不使用浮动 latest。现有 uv.lock 是唯一依赖解析来源，导出生产依赖，排除 pytest、ruff 等开发组；构建包含 migrations 和 Skill 资源的非 editable 应用 wheel。每个平台收集匹配 ABI／架构的全部 wheel；缺少 wheel 时构建失败，不能把源码编译留给用户。Linux 的 glibc 下限与 macOS 最低版本根据实际 Python 和 wheel 清单锁定，并以相应系统实测后公布，不把 Linux 包声称为支持 Alpine/musl。</p>
+  <h3>安装与目录</h3>
+  <pre>~/.local/bin/roami                 稳定入口
+~/.local/share/roami/
+  releases/&lt;version&gt;-&lt;manifest-hash&gt;/
+    bin/roami
+    runtime/python/
+    runtime/.venv/
+    manifest.json
+  current                         原子切换的已验证版本指针
+~/.roami/                         原有用户配置、模型密钥、数据库、会话与附件</pre>
+  <p>系统级安装按实际服务用户解析安装根，保留现有 ROAMI_* 自定义存储路径，不把运行时目录与用户数据库混在一起。运行时查找优先显式 --runtime-dir／ROAMI_AGENT_RUNTIME，再找当前发布目录的 runtime，最后保留源码开发路径。服务启动使用绝对路径，不依赖交互 shell 的 PATH、activate 或工作目录。</p>
+  <ol>
+    <li>安装互斥锁防止两个安装器同时激活；解析一次具体 release tag，包和校验清单取自同一 release，禁止下载过程中多次解析 latest。</li>
+    <li>下载到临时文件，核对摘要及 manifest 平台、版本与路径；拒绝越界归档条目。生产发布必须同时具备主程序和运行时资产。</li>
+    <li>把新版本解压到不会再改名的独立最终目录，先标记未完成。使用包内 Python 创建 .venv，通过 ensurepip 和本地 wheel 离线安装精确依赖；无需用户安装 uv 或系统 Python。不写系统 site-packages。</li>
+    <li>用候选程序执行原有存储布局预检；在临时配置、数据库、私有 tmux 服务和 socket 下完成初始化及模型设置 GET/PUT/重启恢复预检，不使用真实用户的模型凭证或数据库。</li>
+    <li>预检成功后标记 ready。等待现有智能体空闲并有序停止本安装管理的服务；有在途任务或服务归属不明时中止激活并给出重试说明，不终止用户任务。</li>
+    <li>必要时先做一致性存储备份，再原子切换 current，同时切换 Go 与 Python 版本；注册／重启原有 systemd 或 launchd 服务。首次从普通二进制入口迁入版本目录时保留原程序备份。</li>
+    <li>检查主服务及智能体状态、实际模型设置接口。未配置模型时也必须返回可填写的设置。无服务管理器环境给出明确的前台启动方式，不声称已注册开机启动。</li>
+  </ol>
+  <p>准备阶段失败不触碰旧版本。激活后失败需区分数据库迁移：未迁移可回切旧程序；已经迁移则先停止新写者，通过现有存储备份恢复完整实例后再回退，禁止只切旧程序读取新 schema。保留上一份可用发布目录；清理必须避开 current、上一版本及仍有进程引用的环境。首版自动回退只承诺已验证的备份／迁移路径，未知写入状态保留现场并报恢复步骤。</p>
+  <h3>运行时生命周期</h3>
+  <p>Go 主进程统一管理智能体子进程，覆盖安装版、自定义目录启动和 start.sh 开发路径。systemd／launchd 仍只管理一个 Roami 服务，不另让用户配置 Python 服务。默认启动仅运行已准备好的环境，不在服务启动时下载或安装依赖。</p>
+  <p>主服务启动时先解析同实例存储、取得运行时独占锁，再启动 Python，等待私有 socket 就绪；异常退出有退避重启。SIGTERM 时先停止接收新工作，按既有任务语义关闭并等待子进程退出。父进程意外死亡通过继承的存活管道关闭通知子进程退出，不能只依赖 Linux 专有机制；运行时锁保证旧写者未退出时不会启动第二个写者。只回收自己启动且身份匹配的子进程，不接管或终止手动启动的运行时。</p>
+  <p>Go 与 Python 使用同一实例路径和 Unix socket 解析规则，覆盖 macOS 长 HOME 和 Linux XDG_RUNTIME_DIR 不一致场景；超长路径必须有同用户私有短路径策略或明确可恢复错误。hub 模式不启动本机运行时。独立 roami agent serve 保留供开发与诊断使用，并与自动管理共用单实例锁。</p>
+  <h3>代码与模块架构</h3>
+  <pre>.github/workflows/release.yml        四平台原生构建／验收与完整资产发布
+scripts/build/build-agent-bundle.sh  Python、应用 wheel、依赖 wheel 和 manifest
+scripts/build/build-roami.sh         保留 Go／内嵌前端构建
+install.sh                          单命令入口、预检、准备／激活与服务登记
+scripts/install/agent-environment.sh 目标目录建 venv 和离线依赖安装
+cmd/roami/agent.go                  发布目录发现、setup 和 init 兼容
+cmd/roami/agent-supervisor.go        Go 管理运行时进程、就绪、退避与停止
+cmd/roami/main.go                   standard 启停接入，hub 排除
+agent-runtime/src/roami_agent/app.py 运行时锁、父进程存活管道和有序退出
+frontend/.../agent-models.ts         区分运行时不可用与模型服务错误
+scripts/dev/selftest/agent-install.sh 全新／重复／失败安装回归</pre>
+  <h3>实施顺序与验收</h3>
+  <p>按“完整资产构建 → 目标机离线环境准备 → Go 生命周期 → 安装器接入 → 错误提示 → 四平台安装验收”实施；这些是开发步骤，最终用户始终只有同一条命令。</p>
+  <ul>
+    <li>Linux amd64／arm64 与 macOS Intel／Apple Silicon 均使用原生系统验证；至少在干净 Ubuntu 和真实 macOS 完成从公开安装入口到打开设置页的完整流程。</li>
+    <li>验收机无预装 Python／uv／Go／Node；完整包下载后禁用外网仍可创建环境、启动服务。生产包不含构建机路径、editable 指针或开发依赖。</li>
+    <li>未配置任何模型时设置 GET 成功；用本地模型 fixture 验证配置保存、模型列表、真实对话和重启恢复，不调用付费模型。</li>
+    <li>重复安装、同版本重试、升级、下载中断、哈希错误、缺 wheel、环境创建失败和启动失败均有明确结果；准备失败保持旧服务和数据。</li>
+    <li>验证路径含空格、长 HOME、自定义数据目录、systemd／launchd 环境、父进程崩溃、重复启动与子进程恢复；不泄漏第二个运行时或改动用户 tmux 服务。</li>
+    <li>迁移升级单测和真实备份恢复；同一命令升级后原有口令、模型设置和对话仍可读取。完成仓库 quick／full 门禁及受影响前端检查；真实公开资产尚未发布前明确标记为本地候选验收。</li>
+  </ul>
+  <h3>实施修订与验收 · 2026-10-23</h3>
+  <p>完整包固定 CPython 3.12.13，发布 CI 固定 uv 0.11.2。应用构建为普通 wheel，生产依赖从 uv.lock 导出并带哈希；包内携带 wheel、Python 及许可，目标机通过包内 Python 的 venv／pip 离线创建环境，不依赖系统 Python 或目标机 uv。实际目录为 releases/&lt;archive-sha256&gt;，安装完成后不移动环境。</p>
+  <p>原生 CI 发现的兼容修订：macOS 的 /var 与 /private/var 是同一目录，安装测试根统一解析真实路径。cryptography 49 起停止发布 Intel Mac wheel；Intel 构建机使用锁定源码构建当前版本，静态链接经固定 SHA-256 验证的 OpenSSL 3.5.9，部署目标为 macOS 11，随包保留 OpenSSL 许可。构建后用 otool 拒绝系统目录之外的动态库依赖，不要求用户安装 Rust、OpenSSL 或 Homebrew 库。构建输入保留原锁定哈希，目标安装清单由实际 wheel 生成并使用产物哈希；编译仅发生在构建机。</p>
+  <p>Go 的 install-bundle 实现安全解包、拒绝链接与越界路径、平台／版本及逐文件哈希校验、运行环境准备和原子指针切换；激活失败恢复原指针，旧裸二进制另行保留。install-probe 使用临时存储与本地模型目录 fixture 验证设置读取、保存和重启恢复。已有环境不会被原地覆盖；升级通过私有 quiesce 入口检查在途工作并短暂停止新写入，失败／超时恢复接收请求，私有入口不公开挂载。</p>
+  <p>Go 监督 Python 子进程并在异常退出后指数退避重启；就绪后停止探测定时器，常态不增加健康轮询。继承的存活管道在父进程正常退出或崩溃时通知子进程退出，Python 继续使用原有独占数据库锁。systemd／launchd 负责启动和重启 Go；Linux 保留 KillMode=process，避免重启控制台时杀掉用户 tmux 会话。独立手工运行时保持原归属，安装时要求先停止，不自动接管。</p>
+  <p>Unix socket 改为同实例数据目录下的确定路径，不再因交互 shell 与服务的 XDG_RUNTIME_DIR 不同而失联；超长路径使用 /tmp 下按用户隔离、校验所有者与 0700 权限的短目录。内置智能体读取设置不需要先配置模型。运行时不可用时前端显示已有“暂时无法连接智能体”文案，不再提示用户检查模型地址和密钥。</p>
+  <p>数据库边界：本版自动安装与升级只接受当前 schema。旧布局沿用安装前检查；schema 不同则在读取检查阶段阻止激活，保留旧服务和数据，要求使用已有离线备份／迁移流程。尚未实现跨 schema 的自动备份恢复，不把程序回切当成数据库回退。默认完整包安装与 ROAMI_NO_SERVICE 手工启动均可用；tmux 仍是宿主依赖，Chrome／ADB／KVM 为独立可选能力。</p>
+  <ul>
+    <li>Linux 本机通过真实 curl 到 bash 的安装入口，测试 PATH 无 Python／uv／Go／Node；使用临时 systemd／launchd 适配器启动真实服务，不修改宿主常驻服务。覆盖全新安装、重复执行、含空格目录、持久对话与配置、新版本目录切换、启动失败恢复旧版、校验失败保留现有服务和子进程崩溃恢复。</li>
+    <li>Ubuntu 24.04 干净容器只准备 curl、CA 和 tmux，运行阶段关闭 Docker 网络；系统无 Python／uv／Go／Node。实际安装完整包、启动 HTTPS、校验内嵌前端、首次设置口令并通过认证网关读取空模型设置。该检查发现最小系统缺失时区数据库，已把 tzdata 加入生产依赖并增加无宿主 zoneinfo 回归。</li>
+    <li>Python 集成覆盖父进程 SIGTERM／SIGKILL、子进程强制退出及自动恢复、升级忙状态、升级期间拒绝写入、恢复接收和私有接口所有者隔离；Go 覆盖归档越界与链接拒绝、失败清理、版本指针回退和长目录／不同 XDG 环境。</li>
+    <li>桌面实际设置表单可打开；Redmi Note 8 真机为 392 CSS px、compact／coarse，输入框命中高度 44px，真实点按聚焦，键盘 314px，无横向或文档滚动。截图位于 /tmp/roami-install-settings-desktop.png 与 /tmp/roami-install-settings-phone-full.png，触控记录为 /tmp/roami-install-phone-validation.json。</li>
+    <li>macOS Intel／Apple Silicon 的 Go 二进制交叉编译通过；四平台原生完整包安装验收已接入发布 CI，全部 bundle 验收成功后才进入 publish。此开发机没有实际运行 macOS 原生安装，不把交叉编译当作该项通过。</li>
+    <li>最终 full 质量门禁、Go 测试、908 个 Python 用例、925 个前端用例、typecheck／i18n／hover 和生产构建通过；保留已有前端大块体积提示。最终自动检查与运行证据汇总于 /tmp/roami-install-acceptance.json；测试和演示仅使用临时配置、无付费模型调用，未更新用户现用 Roami 服务。CLI 输出与此开发设计正文按 i18n 规范的终端／开发文档例外保留中文，产品文案复用已有中英文键。</li>
+  </ul>
+  <h3>依据与当前证据</h3>
+  <p>隔离复现记录：/tmp/roami-settings-diagnosis-6bzq3vf4/results.json。只有 Go 主程序时模型设置返回 503 AGENT_RUNTIME_UNAVAILABLE；补启运行时后，即使没有 agent.toml、模型地址和密钥，也返回 200。安装与守护实现已完成；公开版本尚未发布。</p>
+  <p>Python 官方将 venv 定义为应在目标位置重建的环境：<a href="https://docs.python.org/3/library/venv.html">venv 文档</a>。独立 Python 发行版归档结构见 <a href="https://gregoryszorc.com/docs/python-build-standalone/main/distributions.html">python-build-standalone 文档</a>；固定 Python 管理方式见 <a href="https://docs.astral.sh/uv/guides/install-python/">uv Python 管理文档</a>。这些支持发行方式选择，不代表上述 Roami 安装实现已通过验收。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

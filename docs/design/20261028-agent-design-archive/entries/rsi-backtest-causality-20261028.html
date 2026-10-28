@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>回测因果检查与输出约定 · 2026-10-28</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-backtest-causality-20261028" lang="zh-CN">
+  <h2>回测因果检查与输出约定 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>脚本解释旧的未来函数错误时，不因注释或文档字符串中的示例被误判。实际执行的负周期 shift 仍拒绝，交易数值、成交时点、费用和净值继续独立核验。</p>
+  <h3>User Stories</h3>
+  <p>用户能在报告中说明删除了哪条错误语句；产物生成者能从公开要求看到交易方向必须使用小写 buy／sell，而不需要猜宿主判定器的字符串约定。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation/authored_grading.py 使用 Python AST 检查可执行 shift 调用，识别负数的位置参数与 periods 关键字；忽略注释、说明字符串，语法错误仍失败。保留 corrected_backtest_matches 的原数值、字段、方向和摘要检查，不接纳大写方向作为暗中放宽。QUANT-01／03 公开序列化约定，authored 套件升 v14，旧 v12／v13 冻结文件不覆盖。真实复验另存公开约定澄清后的 v16 清单，原始价格、judge 与技术期限不变；新合同与旧失败分别记录。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

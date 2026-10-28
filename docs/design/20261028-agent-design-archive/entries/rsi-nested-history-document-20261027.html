@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RSI 历史引用的文档归属 · 2026-10-27</title><base href="../../../../"></head><body>
+<nav><a href="docs/design/20261028-agent-design-archive/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-nested-history-document-20261027" lang="zh-CN">
+  <h2>RSI 历史引用的文档归属 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>长记忆检索的邮件操作引用属于其所在的 User 表单，不要求整个浏览器的第一行标题就是该表单。统一导航外层下的 Main Content 嵌套文档保持有效；其他表单的同名按钮不能借用外层或相邻 User 页面证明引用。</p>
+  <h3>User Stories</h3>
+  <p>用户给出准确答案、原始树引用和真实邮件按钮时，不会因导航容器的标题被误判失败。维护者仍能拒绝错误页面、虚构引用、改动历史及额外答案，不放松原生指标。</p>
+  <h3>Technical Design</h3>
+  <p>long_memory.PROGRAM 按可访问树的缩进维护 RootWebArea 栈，邮件按钮使用最近文档的标题判定表单，离开嵌套文档时弹栈。100 份历史、原始顺序、SHA、盒装答案、原生指标与精确短语检查不变。协议单列 container-uds-v18-native-and-source-context；v17 候选结果保留，修正验证器的零模型重放独立保存。</p>
+</section>
+<p>2026-10-27 验证补充：Native/金融合同定向 105 项、嵌套文档与引用等定向 64 项通过。真实 Docker/UDS 五组零模型对照证明旧版 Main host/direct write 可误通过，新版拒绝且真正 Native 委派可通过；STOCK-03 原产物重放通过，五组负向对照均拒绝。v17 长记忆候选由真实 Native 成功执行，原生指标及引用均正确，修正文档归属后零模型重放全通过；CSV 候选四项硬检查通过、独立质量待评，原生成结果保留。冻结 v6 全部 40 份真实任务经只读审计，26 份具备成功 Native 当前执行，9 份未创建任务；原先通过中有 6 份缺少 Native 凭证，历史 39/5/16 仅保留为原始结果，不代表执行合同完整验收。Codex 完成状态回归改用独立进程作为模拟会话，避免把整个 Go 测试进程的其他子进程算为任务未结束；10 次重复通过，生产存活与身份保护未变。</p>
+
+<!-- archived-source:end -->
+</body></html>
