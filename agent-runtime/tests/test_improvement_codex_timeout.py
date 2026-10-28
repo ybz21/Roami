@@ -50,7 +50,15 @@ async def test_report_timeout_keeps_summary_unknown_cost_and_no_paid_replay(tmp_
         "roami_agent.improvement.workflows.pipeline_reports.codex_json",
         partial(codex_json, runner=timeout),
     )
-    worker = PipelineReportWorker(service)
+    from test_improvement_codex_gateway import plan
+
+    from roami_agent.server.configuration import Settings
+
+    async def resolve(*args, **kwargs):
+        return plan([])
+
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.gateway_plan", resolve)
+    worker = PipelineReportWorker(service, settings=Settings())
     await worker.execute(records.claim_report())
     blocked = records.get("local", run_id)
     assert blocked["state"] == "blocked"

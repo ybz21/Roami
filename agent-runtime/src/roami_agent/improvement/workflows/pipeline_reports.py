@@ -181,8 +181,9 @@ async def publish_run_issue(records, owner, run_id, priorities, *, run=command):
 
 
 class PipelineReportWorker:
-    def __init__(self, service):
+    def __init__(self, service, *, settings=None):
         self.service, self.records = service, service.runs
+        self.settings = settings
         self.task = None
 
     async def start(self):
@@ -210,6 +211,15 @@ class PipelineReportWorker:
         value = self.records.get(owner, run_id)
         config = value["snapshot"]["pipeline"]
         costs = RunCosts(self.records, owner, run_id)
+        model_settings = self.settings() if callable(self.settings) else self.settings
+        model_context = (
+            {
+                "settings": model_settings,
+                "provider_factory": getattr(self.service, "provider_factory", None),
+            }
+            if model_settings is not None
+            else {}
+        )
         stage = "review"
         try:
             blocker = (value["summary"] or {}).get("usage_blocker")
@@ -245,6 +255,7 @@ class PipelineReportWorker:
                             ),
                         }
                     ],
+                    **model_context,
                 )
                 parsed = json.loads(response["text"])
                 require(isinstance(parsed, dict), "RSI_INVALID_MODEL_OUTPUT")
@@ -274,6 +285,7 @@ class PipelineReportWorker:
                             + json.dumps(present, ensure_ascii=False),
                         }
                     ],
+                    **model_context,
                 )
                 plan = json.loads(response["text"])
                 require(isinstance(plan, dict), "RSI_INVALID_ISSUE_PLAN")

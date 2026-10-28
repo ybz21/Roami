@@ -445,16 +445,67 @@ async def test_shared_daily_policy_records_actual_codex_usage_above_legacy_reser
     w.ledger.shared_daily_limit = True
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
 
+    import httpx
+
+    from roami_agent.improvement.integrations.codex_gateway import CodexGatewayPlan
+    from roami_agent.protocol.models import ModelEvent
+
+    monkeypatch.setattr(
+        "roami_agent.improvement.workflows.codex_roles.codex_configuration",
+        lambda **kwargs: ({"model": "gpt-6.1-sol"}, {}),
+    )
+
+    class Provider:
+        model = "rr/gpt-6.1-sol"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", '{"ok":true}')
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 80000,
+                    "outputTokens": 20,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+
+    async def resolve(settings, selected, **kwargs):
+        return CodexGatewayPlan(
+            settings, settings.route("main"), "gpt-6.1-sol", lambda *_: Provider()
+        )
+
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.gateway_plan", resolve)
+
     async def runner(argv, **kwargs):
+        base = next(
+            v.split("=", 1)[1].strip('"')
+            for v in argv
+            if v.startswith("model_providers.roami_rsi_go.base_url=")
+        )
+        async with httpx.AsyncClient(trust_env=False) as client:
+            result = await client.post(
+                base + "/responses",
+                headers={"Authorization": "Bearer " + kwargs["env"]["ROAMI_RSI_CODEX_GATEWAY_KEY"]},
+                json={"model": "gpt-6.1-sol", "stream": True, "input": "fixture"},
+            )
+        assert "response.completed" in result.text
         return {"stdout": codex_events(tokens=80000), "stderr": "", "exitCode": 0}
 
     action = {"id": "unlimited-review", "owner": "owner", "kind": "review"}
     for key in ("one", "two"):
         value = await codex_json(
-            w, action, cfg, key, [{"role": "user", "content": key}], runner=runner
+            w,
+            action,
+            cfg,
+            key,
+            [{"role": "user", "content": key}],
+            runner=runner,
+            settings=Settings(),
         )
         assert value["metrics"]["tokens"] == 80020
         assert value["spending_policy"] == "shared_model_daily"
+        assert value["metrics"]["usage_scope"] == "host_go_gateway"
 
 
 def test_cli_diagnostic_is_retained_without_discarding_a_completed_answer():

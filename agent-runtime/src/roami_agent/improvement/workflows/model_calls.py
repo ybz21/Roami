@@ -13,7 +13,7 @@ async def model_json(workflow, action, settings, config, key, messages, *, provi
     if provider_factory is None:
         from roami_agent.improvement.workflows.codex_roles import codex_json
 
-        return await codex_json(workflow, action, config, key, messages)
+        return await codex_json(workflow, action, config, key, messages, settings=settings)
 
     from roami_agent.providers.factory import configured_provider
 

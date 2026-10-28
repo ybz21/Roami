@@ -21,10 +21,12 @@ class RequestBudgetModel:
         factory=None,
         journal=None,
         shared_budget=None,
+        observation_role=None,
     ):
         self.settings, self.route, self.budget, self.role = settings, route, budget, role
         self.cap, self.factory, self.journal = cap, factory, journal
         self.shared_budget = shared_budget
+        self.observation_role = observation_role or role
         self.model = route.name
         self.input_reservation = InputReservation()
 
@@ -94,7 +96,7 @@ class RequestBudgetModel:
             model = MeteredModel(
                 provider,
                 self.budget,
-                self.role,
+                self.observation_role,
                 output_cap=available,
                 journal=self.journal,
                 input_reserve=overhead,
