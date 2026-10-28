@@ -1,6 +1,7 @@
 package agentproxy
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"net"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestCapabilityDownloadUsesBoundedLongerHeaderBudget(t *testing.T) {
@@ -27,6 +30,7 @@ func TestProxyIdentityStreamingAndPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	released := make(chan struct{})
+	finished := make(chan struct{})
 	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/conversations/c1/events" || r.Header.Get("X-Roami-Owner") != "local" || r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
 			t.Errorf("invalid forwarded request: %s owner=%s", r.URL.Path, r.Header.Get("X-Roami-Owner"))
@@ -37,11 +41,24 @@ func TestProxyIdentityStreamingAndPath(t *testing.T) {
 		select {
 		case <-released:
 		case <-r.Context().Done():
+			return
+		}
+		_, _ = io.WriteString(w, "id: 2\nevent: message.delta\ndata: {\"text\":\"second\"}\n\n")
+		w.(http.Flusher).Flush()
+		select {
+		case <-finished:
+		case <-r.Context().Done():
 		}
 	})}
 	go func() { _ = server.Serve(listener) }()
 	defer server.Close()
-	proxy := httptest.NewServer(Proxy(socket))
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	handler := Proxy(socket)
+	router.GET("/api/agent/conversations/:cid/events", func(c *gin.Context) {
+		handler.ServeHTTP(c.Writer, c.Request)
+	})
+	proxy := httptest.NewServer(router)
 	defer proxy.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -54,12 +71,19 @@ func TestProxyIdentityStreamingAndPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	chunk := make([]byte, 5)
-	if _, err = io.ReadFull(res.Body, chunk); err != nil {
-		t.Fatal(err)
-	}
-	if string(chunk) != "id: 1" {
-		t.Fatalf("stream was changed: %q", chunk)
+	reader := bufio.NewReader(res.Body)
+	for _, expected := range []string{"id: 1\n", "event: message.delta\n", "data: {}\n", "\n"} {
+		line, err := reader.ReadString('\n')
+		if err != nil || line != expected {
+			t.Fatalf("first event before release: got %q, want %q: %v", line, expected, err)
+		}
 	}
 	close(released)
+	for _, expected := range []string{"id: 2\n", "event: message.delta\n", "data: {\"text\":\"second\"}\n", "\n"} {
+		line, err := reader.ReadString('\n')
+		if err != nil || line != expected {
+			t.Fatalf("second event before finish: got %q, want %q: %v", line, expected, err)
+		}
+	}
+	close(finished)
 }
