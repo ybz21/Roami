@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import secrets
+import stat
 import tempfile
 import time
 from collections import Counter
@@ -343,6 +344,49 @@ class ContainerExecutor:
         require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         return grade
 
+    async def recover_execution(self, state, root):
+        from roami_agent.improvement.evaluation.execution.interrupted_evidence import (
+            snapshot_metadata,
+            snapshot_program,
+        )
+        from roami_agent.improvement.integrations.artifact_paths import relative_file
+
+        try:
+            original = load_json(
+                relative_file(root, "state/execution-log.json"), maximum=64_000_000
+            )
+            if (
+                isinstance(original, dict)
+                and isinstance(original.get("tool_calls"), list)
+                and isinstance(original.get("traces"), list)
+            ):
+                return
+        except (DomainError, OSError, ValueError):
+            pass
+        try:
+            try:
+                if not stat.S_ISREG((state / "runtime.db").lstat().st_mode):
+                    return
+            except FileNotFoundError:
+                return
+            # A copied sandbox keeps SQLite WAL recovery and artifact symlinks off the host.
+            raw = await self.sandbox(state, snapshot_program(), copy_workspace=True, timeout=15)
+            value = json.loads(raw)
+            snapshot_metadata(value)
+            private_json(root / "interrupted-execution-log.json", value)
+        except (DomainError, OSError, TimeoutError, ValueError) as error:
+            try:
+                private_json(
+                    root / "interrupted-execution-error.json",
+                    {
+                        "source": "interrupted_runtime_snapshot",
+                        "complete": False,
+                        "error": getattr(error, "code", "RSI_EXECUTION_SNAPSHOT_FAILED"),
+                    },
+                )
+            except OSError:
+                pass
+
     async def run(self, case, policy, root):
         if not self.image_id:
             await self.preflight()
@@ -588,6 +632,8 @@ class ContainerExecutor:
         finally:
             if created:
                 await self.remove(name, name)
+            if failure:
+                await self.recover_execution(state, root)
             for provider in providers:
                 if hasattr(provider, "close"):
                     await provider.close()

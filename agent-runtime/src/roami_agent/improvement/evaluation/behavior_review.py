@@ -47,6 +47,14 @@ def review_trial(trial, root):
         )
 
     names = list(LOGS.get(trial.get("execution_kind"), ("execution-log.json",)))
+    if (
+        trial.get("execution_kind") == "isolated_native_worker"
+        and (root / "interrupted-execution-log.json").is_file()
+    ):
+        names = [
+            "interrupted-execution-log.json" if name == "state/execution-log.json" else name
+            for name in names
+        ]
     if trial.get("isolation", {}).get("project_runtime"):
         names.append("project-runtime-log.json")
     if trial.get("isolation", {}).get("company_runtime"):
@@ -123,6 +131,9 @@ def review_trial(trial, root):
                         raise ValueError("invalid_artifact_review")
                     reference["ratings_reviewed"] = len(value["ratings"])
                 else:
+                    if value.get("source") == "interrupted_runtime_snapshot":
+                        complete = False
+                        reference["coverage"] = "interrupted"
                     records, traces = value["tool_calls"], value["traces"]
                     if not isinstance(records, list) or not isinstance(traces, list):
                         raise ValueError("invalid_execution_log")
