@@ -86,4 +86,4 @@
 
 设置分类原型同时保留原预览外壳中的主题令牌、布局脚本及许可信息；业务代码和设计正文未改写。
 
-原始来源：`AGENTS.md`，提交 `217cce2e8a2db26a80bfe49c5c70583687cb566b`。迁移校验见 [manifest.json](manifest.json)。
+原始来源：`AGENTS.md`，提交 `ac6a97b539ea03ac6379f91fbc1e703dc377d35e`。迁移校验见 [manifest.json](manifest.json)。
