@@ -228,6 +228,50 @@ authority, it just no longer moves the layout under the user a beat after load.
 
 # Gates
 
+<section id="rsi-diagnostic-completion-20261028" lang="zh-CN">
+  <h2>RSI 诊断收尾修复 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>诊断沿用模型页的每日限额，不要求额外配置输出 Token 上限。正常产出的文件不会因为重名、中文名或长文件名阻断运行汇总；历史结果不重写。</p>
+  <h3>User Stories</h3>
+  <ul><li>用户不填写输出上限也能完成诊断，实际调用仍通过统一模型代理计费。</li><li>任务在不同目录生成同名报告，或使用中文及长文件名时，所有产物均能分别归档并生成汇总。</li><li>维护者能用保留的失败记录、当前版本定向复验和独立验收区分源码修复与正式能力通过。</li></ul>
+  <h3>Technical Design</h3>
+  <p>workflows/pipeline_runner.py 的计量包装器读取可选 max_tokens；缺省时仅以 0 代表不追加输出预留，不向模型请求注入 0 或新增 RSI 输出限制。宿主将 shared_daily_limit 显式写入私有容器请求，容器入口只接受布尔 true 并传给 NativeFilesExecutor，使内部计量器沿用同一模式；旧请求缺省保留旧行为，执行协议指纹单列 v23。镜像声明 org.roami.rsi.shared-daily-policy=1，统一限额模式预检会拒绝未支持该协议的旧镜像，避免更新宿主后容器静默沿用旧限制；显式旧模式仍兼容。评测 Main 的系统指令与工具目录统一要求先委派 Native，移除仅限此隔离配置中 Main 的 shell／交付写入能力，Worker 能力不变，消除简单任务可绕过执行凭证的冲突提示。归档身份包含 Case ID 与完整相对路径的摘要，展示文件名部分规范成账本允许的 ASCII 并限长，保留原有账本名称边界；Case 运行记录中的原始文件路径不改写。测试从诊断队列到结果汇总覆盖缺省／显式输出参数、嵌套重名、中文与长文件名。</p>
+  <p>真实复验使用独立工作区、冻结输入和容器；模型调用使用模型页配置与同一每日计费账本，不重放历史未知费用、不启动自动日程。人工参考分仍由人工确认，不把代码回归、文件存在或脚本模型误记为独立质量验收。</p>
+  <p>真实定向复验：相同 FinQA 两题由无 Native 凭证失败转为 2/2 通过，STOCK-01 通过；公开方向格式明确后的 QUANT-03 新生成通过；长历史原产物经修复判定器在容器中零模型重放通过且哈希不变。各版本及原始失败分别保留，不拼接为完整轮次。</p>
+</section>
+
+<section id="rsi-backtest-causality-20261028" lang="zh-CN">
+  <h2>回测因果检查与输出约定 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>脚本解释旧的未来函数错误时，不因注释或文档字符串中的示例被误判。实际执行的负周期 shift 仍拒绝，交易数值、成交时点、费用和净值继续独立核验。</p>
+  <h3>User Stories</h3>
+  <p>用户能在报告中说明删除了哪条错误语句；产物生成者能从公开要求看到交易方向必须使用小写 buy／sell，而不需要猜宿主判定器的字符串约定。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation/authored_grading.py 使用 Python AST 检查可执行 shift 调用，识别负数的位置参数与 periods 关键字；忽略注释、说明字符串，语法错误仍失败。保留 corrected_backtest_matches 的原数值、字段、方向和摘要检查，不接纳大写方向作为暗中放宽。QUANT-01／03 公开序列化约定，authored 套件升 v14，旧 v12／v13 冻结文件不覆盖。真实复验另存公开约定澄清后的 v16 清单，原始价格、judge 与技术期限不变；新合同与旧失败分别记录。</p>
+</section>
+
+<section id="rsi-long-history-answer-20261028" lang="zh-CN">
+  <h2>长历史表单答案的描述词 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>完整表单历史检索的答案可在表单名称后带 form／forms 类别词；数量、表单名称与来源证据仍必须正确，不能借此多答其他表单。</p>
+  <h3>User Stories</h3>
+  <p>用户得到正确数量和表单名称时，不因中性的类别描述词被误判；维护者仍可拒绝额外名称、错误数量、伪造引用或改动输入历史的产物。</p>
+  <h3>Technical Design</h3>
+  <p>evaluation/benchmarks/long_memory.py 的附加最终答案检查按原生 normalize_phrase 分词，仅忽略独立类别词 form／forms。原上游评分、boxed 格式、完整 100 条历史及顺序哈希、引用与邮件按钮归属检查保留。新增正反对照覆盖描述词、额外表单、错误数量及缺少名称。旧运行失败保持原样，修复后的容器重放另列，不冒充一次新生成或正式整套通过。</p>
+</section>
+
+<section id="rsi-memory-admission-20261028" lang="zh-CN">
+  <h2>记忆请求期限与准入拒绝计量 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>后台记忆提取遵循当前后台模型的请求期限，不另加固定 20 秒截断。确定在发送前被拒绝的调用记为零请求；已经发送、缺少完整回执的调用保留未知状态与每日限额阻断。</p>
+  <h3>User Stories</h3>
+  <p>用户调整后台模型超时后，下一次记忆提取即按新值执行；模型页设为不限制请求期限时，记忆提取不提前截断。维护者能区分准入拒绝与真实中断，不能靠错误码文字把未知消费抹成零。</p>
+  <h3>Technical Design</h3>
+  <p>Runtime 为 MemoryJobs 注入读取当前 worker route timeout 的函数，零值映射为 asyncio.timeout(None)，单独构造 MemoryJobs 的旧默认保持兼容。协议新增 ModelAdmissionRejected，仅由可信 ProxyTransport 在账本准入失败、尚未发送请求时标记；MeteredModel 对此单次操作结算零请求、零 Token。ChatCompletions 已发生重试时移除该整个调用“未发送”保证，首个请求的未知计量继续保留。普通同名错误码不具有零消费保证。诊断的 Case 总期限、输出体积、来源与记忆作用域校验不变。</p>
+  <p>本次完整轮次保留原 60 项记录：21 项通过，OPS-04 中一笔记忆流于约 20 秒关闭，后续 38 项模型案例受未知用量阻断。上游本会话统计确认有两次 memory 调用，但中断调用没有可核验用量，不能用聚合中的零占位结算为免费；该账目保留待真实回执核对，后续付费复验暂停。局部诊断、重放和软件回归分别记录，四份人工参考分与独立质量验收不代签。</p>
+  <p>零模型容器对照：将模拟记忆响应延迟 21 秒，旧镜像失败，新镜像完成 Native 交付；同组原任务及明确偏好真实 MemoryJobs 复验曾分别完成且用量已知，未全局激活。后续完整轮次新增的真实未知账不因这些局部结果消除；准入拒绝零计量、重试后未知保留与动态超时均有独立正反回归。</p>
+</section>
+
 <section id="task-followup-routing-20261026" lang="zh-CN">
   <h2>任务续办、完整交办与会话名称 · 2026-10-26</h2>
   <h3>Product Design</h3>
@@ -1895,44 +1939,16 @@ cases/case-N-id/             CASE.md、case.json、materials.json 与显式资�
   <p>实测：wheel 安装和 sdist 独立源码加载均找到 60 个 Case 与材料清单，QUANT 输入与标准库生成器及运行输入一致；替换区间、候选参数和成本后判定读取替换值。真实无网络容器完成 Native Worker 文件写入及宿主判定，镜像内无 authored_fixtures、authored_grading、corpus 模块。容器验证使用已有依赖层复制最终运行时代码及新清理指令，模型为脚本夹具，不作为能力评分。</p>
 </section>
 
-<section id="rsi-diagnostic-completion-20261028" lang="zh-CN">
-  <h2>RSI 诊断收尾修复 · 2026-10-28</h2>
+<section id="conversation-stream-push-20261028" lang="zh-CN">
+  <h2>首页对话提交即推送 · 2026-10-28</h2>
   <h3>Product Design</h3>
-  <p>诊断沿用模型页的每日限额，不要求额外配置输出 Token 上限。正常产出的文件不会因为重名、中文名或长文件名阻断运行汇总；历史结果不重写。</p>
+  <p>首页回答的文本事件提交后立即通过原 SSE 与 Go 网关发送，不再每 200 毫秒查库批量转发。保留现有消息格式、持久化、断线游标与登录边界；不增加页面控件或前端轮询。</p>
   <h3>User Stories</h3>
-  <ul><li>用户不填写输出上限也能完成诊断，实际调用仍通过统一模型代理计费。</li><li>任务在不同目录生成同名报告，或使用中文及长文件名时，所有产物均能分别归档并生成汇总。</li><li>维护者能用保留的失败记录、当前版本定向复验和独立验收区分源码修复与正式能力通过。</li></ul>
+  <ul><li>回答还在生成时即可看到已提交的文本片段。</li><li>连接空闲时只有保活帧，不为等待文字反复查询数据库；重连继续读取已提交记录。</li></ul>
   <h3>Technical Design</h3>
-  <p>workflows/pipeline_runner.py 的计量包装器读取可选 max_tokens；缺省时仅以 0 代表不追加输出预留，不向模型请求注入 0 或新增 RSI 输出限制。宿主将 shared_daily_limit 显式写入私有容器请求，容器入口只接受布尔 true 并传给 NativeFilesExecutor，使内部计量器沿用同一模式；旧请求缺省保留旧行为，执行协议指纹单列 v23。镜像声明 org.roami.rsi.shared-daily-policy=1，统一限额模式预检会拒绝未支持该协议的旧镜像，避免更新宿主后容器静默沿用旧限制；显式旧模式仍兼容。评测 Main 的系统指令与工具目录统一要求先委派 Native，移除仅限此隔离配置中 Main 的 shell／交付写入能力，Worker 能力不变，消除简单任务可绕过执行凭证的冲突提示。归档身份包含 Case ID 与完整相对路径的摘要，展示文件名部分规范成账本允许的 ASCII 并限长，保留原有账本名称边界；Case 运行记录中的原始文件路径不改写。测试从诊断队列到结果汇总覆盖缺省／显式输出参数、嵌套重名、中文与长文件名。</p>
-  <p>真实复验使用独立工作区、冻结输入和容器；模型调用使用模型页配置与同一每日计费账本，不重放历史未知费用、不启动自动日程。人工参考分仍由人工确认，不把代码回归、文件存在或脚本模型误记为独立质量验收。</p>
-</section>
-
-<section id="rsi-backtest-causality-20261028" lang="zh-CN">
-  <h2>回测因果检查与输出约定 · 2026-10-28</h2>
-  <h3>Product Design</h3>
-  <p>脚本解释旧的未来函数错误时，不因注释或文档字符串中的示例被误判。实际执行的负周期 shift 仍拒绝，交易数值、成交时点、费用和净值继续独立核验。</p>
-  <h3>User Stories</h3>
-  <p>用户能在报告中说明删除了哪条错误语句；产物生成者能从公开要求看到交易方向必须使用小写 buy／sell，而不需要猜宿主判定器的字符串约定。</p>
-  <h3>Technical Design</h3>
-  <p>evaluation/authored_grading.py 使用 Python AST 检查可执行 shift 调用，识别负数的位置参数与 periods 关键字；忽略注释、说明字符串，语法错误仍失败。保留 corrected_backtest_matches 的原数值、字段、方向和摘要检查，不接纳大写方向作为暗中放宽。QUANT-01／03 公开序列化约定，authored 套件升 v14，旧 v12／v13 冻结文件不覆盖。真实复验另存公开约定澄清后的 v16 清单，原始价格、judge 与技术期限不变；新合同与旧失败分别记录。</p>
-</section>
-
-<section id="rsi-long-history-answer-20261028" lang="zh-CN">
-  <h2>长历史表单答案的描述词 · 2026-10-28</h2>
-  <h3>Product Design</h3>
-  <p>完整表单历史检索的答案可在表单名称后带 form／forms 类别词；数量、表单名称与来源证据仍必须正确，不能借此多答其他表单。</p>
-  <h3>User Stories</h3>
-  <p>用户得到正确数量和表单名称时，不因中性的类别描述词被误判；维护者仍可拒绝额外名称、错误数量、伪造引用或改动输入历史的产物。</p>
-  <h3>Technical Design</h3>
-  <p>evaluation/benchmarks/long_memory.py 的附加最终答案检查按原生 normalize_phrase 分词，仅忽略独立类别词 form／forms。原上游评分、boxed 格式、完整 100 条历史及顺序哈希、引用与邮件按钮归属检查保留。新增正反对照覆盖描述词、额外表单、错误数量及缺少名称。旧运行失败保持原样，修复后的容器重放另列，不冒充一次新生成或正式整套通过。</p>
-</section>
-
-<section id="rsi-memory-admission-20261028" lang="zh-CN">
-  <h2>记忆请求期限与准入拒绝计量 · 2026-10-28</h2>
-  <h3>Product Design</h3>
-  <p>后台记忆提取遵循当前后台模型的请求期限，不另加固定 20 秒截断。确定在发送前被拒绝的调用记为零请求；已经发送、缺少完整回执的调用保留未知状态与每日限额阻断。</p>
-  <h3>User Stories</h3>
-  <p>用户调整后台模型超时后，下一次记忆提取即按新值执行；模型页设为不限制请求期限时，记忆提取不提前截断。维护者能区分准入拒绝与真实中断，不能靠错误码文字把未知消费抹成零。</p>
-  <h3>Technical Design</h3>
-  <p>Runtime 为 MemoryJobs 注入读取当前 worker route timeout 的函数，零值映射为 asyncio.timeout(None)，单独构造 MemoryJobs 的旧默认保持兼容。协议新增 ModelAdmissionRejected，仅由可信 ProxyTransport 在账本准入失败、尚未发送请求时标记；MeteredModel 对此单次操作结算零请求、零 Token。ChatCompletions 已发生重试时移除该整个调用“未发送”保证，首个请求的未知计量继续保留。普通同名错误码不具有零消费保证。诊断的 Case 总期限、输出体积、来源与记忆作用域校验不变。</p>
-  <p>本次完整轮次保留原 60 项记录：21 项通过，OPS-04 中一笔记忆流于约 20 秒关闭，后续 38 项模型案例受未知用量阻断。上游本会话统计确认有两次 memory 调用，但中断调用没有可核验用量，不能用聚合中的零占位结算为免费；该账目保留待真实回执核对，后续付费复验暂停。局部诊断、重放和软件回归分别记录，四份人工参考分与独立质量验收不代签。</p>
+  <p>storage/conversation_events.py 管理活跃连接的按会话订阅。database.py 在 writer 事务中收集 event() 涉及的会话，COMMIT 成功后在事件循环中唤醒订阅者；回滚不发布，调用方取消也不丢弃已提交通知。通知只唤醒读取，SQLite 仍是事件及游标的唯一事实来源。http.py 在读取前订阅、清除信号，读完后等待提交通知；避免读取与等待之间丢唤醒。10 秒保活不查库，断开连接释放订阅。Go 复用现有 FlushInterval=-1。</p>
+  <h3>验收记录</h3>
+  <p>截图对应的原回答已记录 10 次 message.delta，生成时间约为 1.29～2.35 秒；该记录证明原先有分段落盘，不能将其描述为生成结束才存储。定向测试覆盖提交前不可见、回滚、跨会话隔离、多订阅、取消后提交、读取期间提交、保活不查库、实时文本、重连回放与断开清理。Go 的 Gin／Unix socket 回归要求两段文本均在上游结束前到达。</p>
+  <p>隔离本地 HTTP SSE 夹具经过实际 ChatCompletions、计费代理、Agent、Unix socket、Go agentproxy 与 Gin；三段文本均在模型结束前收到。这组对照中单段传输耗时由约 78～129 毫秒降至约 5～23 毫秒，不代表生产网络或首 Token 延迟。证据位于 /tmp/chat-streaming-20261028；零付费模型调用，未更新现用服务，无前端组件或文案改动。</p>
+  <p>quick 门禁通过：Go 全量、Python 静态／格式检查及 1,679 项测试、前端 typecheck／i18n／hover、秘密扫描与文件策略。最终读取竞争与保活修订另跑 8 项定向测试及静态／格式检查通过。新实时回归在原接口上因空闲查库计数增长按预期失败；隔离验证服务与私有 tmux 实例均已清理。报告入口 /tmp/chat-streaming-20261028/index.html。</p>
 </section>
