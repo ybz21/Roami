@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>记忆请求期限与准入拒绝计量 · 2026-10-28</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-memory-admission-20261028" lang="zh-CN">
+  <h2>记忆请求期限与准入拒绝计量 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>后台记忆提取遵循当前后台模型的请求期限，不另加固定 20 秒截断。确定在发送前被拒绝的调用记为零请求；已经发送、缺少完整回执的调用保留未知状态与每日限额阻断。</p>
+  <h3>User Stories</h3>
+  <p>用户调整后台模型超时后，下一次记忆提取即按新值执行；模型页设为不限制请求期限时，记忆提取不提前截断。维护者能区分准入拒绝与真实中断，不能靠错误码文字把未知消费抹成零。</p>
+  <h3>Technical Design</h3>
+  <p>Runtime 为 MemoryJobs 注入读取当前 worker route timeout 的函数，零值映射为 asyncio.timeout(None)，单独构造 MemoryJobs 的旧默认保持兼容。协议新增 ModelAdmissionRejected，仅由可信 ProxyTransport 在账本准入失败、尚未发送请求时标记；MeteredModel 对此单次操作结算零请求、零 Token。ChatCompletions 已发生重试时移除该整个调用“未发送”保证，首个请求的未知计量继续保留。普通同名错误码不具有零消费保证。诊断的 Case 总期限、输出体积、来源与记忆作用域校验不变。</p>
+  <p>本次完整轮次保留原 60 项记录：21 项通过，OPS-04 中一笔记忆流于约 20 秒关闭，后续 38 项模型案例受未知用量阻断。上游本会话统计确认有两次 memory 调用，但中断调用没有可核验用量，不能用聚合中的零占位结算为免费；该账目保留待真实回执核对，后续付费复验暂停。局部诊断、重放和软件回归分别记录，四份人工参考分与独立质量验收不代签。</p>
+  <p>零模型容器对照：将模拟记忆响应延迟 21 秒，旧镜像失败，新镜像完成 Native 交付；同组原任务及明确偏好真实 MemoryJobs 复验曾分别完成且用量已知，未全局激活。后续完整轮次新增的真实未知账不因这些局部结果消除；准入拒绝零计量、重试后未知保留与动态超时均有独立正反回归。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

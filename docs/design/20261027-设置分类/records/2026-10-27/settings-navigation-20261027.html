@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>设置导航整理 · 2026-10-27</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261027-设置分类/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="settings-navigation-20261027" lang="zh-CN">
+  <h2>设置导航整理 · 2026-10-27</h2>
+  <h3>Product Design</h3>
+  <p>移除常用页的重复入口，外观与语言回到界面分类，提问弹框留在新会话，推送归通知设置，语音按钮归语音输入。快捷键合为一页；移除状态条设置入口。统一记忆在设置内浏览，桌面始终保留左侧分类。</p>
+  <h3>User Stories</h3>
+  <p>用户能在对应分类找到设置，并一次查看全部快捷键；查看记忆列表、筛选与详情时可直接切换其他设置。手机沿用全屏二级页，先从详情返回记忆列表，再返回设置，保留搜索条件。</p>
+  <h3>Technical Design</h3>
+  <p>registry.tsx 统一分类、搜索和手机列表；route-hash.ts 将旧常用、状态条与更多快捷键链接映射到现有页面，设置记忆不再重定向首页。SettingsPage 的记忆区域固定可用高度，AgentMemory 的 embedded 模式省略重复页头；手机复用其已有 MobileSubPage 与路由返回行为，不叠加第二层返回栏或历史。</p>
+  <h3>验收记录</h3>
+  <p>前端 141 个文件、1032 项测试通过；typecheck、i18n、hover 与生产构建通过。隔离 HTTPS 生产包以示例记忆和通知数据完成 78 项浏览器断言，覆盖全部快捷键、归类、侧栏、手机单层返回及七档宽度的中深色／英浅色布局，无文档与内容横向溢出；示例不代表真实用户记忆。快捷键粗指针命中区补足 44px。证据入口 /tmp/settings-navigation-20261027/index.html。Redmi Note 8 仍为安全锁屏，真机触控、键盘与安全区验收未完成；未部署现用服务。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

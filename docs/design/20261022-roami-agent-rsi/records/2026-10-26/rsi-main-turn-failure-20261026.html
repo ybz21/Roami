@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Main 失败预算归因 · 2026-10-26</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-main-turn-failure-20261026" lang="zh-CN">
+  <h2>Main 失败预算归因 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>评测报告保留 Main 已记录的预算根因，不能把准入前拒绝折叠为通用运行时失败。错误归因修正不改变失败状态、费用、原始成绩或判定器。</p>
+  <h3>User Stories</h3>
+  <p>维护者看到长记忆任务真正因 Token 预算失败，能区分模型能力、费用未知和执行器异常；历史失败记录仍可核对。</p>
+  <h3>Technical Design 与验证</h3>
+  <p>evaluation_tasks.evaluation_turn_failure 只读取当前 turn、conversation 和对应终态事件的最新记录，仅保留既有四个 RSI 预算码，其余仍使用原 RSI_TURN_FAILED／INTERRUPTED；不导出任意错误文本。NativeFilesExecutor 在 Main 终态失败分支调用它，容器继续沿用已有有界预算码映射。</p>
+  <p>51 项隔离回归通过，新增六种终止码和跨回合／会话／事件类型隔离。对完整运行中 longmemeval-v2:4ed01379 的真实数据库执行只读、零模型重放，得到 RSI_TOKEN_BUDGET；原 trial 的通用失败及 SHA 保持，案例仍失败。该补丁只修正诊断归因，不声称解决预算耗尽或新增真实模型通过；正在运行的镜像与源码版本保持冻结。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

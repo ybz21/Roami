@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>相对文件名与 SVG 交付修复 · 2026-10-26</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-relative-deliverables-20261026" lang="zh-CN">
+  <h2>相对文件名与 SVG 交付修复 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>用户收到请求的全部文件，包括脚本生成的数据和图形；任务摘要用代码格式列出的相对文件名按已绑定工作区收集。保存后不依赖原目录继续存在，不以工作区中存在文件替代可下载快照。</p>
+  <h3>User Stories</h3>
+  <p>任务列出 analysis.py、result.json、report.md、trades.csv、equity.svg 时，五份文件都能在任务产物中读取；工作区移除后仍可下载原始字节。路径越界、软链接和隐藏文件不能借相对名称进入产物。</p>
+  <h3>Technical Design</h3>
+  <p>storage/task_deliverables.py 扩展既有摘要路径解析，仅在有工作区绑定时接受带支持后缀的单个代码格式文件名，跳过命令和 URI，不扫描目录。SVG 纳入已有文件类型集合，继续使用逐层 no-follow、目录边界、文件大小、所有者、删除标记和 12 项上限。下载仍为 attachment，沿用 nosniff 与 sandbox CSP，不增加内联执行入口。</p>
+  <h3>验证记录</h3>
+  <p>62 项文件／任务交付与产物回归通过，新增 Native／专业执行器五文件保存、删除工作区后读取，以及父目录、软链接和隐藏文件边界。对真实 QUANT-01 的原始文件与最终摘要作零模型隔离重放，五份快照 SHA 均匹配原文件，复制目录移除后仍可读，SVG 附件头、CSP 与跨所有者拒绝通过；原 trial 和原文件未修改。该重放只证明持久化修复，不作为新的 Native 执行或正式评分。</p>
+  <p>进一步保留代码格式文件名中的字面百分号，避免与空格文件名混淆；归一 /api/file/serve 的分段、全路径编码与额外首斜线形式，避免同一 SVG 已保存却因别名误报不可用。归一后仍执行原目录边界与 no-follow 校验，不将 URL 当作新的文件权限。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

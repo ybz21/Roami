@@ -27,3 +27,7 @@
 将本目录保留完整结构，用 Chrome 打开 `index.html`。原型的 CSS、JavaScript 和图标均已内嵌，不需要启动 Roami 或安装依赖；JSONL 和元信息示例位于相邻 `examples/`。设计稿中的拟议接口尚未实现，所有交互只更新隔离的浏览器示例数据。
 
 当前运行中的 native 消息、分支与工具记录保存在 `~/.roami/database/agents/runtime.db`。原设计 PR #426 交付原型；实施 issue #429 补齐真实托管、schema 12、无损 gzip 分段、旧正文冷存、备份恢复及前端入口。代码尚未部署，具体契约与验收以 implementation.html 为准。文档使用中文，属于开发设计文档的 i18n 例外。
+
+## 设计修订与验收记录
+
+[按日期查看记录](records/README.md)。

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>任务会话与 native 托管设计 · 2026-10-22</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-专业任务常驻会话/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="task-native-session-design" lang="zh-CN">
+  <h2>任务会话与 native 托管设计 · 2026-10-22</h2>
+  <p>设计与实施记录。完整 HTML 入口：<a href="docs/design/20261022-任务会话与工作习惯/index.html">任务、会话与工作习惯</a>；<a href="docs/design/20261022-任务会话与工作习惯/verification.html">原型验证记录</a>；<a href="docs/design/20261022-任务会话与工作习惯/implementation.html">实际实现与验收</a>。</p>
+  <h3>产品设计</h3>
+  <p>首页中间保留 Main，右侧任务栏展示任务及可点击项目归属；进入会话直接打开绑定原会话。用户确认结束前保留原身份与筛选；工作习惯只影响新任务，续改复用原工作区和智能体。</p>
+  <h3>用户故事</h3>
+  <p>用户能从首页直接进入专业或 native 会话，补充修改后仍回到原任务；也能点击项目名进入所属项目，返回保留筛选、搜索和位置。</p>
+  <h3>技术设计</h3>
+  <p>native 拟统一托管在 ~/.roami/agents/native/时间戳-随机后缀/，以 .session.json 记录身份关联、.chat.jsonl 记录对话和工具调用，context 与 blobs 保存检查点及大输出。现有 SQLite 继续负责在线事务与调度，事务 outbox 串行补写日志；关闭保留记录，恢复不重放工具副作用。模块、接口、迁移与故障验收在完整稿中定义。</p>
+  <h3>设计验证</h3>
+  <p>Chrome 原型 51 项、Android 真机 9 项检查通过；仅验证设计交互、布局和示例记录格式，不代表真实文件托管、数据库迁移或故障恢复已实施。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

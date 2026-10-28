@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>重复偏好记忆修复 · 2026-10-22</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261019-记忆管理展示/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="duplicate-preference-reconciliation" lang="zh-CN">
+  <h2>重复偏好记忆修复 · 2026-10-22</h2>
+  <h3>产品设计</h3>
+  <p>显式记忆请求即时保存，后台提取不因标题不同或包含“帮我记下”前缀再增加一条有效记忆。确认为个人长期偏好后保留长期记录，对话副本转为历史记录，保留来源和删除／忘记关联。启动时整理已有提升关系中同源、同内容的重复副本，不做模糊语义合并。</p>
+  <h3>用户故事</h3>
+  <p>用户说一次记住偏好，列表和召回只得到一条有效记忆；重复后台提取不增加副本。历史来源可追溯，删除后不回退到旧副本；不同内容、来源、项目和任务保持各自范围。</p>
+  <h3>技术设计</h3>
+  <p>memory/intake.py 复用显式请求正文解析；memory/preference.py 在现有来源校验下按正文、来源 ID 和指纹匹配，复用已有记录或提升后 supersede 本地副本；memory/jobs.py 在提取提交和启动恢复时调用。保留 memory_edges，更新 memory_epoch，写入沿用数据库事务。历史整理仅处理已有提升关系、范围一致且长期目标仍有效的记录，不增加轮询或模型调用。</p>
+  <h3>验收记录</h3>
+  <p>仓库 full 门禁通过，Python 全量 880 个用例通过；记忆相关 57 个用例覆盖新写入、重复提取、历史整理幂等、来源、范围、过期及删除关联。隔离 Unix HTTP 服务配合固定模型响应验证截图原文只返回一条长期偏好、来源未变、跨用户不可见及删除后零条；历史种子从两条整理为一条。验收文件为 /tmp/duplicate-memory-acceptance.json 与同名 PNG，现用服务和记忆未修改。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

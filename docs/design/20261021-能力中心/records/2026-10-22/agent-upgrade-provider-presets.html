@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agent 升级与模型预设 · 2026-10-22</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261021-能力中心/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="agent-upgrade-provider-presets" lang="zh-CN">
+  <h1>Agent 升级与模型预设 · 2026-10-22</h1>
+  <h2>产品设计</h2>
+  <p>能力页 Agent 卡片提供“升级”和“模型”直接入口；管理详情保留版本、程序位置、终端和启动命令。升级遵循当前安装方式，原生安装的 Claude Code 与 OpenCode 使用原生升级器，npm 安装的 Claude Code / Codex / Pi 更新原安装前缀；无法识别的安装方式显示终端升级提示，不另装一份冒充成功。显式确认后升级，成功重新读取实际版本，失败保留原目录。</p>
+  <p>模型页按 Agent 管理服务商预设，填写名称、服务地址、API 协议、模型、API Key 或环境变量引用。保存与应用分开，应用只修改原生配置中对应的连接和模型字段；保留 MCP、插件、hooks、权限、其他服务商及注释。密钥只写不读，留空保留已存密钥。显示实际生效状态和外部改动，不把保存预设当成调用已成功。支持恢复首次应用前的连接与模型字段；每次应用先备份，失败回滚，配置发生外部变化时保留表单并要求重新读取。应用影响后续启动，已有会话由各工具自行处理，不自动重启。</p>
+  <p>桌面沿用详情弹窗中的模型区；手机在同一 URL 详情的全屏二级页展示，单返回栏、单滚动区，编辑区和保存动作遵循既有安全区与键盘规则。OAuth 仍在各工具终端登录；不代理协议、不复制订阅令牌、不提供未实现的自动故障切换。各工具只接受已验证的原生协议。</p>
+  <h2>用户故事</h2>
+  <ul>
+    <li>我能升级当前真正使用的程序，并看到更新后的版本；不会因原生安装与 npm 并存而更新错程序。</li>
+    <li>我能为不同 Agent 保存多个服务商与模型预设，确认后应用，切换后重开终端使用。</li>
+    <li>我能恢复原连接和模型；其他工具配置和登录资料保持可用，失败不会清空输入或谎报已切换。</li>
+    <li>我在手机上可以编辑、保存、应用和返回，API Key 不会在列表和重新打开的表单里回显。</li>
+  </ul>
+  <h2>技术设计</h2>
+  <pre>internal/agentinventory/upgrade.go       固定升级计划、原程序解析、维护互斥与版本复查
+internal/agentproviders/store.go         0600 预设目录、串行写、脱敏视图与按 Agent 隔离
+internal/agentproviders/native-config.go 原生路径、受控字段变更与配置文件读写
+internal/agentproviders/apply.go         修订冲突、备份日志、多文件回滚与中断恢复
+internal/agentproviders/json-config.go   JSON / JSONC 的保留式字段修改
+internal/agentproviders/codex-config.go  TOML AST 定位、精确修改和保留无关配置
+backend/api/agent-providers.go           所有者鉴权下的大小限制、预设 CRUD、应用与恢复
+frontend/src/components/capabilities/AgentModels.tsx 模型预设、失败保留、显式应用
+frontend/src/agent-registry.ts               升级及模型配置的节点感知 API</pre>
+  <p>预设位于当前节点 data root 的 agents/professional/provider-presets.json，不使用公开偏好存储保存密钥。所有写入均为临时文件 fsync 后原子替换，文件 0600、私有目录 0700；预设、单次请求和原生文件均有体积上限。API 只返回 hasKey 和白名单字段，原生解析错误不回显文件内容或密钥。</p>
+  <p>原生路径尊重 CLAUDE_CONFIG_DIR、CODEX_HOME、XDG_CONFIG_HOME、OPENCODE_CONFIG、PI_CODING_AGENT_DIR。Claude 变更用户 settings.json 的模型与认证环境变量；Codex 变更 config.toml 的模型和受管 provider 表，保留 auth.json；OpenCode 区分 V1 / V2 的 provider 字段；Pi 写 models.json 和默认模型 settings.json。服务端修订值防止陈旧页面覆盖新配置；应用前生成私有恢复记录，多文件写入失败按已写入内容比较回滚，恢复时仅还原托管字段。</p>
+  <h2>验收计划</h2>
+  <p>隔离 HOME、Agent 配置与原生程序，覆盖安装来源升级、前缀、并发、取消和失败；四类预设增删改、重启恢复、秘密不回显、环境变量引用、应用和还原、原生格式及无关字段保留、外部修改冲突、落盘失败与恢复。执行 Go / 前端完整门禁及 Android 真机键盘、滚动、触控与返回检查；不升级本机现用程序，不应用到现用凭证。</p>
+  <h2>验收记录</h2>
+  <p>仓库 full 门禁通过，Python 867 个用例、前端 127 个文件 / 907 个用例通过；typecheck、i18n、hover 与生产构建通过，构建保留已有大块体积提示。Go 新增竞态测试覆盖四类预设、密钥不回显、外部变更冲突、两文件失败回滚、中断恢复及符号链接目录中首次建配置后的状态稳定；HTTP 验证请求限制、脱敏和应用状态，升级测试使用固定程序验证原生路径、npm 原前缀与维护互斥。</p>
+  <p>隔离 Go 服务、HOME、私有 tmux 和固定升级程序完成四种 Agent 的保存、应用、恢复、升级后版本读取；已安装的 Codex 0.162.1、OpenCode 2.0.27、Pi 1.1.0 均成功读取生成的原生配置，未发起模型调用。OpenCode 原生服务使用独立配置与端口。</p>
+  <p>桌面中文深色 / 英文浅色在 320、390、820、1100、1280、1600、1920 宽度无文档溢出。Redmi Note 8 真机以 392 CSS px / coarse 指针完成预设编辑、保存、切换、恢复、Android 返回及升级确认；键盘 314px 时保存按钮位于键盘上方，触控高度 44px，四个底部主入口恢复正常。截图与验收脚本在 /tmp/agent-models-*，现用服务及用户原生配置未修改。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>
