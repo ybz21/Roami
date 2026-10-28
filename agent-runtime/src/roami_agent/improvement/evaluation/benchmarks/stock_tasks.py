@@ -78,9 +78,22 @@ def import_stock(source_dir, *, image, raw_source, revision):
     )
 
 
-PROGRAM = r"""import base64,io,json,pathlib,sys
+PRESENTATION_CHECK = r"""from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+def plot_slide_count(path):
+ def has_plot(shapes):
+  for shape in shapes:
+   if shape.has_chart or getattr(shape,'image',None) is not None:return True
+   if shape.shape_type==MSO_SHAPE_TYPE.GROUP and has_plot(shape.shapes):return True
+  return False
+ return sum(has_plot(slide.shapes) for slide in Presentation(path).slides)
+"""
+
+
+PROGRAM = (
+    PRESENTATION_CHECK
+    + r"""import base64,io,json,pathlib,sys
 import pandas as pd
-from pptx import Presentation
 spec=json.loads(sys.stdin.read());root=pathlib.Path('/workspace');golden=base64.b64decode(spec['golden']);read_csv=pd.read_csv
 pd.read_csv=lambda source,*a,**kw:read_csv(io.BytesIO(golden) if source=='/utils/stock_data.csv' else source,*a,**kw)
 namespace={'pd':pd,'BytesIO':io.BytesIO,'logging':__import__('logging'),'check_file_in_owncloud_directory':lambda f,d:(root/f).is_file(),'get_binary_file_content_owncloud':lambda f,d:(root/f).read_bytes()}
@@ -92,11 +105,12 @@ try:
  checks['adapted_csv_values']=True
 except AssertionError:checks['adapted_csv_values']=False
 try:
- p=Presentation(root/'stock_analysis.pptx');checks['five_slides_with_images']=len(p.slides)==5 and all(any(s.shape_type==13 for s in slide.shapes) for slide in p.slides)
-except Exception:checks['five_slides_with_images']=False
+ checks['five_plot_slides']=plot_slide_count(root/'stock_analysis.pptx')>=5
+except Exception:checks['five_plot_slides']=False
 try:checks['nonempty_utf8_script']=len((root/'stock_analysis_script.md').read_text().strip())>=100
 except (OSError,UnicodeError):checks['nonempty_utf8_script']=False
 print(json.dumps({'checks':checks,'native_csv_equality':native_csv_equality}))"""
+)
 
 
 async def grade_stock(case, executor, *, root):
