@@ -1,8 +1,7 @@
 """Two blind, calibrated artifact raters; model usage belongs to the evaluation ledger."""
 
 import asyncio
-import base64
-import hashlib
+import copy
 import json
 import re
 from dataclasses import asdict, replace
@@ -14,6 +13,7 @@ from roami_agent.improvement.evaluation.artifact_evidence import (
     PROGRAM,
     collect_artifact_evidence,
 )
+from roami_agent.improvement.evaluation.artifact_review_input import review_input
 from roami_agent.improvement.evaluation.grading import calibrated_grade
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.improvement.integrations.json_documents import load_json
@@ -175,35 +175,7 @@ class ArtifactReviewer:
     async def rate(self, pack, budget, journal):
         from roami_agent.providers.factory import configured_provider
 
-        require(
-            pack.get("content_hash")
-            == digest({k: v for k, v in pack.items() if k != "content_hash"}),
-            "RSI_ARTIFACT_EVIDENCE_CHANGED",
-        )
-        require(
-            pack.get("renderer_image") == self.profile["renderer_image"],
-            "RSI_ARTIFACT_RENDERER_CHANGED",
-        )
-        labels = {v["label"] for v in pack["images"] + pack["texts"]} | {
-            v["file"] for v in pack["artifacts"]
-        }
-        text = {k: v for k, v in pack.items() if k != "images"}
-        text["allowed_labels"] = sorted(labels)
-        content = [{"type": "text", "text": json.dumps(text, ensure_ascii=False)}]
-        for item in pack["images"]:
-            raw = base64.b64decode(item["data"], validate=True)
-            require(
-                hashlib.sha256(raw).hexdigest() == item["sha256"], "RSI_ARTIFACT_EVIDENCE_CHANGED"
-            )
-            content.extend(
-                [
-                    {"type": "text", "text": item["label"]},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": "data:" + item["mime"] + ";base64," + item["data"]},
-                    },
-                ]
-            )
+        labels, content = review_input(pack, self.profile["renderer_image"])
         messages = [
             {"role": "system", "content": INSTRUCTIONS},
             {"role": "user", "content": content},
@@ -378,6 +350,36 @@ def validate_calibration(certificate, route_hashes):
     )
 
 
+def calibration_inputs(anchors, renderer_image):
+    coverage = {family: {True: 0, False: 0} for family in ("presentation", "plan", "web")}
+    inputs = []
+    for anchor in copy.deepcopy(anchors):
+        require(anchor.get("human_reference") is True and anchor.get("family") in coverage)
+        require(
+            isinstance(anchor.get("human_rater"), str) and 1 <= len(anchor["human_rater"]) <= 100
+        )
+        require(
+            isinstance(anchor.get("expected"), dict)
+            and set(anchor["expected"]) == set(DIMENSIONS)
+            and all(type(v) is int and 0 <= v <= 3 for v in anchor["expected"].values())
+        )
+        require(isinstance(anchor["id"], str) and anchor["id"] not in FILES)
+        require(isinstance(anchor.get("evidence_file"), str))
+        require(
+            isinstance(anchor.get("evidence_hash"), str) and len(anchor["evidence_hash"]) == 64,
+            "RSI_ARTIFACT_EVIDENCE_CHANGED",
+        )
+        pack = private_document(Path(anchor["evidence_file"]))
+        review_input(pack, renderer_image, expected_hash=anchor["evidence_hash"])
+        coverage[anchor["family"]][all(v >= 3 for v in anchor["expected"].values())] += 1
+        inputs.append((anchor, pack))
+    require(
+        all(count >= 2 for family in coverage.values() for count in family.values()),
+        "RSI_ARTIFACT_CALIBRATION_COVERAGE",
+    )
+    return inputs
+
+
 async def calibrate_artifacts(
     settings,
     profile,
@@ -406,22 +408,17 @@ async def calibrate_artifacts(
         calibrated=False,
         shared_daily_limit=shared_daily_limit,
     )
+    # Freeze all approved inputs before the first metered call.
+    inputs = calibration_inputs(anchors, profile["renderer_image"])
+    for anchor, _pack in inputs:
+        location = root / digest(anchor["id"])[:24]
+        require(not location.is_symlink(), "RSI_ARTIFACT_PROFILE_PRIVATE")
+        started = location / "started.json"
+        if started.exists() or started.is_symlink():
+            raise FileExistsError(started)
     results = []
     used = 0
-    for anchor in anchors:
-        require(
-            anchor.get("human_reference") is True
-            and anchor.get("family") in {"presentation", "plan", "web"}
-        )
-        require(
-            isinstance(anchor.get("human_rater"), str) and 1 <= len(anchor["human_rater"]) <= 100
-        )
-        require(
-            set(anchor["expected"]) == set(DIMENSIONS)
-            and all(type(v) is int and 0 <= v <= 3 for v in anchor["expected"].values())
-        )
-        require(anchor["id"] not in FILES and isinstance(anchor["id"], str))
-        pack = private_document(Path(anchor["evidence_file"]))
+    for anchor, pack in inputs:
         if not shared_daily_limit:
             require(used + profile["max_tokens"] <= token_limit, "RSI_TOKEN_BUDGET")
         location = root / digest(anchor["id"])[:24]

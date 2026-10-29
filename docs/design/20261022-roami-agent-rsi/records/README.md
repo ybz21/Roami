@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-30 | [校准材料的完整准入](2026-10-30/calibration-reference-admission.html) |
 | 2026-10-30 | [每日限额下的并发准入](2026-10-30/model-admission-queue.html) |
 | 2026-10-30 | [任务容器的 Office 环境](2026-10-30/container-config-directory.html) |
 | 2026-10-30 | [完成回报的统一指令](2026-10-30/completion-instruction-consistency.html) |

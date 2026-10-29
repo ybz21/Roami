@@ -134,6 +134,7 @@ async def test_daily_calibration_has_no_local_token_reservation_and_never_replay
                     "human_rater": "Synthetic test label",
                     "expected": dict.fromkeys(DIMENSIONS, score),
                     "evidence_file": str(evidence),
+                    "evidence_hash": pack()["content_hash"],
                 }
             )
     calls = []
