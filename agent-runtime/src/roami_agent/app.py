@@ -80,6 +80,7 @@ from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
+from roami_agent.tools.workspace_images import WorkspaceImageReads
 
 log = logging.getLogger(__name__)
 
@@ -196,7 +197,9 @@ class Runtime:
             self.briefs,
         )
         add_worker_tools(self.tools, self.settings, self.artifacts)
-        register_file_tools(self.tools, self.files)
+        register_file_tools(
+            self.tools, self.files, images=WorkspaceImageReads(self.files, self.artifacts)
+        )
         register_artifact_tools(self.tools, self.artifacts)
         mcp_socket = node_socket(database.data_root)
         self.mcp = MCPConnections(
@@ -257,7 +260,7 @@ class Runtime:
                 self.settings,
                 memory=self.memory,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
-                vision=VisionInputs(database, self.artifacts)
+                vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True
                 else None,
             ),

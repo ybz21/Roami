@@ -88,7 +88,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v28-image-transport-evidence",
+                "container-uds-v29-worker-image-input",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -101,6 +101,12 @@ class ContainerExecutor:
         self.memory_route = memory_route
         if memory_route is not None:
             self.model_hash = digest([self.model_hash, asdict(memory_route)])
+        image_route = worker_route or settings.route("worker")
+        self.worker_image_input = {
+            "enabled": image_route.capabilities.get("images") is True,
+            "limits": image_route.image_limits,
+        }
+        self.model_hash = digest([self.model_hash, self.worker_image_input])
         self.image_id = None
         self.provider_factory = provider_factory
         self.shared_budget = shared_budget
@@ -182,6 +188,14 @@ class ContainerExecutor:
             labels = detail.get("Config", {}).get("Labels") or {}
             require(
                 labels.get("org.roami.rsi.shared-daily-policy") == "4",
+                "RSI_CONTAINER_IMAGE_REQUIRED",
+            )
+        if self.worker_image_input["enabled"]:
+            require(
+                (detail.get("Config", {}).get("Labels") or {}).get(
+                    "org.roami.rsi.workspace-image-input"
+                )
+                == "1",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
         self.image_id = detail["Id"]
@@ -450,7 +464,12 @@ class ContainerExecutor:
         view["followups"] = case.get("followups", [])
         private_json(
             state / "request.json",
-            {"case": view, "policy": policy, "shared_daily_limit": self.shared_daily_limit},
+            {
+                "case": view,
+                "policy": policy,
+                "shared_daily_limit": self.shared_daily_limit,
+                "worker_image_input": self.worker_image_input,
+            },
         )
         setup_ms = (time.monotonic() - started) * 1000
         budget = EpisodeBudget(case["limits"], shared_daily_limit=self.shared_daily_limit)

@@ -4,6 +4,7 @@ import base64
 import json
 import struct
 
+from roami_agent.context.workspace_images import WorkspaceImageInputs
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
@@ -13,8 +14,11 @@ class VisionInputs:
     max_bytes = 2 * 1024 * 1024
     max_pixels = 4_000_000
 
-    def __init__(self, database, artifacts):
+    def __init__(self, database, artifacts, settings=None):
         self.db, self.artifacts = database, artifacts
+        self.workspace_images = (
+            WorkspaceImageInputs(database, artifacts, settings) if settings else None
+        )
 
     async def attach(self, turn, plan, prompt):
         if not turn.get("executionRunId"):
@@ -28,6 +32,12 @@ class VisionInputs:
                 observed = value.get("observation") if isinstance(value, dict) else None
             except (ValueError, TypeError):
                 continue
+            if (
+                self.workspace_images
+                and isinstance(value, dict)
+                and isinstance(value.get("fileImage"), dict)
+            ):
+                return await self.workspace_images.attach(turn, plan, prompt, message, value)
             if not isinstance(observed, dict) or not all(
                 isinstance(observed.get(key), str) for key in ("id", "screenshotRef", "resourceId")
             ):

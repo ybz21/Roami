@@ -3,7 +3,7 @@
 from roami_agent.protocol.tools import Tool, object_schema
 
 
-def register_file_tools(registry, files):
+def register_file_tools(registry, files, *, images=None):
     path = {"type": "string", "minLength": 1, "maxLength": 4096}
     digest = {"type": "string", "pattern": "^[a-f0-9]{64}$"}
     registry.add(
@@ -18,7 +18,7 @@ def register_file_tools(registry, files):
                 },
                 ["path"],
             ),
-            files.read,
+            images.read if images else files.read,
         )
     )
     registry.add(
