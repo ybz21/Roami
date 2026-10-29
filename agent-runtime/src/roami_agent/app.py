@@ -307,7 +307,7 @@ class Runtime:
             self.executor.capabilities = self.professional_capabilities
 
     def improvement_provider(self, settings, role):
-        actual = "main" if role == "main" or role.startswith("artifact_") else "worker"
+        actual = "main" if role in {"main", "artifact_a"} else "worker"
         return configured_provider(settings, actual)
 
     async def run_turn(self, turn, *args, **kwargs):

@@ -83,12 +83,26 @@ class ContainerExecutor:
         shared_daily_limit=False,
     ):
         self.settings, self.image = settings, image
+        if shared_daily_limit:
+            require(
+                all(
+                    route is None or route == settings.route(role)
+                    for route, role in (
+                        (main_route, "main"),
+                        (worker_route, "worker"),
+                        (memory_route, "worker"),
+                    )
+                )
+                and not generation_overrides
+                and not output_caps,
+                "RSI_POLICY_OUT_OF_RANGE",
+            )
         self.artifact_reviewer = artifact_reviewer
         self.artifact_renderer = None
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v29-worker-image-input",
+                "container-uds-v30-configured-model-routes",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -488,11 +502,12 @@ class ContainerExecutor:
             )
             from roami_agent.improvement.integrations.request_model import RequestBudgetModel
 
-            route = replace(
-                route,
-                max_retries=0,
-                parameters={**route.parameters, **self.generation_overrides.get(role, {})},
-            )
+            if not self.shared_daily_limit:
+                route = replace(
+                    route,
+                    max_retries=0,
+                    parameters={**route.parameters, **self.generation_overrides.get(role, {})},
+                )
             models[role] = RequestBudgetModel(
                 self.settings,
                 route,

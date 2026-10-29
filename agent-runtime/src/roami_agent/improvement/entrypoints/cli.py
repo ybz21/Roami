@@ -60,15 +60,25 @@ async def execute(args):
         spending = certificate.get("spending_policy", "frozen_protocol")
         require(spending in {"frozen_protocol", "shared_model_daily"})
         shared = spending == "shared_model_daily"
-        parameters = {}
+        settings = Settings()
         if shared:
+            from roami_agent.protocol.model_routes import ModelRoute, settings_with_route
+
             require("model_page_output_tokens" in certificate)
             cap = certificate["model_page_output_tokens"]
             require(cap is None or (type(cap) is int and cap > 0))
-            if cap is not None:
-                parameters["max_tokens"] = cap
+            routes = certificate.get("model_page_routes")
+            require(
+                isinstance(routes, dict) and set(routes) == {"main", "worker"},
+                "RSI_ARTIFACT_CALIBRATION_CHANGED",
+            )
+            # Offline installation checks the certified snapshot; live loading checks node settings.
+            for role in ("main", "worker"):
+                route = ModelRoute.worker(routes[role], settings.route("main"))
+                settings = settings_with_route(settings, role, route)
+            require(cap == settings.route("main").parameters.get("max_tokens"))
         reviewer = ArtifactReviewer(
-            Settings(model_parameters=parameters),
+            settings,
             {**profile, "certificate": certificate},
             shared_daily_limit=shared,
         )

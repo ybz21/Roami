@@ -75,30 +75,17 @@ def payload():
     }
 
 
-@pytest.mark.parametrize(
-    "names,expected",
-    [
-        (["rr/gpt-6.1-sol"], "rr/gpt-6.1-sol"),
-        (["gpt-6.1-sol", "rr/gpt-6.1-sol"], "gpt-6.1-sol"),
-        (["rr/gpt-6.1-sol", "other/gpt-6.1-sol"], None),
-        (["other-model"], None),
-    ],
-)
-async def test_model_alias_is_exact_or_unique_without_changing_the_requested_model(names, expected):
-    async def catalog(endpoint, key):
-        assert endpoint == "https://gateway.invalid/v1"
-        return dict.fromkeys(names)
+@pytest.mark.parametrize("cli_model", ["gpt-6.1-sol", "other-model"])
+async def test_cli_identity_never_selects_the_upstream_model_or_parameters(cli_model, monkeypatch):
+    async def catalog(*args):
+        pytest.fail("Model discovery must not select a different upstream model")
 
-    if expected is None:
-        with pytest.raises(DomainError, match="MODEL_ROUTE_REQUIRED"):
-            await gateway_plan(settings(), {"model": "gpt-6.1-sol"}, catalog=catalog)
-    else:
-        value = await gateway_plan(
-            settings(), {"model": "gpt-6.1-sol", "model_reasoning_effort": "high"}, catalog=catalog
-        )
-        assert value.model == "gpt-6.1-sol" and value.route.name == expected
-        assert value.route.max_retries == 0 and value.route.context_window is None
-        assert value.route.parameters["reasoning_effort"] == "high"
+    monkeypatch.setattr("roami_agent.providers.model_catalog.fetch_catalog", catalog)
+    node = replace(settings(), model_parameters={"reasoning_effort": "low"}, context_window=64000)
+    value = await gateway_plan(node, {"model": cli_model, "model_reasoning_effort": "high"})
+    assert value.model == cli_model and value.route == node.route("main")
+    assert value.route.max_retries == 2 and value.route.context_window == 64000
+    assert value.route.parameters == {"reasoning_effort": "low"}
 
 
 @pytest.mark.parametrize(

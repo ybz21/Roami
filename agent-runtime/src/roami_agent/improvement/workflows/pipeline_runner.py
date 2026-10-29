@@ -56,19 +56,9 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
         return prior_result
     from roami_agent.improvement.evaluation.artifact_review import (
         ArtifactReviewer,
+        needs_artifact_review,
     )
 
-    reviewer = (
-        ArtifactReviewer.load(
-            settings, service.ledger.path.parent, owner, shared_daily_limit=shared
-        )
-        if settings is not None
-        else None
-    )
-    profile_path = (
-        service.ledger.path.parent / "artifact-review" / digest(owner)[:24] / "profile.json"
-    )
-    require(settings is not None or not profile_path.exists(), "RSI_ARTIFACT_SETTINGS_REQUIRED")
     config = records.settings(owner)
     prefs = service.control.preferences(owner)
     baseline = records.get(owner, payload["baseline_run"]) if payload.get("baseline_run") else None
@@ -81,6 +71,21 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
             "RSI_CASES_UNAVAILABLE",
         )
     require(prefs["suite_id"] and prefs["machine_ids"], "RSI_SETUP_REQUIRED")
+    review_needed = any(needs_artifact_review({"id": case_id}) for case_id in case_ids)
+    reviewer = (
+        ArtifactReviewer.load(
+            settings, service.ledger.path.parent, owner, shared_daily_limit=shared
+        )
+        if review_needed and settings is not None
+        else None
+    )
+    profile_path = (
+        service.ledger.path.parent / "artifact-review" / digest(owner)[:24] / "profile.json"
+    )
+    require(
+        not review_needed or settings is not None or not profile_path.exists(),
+        "RSI_ARTIFACT_SETTINGS_REQUIRED",
+    )
     return enqueue_diagnostic_request(
         service.ledger, owner, key, prefs, case_ids, config, reviewer, baseline, shared
     )
@@ -103,15 +108,22 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     require(set(spec["case_ids"]) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
     await asyncio.to_thread(service.run_lifecycle.freeze_cases, owner, run_id, suite)
     settings = runtime.settings.current
-    from roami_agent.improvement.evaluation.artifact_review import ArtifactReviewer
+    from roami_agent.improvement.evaluation.artifact_review import (
+        ArtifactReviewer,
+        needs_artifact_review,
+    )
 
     shared_provider = getattr(service, "provider_factory", None)
-    artifact_reviewer = ArtifactReviewer.load(
-        settings,
-        service.ledger.path.parent,
-        owner,
-        provider_factory=shared_provider,
-        shared_daily_limit=shared,
+    artifact_reviewer = (
+        ArtifactReviewer.load(
+            settings,
+            service.ledger.path.parent,
+            owner,
+            provider_factory=shared_provider,
+            shared_daily_limit=shared,
+        )
+        if any(needs_artifact_review({"id": cid}) for cid in spec["case_ids"])
+        else None
     )
     require(
         (artifact_reviewer.content_hash if artifact_reviewer else None)
@@ -126,7 +138,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     journal = []
 
     def provider(settings_, role):
-        actual = "main" if role == "main" else "worker"
+        actual = "main" if role in {"main", "artifact_a"} else "worker"
         return MeteredModel(
             shared_provider(settings_, role)
             if shared_provider
