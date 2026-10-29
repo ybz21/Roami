@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [附件收集上限与不可用状态](2026-10-29/deliverable-collection-scope.html) |
 | 2026-10-29 | [区分超时运行与产物核验](2026-10-29/post-timeout-assessment-display.html) |
 | 2026-10-29 | [有效模型配置与执行时长](2026-10-29/effective-models-execution-timing.html) |
 | 2026-10-29 | [超时后的真实产物判定](2026-10-29/timeout-artifact-assessment.html) |

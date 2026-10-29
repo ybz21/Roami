@@ -203,6 +203,7 @@ class TaskDeliverables:
             sources = reported_paths(result.get("summary", ""), root) + reported_paths(
                 result.get("output", ""), root
             )
+            reported = set(sources)
             observed = await self.artifacts.db.call(
                 lambda db, attempt=attempt: rows(
                     db,
@@ -266,6 +267,9 @@ class TaskDeliverables:
                 if existing:
                     if existing not in references:
                         references.append(existing)
+                    continue
+                # Reaching the best-effort collection limit is not evidence of a missing side file.
+                if len(references) >= 12 and source not in reported:
                     continue
                 try:
                     if not isinstance(root, str) or not root:
