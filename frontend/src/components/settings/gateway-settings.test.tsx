@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (method, path, body) => {
     if (path === '/agent/model-settings') return { data: connection }
     if (path === '/agent/model-gateway/settings') { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
-    if (path.startsWith('/agent/model-gateway/usage')) return { data: currentUsage }
+    if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, source: new URL(path, 'https://fixture.invalid').searchParams.get('source') || '' } }
     return { data: {} }
   })
 })
@@ -119,4 +119,59 @@ it('sends date selection to the Go ledger and preserves the selected range', asy
   await waitFor(() => expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-gateway/usage?days=1&day=2026-10-28')).toBe(true))
   tab('agent.proxy.prices'); tab('agent.proxy.tab')
   expect((screen.getByLabelText('agent.usage.day') as HTMLInputElement).value).toBe('2026-10-28')
+})
+
+
+it('filters statistics and recent receipts while retaining all-source today and unsaved settings', async () => {
+  const row = { day: usage.day, role: 'main', model: 'same-model', currency: 'CNY', requests: 1, inputTokens: 100, outputTokens: 20, cacheReadTokens: 10, pending: 0, unknown: 0, usageUnknown: 0, failed: 0, cost: '1.000000000' }
+  currentUsage = { ...usage, today: [{ ...row, requests: 3 }], groups: [{ ...row, requests: 3 }] }
+  setup(); await screen.findByText('agent.usage.totalRequests')
+  fireEvent.change(screen.getByLabelText('agent.proxy.dailyLimit'), { target: { value: '9' } })
+  currentUsage = { ...currentUsage, source: 'rsi', groups: [{ ...row, source: 'rsi' }], recent: [{ id: 'legacy-rsi', day: usage.day, model: 'same-model', role: 'main', sessionId: 'rsi-legacy', source: 'rsi', state: 'known', currency: 'CNY', cost: '1.000000000', startedMs: Date.UTC(2026, 9, 29), inputTokens: 100, outputTokens: 20, cacheReadTokens: 10, errorCode: '', httpStatus: 200, reconciliation: '' }] }
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.rsi', { selector: '.ant-select-item-option-content' }))
+  await waitFor(() => expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-gateway/usage?days=7&source=rsi')).toBe(true))
+  await waitFor(() => expect(within(screen.getByText('agent.usage.totalRequests').parentElement!).getByText('1')).toBeTruthy())
+  expect(within(screen.getAllByText('agent.proxy.requests')[0].parentElement!).getByText('3')).toBeTruthy()
+  expect(screen.getByText('agent.usage.sourceHint')).toBeTruthy()
+  fireEvent.click(screen.getByText('agent.proxy.recent'))
+  expect(screen.getByText(/agent.proxy.rsi ·/)).toBeTruthy()
+  tab('agent.proxy.prices'); tab('agent.proxy.tab')
+  expect(screen.getByText('agent.usage.source.rsi', { selector: '.ant-select-selection-item' })).toBeTruthy()
+  expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('9')
+  expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
+})
+
+it('hides a previous source during loading and ignores an aborted source response', async () => {
+  const row = { day: usage.day, role: 'main', model: 'ordinary-only-model', currency: 'CNY', requests: 1, inputTokens: 100, outputTokens: 20, cacheReadTokens: 10, pending: 0, unknown: 0, usageUnknown: 0, failed: 0, cost: '1.000000000' }
+  currentUsage = { ...usage, today: [row], groups: [row] }
+  const original = vi.mocked(api).getMockImplementation()!
+  let finish: (value: any) => void = () => {}
+  vi.mocked(api).mockImplementation((...args) => args[1].includes('source=rsi') ? new Promise(resolve => { finish = resolve }) : original(...args))
+  setup(); await screen.findByRole('article', { name: 'ordinary-only-model' })
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.rsi', { selector: '.ant-select-item-option-content' }))
+  expect(screen.queryByRole('article', { name: 'ordinary-only-model' })).toBeNull()
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.other', { selector: '.ant-select-item-option-content' }))
+  await screen.findByRole('article', { name: 'ordinary-only-model' })
+  await act(async () => finish({ data: { ...usage, groups: [{ ...row, model: 'late-rsi-model' }] } }))
+  expect(screen.queryByText('late-rsi-model')).toBeNull()
+  expect(screen.getByRole('article', { name: 'ordinary-only-model' })).toBeTruthy()
+})
+
+
+it('does not present unfiltered receipts as RSI when an older node ignores the source parameter', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation((...args) => args[1].includes('source=rsi') ? Promise.resolve({ data: usage }) : original(...args))
+  setup(); await screen.findByText('agent.usage.empty')
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.rsi', { selector: '.ant-select-item-option-content' }))
+  await screen.findByText('agent.proxy.loadFailed')
+  expect(screen.queryByText('agent.usage.empty')).toBeNull()
+  expect(screen.queryByText('agent.proxy.recent')).toBeNull()
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.all', { selector: '.ant-select-item-option-content' }))
+  await screen.findByText('agent.usage.empty')
+  expect(screen.queryByText('agent.proxy.loadFailed')).toBeNull()
 })

@@ -33,3 +33,10 @@ it('keeps unknown costs and missing usage visible after reconciliation', () => {
   expect(reconciled.charges).toEqual([{ currency: 'CNY', amount: '0.750000000' }])
   expect(reconciled.statistics?.total.missingUsage).toBe(1)
 })
+
+
+it('labels historical RSI sessions and new roles without guessing untagged requests', () => {
+  const call = { id: '1', day: group.day, model: 'fixture', role: 'main', state: 'known', currency: 'CNY', cost: '0.000000001', startedMs: 1, inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, errorCode: '', httpStatus: 200, reconciliation: '' }
+  const raw = { ...usage([group]), recent: [call, { ...call, sessionId: 'rsi-legacy' }, { ...call, role: 'rsi_artifact_b' }, { ...call, role: 'rsiXworker', sessionId: 'rsiXlegacy' }] }
+  expect(gatewayUsage(raw, 'CNY').recent.map(row => row.source)).toEqual(['other', 'rsi', 'rsi', 'other'])
+})
