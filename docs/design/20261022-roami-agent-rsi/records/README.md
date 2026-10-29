@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [RSI 容器继承模型上下文配置](2026-10-29/container-model-context.html) |
 | 2026-10-29 | [RSI 结果、产物与配置交互](2026-10-29/results-interaction.html) |
 | 2026-10-29 | [RSI 沿用底层模型配置](2026-10-29/configured-model-routes.html) |
 | 2026-10-29 | [Worker 多图对照上下文](2026-10-29/workspace-image-comparison.html) |

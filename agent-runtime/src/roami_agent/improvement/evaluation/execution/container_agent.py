@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 
 from roami_agent.improvement.domain.contracts import require
+from roami_agent.improvement.evaluation.execution.container_context import context_settings
 from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.protocol.image_limits import ImageLimits
@@ -25,6 +26,8 @@ def container_settings(request):
         worker_model="worker",
         model_retries=0,
     )
+    if request.get("shared_daily_limit") is True:
+        settings = context_settings(settings, request.get("model_context"))
     image_input = request.get("worker_image_input")
     if image_input is None:
         return settings

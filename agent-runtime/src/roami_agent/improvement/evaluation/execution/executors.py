@@ -123,11 +123,20 @@ class NativeFilesExecutor:
                 }
                 for r in routes
             ]
-            + [settings.main_instructions, settings.worker_instructions, fixture]
+            + [
+                settings.main_instructions,
+                settings.worker_instructions,
+                fixture,
+                {
+                    "reserve_tokens": settings.reserve_tokens,
+                    "keep_recent_tokens": settings.keep_recent_tokens,
+                    "compaction_ratio": settings.compaction_ratio,
+                },
+            ]
         )
         if shared_daily_limit:
             self.model_hash = digest(
-                [self.model_hash, "shared_model_daily_limit-v2-configured-routes"]
+                [self.model_hash, "shared_model_daily_limit-v3-configured-context"]
             )
 
     async def run(self, case, policy, root):

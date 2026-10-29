@@ -429,6 +429,10 @@ async def test_container_entry_uses_the_host_spending_policy(tmp_path, monkeypat
     request = {"case": {"limits": {"seconds": 10}}, "policy": {}}
     if shared is not None:
         request["shared_daily_limit"] = shared
+    if shared is True:
+        from roami_agent.improvement.evaluation.execution.container_context import model_context
+
+        request["model_context"] = model_context(Settings())
     (state / "request.json").write_text(json.dumps(request))
     captured = {}
 
@@ -470,7 +474,7 @@ async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers
 
 
 @pytest.mark.parametrize("shared", [False, True])
-@pytest.mark.parametrize("version", [None, "1", "2", "3", "4"])
+@pytest.mark.parametrize("version", [None, "1", "2", "3", "4", "5"])
 async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
     tmp_path, monkeypatch, shared, version
 ):
@@ -483,7 +487,7 @@ async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
 
     monkeypatch.setattr(containers, "docker_command", docker)
     executor = containers.ContainerExecutor(Settings(), shared_daily_limit=shared)
-    if shared and version != "4":
+    if shared and version != "5":
         with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
             await executor.preflight()
         assert executor.image_id is None
