@@ -97,3 +97,57 @@ it('shows gateway quota recovery instead of an unknown-usage warning', () => {
   fireEvent.click(screen.getByRole('button', { name: zhCN['agent.rsiPrototype.modelPage'] }))
   expect(window.location.hash).toBe('#/settings/agent/runtime?modelTab=models')
 })
+
+it('selects a blocked workflow stage and explains model configuration errors', () => {
+  state.detail.runs[1].workflow.review.state = 'blocked'
+  state.detail.runs[1].workflow.review.error = 'MODEL_IMAGES_UNSUPPORTED'
+  render(<AgentImprovement node={null} />)
+  fireEvent.click(screen.getByRole('tab', { name: '工作流' }))
+  expect(document.querySelector('.rsi-phase-button[aria-pressed="true"]')?.id).toBe('run-review')
+  expect(screen.getByRole('alert').textContent).toBe(zhCN['agent.rsi.error.MODEL_IMAGES_UNSUPPORTED'])
+  expect(screen.getByRole('alert').closest('.rsi-phase-detail')?.getAttribute('aria-labelledby')).toMatch(/review$/)
+})
+it('explains and preserves an unsaved settings draft after returning to results', () => {
+  render(<AgentImprovement node={null} />)
+  fireEvent.click(screen.getByRole('button', { name: '设置' }))
+  fireEvent.change(screen.getByLabelText('开始时间（小时）'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: '返回' }))
+  expect(screen.getByRole('status').textContent).toContain(zhCN['agent.rsiPrototype.unsaved'])
+  fireEvent.click(screen.getByRole('button', { name: zhCN['agent.rsi.continueSettings'] }))
+  expect((screen.getByLabelText('开始时间（小时）') as HTMLInputElement).value).toBe('5')
+  fireEvent.click(screen.getByRole('button', { name: '返回' }))
+  fireEvent.click(screen.getByRole('button', { name: zhCN['agent.rsi.discardChanges'] }))
+  expect(screen.queryByRole('status')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '设置' }))
+  expect((screen.getByLabelText('开始时间（小时）') as HTMLInputElement).value).toBe('3')
+})
+it('does not claim the shared gateway is active when it is disabled', () => {
+  state.models.gatewayManaged = false
+  render(<AgentImprovement node={null} />)
+  fireEvent.click(screen.getByRole('button', { name: '设置' }))
+  expect(screen.queryByText(zhCN['agent.models.gatewayManaged'])).toBeNull()
+  expect(screen.getByText(zhCN['agent.rsi.error.RSI_SHARED_MODEL_GATEWAY_REQUIRED'])).toBeTruthy()
+})
+
+it('resets a previous phase selection when opening a different run', () => {
+  const { rerender } = render(<AgentImprovement node={null} runId={id} />)
+  fireEvent.click(screen.getByRole('tab', { name: '工作流' }))
+  fireEvent.click(document.querySelector('#run-verify')!)
+  state.detail.runs[0].workflow.review = { state: 'blocked', error: 'MODEL_IMAGES_UNSUPPORTED', artifacts: [] }
+  rerender(<AgentImprovement node={null} runId={earlier} />)
+  expect(document.querySelector('.rsi-phase-button[aria-pressed="true"]')?.id).toBe('run-review')
+})
+it('resets results scroll when changing tabs so summaries remain the entry point', () => {
+  render(<AgentImprovement node={null} />)
+  const scroll = document.querySelector<HTMLElement>('.rsi-scroll[role=tabpanel]')!
+  scroll.scrollTop = 300
+  fireEvent.click(screen.getByRole('tab', { name: 'Issue' }))
+  expect(scroll.scrollTop).toBe(0)
+})
+it('resets results scroll when opening another run', () => {
+  const { rerender } = render(<AgentImprovement node={null} runId={id} />)
+  const scroll = document.querySelector<HTMLElement>('.rsi-scroll[role=tabpanel]')!
+  scroll.scrollTop = 300
+  rerender(<AgentImprovement node={null} runId={earlier} />)
+  expect(scroll.scrollTop).toBe(0)
+})
