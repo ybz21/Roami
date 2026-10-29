@@ -1,5 +1,5 @@
 .agent-settings-form { display:flex; flex-direction:column; gap:var(--sp-4); max-width:calc(var(--sp-5) * 38); width:100%; min-width:0; }
-.agent-settings-form fieldset { display:flex; flex-direction:column; gap:var(--sp-3); margin:0; padding:var(--sp-4); border:1px solid var(--border-subtle); border-radius:var(--r-card); min-width:0; background:var(--bg-container); }
+.agent-settings-form fieldset { display:flex; flex-direction:column; gap:var(--sp-3); margin:0; padding:var(--sp-4) 0; border:0; border-bottom:1px solid var(--border-subtle); border-radius:0; min-width:0; background:var(--bg-base); }
 .agent-settings-form legend { width:auto; padding:0 var(--sp-2); margin:0; color:var(--text-bright); font-size:var(--fs-body); font-weight:600; }
 .agent-settings-field { display:flex; flex-direction:column; gap:var(--sp-2); min-width:0; }
 .agent-settings-form label { color:var(--text-bright); font-size:var(--fs-sm); }
@@ -13,7 +13,7 @@ html[data-size="compact"] .agent-settings-role > .agent-settings-hint { min-heig
 .agent-settings-catalog { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); }
 .agent-settings-catalog > span { color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-settings-switch { display:flex; align-items:center; justify-content:space-between; min-height:var(--tap); gap:var(--sp-3); }
-.agent-settings-save { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); position:sticky; bottom:0; z-index:1; padding:var(--sp-3) var(--sp-4); border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-container); }
+.agent-settings-save { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); position:sticky; bottom:0; z-index:1; padding:var(--sp-3) 0; border-top:1px solid var(--border-subtle); background:var(--bg-base); }
 .agent-settings-save > span { margin-right:auto; color:var(--text-dim); font-size:var(--fs-sm); }
 .agent-settings-save > small { flex-basis:100%; color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-settings-error { color:var(--danger); font-size:var(--fs-sm); }
@@ -134,6 +134,12 @@ html[data-pointer="coarse"] .agent-usage-daily .tt-act { min-height:var(--tap); 
 .agent-price-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); border-radius:var(--r-xs); }
 :where(html[data-pointer="fine"]) .agent-price-toggle:hover { background:var(--list-hover); }
 .agent-price-editor { display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-3); padding-bottom:var(--sp-4); }
-.agent-proxy-price-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--sp-3); width:100%; }
+.agent-proxy-price-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--sp-3); width:100%; }
 html[data-size="compact"] .agent-proxy-price-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
 html[data-pointer="coarse"] .agent-proxy-price .tt-act,html[data-pointer="coarse"] .agent-proxy-price .ant-select-selector,html[data-pointer="coarse"] .agent-price-add .ant-select-selector { min-height:var(--tap); }
+.agent-model-settings { width:100%; min-width:0; max-width:var(--content-form); }
+.agent-proxy-calls li { flex-wrap:wrap; }
+.agent-proxy-calls code { overflow-wrap:anywhere; font-size:var(--fs-meta); }
+.agent-proxy-calls details summary { min-height:var(--tap); display:flex; align-items:center; cursor:pointer; color:var(--accent); }
+html[data-pointer="coarse"] .agent-proxy-calls .tt-act { min-height:var(--tap); }
+html[data-pointer="coarse"] .agent-gateway-reconcile .ant-input,html[data-pointer="coarse"] .agent-gateway-reconcile .ant-btn { min-height:var(--tap); }

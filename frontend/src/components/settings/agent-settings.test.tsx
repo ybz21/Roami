@@ -6,6 +6,7 @@ import { AgentSettings } from './agent-settings'
 import { api } from '../../api'
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: false }) }))
 vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t }) } })
 afterEach(() => { for (const button of screen.queryAllByRole('button', { name: 'agent.models.discard' })) fireEvent.click(button); cleanup(); vi.clearAllMocks(); history.replaceState(null, '', '#/') })
 const role = { baseUrl: 'https://models.example/v1', keyConfigured: true, model: 'fast', images: false }
@@ -65,14 +66,13 @@ it('identifies an unavailable local runtime and retries the settings request', a
   await screen.findByLabelText('agent.models.baseUrl')
 })
 
-it('delegates prices and limits to the gateway and never loads local billing', async () => {
-  vi.mocked(api).mockResolvedValue({ data: { ...settings, proxy: { dailyLimit: 1, currency: 'CNY' } } })
+it('restores local billing and price tabs without reading the archived ledger', async () => {
+  vi.mocked(api).mockResolvedValue({ data: settings })
   setup()
-  const link = await screen.findByRole('link', { name: 'agent.models.gatewayOpen' })
-  expect(link.getAttribute('href')).toBe('https://models.example/')
-  expect(screen.getByText('agent.models.gatewayBilling')).toBeTruthy()
-  expect(screen.queryByRole('tab', { name: 'agent.proxy.tab' })).toBeNull()
-  expect(screen.queryByRole('tab', { name: 'agent.proxy.prices' })).toBeNull()
+  await screen.findByLabelText('agent.models.baseUrl')
+  expect(screen.getByRole('tab', { name: 'agent.proxy.tab' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'agent.proxy.prices' })).toBeTruthy()
+  expect(screen.queryByRole('link', { name: 'agent.models.gatewayOpen' })).toBeNull()
   expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-usage')).toBe(false)
 })
 

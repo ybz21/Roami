@@ -59,7 +59,7 @@ it('retains case display metadata and expanded lists across tabs', () => {
 it('shows the model-page daily amount without RSI token fields', () => {
   render(<AgentImprovement node={null} />)
   fireEvent.click(screen.getByRole('button', { name: '设置' }))
-  expect(screen.getByText('由模型网关管理')).toBeTruthy()
+  expect(screen.getByText(zhCN['agent.models.gatewayManaged'])).toBeTruthy()
   expect(screen.queryByLabelText(/Token/)).toBeNull()
   expect(screen.queryByText(/每次准入预算/)).toBeNull()
 })

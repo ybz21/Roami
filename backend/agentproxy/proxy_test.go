@@ -13,7 +13,32 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/modelgateway"
 )
+
+func TestGatewayManagementUsesPrivateGoSocket(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "agent.sock")
+	listener, err := net.Listen("unix", modelgateway.Socket(socket))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/model-gateway/usage" || r.URL.RawQuery != "days=30" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
+			t.Errorf("invalid gateway request: %s", r.URL)
+		}
+		_, _ = io.WriteString(w, `{"data":{"groups":[]}}`)
+	})}
+	go func() { _ = server.Serve(listener) }()
+	defer server.Close()
+	r := httptest.NewRequest("GET", "/api/agent/model-gateway/usage?days=30", nil)
+	r.Header.Set("Authorization", "private-browser-credential")
+	r.Header.Set("Cookie", "private-browser-cookie")
+	w := httptest.NewRecorder()
+	Proxy(socket).ServeHTTP(w, r)
+	if w.Code != 200 || w.Body.String() != `{"data":{"groups":[]}}` {
+		t.Fatalf("management did not reach Go gateway: %d %s", w.Code, w.Body.String())
+	}
+}
 
 func TestCapabilityDownloadUsesBoundedLongerHeaderBudget(t *testing.T) {
 	proxy := Proxy("/tmp/unused-roami-test.sock").(*httputil.ReverseProxy)
