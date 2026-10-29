@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.domain.run_configuration import STAGES
+from roami_agent.improvement.evaluation.native_judgment import report_judgments
 from roami_agent.improvement.integrations.github_client import command, publication_profile
 from roami_agent.improvement.persistence.publication_outbox import (
     complete_issue_publication,
@@ -35,6 +36,7 @@ DESCRIPTIONS = {
 
 
 def public_issue_body(run, priorities):
+    judgments = report_judgments(run["cases"])
     lines = [
         "## Roami Agent RSI 诊断",
         "",
@@ -45,7 +47,13 @@ def public_issue_body(run, priorities):
         "### 本次指标",
         "",
         "```json",
-        json.dumps(run["summary"], ensure_ascii=False, indent=2),
+        json.dumps(
+            {**(run["summary"] or {}), "native_judgments": judgments}
+            if judgments
+            else run["summary"],
+            ensure_ascii=False,
+            indent=2,
+        ),
         "```",
         "",
         "### 本地问题清单",
@@ -234,6 +242,11 @@ class PipelineReportWorker:
                         "signals": c["signals"],
                         "blocked_by": c.get("blocked_by"),
                         "checks": c["checks"],
+                        **(
+                            {"native_judgments": judgments}
+                            if (judgments := report_judgments([c]))
+                            else {}
+                        ),
                         "metrics": c["metrics"],
                         "tool_calls": c["tool_calls"],
                         "tools": c["tools"],

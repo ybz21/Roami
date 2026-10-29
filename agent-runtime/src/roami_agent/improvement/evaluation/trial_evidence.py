@@ -8,6 +8,7 @@ from roami_agent.improvement.domain.contracts import digest
 from roami_agent.improvement.domain.run_configuration import code
 from roami_agent.improvement.evaluation.case_catalog import case_identity
 from roami_agent.improvement.evaluation.execution.interrupted_evidence import snapshot_metadata
+from roami_agent.improvement.evaluation.native_judgment import native_judgment
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.protocol.errors import DomainError
 
@@ -131,7 +132,8 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
             str(p.relative_to(root / "workspace"))
             for p in (root / "workspace").rglob("*")
             if p.is_file()
-            and p.suffix in {".py", ".md", ".html", ".json", ".csv", ".svg", ".pptx"}
+            and p.suffix
+            in {".py", ".md", ".html", ".json", ".csv", ".svg", ".pptx", ".mp4", ".wav"}
             and "__pycache__" not in p.parts
         ][:32]
     blocked = bool(
@@ -158,6 +160,7 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         else "failed"
     )
     identity = case_identity(case)
+    judgment = native_judgment(grade)
     return {
         "case_id": case["id"],
         **({"blocked_by": blocked_by} if blocked_by else {}),
@@ -173,6 +176,7 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         "hard_passed": grade.get("hard_passed") is True,
         "pending": grade.get("pending") is True,
         "quality": grade.get("quality"),
+        **({"native_judgment": judgment} if judgment else {}),
         "checks": checks,
         "signals": sorted(signals),
         "metrics": {
