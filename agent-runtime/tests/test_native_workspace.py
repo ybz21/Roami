@@ -46,7 +46,12 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
                 ),
                 None,
             )
-            if filename.endswith(".py") and evidence:
+            recovered = any(
+                m["role"] == "tool"
+                and json.loads(m["content"]).get("error") == "TASK_RESULT_REQUIRED"
+                for m in messages
+            )
+            if filename.endswith(".py") and evidence and not recovered:
                 completion = json.JSONDecoder().raw_decode(evidence)[0]
                 yield ModelEvent(
                     "tool",
@@ -151,9 +156,10 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
         assert len(references) == 1 and references[0]["name"] == filename
         messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
         assert references[0]["downloadUrl"] in messages[-1]["content"]["text"]
+        assert messages[-1]["content"]["text"].startswith("File saved.")
         (workspace / filename).unlink()
         if filename.endswith(".py"):
-            assert not await store.call(
+            assert await store.call(
                 lambda db: row(
                     db, "SELECT id FROM tool_calls WHERE state='failed' AND tool_name='task_reply'"
                 )
