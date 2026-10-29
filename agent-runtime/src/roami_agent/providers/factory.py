@@ -1,6 +1,7 @@
 """Construct the protocol client for the configured Go model gateway."""
 
 from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.providers.local_gateway import local_gateway_client
 
 
 def configured_provider(settings, role, *, client=None):
@@ -14,6 +15,6 @@ def configured_provider(settings, role, *, client=None):
         capabilities=route.capabilities,
         cache=route.cache,
         parameters=route.parameters,
-        client=client,
+        client=client or local_gateway_client(role, route.timeout_seconds),
     )
     return provider

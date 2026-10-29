@@ -16,10 +16,14 @@ import (
 	"time"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
+	"github.com/ybz21/Roami/internal/modelgateway"
 	metadb "github.com/ybz21/Roami/internal/storage"
 )
 
 func runAgent(args []string) int {
+	if len(args) > 0 && args[0] == "gateway" {
+		return runAgentGateway(args[1:])
+	}
 	if len(args) > 0 && args[0] == "mcp" {
 		return runAgentMCP(args[1:])
 	}
@@ -58,7 +62,7 @@ func runAgent(args []string) int {
 		return runAgentTrace(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|mcp|trace [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|mcp|trace|gateway [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  gateway settings|usage|configure|reconcile: local Go model billing and daily quota\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
 		return 0
 	}
 	sub := args[0]
@@ -299,6 +303,9 @@ func agentPythonCommand(dir string, p agentruntime.Paths, initialize bool) (*exe
 	args := agentRuntimeArgs(p, initialize, buildChannel)
 	cmd := exec.Command(python, args...)
 	cmd.Env = agentEnvironment()
+	if !initialize {
+		cmd.Env = append(cmd.Env, "ROAMI_MODEL_GATEWAY_SOCKET="+modelgateway.Socket(p.Socket))
+	}
 	if binary, err := os.Executable(); err == nil {
 		cmd.Env = append(cmd.Env, "ROAMI_AGENT_CLI="+binary, "ROAMI_AGENT_VERSION="+version)
 	}
@@ -311,6 +318,13 @@ func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
 	cmd, err := agentPythonCommand(dir, p, initialize)
 	if err != nil {
 		return err
+	}
+	if !initialize {
+		stop, err := modelgateway.Start(p.Storage, modelgateway.Socket(p.Socket))
+		if err != nil {
+			return err
+		}
+		defer stop()
 	}
 	return cmd.Run()
 }

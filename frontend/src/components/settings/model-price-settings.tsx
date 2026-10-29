@@ -23,7 +23,7 @@ export function ModelPriceSettings({ value, models, catalog, loadingCatalog, cat
   const visible = names.filter(model => model.toLowerCase().includes(query.trim().toLowerCase()))
   const candidates = (catalog || []).filter(model => !names.includes(model) && model.toLowerCase().includes(modelQuery.trim().toLowerCase()))
   const options = candidates.slice(0, 50).map(model => ({ value: model, label: model, title: model }))
-  const full = Object.values(value.prices).filter(hasPrice).length >= 32
+  const full = Object.keys(value.prices).length >= 200
   const custom = modelQuery.trim()
   if (custom && !names.includes(custom) && !(catalog || []).includes(custom)) options.push({ value: custom, label: t('agent.models.use', { name: custom }), title: custom })
   const add = (model: string) => {
@@ -54,8 +54,7 @@ export function ModelPriceSettings({ value, models, catalog, loadingCatalog, cat
         </button>
         {open && <div id={`${id}-${index}`} className="agent-price-editor">
           <div className="agent-proxy-price-fields">
-            <div className="agent-settings-field"><label htmlFor={`agent-price-${index}-currency`}>{t('agent.proxy.price.currency')}</label><Select id={`agent-price-${index}-currency`} aria-label={t('agent.proxy.priceCurrencyLabel', { model })} value={price.currency} disabled={disabled} virtual={false} options={Array.from(new Set(['USD', 'CNY', 'EUR', 'GBP', 'JPY', price.currency])).sort().map(currency => ({ value: currency, label: currency }))} onChange={currency => update({ currency })} /></div>
-            {priceFields.map(key => <div className="agent-settings-field" key={key}><label htmlFor={`agent-price-${index}-${key}`}>{t('agent.proxy.price.' + key)}</label><Input id={`agent-price-${index}-${key}`} aria-label={t('agent.proxy.priceLabel', { model, kind: t('agent.proxy.price.' + key) })} type="number" min={0} max={1000000} step="0.000001" value={price[key]} disabled={disabled} placeholder={t(key === 'cacheRead' ? 'agent.proxy.cacheDefault' : 'agent.proxy.notSet')} onChange={event => update({ [key]: event.target.value })} /></div>)}
+            {priceFields.map(key => <div className="agent-settings-field" key={key}><label htmlFor={`agent-price-${index}-${key}`}>{t('agent.proxy.price.' + key)}</label><Input id={`agent-price-${index}-${key}`} aria-label={t('agent.proxy.priceLabel', { model, kind: t('agent.proxy.price.' + key) })} type="number" min={0} max={1000000} step="any" value={price[key]} disabled={disabled} placeholder={t(key === 'cacheRead' ? 'agent.gateway.zeroPrice' : 'agent.proxy.notSet')} onChange={event => update({ [key]: event.target.value })} /></div>)}
           </div>
           {(configured || !models.includes(model)) && <button type="button" className="tt-act danger" disabled={disabled} aria-label={t('agent.proxy.removePrice', { model })} onClick={() => { const prices = { ...value.prices }; delete prices[model]; onChange({ ...value, prices }) }}>{t('agent.proxy.remove')}</button>}
         </div>}

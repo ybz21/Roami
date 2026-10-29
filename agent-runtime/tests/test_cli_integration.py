@@ -163,10 +163,14 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                 stderr=asyncio.subprocess.DEVNULL,
             )
             async with asyncio.timeout(10):
-                while not list(Path(short_root).rglob("*.sock")):
+                while True:
                     assert service.returncode is None
-                    await asyncio.sleep(0.05)
-            actual_socket = next(Path(short_root).rglob("*.sock"))
+                    try:
+                        await cli("status")
+                        break
+                    except AssertionError:
+                        await asyncio.sleep(0.05)
+            actual_socket = next(Path(short_root).rglob("agent-*.sock"))
             assert actual_socket.stat().st_mode & 0o777 == 0o600
             created = await cli("new", "--title", "CLI round trip")
             cid = created["data"]["id"]
@@ -179,6 +183,9 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                         break
                     await asyncio.sleep(0.05)
             assert messages[-1]["content"]["text"] == "Live transport answer"
+            usage = await cli("gateway", "usage")
+            assert usage["data"]["recent"][0]["model"] == "injected-http-model"
+            assert usage["data"]["recent"][0]["cost"] == "0.000000000"
             await cli(
                 "notify", "--conversation", cid, "--key", "reminder-1", "--text", "Time to review"
             )

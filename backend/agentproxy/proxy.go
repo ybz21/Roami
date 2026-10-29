@@ -3,6 +3,7 @@ package agentproxy
 import (
 	"encoding/json"
 	"github.com/ybz21/Roami/internal/agentruntime"
+	"github.com/ybz21/Roami/internal/modelgateway"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -11,10 +12,13 @@ import (
 )
 
 type capabilityTransport struct {
-	standard, marketplace *http.Transport
+	standard, marketplace, models *http.Transport
 }
 
 func (t capabilityTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if strings.HasPrefix(r.URL.Path, "/v1/model-gateway/") {
+		return t.models.RoundTrip(r)
+	}
 	// Bundle downloads and MCP initialization exceed the ordinary API header budget.
 	if strings.HasPrefix(r.URL.Path, "/v1/capability-markets") ||
 		(strings.HasPrefix(r.URL.Path, "/v1/capability-imports/mcp/") && strings.HasSuffix(r.URL.Path, "/connect")) {
@@ -39,7 +43,7 @@ func Proxy(socket string) http.Handler {
 			// Roami's current login is single-user; never accept identity from browser headers.
 			r.Out.Header.Set("X-Roami-Owner", "local")
 		},
-		Transport: capabilityTransport{agentruntime.Transport(socket), marketplace}, FlushInterval: -1,
+		Transport: capabilityTransport{agentruntime.Transport(socket), marketplace, agentruntime.Transport(modelgateway.Socket(socket))}, FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

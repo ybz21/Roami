@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
+	"github.com/ybz21/Roami/internal/modelgateway"
 )
 
 func agentEnvironment() []string {
@@ -19,7 +20,7 @@ func agentEnvironment() []string {
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
 		switch key {
-		case "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "ROAMI_AGENT_CLI":
+		case "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "ROAMI_AGENT_CLI", "ROAMI_MODEL_GATEWAY_SOCKET":
 			continue
 		}
 		result = append(result, value)
@@ -55,6 +56,10 @@ func startAgentSupervisor() (func(), error) {
 	if agentReady(paths.Socket) {
 		return func() {}, nil // A manually managed runtime retains its own lifecycle.
 	}
+	stopGateway, err := modelgateway.Start(paths.Storage, modelgateway.Socket(paths.Socket))
+	if err != nil {
+		return func() {}, err
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	ready := make(chan error, 1)
@@ -62,6 +67,7 @@ func startAgentSupervisor() (func(), error) {
 	report := func(err error) { first.Do(func() { ready <- err }) }
 	go func() {
 		defer close(done)
+		defer stopGateway()
 		delay := time.Second
 		for ctx.Err() == nil {
 			if err := initializeAgent(dir); err != nil {
