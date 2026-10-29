@@ -12,6 +12,12 @@ from roami_agent.protocol.image_limits import MAX_PIXELS
 from roami_agent.storage.database import row
 
 
+class WorkspaceImageReadError(DomainError):
+    def __init__(self, error, path):
+        super().__init__(error.code, error.status)
+        self.path = path
+
+
 class WorkspaceImageReads:
     max_bytes = 32 * 1024 * 1024
     suffixes = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
@@ -62,11 +68,21 @@ class WorkspaceImageReads:
             )
             if not active:
                 raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
-        result = await self.files.read(args, binding)
         if not visual:
-            return result
+            return await self.files.read(args, binding)
+        path = "/".join(self.files.location(args["path"], binding)[1])
+        try:
+            return await self._capture(args, binding, path)
+        except DomainError as exc:
+            raise WorkspaceImageReadError(exc, path) from exc
+
+    async def _capture(self, args, binding, path):
+        result = await self.files.read(args, binding)
         if args.get("offset", 0):
-            return {**result, "fileImage": {"unavailable": "VISION_IMAGE_UNAVAILABLE"}}
+            return {
+                **result,
+                "fileImage": {"path": path, "unavailable": "VISION_IMAGE_UNAVAILABLE"},
+            }
         maximum = min(self.max_bytes, self.artifacts.max_bytes or self.max_bytes)
         try:
             body = await self.files.snapshot(args["path"], binding, maximum=maximum)
@@ -74,11 +90,11 @@ class WorkspaceImageReads:
                 raise DomainError("FILE_CHANGED", 409)
             mime, width, height = await asyncio.to_thread(self.inspect, body)
         except (OSError, ValueError):
-            return {**result, "fileImage": {"unavailable": "VISION_IMAGE_INVALID"}}
+            return {**result, "fileImage": {"path": path, "unavailable": "VISION_IMAGE_INVALID"}}
         except DomainError as exc:
             if exc.code != "FILE_TYPE_OR_SIZE_UNSUPPORTED":
                 raise
-            return {**result, "fileImage": {"unavailable": "VISION_IMAGE_LIMIT"}}
+            return {**result, "fileImage": {"path": path, "unavailable": "VISION_IMAGE_LIMIT"}}
         artifact = await self.artifacts.put(
             binding["owner"],
             body,
@@ -92,6 +108,7 @@ class WorkspaceImageReads:
                 "turnId": binding["turnId"],
                 "toolCallId": binding["toolCallId"],
                 "sourceSha256": result["sha256"],
+                "sourcePath": path,
             },
         )
         return {
@@ -101,5 +118,6 @@ class WorkspaceImageReads:
                 "sha256": artifact["sha256"],
                 "width": width,
                 "height": height,
+                "path": path,
             },
         }

@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [Worker 多图对照上下文](2026-10-29/workspace-image-comparison.html) |
 | 2026-10-29 | [Case 原生判定与媒体交付证据](2026-10-29/native-judgment-evidence.html) |
 | 2026-10-29 | [Worker 工作区图片快照](2026-10-29/workspace-image-observation.html) |
 | 2026-10-29 | [每日准入的评分与 Case 证据](2026-10-29/daily-admission-evidence.html) |
