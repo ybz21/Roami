@@ -11,7 +11,7 @@ it('shows a real zero score and threshold without rounding away a failure', () =
 })
 it('does not show zero or reference comparisons for a verifier that never ran', () => {
   render(<RsiCaseEvidence evidence={{ native_judgment: { native_metric: 0, native_metric_minimum: 1, native_verifier_ran: false, native_reference_results: [0, 0] } }} />)
-  expect(screen.getByText('尚未执行')).toBeTruthy(); expect(screen.queryByText('原生评分')).toBeNull(); expect(screen.queryByText('备选参考结果')).toBeNull()
+  expect(screen.getByText('未完成判定')).toBeTruthy(); expect(screen.queryByText('原生评分')).toBeNull(); expect(screen.queryByText('备选参考结果')).toBeNull()
 })
 it('separates partial points, unscored points and reference results', () => {
   render(<RsiCaseEvidence evidence={{ native_judgment: { native_reference_results: [0, 0], native_partial: { scored_points: 0, total_points: 8, unscored_points: 7 } } }} />)

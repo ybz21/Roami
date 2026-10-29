@@ -98,12 +98,17 @@ spec=json.loads(sys.stdin.read());root=pathlib.Path('/workspace');golden=base64.
 pd.read_csv=lambda source,*a,**kw:read_csv(io.BytesIO(golden) if source=='/utils/stock_data.csv' else source,*a,**kw)
 namespace={'pd':pd,'BytesIO':io.BytesIO,'logging':__import__('logging'),'check_file_in_owncloud_directory':lambda f,d:(root/f).is_file(),'get_binary_file_content_owncloud':lambda f,d:(root/f).read_bytes()}
 exec(compile(spec['checkpoint'],'original_csv_checkpoint.py','exec'),namespace)
-native_csv_equality=bool(namespace['grade_checkpoint1']())
-checks={}
+checks={};native_csv_equality=None
+try:native_csv_equality=bool(namespace['grade_checkpoint1']())
+except Exception:checks['native_checkpoint_completed']=False
 try:
  pd.testing.assert_frame_equal(read_csv(root/'stock_cleaned.csv'),read_csv(io.BytesIO(golden)),check_exact=False,rtol=1e-12,atol=1e-10)
  checks['adapted_csv_values']=True
 except AssertionError:checks['adapted_csv_values']=False
+except (pd.errors.ParserError,pd.errors.EmptyDataError,UnicodeError):
+ checks['adapted_csv_values']=False;checks['csv_readable']=False
+except Exception:
+ checks['adapted_csv_values']=False;checks['csv_verification_completed']=False
 try:
  checks['five_plot_slides']=plot_slide_count(root/'stock_analysis.pptx')>=5
 except Exception:checks['five_plot_slides']=False

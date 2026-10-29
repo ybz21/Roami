@@ -114,10 +114,18 @@ with tempfile.TemporaryDirectory() as directory:
    assert len(set(used))==4 and abs(duration(work/'output/solution.mp4')-offset)<=0.1
   except (AssertionError,KeyError,TypeError,ValueError,subprocess.SubprocessError):checks['full_contiguous_ranges']=False
   args+=['--solution',str(work/'output/solution.json'),'--solution-mp4',str(work/'output/solution.mp4'),'--materials-dir',str(work/'materials')]
- result=subprocess.run([sys.executable,str(judge),*args],cwd=root,capture_output=True,timeout=300)
- checks['verifier_exited']=result.returncode==0 and reward.is_file()
- data=reward.read_bytes() if reward.is_file() else b'{}';score=json.loads(data).get('reward',0)
- print(json.dumps({'checks':checks,'reward':score,'native_result_sha256':hashlib.sha256(data).hexdigest(),'diagnostic':result.stderr.decode(errors='replace')[-8000:] if result.returncode else ''},allow_nan=False))
+ result=None;data=None;score=None
+ try:result=subprocess.run([sys.executable,str(judge),*args],cwd=root,capture_output=True,timeout=300)
+ except subprocess.TimeoutExpired:pass
+ checks['verifier_exited']=result is not None and result.returncode==0 and reward.is_file()
+ try:
+  if reward.is_file() and reward.stat().st_size<=200000:
+   data=reward.read_bytes();receipt=json.loads(data)
+   if isinstance(receipt,dict):score=receipt.get('reward')
+ except (OSError,ValueError,UnicodeError):pass
+ valid=type(score) in (int,float) and 0<=score<=1 and math.isfinite(score)
+ checks['verifier_result_valid']=valid
+ print(json.dumps({'checks':checks,'reward':score if valid else None,'native_result_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'diagnostic':result.stderr.decode(errors='replace')[-8000:] if result is not None and result.returncode else ''},allow_nan=False))
 """
 
 
@@ -164,20 +172,26 @@ async def grade_media(case, workspace, executor):
                 )
         except (OSError, EOFError, wave.Error):
             checks["pcm_shape"] = False
-    result = {"reward": 0}
+    result = {"reward": None}
     if all(checks.values()):
         result = json.loads(
             await executor.sandbox(workspace, PROGRAM, input=json.dumps(spec).encode(), timeout=330)
         )
         checks.update(result["checks"])
     score = result["reward"]
-    require(type(score) in {int, float} and math.isfinite(score) and 0 <= score <= 1)
+    valid = (
+        type(score) in {int, float}
+        and 0 <= score <= 1
+        and math.isfinite(score)
+        and checks.get("verifier_result_valid") is not False
+    )
+    checks["verifier_result_valid"] = valid
     verified = all(checks.values())
-    checks["native_metric_threshold"] = score >= spec["minimum_reward"]
+    checks["native_metric_threshold"] = valid and score >= spec["minimum_reward"]
     passed = all(checks.values())
     return {
         **quality(dict.fromkeys(DIMENSIONS, 3 if passed else 0), hard_passed=passed),
-        "native_metric": score,
+        **({"native_metric": score} if valid else {}),
         "native_metric_minimum": spec["minimum_reward"],
         "reason": "assertions_passed"
         if passed

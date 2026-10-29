@@ -59,7 +59,10 @@ def native_judgment(grade):
         return evidence
     checks = grade.get("checks", {})
     if grade.get("grade_scope") == "original_media_verifier_plus_frozen_delivery_checks":
-        ran = checks.get("verifier_exited") is True
+        ran = (
+            checks.get("verifier_exited") is True
+            and checks.get("verifier_result_valid") is not False
+        )
         evidence["native_verifier_ran"] = ran
         if not ran:
             evidence.pop("native_metric", None)
