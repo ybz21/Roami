@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [模型鉴权阻断与 Case 归因](2026-10-29/model-authentication-blocking.html) |
 | 2026-10-29 | [私有模型流错误码保真](2026-10-29/model-stream-error-codes.html) |
 | 2026-10-29 | [PPTX 比较回执与未评分状态](2026-10-29/slide-comparison-receipts.html) |
 | 2026-10-29 | [RSI 请求来源与统计筛选](2026-10-29/usage-sources.html) |

@@ -8,6 +8,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.domain.contracts import digest, require
+from roami_agent.improvement.domain.issue_triage import issue_priority
 from roami_agent.improvement.domain.run_configuration import STAGES
 from roami_agent.improvement.evaluation.native_judgment import report_judgments
 from roami_agent.improvement.integrations.github_client import command, publication_profile
@@ -23,6 +24,8 @@ from roami_agent.protocol.errors import DomainError
 log = logging.getLogger(__name__)
 
 DESCRIPTIONS = {
+    "MODEL_HTTP_401": "模型认证被拒绝，请检查模型连接",
+    "MODEL_HTTP_403": "模型访问被拒绝，请检查模型连接与权限",
     "MODEL_OUTPUT_LENGTH": "生成达到输出上限，结构化结果可能不完整",
     "WORKSPACE_REQUIRED": "Main 在没有工作区上下文时尝试 shell 操作",
     "ROUTING_EXPLICIT_SOURCE_REQUIRED": "委派时把执行器元信息误当成用户的明确选择",
@@ -65,7 +68,7 @@ def public_issue_body(run, priorities):
             item["code"], "独立检查未通过" if item["code"].startswith("check:") else "运行异常"
         )
         lines.append(
-            f"- [ ] {priorities.get(item['id'], 'P2')} · `{item['case_id']}` · `{item['code']}` · {label} · 本地编号 `{item['id'][:12]}`"
+            f"- [ ] {priorities.get(item['id'], issue_priority(item['code'])[0])} · `{item['case_id']}` · `{item['code']}` · {label} · 本地编号 `{item['id'][:12]}`"
         )
     if not present:
         lines.append("本次未确认新的问题；未覆盖和未验证不等于修复通过。")

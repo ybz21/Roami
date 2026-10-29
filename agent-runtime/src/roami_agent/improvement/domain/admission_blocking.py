@@ -1,6 +1,10 @@
-"""Shared admission failures are incomplete evidence, not agent quality scores."""
+"""Model access failures are incomplete evidence, not agent quality scores."""
 
+MODEL_AUTHENTICATION_BLOCKERS = ("MODEL_HTTP_401", "MODEL_HTTP_403")
+
+# Execution blockers do not imply a request was rejected before dispatch.
 MODEL_ADMISSION_BLOCKERS = (
+    *MODEL_AUTHENTICATION_BLOCKERS,
     "MODEL_HTTP_402",
     "MODEL_PROXY_USAGE_UNKNOWN",
     "MODEL_PROXY_CURRENCY_MISMATCH",
