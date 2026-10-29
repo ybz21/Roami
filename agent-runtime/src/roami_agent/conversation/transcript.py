@@ -320,10 +320,21 @@ class Conversations:
                 branch = item["branchId"]
                 if branch not in visible_by_branch:
                     visible_by_branch[branch] = {
-                        entry["id"] for entry in conversation_activity(db, cid, history(db, branch))
+                        entry["id"]: entry
+                        for entry in conversation_activity(db, cid, history(db, branch))
                     }
                 if activity["id"] not in visible_by_branch[branch]:
                     item["payload"].pop("activity")
+                elif (
+                    activity["state"] == "succeeded"
+                    and visible_by_branch[branch][activity["id"]]["state"] == "blocked"
+                ):
+                    current = visible_by_branch[branch][activity["id"]]
+                    item["payload"]["activity"] = {
+                        **activity,
+                        "state": "blocked",
+                        "errorCode": current["errorCode"],
+                    }
             return batch
 
         return await self.db.call(read)

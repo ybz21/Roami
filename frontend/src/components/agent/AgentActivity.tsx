@@ -7,9 +7,9 @@ import type { AgentActivityItem } from './agent-protocol'
 import './agent-activity.css'
 
 const active = new Set(['planned', 'running', 'queued', 'preparing', 'starting', 'verifying', 'cancelling'])
-const attention = new Set(['failed', 'unknown', 'interrupted'])
+const attention = new Set(['failed', 'unknown', 'interrupted', 'blocked'])
 const toolNames: Record<string, string> = { session_send: 'send', target_search: 'find', target_resolve: 'resolve', workspace_overview: 'overview', delegate: 'delegate', task_status: 'status', shell: 'shell', memory_search: 'memory', memory_get: 'memory', skill_read: 'skill', file_read: 'read', tool_list: 'discover', browser_open: 'browserOpen', browser_act: 'browserAct', browser_observe: 'browserObserve' }
-const reasons: Record<string, string> = { MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired' }
+const reasons: Record<string, string> = { MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired', TASK_CONTINUATION_REQUIRED: 'continueTask', TASK_TARGET_REVIEW_REQUIRED: 'directoryReview', EXECUTION_DIRECTORY_UNAVAILABLE: 'directoryUnavailable', INVALID_EXECUTION_DIRECTORY: 'directoryInvalid' }
 
 export function activityReason(code: string | null | undefined, t: (key: string) => string, fallback = 'agent.activity.failedReason') {
   if (modelProxyFailureKey(code)) return t(modelProxyFailureKey(code)!)

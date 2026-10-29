@@ -147,6 +147,7 @@ class NativeWorkspaceReconciliation:
                 "JOIN tasks t ON t.id=a.task_id JOIN conversations c ON c.id=t.origin_conversation_id "
                 "AND c.owner_id=t.owner_id WHERE a.executor_kind='native' "
                 "AND a.state IN ('unknown','failed','interrupted','cancelled') AND a.id>? "
+                "AND COALESCE(json_extract(t.target_json,'$.workspace.taskDirectory'),0)=0 "
                 "AND NOT EXISTS(SELECT 1 FROM events e WHERE e.event_key='native-workspace-reconciled:'||a.id) "
                 "ORDER BY a.id LIMIT 8",
                 (self.cursor,),

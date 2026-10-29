@@ -50,7 +50,7 @@ class Tools:
                     "For user-authorized local machine operations, set scope=host and omit cwd; "
                     "host scope is general execution in a temporary working directory, not a read-only sandbox. "
                     "For project code or file deliverables, keep workspace scope and delegate to a worker "
-                    "with the existing user-requested directory. "
+                    "with the user-selected directory, or an automatic private directory for new native work. "
                     "Registered permissions and execution receipts remain enforced."
                 )
             elif role != "main" and self.directory and tool.name == "bash":

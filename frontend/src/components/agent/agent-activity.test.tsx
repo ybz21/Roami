@@ -105,3 +105,12 @@ it('uses streamed input and output previews immediately without a detail request
   expect(screen.getByText('{"name":"browser_use"}')).toBeTruthy()
   expect(api).not.toHaveBeenCalled()
 })
+
+it('shows a declined assignment as not accepted rather than queued or an unknown outcome', () => {
+  const item: AgentActivityItem = { ...task('blocked'), id: 'tool:declined', kind: 'tool', name: 'delegate', errorCode: 'TASK_CONTINUATION_REQUIRED' }
+  render(<AgentActivity items={[item]} onSession={vi.fn()} />)
+  expect(document.querySelector('[data-state="blocked"]')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toContain('agent.activity.continueTask')
+  expect(screen.queryByText('agent.activity.accepted')).toBeNull()
+  expect(screen.queryByText('agent.activity.outcomeUnknown')).toBeNull()
+})

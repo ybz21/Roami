@@ -24,7 +24,7 @@ project/auth 的 --server URL 或 ROAMI_SERVER 选择服务，不把别的节点
 例如 `{"argv":["df","-h"],"scope":"host"}`；同一入口支持系统命令和脚本，不需要为每类查询添加工具。
 命令运行在当前 Agent 节点的临时工作目录，结束即删除；这是通用本机执行，不是只读沙箱，不限制绝对路径访问。
 遵守用户授权，不用它绕过任务工作区、禁用能力或受管资源协议。通用命令保守记录为 write，不按命令名猜测只读。
-项目文件任务保留原目录与执行器；需保留的产物使用原工作区。resourceOnly 只免去代码工作区准备，不裁剪基础工具或已启用的 Skill、MCP、CLI 能力。
+项目文件任务保留原目录与执行器；新内置文件任务没有指定目标时使用 `target:{kind:"new_session"}`，运行时自动分配独立可写任务目录。resourceOnly 只免去代码工作区准备，不裁剪基础工具或已启用的 Skill、MCP、CLI 能力。
 
 `roami agent host processes --input '{"limit":10}'` 保留为可选结构化只读快照，不承担通用本机路由。
 它只返回进程名称和资源指标；CPU 为 ps 生命周期平均值，100% 代表一个核；Linux 内存／swap 来自 /proc，未知值为 null。

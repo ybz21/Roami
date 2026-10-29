@@ -504,3 +504,78 @@ async def test_streamed_previews_redact_and_bound_both_inputs_and_results(store)
     assert len(preview["output"]["text"]) == 4000 and preview["output"]["truncated"]
     with pytest.raises(DomainError):
         await conversations.events("bob", c["id"])
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_declined_delegation_never_replays_as_queued(store, legacy):
+    from roami_agent.conversation.activity_events import activity_event
+    from roami_agent.conversation.transcript import Conversations
+    from roami_agent.storage.transcript_repository import message
+
+    conversations = Conversations(store)
+    c = await conversations.create("alice")
+    receipt = await conversations.accept("alice", c["id"], "delegate", "Create report")
+
+    def record(db):
+        mid = message(
+            db, c["id"], c["active_branch_id"], "assistant", {"text": ""}, turn_id=receipt["turnId"]
+        )
+        db.execute(
+            "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,created_ms,updated_ms) VALUES('delegate',?,?,'delegate','{}','write','running','delegate-key',1,1)",
+            (receipt["turnId"], mid),
+        )
+        activity_event(
+            db, c["id"], "tool.started", {"toolCallId": "delegate"}, turn_id=receipt["turnId"]
+        )
+        result = message(
+            db,
+            c["id"],
+            c["active_branch_id"],
+            "tool",
+            {
+                "text": json.dumps(
+                    {
+                        "acceptedOnly": False,
+                        "state": "blocked",
+                        "code": "TASK_CONTINUATION_REQUIRED",
+                    }
+                )
+            },
+            turn_id=receipt["turnId"],
+        )
+        db.execute(
+            "UPDATE tool_calls SET state='succeeded',result_message_id=?,updated_ms=2 WHERE id='delegate'",
+            (result,),
+        )
+        eid = activity_event(
+            db, c["id"], "tool.completed", {"toolCallId": "delegate"}, turn_id=receipt["turnId"]
+        )
+        if legacy:
+            db.execute(
+                "UPDATE events SET payload_json=json_set(payload_json,'$.activity.state','succeeded','$.activity.errorCode',NULL) WHERE id=?",
+                (eid,),
+            )
+        return eid
+
+    eid = await store.call(record, write=True)
+    snapshot = await conversations.messages("alice", c["id"])
+    assert snapshot["activities"][0]["state"] == "blocked"
+    assert snapshot["activities"][0]["errorCode"] == "TASK_CONTINUATION_REQUIRED"
+    events = await conversations.events("alice", c["id"])
+    assert (
+        next(e for e in events if e["kind"] == "tool.started")["payload"]["activity"]["state"]
+        == "running"
+    )
+    completed = next(e for e in events if e["id"] == eid)["payload"]["activity"]
+    assert (
+        completed["state"] == "blocked" and completed["errorCode"] == "TASK_CONTINUATION_REQUIRED"
+    )
+    stored = await store.call(
+        lambda db: row(db, "SELECT payload_json FROM events WHERE id=?", (eid,))
+    )
+    assert json.loads(stored["payload_json"])["activity"]["state"] == (
+        "succeeded" if legacy else "blocked"
+    )
+    assert (
+        await store.call(lambda db: row(db, "SELECT state FROM tool_calls WHERE id='delegate'"))
+    )["state"] == "succeeded"

@@ -10,6 +10,7 @@ from roami_agent.dispatch.navigation_recovery import stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_revisions import TaskRevisions
 from roami_agent.dispatch.task_sessions import session_closure
+from roami_agent.executors.task_directory import automatic_task_directory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -212,14 +213,21 @@ class Tasks:
                             raise DomainError("ROUTING_EXECUTOR_CONFLICT", 409)
                 rejected = row(
                     db,
-                    "SELECT x.id FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                    "SELECT COALESCE(json_extract(e.payload_json,'$.decision.executor'),"
+                    "json_extract(x.arguments_json,'$.executor'),'native') AS executor "
+                    "FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                    "LEFT JOIN events e ON e.event_key='routing:'||x.idempotency_key "
                     "WHERE x.turn_id=? AND x.tool_name='delegate' AND x.state='failed' AND "
                     "CASE WHEN json_valid(json_extract(native_content(m.content_json),'$.text')) THEN "
                     "json_extract(json_extract(native_content(m.content_json),'$.text'),'$.error') END "
                     "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') LIMIT 1",
                     (source_turn_id,),
                 )
-                if rejected:
+                if rejected and not (
+                    executor == "native"
+                    and automatic_task_directory(target)
+                    and rejected["executor"] == "native"
+                ):
                     raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
                 for steering in rows(
                     db,

@@ -374,9 +374,11 @@ class ToolGateway:
                 "TASK_TARGET_REVIEW_REQUIRED",
             }:
                 value["recovery"] = (
-                    "The destination was rejected before task acceptance. Stop delegation for this turn. "
-                    "Do not remove the directory, switch targets or invent a replacement to bypass the error. "
-                    "Explain the rejected path and ask the user for a corrected existing destination."
+                    "No task was accepted. This does not establish that other directories are unwritable. "
+                    "Preserve any user-selected destination and executor. If the rejected path was guessed by you "
+                    "for new native work, retry target={kind:new_session} without a directory so the runtime "
+                    "allocates a private task directory. Do not substitute another guessed path, a project, "
+                    "resourceOnly or another executor. For a user-selected path, ask for its correction."
                 )
             if role == "main" and value["error"] == "TASK_CONTINUATION_ALREADY_REQUESTED":
                 value["recovery"] = (
@@ -485,8 +487,8 @@ class ToolGateway:
             ):
                 value["recovery"] = (
                     "Main has no bound file workspace for this turn. Dispatch the original file work "
-                    "in the user's verified directory; for bounded work without an explicit executor "
-                    "choice use a regular native worker with target.kind=new_session and target.directory. "
+                    "in the user-selected workspace. For new native file work without a selected destination, "
+                    "use target={kind:new_session} without directory; a private writable task directory is prepared. "
                     "Use a prepared workspace for local file edits. Preserve explicit executor choices; complex "
                     "work stays with a professional. Keep the exact requested file and read-back scope; "
                     "never guess hashes, substitute paths or create an unrelated project."
