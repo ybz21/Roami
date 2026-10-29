@@ -4,6 +4,7 @@ import json
 from contextlib import asynccontextmanager
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_browser_driver import BrowserFixture
 from test_runtime import until
 
@@ -45,6 +46,7 @@ async def test_main_web_research_uses_browser_without_configured_code_workspace(
         step = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             self.step += 1
             if self.step == 1:
                 seed = messages[-1]["content"]

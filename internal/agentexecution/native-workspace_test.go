@@ -95,7 +95,7 @@ func TestNativeProjectThroughRealPythonAndGoCLI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recordRuntimeSources(t, repository, "native_workspace_scenario.py")
+	recordRuntimeSources(t, repository, "native_workspace_scenario.py", "native_prompt_messages.py")
 
 	binary := filepath.Join(t.TempDir(), "roami")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/roami")

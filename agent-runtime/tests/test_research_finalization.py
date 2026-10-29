@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_argument_repair_progress import claimed_turn
 from test_coordinator_handoff import call
 from test_runtime import ConversationModel
@@ -22,6 +23,7 @@ async def test_finalization_delivers_existing_findings_without_another_tool_acti
         model = "close-from-evidence"
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             nonlocal rounds
             rounds += 1
             if rounds == 1:

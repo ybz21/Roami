@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_foundations import call, cli
 from test_runtime import ConversationModel, until
 from test_web_research import MemoryModel
@@ -57,6 +58,7 @@ async def test_mcp_lookup_worker_discovers_and_calls_without_a_coding_workspace(
         step = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             self.step += 1
             if self.step == 1:
                 discovery = call("tool_list", {"query": "fixture", "kind": kind})

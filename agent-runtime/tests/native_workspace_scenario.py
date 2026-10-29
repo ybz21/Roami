@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from native_prompt_messages import dialogue_messages
+
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
@@ -25,6 +27,7 @@ class Worker:
     model = "fixture-worker"
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if any(m["role"] == "user" and "write checked file" in m["content"] for m in messages):
             results = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
             step = len(results)

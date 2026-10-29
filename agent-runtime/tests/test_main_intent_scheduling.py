@@ -4,6 +4,7 @@ import asyncio
 import json
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_runtime import ConversationModel, until
 
 from roami_agent.app import Runtime
@@ -231,6 +232,7 @@ async def test_two_background_questions_do_not_need_an_extra_main_model_round(st
         model = "background"
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             await release.wait()
             yield ModelEvent("text", "Worker completed " + messages[-1]["content"])
 

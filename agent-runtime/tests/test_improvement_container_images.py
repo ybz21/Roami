@@ -4,6 +4,7 @@ import json
 from dataclasses import replace
 
 import pytest
+from test_improvement_container_context import captured_request
 
 from roami_agent.improvement.evaluation.execution import containers
 from roami_agent.improvement.evaluation.execution.container_agent import container_settings
@@ -86,3 +87,111 @@ async def test_visual_worker_requires_a_capable_container_image(labels, monkeypa
     else:
         with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
             await executor.preflight()
+
+
+@pytest.mark.parametrize(
+    "main_images,worker_images", [(False, False), (True, False), (False, True), (True, True)]
+)
+async def test_main_and_worker_image_inputs_keep_separate_saved_capabilities(
+    tmp_path, monkeypatch, main_images, worker_images
+):
+    settings = Settings(
+        endpoint="https://private.invalid/v1",
+        model="private-main",
+        model_capabilities={"images": main_images},
+        image_limits={"max_width": 1200},
+    )
+    settings = replace(
+        settings,
+        worker_route=replace(
+            settings.route("worker"),
+            capabilities={"images": worker_images},
+            image_limits={"max_width": 900},
+        ),
+    )
+    request = await captured_request(settings, tmp_path, monkeypatch)
+    assert request["main_image_input"] == {"enabled": main_images, "limits": {"max_width": 1200}}
+    assert request["worker_image_input"] == {"enabled": worker_images, "limits": {"max_width": 900}}
+    child = container_settings(request)
+    for role in ["main", "worker"]:
+        assert (
+            child.route(role).capabilities["images"] is settings.route(role).capabilities["images"]
+        )
+        assert child.route(role).image_limits == settings.route(role).image_limits
+    assert "private.invalid" not in json.dumps(request) and "private-main" not in json.dumps(
+        request
+    )
+
+
+@pytest.mark.parametrize(
+    "image_input",
+    [
+        {},
+        {"enabled": 1, "limits": {}},
+        {"enabled": True, "limits": {}, "apiKey": "fixture"},
+        {"enabled": True, "limits": {"max_width": 0}},
+    ],
+)
+def test_invalid_main_image_input_is_rejected(image_input):
+    with pytest.raises(DomainError):
+        container_settings({"main_image_input": image_input})
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        None,
+        {},
+        {"org.roami.rsi.workspace-image-input": "1"},
+        {"org.roami.rsi.model-image-input": "1"},
+    ],
+)
+async def test_visual_main_requires_a_capable_container_image(labels, monkeypatch):
+    async def docker(*args, **kwargs):
+        return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
+
+    monkeypatch.setattr(containers, "docker_command", docker)
+    settings = Settings(model_capabilities={"images": True})
+    settings = replace(
+        settings, worker_route=replace(settings.route("worker"), capabilities={"images": False})
+    )
+    executor = containers.ContainerExecutor(settings)
+    if labels and labels.get("org.roami.rsi.model-image-input") == "1":
+        assert (await executor.preflight())["image_id"] == "fixture-image"
+    else:
+        with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
+            await executor.preflight()
+
+
+def test_main_image_input_cannot_implicitly_enable_an_unspecified_worker():
+    child = container_settings(
+        {"main_image_input": {"enabled": True, "limits": {"max_width": 1200}}}
+    )
+    assert child.route("main").capabilities["images"] is True
+    assert child.route("worker").capabilities.get("images") is not True
+    assert child.route("worker").image_limits == {}
+
+
+async def test_model_free_renderer_keeps_its_pinned_image_without_actor_input_labels(monkeypatch):
+    from types import SimpleNamespace
+
+    async def docker(*args, **kwargs):
+        actor = args[-1] == "actor"
+        return json.dumps(
+            [
+                {
+                    "Id": "actor" if actor else "old-renderer",
+                    "Config": {"Labels": {"org.roami.rsi.model-image-input": "1"} if actor else {}},
+                }
+            ]
+        ).encode()
+
+    monkeypatch.setattr(containers, "docker_command", docker)
+    settings = Settings(model_capabilities={"images": True})
+    settings = replace(
+        settings, worker_route=replace(settings.route("worker"), capabilities={"images": False})
+    )
+    reviewer = SimpleNamespace(content_hash="profile", profile={"renderer_image": "old-renderer"})
+    executor = containers.ContainerExecutor(settings, image="actor", artifact_reviewer=reviewer)
+    proof = await executor.preflight()
+    assert proof["image_id"] == "actor" and proof["artifact_renderer_image_id"] == "old-renderer"

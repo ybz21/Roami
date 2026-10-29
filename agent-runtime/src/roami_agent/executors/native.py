@@ -52,7 +52,11 @@ class NativeExecutor:
             raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
 
         deadline = json.loads(task["budget_json"]).get("deadlineMs")
-        remaining = max(0, (deadline - now_ms()) / 1000) if deadline else None
+        observed = now_ms()
+        started = run.get("started_ms")
+        if type(started) is not int or started <= 0:
+            started = observed
+        remaining = max(0, (deadline - observed) / 1000) if deadline else None
 
         profile = (
             "research"
@@ -66,6 +70,8 @@ class NativeExecutor:
                     prepared,
                     executionRunId=run["id"],
                     executionProfile=profile,
+                    executionStartedMs=started,
+                    executionDeadlineMs=deadline,
                     executionTimeoutSeconds=remaining,
                 ),
                 profile,

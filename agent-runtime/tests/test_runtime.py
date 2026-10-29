@@ -3,6 +3,7 @@ import json
 import re
 
 import pytest
+from native_prompt_messages import dialogue_messages
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.models import ModelEvent
@@ -13,6 +14,7 @@ class ConversationModel:
     model = "injected-model"
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if messages[-1]["role"] == "tool":
             yield ModelEvent("text", "Task delegated; you can keep chatting.")
         elif any(m["content"].startswith("Background task result") for m in messages):
@@ -193,6 +195,7 @@ class NestedModel(ConversationModel):
         self.completions = []
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         last = messages[-1]
         goals = re.findall(r"\nDelegated goal[^\n]*:\n(parent|leaf)(?:\n|$)", last["content"])
         assigned = goals[-1] if goals else last["content"]
