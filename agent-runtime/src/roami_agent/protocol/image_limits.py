@@ -5,6 +5,7 @@ from dataclasses import dataclass, fields
 from roami_agent.protocol.errors import DomainError
 
 MAX_PIXELS = 64_000_000
+MAX_CONTEXT_IMAGES = 6
 
 
 @dataclass(frozen=True)

@@ -4,9 +4,9 @@ import asyncio
 import base64
 import json
 
-from roami_agent.context.image_preparation import prepare_image
+from roami_agent.context.image_preparation import prepare_image_bundle
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.image_limits import ImageLimits
+from roami_agent.protocol.image_limits import MAX_CONTEXT_IMAGES, ImageLimits
 from roami_agent.storage.database import rows
 
 
@@ -21,8 +21,8 @@ class ChatImages:
         items = await self.db.call(
             lambda db: rows(
                 db,
-                "SELECT * FROM artifacts WHERE owner_id=? AND deleted_ms IS NULL AND mime_type IN ('image/png','image/jpeg','image/webp') AND message_id IN (SELECT value FROM json_each(?)) AND json_extract(metadata_json,'$.source')='chat-upload' AND NOT EXISTS(SELECT 1 FROM memory_tombstones t WHERE t.owner_id=artifacts.owner_id AND t.source_fingerprint=artifacts.sha256) ORDER BY rowid DESC LIMIT 3",
-                (turn["owner_id"], json.dumps(sources)),
+                "SELECT * FROM artifacts WHERE owner_id=? AND deleted_ms IS NULL AND mime_type IN ('image/png','image/jpeg','image/webp') AND message_id IN (SELECT value FROM json_each(?)) AND json_extract(metadata_json,'$.source')='chat-upload' AND NOT EXISTS(SELECT 1 FROM memory_tombstones t WHERE t.owner_id=artifacts.owner_id AND t.source_fingerprint=artifacts.sha256) ORDER BY rowid DESC LIMIT ?",
+                (turn["owner_id"], json.dumps(sources), MAX_CONTEXT_IMAGES),
             )
         )
         if not items:
@@ -35,15 +35,24 @@ class ChatImages:
                     "content": "The attached image contents are unavailable: this Main model is not configured for image input. Explain the limitation if image understanding is needed; never claim to have inspected these images.",
                 },
             ]
-        parts, evidence = [], []
-        for item in reversed(items):
+        readable = []
+        for index, item in enumerate(items):
             try:
                 reference, body = await self.artifacts.read(turn["owner_id"], item["id"])
-                image = await asyncio.to_thread(
-                    prepare_image,
-                    body,
-                    ImageLimits.configured(self.settings.route("main").image_limits),
-                )
+                readable.append((index, reference, body))
+            except (DomainError, OSError, ValueError):
+                continue
+        prepared = await asyncio.to_thread(
+            prepare_image_bundle,
+            [value[2] for value in readable],
+            ImageLimits.configured(self.settings.route("main").image_limits),
+        )
+        images = {readable[index][0]: (readable[index][1], image) for index, image in prepared}
+        parts, evidence = [], []
+        for index in reversed(range(len(items))):
+            item = items[index]
+            if index in images:
+                reference, image = images[index]
                 parts.extend(
                     [
                         {"type": "text", "text": "User attachment: " + item["name"]},
@@ -70,8 +79,12 @@ class ChatImages:
                         "optimized": image["optimized"],
                     }
                 )
-            except (DomainError, OSError, ValueError):
+            else:
                 parts.append(
-                    {"type": "text", "text": "Attachment image unavailable: " + item["name"]}
+                    {
+                        "type": "text",
+                        "text": "Attachment image unavailable or exceeds the combined image payload budget: "
+                        + item["name"],
+                    }
                 )
         return {**plan, "imageEvidence": evidence}, [*prompt, {"role": "user", "content": parts}]

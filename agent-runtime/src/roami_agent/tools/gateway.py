@@ -24,6 +24,7 @@ from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.transcript_repository import message
 from roami_agent.tools.request_coverage_recovery import request_coverage_recovery
+from roami_agent.tools.workspace_images import WorkspaceImageReadError
 
 
 class ToolGateway:
@@ -180,7 +181,7 @@ class ToolGateway:
                     **value,
                     "data": "",
                     "contentOmitted": True,
-                    "recovery": "The workspace image snapshot is referenced below; do not page binary bytes."
+                    "recovery": "Up to six recent distinct workspace image snapshots are attached for comparison within the model's combined image payload budget. Re-reading an unchanged path replaces its snapshot; do not page binary bytes."
                     if value.get("fileImage", {}).get("artifactId")
                     else "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Use an image-capable Worker and read from offset 0, or report that visual inspection is unavailable.",
                 }
@@ -193,6 +194,8 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if isinstance(exc, WorkspaceImageReadError):
+                value["fileImage"] = {"path": exc.path, "unavailable": exc.code}
             if value["error"] in {
                 "REQUEST_COVERAGE_REQUIRED",
                 "REQUEST_COVERAGE_SOURCE_REQUIRED",

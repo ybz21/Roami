@@ -213,6 +213,9 @@ socket and verifies its server identity before cleanup. Setting only `TMUX_TMPDI
 an inherited `TMUX` target. Never use the user's live tmux server as a test fixture or cleanup target.
 The session-isolation regression uses two disposable servers and proves the other server survives.
 
+RSI development and acceptance calls use the node's saved model routes, parameters, and capabilities.
+Do not hardcode or temporarily override them in validation scripts.
+
 ## Agent Panes Are Not Ours
 
 Claude Code and Codex render their own alternate-screen TUIs inside our panes. Anything that

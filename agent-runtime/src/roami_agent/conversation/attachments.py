@@ -13,11 +13,11 @@ from PIL import Image
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
-from roami_agent.protocol.image_limits import MAX_PIXELS
+from roami_agent.protocol.image_limits import MAX_CONTEXT_IMAGES, MAX_PIXELS
 from roami_agent.storage.database import row
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-MAX_ATTACHMENTS = 6
+MAX_ATTACHMENTS = MAX_CONTEXT_IMAGES
 PREVIEW_BYTES = 2000
 
 

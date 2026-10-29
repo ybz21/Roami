@@ -197,7 +197,7 @@ async def test_deletion_also_revokes_already_prepared_model_and_tool_admission(i
         await runtime.db.call(lambda db: assert_context_admitted(db, turn))
 
 
-async def test_only_latest_snapshot_is_attached_and_failed_reads_do_not_restore_an_older_image(
+async def test_distinct_snapshots_are_attached_and_failed_latest_read_does_not_restore_images(
     image_read,
 ):
     runtime, turn, _, _, workspace, read = image_read
@@ -205,13 +205,11 @@ async def test_only_latest_snapshot_is_attached_and_failed_reads_do_not_restore_
     (workspace / "next.png").write_bytes(picture(color="blue"))
     second, new = await read("next.png")
     plan, attached = await runtime.loop.context.vision.attach(turn, {}, [*prompt(old), new])
-    assert len(plan["imageEvidence"]) == 1
-    assert (
-        plan["imageEvidence"][0]["artifactId"]
-        == second["fileImage"]["artifactId"]
-        != first["fileImage"]["artifactId"]
-    )
-    assert len(attached[-1]["content"]) == 2
+    assert [item["artifactId"] for item in plan["imageEvidence"]] == [
+        first["fileImage"]["artifactId"],
+        second["fileImage"]["artifactId"],
+    ]
+    assert len(attached[-1]["content"]) == 4
     (workspace / "invalid.png").write_text("not an image")
     value, invalid = await read("invalid.png")
     assert value["fileImage"]["unavailable"] == "VISION_IMAGE_INVALID"
