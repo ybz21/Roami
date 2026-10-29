@@ -32,6 +32,11 @@ STREAM_ERROR_CODES = frozenset(
         "MODEL_TRANSPORT_FAILED",
         "MODEL_STREAM_INVALID",
         "MODEL_STREAM_INCOMPLETE",
+        "MODEL_PROXY_DAILY_LIMIT",
+        "MODEL_PROXY_USAGE_PENDING",
+        "MODEL_PROXY_USAGE_UNKNOWN",
+        "MODEL_PROXY_CURRENCY_MISMATCH",
+        "MODEL_GATEWAY_STORAGE_FAILED",
         "RSI_TOKEN_BUDGET",
         "RSI_REQUEST_BUDGET",
         "RSI_TIME_BUDGET",
@@ -239,9 +244,14 @@ class ChatCompletions:
                 if data.get("error") is not None:
                     error = data["error"]
                     code = error.get("code") if isinstance(error, dict) else None
+                    # An SSE error cannot prove admission was rejected before dispatch.
                     raise DomainError(
                         code
-                        if isinstance(code, str) and code in STREAM_ERROR_CODES
+                        if isinstance(code, str)
+                        and (
+                            code in STREAM_ERROR_CODES
+                            or re.fullmatch(r"MODEL_HTTP_[45][0-9]{2}", code)
+                        )
                         else "MODEL_STREAM_INVALID",
                         502,
                     )

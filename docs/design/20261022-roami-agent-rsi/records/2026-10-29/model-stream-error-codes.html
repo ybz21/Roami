@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>私有模型流错误码保真</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>私有模型流错误码保真</h1>
+<h2>Product Design</h2><p>RSI 容器收到主机模型的鉴权失败、每日限额或未知用量阻断时，保留真实错误码，不再误报为流格式异常。缺少用量仍是未知，已有用量继续保留。</p>
+<h2>User Stories</h2><ul><li>我能区分模型鉴权、限额与损坏回执。</li><li>错误发生后，已知用量不丢失，未知用量不填零。</li></ul>
+<h2>Technical Design</h2><p>providers/chat_completions.py 在既有流错误白名单中接受五个本地代理错误码，以及严格符合 MODEL_HTTP_[45][0-9]{2} 的错误。未知值、非字符串、额外后缀和换行仍归为 MODEL_STREAM_INVALID，不透传错误正文。沿用 DomainError 与外层 502，不把 SSE 回执解释为可信的发出前拒绝；不改变传输重试、记忆作业重试或计费策略。私有 Unix 桥与业务层无需新增依赖。</p>
+<h2>验收记录</h2><p>新增回归在旧代码下 32 失败、17 通过，修复后 57 项相关检查通过。覆盖真实 Unix-socket ModelGateway、401/403/429/503、代理阻断、已知/未知用量、无重复传输与不完整工具调用。历史401及未知用量两份错误回执也经真实私有Unix桥离线重验，分别保留MODEL_HTTP_401与MODEL_PROXY_USAGE_UNKNOWN；每份只传输一次、未产生用量，不重放原提示词或请求上游。完整门禁通过：Python 2233 项（无跳过）、Go 全量、前端 typecheck/i18n/hover 与生产构建。未修改前端组件，不新增界面或文案。</p>
+<p>本修复验收未调用真实模型，未覆盖保存的模型、参数、能力或重试，也未部署。独立原生复测此前有 14 笔成功、随后一笔 Worker 401；已知 Token 下界为 77,346，另有一笔未知；更早漏继承密钥环境的独立失败也保留未知。401 的上游根因尚无证据，不能据本错误显示修复宣称已解决；原任务质量、独立评分、人工参考及完整观察仍待验收。</p>
+</main></body></html>

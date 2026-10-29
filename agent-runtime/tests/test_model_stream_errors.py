@@ -7,7 +7,7 @@ from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.improvement.integrations.model_gateway import ModelGateway
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.providers.chat_completions import ChatCompletions
 from roami_agent.storage.database import event, row
@@ -20,6 +20,37 @@ from roami_agent.storage.database import event, row
         ({"code": "MODEL_OUTPUT_CONTENT_FILTER"}, "MODEL_OUTPUT_CONTENT_FILTER"),
         ({"code": "RSI_TOKEN_BUDGET"}, "RSI_TOKEN_BUDGET"),
         ({"code": "RSI_USAGE_UNKNOWN"}, "RSI_USAGE_UNKNOWN"),
+        *[
+            ({"code": code}, code)
+            for code in [
+                "MODEL_HTTP_400",
+                "MODEL_HTTP_401",
+                "MODEL_HTTP_402",
+                "MODEL_HTTP_403",
+                "MODEL_HTTP_429",
+                "MODEL_HTTP_499",
+                "MODEL_HTTP_500",
+                "MODEL_HTTP_503",
+                "MODEL_HTTP_599",
+                "MODEL_PROXY_DAILY_LIMIT",
+                "MODEL_PROXY_USAGE_PENDING",
+                "MODEL_PROXY_USAGE_UNKNOWN",
+                "MODEL_PROXY_CURRENCY_MISMATCH",
+                "MODEL_GATEWAY_STORAGE_FAILED",
+            ]
+        ],
+        *[
+            ({"code": code}, "MODEL_STREAM_INVALID")
+            for code in [
+                "MODEL_HTTP_200",
+                "MODEL_HTTP_600",
+                "MODEL_HTTP_401_private",
+                "MODEL_HTTP_401\n",
+                "PRIVATE_PROVIDER_DETAIL",
+                None,
+                401,
+            ]
+        ],
         ({"code": "private-provider-detail"}, "MODEL_STREAM_INVALID"),
         ({"code": []}, "MODEL_STREAM_INVALID"),
         ("private-provider-detail", "MODEL_STREAM_INVALID"),
@@ -59,6 +90,8 @@ async def test_stream_errors_preserve_usage_without_retries_or_partial_tools(err
             async for item in model.stream([], []):
                 events.append(item)
         assert caught.value.code == expected and "private-provider-detail" not in str(caught.value)
+        assert caught.value.status == 502
+        assert not isinstance(caught.value, ModelAdmissionRejected)
         assert len(requests) == 1 and not any(e.kind == "tool" for e in events)
         usage = next(e.value for e in events if e.kind == "usage")
         assert usage["inputTokens"] == 37 and usage["outputTokens"] == 5
@@ -87,7 +120,7 @@ async def test_gateway_memory_terminal_errors_do_not_become_retryable_stream_fai
         provider = ChatCompletions(
             "http://localhost/v1/memory",
             "memory",
-            max_retries=0,
+            max_retries=2,
             client=httpx.AsyncClient(
                 transport=httpx.AsyncHTTPTransport(uds=str(tmp_path / "model.sock"))
             ),
@@ -109,4 +142,56 @@ async def test_gateway_memory_terminal_errors_do_not_become_retryable_stream_fai
             assert payload["usage"]["inputTokens"] == 21 and payload["usage"]["outputTokens"] == 4
         finally:
             await runtime.close()
+            await provider.close()
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "MODEL_HTTP_401",
+        "MODEL_HTTP_403",
+        "MODEL_HTTP_429",
+        "MODEL_HTTP_503",
+        "MODEL_PROXY_DAILY_LIMIT",
+        "MODEL_PROXY_USAGE_PENDING",
+        "MODEL_PROXY_USAGE_UNKNOWN",
+        "MODEL_PROXY_CURRENCY_MISMATCH",
+        "MODEL_GATEWAY_STORAGE_FAILED",
+    ],
+)
+@pytest.mark.parametrize("has_usage", [False, True])
+async def test_private_gateway_preserves_error_and_known_or_unknown_usage(
+    tmp_path, code, has_usage
+):
+    calls, events = [], []
+
+    class Failed:
+        async def stream(self, messages, tools):
+            calls.append(True)
+            if has_usage:
+                yield ModelEvent("usage", {"inputTokens": 21, "outputTokens": 4})
+            raise DomainError(code)
+
+    socket = tmp_path / "model.sock"
+    async with ModelGateway(socket, {"worker": Failed()}) as gateway:
+        provider = ChatCompletions(
+            "http://localhost/v1/worker",
+            "worker",
+            max_retries=2,
+            client=httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(uds=str(socket))),
+        )
+        try:
+            with pytest.raises(DomainError) as caught:
+                async for item in provider.stream([], []):
+                    events.append(item)
+            assert caught.value.code == code and caught.value.status == 502
+            assert not isinstance(caught.value, ModelAdmissionRejected)
+            usages = [item.value for item in events if item.kind == "usage"]
+            if has_usage:
+                assert len(usages) == 1
+                assert usages[0]["inputTokens"] == 21 and usages[0]["outputTokens"] == 4
+            else:
+                assert usages == []
+            assert len(calls) == 1 and gateway.errors == [code]
+        finally:
             await provider.close()
