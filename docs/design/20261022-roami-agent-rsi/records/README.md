@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-30 | [任务容器的 Office 环境](2026-10-30/container-config-directory.html) |
 | 2026-10-30 | [完成回报的统一指令](2026-10-30/completion-instruction-consistency.html) |
 | 2026-10-30 | [完整文稿的验收渲染](2026-10-30/presentation-page-coverage.html) |
 | 2026-10-29 | [文件交付的结果总结](2026-10-29/file-completion-summary.html) |

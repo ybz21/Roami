@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>任务容器的 Office 环境</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>任务容器的 Office 环境</h1>
+<h2>Product Design</h2><p>离线任务可以使用已安装的 LibreOffice 普通导出命令检查演示文稿，无需先排查用户配置初始化错误。配置仅存放在本次容器的临时文件系统中，随容器回收。</p>
+<h2>User Stories</h2><ul><li>任务生成幻灯片后，能够实际导出检查，而非因验收环境问题跳过。</li><li>环境修复与内容质量分开展示，现有产物和失败记录不会被替换。</li></ul>
+<h2>Technical Design</h2><p>evaluation/execution/containers.py 在任务容器和独立 sandbox 启动参数中显式传递 XDG_CONFIG_HOME=/tmp。该目录已存在且可写；仅传 HOME 对镜像中没有 passwd 条目的运行 UID 不足。沿用只读根文件系统、断网、非 root、权限裁剪和私有临时目录，不修改宿主环境、模型设置或任务合同。执行指纹升级为 v33、环境指纹升级为 v2，避免新旧环境混称同条件运行；不改变评分标准、原输入或历史产物。</p>
+<p>镜像同时安装 Debian 的 fonts-crosextra-carlito，为常用 Calibri 提供字宽兼容替代，避免回退到等宽字体后出现错误字距。依据：<a href="https://packages.debian.org/bookworm/fonts/fonts-crosextra-carlito">Debian 字体包说明</a>。这改变渲染环境而非原PPTX；新镜像以独立摘要固定，旧参考、渲染证据和校准证书保留，不能冒称同条件质量提升。既有独立评分仍需当前模型能力及新环境校准。</p><h2>实际问题</h2><p>股票 v49 的 Worker 曾尝试普通 soffice 导出，重定向后的错误未出现在报告正文。只读副本在旧容器环境复现退出码77及“User installation could not be completed”；显式私有配置可成功导出。进一步检查确认 XDG_CONFIG_HOME 未配置、运行 UID 在镜像中没有 passwd 条目；仅设 HOME 仍失败。首次修复使用不存在的配置子目录，真实回归仍失败，现改用已存在的容器临时目录。</p>
+<h2>验收记录</h2><p>新增配置目录3项回归在旧代码全部失败，字体回退新增回归在旧镜像也失败；修复后72项相关回归通过，覆盖普通 sandbox、runtime sandbox 的真实 LibreOffice 导出，以及实际任务容器参数、只读和断网保护。输入 PPTX 摘要不变；不借助私有 profile 参数。实际股票v49副本使用普通命令完整导出9页，退出码0、原PPTX摘要不变；补齐字体后相同第9页的异常字距消失。前轮将该现象笼统记为排版缺陷，现依据原文XML、实际字体解析及同文件渲染对照明确为镜像字体缺失，不能归为模型修改了原文。原Case的CSV失败及未评分情况不变。完整门禁待记录。0模型调用，不给原失败 Case 补分，不把导出成功当作质量通过。</p>
+</main></body></html>
