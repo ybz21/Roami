@@ -21,7 +21,7 @@ NAME = "mcp_fixture_search"
 @pytest.mark.parametrize("resource_only", [False, True])
 @pytest.mark.parametrize("source_kind", ["mcp", "cli", "http"])
 @pytest.mark.parametrize("effect", ["read", "write"])
-async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspace(
+async def test_mcp_lookup_worker_discovers_and_calls_without_a_coding_workspace(
     store, resource_only, source_kind, effect
 ):
     invoked = []
@@ -74,7 +74,10 @@ async def test_mcp_lookup_worker_discovers_and_calls_the_tool_without_a_workspac
 
     async def search(args, binding):
         assert binding["role"] == ("research" if resource_only else "worker")
-        assert not binding.get("workspace")
+        if resource_only:
+            assert not binding.get("workspace")
+        else:
+            assert binding["workspace"]["taskDirectory"] is True
         invoked.append(args["query"])
         return {
             "content": [{"type": "text", "text": "Fixture documentation: https://example.org/docs"}]

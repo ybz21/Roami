@@ -73,3 +73,5 @@ P1 是下一批建议，尚未实施。条件监控、审批卡绑定、外部�
 ## 主对话执行过程 SSE · 2026-10-29
 
 [实时工具、知识读取与派生任务展示及验收](execution-stream-20261029.html)。
+
+[内置任务自动目录与未接单状态验收](execution-stream-20261029.html#native-task-directories-20261029)。

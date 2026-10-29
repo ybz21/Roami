@@ -157,6 +157,12 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
             and isinstance(value.get("exitCode"), int)
             and value["exitCode"] != 0
         )
+        not_accepted = (
+            call["tool_name"] == "delegate"
+            and isinstance(value, dict)
+            and value.get("acceptedOnly") is False
+            and value.get("state") == "blocked"
+        )
         activities.append(
             {
                 "id": "tool:" + call["id"],
@@ -174,7 +180,9 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                 "anchorMessageId": anchor(task) if task else call["assistant_message_id"],
                 "taskId": task["id"] if task else None,
                 "parentTaskId": task["parent_task_id"] if task else None,
-                "state": "failed"
+                "state": "blocked"
+                if not_accepted
+                else "failed"
                 if command_failed
                 else "delivered"
                 if call["state"] == "succeeded"
@@ -186,7 +194,9 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                 else None,
                 "startedMs": call["created_ms"],
                 "updatedMs": call["updated_ms"],
-                "errorCode": "COMMAND_EXIT_NONZERO"
+                "errorCode": public_error_code(value.get("code"))
+                if not_accepted
+                else "COMMAND_EXIT_NONZERO"
                 if command_failed
                 else public_error_code(value.get("error"))
                 if isinstance(value, dict) and call["state"] in {"failed", "unknown"}

@@ -15,10 +15,12 @@ def continuation_candidates(db, owner, conversation, turn_id, target):
         return []
     candidates = rows(
         db,
-        "SELECT t.id,t.revision,t.state,t.intent_json,t.target_json FROM tasks t "
+        "SELECT t.id,t.revision,t.state,t.intent_json,t.target_json,a.state AS attempt_state,a.result_json FROM tasks t "
         "JOIN turns u ON u.id=? AND u.conversation_id=t.origin_conversation_id "
         "AND u.branch_id=t.origin_branch_id "
         "JOIN messages m ON m.id=t.origin_message_id AND m.deleted_ms IS NULL "
+        "LEFT JOIN task_attempts a ON a.id=(SELECT id FROM task_attempts WHERE task_id=t.id "
+        "ORDER BY task_revision DESC,attempt_no DESC LIMIT 1) "
         "WHERE t.owner_id=? AND t.origin_conversation_id=? AND t.parent_task_id IS NULL "
         "AND json_extract(t.intent_json,'$.executor') IN ('codex','claude','opencode','pi','native') "
         "AND NOT EXISTS(SELECT 1 FROM task_session_closures z WHERE z.task_id=t.id AND z.state='closed') "
@@ -30,17 +32,31 @@ def continuation_candidates(db, owner, conversation, turn_id, target):
     for task in candidates:
         binding = json.loads(task["target_json"]) if task["target_json"] else {}
         workdir = binding.get("workdir")
+        intent = json.loads(task["intent_json"])
+        result = json.loads(task["result_json"] or "{}")
+        owns_children = (
+            intent["executor"] != "native"
+            or binding.get("projectId")
+            or (intent.get("target") or {}).get("kind") in {"project", "new_project"}
+            or task["state"] in {"queued", "preparing", "running", "cancelling", "interrupted"}
+            or task["attempt_state"] == "unknown"
+            or result.get("outcomeKnown") is False
+            or result.get("inputStopped") is False
+        )
         try:
             same_directory = bool(
                 directory
                 and workdir
-                and Path(directory).resolve().is_relative_to(Path(workdir).resolve())
+                and (
+                    Path(directory).resolve() == Path(workdir).resolve()
+                    or owns_children
+                    and Path(directory).resolve().is_relative_to(Path(workdir).resolve())
+                )
             )
         except (OSError, ValueError, RuntimeError):
             same_directory = False
         if not same_directory and not (workspace and workspace == binding.get("workspaceId")):
             continue
-        intent = json.loads(task["intent_json"])
         matched.append(
             {
                 "taskId": task["id"],

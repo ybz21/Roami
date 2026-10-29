@@ -362,8 +362,10 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "nextAction": "This workspace belongs to tracked work. For edits, additions or missing deliverables, "
                     "call task_steer with the referenced taskId and current revision. Preserve its executor, workspace "
                     "and session; no new executor quote is needed. If ambiguous, inspect task_status or ask which task. "
-                    "Do not drop the executor, change directory or create a replacement. Genuinely independent work "
-                    "uses a separate workspace through the discovered project, never a second agent in this workspace.",
+                    "Do not change executor or create a replacement for a continuation. Genuinely independent native work "
+                    "without a user-selected destination can omit directory with target={kind:new_session} for a private "
+                    "task directory. Independent project work uses a separate workspace through the discovered project, "
+                    "never a second agent in this workspace.",
                 }
             if exc.code != "TASK_FAILURE_REVIEW_REQUIRED":
                 raise
@@ -700,7 +702,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                             },
                             ["kind"],
                         ),
-                        "description": "Existing session: kind=session, exact sessionId (+nodeId/label); no directory/workspaceId/base/remote; projectId cannot override the session. Existing project: kind=project, discovered projectId; workspaceId reuses work without base/remote/directory overrides. Loose work: kind=new_session, directory=actual absolute work directory, NEVER baseDir. File output does not authorize a new project. Use kind=new_project, name (+existing absolute baseDir) ONLY when the user requests a new project. Resolve actual project IDs; ask for missing destinations, never invent paths. Reuse preserves local work.",
+                        "description": "Session: kind=session, exact sessionId (+nodeId/label), no directory/workspaceId/base/remote overrides. Project: kind=project, discovered projectId; workspaceId reuses work without path/base/remote overrides. New native work: kind=new_session omits directory for a private writable task directory; preserve a user-selected existing directory. Never use baseDir for new_session. Only a user-requested new project uses new_project, name (+existing absolute baseDir). Never invent IDs or paths.",
                     },
                     "fromMessageId": {"type": "string"},
                 },

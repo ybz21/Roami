@@ -325,3 +325,17 @@ async def test_slow_stop_receipt_does_not_block_main_conversation(store):
         release.set()
         await asyncio.gather(reconciling, return_exceptions=True)
         await runtime.close()
+
+
+async def test_private_task_directories_have_no_go_workspace_to_reconcile(store):
+    _, task, _, _, _ = await abandoned(store)
+    await store.call(
+        lambda db: db.execute(
+            "UPDATE tasks SET target_json=? WHERE id=?",
+            (encoded({"workspace": {"taskDirectory": True}}), task["id"]),
+        ),
+        write=True,
+    )
+    cli = CLI()
+    await NativeWorkspaceReconciliation(store, Settings(), command=cli).tick()
+    assert not cli.calls

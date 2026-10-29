@@ -392,7 +392,11 @@ class TaskRevisions:
                         "sessionId": run["session_id"],
                         "nodeId": run["node_id"] or "local",
                     }
-                elif intent["target"]["kind"] != "session" and target.get("workspaceId"):
+                elif (
+                    intent["target"]["kind"] != "session"
+                    and target.get("workspaceId")
+                    and not (target.get("workspace") or {}).get("taskDirectory")
+                ):
                     intent["target"] = (
                         {
                             "kind": "project",

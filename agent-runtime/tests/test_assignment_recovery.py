@@ -202,7 +202,7 @@ async def test_missing_executor_field_reports_its_path_and_accepts_a_corrected_r
         {"kind": "project", "projectId": "other"},
     ],
 )
-async def test_rejected_destination_cannot_be_removed_or_replaced_until_a_new_user_turn(
+async def test_rejected_destination_can_only_recover_into_a_private_native_task_directory(
     store, tmp_path, fallback
 ):
     runtime, _, _, _, binding = await setup(store)
@@ -240,6 +240,11 @@ async def test_rejected_destination_cannot_be_removed_or_replaced_until_a_new_us
             "main",
             binding,
         )
+        if fallback == {"kind": "new_session"}:
+            assert second["acceptedOnly"] is True
+            task = (await runtime.tasks.list("alice"))[0]
+            assert json.loads(task["intent_json"])["target"] == fallback
+            return
         assert second["error"] == "TASK_TARGET_REVIEW_REQUIRED"
         assert not await runtime.tasks.list("alice")
         await store.call(
@@ -540,6 +545,50 @@ async def test_untracked_user_executor_is_explained_and_cannot_be_hidden_in_nati
             binding,
         )
         assert fallback["error"] == "ROUTING_EXECUTOR_CONFLICT"
+        assert not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("routed", [False, True])
+async def test_rejected_professional_directory_does_not_allow_executor_downgrade(
+    store, tmp_path, routed
+):
+    runtime, _, _, tools, binding = await setup(store)
+    if routed:
+        runtime.gateway.tools = tools
+    try:
+        turn = await active_turn(store, binding)
+        binding["toolCallId"] = "bad-professional-path"
+        first = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "bad-professional-path",
+                "delegate",
+                {
+                    "goal": "Save report",
+                    **(request() if routed else {"executor": "codex"}),
+                    "target": {"kind": "new_session", "directory": str(tmp_path / "missing")},
+                },
+            ),
+            "main",
+            binding,
+        )
+        assert first["error"] == "EXECUTION_DIRECTORY_UNAVAILABLE"
+        binding["toolCallId"] = "native-fallback"
+        fallback = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "native-fallback",
+                "delegate",
+                {"goal": "Save report", "executor": "native", "target": {"kind": "new_session"}},
+            ),
+            "main",
+            binding,
+        )
+        assert fallback["error"] == "TASK_TARGET_REVIEW_REQUIRED"
         assert not await runtime.tasks.list("alice")
     finally:
         await runtime.close()
