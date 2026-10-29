@@ -123,7 +123,7 @@ with tempfile.TemporaryDirectory() as directory:
    data=reward.read_bytes();receipt=json.loads(data)
    if isinstance(receipt,dict):score=receipt.get('reward')
  except (OSError,ValueError,UnicodeError):pass
- valid=type(score) in (int,float) and 0<=score<=1 and math.isfinite(score)
+ valid=checks['verifier_exited'] and type(score) in (int,float) and 0<=score<=1 and math.isfinite(score)
  checks['verifier_result_valid']=valid
  print(json.dumps({'checks':checks,'reward':score if valid else None,'native_result_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'diagnostic':result.stderr.decode(errors='replace')[-8000:] if result is not None and result.returncode else ''},allow_nan=False))
 """
@@ -180,7 +180,8 @@ async def grade_media(case, workspace, executor):
         checks.update(result["checks"])
     score = result["reward"]
     valid = (
-        type(score) in {int, float}
+        checks.get("verifier_exited") is True
+        and type(score) in {int, float}
         and 0 <= score <= 1
         and math.isfinite(score)
         and checks.get("verifier_result_valid") is not False

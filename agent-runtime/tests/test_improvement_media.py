@@ -111,7 +111,11 @@ async def test_native_reward_and_delivery_contract_must_both_pass(
             return json.dumps({"reward": score, "checks": {"verifier_exited": exited}}).encode()
 
     grade = await grade_media(case, tmp_path / "work", Scored())
-    assert grade["passed"] is expected and grade["native_metric"] == score
+    assert grade["passed"] is expected
+    if exited:
+        assert grade["native_metric"] == score
+    else:
+        assert "native_metric" not in grade
     assert grade["native_metric_minimum"] == 0.8
-    assert grade["checks"]["native_metric_threshold"] is (score >= 0.8)
+    assert grade["checks"]["native_metric_threshold"] is (exited and score >= 0.8)
     assert grade["reason"] == reason

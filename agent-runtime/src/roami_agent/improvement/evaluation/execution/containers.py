@@ -106,7 +106,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v32-configured-image-roles",
+                "container-uds-v33-writable-config-directory",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -244,7 +244,7 @@ class ContainerExecutor:
             "image_id": self.image_id,
             "artifact_renderer_image_id": renderer_id,
             "environment_hash": digest(
-                [self.image_id, renderer_id, "network-none", "nonroot-readonly-v1"]
+                [self.image_id, renderer_id, "network-none", "nonroot-readonly-v2-writable-config"]
             ),
         }
 
@@ -304,6 +304,8 @@ class ContainerExecutor:
             ),
             "-e",
             "HOME=/tmp/home",
+            "-e",
+            "XDG_CONFIG_HOME=/tmp",
             "--workdir",
             "/workspace",
             "--entrypoint",
@@ -610,6 +612,8 @@ class ContainerExecutor:
                         f"type=bind,src={directory},dst=/model,readonly",
                         "-e",
                         "HOME=/tmp/home",
+                        "-e",
+                        "XDG_CONFIG_HOME=/tmp",
                         "-e",
                         "ROAMI_RSI_CONTAINER=1",
                         *self.source_mounts(),

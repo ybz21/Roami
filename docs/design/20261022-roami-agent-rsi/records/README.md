@@ -4,6 +4,13 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-30 | [RSI CLI 继承节点模型与每日限额](2026-10-30/cli-node-models.html) |
+| 2026-10-30 | [CSV 比较失败的安全诊断](2026-10-30/stock-csv-diagnostics.html) |
+| 2026-10-30 | [媒体判定器完整结束与有效分数](2026-10-30/media-verifier-completion.html) |
+| 2026-10-30 | [校准材料的完整准入](2026-10-30/calibration-reference-admission.html) |
+| 2026-10-30 | [每日限额下的并发准入](2026-10-30/model-admission-queue.html) |
+| 2026-10-30 | [任务容器的 Office 环境](2026-10-30/container-config-directory.html) |
+| 2026-10-30 | [完成回报的统一指令](2026-10-30/completion-instruction-consistency.html) |
 | 2026-10-30 | [完整文稿的验收渲染](2026-10-30/presentation-page-coverage.html) |
 | 2026-10-29 | [文件交付的结果总结](2026-10-29/file-completion-summary.html) |
 | 2026-10-29 | [股票任务的清洗要求与评分说明](2026-10-29/stock-task-transport-contract.html) |

@@ -13,7 +13,6 @@ from roami_agent.improvement.domain.policy import BOUNDS, next_candidate
 from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.evaluation.daily_suite import assemble_daily, daily_coverage
 from roami_agent.improvement.evaluation.execution.executors import (
-    ExternalExecutor,
     NativeFilesExecutor,
 )
 from roami_agent.improvement.evaluation.protocol_suite import protocol_suite
@@ -96,17 +95,21 @@ async def execute(args):
             "path": str(directory / "profile.json"),
         }
     if args.command == "calibrate-artifacts":
+        from roami_agent.improvement.entrypoints.node_models import node_model_settings
         from roami_agent.improvement.evaluation.artifact_review import (
             calibrate_artifacts,
             private_document,
         )
+        from roami_agent.providers.factory import configured_provider
 
         return await calibrate_artifacts(
-            Settings(),
+            await node_model_settings(args.agent_config, args.data_root),
             private_document(args.profile),
             private_document(args.anchors),
             args.output,
-            token_limit=args.token_limit,
+            provider_factory=configured_provider,
+            shared_daily_limit=True,
+            provider_mode="live_models",
         )
     if args.command == "import-gaia-course":
         from roami_agent.improvement.evaluation.benchmarks.gaia_tasks import import_gaia_course
@@ -365,9 +368,14 @@ async def execute(args):
     machine = config["machine"]
     require(isinstance(machine["id"], str) and bool(machine["id"]))
     mode = machine.get("mode")
+    require(mode != "external", "RSI_SHARED_MODEL_GATEWAY_REQUIRED")
     if mode in {"native_files", "protocol_fixture"}:
+        from roami_agent.improvement.entrypoints.node_models import node_model_settings
+
         settings = (
-            Settings.load(resolve(base, config["model_config"]))
+            await node_model_settings(
+                resolve(base, config["model_config"]), resolve(base, config["data_root"])
+            )
             if mode == "native_files"
             else Settings()
         )
@@ -375,7 +383,10 @@ async def execute(args):
             mode != "native_files" or bool(settings.endpoint and settings.model),
             "MODEL_NOT_CONFIGURED",
         )
-        executor = NativeFilesExecutor(settings, fixture=mode == "protocol_fixture")
+        ledger.shared_daily_limit = mode == "native_files"
+        executor = NativeFilesExecutor(
+            settings, fixture=mode == "protocol_fixture", shared_daily_limit=mode == "native_files"
+        )
         machine = dict(
             machine,
             environment_hash=digest(
@@ -389,9 +400,8 @@ async def execute(args):
             ),
         )
     else:
-        require(mode == "external", "RSI_MACHINE_MODE")
-        executor = ExternalExecutor(machine["argv"], model_hash=machine["model_hash"])
-    budgets = config["daily_budget"]
+        raise DomainError("RSI_MACHINE_MODE")
+    budgets = config["daily_budget"] if mode != "native_files" else {"tokens": 0, "episodes": 0}
     baseline = (
         {key: getattr(settings, key) for key in BOUNDS}
         if mode in {"native_files", "protocol_fixture"}
@@ -537,7 +547,9 @@ def main():
     p = commands.add_parser("calibrate-artifacts")
     for name in ("profile", "anchors", "output"):
         p.add_argument("--" + name, type=Path, required=True)
-    p.add_argument("--token-limit", type=int, required=True)
+    p.add_argument("--agent-config", type=Path, required=True)
+    p.add_argument("--data-root", type=Path, required=True)
+    p.add_argument("--token-limit", type=int, help=argparse.SUPPRESS)
     p = commands.add_parser("import-gaia-course")
     p.add_argument("--source", required=True, type=Path)
     p.add_argument("--output", required=True, type=Path)

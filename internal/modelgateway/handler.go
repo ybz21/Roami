@@ -15,11 +15,13 @@ import (
 )
 
 type Handler struct {
-	Ledger  *Ledger
-	Client  *http.Client
-	wait    sync.WaitGroup
-	mu      sync.Mutex
-	closing bool
+	Ledger           *Ledger
+	Client           *http.Client
+	wait             sync.WaitGroup
+	mu               sync.Mutex
+	closing          bool
+	activeForwards   int
+	admissionChanged chan struct{}
 }
 
 func NewHandler(ledger *Ledger) *Handler {
@@ -89,6 +91,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
+			h.notifyAdmission()
 			writeJSON(w, 200, map[string]any{"data": c})
 			return
 		}
@@ -170,13 +173,18 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		reject(w, 400, "INVALID_MODEL_CONFIG")
 		return
 	}
-	call, err := h.Ledger.Admit(role, payload.Model, session, requestID)
+	call, err := h.admit(r.Context(), role, payload.Model, session, requestID)
 	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
 		switch err.Error() {
 		case "MODEL_PROXY_DAILY_LIMIT":
 			reject(w, 402, err.Error())
 		case "MODEL_PROXY_USAGE_PENDING", "MODEL_PROXY_USAGE_UNKNOWN":
 			reject(w, 409, err.Error())
+		case "MODEL_GATEWAY_UNAVAILABLE":
+			reject(w, 503, err.Error())
 		default:
 			reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
 		}
@@ -185,6 +193,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	status, code, notSent := 0, "MODEL_GATEWAY_INTERRUPTED", false
 	var usage *Usage
 	defer func() {
+		defer h.releaseAdmission()
 		if err := h.Ledger.Settle(call, usage, status, code, notSent); err != nil {
 			log.Printf("model gateway: settlement failed call=%s", call.ID)
 		}

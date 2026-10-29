@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>CSV 比较失败的安全诊断</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>CSV 比较失败的安全诊断</h1>
+<h2>Product Design</h2><p>Case的既有证据JSON、免费汇总和复盘保留CSV失败类别，区分列数、列顺序/名称、行数、数据类型、数值和文件不可读。只提供输出自身的行列数与固定枚举，不提供参考表头、参考值、差异样例或断言原文。诊断不能改变原生分数、适配检查、独立评分状态或历史记录。</p>
+<h2>User Stories</h2><ul><li>我能在展开Case证据后区分输出格式与数值问题，不必猜一个布尔失败。</li><li>我能在汇总与复盘看到相同诊断，基线和候选不互借结果。</li><li>旧版本没有诊断时保持缺失，不补造失败原因；错误内容不能带出隐藏参考。</li></ul>
+<h2>Technical Design</h2><p>evaluation/benchmarks/stock_tasks.py在既有Pandas比较中分类，仅输出actual的形状和固定类别；原checkpoint、assert_frame_equal、rtol=1e-12及atol=1e-10保持。evaluation/csv_diagnostics.py校验精确字段、枚举和依据既有8MB产物上限的计数范围；native_judgment复用验证，进入trial_summary、既有Case证据、免费报告及paired arms。不解析AssertionError正文，不新增前端控件、翻译键、轮询或模型参数；英文属于证据文件和内部协议字段。</p>
+<h2>验收记录</h2><p>18项新增回归在旧实现10失败、8通过。测试包括真实冻结容器内的8类CSV比较、正常零分与舍入差异、Case与免费汇总贯通、paired arms独立结果，以及非法字段/隐藏参考注入保护。修复后86项相关检查通过，本地完整门禁Python2390项无跳过、Go全量及前端typecheck/i18n/hover/生产构建通过。原v49产物副本返回column_count、实际3735行/10列；Case证据和复盘字段一致，原生0/8、另7未评分保持，原文件/副本哈希与历史Case行均未改。193执行核心/资源/入口文件仍与冻结v54镜像匹配。只读数值诊断已确认v49的3735日期、22410基础值和收益/均线在既有容差内一致，原CSV整表合同仍失败；不以诊断冒称通过或独立视觉质量结论。0真实模型调用，未部署或改写历史。</p>
+</main></body></html>

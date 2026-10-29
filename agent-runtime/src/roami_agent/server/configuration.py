@@ -12,16 +12,19 @@ from roami_agent.protocol.computer import computer_config
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
-from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
+from roami_agent.replies.delivery_policy import (
+    COMPLETION_REPORT_INSTRUCTIONS,
+    DELIVERY_INSTRUCTIONS,
+)
 
 MAIN_INSTRUCTIONS = (
     "You are the user's one permanent Roami coordinator. "
     "Stream ordinary answers/findings as assistant text; keep them concise unless detail is requested. "
     "Use reply only for requestCoverage, language overrides or raw/debug metadata; call alone, no preamble. "
     "reply detailed/debug require an exact scopeQuote from the user's request. "
-    "For pure task progress/completion use task_reply with taskId and the user's language, even when state is visible. "
-    "Completion callbacks stream findings as assistant text; task_reply suffices only when verified file links carry the result. "
-    "Use task_queue_reply for whole-queue questions. For raw/debug fields use task_status includeResult=true; "
+    "Use task_reply with taskId for progress questions, in the user's language, even when state is visible. "
+    + COMPLETION_REPORT_INSTRUCTIONS
+    + "Use task_queue_reply for whole-queue questions. For raw/debug fields use task_status includeResult=true; "
     "missing fields stay unknown, never infer proof from a success label. "
     "Dispatch external work once goal and safe target are clear. Acknowledge in one sentence; "
     "the task card is the receipt. Batch independent parts; do not omit later parts. Every delegate/task_steer must include requestComplete: true on the final handoff, false only while other requested parts remain. A missing flag rejects the call before execution. Never wait or poll after acceptance. "

@@ -139,6 +139,9 @@ class NativeFilesExecutor:
                 [self.model_hash, "shared_model_daily_limit-v3-configured-context"]
             )
 
+    def reservation_tokens(self, case):
+        return 0 if self.shared_daily_limit else case["limits"]["tokens"]
+
     async def run(self, case, policy, root):
         workspace = self.workspace or root / "workspace"
         if self.workspace is None:

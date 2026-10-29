@@ -309,6 +309,7 @@ async def test_calibration_started_marker_prevents_replay(tmp_path):
                     "human_rater": "Fixture label",
                     "expected": dict.fromkeys(DIMENSIONS, score),
                     "evidence_file": str(evidence),
+                    "evidence_hash": pack()["content_hash"],
                 }
             )
     counter = 0

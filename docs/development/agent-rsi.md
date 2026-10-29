@@ -55,13 +55,13 @@ uv run --frozen roami-agent-evaluate import-finance --conversational \
 
 Agent 只看到完整原始表格、正文和问题，不接收 gold rows、参考程序、答案或抽样锁中的判定数据。百分比按小数比例作答；ConvFinQA 不注入参考历史答案，每一轮都必须通过。这个改编分数是**组件的数值回答准确率**，不是上游程序执行准确率或官方榜单分数。
 
-## 独立评测 CLI 的测试机与冻结预算
+## 独立评测 CLI 的节点配置与每日限额
 
-以下为离线评测 CLI 的显式协议配置；运行中的 RSI 页面使用模型页每日金额限额。
+真实模型运行与 RSI 页面统一经过现有 Go 模型网关，使用模型页每日金额限额；CLI 不另设 Token 或调用次数预算。
 
-复制 [machine.example.json](../../scripts/dev/agent-evaluation/machine.example.json)，提供独立 `evaluation-agent.toml`、冻结 suite、机器 ID、可信环境指纹与模型凭证的环境变量引用。所有相对路径相对配置文件；凭证不写进 JSON。`output_root` 目录必须私有，文件与账本权限为 0600。
+复制 [machine.example.json](../../scripts/dev/agent-evaluation/machine.example.json)，将 `model_config` 与 `data_root` 指向节点现用的 `agent.toml` 和数据目录，提供冻结 suite、机器 ID 与可信环境指纹。所有相对路径相对配置文件；凭证不写进 JSON。`output_root` 目录必须私有，文件与账本权限为 0600。
 
-`native_files` 的模型配置使用现有 `Settings.load()` 的 TOML 格式。评测请求固定关闭 HTTP 自动重试，输出上限最多 2048 Token。上线模型配置、Skill、MCP 和浏览器配置不会被复制进评测实例。原始 main/worker 指令保留，文件任务的受限工具配置记录为执行范围。
+`native_files` 从 TOML 和数据目录的 `agents/model-settings.json` 读取保存的 Main/Worker 路由、参数、图片能力和重试，并沿正式服务的容量解析处理自动上下文窗口，不覆盖输出长度。必须继承节点已有的 `ROAMI_MODEL_GATEWAY_SOCKET` 绑定；缺失或不可用时阻断，不直连上游或新建独立费用账。旧 `daily_budget` 字段不再约束真实模型运行。Skill、MCP 和浏览器仍按文件评测范围隔离，原始 main/worker 指令保留。
 
 ```bash
 cd agent-runtime
@@ -69,9 +69,9 @@ uv run --frozen roami-agent-evaluate cycle --config /private/evaluations/machine
 uv run --frozen roami-agent-evaluate watch --config /private/evaluations/machine.json
 ```
 
-`cycle` 执行当天一次；`watch` 是独立长期 worker，按配置时区的 `hour` 每天触发一次，不占 Main 队列，不补跑停机期间的所有历史日期。适合由系统服务管理。多测试机使用同一中央账本、不同机器 ID；远程环境通过外部包装程序调用。SQLite 账本放在中央本地磁盘，不直接共享到网络文件系统。
+`cycle` 执行当天一次；`watch` 是独立长期 worker，按配置时区的 `hour` 每天触发一次，不占 Main 队列，不补跑停机期间的所有历史日期。适合由系统服务管理。外部执行器模式无法证明节点模型与统一计费绑定，在启动前拒绝；多节点应各自绑定该节点的保存配置和 Go 网关。SQLite 账本放在本地磁盘，不直接共享到网络文件系统。
 
-每轮先按实际执行组数原子预留 **整套 episode 的 Token 上限及次数**。超过日预算直接拒绝。当前采用保守预留，不回收未用余额；中断、用量未知也保留预留。每次模型请求用输入 UTF-8 字节量加协议余量、输出上限做保守准入，再按供应商用量结算。供应商未报用量、重试成本不全或超过预算时阻止后续请求。此限额不是供应商侧的金额硬上限，供应商侧配额仍应独立配置。
+Go 网关负责真实调用的每日金额准入、费用结算和未知用量保护；CLI 保留调用明细，不清零或重放未知调用。冻结 Case 的执行时限与评分标准保持不变。`protocol_fixture` 不调用真实模型，仍可脱离节点配置运行，并保留用于协议回归的显式 `daily_budget`。
 
 `auto_candidates=true` 只允许 development 套件。候选生成器按单参数缩减预算做有界搜索，用冻结的基线重新 A/B；下一天消费未试过的提案。失败先标为待诊断，不继续缩预算。它不是 GEPA/ACE 完整实现，不调用模型自改代码，不修改线上策略；需要更丰富的诊断策略时扩展 `policy.py`。
 
@@ -300,7 +300,7 @@ agent-runtime/.venv/bin/roami-agent-evaluate research-status \
 
 GitHub交付是显式本机配置，默认没有此配置，不对外写Issue或PR；没有确认Issue就不自动修复。目标仓库必须与配置 remote 的 GitHub 地址一致。发布前重新核验冻结比较证据；提交前quick、推送前full。PR只写公开用例ID、受控源码路径、验证摘要与报告hash，不上传原始日志、隐藏题、凭证或用户记录。创建请求先写私有发送标记；断线后查到精确分支/commit的PR就续接，查不到则阻塞，不能再次POST。
 
-当前60项合同已备，7项复杂产物已接真实离线渲染和两个不同模型的盲评接口。正式使用必须先完成12个有参考标签的平衡校准锚点，安装真实模型校准证书。`calibrate-artifacts`执行有界校准，`configure-artifact-review`安装私有证书；协议演练证书不能用于正式日跑。相关字段和限制见CLI `--help` 与 `artifact_review.py`。
+当前60项合同已备，7项复杂产物已接真实离线渲染和两个不同模型的盲评接口。正式使用必须先完成12个有参考标签的平衡校准锚点，安装真实模型校准证书。`calibrate-artifacts` 必须提供 `--agent-config` 和 `--data-root`，沿保存的 Main/Worker 和 Go 网关每日限额校准；旧 `--token-limit` 兼容参数被忽略，不另设预算。`configure-artifact-review` 安装私有证书；协议演练证书不能用于正式日跑，缺人工标签或独立图片评分能力仍在调用前阻断。相关字段见 CLI `--help` 与 `artifact_review.py`。
 
 **当前日程仍未启用**：已登记专用本机容器runner，真实评分校准和日预算未齐。已验证自动闭环设施与真实执行器小任务，不代表跑完真实60项或已获得效率收益。
 

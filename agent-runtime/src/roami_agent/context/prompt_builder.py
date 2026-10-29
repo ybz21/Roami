@@ -18,7 +18,10 @@ from roami_agent.context.token_estimate import (
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
+from roami_agent.replies.delivery_policy import (
+    COMPLETION_REPORT_INSTRUCTIONS,
+    DELIVERY_INSTRUCTIONS,
+)
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.request_coverage import latest_coverage
 from roami_agent.storage.task_context import recent_task_context
@@ -340,10 +343,8 @@ class PromptBuilder:
                         "Use provided downloadUrl values unchanged; /api/ URLs are not filesystem paths. "
                         "Default to 1-3 short sentences, without headings, emoji or boilerplate offers. "
                         "Use the original user request language, not the report or example language. "
-                        "Report the actual outcome even when downloadable files exist; file links alone are not "
-                        "a summary. Include the essential finding and any pending acceptance or blocker. "
-                        "Do not replace this completion report with task_reply or task_queue_reply status text. "
-                        "Stream ordinary findings as assistant text; use reply for explicit language, coverage or raw/debug metadata. "
+                        + COMPLETION_REPORT_INSTRUCTIONS
+                        + "Stream ordinary findings as assistant text; use reply for explicit language, coverage or raw/debug metadata. "
                         "A known model authentication failure (MODEL_HTTP_401/403) requires configuration repair, "
                         "not a retry choice: explain the cause and repair step without offering an immediate retry "
                         "or asking for approval to rerun while authentication is unchanged. "
