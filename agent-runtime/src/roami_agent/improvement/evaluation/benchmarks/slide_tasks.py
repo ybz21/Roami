@@ -8,7 +8,7 @@ import re
 import zipfile
 from pathlib import PurePosixPath
 
-from roami_agent.improvement.domain.contracts import DIMENSIONS, digest, require
+from roami_agent.improvement.domain.contracts import DIMENSIONS, digest, number, require
 from roami_agent.improvement.domain.scoring import quality
 from roami_agent.improvement.evaluation.contracts import freeze_suite
 from roami_agent.improvement.integrations.artifact_paths import relative_file
@@ -139,9 +139,10 @@ def prepare_slides(case, workspace):
         relative_file(workspace, name).unlink()
 
 
-PROGRAM = r"""import base64,contextlib,hashlib,io,json,pathlib,tempfile,zipfile
+PROGRAM = r"""import base64,contextlib,hashlib,io,json,math,pathlib,tempfile,zipfile
 payload=json.loads(__import__('sys').stdin.read())
-namespace={'__name__':'frozen_slide_metric'};exec(compile(payload['verifier'],'frozen_slides.py','exec'),namespace)
+namespace={'__name__':'frozen_slide_metric'}
+with contextlib.redirect_stdout(io.StringIO()):exec(compile(payload['verifier'],'frozen_slides.py','exec'),namespace)
 with zipfile.ZipFile('/workspace/input.pptx') as source:parts={n:source.read(n) for n in source.namelist() if not n.endswith('/')}
 results=[];errors=[]
 with tempfile.TemporaryDirectory() as directory:
@@ -156,10 +157,35 @@ with tempfile.TemporaryDirectory() as directory:
    for name,data in expected.items():bundle.writestr(name,data)
   try:
    with contextlib.redirect_stdout(io.StringIO()):value=namespace['compare_pptx_files']('/workspace/updated.pptx',str(target),**dict(payload['options'][i],enable_debug=False))
-   results.append(value)
-  except Exception as error:results.append(0);errors.append(type(error).__name__)
+   if type(value) in (int,float) and math.isfinite(value) and 0<=value<=1:results.append(value)
+   else:results.append(None);errors.append('InvalidResult')
+  except Exception as error:results.append(None);errors.append(type(error).__name__)
 print(json.dumps({'results':results,'errors':errors},allow_nan=False))
 """
+
+
+def comparison_receipt(payload, count):
+    rows = payload.get("results") if isinstance(payload, dict) else None
+    errors = payload.get("errors", []) if isinstance(payload, dict) else None
+    if (
+        not isinstance(rows, list)
+        or len(rows) != count
+        or not isinstance(errors, list)
+        or len(errors) > count
+        or any(
+            not isinstance(error, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,79}", error)
+            for error in errors
+        )
+    ):
+        return {"results": [None] * count, "errors": ["InvalidReceipt"]}
+    values = [value if number(value, 0, 1) else None for value in rows]
+    errors = list(errors)
+    if any(value is not None and not number(value, 0, 1) for value in rows):
+        errors.append("InvalidResult")
+    # Older receipts replaced an unknown alternative with zero without recording its index.
+    if errors and None not in values:
+        values = [value if value == 1 else None for value in values]
+    return {"results": values, "errors": errors}
 
 
 async def grade_slides(case, workspace, executor):
@@ -187,25 +213,42 @@ async def grade_slides(case, workspace, executor):
                 checks["artifact:" + name] = False
             if name == "input.pptx":
                 checks["source_unchanged"] = checksum == spec["source_sha256"]
-    result = {"results": [0, 0], "errors": []}
-    if all(checks.values()):
-        result = json.loads(
-            await executor.sandbox(workspace, PROGRAM, input=json.dumps(spec).encode(), timeout=180)
-        )
+    references = spec.get("references", [None, None])
+    require(isinstance(references, list) and 1 <= len(references) <= 8)
+    count = len(references)
+    result = {"results": [None] * count, "errors": []}
+    attempted = all(checks.values())
+    if attempted:
+        try:
+            raw = await executor.sandbox(
+                workspace, PROGRAM, input=json.dumps(spec).encode(), timeout=180
+            )
+            require(
+                isinstance(raw, (bytes, str)) and len(raw) <= 200_000, "RSI_INVALID_NATIVE_RECEIPT"
+            )
+            payload = json.loads(raw)
+            result = comparison_receipt(payload, count)
+        except (DomainError, OSError, TimeoutError, ValueError) as error:
+            result["errors"] = [type(error).__name__]
         checks["native_reference_match"] = any(v == 1 for v in result["results"])
-    passed = all(checks.values()) and any(v == 1 for v in result["results"])
+        checks["native_comparison_completed"] = checks["native_reference_match"] or all(
+            v is not None for v in result["results"]
+        )
+    complete = checks.get("native_comparison_completed", False)
+    passed = all(checks.values()) and checks.get("native_reference_match", False)
     return {
         **quality(dict.fromkeys(DIMENSIONS, 3 if passed else 0), hard_passed=passed),
         "reason": "assertions_passed"
         if passed
         else "native_verifier_failed"
-        if result["errors"]
+        if attempted and (result["errors"] or not complete)
         else "native_reference_mismatch"
         if "native_reference_match" in checks
         else "assertion_failed",
         "checks": checks,
-        "native_metric": float(passed),
-        "native_reference_results": result["results"],
+        **({"native_metric": float(passed)} if complete else {}),
+        **({"native_reference_results": result["results"]} if attempted else {}),
+        "native_verifier_ran": any(v is not None for v in result["results"]),
         "native_errors": result["errors"],
         "evidence": evidence,
         "grade_scope": "original_pptx_state_comparison_not_gui_or_visual_quality",

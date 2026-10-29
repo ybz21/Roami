@@ -66,9 +66,9 @@ def test_registration_and_suite_reader_accept_large_frozen_inputs(tmp_path):
     ("results", "errors", "passed", "reason"),
     [
         ([0, 0], [], False, "native_reference_mismatch"),
-        ([0, 0], ["ValueError"], False, "native_verifier_failed"),
+        ([None, 0], ["ValueError"], False, "native_verifier_failed"),
         ([0, 1], [], True, "assertions_passed"),
-        ([1, 0], ["ValueError"], True, "assertions_passed"),
+        ([1, None], ["ValueError"], True, "assertions_passed"),
     ],
 )
 async def test_slide_summary_explains_comparison_without_changing_alternative_acceptance(

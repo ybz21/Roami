@@ -15,7 +15,7 @@ def _score_fields(grade):
     if (
         isinstance(references, list)
         and 1 <= len(references) <= 8
-        and all(number(value, 0, 1) for value in references)
+        and all(value is None or number(value, 0, 1) for value in references)
     ):
         evidence["native_reference_results"] = list(references)
     partial = grade.get("native_partial")
@@ -37,6 +37,8 @@ def _score_fields(grade):
         )
     ):
         evidence["native_partial"] = {key: partial[key] for key in sorted(keys)}
+    if type(grade.get("native_verifier_ran")) is bool:
+        evidence["native_verifier_ran"] = grade["native_verifier_ran"]
     if not evidence:
         return evidence
     scope = grade.get("grade_scope")
@@ -48,8 +50,6 @@ def _score_fields(grade):
     official = grade.get("official_leaderboard_comparable")
     if type(official) is bool:
         evidence["official_leaderboard_comparable"] = official
-    if type(grade.get("native_verifier_ran")) is bool:
-        evidence["native_verifier_ran"] = grade["native_verifier_ran"]
     return evidence
 
 
@@ -66,6 +66,18 @@ def native_judgment(grade):
         evidence["native_verifier_ran"] = ran
         if not ran:
             evidence.pop("native_metric", None)
+    if grade.get("grade_scope") == "original_pptx_state_comparison_not_gui_or_visual_quality":
+        ran = grade.get("native_verifier_ran")
+        if type(ran) is not bool:
+            ran = "native_reference_match" in checks and (
+                not grade.get("native_errors") or evidence.get("native_metric") == 1
+            )
+            if grade.get("native_errors"):
+                evidence.pop("native_reference_results", None)
+        evidence["native_verifier_ran"] = ran
+        if not ran:
+            evidence.pop("native_metric", None)
+            evidence.pop("native_reference_results", None)
     if "native_reference_match" not in checks:
         evidence.pop("native_reference_results", None)
     return evidence

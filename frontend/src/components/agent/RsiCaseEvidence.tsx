@@ -7,7 +7,7 @@ function CaseEvidenceBody({ evidence }: { evidence: unknown }) {
   const { t } = useI18n(), value = fields(evidence), native = fields(value.native_judgment)
   const metric = native.native_verifier_ran !== false && score(native.native_metric) ? native.native_metric : undefined
   const minimum = score(native.native_metric_minimum) ? native.native_metric_minimum : undefined
-  const references = native.native_verifier_ran !== false && Array.isArray(native.native_reference_results) && native.native_reference_results.length <= 8 && native.native_reference_results.every(score) ? native.native_reference_results : []
+  const references = native.native_verifier_ran !== false && Array.isArray(native.native_reference_results) && native.native_reference_results.length <= 8 && native.native_reference_results.every(value => value === null || score(value)) ? native.native_reference_results : []
   const partial = fields(native.native_partial)
   const hasPartial = native.native_verifier_ran !== false && Number.isInteger(partial.total_points) && Number(partial.total_points) > 0 && Number.isInteger(partial.unscored_points) && Number(partial.unscored_points) >= 0 && (partial.scored_points === null || Number.isInteger(partial.scored_points) && Number(partial.scored_points) >= 0)
   const metrics = fields(value.metrics), tools = Array.isArray(value.tools) ? value.tools.map(fields) : []
@@ -17,7 +17,7 @@ function CaseEvidenceBody({ evidence }: { evidence: unknown }) {
       {native.native_verifier_ran === false && <div><dt>{t('agent.rsiResults.nativeJudgment')}</dt><dd>{t('agent.rsiResults.nativeNotRun')}</dd></div>}
       {metric !== undefined && <div><dt>{t('agent.rsiResults.nativeScore')}</dt><dd>{String(metric)}</dd></div>}
       {minimum !== undefined && <div><dt>{t('agent.rsiResults.nativeMinimum')}</dt><dd>{String(minimum)}</dd></div>}
-      {references.length > 0 && <div><dt>{t('agent.rsiResults.nativeReferences')}</dt><dd>{references.map((value, index) => <span key={index}>{t('agent.rsiResults.nativeReference', { index: index + 1, score: String(value) })}{index < references.length - 1 ? ' · ' : ''}</span>)}</dd></div>}
+      {references.length > 0 && <div><dt>{t('agent.rsiResults.nativeReferences')}</dt><dd>{references.map((value, index) => <span key={index}>{t('agent.rsiResults.nativeReference', { index: index + 1, score: value === null ? t('agent.rsiResults.nativeUnscored') : String(value) })}{index < references.length - 1 ? ' · ' : ''}</span>)}</dd></div>}
       {hasPartial && <div><dt>{t('agent.rsiResults.nativePoints')}</dt><dd>{partial.scored_points === null ? t('agent.rsiResults.nativeUnscored') : t('agent.rsiResults.nativePartial', { score: Number(partial.scored_points), total: Number(partial.total_points) })}{Number(partial.unscored_points) > 0 && <p>{t('agent.rsiResults.nativeUnscoredCount', { count: Number(partial.unscored_points) })}</p>}</dd></div>}
     </dl>}
     {(tools.length > 0 || files.length > 0 || metrics.tokens !== undefined || metrics.model_calls !== undefined) && <details className="rsi-disclosure rsi-case-execution"><summary>{t('agent.rsiResults.executionRecords')}<ChevronRight size={15} /></summary>
