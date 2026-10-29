@@ -8,6 +8,7 @@ from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.models import ModelEvent
+from roami_agent.replies.delivery_policy import COMPLETION_REPORT_INSTRUCTIONS
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 
@@ -30,6 +31,16 @@ async def test_file_callback_requires_findings_even_with_a_downloadable_attachme
         async def stream(self, messages, tools):
             nonlocal rounds
             rounds += 1
+            assert "file links alone are not a summary" in messages[0]["content"]
+            assert "For pure task progress/completion use task_reply" not in messages[0]["content"]
+            assert "task_reply suffices only when verified file links" not in messages[0]["content"]
+            assert COMPLETION_REPORT_INSTRUCTIONS in messages[0]["content"]
+            assert any(
+                message["role"] == "system"
+                and COMPLETION_REPORT_INSTRUCTIONS in message["content"]
+                and "Background task result." in message["content"]
+                for message in messages[1:]
+            )
             if rounds == 1:
                 yield ModelEvent("tool", call("task_reply", {"taskId": task_id}))
             else:
