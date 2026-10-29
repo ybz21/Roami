@@ -4,15 +4,15 @@ import asyncio
 import base64
 import json
 
-from roami_agent.context.image_preparation import prepare_image
+from roami_agent.context.image_preparation import prepare_image_bundle
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.image_limits import ImageLimits
+from roami_agent.protocol.image_limits import MAX_CONTEXT_IMAGES, ImageLimits
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
 
 
 class WorkspaceImageInputs:
-    max_images = 3
+    max_images = MAX_CONTEXT_IMAGES
 
     def __init__(self, database, artifacts, settings):
         self.db, self.artifacts, self.settings = database, artifacts, settings
@@ -52,11 +52,7 @@ class WorkspaceImageInputs:
             return None
         return source
 
-    async def prepare(self, source, call_id):
-        reference, body = await self.artifacts.read(source["owner_id"], source["id"])
-        image = await asyncio.to_thread(
-            prepare_image, body, ImageLimits.configured(self.settings.route("worker").image_limits)
-        )
+    def image_parts(self, source, call_id, reference, image):
         path = json.loads(source["metadata_json"]).get("sourcePath")
         evidence = {
             "artifactId": source["id"],
@@ -89,6 +85,19 @@ class WorkspaceImageInputs:
         ]
         return evidence, parts
 
+    def unavailable(self, plan, prompt):
+        return {
+            **plan,
+            "imageEvidence": [],
+            "imageError": "VISION_IMAGE_UNAVAILABLE",
+        }, [
+            *prompt,
+            {
+                "role": "user",
+                "content": "The workspace image snapshot is unavailable; do not claim to have inspected its pixels.",
+            },
+        ]
+
     async def attach(self, turn, plan, prompt, message, value):
         if self.settings.route("worker").capabilities.get("images") is not True:
             return plan, prompt
@@ -120,33 +129,34 @@ class WorkspaceImageInputs:
                     sources.append((selected, previous["tool_call_id"]))
                 if len(sources) == self.max_images:
                     break
-        prepared, unavailable = [], False
+        readable, unavailable = [], False
         for index, (item, call_id) in enumerate(sources):
             try:
-                prepared.append(await self.prepare(item, call_id))
+                reference, body = await self.artifacts.read(item["owner_id"], item["id"])
+                readable.append((item, call_id, reference, body))
             except (DomainError, OSError, ValueError):
                 if index == 0:
-                    return {
-                        **plan,
-                        "imageEvidence": [],
-                        "imageError": "VISION_IMAGE_UNAVAILABLE",
-                    }, [
-                        *prompt,
-                        {
-                            "role": "user",
-                            "content": "The workspace image snapshot is unavailable; do not claim to have inspected its pixels.",
-                        },
-                    ]
+                    return self.unavailable(plan, prompt)
                 unavailable = True
+        prepared = await asyncio.to_thread(
+            prepare_image_bundle,
+            [item[3] for item in readable],
+            ImageLimits.configured(self.settings.route("worker").image_limits),
+        )
+        if not prepared or prepared[0][0] != 0:
+            return self.unavailable(plan, prompt)
+        unavailable = unavailable or len(prepared) != len(readable)
         evidence, parts = [], []
-        for item, content in reversed(prepared):
+        for index, image in reversed(prepared):
+            source, call_id, reference, _ = readable[index]
+            item, content = self.image_parts(source, call_id, reference, image)
             evidence.append(item)
             parts.extend(content)
         if unavailable:
             parts.append(
                 {
                     "type": "text",
-                    "text": "An older workspace snapshot is unavailable and was omitted; do not claim to have inspected it.",
+                    "text": "An older workspace snapshot is unavailable or exceeds the combined image payload budget and was omitted; do not claim to have inspected it.",
                 }
             )
         return {**plan, "imageEvidence": evidence}, [*prompt, {"role": "user", "content": parts}]

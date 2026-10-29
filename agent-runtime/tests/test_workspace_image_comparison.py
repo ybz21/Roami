@@ -3,6 +3,7 @@
 import base64
 import io
 import json
+from dataclasses import replace
 
 import pytest
 from PIL import Image
@@ -17,10 +18,10 @@ from roami_agent.storage.context_admission import assert_context_admitted
 image_read = workspace_image_fixture
 
 
-async def test_only_three_latest_distinct_paths_are_present_and_pixels_match_labels(image_read):
+async def test_only_six_latest_distinct_paths_are_present_and_pixels_match_labels(image_read):
     runtime, turn, _, _, workspace, read = image_read
     tools, refs = [], []
-    for number, color in enumerate(["red", "blue", "green", "yellow"]):
+    for number, color in enumerate(["red", "blue", "green", "yellow", "black", "white", "purple"]):
         name = f"{number}.png"
         (workspace / name).write_bytes(picture(color=color))
         value, tool = await read(name)
@@ -29,8 +30,8 @@ async def test_only_three_latest_distinct_paths_are_present_and_pixels_match_lab
     plan, payload = await runtime.loop.context.vision.attach(
         turn, {}, [*prompt(tools[0]), *tools[1:]]
     )
-    assert [x["artifactId"] for x in plan["imageEvidence"]] == refs[-3:]
-    assert [x["path"] for x in plan["imageEvidence"]] == ["1.png", "2.png", "3.png"]
+    assert [x["artifactId"] for x in plan["imageEvidence"]] == refs[-6:]
+    assert [x["path"] for x in plan["imageEvidence"]] == [f"{index}.png" for index in range(1, 7)]
     parts = payload[-1]["content"]
     pixels = []
     for part in parts:
@@ -39,7 +40,14 @@ async def test_only_three_latest_distinct_paths_are_present_and_pixels_match_lab
                 io.BytesIO(base64.b64decode(part["image_url"]["url"].split(",", 1)[1]))
             ) as image:
                 pixels.append(image.getpixel((0, 0)))
-    assert pixels == [(0, 0, 255), (0, 128, 0), (255, 255, 0)]
+    assert pixels == [
+        (0, 0, 255),
+        (0, 128, 0),
+        (255, 255, 0),
+        (0, 0, 0),
+        (255, 255, 255),
+        (128, 0, 128),
+    ]
     stored = await runtime.db.call(
         lambda db: [r[0] for r in db.execute("SELECT content_json FROM messages")]
     )
@@ -230,9 +238,12 @@ async def test_deleting_any_prepared_comparison_image_revokes_next_operation(ima
         await runtime.db.call(lambda db: assert_context_admitted(db, turn))
 
 
-async def test_native_loop_compares_two_pixels_in_one_model_request(image_read):
+@pytest.mark.parametrize("count", [2, 6])
+async def test_native_loop_compares_all_pixels_in_one_model_request(image_read, count):
     runtime, turn, task, _, workspace, _ = image_read
-    (workspace / "next.png").write_bytes(picture(color="blue"))
+    names = ["frame.png", *[f"next-{index}.png" for index in range(1, count)]]
+    for name in names[1:]:
+        (workspace / name).write_bytes(picture(color="blue"))
 
     class ComparisonWorker:
         model = "comparison-fixture"
@@ -240,8 +251,8 @@ async def test_native_loop_compares_two_pixels_in_one_model_request(image_read):
 
         async def stream(self, messages, tools):
             self.calls += 1
-            assert self.calls <= 3, "Both file snapshots must be visible together"
-            if self.calls < 3:
+            assert self.calls <= count + 1, "All file snapshots must be visible together"
+            if self.calls <= count:
                 yield ModelEvent(
                     "tool",
                     {
@@ -249,9 +260,7 @@ async def test_native_loop_compares_two_pixels_in_one_model_request(image_read):
                         "type": "function",
                         "function": {
                             "name": "read",
-                            "arguments": json.dumps(
-                                {"path": "frame.png" if self.calls == 1 else "next.png"}
-                            ),
+                            "arguments": json.dumps({"path": names[self.calls - 1]}),
                         },
                     },
                 )
@@ -263,7 +272,7 @@ async def test_native_loop_compares_two_pixels_in_one_model_request(image_read):
                             io.BytesIO(base64.b64decode(part["image_url"]["url"].split(",", 1)[1]))
                         ) as image:
                             pixels.append(image.getpixel((0, 0)))
-                assert pixels == [(255, 0, 0), (0, 0, 255)]
+                assert pixels == [(255, 0, 0), *[(0, 0, 255)] * (count - 1)]
                 yield ModelEvent("text", "Red then blue.")
             yield ModelEvent(
                 "usage",
@@ -278,3 +287,22 @@ async def test_native_loop_compares_two_pixels_in_one_model_request(image_read):
     worker = ComparisonWorker()
     runtime.loop.worker_model = worker
     assert await runtime.loop.run(turn, "worker", task_id=task) == "Red then blue."
+
+
+async def test_tight_combined_budget_retains_latest_snapshot_with_audited_source(image_read):
+    runtime, turn, _, _, workspace, read = image_read
+    adapter = runtime.loop.context.vision.workspace_images
+    adapter.settings = replace(adapter.settings.current, image_limits={"max_encoded_bytes": 100})
+    tools, refs = [], []
+    for index in range(6):
+        name = f"{index}.png"
+        (workspace / name).write_bytes(picture(size=(1, 1)))
+        value, tool = await read(name)
+        tools.append(tool)
+        refs.append(value["fileImage"]["artifactId"])
+    plan, payload = await runtime.loop.context.vision.attach(
+        turn, {}, [*prompt(tools[0]), *tools[1:]]
+    )
+    assert [image["artifactId"] for image in plan["imageEvidence"]] == refs[-1:]
+    assert plan["imageEvidence"][0]["path"] == "5.png"
+    assert "omitted" in json.dumps(payload[-1])
