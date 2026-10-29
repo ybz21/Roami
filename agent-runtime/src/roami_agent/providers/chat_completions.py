@@ -206,6 +206,11 @@ class ChatCompletions:
             json=body,
             follow_redirects=False,
         ) as response:
+            request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
+            receipt = {"phase": "headers", "attempt": attempt + 1}
+            if request_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", request_id):
+                receipt["requestId"] = request_id
+            yield ModelEvent("telemetry", receipt)
             if response.status_code in {408, 429, 500, 502, 503, 504}:
                 raise RetryableResponse(
                     response.status_code, retry_delay(response.headers.get("retry-after"), attempt)
@@ -215,11 +220,6 @@ class ChatCompletions:
             if response.status_code >= 400:
                 # Provider bodies can contain echoed prompts and credentials; do not relay them.
                 raise DomainError("MODEL_HTTP_" + str(response.status_code), 502)
-            request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
-            receipt = {"phase": "headers", "attempt": attempt + 1}
-            if request_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", request_id):
-                receipt["requestId"] = request_id
-            yield ModelEvent("telemetry", receipt)
             first_delta = True
             lines = response.aiter_lines()
             async for line in lines:
