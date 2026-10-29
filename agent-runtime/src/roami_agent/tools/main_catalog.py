@@ -49,11 +49,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "reply",
-            "Deliver the final answer and end this turn, without an extra model request. Call alone, no text preamble. "
-            "Use brief for ordinary concise answers, detailed for explicitly requested full/detail content, debug for explicitly requested raw fields/records. "
-            "detailed/debug require scopeQuote copied exactly from the original user's request. Keep requested quotes and content intact. "
-            "Brief rejects boilerplate offers, internal status fields and a Chinese answer to an English request; correct the answer if rejected. "
-            "Use task_reply for pure progress or routine file handoffs. Use ask_user for a missing decision.",
+            "Final answer with requestCoverage, language override or raw/debug metadata. "
+            "Stream ordinary prose as assistant text. Call alone, no preamble; ends the turn. "
+            "brief is concise; detailed/debug preserve explicitly requested content and require an exact user scopeQuote. "
+            "Brief rejects boilerplate, internal fields and Chinese for an English request; correct rejected answers. "
+            "Use task_reply for progress/file handoffs and ask_user for missing decisions.",
             object_schema(
                 {
                     "text": {"type": "string", "minLength": 1},
