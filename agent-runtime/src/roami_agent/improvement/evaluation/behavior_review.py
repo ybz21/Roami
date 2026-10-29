@@ -22,7 +22,7 @@ LOGS = {
     "admission_blocked": ("admission-blocked.json",),
 }
 ACTIONS = {
-    "admission_blocked": "核对首发用量或共享每日限额；后续未执行的 Case 不是新增独立缺陷。",
+    "admission_blocked": "核对首发模型连接、用量或共享每日限额；后续未执行的 Case 不是新增独立缺陷。",
     "failed_assertion": "复现失败断言，核对实际产物和执行链，再修改执行逻辑；不得放宽评分标准。",
     "judge_pending": "补齐独立产物评分；不能把文件存在视为质量通过。",
     "usage_unknown": "核对各角色、重试和异步维护的用量；计量完整前不宣称节省Token。",

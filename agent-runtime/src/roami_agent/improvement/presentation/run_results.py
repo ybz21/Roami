@@ -2,17 +2,11 @@
 
 import json
 
+from roami_agent.improvement.domain.admission_blocking import MODEL_ADMISSION_BLOCKERS
+from roami_agent.improvement.domain.issue_triage import issue_priority
 from roami_agent.improvement.domain.run_configuration import STAGES
 from roami_agent.improvement.evaluation.case_catalog import case_definitions
 from roami_agent.protocol.errors import DomainError
-
-
-def _priority(code):
-    if code in {"RSI_UNEXPECTED_MODEL_TOOL", "RSI_PRIVATE_OUTPUT_REQUIRED"}:
-        return "P0", "boundary_violation"
-    if code in {"RSI_NATIVE_TASK_FAILED", "MODEL_OUTPUT_LENGTH", "RSI_NATIVE_TASK_REQUIRED"}:
-        return "P1", "delivery_blocked"
-    return "P2", "review_required"
 
 
 def _run(records, owner, row, sequence, selected_id):
@@ -114,14 +108,13 @@ def _run(records, owner, row, sequence, selected_id):
     from roami_agent.improvement.persistence.verification_receipts import for_run
 
     verified, closed, verification_evidence = for_run(records, owner, value)
-    blockers = {
-        "MODEL_HTTP_402",
-        "MODEL_PROXY_DAILY_LIMIT",
-        "MODEL_PROXY_USAGE_UNKNOWN",
-        "MODEL_PROXY_CURRENCY_MISMATCH",
-    }
+    blockers = MODEL_ADMISSION_BLOCKERS
     blocker = next(
-        (node.get("error_code") for node in value["nodes"] if node.get("error_code") in blockers),
+        (
+            node.get("error_code")
+            for node in latest.values()
+            if node.get("state") in {"blocked", "failed"} and node.get("error_code") in blockers
+        ),
         None,
     )
     if blocker is None:
@@ -129,6 +122,7 @@ def _run(records, owner, row, sequence, selected_id):
             (
                 signal
                 for case in value["cases"]
+                if case.get("state") == "blocked"
                 for signal in case.get("signals", [])
                 if signal in blockers
             ),
@@ -201,7 +195,7 @@ def results_view(records, owner, run_id):
             if not history or original is None:
                 continue
             first = history[0]["run_id"]
-        priority, reason = _priority(row["code"])
+        priority, reason = issue_priority(row["code"])
         decision = next(
             (run["triage"][row["id"]] for run in reversed(runs) if row["id"] in run["triage"]), None
         )

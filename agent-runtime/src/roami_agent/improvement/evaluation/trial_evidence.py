@@ -137,7 +137,8 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
             and "__pycache__" not in p.parts
         ][:32]
     blocked = bool(
-        signals
+        blocking_code(result, signals)
+        or signals
         & {
             "RSI_TOKEN_BUDGET",
             "RSI_DAILY_BUDGET",
@@ -172,10 +173,10 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         else "task",
         "source_hash": digest(case),
         "state": state,
-        "passed": grade.get("passed") is True,
+        "passed": not blocked and grade.get("passed") is True,
         "hard_passed": grade.get("hard_passed") is True,
-        "pending": grade.get("pending") is True,
-        "quality": grade.get("quality"),
+        "pending": not blocked and grade.get("pending") is True,
+        "quality": None if blocked else grade.get("quality"),
         **({"native_judgment": judgment} if judgment else {}),
         "checks": checks,
         "signals": sorted(signals),

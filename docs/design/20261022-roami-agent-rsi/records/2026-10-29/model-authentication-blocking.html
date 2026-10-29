@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>模型鉴权阻断与 Case 归因</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>模型鉴权阻断与 Case 归因</h1><h2>Product Design</h2><p>模型返回401或403后，本轮停止后续需要模型的Case和付费复盘；不依赖模型的机制检查继续。首发保留已知或未知用量，后续未执行项关联同一首发Case和错误；不把阻断当作新的质量零分或一批缺失产物缺陷。</p>
+<h2>User Stories</h2><ul><li>我能先看到一项P1鉴权问题，再展开首发与后续未执行的Case。</li><li>旧产物问题在本轮无法验证时保持未验证，不误报再次失败或已修复。</li><li>实际判定零分与已恢复后的成功结果仍保留；历史错误不覆盖最新成功环节。</li></ul>
+<h2>Technical Design</h2><p>domain/admission_blocking.py 将401/403纳入既有执行阻断合同，供正式配对、诊断与行为复盘共用；执行阻断不赋予可信发送前拒绝、退费或零用量语义。evaluation/trial_evidence.py 将阻断的总体质量保留为null，仍保留原生判定、检查与信号。persistence/run_repository.py 仅对新阻断的鉴权Case将问题观察归因到鉴权本身，原始信号不删；旧产物问题为unverified，后续未执行项不创建新缺陷。presentation/run_results.py 使用最新环节及实际blocked Case展示阻断，忽略已恢复环节的旧错误。domain/issue_triage.py 统一结果页与免费Markdown汇总的默认分级；401/403默认P1，既有独立分级回执仍可覆盖。既有PipelineReportWorker据首发阻断停止付费报告，无新轮询。</p>
+<h2>验收记录</h2><p>定向106项回归通过，覆盖真实HTTP适配器及私有Unix模型桥、401/403、已知/未知用量、首发归因、后续未调用、机制检查、付费复盘禁止、配对不可比、旧问题未验证、恢复成功及真实零分。新增19项在旧代码下16失败、3通过，修复后全部通过。完整门禁通过：Python2252项（无跳过）、Go全量、前端typecheck/i18n/hover与生产构建。</p><p>本修复验收未调用真实模型，未修改保存模型、参数、能力、每日限额或重试，未部署、未重写原历史Case及未知用量。中途401的上游根因仍未证实；原任务质量、独立评分、人工参考及完整观察仍未完成。新增中文属于诊断Markdown文件内容，沿既有报告格式；产品界面沿用既有中英文鉴权与blocked文案。</p>
+</main></body></html>

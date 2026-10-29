@@ -4,6 +4,7 @@ import json
 import re
 import secrets
 
+from roami_agent.improvement.domain.admission_blocking import MODEL_AUTHENTICATION_BLOCKERS
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.domain.run_configuration import DEFAULTS, STAGES
 from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
@@ -217,10 +218,21 @@ class RunRepository:
                 r["case_id"]: json.loads(r["result_json"])
                 for r in db.execute("SELECT * FROM rsi_pipeline_cases WHERE run_id=?", (run_id,))
             }
+            observed = {}
+            for case in cases.values():
+                authentication = next(
+                    (
+                        code
+                        for code in MODEL_AUTHENTICATION_BLOCKERS
+                        if case.get("state") == "blocked" and code in case["signals"]
+                    ),
+                    None,
+                )
+                observed[case["case_id"]] = [authentication] if authentication else case["signals"]
             for case in cases.values():
                 if case.get("blocked_by"):
                     continue
-                for signal in case["signals"]:
+                for signal in observed[case["case_id"]]:
                     if signal in {"MODEL_HTTP_402", "MODEL_PROXY_DAILY_LIMIT"}:
                         continue
                     ident = digest([owner, case["case_id"], signal])
@@ -243,7 +255,9 @@ class RunRepository:
                         run_id,
                     ),
                 ).fetchone()
-                if prior is None and (case is None or issue["code"] not in case["signals"]):
+                if prior is None and (
+                    case is None or issue["code"] not in observed[case["case_id"]]
+                ):
                     db.execute(
                         "DELETE FROM rsi_pipeline_observations WHERE run_id=? AND issue_id=?",
                         (run_id, issue["id"]),
@@ -255,7 +269,7 @@ class RunRepository:
                     else "unverified"
                     if case.get("blocked_by")
                     else "present"
-                    if issue["code"] in case["signals"]
+                    if issue["code"] in observed[case["case_id"]]
                     else "not_comparable"
                     if prior and prior[0] != case["source_hash"]
                     else "not_reproduced"
