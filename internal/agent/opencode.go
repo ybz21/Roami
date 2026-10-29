@@ -10,18 +10,28 @@ func (opencode) Bin() string              { return "opencode" }
 func (opencode) PinsConversationID() bool { return false }
 func (opencode) OneShotPromptArg() bool   { return true }
 func (opencode) InteractiveArgs(opt StartOpts) []string {
+	var args []string
 	if opt.Model != "" {
-		return []string{"--model", opt.Model, "--prompt"}
+		args = append(args, "--model", opt.Model)
 	}
-	return []string{"--prompt"}
+	args = append(args, openCodePermissionArgs(opt.Permission)...)
+	return append(args, "--prompt")
 }
 func (opencode) OneShotArgs(opt StartOpts) []string {
 	args := []string{"run"}
 	if opt.Model != "" {
 		args = append(args, "--model", opt.Model)
 	}
-	return args
+	return append(args, openCodePermissionArgs(opt.Permission)...)
 }
+
+func openCodePermissionArgs(permission string) []string {
+	if permission == "auto" || permission == "dangerously-skip-permissions" {
+		return []string{"--auto"}
+	}
+	return nil
+}
+
 func (opencode) ResumeCommand(string) string        { return "" }
 func (opencode) DetectConversationID(string) string { return "" }
 func (opencode) ConversationDir(string) string      { return "" }

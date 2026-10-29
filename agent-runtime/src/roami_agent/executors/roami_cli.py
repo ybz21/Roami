@@ -90,6 +90,8 @@ class CodingExecutor:
             if json.loads(task["budget_json"]).get("deadlineMs")
             else 0,
         }
+        if target["kind"] != "session":
+            launch["permission"] = "auto"
         if spec.get("model") and target["kind"] != "session":
             launch["model"] = spec["model"]
         continuing_session = target["kind"] == "session" and spec.get("continuation", {}).get(
