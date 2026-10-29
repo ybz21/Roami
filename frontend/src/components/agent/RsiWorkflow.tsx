@@ -1,6 +1,7 @@
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { ChevronRight, FileTextIcon } from '../../icons'
+import { rsiErrorMessage } from './rsi-error-message'
 
 const stages = ['evaluate', 'review', 'issue', 'repair', 'verify', 'publish', 'observe'] as const
 export type WorkflowStage = typeof stages[number]
@@ -20,7 +21,7 @@ export default function RsiWorkflow({ scenario, total, progress, idPrefix, onArt
 }) {
   const { t } = useI18n(), { phone } = useLayout()
   const initialStage: Stage = scenario === 'repairing' ? 'repair' : scenario === 'complete' ? 'publish' : 'evaluate'
-  const selected = selectedStage ?? (snapshot ? stages.find(stage => snapshot.phases[stage].state === 'active' || snapshot.phases[stage].state === 'failed' || snapshot.phases[stage].state === 'pending') || 'evaluate' : initialStage)
+  const selected = selectedStage ?? (snapshot ? stages.find(stage => snapshot.phases[stage].state === 'active') || stages.find(stage => ['failed', 'blocked', 'pending'].includes(snapshot.phases[stage].state)) || 'evaluate' : initialStage)
 
   const phase = (stage: Stage) => {
     const index = stages.indexOf(stage)
@@ -48,10 +49,11 @@ export default function RsiWorkflow({ scenario, total, progress, idPrefix, onArt
     return <div className="rsi-phase-detail" id={idPrefix + '-phase'} role="region" aria-labelledby={idPrefix + '-' + selected}>
       {!phone && <div className="rsi-section-heading"><h4>{t('agent.rsiPrototype.stage.' + selected)}</h4><span className="rsi-status" data-stage-state={value.state}>{t('agent.rsiPrototype.flow.' + value.stateLabel)}</span></div>}
       {!phone && <p className="rsi-phase-conclusion">{value.summary}</p>}
+      {snapshot?.phases[selected].error && ['blocked', 'failed'].includes(value.state) && <p className="rsi-danger" role="alert">{rsiErrorMessage(snapshot.phases[selected].error!, t)}</p>}
       <dl className="rsi-phase-facts"><div><dt>{t('agent.rsiPrototype.flow.actor')}</dt><dd>{t('agent.rsiPrototype.flow.actor.' + selected)}</dd></div><div><dt>{t('agent.rsiPrototype.flow.input')}</dt><dd>{t('agent.rsiPrototype.flow.' + selected + '.input')}</dd></div></dl>
       <h4>{t('agent.rsiPrototype.' + (['waiting', 'skipped'].includes(value.state) ? 'flow.plan' : 'flow.work'))}</h4><p>{t('agent.rsiPrototype.flow.' + selected + '.action')}</p>
       <h4>{t('agent.rsiPrototype.flow.outputs')}</h4>{snapshot?.phases[selected].artifacts ? snapshot.phases[selected].artifacts!.length ? snapshot.phases[selected].artifacts!.map(artifact => <button type="button" className="rsi-phase-output" key={artifact.id} onClick={() => onArtifact({ name: artifact.name, artifactId: artifact.id, runId: snapshot.runId })}><FileTextIcon size={17} /><span>{artifact.name}</span><ChevronRight size={15} /></button>) : <p className="rsi-muted">{t('agent.rsiPrototype.flow.noOutputs')}</p> : value.hasOutput ? <button type="button" className="rsi-phase-output" onClick={() => onArtifact({ name: (snapshot ? snapshot.id + '-' : '') + filenames[selected], text: [snapshot ? [snapshot.id, snapshot.source, snapshot.suite, snapshot.judge].join(' / ') : '', t('agent.rsiPrototype.stage.' + selected), value.summary, t('agent.rsiPrototype.flow.' + selected + '.action'), t('agent.rsiPrototype.flow.recordsHint')].join('\n\n') })}><FileTextIcon size={17} /><span>{snapshot ? snapshot.id + '-' : ''}{filenames[selected]}</span><ChevronRight size={15} /></button> : <p className="rsi-muted">{t('agent.rsiPrototype.flow.noOutputs')}</p>}
-      <h4>{t('agent.rsiPrototype.flow.next')}</h4><p>{t(value.state === 'skipped' ? 'agent.rsiPrototype.flow.skippedNext' : 'agent.rsiPrototype.flow.' + selected + '.next')}</p>
+      <h4>{t('agent.rsiPrototype.flow.next')}</h4><p>{t(['blocked', 'failed'].includes(value.state) ? 'agent.rsiResults.blockedNext' : value.state === 'skipped' ? 'agent.rsiPrototype.flow.skippedNext' : 'agent.rsiPrototype.flow.' + selected + '.next')}</p>
       <details className="rsi-disclosure"><summary>{t('agent.rsiPrototype.flow.records')}<ChevronRight size={15} /></summary><p className="rsi-footnote">{t('agent.rsiPrototype.flow.recordsHint')}</p><p className="rsi-footnote">{value.summary}</p>{snapshot?.phases[selected].error && <code>{snapshot.phases[selected].error}</code>}</details>
     </div>
   }

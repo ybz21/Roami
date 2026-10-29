@@ -3,9 +3,10 @@
 .rsi-results-selector .ant-select, .rsi-results-filters .ant-select { width:100%; min-width:0; }
 .rsi-results-comparison p { display:flex; flex-wrap:wrap; gap:var(--sp-3); font-size:var(--fs-sm); margin:var(--sp-4) 0 var(--sp-2); }
 .rsi-results-comparison p > span { color:var(--text-dim); }.rsi-results-comparison small { font-size:var(--fs-meta); color:var(--text-dim); line-height:1.6; }
-.rsi-results-metrics { grid-template-columns:repeat(auto-fit, minmax(0, 1fr)); }
-.rsi-results-metrics > button { background:transparent; color:var(--text-bright); border:0; border-left:1px solid var(--border-subtle); border-radius:0; padding:0 0 0 var(--sp-5); text-align:left; font:inherit; display:flex; flex-direction:column; gap:var(--sp-2); cursor:pointer; }
-.rsi-results-metrics > button:first-child { border:0; padding-left:0; }
+.rsi-metrics.rsi-results-metrics { grid-template-columns:repeat(auto-fit, minmax(min(100%, calc(var(--tap) * 2.5)), 1fr)); }
+.rsi-metrics.rsi-results-metrics > button, .rsi-metrics.rsi-results-metrics > div { min-width:0; padding-left:0; border:0; }
+.rsi-results-metrics > button { background:transparent; color:var(--text-bright); border:0; border-radius:0; padding:0; text-align:left; font:inherit; display:flex; flex-direction:column; gap:var(--sp-2); cursor:pointer; }
+
 .rsi-results-metrics small { color:var(--text-dim); font-size:var(--fs-meta); }
 .rsi-results-groups { display:flex; flex-direction:column; gap:var(--sp-3); }
 .rsi-results-groups > div { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--sp-2); font-size:var(--fs-sm); }.rsi-results-groups strong { font-weight:500; }.rsi-results-groups span { color:var(--text-dim); font-size:var(--fs-meta); }
@@ -44,3 +45,8 @@ html[data-size="compact"] .rsi-results-selector { padding:var(--sp-4) 0; gap:var
 .rsi-run-history { border-bottom:1px solid var(--border-subtle); }
 .rsi-run-history > summary { color:var(--text-dim); font-size:var(--fs-sm); }
 .rsi-run-history .rsi-result-disclosure { margin-left:var(--sp-3); }
+.rsi-native-evidence { margin:var(--sp-4) 0; }
+.rsi-case-execution { margin:var(--sp-4) 0; }
+.rsi-case-execution ul { padding-left:var(--sp-5); font-size:var(--fs-meta); color:var(--text-dim); }
+.rsi-draft-notice { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-subtle); font-size:var(--fs-sm); }
+.rsi-draft-notice > span { flex:1; }

@@ -9,9 +9,11 @@ import MobileSubPage from '../MobileSubPage'
 import Markdown from '../markdown/Markdown'
 import { useAgentData } from './useAgentData'
 import { modelProxyFailureKey } from './agent-models'
+import { useRsiArtifact } from './useRsiArtifact'
+import { rsiErrorMessage, rsiModelErrors } from './rsi-error-message'
 import RsiRunResults from './RsiRunResults'
 import { initialResultsView, type CaseDefinition, type IssueDefinition, type RunRecord } from './rsi-history'
-import type { WorkflowArtifact, WorkflowStage } from './RsiWorkflow'
+import type { WorkflowStage } from './RsiWorkflow'
 import './rsi-workspace.css'
 
 type Overview = {
@@ -36,7 +38,7 @@ export default function RsiWorkspace({ node, runId = '', onRun }: { node: string
   const detail = useAgentData<Results>(selectedId ? '/agent/improvement/pipeline/runs/' + encodeURIComponent(selectedId) + '/results' : null, 0, runState && activeStates.has(runState) ? 2000 : 0)
   const [settingsOpen, setSettingsOpen] = useState(false), [draft, setDraft] = useState<Overview | null>(null), [dirty, setDirty] = useState(false)
   const models = useAgentData<{ gatewayManaged?: boolean }>('/agent/model-settings', 0, 0, 'GET', settingsOpen)
-  const [artifact, setArtifact] = useState<{ name: string; text?: string } | null>(null)
+  const { artifact, open: openArtifact, close: closeArtifact } = useRsiArtifact(node, selectedId)
   const [error, setError] = useState(''), [busy, setBusy] = useState('')
   const scope = useRef(node); scope.current = node
   const pending = useRef(new Map<string, string>()), starting = useRef(false), mounted = useRef(true)
@@ -48,8 +50,7 @@ export default function RsiWorkspace({ node, runId = '', onRun }: { node: string
   useEffect(() => { setPoll(live?.pipeline.runs.some(run => activeStates.has(run.state)) ? 2000 : live?.preferences.enabled ? 30000 : 0) }, [live])
   useEffect(() => { if (live && !dirty) { setDraft(live); acknowledged.current = live } }, [live, dirty])
   useEffect(() => { if (selectedId) setSelection(value => value.runId === selectedId ? value : { ...value, runId: selectedId, baselineId: '' }) }, [selectedId])
-  const chosen = useRef(selectedId); chosen.current = selectedId
-  useEffect(() => { setArtifact(null); setError('') }, [selectedId, node])
+  useEffect(() => { setError(''); setStage(null) }, [selectedId, node])
   const mutate = async (key: string, path: string, value?: unknown, method = 'POST') => {
     const owner = node
     setBusy(key); setError('')
@@ -59,16 +60,6 @@ export default function RsiWorkspace({ node, runId = '', onRun }: { node: string
       return response.data
     } catch (e: any) { if (mounted.current && scope.current === owner) setError(e.apiError?.code || 'RSI_OPERATION_FAILED'); throw e }
     finally { if (mounted.current && scope.current === owner) setBusy('') }
-  }
-  const openArtifact = async (value: WorkflowArtifact) => {
-    if (!value.artifactId) { setArtifact({ name: value.name, text: value.text }); return }
-    const owner = node, run = selectedId
-    setBusy('artifact'); setError('')
-    try {
-      const response = await api('GET', '/agent/improvement/pipeline/runs/' + encodeURIComponent(value.runId || run) + '/artifacts/' + encodeURIComponent(value.artifactId))
-      if (mounted.current && scope.current === owner && chosen.current === run) setArtifact(response.data)
-    } catch { if (scope.current === owner) setError('RSI_ARTIFACT_UNAVAILABLE') }
-    finally { if (scope.current === owner) setBusy('') }
   }
   const save = async () => {
     if (!draft || !acknowledged.current) return
@@ -122,29 +113,30 @@ export default function RsiWorkspace({ node, runId = '', onRun }: { node: string
   const modelLink = () => { location.hash = modelSettingsHref('models') }
   const settings = draft ? <ConfigProvider componentDisabled={!!busy}>
     <div className="rsi-scroll"><div className="rsi-content">
-      {error && <p role="alert" className="rsi-danger">{t('agent.rsi.operationFailed', { code: error })}</p>}
+      {error && <p role="alert" className="rsi-danger">{rsiErrorMessage(error, t)}</p>}
       <section className="rsi-section"><div className="rsi-setting-toggle"><span><strong>{t('agent.rsiPrototype.schedule')}</strong></span><Switch checked={draft.preferences.enabled} aria-label={t('agent.rsiPrototype.schedule')} onChange={enabled => changePreferences({ enabled })} /></div>{draft.preferences.enabled && <div className="rsi-form-grid"><label>{t('agent.rsi.hour')}<InputNumber min={0} max={23} value={draft.preferences.hour} onChange={hour => hour != null && changePreferences({ hour })} /></label><label>{t('agent.rsi.timezone')}<Input value={draft.preferences.timezone} onChange={event => changePreferences({ timezone: event.target.value })} /></label></div>}</section>
       <section className="rsi-section"><h3>{t('agent.rsiPrototype.scope')}</h3><div className="rsi-form-grid"><label>{t('agent.rsi.suite')}<Select value={draft.preferences.suite_id || undefined} options={live?.catalog.suites.map(value => ({ value: value.id, label: value.id + ' · ' + value.count }))} onChange={suite_id => changePreferences({ suite_id })} /></label><label>{t('agent.rsi.machines')}<Select mode="multiple" value={draft.preferences.machine_ids} options={live?.catalog.machines.map(value => ({ value: value.id, label: value.label }))} onChange={machine_ids => changePreferences({ machine_ids })} /></label></div>{!live?.catalog.suites.length && <Button disabled={!!busy} onClick={() => void mutate('prepare', '/prepare').catch(() => {})}>{t('agent.rsi.prepare')}</Button>}{!live?.catalog.machines.length && <Button disabled={!!busy} onClick={() => void mutate('machine', '/machines', { id: 'local-container', label: t('agent.rsi.localMachine'), mode: 'container' }).catch(() => {})}>{t('agent.rsi.addLocal')}</Button>}</section>
       <section className="rsi-section"><h3>{t('agent.rsiPrototype.workflow')}</h3><div className="rsi-setting-toggle"><span>{t('agent.rsiPrototype.autoRepair')}</span><Switch checked={draft.research.settings.enabled} aria-label={t('agent.rsiPrototype.autoRepair')} onChange={changeResearch} /></div><div className="rsi-setting-toggle"><span>{t('agent.rsiPrototype.autoIssue')}</span><Switch checked={draft.pipeline.settings.auto_publish} aria-label={t('agent.rsiPrototype.autoIssue')} onChange={changePipeline} /></div></section>
-      <section className="rsi-section"><h3>{t('agent.rsiPrototype.modelsBudget')}</h3><p className="rsi-muted">{t('agent.rsiPrototype.sharedHint')}</p><div className="rsi-budget-note"><span>{models.failed ? t('agent.rsi.loadFailed') : !models.value ? t('common.loading') : t('agent.models.gatewayManaged')}</span><Button onClick={modelLink}>{t('agent.rsiPrototype.modelPage')}</Button></div></section>
+      <section className="rsi-section"><h3>{t('agent.rsiPrototype.modelsBudget')}</h3><p className="rsi-muted">{t('agent.rsiPrototype.sharedHint')}</p><div className="rsi-budget-note"><span>{models.failed ? t('agent.rsi.loadFailed') : !models.value ? t('common.loading') : models.value.gatewayManaged === true ? t('agent.models.gatewayManaged') : t('agent.rsi.error.RSI_SHARED_MODEL_GATEWAY_REQUIRED')}</span><Button onClick={modelLink}>{t('agent.rsiPrototype.modelPage')}</Button></div></section>
     </div></div>
     <footer className="rsi-savebar"><span className="rsi-muted">{dirty ? t('agent.rsiPrototype.unsaved') : ''}</span><Button disabled={!!busy} onClick={() => { setDraft(acknowledged.current); setDirty(false); setSettingsOpen(false) }}>{t('agent.rsiPrototype.cancel')}</Button><Button type="primary" loading={busy === 'save'} disabled={!dirty || !!busy} onClick={() => void save()}>{t('agent.rsi.save')}</Button></footer>
   </ConfigProvider> : <div className="rsi-content">{overview.failed ? <p role="alert">{t('agent.rsi.loadFailed')}<Button onClick={overview.refresh}>{t('agent.rsi.retry')}</Button></p> : <Spin />}</div>
-  const artifactContent = artifact && <div className="rsi-scroll"><div className="rsi-content"><section className="rsi-section"><h3>{artifact.name}</h3>{artifact.name.endsWith('.md') ? <Markdown allowImages={false}>{artifact.text || ''}</Markdown> : <pre className="rsi-artifact-preview">{artifact.text}</pre>}</section></div></div>
+  const artifactContent = artifact && <div className="rsi-scroll"><div className="rsi-content"><section className="rsi-section"><h3>{artifact.name}</h3>{artifact.loading ? <div role="status" aria-label={t('common.loading')}><Spin /></div> : artifact.failed ? <div role="alert"><p>{t('agent.rsi.loadFailed')}</p><Button onClick={() => void openArtifact(artifact.request)}>{t('agent.rsi.retry')}</Button></div> : artifact.name.endsWith('.md') ? <Markdown allowImages={false}>{artifact.text || ''}</Markdown> : <pre className="rsi-artifact-preview">{artifact.text}</pre>}</section></div></div>
   const data = detail.value
   const record = data?.runs.find(run => run.id === selectedId)
   const publication = record?.publication?.url
   const runs = data?.runs.map(run => ({ ...run, time: typeof run.time === 'number' ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(run.time) : run.time })) || []
   return <div className="rsi-workspace">
     <div className="rsi-main">
-      {(error || overview.failed || detail.failed) && <p className="rsi-danger" role="alert">{error ? t('agent.rsi.error.' + error).startsWith('agent.rsi.error.') ? t('agent.rsi.operationFailed', { code: error }) : t('agent.rsi.error.' + error) : t('agent.rsi.loadFailed')}<Button onClick={() => { overview.refresh(); detail.refresh() }}>{t('agent.rsi.retry')}</Button></p>}
-      {(!phone && settingsOpen) || (!phone && artifact) ? <><header className="rsi-pagehead rsi-return-head"><button type="button" className="rsi-back" aria-label={t('common.back')} onClick={() => { if (artifact) setArtifact(null); else setSettingsOpen(false) }}><ChevronLeft size={20} /></button><strong>{artifact ? t('agent.rsiPrototype.artifactTitle') : t('agent.rsiPrototype.settings')}</strong></header>{artifact ? artifactContent : settings}</> : <>
+      {!settingsOpen && !artifact && (error || overview.failed || detail.failed) && <p className="rsi-danger" role="alert">{error ? rsiErrorMessage(error, t) : t('agent.rsi.loadFailed')}{error && rsiModelErrors.has(error) ? <Button onClick={modelLink}>{t('agent.rsiPrototype.modelPage')}</Button> : <Button onClick={() => { overview.refresh(); detail.refresh() }}>{t('agent.rsi.refreshStatus')}</Button>}</p>}
+      {(!phone && settingsOpen) || (!phone && artifact) ? <><header className="rsi-pagehead rsi-return-head"><button type="button" className="rsi-back" aria-label={t('common.back')} onClick={() => { if (artifact) closeArtifact(); else setSettingsOpen(false) }}><ChevronLeft size={20} /></button><strong>{artifact ? t('agent.rsiPrototype.artifactTitle') : t('agent.rsiPrototype.settings')}</strong></header>{artifact ? artifactContent : settings}</> : <>
         <header className={phone ? "rsi-live-actions" : "tt-pagehead rsi-live-head"}>{!phone && <h2>{t('agent.rsiPrototype.title')}</h2>}<div className="acts">{selectedId && selectedId !== live?.pipeline.runs[0]?.id && <Button onClick={() => { const id = live?.pipeline.runs[0]?.id; if (id) { setSelection({ ...initialResultsView, runId: id, baselineId: selectedId }); onRun?.(id) } }}>{t('agent.rsiResults.latestRun')}</Button>}{record?.rawState === 'blocked' && <Button disabled={!!busy} onClick={() => void mutate('resume', '/pipeline/runs/' + selectedId + '/resume').catch(() => {})}>{t('agent.rsi.retry')}</Button>}{publication?.startsWith('https://github.com/') && <a href={publication} target="_blank" rel="noopener noreferrer">{t('agent.rsi.viewIssue')}</a>}<Button icon={<GearIcon size={16} />} onClick={() => setSettingsOpen(true)}>{t('agent.rsiPrototype.settings')}</Button><Button disabled={!!busy || dirty} icon={<PlayIcon />} onClick={() => void start(false)}>{t('agent.pipeline.startTen')}</Button><Button type="primary" disabled={!!busy || dirty || !live?.preferences.machine_ids.length} loading={busy === 'run'} onClick={() => void start(true)}>{t('agent.rsiPrototype.full')}</Button></div></header>
+        {dirty && !settingsOpen && <div className="rsi-draft-notice" role="status"><span>{t('agent.rsiPrototype.unsaved')}</span><Button onClick={() => setSettingsOpen(true)}>{t('agent.rsi.continueSettings')}</Button><Button onClick={() => { setDraft(acknowledged.current); setDirty(false) }}>{t('agent.rsi.discardChanges')}</Button></div>}
         <nav className="rsi-tabs" role="tablist" aria-label={t('agent.rsiPrototype.title')}>{tabs.map((value, index) => <button type="button" key={value} role="tab" id={'live-rsi-tab-' + value} aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} onClick={() => setTab(value)} onKeyDown={event => { if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; event.preventDefault(); const next = tabs[event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : -1) + 3) % 3]; setTab(next); document.getElementById('live-rsi-tab-' + next)?.focus() }}>{t('agent.rsiResults.' + (value === 'workflow' ? 'workflowTab' : value === 'overview' ? 'runResults' : 'issueTab'))}</button>)}</nav>
-        <div className="rsi-scroll" role="tabpanel" aria-labelledby={'live-rsi-tab-' + tab}><div className="rsi-content rsi-content-results">{data && !data.history_complete && <p className="rsi-muted">{t('agent.rsiResults.historyPartial')}</p>}{record?.blocker && <div className="rsi-budget-note" role="status"><span>{t(modelProxyFailureKey(record.blocker) || 'agent.rsiPrototype.usageUnknownHint')}</span><Button onClick={modelLink}>{t('agent.rsiPrototype.modelPage')}</Button></div>}{overview.loading || detail.loading ? <Spin /> : data ? <RsiRunResults issueActions={record && <div className="rsi-results-actions"><Button disabled={!!busy || dirty || !record.scope.length} onClick={() => void start(false, record.id)}>{t('agent.pipeline.rerun')}</Button>{!publication && Object.values(record.workflow || {}).some(node => node.artifacts.some(artifact => artifact.name === 'issue-plan.json')) && <Button disabled={!!busy} onClick={() => void mutate('publish', '/pipeline/runs/' + selectedId + '/publish').catch(() => {})}>{t('agent.pipeline.publishIssue')}</Button>}</div>} view={tab} scenario="live" progress={0} runs={runs} cases={data.cases} issues={data.issues} stopped={false} onStop={() => void mutate('cancel', '/requests/' + selectedId + '/cancel').catch(() => {})} state={{ ...selection, runId: selectedId }} setState={select} workflowStage={stage} onStage={setStage} onArtifact={value => void openArtifact(value)} onView={setTab} /> : <section className="rsi-empty"><p>{t('agent.rsiResults.noResults')}</p><Button onClick={() => setSettingsOpen(true)}>{t('agent.rsiPrototype.settings')}</Button></section>}</div></div>
+        <div className="rsi-scroll" role="tabpanel" aria-labelledby={'live-rsi-tab-' + tab}><div className="rsi-content rsi-content-results">{data && !data.history_complete && <p className="rsi-muted">{t('agent.rsiResults.historyPartial')}</p>}{record?.blocker && <div className="rsi-budget-note" role="status"><span>{modelProxyFailureKey(record.blocker) ? t(modelProxyFailureKey(record.blocker)!) : rsiErrorMessage(record.blocker, t)}</span><Button onClick={modelLink}>{t('agent.rsiPrototype.modelPage')}</Button></div>}{overview.loading || detail.loading ? <Spin /> : data ? <RsiRunResults issueActions={record && <div className="rsi-results-actions"><Button disabled={!!busy || dirty || !record.scope.length} onClick={() => void start(false, record.id)}>{t('agent.pipeline.rerun')}</Button>{!publication && Object.values(record.workflow || {}).some(node => node.artifacts.some(artifact => artifact.name === 'issue-plan.json')) && <Button disabled={!!busy} onClick={() => void mutate('publish', '/pipeline/runs/' + selectedId + '/publish').catch(() => {})}>{t('agent.pipeline.publishIssue')}</Button>}</div>} view={tab} scenario="live" progress={0} runs={runs} cases={data.cases} issues={data.issues} stopped={false} onStop={() => void mutate('cancel', '/requests/' + selectedId + '/cancel').catch(() => {})} state={{ ...selection, runId: selectedId }} setState={select} workflowStage={stage} onStage={setStage} onArtifact={value => void openArtifact(value)} onView={setTab} /> : <section className="rsi-empty"><p>{t('agent.rsiResults.noResults')}</p><Button onClick={() => setSettingsOpen(true)}>{t('agent.rsiPrototype.settings')}</Button></section>}</div></div>
       </>}
     </div>
     {phone && settingsOpen && <MobileSubPage title={t('agent.rsiPrototype.settings')} onBack={() => setSettingsOpen(false)} search={false} keepBottomNav>{settings}</MobileSubPage>}
-    {phone && artifact && <MobileSubPage title={t('agent.rsiPrototype.artifactTitle')} onBack={() => setArtifact(null)} search={false}>{artifactContent}</MobileSubPage>}
+    {phone && artifact && <MobileSubPage title={t('agent.rsiPrototype.artifactTitle')} onBack={closeArtifact} search={false}>{artifactContent}</MobileSubPage>}
   </div>
 }
