@@ -62,7 +62,9 @@ async def codex_json(
         not shared or proxy is not None or settings is not None, "RSI_CODEX_SHARED_GATEWAY_REQUIRED"
     )
     gateway = shared and proxy is None
-    binding = ["codex-text-go-v1", asdict(settings.route("main"))] if gateway else None
+    binding = (
+        ["codex-text-go-v2-configured-model", asdict(settings.route("main"))] if gateway else None
+    )
     plan = None
     if proxy is not None:
         require(

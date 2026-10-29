@@ -2,7 +2,8 @@
 
 import copy
 import json
-from dataclasses import replace
+from dataclasses import asdict
+from pathlib import Path
 
 import pytest
 from test_improvement_artifact_review import certificate, pack, profile, rating
@@ -10,8 +11,26 @@ from test_improvement_artifact_review import certificate, pack, profile, rating
 from roami_agent.improvement.domain.contracts import DIMENSIONS, digest
 from roami_agent.improvement.evaluation.artifact_review import ArtifactReviewer, calibrate_artifacts
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
+
+
+def configured_settings(parameters=None):
+    return Settings(
+        endpoint="https://configured.invalid/v1",
+        model="saved-main",
+        model_capabilities={"images": True},
+        model_parameters=parameters or {},
+        worker_route=ModelRoute(
+            "https://configured.invalid/v1",
+            "saved-worker",
+            "SAVED_WORKER_KEY",
+            90,
+            capabilities={"images": True},
+            parameters=parameters or {},
+        ),
+    )
 
 
 @pytest.mark.parametrize("configured_cap", [None, 8192])
@@ -21,7 +40,7 @@ async def test_daily_raters_use_model_page_cap_and_can_exceed_the_old_profile_bu
     legacy_limits,
 ):
     parameters = {} if configured_cap is None else {"max_tokens": configured_cap}
-    settings = replace(Settings(), model_parameters=parameters)
+    settings = configured_settings(parameters)
     raw = profile()
     legacy_token_limit = raw["max_tokens"]
     raw["output_tokens"] = 4096
@@ -57,7 +76,7 @@ async def test_daily_raters_use_model_page_cap_and_can_exceed_the_old_profile_bu
     budget, journal = judge.budget(), []
     ratings = await judge.rate(pack(), budget, journal)
     assert len(ratings) == 2 and budget.metrics()["tokens"] == 80000 > legacy_token_limit
-    assert observed == [{**parameters, "temperature": 0}] * 2
+    assert observed == [parameters] * 2
     assert [r["output_cap"] for r in journal] == [configured_cap or 0] * 2
     changed = copy.deepcopy(raw)
     changed.update(max_tokens=64000, output_tokens=1024)
@@ -74,7 +93,7 @@ async def test_daily_raters_use_model_page_cap_and_can_exceed_the_old_profile_bu
 def test_loaded_rater_uses_the_same_policy_as_preflight_and_rejects_changed_routes(
     tmp_path, shared
 ):
-    settings, raw = Settings(), profile()
+    settings, raw = configured_settings(), profile()
     draft = ArtifactReviewer(settings, raw, calibrated=False, shared_daily_limit=shared)
     cert = certificate(draft.route_hashes)
     cert["provider_mode"] = "live_models"  # Synthetic certificate validation fixture.
@@ -145,7 +164,7 @@ async def test_daily_calibration_has_no_local_token_reservation_and_never_replay
 
     root = tmp_path / "ratings"
     result = await calibrate_artifacts(
-        Settings(),
+        configured_settings(),
         profile(),
         anchors,
         root,
@@ -154,6 +173,10 @@ async def test_daily_calibration_has_no_local_token_reservation_and_never_replay
         shared_daily_limit=True,
     )
     assert result["passed"] and result["provider_mode"] == "protocol_fixture"
+    saved = json.loads(Path(result["certificate"]).read_text())
+    assert saved["model_page_routes"] == {
+        role: asdict(configured_settings().route(role)) for role in ("main", "worker")
+    }
     assert len(calls) == 24 and result["tokens"] == 24 * 50001
     starts = [json.loads(p.read_text()) for p in root.glob("*/started.json")]
     assert len(starts) == 12
@@ -163,7 +186,7 @@ async def test_daily_calibration_has_no_local_token_reservation_and_never_replay
     )
     with pytest.raises(FileExistsError):
         await calibrate_artifacts(
-            Settings(),
+            configured_settings(),
             profile(),
             anchors,
             root,
@@ -191,7 +214,7 @@ async def test_configure_command_installs_the_exact_calibrated_policy(
     from roami_agent.improvement.entrypoints.cli import execute
 
     parameters = {} if cap is None else {"max_tokens": cap}
-    settings = replace(Settings(), model_parameters=parameters)
+    settings = configured_settings(parameters)
     raw = profile()
     if not legacy_limits:
         raw.pop("max_tokens")
@@ -199,7 +222,11 @@ async def test_configure_command_installs_the_exact_calibrated_policy(
     cert = certificate(draft.route_hashes)
     cert["provider_mode"] = "live_models"  # Synthetic command-validation fixture only.
     if shared:
-        cert.update(spending_policy="shared_model_daily", model_page_output_tokens=cap)
+        cert.update(
+            spending_policy="shared_model_daily",
+            model_page_output_tokens=cap,
+            model_page_routes={role: asdict(settings.route(role)) for role in ("main", "worker")},
+        )
     inputs = []
     for name, value in [("profile.json", raw), ("certificate.json", cert)]:
         path = tmp_path / name
@@ -245,7 +272,7 @@ async def test_profile_without_token_fields_previews_and_queues_on_daily_policy(
     )
     raw = profile()
     raw.pop("max_tokens")
-    settings = Settings()
+    settings = configured_settings()
     judge = ArtifactReviewer(settings, raw, calibrated=False, shared_daily_limit=True)
     cert = certificate(judge.route_hashes)
     cert["provider_mode"] = "live_models"  # Synthetic profile-loading fixture only.
@@ -314,7 +341,11 @@ async def test_daily_rater_unknown_usage_still_stops_the_second_rater():
         return Provider()
 
     judge = ArtifactReviewer(
-        Settings(), profile(), calibrated=False, provider_factory=factory, shared_daily_limit=True
+        configured_settings(),
+        profile(),
+        calibrated=False,
+        provider_factory=factory,
+        shared_daily_limit=True,
     )
     budget = judge.budget()
     with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):

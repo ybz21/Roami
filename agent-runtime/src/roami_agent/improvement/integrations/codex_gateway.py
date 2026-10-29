@@ -5,7 +5,7 @@ import hmac
 import json
 import secrets
 from contextlib import aclosing, asynccontextmanager
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.integrations.codex_responses import TextResponse, text_messages
@@ -13,7 +13,6 @@ from roami_agent.improvement.integrations.measurements import EpisodeBudget
 from roami_agent.improvement.integrations.model_gateway import MAX_HEADER_BYTES, MAX_REQUEST_BYTES
 from roami_agent.improvement.integrations.request_model import RequestBudgetModel
 from roami_agent.protocol.errors import DomainError, public_error_code
-from roami_agent.providers.model_catalog import fetch_catalog
 
 
 @dataclass
@@ -25,36 +24,16 @@ class CodexGatewayPlan:
 
     @property
     def identity(self):
-        return digest(["codex-text-go-v1", self.model, asdict(self.route)])
+        return digest(["codex-text-go-v2-configured-model", self.model, asdict(self.route)])
 
 
-async def gateway_plan(settings, selected, *, factory=None, catalog=None):
+async def gateway_plan(settings, selected, *, factory=None):
     model = selected.get("model")
     require(isinstance(model, str) and 0 < len(model) <= 200, "RSI_CODEX_MODEL_REQUIRED")
     route = settings.route("main")
-    require(bool(route.endpoint), "RSI_CODEX_SHARED_GATEWAY_REQUIRED")
-    available = await (catalog or fetch_catalog)(route.endpoint, settings.credentials("main"))
-    matches = (
-        [model]
-        if model in available
-        else [name for name in available if name.endswith("/" + model)]
-    )
-    require(len(matches) == 1, "RSI_CODEX_MODEL_ROUTE_REQUIRED")
-    parameters = dict(route.parameters) if route.name == matches[0] else {}
-    if effort := selected.get("model_reasoning_effort"):
-        parameters["reasoning_effort"] = effort
-    return CodexGatewayPlan(
-        settings,
-        replace(
-            route,
-            name=matches[0],
-            max_retries=0,
-            context_window=available[matches[0]],
-            parameters=parameters,
-        ),
-        model,
-        factory,
-    )
+    require(bool(route.endpoint and route.name), "RSI_CODEX_SHARED_GATEWAY_REQUIRED")
+    # The CLI model identifies its wire protocol; the node owns upstream selection.
+    return CodexGatewayPlan(settings, route, model, factory)
 
 
 @asynccontextmanager
@@ -192,16 +171,13 @@ class CodexTextGateway:
                 )
                 body = json.loads(await reader.readexactly(int(length)))
                 messages = text_messages(body, self.plan.model)
-                parameters = dict(self.plan.route.parameters)
                 reasoning = body.get("reasoning") or {}
                 require(isinstance(reasoning, dict), "RSI_CODEX_GATEWAY_INPUT")
-                if effort := reasoning.get("effort"):
-                    parameters["reasoning_effort"] = effort
-                if maximum := body.get("max_output_tokens"):
-                    parameters["max_tokens"] = maximum
-                from roami_agent.providers.generation_parameters import generation_parameters
-
-                route = replace(self.plan.route, parameters=generation_parameters(parameters))
+                maximum = body.get("max_output_tokens")
+                require(
+                    maximum is None or type(maximum) is int and maximum > 0,
+                    "RSI_CODEX_GATEWAY_INPUT",
+                )
                 require(not self.accepted, "RSI_CODEX_SINGLE_TURN_REQUIRED")
                 self.accepted = True
             writer.write(
@@ -212,7 +188,7 @@ class CodexTextGateway:
             await response.start()
             model = RequestBudgetModel(
                 self.plan.settings,
-                route,
+                self.plan.route,
                 self.budget,
                 "main",
                 factory=self.plan.factory,

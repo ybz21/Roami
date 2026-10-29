@@ -126,7 +126,9 @@ class NativeFilesExecutor:
             + [settings.main_instructions, settings.worker_instructions, fixture]
         )
         if shared_daily_limit:
-            self.model_hash = digest([self.model_hash, "shared_model_daily_limit"])
+            self.model_hash = digest(
+                [self.model_hash, "shared_model_daily_limit-v2-configured-routes"]
+            )
 
     async def run(self, case, policy, root):
         workspace = self.workspace or root / "workspace"
@@ -177,18 +179,16 @@ class NativeFilesExecutor:
                     if self.shared_daily_limit
                     else min(2048, route.parameters.get("max_tokens", 2048))
                 )
-                route = replace(
-                    route,
-                    parameters={
-                        **route.parameters,
-                        **({"max_tokens": output_cap} if output_cap is not None else {}),
-                    },
-                    max_retries=0,
-                    timeout_seconds=min(
-                        case["limits"]["seconds"],
-                        route.timeout_seconds or case["limits"]["seconds"],
-                    ),
-                )
+                if not self.shared_daily_limit:
+                    route = replace(
+                        route,
+                        parameters={**route.parameters, "max_tokens": output_cap},
+                        max_retries=0,
+                        timeout_seconds=min(
+                            case["limits"]["seconds"],
+                            route.timeout_seconds or case["limits"]["seconds"],
+                        ),
+                    )
                 configured = settings_with_route(settings, actual_role, route)
                 provider = (
                     self.provider_factory(configured, role)
