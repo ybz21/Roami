@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [超时后的真实产物判定](2026-10-29/timeout-artifact-assessment.html) |
 | 2026-10-29 | [失败模型请求的上游编号](2026-10-29/model-error-request-receipts.html) |
 | 2026-10-29 | [模型鉴权阻断与 Case 归因](2026-10-29/model-authentication-blocking.html) |
 | 2026-10-29 | [私有模型流错误码保真](2026-10-29/model-stream-error-codes.html) |
