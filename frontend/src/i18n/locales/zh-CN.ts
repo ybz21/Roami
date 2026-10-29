@@ -15,7 +15,7 @@ const zhCN = {
   'agent.rsi.error.RSI_ARTIFACT_SETTINGS_REQUIRED': "独立评分缺少有效的模型配置。",
   'agent.rsiResults.blockedNext': '先处理上面的阻断原因，再重试本次运行。',
   'agent.rsiResults.nativeJudgment': "原生判定",
-  'agent.rsiResults.nativeNotRun': "尚未执行",
+  'agent.rsiResults.nativeNotRun': "未完成判定",
   'agent.rsiResults.nativeScore': "原生评分",
   'agent.rsiResults.nativeMinimum': "最低要求",
   'agent.rsiResults.nativeReferences': "备选参考结果",

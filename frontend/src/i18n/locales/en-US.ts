@@ -15,7 +15,7 @@ const enUS = {
   'agent.rsi.error.RSI_ARTIFACT_SETTINGS_REQUIRED': "Independent scoring requires valid model settings.",
   'agent.rsiResults.blockedNext': 'Resolve the blocker above, then retry this run.',
   'agent.rsiResults.nativeJudgment': "Native evaluation",
-  'agent.rsiResults.nativeNotRun': "Not run",
+  'agent.rsiResults.nativeNotRun': "Evaluation incomplete",
   'agent.rsiResults.nativeScore': "Native score",
   'agent.rsiResults.nativeMinimum': "Required minimum",
   'agent.rsiResults.nativeReferences': "Reference results",
