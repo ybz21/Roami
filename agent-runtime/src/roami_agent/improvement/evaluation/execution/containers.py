@@ -13,6 +13,7 @@ from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.evaluation.execution.container_context import model_context
 from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
 from roami_agent.improvement.evaluation.grading import judge_case
 from roami_agent.improvement.integrations.artifact_files import materialize, private_json
@@ -102,7 +103,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v30-configured-model-routes",
+                "container-uds-v31-configured-context",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -125,8 +126,11 @@ class ContainerExecutor:
         self.provider_factory = provider_factory
         self.shared_budget = shared_budget
         self.shared_daily_limit = shared_daily_limit
+        self.model_context = model_context(settings) if shared_daily_limit else None
         if shared_daily_limit:
-            self.model_hash = digest([self.model_hash, "shared_model_daily_limit"])
+            self.model_hash = digest(
+                [self.model_hash, "shared_model_daily_limit", self.model_context]
+            )
         self.source_root = Path(source_root).resolve() if source_root is not None else None
         self.regression_root = regression_root
         self.output_caps = output_caps or {}
@@ -201,7 +205,7 @@ class ContainerExecutor:
         if self.shared_daily_limit:
             labels = detail.get("Config", {}).get("Labels") or {}
             require(
-                labels.get("org.roami.rsi.shared-daily-policy") == "4",
+                labels.get("org.roami.rsi.shared-daily-policy") == "5",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
         if self.worker_image_input["enabled"]:
@@ -483,6 +487,7 @@ class ContainerExecutor:
                 "policy": policy,
                 "shared_daily_limit": self.shared_daily_limit,
                 "worker_image_input": self.worker_image_input,
+                "model_context": self.model_context,
             },
         )
         setup_ms = (time.monotonic() - started) * 1000
