@@ -137,3 +137,17 @@ it('resets a previous phase selection when opening a different run', () => {
   rerender(<AgentImprovement node={null} runId={earlier} />)
   expect(document.querySelector('.rsi-phase-button[aria-pressed="true"]')?.id).toBe('run-review')
 })
+it('resets results scroll when changing tabs so summaries remain the entry point', () => {
+  render(<AgentImprovement node={null} />)
+  const scroll = document.querySelector<HTMLElement>('.rsi-scroll[role=tabpanel]')!
+  scroll.scrollTop = 300
+  fireEvent.click(screen.getByRole('tab', { name: 'Issue' }))
+  expect(scroll.scrollTop).toBe(0)
+})
+it('resets results scroll when opening another run', () => {
+  const { rerender } = render(<AgentImprovement node={null} runId={id} />)
+  const scroll = document.querySelector<HTMLElement>('.rsi-scroll[role=tabpanel]')!
+  scroll.scrollTop = 300
+  rerender(<AgentImprovement node={null} runId={earlier} />)
+  expect(scroll.scrollTop).toBe(0)
+})
