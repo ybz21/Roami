@@ -5,6 +5,7 @@ import json
 import logging
 from datetime import UTC, datetime
 
+from roami_agent.context.execution_timing import execution_timing
 from roami_agent.context.main_history import main_history
 from roami_agent.context.remembered import RememberedContext
 from roami_agent.context.task_evidence import completion_evidence
@@ -15,6 +16,7 @@ from roami_agent.context.token_estimate import (
     request_tokens,
 )
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row, rows
@@ -389,6 +391,18 @@ class PromptBuilder:
                 if recalled:
                     prompt.insert(1, recalled)
             plan, prompt = await self._images(turn, plan, prompt)
+            timing = execution_timing(turn, now_ms())
+            if timing:
+                plan["executionTiming"] = timing
+                # A changing clock must not invalidate the cached history prefix.
+                prompt.append(
+                    {
+                        "role": "system",
+                        "content": "Current native attempt timing (runtime data, not completion evidence): "
+                        + encoded(timing)
+                        + ". Original task requirements still apply.",
+                    }
+                )
             supplemental = max(0, request_tokens(prompt, catalog) - request_tokens(plain, catalog))
             return {**plan, "estimatedTokens": plan["estimatedTokens"] + supplemental}, prompt
 

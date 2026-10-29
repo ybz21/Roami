@@ -12,6 +12,7 @@ import threading
 import pytest
 
 Xlib = pytest.importorskip("Xlib")
+from native_prompt_messages import dialogue_messages
 from Xlib import XK, X, display
 
 from roami_agent.app import Runtime
@@ -146,6 +147,7 @@ class DesktopModel:
         self.step = 0
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if not tools or "ask_user" in {tool["function"]["name"] for tool in tools}:
             yield ModelEvent("text", '{"memories":[]}')
             return
@@ -334,6 +336,7 @@ class DelayedDesktopModel:
     model = "delayed-desktop-model"
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if not tools or "ask_user" in {tool["function"]["name"] for tool in tools}:
             yield ModelEvent("text", "Quick answer")
             return

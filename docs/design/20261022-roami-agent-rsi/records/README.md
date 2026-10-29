@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [有效模型配置与执行时长](2026-10-29/effective-models-execution-timing.html) |
 | 2026-10-29 | [超时后的真实产物判定](2026-10-29/timeout-artifact-assessment.html) |
 | 2026-10-29 | [失败模型请求的上游编号](2026-10-29/model-error-request-receipts.html) |
 | 2026-10-29 | [模型鉴权阻断与 Case 归因](2026-10-29/model-authentication-blocking.html) |

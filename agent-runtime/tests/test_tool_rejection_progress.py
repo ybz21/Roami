@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_argument_repair_progress import claimed_turn
 
 from roami_agent.app import Runtime
@@ -36,6 +37,7 @@ class Calls:
         self.script, self.calls, self.results = calls, 0, []
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if messages[-1]["role"] == "tool":
             self.results.append(json.loads(messages[-1]["content"]))
         self.calls += 1

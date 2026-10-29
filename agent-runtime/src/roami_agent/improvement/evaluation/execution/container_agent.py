@@ -28,25 +28,30 @@ def container_settings(request):
     )
     if request.get("shared_daily_limit") is True:
         settings = context_settings(settings, request.get("model_context"))
-    image_input = request.get("worker_image_input")
-    if image_input is None:
-        return settings
-    require(
-        isinstance(image_input, dict)
-        and set(image_input) == {"enabled", "limits"}
-        and type(image_input["enabled"]) is bool,
-        "RSI_CONTAINER_MODEL_INPUT_INVALID",
-    )
-    ImageLimits.configured(image_input["limits"])
-    return settings_with_route(
-        settings,
-        "worker",
-        replace(
-            settings.route("worker"),
-            capabilities={"images": image_input["enabled"]},
-            image_limits=image_input["limits"],
-        ),
-    )
+    # Main input changes must not enable an unspecified Worker's fallback route.
+    settings = settings_with_route(settings, "worker", settings.route("worker"))
+    for role in ("main", "worker"):
+        image_input = request.get(role + "_image_input")
+        if image_input is None:
+            continue
+        require(
+            isinstance(image_input, dict)
+            and set(image_input) == {"enabled", "limits"}
+            and type(image_input["enabled"]) is bool,
+            "RSI_CONTAINER_MODEL_INPUT_INVALID",
+        )
+        ImageLimits.configured(image_input["limits"])
+        route = settings.route(role)
+        settings = settings_with_route(
+            settings,
+            role,
+            replace(
+                route,
+                capabilities={**route.capabilities, "images": image_input["enabled"]},
+                image_limits=image_input["limits"],
+            ),
+        )
+    return settings
 
 
 async def main():

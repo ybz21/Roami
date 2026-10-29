@@ -2,6 +2,7 @@ import json
 import sys
 
 import pytest
+from native_prompt_messages import dialogue_messages
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
@@ -422,6 +423,7 @@ async def test_multistep_turn_does_not_sum_individual_model_request_timeouts(sto
         model = "multi-step-worker"
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             await asyncio.sleep(0.6)
             if messages[-1]["role"] == "tool":
                 yield ModelEvent("text", "verified work")

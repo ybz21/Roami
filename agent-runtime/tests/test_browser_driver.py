@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
+from native_prompt_messages import dialogue_messages
 
 from roami_agent.app import Runtime
 from roami_agent.executors.browser_driver import BrowserDriver
@@ -148,6 +149,7 @@ class BrowserModel:
         self.step = 0
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if not tools or "ask_user" in {item["function"]["name"] for item in tools}:
             yield ModelEvent("text", "Reported in the original conversation")
             return
@@ -314,6 +316,7 @@ async def test_failed_source_navigation_can_continue_in_the_same_task(store, ini
 
     class RecoveryModel(BrowserModel):
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             if not tools or "ask_user" in {item["function"]["name"] for item in tools}:
                 yield ModelEvent("text", "Reported in the original conversation")
                 return
@@ -786,6 +789,7 @@ async def test_only_stopped_research_navigation_returns_fresh_scene_without_repl
             self.steps = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             self.steps += 1
             if self.steps == 1:
                 name, args = "browser_open", {}

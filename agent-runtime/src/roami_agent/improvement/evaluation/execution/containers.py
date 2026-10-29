@@ -106,7 +106,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v31-configured-context",
+                "container-uds-v32-configured-image-roles",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -124,7 +124,12 @@ class ContainerExecutor:
             "enabled": image_route.capabilities.get("images") is True,
             "limits": image_route.image_limits,
         }
-        self.model_hash = digest([self.model_hash, self.worker_image_input])
+        main_image_route = main_route or settings.route("main")
+        self.main_image_input = {
+            "enabled": main_image_route.capabilities.get("images") is True,
+            "limits": main_image_route.image_limits,
+        }
+        self.model_hash = digest([self.model_hash, self.main_image_input, self.worker_image_input])
         self.image_id = None
         self.provider_factory = provider_factory
         self.shared_budget = shared_budget
@@ -200,18 +205,23 @@ class ContainerExecutor:
         )
         return case["limits"]["tokens"] + extra
 
-    async def preflight(self):
+    async def preflight(self, *, model_inputs=True):
         try:
             detail = json.loads(await docker_command("image", "inspect", self.image))[0]
         except (DomainError, ValueError):
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
+        labels = detail.get("Config", {}).get("Labels") or {}
         if self.shared_daily_limit:
-            labels = detail.get("Config", {}).get("Labels") or {}
             require(
                 labels.get("org.roami.rsi.shared-daily-policy") == "5",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
-        if self.worker_image_input["enabled"]:
+        if model_inputs and self.main_image_input["enabled"]:
+            require(
+                labels.get("org.roami.rsi.model-image-input") == "1",
+                "RSI_CONTAINER_IMAGE_REQUIRED",
+            )
+        if model_inputs and self.worker_image_input["enabled"]:
             require(
                 (detail.get("Config", {}).get("Labels") or {}).get(
                     "org.roami.rsi.workspace-image-input"
@@ -227,7 +237,7 @@ class ContainerExecutor:
                 self.artifact_renderer = self
             else:
                 self.artifact_renderer = ContainerExecutor(self.settings, image=expected)
-                await self.artifact_renderer.preflight()
+                await self.artifact_renderer.preflight(model_inputs=False)
             renderer_id = self.artifact_renderer.image_id
             require(renderer_id == expected, "RSI_ARTIFACT_RENDERER_CHANGED")
         return {
@@ -502,6 +512,7 @@ class ContainerExecutor:
                 "policy": policy,
                 "shared_daily_limit": self.shared_daily_limit,
                 "worker_image_input": self.worker_image_input,
+                "main_image_input": self.main_image_input,
                 "model_context": self.model_context,
             },
         )

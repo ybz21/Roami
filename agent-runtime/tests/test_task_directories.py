@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_runtime import ConversationModel, until
 from test_task_delivery_benchmark import mark
 
@@ -25,6 +26,7 @@ async def test_native_creates_and_delivers_a_file_without_a_directory_or_go_work
         model = "native-file-fixture"
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             workspace = json.JSONDecoder().raw_decode(
                 messages[0]["content"].split(
                     "Prepared task workspace (trusted runtime binding): ", 1

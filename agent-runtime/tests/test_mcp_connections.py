@@ -9,6 +9,7 @@ import pytest
 import uvicorn
 from mcp import ClientSession
 from mcp.server.fastmcp import FastMCP
+from native_prompt_messages import dialogue_messages
 from starlette.responses import Response
 
 from roami_agent.app import Runtime
@@ -242,6 +243,7 @@ async def test_worker_discovers_calls_and_records_mcp_outcomes(
         calls = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             names = [tool["function"]["name"] for tool in tools]
             if not tools or "ask_user" in names:
                 yield ModelEvent("text", "Task result received")

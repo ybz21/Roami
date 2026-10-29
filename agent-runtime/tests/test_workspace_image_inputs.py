@@ -7,6 +7,7 @@ import os
 from dataclasses import replace
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from PIL import Image
 from test_image_preparation import picture
 from test_resource_leases import controller
@@ -327,6 +328,7 @@ async def test_native_loop_delivers_file_pixels_to_the_worker_and_keeps_only_ref
         calls = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             self.calls += 1
             assert self.calls <= 2, "The read image did not reach the next model request"
             if isinstance(messages[-1].get("content"), list):

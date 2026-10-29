@@ -82,10 +82,12 @@ class TaskDispatcher:
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?",
                 ("preparing" if preparing else "running", now_ms(), task["id"]),
             )
+            started_ms = now_ms()
             db.execute(
                 "UPDATE task_attempts SET state=?,started_ms=? WHERE id=?",
-                ("starting" if preparing else "running", now_ms(), run["id"]),
+                ("starting" if preparing else "running", started_ms, run["id"]),
             )
+            run = dict(run, started_ms=started_ms)
             turn = None
             if run["executor_kind"] == "native":
                 b = row(db, "SELECT * FROM branches WHERE id=?", (run["native_branch_id"],))

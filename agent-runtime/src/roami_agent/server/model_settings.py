@@ -14,6 +14,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_value
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
+from roami_agent.providers.model_capacity import resolve_model_capacity
 from roami_agent.providers.model_catalog import fetch_catalog
 from roami_agent.providers.reasoning_effort import reasoning_efforts, with_reasoning_effort
 
@@ -155,6 +156,10 @@ def effective_settings(base, saved, *, credentials=True):
 def load_model_settings(base, root):
     saved = read_saved(root)
     return effective_settings(base, saved) if saved else base
+
+
+async def load_runtime_model_settings(base, root):
+    return await resolve_model_capacity(load_model_settings(base, root), fetch=fetch_catalog)
 
 
 class ModelSettings:
@@ -426,18 +431,7 @@ class ModelSettings:
         }
 
     async def resolve_capacity(self, settings):
-        async def resolve(role):
-            route = settings.route(role)
-            if route.context_window is not None or not route.endpoint or not route.name:
-                return route
-            try:
-                catalog = await fetch_catalog(route.endpoint, settings.credentials(role))
-            except DomainError:
-                return route
-            return replace(route, context_window=catalog.get(route.name))
-
-        main, worker = await asyncio.gather(resolve("main"), resolve("worker"))
-        return replace(settings, context_window=main.context_window, worker_route=worker)
+        return await resolve_model_capacity(settings, fetch=fetch_catalog)
 
     async def refresh_capacity(self):
         self.runtime.settings.current = await self.resolve_capacity(self.runtime.settings.current)

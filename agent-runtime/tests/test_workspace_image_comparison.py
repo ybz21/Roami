@@ -6,6 +6,7 @@ import json
 from dataclasses import replace
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from PIL import Image
 from test_image_preparation import picture
 from test_workspace_image_inputs import image_read as workspace_image_fixture
@@ -250,6 +251,7 @@ async def test_native_loop_compares_all_pixels_in_one_model_request(image_read, 
         calls = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             self.calls += 1
             assert self.calls <= count + 1, "All file snapshots must be visible together"
             if self.calls <= count:
