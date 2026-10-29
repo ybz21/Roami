@@ -113,7 +113,7 @@ const enUS = {
   'agent.rsiResults.linkedIssues': 'Linked issues',
   'agent.rsiResults.noLinkedIssue': 'No linked issue',
   'agent.rsiResults.caseEvidence.passed': 'Case assertions passed. Issue resolution still depends on independent verification and subsequent observation.',
-  'agent.rsiResults.caseEvidence.failed': 'Case failed. Failure evidence is linked to its issue.',
+  'agent.rsiResults.caseEvidence.failed': 'Case failed.',
   'agent.rsiResults.caseEvidence.pending': 'Delivery preserved. Scoring is incomplete; this does not count as a pass.',
   'agent.rsiResults.caseEvidence.not_run': 'This case did not run. There is no new verification result.',
   'agent.rsiResults.caseEvidence.running': 'Case is running. No final result is available.',

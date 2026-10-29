@@ -27,3 +27,10 @@ it('keeps tools, files and unknown usage in execution details', () => {
   const details = screen.getByText('执行记录').closest('details')!
   expect(details.open).toBe(false); expect(within(details).getByText('模型用量未知')).toBeTruthy(); expect(within(details).getByText('output.mp4')).toBeTruthy()
 })
+
+it('keeps a partial reference unscored while displaying a genuine zero for its alternative', () => {
+  render(<RsiCaseEvidence evidence={{ native_judgment: { native_reference_results: [null, 0], native_verifier_ran: true } }} />)
+  expect(screen.getByText(/参考 1：尚未评分/)).toBeTruthy()
+  expect(screen.getByText(/参考 2：0/)).toBeTruthy()
+  expect(screen.queryByText('原生评分')).toBeNull()
+})

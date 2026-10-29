@@ -113,7 +113,7 @@ const zhCN = {
   'agent.rsiResults.linkedIssues': '关联 Issue',
   'agent.rsiResults.noLinkedIssue': '没有关联 Issue',
   'agent.rsiResults.caseEvidence.passed': '本例断言通过；是否解决关联 Issue，仍以独立验收和后续观察为准。',
-  'agent.rsiResults.caseEvidence.failed': '本例未通过，失败证据已关联到对应 Issue。',
+  'agent.rsiResults.caseEvidence.failed': '本例未通过。',
   'agent.rsiResults.caseEvidence.pending': '产物已保留，尚未完成评分，不能计为通过。',
   'agent.rsiResults.caseEvidence.not_run': '本次未运行此项，没有新的验证结论。',
   'agent.rsiResults.caseEvidence.running': '本例正在运行，尚无最终结论。',
