@@ -42,7 +42,7 @@ def import_stock(source_dir, *, image, raw_source, revision):
         "grading_profile": "presentation",
         "files": {},
         "prompt": instruction
-        + "\n\nUse the isolated native ownCloud through python /workspace/stock-http.py GET|MKCOL|PUT /Documents/path [local-file]. GET downloads to local-file; PUT uploads it. Only the supplied raw CSV and the three requested output filenames are accessible, and MKCOL creates the requested stock_presentation folder. The agent has no direct network or service credentials. Native state is captured after exit: local files alone do not count as delivery. Do not replay writes with unknown outcomes; reconcile by reading. The original strict CSV equality result is reported separately; the adapted numeric gate uses rtol=1e-12, atol=1e-10 for published floating-point roundoff while preserving schema, types and row order; chart correctness, business interpretation, presenter script and visual usability require independent calibrated review. API adaptation excludes browser interaction and official leaderboard comparability.",
+        + "\n\nUse the isolated native ownCloud through python /workspace/stock-http.py GET|MKCOL|PUT /Documents/path [local-file]. GET downloads to local-file; PUT uploads it. Only the supplied raw CSV and the three requested output filenames are accessible, and MKCOL creates the requested stock_presentation folder. The agent has no direct network or service credentials. Native state is captured after exit: local files alone do not count as delivery. Do not replay writes with unknown outcomes; reconcile by reading.",
         "limits": {"seconds": 900, "tokens": 256000, "requests": 48},
         "judge": {
             "kind": "company_stock",
@@ -60,7 +60,7 @@ def import_stock(source_dir, *, image, raw_source, revision):
             "task_id": TASK_ID,
             "revision": revision,
             "source_split": "company_stock_workflow",
-            "adapter_revision": "native-owncloud-post-exit-webdav-v1",
+            "adapter_revision": "native-owncloud-post-exit-webdav-v2",
             "input_sha256": digest(
                 {
                     "instruction": instruction,
@@ -70,11 +70,11 @@ def import_stock(source_dir, *, image, raw_source, revision):
             ),
             "verifier_sha256": hashlib.sha256(verifier.encode()).hexdigest(),
             "adapted": True,
-            "adaptation": "Publisher ownCloud1.0.0 seeded image pinned by digest, fresh anonymous data volume per trial, non-root internal unpublished service, allowlisted Unix-socket WebDAV. Original CSV equality checkpoint retained; original seven LLM chart/script points unscored pending independent calibration. Adapted numeric gate rtol=1e-12/atol=1e-10 handles seven published float roundoff artifacts; the original strict equality result remains separately reported. Extra source-immutability and remote-delivery structural gates. No browser or official full score.",
+            "adaptation": "Publisher ownCloud1.0.0 seeded image pinned by digest, fresh anonymous data volume per trial, non-root internal unpublished service, allowlisted Unix-socket WebDAV. Original CSV equality checkpoint retained; original seven LLM chart/script points unscored pending independent calibration. Adapted numeric gate rtol=1e-12/atol=1e-10 handles seven published float roundoff artifacts; the original strict equality result remains separately reported. Extra source-immutability and remote-delivery structural gates. Agent instructions contain only the original task and transport contract; grader tolerances and reference ordering are not data-cleaning instructions. No browser or official full score.",
         },
     }
     return freeze_suite(
-        "the-agent-company-stock-native-v1", [case], official_leaderboard_comparable=False
+        "the-agent-company-stock-native-v2", [case], official_leaderboard_comparable=False
     )
 
 
