@@ -32,7 +32,7 @@ export function ModelProxySettings({ value, disabled, onChange, snapshot, active
     const abort = new AbortController()
     setFailed(false); setLoading(true)
     const path = `/agent/model-gateway/usage?days=${days}${days === 1 && selectedDay ? '&day=' + encodeURIComponent(selectedDay) : ''}${source ? '&source=' + source : ''}`
-    void api('GET', path, undefined, { signal: abort.signal }).then(({ data }: { data: GatewayUsage }) => { if (!abort.signal.aborted) setResult({ usage: gatewayUsage(data, value.currency), source }) }).catch(() => { if (!abort.signal.aborted) setFailed(true) }).finally(() => { if (!abort.signal.aborted) setLoading(false) })
+    void api('GET', path, undefined, { signal: abort.signal }).then(({ data }: { data: GatewayUsage }) => { if ((data.source || '') !== source) throw new Error('MODEL_USAGE_SOURCE_MISMATCH'); if (!abort.signal.aborted) setResult({ usage: gatewayUsage(data, value.currency), source }) }).catch(() => { if (!abort.signal.aborted) setFailed(true) }).finally(() => { if (!abort.signal.aborted) setLoading(false) })
     return () => abort.abort()
   }, [active, snapshot, retry, days, selectedDay, source])
   const count = (amount: number) => new Intl.NumberFormat(locale).format(amount)

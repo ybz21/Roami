@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (method, path, body) => {
     if (path === '/agent/model-settings') return { data: connection }
     if (path === '/agent/model-gateway/settings') { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
-    if (path.startsWith('/agent/model-gateway/usage')) return { data: currentUsage }
+    if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, source: new URL(path, 'https://fixture.invalid').searchParams.get('source') || '' } }
     return { data: {} }
   })
 })
@@ -158,4 +158,20 @@ it('hides a previous source during loading and ignores an aborted source respons
   await act(async () => finish({ data: { ...usage, groups: [{ ...row, model: 'late-rsi-model' }] } }))
   expect(screen.queryByText('late-rsi-model')).toBeNull()
   expect(screen.getByRole('article', { name: 'ordinary-only-model' })).toBeTruthy()
+})
+
+
+it('does not present unfiltered receipts as RSI when an older node ignores the source parameter', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation((...args) => args[1].includes('source=rsi') ? Promise.resolve({ data: usage }) : original(...args))
+  setup(); await screen.findByText('agent.usage.empty')
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.rsi', { selector: '.ant-select-item-option-content' }))
+  await screen.findByText('agent.proxy.loadFailed')
+  expect(screen.queryByText('agent.usage.empty')).toBeNull()
+  expect(screen.queryByText('agent.proxy.recent')).toBeNull()
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'agent.usage.source' }))
+  fireEvent.click(screen.getByText('agent.usage.source.all', { selector: '.ant-select-item-option-content' }))
+  await screen.findByText('agent.usage.empty')
+  expect(screen.queryByText('agent.proxy.loadFailed')).toBeNull()
 })
