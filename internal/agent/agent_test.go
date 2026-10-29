@@ -3,10 +3,53 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestAgentPermissionModes(t *testing.T) {
+	for _, kind := range []string{"claude", "codex", "opencode"} {
+		for _, permission := range []string{"", "plan", "auto", "dangerously-skip-permissions"} {
+			t.Run(kind+"/"+permission, func(t *testing.T) {
+				a := Get(kind)
+				opt := StartOpts{Permission: permission, Model: "test-model"}
+				var want []string
+				switch kind {
+				case "claude":
+					if permission == "dangerously-skip-permissions" {
+						want = []string{"--dangerously-skip-permissions"}
+					} else if permission != "" {
+						want = []string{"--permission-mode", permission}
+					}
+				case "codex":
+					if permission == "auto" || permission == "dangerously-skip-permissions" {
+						want = []string{"--dangerously-bypass-approvals-and-sandbox"}
+					}
+				case "opencode":
+					if permission == "auto" || permission == "dangerously-skip-permissions" {
+						want = []string{"--auto"}
+					}
+				}
+				for _, args := range [][]string{a.InteractiveArgs(opt), a.OneShotArgs(opt)} {
+					var got []string
+					for i, arg := range args {
+						switch arg {
+						case "--auto", "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox":
+							got = append(got, arg)
+						case "--permission-mode":
+							got = append(got, arg, args[i+1])
+						}
+					}
+					if !slices.Equal(got, want) {
+						t.Fatalf("permission arguments: got %v, want %v (command %v)", got, want, args)
+					}
+				}
+			})
+		}
+	}
+}
 
 // 每一型都得答得上这几个问题。新增一型时这条会自动把它带上——
 // 忘了实现哪一项，红的是这里，而不是半年后某个用户的会话恢复不出来。

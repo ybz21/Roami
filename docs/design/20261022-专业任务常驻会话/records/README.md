@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [派发任务的自动执行模式](2026-10-29/delegated-auto-mode.md) |
 | 2026-10-25 | [会话内完整过程修订 · 2026-10-25](2026-10-25/native-session-inline-tools-20261025.html) |
 | 2026-10-25 | [本地智能体会话与产物 · 2026-10-25](2026-10-25/native-session-experience-20261025.html) |
 | 2026-10-22 | [native 会话托管实施 · 2026-10-22](2026-10-22/task-native-session-implementation.html) |

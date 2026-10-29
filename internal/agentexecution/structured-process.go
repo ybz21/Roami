@@ -19,21 +19,16 @@ import (
 func structuredArgs(spec Spec, provider string) []string {
 	var args []string
 	if spec.Executor == "opencode" {
-		args = []string{"run", "--standalone", "--format", "json"}
+		args = agent.Get("opencode").OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission})
+		args = append(args, "--standalone", "--format", "json")
 		if provider != "" {
 			args = append(args, "--session", provider)
 		}
-		if spec.Permission == "auto" || spec.Permission == "dangerously-skip-permissions" {
-			args = append(args, "--auto")
-		}
-	} else {
-		args = []string{"--print", "--mode", "json", "--session-id", provider}
+		return args
 	}
+	args = []string{"--print", "--mode", "json", "--session-id", provider}
 	if spec.Model != "" {
 		args = append(args, "--model", spec.Model)
-	}
-	if spec.Executor == "opencode" {
-		return args
 	}
 	return append(args, "--", spec.Prompt)
 }

@@ -234,6 +234,48 @@ async def test_coding_new_project_resolves_before_launch_without_using_loose_dir
     assert calls == ["provision", "launch"]
 
 
+@pytest.mark.parametrize("provider", ["claude", "codex", "opencode"])
+@pytest.mark.parametrize("persistent", [True, False])
+@pytest.mark.parametrize("target_kind", ["new_session", "project"])
+async def test_new_delegated_tasks_launch_in_auto_mode(
+    store, tmp_path, provider, persistent, target_kind
+):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    target = {"kind": target_kind}
+    if target_kind == "project":
+        target["projectId"] = "existing-project"
+    else:
+        target["directory"] = str(tmp_path)
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "Update the project",
+        key="auto-mode",
+        executor=provider,
+        target=target,
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings(), persistent=persistent)
+    launches = []
+
+    async def command(sub, *args, spec=None):
+        assert sub == "launch"
+        launches.append(spec)
+        return {"state": "unknown"}
+
+    executor.command = command
+    assert await executor.run(task, run) is None
+    assert len(launches) == 1
+    assert launches[0]["executor"] == provider
+    assert launches[0]["persistent"] is persistent
+    assert launches[0]["permission"] == "auto"
+
+
 @pytest.mark.parametrize("provider", ["codex", "claude", "opencode", "pi"])
 async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(
     store, tmp_path, provider
@@ -269,6 +311,7 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
         assert spec["executor"] == provider
         assert spec["sessionId"] == "stable-session"
         assert "directory" not in spec and "projectId" not in spec
+        assert "permission" not in spec
         return receipt
 
     executor.command = command

@@ -5,9 +5,29 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
+
+func TestOpenCodeAutoModeSurvivesStructuredContinuation(t *testing.T) {
+	for _, permission := range []string{"", "auto", "dangerously-skip-permissions"} {
+		for _, provider := range []string{"", "ses_existing"} {
+			args := structuredArgs(Spec{Executor: "opencode", Model: "provider/model", Permission: permission}, provider)
+			want := []string{"run", "--model", "provider/model"}
+			if permission != "" {
+				want = append(want, "--auto")
+			}
+			want = append(want, "--standalone", "--format", "json")
+			if provider != "" {
+				want = append(want, "--session", provider)
+			}
+			if !slices.Equal(args, want) {
+				t.Fatalf("permission %q, provider %q: got %v, want %v", permission, provider, args, want)
+			}
+		}
+	}
+}
 
 func TestStructuredCompletionRequiresNativeProof(t *testing.T) {
 	cases := []struct {
