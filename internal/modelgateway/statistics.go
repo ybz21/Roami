@@ -6,7 +6,11 @@ import (
 	"time"
 )
 
+// Historical evaluations already carry an RSI session ID, even when their role is main/worker.
+const usageSourceSQL = `CASE WHEN substr(role,1,4)='rsi_' OR substr(session_id,1,4)='rsi-' THEN 'rsi' ELSE 'other' END`
+
 type UsageGroup struct {
+	Source       string `json:"source"`
 	Day          string `json:"day"`
 	Role         string `json:"role"`
 	Model        string `json:"model"`
@@ -23,6 +27,7 @@ type UsageGroup struct {
 }
 
 type CallRecord struct {
+	Source         string  `json:"source"`
 	ID             string  `json:"id"`
 	Day            string  `json:"day"`
 	Role           string  `json:"role"`
@@ -42,6 +47,7 @@ type CallRecord struct {
 }
 
 type Statistics struct {
+	Source   string        `json:"source"`
 	Day      string        `json:"day"`
 	Timezone string        `json:"timezone"`
 	From     string        `json:"from"`
@@ -63,7 +69,14 @@ func (l *Ledger) Statistics(days int) (Statistics, error) {
 }
 
 func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
-	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days}
+	return l.StatisticsForSource(days, selected, "")
+}
+
+func (l *Ledger) StatisticsForSource(days int, selected, source string) (Statistics, error) {
+	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days, Source: source}
+	if source != "" && source != "rsi" && source != "other" {
+		return result, fmt.Errorf("INVALID_MODEL_USAGE_SOURCE")
+	}
 	if days < 0 || days > 90 {
 		return result, fmt.Errorf("INVALID_MODEL_USAGE_DAY")
 	}
@@ -90,19 +103,19 @@ func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
 				return err
 			}
 		}
-		rows, err := tx.Query(`SELECT day,role,model,currency,count(*),COALESCE(sum(input_tokens),0),COALESCE(sum(output_tokens),0),COALESCE(sum(cache_read_tokens),0),sum(state='pending'),sum(state='unknown'),sum(state!='pending' AND input_tokens IS NULL),sum(state='failed'),COALESCE(sum(cost_nano),0) FROM gateway_calls WHERE (day>=? AND day<=?) OR day=? GROUP BY day,role,model,currency ORDER BY day DESC,role,model,currency`, result.From, result.To, result.Day)
+		rows, err := tx.Query(`SELECT day,role,model,currency,`+usageSourceSQL+` AS source,count(*),COALESCE(sum(input_tokens),0),COALESCE(sum(output_tokens),0),COALESCE(sum(cache_read_tokens),0),sum(state='pending'),sum(state='unknown'),sum(state!='pending' AND input_tokens IS NULL),sum(state='failed'),COALESCE(sum(cost_nano),0) FROM gateway_calls WHERE (day>=? AND day<=?) OR day=? GROUP BY day,role,model,currency,source ORDER BY day DESC,role,model,currency,source`, result.From, result.To, result.Day)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var group UsageGroup
 			var nano int64
-			if err = rows.Scan(&group.Day, &group.Role, &group.Model, &group.Currency, &group.Requests, &group.Input, &group.Output, &group.Cached, &group.Pending, &group.Unknown, &group.UsageUnknown, &group.Failed, &nano); err != nil {
+			if err = rows.Scan(&group.Day, &group.Role, &group.Model, &group.Currency, &group.Source, &group.Requests, &group.Input, &group.Output, &group.Cached, &group.Pending, &group.Unknown, &group.UsageUnknown, &group.Failed, &nano); err != nil {
 				rows.Close()
 				return err
 			}
 			group.Cost = money(nano)
-			if group.Day >= result.From && group.Day <= result.To {
+			if group.Day >= result.From && group.Day <= result.To && (source == "" || group.Source == source) {
 				result.Groups = append(result.Groups, group)
 			}
 			if group.Day == result.Day {
@@ -115,27 +128,27 @@ func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
 			return err
 		}
 		if result.Days == 1 {
-			rows, err = tx.Query(`SELECT started_ms,role,model,currency,state,input_tokens,output_tokens,cache_read_tokens,cost_nano FROM gateway_calls WHERE day=?`, result.From)
+			rows, err = tx.Query(`SELECT started_ms,role,model,currency,`+usageSourceSQL+`,state,input_tokens,output_tokens,cache_read_tokens,cost_nano FROM gateway_calls WHERE day=? AND (?='' OR `+usageSourceSQL+`=?)`, result.From, source, source)
 			if err != nil {
 				return err
 			}
 			type key struct {
-				hour                  int
-				role, model, currency string
+				hour                          int
+				role, model, currency, source string
 			}
 			groups := map[key]*HourlyUsage{}
 			costs := map[key]int64{}
 			for rows.Next() {
 				var started int64
-				var role, model, currency, state string
+				var role, model, currency, rowSource, state string
 				var input, output, cached, nano sql.NullInt64
-				if err = rows.Scan(&started, &role, &model, &currency, &state, &input, &output, &cached, &nano); err != nil {
+				if err = rows.Scan(&started, &role, &model, &currency, &rowSource, &state, &input, &output, &cached, &nano); err != nil {
 					rows.Close()
 					return err
 				}
-				k := key{time.UnixMilli(started).In(zone).Hour(), role, model, currency}
+				k := key{time.UnixMilli(started).In(zone).Hour(), role, model, currency, rowSource}
 				if groups[k] == nil {
-					groups[k] = &HourlyUsage{UsageGroup: UsageGroup{Day: result.From, Role: role, Model: model, Currency: currency}, Hour: k.hour}
+					groups[k] = &HourlyUsage{UsageGroup: UsageGroup{Day: result.From, Role: role, Model: model, Currency: currency, Source: rowSource}, Hour: k.hour}
 				}
 				g := groups[k]
 				g.Requests++
@@ -166,7 +179,7 @@ func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
 				result.Hourly = append(result.Hourly, *g)
 			}
 		}
-		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id FROM gateway_calls WHERE day>=? AND day<=? ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To)
+		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id,`+usageSourceSQL+` FROM gateway_calls WHERE day>=? AND day<=? AND (?='' OR `+usageSourceSQL+`=?) ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To, source, source)
 		if err != nil {
 			return err
 		}
@@ -174,7 +187,7 @@ func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
 		for rows.Next() {
 			var record CallRecord
 			var nano *int64
-			if err = rows.Scan(&record.ID, &record.Day, &record.Role, &record.Model, &record.Currency, &record.State, &record.Started, &record.Input, &record.Output, &record.Cached, &nano, &record.Status, &record.Error, &record.Reconciliation, &record.Session, &record.Request); err != nil {
+			if err = rows.Scan(&record.ID, &record.Day, &record.Role, &record.Model, &record.Currency, &record.State, &record.Started, &record.Input, &record.Output, &record.Cached, &nano, &record.Status, &record.Error, &record.Reconciliation, &record.Session, &record.Request, &record.Source); err != nil {
 				return err
 			}
 			if nano != nil {

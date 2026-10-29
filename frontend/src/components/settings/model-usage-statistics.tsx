@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Fragment, useRef, useState } from 'react'
 import { Input, Select } from 'antd'
 import { useI18n } from '../../i18n'
@@ -9,7 +10,7 @@ export type UsageModelPart = UsageTotals & { model: string | null }
 export type UsagePoint = UsageTotals & { models?: UsageModelPart[] }
 export type UsageStatistics = { days: number; startDay: string; endDay: string; dailyStartDay: string; total: UsageTotals; daily: (UsagePoint & { day: string })[]; hourly?: (UsagePoint & { hour: number })[]; seriesModels?: string[]; seriesTruncated?: boolean; models: (UsageTotals & { model: string })[]; modelsTruncated: boolean }
 
-export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedDay, today, onDayChange, loading, disabled }: { statistics?: UsageStatistics; days: number; onDaysChange: (days: number) => void; selectedDay?: string; today?: string; onDayChange?: (day: string) => void; loading: boolean; disabled: boolean }) {
+export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedDay, today, onDayChange, loading, disabled, sourceControl, filterHint }: { sourceControl?: ReactNode; filterHint?: string; statistics?: UsageStatistics; days: number; onDaysChange: (days: number) => void; selectedDay?: string; today?: string; onDayChange?: (day: string) => void; loading: boolean; disabled: boolean }) {
   const { t, locale } = useI18n()
   const [metric, setMetric] = useState('totalTokens'), [expandedPoint, setExpandedPoint] = useState(''), [selectedPoint, setSelectedPoint] = useState('')
   const previousColors = useRef(new Map<string, number>())
@@ -47,7 +48,8 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
 
 
   return <section className="agent-usage-statistics" aria-busy={loading} aria-label={t('agent.usage.title')}>
-    <div className="agent-usage-toolbar"><h3>{t('agent.usage.title')}</h3><div className="agent-usage-filters">{days === 1 && onDayChange && <Input type="date" aria-label={t('agent.usage.day')} value={selectedDay || ''} max={today} disabled={disabled} onChange={event => { if (event.target.value) onDayChange(event.target.value) }} />}<Select aria-label={t('agent.usage.range')} value={days} disabled={disabled} virtual={false} options={[1, 7, 30, 90, 0].map(value => ({ value, label: t('agent.usage.range.' + value) }))} onChange={onDaysChange} /></div></div>
+    <div className="agent-usage-toolbar"><h3>{t('agent.usage.title')}</h3><div className="agent-usage-filters">{sourceControl}{days === 1 && onDayChange && <Input type="date" aria-label={t('agent.usage.day')} value={selectedDay || ''} max={today} disabled={disabled} onChange={event => { if (event.target.value) onDayChange(event.target.value) }} />}<Select aria-label={t('agent.usage.range')} value={days} disabled={disabled} virtual={false} options={[1, 7, 30, 90, 0].map(value => ({ value, label: t('agent.usage.range.' + value) }))} onChange={onDaysChange} /></div></div>
+    {filterHint && <p className="agent-settings-hint">{filterHint}</p>}
     {loading && <p className="agent-settings-hint" role="status">{t('agent.usage.loading')}</p>}
     {statistics && <>
       <p className="agent-settings-hint">{t('agent.usage.period', { start: day(statistics.startDay, true), end: day(statistics.endDay, true) })}</p>

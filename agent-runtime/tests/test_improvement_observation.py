@@ -39,6 +39,9 @@ async def test_evaluator_identity_is_reconcilable_and_never_leaks_to_normal_requ
         assert model_observation.get() is None
         async for _event in provider.stream([{"role": "user", "content": "normal"}], []):
             pass
+    assert seen[0]["x-eval-call-role"] == "rsi_memory"
+    assert seen[0]["x-eval-agent-id"] == "rsi_memory"
+    assert journal[0]["role"] == "memory"
     assert seen[0]["x-eval-session-id"] == "rsi-test-run"
     assert seen[0]["x-request-id"] == journal[0]["request_id"]
     assert "x-eval-session-id" not in seen[1] and "x-request-id" not in seen[1]
@@ -59,7 +62,7 @@ async def test_nested_meters_share_one_upstream_request_identity():
         model = "fixture"
 
         async def stream(self, messages, tools):
-            assert model_observation.get()["role"] == "worker"
+            assert model_observation.get()["role"] == "rsi_worker"
             yield ModelEvent(
                 "usage",
                 {
@@ -172,4 +175,38 @@ async def test_stream_closed_by_another_task_does_not_leak_context():
     assert model_observation.get() is None
     await asyncio.create_task(stream.aclose())
     assert budget.metrics()["tokens"] == 2
+    assert model_observation.get() is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["main", "worker", "artifact_a", "artifact_b", "rsi_codex_repair"])
+async def test_source_tag_does_not_change_model_or_budget_role(role):
+    from roami_agent.protocol.models import ModelEvent
+
+    seen = []
+
+    class Provider:
+        model = "saved-model"
+
+        async def stream(self, messages, tools):
+            seen.append(dict(model_observation.get()))
+            yield ModelEvent(
+                "usage",
+                {
+                    "inputTokens": 3,
+                    "outputTokens": 2,
+                    "requestAttempts": 1,
+                    "retryUsageKnown": True,
+                },
+            )
+
+    journal = []
+    budget = EpisodeBudget({"tokens": 10000, "seconds": 10, "requests": 1})
+    model = MeteredModel(Provider(), budget, role, journal=journal)
+    async for _ in model.stream([], []):
+        pass
+    assert seen[0]["role"] == (role if role.startswith("rsi_") else "rsi_" + role)
+    assert model.role == journal[0]["role"] == role
+    assert model.model == "saved-model"
+    assert budget.metrics()["tokens"] == 5
     assert model_observation.get() is None

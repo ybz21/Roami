@@ -107,9 +107,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			reject(w, 400, "INVALID_MODEL_USAGE_DAY")
 			return
 		}
-		data, err := h.Ledger.StatisticsFor(days, r.URL.Query().Get("day"))
+		data, err := h.Ledger.StatisticsForSource(days, r.URL.Query().Get("day"), r.URL.Query().Get("source"))
 		if err != nil {
-			if err.Error() == "INVALID_MODEL_USAGE_DAY" {
+			if err.Error() == "INVALID_MODEL_USAGE_DAY" || err.Error() == "INVALID_MODEL_USAGE_SOURCE" {
 				reject(w, 400, err.Error())
 				return
 			}

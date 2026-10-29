@@ -23,14 +23,14 @@ func TestGatewayManagementUsesPrivateGoSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/model-gateway/usage" || r.URL.RawQuery != "days=30" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
+		if r.URL.Path != "/v1/model-gateway/usage" || r.URL.RawQuery != "days=30&source=rsi&day=2026-10-28" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
 			t.Errorf("invalid gateway request: %s", r.URL)
 		}
 		_, _ = io.WriteString(w, `{"data":{"groups":[]}}`)
 	})}
 	go func() { _ = server.Serve(listener) }()
 	defer server.Close()
-	r := httptest.NewRequest("GET", "/api/agent/model-gateway/usage?days=30", nil)
+	r := httptest.NewRequest("GET", "/api/agent/model-gateway/usage?days=30&source=rsi&day=2026-10-28", nil)
 	r.Header.Set("Authorization", "private-browser-credential")
 	r.Header.Set("Cookie", "private-browser-cookie")
 	w := httptest.NewRecorder()

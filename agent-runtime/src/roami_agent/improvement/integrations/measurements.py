@@ -137,7 +137,7 @@ class MeteredModel:
             observation = {
                 "session": self.budget.observation_id,
                 "request": identity(),
-                "role": self.role,
+                "role": self.role if self.role.startswith("rsi_") else "rsi_" + self.role,
             }
         record = None
         if self.journal is not None:
