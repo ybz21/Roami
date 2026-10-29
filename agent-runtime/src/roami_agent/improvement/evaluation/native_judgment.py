@@ -3,6 +3,7 @@
 import re
 
 from roami_agent.improvement.domain.contracts import number
+from roami_agent.improvement.evaluation.csv_diagnostics import csv_diagnostic
 from roami_agent.protocol.errors import public_error_code
 
 
@@ -20,6 +21,8 @@ def _score_fields(grade):
     ):
         evidence["native_reference_results"] = list(references)
     partial = grade.get("native_partial")
+    if diagnostic := csv_diagnostic(grade.get("native_csv_diagnostic")):
+        evidence["native_csv_diagnostic"] = diagnostic
     keys = {"scored_points", "total_points", "unscored_points"}
     if (
         isinstance(partial, dict)

@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-30 | [CSV 比较失败的安全诊断](2026-10-30/stock-csv-diagnostics.html) |
 | 2026-10-30 | [媒体判定器完整结束与有效分数](2026-10-30/media-verifier-completion.html) |
 | 2026-10-30 | [校准材料的完整准入](2026-10-30/calibration-reference-admission.html) |
 | 2026-10-30 | [每日限额下的并发准入](2026-10-30/model-admission-queue.html) |

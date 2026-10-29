@@ -9,6 +9,7 @@ import re
 from roami_agent.improvement.domain.contracts import DIMENSIONS, digest, require
 from roami_agent.improvement.domain.scoring import quality
 from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.csv_diagnostics import csv_diagnostic
 from roami_agent.improvement.evaluation.execution.stock_environment import IMAGE_RE, OUTPUTS
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.protocol.errors import DomainError
@@ -98,15 +99,22 @@ spec=json.loads(sys.stdin.read());root=pathlib.Path('/workspace');golden=base64.
 pd.read_csv=lambda source,*a,**kw:read_csv(io.BytesIO(golden) if source=='/utils/stock_data.csv' else source,*a,**kw)
 namespace={'pd':pd,'BytesIO':io.BytesIO,'logging':__import__('logging'),'check_file_in_owncloud_directory':lambda f,d:(root/f).is_file(),'get_binary_file_content_owncloud':lambda f,d:(root/f).read_bytes()}
 exec(compile(spec['checkpoint'],'original_csv_checkpoint.py','exec'),namespace)
-checks={};native_csv_equality=None
+checks={};native_csv_equality=None;actual=expected=None;diagnostic={'comparison':'verification_failed','rows':None,'columns':None}
 try:native_csv_equality=bool(namespace['grade_checkpoint1']())
 except Exception:checks['native_checkpoint_completed']=False
 try:
- pd.testing.assert_frame_equal(read_csv(root/'stock_cleaned.csv'),read_csv(io.BytesIO(golden)),check_exact=False,rtol=1e-12,atol=1e-10)
+ actual=read_csv(root/'stock_cleaned.csv');expected=read_csv(io.BytesIO(golden))
+ diagnostic.update(rows=len(actual),columns=len(actual.columns))
+ pd.testing.assert_frame_equal(actual,expected,check_exact=False,rtol=1e-12,atol=1e-10)
  checks['adapted_csv_values']=True
-except AssertionError:checks['adapted_csv_values']=False
+ diagnostic['comparison']='passed'
+except AssertionError:
+ checks['adapted_csv_values']=False
+ if actual is not None and expected is not None:
+  diagnostic['comparison']=('column_count' if len(actual.columns)!=len(expected.columns) else 'columns' if not actual.columns.equals(expected.columns) else 'row_count' if len(actual)!=len(expected) else 'dtypes' if not actual.dtypes.equals(expected.dtypes) else 'values')
 except (pd.errors.ParserError,pd.errors.EmptyDataError,UnicodeError):
  checks['adapted_csv_values']=False;checks['csv_readable']=False
+ diagnostic['comparison']='unreadable'
 except Exception:
  checks['adapted_csv_values']=False;checks['csv_verification_completed']=False
 try:
@@ -114,12 +122,12 @@ try:
 except Exception:checks['five_plot_slides']=False
 try:checks['nonempty_utf8_script']=len((root/'stock_analysis_script.md').read_text().strip())>=100
 except (OSError,UnicodeError):checks['nonempty_utf8_script']=False
-print(json.dumps({'checks':checks,'native_csv_equality':native_csv_equality}))"""
+print(json.dumps({'checks':checks,'native_csv_equality':native_csv_equality,'csv_diagnostic':diagnostic}))"""
 )
 
 
 async def grade_stock(case, executor, *, root):
-    checks, evidence, native_csv = {}, [], None
+    checks, evidence, native_csv, diagnostic = {}, [], None, None
     try:
         state_path = relative_file(root, "stock-snapshot.json")
         require(state_path.is_file() and state_path.stat().st_size < 100000)
@@ -150,6 +158,7 @@ async def grade_stock(case, executor, *, root):
         )
         checks.update(result["checks"])
         native_csv = result["native_csv_equality"]
+        diagnostic = csv_diagnostic(result.get("csv_diagnostic"))
         evidence.append(
             {
                 "source": "host_native_snapshot",
@@ -172,6 +181,7 @@ async def grade_stock(case, executor, *, root):
             "total_points": 8,
             "unscored_points": 7 if native_csv is not None else 8,
         },
+        **({"native_csv_diagnostic": diagnostic} if diagnostic else {}),
         rubric_required=True,
         grade_scope="native_uploaded_stock_artifacts_csv_checkpoint_only_quality_pending",
         reason="independent_rubric_required" if hard else "hard_assertion_failed",
