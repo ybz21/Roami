@@ -24,6 +24,9 @@ from roami_agent.protocol.errors import DomainError
 
 IMAGE = "roami-rsi-eval:local"
 
+# Docker creation plus the existing model-free verifier sandbox windows.
+POST_TIMEOUT_ASSESSMENT_SECONDS = {"media": 360, "slides": 90}
+
 
 async def docker_command(*args, timeout=30, input=None, maximum=8_000_000):
     process = await asyncio.create_subprocess_exec(
@@ -316,8 +319,17 @@ class ContainerExecutor:
         finally:
             await self.remove(name, name)
 
-    async def verify(self, case, workspace, output, *, started, evidence_root=None):
-        remaining = case["limits"]["seconds"] - (time.monotonic() - started)
+    async def verify(
+        self, case, workspace, output, *, started, evidence_root=None, after_timeout=False
+    ):
+        if after_timeout:
+            require(
+                case["judge"]["kind"] in POST_TIMEOUT_ASSESSMENT_SECONDS,
+                "RSI_ARTIFACT_ASSESSMENT_UNSUPPORTED",
+            )
+            remaining = POST_TIMEOUT_ASSESSMENT_SECONDS[case["judge"]["kind"]]
+        else:
+            remaining = case["limits"]["seconds"] - (time.monotonic() - started)
         require(remaining > 0, "RSI_TIME_BUDGET")
         async with asyncio.timeout(remaining):
             kind = case["judge"]["kind"]
@@ -375,7 +387,10 @@ class ContainerExecutor:
                 grade = await grade_stock(case, self, root=evidence_root)
             else:
                 grade = judge_case(case, output, workspace)
-        require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
+        if after_timeout:
+            grade["artifact_assessment_after_timeout"] = True
+        else:
+            require(time.monotonic() - started < case["limits"]["seconds"], "RSI_TIME_BUDGET")
         return grade
 
     async def recover_execution(self, state, root):
@@ -689,9 +704,35 @@ class ContainerExecutor:
                     ],
                 },
             )
+        assessment_ms = None
+        if (
+            failure == "RSI_TIME_BUDGET"
+            and case["judge"]["kind"] in POST_TIMEOUT_ASSESSMENT_SECONDS
+        ):
+            # Generation stays stopped; this path only reads artifacts with the original verifier.
+            assessment_started = time.monotonic()
+            try:
+                grade = await self.verify(
+                    case, workspace, "", started=started, evidence_root=root, after_timeout=True
+                )
+            except (DomainError, OSError, TimeoutError, ValueError, TypeError, KeyError) as error:
+                grade.update(
+                    artifact_assessment_after_timeout=True,
+                    native_verifier_ran=False,
+                    artifact_assessment_error=error.code
+                    if isinstance(error, DomainError)
+                    else "RSI_ARTIFACT_ASSESSMENT_TIMEOUT"
+                    if isinstance(error, TimeoutError)
+                    else "RSI_ARTIFACT_ASSESSMENT_FAILED",
+                )
+            assessment_ms = (time.monotonic() - assessment_started) * 1000
+            elapsed = (time.monotonic() - started) * 1000
+
         from roami_agent.improvement.evaluation.artifact_review import episode_metrics
 
         metrics = episode_metrics(budget, review_budget)
+        if assessment_ms is not None:
+            metrics["artifact_assessment_ms"] = assessment_ms
         metrics["artifact_review_ms"] = artifact_review_ms
         metrics["fixture_setup_ms"] = setup_ms
         if case["judge"]["kind"] == "swe":

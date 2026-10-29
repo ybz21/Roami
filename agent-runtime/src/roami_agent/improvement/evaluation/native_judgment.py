@@ -3,6 +3,7 @@
 import re
 
 from roami_agent.improvement.domain.contracts import number
+from roami_agent.protocol.errors import public_error_code
 
 
 def _score_fields(grade):
@@ -39,6 +40,10 @@ def _score_fields(grade):
         evidence["native_partial"] = {key: partial[key] for key in sorted(keys)}
     if type(grade.get("native_verifier_ran")) is bool:
         evidence["native_verifier_ran"] = grade["native_verifier_ran"]
+    if grade.get("artifact_assessment_after_timeout") is True:
+        evidence["artifact_assessment_after_timeout"] = True
+        if error := public_error_code(grade.get("artifact_assessment_error")):
+            evidence["artifact_assessment_error"] = error
     if not evidence:
         return evidence
     scope = grade.get("grade_scope")

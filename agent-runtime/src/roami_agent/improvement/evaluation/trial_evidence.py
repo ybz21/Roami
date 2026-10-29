@@ -183,6 +183,7 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         "metrics": {
             k: metrics.get(k)
             for k in ("tokens", "token_coverage", "model_calls", "elapsed_ms", "model_ms")
+            + (("artifact_assessment_ms",) if "artifact_assessment_ms" in metrics else ())
         },
         "tools": tools,
         "tool_calls": execution_evidence["recorded_tool_calls"]
