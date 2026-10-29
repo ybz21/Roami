@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-29 | [股票任务的清洗要求与评分说明](2026-10-29/stock-task-transport-contract.html) |
 | 2026-10-29 | [附件收集上限与不可用状态](2026-10-29/deliverable-collection-scope.html) |
 | 2026-10-29 | [区分超时运行与产物核验](2026-10-29/post-timeout-assessment-display.html) |
 | 2026-10-29 | [有效模型配置与执行时长](2026-10-29/effective-models-execution-timing.html) |
