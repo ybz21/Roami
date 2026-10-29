@@ -4,6 +4,8 @@
 
 会话操作统一使用 `roami session`，浏览器操作使用 `roami chrome`，Android 手机操作使用 `roami adb`。不要直接清理原生 tmux 服务。测试实例使用仓库的 `scripts/dev/isolated-roami.sh <测试目录> <命令...>`，清理仅用同一入口的 `--stop`；不能只设置 `TMUX_TMPDIR` 来选择清理目标。
 
+Roami 已有的能力优先用 `roami` CLI 完成；用 `roami help` 查看命令入口，再查对应能力的帮助或 skill。Git、依赖安装和项目测试仍按仓库约定执行。
+
 ## Skill 入口
 
 - 使用会话、派活或蜂群能力前，先读取本机 `roami-session` skill。标准位置是 `~/.codex/skills/roami-session/SKILL.md` 或 `~/.claude/skills/roami-session/SKILL.md`；配置了 `CODEX_HOME` 或 `TTMUX_SKILLS_DIR` 时，按实际技能目录查找。其他 Agent 也可读取这些文件。
@@ -18,6 +20,10 @@
 - 建蜂群并派活：`roami session swarm new <群名> --goal "目标" --no-master` 建立由当前会话负责的群；`roami session swarm add <群名> <成员名> --type agent --kind <已安装Agent类型> --role member --dir <工作目录> "任务与验收标准"` 启动成员。需要另起指挥 Agent 时才使用默认带指挥的建群方式。
 - 分工与沟通：`roami session swarm task add/assign/ls/show/move/done` 管任务卡；`roami session swarm say/feed/listen` 管成员消息；`roami session swarm status/board/collect` 查看进展和输出。具体参数见 `roami-session` skill。验收成员成果后用 `roami session swarm done <群名> <成员名>` 更新成员状态，整群通过集成验收后才标记整群完成。
 - 整理会话：`roami session rename <会话ID> <短名称>` 改展示名；`roami session children <会话ID> --json` 看直接子会话；关闭仅针对明确属于当前任务、已不再需要的会话 ID。
+
+## Agent 自动执行
+
+新建任务和派活使用对应 Agent 的 YOLO / Auto 模式。通过 `roami session swarm add` 启动成员时沿用其自动权限默认值；如果先用 `roami session fork` 建了 shell，再启动 Agent，Claude Code 用 `claude --dangerously-skip-permissions`，Codex 用 `codex --dangerously-bypass-approvals-and-sandbox`，OpenCode 用 `opencode --auto`。Pi 原生直接执行工具，无需额外的 YOLO 参数。保留用户明确配置的权限模式，自动模式下仍遵守用户授权范围和仓库规则。
 
 ## 浏览器与验收
 
