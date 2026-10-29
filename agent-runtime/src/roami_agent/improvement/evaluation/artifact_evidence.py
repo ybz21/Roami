@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory() as td:
    out=tmp/path.stem;out.mkdir();subprocess.run(['soffice','-env:UserInstallation=file://'+str(out/'profile'),'--headless','--convert-to','pdf','--outdir',str(out),str(path)],check=True,capture_output=True,timeout=60)
    pdf=out/(path.stem+'.pdf');subprocess.run(['pdftoppm','-scale-to','1440','-jpeg','-jpegopt','quality=78',str(pdf),str(out/'page')],check=True,capture_output=True,timeout=45)
    pages=sorted(out.glob('page-*.jpg'))
-   if not 1<=len(pages)<=8:raise ValueError('unexpected page count')
+   if not pages or len(images)+len(pages)>16:raise ValueError('unexpected page count')
    for i,page in enumerate(pages):add(name+' page '+str(i+1),page.read_bytes())
    result=subprocess.run(['pdftotext',str(pdf),'-'],check=True,capture_output=True,timeout=15);text=result.stdout.decode();texts.append({'label':name,'text':text[:12000],'truncated':len(text)>12000})
   elif path.suffix in {'.md','.json','.svg'}:
