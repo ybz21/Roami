@@ -81,7 +81,13 @@ class Worker:
             return
         code = "from pathlib import Path; import os; assert 'GIT_DIR' not in os.environ; Path('native-proof.txt').write_text('native')"
         if "cancel" in goal:
-            code = "from pathlib import Path; import os,time; Path('native-pid.txt').write_text(str(os.getpid())); time.sleep(60); Path('late-write.txt').write_text('unexpected')"
+            # Publish readiness only after the complete PID is readable.
+            code = (
+                "from pathlib import Path; import os,time; "
+                "Path('native-pid.tmp').write_text(str(os.getpid())); "
+                "Path('native-pid.tmp').replace('native-pid.txt'); "
+                "time.sleep(60); Path('late-write.txt').write_text('unexpected')"
+            )
         yield ModelEvent(
             "tool",
             {
