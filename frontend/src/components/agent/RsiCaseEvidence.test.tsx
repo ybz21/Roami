@@ -34,3 +34,45 @@ it('keeps a partial reference unscored while displaying a genuine zero for its a
   expect(screen.getByText(/参考 2：0/)).toBeTruthy()
   expect(screen.queryByText('原生评分')).toBeNull()
 })
+
+it('identifies post-timeout artifact scores without calling the run passed', () => {
+  render(<RsiCaseEvidence evidence={{ native_judgment: { artifact_assessment_after_timeout: true, native_metric: 1, native_metric_minimum: 1, native_verifier_ran: true } }} />)
+  expect(screen.getByText('核验时机')).toBeTruthy()
+  expect(screen.getByText('执行超时后（运行未通过）')).toBeTruthy()
+  expect(screen.getByText('原生评分')).toBeTruthy()
+})
+
+it('keeps a failed timeout assessment unscored and its error in collapsed execution details', () => {
+  render(<RsiCaseEvidence evidence={{ native_judgment: { artifact_assessment_after_timeout: true, artifact_assessment_error: 'RSI_ARTIFACT_ASSESSMENT_TIMEOUT', native_metric: 0, native_verifier_ran: false } }} />)
+  expect(screen.getByText('执行超时后（运行未通过）')).toBeTruthy()
+  expect(screen.getByText('未完成判定')).toBeTruthy()
+  expect(screen.queryByText('原生评分')).toBeNull()
+  const details = screen.getByText('执行记录').closest('details')!
+  expect(details.open).toBe(false)
+  expect(within(details).getByText('RSI_ARTIFACT_ASSESSMENT_TIMEOUT')).toBeTruthy()
+})
+
+it('can show timeout assessment scope even when there is no valid score or metric', () => {
+  render(<RsiCaseEvidence evidence={{ native_judgment: { artifact_assessment_after_timeout: true } }} />)
+  expect(screen.getByText('执行超时后（运行未通过）')).toBeTruthy()
+  expect(screen.queryByText('原生评分')).toBeNull()
+})
+
+it('keeps normal evaluation and the other paired arm free of timeout labels', () => {
+  render(<RsiCaseEvidence evidence={{ arm_results: { baseline: { native_judgment: { native_metric: 1 } }, candidate: { native_judgment: { artifact_assessment_after_timeout: true, native_metric: 1 } } } }} />)
+  expect(within(screen.getByText('基线结果').parentElement!).queryByText('核验时机')).toBeNull()
+  expect(within(screen.getByText('候选结果').parentElement!).getByText('执行超时后（运行未通过）')).toBeTruthy()
+})
+
+it('requires the boolean timeout flag before showing a timeout scope or error', () => {
+  render(<RsiCaseEvidence evidence={{ native_judgment: { artifact_assessment_after_timeout: 'true', artifact_assessment_error: 'RSI_ARTIFACT_ASSESSMENT_TIMEOUT', native_metric: 0.2 } }} />)
+  expect(screen.queryByText('核验时机')).toBeNull()
+  expect(screen.queryByText('RSI_ARTIFACT_ASSESSMENT_TIMEOUT')).toBeNull()
+})
+
+it('keeps an invalid public error out of the execution details', () => {
+  render(<RsiCaseEvidence evidence={{ native_judgment: { artifact_assessment_after_timeout: true, artifact_assessment_error: 'arbitrary upstream text' } }} />)
+  expect(screen.getByText('执行超时后（运行未通过）')).toBeTruthy()
+  expect(screen.queryByText('arbitrary upstream text')).toBeNull()
+  expect(screen.queryByText('执行记录')).toBeNull()
+})
