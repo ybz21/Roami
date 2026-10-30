@@ -14,6 +14,8 @@ from roami_agent.protocol.errors import DomainError
 
 
 class WorkspacePresentationReads:
+    page_bytes = 16000
+
     def __init__(self, files, raw_read):
         self.files, self.raw_read = files, raw_read
 
@@ -35,11 +37,11 @@ class WorkspacePresentationReads:
             return json.dumps(
                 {"editorPalette": installed_presentation_palette(), **document},
                 ensure_ascii=False,
-                indent=2,
+                separators=(",", ":"),
             ).encode()
 
         representation = await asyncio.to_thread(inspect)
-        offset, limit = args.get("offset", 0), args.get("limit", 16000)
+        offset, limit = args.get("offset", 0), args.get("limit", self.page_bytes)
         page = representation[offset : offset + limit]
         try:
             data, encoding = page.decode(), "utf-8"

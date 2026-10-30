@@ -103,3 +103,5 @@
 - [2026-10-30：进程退出观测竞态](2026-10-30/process-observation-race.html)
 
 - [2026-10-30：Agent 演示文稿读取能力与分层](2026-10-30/agent-presentation-read.html)
+
+- [2026-10-30：Agent 显式文稿输入准备](2026-10-30/agent-document-intake.html)
