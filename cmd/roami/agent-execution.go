@@ -37,11 +37,11 @@ func runAgentExecution(args []string) int {
 		return 0
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution catalog (read-only installation and tracking discovery; auth/usage unknown)\nroami agent execution launch --file SPEC.json\nroami agent execution send-message --file - (delivery receipt only)\nroami agent execution status|cancel|close --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch with persistent=true retains the interactive coding session until explicit close; legacy launch creates a one-shot session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		fmt.Println("roami agent execution catalog (read-only installation and tracking discovery; auth/usage unknown)\nroami agent execution launch --file SPEC.json\nroami agent execution send-message --file - (delivery receipt only)\nroami agent execution status|cancel|close|cleanup --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch with persistent=true retains the interactive coding session until explicit close; legacy launch creates a one-shot session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
 		return 0
 	}
 	sub := args[0]
-	if sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "close" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" {
+	if sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "close" && sub != "cleanup" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -189,6 +189,15 @@ func runAgentExecution(args []string) int {
 		status, err = service.Cancel(*key)
 	case "close":
 		status, err = service.CloseSession(context.Background(), *key)
+	case "cleanup":
+		result, err := service.CleanupWorkspace(context.Background(), *key)
+		if err != nil {
+			return fail(err)
+		}
+		if err = json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			return fail(err)
+		}
+		return 0
 	case "run":
 		runCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 		defer stop()

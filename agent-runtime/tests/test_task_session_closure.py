@@ -160,3 +160,174 @@ async def test_retry_after_acceptance_failure_does_not_close_the_professional_se
         assert (await runtime.tasks.get("alice", task["id"]))["task"]["state"] == "succeeded"
     finally:
         await runtime.close()
+
+
+async def close_job(store, task_id):
+    return await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE kind='task.close_session' AND aggregate_id=?", (task_id,)
+        )
+    )
+
+
+async def test_queued_close_survives_a_new_service_and_fences_continuations(store):
+    runtime, task, run, calls, service = await prepare(store)
+    try:
+        first = await service.request("alice", task["id"], 1, run["id"])
+        assert first["state"] == "closing"
+        assert await service.request("alice", task["id"], 1, run["id"]) == first
+        assert not calls
+        with pytest.raises(DomainError, match="TASK_SESSION_CLOSING"):
+            await runtime.tasks.revisions.request("alice", task["id"], "racing edit", 1, "racing")
+        recovered = TaskSessions(store, service.executor, runtime.dispatch.confirm)
+        await recovered.advance(await close_job(store, task["id"]))
+        detail = await runtime.tasks.get("alice", task["id"])
+        assert detail["sessionClosure"]["state"] == "closed"
+        assert detail["task"]["state"] == "succeeded"
+        assert len(calls) == 1
+        assert (await close_job(store, task["id"]))["state"] == "done"
+    finally:
+        await runtime.close()
+
+
+async def test_cleanup_failure_is_visible_and_retry_keeps_the_exact_run(store):
+    runtime, task, run, _calls, service = await prepare(store)
+    cleaned = []
+
+    async def cleanup(task, run):
+        cleaned.append(run["id"])
+        if len(cleaned) == 1:
+            raise DomainError("WORKTREE_DIRTY", 409)
+
+    service.cleanup = cleanup
+    try:
+        await service.request("alice", task["id"], 1, run["id"])
+        await service.advance(await close_job(store, task["id"]))
+        detail = await runtime.tasks.get("alice", task["id"])
+        assert detail["sessionClosure"]["state"] == "failed"
+        assert detail["sessionClosure"]["error_code"] == "WORKTREE_DIRTY"
+        assert detail["task"]["state"] == "waiting_user"
+        await service.request("alice", task["id"], 1, run["id"])
+        await service.advance(await close_job(store, task["id"]))
+        assert (await runtime.tasks.get("alice", task["id"]))["sessionClosure"]["state"] == "closed"
+        assert cleaned == [run["id"], run["id"]]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("queued_follower", [False, True])
+async def test_one_close_request_stops_an_active_native_task_and_closes_automatically(
+    store, queued_follower
+):
+    from roami_agent.app import Runtime
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.server.configuration import Settings
+
+    entered = asyncio.Event()
+
+    class Model:
+        model = "close-fixture"
+
+        async def stream(self, messages, tools):
+            entered.set()
+            await asyncio.Event().wait()
+            yield ModelEvent("text", "unused")
+
+    runtime = Runtime(store, Model(), settings=Settings(workers=1))
+    try:
+        conversation = await runtime.conversations.create("alice")
+        task = await runtime.tasks.create(
+            "alice", conversation["id"], "Do work", key="active-close", record_intent=True
+        )
+        await runtime.start()
+        await asyncio.wait_for(entered.wait(), 3)
+        if queued_follower:
+            await runtime.tasks.create(
+                "alice", conversation["id"], "Other work", key="follower", record_intent=True
+            )
+        run = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+        )
+        response = await runtime.task_sessions.request("alice", task["id"], 1, run["id"])
+        assert response["state"] == "closing"
+        runtime.wakeup.set()
+        async with asyncio.timeout(5):
+            while True:
+                detail = await runtime.tasks.get("alice", task["id"])
+                if detail["sessionClosure"]["state"] == "closed":
+                    break
+                assert detail["sessionClosure"]["state"] != "failed", detail
+                await asyncio.sleep(0.03)
+        assert detail["task"]["state"] == "cancelled"
+        assert (await close_job(store, task["id"]))["state"] == "done"
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "scenario,code",
+    [
+        ("foreign", "TASK_NOT_FOUND"),
+        ("revision", "TASK_REVISION_CHANGED"),
+        ("run", "TASK_REVISION_CHANGED"),
+    ],
+)
+async def test_close_request_validates_owner_revision_and_attempt_before_queuing(
+    store, scenario, code
+):
+    runtime, task, run, calls, service = await prepare(store)
+    try:
+        with pytest.raises(DomainError, match=code):
+            await service.request(
+                "bob" if scenario == "foreign" else "alice",
+                task["id"],
+                2 if scenario == "revision" else 1,
+                "wrong" if scenario == "run" else run["id"],
+            )
+        assert not calls
+        assert await close_job(store, task["id"]) is None
+        assert (await runtime.tasks.get("alice", task["id"]))["sessionClosure"] is None
+    finally:
+        await runtime.close()
+
+
+async def test_close_request_finishes_waiting_child_sessions_before_the_parent(store):
+    runtime, task, run, _calls, service = await prepare(store)
+    try:
+        await store.call(
+            lambda db: db.execute("UPDATE tasks SET state='running' WHERE id=?", (task["id"],)),
+            write=True,
+        )
+        child = await runtime.tasks.create(
+            "alice",
+            task["origin_conversation_id"],
+            "Child work",
+            key="close-child",
+            parent_task_id=task["id"],
+            record_intent=True,
+        )
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET state='waiting_user' WHERE id IN (?,?)", (task["id"], child["id"])
+            ),
+            write=True,
+        )
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE task_attempts SET state='succeeded',finished_ms=1,result_json='{}' WHERE task_id=?",
+                (child["id"],),
+            ),
+            write=True,
+        )
+        await service.request("alice", task["id"], 1, run["id"])
+        with pytest.raises(DomainError, match="TASK_SESSION_CLOSING"):
+            await runtime.tasks.revisions.request(
+                "alice", child["id"], "Racing child continuation", 1, "child-race"
+            )
+        await service.advance(await close_job(store, task["id"]))
+        for ident in (child["id"], task["id"]):
+            detail = await runtime.tasks.get("alice", ident)
+            assert detail["sessionClosure"]["state"] == "closed"
+            assert detail["task"]["state"] == "succeeded"
+    finally:
+        await runtime.close()

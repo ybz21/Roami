@@ -708,3 +708,26 @@ it('shows existing reports and downloads while execution remains unconfirmed', a
   await screen.findByText('agent.task.reportUnconfirmed')
   expect(screen.getAllByText('A source-bound research report').length).toBe(2)
 })
+
+it('accepts closing a running session and shows asynchronous cleanup failures with a retry action', async () => {
+  let phase = 'running'
+  const professional = { ...task('one'), state: 'running', intent_json: JSON.stringify({ goal: 'Goal one', executor: 'codex' }), latestAttempt: { executorKind: 'cli', sessionId: 'original-codex', agentConversationId: 'original-context' } }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') { phase = 'closing'; return { data: { state: 'closing' } } }
+    if (path.includes('?conversationId=')) return { data: [professional] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: { ...professional, state: phase === 'failed' ? 'cancelled' : 'running' }, sessionClosure: phase === 'running' ? null : { state: phase, error_code: phase === 'failed' ? 'WORKTREE_DIRTY' : null }, attempts: [{ ...detail('one').attempts[0], sessionId: 'original-codex' }] } }
+  })
+  const view = render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.task.closeSession' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.completeAndClose' }))
+  await screen.findByText('agent.task.sessionClosing')
+  expect(screen.getByRole('button', { name: 'agent.task.closeSession' }).hasAttribute('disabled')).toBe(true)
+  view.unmount(); clearAgentDataCache(); phase = 'failed'
+  render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
+  await screen.findByText('agent.task.cleanupDirty')
+  expect(screen.getByRole('button', { name: 'agent.task.closeSession' }).hasAttribute('disabled')).toBe(false)
+})

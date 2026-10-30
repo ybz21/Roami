@@ -35,7 +35,8 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
   const { t } = useI18n(), snapshot = useAgentTask(metadata.taskId), models = useAgentModels(node, 'worker')
   const detail = snapshot.detail.value, task = detail?.task
   const closed = detail?.sessionClosure?.state === 'closed'
-  const closing = ['closing', 'unknown'].includes(detail?.sessionClosure?.state || '')
+  const closing = detail?.sessionClosure?.state === 'closing'
+  const closeError = ['failed', 'unknown'].includes(detail?.sessionClosure?.state || '') ? taskSessionError(detail?.sessionClosure?.error_code || undefined, t) : ''
   const active = !!task && ['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(task.state)
   const path = '/agent/native-sessions/' + encodeURIComponent(metadata.nativeSessionId) + '/conversation'
   const conversation = useAgentData<Page>(path, 0, active ? 3000 : 0)
@@ -132,11 +133,11 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
       {tab === 'process' && detail && <div className="native-session-process"><TaskProcess id={metadata.taskId} active={active} onSession={sessionId => onSession?.(sessionId)} /><details className="agent-task-requirements"><summary><ChevronRight />{t('agent.task.reports')}</summary>{detail.attempts.map(attempt => <section className="agent-task-attempt" key={attempt.id}><b>{t('agent.task.revision', { n: attempt.revision })}</b><span>{t('agent.state.' + attempt.state)}</span><div className="agent-task-attempt-record"><TaskResult attempt={attempt} artifacts={artifacts} /></div></section>)}{detail.attemptsTruncated && <small>{t('agent.task.moreHistory')}</small>}</details></div>}
       {tab === 'artifacts' && detail && <NativeSessionArtifacts detail={detail} artifacts={artifacts} failed={snapshot.artifacts.failed} retry={snapshot.refresh} />}
     </div>
-    <div className="native-session-composer conversation-composer-dock">{steering?.state === 'blocked' && <p role="alert">{taskSessionError(steering.errorCode,t)}</p>}{error && <p role="alert">{error}</p>}{stopping && <p role="status">{t('agent.task.steering.stopping')}</p>}{closed && <p role="status">{t('agent.task.sessionClosed')}</p>}{closing && <p role="status">{t('agent.task.sessionCloseUnknown')}</p>}
+    <div className="native-session-composer conversation-composer-dock">{steering?.state === 'blocked' && <p role="alert">{taskSessionError(steering.errorCode,t)}</p>}{(error || closeError) && <p role="alert">{error || closeError}</p>}{stopping && <p role="status">{t('agent.task.steering.stopping')}</p>}{closed && <p role="status">{t('agent.task.sessionClosed')}</p>}{closing && <p role="status">{t('agent.task.sessionClosing')}</p>}
       <ConversationComposer id="native-message" value={draft} onChange={setDraft} label={t('agent.task.additionalRequirements')} placeholder={t('agent.task.continuePlaceholder')} disabled={disabled} maxLength={10000}
         send={{ label: t('agent.task.continue'), pending: busy, onClick: () => { void send() } }}
         stop={active ? { label: t('agent.cancelTask'), disabled, onClick: () => { void mutation('cancel', {}) } } : undefined}
-        leading={<Dropdown trigger={['click']} menu={{ items: [{ key: 'details', label: t('agent.task.details') }, { key: 'artifacts', label: t('agent.task.sessionTab.artifacts') }, ...(!active && !closed ? [{ key: 'close', label: t('agent.task.completeAndClose'), disabled: disabled || !detail?.attempts[0]?.finishedMs }] : [])], onClick: ({ key }) => { if (key === 'details') openAgentPage('tasks', metadata.taskId); else if (key === 'artifacts') switchTab('artifacts'); else setConfirm(true) } }}><button type="button" className="tt-pill ico" aria-label={t('chat.more')}><PlusIcon size={16} /></button></Dropdown>}
+        leading={<Dropdown trigger={['click']} menu={{ items: [{ key: 'details', label: t('agent.task.details') }, { key: 'artifacts', label: t('agent.task.sessionTab.artifacts') }, ...(!closed ? [{ key: 'close', label: t('agent.task.completeAndClose'), disabled: busy || !task || snapshot.detail.failed || closing || !detail?.attempts[0] }] : [])], onClick: ({ key }) => { if (key === 'details') openAgentPage('tasks', metadata.taskId); else if (key === 'artifacts') switchTab('artifacts'); else setConfirm(true) } }}><button type="button" className="tt-pill ico" aria-label={t('chat.more')}><PlusIcon size={16} /></button></Dropdown>}
         settings={<AgentModelPicker models={models} disabled={disabled || active} node={node} />}
         voice={<VoiceInput inline scope={metadata.nativeSessionId + ':' + node} hotkey disabled={disabled} accent="var(--accent)" onResult={text => setDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
     </div>
