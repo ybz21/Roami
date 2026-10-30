@@ -20,6 +20,13 @@ from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 from roami_agent.storage.workspace_files import WorkspaceFiles
+from roami_agent.tools.registry import Tools
+
+
+def document_tools(text=""):
+    tools = Tools()
+    tools.skills["presentation_files"] = {"text": text}
+    return tools
 
 
 @pytest.mark.parametrize(
@@ -47,7 +54,7 @@ async def test_intake_observes_only_named_existing_files_and_never_rewrites_them
     source.write_bytes(original)
     (tmp_path / "unmentioned.pptx").write_bytes(b"unrelated")
     files = WorkspaceFiles(Settings())
-    intake = TaskDocumentIntake(files, {"presentation_files": {"text": "Format workflow"}})
+    intake = TaskDocumentIntake(files, document_tools("Format workflow"))
     try:
         result = await intake.prepare(
             f"Inspect deck.pptx and {source}; save result.pptx.",
@@ -81,7 +88,7 @@ async def test_intake_never_reads_outside_or_linked_documents(tmp_path):
     (workspace / "linked.pptx").symlink_to(secret)
     files = WorkspaceFiles(Settings())
     try:
-        result = await TaskDocumentIntake(files, {}).prepare(
+        result = await TaskDocumentIntake(files, document_tools()).prepare(
             "../secret.pptx linked.pptx",
             {"taskId": "t", "workspace": {"directory": str(workspace)}},
         )
@@ -101,7 +108,7 @@ async def test_prompt_counts_document_input_as_data_without_persisting_it_in_his
     path = tmp_path / "deck.pptx"
     path.write_bytes(presentation_bytes())
     files = WorkspaceFiles(Settings())
-    intake = TaskDocumentIntake(files, {"presentation_files": {"text": "Trusted workflow"}})
+    intake = TaskDocumentIntake(files, document_tools("Trusted workflow"))
     conversations = Conversations(store)
     c = await conversations.create("alice")
     receipt = await conversations.accept("alice", c["id"], "read", "Inspect deck.pptx")
@@ -196,7 +203,7 @@ async def test_partial_preview_defers_other_mentions_without_denying_task_execut
     (tmp_path / "second.pptx").write_bytes(presentation_bytes())
     files = WorkspaceFiles(Settings())
     try:
-        intake = TaskDocumentIntake(files, {})
+        intake = TaskDocumentIntake(files, document_tools())
         result = await intake.prepare(
             "Inspect large.pptx and second.pptx",
             {"taskId": "t", "workspace": {"directory": str(tmp_path)}},
@@ -213,7 +220,11 @@ async def test_partial_preview_defers_other_mentions_without_denying_task_execut
         await files.close()
 
 
-def test_memory_prefix_does_not_put_document_data_between_a_tool_call_and_its_result():
+async def test_memory_prefix_does_not_put_document_data_between_a_tool_call_and_its_result(
+    tmp_path,
+):
+    files = WorkspaceFiles(Settings())
+    intake = TaskDocumentIntake(files, document_tools("format workflow"))
     previous_call = {
         "role": "assistant",
         "tool_calls": [
@@ -228,7 +239,7 @@ def test_memory_prefix_does_not_put_document_data_between_a_tool_call_and_its_re
         {"role": "system", "content": "Recalled memory"},
         *history,
     ]
-    plan, observed = TaskDocumentIntake.attach(
+    plan, observed = intake.attach(
         {
             "executionRunId": "new",
             "documentInputs": {
@@ -250,3 +261,5 @@ def test_memory_prefix_does_not_put_document_data_between_a_tool_call_and_its_re
         {"role": "system", "content": "Recalled memory"},
         *history,
     ]
+
+    await files.close()
