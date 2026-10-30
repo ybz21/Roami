@@ -204,6 +204,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	w.Header().Set("X-Roami-Model-Call", call.ID)
 	status, code, notSent := 0, "MODEL_GATEWAY_INTERRUPTED", false
 	var usage *Usage
 	defer func() {
@@ -242,7 +243,6 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(key, value)
 		}
 	}
-	w.Header().Set("X-Roami-Model-Call", call.ID)
 	w.WriteHeader(status)
 	capture := usageCapture{stream: strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")}
 	buffer := make([]byte, 32<<10)

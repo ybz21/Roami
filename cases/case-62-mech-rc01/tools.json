@@ -1,0 +1,19 @@
+{
+  "kind": "isolated_host_regression",
+  "requirements": [
+    "Go toolchain",
+    "uv and frozen agent-runtime dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "go_packages": [
+    "./internal/modelgateway"
+  ],
+  "go_test_pattern": "^TestHTTPFailuresUnknownUsageAndNoRedirect$",
+  "pytest_selectors": [
+    "tests/test_request_receipts.py"
+  ],
+  "pytest_expected_count": 25,
+  "model_provider": "scripted local fixture only",
+  "real_model_calls": 0,
+  "production_data_modified": false
+}

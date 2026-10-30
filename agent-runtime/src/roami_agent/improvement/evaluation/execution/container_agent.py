@@ -15,6 +15,7 @@ from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.protocol.image_limits import ImageLimits
 from roami_agent.protocol.model_routes import settings_with_route
 from roami_agent.providers.factory import configured_provider
+from roami_agent.providers.model_bridge_transport import PrivateModelBridgeTransport
 from roami_agent.server.configuration import Settings
 
 
@@ -74,7 +75,7 @@ async def main():
         route = settings_.route(actual)
         route = replace(route, endpoint="http://localhost/v1/" + role, name=actual)
         client = httpx.AsyncClient(
-            transport=httpx.AsyncHTTPTransport(uds="/model/gateway.sock"),
+            transport=PrivateModelBridgeTransport("/model/gateway.sock"),
             timeout=httpx.Timeout(case["limits"]["seconds"], connect=10),
         )
         return configured_provider(

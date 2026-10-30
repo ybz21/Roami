@@ -46,3 +46,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 [QUANT-02](case-16-quant-02/CASE.md) 提供完整示例：`inputs/prices.json` 是 180 根合成行情，
 `generate.py` 可重建它，`tools.json` 列出工具需求，`provenance.json` 和 `acceptance.md` 说明来源与验收。
 运行时直接读取公开输入并追加本次 receipt，不再另藏一份行情生成逻辑。该任务只能验证回测实现和泄漏防护，不能证明真实投研能力。
+
+- [MECH-RC01 / 模型请求回执与重试用量](case-62-mech-rc01/CASE.md)：数据、工具与独立 runner 齐备；不加入历史正式套件。

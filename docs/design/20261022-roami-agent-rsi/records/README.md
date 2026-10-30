@@ -105,3 +105,5 @@
 - [2026-10-30：Agent 演示文稿读取能力与分层](2026-10-30/agent-presentation-read.html)
 
 - [2026-10-30：Agent 显式文稿输入准备](2026-10-30/agent-document-intake.html)
+
+- [2026-10-30：模型请求关联与重试观测](2026-10-30/model-request-correlation.html)

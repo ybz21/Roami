@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -155,26 +156,43 @@ func TestTerminalUsageSettlesWhenCallerClosesBeforeHTTPBodyEnds(t *testing.T) {
 }
 
 func TestHTTPFailuresUnknownUsageAndNoRedirect(t *testing.T) {
-	for _, status := range []int{200, 302, 401, 500} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
+	for _, status := range []int{0, 200, 302, 401, 500} {
+		name := http.StatusText(status)
+		if status == 0 {
+			name = "TransportFailure"
+		}
+		t.Run(name, func(t *testing.T) {
 			l := newLedger(t)
 			if err := l.Configure(testConfiguration(nil)); err != nil {
 				t.Fatal(err)
 			}
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Location", "http://must-not-follow.invalid")
+				w.Header().Set("X-Roami-Model-Call", "forged-upstream-id")
 				w.WriteHeader(status)
 				_, _ = io.WriteString(w, `{"error":"fixture"}`)
 			}))
 			defer up.Close()
 			w := httptest.NewRecorder()
-			nodeConfiguredHandler(t, l, up.URL).ServeHTTP(w, modelRequest(up.URL))
-			if w.Code != status {
+			handler := nodeConfiguredHandler(t, l, up.URL)
+			expected := status
+			if status == 0 {
+				socket := filepath.Join(t.TempDir(), "missing.sock")
+				handler.Client.Transport = &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "unix", socket)
+				}}
+				expected = 502
+			}
+			handler.ServeHTTP(w, modelRequest(up.URL))
+			if w.Code != expected {
 				t.Fatalf("status: %d", w.Code)
 			}
 			stats, err := l.Statistics(1)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if callID := w.Header().Get("X-Roami-Model-Call"); callID == "" || callID != stats.Recent[0].ID {
+				t.Fatalf("response cannot correlate to the Go ledger: %q", callID)
 			}
 			unknown := status == 200 || status == 500
 			if (stats.Recent[0].Cost == nil) != unknown {

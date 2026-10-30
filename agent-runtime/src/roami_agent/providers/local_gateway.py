@@ -5,6 +5,7 @@ import os
 import httpx
 
 from roami_agent.protocol.errors import ModelAdmissionRejected
+from roami_agent.providers.request_receipts import GATEWAY_EXTENSION
 
 
 class LocalGatewayTransport(httpx.AsyncBaseTransport):
@@ -30,6 +31,7 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
             extensions=request.extensions,
         )
         response = await self.transport.handle_async_request(forwarded)
+        response.extensions[GATEWAY_EXTENSION] = True
         code = response.headers.get("x-roami-model-error")
         if response.status_code >= 400 and code in {
             "MODEL_PROXY_DAILY_LIMIT",
