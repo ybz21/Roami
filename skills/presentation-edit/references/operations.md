@@ -2,21 +2,7 @@
 
 Pass JSON through `--request-json` as one argv element, or use `--request changes.json` for a workspace request file. Paths are relative to `--workspace` (absolute paths within it also work). Parent directories must exist. Source and destination must differ. The complete validation schema ships as `scripts/edit-request.schema.json`.
 
-```json
-{
-  "path": "input.pptx",
-  "expectedSha256": "<sha256 from inspect>",
-  "destination": "updated.pptx",
-  "expectedDestinationSha256": null,
-  "operations": [
-    {
-      "slide": 1,
-      "target": {"order": "top_to_bottom", "ordinal": 1},
-      "alignment": "center"
-    }
-  ]
-}
-```
+The minimal alignment request and named-color form are shown in [the workflow](../SKILL.md). `expectedSha256` is the source presentation hash returned by inspection, not a shell-output artifact hash.
 
 Slides and position ranks start at 1. Alternatively, copy a specific `shapePath` array from inspection: `"target": {"shapePath": [0, 1]}`. Alignment accepts `left`, `center`, `right`, `justify`. Each operation can set alignment, text color, or both. A property cannot be changed twice on the same object in one batch.
 

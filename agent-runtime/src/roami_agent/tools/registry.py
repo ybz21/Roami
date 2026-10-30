@@ -57,6 +57,19 @@ class Tools:
                 wire = deepcopy(wire)
                 if "scope" in wire["function"]["parameters"]["properties"]:
                     wire["function"]["parameters"]["properties"]["scope"]["enum"] = ["workspace"]
+            if self.directory and tool.name == "read":
+                skills = [
+                    {key: item[key] for key in ("name", "description", "location")}
+                    for item in self.directory.skill_entries()
+                    if self.skills[item["name"]].get("source") in {"configured", "managed"}
+                ]
+                if skills:
+                    wire = deepcopy(wire)
+                    wire["function"]["description"] += (
+                        "\nAvailable optional Skills (metadata only): "
+                        + encoded(skills)
+                        + ". Read the relevant Skill's instructions before using its workflow."
+                    )
             result.append(wire)
         return result
 

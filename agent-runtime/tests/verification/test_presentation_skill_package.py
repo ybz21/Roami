@@ -23,6 +23,14 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 
 
+def foundation_contract(catalog):
+    result = copy.deepcopy(catalog)
+    for item in result:
+        if item["function"]["name"] == "read":
+            item["function"].pop("description")
+    return result
+
+
 async def test_external_skill_import_executes_and_delivers_with_unchanged_foundations(
     store, tmp_path, monkeypatch
 ):
@@ -54,6 +62,13 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
         model = "skill-package-worker-contract"
 
         async def stream(self, messages, tools):
+            description = next(
+                item["function"]["description"]
+                for item in tools
+                if item["function"]["name"] == "read"
+            )
+            assert "presentation-edit" in description
+            assert "Inspect the source before choosing objects" not in description
             receipts = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
             if not receipts:
                 name, args = "read", {"path": "skill://presentation-edit"}
@@ -112,7 +127,7 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
         settings = Settings(skill_roots=(root,))
     runtime = Runtime(store, Main(), worker_model=Worker(), memory_model=Main(), settings=settings)
     runtime.dispatch.native_executor.workspace_factory = prepare
-    before = copy.deepcopy(runtime.tools.catalog("worker"))
+    before = foundation_contract(runtime.tools.catalog("worker"))
     tool_names = set(runtime.tools.registry)
     implicit_reads = []
     original_read = runtime.files.read
@@ -141,7 +156,8 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
     }
     if not configured:
         await runtime.capability_imports.save("local", "skills", payload)
-    assert runtime.tools.catalog("worker") == before and set(runtime.tools.registry) == tool_names
+    assert foundation_contract(runtime.tools.catalog("worker")) == before
+    assert set(runtime.tools.registry) == tool_names
     assert any(
         item["name"] == "presentation-edit"
         for item in runtime.tools.directory.list("幻灯片", "skill")["items"]
@@ -203,7 +219,8 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
         else:
             assert not runtime.capability_imports.saved["skills"]
         assert (
-            runtime.tools.catalog("worker") == before and set(runtime.tools.registry) == tool_names
+            foundation_contract(runtime.tools.catalog("worker")) == before
+            and set(runtime.tools.registry) == tool_names
         )
     finally:
         await runtime.close()

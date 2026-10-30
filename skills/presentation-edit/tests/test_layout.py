@@ -48,7 +48,9 @@ def test_spatial_order_is_not_the_drawing_traversal():
     result = presentation_metadata(layout_presentation())
     slide = result["slides"][0]
     assert [item["text"] for item in slide["textObjects"]] == ["正文", "Heading"]
-    assert [item["ordinal"] for item in slide["textObjects"]] == [1, 2]
+    assert [item["drawingOrdinal"] for item in slide["textObjects"]] == [1, 2]
+    assert [item["topToBottomRank"] for item in slide["textObjects"]] == [2, 1]
+    assert all("ordinal" not in item for item in slide["textObjects"])
     assert slide["topToBottomPaths"] == [[2], [1, 0]]
     assert slide["textObjects"][0]["slideBounds"] == {
         "x": 100,

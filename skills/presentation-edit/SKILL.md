@@ -15,11 +15,27 @@ Inspect the source before choosing objects:
 python <packagePath>/scripts/presentation.py inspect --workspace <workspace> --path input.pptx
 ```
 
-Use the observed `shapePath` for a specific text frame. Drawing order is not reading order. For an explicit top-to-bottom rank, use `topToBottomPaths`; unknown or overlapping placement needs inspection in the actual editor or a rendering. Structural inspection alone does not establish visual quality.
+Use the observed `shapePath` for a specific text frame. `drawingOrdinal` identifies drawing traversal; `topToBottomRank` and `topToBottomPaths` describe geometric top-to-bottom order. These are different facts: a bottom caption can be drawn first. Unknown or overlapping placement needs inspection in the actual editor or a rendering. Structural inspection alone does not establish visual quality.
 
 If the shell externalizes a long inspection result, read its returned text artifact through `read artifact://ID` and follow the returned page offsets. A stdout preview is not the complete JSON document; do not infer missing objects from it.
 
-For alignment or color edits, construct [the request JSON](references/operations.md), then run:
+For supported alignment or color changes, use the bundled edit command after inspection. It handles object selection and source/destination checks. A minimal request is:
+
+```json
+{
+  "path": "input.pptx",
+  "expectedSha256": "<source sha256 from inspect>",
+  "destination": "updated.pptx",
+  "expectedDestinationSha256": null,
+  "operations": [
+    {"slide": 1, "target": {"order": "top_to_bottom", "ordinal": 1}, "alignment": "center"}
+  ]
+}
+```
+
+Use the requested slide, object and alignment; add operations for additional changes. For a specific observed object use `"target": {"shapePath": [0, 1]}` instead of a rank. For a named color, add `"color": {"editor": "<observed editorPalette.editor>", "palette": "<observed editorPalette.name>", "name": "<requested color>"}`. Detailed validation and receipt fields are in [the request reference](references/operations.md).
+
+Run the complete request as one batch:
 
 ```bash
 python <packagePath>/scripts/presentation.py edit --workspace <workspace> --request-json '<request JSON>'

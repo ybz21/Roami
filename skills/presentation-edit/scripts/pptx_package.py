@@ -146,7 +146,8 @@ def presentation_metadata(body):
                     transform = shape.find("p:spPr/a:xfrm/a:off", NS)
                     objects.append(
                         {
-                            "ordinal": len(objects) + 1,
+                            "drawingOrdinal": len(objects) + 1,
+                            "topToBottomRank": None,
                             "shapePath": path,
                             "shapeId": identity.get("id")
                             if identity is not None
@@ -175,12 +176,15 @@ def presentation_metadata(body):
                     key=lambda item: (
                         item["slideBounds"]["y"],
                         item["slideBounds"]["x"],
-                        item["ordinal"],
+                        item["drawingOrdinal"],
                     ),
                 )
                 if all(item["slideBounds"] is not None for item in objects)
                 else None
             )
+            if ordered is not None:
+                for rank, item in enumerate(ordered, 1):
+                    item["topToBottomRank"] = rank
             slides.append(
                 {
                     "number": number,

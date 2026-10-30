@@ -53,23 +53,25 @@ class ToolDirectory:
             and (role != "main" or tool.main or tool.name == "artifact_read")
         ]
 
+    def skill_entries(self):
+        if {"read", "skill_read"} & self.registry.disabled_tools:
+            return []
+        return [
+            {
+                "id": "skill:" + name,
+                "kind": "skill",
+                "name": name,
+                "description": value["description"],
+                "version": value["version"],
+                "location": "skill://" + name,
+            }
+            for name, value in self.registry.skills.items()
+            if name not in self.registry.disabled_skills
+        ]
+
     def list(self, query="", kind="all", limit=10, role="main", offset=0):
         limit, offset = min(max(limit, 1), 20), max(offset, 0)
-        entries = []
-        if "read" not in self.registry.disabled_tools:
-            for name, value in self.registry.skills.items():
-                if name in self.registry.disabled_skills:
-                    continue
-                entries.append(
-                    {
-                        "id": "skill:" + name,
-                        "kind": "skill",
-                        "name": name,
-                        "description": value["description"],
-                        "version": value["version"],
-                        "location": "skill://" + name,
-                    }
-                )
+        entries = self.skill_entries()
         if "bash" not in self.registry.disabled_tools:
             entries.extend(self.command_entries(role))
             for tool in self.operations(role):
