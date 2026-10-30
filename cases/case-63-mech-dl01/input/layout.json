@@ -1,0 +1,37 @@
+{
+  "kind": "generated_ooxml_fixture",
+  "generator": "test_presentation_layout.layout_presentation",
+  "parameters": {
+    "group_rotation": 0,
+    "group_flip": null,
+    "missing_size": false
+  },
+  "expected": {
+    "drawing_texts": [
+      "正文",
+      "Heading"
+    ],
+    "top_to_bottom_paths": [
+      [
+        2
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "caption_bounds": {
+      "x": 100,
+      "y": 200,
+      "width": 20,
+      "height": 20
+    },
+    "heading_bounds": {
+      "x": 20,
+      "y": 25,
+      "width": 30,
+      "height": 10
+    }
+  },
+  "source_note": "The actual PPTX generator is the repository test fixture named above. This JSON supplies its parameters and independent checked expectations; scripts/run.py writes the generated PPTX into its output directory before invoking the regression tests."
+}

@@ -1,0 +1,60 @@
+{
+  "id": "MECH-DL01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "演示文稿位置回归",
+  "prompt": "通过受作用域限制的文稿读取，返回绘制顺序、组合变换后的边界与从上到下的位置顺序；未知位置保持未知。",
+  "preconditions": "本地生成的 PPTX，包含正文先绘制、标题在上、组合缩放、旋转和翻转；不调用模型。",
+  "expected_terminal": "layout_observed_without_rewriting_source",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "实际生成的 PPTX 与读取 JSON",
+    "冻结资源和实现哈希",
+    "实际执行且无跳过的测试回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-DL01-H1",
+      "rule": "绘制顺序及 shapePath 保持稳定，位置顺序单独给出。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DL01-H2",
+      "rule": "嵌套组合缩放、偏移、旋转及翻转与手算边界一致。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DL01-H3",
+      "rule": "缺失或无法解析的位置不能伪造第一个文本框。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DL01-H4",
+      "rule": "读取不改源文件，不声称渲染、真实模型或任务质量通过。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/layout.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
