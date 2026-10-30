@@ -712,9 +712,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     { key: 'rotate', icon: <RotateScreenIcon />, label: rotation ? `${t('browser.rotateTitle')} ${rotation}°` : t('browser.rotateTitle'), onClick: rotate },
     { key: 'devtools', icon: <CodeIcon />, label: t('browser.devtoolsTitle'), onClick: openDevtools },
     { key: 'external', icon: <GlobeIcon size={15} />, label: t('browser.openExternalTitle'), onClick: openExternal },
-    // terms=none：新开的这页只有镜像，不把当前开着的会话标签一并拽过去（见 route-hash）
     { key: 'newpage', icon: <OpenInIcon size={15} />, label: t('mirror.openInNewPage'),
-      onClick: () => window.open('/#/browser?terms=none', '_blank') },
+      onClick: () => window.open('/#/browser', '_blank') },
     { type: 'divider' as const, key: 'd2' },
     { key: 'newtab', icon: <PlusIcon />, label: t('browser.newHumanTab'), onClick: newTab },
   ]

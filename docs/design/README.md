@@ -25,6 +25,8 @@
 
 ## 其它主题
 
+- [20261030-server-workspace-state](20261030-server-workspace-state/README.md)
+
 - [20261030-对话文件链接](20261030-对话文件链接/README.md)
 
 - [20261017-CLI统一设计](20261017-CLI统一设计/README.md)

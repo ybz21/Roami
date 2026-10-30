@@ -1,22 +1,22 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { normalizeRoute, readTermTokens, setHashParams } from './route-hash'
+import { getHashParams, normalizeRoute, readTermTokens, setHashParams } from './route-hash'
 
 const at = (hash: string) => { location.hash = hash }
 
-describe('readTermTokens：terms 的三态', () => {
+describe('旧工作区链接导入', () => {
   beforeEach(() => at('#/projects'))
 
-  it('没写 terms = 这条链接对标签没意见（交给本机记忆）', () => {
-    expect(readTermTokens()).toEqual({ terms: [], active: '', none: false })
+  it('未指定会话时返回空的导入列表', () => {
+    expect(readTermTokens()).toEqual({ terms: [], active: '' })
   })
-  it('terms=none = 明说这页不要标签', () => {
+  it('旧镜像页的 terms=none 不导入会话', () => {
     at('#/browser?terms=none')
-    expect(readTermTokens()).toEqual({ terms: [], active: '', none: true })
+    expect(readTermTokens()).toEqual({ terms: [], active: '' })
   })
-  it('有值就还原那几个，none 不再成立', () => {
+  it('读取旧链接中的会话列表与选择', () => {
     at('#/projects?terms=a,b&active=b')
-    expect(readTermTokens()).toEqual({ terms: ['a', 'b'], active: 'b', none: false })
+    expect(readTermTokens()).toEqual({ terms: ['a', 'b'], active: 'b' })
   })
 })
 
@@ -30,11 +30,11 @@ describe('legacy inbox links', () => {
 })
 
 
-it('keeps the exact task browser target when terminal tabs synchronize the URL', () => {
+it('keeps the exact task browser target when node parameters change', () => {
   at('#/browser/task/browser-instance/exact-tab')
-  setHashParams({ terms: 'session-a', active: 'session-a' })
+  setHashParams({ node: 'node-a' })
   expect(normalizeRoute(location.hash.replace(/^#\/?/, ''))).toBe('browser/task/browser-instance/exact-tab')
-  expect(readTermTokens().active).toBe('session-a')
+  expect(getHashParams().get('node')).toBe('node-a')
 })
 
 it('migrates plugin and settings capability links without losing their selection', () => {

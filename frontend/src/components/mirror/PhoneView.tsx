@@ -237,9 +237,8 @@ export default function PhoneView() {
       { key: 'lock', icon: <PowerIcon size={14} />, label: t('phone.lock'), onClick: () => pressKey('lock') },
     ]),
     { key: 'reconnect', icon: <RefreshIcon size={14} />, label: t('phone.reconnect'), onClick: () => setReconnectKey((n) => n + 1) },
-    // terms=none：新开的这页只有镜像，不继承当前的会话标签（见 route-hash）
     { key: 'newpage', icon: <OpenInIcon size={14} />, label: t('mirror.openInNewPage'),
-      onClick: () => window.open('/#/phone?terms=none', '_blank') },
+      onClick: () => window.open('/#/phone', '_blank') },
   ]
 
   // 设备身份：名字 + 它是什么（本机模拟器/真机/远程），点开换一台。
