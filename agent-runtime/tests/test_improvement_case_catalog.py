@@ -71,8 +71,8 @@ def test_contract_cannot_duplicate_metadata_or_disagree_with_directory(tmp_path)
 
 def test_catalog_is_complete_and_execution_matches_frozen_contracts():
     definitions = case_definitions()
-    assert len(definitions) == 67
-    assert len({value["id"] for value in definitions}) == 67
+    assert len(definitions) == 68
+    assert len({value["id"] for value in definitions}) == 68
     assert all(value["name"] and value["description"] for value in definitions)
     historical = json.loads(
         (
@@ -154,13 +154,15 @@ async def test_http_catalog_requires_local_owner_and_exposes_readable_metadata(s
         response = await client.get("/v1/improvement/cases", headers={"X-Roami-Owner": "local"})
         assert response.status_code == 200
         cases = response.json()["data"]
-        assert len(cases) == 67
+        assert len(cases) == 68
         configured = next(value for value in cases if value["id"] == "MECH-SP01")
         assert configured["name"] == "本地 Skill 完整目录执行"
         assert configured["description"]
         discovery = next(value for value in cases if value["id"] == "MECH-SD01")
         assert discovery["name"] == "外挂 Skill 的初始发现"
         assert discovery["description"]
+        inherited = next(value for value in cases if value["id"] == "MECH-CI01")
+        assert inherited["name"] == "RSI 保存角色指令的容器传递"
         workflow = next(value for value in cases if value["id"] == "MECH-WF01")
         assert workflow["name"] == "已安装工作流的执行上下文"
         assert workflow["description"]

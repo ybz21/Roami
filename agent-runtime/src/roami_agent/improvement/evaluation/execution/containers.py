@@ -13,7 +13,10 @@ from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.evaluation.contracts import agent_view
-from roami_agent.improvement.evaluation.execution.container_context import model_context
+from roami_agent.improvement.evaluation.execution.container_context import (
+    model_context,
+    role_instructions,
+)
 from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
 from roami_agent.improvement.evaluation.grading import judge_case
 from roami_agent.improvement.evaluation.verification_windows import (
@@ -115,7 +118,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings).model_hash,
-                "container-uds-v33-writable-config-directory",
+                "container-uds-v34-saved-role-instructions",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -212,6 +215,10 @@ class ContainerExecutor:
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
         labels = detail.get("Config", {}).get("Labels") or {}
         if model_inputs:
+            require(
+                labels.get("org.roami.rsi.role-instructions") == "1",
+                "RSI_CONTAINER_IMAGE_REQUIRED",
+            )
             require(
                 labels.get("org.roami.rsi.shared-daily-policy") == "6",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
@@ -516,6 +523,7 @@ class ContainerExecutor:
                 "worker_image_input": self.worker_image_input,
                 "main_image_input": self.main_image_input,
                 "model_context": self.model_context,
+                "role_instructions": role_instructions(self.settings),
             },
         )
         setup_ms = (time.monotonic() - started) * 1000

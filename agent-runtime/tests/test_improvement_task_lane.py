@@ -482,7 +482,11 @@ async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
 
     async def docker(*args, **kwargs):
         assert args[:2] == ("image", "inspect")
-        labels = {"org.roami.rsi.shared-daily-policy": version} if version else None
+        labels = (
+            {"org.roami.rsi.shared-daily-policy": version, "org.roami.rsi.role-instructions": "1"}
+            if version
+            else None
+        )
         return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
 
     monkeypatch.setattr(containers, "docker_command", docker)

@@ -120,3 +120,5 @@
 - [2026-10-30：隔离回归包的请求输入数据](2026-10-30/regression-receipt-fixture.html)
 
 - [冻结运行时回归边界与临时数据](2026-10-30/frozen-runtime-regression-boundary.html)
+
+- [RSI 保存角色指令的容器传递](2026-10-31/saved-role-instructions.md)
