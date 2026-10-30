@@ -30,4 +30,6 @@
 
 ## 设计修订与验收记录
 
+[2026-10-30：完成并关闭自动停止任务并清理专属 worktree](records/2026-10-30/session-close-cleanup.md)。
+
 [按日期查看记录](records/README.md)。

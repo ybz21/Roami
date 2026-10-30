@@ -45,8 +45,16 @@ class CodingExecutor:
         )
         if response["exitCode"]:
             # CLI diagnostics may contain paths or account details; keep them out of model context.
-            if sub in {"launch", "close"} and response["stderr"].strip() in SESSION_REJECTIONS | {
-                "SESSION_BINDING_CONFLICT"
+            if sub in {"launch", "close", "cleanup"} and response[
+                "stderr"
+            ].strip() in SESSION_REJECTIONS | {
+                "SESSION_BINDING_CONFLICT",
+                "WORKSPACE_BUSY",
+                "WORKSPACE_OUTCOME_UNKNOWN",
+                "WORKSPACE_CLEANUP_UNAVAILABLE",
+                "WORKTREE_DIRTY",
+                "WORKSPACE_STALE",
+                "SESSIONS_INSIDE",
             }:
                 raise DomainError(response["stderr"].strip())
             raise DomainError("CODING_EXECUTOR_UNAVAILABLE", 503)

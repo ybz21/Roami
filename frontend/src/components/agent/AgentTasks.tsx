@@ -132,7 +132,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const latest = detail?.attempts[0], steering = detail?.steering
   const artifacts = useMemo(() => currentTaskArtifacts([...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()]), [snapshot.artifacts.value, detail?.delivery?.artifacts])
   const sessionClosed = detail?.sessionClosure?.state === 'closed'
-  const sessionClosing = ['closing', 'unknown'].includes(detail?.sessionClosure?.state || '')
+  const sessionClosing = detail?.sessionClosure?.state === 'closing'
   const sessionId = detail?.attempts.find(attempt => attempt.sessionId)?.sessionId || task?.latestAttempt?.sessionId
   const professional = !!task && isAgentKind(taskExecutor(task))
   const retainedSession = !!task?.nativeSession || professional && !!(task?.latestAttempt?.agentConversationId || detail?.attempts.some(attempt => attempt.sessionId === sessionId && attempt.agentConversationId))
@@ -185,14 +185,15 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
         {task?.nativeSession && <Button onClick={() => openAgentPage('session', task.nativeSession!.id)}>{t('agent.task.enterSession')}</Button>}
         {task?.projectId && <a className="tt-act" href={'#/projects/' + encodeURIComponent(task.projectId)}>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</a>}
         {sessionId && (!ended || retainedSession) && !sessionClosed && <Button onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
-        {retainedSession && (sessionId || task.nativeSession) && (terminal.has(task.state) || task.state === 'waiting_user') && !sessionClosed && <Button disabled={!detailSafe || !!busy || sessionClosing} onClick={() => setCloseConfirm(true)}>{t('agent.task.closeSession')}</Button>}
+        {retainedSession && (sessionId || task.nativeSession) && !sessionClosed && <Button disabled={!detailSafe || !!busy || sessionClosing} onClick={() => setCloseConfirm(true)}>{t('agent.task.closeSession')}</Button>}
         {task.parent_task_id && <Button onClick={() => select(task.parent_task_id!)}>{t('agent.task.parent')}</Button>}
         {(!terminal.has(task.state) || stopping) && <Button danger disabled={!detailSafe || !!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
       </div>
       {steering && ['stopping', 'blocked', 'cancelled'].includes(steering.state) && <p className="agent-task-note" role="status">{steering.state === 'blocked' ? failure(steering.errorCode, t) : t('agent.task.steering.' + steering.state)}</p>}
       {error && !closeConfirm && <p className="agent-task-note error" role="alert">{error}</p>}
       {sessionClosed && <p className="agent-task-note" role="status">{t('agent.task.sessionClosed')}</p>}
-      {sessionClosing && <p className="agent-task-note" role="status">{t('agent.task.sessionCloseUnknown')}</p>}
+      {sessionClosing && <p className="agent-task-note" role="status">{t('agent.task.sessionClosing')}</p>}
+      {['failed', 'unknown'].includes(detail?.sessionClosure?.state || '') && <p className="agent-task-note error" role="alert">{failure(detail?.sessionClosure?.error_code || undefined, t)}</p>}
       <Modal open={closeConfirm} title={t('agent.task.closeSessionConfirm')} okText={t('agent.task.completeAndClose')} cancelText={t('common.cancel')} confirmLoading={busy === 'close-session'} onCancel={() => { if (!busy) setCloseConfirm(false) }} onOk={() => { void mutate('close-session', '/agent/tasks/' + encodeURIComponent(id) + '/close-session', { revision: task.revision, runId: latest?.id }).then(ok => { if (ok) setCloseConfirm(false) }) }}><p>{t('agent.task.closeSessionHint')}</p>{error && <p role="alert" className="agent-task-note error">{error}</p>}</Modal>
       {(artifacts.length > 0 || snapshot.artifacts.failed || !!detail?.delivery?.unavailable.length) && <section className="agent-task-section"><h4>{t('agent.task.artifacts')}</h4>
         {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}

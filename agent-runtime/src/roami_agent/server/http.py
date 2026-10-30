@@ -923,9 +923,9 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/tasks/{task_id}/close-session")
     async def close_task_session(task_id: str, body: CloseTaskSession, owner: Owner):
-        return {
-            "data": await runtime.task_sessions.close(owner, task_id, body.revision, body.runId)
-        }
+        result = await runtime.task_sessions.request(owner, task_id, body.revision, body.runId)
+        runtime.wakeup.set()
+        return {"data": result}
 
     @app.post("/v1/tasks/{task_id}/cancel")
     async def cancel_task(task_id: str, owner: Owner):
