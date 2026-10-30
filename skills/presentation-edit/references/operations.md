@@ -25,3 +25,5 @@ For a named text color, use `"color": {"editor": "<observed editorPalette.editor
 Successful edit receipts include output `path`, `sha256`, `sourceSha256`, `previousSha256`, `sizeBytes`, `writePublished` and observed `changes`. Reinspect the result; include its path in the final task result so the existing delivery mechanism can collect it. Invalid or conflicting requests publish nothing. A post-publication I/O error returns `writePublished: null` and exit 2; reconcile actual files rather than rerunning blindly.
 
 Install this folder as a complete external Skill bundle through the existing Skills import mechanism, retaining scripts and this reference. A text-only SKILL.md import cannot run its scripts. No PPTX-specific registration in the foundation tool catalog is required.
+
+Large inspection results may appear in the normal shell receipt as `artifactRefs` with a stdout preview. Use the existing `read artifact://ID` operation and its offset/hasMore fields to retrieve the complete text. Keep the source SHA256 distinct from the inspection artifact SHA256; edit requests require the former.

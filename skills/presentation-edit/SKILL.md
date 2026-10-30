@@ -15,6 +15,8 @@ uv run --script <packagePath>/scripts/presentation.py inspect --workspace <works
 
 Use the observed `shapePath` for a specific text frame. Drawing order is not reading order. For an explicit top-to-bottom rank, use `topToBottomPaths`; unknown or overlapping placement needs inspection in the actual editor or a rendering. Structural inspection alone does not establish visual quality.
 
+If the shell externalizes a long inspection result, read its returned text artifact through `read artifact://ID` and follow the returned page offsets. A stdout preview is not the complete JSON document; do not infer missing objects from it.
+
 For alignment or color edits, construct [the request JSON](references/operations.md), then run:
 
 ```bash
