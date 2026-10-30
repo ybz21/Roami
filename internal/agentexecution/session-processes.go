@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/ybz21/Roami/internal/memguard"
 )
@@ -18,7 +19,11 @@ type paneProcess struct {
 
 // Start times distinguish a surviving process from a recycled PID.
 func processSnapshot() (map[int]paneProcess, error) {
-	entries, err := os.ReadDir("/proc")
+	return processSnapshotFromProc("/proc", os.ReadFile)
+}
+
+func processSnapshotFromProc(root string, readStat func(string) ([]byte, error)) (map[int]paneProcess, error) {
+	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, fmt.Errorf("SESSION_PROCESS_OBSERVATION_UNAVAILABLE")
 	}
@@ -28,9 +33,16 @@ func processSnapshot() (map[int]paneProcess, error) {
 		if err != nil {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join("/proc", entry.Name(), "stat"))
+		directory := filepath.Join(root, entry.Name())
+		data, err := readStat(filepath.Join(directory, "stat"))
 		if errors.Is(err, os.ErrNotExist) {
 			continue
+		}
+		if errors.Is(err, syscall.ESRCH) {
+			// A proc descriptor can outlive its task; a present PID still needs observation.
+			if _, missing := os.Stat(directory); errors.Is(missing, os.ErrNotExist) {
+				continue
+			}
 		}
 		if err != nil {
 			return nil, fmt.Errorf("SESSION_PROCESS_OBSERVATION_UNAVAILABLE")
