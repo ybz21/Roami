@@ -50,3 +50,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [MECH-RC01 / 模型请求回执与重试用量](case-62-mech-rc01/CASE.md)：数据、工具与独立 runner 齐备；不加入历史正式套件。
 
 - [Case 63：演示文稿位置与绘制顺序](case-63-mech-dl01/CASE.md)：独立结构回归，保留原正式套件。
+
+- [Case 64：外挂演示文稿编辑](case-64-mech-dp01/CASE.md)：独立 Skill、实际材料与通用 Agent 交付合同，不扩大基础工具接口。

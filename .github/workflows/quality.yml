@@ -44,3 +44,9 @@ jobs:
           QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           QUALITY_HEAD_SHA: ${{ github.sha }}
         run: scripts/dev/quality/check.sh full
+
+      - name: Check external presentation Skill
+        run: |
+          uv run --project agent-runtime --frozen ruff check skills/presentation-edit
+          uv run --project agent-runtime --frozen ruff format --check skills/presentation-edit
+          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/presentation-edit/tests

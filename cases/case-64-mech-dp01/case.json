@@ -1,0 +1,60 @@
+{
+  "id": "MECH-DP01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "外挂文稿编辑回归",
+  "prompt": "通过外挂 presentation-edit Skill 的独立 CLI 检查、编辑并交付独立 PPTX；基础工具目录与 schema 保持不变。",
+  "preconditions": "完整外挂 Skill 包；本地生成可编辑 PPTX；无真实模型调用。",
+  "expected_terminal": "property_copy_published_with_source_and_scope_preserved",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "实际生成的输入与编辑后 PPTX",
+    "原生工具回执及读取 JSON",
+    "冻结哈希和真实执行的测试回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-DP01-H1",
+      "rule": "按位置或显式路径定位对象，命名颜色来自指定编辑器调色板。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DP01-H2",
+      "rule": "无效批次、并发改动、未知颜色及作用域越界不发布输出。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DP01-H3",
+      "rule": "修改只涉及请求的属性和幻灯片，输入与其余部件字节不变。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DP01-H4",
+      "rule": "完整外部 Skill 包通过既有导入/读取/bash执行/文件交付合同工作，基础工具目录与 schema 不变。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/recipe.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
