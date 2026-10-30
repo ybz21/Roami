@@ -1,6 +1,7 @@
 """Standalone inference keeps node routes, gateway admission and the model-page quota."""
 
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -34,6 +35,18 @@ def node(tmp_path, monkeypatch):
     )
     saved.chmod(0o600)
     monkeypatch.setenv("ROAMI_MODEL_GATEWAY_SOCKET", str(tmp_path / "model.sock"))
+
+    async def binding(argv, **options):
+        assert argv[1:] == ["agent", "gateway", "binding", "--data-root", str(root)]
+        socket = os.environ.get("ROAMI_MODEL_GATEWAY_SOCKET")
+        return {
+            "exitCode": 0 if socket else 1,
+            "stdout": json.dumps({"data": {"socket": socket}}),
+            "stderr": "",
+        }
+
+    monkeypatch.setattr("roami_agent.improvement.entrypoints.node_models.execute", binding)
+
     return root, config, saved
 
 

@@ -42,8 +42,8 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
         await self.transport.aclose()
 
 
-def local_gateway_client(role, timeout):
-    socket = os.environ.get("ROAMI_MODEL_GATEWAY_SOCKET")
+def local_gateway_client(role, timeout, *, socket=None):
+    socket = socket or os.environ.get("ROAMI_MODEL_GATEWAY_SOCKET")
     if not socket:
         return None
     return httpx.AsyncClient(
