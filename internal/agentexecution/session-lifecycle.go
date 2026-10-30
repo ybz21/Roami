@@ -1,10 +1,12 @@
 package agentexecution
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -427,6 +429,9 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if recovered, ok, problem := s.reconcileCodexCompletion(key, status, &state, path); ok || problem != nil {
 		return recovered, problem
 	}
+	if state.LaunchKey == key && state.Executor == "claude" && state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.resourceID() == binding.resourceID() {
+		status.Progress = claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
+	}
 	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State = "unknown"
 		return status, nil
@@ -447,10 +452,23 @@ func HookConfiguration(executable, executor string) (map[string]any, error) {
 }
 
 func DecodeSessionEvent(content []byte) (SessionEvent, error) {
+	return ReadSessionEvent(bytes.NewReader(content))
+}
+
+// Tool responses are not lifecycle evidence and can be much larger than the event metadata.
+func ReadSessionEvent(input io.Reader) (SessionEvent, error) {
 	var event SessionEvent
-	if len(content) > 100000 {
-		return event, fmt.Errorf("INVALID_SESSION_EVENT")
+	bounded := &io.LimitedReader{R: input, N: (64 << 20) + 1}
+	decoder := json.NewDecoder(bounded)
+	if err := decoder.Decode(&event); err != nil {
+		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
 	}
-	err := json.Unmarshal(content, &event)
-	return event, err
+	if decoder.Decode(new(any)) != io.EOF || bounded.N == 0 {
+		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
+	}
+	metadata, err := json.Marshal(event)
+	if err != nil || len(metadata) > 100000 {
+		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
+	}
+	return event, nil
 }

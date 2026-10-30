@@ -19,6 +19,7 @@ from roami_agent.storage.database import row, rows
 from roami_agent.storage.native_session_registry import register as register_native_session
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.task_continuation import continuation_candidates
+from roami_agent.storage.task_reports import reported_progress
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -594,6 +595,7 @@ class Tasks:
                 attempt["hasConversation"] = bool(attempt.pop("native_branch_id"))
                 result_json = attempt.pop("result_json")
                 attempt["result"] = json.loads(result_json) if result_json else None
+                attempt["progress"] = reported_progress(db, task_id, attempt["id"])
             children = rows(
                 db,
                 "SELECT * FROM tasks WHERE parent_task_id=? AND owner_id=? ORDER BY created_ms DESC LIMIT 101",

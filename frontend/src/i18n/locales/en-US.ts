@@ -1,4 +1,8 @@
 const enUS = {
+  'agent.task.executionUnconfirmed': "Execution unconfirmed",
+  'agent.task.executionUnconfirmedHint': "View retained files or open the work session to check the outcome.",
+  'agent.task.reportUnconfirmedTitle': "Unconfirmed report",
+  'agent.task.reportUnconfirmed': "The work session reported progress; completion is unconfirmed.",
   'agent.rsiResults.baselineArm': "Baseline result",
   'agent.rsiResults.candidateArm': "Candidate result",
   'agent.rsi.error.RSI_USAGE_UNKNOWN': "Model usage is unknown. Further operations stopped. Check execution records.",

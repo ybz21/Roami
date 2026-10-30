@@ -71,8 +71,8 @@ def test_contract_cannot_duplicate_metadata_or_disagree_with_directory(tmp_path)
 
 def test_catalog_is_complete_and_execution_matches_frozen_contracts():
     definitions = case_definitions()
-    assert len(definitions) == 60
-    assert len({value["id"] for value in definitions}) == 60
+    assert len(definitions) == 61
+    assert len({value["id"] for value in definitions}) == 61
     assert all(value["name"] and value["description"] for value in definitions)
     historical = json.loads(
         (
@@ -82,7 +82,12 @@ def test_catalog_is_complete_and_execution_matches_frozen_contracts():
     # The historical bank also contains unselected candidates; all 40 executable contracts survive.
     old = historical if isinstance(historical, list) else historical["cases"]
     old_by_id = {value["id"]: value for value in old}
-    own = [value for value in definitions if value["kind"] != "public_source_reference"]
+    own = [
+        value
+        for value in definitions
+        if value["kind"] != "public_source_reference"
+        and value.get("selected_in_mixed_suite_v1", True)
+    ]
     assert len(own) == 40
     for value in own:
         previous = old_by_id[value["id"]]
@@ -149,7 +154,7 @@ async def test_http_catalog_requires_local_owner_and_exposes_readable_metadata(s
         response = await client.get("/v1/improvement/cases", headers={"X-Roami-Owner": "local"})
         assert response.status_code == 200
         cases = response.json()["data"]
-        assert len(cases) == 60
+        assert len(cases) == 61
         assert cases[0]["name"] == "新增分页接口"
         assert cases[0]["description"]
         assert "prompt" not in cases[0] and "judge" not in cases[0]
@@ -227,3 +232,17 @@ def test_quant_selection_uses_the_declared_input_ranges_candidates_and_costs(tmp
         expected["test_final_equity"]
         == backtest(public["bars"][120:175], 2, 6, fee=0.003, slip=0.002)["equity"][-1]
     )
+
+
+def test_additional_delivery_regression_has_materials_without_changing_the_default_suite():
+    from roami_agent.improvement.evaluation.case_catalog import case_resource, resource_hashes
+
+    definition = next(value for value in case_definitions() if value["id"] == "MECH-VD03")
+    assert definition["selected_in_mixed_suite_v1"] is False
+    assert definition["name"] and definition["description"]
+    assert "scripts/run.py" in resource_hashes(definition)
+    manifest = json.loads(case_resource(definition["id"], "materials.json").read_text())
+    assert manifest["data"]["local_inputs"] is True
+    assert manifest["acceptance"]["entry"] == "scripts/run.py"
+    suite = authored_suite("extension-case-regression")
+    assert len(suite["cases"]) == 40 and all(case["id"] != "MECH-VD03" for case in suite["cases"])

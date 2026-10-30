@@ -6,8 +6,12 @@ import type { TaskArtifact, TaskAttempt } from './agent-task-protocol'
 import { taskFailureKey } from './task-failure'
 import DocumentPreview, { isPdfDocument, isPptxDocument } from '../documents/DocumentPreview'
 
-export function taskOutputHref(href: string, artifacts: TaskArtifact[]): string {
-  const output = artifacts.find(item => item.metadata?.sourcePath === href)
+export function taskOutputArtifact(href: string, artifacts: TaskArtifact[], runId?: string): TaskArtifact | undefined {
+  return artifacts.find(item => (!runId || !item.metadata?.runId || item.metadata.runId === runId) && (item.metadata?.sourcePath === href || item.metadata?.reportedAliases?.includes(href)))
+}
+
+export function taskOutputHref(href: string, artifacts: TaskArtifact[], runId?: string): string {
+  const output = taskOutputArtifact(href, artifacts, runId)
   if (output) return nodeApi('/agent/artifacts/' + encodeURIComponent(output.id) + '/content')
   if (href.startsWith('/api/')) return nodeApi(href.slice(4))
   if (href.startsWith('/') && !href.startsWith('//')) return nodeApi('/file/raw?path=' + encodeURIComponent(href))
@@ -16,17 +20,19 @@ export function taskOutputHref(href: string, artifacts: TaskArtifact[]): string 
 
 function TaskResultBody({ attempt, artifacts, onPreview }: { attempt: TaskAttempt; artifacts: TaskArtifact[]; onPreview?: (id: string) => void }) {
   const { t, locale } = useI18n()
-  const code = typeof attempt.result?.summary === 'string' ? attempt.result.summary : ''
+  const reported = !attempt.result?.summary && attempt.progress?.source === 'provider_transcript' ? attempt.progress.summary : ''
+  const code = typeof attempt.result?.summary === 'string' ? attempt.result.summary : reported
   const stderr = typeof attempt.result?.stderr === 'string' ? attempt.result.stderr : ''
   const output = typeof attempt.result?.output === 'string' ? attempt.result.output : ''
   const reason = attempt.state === 'failed' || attempt.state === 'interrupted' || attempt.result?.outcomeKnown === false ? taskFailureKey(code) : undefined
   return <>
+    {reported && <p className="agent-task-note" role="status">{t('agent.task.reportUnconfirmed')}</p>}
     {reason && <p className="agent-task-note" role="status">{t(reason)}</p>}
     {attempt.startedMs && <small className="agent-muted">{t('agent.task.startedAt', { time: new Date(attempt.startedMs).toLocaleString(locale) })}</small>}
     {attempt.finishedMs && <small className="agent-muted">{t('agent.task.finishedAt', { time: new Date(attempt.finishedMs).toLocaleString(locale) })}</small>}
     {attempt.result?.outcomeKnown === false && <p className="agent-task-note" role="status">{t('agent.task.outcomeUnknown')}</p>}
-    {code && <div className="agent-task-report"><Markdown resolveHref={href => taskOutputHref(href, artifacts)} onLinkClick={(href, event) => {
-      const artifact = artifacts.find(item => item.metadata?.sourcePath === href)
+    {code && <div className="agent-task-report"><Markdown resolveHref={href => taskOutputHref(href, artifacts, attempt.id)} onLinkClick={(href, event) => {
+      const artifact = taskOutputArtifact(href, artifacts, attempt.id)
       if (artifact && onPreview && canPreviewArtifact(artifact)) { event.preventDefault(); onPreview(artifact.id) }
     }}>{code}</Markdown></div>}
     {(stderr || output) && <details className="agent-task-log"><summary>{t('agent.task.executionLog')}</summary><p className="agent-muted">{t('agent.task.logHint')}</p>{output && <pre>{output}</pre>}{stderr && <pre>{stderr}</pre>}</details>}

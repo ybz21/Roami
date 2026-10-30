@@ -12,6 +12,7 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.task_reports import retain_reported_progress
 from roami_agent.tools.process import execute
 
 SESSION_REJECTIONS = {
@@ -161,7 +162,10 @@ class CodingExecutor:
 
         def write(db):
             current = row(db, "SELECT * FROM task_attempts WHERE id=?", (run["id"],))
-            if not current or current["result_json"]:
+            if not current:
+                return
+            retain_reported_progress(db, task, run, receipt)
+            if current["result_json"]:
                 return
             binding = receipt.get("sessionBinding")
             if binding:

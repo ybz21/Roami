@@ -197,12 +197,25 @@ class TaskDeliverables:
                 json.loads(preparation["payload_json"]).get("workspace", {}) if preparation else {}
             )
             root = workspace.get("directory")
-            if not attempt.get("finishedMs"):
+            progress = attempt.get("progress") or {}
+            if not attempt.get("finishedMs") and progress.get("source") != "provider_transcript":
                 continue
             updates = await self.completion_file_updates(owner, task, attempt)
             sources = reported_paths(result.get("summary", ""), root) + reported_paths(
                 result.get("output", ""), root
             )
+            reported_aliases = {}
+            if progress.get("source") == "provider_transcript" and (
+                not attempt.get("finishedMs") or result.get("summary") == progress.get("summary")
+            ):
+                for source in reported_paths(
+                    progress.get("summary", ""), progress.get("directory")
+                ):
+                    original = source
+                    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", source):
+                        source = str(output_path(progress["directory"], source))
+                        reported_aliases.setdefault(source, []).append(original)
+                    sources.append(source)
             reported = set(sources)
             observed = await self.artifacts.db.call(
                 lambda db, attempt=attempt: rows(
@@ -238,7 +251,10 @@ class TaskDeliverables:
                     "sourcePath": source,
                     "sourceFile": canonical,
                     "kind": "deliverable",
+                    "provisional": not bool(attempt.get("finishedMs")),
                 }
+                if canonical in reported_aliases:
+                    metadata["reportedAliases"] = list(dict.fromkeys(reported_aliases[canonical]))
                 update = updates.get(canonical)
                 if update:
                     metadata["sourceUpdate"] = update
@@ -260,6 +276,9 @@ class TaskDeliverables:
                         a
                         for a in stored
                         if same_source(a.get("metadata", {}))
+                        and not (
+                            a.get("metadata", {}).get("provisional") and attempt.get("finishedMs")
+                        )
                         and (not update or a["sha256"] == update["sha256"])
                     ),
                     None,

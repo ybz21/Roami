@@ -1,0 +1,11 @@
+{
+  "kind": "isolated_host_regression",
+  "requirements": ["Go repository toolchain", "uv with frozen agent-runtime dependencies", "scripts/dev/isolated-roami.sh"],
+  "go_packages": ["./internal/agentexecution", "./cmd/roami"],
+  "go_test_pattern": "TestLargePostToolUse|TestSessionHookMetadata|TestSessionEventDecoder|TestSessionEventInput|TestClaudeReport",
+  "pytest_selectors": ["tests/test_task_reported_progress.py"],
+  "model_provider": "scripted only",
+  "real_model_calls": 0,
+  "user_tmux_used": false,
+  "production_data_modified": false
+}
