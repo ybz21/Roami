@@ -14,7 +14,23 @@
   },
   "tools": {
     "kind": "benchmark_environment",
-    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference.",
+    "runtime_checks": {
+      "contract": "Offline Python packages must remain available through ordinary and explicit login shells.",
+      "pytest_selector": "tests/test_rsi_login_environment.py::test_offline_python_tools_survive_shell_selection",
+      "image_label": {
+        "org.roami.rsi.login-runtime-path": "1"
+      },
+      "modules": [
+        "pptx",
+        "lxml",
+        "PIL",
+        "numpy",
+        "scipy",
+        "openpyxl",
+        "playwright"
+      ]
+    }
   },
   "acceptance": {
     "kind": "upstream_adapter",

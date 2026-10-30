@@ -5,7 +5,7 @@
     "kind": "runtime_regression",
     "pytest_selectors": [
       "test_routing_policy.py::test_external_or_invented_quote_cannot_override_the_user",
-      "test_foundations.py::test_research_and_main_cannot_escape_cli_admission"
+      "test_foundations.py::test_background_roles_share_workspace_and_registered_cli_rules"
     ],
     "local_inputs": false,
     "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
@@ -18,7 +18,7 @@
     "kind": "pytest_assertions",
     "pytest_selectors": [
       "test_routing_policy.py::test_external_or_invented_quote_cannot_override_the_user",
-      "test_foundations.py::test_research_and_main_cannot_escape_cli_admission"
+      "test_foundations.py::test_background_roles_share_workspace_and_registered_cli_rules"
     ]
   }
 }
