@@ -9,7 +9,10 @@ from pathlib import Path
 import httpx
 
 from roami_agent.improvement.domain.contracts import require
-from roami_agent.improvement.evaluation.execution.container_context import context_settings
+from roami_agent.improvement.evaluation.execution.container_context import (
+    context_settings,
+    instruction_settings,
+)
 from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.protocol.image_limits import ImageLimits
@@ -29,6 +32,8 @@ def container_settings(request):
     )
     if request.get("shared_daily_limit") is True:
         settings = context_settings(settings, request.get("model_context"))
+    if "role_instructions" in request:
+        settings = instruction_settings(settings, request["role_instructions"])
     # Main input changes must not enable an unspecified Worker's fallback route.
     settings = settings_with_route(settings, "worker", settings.route("worker"))
     for role in ("main", "worker"):

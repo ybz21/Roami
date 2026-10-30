@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-CI01",
+  "data": {
+    "kind": "synthetic_saved_role_policies_and_image_labels",
+    "scenarios": "input/scenarios.json",
+    "generators": [
+      "agent-runtime/tests/test_improvement_container_instructions.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "private_container_transport_and_runtime_context"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_improvement_container_instructions.py"
+    ],
+    "expected_collected": 16,
+    "no_skips": true,
+    "kind": "source_frozen_pytest_receipt"
+  }
+}

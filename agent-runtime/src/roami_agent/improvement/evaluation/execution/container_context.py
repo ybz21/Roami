@@ -1,4 +1,4 @@
-"""Capacity metadata crosses the private bridge; model connections stay on the host."""
+"""Request context crosses the private bridge; model connections stay on the host."""
 
 import math
 from dataclasses import replace
@@ -6,6 +6,20 @@ from dataclasses import replace
 from roami_agent.improvement.domain.contracts import require
 
 ERROR = "RSI_CONTAINER_MODEL_CONTEXT_INVALID"
+
+
+def role_instructions(settings):
+    return {"main": settings.main_instructions, "worker": settings.worker_instructions}
+
+
+def instruction_settings(settings, raw):
+    require(
+        isinstance(raw, dict)
+        and set(raw) == {"main", "worker"}
+        and all(isinstance(value, str) for value in raw.values()),
+        "RSI_CONTAINER_ROLE_INSTRUCTIONS_INVALID",
+    )
+    return replace(settings, main_instructions=raw["main"], worker_instructions=raw["worker"])
 
 
 def model_context(settings):
