@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -155,8 +156,12 @@ func TestTerminalUsageSettlesWhenCallerClosesBeforeHTTPBodyEnds(t *testing.T) {
 }
 
 func TestHTTPFailuresUnknownUsageAndNoRedirect(t *testing.T) {
-	for _, status := range []int{200, 302, 401, 500} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
+	for _, status := range []int{0, 200, 302, 401, 500} {
+		name := http.StatusText(status)
+		if status == 0 {
+			name = "TransportFailure"
+		}
+		t.Run(name, func(t *testing.T) {
 			l := newLedger(t)
 			if err := l.Configure(testConfiguration(nil)); err != nil {
 				t.Fatal(err)
@@ -169,8 +174,17 @@ func TestHTTPFailuresUnknownUsageAndNoRedirect(t *testing.T) {
 			}))
 			defer up.Close()
 			w := httptest.NewRecorder()
-			nodeConfiguredHandler(t, l, up.URL).ServeHTTP(w, modelRequest(up.URL))
-			if w.Code != status {
+			handler := nodeConfiguredHandler(t, l, up.URL)
+			expected := status
+			if status == 0 {
+				socket := filepath.Join(t.TempDir(), "missing.sock")
+				handler.Client.Transport = &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "unix", socket)
+				}}
+				expected = 502
+			}
+			handler.ServeHTTP(w, modelRequest(up.URL))
+			if w.Code != expected {
 				t.Fatalf("status: %d", w.Code)
 			}
 			stats, err := l.Statistics(1)
