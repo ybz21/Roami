@@ -411,3 +411,5 @@ jpeg_quality = 80
 ```
 
 The image's actual MIME is used in `image_url` data URLs; transcript JSON retains references, never Base64. Enable the model's image capability only after verifying its actual behavior: the currently configured service advertises text-only metadata, but an isolated real image probe succeeded. These changes cover chat attachments; arbitrary file/MCP images are not claimed to be integrated into this path.
+
+Standalone RSI inference resolves the selected node through `roami agent gateway binding --data-root PATH`. The Go CLI supplies only its private local socket and instance identity; upstream model routes and credentials remain in the existing node settings. Scripts do not need to export a gateway socket or supply another gateway configuration. An unavailable local gateway stops inference before any model request.

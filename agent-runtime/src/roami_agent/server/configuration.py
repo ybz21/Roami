@@ -166,6 +166,7 @@ WORKER_INSTRUCTIONS = (
 
 @dataclass(frozen=True)
 class Settings:
+    model_gateway_socket: str = ""
     endpoint: str = ""
     model: str = ""
     key_env: str = "ROAMI_AGENT_API_KEY"

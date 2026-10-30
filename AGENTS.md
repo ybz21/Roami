@@ -297,6 +297,9 @@ PR 的图抹了）。
 
 ## Code Review
 
+After merging a PR, remove its remote branch, local branch, and clean unused worktree.
+Preserve active worktrees, unmerged work, and uncommitted changes.
+
 - PRs are reviewed by the **Codex GitHub App** (`chatgpt-codex-connector` bot). See
   [docs/development/codex-review.md](docs/development/codex-review.md) for how it is enabled and
   how to respond.

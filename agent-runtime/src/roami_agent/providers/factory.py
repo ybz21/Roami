@@ -15,6 +15,7 @@ def configured_provider(settings, role, *, client=None):
         capabilities=route.capabilities,
         cache=route.cache,
         parameters=route.parameters,
-        client=client or local_gateway_client(role, route.timeout_seconds),
+        client=client
+        or local_gateway_client(role, route.timeout_seconds, socket=settings.model_gateway_socket),
     )
     return provider
