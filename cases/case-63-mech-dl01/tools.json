@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-DL01",
+  "runtime": "repository Python environment and the isolated-roami launcher",
+  "test_module": "agent-runtime/tests/test_presentation_layout.py",
+  "expected_collected": 10,
+  "data_generator": "test_presentation_layout.layout_presentation",
+  "actual_reader": "roami_agent.documents.presentation.presentation_metadata; registered file_read is also exercised by the tests",
+  "model_calls": 0,
+  "network": "not required"
+}

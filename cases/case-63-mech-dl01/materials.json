@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-DL01",
+  "data": {
+    "kind": "runtime_generated_pptx",
+    "contract": "input/layout.json",
+    "generator_source": "agent-runtime/tests/test_presentation_layout.py",
+    "package_fixture_source": "agent-runtime/tests/test_presentation_reads.py",
+    "actual_output": "<output>/input/deck.pptx"
+  },
+  "tools": {
+    "kind": "isolated_scripted_regression",
+    "configuration": "tools.json",
+    "model_calls": 0
+  },
+  "acceptance": {
+    "kind": "strict_pytest_receipt_and_source_hash",
+    "test_module": "agent-runtime/tests/test_presentation_layout.py",
+    "expected_collected": 10,
+    "skips_or_xfail_allowed": false
+  },
+  "historical_suite_updated": false
+}

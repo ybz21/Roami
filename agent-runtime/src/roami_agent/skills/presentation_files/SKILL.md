@@ -5,7 +5,9 @@ description: Inspect and edit PowerPoint PPTX presentations, slide text, formatt
 
 # Presentation files
 
-Read the source with `read` and `view: document` before editing. The result lists text objects in slide order, recursively including groups. `shapePath` identifies each object through nested shape collections. Empty decorative text frames are listed separately. Use the user's spatial order when specified; otherwise identify the requested text container from its content and document order.
+Read the source with `read` and `view: document` before editing. `shapePath` identifies each object through nested shape collections; `ordinal` is drawing traversal, not reading order. Empty decorative text frames are listed separately.
+
+Locate the requested text container from its content and placement. Do not select a "first textbox" by drawing ordinal alone. `slideBounds` gives explicit shape bounds in slide EMU coordinates, including group scaling, rotation and flips. `topToBottomPaths` sorts nonempty text frames by top edge, then left edge; it is null when any position is unresolved. Respect the user's requested order. Bounds do not establish visibility or reading order for overlapping objects. Inspect the native application or a rendering when inherited or ambiguous layout prevents identifying the intended object.
 
 Named colors belong to the intended editor. Use the installed `editorPalette` when that editor applies; ask or inspect the relevant application metadata when it is unavailable. Do not assume another application's RGB names.
 

@@ -5,6 +5,8 @@ import posixpath
 import zipfile
 from xml.etree import ElementTree
 
+from roami_agent.documents.presentation_geometry import IDENTITY, placement, slide_bounds
+
 NS = {
     "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
@@ -68,14 +70,20 @@ def presentation_metadata(body):
                 raise ValueError("Missing slide objects")
             objects, empty = [], []
 
-            def walk(parent, ancestry, objects, empty):
+            def walk(parent, ancestry, objects, empty, matrix):
                 if len(ancestry) > 64:
                     raise ValueError("Excessive presentation group depth")
                 shapes = [child for child in parent if child.tag.rsplit("}", 1)[-1] in SHAPES]
                 for index, shape in enumerate(shapes):
                     path = [*ancestry, index]
                     if shape.tag == "{" + NS["p"] + "}grpSp":
-                        walk(shape, path, objects, empty)
+                        walk(
+                            shape,
+                            path,
+                            objects,
+                            empty,
+                            placement(shape.find("p:grpSpPr/a:xfrm", NS), matrix, group=True),
+                        )
                         continue
                     text = shape.find("p:txBody", NS)
                     if text is None:
@@ -118,6 +126,7 @@ def presentation_metadata(body):
                             "name": identity.get("name") if identity is not None else None,
                             "text": value,
                             "paragraphs": paragraphs,
+                            "slideBounds": slide_bounds(shape.find("p:spPr/a:xfrm", NS), matrix),
                             "localPosition": {key: int(transform.get(key)) for key in ("x", "y")}
                             if transform is not None
                             and all(key in transform.attrib for key in ("x", "y"))
@@ -125,6 +134,33 @@ def presentation_metadata(body):
                         }
                     )
 
-            walk(tree, [], objects, empty)
-            slides.append({"number": number, "textObjects": objects, "emptyTextFramePaths": empty})
-        return {"format": "pptx", "rendered": False, "slides": slides}
+            walk(tree, [], objects, empty, IDENTITY)
+            ordered = (
+                sorted(
+                    objects,
+                    key=lambda item: (
+                        item["slideBounds"]["y"],
+                        item["slideBounds"]["x"],
+                        item["ordinal"],
+                    ),
+                )
+                if all(item["slideBounds"] is not None for item in objects)
+                else None
+            )
+            slides.append(
+                {
+                    "number": number,
+                    "textObjects": objects,
+                    "emptyTextFramePaths": empty,
+                    "topToBottomPaths": [item["shapePath"] for item in ordered]
+                    if ordered is not None
+                    else None,
+                }
+            )
+        return {
+            "format": "pptx",
+            "rendered": False,
+            "objectOrder": "drawing_traversal",
+            "coordinateUnit": "EMU",
+            "slides": slides,
+        }
