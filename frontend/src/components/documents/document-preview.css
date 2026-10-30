@@ -1,10 +1,11 @@
 .pdf-document { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; background:var(--bg-base); }
 .pdf-document-pages { flex:none; display:flex; align-items:center; justify-content:center; gap:var(--sp-3); padding:var(--sp-1) var(--sp-2); border-bottom:1px solid var(--border-subtle); color:var(--text-dim); font-size:var(--fs-meta); }
 .pdf-document-pages .tt-act { position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:var(--tap); min-height:var(--tap); }
-.pdf-document-scroll { flex:1; min-height:0; min-width:0; overflow:auto; overscroll-behavior:contain; }
+.pdf-document-scroll { position:relative; flex:1; min-height:0; min-width:0; overflow:auto; scrollbar-gutter:stable; overscroll-behavior:contain; }
 .pdf-document-scroll canvas { display:block; max-width:100%; margin:auto; background:white; }
-.pdf-document-scroll canvas[hidden] { display:none; }
+.pdf-document-scroll canvas[hidden] { visibility:hidden; }
 .pdf-document-scroll p { margin:0; padding:var(--sp-4); color:var(--text-dim); font-size:var(--fs-body); }
+.pdf-document-loading { position:absolute; top:0; left:0; }
 .document-preview { height:100%; min-height:0; min-width:0; overflow:auto; }
 .document-preview-full { flex:1; min-height:0; min-width:0; }
 .document-preview-download { display:flex; justify-content:flex-end; flex:none; padding:var(--sp-2) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
