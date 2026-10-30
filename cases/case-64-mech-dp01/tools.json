@@ -3,7 +3,7 @@
     "skills/presentation-edit/tests",
     "agent-runtime/tests/verification/test_presentation_skill_package.py"
   ],
-  "expected_collected": 23,
+  "expected_collected": 43,
   "generator": "skills/presentation-edit/tests/deck_fixture.py::deck_bytes",
   "registered_tools": [
     "read",

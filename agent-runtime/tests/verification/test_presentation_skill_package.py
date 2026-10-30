@@ -22,7 +22,7 @@ from roami_agent.storage.database import row
 
 
 async def test_external_skill_import_executes_and_delivers_with_unchanged_foundations(
-    store, tmp_path
+    store, tmp_path, monkeypatch
 ):
     package = Path(__file__).resolve().parents[3] / "skills/presentation-edit"
     workspace = tmp_path / "work with spaces"
@@ -103,10 +103,23 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
     runtime.dispatch.native_executor.workspace_factory = prepare
     before = copy.deepcopy(runtime.tools.catalog("worker"))
     tool_names = set(runtime.tools.registry)
+    implicit_reads = []
+    original_read = runtime.files.read
+
+    async def observe_read(*args, **kwargs):
+        if not calls:
+            implicit_reads.append(args[0])
+        return await original_read(*args, **kwargs)
+
+    monkeypatch.setattr(runtime.files, "read", observe_read)
     assert "presentation-edit" not in runtime.tools.skills
     payload = {
         "name": "presentation-edit",
-        "description": "Optional presentation editing package",
+        "description": next(
+            line.partition(":")[2].strip()
+            for line in (package / "SKILL.md").read_text().splitlines()
+            if line.startswith("description:")
+        ),
         "text": (package / "SKILL.md").read_text(),
         "files": {
             str(path.relative_to(package)): base64.b64encode(path.read_bytes()).decode()
@@ -117,13 +130,17 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
     }
     await runtime.capability_imports.save("local", "skills", payload)
     assert runtime.tools.catalog("worker") == before and set(runtime.tools.registry) == tool_names
+    assert any(
+        item["name"] == "presentation-edit"
+        for item in runtime.tools.directory.list("幻灯片", "skill")["items"]
+    )
     await runtime.start()
     try:
         conversation = await runtime.conversations.create("alice")
         task = await runtime.tasks.create(
             "alice",
             conversation["id"],
-            "Use the external Skill to center the top heading.",
+            "Use the external Skill to inspect source.pptx and center its top heading in edited.pptx.",
             key="external-skill",
             target={"kind": "new_session", "directory": str(workspace)},
             record_intent=True,
@@ -137,6 +154,7 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
                 (conversation["id"],),
             ),
         )
+        assert implicit_reads == []
         assert calls == ["read", "bash", "bash", "bash"]
         references = await runtime.artifacts.list("alice", task_id=task["id"])
         assert len(references) == 1 and references[0]["name"] == "edited.pptx"

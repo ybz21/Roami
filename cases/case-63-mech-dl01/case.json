@@ -3,14 +3,14 @@
   "kind": "mechanism_regression",
   "category": "MECH",
   "category_label": "演示文稿位置回归",
-  "prompt": "通过受作用域限制的文稿读取，返回绘制顺序、组合变换后的边界与从上到下的位置顺序；未知位置保持未知。",
-  "preconditions": "本地生成的 PPTX，包含正文先绘制、标题在上、组合缩放、旋转和翻转；不调用模型。",
+  "prompt": "通过外挂 Skill 的检查入口返回绘制顺序、组合变换后的边界与从上到下的位置顺序；未知位置保持未知。",
+  "preconditions": "本地生成的最小 OOXML ZIP 结构样本，覆盖正文先绘制、标题在上、组合缩放、旋转和翻转；非完整可编辑文稿，不调用模型。",
   "expected_terminal": "layout_observed_without_rewriting_source",
   "counts_as_delivery": false,
   "selected_in_mixed_suite_v1": false,
   "run_profile": "isolated_host_regression",
   "required_deliverables": [
-    "实际生成的 PPTX 与读取 JSON",
+    "实际生成的 OOXML 结构样本与读取 JSON",
     "冻结资源和实现哈希",
     "实际执行且无跳过的测试回执"
   ],

@@ -88,6 +88,8 @@
   "benchmark_mapping_status": "capability_mapping_only_no_upstream_samples_imported",
   "selected_in_mixed_suite_v1": true,
   "resources": {
-    "materials": "materials.json"
+    "materials": "materials.json",
+    "tools": "tools.json",
+    "acceptance": "acceptance.md"
   }
 }

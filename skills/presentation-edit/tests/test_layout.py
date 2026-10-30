@@ -5,9 +5,8 @@ import zipfile
 from xml.etree import ElementTree as E
 
 import pytest
-from test_presentation_reads import presentation_bytes
-
-from roami_agent.documents.presentation import NS, presentation_metadata
+from pptx_package import NS, presentation_metadata
+from presentation_fixture import presentation_bytes
 
 
 def layout_presentation(*, group_rotation=0, group_flip=None, missing_size=False):
@@ -23,7 +22,9 @@ def layout_presentation(*, group_rotation=0, group_flip=None, missing_size=False
         transform = E.SubElement(properties, "{" + NS["a"] + "}xfrm")
         E.SubElement(transform, "{" + NS["a"] + "}off", x=str(x), y=str(y))
         if not (missing_size and shape is heading):
-            E.SubElement(transform, "{" + NS["a"] + "}ext", cx=str(width), cy=str(height))
+            E.SubElement(
+                transform, "{" + NS["a"] + "}ext", cx=str(width), cy=str(height)
+            )
     group = shapes.find("p:grpSp/p:grpSpPr", NS)
     transform = E.SubElement(group, "{" + NS["a"] + "}xfrm", rot=str(group_rotation))
     if group_flip:
@@ -49,8 +50,18 @@ def test_spatial_order_is_not_the_drawing_traversal():
     assert [item["text"] for item in slide["textObjects"]] == ["正文", "Heading"]
     assert [item["ordinal"] for item in slide["textObjects"]] == [1, 2]
     assert slide["topToBottomPaths"] == [[2], [1, 0]]
-    assert slide["textObjects"][0]["slideBounds"] == {"x": 100, "y": 200, "width": 20, "height": 20}
-    assert slide["textObjects"][1]["slideBounds"] == {"x": 20, "y": 25, "width": 30, "height": 10}
+    assert slide["textObjects"][0]["slideBounds"] == {
+        "x": 100,
+        "y": 200,
+        "width": 20,
+        "height": 20,
+    }
+    assert slide["textObjects"][1]["slideBounds"] == {
+        "x": 20,
+        "y": 25,
+        "width": 30,
+        "height": 10,
+    }
     assert result["rendered"] is False
 
 
@@ -63,9 +74,9 @@ def test_spatial_order_is_not_the_drawing_traversal():
     ],
 )
 def test_group_transform_matches_hand_computed_bounds(rotation, flip, expected):
-    item = presentation_metadata(layout_presentation(group_rotation=rotation, group_flip=flip))[
-        "slides"
-    ][0]["textObjects"][0]
+    item = presentation_metadata(
+        layout_presentation(group_rotation=rotation, group_flip=flip)
+    )["slides"][0]["textObjects"][0]
     assert item["slideBounds"] == expected
 
 
@@ -109,7 +120,9 @@ def test_nested_groups_with_child_offsets_compose_in_slide_coordinates():
             E.SubElement(transform, "{" + NS["a"] + "}" + tag, values)
         nested.append(body)
 
-    item = presentation_metadata(repack(layout_presentation(), nest))["slides"][0]["textObjects"][0]
+    item = presentation_metadata(repack(layout_presentation(), nest))["slides"][0][
+        "textObjects"
+    ][0]
     # Each group doubles size; translations give x=160+4u, y=300+4v.
     assert item["shapePath"] == [1, 0, 0]
     assert item["slideBounds"] == {"x": 160, "y": 300, "width": 40, "height": 40}
@@ -120,9 +133,9 @@ def test_shape_rotation_preserves_its_center_and_reports_axis_aligned_bounds():
         shape = tree.findall("p:cSld/p:spTree/p:sp", NS)[-1]
         shape.find("p:spPr/a:xfrm", NS).set("rot", str(90 * 60000))
 
-    item = presentation_metadata(repack(layout_presentation(), rotate))["slides"][0]["textObjects"][
-        1
-    ]
+    item = presentation_metadata(repack(layout_presentation(), rotate))["slides"][0][
+        "textObjects"
+    ][1]
     assert item["slideBounds"] == {"x": 30, "y": 15, "width": 10, "height": 30}
 
 
@@ -135,45 +148,30 @@ def test_unresolved_group_layout_does_not_become_local_coordinate_order(kind):
         else:
             group.find("a:xfrm/a:chExt", NS).set("cx", "0")
 
-    slide = presentation_metadata(repack(layout_presentation(), invalidate))["slides"][0]
+    slide = presentation_metadata(repack(layout_presentation(), invalidate))["slides"][
+        0
+    ]
     assert slide["topToBottomPaths"] is None
     assert slide["textObjects"][0]["slideBounds"] is None
     assert slide["textObjects"][0]["localPosition"] == {"x": 0, "y": 0}
 
 
-async def test_registered_document_view_exposes_layout_without_rewriting_source(tmp_path):
-    import base64
+def test_external_inspection_cli_exposes_layout_without_rewriting_source(
+    tmp_path, capsys
+):
     import hashlib
     import json
 
-    from roami_agent.server.configuration import Settings
-    from roami_agent.storage.workspace_files import WorkspaceFiles
-    from roami_agent.tools.files import register_file_tools
-    from roami_agent.tools.registry import Tools
+    from presentation import main
 
     body = layout_presentation()
     path = tmp_path / "deck.pptx"
     path.write_bytes(body)
-    files, tools = WorkspaceFiles(Settings()), Tools()
-    register_file_tools(tools, files)
-    try:
-        page = await tools.invoke(
-            {
-                "function": {
-                    "name": "file_read",
-                    "arguments": json.dumps({"path": "deck.pptx", "view": "document"}),
-                }
-            },
-            "worker",
-            {"taskId": "layout", "workspace": {"directory": str(tmp_path)}},
-        )
-        document = json.loads(
-            base64.b64decode(page["data"]) if page["encoding"] == "base64" else page["data"]
-        )
-        assert page["sha256"] == hashlib.sha256(body).hexdigest()
-        assert document["objectOrder"] == "drawing_traversal"
-        assert document["coordinateUnit"] == "EMU"
-        assert document["slides"][0]["topToBottomPaths"] == [[2], [1, 0]]
-        assert path.read_bytes() == body
-    finally:
-        await files.close()
+    assert main(["inspect", "--workspace", str(tmp_path), "--path", path.name]) == 0
+    document = json.loads(capsys.readouterr().out)
+    assert document["ok"] is True
+    assert document["sha256"] == hashlib.sha256(body).hexdigest()
+    assert document["objectOrder"] == "drawing_traversal"
+    assert document["coordinateUnit"] == "EMU"
+    assert document["slides"][0]["topToBottomPaths"] == [[2], [1, 0]]
+    assert path.read_bytes() == body

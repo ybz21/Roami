@@ -13,7 +13,6 @@ from pathlib import Path
 import uvicorn
 
 from roami_agent.context.chat_images import ChatImages
-from roami_agent.context.document_intake import TaskDocumentIntake
 from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
 from roami_agent.context.token_estimate import request_context
@@ -219,7 +218,6 @@ class Runtime:
 
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
-        self.document_intake = TaskDocumentIntake(self.files, self.tools)
 
         self.context.request_context = lambda: request_context(
             self.settings, self.settings.main_instructions, self.tools.catalog("main")
@@ -246,7 +244,6 @@ class Runtime:
                 if self.browser.config.get("enabled") or self.desktop.config["enabled"]
                 else None,
                 artifacts=self.artifacts,
-                documents=self.document_intake,
             ),
             self.wakeup,
             self.active,
@@ -266,7 +263,6 @@ class Runtime:
                 self.context,
                 self.settings,
                 memory=self.memory,
-                documents=self.document_intake,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True
