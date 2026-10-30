@@ -163,6 +163,7 @@ func TestHTTPFailuresUnknownUsageAndNoRedirect(t *testing.T) {
 			}
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Location", "http://must-not-follow.invalid")
+				w.Header().Set("X-Roami-Model-Call", "forged-upstream-id")
 				w.WriteHeader(status)
 				_, _ = io.WriteString(w, `{"error":"fixture"}`)
 			}))
@@ -175,6 +176,9 @@ func TestHTTPFailuresUnknownUsageAndNoRedirect(t *testing.T) {
 			stats, err := l.Statistics(1)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if callID := w.Header().Get("X-Roami-Model-Call"); callID == "" || callID != stats.Recent[0].ID {
+				t.Fatalf("response cannot correlate to the Go ledger: %q", callID)
 			}
 			unknown := status == 200 || status == 500
 			if (stats.Recent[0].Cost == nil) != unknown {

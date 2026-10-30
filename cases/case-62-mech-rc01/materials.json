@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-RC01",
+  "data": {
+    "kind": "observed_failure_synthetic_replay",
+    "local_inputs": true,
+    "recipe": "input/receipts.json",
+    "load_from": "test_request_receipts.py reads the retry sequence and usage from this file; Go creates its own temporary ledger."
+  },
+  "tools": {
+    "kind": "isolated_host_regression",
+    "configuration": "tools.json",
+    "model_calls": "No inference; local scripted responses only."
+  },
+  "acceptance": {
+    "kind": "go_and_pytest_assertions",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "test_request_receipts.py"
+    ]
+  }
+}

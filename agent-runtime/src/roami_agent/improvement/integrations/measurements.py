@@ -59,10 +59,13 @@ class EpisodeBudget:
                 for k in ("inputTokens", "outputTokens", "requestAttempts")
             )
             known = known and entry["retryUsageKnown"] is True
+            self.used += sum(
+                entry[key]
+                for key in ("inputTokens", "outputTokens")
+                if type(entry[key]) is int and entry[key] >= 0
+            )
             if not known:
                 self.unknown = True
-            else:
-                self.used += entry["inputTokens"] + entry["outputTokens"]
 
     def metrics(self):
         known = not self.unknown and all(r["elapsedMs"] is not None for r in self.requests)

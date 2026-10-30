@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>模型请求关联与重试观测</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>模型请求关联与重试观测</h1>
+<h2>Product Design</h2><p>续修 #443：Go 已为每次请求生成账本编号，但 Agent 的响应遥测忽略该编号；私有桥又丢弃宿主响应回执和重试完整性，容器记录无法直接关联账本，也可能把三次请求显示为一次完整请求。</p>
+<h2>User Stories</h2><ul><li>我能从普通 Agent 与 RSI 的执行详情定位 Go 账本请求，并区分桥接 HTTP 200 和真正的上游失败状态。</li><li>逐次重试可串联；未知的总用量仍为未知，已观测的成功用量不被丢弃。</li><li>回归 Case 有名称、说明、实际数据、工具入口与独立执行回执，不修改正式成绩。</li></ul>
+<h2>Technical Design</h2><p><code>providers/request_receipts.py</code> 只保留安全请求编号、Go UUID、HTTP 状态、尝试次数与用量完整性；错误正文不读取。<code>LocalGatewayTransport</code> 为 Go 响应标记来源，<code>ChatCompletions</code> 记录该编号。<code>PrivateModelBridgeTransport</code> 只标记宿主 Unix 私有桥，普通上游不能注入私有回执或计量元数据。</p>
+<p>桥接适配器转发经过白名单校验的回执与重试元数据；容器入口使用私有传输，SDK 将宿主回执记录为 upstream_headers，与本地桥接响应分开。中断过的桥接调用不伪造总尝试数或完整用量；损坏的私有计量字段拒绝为无效用量。RSI 计量只补充已观测 Token 下界，不将未知总量变成已知。没有新增 Python Token、请求数或费用准入，Go 额度与结算逻辑不变，保存模型、参数及重试配置不覆盖。</p>
+<p>新增扩展 Case <code>cases/case-62-mech-rc01/</code>，CASE.md 包含 name/description，输入 JSON 由测试实际读取；tools、provenance、materials、acceptance 与 runner 齐备。runner 冻结资源和实现 SHA，核验 Go 指定根测试及全部 25 项 Python 检查实际通过，拒绝缺失、跳过、xfail 或空执行。它不加入原 authored-40 或正式 60 项。</p>
+<h2>Acceptance</h2><p>隔离 Unix 套接字的修复前后对照复现：两次 503 后一次成功，旧桥报告 1 次且用量完整；新链路报告 3 次、逐次编号和真实状态，用量仍不完整。144 项相关检查通过，覆盖普通 Agent 失败 trace、真实私有桥、非法元数据、伪造上游、错误正文不读取及未知用量保留。Go 的真实本地 HTTP 回归核对响应编号等于临时账本，拒绝上游覆盖。Case 62 独立实际执行通过：指定 Go 根测试及其四个 HTTP 子场景全部执行，25 项 Python 测试零跳过，冻结实现 SHA 保持，隔离实例清理成功。完整门禁与 CI 以本 PR 实际记录为准。</p><p>本轮 0 真实模型调用，未重放原 401；不能补造历史缺失的回执或宣称鉴权已恢复。原生任务质量、独立评分、人工参考、正式全套和观察仍未完成。未部署正式服务或启用日程。</p>
+</main></body></html>

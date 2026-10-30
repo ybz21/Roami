@@ -35,7 +35,7 @@ async def test_http_failures_record_request_id_before_raising(status):
     )
     assert caught.value.status == 502 and len(calls) == 1
     assert [e.value for e in events if e.kind == "telemetry" and e.value["phase"] == "headers"] == [
-        {"phase": "headers", "attempt": 1, "requestId": f"trace-{status}"}
+        {"phase": "headers", "attempt": 1, "httpStatus": status, "requestId": f"trace-{status}"}
     ]
     assert not any(e.kind in {"text", "tool", "usage"} for e in events)
 
@@ -55,7 +55,7 @@ async def test_failed_request_ids_keep_existing_sanitization(request_id):
             async for event in provider.stream([], []):
                 events.append(event)
     assert [e.value for e in events if e.kind == "telemetry" and e.value["phase"] == "headers"] == [
-        {"phase": "headers", "attempt": 1}
+        {"phase": "headers", "attempt": 1, "httpStatus": 401}
     ]
 
 

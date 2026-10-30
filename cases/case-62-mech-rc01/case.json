@@ -1,0 +1,60 @@
+{
+  "id": "MECH-RC01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "模型请求回执回归",
+  "prompt": "通过本地 Go 及私有模型桥记录请求编号、HTTP 状态和重试用量；保留未知，不接触正式模型。",
+  "preconditions": "本地脚本化 HTTP/Unix 套接字、独立账本、临时工作区，无正式模型调用。",
+  "expected_terminal": "receipts_preserved_and_unknown_usage_retained",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "冻结输入与实现 SHA",
+    "实际 Go/Python 测试输出",
+    "无跳过的执行回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-RC01-H1",
+      "rule": "Go 响应编号等于账本编号，上游伪造编号不能覆盖。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RC01-H2",
+      "rule": "私有桥保留每次宿主响应的编号与状态，外部服务不能伪造私有回执。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RC01-H3",
+      "rule": "三次请求不能显示成一次完整请求；未知重试用量保留未知，已观测成功用量不丢失。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RC01-H4",
+      "rule": "错误正文不读取，不伪造用量、发送前拒绝或任务成功；不调用真实模型。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "TR",
+    "MB"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/receipts.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

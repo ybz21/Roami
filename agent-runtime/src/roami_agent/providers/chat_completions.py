@@ -21,6 +21,12 @@ from roami_agent.providers.request_policy import (
     request_policy,
     retry_delay,
 )
+from roami_agent.providers.request_receipts import (
+    BRIDGE_EXTENSION,
+    relayed_receipt,
+    response_receipt,
+    usage_receipt,
+)
 
 STREAM_ERROR_CODES = frozenset(
     {
@@ -31,6 +37,7 @@ STREAM_ERROR_CODES = frozenset(
         "MODEL_DEADLINE",
         "MODEL_TRANSPORT_FAILED",
         "MODEL_STREAM_INVALID",
+        "MODEL_USAGE_INVALID",
         "MODEL_STREAM_INCOMPLETE",
         "MODEL_PROXY_DAILY_LIMIT",
         "MODEL_GATEWAY_ROUTE_CHANGED",
@@ -209,11 +216,7 @@ class ChatCompletions:
             json=body,
             follow_redirects=False,
         ) as response:
-            request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
-            receipt = {"phase": "headers", "attempt": attempt + 1}
-            if request_id and re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", request_id):
-                receipt["requestId"] = request_id
-            yield ModelEvent("telemetry", receipt)
+            yield ModelEvent("telemetry", response_receipt(response, attempt + 1))
             if response.status_code in {408, 429, 500, 502, 503, 504}:
                 raise RetryableResponse(
                     response.status_code, retry_delay(response.headers.get("retry-after"), attempt)
@@ -240,10 +243,23 @@ class ChatCompletions:
                     raise DomainError("MODEL_STREAM_INVALID", 502) from exc
                 if not isinstance(data, dict):
                     raise DomainError("MODEL_STREAM_INVALID", 502)
+                if response.extensions.get(BRIDGE_EXTENSION) is True:
+                    receipt = relayed_receipt(data.get("roami_model_receipt"), attempt + 1)
+                    if receipt is not None:
+                        yield ModelEvent("telemetry", receipt)
                 if data.get("usage"):
                     if not isinstance(data["usage"], dict):
                         raise DomainError("MODEL_USAGE_INVALID", 502)
-                    yield ModelEvent("usage", normalized_usage(data["usage"], attempt + 1))
+                    usage = normalized_usage(data["usage"], attempt + 1)
+                    if (
+                        response.extensions.get(BRIDGE_EXTENSION) is True
+                        and "roami_model_metering" in data
+                    ):
+                        usage.update(usage_receipt(data["roami_model_metering"]))
+                        if attempt:
+                            # Earlier interrupted relay calls may have reached the provider.
+                            usage.update(requestAttempts=None, retryUsageKnown=False)
+                    yield ModelEvent("usage", usage)
                 if data.get("error") is not None:
                     error = data["error"]
                     code = error.get("code") if isinstance(error, dict) else None
