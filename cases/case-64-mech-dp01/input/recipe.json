@@ -1,0 +1,19 @@
+{
+  "parameters": {
+    "same_position": false
+  },
+  "expected": {
+    "drawing_texts": [
+      "Body",
+      "Heading"
+    ],
+    "top_to_bottom_paths": [
+      [
+        1
+      ],
+      [
+        0
+      ]
+    ]
+  }
+}
