@@ -14,8 +14,15 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row, rows
 
 
-@pytest.fixture
-async def followup(store):
+@pytest.fixture(
+    params=[
+        pytest.param((executor, state), id=f"{executor}-{state}")
+        for executor in ("codex", "claude", "opencode", "pi")
+        for state in ("succeeded", "waiting_user", "failed", "cancelled", "interrupted")
+    ]
+)
+async def followup(store, request):
+    provider, prior_state = request.param
     settings = Settings(workers=1)
     executor = CodingExecutor(store, settings)
     runtime = Runtime(store, ConversationModel(), settings=settings, executor=executor)
@@ -25,7 +32,7 @@ async def followup(store):
         conversation["id"],
         "Create a research page",
         key="initial",
-        executor="claude",
+        executor=provider,
         target={"kind": "session", "sessionId": "original-session"},
         record_intent=True,
     )
@@ -38,9 +45,17 @@ async def followup(store):
         ),
         write=True,
     )
-    await runtime.tasks.report(
-        "alice", task["id"], old["id"], 1, {"state": "succeeded", "summary": "Original page"}
-    )
+    result = {
+        "state": "failed"
+        if prior_state in {"failed", "interrupted"}
+        else "cancelled"
+        if prior_state == "cancelled"
+        else "succeeded",
+        "summary": "Original page",
+        "inputStopped": True,
+        "outcomeKnown": True,
+    }
+    await runtime.tasks.report("alice", task["id"], old["id"], 1, result)
     await store.call(
         lambda db: db.execute("UPDATE jobs SET state='done' WHERE kind='task.run'"), write=True
     )
@@ -48,7 +63,12 @@ async def followup(store):
         lambda db: row(db, "SELECT * FROM jobs WHERE kind='task.verify'")
     )
     await runtime.dispatch.verify(verification)
-    assert (await runtime.tasks.list("alice"))[0]["state"] == "waiting_user"
+    if prior_state == "succeeded":
+        await runtime.dispatch.confirm("alice", task["id"], True)
+    elif prior_state == "interrupted":
+        # A stopped failure is distinct from an unresolved external effect.
+        await runtime.dispatch.complete(task, old, result, "interrupted")
+    assert (await runtime.tasks.list("alice"))[0]["state"] == prior_state
     await runtime.tasks.revisions.request("alice", task["id"], "Add more detail", 1, "append")
     await runtime.tasks.revisions.advance()
     try:
@@ -137,7 +157,10 @@ async def test_busy_followup_survives_restart_and_returns_only_its_own_result(
     )
     assert json.loads(budget["budget_json"])["usedSteps"] == 1
     events = await runtime.conversations.events("alice", task["origin_conversation_id"])
-    assert not any(event["kind"] == "task.failed" for event in events)
+    assert not any(
+        event["kind"] == "task.failed" and event["payload"].get("taskRevision") == 2
+        for event in events
+    )
     assert sum(event["kind"] == "task.preparing" for event in events) == 1
 
 
