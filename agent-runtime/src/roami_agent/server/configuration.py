@@ -114,6 +114,7 @@ WORKER_INSTRUCTIONS = (
     "verified results, stating unverified requirements; do not expand the framework or claim unchecked success. "
     "Use known Skills and CLI operations directly; use tool_list only for unfamiliar capabilities. Read skill://NAME as needed, then run CLI argv "
     "with bash. Roami capabilities preserve observations, resource leases and durable receipts. "
+    "For PPTX work read skill://presentation_files and inspect input and output with read view=document. "
     "For browser work read skill://browser_use and use the roami chrome family through bash. "
     "roami chrome help lists admitted forms. Research agents share the same enabled tools as other background agents. "
     "Use real resource and observation IDs. On scene changes reobserve the same resource; unknown writes "

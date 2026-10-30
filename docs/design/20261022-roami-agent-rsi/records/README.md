@@ -101,3 +101,5 @@
 - [2026-10-30：机制 Case 执行合同与回归入口](2026-10-30/mechanism-execution-contracts.html)
 
 - [2026-10-30：进程退出观测竞态](2026-10-30/process-observation-race.html)
+
+- [2026-10-30：Agent 演示文稿读取能力与分层](2026-10-30/agent-presentation-read.html)
