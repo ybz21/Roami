@@ -113,7 +113,7 @@ async def test_builtin_aliases_read_current_content_without_duplicate_entries(st
         assert await runtime.tools.invoke(read(old), "main", {}) == await runtime.tools.invoke(
             read(new), "main", {}
         )
-    assert set(runtime.tools.skills) == {"roami", "browser_use"}
+    assert set(runtime.tools.skills) == {"roami", "browser_use", "presentation_files"}
     with pytest.raises(DomainError, match="CAPABILITY_ALREADY_EXISTS"):
         await runtime.capability_imports.save(
             "local", "skills", {"name": "web-research", "text": "replacement"}

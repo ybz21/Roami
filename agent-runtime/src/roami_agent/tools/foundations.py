@@ -121,6 +121,8 @@ class ToolDirectory:
             "截图": "chrome screenshot",
             "录屏": "chrome recording",
             "标签页": "chrome browser",
+            "演示文稿": "presentation pptx",
+            "幻灯片": "presentation pptx",
             "记忆": "memory",
             "提醒": "reminder",
             "任务": "task",
@@ -470,7 +472,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "read",
-            "Read a file, skill://NAME workflow, skill://NAME/references/FILE.md, or artifact://ID. Load only relevant skill references. File access uses the bound workspace or configured roots. First-page images provide snapshots to image-capable Workers; other routes get metadata.",
+            "Read files within bound/configured roots, skill://NAME[/references/FILE.md] or artifact://ID. Load relevant references only. PPTX view=document exposes text, groups and editor palette. First-page images reach image-capable Workers; other routes get metadata.",
             registry.registry["file_read"].schema,
             resolved_only,
             main=True,
