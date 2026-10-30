@@ -333,6 +333,9 @@ func New(cfg Config) *gin.Engine {
 		g.PUT("/preferences", h.SetPreferences)          //
 		g.POST("/speech/transcribe", h.SpeechTranscribe) // 上传录音 → 返回识别文本
 
+		g.GET("/workspace", h.GetWorkspace)
+		g.PATCH("/workspace", h.ChangeWorkspace)
+
 		g.POST("/password", a.ChangePassword) // 设置页改密（校验旧口令）→ /api/password
 
 		g.POST("/2fa/qr", a.TOTPQR)           // 当前状态 + 密钥二维码

@@ -1,5 +1,5 @@
 import { Layout } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentKinds } from '../agent-kind'
 import '../components/agent/agent-chat.css'
 import { openAgentPage } from '../components/agent/agent-page-route'
@@ -63,13 +63,14 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const agentInbox = useAgentInbox(true, curNodeId, tab === 'home' && !routing.agentPage && !routing.agentBranch)
   const data = useSessionDirectory()
   const workspace = useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: hasSider, mobile: isMobile, page: tab, navigate: go })
-  const { terms, active, curFile, activeTask, space, taskView, overlay, noTabs, returnToTask, openFileTab } = workspace
-  const cluster = useClusterNavigation(noTabs, go)
+  const { terms, active, curFile, activeTask, space, taskView, overlay, returnToTask, openFileTab } = workspace
+  const cluster = useClusterNavigation(go)
   const { clusterNodes, curNode, hubHealth, nodeItems } = cluster
   const activeProject = useSessionProject(active)
   const directory = useProjectDirectory(hasSider, activeProject?.worktree || activeProject?.dir || '')
   const { treeSrc, unfinished, swarmCount, git } = directory
-  const runtime = useTerminalRuntime(terms, isMobile)
+  const runtimeTerms = useMemo(() => isMobile ? (overlay && active ? [active] : []) : terms, [terms, active, isMobile, overlay])
+  const runtime = useTerminalRuntime(runtimeTerms, isMobile)
   const { claudeMap, codexMap, mobileWaiting } = runtime
   const inspector = useTabInspector(workspace, data.sessIds)
   const { panel, pickPanel, toggleInspector, searchNonce } = inspector

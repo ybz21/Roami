@@ -991,7 +991,7 @@ export default function TerminalPane(props: {
           </button>
         </div>
       </div>
-      <MobileSessionSwitch open={switchOpen} onClose={() => setSwitchOpen(false)} active={active}
+      <MobileSessionSwitch terms={terms} open={switchOpen} onClose={() => setSwitchOpen(false)} active={active}
         onPick={(n) => (onOpenSession ? onOpenSession(n) : setActive(n))}
         onAll={() => { onCollapse?.(); location.hash = '#/sessions' }} />
       <MobileSheet open={moreSheet} title={t('common.more')} onClose={() => setMoreSheet(false)}>
@@ -1177,7 +1177,7 @@ export default function TerminalPane(props: {
         {!active && !curFile && onNew && (
           <div className="tt-tabs-empty">{t('tabs.empty')}<small>{t('tabs.emptyHint')}</small></div>
         )}
-        {terms.map((termName) => (
+        {(isPhone ? terms.filter(name => name === active) : terms).map((termName) => (
           // 非当前终端不能用 display:none：xterm 会暂停渲染且容器尺寸归零，切换或关闭当前标签时
           // 下一张 WebGL 画布要经过“重新量尺寸 → 清画布 → 重画”，中间会露出 1~2 帧黑屏。
           // visibility:hidden 保留真实尺寸并让后台画布保持就绪；pointerEvents/zIndex 隔离交互与层叠。

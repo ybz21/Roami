@@ -41,6 +41,7 @@ type API struct {
 	Football       *FootballStore
 	Speech         *SpeechStore      // 语音识别(ASR)配置 + 转录
 	Prefs          *PreferencesStore // 用户偏好（主题/语言/Agent 命令等）
+	Workspace      *WorkspaceStore
 	Push           *PushStore        // Web Push：VAPID 密钥 + 设备订阅（api/push.go）
 	Inbox          *InboxStore       // 收件箱：会话事件 + 已读（api/inbox.go）
 	Live           liveTable         // 探测循环攒的活状态：agent / 等你 / 最近一句（api/sessions-overview.go）
@@ -66,7 +67,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 	}()
 	return &API{GitFootprints: NewGitFootprintStore(dataDir), Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir), AgentProviders: agentproviders.NewStore(dataDir),
-		Prefs: NewPreferencesStore(dataDir), Races: race.NewStore(dataDir, meta),
+		Prefs: NewPreferencesStore(dataDir), Workspace: NewWorkspaceStore(dataDir), Races: race.NewStore(dataDir, meta),
 		Push: NewPushStore(dataDir), Inbox: NewInboxStore(dataDir, func() *sql.DB {
 			if meta.OK() {
 				return meta.SQL()
