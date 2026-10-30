@@ -17,9 +17,7 @@ from roami_agent.providers.local_gateway import LocalGatewayTransport
 from roami_agent.providers.model_bridge_transport import PrivateModelBridgeTransport
 from roami_agent.providers.request_receipts import forwarded_receipt
 
-INPUT = json.loads(
-    (Path(__file__).parents[2] / "cases/case-62-mech-rc01/input/receipts.json").read_text()
-)
+INPUT = json.loads((Path(__file__).parent / "fixtures/model-request-receipts.json").read_text())
 CALL = INPUT["retry_scenario"][0]["call_id"]
 
 

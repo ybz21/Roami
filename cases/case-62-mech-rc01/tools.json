@@ -15,5 +15,6 @@
   "pytest_expected_count": 25,
   "model_provider": "scripted local fixture only",
   "real_model_calls": 0,
-  "production_data_modified": false
+  "production_data_modified": false,
+  "pytest_fixture": "agent-runtime/tests/fixtures/model-request-receipts.json"
 }

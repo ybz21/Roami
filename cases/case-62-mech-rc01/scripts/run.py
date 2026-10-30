@@ -41,6 +41,10 @@ def main():
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     folder = Path(__file__).resolve().parents[1]
     tools = json.loads((folder / "tools.json").read_text())
+    fixture = repository / tools["pytest_fixture"]
+    canonical = folder / "input/receipts.json"
+    if fixture.read_bytes() != canonical.read_bytes():
+        raise ValueError("The regression test fixture does not match this Case input")
     resources = {
         str(p.relative_to(folder)): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in folder.rglob("*")

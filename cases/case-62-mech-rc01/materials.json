@@ -5,7 +5,8 @@
     "kind": "observed_failure_synthetic_replay",
     "local_inputs": true,
     "recipe": "input/receipts.json",
-    "load_from": "test_request_receipts.py reads the retry sequence and usage from this file; Go creates its own temporary ledger."
+    "load_from": "The frozen runtime test pack reads its adjacent fixture snapshot. scripts/run.py and the host catalog regression require byte equality with canonical input/receipts.json; the evaluator does not mount the Case catalog or benchmark oracles into the Agent.",
+    "test_pack_snapshot": "agent-runtime/tests/fixtures/model-request-receipts.json"
   },
   "tools": {
     "kind": "isolated_host_regression",

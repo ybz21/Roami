@@ -246,3 +246,11 @@ def test_additional_delivery_regression_has_materials_without_changing_the_defau
     assert manifest["acceptance"]["entry"] == "scripts/run.py"
     suite = authored_suite("extension-case-regression")
     assert len(suite["cases"]) == 40 and all(case["id"] != "MECH-VD03" for case in suite["cases"])
+
+
+def test_case62_input_matches_the_self_contained_frozen_regression_pack():
+    from roami_agent.improvement.evaluation.case_catalog import case_resource
+
+    canonical = case_resource("MECH-RC01", "input/receipts.json").read_bytes()
+    snapshot = Path(__file__).parent / "fixtures/model-request-receipts.json"
+    assert snapshot.read_bytes() == canonical

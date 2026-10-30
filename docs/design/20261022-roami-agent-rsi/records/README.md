@@ -111,3 +111,5 @@
 - [2026-10-30：Agent 文稿准备能力策略](2026-10-30/agent-document-capability-policy.html)
 
 - [2026-10-30：Agent 演示文稿位置与绘制顺序](2026-10-30/presentation-position-order.html)
+
+- [2026-10-30：隔离回归包的请求输入数据](2026-10-30/regression-receipt-fixture.html)

@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>隔离回归包的请求输入数据</title><body>
+<h1>隔离回归包携带请求输入数据</h1>
+<h2>Product Design</h2><p>请求回执回归在完整仓库、冻结测试目录和候选检查容器中使用同一份合成输入。候选检查不能因为仓库外部路径缺失而在收集阶段失败，也不能靠跳过或放松断言通过。</p>
+<h2>User Stories</h2><ul><li>冻结运行时测试包只挂载 tests 时，请求回执的 25 项回归仍可完整执行。</li><li>Case 62 的原始数据仍可直接查看，测试包内快照必须与其字节一致；数据漂移在主机目录检查及 Case 启动前被拒绝。</li></ul>
+<h2>Technical Design</h2><p>test_request_receipts.py 从相邻 fixtures/model-request-receipts.json 加载输入，不从隐含的仓库根查找 Case。Case 62 保留 input/receipts.json 为规范来源，materials 与 tools 明确快照位置，运行器及主机目录回归强制检查字节一致；既有实现冻结同时覆盖 JSON 快照。运行时 Agent 和修复模型不挂载 Case 目录或判定器，不改变生产执行器、评分规则或模型配置。</p>
+<h2>Acceptance</h2><p>使用真实候选检查的 tests 挂载位置复现 FileNotFoundError，0 项收集。修复后在无宿主 Actor 挂载、无 Case 挂载的隔离容器中实际执行 25 项、0 跳过；相关主机 41 项通过。</p><p>独立诊断还暴露增量验证镜像的可信桥接模块版本旧；验证镜像按当前受保护基线对齐该模块，记录其源码 SHA，保留同一 204 个 Actor 文件，不让候选替换评分器。未对齐镜像的 10 项失败如实保留，不计为通过。最终完整门禁与 CI 结果随 PR 交付。</p><p>本次真实模型调用 0，不重放历史未知操作，不部署或启用日程。该机制修复不代表原 401 根因或真实任务内容质量已解决。</p>
+</body></html>
