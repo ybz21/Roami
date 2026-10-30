@@ -19,7 +19,8 @@ def test_grouped_text_and_empty_decorations_have_distinct_locators():
     assert document["rendered"] is False
     assert slide["emptyTextFramePaths"] == [[0]]
     assert [x["text"] for x in slide["textObjects"]] == ["正文", "Heading"]
-    assert [x["ordinal"] for x in slide["textObjects"]] == [1, 2]
+    assert [x["drawingOrdinal"] for x in slide["textObjects"]] == [1, 2]
+    assert all(x["topToBottomRank"] is None for x in slide["textObjects"])
     assert [x["shapePath"] for x in slide["textObjects"]] == [[1, 0], [2]]
     assert slide["textObjects"][0]["paragraphs"][0]["alignment"] == "center"
 

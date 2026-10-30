@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-31 | [外挂 Skill 的初始发现](2026-10-31/optional-skill-discovery.md) |
 | 2026-10-31 | [本地配置 Skill 的资源目录](2026-10-31/configured-skill-package.md) |
 | 2026-10-31 | [文稿读取与自动注入迁出核心](2026-10-31/presentation-core-boundary.html) |
 | 2026-10-30 | [外挂演示文稿编辑与最小核心](2026-10-30/external-presentation-skill.html) |

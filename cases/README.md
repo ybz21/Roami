@@ -54,3 +54,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case 64：外挂演示文稿编辑](case-64-mech-dp01/CASE.md)：独立 Skill、实际材料与通用 Agent 交付合同，不扩大基础工具接口。
 
 - [Case 65：本地 Skill 完整目录执行](case-65-mech-sp01/CASE.md)：本地配置目录中的脚本、素材和通用文件交付，不需要额外导入。
+
+- [Case 66：外挂 Skill 的初始发现](case-66-mech-sd01/CASE.md)：元数据在首次请求中可见，正文按需加载，权限变化即时生效。

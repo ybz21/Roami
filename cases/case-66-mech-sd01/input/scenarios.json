@@ -1,0 +1,29 @@
+{
+  "roles": [
+    "main",
+    "worker",
+    "research"
+  ],
+  "configured_metadata": {
+    "name": "sensor-workflow",
+    "description": "Prepare sensor reports",
+    "location": "skill://sensor-workflow"
+  },
+  "excluded_from_discovery": [
+    "instruction body",
+    "script bytes",
+    "absolute package directory"
+  ],
+  "managed_lifecycle": [
+    "import",
+    "update description",
+    "disable",
+    "enable",
+    "remove"
+  ],
+  "unavailable_tools": [
+    "read",
+    "skill_read"
+  ],
+  "native_pptx_fixture": "agent-runtime/tests/verification/test_presentation_skill_package.py::exercise_external_skill_package"
+}

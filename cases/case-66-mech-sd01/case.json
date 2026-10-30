@@ -1,0 +1,55 @@
+{
+  "id": "MECH-SD01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "外挂能力发现回归",
+  "prompt": "模型首次请求可看到外挂名称、用途和读取路径；正文、脚本与素材继续按需使用。",
+  "preconditions": "本地合成素材；完整可选 Skill；无真实模型调用。",
+  "expected_terminal": "optional_skill_metadata_visible_before_first_tool_call",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "冻结哈希与严格测试回执",
+    "初始 Native Worker 工具信息断言",
+    "实际编辑并持久化的 PPTX 附件"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-SD01-H1",
+      "rule": "三种角色初始工具信息可见已启用外挂元数据，不含正文、脚本或宿主目录。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-SD01-H2",
+      "rule": "导入、更新、禁用及移除立即反映在发现信息；不可读取的 Skill 不显示。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-SD01-H3",
+      "rule": "基础工具名及参数 schema 不变，实际 Native Worker 先看到元数据，再按需读取外挂并完成交付。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
