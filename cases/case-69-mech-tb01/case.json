@@ -1,0 +1,55 @@
+{
+  "id": "MECH-TB01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "表格外挂交付回归",
+  "prompt": "通过可选表格工作流，从分析数据选择行、恢复原标识和字段，保留原值与精度，使用原有工具交付CSV。",
+  "preconditions": "本地合成素材；完整可选 Skill；无真实模型调用。",
+  "expected_terminal": "external_csv_export_and_persistent_delivery",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "源哈希、严格测试回执和JUnit",
+    "通过NativeExecutor持久交付的CSV"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-TB01-H1",
+      "rule": "字段顺序、记录标识及数值精度正确，分析列不进入默认源表导出。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TB01-H2",
+      "rule": "双输入哈希、输出保护、歧义键、非法数值和路径限制保持；明确请求的特征表仍支持。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TB01-H3",
+      "rule": "外挂通过既有导入、read/bash执行并持久交付，基础工具与权限不扩展。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/raw.csv",
+      "input/analysis.csv"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TB01",
+  "data": {
+    "kind": "local_synthetic_csv",
+    "inputs": [
+      "input/raw.csv",
+      "input/analysis.csv"
+    ],
+    "expected": "expected/cleaned.csv",
+    "generators": [
+      "skills/tabular-analysis/tests",
+      "agent-runtime/tests/verification/test_tabular_skill_package.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "optional_skill_and_existing_read_bash"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "skills/tabular-analysis/tests",
+      "agent-runtime/tests/verification/test_tabular_skill_package.py"
+    ],
+    "expected_collected": 23,
+    "no_skips": true,
+    "kind": "source_frozen_pytest_receipt"
+  }
+}

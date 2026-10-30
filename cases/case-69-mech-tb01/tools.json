@@ -1,0 +1,17 @@
+{
+  "pytest_selectors": [
+    "skills/tabular-analysis/tests",
+    "agent-runtime/tests/verification/test_tabular_skill_package.py"
+  ],
+  "expected_collected": 23,
+  "registered_tools": [
+    "read",
+    "bash"
+  ],
+  "runtime": [
+    "Python 3.12 standard library",
+    "pytest/pytest-asyncio",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "model_calls": 0
+}
