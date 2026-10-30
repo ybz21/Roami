@@ -10,7 +10,7 @@ import { taskExecutor, taskGoal, taskInstructions, taskExecutionUnconfirmed, cur
 import AgentTaskRecord from './AgentTaskRecord'
 import TaskDescription from './TaskDescription'
 import { taskTopic } from './task-topic'
-import { taskOutcome, taskReportLinks } from './task-outcome'
+import { taskOutcome, taskReportLinks, taskReportSummary } from './task-outcome'
 import { useAgentData } from './useAgentData'
 import { useAgentTask } from './useAgentTask'
 import { useAgentDraft } from './useAgentDraft'
@@ -179,7 +179,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
       {uncertain && <p className="agent-task-note" role="status">{t('agent.task.executionUnconfirmedHint')}</p>}
       <details className="agent-task-section agent-task-requirements"><summary><ChevronRight />{t('agent.task.instructions')}</summary><p>{taskInstructions(task) || t('agent.task.noInstructions')}</p>{steering?.text && steering.state !== 'applied' && <p><b>{t('agent.task.unappliedRequirements')}</b>{steering.text}</p>}<small className="agent-muted">{t('agent.task.revision', { n: task.revision })}</small>{task.latestAttempt?.workspace && <code className="agent-task-workspace">{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}</details>
       {failed ? <p className="agent-task-note error" role="status">{t(reason || 'agent.task.incomplete')}</p> : outcome && <section className="agent-task-section agent-task-outcome"><h4>{t('agent.task.result')}</h4>{task.state !== 'succeeded' && <p className="agent-muted">{t('agent.task.resultPending')}</p>}<p>{outcome}</p></section>}
-      {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={reported} title={false} /></section>}
+      {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={taskReportSummary(reported)} title={false} /></section>}
       {!!reportLinks.length && <section className="agent-task-section"><h4>{t(task.state === 'succeeded' ? 'agent.task.deliveryLinks' : 'agent.task.reportedLinks')}</h4>{reportLinks.map(href => <a className="tt-act agent-task-delivery-link" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</section>}
       <div className="agent-task-actions">
         {task?.nativeSession && <Button onClick={() => openAgentPage('session', task.nativeSession!.id)}>{t('agent.task.enterSession')}</Button>}
