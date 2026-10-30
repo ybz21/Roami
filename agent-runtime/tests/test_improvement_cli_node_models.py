@@ -137,7 +137,8 @@ async def test_cli_calibration_private_quota(tmp_path, monkeypatch):
         result = await cli.execute(calibration_args(tmp_path, root, config))
     assert result["quotaBlocked"] and len(seen) == 1
     _, headers, body = seen[0]
-    assert headers["x-roami-model-upstream"] == "https://saved.invalid/v1/chat/completions"
+    assert "x-roami-model-upstream" not in headers and "authorization" not in headers
+    assert len(headers["x-roami-model-route"]) == 64
     assert body["model"] == "saved-main" and body["max_tokens"] == 8192
     assert body["temperature"] == 0.4
 

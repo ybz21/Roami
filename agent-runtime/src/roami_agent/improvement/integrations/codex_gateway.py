@@ -88,7 +88,7 @@ async def gateway_route(plan, selected, env, role, *, outcome, seconds, observat
                 "identity": plan.identity,
                 "model": plan.model,
                 "gateway_model": plan.route.name,
-                "endpoint": plan.route.endpoint,
+                "transport": "local_go_gateway",
             }
 
 

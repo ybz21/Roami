@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-func (h *Handler) admit(ctx context.Context, role, model, session, request string) (Call, error) {
+func (h *Handler) admit(ctx context.Context, role, model, session, request string, validate func() error) (Call, error) {
 	for {
 		h.mu.Lock()
 		if err := ctx.Err(); err != nil {
@@ -15,6 +15,10 @@ func (h *Handler) admit(ctx context.Context, role, model, session, request strin
 		if h.closing {
 			h.mu.Unlock()
 			return Call{}, errors.New("MODEL_GATEWAY_UNAVAILABLE")
+		}
+		if err := validate(); err != nil {
+			h.mu.Unlock()
+			return Call{}, err
 		}
 		call, err := h.Ledger.Admit(role, model, session, request)
 		if err == nil {

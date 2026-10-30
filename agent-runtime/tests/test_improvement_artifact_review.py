@@ -256,7 +256,7 @@ async def test_hard_evidence_retained_and_rating_disagreement_stays_pending(
     monkeypatch.setattr(artifact_review, "collect_artifact_evidence", evidence)
     judge = reviewer(
         lambda s, r: ProtocolFixtureModel(
-            [{"text": json.dumps(rating(2 if disagree and r == "artifact_b" else 3))}]
+            [{"text": json.dumps(rating(2 if disagree and r == "worker" else 3))}]
         )
     )
     original = {

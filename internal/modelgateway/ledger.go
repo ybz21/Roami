@@ -24,8 +24,9 @@ CREATE INDEX gateway_calls_day ON gateway_calls(day,started_ms);
 `}}
 
 type Ledger struct {
-	db  *metadb.DB
-	now func() time.Time
+	paths metadb.Paths
+	db    *metadb.DB
+	now   func() time.Time
 }
 
 func Open(paths metadb.Paths) (*Ledger, error) {
@@ -36,7 +37,7 @@ func Open(paths metadb.Paths) (*Ledger, error) {
 	if err != nil {
 		return nil, err
 	}
-	l := &Ledger{db: db, now: time.Now}
+	l := &Ledger{db: db, now: time.Now, paths: paths}
 	return l, nil
 }
 

@@ -16,6 +16,12 @@ from roami_agent.improvement.evaluation.contracts import agent_view
 from roami_agent.improvement.evaluation.execution.container_context import model_context
 from roami_agent.improvement.evaluation.execution.executors import NativeFilesExecutor
 from roami_agent.improvement.evaluation.grading import judge_case
+from roami_agent.improvement.evaluation.verification_windows import (
+    DOCKER_OPERATION_SECONDS,
+    MEDIA_VERIFICATION_SECONDS,
+    SANDBOX_CONTROL_SECONDS,
+    SLIDE_COMPARISON_SECONDS,
+)
 from roami_agent.improvement.integrations.artifact_files import materialize, private_json
 from roami_agent.improvement.integrations.json_documents import load_json
 from roami_agent.improvement.integrations.measurements import EpisodeBudget
@@ -24,11 +30,14 @@ from roami_agent.protocol.errors import DomainError
 
 IMAGE = "roami-rsi-eval:local"
 
-# Docker creation plus the existing model-free verifier sandbox windows.
-POST_TIMEOUT_ASSESSMENT_SECONDS = {"media": 360, "slides": 90}
+# Control operations must not consume the original model-free verifier window.
+POST_TIMEOUT_ASSESSMENT_SECONDS = {
+    "media": SANDBOX_CONTROL_SECONDS + MEDIA_VERIFICATION_SECONDS,
+    "slides": SANDBOX_CONTROL_SECONDS + SLIDE_COMPARISON_SECONDS,
+}
 
 
-async def docker_command(*args, timeout=30, input=None, maximum=8_000_000):
+async def docker_command(*args, timeout=DOCKER_OPERATION_SECONDS, input=None, maximum=8_000_000):
     process = await asyncio.create_subprocess_exec(
         "docker",
         *args,
@@ -313,7 +322,7 @@ class ContainerExecutor:
             self.image_id,
             "-c",
             program,
-            timeout=30,
+            timeout=DOCKER_OPERATION_SECONDS,
         )
         try:
             return await docker_command(

@@ -172,6 +172,10 @@ async def codex_json(
         in {
             "MODEL_HTTP_402",
             "MODEL_PROXY_DAILY_LIMIT",
+            "MODEL_GATEWAY_REQUIRED",
+            "MODEL_NOT_CONFIGURED",
+            "MODEL_GATEWAY_ROUTE_CHANGED",
+            "MODEL_GATEWAY_CONFIGURATION_INVALID",
             "MODEL_PROXY_USAGE_UNKNOWN",
             "MODEL_PROXY_CURRENCY_MISMATCH",
         }

@@ -1,6 +1,7 @@
 """Configured model clients use the private Go socket and never fall back to cloud."""
 
 import asyncio
+import hashlib
 import json
 from contextlib import asynccontextmanager
 
@@ -14,7 +15,7 @@ from roami_agent.server.configuration import Settings
 
 
 @asynccontextmanager
-async def gateway_fixture(socket, seen, *, status=200, code=None):
+async def gateway_fixture(socket, seen, *, status=200, code=None, events=EVENTS):
     async def handle(reader, writer):
         try:
             raw = await reader.readuntil(b"\r\n\r\n")
@@ -22,7 +23,7 @@ async def gateway_fixture(socket, seen, *, status=200, code=None):
             headers = dict(line.lower().split(": ", 1) for line in lines[1:] if line)
             body = await reader.readexactly(int(headers["content-length"]))
             seen.append((lines[0], headers, json.loads(body)))
-            payload = EVENTS if status == 200 else b"{}"
+            payload = events if status == 200 else b"{}"
             response = (
                 f"HTTP/1.1 {status} Fixture\r\nContent-Type: text/event-stream\r\n"
                 f"Content-Length: {len(payload)}\r\nConnection: close\r\n"
@@ -63,11 +64,12 @@ async def test_factory_preserves_route_and_uses_local_socket(tmp_path, monkeypat
     line, headers, body = seen[0]
     assert line == "POST /v1/chat/completions HTTP/1.1"
     assert headers["x-roami-model-role"] == role
+    assert "x-roami-model-upstream" not in headers
+    assert "authorization" not in headers
     assert (
-        headers["x-roami-model-upstream"]
-        == "https://must-not-connect.invalid/gateway/v1/chat/completions"
+        headers["x-roami-model-route"]
+        == hashlib.sha256(b"https://must-not-connect.invalid/gateway/v1\x00fixture").hexdigest()
     )
-    assert headers["authorization"] == "bearer fixture"
     assert body["model"] == "fixture" and body["stream"] is True
 
 
@@ -77,6 +79,9 @@ async def test_factory_preserves_route_and_uses_local_socket(tmp_path, monkeypat
         (402, "MODEL_PROXY_DAILY_LIMIT"),
         (409, "MODEL_PROXY_USAGE_UNKNOWN"),
         (409, "MODEL_PROXY_USAGE_PENDING"),
+        (409, "MODEL_GATEWAY_ROUTE_CHANGED"),
+        (503, "MODEL_NOT_CONFIGURED"),
+        (503, "MODEL_GATEWAY_CONFIGURATION_INVALID"),
     ],
 )
 async def test_local_quota_rejection_is_not_retried(tmp_path, monkeypatch, status, code):
@@ -129,3 +134,41 @@ async def test_explicit_container_bridge_transport_is_preserved(monkeypatch):
         await provider.close()
     assert len(seen) == 1
     assert str(seen[0].url) == "http://localhost/v1/main/chat/completions"
+
+
+async def test_host_client_never_reads_or_sends_provider_credentials(tmp_path, monkeypatch):
+    def forbidden(*args):
+        raise AssertionError("Only Go reads the saved provider credential")
+
+    monkeypatch.setattr(Settings, "credentials", forbidden)
+    settings = Settings(
+        endpoint="https://private-provider.invalid/v1",
+        model="saved-model",
+        model_gateway_socket=str(tmp_path / "model.sock"),
+    )
+    seen = []
+    async with gateway_fixture(settings.model_gateway_socket, seen):
+        provider = configured_provider(settings, "main")
+        try:
+            await consume(provider)
+            assert provider.endpoint == "http://localhost/v1"
+        finally:
+            await provider.close()
+    assert len(seen) == 1
+    assert all("private-provider" not in str(headers) for _, headers, _ in seen)
+
+
+async def test_private_transport_keeps_the_existing_normalized_cache_identity():
+    from roami_agent.providers.chat_completions import ChatCompletions
+
+    settings = Settings(endpoint="https://saved-provider.invalid/v1", model="saved-model")
+    provider = configured_provider(settings, "main")
+    direct = ChatCompletions(settings.endpoint, settings.model)
+    try:
+        assert (provider.provider_key, provider.settings_hash) == (
+            direct.provider_key,
+            direct.settings_hash,
+        )
+    finally:
+        await provider.close()
+        await direct.close()

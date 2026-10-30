@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Go 从本地配置选择模型连接</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>Go 从本地配置选择模型连接</h1>
+<h2>Product Design</h2><p>RSI 和 Agent 沿用模型页保存的主、后台模型。调用方不再携带上游地址或供应商密钥；Go 从节点本地配置读取连接，统一完成发送、计费与每日额度准入。缺少配置或路由已变化时，在发送前返回可追踪的阻断原因。</p>
+<h2>User Stories</h2><ul><li>开发验收脚本不能通过自定义上游地址、密钥或模型绕过节点配置。</li><li>修改模型页后，排队中的旧请求不能继续发送到旧连接。</li><li>两位图片评审分别调用保存的主、后台角色，不能因工厂角色名不同而落到同一个后台模型。</li></ul>
+<h2>Technical Design</h2><p>internal/modelgateway/node_routes.go 从同一实例的 agent.toml 与私有 agents/model-settings.json 解析角色连接、认证和保存参数。handler 在额度准入前检查模型、参数及不透明路由标识；上游请求使用 Go 读取的连接和认证，忽略调用方连接头并移除其认证。providers/factory.py 构造本地占位连接；local_gateway.py 只把请求和角色经节点 Unix socket 交给 Go。容器显式传入的操作级私有桥保持原协议。</p>
+<p>artifact_review.py 传实际 main/worker 角色给所有工厂；请求日志仍保留 artifact_a/artifact_b 评审身份。角色映射加入校准协议标识，旧证书必须重新校准，不能沿用可能错路由的结果。Codex 结果仅记录本地 Go 传输标识，不显示供应商连接地址。</p>
+<h2>验证记录</h2><p>验证覆盖真实 Unix socket 上无上游地址和认证、主后台独立模型、Go 忽略恶意上游头、配置与参数变动在发送前拒绝、私有配置错误时关闭访问、原每日额度与未知账目保护。所有验收使用本地合成上游，不新增正式消费。完整门禁通过：Go 全量、Python 2,409 项且无跳过、前端 typecheck / i18n / hover / 生产构建；相关 Python 135 项与 Go 网关竞态检查通过。首次集成检查发现旧用例仍要求上游地址头和评审别名，已按新接口断言不传连接/认证并使用实际角色，最终完整回归通过。冻结 v62 的 194 个执行核心文件逐一匹配源码，默认镜像未改。</p>
+<p>Go 与 Python 必须配套更新，校准协议变化要求重新校准。此记录不代表部署完成，也不代表正式 60 Case 或两天观察已完成。正式问题继续按原有质量证据追踪。</p>
+</main></body></html>

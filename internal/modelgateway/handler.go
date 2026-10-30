@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -147,11 +146,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
-	target, err := url.Parse(r.Header.Get("X-Roami-Model-Upstream"))
-	if err != nil || target.Host == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" || (target.Scheme != "https" && target.Scheme != "http") || !strings.HasSuffix(target.Path, "/chat/completions") {
-		reject(w, 400, "INVALID_MODEL_CONFIG")
-		return
-	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 256<<20))
 	var payload struct {
 		Model  string `json:"model"`
@@ -160,6 +154,24 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	if err != nil || json.Unmarshal(body, &payload) != nil || len(payload.Model) == 0 || len(payload.Model) > 200 {
 		reject(w, 400, "INVALID_MODEL_CONFIG")
 		return
+	}
+	routingRole := r.Header.Get("X-Roami-Model-Role")
+	if routingRole == "" {
+		routingRole = "main"
+	}
+	var route nodeModelRoute
+	var requestBody map[string]any
+	_ = json.Unmarshal(body, &requestBody)
+	validate := func() error {
+		var routeErr error
+		route, routeErr = readNodeModels(h.Ledger.paths, routingRole)
+		if routeErr != nil {
+			return routeErr
+		}
+		if !route.accepts(requestBody, r.Header.Get("X-Roami-Model-Route")) {
+			return errors.New("MODEL_GATEWAY_ROUTE_CHANGED")
+		}
+		return nil
 	}
 	role := r.Header.Get("X-Roami-Model-Role")
 	if observed := r.Header.Get("X-Eval-Call-Role"); observed != "" {
@@ -173,7 +185,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		reject(w, 400, "INVALID_MODEL_CONFIG")
 		return
 	}
-	call, err := h.admit(r.Context(), role, payload.Model, session, requestID)
+	call, err := h.admit(r.Context(), role, payload.Model, session, requestID, validate)
 	if err != nil {
 		if r.Context().Err() != nil {
 			return
@@ -183,7 +195,9 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 			reject(w, 402, err.Error())
 		case "MODEL_PROXY_USAGE_PENDING", "MODEL_PROXY_USAGE_UNKNOWN":
 			reject(w, 409, err.Error())
-		case "MODEL_GATEWAY_UNAVAILABLE":
+		case "MODEL_GATEWAY_ROUTE_CHANGED":
+			reject(w, 409, err.Error())
+		case "MODEL_NOT_CONFIGURED", "MODEL_GATEWAY_CONFIGURATION_INVALID", "INVALID_MODEL_CONFIG", "MODEL_GATEWAY_UNAVAILABLE":
 			reject(w, 503, err.Error())
 		default:
 			reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
@@ -198,17 +212,20 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 			log.Printf("model gateway: settlement failed call=%s", call.ID)
 		}
 	}()
-	out, err := http.NewRequestWithContext(r.Context(), "POST", target.String(), bytes.NewReader(body))
+	out, err := http.NewRequestWithContext(r.Context(), "POST", route.endpoint+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		notSent = true
 		reject(w, 400, "INVALID_MODEL_CONFIG")
 		return
 	}
 	for key, values := range r.Header {
-		if strings.HasPrefix(strings.ToLower(key), "x-roami-") || key == "Cookie" || key == "Connection" || key == "Proxy-Authorization" {
+		if strings.HasPrefix(strings.ToLower(key), "x-roami-") || key == "Cookie" || key == "Connection" || key == "Proxy-Authorization" || key == "Authorization" || strings.EqualFold(key, "X-Api-Key") || strings.EqualFold(key, "Api-Key") {
 			continue
 		}
 		out.Header[key] = append([]string(nil), values...)
+	}
+	if route.key != "" {
+		out.Header.Set("Authorization", "Bearer "+route.key)
 	}
 	response, err := h.Client.Do(out)
 	if err != nil {

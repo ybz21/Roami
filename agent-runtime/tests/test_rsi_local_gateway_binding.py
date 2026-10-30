@@ -44,7 +44,8 @@ async def test_cli_discovers_go_binding_and_preserves_saved_model_parameters(
     assert len(commands) == len(seen) == 1 and commands[0][-2:] == ["--data-root", str(root)]
     assert seen[0][2]["model"] == "saved-worker"
     assert seen[0][2]["max_tokens"] == 8192 and seen[0][2]["temperature"] == 0.4
-    assert seen[0][1]["x-roami-model-upstream"] == "https://saved.invalid/v1/chat/completions"
+    assert "x-roami-model-upstream" not in seen[0][1] and "authorization" not in seen[0][1]
+    assert len(seen[0][1]["x-roami-model-route"]) == 64
     assert saved.read_bytes() == before
 
 
