@@ -70,7 +70,7 @@ class CodePairExecutor:
     async def regression(self, root):
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         program = """import json,subprocess,sys
-p=subprocess.run([sys.executable,"-m","pytest","-q","--asyncio-mode=auto","--ignore-glob=/opt/roami-agent/tests/test_improvement*.py","-p","no:cacheprovider","--basetemp=/tmp/rsi-tests","/opt/roami-agent/tests"],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+p=subprocess.run([sys.executable,"-m","pytest","-q","--asyncio-mode=auto","--ignore-glob=/opt/roami-agent/tests/test_improvement*.py","--ignore=/opt/roami-agent/tests/verification","-p","no:cacheprovider","-o","tmp_path_retention_policy=failed","--basetemp=/tmp/rsi-tests","/opt/roami-agent/tests"],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
 print(json.dumps({"scope":"frozen_runtime_regressions","exit_code":p.returncode,"output":p.stdout.decode(errors="replace")[-500000:]}))"""
         raw = await self.executors["candidate"].sandbox(root, program, timeout=600, runtime=True)
         result = json.loads(raw)

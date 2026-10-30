@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-source = Path(__file__).resolve().parents[2] / "scripts/dev/agent-evaluation/fetch-public.py"
+source = Path(__file__).resolve().parents[3] / "scripts/dev/agent-evaluation/fetch-public.py"
 spec = importlib.util.spec_from_file_location("public_material_download", source)
 fetcher = importlib.util.module_from_spec(spec)
 previous_bytecode = sys.dont_write_bytecode
