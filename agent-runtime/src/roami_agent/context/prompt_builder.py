@@ -15,6 +15,7 @@ from roami_agent.context.token_estimate import (
     request_context,
     request_tokens,
 )
+from roami_agent.context.workflow_instructions import workflow_instructions
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
@@ -40,10 +41,12 @@ class PromptBuilder:
         vision=None,
         chat_images=None,
         memory=None,
+        skills=None,
     ):
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
         self.chat_images = chat_images
+        self.skills = skills
         self.remembered = RememberedContext(memory, settings) if memory else None
 
     async def _images(self, turn, plan, prompt):
@@ -54,6 +57,8 @@ class PromptBuilder:
         return plan, prompt
 
     def _configuration(self, turn, instructions, catalog):
+        if self.skills:
+            instructions = workflow_instructions(instructions, self.skills())
         workspace = turn.get("workspace")
         if workspace:
             instructions += (

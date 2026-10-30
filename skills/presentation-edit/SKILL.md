@@ -1,6 +1,6 @@
 ---
 name: presentation-edit
-description: Inspect and edit existing PPTX slide text alignment and colors while preserving editable objects and unrelated document parts. Use for PowerPoint or Impress file changes (演示文稿、幻灯片).
+description: Edit existing PPTX textbox alignment and named text colors while preserving editable objects. Use before PowerPoint/Impress alignment or color changes (演示文稿、幻灯片); resolves visible textbox order and the installed editor's named palette instead of assuming drawing order or guessing RGB values.
 ---
 
 # Presentation editing
@@ -17,7 +17,17 @@ python <packagePath>/scripts/presentation.py inspect --workspace <workspace> --p
 
 Use the observed `shapePath` for a specific text frame. `drawingOrdinal` identifies drawing traversal; `topToBottomRank` and `topToBottomPaths` describe geometric top-to-bottom order. These are different facts: a bottom caption can be drawn first. Unknown or overlapping placement needs inspection in the actual editor or a rendering. Structural inspection alone does not establish visual quality.
 
+For ordinal references to visible textboxes, such as the first or second textbox, use unambiguous geometric top-to-bottom order unless the user specifies drawing or tab order. Do not substitute a drawing ordinal for visible order. If the requested object is still ambiguous, report that uncertainty instead of claiming the selection was verified.
+
 If the shell externalizes a long inspection result, read its returned text artifact through `read artifact://ID` and follow the returned page offsets. A stdout preview is not the complete JSON document; do not infer missing objects from it.
+
+For a slide's full list of named text colors, use the names-only command. It maps the nonempty textboxes in geometric top-to-bottom order and resolves names from the installed editor's palette, avoiding a manual RGB translation:
+
+```bash
+python <packagePath>/scripts/presentation.py colors --workspace <workspace> --path input.pptx --destination updated.pptx --expected-sha256 <source-sha256> --slide 1 --names Blue Orange Purple
+```
+
+Replace the slide and names with the user's request. The name count must equal that slide's nonempty textbox count. Unknown colors, ambiguous placement or changed input publish nothing. The destination must be new; to revise an observed existing output, also pass `--expected-destination-sha256 <output-sha256>`. For a subset of objects, mixed changes or an explicit RGB request, use the batch edit form below.
 
 For supported alignment or color changes, use the bundled edit command after inspection. It handles object selection and source/destination checks. A minimal request is:
 

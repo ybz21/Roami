@@ -17,6 +17,7 @@ from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
 from roami_agent.context.token_estimate import request_context
 from roami_agent.context.vision_inputs import VisionInputs
+from roami_agent.context.workflow_instructions import workflow_instructions
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
@@ -220,7 +221,11 @@ class Runtime:
         register_foundations(self.tools, self.settings)
 
         self.context.request_context = lambda: request_context(
-            self.settings, self.settings.main_instructions, self.tools.catalog("main")
+            self.settings,
+            workflow_instructions(
+                self.settings.main_instructions, self.tools.optional_skill_metadata()
+            ),
+            self.tools.catalog("main"),
         )
 
         self.mailbox = TurnMailbox(database)
@@ -263,6 +268,7 @@ class Runtime:
                 self.context,
                 self.settings,
                 memory=self.memory,
+                skills=self.tools.optional_skill_metadata,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True

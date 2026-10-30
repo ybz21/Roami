@@ -1,0 +1,28 @@
+{
+  "roles": [
+    "main",
+    "worker",
+    "research"
+  ],
+  "saved_instructions": [
+    "Persisted Main policy",
+    "Persisted Worker policy"
+  ],
+  "optional_skill": {
+    "name": "station-workflow",
+    "description": "Process station records",
+    "body": "BODY_LOADED_ONLY_BY_EXPLICIT_READ"
+  },
+  "lifecycle": [
+    "import",
+    "disable",
+    "enable",
+    "remove"
+  ],
+  "blocked_tools": [
+    "read",
+    "skill_read"
+  ],
+  "request_and_compaction_basis": "same runtime policy and current tool catalog",
+  "native_fixture": "agent-runtime/tests/verification/test_presentation_skill_package.py::exercise_external_skill_package"
+}

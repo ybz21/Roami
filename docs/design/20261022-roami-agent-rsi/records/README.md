@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-31 | [已安装工作流的执行上下文](2026-10-31/optional-workflow-context.md) |
 | 2026-10-31 | [外挂 Skill 的初始发现](2026-10-31/optional-skill-discovery.md) |
 | 2026-10-31 | [本地配置 Skill 的资源目录](2026-10-31/configured-skill-package.md) |
 | 2026-10-31 | [文稿读取与自动注入迁出核心](2026-10-31/presentation-core-boundary.html) |
