@@ -680,3 +680,31 @@ it('does not present an earlier revision as the current delivery while continuat
   expect(screen.getByText('agent.task.previousArtifacts')).toBeTruthy()
   expect(screen.getByText('prior.png')).toBeTruthy()
 })
+
+it('shows existing reports and downloads while execution remains unconfirmed', async () => {
+  const pending = { ...task('pending'), state: 'running', latestAttempt: { state: 'unknown', sessionId: 'work-session', executorKind: 'cli' } }
+  const progress = { source: 'provider_transcript', summary: 'A source-bound research report', directory: '/workspace/research', observedMs: 123456 }
+  const output = { id: 'report-html', name: 'index.html', mimeType: 'text/html', sizeBytes: 200, metadata: { runId: 'attempt-pending', sourceFile: '/workspace/research/index.html', sourcePath: '/workspace/research/index.html', provisional: true, reportedAliases: ['index.html'] } }
+  const session = vi.fn()
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.includes('?conversationId=')) return { data: [pending] }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [output] }
+    return { data: { ...detail('pending'), task: pending, attempts: [{ id: 'attempt-pending', revision: 1, state: 'unknown', sessionId: 'work-session', result: null, progress }], delivery: { artifacts: [output], unavailable: [] } } }
+  })
+  render(<AgentTasks cid="conversation" onSession={session} onChanged={vi.fn()} />)
+  await screen.findByText('agent.task.executionUnconfirmed')
+  expect(screen.queryByText('agent.state.running')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.attention' }))
+  fireEvent.click(await screen.findByRole('button', { name: /Goal pending/ }))
+  await screen.findByText('A source-bound research report')
+  expect(screen.getByText('agent.task.executionUnconfirmedHint')).toBeTruthy()
+  expect(screen.getByText('index.html')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'agent.task.download' }).getAttribute('href')).toBe('/n/selected/api/agent/artifacts/report-html/content')
+  expect(screen.queryByRole('button', { name: 'agent.task.accept' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.openSession' }))
+  expect(session).toHaveBeenCalledWith('work-session')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
+  await screen.findByText('agent.task.reportUnconfirmed')
+  expect(screen.getAllByText('A source-bound research report').length).toBe(2)
+})

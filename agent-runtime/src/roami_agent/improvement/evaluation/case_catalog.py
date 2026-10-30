@@ -99,7 +99,10 @@ def case_definitions():
 
 def authored_cases():
     values = tuple(
-        value for value in case_definitions() if value["kind"] != "public_source_reference"
+        value
+        for value in case_definitions()
+        if value["kind"] != "public_source_reference"
+        and value.get("selected_in_mixed_suite_v1", True)
     )
     require(len(values) == 40, "RSI_CASE_CATALOG_INCOMPLETE")
     return values

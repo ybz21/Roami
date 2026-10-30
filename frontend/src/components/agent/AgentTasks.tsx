@@ -6,7 +6,7 @@ import { AgentLogo, BotIcon, RoamiLogo, ChecklistIcon, CheckIcon, CircleIcon, Cl
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
-import { taskExecutor, taskGoal, taskInstructions } from './agent-task-protocol'
+import { taskExecutor, taskGoal, taskInstructions, taskExecutionUnconfirmed, currentTaskArtifacts } from './agent-task-protocol'
 import AgentTaskRecord from './AgentTaskRecord'
 import TaskDescription from './TaskDescription'
 import { taskTopic } from './task-topic'
@@ -28,10 +28,10 @@ type TaskFilter = typeof taskFilters[number]
 
 function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   if (filter === 'all') return true
-  if (filter === 'active') return active.has(task.state)
+  if (filter === 'active') return active.has(task.state) && !taskExecutionUnconfirmed(task)
   if (filter === 'open') return !!(task.nativeSession || task.latestAttempt?.agentConversationId || task.latestAttempt?.sessionId && !terminal.has(task.state)) && task.sessionClosure?.state !== 'closed'
   if (filter === 'ended') return terminal.has(task.state)
-  return !active.has(task.state) && task.state !== 'succeeded' && task.state !== 'cancelled'
+  return taskExecutionUnconfirmed(task) || !active.has(task.state) && task.state !== 'succeeded' && task.state !== 'cancelled'
 }
 
 
@@ -92,14 +92,15 @@ function TaskTimeline({ tasks, compact, select, projects, onSession }: { project
 
 function TaskRow({ task, compact, select, projects, onSession }: { projects: { id: string; name: string }[]; onSession: (id: string) => void; task: AgentTask; compact: boolean; select: (id: string) => void }) {
   const { t, locale } = useI18n(), executor = taskExecutor(task)
-  const state = ['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'
+  const uncertain = taskExecutionUnconfirmed(task)
+  const state = uncertain ? 'unknown' : ['queued', 'preparing', 'running', 'verifying', 'cancelling', 'waiting_user', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(task.state) ? task.state : 'unknown'
   const time = taskTime(task) ? new Date(taskTime(task)) : null
   const name = isAgentKind(executor) ? executor === 'claude' ? 'Claude Code' : agentName(executor) : executor === 'native' ? t('agent.workspace.native') : ''
   return <div className="agent-task-entry"><button type="button" className={`agent-task-link${compact ? ' agent-task-card' : ''}`} data-state={state} onClick={() => select(task.id)}>
     <span className="agent-task-status-icon" aria-hidden="true">{state === 'succeeded' ? <CheckIcon size={16} /> : state === 'failed' ? <WarnIcon size={16} /> : state === 'unknown' ? <QuestionIcon size={16} /> : state === 'cancelled' || state === 'interrupted' ? <CloseIcon size={16} /> : state === 'waiting_user' ? <ClockIcon size={16} /> : <CircleIcon size={16} />}</span>
     <span className="agent-task-row-copy">
       <b>{taskTopic(task) || t('agent.task.untitled')}</b>
-      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t('agent.state.' + state)}</span>{executor && <span>{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : executor === 'native' ? <RoamiLogo size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
+      <small className="agent-task-card-meta"><span className="agent-task-state" data-state={state}>{t(uncertain ? 'agent.task.executionUnconfirmed' : 'agent.state.' + state)}</span>{executor && <span>{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : executor === 'native' ? <RoamiLogo size={14} /> : <BotIcon size={14} />}{name}</span>}{time && <time dateTime={time.toISOString()}>{time.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}</time>}</small>
     </span>
   </button>
     {task.projectId && <a className="tt-act agent-task-project" href={'#/projects/' + encodeURIComponent(task.projectId)}><FolderIcon size={14} /><span>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</span></a>}
@@ -129,7 +130,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const controlSafe = detailSafe && snapshot.controls.version >= controlFence.current && !snapshot.controls.failed && !busy
   const controls = controlSafe ? snapshot.controls.value : null
   const latest = detail?.attempts[0], steering = detail?.steering
-  const artifacts = useMemo(() => [...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()], [snapshot.artifacts.value, detail?.delivery?.artifacts])
+  const artifacts = useMemo(() => currentTaskArtifacts([...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()]), [snapshot.artifacts.value, detail?.delivery?.artifacts])
   const sessionClosed = detail?.sessionClosure?.state === 'closed'
   const sessionClosing = ['closing', 'unknown'].includes(detail?.sessionClosure?.state || '')
   const sessionId = detail?.attempts.find(attempt => attempt.sessionId)?.sessionId || task?.latestAttempt?.sessionId
@@ -144,6 +145,8 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const goal = task ? taskGoal(task) : ''
   const current = latest?.revision === task?.revision ? latest : undefined
   const outcome = taskOutcome(current), reportLinks = taskReportLinks(current)
+  const uncertain = !!task && ['running', 'preparing'].includes(task.state) && current?.state === 'unknown'
+  const reported = !outcome && current?.progress?.source === 'provider_transcript' ? current.progress.summary : ''
   const failed = task?.state === 'failed' || task?.state === 'interrupted' || current?.result?.outcomeKnown === false
   const reason = failed ? taskFailureKey(detail?.outcome?.errorCode || current?.result?.summary || '') : undefined
   const mutate = async (name: string, path: string, body: unknown = {}) => {
@@ -171,10 +174,12 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
     {!task && !snapshot.detail.failed && <Spin />}
     {snapshot.detail.failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {task && <>
-      <div className="agent-task-heading"><h3>{taskTopic(task) || t('agent.task.untitled')}</h3><span className="agent-task-state" data-state={task.state}>{t('agent.state.' + task.state)}</span></div>
+      <div className="agent-task-heading"><h3>{taskTopic(task) || t('agent.task.untitled')}</h3><span className="agent-task-state" data-state={uncertain ? 'unknown' : task.state}>{t(uncertain ? 'agent.task.executionUnconfirmed' : 'agent.state.' + task.state)}</span></div>
       <TaskDescription content={goal === task.id ? '' : goal} />
+      {uncertain && <p className="agent-task-note" role="status">{t('agent.task.executionUnconfirmedHint')}</p>}
       <details className="agent-task-section agent-task-requirements"><summary><ChevronRight />{t('agent.task.instructions')}</summary><p>{taskInstructions(task) || t('agent.task.noInstructions')}</p>{steering?.text && steering.state !== 'applied' && <p><b>{t('agent.task.unappliedRequirements')}</b>{steering.text}</p>}<small className="agent-muted">{t('agent.task.revision', { n: task.revision })}</small>{task.latestAttempt?.workspace && <code className="agent-task-workspace">{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}</details>
       {failed ? <p className="agent-task-note error" role="status">{t(reason || 'agent.task.incomplete')}</p> : outcome && <section className="agent-task-section agent-task-outcome"><h4>{t('agent.task.result')}</h4>{task.state !== 'succeeded' && <p className="agent-muted">{t('agent.task.resultPending')}</p>}<p>{outcome}</p></section>}
+      {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={reported} title={false} /></section>}
       {!!reportLinks.length && <section className="agent-task-section"><h4>{t(task.state === 'succeeded' ? 'agent.task.deliveryLinks' : 'agent.task.reportedLinks')}</h4>{reportLinks.map(href => <a className="tt-act agent-task-delivery-link" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</section>}
       <div className="agent-task-actions">
         {task?.nativeSession && <Button onClick={() => openAgentPage('session', task.nativeSession!.id)}>{t('agent.task.enterSession')}</Button>}

@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-30 | [任务回报与待确认产物](2026-10-30/task-reported-artifacts.html) |
 | 2026-10-30 | [判定器完整执行与超时后验收窗口](2026-10-30/verifier-assessment-window.html) |
 | 2026-10-30 | [Go 从本地配置选择模型连接](2026-10-30/go-local-model-routing.html) |
 | 2026-10-30 | [Go 网关统一模型额度与用量记录](2026-10-30/go-quota-authority.html) |

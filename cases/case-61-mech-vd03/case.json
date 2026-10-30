@@ -1,0 +1,24 @@
+{
+  "id": "MECH-VD03",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "交付与执行对账回归",
+  "prompt": "读取长文档后生成单页 HTML 和截图，保留可用产物；完成回调缺失时显示待确认回报，不重跑任务或伪造成功。",
+  "preconditions": "绑定唯一任务、轮次、专业会话和工作区；工具响应大于 100KB；另有同工作区的无关文件。",
+  "expected_terminal": "confirmed_completion_or_explicitly_unconfirmed",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": ["冻结回归合同", "Go 与 Python 原始测试输出", "状态和文件断言回执"],
+  "hard_assertions": [
+    {"id": "MECH-VD03-H1", "rule": "大工具响应不丢失生命周期元数据；只有匹配的 Stop 与空闲确认才完成对账。", "failure_effect": "case_failed"},
+    {"id": "MECH-VD03-H2", "rule": "可信会话回报支持的已有文件可查看和下载；未确认的执行保持未确认。", "failure_effect": "case_failed"},
+    {"id": "MECH-VD03-H3", "rule": "不扫描无关文件，不混入其他任务或后续请求，不重复派发或调用模型。", "failure_effect": "case_failed"},
+    {"id": "MECH-VD03-H4", "rule": "重复读取幂等，已删除的产物不恢复；错误或缺失来源不能变成成功。", "failure_effect": "case_failed"}
+  ],
+  "decision_domains": ["TE", "TR", "VD"],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {"origin": "observed_runtime_regression", "issue": 523, "private_records_published": false},
+  "resources": {"inputs": ["input/incident.json"], "tools": "tools.json", "generator": "scripts/run.py", "provenance": "provenance.json", "acceptance": "acceptance.md", "materials": "materials.json"}
+}

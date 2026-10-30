@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-VD03",
+  "data": {"kind": "observed_failure_synthetic_replay", "local_inputs": true, "recipe": "input/incident.json", "load_from": "Go lifecycle fixtures and test_task_reported_progress.py create disposable transcripts, HTML and file receipts."},
+  "tools": {"kind": "isolated_host_regression", "configuration": "tools.json", "model_calls": "No live inference; scripted execution receipts only."},
+  "acceptance": {"kind": "go_and_pytest_assertions", "entry": "scripts/run.py", "contract": "acceptance.md", "pytest_selectors": ["test_task_reported_progress.py"]}
+}

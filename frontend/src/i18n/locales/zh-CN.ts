@@ -1,4 +1,8 @@
 const zhCN = {
+  'agent.task.executionUnconfirmed': "执行待确认",
+  'agent.task.executionUnconfirmedHint': "已有文件可先查看，或打开工作会话核对执行结果。",
+  'agent.task.reportUnconfirmedTitle': "待确认的回报",
+  'agent.task.reportUnconfirmed': "工作会话已有回报，尚未确认完成。",
   'agent.rsiResults.baselineArm': "基线结果",
   'agent.rsiResults.candidateArm': "候选结果",
   'agent.rsi.error.RSI_USAGE_UNKNOWN': "调用用量未知，后续操作已停止。请查看执行记录。",

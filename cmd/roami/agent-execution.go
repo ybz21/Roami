@@ -115,11 +115,7 @@ func runAgentExecution(args []string) int {
 		if (*file == "") == (*notification == "") {
 			return fail(fmt.Errorf("event requires either --file or --notification"))
 		}
-		content, err := agentInput(*file, *notification)
-		if err != nil {
-			return fail(err)
-		}
-		event, err := agentexecution.DecodeSessionEvent(content)
+		event, err := sessionEventInput(*file, *notification)
 		if err != nil {
 			return fail(err)
 		}
@@ -209,4 +205,19 @@ func runAgentExecution(args []string) int {
 		return fail(err)
 	}
 	return 0
+}
+
+func sessionEventInput(file, notification string) (agentexecution.SessionEvent, error) {
+	if file == "-" {
+		return agentexecution.ReadSessionEvent(os.Stdin)
+	}
+	if file == "" {
+		return agentexecution.ReadSessionEvent(strings.NewReader(notification))
+	}
+	input, err := os.Open(file)
+	if err != nil {
+		return agentexecution.SessionEvent{}, err
+	}
+	defer input.Close()
+	return agentexecution.ReadSessionEvent(input)
 }

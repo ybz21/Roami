@@ -65,7 +65,8 @@ type Result struct {
 
 type Status struct {
 	Receipt
-	Result *Result `json:"result,omitempty"`
+	Result   *Result           `json:"result,omitempty"`
+	Progress *ReportedProgress `json:"progress,omitempty"`
 }
 
 type Service struct {
