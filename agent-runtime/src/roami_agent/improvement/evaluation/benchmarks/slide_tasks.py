@@ -11,6 +11,7 @@ from pathlib import PurePosixPath
 from roami_agent.improvement.domain.contracts import DIMENSIONS, digest, number, require
 from roami_agent.improvement.domain.scoring import quality
 from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.verification_windows import SLIDE_COMPARISON_SECONDS
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.protocol.errors import DomainError
 
@@ -221,7 +222,10 @@ async def grade_slides(case, workspace, executor):
     if attempted:
         try:
             raw = await executor.sandbox(
-                workspace, PROGRAM, input=json.dumps(spec).encode(), timeout=180
+                workspace,
+                PROGRAM,
+                input=json.dumps(spec).encode(),
+                timeout=SLIDE_COMPARISON_SECONDS,
             )
             require(
                 isinstance(raw, (bytes, str)) and len(raw) <= 200_000, "RSI_INVALID_NATIVE_RECEIPT"

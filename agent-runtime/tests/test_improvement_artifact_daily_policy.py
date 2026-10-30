@@ -2,7 +2,7 @@
 
 import copy
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -350,5 +350,65 @@ async def test_daily_rater_unknown_usage_is_recorded_without_blocking_other_rate
     )
     budget = judge.budget()
     assert len(await judge.rate(pack(), budget, [])) == 2
-    assert calls == ["artifact_a", "artifact_b"] and budget.unknown
+    assert calls == ["main", "worker"] and budget.unknown
     assert budget.metrics()["tokens"] is None
+
+
+async def test_calibration_factory_routes_raters_to_distinct_saved_roles_over_go_socket(tmp_path):
+    import base64
+    import hashlib
+    import io
+
+    from PIL import Image
+    from test_local_go_gateway import gateway_fixture
+    from test_model_proxy import USAGE
+
+    from roami_agent.providers.factory import configured_provider
+
+    socket = str(tmp_path / "model.sock")
+    settings = configured_settings()
+    settings = replace(settings, model_gateway_socket=socket)
+    image = io.BytesIO()
+    Image.new("RGB", (1, 1)).save(image, format="PNG")
+    evidence = pack()
+    evidence["images"][0].update(
+        mime="image/png",
+        data=base64.b64encode(image.getvalue()).decode(),
+        sha256=hashlib.sha256(image.getvalue()).hexdigest(),
+    )
+    evidence.pop("content_hash")
+    evidence["content_hash"] = digest(evidence)
+    events = (
+        "data: "
+        + json.dumps(
+            {"choices": [{"delta": {"content": json.dumps(rating())}, "finish_reason": "stop"}]}
+        )
+        + "\n\ndata: "
+        + json.dumps({"choices": [], "usage": USAGE})
+        + "\n\ndata: [DONE]\n\n"
+    ).encode()
+    observed = []
+    judge = ArtifactReviewer(
+        settings, profile(), provider_factory=configured_provider, calibrated=False
+    )
+    async with gateway_fixture(socket, observed, events=events):
+        ratings = await judge.rate(evidence, judge.budget(), [])
+    assert len(ratings) == 2
+    assert [(headers["x-roami-model-role"], body["model"]) for _, headers, body in observed] == [
+        ("main", "saved-main"),
+        ("worker", "saved-worker"),
+    ]
+    assert all(
+        "authorization" not in headers and "x-roami-model-upstream" not in headers
+        for _, headers, _ in observed
+    )
+
+
+def test_certificate_before_rater_role_fix_cannot_be_reused():
+    from roami_agent.improvement.evaluation.artifact_review import INSTRUCTIONS, PROGRAM
+
+    draft = ArtifactReviewer(configured_settings(), profile(), calibrated=False)
+    old = certificate(draft.route_hashes)
+    old["protocol_hash"] = digest([INSTRUCTIONS, PROGRAM, "artifact-rubric-0to3-v1"])
+    with pytest.raises(DomainError, match="RSI_ARTIFACT_CALIBRATION_CHANGED"):
+        ArtifactReviewer(configured_settings(), {**profile(), "certificate": old})

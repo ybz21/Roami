@@ -8,15 +8,19 @@ from roami_agent.protocol.errors import ModelAdmissionRejected
 
 
 class LocalGatewayTransport(httpx.AsyncBaseTransport):
-    def __init__(self, socket, role):
+    def __init__(self, socket, role, route_id=None):
         self.transport = httpx.AsyncHTTPTransport(uds=socket, retries=0) if socket else None
-        self.role = role
+        self.role, self.route_id = role, route_id
 
     async def handle_async_request(self, request):
         if self.transport is None:
             raise ModelAdmissionRejected("MODEL_GATEWAY_REQUIRED", 503)
         headers = dict(request.headers)
-        headers["X-Roami-Model-Upstream"] = str(request.url)
+        for key in list(headers):
+            if key in {"authorization", "x-api-key", "api-key"} or key.startswith("x-roami-"):
+                headers.pop(key)
+        if self.route_id:
+            headers["X-Roami-Model-Route"] = self.route_id
         headers["X-Roami-Model-Role"] = self.role
         forwarded = httpx.Request(
             request.method,
@@ -32,6 +36,10 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
             "MODEL_PROXY_USAGE_PENDING",
             "MODEL_PROXY_USAGE_UNKNOWN",
             "MODEL_GATEWAY_STORAGE_FAILED",
+            "MODEL_NOT_CONFIGURED",
+            "MODEL_GATEWAY_ROUTE_CHANGED",
+            "MODEL_GATEWAY_CONFIGURATION_INVALID",
+            "INVALID_MODEL_CONFIG",
         }:
             await response.aclose()
             # Pending charges use the existing unsettled-cost recovery hint.
@@ -45,10 +53,10 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
             await self.transport.aclose()
 
 
-def local_gateway_client(role, timeout, *, socket=None):
+def local_gateway_client(role, timeout, *, socket=None, route_id=None):
     socket = socket or os.environ.get("ROAMI_MODEL_GATEWAY_SOCKET")
     return httpx.AsyncClient(
-        transport=LocalGatewayTransport(socket, role),
+        transport=LocalGatewayTransport(socket, role, route_id),
         timeout=httpx.Timeout(timeout or None, connect=10),
         follow_redirects=False,
     )

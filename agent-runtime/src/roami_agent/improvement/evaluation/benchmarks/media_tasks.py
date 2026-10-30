@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 from roami_agent.improvement.domain.contracts import DIMENSIONS, digest, require
 from roami_agent.improvement.domain.scoring import quality
 from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.verification_windows import MEDIA_VERIFICATION_SECONDS
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 
 TASKS = {"assembly": "agentic-vbench-assembly-task1", "repair": "exp-codec-restore-task01"}
@@ -175,7 +176,12 @@ async def grade_media(case, workspace, executor):
     result = {"reward": None}
     if all(checks.values()):
         result = json.loads(
-            await executor.sandbox(workspace, PROGRAM, input=json.dumps(spec).encode(), timeout=330)
+            await executor.sandbox(
+                workspace,
+                PROGRAM,
+                input=json.dumps(spec).encode(),
+                timeout=MEDIA_VERIFICATION_SECONDS,
+            )
         )
         checks.update(result["checks"])
     score = result["reward"]

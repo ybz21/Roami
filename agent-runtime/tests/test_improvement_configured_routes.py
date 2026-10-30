@@ -102,8 +102,7 @@ async def test_daily_artifact_profile_cannot_override_either_saved_role():
     seen = []
 
     def factory(effective, role):
-        actual = "main" if role == "artifact_a" else "worker"
-        seen.append((role, effective.route(actual)))
+        seen.append((role, effective.route(role)))
         return ProtocolFixtureModel([{"text": json.dumps(rating())}])
 
     judge = ArtifactReviewer(
@@ -114,7 +113,7 @@ async def test_daily_artifact_profile_cannot_override_either_saved_role():
         "artifact_b": settings.route("worker"),
     }
     assert len(await judge.rate(pack(), judge.budget(), [])) == 2
-    assert seen == list(judge.routes.items())
+    assert seen == [(role, settings.route(role)) for role in ("main", "worker")]
     assert (
         ArtifactReviewer(
             settings, profile(), calibrated=False, shared_daily_limit=True

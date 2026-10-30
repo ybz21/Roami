@@ -36,7 +36,7 @@ func TestGatewayStreamsAccountsAndRejectsBeforeUpstream(t *testing.T) {
 	var hits atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
-		if r.URL.Path != "/custom/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer fixture-credential" || r.Header.Get("X-Roami-Owner") != "" || r.Header.Get("X-Roami-Model-Upstream") != "" {
+		if r.URL.Path != "/custom/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer node-key" || r.Header.Get("X-Roami-Owner") != "" || r.Header.Get("X-Roami-Model-Upstream") != "" {
 			t.Error("upstream path/auth/private metadata mismatch")
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -47,7 +47,7 @@ func TestGatewayStreamsAccountsAndRejectsBeforeUpstream(t *testing.T) {
 		}
 	}))
 	defer upstream.Close()
-	h := NewHandler(l)
+	h := nodeConfiguredHandler(t, l, upstream.URL)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, modelRequest(upstream.URL))
 	if w.Code != 200 || w.Body.String() != billableEvents || !w.Flushed || w.Header().Get("X-Request-Id") != "upstream-receipt" {
@@ -112,7 +112,7 @@ func TestTerminalUsageSettlesWhenCallerClosesBeforeHTTPBodyEnds(t *testing.T) {
 		<-r.Context().Done()
 	}))
 	defer upstream.Close()
-	gateway := httptest.NewServer(NewHandler(l))
+	gateway := httptest.NewServer(nodeConfiguredHandler(t, l, upstream.URL))
 	defer gateway.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -168,7 +168,7 @@ func TestHTTPFailuresUnknownUsageAndNoRedirect(t *testing.T) {
 			}))
 			defer up.Close()
 			w := httptest.NewRecorder()
-			NewHandler(l).ServeHTTP(w, modelRequest(up.URL))
+			nodeConfiguredHandler(t, l, up.URL).ServeHTTP(w, modelRequest(up.URL))
 			if w.Code != status {
 				t.Fatalf("status: %d", w.Code)
 			}

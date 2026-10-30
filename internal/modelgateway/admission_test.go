@@ -50,7 +50,7 @@ func TestActiveUsageAdmission(t *testing.T) {
 			}))
 			defer upstream.Close()
 			defer unblock()
-			handler := NewHandler(ledger)
+			handler := nodeConfiguredHandler(t, ledger, upstream.URL)
 			first, second := httptest.NewRecorder(), httptest.NewRecorder()
 			firstDone, secondDone := make(chan struct{}), make(chan struct{})
 			go func() { defer close(firstDone); handler.ServeHTTP(first, modelRequest(upstream.URL)) }()
@@ -115,7 +115,7 @@ func TestCancelledAdmissionDoesNotCreateCallOrReplay(t *testing.T) {
 	}))
 	defer upstream.Close()
 	defer unblock()
-	handler := NewHandler(ledger)
+	handler := nodeConfiguredHandler(t, ledger, upstream.URL)
 	firstDone := make(chan struct{})
 	go func() { defer close(firstDone); handler.ServeHTTP(httptest.NewRecorder(), modelRequest(upstream.URL)) }()
 	awaitAdmission(t, entered)
@@ -167,7 +167,7 @@ func TestAdmissionRechecksChangedDailyPolicy(t *testing.T) {
 	}))
 	defer upstream.Close()
 	defer unblock()
-	handler := NewHandler(ledger)
+	handler := nodeConfiguredHandler(t, ledger, upstream.URL)
 	firstDone := make(chan struct{})
 	go func() { defer close(firstDone); handler.ServeHTTP(httptest.NewRecorder(), modelRequest(upstream.URL)) }()
 	awaitAdmission(t, entered)
@@ -215,7 +215,7 @@ func TestUnownedPendingCallIsNotWaitedOnOrReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := httptest.NewRecorder()
-	NewHandler(ledger).ServeHTTP(w, modelRequest("https://must-not-connect.invalid"))
+	nodeConfiguredHandler(t, ledger, "https://must-not-connect.invalid").ServeHTTP(w, modelRequest("https://must-not-connect.invalid"))
 	if w.Code != 409 || w.Header().Get("X-Roami-Model-Error") != "MODEL_PROXY_USAGE_PENDING" {
 		t.Fatalf("unowned pending protection lost: %d %s", w.Code, w.Body.String())
 	}
@@ -245,7 +245,7 @@ func TestConcurrentAdmissionSettlesEveryRequestOnce(t *testing.T) {
 		_, _ = io.WriteString(w, billableEvents)
 	}))
 	defer upstream.Close()
-	handler := NewHandler(ledger)
+	handler := nodeConfiguredHandler(t, ledger, upstream.URL)
 	var wait sync.WaitGroup
 	codes := make(chan int, 16)
 	for range 16 {
