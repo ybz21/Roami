@@ -1,6 +1,7 @@
 """Retained provider reports are useful without pretending an unknown task is complete."""
 
 import copy
+import io
 import json
 import os
 from pathlib import Path
@@ -30,7 +31,11 @@ async def reported_task(store, tmp_path):
     page.mkdir(parents=True)
     assert [p.name for p in paths] == ["index.html", "shot.png"]
     (page / "index.html").write_text("<!doctype html><title>Research report</title>")
-    (page / "shot.png").write_bytes(b"synthetic screenshot fixture")
+    from PIL import Image
+
+    picture = io.BytesIO()
+    Image.new("RGB", (2, 2)).save(picture, format="PNG")
+    (page / "shot.png").write_bytes(picture.getvalue())
     (workspace / "unrelated.txt").write_text("Must not be collected")
     runtime, _, _, _, binding = await setup(store, settings=Settings(coding_directory=workspace))
     task = await admit(
