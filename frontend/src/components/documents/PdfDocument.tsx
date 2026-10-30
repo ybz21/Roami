@@ -12,6 +12,7 @@ export default function PdfDocument({ src, name }: { src: string; name: string }
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null)
   const [page, setPage] = useState(1), [width, setWidth] = useState(0), [retry, setRetry] = useState(0)
   const [failed, setFailed] = useState(false), [rendering, setRendering] = useState(true)
+  const [ready, setReady] = useState(false)
   const container = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const element = container.current
@@ -23,7 +24,7 @@ export default function PdfDocument({ src, name }: { src: string; name: string }
   }, [])
   useEffect(() => {
     let stopped = false
-    setDocument(null); setPage(1); setFailed(false); setRendering(true)
+    setDocument(null); setPage(1); setFailed(false); setRendering(true); setReady(false)
     const loading = getDocument({ url: src, withCredentials: true, useSystemFonts: true, useWasm: false,
       cMapUrl: `${import.meta.env.BASE_URL}pdfjs/cmaps/`, cMapPacked: true,
       standardFontDataUrl: `${import.meta.env.BASE_URL}pdfjs/standard_fonts/`,
@@ -36,20 +37,30 @@ export default function PdfDocument({ src, name }: { src: string; name: string }
     let stopped = false
     let render: ReturnType<Awaited<ReturnType<PDFDocumentProxy['getPage']>>['render']> | undefined
     setRendering(true); setFailed(false)
-    void document.getPage(page).then(pdfPage => {
+    void document.getPage(page).then(async pdfPage => {
       if (stopped || !canvas.current) return
       const base = pdfPage.getViewport({ scale: 1 })
       const viewport = pdfPage.getViewport({ scale: width / base.width })
       // Bound mobile canvas memory independently of display density.
       const density = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8_000_000 / (viewport.width * viewport.height)))
       const element = canvas.current
-      element.width = Math.max(1, Math.floor(viewport.width * density))
-      element.height = Math.max(1, Math.floor(viewport.height * density))
+      // Keep the displayed page and its scrollbar until the replacement is complete.
+      const buffer = element.ownerDocument.createElement('canvas')
+      buffer.width = Math.max(1, Math.floor(viewport.width * density))
+      buffer.height = Math.max(1, Math.floor(viewport.height * density))
+      render = pdfPage.render({ canvas: buffer, viewport, transform: [density, 0, 0, density, 0, 0] })
+      await render.promise
+      render = undefined
+      if (stopped) return
+      const context = element.getContext('2d')
+      if (!context) throw new Error('Canvas unavailable')
+      element.width = buffer.width
+      element.height = buffer.height
       element.style.width = `${viewport.width}px`
       element.style.height = `${viewport.height}px`
-      render = pdfPage.render({ canvas: element, viewport, transform: [density, 0, 0, density, 0, 0] })
-      return render.promise
-    }).then(() => { if (!stopped) setRendering(false) }).catch(() => { if (!stopped) { setFailed(true); setRendering(false) } })
+      context.drawImage(buffer, 0, 0)
+      setReady(true); setRendering(false)
+    }).catch(() => { if (!stopped) { setFailed(true); setRendering(false) } })
     return () => { stopped = true; render?.cancel() }
   }, [document, page, width])
   return <div className="pdf-document">
@@ -60,8 +71,8 @@ export default function PdfDocument({ src, name }: { src: string; name: string }
     </div>}
     <div className="pdf-document-scroll" ref={container}>
       {failed ? <p role="alert">{t('document.loadFailed')} <button type="button" className="tt-act" onClick={() => setRetry(value => value + 1)}>{t('agent.retry')}</button></p> : <>
-        {rendering && <p role="status">{t('common.loading')}</p>}
-        <canvas ref={canvas} role="img" aria-label={`${name} ${t('office.page', { page })}`} hidden={rendering} />
+        {rendering && !ready && <p className="pdf-document-loading" role="status">{t('common.loading')}</p>}
+        <canvas ref={canvas} role="img" aria-label={`${name} ${t('office.page', { page })}`} hidden={!ready} />
       </>}
     </div>
   </div>
