@@ -15,6 +15,7 @@ import FileWorkspace from '../files/FileWorkspace'
 import GitPanel from '../git/GitPanel'
 import MobileSubPage from '../MobileSubPage'
 import { PaneCloseConfirm, type PaneCloseTarget } from './PaneCloseConfirm'
+import { TabContextMenu } from './TabContextMenu'
 import Term, { TermHandle, TermStatus } from './Terminal'
 import { api, makeClipboardImageFile, upload, uploadedPathOf } from '../../api'
 import { VoiceInput } from '../chat/VoiceInput'
@@ -771,7 +772,7 @@ export default function TerminalPane(props: {
           el.scrollLeft += e.deltaY
         }}>
         {(pageTabs || []).map((page) => (
-          <Dropdown key={'page:' + page.key} trigger={['contextMenu']}
+          <TabContextMenu key={'page:' + page.key}
             menu={tabMenu(`page:${page.key}`, () => onClosePage?.(page.key))}>
           <span ref={activePage === page.key ? activeTabRef : undefined}
             style={{ order: pinnedTabIds.has(`page:${page.key}`) ? 0 : 1 }}
@@ -782,7 +783,7 @@ export default function TerminalPane(props: {
             </button>
             <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')}
               onClick={() => onClosePage?.(page.key)}>{TI.close}</button>
-          </span></Dropdown>
+          </span></TabContextMenu>
         ))}
         {tabs.map((termName, i) => {
           const on = !activePage && !curFile && termName === active
@@ -849,14 +850,14 @@ export default function TerminalPane(props: {
           )
           // 右键菜单：标签是跨页常驻的，「这个会话是哪来的」得有个地方能问（14 §6.3.4）
           return (
-            <Dropdown key={termName} trigger={['contextMenu']} menu={{ onClick: ({ domEvent }) => domEvent.stopPropagation(), items: [
+            <TabContextMenu key={termName} menu={{ onClick: ({ domEvent }) => domEvent.stopPropagation(), items: [
               ...(proj ? [{ key: 'proj', label: t('terminal.openOwnerProject', { name: proj.name }),
                 onClick: () => { location.hash = '#/projects/' + encodeURIComponent(proj.key) } }] : []),
               { key: 'newtab', label: t('terminal.openInNewTabTitle'),
                 onClick: () => window.open(`/#/term/${encodeURIComponent(termName)}`, '_blank') },
               { type: 'divider' as const },
               ...tabMenu(`term:${termName}`, () => closeTerm(termName)).items,
-            ] }}>{tab}</Dropdown>
+            ] }}>{tab}</TabContextMenu>
           )
         })}
         {/* 文件标签（22 设计 §3.3）：接在会话标签后面，同一款 .tt-tab；预览态斜体，单击别的文件会替换它，
@@ -866,7 +867,7 @@ export default function TerminalPane(props: {
           const name = f.path.split('/').pop() || f.path
           const dirty = dirtyFiles.has(f.path)
           return (
-            <Dropdown key={'file:' + f.path} trigger={['contextMenu']}
+            <TabContextMenu key={'file:' + f.path}
               menu={tabMenu(`file:${f.path}`, () => closeFile(f.path))}>
             <span ref={on ? activeTabRef : undefined}
               style={{ order: pinnedTabIds.has(`file:${f.path}`) ? 0 : 1 }}
@@ -877,7 +878,7 @@ export default function TerminalPane(props: {
               <button type="button" className="tt-x" aria-label={dirty ? t('file.unsaved') : t('common.close')}
                 title={dirty ? t('file.unsaved') : t('common.close')}
                 onClick={(e) => { e.stopPropagation(); closeFile(f.path) }}>{dirty ? <span className="tt-tab-dirty" /> : TI.close}</button>
-            </span></Dropdown>
+            </span></TabContextMenu>
           )
         })}
         {/* 拖到最右侧：最后一个标签的右半边已经给出 i+1，这里只补"空白区也能落" */}
