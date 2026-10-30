@@ -8,7 +8,7 @@ import stat
 import tempfile
 import time
 from collections import Counter
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import digest, require
@@ -87,20 +87,20 @@ class ContainerExecutor:
         shared_daily_limit=False,
     ):
         self.settings, self.image = settings, image
-        if shared_daily_limit:
-            require(
-                all(
-                    route is None or route == settings.route(role)
-                    for route, role in (
-                        (main_route, "main"),
-                        (worker_route, "worker"),
-                        (memory_route, "worker"),
-                    )
+        shared_daily_limit = True
+        require(
+            all(
+                route is None or route == settings.route(role)
+                for route, role in (
+                    (main_route, "main"),
+                    (worker_route, "worker"),
+                    (memory_route, "worker"),
                 )
-                and not generation_overrides
-                and not output_caps,
-                "RSI_POLICY_OUT_OF_RANGE",
             )
+            and not generation_overrides
+            and not output_caps,
+            "RSI_POLICY_OUT_OF_RANGE",
+        )
         self.artifact_reviewer = artifact_reviewer
         self.artifact_renderer = None
         self.model_hash = digest(
@@ -194,16 +194,7 @@ class ContainerExecutor:
             if "selectors" in case["judge"]:
                 require(case["judge"]["selectors"] == selected, "RSI_REGRESSION_PACK_CHANGED")
             return 0
-        if self.shared_daily_limit:
-            return 0
-        from roami_agent.improvement.evaluation.artifact_review import needs_artifact_review
-
-        extra = (
-            self.artifact_reviewer.profile["max_tokens"]
-            if self.artifact_reviewer and needs_artifact_review(case)
-            else 0
-        )
-        return case["limits"]["tokens"] + extra
+        return 0
 
     async def preflight(self, *, model_inputs=True):
         try:
@@ -211,9 +202,9 @@ class ContainerExecutor:
         except (DomainError, ValueError):
             raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
         labels = detail.get("Config", {}).get("Labels") or {}
-        if self.shared_daily_limit:
+        if model_inputs:
             require(
-                labels.get("org.roami.rsi.shared-daily-policy") == "5",
+                labels.get("org.roami.rsi.shared-daily-policy") == "6",
                 "RSI_CONTAINER_IMAGE_REQUIRED",
             )
         if model_inputs and self.main_image_input["enabled"]:
@@ -255,7 +246,7 @@ class ContainerExecutor:
         self, workspace, program, *, input=None, timeout=60, runtime=False, copy_workspace=False
     ):
         if not self.image_id:
-            await self.preflight()
+            await self.preflight(model_inputs=False)
         name = "roami-rsi-grade-" + secrets.token_hex(10)
         if copy_workspace:
             # Copy inside the sandbox so artifact symlinks never traverse the host filesystem.
@@ -535,12 +526,6 @@ class ContainerExecutor:
             )
             from roami_agent.improvement.integrations.request_model import RequestBudgetModel
 
-            if not self.shared_daily_limit:
-                route = replace(
-                    route,
-                    max_retries=0,
-                    parameters={**route.parameters, **self.generation_overrides.get(role, {})},
-                )
             models[role] = RequestBudgetModel(
                 self.settings,
                 route,

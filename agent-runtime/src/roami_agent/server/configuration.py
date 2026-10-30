@@ -210,9 +210,7 @@ class Settings:
     artifact_gc_grace_seconds: int = 86400
     artifact_gc_interval_seconds: int = 300
     proactive_enabled: bool = False
-    proactive_daily_budget: int = 3
     proactive_timeout_seconds: int = 0
-    brief_daily_budget: int = 3
     brief_timeout_seconds: int = 0
 
     @classmethod
@@ -256,9 +254,7 @@ class Settings:
             artifact_gc_grace_seconds=raw.get("artifacts", {}).get("gc_grace_seconds", 86400),
             artifact_gc_interval_seconds=raw.get("artifacts", {}).get("gc_interval_seconds", 300),
             proactive_enabled=raw.get("proactive", {}).get("enabled", False),
-            proactive_daily_budget=raw.get("proactive", {}).get("daily_budget", 3),
             proactive_timeout_seconds=raw.get("proactive", {}).get("timeout_seconds", 0),
-            brief_daily_budget=raw.get("briefs", {}).get("daily_budget", 3),
             brief_timeout_seconds=raw.get("briefs", {}).get("timeout_seconds", 0),
             cli_bin=runtime.get("cli_bin", os.environ.get("ROAMI_AGENT_CLI", "roami")),
             professional_executor=runtime.get("professional_executor", ""),
@@ -277,18 +273,11 @@ class Settings:
                 raise DomainError("INVALID_RUNTIME_CONFIG")
         if (
             type(result.proactive_enabled) is not bool
-            or type(result.proactive_daily_budget) is not int
-            or not 1 <= result.proactive_daily_budget <= 10
             or type(result.proactive_timeout_seconds) is not int
             or result.proactive_timeout_seconds < 0
         ):
             raise DomainError("INVALID_PROACTIVE_CONFIG")
-        if (
-            type(result.brief_daily_budget) is not int
-            or not 1 <= result.brief_daily_budget <= 10
-            or type(result.brief_timeout_seconds) is not int
-            or result.brief_timeout_seconds < 0
-        ):
+        if type(result.brief_timeout_seconds) is not int or result.brief_timeout_seconds < 0:
             raise DomainError("INVALID_BRIEF_CONFIG")
         if (
             type(result.reserve_tokens) is not int

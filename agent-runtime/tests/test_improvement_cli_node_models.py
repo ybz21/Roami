@@ -209,7 +209,7 @@ async def test_protocol_fixture_cycle_stays_offline_without_node_binding(tmp_pat
 
     async def run(**options):
         assert getattr(options["ledger"], "shared_daily_limit", False) is False
-        assert options["daily_tokens"] == options["daily_episodes"] == 2
+        assert options["daily_tokens"] == options["daily_episodes"] == 0
         return {"fixture": True}
 
     monkeypatch.setattr(cli, "NativeFilesExecutor", Executor)

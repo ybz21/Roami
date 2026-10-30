@@ -20,7 +20,7 @@ def preview(service, owner, settings):
     shared = uses_shared_model_limit(service.ledger)
     catalog = service.control.catalog(owner)
     selected = next((s for s in catalog["suites"] if s["id"] == prefs["suite_id"]), None)
-    blockers, tokens, artifact_count = [], None, 0
+    blockers, artifact_count = [], 0
     if not selected:
         blockers.append("RSI_SUITE_NOT_FOUND")
     else:
@@ -31,27 +31,19 @@ def preview(service, owner, settings):
             suite = load_suite(Path(source["path"]))
             require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
             artifact_count = sum(needs_artifact_review(c) for c in suite["cases"])
-            tokens = sum(
-                c["limits"]["tokens"] for c in suite["cases"] if c["judge"]["kind"] != "mechanism"
-            )
             if artifact_count:
                 reviewer = ArtifactReviewer.load(
                     settings, service.ledger.path.parent, owner, shared_daily_limit=shared
                 )
                 require(reviewer is not None, "RSI_ARTIFACT_REVIEW_REQUIRED")
-                if not shared:
-                    tokens += artifact_count * reviewer.profile["max_tokens"]
         except DomainError as exc:
             blockers.append(exc.code)
-            tokens = None
         except OSError:
             blockers.append("RSI_SUITE_NOT_FOUND")
-            tokens = None
     machines = len(prefs["machine_ids"])
-    episodes = (60 if shared else 120) * machines
+    episodes = 60 * machines
     if not machines:
         blockers.append("RSI_MACHINE_NOT_FOUND")
-    reservation = tokens * 2 * machines if tokens is not None and machines else None
     if not settings.endpoint or not settings.model:
         blockers.append("MODEL_NOT_CONFIGURED")
     now = datetime.now(ZoneInfo(prefs["timezone"]))
@@ -63,13 +55,13 @@ def preview(service, owner, settings):
         "cases": 60,
         "machines": machines,
         "episodes": episodes,
-        "reservation_tokens": None if shared else reservation,
-        "spending_policy": "shared_model_daily" if shared else "frozen_protocol",
+        "reservation_tokens": None,
+        "spending_policy": "shared_model_daily",
         "artifact_cases": artifact_count,
         "schedule_enabled": prefs["enabled"],
         "next_run": next_run.isoformat() if prefs["enabled"] else None,
         "research_enabled": research["enabled"],
-        "codex_tokens_per_operation": None if shared else research["model_tokens"],
+        "codex_tokens_per_operation": None,
         "blockers": list(dict.fromkeys(blockers)),
         "runtime_preflight_required": True,
     }

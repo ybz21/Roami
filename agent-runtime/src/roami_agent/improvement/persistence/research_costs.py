@@ -3,8 +3,6 @@
 import json
 
 from roami_agent.improvement.domain.contracts import require
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
-from roami_agent.improvement.persistence.operation_accounting import assert_operation_costs_settled
 
 
 class ResearchCosts:
@@ -33,23 +31,9 @@ class ResearchCosts:
                     prior["state"] == "completed", "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION"
                 )
                 return json.loads(prior["result_json"])
-            assert_operation_costs_settled(db, owner, shared=uses_shared_model_limit(self.ledger))
-            budget = db.execute(
-                "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-            ).fetchone()
-            require(
-                uses_shared_model_limit(self.ledger)
-                or budget
-                and budget["tokens_reserved"] + tokens <= budget["tokens_limit"],
-                "RSI_DAILY_BUDGET",
-            )
-            db.execute(
-                "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
-                (tokens, owner, day),
-            )
             db.execute(
                 "INSERT INTO rsi_operation_costs VALUES(?,?,?,?,'running',NULL)",
-                (key, owner, day, tokens),
+                (key, owner, day, 0),
             )
         return None
 
@@ -63,11 +47,6 @@ class ResearchCosts:
                 (owner, key),
             ).fetchone()
             require(row is not None, "RSI_OPERATION_CONFLICT")
-            if tokens is not None:
-                db.execute(
-                    "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
-                    (tokens - row["reserved"], owner, row["day"]),
-                )
             db.execute(
                 "UPDATE rsi_operation_costs SET state=?,result_json=? WHERE owner=? AND id=? AND state='running'",
                 (

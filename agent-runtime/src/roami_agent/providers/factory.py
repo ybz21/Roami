@@ -6,6 +6,9 @@ from roami_agent.providers.local_gateway import local_gateway_client
 
 def configured_provider(settings, role, *, client=None):
     route = settings.route(role)
+    transport = client or local_gateway_client(
+        role, route.timeout_seconds, socket=settings.model_gateway_socket
+    )
     provider = ChatCompletions(
         route.endpoint,
         route.name,
@@ -15,7 +18,6 @@ def configured_provider(settings, role, *, client=None):
         capabilities=route.capabilities,
         cache=route.cache,
         parameters=route.parameters,
-        client=client
-        or local_gateway_client(role, route.timeout_seconds, socket=settings.model_gateway_socket),
+        client=transport,
     )
     return provider

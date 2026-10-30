@@ -397,7 +397,7 @@ async def test_container_request_preserves_the_shared_daily_policy(tmp_path, mon
     async def docker(*args, **kwargs):
         if args[0] == "start":
             request = json.loads((tmp_path / "state/request.json").read_text())
-            assert request.get("shared_daily_limit", False) is shared
+            assert request.get("shared_daily_limit", False) is True
             (tmp_path / "state/response.json").write_text(
                 json.dumps({"output": "", "release_blockers": []})
             )
@@ -474,7 +474,7 @@ async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers
 
 
 @pytest.mark.parametrize("shared", [False, True])
-@pytest.mark.parametrize("version", [None, "1", "2", "3", "4", "5"])
+@pytest.mark.parametrize("version", [None, "1", "2", "3", "4", "5", "6"])
 async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
     tmp_path, monkeypatch, shared, version
 ):
@@ -487,7 +487,7 @@ async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
 
     monkeypatch.setattr(containers, "docker_command", docker)
     executor = containers.ContainerExecutor(Settings(), shared_daily_limit=shared)
-    if shared and version != "5":
+    if version != "6":
         with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
             await executor.preflight()
         assert executor.image_id is None

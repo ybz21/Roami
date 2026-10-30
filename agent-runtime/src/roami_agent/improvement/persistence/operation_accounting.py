@@ -56,7 +56,7 @@ def quarantine_operation(ledger, owner, operation, *, reason, evidence):
             "SELECT * FROM rsi_operation_costs WHERE owner=? AND id=?", (owner, operation)
         ).fetchone()
         require(row is not None, "RSI_OPERATION_NOT_FOUND")
-        require(row["state"] == "unknown" and row["reserved"] > 0, "RSI_OPERATION_CONFLICT")
+        require(row["state"] == "unknown", "RSI_OPERATION_CONFLICT")
         result = json.loads(row["result_json"])
         require(result["value"]["metrics"].get("tokens") is None, "RSI_OPERATION_CONFLICT")
         receipt["reservation_retained"] = row["reserved"]
@@ -66,13 +66,3 @@ def quarantine_operation(ledger, owner, operation, *, reason, evidence):
             (json.dumps(result), owner, operation),
         )
     return receipt
-
-
-def assert_operation_costs_settled(db, owner, *, shared=False):
-    require(
-        not db.execute(
-            "SELECT 1 FROM rsi_operation_costs WHERE owner=? AND (state NOT IN ('completed','quarantined') OR (state='completed' AND (json_type(result_json,'$.value.metrics.tokens') IS NOT 'integer' OR (json_extract(result_json,'$.value.metrics.tokens')>reserved AND COALESCE(json_extract(result_json,'$.value.spending_policy'),'frozen_protocol')!='shared_model_daily' AND ?))))",
-            (owner, not shared),
-        ).fetchone(),
-        "RSI_UNKNOWN_OPERATION_REQUIRES_RECONCILIATION",
-    )

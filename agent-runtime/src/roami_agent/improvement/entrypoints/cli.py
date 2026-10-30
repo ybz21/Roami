@@ -322,8 +322,8 @@ async def execute(args):
             baseline={},
             candidate={"memory_recall_limit": 4},
             output_root=root / "runs",
-            daily_tokens=512000,
-            daily_episodes=4,
+            daily_tokens=0,
+            daily_episodes=0,
         )
     if args.command == "import-finance":
         suite = import_finqa(
@@ -401,7 +401,7 @@ async def execute(args):
         )
     else:
         raise DomainError("RSI_MACHINE_MODE")
-    budgets = config["daily_budget"] if mode != "native_files" else {"tokens": 0, "episodes": 0}
+    budgets = {"tokens": 0, "episodes": 0}
     baseline = (
         {key: getattr(settings, key) for key in BOUNDS}
         if mode in {"native_files", "protocol_fixture"}

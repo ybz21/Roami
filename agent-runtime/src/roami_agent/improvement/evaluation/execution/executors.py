@@ -102,7 +102,7 @@ class NativeFilesExecutor:
         self.allow_tasks = allow_tasks
         require(not allow_tasks or allow_shell, "RSI_CONTAINER_REQUIRED")
         self.provider_factory = provider_factory
-        self.shared_daily_limit = shared_daily_limit
+        self.shared_daily_limit = True
         require(
             not allow_shell
             or (Path("/.dockerenv").exists() and os.environ.get("ROAMI_RSI_CONTAINER") == "1"),
@@ -134,13 +134,13 @@ class NativeFilesExecutor:
                 },
             ]
         )
-        if shared_daily_limit:
+        if self.shared_daily_limit:
             self.model_hash = digest(
                 [self.model_hash, "shared_model_daily_limit-v3-configured-context"]
             )
 
     def reservation_tokens(self, case):
-        return 0 if self.shared_daily_limit else case["limits"]["tokens"]
+        return 0
 
     async def run(self, case, policy, root):
         workspace = self.workspace or root / "workspace"
@@ -186,21 +186,6 @@ class NativeFilesExecutor:
             else:
                 actual_role = "main" if role == "main" else "worker"
                 route = settings.route(actual_role)
-                output_cap = (
-                    route.parameters.get("max_tokens")
-                    if self.shared_daily_limit
-                    else min(2048, route.parameters.get("max_tokens", 2048))
-                )
-                if not self.shared_daily_limit:
-                    route = replace(
-                        route,
-                        parameters={**route.parameters, "max_tokens": output_cap},
-                        max_retries=0,
-                        timeout_seconds=min(
-                            case["limits"]["seconds"],
-                            route.timeout_seconds or case["limits"]["seconds"],
-                        ),
-                    )
                 configured = settings_with_route(settings, actual_role, route)
                 provider = (
                     self.provider_factory(configured, role)
@@ -210,7 +195,16 @@ class NativeFilesExecutor:
             providers.append(provider)
         journal = []
         models = [
-            MeteredModel(p, budget, role, journal=journal)
+            MeteredModel(
+                p,
+                budget,
+                role,
+                journal=journal,
+                output_cap=settings.route("main" if role == "main" else "worker").parameters.get(
+                    "max_tokens"
+                )
+                or 0,
+            )
             for p, role in zip(providers, ("main", "worker", "memory"), strict=True)
         ]
         database = Database(root / "runtime.db", root / "runtime", managed=False)
@@ -424,7 +418,7 @@ class NativeFilesExecutor:
             if self.settle_maintenance
             else "calendar_deferred",
         }
-        metrics["observed_tokens"] = metrics["tokens"]
+        metrics["observed_tokens"] = budget.used
         if diagnostics:
             metrics["first_committed_text_ms"] = diagnostics[0]["first_committed_text_ms"]
         if deferred_jobs:
@@ -515,13 +509,11 @@ class ExternalExecutor:
             )
             metrics = response["metrics"]
             require(
-                type(metrics.get("tokens")) is int
-                and 0 <= metrics["tokens"] <= case["limits"]["tokens"],
+                type(metrics.get("tokens")) is int and metrics["tokens"] >= 0,
                 "RSI_EXTERNAL_USAGE",
             )
             require(
-                type(metrics.get("model_calls")) is int
-                and 0 <= metrics["model_calls"] <= case["limits"]["requests"],
+                type(metrics.get("model_calls")) is int and metrics["model_calls"] >= 0,
                 "RSI_EXTERNAL_USAGE",
             )
             grade = validate_external_grade(response["grade"])

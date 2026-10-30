@@ -9,7 +9,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import digest, require
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
 from roami_agent.improvement.persistence.schema import (
     EVALUATION_SCHEMA,
     PIPELINE_SCHEMA,
@@ -57,11 +56,8 @@ class Ledger:
                 db.close()
             os.close(lock)
 
-    def reserve(self, owner, day, manifest, *, tokens_limit, episodes_limit):
-        shared = uses_shared_model_limit(self)
+    def reserve(self, owner, day, manifest, *, tokens_limit=0, episodes_limit=0):
         require(isinstance(owner, str) and 0 < len(owner) <= 200)
-        require(shared or type(tokens_limit) is int and tokens_limit > 0)
-        require(shared or type(episodes_limit) is int and 0 < episodes_limit <= 10000)
         cycle_id = digest([owner, day, manifest])
         tokens = manifest["reserved_tokens"]
         episodes = manifest["reserved_episodes"]
@@ -77,29 +73,6 @@ class Ledger:
             ).fetchone()
             if existing:
                 return existing["id"], False
-            db.execute(
-                "INSERT OR IGNORE INTO rsi_budgets(owner,day,tokens_limit,episodes_limit) VALUES(?,?,?,?)",
-                (owner, day, tokens_limit, episodes_limit),
-            )
-            budget = db.execute(
-                "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-            ).fetchone()
-            require(
-                shared
-                or budget["tokens_limit"] == tokens_limit
-                and budget["episodes_limit"] == episodes_limit,
-                "RSI_DAILY_BUDGET_ALREADY_FROZEN",
-            )
-            require(
-                shared
-                or budget["tokens_reserved"] + tokens <= tokens_limit
-                and budget["episodes_reserved"] + episodes <= episodes_limit,
-                "RSI_DAILY_BUDGET",
-            )
-            db.execute(
-                "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+?,episodes_reserved=episodes_reserved+? WHERE owner=? AND day=?",
-                (tokens, episodes, owner, day),
-            )
             db.execute(
                 "INSERT INTO rsi_cycles VALUES(?,?,?,'running',?,NULL,?,?,NULL)",
                 (cycle_id, owner, day, timestamp, timestamp, json.dumps(manifest)),

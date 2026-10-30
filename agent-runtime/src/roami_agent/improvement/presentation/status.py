@@ -18,20 +18,6 @@ async def overview(service, owner):
         }
 
     result = await asyncio.to_thread(read)
-    proxy = getattr(service, "model_proxy", None)
-    if proxy is not None:
-        from roami_agent.providers.model_billing import proxy_configuration
-
-        usage = await proxy.billing.daily_summary()
-        config = proxy_configuration(proxy.billing.configuration())
-        result["billing"] = {
-            "dailyLimit": config["dailyLimit"],
-            "currency": config["currency"],
-            **{
-                key: usage[key]
-                for key in ("day", "timezone", "charges", "localCharges", "unknown", "pending")
-            },
-        }
     return result
 
 

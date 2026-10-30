@@ -19,7 +19,6 @@ from roami_agent.improvement.integrations.source_workspace import allowed, sourc
 from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
 from roami_agent.improvement.persistence.control import ImprovementControl
 from roami_agent.improvement.persistence.evidence_queries import (
-    verification_budget,
     verification_suites,
 )
 from roami_agent.improvement.workflows.cycle import run_cycle
@@ -141,16 +140,6 @@ async def verify_candidate(
         executor = executor_factory(settings, candidate)
     fingerprint = await executor.preflight()
     day = workflow.day(action["owner"])
-    budget = verification_budget(workflow.ledger, action["owner"], day)
-    needed = 2 * sum(executor.reservation_tokens(c) for s in suites for c in s["cases"])
-    episodes = 2 * sum(len(s["cases"]) for s in suites)
-    require(
-        uses_shared_model_limit(workflow.ledger)
-        or budget
-        and budget["tokens_reserved"] + needed <= budget["tokens_limit"]
-        and budget["episodes_reserved"] + episodes <= budget["episodes_limit"],
-        "RSI_DAILY_BUDGET",
-    )
     checks = await executor.regression(workflow.ledger.path.parent / "checks" / action["id"])
     machine = {**json.loads(origin[0])["machine"], **fingerprint}
     require(machine["cache_mode"] in {"cold", "warm"}, "RSI_CONTROLLED_CACHE_REQUIRED")
@@ -167,8 +156,8 @@ async def verify_candidate(
             baseline=policy,
             candidate=policy,
             output_root=workflow.ledger.path.parent / "runs",
-            daily_tokens=budget["tokens_limit"] if budget else 0,
-            daily_episodes=budget["episodes_limit"] if budget else 0,
+            daily_tokens=0,
+            daily_episodes=0,
             request_key=action["id"] + ":" + str(i),
             source_builds=executor.builds,
         )

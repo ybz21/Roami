@@ -18,11 +18,6 @@ from roami_agent.improvement.integrations.codex_gateway import (
     gateway_plan,
     gateway_route,
 )
-from roami_agent.improvement.integrations.codex_proxy import codex_route
-from roami_agent.improvement.integrations.spending_policy import (
-    model_proxy_for,
-    uses_shared_model_limit,
-)
 from roami_agent.improvement.persistence.operation_accounting import archive_rejected_admission
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
@@ -50,50 +45,26 @@ async def codex_json(
         + " role. Use only the supplied evidence. Do not call tools. Return the requested JSON object.\n"
         + json.dumps(messages, ensure_ascii=False)
     )
-    shared = uses_shared_model_limit(workflow.ledger)
-    require(shared or len(prompt.encode()) + 8192 <= config["model_tokens"], "RSI_TOKEN_BUDGET")
-    proxy = model_proxy_for(workflow)
-    selected, env = (
-        codex_configuration(shared_gateway=True)
-        if shared and proxy is None
-        else codex_configuration()
-    )
-    require(
-        not shared or proxy is not None or settings is not None, "RSI_CODEX_SHARED_GATEWAY_REQUIRED"
-    )
-    gateway = shared and proxy is None
-    binding = (
-        ["codex-text-go-v2-configured-model", asdict(settings.route("main"))] if gateway else None
-    )
+    require(settings is not None, "RSI_CODEX_SHARED_GATEWAY_REQUIRED")
+    selected, env = codex_configuration(shared_gateway=True)
+    binding = ["codex-text-go-v2-configured-model", asdict(settings.route("main"))]
+    request_hash = digest([action["kind"], messages, selected, binding])
     plan = None
-    if proxy is not None:
-        require(
-            isinstance(selected.get("model"), str) and 0 < len(selected["model"]) <= 200,
-            "RSI_CODEX_MODEL_REQUIRED",
-        )
-
-    request_hash = digest([action["kind"], messages, selected] + ([binding] if gateway else []))
-    # CLI usage is reported at turn completion, not a provider-enforced token ceiling.
-    saved = (
-        await asyncio.to_thread(workflow.operation_result, action["owner"], operation)
-        if proxy is not None or gateway
-        else None
-    )
+    saved = await asyncio.to_thread(workflow.operation_result, action["owner"], operation)
     if saved is None:
-        if gateway:
-            plan = await gateway_plan(settings, selected, factory=provider_factory)
+        plan = await gateway_plan(settings, selected, factory=provider_factory)
         saved = await asyncio.to_thread(
             workflow.reserve_operation,
             action["owner"],
             workflow.day(action["owner"]),
             operation,
-            config["model_tokens"],
+            0,
         )
     if saved is not None:
         value = saved["value"]
         require(value.get("request_hash") == request_hash, "RSI_OPERATION_CONTEXT_CHANGED")
         if value.get("admission_rejected") is True:
-            if gateway and plan is None:
+            if plan is None:
                 plan = await gateway_plan(settings, selected, factory=provider_factory)
             await asyncio.to_thread(
                 archive_rejected_admission,
@@ -107,7 +78,7 @@ async def codex_json(
                 action["owner"],
                 workflow.day(action["owner"]),
                 operation,
-                config["model_tokens"],
+                0,
             )
             if saved is not None:
                 require(
@@ -118,10 +89,6 @@ async def codex_json(
                     raise DomainError(saved["value"]["error_code"])
                 return saved["value"]
         else:
-            require(
-                shared or value["metrics"]["tokens"] <= config["model_tokens"],
-                "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
-            )
             return value
     root = (
         workflow.ledger.path.parent
@@ -162,18 +129,14 @@ async def codex_json(
     )
     started = time.monotonic()
     outcome = {}
-    context = (
-        gateway_route(
-            plan,
-            selected,
-            env,
-            action["kind"],
-            outcome=outcome,
-            seconds=config["model_seconds"],
-            observation_id="rsi-codex-" + digest([action["owner"], operation]),
-        )
-        if plan
-        else codex_route(proxy, selected, env, action["kind"], outcome=outcome)
+    context = gateway_route(
+        plan,
+        selected,
+        env,
+        action["kind"],
+        outcome=outcome,
+        seconds=config["model_seconds"],
+        observation_id="rsi-codex-" + digest([action["owner"], operation]),
     )
     try:
         async with context as (routed, environment):
@@ -204,7 +167,7 @@ async def codex_json(
     blocked = outcome.get("error_code")
     if (
         result["exitCode"] != 0
-        and (outcome.get("admission_rejected") if plan else not outcome.get("attempts"))
+        and outcome.get("admission_rejected")
         and blocked
         in {
             "MODEL_HTTP_402",
@@ -227,25 +190,20 @@ async def codex_json(
             },
         )
         raise DomainError(blocked)
-    if plan and blocked:
+    if blocked:
         raise DomainError(blocked)
     require(result["exitCode"] == 0, "RSI_CODEX_EXEC_FAILED")
     value = completed_result(result["stdout"])
-    if plan:
-        value["cli_metrics"] = dict(value["metrics"])
-        value["metrics"] = gateway_metrics(outcome, value["metrics"])
-        value["gateway"] = outcome["gateway"]
+    value["cli_metrics"] = dict(value["metrics"])
+    value["metrics"] = gateway_metrics(outcome, value["metrics"])
+    value["gateway"] = outcome["gateway"]
     value["metrics"]["elapsed_ms"] = round((time.monotonic() - started) * 1000)
     value.update(
-        spending_policy="shared_model_daily" if shared else "frozen_protocol",
+        spending_policy="shared_model_daily",
         executor="codex",
         role=action["kind"],
         request_hash=request_hash,
         log=str(root / "process.json"),
     )
     await asyncio.to_thread(workflow.settle_operation, action["owner"], operation, {"value": value})
-    require(
-        shared or value["metrics"]["tokens"] <= config["model_tokens"],
-        "RSI_CODEX_TOKEN_LIMIT_EXCEEDED",
-    )
     return value

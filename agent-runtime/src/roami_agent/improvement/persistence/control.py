@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.domain.contracts import digest, identifier, require
-from roami_agent.improvement.domain.evaluation_configuration import DEFAULTS
+from roami_agent.improvement.domain.evaluation_configuration import DEFAULTS, LEGACY_FIELDS
 from roami_agent.improvement.domain.policy import validate_policy
 from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.evaluation.daily_suite import daily_coverage
@@ -26,24 +26,18 @@ class ImprovementControl:
             return {
                 "revision": value["revision"] if value else 0,
                 **DEFAULTS,
-                **(json.loads(value["value_json"]) if value else {}),
+                **{
+                    k: v
+                    for k, v in (json.loads(value["value_json"]) if value else {}).items()
+                    if k in DEFAULTS
+                },
                 "cases_per_day": 60,
             }
 
     def save(self, owner, raw):
-        shared = uses_shared_model_limit(self.ledger)
-        if shared:
-            public = {*DEFAULTS, "revision"} - {"daily_tokens", "daily_episodes"}
-            require(
-                isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
-                "RSI_INVALID_SETTINGS",
-            )
-            raw = {
-                **self.preferences(owner),
-                **{key: value for key, value in raw.items() if key in public},
-            }
         require(
-            isinstance(raw, dict) and {"revision"} <= set(raw) <= {*DEFAULTS, "revision"},
+            isinstance(raw, dict)
+            and {"revision"} <= set(raw) <= {*DEFAULTS, "revision", *LEGACY_FIELDS},
             "RSI_INVALID_SETTINGS",
         )
         prior_values = self.preferences(owner)
@@ -51,8 +45,6 @@ class ImprovementControl:
         validate_policy(value["candidate_policy"])
         require(type(value["enabled"]) is bool and type(value["auto_candidates"]) is bool)
         require(type(value["hour"]) is int and 0 <= value["hour"] <= 23)
-        require(type(value["daily_tokens"]) is int and 0 <= value["daily_tokens"] <= 100_000_000)
-        require(type(value["daily_episodes"]) is int and 0 <= value["daily_episodes"] <= 10000)
         require(
             type(value["cases_per_day"]) is int and value["cases_per_day"] == 60,
             "RSI_FULL_SUITE_REQUIRED",
@@ -109,20 +101,10 @@ class ImprovementControl:
             )
             db.execute("COMMIT")
         result = {"revision": revision + 1, **value}
-        return {
-            key: val
-            for key, val in result.items()
-            if not shared or key not in {"daily_tokens", "daily_episodes"}
-        }
+        return result
 
     def preferences_view(self, owner):
-        value = self.preferences(owner)
-        return {
-            key: val
-            for key, val in value.items()
-            if not uses_shared_model_limit(self.ledger)
-            or key not in {"daily_tokens", "daily_episodes"}
-        }
+        return self.preferences(owner)
 
     def register_machine(self, owner, raw, *, local_only=False):
         require(isinstance(raw, dict))

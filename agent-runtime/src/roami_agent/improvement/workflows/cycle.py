@@ -57,8 +57,8 @@ async def run_cycle(
     baseline,
     candidate,
     output_root,
-    daily_tokens,
-    daily_episodes,
+    daily_tokens=0,
+    daily_episodes=0,
     case_limit=None,
     seed=20261023,
     request_key="daily",
@@ -90,16 +90,7 @@ async def run_cycle(
     # Uncontrolled cache comparisons may be diagnostic, never release evidence.
     require(case_limit is None or case_limit >= len(suite["cases"]), "RSI_FULL_SUITE_REQUIRED")
     cases = daily_selection(suite["cases"], day, limit=len(suite["cases"]), seed=seed)
-    reservation = getattr(executor, "reservation_tokens", lambda case: case["limits"]["tokens"])
-    costs = {case["id"]: reservation(case) for case in cases}
-    require(all(type(cost) is int and cost >= 0 for cost in costs.values()))
-    tokens = len(trial_arms) * sum(costs.values())
-    require(
-        uses_shared_model_limit(ledger)
-        or tokens <= daily_tokens
-        and len(trial_arms) * len(cases) <= daily_episodes,
-        "RSI_FULL_SUITE_BUDGET",
-    )
+    tokens = 0
     manifest = {
         "judge_hash": grading_hash(suite, executor),
         "spending_policy": "shared_model_daily"

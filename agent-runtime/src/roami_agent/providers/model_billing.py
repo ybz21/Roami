@@ -1,8 +1,7 @@
-"""Upstream charges, configured fallback pricing and node-local daily admission."""
+"""Legacy usage records and history; all quota admission belongs to Go."""
 
 import json
 from datetime import date, datetime
-from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from roami_agent.protocol.errors import DomainError
@@ -21,7 +20,6 @@ from roami_agent.providers.model_usage import (
     usage_statistics,
     usage_totals,
 )
-from roami_agent.providers.upstream_costs import add_amounts
 
 
 def proxy_configuration(raw=None):
@@ -97,34 +95,6 @@ class ModelBilling:
             self.recovered = True
             self.revision += 1
 
-    @staticmethod
-    def assert_admission(db, config, day):
-        if config["dailyLimit"] is not None:
-            spent = Decimal(0)
-            for row in db.execute(
-                "SELECT state,cost_source,cost_amount,cost_currency FROM model_proxy_calls WHERE day=?",
-                (day,),
-            ):
-                billable = (
-                    row["cost_source"] in {"upstream", "estimate"}
-                    and row["cost_amount"] is not None
-                )
-                if row["state"] == "pending" or not (billable or row["cost_source"] == "not_sent"):
-                    raise DomainError("MODEL_PROXY_USAGE_UNKNOWN", 409)
-                if billable:
-                    if Decimal(row["cost_amount"]) == 0:
-                        continue
-                    if row["cost_currency"] != config["currency"]:
-                        raise DomainError("MODEL_PROXY_CURRENCY_MISMATCH", 409)
-                    spent = add_amounts(spent, Decimal(row["cost_amount"]))
-            if spent >= amount(config["dailyLimit"]):
-                raise DomainError("MODEL_PROXY_DAILY_LIMIT", 409)
-
-    async def check(self):
-        config = proxy_configuration(self.configuration())
-        day, _ = self.period()
-        await self.db.call(lambda db: self.assert_admission(db, config, day))
-
     async def daily_summary(self):
         day, zone = self.period()
         key = (day, zone, self.revision)
@@ -153,7 +123,6 @@ class ModelBilling:
         call_id, started = identity(), self.clock()
 
         def insert(db):
-            self.assert_admission(db, config, day)
             db.execute(
                 "INSERT INTO model_proxy_calls(id,day,timezone,role,model,started_ms,state,prices_json) VALUES(?,?,?,?,?,?,'pending',?)",
                 (

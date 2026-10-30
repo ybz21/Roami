@@ -42,7 +42,7 @@ def test_invalid_model_price_catalog_is_rejected(prices):
         proxy_configuration({"prices": prices})
 
 
-async def test_fallback_uses_exact_cache_adjusted_price_and_enforces_daily_limit(store):
+async def test_legacy_accounting_preserves_cache_adjusted_prices_without_admission(store):
     proxy, _ = proxy_for(store, limit=0.002)
     requests = []
 
@@ -65,9 +65,8 @@ async def test_fallback_uses_exact_cache_adjusted_price_and_enforces_daily_limit
             assert point["charges"] == point["localCharges"] == expected
             assert point["models"][0]["localCharges"] == expected
             assert point["unknown"] == 0 and point["localEstimated"] == 1
-    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-        await consume(model)
-    assert len(requests) == 1
+    await consume(model)
+    assert len(requests) == 2
     await model.close()
 
 
@@ -162,13 +161,13 @@ async def test_adding_prices_does_not_reprice_old_zero_default_records(store):
     assert next(row for row in view["recent"] if row["id"] == old)["cost_amount"] == "0"
 
 
-async def test_fallback_currency_is_checked_against_limit_and_never_converted(store):
+async def test_legacy_accounting_preserves_currency_without_admission(store):
     proxy, config = proxy_for(store, limit=1)
     config["prices"]["fixture"] = {**PRICES, "currency": "CNY"}
     call = await proxy.billing.admit("main", "fixture")
     await proxy.billing.settle(call, (1000, 100, 400))
-    with pytest.raises(DomainError, match="MODEL_PROXY_CURRENCY_MISMATCH"):
-        await proxy.billing.admit("main", "fixture")
+    await proxy.billing.admit("main", "fixture")
+    assert (await proxy.billing.view())["charges"] == [{"currency": "CNY", "amount": "0.00208"}]
 
 
 @pytest.mark.parametrize("role", ["main", "worker", "memory"])
@@ -218,7 +217,6 @@ async def test_zero_price_snapshot_survives_new_prices_currency_change_and_resta
     assert row["charges"] == [{"currency": "USD", "amount": "0"}]
     assert row["error_code"] == "MODEL_PROXY_INTERRUPTED"
     assert view["unknown"] == view["pending"] == 0
-    await restored.billing.check()
     await restored.billing.admit("worker", "fixture")
 
 
@@ -253,13 +251,13 @@ async def test_restart_recovers_legacy_unpriced_unknown_calls_without_rewriting_
     await restored.billing.admit("main", "fixture")
 
 
-async def test_priced_unknown_call_still_blocks_an_unpriced_model(store):
+async def test_priced_unknown_receipt_does_not_own_model_admission(store):
     proxy, _ = proxy_for(store, limit=1)
     await proxy.ready()
     call = await proxy.billing.admit("main", "fixture")
     await proxy.billing.settle(call, None)
-    with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-        await proxy.billing.admit("worker", "unpriced")
+    await proxy.billing.admit("worker", "unpriced")
+    assert (await proxy.billing.view())["unknown"] == 1
 
 
 async def test_legacy_zero_price_snapshot_without_currency_uses_legacy_cny(store):
@@ -278,10 +276,9 @@ async def test_legacy_zero_price_snapshot_without_currency_uses_legacy_cny(store
     view = await restored.billing.view()
     assert view["charges"] == [{"currency": "CNY", "amount": "0"}]
     assert view["unknown"] == 0
-    await restored.billing.check()
 
 
-async def test_upstream_charge_on_unpriced_model_still_enforces_limit(store):
+async def test_legacy_upstream_charge_is_recorded_without_enforcing_limit(store):
     proxy, _ = proxy_for(store, limit=0.001, prices=False)
     calls = []
 
@@ -291,7 +288,6 @@ async def test_upstream_charge_on_unpriced_model_still_enforces_limit(store):
 
     model = provider(proxy, handler)
     await consume(model)
-    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-        await consume(model)
-    assert len(calls) == 1
+    await consume(model)
+    assert len(calls) == 2
     await model.close()

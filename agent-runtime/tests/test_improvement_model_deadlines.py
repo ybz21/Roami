@@ -14,11 +14,11 @@ from roami_agent.server.configuration import Settings
 @pytest.mark.parametrize(
     "seconds,main_timeout,worker_timeout,expected_main,expected_worker",
     [
-        (900, 0, 0, 900, 900),
+        (900, 0, 0, 0, 0),
         (900, 30, 45, 30, 45),
-        (900, 1200, 1200, 900, 900),
-        (30, 0, 0, 30, 30),
-        (900, 30, 0, 30, 900),
+        (900, 1200, 1200, 1200, 1200),
+        (30, 0, 0, 0, 0),
+        (900, 30, 0, 30, 0),
     ],
 )
 async def test_executor_keeps_explicit_deadlines_and_case_upper_bound(

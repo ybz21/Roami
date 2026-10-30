@@ -27,10 +27,13 @@ def validate_case(case):
     require(isinstance(case.get("prompt"), str) and 0 < len(case["prompt"]) <= 1_000_000)
     require(type(case.get("counts_as_delivery")) is bool)
     limits = case.get("limits", {})
-    require(set(limits) == {"seconds", "tokens", "requests"})
+    require(
+        isinstance(limits, dict) and {"seconds"} <= set(limits) <= {"seconds", "tokens", "requests"}
+    )
     require(number(limits["seconds"], 1, 3600))
-    require(type(limits["tokens"]) is int and 1 <= limits["tokens"] <= 1_000_000)
-    require(type(limits["requests"]) is int and 1 <= limits["requests"] <= 100)
+    for field in ("tokens", "requests"):
+        if field in limits:
+            require(type(limits[field]) is int and limits[field] >= 0)
     fixtures = case.get("files", {})
     require(isinstance(fixtures, dict) and len(fixtures) <= 1000)
     for name, content in fixtures.items():
@@ -274,5 +277,5 @@ def agent_view(case, workspace):
         "id": case["id"],
         "prompt": case["prompt"],
         "workspace": str(workspace),
-        "limits": case["limits"],
+        "limits": {"seconds": case["limits"]["seconds"]},
     }

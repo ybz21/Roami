@@ -455,17 +455,18 @@ async def test_unknown_paid_operation_is_never_replayed_on_resume(tmp_path):
     w.discover()
     action = w.claim()
     model = Reviewer(usage=False)
-    with pytest.raises(DomainError, match="USAGE_UNKNOWN"):
-        await model_json(
-            w,
-            action,
-            Settings(),
-            cfg,
-            "one",
-            [{"role": "system", "content": "You are Roami's isolated repair"}],
-            provider_factory=lambda _: model,
-        )
+    result = await model_json(
+        w,
+        action,
+        Settings(),
+        cfg,
+        "one",
+        [{"role": "system", "content": "You are Roami's isolated repair"}],
+        provider_factory=lambda _: model,
+    )
     w.block(action, "RSI_USAGE_UNKNOWN")
+    assert result["metrics"]["tokens"] is None
+
     with pytest.raises(DomainError, match="RECONCILIATION"):
         w.resume("owner", action["id"])
     with pytest.raises(DomainError, match="RECONCILIATION"):
@@ -525,17 +526,16 @@ async def test_protected_trials_cannot_create_optimizer_findings(tmp_path):
     assert w.snapshot("owner")["improvements"] == []
 
 
-async def test_budget_failure_happens_before_any_reviewer_request(tmp_path):
+async def test_legacy_budget_does_not_make_reviewer_admission_decisions(tmp_path):
     w, cfg, _, _, _ = await setup(tmp_path)
     w.discover()
     action = w.claim()
     provider = Reviewer()
     with w.ledger.connection() as db:
         db.execute("UPDATE rsi_budgets SET tokens_reserved=tokens_limit WHERE owner=?", ("owner",))
-    with pytest.raises(DomainError, match="DAILY_BUDGET"):
-        await observe_cycle(w, action, Settings(), cfg, provider_factory=lambda _: provider)
-    assert provider.calls == 0
-    assert w.review_saved("owner", action["payload"]["cycle_id"]) == {}
+    await observe_cycle(w, action, Settings(), cfg, provider_factory=lambda _: provider)
+    assert provider.calls > 0
+    assert w.review_saved("owner", action["payload"]["cycle_id"])
 
 
 async def test_evidence_hash_and_source_scope_are_verified(tmp_path):

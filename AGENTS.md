@@ -213,6 +213,9 @@ socket and verifies its server identity before cleanup. Setting only `TMUX_TMPDI
 an inherited `TMUX` target. Never use the user's live tmux server as a test fixture or cleanup target.
 The session-isolation regression uses two disposable servers and proves the other server survives.
 
+RSI and Agent model quota admission belongs to the Go gateway. Python records usage and propagates
+gateway decisions; do not add Token, request-count, or spending caps in those frameworks.
+
 RSI development and acceptance calls use the node's saved model routes, parameters, and capabilities.
 Do not hardcode or temporarily override them in validation scripts.
 

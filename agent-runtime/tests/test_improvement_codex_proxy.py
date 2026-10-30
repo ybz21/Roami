@@ -4,10 +4,9 @@ import json
 
 import httpx
 import pytest
-from test_model_proxy import Chunks, consume, provider, proxy_for
+from test_model_proxy import EVENTS, Chunks, consume, provider, proxy_for
 
 from roami_agent.improvement.integrations.codex_proxy import CodexProxy, codex_route
-from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.model_billing import usage_counts
 
 
@@ -74,11 +73,13 @@ async def test_codex_charges_share_daily_admission_with_main_chat(store):
         assert view["recent"][0]["role"] == "rsi_codex_review"
         assert view["recent"][0]["input_tokens"] == 100
         model = provider(
-            proxy, lambda request: pytest.fail("Daily limit must reject before chat's network call")
+            proxy,
+            lambda request: httpx.Response(
+                200, headers={"content-type": "text/event-stream"}, content=EVENTS
+            ),
         )
         try:
-            with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-                await consume(model)
+            await consume(model)
         finally:
             await model.close()
     assert len(requests) == 1
@@ -132,14 +133,10 @@ async def test_codex_missing_receipt_uses_zero_default_or_configured_prices(
         response = await client.post(
             bridge.url + "/responses", json={"input": "x"}, headers=headers
         )
-        blocked = priced and not complete
-        if blocked:
-            assert response.json()["error"]["code"] == "MODEL_PROXY_USAGE_UNKNOWN"
-        else:
-            assert response.status_code == 200
+        assert response.status_code == 200
     view = await proxy.billing.view()
-    assert len(requests) == (1 if blocked else 2)
-    assert view["unknown"] == int(blocked)
+    assert len(requests) == 2
+    assert view["unknown"] == (2 if priced and not complete else 0)
     if not priced:
         assert view["charges"] == [{"currency": "USD", "amount": "0"}]
 

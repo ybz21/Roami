@@ -144,7 +144,6 @@ class Runtime:
         self.briefs = DailyBriefs(
             database,
             self.worker_model,
-            daily_budget=self.settings.brief_daily_budget,
             timeout=self.settings.brief_timeout_seconds,
         )
         self.deliveries = DeliveryOutbox(database, self.notification_policy)
@@ -152,7 +151,6 @@ class Runtime:
             database,
             self.worker_model,
             self.notification_policy,
-            daily_budget=self.settings.proactive_daily_budget,
             timeout=self.settings.proactive_timeout_seconds,
         )
         self.context = Context(

@@ -7,33 +7,12 @@ import pytest
 from test_improvement_control import suite_file
 
 from roami_agent.app import Runtime
-from roami_agent.improvement.persistence.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.service import ImprovementStatus
-from roami_agent.protocol.errors import DomainError
 from roami_agent.server.http import create_app
 
 
 class Model:
     model = "fixture"
-
-
-@pytest.mark.parametrize(
-    ("tokens", "shared", "accepted"), [(10, True, True), (None, True, False), (10, False, False)]
-)
-def test_legacy_known_receipts_can_exceed_old_reservations_only_under_shared_policy(
-    tmp_path, tokens, shared, accepted
-):
-    service = ImprovementStatus(tmp_path)
-    with service.ledger.connection() as db:
-        db.execute(
-            "INSERT INTO rsi_operation_costs VALUES('legacy','local','day',1,'completed',?)",
-            (json.dumps({"value": {"metrics": {"tokens": tokens}}}),),
-        )
-        if accepted:
-            assert_operation_costs_settled(db, "local", shared=shared)
-        else:
-            with pytest.raises(DomainError, match="UNKNOWN_OPERATION"):
-                assert_operation_costs_settled(db, "local", shared=shared)
 
 
 async def test_runtime_settings_omit_quota_fields_and_keep_legacy_audit_values(store, tmp_path):
@@ -61,7 +40,7 @@ async def test_runtime_settings_omit_quota_fields_and_keep_legacy_audit_values(s
             json={**view["preferences"], "suite_id": "data", "machine_ids": ["a"]},
         )
         assert response.status_code == 200 and "daily_tokens" not in response.json()["data"]
-        assert service.control.preferences("local")["daily_tokens"] == 0
+        assert "daily_tokens" not in service.control.preferences("local")
         response = await client.put(
             "/v1/improvement/pipeline/settings",
             json={**view["pipeline"]["settings"], "daily_tokens": 1},
@@ -70,12 +49,12 @@ async def test_runtime_settings_omit_quota_fields_and_keep_legacy_audit_values(s
             "revision",
             "auto_publish",
         }
-        assert service.runs.settings("local")["daily_tokens"] == 1000000
+        assert "daily_tokens" not in service.runs.settings("local")
         response = await client.put(
             "/v1/improvement/research", json={**view["research"]["settings"], "model_tokens": 1}
         )
         assert response.status_code == 200 and "model_tokens" not in response.json()["data"]
-        assert service.research.settings("local")["model_tokens"] == 64000
+        assert "model_tokens" not in service.research.settings("local")
         response = await client.post(
             "/v1/improvement/requests",
             json={"machine_id": "a", "request_key": "shared-no-token-budget"},

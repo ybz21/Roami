@@ -86,7 +86,7 @@ async def test_daily_raters_use_model_page_cap_and_can_exceed_the_old_profile_bu
             settings, changed, calibrated=False, shared_daily_limit=True
         ).content_hash
     )
-    assert judge.route_hashes != ArtifactReviewer(settings, changed, calibrated=False).route_hashes
+    assert judge.route_hashes == ArtifactReviewer(settings, changed, calibrated=False).route_hashes
 
 
 @pytest.mark.parametrize("shared", [False, True])
@@ -107,7 +107,7 @@ def test_loaded_rater_uses_the_same_policy_as_preflight_and_rejects_changed_rout
         path.write_text(json.dumps(value))
         path.chmod(0o600)
     loaded = ArtifactReviewer.load(settings, tmp_path, "alice", shared_daily_limit=shared)
-    assert loaded.shared_daily_limit is shared
+    assert loaded.shared_daily_limit is True
     assert loaded.route_hashes == draft.route_hashes
     assert (
         loaded.content_hash
@@ -115,8 +115,9 @@ def test_loaded_rater_uses_the_same_policy_as_preflight_and_rejects_changed_rout
             settings, {**raw, "certificate": cert}, shared_daily_limit=shared
         ).content_hash
     )
+    changed_settings = configured_settings({"max_tokens": 12345})
     with pytest.raises(DomainError, match="RSI_ARTIFACT_CALIBRATION_CHANGED"):
-        ArtifactReviewer.load(settings, tmp_path, "alice", shared_daily_limit=not shared)
+        ArtifactReviewer.load(changed_settings, tmp_path, "alice", shared_daily_limit=not shared)
 
 
 async def test_daily_calibration_has_no_local_token_reservation_and_never_replays(tmp_path):
@@ -200,7 +201,6 @@ async def test_daily_calibration_has_no_local_token_reservation_and_never_replay
 @pytest.mark.parametrize(
     ("shared", "cap", "legacy_limits"),
     [
-        (False, None, True),
         (True, None, True),
         (True, 8192, True),
         (True, None, False),
@@ -245,8 +245,8 @@ async def test_configure_command_installs_the_exact_calibrated_policy(
     loaded = ArtifactReviewer.load(settings, args.ledger.parent, "alice", shared_daily_limit=shared)
     assert result["configured"] and loaded.content_hash == result["profile_hash"]
     assert loaded.route_hashes == draft.route_hashes
-    assert loaded.shared_daily_limit is shared
-    assert loaded.budget().limits["tokens"] == (0 if shared else raw["max_tokens"])
+    assert loaded.shared_daily_limit is True
+    assert loaded.budget().limits == {}
 
 
 async def test_profile_without_token_fields_previews_and_queues_on_daily_policy(tmp_path):
@@ -328,7 +328,7 @@ async def test_daily_calibration_requires_a_bound_gateway_before_any_work(tmp_pa
     assert not root.exists()
 
 
-async def test_daily_rater_unknown_usage_still_stops_the_second_rater():
+async def test_daily_rater_unknown_usage_is_recorded_without_blocking_other_rater():
     calls = []
 
     class Provider:
@@ -349,6 +349,6 @@ async def test_daily_rater_unknown_usage_still_stops_the_second_rater():
         shared_daily_limit=True,
     )
     budget = judge.budget()
-    with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):
-        await judge.rate(pack(), budget, [])
-    assert calls == ["artifact_a"] and budget.unknown and budget.metrics()["tokens"] is None
+    assert len(await judge.rate(pack(), budget, [])) == 2
+    assert calls == ["artifact_a", "artifact_b"] and budget.unknown
+    assert budget.metrics()["tokens"] is None

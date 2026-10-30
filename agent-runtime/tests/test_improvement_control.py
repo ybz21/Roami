@@ -64,7 +64,7 @@ def test_opt_in_and_frozen_request_survive_settings_edits(tmp_path):
     current = c.preferences("local")
     c.save("local", {**current, "daily_tokens": 200000})
     request = c.claim()
-    assert c.profiles(request)[0]["daily_tokens"] == 100000
+    assert "daily_tokens" not in c.profiles(request)[0]
     assert c.cancel("local", request["id"])["state"] == "cancelling"
     c.finish(request, "interrupted")
     assert c.requests("local")[0]["state"] == "interrupted"

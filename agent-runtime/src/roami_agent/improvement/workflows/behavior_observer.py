@@ -8,7 +8,6 @@ from pathlib import Path
 from roami_agent.improvement.domain.contracts import digest, evaluation_arms, require
 from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.integrations.artifact_paths import relative_file
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
 from roami_agent.improvement.workflows.model_calls import model_json
 
 INSTRUCTIONS = """You are Roami RSI's read-only behavior reviewer. Review the supplied trial's
@@ -75,11 +74,7 @@ async def prefetch_reviews(workflow, action, settings, config, packets, saved):
     for key, packet in packets.items():
         proposed = {**group, key: packet}
         if group and (
-            next(iter(group.values()))["protected"] != packet["protected"]
-            or len(proposed) > 4
-            or not uses_shared_model_limit(workflow.ledger)
-            and len(json.dumps(proposed, ensure_ascii=False).encode()) + 18000
-            > config["model_tokens"]
+            next(iter(group.values()))["protected"] != packet["protected"] or len(proposed) > 4
         ):
             groups.append(group)
             group = {}

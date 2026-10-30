@@ -5,22 +5,22 @@ import re
 STAGES = ("evaluate", "review", "issue", "repair", "verify", "publish", "observe")
 
 
-DEFAULTS = {
-    "revision": 0,
-    "auto_publish": False,
-    "daily_tokens": 1000000,
-    "generation_tokens": 300000,
-    "codex_tokens": 64000,
-    "output_tokens": 8192,
-    "main_output_tokens": None,
-    "worker_output_tokens": None,
-    "memory_output_tokens": 2048,
-    "main_model": None,
-    "main_reasoning_effort": None,
-    "worker_model": None,
-    "worker_reasoning_effort": None,
-    "memory_model": None,
-    "memory_reasoning_effort": None,
+DEFAULTS = {"revision": 0, "auto_publish": False}
+
+LEGACY_FIELDS = {
+    "memory_reasoning_effort",
+    "worker_model",
+    "worker_output_tokens",
+    "main_output_tokens",
+    "output_tokens",
+    "worker_reasoning_effort",
+    "main_model",
+    "generation_tokens",
+    "daily_tokens",
+    "main_reasoning_effort",
+    "codex_tokens",
+    "memory_output_tokens",
+    "memory_model",
 }
 
 

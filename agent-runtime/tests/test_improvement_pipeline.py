@@ -110,8 +110,7 @@ def test_unknown_codex_cost_prevents_paid_replay(tmp_path):
     assert costs.reserve_operation("local", "today", "first", 64000) is None
     with pytest.raises(DomainError, match="RECONCILIATION"):
         costs.reserve_operation("local", "today", "first", 64000)
-    with pytest.raises(DomainError, match="RECONCILIATION"):
-        costs.reserve_operation("local", "today", "second", 64000)
+    assert costs.reserve_operation("local", "today", "second", 64000) is None
     costs.settle_operation("local", "first", {"value": {"metrics": {"tokens": 50}}})
     assert (
         costs.reserve_operation("local", "today", "first", 64000)["value"]["metrics"]["tokens"]
@@ -234,9 +233,9 @@ def test_memory_route_is_optional_frozen_and_validated(tmp_path):
     result = service.runs.configure(
         "local", {**current, "memory_model": "glm-5.3-flash", "memory_reasoning_effort": "low"}
     )
-    assert result["memory_model"] == "glm-5.3-flash"
-    with pytest.raises(DomainError, match="INVALID_SETTINGS"):
-        service.runs.configure("local", {**result, "memory_model": "bad\nmodel"})
+    assert set(result) == {"revision", "auto_publish"}
+    ignored = service.runs.configure("local", {**result, "memory_model": "bad\nmodel"})
+    assert set(ignored) == {"revision", "auto_publish"}
 
 
 def test_daily_artifact_admission_has_no_reservation_and_unknown_operations_do_not_spend_again(
@@ -287,37 +286,42 @@ def test_daily_artifact_admission_has_no_reservation_and_unknown_operations_do_n
         )
         == first
     )
-    with pytest.raises(DomainError, match="RECONCILIATION"):
+    assert (
         enqueue_diagnostic(
             service, "local", {"request_key": "new", "case_ids": ["DOC-05"]}, Settings()
-        )
+        )["id"]
+        != first["id"]
+    )
     with service.ledger.connection() as db:
         assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
 
 
 @pytest.mark.parametrize("field", ["generation_tokens", "artifact_review_tokens"])
-def test_unknown_evaluation_usage_blocks_paid_codex_review(tmp_path, field):
+def test_unknown_evaluation_usage_does_not_own_go_admission(tmp_path, field):
     service, run_id = setup_run(tmp_path)
     service.runs.set_state("local", run_id, "report_queued", {field: None})
     costs = RunCosts(service.runs, "local", run_id)
-    with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):
-        costs.reserve_operation("local", "today", "review", 64000)
+    assert costs.reserve_operation("local", "today", "review", 64000) is None
     with service.ledger.connection() as db:
-        assert db.execute("SELECT COUNT(*) FROM rsi_pipeline_costs").fetchone()[0] == 0
+        assert db.execute("SELECT reserved FROM rsi_pipeline_costs").fetchone()[0] == 0
 
 
-def test_unknown_calibration_blocks_paid_codex_review(tmp_path):
+def test_unrelated_unknown_calibration_does_not_own_go_admission(tmp_path):
     service, run_id = setup_run(tmp_path)
     with service.ledger.connection() as db:
         db.execute(
             "INSERT INTO rsi_operation_costs VALUES('calibration','local','today',100,'unknown',NULL)"
         )
-    with pytest.raises(DomainError, match="RECONCILIATION"):
+    assert (
         RunCosts(service.runs, "local", run_id).reserve_operation("local", "today", "review", 64000)
+        is None
+    )
 
 
 @pytest.mark.asyncio
-async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monkeypatch):
+async def test_unknown_artifact_usage_preserves_measurement_without_local_quota(
+    tmp_path, monkeypatch
+):
     from roami_agent.improvement.evaluation.contracts import freeze_suite, load_suite
     from roami_agent.improvement.workflows.pipeline_runner import execute_diagnostic
     from roami_agent.server.configuration import Settings
@@ -362,7 +366,7 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
         service.control.claim(),
     )
     value = service.runs.get("local", run["id"])
-    assert calls == [("a", 268000)]
+    assert calls == [("a", 384000), ("b", 384000)]
     budgets = [
         json.loads(service.runs.read_artifact("local", run["id"], a["id"])["text"])
         for a in value["artifacts"]
@@ -370,16 +374,11 @@ async def test_unknown_artifact_usage_stops_subsequent_generation(tmp_path, monk
     ]
     first = next(b for b in budgets if b["case_id"] == "a")
     assert first["original_limits"]["tokens"] == 384000
-    assert first["effective_limits"]["tokens"] == 268000
-    assert first["reserved_for_later_cases"] == 32000
+    assert first["effective_limits"]["tokens"] is None
+    assert first["reserved_for_later_cases"] is None
     assert value["summary"]["artifact_review_tokens"] is None
-    assert value["cases"][1]["signals"] == ["RSI_USAGE_UNKNOWN"]
-    assert value["cases"][1]["blocked_by"] == {"case_id": "a", "code": "RSI_USAGE_UNKNOWN"}
-    assert value["cases"][1]["metrics"]["tokens"] == 0
-    assert value["cases"][1]["tool_calls"] == 0
-    assert value["summary"]["not_run"] == 1
-    assert not any(issue["case_id"] == "b" for issue in value["issues"])
-    assert next(n for n in value["nodes"] if n["node"] == "evaluate")["state"] == "blocked"
+    assert all("blocked_by" not in case for case in value["cases"])
+    assert value["summary"]["not_run"] == 0
 
 
 @pytest.mark.asyncio
@@ -464,6 +463,14 @@ async def test_unknown_generation_keeps_one_cause_and_a_free_summary(
         service.control.claim(),
     )
     value = service.runs.get("local", receipt["id"])
+    if rejection is None:
+        assert calls == ["root", "later-a", "mechanism", "later-b"]
+        assert value["summary"]["generation_tokens"] is None
+        assert value["summary"]["not_run"] == 0
+        assert not value["summary"].get("usage_blocker")
+        assert all("blocked_by" not in case for case in value["cases"])
+        assert any(a["name"] == "evaluation-summary.md" for a in value["artifacts"])
+        return
     assert calls == ["root", "mechanism"]
     cause = rejection or "RSI_USAGE_UNKNOWN"
     assert value["summary"]["generation_tokens"] == (0 if rejection else None)
@@ -541,8 +548,7 @@ def test_quarantine_keeps_full_cost_unknown_and_cannot_replay(tmp_path):
             (json.dumps({"value": {"metrics": {"tokens": None}}}),),
         )
     workflow = service.research
-    with pytest.raises(DomainError, match="RECONCILIATION"):
-        workflow.reserve_operation("local", "today", "new", 10000)
+    assert workflow.reserve_operation("local", "today", "independent", 10000) is None
     with pytest.raises(DomainError, match="NOT_FOUND"):
         quarantine_operation(
             service.ledger,
@@ -563,7 +569,7 @@ def test_quarantine_keeps_full_cost_unknown_and_cannot_replay(tmp_path):
     with pytest.raises(DomainError, match="RECONCILIATION"):
         workflow.reserve_operation("local", "today", "old", 100000)
     with service.ledger.connection() as db:
-        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 110000
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 100000
         result = json.loads(
             db.execute("SELECT result_json FROM rsi_operation_costs WHERE id='old'").fetchone()[0]
         )
@@ -581,10 +587,10 @@ def test_missing_optional_fields_preserve_saved_role_routes(tmp_path):
         for k, v in saved.items()
         if not k.startswith(("worker_", "memory_model", "memory_reasoning"))
     }
-    assert service.runs.configure("local", legacy)["worker_model"] == "glm-5.3-flash"
+    assert set(service.runs.configure("local", legacy)) == {"revision", "auto_publish"}
 
 
-def test_known_operation_settles_actual_admission_and_unknown_keeps_reservation(tmp_path):
+def test_operation_usage_is_durable_and_legacy_budget_is_never_changed(tmp_path):
     service = ImprovementStatus(tmp_path)
     with service.ledger.connection() as db:
         db.execute("INSERT INTO rsi_budgets VALUES('local','today',100000,20,0,0)")
@@ -592,20 +598,20 @@ def test_known_operation_settles_actual_admission_and_unknown_keeps_reservation(
     workflow.reserve_operation("local", "today", "one", 50000)
     workflow.settle_operation("local", "one", {"value": {"metrics": {"tokens": 1000}}})
     with service.ledger.connection() as db:
-        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 1000
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 0
     with pytest.raises(DomainError, match="CONFLICT"):
         workflow.settle_operation("local", "one", {"value": {"metrics": {"tokens": 1000}}})
     workflow.reserve_operation("local", "today", "two", 50000)
     workflow.settle_operation("local", "two", {"value": {"metrics": {"tokens": None}}})
     with service.ledger.connection() as db:
-        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 51000
+        assert db.execute("SELECT tokens_reserved FROM rsi_budgets").fetchone()[0] == 0
         assert (
             db.execute("SELECT state FROM rsi_operation_costs WHERE id='two'").fetchone()[0]
             == "unknown"
         )
 
 
-def test_legacy_completed_record_with_unknown_usage_still_blocks_new_work(tmp_path):
+def test_legacy_unknown_receipt_remains_visible_without_local_quota(tmp_path):
     service = ImprovementStatus(tmp_path)
     with service.ledger.connection() as db:
         db.execute("INSERT INTO rsi_budgets VALUES('local','today',100000,20,50000,0)")
@@ -613,8 +619,7 @@ def test_legacy_completed_record_with_unknown_usage_still_blocks_new_work(tmp_pa
             "INSERT INTO rsi_operation_costs VALUES('legacy','local','today',50000,'completed',?)",
             (json.dumps({"value": {"metrics": {"tokens": None}}}),),
         )
-    with pytest.raises(DomainError, match="RECONCILIATION"):
-        service.research.reserve_operation("local", "today", "new", 1000)
+    assert service.research.reserve_operation("local", "today", "new", 1000) is None
 
 
 def test_diagnostic_header_allows_later_formal_budget_reservation(tmp_path):
@@ -630,8 +635,7 @@ def test_diagnostic_header_allows_later_formal_budget_reservation(tmp_path):
     enqueue_diagnostic(service, "local", {"request_key": "diagnostic", "case_ids": ["a"]})
     day = service.research.day("local")
     with service.ledger.connection() as db:
-        budget = dict(db.execute("SELECT * FROM rsi_budgets").fetchone())
-    assert budget["episodes_limit"] == control.preferences("local")["daily_episodes"] == 120
+        assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
     cycle, admitted = service.ledger.reserve(
         "local",
         day,
@@ -641,13 +645,13 @@ def test_diagnostic_header_allows_later_formal_budget_reservation(tmp_path):
             "machine": {"id": "a"},
             "request_key": "formal-budget-check",
         },
-        tokens_limit=budget["tokens_limit"],
+        tokens_limit=0,
         episodes_limit=120,
     )
     assert admitted and cycle
 
 
-def test_diagnostics_respect_configured_episode_cap(tmp_path):
+def test_diagnostics_ignore_removed_python_episode_cap(tmp_path):
     service = ImprovementStatus(tmp_path)
     control = service.control
     control.register_machine(
@@ -666,10 +670,10 @@ def test_diagnostics_respect_configured_episode_cap(tmp_path):
     service.runs.configure("local", {**service.runs.settings("local"), "daily_tokens": 2000000})
     for key in ["one", "two"]:
         enqueue_diagnostic(service, "local", {"request_key": key, "case_ids": ["a"]})
-    with pytest.raises(DomainError, match="RSI_DAILY_EPISODE_BUDGET"):
-        enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
+    enqueue_diagnostic(service, "local", {"request_key": "three", "case_ids": ["a"]})
     with service.ledger.connection() as db:
-        assert db.execute("SELECT episodes_reserved FROM rsi_budgets").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM rsi_budgets").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM rsi_pipeline_runs").fetchone()[0] == 3
 
 
 @pytest.mark.asyncio
@@ -758,16 +762,11 @@ async def test_diagnostic_admission_evidence_matches_policy_and_keeps_model_outp
     original = evidence["original_limits"]
     assert all(type(original[key]) is int for key in ("seconds", "tokens", "requests"))
     assert evidence["effective_limits"]["seconds"] == original["seconds"]
-    assert evidence["spending_policy"] == ("shared_model_daily" if shared else "frozen_protocol")
-    if shared:
-        assert evidence["effective_limits"]["tokens"] is None
-        assert evidence["effective_limits"]["requests"] is None
-        assert evidence["run_token_limit"] is None
-        assert evidence["reserved_for_later_cases"] is None
-    else:
-        assert evidence["effective_limits"] == original
-        assert type(evidence["run_token_limit"]) is int and evidence["run_token_limit"] > 0
-        assert evidence["reserved_for_later_cases"] == 0
+    assert evidence["spending_policy"] == "shared_model_daily"
+    assert evidence["effective_limits"]["tokens"] is None
+    assert evidence["effective_limits"]["requests"] is None
+    assert evidence["run_token_limit"] is None
+    assert evidence["reserved_for_later_cases"] is None
 
 
 @pytest.mark.asyncio

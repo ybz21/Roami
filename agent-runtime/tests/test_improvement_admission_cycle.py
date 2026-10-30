@@ -228,8 +228,8 @@ async def test_formal_usage_gaps_follow_gateway_admission_not_token_quota(tmp_pa
     executor = RefusingExecutor("RSI_USAGE_UNKNOWN")
     report = await run_cycle(**arguments(ledger, executor, tmp_path / "runs"))
     real = [c for c in executor.calls if c.startswith("REAL-")]
-    assert len(real) == (4 if shared else 1)
-    assert bool(report["usage_blocker"]) is not shared
+    assert len(real) == 4
+    assert not report["usage_blocker"]
     assert not report["evaluation_complete"]
     assert not report["comparison"]["eligible_for_promotion"]
 
@@ -367,7 +367,6 @@ async def test_diagnostic_usage_gaps_defer_to_gateway_http_admission(
 @pytest.mark.parametrize("shared", [False, True])
 def test_unknown_token_count_does_not_block_gateway_managed_review(tmp_path, shared):
     from roami_agent.improvement.persistence.run_costs import RunCosts
-    from roami_agent.protocol.errors import DomainError
 
     service = ImprovementStatus(tmp_path)
     service.ledger.shared_daily_limit = shared
@@ -376,8 +375,4 @@ def test_unknown_token_count_does_not_block_gateway_managed_review(tmp_path, sha
     )
     service.runs.set_state("local", ident, "report_queued", {"generation_tokens": None})
     costs = RunCosts(service.runs, "local", ident)
-    if shared:
-        assert costs.reserve_operation("local", "today", "review", 64000) is None
-    else:
-        with pytest.raises(DomainError, match="RSI_USAGE_UNKNOWN"):
-            costs.reserve_operation("local", "today", "review", 64000)
+    assert costs.reserve_operation("local", "today", "review", 64000) is None
