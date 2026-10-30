@@ -4,6 +4,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { Input, Select } from 'antd'
 import { ChevronDown, ChevronLeft, ChevronRight, ZoomInIcon, ZoomOutIcon } from '../../icons'
 import { useI18n } from '../../i18n'
+import { usePdfPinchZoom } from './pdf-pinch-zoom'
 import './document-preview.css'
 
 GlobalWorkerOptions.workerSrc = workerUrl
@@ -20,6 +21,7 @@ export default function PdfDocument({ src, name }: { src: string; name: string }
   const [failed, setFailed] = useState(false), [rendering, setRendering] = useState(true)
   const [ready, setReady] = useState(false)
   const container = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null)
+  usePdfPinchZoom(container, canvas, scale, ready && !rendering, setScaleMode)
   useEffect(() => {
     const element = container.current
     if (!element) return
@@ -106,6 +108,7 @@ export default function PdfDocument({ src, name }: { src: string; name: string }
           options={[
             { value: 'page', label: t('document.fitPage') }, { value: 'width', label: t('document.fitWidth') },
             ...zoomSteps.map(value => ({ value, label: percent(value) })),
+            ...(typeof scaleMode === 'number' && !zoomSteps.includes(scaleMode) ? [{ value: scaleMode, label: percent(scaleMode) }] : []),
           ]} />
         <button type="button" className="tt-act" aria-label={t('file.imgZoomIn')} disabled={zoomIn === undefined || rendering} onClick={() => setScaleMode(zoomIn!)}><ZoomInIcon size={20} /></button>
       </div>

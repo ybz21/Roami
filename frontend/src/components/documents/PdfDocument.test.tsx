@@ -188,3 +188,45 @@ it('recalculates fitting for a landscape page after a portrait page', async () =
   expect(screen.getByRole('img').style.width).toBe('600px')
   expect(screen.getByRole('img').style.height).toBe('400px')
 })
+
+
+it('previews a pinch without repeated rendering and commits a sharp zoom on release', async () => {
+  render(<PdfDocument src="/sample.pdf" name="Sample" />)
+  await waitFor(() => expect(pending).toHaveLength(1))
+  await act(async () => pending[0].resolve())
+  const paper = screen.getByRole('img') as HTMLCanvasElement
+  const scroll = paper.parentElement!
+  vi.spyOn(paper, 'getBoundingClientRect').mockImplementation(() => ({ left: 0, top: 0, width: parseFloat(paper.style.width), height: parseFloat(paper.style.height) } as DOMRect))
+  const touches = (distance: number) => [{ clientX: 300 - distance / 2, clientY: 200 }, { clientX: 300 + distance / 2, clientY: 200 }]
+  fireEvent.touchStart(scroll, { touches: touches(200) })
+  expect(fireEvent.touchMove(scroll, { touches: touches(320) })).toBe(false)
+  expect(paper.style.width).toBe('960px')
+  expect(paper.style.height).toBe('1440px')
+  expect(scroll.scrollLeft).toBe(180)
+  expect(scroll.scrollTop).toBe(120)
+  expect(pending).toHaveLength(1)
+  fireEvent.touchEnd(scroll, { touches: [] })
+  await waitFor(() => expect(pending).toHaveLength(2))
+  await act(async () => pending[1].resolve())
+  expect(paper.style.width).toBe('960px')
+  expect(paper.width).toBe(960)
+  expect(screen.getByText('160%')).toBeTruthy()
+})
+
+it('restores a cancelled pinch and keeps single-finger scrolling native', async () => {
+  render(<PdfDocument src="/sample.pdf" name="Sample" />)
+  await waitFor(() => expect(pending).toHaveLength(1))
+  await act(async () => pending[0].resolve())
+  const paper = screen.getByRole('img') as HTMLCanvasElement
+  const scroll = paper.parentElement!
+  vi.spyOn(paper, 'getBoundingClientRect').mockImplementation(() => ({ left: 0, top: 0, width: parseFloat(paper.style.width), height: parseFloat(paper.style.height) } as DOMRect))
+  expect(fireEvent.touchMove(scroll, { touches: [{ clientX: 300, clientY: 200 }] })).toBe(true)
+  fireEvent.touchStart(scroll, { touches: [{ clientX: 200, clientY: 200 }, { clientX: 400, clientY: 200 }] })
+  fireEvent.touchMove(scroll, { touches: [{ clientX: 100, clientY: 200 }, { clientX: 500, clientY: 200 }] })
+  fireEvent.touchCancel(scroll)
+  expect(paper.style.width).toBe('600px')
+  expect(paper.style.height).toBe('900px')
+  expect(scroll.scrollLeft).toBe(0)
+  expect(scroll.scrollTop).toBe(0)
+  expect(pending).toHaveLength(1)
+})

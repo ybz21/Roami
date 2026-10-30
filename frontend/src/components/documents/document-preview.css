@@ -6,15 +6,18 @@
 .pdf-document-page-input.ant-input { width:calc(var(--sp-5) * 2); text-align:center; font-size:var(--fs-body); }
 .pdf-document-scale { width:calc(var(--sp-5) * 5); }
 html[data-pointer="coarse"] .pdf-document-page-input.ant-input { min-height:var(--tap); }
-html[data-pointer="coarse"] .pdf-document-scale .ant-select-selector { min-height:var(--tap); align-items:center; }
+html[data-pointer="coarse"] .pdf-document-scale, html[data-pointer="coarse"] .pdf-document-scale .ant-select-selector { min-height:var(--tap); align-items:center; }
 html[data-pointer="coarse"] .pdf-document-scale-options .ant-select-item { min-height:var(--tap); align-items:center; }
-.pdf-document-scroll { position:relative; flex:1; min-height:0; min-width:0; overflow:auto; scrollbar-gutter:stable; overscroll-behavior:contain; }
+.pdf-document-scroll { position:relative; flex:1; min-height:0; min-width:0; overflow:auto; scrollbar-gutter:stable; overscroll-behavior:contain; touch-action:pan-x pan-y; }
 .pdf-document-scroll canvas { display:block; max-width:none; margin:auto; background:white; }
 .pdf-document-scroll canvas[hidden] { visibility:hidden; }
 .pdf-document-scroll p { margin:0; padding:var(--sp-4); color:var(--text-dim); font-size:var(--fs-body); }
 .pdf-document-loading { position:absolute; top:0; left:0; }
+html:is([data-size="compact"], [data-size="medium"]) .pdf-document-toolbar { column-gap:var(--sp-2); justify-content:space-between; }
+html:is([data-size="compact"], [data-size="medium"]) .pdf-document-pages { gap:var(--sp-1); }
+html:is([data-size="compact"], [data-size="medium"]) .pdf-document-page-input.ant-input { width:var(--tap); }
+html:is([data-size="compact"], [data-size="medium"]) .pdf-document-scale { width:calc(var(--sp-5) * 4 + var(--sp-2)); }
+html:is([data-size="compact"], [data-size="medium"]) .pdf-document-zoom > button { display:none; }
 .document-preview { height:100%; min-height:0; min-width:0; overflow:auto; }
 .document-preview-full { flex:1; min-height:0; min-width:0; }
-.document-preview-download { display:flex; justify-content:flex-end; flex:none; padding:var(--sp-2) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
-.document-preview-download a { display:inline-flex; align-items:center; gap:var(--sp-2); min-height:var(--tap); color:var(--accent); font-size:var(--fs-sm); }
 .agent-task-document-preview { height:calc(var(--sp-5) * 20); min-height:0; }
