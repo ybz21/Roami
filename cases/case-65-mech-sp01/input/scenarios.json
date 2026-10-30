@@ -1,0 +1,24 @@
+{
+  "binary_asset_hex": "00ff736f75726365",
+  "local_path_contains_spaces": true,
+  "roles": [
+    "main",
+    "worker",
+    "research"
+  ],
+  "presentation_fixture": {
+    "generator": "agent-runtime/tests/verification/test_presentation_skill_package.py::exercise_external_skill_package",
+    "shapes": [
+      "Body at y=4 inches",
+      "Heading at y=1 inch"
+    ],
+    "operation": "center top heading in a separate edited.pptx",
+    "preserve": [
+      "source bytes",
+      "body alignment",
+      "download after workspace output removal",
+      "owner access"
+    ]
+  },
+  "outside_directory_symlink": "excluded from discovery"
+}

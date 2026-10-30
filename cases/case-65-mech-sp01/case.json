@@ -1,0 +1,55 @@
+{
+  "id": "MECH-SP01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "本地外挂加载回归",
+  "prompt": "使用本地配置的 Skill 完整资源目录执行脚本并交付文件，保持现有基础工具合同。",
+  "preconditions": "本地合成素材；完整可选 Skill；无真实模型调用。",
+  "expected_terminal": "configured_skill_executed_and_artifact_persisted",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "冻结代码与输入哈希",
+    "JUnit 与执行日志",
+    "实际生成的可编辑 PPTX 与持久化附件"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-SP01-H1",
+      "rule": "三种角色可取得配置目录并执行相邻二进制素材脚本，无需导入副本。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-SP01-H2",
+      "rule": "禁用 Skill 后读取被拒绝，越界目录符号链接不进入目录。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-SP01-H3",
+      "rule": "可选 PPTX 编辑通过既有工具完成检查、修改及持久化交付，输入与未请求属性不变。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

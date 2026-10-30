@@ -43,6 +43,7 @@ def register_skills(registry, settings):
                 "version": digest.hexdigest(),
                 "references": references,
                 "source": "builtin" if root == builtin else "configured",
+                **({"packagePath": str(resolved.parent)} if root != builtin else {}),
                 "description": next(
                     (
                         line.partition(":")[2].strip().strip("\"'")
