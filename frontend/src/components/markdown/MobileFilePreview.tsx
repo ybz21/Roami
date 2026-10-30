@@ -17,7 +17,8 @@ export default function MobileFilePreview({ link, onBack }: { link: FileLink; on
   const [loading, setLoading] = useState(link.resolvePath)
   const [error, setError] = useState('')
   const [artifact, setArtifact] = useState<TaskArtifact | null>(null)
-  const directDocument = isPdfDocument(link.name, '') || isPptxDocument(link.name, '')
+  const name = artifact?.name || path?.split('/').pop() || link.name
+  const directDocument = isPdfDocument(name, '') || isPptxDocument(name, '')
   useEffect(() => {
     if (!link.metadataUrl) return
     const controller = new AbortController()
@@ -45,12 +46,12 @@ export default function MobileFilePreview({ link, onBack }: { link: FileLink; on
     return () => controller.abort()
   }, [link])
   return (
-    <MobileSubPage title={artifact?.name || path?.split('/').pop() || link.name} onBack={onBack} layer="session">
-      {(artifact || (!path && directDocument)) && <div className="document-preview-download"><a href={link.url + (link.url.includes('?') ? '&' : '?') + 'dl=1'} download={artifact?.name || link.name}><DownloadIcon />{t('file.download')}</a></div>}
-      {loading ? <Spin /> : error ? <div role="alert" style={{ padding: 'var(--sp-4)', color: 'var(--text-dim)' }}>{t('file.openFailed', { message: error })}</div> : path
-        ? <Suspense fallback={<Spin />}><FileView path={path} accent="var(--accent)" inline tabbed forcePreview onClose={onBack} onOpenPath={setPath} /></Suspense>
+    <MobileSubPage title={name} onBack={onBack} layer="session"
+      action={artifact || directDocument ? { label: t('file.download'), icon: <DownloadIcon />, href: link.url + (link.url.includes('?') ? '&' : '?') + 'dl=1', download: name } : undefined}>
+      {loading ? <Spin /> : error ? <div role="alert" style={{ padding: 'var(--sp-4)', color: 'var(--text-dim)' }}>{t('file.openFailed', { message: error })}</div>
         : artifact ? canPreviewArtifact(artifact) ? <TaskArtifactPreview artifact={artifact} contentUrl={link.url} fullHeight /> : <p role="status">{t('document.previewUnavailable')}</p>
-        : directDocument ? <div className="document-preview-full"><DocumentPreview src={link.url} name={link.name} mimeType="" /></div>
+        : directDocument ? <div className="document-preview-full"><DocumentPreview src={link.url} name={name} mimeType="" /></div>
+        : path ? <Suspense fallback={<Spin />}><FileView path={path} accent="var(--accent)" inline tabbed forcePreview onClose={onBack} onOpenPath={setPath} /></Suspense>
         : <iframe title={link.name} src={link.url} style={{ flex: 1, minHeight: 0, width: '100%', border: 0, background: 'var(--bg-base)' }} />}
     </MobileSubPage>
   )
