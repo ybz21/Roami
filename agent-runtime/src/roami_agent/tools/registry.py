@@ -24,6 +24,15 @@ class Tools:
         Draft202012Validator.check_schema(tool.schema)
         self.registry[tool.name] = tool
 
+    def optional_skill_metadata(self):
+        if not self.directory:
+            return []
+        return [
+            {key: item[key] for key in ("name", "description", "location")}
+            for item in self.directory.skill_entries()
+            if self.skills[item["name"]].get("source") in {"configured", "managed"}
+        ]
+
     def catalog(self, role="main"):
         result = []
         for tool in self.registry.values():
@@ -58,11 +67,7 @@ class Tools:
                 if "scope" in wire["function"]["parameters"]["properties"]:
                     wire["function"]["parameters"]["properties"]["scope"]["enum"] = ["workspace"]
             if self.directory and tool.name == "read":
-                skills = [
-                    {key: item[key] for key in ("name", "description", "location")}
-                    for item in self.directory.skill_entries()
-                    if self.skills[item["name"]].get("source") in {"configured", "managed"}
-                ]
+                skills = self.optional_skill_metadata()
                 if skills:
                     wire = deepcopy(wire)
                     wire["function"]["description"] += (

@@ -1,0 +1,55 @@
+{
+  "id": "MECH-WF01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "工作流上下文回归",
+  "prompt": "使用可读外挂时，在实际执行上下文中先按需加载工作流；保持保存的角色指令与模型配置，权限和上下文估算即时一致。",
+  "preconditions": "本地合成素材；完整可选 Skill；无真实模型调用。",
+  "expected_terminal": "workflow_guidance_present_without_eager_body_load",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "冻结哈希与严格测试回执",
+    "初始 Native Worker 工具信息断言",
+    "实际编辑并持久化的 PPTX 附件"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-WF01-H1",
+      "rule": "三个角色的持久化指令保留，外部工作流可用时补通用执行前读取策略，不加载正文。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-WF01-H2",
+      "rule": "导入、禁用和移除即时反映在实际请求和压缩上下文；不可读工作流不添加策略。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-WF01-H3",
+      "rule": "实际 Native Worker 首次请求含通用工作流策略，完整外挂通过已有工具检查、编辑并持久交付。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

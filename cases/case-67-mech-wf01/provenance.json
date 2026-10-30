@@ -1,0 +1,7 @@
+{
+  "origin": "persisted role policies did not mention optional workflows; model sometimes skipped a relevant installed Skill despite tool metadata",
+  "fixture_kind": "synthetic persisted policies and editable PPTX",
+  "model_calls": 0,
+  "formal_history_updated": false,
+  "human_labels_updated": false
+}

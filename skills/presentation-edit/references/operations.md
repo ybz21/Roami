@@ -4,6 +4,8 @@ Pass JSON through `--request-json` as one argv element, or use `--request change
 
 The minimal alignment request and named-color form are shown in [the workflow](../SKILL.md). `expectedSha256` is the source presentation hash returned by inspection, not a shell-output artifact hash.
 
+The `colors` shorthand applies a full slide's list of palette names in geometric order, building the same validated batch internally. It requires an observed source hash and a matching number of names; use the general request for partial or mixed edits.
+
 Slides and position ranks start at 1. Alternatively, copy a specific `shapePath` array from inspection: `"target": {"shapePath": [0, 1]}`. Alignment accepts `left`, `center`, `right`, `justify`. Each operation can set alignment, text color, or both. A property cannot be changed twice on the same object in one batch.
 
 For a named text color, use `"color": {"editor": "<observed editorPalette.editor>", "palette": "<observed editorPalette.name>", "name": "<requested color name>"}`. Names are resolved case-insensitively from the installed editor palette; there is no fallback. For an explicit RGB request, use `"color": {"rgb": "#ABCDEF"}` instead. These two color forms cannot be combined.

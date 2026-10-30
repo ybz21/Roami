@@ -62,6 +62,10 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
         model = "skill-package-worker-contract"
 
         async def stream(self, messages, tools):
+            assert any(
+                item["role"] == "system" and "Installed optional workflows" in item["content"]
+                for item in messages
+            )
             description = next(
                 item["function"]["description"]
                 for item in tools
