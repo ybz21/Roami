@@ -5,6 +5,7 @@ import copy
 import hashlib
 import io
 import json
+import shutil
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,12 +19,17 @@ from test_runtime import until
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
+from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 
 
 async def test_external_skill_import_executes_and_delivers_with_unchanged_foundations(
     store, tmp_path, monkeypatch
 ):
+    await exercise_external_skill_package(store, tmp_path, monkeypatch, configured=False)
+
+
+async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, configured):
     package = Path(__file__).resolve().parents[3] / "skills/presentation-edit"
     workspace = tmp_path / "work with spaces"
     workspace.mkdir()
@@ -99,7 +105,12 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
     async def prepare(*args, **kwargs):
         yield {"workspaceId": "external-skill", "directory": str(workspace)}
 
-    runtime = Runtime(store, Main(), worker_model=Worker(), memory_model=Main())
+    settings = Settings()
+    if configured:
+        root = tmp_path / "local skills"
+        shutil.copytree(package, root / package.name, ignore=shutil.ignore_patterns("__pycache__"))
+        settings = Settings(skill_roots=(root,))
+    runtime = Runtime(store, Main(), worker_model=Worker(), memory_model=Main(), settings=settings)
     runtime.dispatch.native_executor.workspace_factory = prepare
     before = copy.deepcopy(runtime.tools.catalog("worker"))
     tool_names = set(runtime.tools.registry)
@@ -112,7 +123,7 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
         return await original_read(*args, **kwargs)
 
     monkeypatch.setattr(runtime.files, "read", observe_read)
-    assert "presentation-edit" not in runtime.tools.skills
+    assert ("presentation-edit" in runtime.tools.skills) is configured
     payload = {
         "name": "presentation-edit",
         "description": next(
@@ -128,7 +139,8 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
             if path.is_file() and "__pycache__" not in path.parts
         },
     }
-    await runtime.capability_imports.save("local", "skills", payload)
+    if not configured:
+        await runtime.capability_imports.save("local", "skills", payload)
     assert runtime.tools.catalog("worker") == before and set(runtime.tools.registry) == tool_names
     assert any(
         item["name"] == "presentation-edit"
@@ -183,10 +195,13 @@ async def test_external_skill_import_executes_and_delivers_with_unchanged_founda
                 "worker",
                 {},
             )
-        await runtime.capability_imports.save(
-            "local", "skills", None, name="presentation-edit", remove=True
-        )
-        assert "presentation-edit" not in runtime.tools.skills
+        if not configured:
+            await runtime.capability_imports.save(
+                "local", "skills", None, name="presentation-edit", remove=True
+            )
+            assert "presentation-edit" not in runtime.tools.skills
+        else:
+            assert not runtime.capability_imports.saved["skills"]
         assert (
             runtime.tools.catalog("worker") == before and set(runtime.tools.registry) == tool_names
         )
