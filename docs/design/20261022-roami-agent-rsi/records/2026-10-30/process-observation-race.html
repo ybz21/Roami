@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>进程退出观测竞态</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>进程退出观测竞态</h1>
+<h2>Product Design</h2><p>修复 Issue #363。会话停止证明扫描进程时，已经打开的 /proc/PID/stat 在进程退出后可能返回 ESRCH；旧代码只忽略 ENOENT，导致无关进程退出使整个会话观测失效，任务长期等待确认。</p>
+<h2>User Stories</h2><ul><li>无关进程正常退出不阻断当前会话的完成或取消确认。</li><li>目标进程身份、作用域和残留执行检查保留，权限失败和不确定状态不能当作停止。</li></ul>
+<h2>Technical Design</h2><p>修改 Agent 底层 internal/agentexecution/session-processes.go。仅对 stat 读取返回 ESRCH 且对应 PID 目录已经不存在的情况忽略该条；目录仍存在、权限失败、IO 错误继续拒绝观测。原始 PID/start-time/scope 比对与工作区保护未放宽。</p>
+<p>测试打开自建 cat 子进程的 proc stat 文件，在回收子进程后读取同一文件，实际内核返回 ESRCH；再验证收集过程保留活着的根进程，并且根进程丢失不构成停止证明。独立变体覆盖权限与 IO 错误及目录仍存在的 PID。</p>
+<h2>Acceptance</h2><p>受控真实子进程复现 errno=3 / ESRCH，无用户会话参与。保留旧错误处理时新回归失败，加入窄范围处理后相关集成测试重复 5 次通过；最终完整门禁、竞态检查与 CI 见 PR 记录。本修复属于 Agent 执行框架，不改变 Case、提示、评分或模型配置。</p>
+</main></body></html>

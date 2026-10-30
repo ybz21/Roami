@@ -99,3 +99,5 @@
 原文来源与迁移校验见[迁移清单](../../20261028-agent-instructions/manifest.json)。历史验收结论按当时版本保留。
 
 - [2026-10-30：机制 Case 执行合同与回归入口](2026-10-30/mechanism-execution-contracts.html)
+
+- [2026-10-30：进程退出观测竞态](2026-10-30/process-observation-race.html)
