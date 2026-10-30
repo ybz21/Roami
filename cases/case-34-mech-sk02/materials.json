@@ -5,20 +5,28 @@
     "kind": "runtime_regression",
     "pytest_selectors": [
       "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
-      "test_skill_references.py::test_reference_cannot_escape_skill"
+      "test_skill_references.py::test_reference_cannot_escape_skill",
+      "test_document_capability_policy.py::test_native_intake_obeys_execution_capability_policy",
+      "test_document_capability_policy.py::test_next_worker_prompt_drops_input_or_workflow_after_policy_changes",
+      "test_document_capability_policy.py::test_intake_stops_remaining_reads_when_policy_changes_during_io"
     ],
     "local_inputs": false,
-    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories.",
+    "automatic_document_variant": "test_presentation_reads.presentation_bytes constructs the actual PPTX input, including nested text and empty decorations; each native run binds a disposable workspace. No real model calls."
   },
   "tools": {
     "kind": "scripted_test_runtime",
-    "model_calls": "Scripted providers; not a live-model capability score."
+    "model_calls": "Scripted providers; not a live-model capability score.",
+    "configuration": "tools.json"
   },
   "acceptance": {
     "kind": "pytest_assertions",
     "pytest_selectors": [
       "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
-      "test_skill_references.py::test_reference_cannot_escape_skill"
+      "test_skill_references.py::test_reference_cannot_escape_skill",
+      "test_document_capability_policy.py::test_native_intake_obeys_execution_capability_policy",
+      "test_document_capability_policy.py::test_next_worker_prompt_drops_input_or_workflow_after_policy_changes",
+      "test_document_capability_policy.py::test_intake_stops_remaining_reads_when_policy_changes_during_io"
     ]
   }
 }

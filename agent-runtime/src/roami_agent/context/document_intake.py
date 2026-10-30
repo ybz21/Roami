@@ -21,17 +21,31 @@ def requested_presentations(text):
 
 
 class TaskDocumentIntake:
-    def __init__(self, files, skills):
+    def __init__(self, files, tools):
         self.reader = WorkspacePresentationReads(files, files.read)
-        self.skills = skills
+        self.tools = tools
+
+    def can_read(self):
+        return not {"read", "file_read"} & self.tools.disabled_tools
+
+    def workflow(self):
+        if (
+            not self.can_read()
+            or "skill_read" in self.tools.disabled_tools
+            or "presentation_files" in self.tools.disabled_skills
+        ):
+            return ""
+        return self.tools.skills.get("presentation_files", {}).get("text", "")
 
     async def prepare(self, goal, binding):
-        if not binding.get("workspace"):
+        if not binding.get("workspace") or not self.can_read():
             return {}
         sources, uninspected, seen = [], [], set()
         remaining = self.reader.page_bytes
         paths = requested_presentations(goal)
         for path in paths:
+            if not self.can_read():
+                return {}
             try:
                 location = self.reader.files.location(path, binding)
                 if location in seen:
@@ -64,25 +78,25 @@ class TaskDocumentIntake:
                 }
             )
             remaining -= page["readBytes"]
-        if not sources:
+        if not sources or not self.can_read():
             return {}
         return {
-            "workflow": self.skills.get("presentation_files", {}).get("text", ""),
+            "workflow": self.workflow(),
             "sources": sources,
             "uninspectedPaths": uninspected,
         }
 
-    @staticmethod
-    def attach(turn, plan, prompt):
+    def attach(self, turn, plan, prompt):
         intake = turn.get("documentInputs")
-        if not turn.get("executionRunId") or not intake:
+        if not turn.get("executionRunId") or not intake or not self.can_read():
             return plan, prompt
         messages = []
-        if intake["workflow"]:
+        workflow = self.workflow()
+        if workflow:
             messages.append(
                 {
                     "role": "system",
-                    "content": "Applicable built-in document workflow:\n" + intake["workflow"],
+                    "content": "Applicable built-in document workflow:\n" + workflow,
                 }
             )
         messages.append(

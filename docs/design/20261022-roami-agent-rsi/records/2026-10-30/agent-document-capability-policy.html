@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Agent 文稿准备能力策略</title><body>
+<h1>Agent 文稿准备遵守执行能力策略</h1>
+<h2>Product Design</h2><p>自动准备只读取允许的输入，只注入当前可用的内置工作流。执行器收紧能力后，后续请求停止注入已禁用内容。内置能力在产品页仍为只读；本修复针对运行时执行器的能力过滤，不新增设置开关。</p>
+<h2>User Stories</h2><ul><li>任务执行策略禁止 read 或 file_read 时，自动 PPTX 准备不能绕过显式工具调用的拒绝。</li><li>仅禁止 skill_read 或 presentation_files 时，允许的文档数据仍可使用，禁用的工作流不能自动进入系统消息。</li><li>策略集合在任务中被替换后，同一 intake 在下一轮提示投影时立即采用新策略；已经发出的请求不声称撤回。</li></ul>
+<h2>Technical Design</h2><p>Runtime 向 context/document_intake.py 传递 Tools 注册表，而非只传 Skill 字典。准备前、文件循环和最终投影查询当前策略；读取 await 中收紧策略会停止后续文件读取并丢弃自动准备结果。每次 attach 再检查当前文件权限及工作流策略，不复用已失效的工作流缓存。文件读取仍通过 tools/workspace_presentations.py 和 storage/workspace_files.py 的工作区边界。关闭读取不撤销其他独立工具，也不新增限额。</p>
+<h2>Acceptance</h2><p>修复前，真实 NativeExecutor/Worker 请求回归复现 6 项失败。修复后新增 10 项参数化回归覆盖初始拒绝、下一轮策略更改、读取中更改和同一实例恢复；相关 53 项通过。Case 34 / MECH-SK02 增加实际数据与工具说明，以及相同回归选择器，原提示与原有版本/引用边界断言保留。冻结 v73 镜像实际执行全部 20 个机制 Case，共 89 项测试、0 跳过，其中 Case 34 为 14 项；不挂载宿主 Actor 核心，203 个执行文件与源码哈希一致。另 44 项依赖真实 Office、浏览器和镜像环境的检查单独执行通过、0 跳过。完整门禁日志与 CI 最终状态随 PR 交付。</p><p>本次真实模型调用为 0，无生产部署、模型或限额配置改动；该控制问题的修复不代表 401 根因、PPTX/音视频/股票内容质量或正式全套验收已通过。</p>
+</body></html>

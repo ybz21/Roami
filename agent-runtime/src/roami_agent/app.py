@@ -218,7 +218,7 @@ class Runtime:
 
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
-        self.document_intake = TaskDocumentIntake(self.files, self.tools.skills)
+        self.document_intake = TaskDocumentIntake(self.files, self.tools)
 
         self.context.request_context = lambda: request_context(
             self.settings, self.settings.main_instructions, self.tools.catalog("main")

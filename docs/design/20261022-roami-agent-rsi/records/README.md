@@ -107,3 +107,5 @@
 - [2026-10-30：Agent 显式文稿输入准备](2026-10-30/agent-document-intake.html)
 
 - [2026-10-30：模型请求关联与重试观测](2026-10-30/model-request-correlation.html)
+
+- [2026-10-30：Agent 文稿准备能力策略](2026-10-30/agent-document-capability-policy.html)
