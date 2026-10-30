@@ -1,14 +1,10 @@
 """Owner-scoped transactional persistence for diagnostic requests."""
 
 import json
-from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from roami_agent.improvement.domain.contracts import digest, require
-from roami_agent.improvement.evaluation.artifact_review import needs_artifact_review
 from roami_agent.improvement.evaluation.contracts import load_suite
-from roami_agent.improvement.persistence.operation_accounting import assert_operation_costs_settled
 from roami_agent.improvement.persistence.run_repository import RunRepository
 from roami_agent.protocol.identity import now_ms
 
@@ -18,7 +14,6 @@ def enqueue_diagnostic_request(
 ):
     with ledger.connection() as db:
         db.execute("BEGIN IMMEDIATE")
-        assert_operation_costs_settled(db, owner, shared=shared)
         machine = db.execute(
             "SELECT profile_json FROM rsi_machines WHERE owner=? AND id=?",
             (owner, prefs["machine_ids"][0]),
@@ -39,36 +34,6 @@ def enqueue_diagnostic_request(
         suite = load_suite(Path(source["path"]))
         require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
         require(set(case_ids) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
-        artifact_count = sum(
-            needs_artifact_review(c) for c in suite["cases"] if c["id"] in case_ids
-        )
-        artifact_reservation = (
-            reviewer.profile["max_tokens"] * artifact_count if reviewer and not shared else 0
-        )
-        if not shared:
-            today = datetime.now(ZoneInfo(prefs["timezone"])).date().isoformat()
-            reserve = (
-                config["generation_tokens"] + config["codex_tokens"] * 2 + artifact_reservation
-            )
-            db.execute(
-                "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
-                (owner, today, config["daily_tokens"], prefs["daily_episodes"] or 10000),
-            )
-            budget = db.execute(
-                "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, today)
-            ).fetchone()
-            require(
-                shared or budget["tokens_reserved"] + reserve <= budget["tokens_limit"],
-                "RSI_DAILY_BUDGET",
-            )
-            require(
-                shared or budget["episodes_reserved"] + len(case_ids) <= budget["episodes_limit"],
-                "RSI_DAILY_EPISODE_BUDGET",
-            )
-            db.execute(
-                "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+?,episodes_reserved=episodes_reserved+? WHERE owner=? AND day=?",
-                (reserve, len(case_ids), owner, today),
-            )
         request = {
             "period_key": key,
             "preferences": prefs,
@@ -91,7 +56,7 @@ def enqueue_diagnostic_request(
             "formal_daily": False,
             "artifact_review": {
                 "hash": reviewer.content_hash if reviewer else None,
-                "reservation_tokens": artifact_reservation,
+                "reservation_tokens": 0,
             },
         }
         RunRepository.create_tx(db, owner, run_id, key, "diagnostic", snapshot)

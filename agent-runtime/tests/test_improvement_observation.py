@@ -122,15 +122,15 @@ async def test_closed_stream_is_not_an_invented_model_failure():
 
 
 @pytest.mark.asyncio
-async def test_nested_admission_rejection_is_known_zero_and_never_reaches_provider():
-    from roami_agent.protocol.errors import DomainError
+async def test_nested_meter_preserves_go_presend_rejection_as_known_zero():
+    from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
     from roami_agent.protocol.models import ModelEvent
 
     class Provider:
         model = "fixture"
 
         async def stream(self, messages, tools):
-            raise AssertionError("must not send a provider request")
+            raise ModelAdmissionRejected("MODEL_PROXY_DAILY_LIMIT")
             yield ModelEvent("text", "unused")
 
     outer_budget = EpisodeBudget({"tokens": 1, "seconds": 10, "requests": 1})
@@ -139,7 +139,7 @@ async def test_nested_admission_rejection_is_known_zero_and_never_reaches_provid
     model = MeteredModel(
         MeteredModel(Provider(), outer_budget, "worker"), inner_budget, "worker", journal=journal
     )
-    with pytest.raises(DomainError, match="RSI_TOKEN_BUDGET"):
+    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
         async for _ in model.stream([], []):
             pass
     assert not inner_budget.unknown and not outer_budget.unknown

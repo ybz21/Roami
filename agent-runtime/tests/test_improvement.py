@@ -183,8 +183,8 @@ async def test_episode_budget_counts_all_models_and_does_not_double_count_cache(
         consume(MeteredModel(UsageModel(usage), budget, "memory")),
     )
     assert budget.metrics()["tokens"] == 240
-    with pytest.raises(DomainError, match="REQUEST_BUDGET"):
-        await consume(MeteredModel(UsageModel(usage), budget, "worker"))
+    await consume(MeteredModel(UsageModel(usage), budget, "worker"))
+    assert budget.metrics()["tokens"] == 360
 
 
 @pytest.mark.parametrize(
@@ -194,12 +194,12 @@ async def test_episode_budget_counts_all_models_and_does_not_double_count_cache(
         {"inputTokens": 100, "outputTokens": 20, "requestAttempts": 2, "retryUsageKnown": False},
     ],
 )
-async def test_missing_or_partial_retry_usage_is_unknown_and_blocks_next_request(usage):
+async def test_missing_or_partial_retry_usage_stays_unknown_without_local_quota(usage):
     budget = EpisodeBudget({"seconds": 10, "tokens": 10000, "requests": 5})
     await consume(MeteredModel(UsageModel(usage), budget, "main"))
     assert budget.metrics()["tokens"] is None
-    with pytest.raises(DomainError, match="USAGE_UNKNOWN"):
-        await consume(MeteredModel(UsageModel(usage), budget, "worker"))
+    await consume(MeteredModel(UsageModel(usage), budget, "worker"))
+    assert budget.metrics()["tokens"] is None and budget.metrics()["model_calls"] == 2
 
 
 def trial(identifier, **overrides):
@@ -302,17 +302,17 @@ def test_atomic_daily_reservation_and_unknown_restart_do_not_replay(tmp_path):
     assert ledger.list("bob") == []
     with pytest.raises(DomainError, match="NOT_FOUND"):
         ledger.get("bob", identifier)
-    with pytest.raises(DomainError, match="DAILY_BUDGET"):
-        ledger.reserve(
-            "alice",
-            "2026-10-23",
-            {**manifest, "machine": {"id": "other"}},
-            tokens_limit=100,
-            episodes_limit=2,
-        )
+    other, admitted = ledger.reserve(
+        "alice",
+        "2026-10-23",
+        {**manifest, "machine": {"id": "other"}},
+        tokens_limit=0,
+        episodes_limit=0,
+    )
+    assert admitted and other != identifier
     with ledger.connection() as db:
         db.execute("UPDATE rsi_cycles SET heartbeat_ms=0")
-    assert ledger.recover("alice", stale_seconds=60) == 1
+    assert ledger.recover("alice", stale_seconds=60) == 2
     assert ledger.get("alice", identifier)["state"] == "interrupted"
     assert reserve(0) == (identifier, False)
     assert (tmp_path / "ledger.sqlite3").stat().st_mode & 0o077 == 0
@@ -542,7 +542,7 @@ async def test_interrupted_provider_journal_preserves_error_without_guessing_usa
     assert journal[0]["error_code"] == "MODEL_STREAM_INCOMPLETE"
     assert journal[0]["events"] == [{"kind": "text", "value": "partial"}]
     assert budget.metrics()["tokens"] is None
-    with pytest.raises(DomainError, match="USAGE_UNKNOWN"):
+    with pytest.raises(DomainError, match="MODEL_STREAM_INCOMPLETE"):
         async for _ in MeteredModel(Interrupted(), budget, "memory").stream([], []):
             pass
-    assert len(budget.requests) == 1
+    assert len(budget.requests) == 2

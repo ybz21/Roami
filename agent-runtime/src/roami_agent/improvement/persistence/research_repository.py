@@ -52,14 +52,9 @@ class ResearchRepository:
             with self.ledger.connection() as db:
                 db.execute(
                     "UPDATE rsi_actions SET state='queued',error_code=NULL,due_ms=? "
-                    "WHERE owner=? AND state='waiting_budget' AND json_extract(payload_json,'$.budget_day')!=? "
-                    "AND (? OR EXISTS(SELECT 1 FROM rsi_budgets WHERE owner=? AND day=?))",
+                    "WHERE owner=? AND state='waiting_budget' AND json_extract(payload_json,'$.budget_day')!=? ",
                     (
                         self.clock(),
-                        owner,
-                        day,
-                        getattr(self, "model_proxy", None) is not None
-                        or uses_shared_model_limit(self.ledger),
                         owner,
                         day,
                     ),
@@ -83,8 +78,6 @@ class ResearchRepository:
             self.enqueue_review(c["owner"], c["id"])
 
     def day(self, owner):
-        if getattr(self, "model_proxy", None) is not None:
-            return self.model_proxy.billing.period()[0]
         with self.ledger.connection() as db:
             row = db.execute(
                 "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)

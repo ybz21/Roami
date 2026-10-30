@@ -148,7 +148,7 @@ async def test_price_snapshot_idempotence_and_recovery_survive_new_proxy(store):
     assert next(row for row in usage["recent"] if row["id"] == pending)["state"] == "unknown"
 
 
-async def test_daily_limit_blocks_before_network_and_resets_in_node_timezone(store):
+async def test_legacy_limit_is_record_only_and_period_uses_node_timezone(store):
     proxy, _ = proxy_for(store, limit=0.002)
     proxy.billing.clock = lambda: int(datetime(2026, 10, 25, 15, 59, tzinfo=UTC).timestamp() * 1000)
     requests = []
@@ -159,17 +159,16 @@ async def test_daily_limit_blocks_before_network_and_resets_in_node_timezone(sto
 
     model = provider(proxy, handler)
     await consume(model)
-    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-        await consume(model)
-    assert len(requests) == 1
+    await consume(model)
+    assert len(requests) == 2
     proxy.billing.clock = lambda: int(datetime(2026, 10, 25, 16, 1, tzinfo=UTC).timestamp() * 1000)
     assert (await proxy.billing.view())["day"] == "2026-10-26"
     await consume(model)
-    assert len(requests) == 2
+    assert len(requests) == 3
     await model.close()
 
 
-async def test_limited_main_and_worker_admissions_are_serialized(store):
+async def test_legacy_accounting_does_not_serialize_main_and_worker_for_quota(store):
     proxy, _ = proxy_for(store, limit=0.001)
     started, release = asyncio.Event(), asyncio.Event()
     requests = []
@@ -186,12 +185,9 @@ async def test_limited_main_and_worker_admissions_are_serialized(store):
     await started.wait()
     second = asyncio.create_task(consume(worker))
     await asyncio.sleep(0)
-    assert len(requests) == 1
     release.set()
-    await first
-    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-        await second
-    assert len(requests) == 1
+    await asyncio.gather(first, second)
+    assert len(requests) == 2
     await main.close()
     await worker.close()
 
@@ -203,7 +199,7 @@ async def test_limited_main_and_worker_admissions_are_serialized(store):
         EVENTS.replace(b"data: [DONE]\n\n", b""),
     ],
 )
-async def test_missing_usage_or_truncated_stream_is_unknown_and_blocks_limited_calls(store, body):
+async def test_missing_usage_remains_unknown_without_local_admission_decision(store, body):
     proxy, _ = proxy_for(store, limit=10)
     model = provider(
         proxy,
@@ -214,8 +210,8 @@ async def test_missing_usage_or_truncated_stream_is_unknown_and_blocks_limited_c
     await consume(model)
     usage = await proxy.billing.view()
     assert usage["unknown"] == 1 and usage["recent"][0]["charges"] == []
-    with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-        await consume(model)
+    await consume(model)
+    assert (await proxy.billing.view())["unknown"] == 2
     await model.close()
 
 
@@ -282,7 +278,11 @@ async def test_cancelled_stream_releases_admission_but_keeps_unknown_charge(stor
     await model.close()
 
 
-async def test_settings_http_owner_boundary_persistence_and_invalid_save(store):
+async def test_settings_http_owner_boundary_persistence_and_invalid_save(
+    store, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("ROAMI_MODEL_GATEWAY_SOCKET", str(tmp_path / "construction-only.sock"))
+
     class EmptyModel:
         async def stream(self, messages, tools):
             return
@@ -337,8 +337,8 @@ async def test_disk_reopen_preserves_receipts_and_marks_inflight_unknown(store):
             {"currency": "USD", "amount": "0.00208"}
         ]
         assert usage["unknown"] == 1 and usage["pending"] == 0
-        with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-            await restored.billing.admit("main", "fixture")
+        await restored.billing.admit("main", "fixture")
+        assert (await restored.billing.view())["unknown"] == 1
     finally:
         await reopened.close()
 
@@ -396,13 +396,13 @@ def test_existing_charge_receipts_require_valid_amount_and_documented_currency(
     assert ((str(receipt.amount), receipt.currency) if receipt else None) == expected
 
 
-async def test_currency_mismatch_does_not_convert_or_admit_more_requests(store):
+async def test_legacy_currency_mismatch_is_preserved_without_local_admission_decision(store):
     proxy, config = proxy_for(store, limit=1)
     await proxy.ready()
     call = await proxy.billing.admit("main", "fixture")
     await proxy.billing.settle(call, None, charge=UpstreamCharge(Decimal("0.01"), "CNY"))
-    with pytest.raises(DomainError, match="MODEL_PROXY_CURRENCY_MISMATCH"):
-        await proxy.billing.admit("main", "fixture")
+    await proxy.billing.admit("main", "fixture")
+    assert (await proxy.billing.view())["charges"] == [{"currency": "CNY", "amount": "0.01"}]
     config["currency"] = "CNY"
     await proxy.billing.admit("main", "fixture")
 

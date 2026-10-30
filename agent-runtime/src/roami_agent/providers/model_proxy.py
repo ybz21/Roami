@@ -9,7 +9,7 @@ from decimal import Decimal
 import httpx
 
 from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
-from roami_agent.providers.model_billing import ModelBilling, proxy_configuration, usage_counts
+from roami_agent.providers.model_billing import ModelBilling, usage_counts
 from roami_agent.providers.upstream_costs import upstream_charge
 
 model_proxy_context = ContextVar("model_proxy_context", default=None)
@@ -49,14 +49,10 @@ class ModelProxy:
     @asynccontextmanager
     async def external_turn(self, role, model):
         await self.ready()
-        limited = proxy_configuration(self.billing.configuration())["dailyLimit"] is not None
         held, call_id = False, None
         receipt = {"sent": False, "counts": None}
         error = None
         try:
-            if limited:
-                await self.admission.acquire()
-                held = True
             admission = asyncio.create_task(self.billing.admit(role, model))
             try:
                 call_id = await asyncio.shield(admission)
@@ -100,14 +96,10 @@ class ProxyTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request):
         await self.proxy.ready()
-        limited = proxy_configuration(self.proxy.billing.configuration())["dailyLimit"] is not None
         held = False
         call_id = None
         sent = False
         try:
-            if limited:
-                await self.proxy.admission.acquire()
-                held = True
             admission = asyncio.create_task(self.proxy.billing.admit(self.role, self.model))
             try:
                 call_id = await asyncio.shield(admission)

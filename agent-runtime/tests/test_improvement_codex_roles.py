@@ -51,17 +51,36 @@ async def test_codex_roles_use_native_cli_without_tools_and_reuse_paid_receipt(
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
     monkeypatch.setenv("GH_TOKEN", "fixture-do-not-forward")
     action = {"id": "codex-review", "owner": "owner", "kind": "review"}
+    from test_improvement_codex_gateway import plan, settings
+    from test_improvement_codex_gateway_operations import invoke_local_gateway
+
+    async def resolve(*args, **kwargs):
+        return plan([])
+
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.gateway_plan", resolve)
     calls = []
 
     async def runner(argv, **kwargs):
         calls.append((argv, kwargs))
-        return {"stdout": codex_events(), "stderr": "", "exitCode": 0}
+        return await invoke_local_gateway(argv, **kwargs)
 
     first = await codex_json(
-        w, action, cfg, "packet-1", [{"role": "user", "content": "fixture"}], runner=runner
+        w,
+        action,
+        cfg,
+        "packet-1",
+        [{"role": "user", "content": "fixture"}],
+        runner=runner,
+        settings=settings(),
     )
     second = await codex_json(
-        w, action, cfg, "packet-1", [{"role": "user", "content": "fixture"}], runner=runner
+        w,
+        action,
+        cfg,
+        "packet-1",
+        [{"role": "user", "content": "fixture"}],
+        runner=runner,
+        settings=settings(),
     )
     assert first == second and len(calls) == 1
     args, kwargs = calls[0]
@@ -71,18 +90,32 @@ async def test_codex_roles_use_native_cli_without_tools_and_reuse_paid_receipt(
     assert "GH_TOKEN" not in kwargs["env"]
     assert kwargs["cwd"] != tmp_path / "repo"
     assert first["executor"] == "codex" and first["thread_id"] == "codex-fixture-thread"
-    assert first["metrics"]["tokens"] == 120
+    assert first["metrics"]["tokens"] == 130
     assert (kwargs["cwd"] / "process.json").stat().st_mode & 0o077 == 0
     with pytest.raises(DomainError, match="CONTEXT_CHANGED"):
         await codex_json(
-            w, action, cfg, "packet-1", [{"role": "user", "content": "changed"}], runner=runner
+            w,
+            action,
+            cfg,
+            "packet-1",
+            [{"role": "user", "content": "changed"}],
+            runner=runner,
+            settings=settings(),
         )
     assert len(calls) == 1
 
 
-async def test_unknown_codex_call_never_replays_and_blocks_other_paid_calls(tmp_path, monkeypatch):
+async def test_unknown_codex_call_never_replays_but_other_operations_reach_go(
+    tmp_path, monkeypatch
+):
     w, cfg, _, _, _ = await setup(tmp_path)
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty"))
+    from test_improvement_codex_gateway import plan, settings
+
+    async def resolve(*args, **kwargs):
+        return plan([])
+
+    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.gateway_plan", resolve)
     calls = []
 
     async def interrupted(*args, **kwargs):
@@ -91,30 +124,14 @@ async def test_unknown_codex_call_never_replays_and_blocks_other_paid_calls(tmp_
 
     action = {"id": "interrupted-codex", "owner": "owner", "kind": "repair"}
     with pytest.raises(TimeoutError):
-        await codex_json(w, action, cfg, "patch", [], runner=interrupted)
-    for key in ("patch", "other-packet"):
-        with pytest.raises(DomainError, match="UNKNOWN_OPERATION"):
-            await codex_json(w, action, cfg, key, [], runner=interrupted)
-    assert calls == [1]
-
-
-async def test_codex_overrun_is_accounted_once_then_stops(tmp_path, monkeypatch):
-    w, cfg, _, _, _ = await setup(tmp_path)
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty"))
-    calls = []
-
-    async def overrun(*args, **kwargs):
-        calls.append(1)
-        return {"stdout": codex_events(tokens=cfg["model_tokens"] + 1), "stderr": "", "exitCode": 0}
-
-    action = {"id": "overrun", "owner": "owner", "kind": "issue"}
-    for _ in range(2):
-        with pytest.raises(DomainError, match="TOKEN_LIMIT_EXCEEDED"):
-            await codex_json(w, action, cfg, "plan", [], runner=overrun)
+        await codex_json(w, action, cfg, "patch", [], runner=interrupted, settings=settings())
     with pytest.raises(DomainError, match="UNKNOWN_OPERATION"):
-        await codex_json(w, action, cfg, "new-plan", [], runner=overrun)
-    assert len(calls) == 1
-    assert w.snapshot("owner")["model_cost"]["observed_tokens"] == cfg["model_tokens"] + 21
+        await codex_json(w, action, cfg, "patch", [], runner=interrupted, settings=settings())
+    with pytest.raises(TimeoutError):
+        await codex_json(
+            w, action, cfg, "other-packet", [], runner=interrupted, settings=settings()
+        )
+    assert calls == [1, 1]
 
 
 @pytest.mark.parametrize(
@@ -393,51 +410,6 @@ async def test_daily_schedule_is_idempotent_expires_old_jobs_and_respects_stop(
     assert control.claim()["id"] == manual["id"]
 
 
-async def test_daily_admission_rejection_is_preserved_and_can_retry_without_replaying_paid_work(
-    tmp_path, monkeypatch
-):
-    from contextlib import asynccontextmanager
-
-    w, cfg, _, _, _ = await setup(tmp_path)
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
-    action = {"id": "blocked-review", "owner": "owner", "kind": "review"}
-    attempts = []
-
-    @asynccontextmanager
-    async def route(proxy, selected, env, role, *, outcome):
-        if not attempts:
-            outcome.update(error_code="MODEL_PROXY_DAILY_LIMIT", responses=0)
-        yield selected, env
-
-    async def runner(argv, **kwargs):
-        attempts.append(kwargs["cwd"])
-        return {
-            "stdout": "" if len(attempts) == 1 else codex_events(),
-            "stderr": "",
-            "exitCode": 1 if len(attempts) == 1 else 0,
-        }
-
-    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.codex_route", route)
-    messages = [{"role": "user", "content": "fixture"}]
-    with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-        await codex_json(w, action, cfg, "packet", messages, runner=runner)
-    first_log = (attempts[0] / "process.json").read_bytes()
-    value = await codex_json(w, action, cfg, "packet", messages, runner=runner)
-    assert value["metrics"]["tokens"] == 120 and len(attempts) == 2
-    assert attempts[0] != attempts[1] and (attempts[0] / "process.json").read_bytes() == first_log
-    assert await codex_json(w, action, cfg, "packet", messages, runner=runner) == value
-    assert len(attempts) == 2
-    with w.ledger.connection() as db:
-        rows = db.execute(
-            "SELECT state,result_json FROM rsi_operation_costs WHERE id LIKE 'blocked-review:%'"
-        ).fetchall()
-    assert len(rows) == 2 and all(row["state"] == "completed" for row in rows)
-    assert sorted(json.loads(row["result_json"])["value"]["metrics"]["tokens"] for row in rows) == [
-        0,
-        120,
-    ]
-
-
 async def test_shared_daily_policy_records_actual_codex_usage_above_legacy_reservation(
     tmp_path, monkeypatch
 ):
@@ -531,35 +503,4 @@ def test_cli_diagnostic_is_retained_without_discarding_a_completed_answer():
                     "item": {"type": "error", "message": "tool", "command": "forbidden"},
                 }
             )
-        )
-
-
-async def test_an_attempt_without_response_headers_is_not_archived_as_unspent(
-    tmp_path, monkeypatch
-):
-    from contextlib import asynccontextmanager
-
-    w, cfg, _, _, _ = await setup(tmp_path)
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
-    action = {"id": "pending-response", "owner": "owner", "kind": "review"}
-
-    @asynccontextmanager
-    async def route(proxy, selected, env, role, *, outcome):
-        outcome.update(error_code="MODEL_PROXY_USAGE_UNKNOWN", attempts=1, responses=0)
-        yield selected, env
-
-    async def runner(argv, **kwargs):
-        return {"stdout": "", "stderr": "", "exitCode": 1}
-
-    monkeypatch.setattr("roami_agent.improvement.workflows.codex_roles.codex_route", route)
-    with pytest.raises(DomainError, match="RSI_CODEX_EXEC_FAILED"):
-        await codex_json(w, action, cfg, "packet", [], runner=runner)
-    with pytest.raises(DomainError, match="RECONCILIATION"):
-        await codex_json(w, action, cfg, "packet", [], runner=runner)
-    with w.ledger.connection() as db:
-        assert (
-            db.execute(
-                "SELECT state FROM rsi_operation_costs WHERE id='pending-response:packet'"
-            ).fetchone()[0]
-            == "running"
         )

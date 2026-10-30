@@ -1,23 +1,19 @@
 import asyncio
 import json
 from dataclasses import replace
-from decimal import Decimal
 from itertools import pairwise
 
 import httpx
 import pytest
-from test_improvement_codex_roles import codex_events
 from test_improvement_workflow import setup
 from test_model_proxy import EVENTS, consume, proxy_for
 
 from roami_agent.app import configured_provider
 from roami_agent.improvement.integrations.codex_proxy import CodexProxy
 from roami_agent.improvement.integrations.measurements import EpisodeBudget
-from roami_agent.improvement.workflows.codex_roles import codex_json
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.model_routes import settings_with_route
 from roami_agent.providers.model_proxy import model_accounting
-from roami_agent.providers.upstream_costs import UpstreamCharge
 from roami_agent.server.configuration import Settings
 
 
@@ -69,7 +65,7 @@ def codex_responses(monkeypatch):
     return request
 
 
-async def test_rsi_provider_ignores_legacy_token_admission_but_shares_the_daily_cost_limit(store):
+async def test_rsi_provider_ignores_legacy_python_token_and_spending_limits(store):
     proxy, _ = proxy_for(store, limit=0.002)
     settings = Settings()
     route = replace(settings.route("worker"), endpoint="https://provider.test/v1", name="fixture")
@@ -98,150 +94,14 @@ async def test_rsi_provider_ignores_legacy_token_admission_but_shares_the_daily_
         model = configured_provider(
             settings, "worker", client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
         )
-        assert proxy.attach(model, "worker") is model
+        model = proxy.attach(model, "worker")
         await consume(model)
-        with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-            await consume(model)
+        await consume(model)
         await model.close()
-    assert len(requests) == 1
+    assert len(requests) == 2
     summary = await proxy.billing.daily_summary()
-    assert summary["charges"] == [{"currency": "USD", "amount": "0.00208"}]
-    assert summary["requests"] == 1
-
-
-async def test_codex_turns_are_priced_once_and_limit_rejection_does_not_poison_the_operation(
-    store, tmp_path, monkeypatch, codex_responses
-):
-    workflow, config, *_ = await setup(tmp_path)
-    home = tmp_path / "codex-settings"
-    home.mkdir()
-    (home / "config.toml").write_text('model = "fixture"\n')
-    monkeypatch.setenv("CODEX_HOME", str(home))
-    proxy, pricing = proxy_for(store, limit=0.0003)
-    calls = []
-
-    async def runner(argv, **kwargs):
-        calls.append(1)
-        response = await codex_responses(argv, kwargs["env"], expected=None)
-        return {
-            "stdout": codex_events(),
-            "stderr": "",
-            "exitCode": 0 if response.status_code == 200 else 1,
-        }
-
-    action = {"id": "priced-codex", "owner": "owner", "kind": "review"}
-    with model_accounting(proxy):
-        first = await codex_json(
-            workflow, action, {**config, "model_tokens": 1}, "one", [], runner=runner
-        )
-        cached = await codex_json(
-            workflow, action, {**config, "model_tokens": 1}, "one", [], runner=runner
-        )
-        assert first == cached and len(calls) == 1
-        with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-            await codex_json(workflow, action, config, "two", [], runner=runner)
-        rejected = workflow.operation_result("owner", "priced-codex:two")["value"]
-        assert rejected["admission_rejected"] and rejected["metrics"]["tokens"] == 0
-        pricing["dailyLimit"] = 1
-        await codex_json(workflow, action, config, "two", [], runner=runner)
-    assert len(calls) == 3
-    summary = await proxy.billing.view(days=1)
-    assert summary["localEstimated"] == 2 and summary["unknown"] == 0
-    assert summary["localCharges"] == [{"currency": "USD", "amount": "0.000684"}]
-    assert all(row["model"] == "fixture" for row in summary["recent"])
-
-
-async def test_native_spending_is_rejected_by_the_legacy_transport(
-    store, tmp_path, monkeypatch, codex_responses
-):
-    workflow, config, *_ = await setup(tmp_path)
-    home = tmp_path / "codex-settings"
-    home.mkdir()
-    (home / "config.toml").write_text('model = "fixture"\n')
-    monkeypatch.setenv("CODEX_HOME", str(home))
-    proxy, _ = proxy_for(store, limit=1)
-    await proxy.ready()
-    call = await proxy.billing.admit("main", "fixture")
-    await proxy.billing.settle(call, (100, 20, 0), charge=UpstreamCharge(Decimal(1), "USD"))
-    calls = []
-
-    async def runner(argv, **kwargs):
-        calls.append(1)
-        await codex_responses(argv, kwargs["env"], expected=429)
-        return {"stdout": "", "stderr": "Daily limit", "exitCode": 1}
-
-    with model_accounting(proxy), pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-        await codex_json(
-            workflow,
-            {"id": "after-native", "owner": "owner", "kind": "review"},
-            config,
-            "one",
-            [],
-            runner=runner,
-        )
-    assert calls == [1]
-
-
-async def test_missing_codex_usage_stays_unknown_and_cannot_replay(
-    store, tmp_path, monkeypatch, codex_responses
-):
-    workflow, config, *_ = await setup(tmp_path)
-    home = tmp_path / "codex-settings"
-    home.mkdir()
-    (home / "config.toml").write_text('model = "fixture"\n')
-    monkeypatch.setenv("CODEX_HOME", str(home))
-    proxy, _ = proxy_for(store, limit=1)
-    calls = []
-
-    async def interrupted(argv, **kwargs):
-        calls.append(1)
-        await codex_responses(argv, kwargs["env"], complete=False)
-        raise TimeoutError
-
-    action = {"id": "unknown-codex", "owner": "owner", "kind": "review"}
-    with model_accounting(proxy):
-        with pytest.raises(TimeoutError):
-            await codex_json(workflow, action, config, "one", [], runner=interrupted)
-        with pytest.raises(DomainError, match="UNKNOWN_OPERATION"):
-            await codex_json(workflow, action, config, "one", [], runner=interrupted)
-        with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-            await proxy.billing.check()
-    assert calls == [1]
-    assert (await proxy.billing.daily_summary())["unknown"] == 1
-
-
-async def test_invalid_codex_content_still_accounts_completed_usage(
-    store, tmp_path, monkeypatch, codex_responses
-):
-    workflow, config, *_ = await setup(tmp_path)
-    home = tmp_path / "codex-settings"
-    home.mkdir()
-    (home / "config.toml").write_text('model = "fixture"\n')
-    monkeypatch.setenv("CODEX_HOME", str(home))
-    proxy, _ = proxy_for(store)
-
-    async def runner(argv, **kwargs):
-        await codex_responses(argv, kwargs["env"])
-        events = [json.loads(line) for line in codex_events().splitlines()]
-        events = [event for event in events if event["type"] != "item.completed"]
-        return {
-            "stdout": "\n".join(json.dumps(event) for event in events),
-            "stderr": "",
-            "exitCode": 0,
-        }
-
-    with model_accounting(proxy), pytest.raises(DomainError, match="INVALID_MODEL_OUTPUT"):
-        await codex_json(
-            workflow,
-            {"id": "invalid-content", "owner": "owner", "kind": "review"},
-            config,
-            "one",
-            [],
-            runner=runner,
-        )
-    summary = await proxy.billing.daily_summary()
-    assert summary["localCharges"] == [{"currency": "USD", "amount": "0.000342"}]
-    assert summary["unknown"] == 0
+    assert summary["charges"] == [{"currency": "USD", "amount": "0.00416"}]
+    assert summary["requests"] == 2
 
 
 async def test_cancelled_external_admission_is_not_sent_and_releases_the_shared_lock(
@@ -269,33 +129,9 @@ async def test_cancelled_external_admission_is_not_sent_and_releases_the_shared_
     with pytest.raises(asyncio.CancelledError):
         await task
     assert not proxy.admission.locked()
-    await proxy.billing.check()
     summary = await proxy.billing.view(days=1)
     assert summary["pending"] == summary["unknown"] == 0
     assert summary["recent"][0]["cost_source"] == "not_sent"
-
-
-async def test_codex_requires_model_identity_before_reserving_any_operation(
-    store, tmp_path, monkeypatch
-):
-    workflow, config, *_ = await setup(tmp_path)
-    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "empty-codex-config"))
-    proxy, _ = proxy_for(store, limit=1)
-
-    async def runner(*args, **kwargs):
-        pytest.fail("Unknown model identity must not launch a paid call")
-
-    with model_accounting(proxy), pytest.raises(DomainError, match="RSI_CODEX_MODEL_REQUIRED"):
-        await codex_json(
-            workflow,
-            {"id": "missing-model", "owner": "owner", "kind": "review"},
-            config,
-            "one",
-            [],
-            runner=runner,
-        )
-    assert workflow.operation_result("owner", "missing-model:one") is None
-    assert (await proxy.billing.daily_summary())["requests"] == 0
 
 
 async def test_waiting_research_uses_the_shared_billing_day_without_a_new_token_budget_row(
@@ -305,7 +141,7 @@ async def test_waiting_research_uses_the_shared_billing_day_without_a_new_token_
     proxy, _ = proxy_for(store, limit=1)
     workflow.model_proxy = proxy
     timestamp = [1793030400000]
-    proxy.billing.clock = lambda: timestamp[0]
+    workflow.clock = lambda: timestamp[0]
     with workflow.ledger.connection() as db:
         workflow._enqueue(db, "owner", "review", "budget-wait", {"cycle_id": "fixture-cycle"})
     action = workflow.claim()
@@ -337,38 +173,6 @@ async def test_overview_reuses_a_stable_daily_summary_until_usage_changes(store)
     settled = await proxy.billing.daily_summary()
     assert settled["pending"] == 0 and settled["localEstimated"] == 1
     assert await proxy.billing.daily_summary() is settled
-
-
-async def test_proxy_admission_rejection_is_known_zero_without_poisoning_rsi_usage(store):
-    from test_model_proxy import provider
-
-    from roami_agent.improvement.integrations.measurements import MeteredModel
-
-    proxy, _ = proxy_for(store, limit=0.002)
-    calls = []
-
-    def handler(request):
-        calls.append(request)
-        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=EVENTS)
-
-    upstream = provider(proxy, handler)
-    budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 10}, shared_daily_limit=True)
-    journal = []
-    measured = MeteredModel(upstream, budget, "main", output_cap=0, journal=journal)
-    try:
-        await consume(measured)
-        with pytest.raises(DomainError, match="MODEL_PROXY_DAILY_LIMIT"):
-            await consume(measured)
-        assert len(calls) == 1
-        metrics = budget.metrics()
-        assert metrics["tokens"] == 1100 and metrics["request_attempts"] == 1
-        assert not budget.unknown
-        assert journal[-1]["admission_rejected"] is True
-        assert journal[-1]["measurement"]["inputTokens"] == 0
-        summary = await proxy.billing.daily_summary()
-        assert summary["requests"] == 1 and summary["unknown"] == 0
-    finally:
-        await upstream.close()
 
 
 @pytest.mark.parametrize("code", ["MODEL_PROXY_DAILY_LIMIT", "MODEL_PROXY_USAGE_UNKNOWN"])
@@ -409,13 +213,13 @@ async def test_retry_admission_rejection_preserves_the_first_unknown_request(sto
     budget = EpisodeBudget({"tokens": 1, "requests": 1, "seconds": 10}, shared_daily_limit=True)
     journal = []
     try:
-        with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
+        with pytest.raises(DomainError, match="MODEL_HTTP_503"):
             await consume(MeteredModel(upstream, budget, "main", output_cap=0, journal=journal))
-        assert len(calls) == 1 and budget.unknown
+        assert len(calls) == 2 and budget.unknown
         assert budget.metrics()["tokens"] is None
         assert not journal[-1].get("admission_rejected", False)
         summary = await proxy.billing.daily_summary()
-        assert summary["requests"] == 1 and summary["unknown"] == 1
+        assert summary["requests"] == 2 and summary["unknown"] == 2
     finally:
         await upstream.close()
 
@@ -442,15 +246,11 @@ async def test_shared_daily_admission_allows_known_zero_cost_without_token_usage
     metered = MeteredModel(model, budget, "main", output_cap=0)
     try:
         await consume(metered)
-        if prices:
-            with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-                await consume(metered)
-        else:
-            await consume(metered)
-        assert len(calls) == (1 if prices else 2)
+        await consume(metered)
+        assert len(calls) == 2
         assert budget.unknown and budget.metrics()["tokens"] is None
         summary = await proxy.billing.daily_summary()
-        assert summary["unknown"] == (1 if prices else 0)
+        assert summary["unknown"] == (2 if prices else 0)
         assert summary["requests"] == len(calls)
     finally:
         await model.close()

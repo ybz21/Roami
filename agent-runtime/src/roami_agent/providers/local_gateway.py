@@ -9,10 +9,12 @@ from roami_agent.protocol.errors import ModelAdmissionRejected
 
 class LocalGatewayTransport(httpx.AsyncBaseTransport):
     def __init__(self, socket, role):
-        self.transport = httpx.AsyncHTTPTransport(uds=socket, retries=0)
+        self.transport = httpx.AsyncHTTPTransport(uds=socket, retries=0) if socket else None
         self.role = role
 
     async def handle_async_request(self, request):
+        if self.transport is None:
+            raise ModelAdmissionRejected("MODEL_GATEWAY_REQUIRED", 503)
         headers = dict(request.headers)
         headers["X-Roami-Model-Upstream"] = str(request.url)
         headers["X-Roami-Model-Role"] = self.role
@@ -39,13 +41,12 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
         return response
 
     async def aclose(self):
-        await self.transport.aclose()
+        if self.transport is not None:
+            await self.transport.aclose()
 
 
 def local_gateway_client(role, timeout, *, socket=None):
     socket = socket or os.environ.get("ROAMI_MODEL_GATEWAY_SOCKET")
-    if not socket:
-        return None
     return httpx.AsyncClient(
         transport=LocalGatewayTransport(socket, role),
         timeout=httpx.Timeout(timeout or None, connect=10),

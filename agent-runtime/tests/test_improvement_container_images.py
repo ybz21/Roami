@@ -32,7 +32,8 @@ async def test_effective_worker_image_input_reaches_container_request(tmp_path, 
         pass
 
     monkeypatch.setattr(containers, "docker_command", docker)
-    executor = containers.ContainerExecutor(settings, worker_route=route)
+    settings = replace(settings, worker_route=route)
+    executor = containers.ContainerExecutor(settings)
     executor.image_id = "fixture-image"
     monkeypatch.setattr(executor, "remove", remove)
     await executor.run(protocol_suite()["cases"][0], {}, tmp_path)
@@ -46,7 +47,7 @@ async def test_effective_worker_image_input_reaches_container_request(tmp_path, 
     assert child.route("worker").endpoint == "http://localhost/v1/main"
     assert child.route("main").capabilities.get("images") is not True
     other = containers.ContainerExecutor(
-        settings, worker_route=replace(route, image_limits={"max_width": 901})
+        replace(settings, worker_route=replace(route, image_limits={"max_width": 901}))
     )
     assert other.model_hash != executor.model_hash
 
@@ -75,13 +76,23 @@ def test_invalid_container_image_input_is_rejected(image_input):
 @pytest.mark.parametrize("labels", [None, {}, {"org.roami.rsi.workspace-image-input": "1"}])
 async def test_visual_worker_requires_a_capable_container_image(labels, monkeypatch):
     async def docker(*args, **kwargs):
-        return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
+        return json.dumps(
+            [
+                {
+                    "Id": "fixture-image",
+                    "Config": {
+                        "Labels": {**(labels or {}), "org.roami.rsi.shared-daily-policy": "6"}
+                    },
+                }
+            ]
+        ).encode()
 
     monkeypatch.setattr(containers, "docker_command", docker)
     settings = Settings()
-    executor = containers.ContainerExecutor(
+    settings = replace(
         settings, worker_route=replace(settings.route("worker"), capabilities={"images": True})
     )
+    executor = containers.ContainerExecutor(settings)
     if labels:
         assert (await executor.preflight())["image_id"] == "fixture-image"
     else:
@@ -148,7 +159,16 @@ def test_invalid_main_image_input_is_rejected(image_input):
 )
 async def test_visual_main_requires_a_capable_container_image(labels, monkeypatch):
     async def docker(*args, **kwargs):
-        return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()
+        return json.dumps(
+            [
+                {
+                    "Id": "fixture-image",
+                    "Config": {
+                        "Labels": {**(labels or {}), "org.roami.rsi.shared-daily-policy": "6"}
+                    },
+                }
+            ]
+        ).encode()
 
     monkeypatch.setattr(containers, "docker_command", docker)
     settings = Settings(model_capabilities={"images": True})
@@ -181,7 +201,14 @@ async def test_model_free_renderer_keeps_its_pinned_image_without_actor_input_la
             [
                 {
                     "Id": "actor" if actor else "old-renderer",
-                    "Config": {"Labels": {"org.roami.rsi.model-image-input": "1"} if actor else {}},
+                    "Config": {
+                        "Labels": {
+                            "org.roami.rsi.model-image-input": "1",
+                            "org.roami.rsi.shared-daily-policy": "6",
+                        }
+                        if actor
+                        else {}
+                    },
                 }
             ]
         ).encode()

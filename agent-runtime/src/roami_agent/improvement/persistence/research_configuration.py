@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import require
-from roami_agent.improvement.domain.research_configuration import DEFAULTS
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
+from roami_agent.improvement.domain.research_configuration import DEFAULTS, LEGACY_FIELDS
 
 
 class ResearchConfiguration:
@@ -17,7 +16,11 @@ class ResearchConfiguration:
             r = db.execute("SELECT * FROM rsi_research_settings WHERE owner=?", (owner,)).fetchone()
             value = {
                 **DEFAULTS,
-                **(json.loads(r["config_json"]) if r else {}),
+                **{
+                    k: v
+                    for k, v in (json.loads(r["config_json"]) if r else {}).items()
+                    if k in DEFAULTS
+                },
                 "revision": r["revision"] if r else 0,
             }
             if value["repair_executor"] == "native_patch":
@@ -26,11 +29,13 @@ class ResearchConfiguration:
             return value
 
     def configure(self, owner, raw):
-        require(isinstance(raw, dict) and set(raw) == {*DEFAULTS, "revision"})
+        require(
+            isinstance(raw, dict)
+            and {*DEFAULTS, "revision"} <= set(raw) <= {*DEFAULTS, "revision", *LEGACY_FIELDS}
+        )
         value = {k: raw[k] for k in DEFAULTS}
         require(type(value["enabled"]) is bool)
         require(value["repair_executor"] == "codex", "RSI_CODEX_REQUIRED")
-        require(type(value["model_tokens"]) is int and 10000 <= value["model_tokens"] <= 100000)
         require(type(value["model_seconds"]) is int and 10 <= value["model_seconds"] <= 600)
         require(type(value["max_attempts"]) is int and 1 <= value["max_attempts"] <= 3)
         require(type(value["observation_days"]) is int and 2 <= value["observation_days"] <= 14)
@@ -75,14 +80,9 @@ class ResearchConfiguration:
         return {**value, "revision": revision + 1}
 
     def configure_experiment(self, owner, raw):
-        fields = {"enabled", "model_tokens", "model_seconds", "max_attempts", "observation_days"}
-        if uses_shared_model_limit(self.ledger):
-            public = fields - {"model_tokens"} | {"revision"}
-            require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
-            value = self.configure(
-                owner,
-                {**self.settings(owner), **{key: val for key, val in raw.items() if key in public}},
-            )
-            return {key: val for key, val in value.items() if key in public}
-        require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | {"revision"})
-        return self.configure(owner, {**self.settings(owner), **raw})
+        fields = {"enabled", "model_seconds", "max_attempts", "observation_days", "revision"}
+        require(isinstance(raw, dict) and {"revision"} <= set(raw) <= fields | LEGACY_FIELDS)
+        value = self.configure(
+            owner, {**self.settings(owner), **{k: v for k, v in raw.items() if k in fields}}
+        )
+        return {k: v for k, v in value.items() if k in fields}

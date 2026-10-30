@@ -25,8 +25,8 @@ def test_preview_checks_setup_without_requiring_an_independent_token_budget(tmp_
     with service.ledger.connection() as db:
         before = list(db.iterdump())
     result = preview(service, "local", Settings())
-    assert result["cases"] == 60 and result["episodes"] == 120
-    assert result["reservation_tokens"] == 20000
+    assert result["cases"] == 60 and result["episodes"] == 60
+    assert result["reservation_tokens"] is None
     assert "RSI_FORMAL_SUITE_INCOMPLETE" in result["blockers"]
     assert "RSI_BUDGET_REQUIRED" not in result["blockers"]
     assert result["next_run"] is None and result["runtime_preflight_required"]
@@ -58,15 +58,16 @@ def test_visual_configuration_preserves_trusted_targets_and_rejects_stale_writes
         for k in (
             "revision",
             "enabled",
-            "model_tokens",
             "model_seconds",
             "max_attempts",
             "observation_days",
         )
     }
     saved = workflow.configure_experiment("local", {**fields, "max_attempts": 3})
-    assert saved["repo"] == str(tmp_path) and saved["base_commit"] == "a" * 40
-    assert saved["repair_executor"] == "codex" and saved["max_attempts"] == 3
+    trusted = workflow.settings("local")
+    assert trusted["repo"] == str(tmp_path) and trusted["base_commit"] == "a" * 40
+    assert trusted["repair_executor"] == "codex" and saved["max_attempts"] == 3
+    assert "repo" not in saved and "base_commit" not in saved
     with pytest.raises(DomainError, match="SETTINGS_CONFLICT"):
         workflow.configure_experiment("local", fields)
     with pytest.raises(DomainError):
@@ -96,4 +97,4 @@ async def test_preview_and_visual_settings_are_development_only(store, developme
         assert result.status_code == (200 if development else 404)
         if development:
             assert "model_tokens" not in result.json()["data"]
-            assert runtime.improvement.research.settings("local")["model_tokens"] == 64000
+            assert "model_tokens" not in runtime.improvement.research.settings("local")

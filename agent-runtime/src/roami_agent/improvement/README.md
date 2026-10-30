@@ -54,10 +54,10 @@ all extracted domain and evaluation Python sources so a rule change cannot silen
 old grader identity. Existing public `python -m ...improvement.cli`, `container_agent` and
 `import_diagnostic` entry points remain small shims; private imports use the actual new modules.
 
-Shared daily accounting requires rebuilding `improvement.Dockerfile` after upgrading. The image
-label `org.roami.rsi.shared-daily-policy=5` identifies support for forwarding the host policy into
-the Native executor, inheriting saved role windows and compaction policy, and deferring fee
-admission to the configured Go gateway. Context metadata contains no connection or credentials. Missing token counts remain
-unknown evaluation evidence; they do not introduce a second spending gate when the configured Go gateway
-allows the request. Shared-mode preflight rejects older images before model execution, so an old
-image cannot silently retain per-case token, request or missing-usage caps. Explicit legacy mode stays supported.
+All RSI model admission is owned by the Go gateway. Rebuild `improvement.Dockerfile` after
+upgrading: `org.roami.rsi.shared-daily-policy=6` identifies a guest with record-only model usage,
+no local Token/request/missing-usage admission gates, and no legacy quota metadata in the actor
+view. Saved role parameters, capabilities, context windows and retries stay authoritative. Host
+model preflight rejects older actors; model-free rendering can keep its pinned image. Historical
+configuration and receipts remain readable without reactivating their old quotas. Benchmark
+execution and grading deadlines remain part of the frozen acceptance contract.

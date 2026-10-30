@@ -261,7 +261,7 @@ class PipelineReportWorker:
                 response = await codex_json(
                     costs,
                     {"id": run_id + "-review", "kind": "review", "owner": owner},
-                    {"model_tokens": config["codex_tokens"], "model_seconds": 180},
+                    {"model_seconds": 180},
                     "report",
                     [
                         {
@@ -293,7 +293,7 @@ class PipelineReportWorker:
                 response = await codex_json(
                     costs,
                     {"id": run_id + "-issue", "kind": "issue", "owner": owner},
-                    {"model_tokens": config["codex_tokens"], "model_seconds": 180},
+                    {"model_seconds": 180},
                     "plan",
                     [
                         {

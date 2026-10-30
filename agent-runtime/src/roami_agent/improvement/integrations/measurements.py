@@ -6,8 +6,7 @@ import time
 
 from roami_agent.improvement.domain.contracts import require
 from roami_agent.improvement.integrations.input_reservation import InputReservation
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
-from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
+from roami_agent.protocol.errors import ModelAdmissionRejected
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.model_observation import model_observation
 
@@ -19,8 +18,8 @@ class BudgetAdmissionRejected(ModelAdmissionRejected):
 class EpisodeBudget:
     def __init__(self, limits, *, observation_id=None, shared_daily_limit=False):
         self.limits = limits
-        self.shared_daily_limit = shared_daily_limit or uses_shared_model_limit()
-        self.enforce_tokens = not self.shared_daily_limit
+        self.shared_daily_limit = True
+        self.enforce_tokens = False
         self.observation_id = observation_id or "rsi-" + identity()
         self.started = time.monotonic()
         self.requests = []
@@ -29,29 +28,15 @@ class EpisodeBudget:
         self.reserved = 0
         self.used = 0
 
-    def check(self):
-        if time.monotonic() - self.started >= self.limits["seconds"]:
-            raise BudgetAdmissionRejected("RSI_TIME_BUDGET")
-        if self.unknown and not self.shared_daily_limit:
-            raise BudgetAdmissionRejected("RSI_USAGE_UNKNOWN")
-
     async def admit(self, messages, tools, output_cap, *, input_reserve=None):
         async with self.lock:
-            self.check()
-            if not self.shared_daily_limit and len(self.requests) >= self.limits["requests"]:
-                raise BudgetAdmissionRejected("RSI_REQUEST_BUDGET")
-            # This is a conservative local admission estimate, not provider billing.
+            # Estimates are diagnostic only; Go owns admission and billing.
             if input_reserve is None:
                 input_reserve = (
                     len(json.dumps([messages, tools], ensure_ascii=False).encode()) + 4096
                 )
             require(type(input_reserve) is int and input_reserve >= 4096)
             estimate = input_reserve + output_cap
-            if (
-                not self.shared_daily_limit
-                and self.used + self.reserved + estimate > self.limits["tokens"]
-            ):
-                raise BudgetAdmissionRejected("RSI_TOKEN_BUDGET")
             entry = {
                 "inputTokens": None,
                 "outputTokens": None,
@@ -78,13 +63,12 @@ class EpisodeBudget:
                 self.unknown = True
             else:
                 self.used += entry["inputTokens"] + entry["outputTokens"]
-                if not self.shared_daily_limit and self.used > self.limits["tokens"]:
-                    raise DomainError("RSI_TOKEN_BUDGET")
 
     def metrics(self):
         known = not self.unknown and all(r["elapsedMs"] is not None for r in self.requests)
         return {
             "tokens": self.used if known else None,
+            "observed_tokens": self.used,
             "token_coverage": "complete" if known else "unknown",
             "model_calls": len(self.requests),
             "request_attempts": sum(r["requestAttempts"] or 0 for r in self.requests)
@@ -104,7 +88,7 @@ class MeteredModel:
         budget,
         role,
         *,
-        output_cap=2048,
+        output_cap=0,
         journal=None,
         input_reserve=None,
         reservation_basis=None,

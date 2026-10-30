@@ -238,8 +238,8 @@ async def test_schema_13_migration_preserves_estimates_without_relabelling_as_re
         assert (await billing.view())["estimatedCharges"] == [
             {"currency": "CNY", "amount": "0.123456789"}
         ]
-        with pytest.raises(DomainError, match="MODEL_PROXY_USAGE_UNKNOWN"):
-            await billing.admit("main", "a")
+        await billing.admit("main", "a")
+        assert (await billing.view())["estimatedCharges"] == result["total"]["estimatedCharges"]
     finally:
         await database.close()
 

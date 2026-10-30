@@ -4,7 +4,6 @@ import asyncio
 import copy
 import json
 import re
-from dataclasses import replace
 from pathlib import Path
 
 from roami_agent.improvement.domain.admission_blocking import MODEL_ADMISSION_BLOCKERS
@@ -98,7 +97,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
 
     payload = json.loads(request["payload_json"])
     spec = payload["diagnostic"]
-    owner, run_id, config = request["owner"], spec["run_id"], spec["config"]
+    owner, run_id = request["owner"], spec["run_id"]
     shared = uses_shared_model_limit(service.ledger)
     records = service.runs
     records.set_state(owner, run_id, "running")
@@ -131,7 +130,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         "RSI_ARTIFACT_PROFILE_CHANGED",
     )
     budget = EpisodeBudget(
-        {"tokens": config["generation_tokens"], "seconds": 14400, "requests": 300},
+        {},
         observation_id=run_id,
         shared_daily_limit=shared,
     )
@@ -149,44 +148,13 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             journal=journal,
         )
 
-    main_route = (
-        replace(settings.route("main"), name=config["main_model"])
-        if config.get("main_model") and not shared
-        else None
-    )
-    worker_route = (
-        replace(settings.route("worker"), name=config["worker_model"])
-        if config.get("worker_model") and not shared
-        else None
-    )
-    memory_route = (
-        replace(worker_route or settings.route("worker"), name=config["memory_model"])
-        if config.get("memory_model") and not shared
-        else None
-    )
-    generation_overrides = {
-        role: {"reasoning_effort": config[role + "_reasoning_effort"]}
-        for role in ("main", "worker", "memory")
-        if config.get(role + "_reasoning_effort") and not shared
-    }
     executor = ContainerExecutor(
         settings,
         **({"image": executor_image} if executor_image else {}),
-        memory_route=memory_route,
-        worker_route=worker_route,
-        main_route=main_route,
         artifact_reviewer=artifact_reviewer,
-        generation_overrides=generation_overrides,
         provider_factory=provider,
         shared_budget=budget,
-        shared_daily_limit=shared,
-        output_caps={}
-        if shared
-        else {
-            "main": config.get("main_output_tokens", config["output_tokens"]),
-            "worker": config.get("worker_output_tokens", config["output_tokens"]),
-            "memory": config["memory_output_tokens"],
-        },
+        shared_daily_limit=True,
     )
     fingerprint = await executor.preflight()
     from roami_agent.improvement.evaluation.comparison_context import comparison_context
@@ -200,37 +168,16 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
     outcomes = []
     artifact_tokens = 0
     usage_blocker = None
-    real_cases = sum(
-        c["judge"]["kind"] != "mechanism" for c in suite["cases"] if c["id"] in spec["case_ids"]
-    )
-    minimum_start = min(32000, config["generation_tokens"] // max(1, real_cases))
-    remaining_real = real_cases
     records.artifact(
         owner,
         run_id,
         "evaluate",
         "budget-plan.json",
-        {
-            "spending_policy": "shared_model_daily",
-            "admission": "go_gateway",
-            "technical_timeout_seconds": 14400,
-        }
-        if shared
-        else {
-            "minimum_start_tokens": minimum_start,
-            "real_cases": real_cases,
-            "total": config["generation_tokens"],
-        },
+        {"spending_policy": "shared_model_daily", "admission": "go_gateway"},
     )
     for case_id in spec["case_ids"]:
         original = next(c for c in suite["cases"] if c["id"] == case_id)
         case = copy.deepcopy(original)
-        if case["judge"]["kind"] != "mechanism" and not shared:
-            remaining_real -= 1
-            budget.limits["tokens"] = config["generation_tokens"] - remaining_real * minimum_start
-            case["limits"]["tokens"] = min(
-                case["limits"]["tokens"], max(1, budget.limits["tokens"] - budget.used)
-            )
         target = directory / ("case-" + digest(case_id)[:20])
         target.mkdir(mode=0o700)
         records.artifact(
@@ -240,14 +187,12 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
             "budget-" + digest(case_id)[:20] + ".json",
             {
                 "case_id": case_id,
-                "spending_policy": "shared_model_daily" if shared else "frozen_protocol",
+                "spending_policy": "shared_model_daily",
                 "original_limits": original["limits"],
-                "effective_limits": {**case["limits"], "tokens": None, "requests": None}
-                if shared
-                else case["limits"],
+                "effective_limits": {**case["limits"], "tokens": None, "requests": None},
                 "run_tokens_used": budget.used,
-                "run_token_limit": None if shared else budget.limits["tokens"],
-                "reserved_for_later_cases": None if shared else remaining_real * minimum_start,
+                "run_token_limit": None,
+                "reserved_for_later_cases": None,
             },
         )
         blocked_by = None

@@ -1,5 +1,5 @@
 FROM python:3.12-slim
-LABEL org.roami.rsi.shared-daily-policy="5"
+LABEL org.roami.rsi.shared-daily-policy="6"
 LABEL org.roami.rsi.workspace-image-input="1"
 LABEL org.roami.rsi.model-image-input="1"
 RUN apt-get update && apt-get install -y --no-install-recommends chromium ffmpeg libreoffice-impress fonts-noto-cjk fonts-liberation fonts-crosextra-carlito git && rm -rf /var/lib/apt/lists/*

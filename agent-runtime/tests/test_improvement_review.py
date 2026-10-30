@@ -93,8 +93,6 @@ async def test_all_sixty_cases_and_every_log_are_reviewed_without_paid_model_cal
 @pytest.mark.parametrize(
     "change,code",
     [
-        ({"daily_episodes": 118}, "FULL_SUITE_BUDGET"),
-        ({"daily_tokens": 11999}, "FULL_SUITE_BUDGET"),
         ({"case_limit": 4}, "FULL_SUITE_REQUIRED"),
     ],
 )
@@ -252,7 +250,7 @@ async def test_single_baseline_keeps_every_case_and_log_without_duplicate_trials
     assert result["comparison"]["pairs"] == 0 and not result["comparison"]["eligible_for_promotion"]
     cycle = arguments["ledger"].get("local", result["cycle_id"])
     assert cycle["manifest"]["trial_arms"] == ["baseline"]
-    assert cycle["manifest"]["reserved_tokens"] == 600
+    assert cycle["manifest"]["reserved_tokens"] == 0
     assert cycle["manifest"]["reserved_episodes"] == 60
     assert not (await run_cycle(**arguments))["admitted"] and executor.calls == 60
 

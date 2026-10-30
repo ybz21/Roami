@@ -3,8 +3,9 @@
   "enabled": false,
   "repo": "/path/to/roami",
   "base_commit": "",
-  "allowed_paths": ["agent-runtime/src/roami_agent/context"],
-  "model_tokens": 64000,
+  "allowed_paths": [
+    "agent-runtime/src/roami_agent/context"
+  ],
   "model_seconds": 180,
   "repair_executor": "codex",
   "validation_suite_id": "private-rsi",

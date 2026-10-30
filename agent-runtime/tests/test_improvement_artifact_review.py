@@ -5,6 +5,7 @@ import base64
 import copy
 import hashlib
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -19,8 +20,24 @@ from roami_agent.improvement.evaluation.artifact_review import (
 from roami_agent.improvement.evaluation.execution.executors import ProtocolFixtureModel
 from roami_agent.improvement.integrations.measurements import EpisodeBudget
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
+
+
+def fixture_settings():
+    return Settings(
+        endpoint="https://model.invalid/v1",
+        model="artifact_a",
+        model_capabilities={"images": True},
+        worker_route=ModelRoute(
+            "https://model.invalid/v1",
+            "artifact_b",
+            "RSI_FIXTURE_KEY",
+            30,
+            capabilities={"images": True},
+        ),
+    )
 
 
 def pack():
@@ -111,9 +128,9 @@ def certificate(routes):
 
 def reviewer(factory):
     raw = profile()
-    draft = ArtifactReviewer(Settings(), raw, provider_factory=factory, calibrated=False)
+    draft = ArtifactReviewer(fixture_settings(), raw, provider_factory=factory, calibrated=False)
     return ArtifactReviewer(
-        Settings(),
+        fixture_settings(),
         {**raw, "certificate": certificate(draft.route_hashes)},
         provider_factory=factory,
     )
@@ -132,7 +149,7 @@ def reviewer(factory):
     ],
 )
 def test_calibration_requires_same_models_balanced_human_labels_and_known_usage(fault):
-    draft = ArtifactReviewer(Settings(), profile(), calibrated=False)
+    draft = ArtifactReviewer(fixture_settings(), profile(), calibrated=False)
     cert = certificate(draft.route_hashes)
     if fault == "protocol":
         cert["protocol_hash"] = "changed"
@@ -157,14 +174,15 @@ def test_calibration_requires_same_models_balanced_human_labels_and_known_usage(
 
 def test_model_aliases_and_fixture_calibration_are_not_production_ready():
     raw = profile()
-    raw["reviewers"][1]["route"]["name"] = "artifact_a"
+    same_model = fixture_settings()
+    same_model = replace(same_model, worker_route=same_model.route("main"))
     with pytest.raises(DomainError, match="INDEPENDENT"):
-        ArtifactReviewer(Settings(), raw, calibrated=False)
+        ArtifactReviewer(same_model, raw, calibrated=False)
     raw = profile()
-    draft = ArtifactReviewer(Settings(), raw, calibrated=False)
+    draft = ArtifactReviewer(fixture_settings(), raw, calibrated=False)
     raw["certificate"] = certificate(draft.route_hashes)
     with pytest.raises(DomainError, match="NOT_PRODUCTION"):
-        ArtifactReviewer(Settings(), raw)
+        ArtifactReviewer(fixture_settings(), raw)
 
 
 async def test_raters_receive_identical_blind_evidence_and_authoritative_usage():
@@ -216,9 +234,14 @@ async def test_no_paid_output_replay_or_fabricated_evidence(fault):
     evidence = pack()
     if fault == "bad_hash":
         evidence["images"][0]["data"] = base64.b64encode(b"replaced").decode()
-    with pytest.raises((DomainError, ValueError)):
-        await judge.rate(evidence, judge.budget(), [])
-    assert len(calls) == (0 if fault == "bad_hash" else 1)
+    budget = judge.budget()
+    if fault == "unknown_usage":
+        assert len(await judge.rate(evidence, budget, [])) == 2
+        assert budget.metrics()["tokens"] is None and len(calls) == 2
+    else:
+        with pytest.raises((DomainError, ValueError)):
+            await judge.rate(evidence, budget, [])
+        assert len(calls) == (0 if fault == "bad_hash" else 1)
 
 
 @pytest.mark.parametrize("disagree", [False, True])
@@ -322,12 +345,17 @@ async def test_calibration_started_marker_prevents_replay(tmp_path):
 
     root = tmp_path / "calibration"
     result = await calibrate_artifacts(
-        Settings(), profile(), anchors, root, token_limit=100000, provider_factory=factory
+        fixture_settings(), profile(), anchors, root, token_limit=100000, provider_factory=factory
     )
     assert result["passed"] and result["provider_mode"] == "protocol_fixture" and counter == 24
     with pytest.raises(FileExistsError):
         await calibrate_artifacts(
-            Settings(), profile(), anchors, root, token_limit=100000, provider_factory=factory
+            fixture_settings(),
+            profile(),
+            anchors,
+            root,
+            token_limit=100000,
+            provider_factory=factory,
         )
     assert counter == 24
 
@@ -344,23 +372,23 @@ async def test_old_mechanism_selection_is_rejected_before_container_execution(tm
         await run_mechanism(case, {}, tmp_path, executor)
 
 
-async def test_rater_output_budget_is_explicit_and_labels_are_advertised():
+async def test_rater_ignores_legacy_output_budget_and_advertises_evidence_labels():
     raw = profile()
     raw["output_tokens"] = 4096
     observed = []
 
     def factory(settings, role):
-        observed.append(settings.route("main").parameters["max_tokens"])
+        observed.append(settings.route("main").parameters.get("max_tokens"))
         return ProtocolFixtureModel([{"text": json.dumps(rating())}])
 
-    judge = ArtifactReviewer(Settings(), raw, provider_factory=factory, calibrated=False)
+    judge = ArtifactReviewer(fixture_settings(), raw, provider_factory=factory, calibrated=False)
     journal = []
     await judge.rate(pack(), judge.budget(), journal)
-    assert observed == [4096, 4096]
+    assert observed == [None, None]
     sent = json.loads(journal[0]["messages"][-1]["content"][0]["text"])
     assert set(sent["allowed_labels"]) == {"plan.md", "rendered page"}
-    changed = ArtifactReviewer(Settings(), profile(), calibrated=False)
-    assert changed.route_hashes != judge.route_hashes
+    changed = ArtifactReviewer(fixture_settings(), profile(), calibrated=False)
+    assert changed.route_hashes == judge.route_hashes
 
 
 async def test_renderer_cannot_replace_the_agent_under_test(monkeypatch):
@@ -379,8 +407,8 @@ async def test_renderer_cannot_replace_the_agent_under_test(monkeypatch):
 
     monkeypatch.setattr(containers, "docker_command", docker)
     reviewer = SimpleNamespace(profile={"renderer_image": renderer_image}, content_hash="reviewer")
-    executor = containers.ContainerExecutor(Settings(), artifact_reviewer=reviewer)
-    result = await executor.preflight()
+    executor = containers.ContainerExecutor(fixture_settings(), artifact_reviewer=reviewer)
+    result = await executor.preflight(model_inputs=False)
     assert executor.image == containers.IMAGE and executor.image_id == agent_image
     assert executor.artifact_renderer.image_id == renderer_image
     assert result["artifact_renderer_image_id"] == renderer_image

@@ -1,8 +1,6 @@
 """Durable, metered model responses shared by RSI review and revision workflows."""
 
 import asyncio
-import json
-from dataclasses import replace
 
 from roami_agent.improvement.domain.contracts import require
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
@@ -23,21 +21,18 @@ async def model_json(workflow, action, settings, config, key, messages, *, provi
     )
     day = await asyncio.to_thread(workflow.day, action["owner"])
     operation = action["id"] + ":" + key
-    cap = min(4096, route.parameters.get("max_tokens", 4096))
-    reservation = len(json.dumps([messages, []], ensure_ascii=False).encode()) + 4096 + cap
-    require(reservation <= config["model_tokens"], "RSI_TOKEN_BUDGET")
-    saved = await asyncio.to_thread(
-        workflow.reserve_operation, action["owner"], day, operation, reservation
-    )
+    saved = await asyncio.to_thread(workflow.reserve_operation, action["owner"], day, operation, 0)
     if saved is not None:
         return saved["value"]
-    route = replace(route, max_retries=0, parameters={**route.parameters, "max_tokens": cap})
     frozen = settings_with_route(settings, "main", route)
     provider = provider_factory(frozen) if provider_factory else configured_provider(frozen, "main")
-    budget = EpisodeBudget(
-        {"tokens": reservation, "seconds": config["model_seconds"], "requests": 1}
+    budget = EpisodeBudget({}, shared_daily_limit=True)
+    model = MeteredModel(
+        provider,
+        budget,
+        "rsi_" + action["kind"],
+        output_cap=route.parameters.get("max_tokens") or 0,
     )
-    model = MeteredModel(provider, budget, "rsi_" + action["kind"], output_cap=cap)
     text = []
     try:
         async with asyncio.timeout(config["model_seconds"]):
@@ -48,7 +43,6 @@ async def model_json(workflow, action, settings, config, key, messages, *, provi
                     require(sum(map(len, text)) <= 64000, "RSI_INVALID_MODEL_OUTPUT")
                 require(event.kind != "tool", "RSI_UNEXPECTED_MODEL_TOOL")
         metrics = budget.metrics()
-        require(metrics["tokens"] is not None, "RSI_USAGE_UNKNOWN")
         # Store paid output before interpreting it; malformed JSON must not trigger another call.
         result = {"text": "".join(text), "metrics": metrics}
         await asyncio.to_thread(

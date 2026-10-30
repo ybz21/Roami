@@ -6,8 +6,7 @@ import secrets
 
 from roami_agent.improvement.domain.admission_blocking import MODEL_AUTHENTICATION_BLOCKERS
 from roami_agent.improvement.domain.contracts import digest, require
-from roami_agent.improvement.domain.run_configuration import DEFAULTS, STAGES
-from roami_agent.improvement.integrations.spending_policy import uses_shared_model_limit
+from roami_agent.improvement.domain.run_configuration import DEFAULTS, LEGACY_FIELDS, STAGES
 from roami_agent.improvement.persistence.run_artifacts import RunArtifacts
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -24,61 +23,19 @@ class RunRepository:
             row = db.execute(
                 "SELECT value_json FROM rsi_pipeline_settings WHERE owner=?", (owner,)
             ).fetchone()
-            return {**DEFAULTS, **(json.loads(row[0]) if row else {})}
+            return {
+                **DEFAULTS,
+                **{k: v for k, v in (json.loads(row[0]) if row else {}).items() if k in DEFAULTS},
+            }
 
     def configure(self, owner, value):
-        shared = uses_shared_model_limit(self.ledger)
-        if shared:
-            require(
-                isinstance(value, dict)
-                and {"revision", "auto_publish"} <= set(value) <= set(DEFAULTS),
-                "RSI_INVALID_SETTINGS",
-            )
-            value = {
-                **self.settings(owner),
-                "revision": value["revision"],
-                "auto_publish": value["auto_publish"],
-            }
         require(
-            isinstance(value, dict) and {"revision"} <= set(value) <= set(DEFAULTS),
+            isinstance(value, dict)
+            and {"revision", "auto_publish"} <= set(value) <= set(DEFAULTS) | LEGACY_FIELDS,
             "RSI_INVALID_SETTINGS",
         )
-        value = {**self.settings(owner), **value}
-        for role in ("main", "worker"):
-            cap = value[role + "_output_tokens"]
-            require(
-                cap is None or type(cap) is int and 512 <= cap <= 1_000_000,
-                "RSI_POLICY_OUT_OF_RANGE",
-            )
-        from roami_agent.providers.reasoning_effort import EFFORTS
-
-        for role in ("main", "worker", "memory"):
-            model, effort = value[role + "_model"], value[role + "_reasoning_effort"]
-            require(
-                model is None
-                or isinstance(model, str)
-                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}", model),
-                "RSI_INVALID_SETTINGS",
-            )
-            require(
-                effort is None or isinstance(effort, str) and effort in EFFORTS,
-                "RSI_INVALID_SETTINGS",
-            )
+        value = {key: value[key] for key in DEFAULTS}
         require(type(value["auto_publish"]) is bool)
-        for key, lower, upper in (
-            ("daily_tokens", 10000, 100000000),
-            ("generation_tokens", 10000, 2000000),
-            ("codex_tokens", 20000, 100000),
-            ("output_tokens", 4096, 16384),
-            ("memory_output_tokens", 1024, 8192),
-        ):
-            require(
-                type(value[key]) is int and lower <= value[key] <= upper, "RSI_POLICY_OUT_OF_RANGE"
-            )
-        require(
-            value["generation_tokens"] + 2 * value["codex_tokens"] <= value["daily_tokens"],
-            "RSI_DAILY_BUDGET",
-        )
         with self.ledger.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             old = db.execute(
@@ -89,39 +46,12 @@ class RunRepository:
                 type(value["revision"]) is int and value["revision"] == prior["revision"],
                 "RSI_SETTINGS_CONFLICT",
             )
-            if value["daily_tokens"] != prior["daily_tokens"] and not getattr(
-                self.ledger, "shared_daily_limit", False
-            ):
-                from datetime import datetime
-                from zoneinfo import ZoneInfo
-
-                prefs = db.execute(
-                    "SELECT value_json FROM rsi_preferences WHERE owner=?", (owner,)
-                ).fetchone()
-                timezone = (
-                    json.loads(prefs[0]).get("timezone", "Asia/Shanghai")
-                    if prefs
-                    else "Asia/Shanghai"
-                )
-                day = datetime.now(ZoneInfo(timezone)).date().isoformat()
-                budget = db.execute(
-                    "SELECT tokens_reserved FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-                ).fetchone()
-                require(not budget or budget[0] <= value["daily_tokens"], "RSI_DAILY_BUDGET")
-                db.execute(
-                    "UPDATE rsi_budgets SET tokens_limit=? WHERE owner=? AND day=?",
-                    (value["daily_tokens"], owner, day),
-                )
             result = {**value, "revision": value["revision"] + 1}
             db.execute(
                 "INSERT OR REPLACE INTO rsi_pipeline_settings VALUES(?,?)",
                 (owner, json.dumps(result)),
             )
-        return {
-            key: val
-            for key, val in result.items()
-            if not shared or key in {"revision", "auto_publish"}
-        }
+        return result
 
     @staticmethod
     def create_tx(db, owner, run_id, request_key, mode, snapshot):
@@ -397,50 +327,6 @@ class RunRepository:
             )
 
     def queue_report(self, owner, run_id, summary, *, reserve=False):
-        value = self.get(owner, run_id)
-        if reserve:
-            from datetime import datetime
-            from zoneinfo import ZoneInfo
-
-            from roami_agent.improvement.domain.evaluation_configuration import (
-                DEFAULTS as EVALUATION_DEFAULTS,
-            )
-
-            config = value["snapshot"]["pipeline"]
-            prefs = value["snapshot"].get("preferences", {})
-            day = datetime.now(ZoneInfo(prefs.get("timezone", "Asia/Shanghai"))).date().isoformat()
-            with self.ledger.connection() as db:
-                db.execute("BEGIN IMMEDIATE")
-                db.execute(
-                    "INSERT OR IGNORE INTO rsi_budgets VALUES(?,?,?,?,0,0)",
-                    (
-                        owner,
-                        day,
-                        prefs.get("daily_tokens") or config["daily_tokens"],
-                        prefs.get("daily_episodes", EVALUATION_DEFAULTS["daily_episodes"]) or 10000,
-                    ),
-                )
-                budget = db.execute(
-                    "SELECT * FROM rsi_budgets WHERE owner=? AND day=?", (owner, day)
-                ).fetchone()
-                amount = config["codex_tokens"] * 2
-                if (
-                    not uses_shared_model_limit(self.ledger)
-                    and budget["tokens_reserved"] + amount > budget["tokens_limit"]
-                ):
-                    db.execute(
-                        "UPDATE rsi_pipeline_runs SET state='blocked',summary_json=? WHERE id=? AND owner=?",
-                        (json.dumps(summary), run_id, owner),
-                    )
-                    db.execute(
-                        "UPDATE rsi_pipeline_nodes SET state='blocked',error_code='RSI_DAILY_BUDGET' WHERE run_id=? AND node='review'",
-                        (run_id,),
-                    )
-                    return
-                db.execute(
-                    "UPDATE rsi_budgets SET tokens_reserved=tokens_reserved+? WHERE owner=? AND day=?",
-                    (amount, owner, day),
-                )
         self.set_state(owner, run_id, "report_queued", {**summary, "report_admitted": True})
 
     def resume(self, owner, run_id):
@@ -453,7 +339,7 @@ class RunRepository:
         ):
             self.queue_report(owner, run_id, value["summary"] or {}, reserve=True)
             value = self.get(owner, run_id)
-            require(value["state"] == "report_queued", "RSI_DAILY_BUDGET")
+            require(value["state"] == "report_queued", "RSI_ACTION_NOT_RESUMABLE")
         require(value["state"] in {"blocked", "report_queued"}, "RSI_ACTION_NOT_RESUMABLE")
         with self.ledger.connection() as db:
             require(

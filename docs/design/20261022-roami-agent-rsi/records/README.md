@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-10-30 | [Go 网关统一模型额度与用量记录](2026-10-30/go-quota-authority.html) |
 | 2026-10-30 | [RSI 自动绑定本地网关与计费核对](2026-10-30/local-gateway-binding.html) |
 | 2026-10-30 | [RSI CLI 继承节点模型与每日限额](2026-10-30/cli-node-models.html) |
 | 2026-10-30 | [CSV 比较失败的安全诊断](2026-10-30/stock-csv-diagnostics.html) |
