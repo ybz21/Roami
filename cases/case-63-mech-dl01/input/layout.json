@@ -1,6 +1,6 @@
 {
   "kind": "generated_ooxml_fixture",
-  "generator": "test_presentation_layout.layout_presentation",
+  "generator": "test_layout.layout_presentation",
   "parameters": {
     "group_rotation": 0,
     "group_flip": null,

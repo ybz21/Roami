@@ -6,13 +6,13 @@
     "pytest_selectors": [
       "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
       "test_skill_references.py::test_reference_cannot_escape_skill",
-      "test_document_capability_policy.py::test_native_intake_obeys_execution_capability_policy",
-      "test_document_capability_policy.py::test_next_worker_prompt_drops_input_or_workflow_after_policy_changes",
-      "test_document_capability_policy.py::test_intake_stops_remaining_reads_when_policy_changes_during_io"
+      "test_native_input_policy.py::test_native_preparation_never_reads_named_inputs_implicitly",
+      "test_native_input_policy.py::test_explicit_file_reads_obey_current_policy",
+      "test_native_input_policy.py::test_explicit_skill_reads_obey_current_policy"
     ],
     "local_inputs": false,
     "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories.",
-    "automatic_document_variant": "test_presentation_reads.presentation_bytes constructs the actual PPTX input, including nested text and empty decorations; each native run binds a disposable workspace. No real model calls."
+    "explicit_input_variant": "Arbitrary input bytes in disposable workspaces; filenames do not trigger implicit reads. Generic file/Skill reads obey current disable policy, including changes between rounds. No provider constructed."
   },
   "tools": {
     "kind": "scripted_test_runtime",
@@ -24,9 +24,9 @@
     "pytest_selectors": [
       "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
       "test_skill_references.py::test_reference_cannot_escape_skill",
-      "test_document_capability_policy.py::test_native_intake_obeys_execution_capability_policy",
-      "test_document_capability_policy.py::test_next_worker_prompt_drops_input_or_workflow_after_policy_changes",
-      "test_document_capability_policy.py::test_intake_stops_remaining_reads_when_policy_changes_during_io"
+      "test_native_input_policy.py::test_native_preparation_never_reads_named_inputs_implicitly",
+      "test_native_input_policy.py::test_explicit_file_reads_obey_current_policy",
+      "test_native_input_policy.py::test_explicit_skill_reads_obey_current_policy"
     ]
   }
 }

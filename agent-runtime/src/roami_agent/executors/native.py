@@ -24,12 +24,10 @@ class NativeExecutor:
         *,
         resources=None,
         artifacts=None,
-        documents=None,
     ):
         self.run_turn, self.db, self.settings = run_turn, database, settings
         self.workspace_factory = workspace_factory
         self.resources, self.artifacts = resources, artifacts
-        self.documents = documents
 
     def requires_workspace(self, task):
         target = json.loads(task["intent_json"])["target"]
@@ -67,14 +65,6 @@ class NativeExecutor:
         )
 
         async def execute(prepared):
-            if self.documents:
-                prepared = dict(
-                    prepared,
-                    documentInputs=await self.documents.prepare(
-                        json.loads(task["intent_json"]).get("goal", ""),
-                        {"taskId": task["id"], "workspace": prepared.get("workspace")},
-                    ),
-                )
             text = await self.run_turn(
                 dict(
                     prepared,

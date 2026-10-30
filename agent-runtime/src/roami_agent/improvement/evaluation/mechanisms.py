@@ -79,15 +79,9 @@ NODES = {
     "SK02": [
         ("skill_references", "reference_is_loaded_on_demand_and_changes_catalog_version"),
         ("skill_references", "reference_cannot_escape_skill"),
-        ("document_capability_policy", "native_intake_obeys_execution_capability_policy"),
-        (
-            "document_capability_policy",
-            "next_worker_prompt_drops_input_or_workflow_after_policy_changes",
-        ),
-        (
-            "document_capability_policy",
-            "intake_stops_remaining_reads_when_policy_changes_during_io",
-        ),
+        ("native_input_policy", "native_preparation_never_reads_named_inputs_implicitly"),
+        ("native_input_policy", "explicit_file_reads_obey_current_policy"),
+        ("native_input_policy", "explicit_skill_reads_obey_current_policy"),
     ],
     "PL01": [
         ("execution_traces", "trace_joins_native_task_and_completion_without_another_user_turn"),

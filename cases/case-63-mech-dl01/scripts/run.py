@@ -22,9 +22,10 @@ def main():
     if output == repository or repository in output.parents:
         parser.error("Output must be a new directory outside the checkout")
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    sys.path.insert(0, str(repository / "agent-runtime/tests"))
-    fixture = importlib.import_module("test_presentation_layout")
-    from roami_agent.documents.presentation import presentation_metadata
+    sys.path.insert(0, str(repository / "skills/presentation-edit/tests"))
+    sys.path.insert(0, str(repository / "skills/presentation-edit/scripts"))
+    fixture = importlib.import_module("test_layout")
+    from pptx_package import presentation_metadata
 
     resources = [
         path
@@ -33,13 +34,9 @@ def main():
     ]
     implementation = [
         path
-        for path in (repository / "agent-runtime/src").rglob("*")
+        for path in (repository / "skills/presentation-edit").rglob("*")
         if path.is_file() and "__pycache__" not in path.parts
     ]
-    implementation.extend(
-        repository / "agent-runtime/tests" / name
-        for name in ["test_presentation_layout.py", "test_presentation_reads.py"]
-    )
     tracked = {
         str(path.relative_to(repository)): digest(path)
         for path in resources + implementation
@@ -96,7 +93,7 @@ sys.exit(int(result))
                     "no:cacheprovider",
                     "--basetemp",
                     str(output / "pytest"),
-                    str(repository / "agent-runtime/tests/test_presentation_layout.py"),
+                    str(repository / "skills/presentation-edit/tests/test_layout.py"),
                 ],
                 cwd=repository,
                 check=False,

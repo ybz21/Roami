@@ -1,27 +1,24 @@
 """Worker file tools bind every edit to the observed content hash."""
 
 from roami_agent.protocol.tools import Tool, object_schema
-from roami_agent.tools.workspace_presentations import WorkspacePresentationReads
 
 
 def register_file_tools(registry, files, *, images=None):
-    presentations = WorkspacePresentationReads(files, images.read if images else files.read)
     path = {"type": "string", "minLength": 1, "maxLength": 4096}
     digest = {"type": "string", "pattern": "^[a-f0-9]{64}$"}
     registry.add(
         Tool(
             "file_read",
-            "Read one file in bounded byte pages with its original content hash. Use view=document for PPTX text objects, groups and editor palette before editing. Document view pages describe the inspection, not the source bytes. Raw non-UTF-8 pages are base64. Main: delegate repository/code work when only a directory is known; do not guess filenames.",
+            "Read one file in bounded byte pages with its original content hash. Raw non-UTF-8 pages are base64. Main: delegate repository/code work when only a directory is known; do not guess filenames.",
             object_schema(
                 {
                     "path": path,
-                    "view": {"enum": ["raw", "document"]},
                     "offset": {"type": "integer", "minimum": 0},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 16000},
                 },
                 ["path"],
             ),
-            presentations.read,
+            images.read if images else files.read,
         )
     )
     registry.add(

@@ -1,6 +1,6 @@
 ---
 name: presentation-edit
-description: Inspect and edit existing PPTX slide text alignment and colors while preserving editable objects and unrelated document parts. Use for PowerPoint or Impress file changes.
+description: Inspect and edit existing PPTX slide text alignment and colors while preserving editable objects and unrelated document parts. Use for PowerPoint or Impress file changes (演示文稿、幻灯片).
 ---
 
 # Presentation editing
