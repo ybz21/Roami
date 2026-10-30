@@ -289,12 +289,15 @@ def test_corpus_contract_revision_preserves_previously_frozen_material(tmp_path)
     v14.write_bytes(b"previous v14 frozen evidence")
     v15 = root / "authored-40-v15.json"
     v15.write_bytes(b"previous v15 frozen evidence")
+    v16 = root / "authored-40-v16.json"
+    v16.write_bytes(b"previous v16 frozen evidence")
     prepare_corpus(service, "owner")
+    assert v16.read_bytes() == b"previous v16 frozen evidence"
     assert v15.read_bytes() == b"previous v15 frozen evidence"
     assert v14.read_bytes() == b"previous v14 frozen evidence"
     assert v13.read_bytes() == b"previous v13 frozen evidence"
     assert previous.read_bytes() == b"original frozen suite evidence"
-    revised = json.loads((root / "authored-40-v16.json").read_text())
+    revised = json.loads((root / "authored-40-v17.json").read_text())
     assert len(revised["cases"]) == 40
     identities = {c["id"]: c["origin"]["recipe_revision"] for c in revised["cases"]}
     assert identities["DEMO-02"] == identities["STOCK-01"] == "authored-v10-separated-instructions"

@@ -4,7 +4,8 @@
   "data": {
     "kind": "runtime_regression",
     "pytest_selectors": [
-      "test_improvement.py::test_missing_or_partial_retry_usage_is_unknown_and_blocks_next_request",
+      "test_gateway_quota_authority.py::test_go_quota_rejection_remains_authoritative_even_with_zero_python_limits",
+      "test_improvement.py::test_missing_or_partial_retry_usage_stays_unknown_without_local_quota",
       "test_improvement.py::test_episode_budget_counts_all_models_and_does_not_double_count_cache"
     ],
     "local_inputs": false,
@@ -17,7 +18,8 @@
   "acceptance": {
     "kind": "pytest_assertions",
     "pytest_selectors": [
-      "test_improvement.py::test_missing_or_partial_retry_usage_is_unknown_and_blocks_next_request",
+      "test_gateway_quota_authority.py::test_go_quota_rejection_remains_authoritative_even_with_zero_python_limits",
+      "test_improvement.py::test_missing_or_partial_retry_usage_stays_unknown_without_local_quota",
       "test_improvement.py::test_episode_budget_counts_all_models_and_does_not_double_count_cache"
     ]
   }

@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>机制 Case 执行合同</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>机制 Case 执行合同</h1>
+<h2>Product Design</h2><p>续修 Issue #443：TR02、SK02、MB02 三个 Case 引用失效的测试函数，下一轮会在收集阶段失败；旧执行器只看 pytest 退出码，也会把跳过或预期失败当作通过。</p>
+<h2>User Stories</h2><ul><li>我能在 Case 材料中看到实际可执行的测试入口，模型额度归 Go 网关统一管理。</li><li>缺少、跳过、预期失败、零收集或漏选断言时，回归不能显示通过。</li><li>新运行使用更新的执行合同，历史冻结用例与成绩保留。</li></ul>
+<h2>Technical Design</h2><p>evaluation/mechanisms.py 对齐现有 CLI/Skill 边界及 Go 网关准入测试；容器创建前校验函数存在。独立 pytest 插件回传收集数量、执行通过数量、跳过/xfail 和实际选择的测试，host 核验每个合同入口全部执行通过才允许通过，原始回执保留在 grade 中。</p>
+<p>相应 Case 的 materials.json 与实际入口同步，MB02 明确额度归 Go。corpus.py 生成 authored-40-v17，保留此前 v16 文件；新旧选择器不兼容时继续拒绝复用旧冻结合同，不修改原正式 60 项或人工标签。新增回归覆盖全部 20 个机制入口与材料一致性、缺失函数的提前拒绝，以及真实 pytest 的通过/跳过/xfail/xpass/失败和空收集。</p>
+<h2>Acceptance</h2><p>针对性检查已通过 103 项。全部 20 个机制 Case 已在隔离容器内实际运行，合计 79 项断言全部执行通过，0 跳过、0 推理调用；原三个失效入口的 pytest 收集已复现退出码 4。最终实际容器运行、完整门禁及 CI 以本次 PR 记录为准；脚本化机制分数不等于真实模型任务的质量分数。验收不覆盖底层模型配置，不启用日程或部署。</p>
+</main></body></html>

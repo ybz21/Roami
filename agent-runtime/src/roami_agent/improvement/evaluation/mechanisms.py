@@ -1,5 +1,6 @@
 """Frozen executable regression variants for the twenty decision-space contracts."""
 
+import ast
 import json
 import time
 from pathlib import Path
@@ -69,7 +70,7 @@ NODES = {
     ],
     "TR02": [
         ("routing_policy", "external_or_invented_quote_cannot_override_the_user"),
-        ("foundations", "research_and_main_cannot_escape_cli_admission"),
+        ("foundations", "background_roles_share_workspace_and_registered_cli_rules"),
     ],
     "SK01": [
         ("skill_references", "reference_is_loaded_on_demand_and_changes_catalog_version"),
@@ -77,7 +78,7 @@ NODES = {
     ],
     "SK02": [
         ("skill_references", "reference_is_loaded_on_demand_and_changes_catalog_version"),
-        ("skill_references", "reference_cannot_escape_skill_or_bypass_research_profile"),
+        ("skill_references", "reference_cannot_escape_skill"),
     ],
     "PL01": [
         ("execution_traces", "trace_joins_native_task_and_completion_without_another_user_turn"),
@@ -103,7 +104,11 @@ NODES = {
         ("generation_parameters", "invalid_parameters_fail_before_any_provider_request"),
     ],
     "MB02": [
-        ("improvement", "missing_or_partial_retry_usage_is_unknown_and_blocks_next_request"),
+        (
+            "gateway_quota_authority",
+            "go_quota_rejection_remains_authoritative_even_with_zero_python_limits",
+        ),
+        ("improvement", "missing_or_partial_retry_usage_stays_unknown_without_local_quota"),
         ("improvement", "episode_budget_counts_all_models_and_does_not_double_count_cache"),
     ],
     "VD01": [
@@ -123,6 +128,35 @@ def nodes(case_id):
     return [f"test_{module}.py::test_{name}" for module, name in NODES[key]]
 
 
+def regression_program(policy, selectors):
+    return """import json,pytest
+from roami_agent.protocol.improvement import policy_binding
+policy_binding.set({{"policy":json.loads({!r})}})
+class Receipt:
+ def __init__(self):self.selectors=[];self.collected=0;self.passed=0;self.skipped=0
+ def pytest_collection_finish(self,session):
+  self.collected=len(session.items)
+  self.selectors=sorted(set(item.nodeid.split('[',1)[0] for item in session.items))
+ def pytest_runtest_logreport(self,report):
+  uncertain=report.skipped or bool(getattr(report,'wasxfail',None))
+  if uncertain:self.skipped+=1
+  if report.when=='call' and report.passed and not uncertain:self.passed+=1
+receipt=Receipt()
+result=pytest.main([{},"-q","--asyncio-mode=auto","--rootdir=/testing","-p","no:cacheprovider","--basetemp=/tmp/rsi-tests"],plugins=[receipt])
+print(json.dumps({{"exit_code":int(result),"selectors":receipt.selectors,"collected":receipt.collected,"passed":receipt.passed,"skipped":receipt.skipped}}))
+""".format(json.dumps(policy), ",".join(repr("/testing/" + s) for s in selectors))
+
+
+def regression_passed(result, selectors):
+    return (
+        result.get("exit_code") == 0
+        and result.get("skipped") == 0
+        and result.get("passed", 0) > 0
+        and result.get("passed") == result.get("collected")
+        and set(result.get("selectors", [])) == set(selectors)
+    )
+
+
 async def run_mechanism(case, policy, root, executor):
     from roami_agent.improvement.evaluation.execution.containers import docker_command
 
@@ -137,12 +171,15 @@ async def run_mechanism(case, policy, root, executor):
     require(
         all((tests / n.split("::")[0]).is_file() for n in selectors), "RSI_REGRESSION_PACK_REQUIRED"
     )
-    program = """import json,pytest
-from roami_agent.protocol.improvement import policy_binding
-policy_binding.set({{"policy":json.loads({!r})}})
-result=pytest.main([{},"-q","--asyncio-mode=auto","--rootdir=/testing","-p","no:cacheprovider","--basetemp=/tmp/rsi-tests"])
-print(json.dumps({{"exit_code":int(result)}}))
-""".format(json.dumps(policy), ",".join(repr("/testing/" + s) for s in selectors))
+    for selector in selectors:
+        module, name = selector.split("::")
+        functions = {
+            node.name
+            for node in ast.parse((tests / module).read_text()).body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        require(name in functions, "RSI_REGRESSION_NODE_REQUIRED")
+    program = regression_program(policy, selectors)
     started = time.monotonic()
     name = "roami-rsi-mechanism-" + digest([str(root), policy])[:20]
     await docker_command(
@@ -178,7 +215,7 @@ print(json.dumps({{"exit_code":int(result)}}))
     try:
         raw = await docker_command("start", "--attach", name, timeout=case["limits"]["seconds"])
         result = json.loads(raw.decode().splitlines()[-1])
-        passed = result["exit_code"] == 0
+        passed = regression_passed(result, selectors)
     finally:
         await executor.remove(name, name)
     (root / "regression.log").write_bytes(raw)
@@ -186,6 +223,7 @@ print(json.dumps({{"exit_code":int(result)}}))
     grade.update(
         grade_scope="deterministic_mechanism_regression",
         selectors=selectors,
+        regression_receipt=result,
         evidence_hash=digest(raw.decode()),
     )
     return {

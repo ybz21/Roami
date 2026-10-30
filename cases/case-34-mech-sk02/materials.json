@@ -5,7 +5,7 @@
     "kind": "runtime_regression",
     "pytest_selectors": [
       "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
-      "test_skill_references.py::test_reference_cannot_escape_skill_or_bypass_research_profile"
+      "test_skill_references.py::test_reference_cannot_escape_skill"
     ],
     "local_inputs": false,
     "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
@@ -18,7 +18,7 @@
     "kind": "pytest_assertions",
     "pytest_selectors": [
       "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
-      "test_skill_references.py::test_reference_cannot_escape_skill_or_bypass_research_profile"
+      "test_skill_references.py::test_reference_cannot_escape_skill"
     ]
   }
 }
