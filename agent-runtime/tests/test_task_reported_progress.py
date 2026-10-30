@@ -17,11 +17,11 @@ from roami_agent.storage.database import row
 
 
 async def reported_task(store, tmp_path):
-    from roami_agent.improvement.evaluation.case_catalog import case_resource
-
     recipe = json.loads(
         Path(
-            os.environ.get("ROAMI_CASE61_INPUT", case_resource("MECH-VD03", "input/incident.json"))
+            os.environ.get(
+                "ROAMI_CASE61_INPUT", Path(__file__).parent / "fixtures/task-reported-progress.json"
+            )
         ).read_text()
     )
     paths = [Path(name) for name in recipe["reported_outputs"]]

@@ -8,3 +8,5 @@ Go 与 Python 两组断言必须全部通过，原始输出与退出码保存在
 4. 未完成轮次已有的明确回报文件可冻结、预览和下载，保留 provisional 标记；state、result、finished_ms 不伪造，不能触发验收或重新派活。
 5. 相对路径按回报目录处理，文件必须仍在原工作区内；不扫描无关文件。重复读取不重复写事件或产物，删除后不复活，其他用户不可读取。
 6. 现有正式套件和历史成绩不变。此 Case 的通过只证明上述机制，不代表真实模型质量或两天观察完成。
+
+运行时测试包携带 `agent-runtime/tests/fixtures/task-reported-progress.json`，与本 Case 的 `input/incident.json` 字节一致。宿主同步断言与运行器均阻止数据漂移，不向 Actor 挂载 Case 目录或判定器。

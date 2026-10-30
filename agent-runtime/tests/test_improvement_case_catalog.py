@@ -254,3 +254,10 @@ def test_case62_input_matches_the_self_contained_frozen_regression_pack():
     canonical = case_resource("MECH-RC01", "input/receipts.json").read_bytes()
     snapshot = Path(__file__).parent / "fixtures/model-request-receipts.json"
     assert snapshot.read_bytes() == canonical
+
+
+def test_case61_input_matches_the_self_contained_runtime_pack():
+    root = Path(__file__).parents[2]
+    assert (root / "cases/case-61-mech-vd03/input/incident.json").read_bytes() == (
+        Path(__file__).parent / "fixtures/task-reported-progress.json"
+    ).read_bytes()

@@ -16,7 +16,7 @@ from roami_agent.protocol.errors import DomainError
 
 
 def test_all_mechanism_selectors_resolve_and_match_case_materials():
-    tests = Path(__file__).parent
+    tests = Path(__file__).parents[1]
     definitions = {case["id"]: case for case in case_definitions()}
     for key in mechanisms.NODES:
         ident = "MECH-" + key
