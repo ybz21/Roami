@@ -31,11 +31,22 @@ log = logging.getLogger(__name__)
 
 
 class PromptBuilder:
-    def __init__(self, database, context, settings, *, vision=None, chat_images=None, memory=None):
+    def __init__(
+        self,
+        database,
+        context,
+        settings,
+        *,
+        vision=None,
+        chat_images=None,
+        memory=None,
+        documents=None,
+    ):
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
         self.chat_images = chat_images
         self.remembered = RememberedContext(memory, settings) if memory else None
+        self.documents = documents
 
     async def _images(self, turn, plan, prompt):
         if self.chat_images:
@@ -391,6 +402,8 @@ class PromptBuilder:
                 plan["memoryEvidence"] = evidence
                 if recalled:
                     prompt.insert(1, recalled)
+            if self.documents:
+                plan, prompt = self.documents.attach(turn, plan, prompt)
             plan, prompt = await self._images(turn, plan, prompt)
             timing = execution_timing(turn, now_ms())
             if timing:
