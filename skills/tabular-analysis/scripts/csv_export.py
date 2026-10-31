@@ -61,6 +61,7 @@ def export(
     keys=(),
     date_keys=(),
     numeric=(),
+    preserve_numeric_text=(),
     value_mode="analysis",
     analysis_key_values=False,
     columns=None,
@@ -68,6 +69,11 @@ def export(
 ):
     original, raw, _ = table(workspace, source, source_sha)
     available, selected, _ = table(workspace, analysis, analysis_sha)
+    if workspace.relative(destination) in [
+        workspace.relative(source),
+        workspace.relative(analysis),
+    ]:
+        raise PublicationError("OUTPUT_MUST_DIFFER")
     wanted = original if columns is None else columns
     if not wanted or len(set(wanted)) != len(wanted):
         raise PublicationError("TABLE_COLUMNS_INVALID")
@@ -75,12 +81,18 @@ def export(
         len(set(keys)) != len(keys)
         or not set(numeric) <= set(wanted)
         or not set(date_keys) <= set(keys)
+        or not set(preserve_numeric_text) <= set(wanted)
+        or set(preserve_numeric_text) & set(numeric)
     ):
         raise PublicationError(
             "TABLE_FIELD_SELECTION_INVALID",
             details={
                 "invalidNumericFields": sorted(set(numeric) - set(wanted)),
                 "invalidDateKeys": sorted(set(date_keys) - set(keys)),
+                "invalidPreserveFields": sorted(
+                    set(preserve_numeric_text) - set(wanted)
+                ),
+                "conflictingFields": sorted(set(preserve_numeric_text) & set(numeric)),
                 "availableColumns": wanted,
                 "recovery": "Keep complete field names as argv items or arrays in --spec; correct the selection without dropping intended fields.",
             },
@@ -139,6 +151,18 @@ def export(
                     value = ("-" if number.is_signed() and number else "") + integer
             output.append(value)
         projected.append(output)
+    retained = integral_decimal_fields(wanted, projected, exclude=numeric)
+    unresolved = [
+        item for item in retained if item["field"] not in preserve_numeric_text
+    ]
+    if unresolved:
+        raise PublicationError(
+            "TABLE_NUMERIC_CHOICES_REQUIRED",
+            details={
+                "unresolvedFields": unresolved,
+                "recovery": "Choose each unresolved field in numeric or preserveNumericText based on the task and input; do not preserve a missed conversion merely to clear this error.",
+            },
+        )
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(wanted)
@@ -163,9 +187,10 @@ def export(
         "recoveredSourceColumns": [name for name in wanted if name in missing],
         "valueMode": value_mode,
         "numericFields": [field for field in wanted if field in numeric],
-        "retainedIntegralDecimalFields": integral_decimal_fields(
-            wanted, projected, exclude=numeric
-        ),
+        "retainedIntegralDecimalFields": retained,
+        "preservedNumericTextFields": [
+            field for field in wanted if field in preserve_numeric_text
+        ],
     }
 
 
@@ -186,6 +211,7 @@ def main(argv=None):
     parser.add_argument("--keys", nargs="+", default=[])
     parser.add_argument("--date-keys", nargs="+", default=[])
     parser.add_argument("--numeric", nargs="+", default=[])
+    parser.add_argument("--preserve-numeric-text", nargs="+", default=[])
     parser.add_argument("--columns", nargs="+")
     args = parser.parse_args(argv)
     export_options = (
@@ -201,6 +227,7 @@ def main(argv=None):
         args.date_keys,
         args.numeric,
         args.columns,
+        args.preserve_numeric_text,
     )
     if args.operation == "inspect" and (
         not args.path or args.spec or any(export_options)
@@ -237,6 +264,7 @@ def main(argv=None):
                 keys=args.keys,
                 date_keys=args.date_keys,
                 numeric=args.numeric,
+                preserve_numeric_text=args.preserve_numeric_text,
                 value_mode=args.values or "analysis",
                 analysis_key_values=args.analysis_key_values,
                 columns=args.columns,

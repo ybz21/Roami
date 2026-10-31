@@ -28,7 +28,8 @@ Inspection reports `integralDecimalFields`: exact field names and counts of deci
   "keys": ["event date"],
   "dateKeys": ["event date"],
   "values": "source",
-  "numeric": ["units", "total amount"]
+  "numeric": ["units", "total amount"],
+  "preserveNumericText": ["record code"]
 }
 ```
 
@@ -36,15 +37,17 @@ Inspection reports `integralDecimalFields`: exact field names and counts of deci
 python <packagePath>/scripts/csv_export.py export --workspace <directory> --spec export.json
 ```
 
-`numeric` is required in a spec: list the fields whose numeric representations should be normalized, or explicitly use `[]` if none. Omitting it is rejected, so a forgotten selection cannot silently skip the decision. The spec accepts the same options as individual flags: `columns`, `analysisKeyValues`, and `expectedDestinationSha256` are optional. Do not mix `--spec` with individual export options. For direct flags, use structured `bash.argv` items for full field names. If field selection fails, use the returned rejected names and available columns to repair quoting or the JSON; do not drop intended conversions just to clear an error.
+`numeric` is required in a spec: list the fields whose numeric representations should be normalized, or explicitly use `[]` if none. Omitting it is rejected, so a forgotten selection cannot silently skip the decision. Every exported field retaining decimal-form whole numbers must be declared in either `numeric` or `preserveNumericText` (`--preserve-numeric-text`). Undeclared fields stop the write with their exact names and observed counts. Select preservation only when the task calls for unchanged text, such as padded or mixed identifiers; do not acknowledge a missed conversion merely to clear an error. A field cannot be in both lists. The spec accepts the same options as individual flags: `columns`, `analysisKeyValues`, and `expectedDestinationSha256` are optional. Do not mix `--spec` with individual export options. For direct flags, use structured `bash.argv` items for full field names. If field selection fails, use the returned rejected names and available columns to repair quoting or the JSON; do not drop intended conversions just to clear an error.
 
 For cleaning that only filters/reorders rows or normalizes selected numeric representations, `values: "source"` (`--values source`) retains the matching original field values and representations, including timestamp/time-zone text. The selected `numeric` conversions still run in source mode; type cleanup alone does not require analysis mode. For actual cell-value corrections or imputation, use the default `values: "analysis"` (`--values analysis`) to retain edited values; source mode would undo those edits.
+
+CSV stores text rather than in-memory column types. Parsing a key to datetime for filtering or sorting is not by itself a request to shorten its exported timestamp or remove its time zone. For type conversion alone, keep the matched source key text; choose analysis key text only for an explicitly requested serialization-format change.
 
 Choose keys from the actual input, not the example. Source rows matching those keys must be unique; ambiguous or unmatched keys stop publication. `--date-keys` explicitly compares ISO civil dates, allowing a timestamp to match its date-only form. It preserves the matched source date-key text even in analysis-value mode; use `--analysis-key-values` only when the user requests that format change. It does not infer time zones; use full or prepared keys when time-of-day matters. A collision is an error, not permission to pick a row.
 
 Choose `--numeric` only for fields established as numeric by the input and task. It validates finite numbers and removes incidental decimal-zero suffixes from ordinary integral representations; it does not round fractional data or convert undeclared identifier fields. Preserve full input precision during analysis and format chart labels separately.
 
-The source and analysis files remain unchanged. The output is separate and create-only by default; replacing an existing output requires its observed `--expected-destination-sha256`. Input changes fail before publication. The export receipt names `numericFields` and `retainedIntegralDecimalFields`; check that retained representations are intentional before delivery. If one was missed, correct the selection and use the observed destination hash for replacement. If a failure reports `writePublished: true`, inspect the output and reconcile its hash before considering another write.
+The source and analysis files remain unchanged. The output is separate and create-only by default; replacing an existing output requires its observed `--expected-destination-sha256`. Input changes fail before publication. The export receipt names `numericFields` and `retainedIntegralDecimalFields`; check that retained representations are intentional before delivery. If a field has no type choice, correct the selection before publication. Replacing a prior output still requires its observed destination hash. If a failure reports `writePublished: true`, inspect the output and reconcile its hash before considering another write.
 
 Inspect the exported CSV and use it for the requested cleaned-data delivery, keeping derived features in the analysis data unless requested as output. When the destination is a service, use the task's authorized transfer interface and confirm remote delivery. Reopen requested charts or reports and state any unverified visual limitations.
 
