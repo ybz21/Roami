@@ -3,6 +3,8 @@
 ## 产品设计与用户故事
 
 用户给原任务追加要求时，上一轮回报与工作会话的空闲确认可能尚未同步。
+主要入口是用户在主智能体对话中提出新要求，由 Main 从对话和已跟踪任务识别续接意图，
+调用 `task_steer`；任务详情中的追加框属于另一入口，不能代替这条链路的验收。
 追加要求应保留并排队，空闲后在原会话继续；不能把尚未发送的请求显示为任务失败，
 也不能提前宣布任务完成。取消排队后不再发送，发送结果不确定时不自动重复追加。
 
@@ -102,3 +104,23 @@ Chrome 截图视口，未做 Android 真机触控验收。本轮没有修改产�
 - [执行回报待核验](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-claude-appended-finished.png)
 - [紧凑档结果](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-claude-appended-finished-compact.png)
 - [Main 对话收到追加回报](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-completion-reply-in-main.png)
+
+## 主对话追加与完成回调约束（2026-10-31）
+
+此前 40 个 Chrome 场景的追加动作来自任务详情框，Main 模型也使用了夹具，
+因此只能作为详情入口和状态机验收，不能证明自然语言续接意图的识别。
+
+补测改为 Chrome 主对话输入自然语言，由节点保存的 Main 模型经原 Go 模型网关判断
+并调用工具，保留保存的路由、参数和能力配置。发现原任务续接已受理后，Main 在完成
+回调中仍可能因自行补出的文件要求创建替代任务。原回调入口仅限制取消和不可重试失败，
+没有使用用户请求已最终交接的持久化回执。
+
+`storage/task_handoff.py` 从回调来源追溯真实用户消息（含 `taskSteer` 的来源映射），
+读取该轮已成功接收且 `requestComplete=true` 的交接回执。
+`tools/gateway.py` 据此在执行前拒绝完成回调中的 `delegate/task_steer`，
+包括通过 CLI 注册命令转入的操作。回调只报告真实结果与阻碍，不重新授权任务。
+新用户消息仍可追加；没有最终交接的分阶段请求保留后续执行能力。
+
+`test_main_followup_callbacks.py` 覆盖两种原交接、四种完成状态、直接派活/追加及
+CLI 追加，共 24 项拒绝重复派活并允许新消息追加的回归；另验证非最终交接可继续下一阶段。
+连同既有回报与阶段来源回归，39 项针对性测试通过。
