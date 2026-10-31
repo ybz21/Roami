@@ -1,6 +1,7 @@
 """Delivery URLs come from persisted task artifacts, not copied model identifiers."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -35,12 +36,18 @@ def test_missing_links_are_added_and_duplicate_names_are_never_guessed():
     assert deliverable_links("No saved files.", []) == "No saved files."
 
 
-async def test_main_delivery_only_normalizes_current_owned_undeleted_artifacts(store):
+@pytest.mark.parametrize("html", [False, True])
+async def test_main_delivery_only_normalizes_current_owned_undeleted_artifacts(store, html):
     class Report:
         model = "artifact-handoff"
 
         async def stream(self, messages, tools):
-            yield ModelEvent("text", "Ready: [report.txt](/api/agent/artifacts/typo/content).")
+            text = (
+                '<li><a href="/api/agent/artifacts/typo/content">report.txt</a></li>'
+                if html
+                else "Ready: [report.txt](/api/agent/artifacts/typo/content)."
+            )
+            yield ModelEvent("text", text)
 
     runtime = Runtime(store, Report())
     try:
@@ -83,7 +90,12 @@ async def test_main_delivery_only_normalizes_current_owned_undeleted_artifacts(s
         )
         messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
         text = messages[-1]["content"]["text"]
-        assert text == f"Ready: [report.txt]({owned['downloadUrl']})."
+        expected = (
+            '<li><a href="">report.txt</a></li>\n\n' + f"[report.txt]({owned['downloadUrl']})"
+            if html
+            else f"Ready: [report.txt]({owned['downloadUrl']})."
+        )
+        assert text == expected
         assert all(item["id"] not in text for item in [other, unrelated, deleted])
     finally:
         await runtime.close()
@@ -198,3 +210,48 @@ def test_loopback_download_in_json_remains_a_relative_string():
 def test_bare_loopback_download_remains_clickable_before_sentence_punctuation(punctuation):
     text = "下载：http://localhost:3000" + URL + punctuation
     assert deliverable_links(text, REFS) == f"下载：[report.txt]({URL})" + punctuation
+
+
+@pytest.mark.parametrize("quote", ['"', "'", ""])
+@pytest.mark.parametrize("origin", ["", "http://localhost:3000"])
+def test_html_attribute_keeps_a_url_and_gets_a_separate_clickable_download(quote, origin):
+    text = f"<li><a href={quote}{origin}{URL}{quote}>report.txt</a></li>"
+    expected = f"<li><a href={quote}{URL}{quote}>report.txt</a></li>\n\n[report.txt]({URL})"
+    assert deliverable_links(text, REFS) == expected
+
+
+def test_quoted_angle_bracket_does_not_end_the_attribute_context():
+    text = f'<a title="download > preview" href="{URL}">report.txt</a>'
+    assert deliverable_links(text, REFS) == text + f"\n\n[report.txt]({URL})"
+
+
+def test_html_attribute_does_not_hide_a_missing_other_artifact():
+    refs = [*REFS, {"id": "deck", "name": "slides.pptx"}]
+    text = f'<a href="{URL}">report.txt</a>'
+    delivered = deliverable_links(text, refs)
+    assert (
+        delivered
+        == text + f"\n\n[report.txt]({URL})\n[slides.pptx](/api/agent/artifacts/deck/content)"
+    )
+
+
+def test_unowned_html_attribute_stays_unlinked_and_cannot_suppress_owned_delivery():
+    text = '<a href="/api/agent/artifacts/foreign/content">report.txt</a>'
+    delivered = deliverable_links(text, REFS)
+    assert delivered == '<a href="">report.txt</a>\n\n' + f"[report.txt]({URL})"
+
+
+def test_actual_html_list_recipe_keeps_one_renderable_canonical_link_on_repeat():
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures/html-artifact-delivery.json").read_text()
+    )
+    result = deliverable_links(fixture["text"], fixture["references"])
+    assert result == fixture["expected"]
+    assert deliverable_links(result, fixture["references"]) == result
+
+
+def test_existing_markdown_nested_in_html_attribute_is_repaired():
+    text = f'<a href="[report.txt]({URL})">report.txt</a>'
+    assert deliverable_links(text, REFS) == (
+        f'<a href="{URL}">report.txt</a>\n\n[report.txt]({URL})'
+    )

@@ -72,3 +72,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case74 · 模型传输失败位置与脱敏证据](case-74-mech-mt01/CASE.md)
 
 - [Case75 · 分布统计口径与报告证据](case-75-mech-dm01/CASE.md)
+
+- [Case76 / MECH-AL01](case-76-mech-al01/CASE.md)：实际回复HTML属性与真实产物下载链接，含输入、工具和冻结回执。

@@ -1,0 +1,10 @@
+{
+  "text": "Verified.\n\n<li><a href=\"/api/agent/artifacts/owned/content\">report.txt</a></li>\n\nPending external acceptance.",
+  "references": [
+    {
+      "id": "owned",
+      "name": "report.txt"
+    }
+  ],
+  "expected": "Verified.\n\n<li><a href=\"/api/agent/artifacts/owned/content\">report.txt</a></li>\n\nPending external acceptance.\n\n[report.txt](/api/agent/artifacts/owned/content)"
+}
