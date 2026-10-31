@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Input, Modal, Popconfirm, Select, Spin, message } from 'antd'
-import { AgentLogo, BotIcon, GearIcon, SearchIcon } from '../../icons'
+import { AgentLogo, RoamiLogo, GearIcon, SearchIcon } from '../../icons'
 import RoamiAgentModels from './RoamiAgentModels'
 import { type AgentKind, isAgentKind } from '../../agent-kind'
 import { checkAgent, discoverAgents, installAgent, upgradeAgent, type RegisteredAgent } from '../../agent-registry'
@@ -115,7 +115,7 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
     {failed && <Alert type="error" className="tt-capability-alert" showIcon message={t('agent.professional.loadFailed')} action={<Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button>} />}
     {!agents && !failed && <Spin />}
     {!filtered.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('capabilities.agents.empty')} />}
-    <div className="tt-capability-list">{!query && <article className="tt-capability-row"><div className="tt-capability-cardhead"><BotIcon size={32} /><strong>Roami</strong></div><p className="tt-capability-description">{t('hub.roamiModels')}</p><button type="button" className="tt-act" onClick={() => onSelect('roami')}>{t('capabilities.agents.manage')}</button></article>}{filtered.map(kind => {
+    <div className="tt-capability-list">{!query && <article className="tt-capability-row"><div className="tt-capability-cardhead"><span className="tt-agentmark"><RoamiLogo size={32} /></span><strong>Roami</strong></div><p className="tt-capability-description">{t('hub.roamiModels')}</p><button type="button" className="tt-act" onClick={() => onSelect('roami')}>{t('capabilities.agents.manage')}</button></article>}{filtered.map(kind => {
       const row = rows.find(row => row.kind === kind)
       return <article className="tt-capability-row" key={kind} aria-label={names[kind]}>
         <div className="tt-capability-cardhead tt-agent-cardhead"><span className="tt-agentmark"><AgentLogo kind={kind} size={32} /></span>

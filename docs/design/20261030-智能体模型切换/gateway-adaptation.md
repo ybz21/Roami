@@ -48,3 +48,9 @@ Redmi Note 8，1080×2340、DPR 2.75。来源与模型选项、返回按钮均�
 录屏已解码检查，为 1280×800、111 帧、约 22 秒。临时实例和手机转发通过任务所属入口清理；测试密钥及捕获的请求不进入仓库。
 
 协议范围与剩余限制见 [设计入口](README.md#适配边界)。提供商的加密思考状态、服务器会话和模型固有能力不凭协议转换获得；无法等价实现的内容明确拒绝。
+
+## Roami 智能体品牌标修正（2026-11-01）
+
+智能体目录中的 Roami 项改用既有 `RoamiLogo`，直接引用 `/logo-mark.svg`，保留 32px 尺寸及现有品牌标布局，无新增产品文案。桌面与 Redmi Note 8 均确认图片完整加载；手机实际点按管理进入 Roami 模型配置，页面宽 392、文档宽 392。完整前端仍为 1136 项通过，完整质量门通过。
+
+[桌面改前](/api/file/tmp/roami-agent-logo-before-desktop.png) · [桌面改后](/api/file/tmp/roami-agent-logo-after-desktop.png) · [手机改前](/api/file/tmp/roami-agent-logo-before-phone.png) · [手机改后](/api/file/tmp/roami-agent-logo-after-phone.png)。所有截图使用隔离实例；测试结束后清理本轮实例与手机转发。
