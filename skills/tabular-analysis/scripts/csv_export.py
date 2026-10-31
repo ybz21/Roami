@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from export_spec import load_spec
+from numeric_representation import integral_decimal_fields
 from table_publication import PublicationError, Workspace
 
 
@@ -27,7 +28,13 @@ def table(workspace, path, expected=None):
 
 def inspect(workspace, path):
     columns, rows, sha = table(workspace, path)
-    return {"path": path, "sha256": sha, "columns": columns, "rows": len(rows)}
+    return {
+        "path": path,
+        "sha256": sha,
+        "columns": columns,
+        "rows": len(rows),
+        "integralDecimalFields": integral_decimal_fields(columns, rows),
+    }
 
 
 def key_value(values, keys, date_keys):
@@ -155,6 +162,10 @@ def export(
         "excludedAnalysisColumns": [name for name in available if name not in wanted],
         "recoveredSourceColumns": [name for name in wanted if name in missing],
         "valueMode": value_mode,
+        "numericFields": [field for field in wanted if field in numeric],
+        "retainedIntegralDecimalFields": integral_decimal_fields(
+            wanted, projected, exclude=numeric
+        ),
     }
 
 

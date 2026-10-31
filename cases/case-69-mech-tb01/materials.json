@@ -5,14 +5,15 @@
     "kind": "local_synthetic_csv",
     "inputs": [
       "input/raw.csv",
-      "input/analysis.csv"
+      "input/analysis.csv",
+      "input/numeric-representation.csv"
     ],
     "expected": "expected/cleaned.csv",
     "generators": [
       "skills/tabular-analysis/tests",
       "agent-runtime/tests/verification/test_tabular_skill_package.py"
     ],
-    "description": "合成CSV包含带空格的record id与unit count字段；规格由既有bash工具以结构化argv创建并执行。"
+    "description": "合成CSV包含带空格的record id与unit count字段；规格由既有bash工具以结构化argv创建并执行。 新增空表头、补零标识和小数精度输入，实际导出测试直接读取，检查类型处理的观察回执而不自动推断标识语义。"
   },
   "tools": {
     "configuration": "tools.json",
@@ -25,7 +26,7 @@
       "skills/tabular-analysis/tests",
       "agent-runtime/tests/verification/test_tabular_skill_package.py"
     ],
-    "expected_collected": 41,
+    "expected_collected": 77,
     "no_skips": true,
     "kind": "source_frozen_pytest_receipt"
   }

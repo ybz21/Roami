@@ -44,7 +44,8 @@
   "resources": {
     "inputs": [
       "input/raw.csv",
-      "input/analysis.csv"
+      "input/analysis.csv",
+      "input/numeric-representation.csv"
     ],
     "tools": "tools.json",
     "generator": "scripts/run.py",

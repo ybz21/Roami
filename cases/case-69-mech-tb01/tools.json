@@ -3,7 +3,7 @@
     "skills/tabular-analysis/tests",
     "agent-runtime/tests/verification/test_tabular_skill_package.py"
   ],
-  "expected_collected": 41,
+  "expected_collected": 77,
   "registered_tools": [
     "read",
     "bash"
