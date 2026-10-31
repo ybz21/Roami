@@ -1,0 +1,15 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_artifact_links.py"
+  ],
+  "expected_collected": 39,
+  "runtime": [
+    "Python 3.12",
+    "actual Agent Runtime and SQLite",
+    "local scripted model events",
+    "pytest/pytest-asyncio",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

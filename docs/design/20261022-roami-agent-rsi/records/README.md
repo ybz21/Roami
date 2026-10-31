@@ -140,3 +140,5 @@
 - [Agent模型传输错误定位证据](2026-10-31/transport-error-evidence.md)
 
 - [表格分布统计与叙述证据](2026-10-31/stock-distribution-evidence.md)
+
+- [最终回复的HTML产物链接](2026-10-31/html-delivery-links.md)

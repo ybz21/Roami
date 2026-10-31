@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-AL01",
+  "data": {
+    "kind": "anonymized_actual_html_delivery_shape",
+    "inputs": [
+      "input/delivery.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/html-artifact-delivery.json",
+    "byte_identical_required": true
+  },
+  "tools": {
+    "kind": "actual_runtime_delivery_and_url_normalization",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_artifact_links.py"
+    ],
+    "no_skips": true,
+    "expected_collected": 39
+  }
+}

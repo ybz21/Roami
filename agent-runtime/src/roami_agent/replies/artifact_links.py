@@ -6,6 +6,7 @@ import re
 from urllib.parse import parse_qs, urlsplit
 
 LINK = re.compile(r"\[([^\]\n]*)\]\(([^)\n]+)\)")
+HTML_TAG = re.compile(r"""<[/!?]?[a-zA-Z](?:[^"'<>]|"[^"]*"|'[^']*')*>""")
 ARTIFACT_URL = re.compile(r"/api/agent/artifacts/[^/]+/content")
 URL_TOKEN = re.compile(
     LINK.pattern
@@ -56,6 +57,11 @@ def deliverable_links(text, references):
         "/api/agent/artifacts/" + item["id"] + "/content": item["name"] for item in references
     }
 
+    attributes = [(match.start(), match.end()) for match in HTML_TAG.finditer(text)]
+
+    def in_attribute(match):
+        return any(start <= match.start() < end for start, end in attributes)
+
     def replace(match):
         label, url = match.groups()
         path = artifact_path(url)
@@ -63,12 +69,15 @@ def deliverable_links(text, references):
             return match[0]
         url = path
         if url in urls:
-            return f"[{label}]({url})"
+            return url if in_attribute(match) else f"[{label}]({url})"
         candidates = names.get(label, [])
         # A unique persisted filename binds a copied URL; ambiguous names stay unlinked.
-        return f"[{label}]({candidates[0]})" if len(candidates) == 1 else label
+        if len(candidates) != 1:
+            return label
+        return candidates[0] if in_attribute(match) else f"[{label}]({candidates[0]})"
 
     text = LINK.sub(replace, text)
+    attributes = [(match.start(), match.end()) for match in HTML_TAG.finditer(text)]
 
     def replace_bare(match):
         raw = match[0]
@@ -81,13 +90,19 @@ def deliverable_links(text, references):
             return raw
         if path not in urls:
             return suffix
-        if not structured:
+        if not structured and not in_attribute(match):
             return f"[{link_label(labels[path])}]({path})" + suffix
         return path + suffix
 
     text = URL_TOKEN.sub(replace_bare, text)
+    attributes = [(match.start(), match.end()) for match in HTML_TAG.finditer(text)]
     linked = {match[2] for match in LINK.finditer(text) if match[2] in urls}
-    linked.update(match[0] for match in URL_TOKEN.finditer(text) if match[0] in urls)
+    # HTML attributes cannot contain Markdown or stand in for a rendered download link.
+    linked.update(
+        match[0]
+        for match in URL_TOKEN.finditer(text)
+        if match[0] in urls and (structured or not in_attribute(match))
+    )
     missing = []
     for item in references:
         url = "/api/agent/artifacts/" + item["id"] + "/content"
