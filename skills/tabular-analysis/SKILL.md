@@ -16,6 +16,8 @@ python <packagePath>/scripts/csv_export.py inspect --workspace <directory> --pat
 
 Write `export.json` using the actual columns and the two observed hashes:
 
+Inspection reports `integralDecimalFields`: exact field names and counts of decimal-form whole numbers, numeric values, and leading-zero representations. Review every listed field, including empty or unnamed headers, when cleaning types. These are observations, not automatic type decisions; mixed values and padded identifiers require deliberate treatment.
+
 ```json
 {
   "source": "raw.csv",
@@ -42,7 +44,7 @@ Choose keys from the actual input, not the example. Source rows matching those k
 
 Choose `--numeric` only for fields established as numeric by the input and task. It validates finite numbers and removes incidental decimal-zero suffixes from ordinary integral representations; it does not round fractional data or convert undeclared identifier fields. Preserve full input precision during analysis and format chart labels separately.
 
-The source and analysis files remain unchanged. The output is separate and create-only by default; replacing an existing output requires its observed `--expected-destination-sha256`. Input changes fail before publication. If a failure reports `writePublished: true`, inspect the output and reconcile its hash before considering another write.
+The source and analysis files remain unchanged. The output is separate and create-only by default; replacing an existing output requires its observed `--expected-destination-sha256`. Input changes fail before publication. The export receipt names `numericFields` and `retainedIntegralDecimalFields`; check that retained representations are intentional before delivery. If one was missed, correct the selection and use the observed destination hash for replacement. If a failure reports `writePublished: true`, inspect the output and reconcile its hash before considering another write.
 
 Inspect the exported CSV and use it for the requested cleaned-data delivery, keeping derived features in the analysis data unless requested as output. When the destination is a service, use the task's authorized transfer interface and confirm remote delivery. Reopen requested charts or reports and state any unverified visual limitations.
 
@@ -56,3 +58,5 @@ For dated extrema, add `--labels` with the actual date or record-identity column
 Report the returned sample count and definition with a statistic. Pearson population kurtosis has normal reference 3; excess kurtosis has reference 0. The corrected sample excess is a separate estimate. Constant or insufficient data produce unavailable values, not an invented normal score. Use the same named metric consistently in chart labels, slide text and speaker notes; format values only for display.
 
 Separate what supplied fields establish from explanations requiring other evidence. Label unsupported explanations as hypotheses and identify the evidence needed; correlation alone does not establish a cause. External benchmarks need a cited source. A numerical profile is descriptive evidence, not confirmation of business causes or a substitute for reviewing the final charts and narrative.
+
+For reports drawing business or trading conclusions from daily market prices and volume, read [references/market-data-evidence.md](references/market-data-evidence.md) before drafting. Apply the same evidence boundaries to slide titles, speaker notes, charts, and the final summary.
