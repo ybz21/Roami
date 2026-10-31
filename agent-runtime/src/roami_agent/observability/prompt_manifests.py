@@ -41,6 +41,8 @@ class PromptManifests:
                             "modelContext": {key: plan.get(key) for key in CONTEXT_FIELDS},
                             "requestLimits": plan.get("requestLimits"),
                             "executionTiming": plan.get("executionTiming"),
+                            "loadedWorkflows": plan.get("loadedWorkflows", []),
+                            "availableWorkflows": plan.get("availableWorkflows", []),
                             "sourceMessageIds": plan.get("sourceMessageIds", []),
                             "catalogHash": hashlib.sha256(encoded(catalog).encode()).hexdigest(),
                             "modelSettingsHash": plan.get("modelSettingsHash"),

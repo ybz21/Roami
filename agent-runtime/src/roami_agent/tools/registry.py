@@ -7,6 +7,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
 from roami_agent.protocol.tools import Tool
+from roami_agent.tools.skill_reads import loaded_workflows
 
 
 class Tools:
@@ -32,6 +33,19 @@ class Tools:
             for item in self.directory.skill_entries()
             if self.skills[item["name"]].get("source") in {"configured", "managed"}
         ]
+
+    def loaded_workflow_metadata(self, messages):
+        if "skill_read" not in self.registry or {"read", "skill_read"} & self.disabled_tools:
+            return []
+        return loaded_workflows(
+            messages,
+            {
+                name: value
+                for name, value in self.skills.items()
+                if name not in self.disabled_skills
+                and value.get("source") in {"configured", "managed"}
+            },
+        )
 
     def catalog(self, role="main"):
         result = []

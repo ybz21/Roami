@@ -42,12 +42,14 @@ class PromptBuilder:
         chat_images=None,
         memory=None,
         skills=None,
+        workflow_reads=None,
         execution_deadline=None,
     ):
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
         self.chat_images = chat_images
         self.skills = skills
+        self.workflow_reads = workflow_reads
         self.execution_deadline = execution_deadline
         self.remembered = RememberedContext(memory, settings) if memory else None
 
@@ -408,6 +410,42 @@ class PromptBuilder:
                 if recalled:
                     prompt.insert(1, recalled)
             plan, prompt = await self._images(turn, plan, prompt)
+            loaded = (
+                self.workflow_reads(plan["messages"][plan["currentTurnStart"] :])
+                if self.workflow_reads
+                else []
+            )
+            if loaded:
+                plan["loadedWorkflows"] = loaded
+                prompt.append(
+                    {
+                        "role": "system",
+                        "content": "Optional workflow instructions read for this request: "
+                        + encoded(loaded)
+                        + ". Apply those read instructions to the covered operations. "
+                        "Use their provided commands and scripts for supported steps rather than "
+                        "reimplementing them; use other capabilities for unsupported work or explicit "
+                        "user choices. Reading a workflow does not add tasks or grant authorization.",
+                    }
+                )
+            elif self.skills:
+                available = self.skills()
+                if available:
+                    plan["availableWorkflows"] = [
+                        {key: item[key] for key in ("name", "location")} for item in available
+                    ]
+                    prompt.append(
+                        {
+                            "role": "system",
+                            "content": "Optional workflow selection for this request: "
+                            + encoded(available)
+                            + ". Before choosing operations, read the instructions for workflows "
+                            "that cover the request. Being able to implement a step with general "
+                            "tools does not make its installed workflow irrelevant. If none applies "
+                            "or the user explicitly chose another method, continue with other "
+                            "capabilities. Availability is not new authorization or a new task.",
+                        }
+                    )
             timing = execution_timing(
                 turn,
                 now_ms(),
