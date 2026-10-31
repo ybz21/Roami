@@ -124,3 +124,28 @@ Chrome 截图视口，未做 Android 真机触控验收。本轮没有修改产�
 `test_main_followup_callbacks.py` 覆盖两种原交接、四种完成状态、直接派活/追加及
 CLI 追加，共 24 项拒绝重复派活并允许新消息追加的回归；另验证非最终交接可继续下一阶段。
 连同既有回报与阶段来源回归，39 项针对性测试通过。
+
+### 主对话 Chrome 结果
+
+运行时代码：`99b19f18f7d31640032baa7865e2aec4a16d103e`。
+
+主对话浏览器验收使用当前保存的 Main 模型，通过 Go 模型网关调用，保留路由、参数与能力配置。
+初始历史用户轮次与原任务由隔离夹具准备；追加要求全部在主对话中输入并物理点击发送，
+没有使用任务详情追加框。五类执行器 × 已完成/待核验/执行中，共 15 场景、283 断言通过。
+
+每条均核对真实用户消息、用户轮次与成功 task_steer 的关联，执行文本为当前用户原话；
+原任务、执行器、外部会话保留，忙状态仅排队，旧执行停止确认前不提交新轮次，
+每轮只接收一个提交；完成后不产生替代任务，最终回报在原 Main 对话中可见。
+其中一条历史夹具状态曾导致主对话消息留在本地待发队列，导航刷新后原消息送达，
+未重发或改写文本。真实 Main 调用中也出现过被校验器拒绝后自行修正的工具参数；
+断言针对任务状态与续接效果，不声称模型每次工具调用都无错误。
+
+外部执行器回执、停止信号及原生 worker 使用受控夹具，未向真实外部 TUI 发消息，
+未验证初次派活的意图识别，未做 Android 真机测试。PAI 暂按 Pi 执行器覆盖。
+验收后关闭测试标签与服务，并用同一 isolated-roami.sh 入口停止私有 tmux 实例。
+
+本轮 quick 门禁通过；quick 与 full 的 Python 回归均为 2721 项通过、47 项跳过。
+
+- [主对话输入追加要求](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/main-chat-user-followup.png)
+- [主对话显示追加排队](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/main-chat-followup-queued.png)
+- [原任务完成回报回到 Main](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/main-chat-followup-result.png)
