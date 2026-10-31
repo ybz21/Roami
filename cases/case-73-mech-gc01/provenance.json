@@ -1,0 +1,8 @@
+{
+  "origin": "reproduced zero-byte local Unix connection generates RSI_GATEWAY_FAILED with zero provider calls",
+  "fixture_kind": "synthetic HTTP requests, no original traffic, credentials or model response",
+  "model_calls": 0,
+  "historical_401_root_proven": false,
+  "formal_history_updated": false,
+  "human_labels_updated": false
+}
