@@ -136,3 +136,5 @@
 - [外挂整段视频拼接](2026-10-31/video-assembly.md)：Case72实际编码/解码与文件保护；区分工具完整性和原题视觉质量。
 
 - [空模型连接关闭误报](2026-10-31/idle-model-connection.md)
+
+- [Agent模型传输错误定位证据](2026-10-31/transport-error-evidence.md)

@@ -68,3 +68,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case 72：外挂整段视频拼接](case-72-mech-va01/CASE.md)：实际合成素材、FFmpeg/FFprobe、16项检查与冻结运行器；不加入历史正式套件。
 
 - [Case73 · 空模型连接与截断请求分类](case-73-mech-gc01/CASE.md)
+
+- [Case74 · 模型传输失败位置与脱敏证据](case-74-mech-mt01/CASE.md)

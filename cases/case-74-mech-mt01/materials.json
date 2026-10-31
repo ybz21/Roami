@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MT01",
+  "data": {
+    "kind": "synthetic_transport_failure_categories",
+    "inputs": [
+      "input/failures.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/model-transport-failures.json",
+    "byte_identical_required": true
+  },
+  "tools": {
+    "kind": "scripted_http_and_real_runtime_trace",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_model_error_telemetry.py",
+      "agent-runtime/tests/test_provider_policy.py",
+      "agent-runtime/tests/test_request_receipts.py"
+    ],
+    "no_skips": true,
+    "expected_collected": 77
+  }
+}
