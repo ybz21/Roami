@@ -137,12 +137,13 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		}
 		key := s.credential(input.Kind)
 		base := s.baseURL + "/v1"
-		if model.Protocol == "anthropic-messages" {
+		protocol := nativeProtocol(input.Kind)
+		if protocol == "anthropic-messages" {
 			base = s.baseURL
 		}
 		profileID := ""
 		for _, p := range view.Profiles {
-			if p.Name == "Roami Gateway" && p.BaseURL == base {
+			if p.Name == "Roami Gateway" && (p.BaseURL == s.baseURL || strings.HasPrefix(p.BaseURL, s.baseURL+"/")) {
 				profileID = p.ID
 			}
 		}
@@ -150,7 +151,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Kind == "claude" {
 			authMode = "bearer"
 		}
-		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, Protocol: model.Protocol, AuthMode: authMode, APIKey: &key})
+		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, Protocol: protocol, AuthMode: authMode, APIKey: &key})
 		if e != nil {
 			err = e
 			break
@@ -208,9 +209,6 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" && r.URL.Path == "/v1/models" {
 		data := []map[string]any{}
 		for _, m := range snapshot.Models {
-			if kind == "codex" && m.Protocol != "openai-responses" || kind == "claude" && m.Protocol != "anthropic-messages" || kind == "roami" && m.Protocol != "openai-completions" {
-				continue
-			}
 			data = append(data, map[string]any{"id": m.ID, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
 		}
 		writeJSON(w, 200, map[string]any{"object": "list", "data": data, "has_more": false})
@@ -247,7 +245,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	_ = json.Unmarshal(payload["model"], &alias)
 	var model *CatalogModel
 	for _, m := range catalog.Models {
-		if m.ID == alias && m.Protocol == protocol {
+		if m.ID == alias {
 			copy := m
 			model = &copy
 		}
@@ -266,7 +264,23 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		sources[s.ID] = s
 	}
 	for index, candidate := range model.Candidates {
-		source := sources[candidate.SourceID]
+		source, exists := sources[candidate.SourceID]
+		if !exists {
+			reject(w, 400, "MODEL_NOT_CONFIGURED")
+			return
+		}
+		if r.URL.Path == "/v1/responses/compact" && source.Protocol != protocol {
+			reject(w, 400, "MODEL_GATEWAY_COMPACTION_UNSUPPORTED")
+			return
+		}
+		upstreamBody, bridge, conversionError := prepareProtocolBridge(body, protocol, source.Protocol, candidate.Model)
+		if conversionError != nil {
+			reject(w, 400, protocolCode(conversionError))
+			return
+		}
+		if bridge != nil {
+			bridge.model = alias
+		}
 		validate := func() error { return nil }
 		if len(checks) > 0 {
 			validate = checks[0]
@@ -305,9 +319,10 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				}
 				h.releaseAdmission()
 			}()
-			payload["model"], _ = json.Marshal(candidate.Model)
-			upstreamBody, _ := json.Marshal(payload)
 			suffix := r.URL.Path
+			if bridge != nil {
+				suffix = map[string]string{"openai-completions": "/v1/chat/completions", "openai-responses": "/v1/responses", "anthropic-messages": "/v1/messages"}[source.Protocol]
+			}
 			if strings.HasSuffix(source.BaseURL, "/v1") {
 				suffix = strings.TrimPrefix(suffix, "/v1")
 			}
@@ -323,15 +338,21 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				if containsField([]string{"authorization", "cookie", "x-api-key", "api-key", "proxy-authorization", "connection", "upgrade", "content-length", "host"}, lower) || strings.HasPrefix(lower, "x-roami-") {
 					continue
 				}
+				if bridge != nil && (lower == "accept-encoding" || strings.HasPrefix(lower, "anthropic-") || strings.HasPrefix(lower, "openai-")) {
+					continue
+				}
 				out.Header[name] = append([]string(nil), values...)
 			}
 			out.Header.Set("Content-Type", "application/json")
 			if source.APIKey != "" {
-				if protocol == "anthropic-messages" && source.AuthMode == "api_key" {
+				if source.Protocol == "anthropic-messages" && source.AuthMode == "api_key" {
 					out.Header.Set("X-Api-Key", source.APIKey)
 				} else {
 					out.Header.Set("Authorization", "Bearer "+source.APIKey)
 				}
+			}
+			if source.Protocol == "anthropic-messages" && out.Header.Get("Anthropic-Version") == "" {
+				out.Header.Set("Anthropic-Version", "2023-06-01")
 			}
 			response, e := h.Client.Do(out)
 			if e != nil {
@@ -351,13 +372,32 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				if containsField([]string{"connection", "transfer-encoding", "content-length", "set-cookie", "upgrade"}, lower) {
 					continue
 				}
+				if bridge != nil && containsField([]string{"content-type", "content-encoding"}, lower) {
+					continue
+				}
 				w.Header()[name] = append([]string(nil), values...)
 			}
 			w.Header().Set("X-Roami-Model-Source", source.ID)
 			w.Header().Set("X-Roami-Model-Alias", model.ID)
 			w.Header().Set("X-Roami-Model-Call", call.ID)
+			capture := nativeUsageCapture{protocol: source.Protocol, stream: strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")}
+			if bridge != nil {
+				if status < 200 || status >= 300 {
+					code = "MODEL_HTTP_" + strconv.Itoa(status)
+					newProtocolEncoder(w, bridge).fail(code)
+					return false
+				}
+				complete, conversionError := bridge.forward(w, response, &capture)
+				usage = capture.finish(complete)
+				if conversionError != nil {
+					code = protocolCode(conversionError)
+					status = 502
+				} else {
+					code = ""
+				}
+				return false
+			}
 			w.WriteHeader(status)
-			capture := nativeUsageCapture{protocol: protocol, stream: strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")}
 			buffer := make([]byte, 32<<10)
 			complete := false
 			for {

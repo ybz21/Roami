@@ -15,9 +15,8 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const { t } = useI18n(), catalog = useModelCatalog(), { phone } = useLayout()
   const [mode, setMode] = useState<'official' | 'custom' | null>(null), [source, setSource] = useState(''), [model, setModel] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [directory, setDirectory] = useState<{ key: string; models: string[]; loading: boolean; error: string }>({ key: '', models: [], loading: false, error: '' }), [directoryVersion, setDirectoryVersion] = useState(0), [search, setSearch] = useState('')
-  const compatible = (protocol: string) => kind === 'codex' ? protocol === 'openai-responses' : kind === 'claude' ? protocol === 'anthropic-messages' : true
-  const sources = (catalog.value?.sources || []).filter(source => compatible(source.protocol))
-  const models = (catalog.value?.models || []).filter(model => compatible(model.protocol))
+  const sources = catalog.value?.sources || []
+  const models = catalog.value?.models || []
   const profile = view.profiles.find(profile => profile.applied || profile.id === view.activeId)
   const currentModel = models.find(model => model.id === view.current.model) || models.find(model => {
     const source = sources.find(source => source.id === model.candidates[0].sourceId)
@@ -76,7 +75,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
       <details><summary>{t('hub.compatibility')}</summary><p>{t('hub.continuationHint')}</p></details>
     </>}
     <div className="tt-model-binding-actions"><Popconfirm classNames={{ root: 'tt-agent-install-confirm' }} title={t(selectedMode === 'official' ? 'hub.factoryConfirm' : 'capabilities.models.applyConfirm')} description={t(selectedMode === 'official' ? 'hub.factoryScope' : 'hub.applyScope')} onConfirm={apply} okText={t('capabilities.models.apply')} cancelText={t('common.cancel')}><Button type="primary" loading={busy} disabled={!valid || applied || busy}>{t(applied ? 'capabilities.models.applied' : 'capabilities.models.apply')}</Button></Popconfirm>
-      {selectedMode === 'custom' && <Button href={'#/capabilities/models/sources' + (params ? '?' + params : '')}>{t('hub.manageSources')}</Button>}
+      {selectedMode === 'custom' && <Button href={'#/capabilities/models/catalog' + (params ? '?' + params : '')}>{t('hub.manageSources')}</Button>}
     </div>
   </section>
 }
