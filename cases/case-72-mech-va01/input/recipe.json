@@ -1,0 +1,1 @@
+{"clips":[{"name":"red","color":"red","fps":24,"videoSeconds":"0.53","audioSeconds":"0.59"},{"name":"blue","color":"blue","fps":30,"videoSeconds":"0.47","audioSeconds":"0.39"},{"name":"green","color":"lime","fps":15,"videoSeconds":"0.8","audioSeconds":null}],"expectedSources":["red","blue","green"],"expectedDefaultFrames":47}

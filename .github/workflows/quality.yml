@@ -56,3 +56,13 @@ jobs:
           uv run --project agent-runtime --frozen ruff check skills/tabular-analysis
           uv run --project agent-runtime --frozen ruff format --check skills/tabular-analysis
           uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/tabular-analysis/tests
+
+      - name: Check external video assembly Skill
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          uv run --project agent-runtime --frozen ruff check skills/video-assembly
+          uv run --project agent-runtime --frozen ruff format --check skills/video-assembly
+          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/video-assembly/tests
