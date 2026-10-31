@@ -1,0 +1,13 @@
+{
+  "pytest_selectors": [
+    "skills/tabular-analysis/tests"
+  ],
+  "expected_collected": 58,
+  "runtime": [
+    "Python标准库",
+    "pytest",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

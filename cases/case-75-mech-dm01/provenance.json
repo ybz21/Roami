@@ -1,0 +1,7 @@
+{
+  "origin": "actual delivered stock script compared 7.6 excess kurtosis with normal Pearson baseline 3",
+  "inputs": "public synthetic symmetric numbers; no original stock task reference values",
+  "model_calls": 0,
+  "historical_scores_updated": false,
+  "human_labels_updated": false
+}

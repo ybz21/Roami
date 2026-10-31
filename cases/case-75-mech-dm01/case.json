@@ -1,0 +1,48 @@
+{
+  "id": "MECH-DM01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "外挂分布统计回归",
+  "prompt": "按明确定义计算CSV分布指标，保留数据来源和样本量，避免普通/超额峰度混用。",
+  "preconditions": "公开数值配方、Python标准库和外挂Skill脚本。",
+  "expected_terminal": "distribution_conventions_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "具名指标与方法、输入哈希和样本量",
+    "源码冻结及JUnit回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-DM01-H1",
+      "rule": "普通、总体超额与修正样本超额峰度分开，单位缩放不改变峰度；不可用值不伪装正常值。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DM01-H2",
+      "rule": "相邻变化不跨缺失值，零基数或非法数值显式拒绝，输入不改，CSV来源哈希正确。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/moments.csv"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
