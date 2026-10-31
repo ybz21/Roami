@@ -1,0 +1,10 @@
+{
+  "name": "Synthetic stock artifact binding",
+  "description": "Public bytes for source-hash admission checks; rendered views and model ratings are fixtures, not task quality evidence.",
+  "files": {
+    "stock_analysis.pptx": "synthetic deck bytes, not a renderable presentation\n",
+    "stock_analysis_script.md": "Synthetic narrative for the source-binding test.\n",
+    "stock_cleaned.csv": "record,date,units\n1,2020-01-01,2\n2,2020-01-02,3\n"
+  },
+  "snapshot": {"initial": {"outputs": {}}, "final": {"outputs": {}}}
+}

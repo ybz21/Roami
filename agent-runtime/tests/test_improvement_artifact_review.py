@@ -46,7 +46,9 @@ def pack():
         "schema_version": 1,
         "renderer_image": "sha256:" + "f" * 64,
         "instruction": "Assess this example artifact",
-        "artifacts": [{"file": "plan.md", "sha256": "a" * 64}],
+        "artifacts": [
+            {"file": "plan.md", "sha256": hashlib.sha256(b"A concrete plan").hexdigest()}
+        ],
         "grounding": {"hard_checks": {"required": True}},
         "texts": [{"label": "plan.md", "text": "A concrete plan", "truncated": False}],
         "images": [
@@ -251,6 +253,9 @@ async def test_hard_evidence_retained_and_rating_disagreement_stays_pending(
     from roami_agent.improvement.evaluation import artifact_review
 
     async def evidence(*args):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir(exist_ok=True)
+        (workspace / "plan.md").write_bytes(b"A concrete plan")
         return pack()
 
     monkeypatch.setattr(artifact_review, "collect_artifact_evidence", evidence)
@@ -289,6 +294,9 @@ async def test_cancellation_persists_unknown_usage(monkeypatch, tmp_path):
     from roami_agent.improvement.evaluation import artifact_review
 
     async def evidence(*args):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir(exist_ok=True)
+        (workspace / "plan.md").write_bytes(b"A concrete plan")
         return pack()
 
     monkeypatch.setattr(artifact_review, "collect_artifact_evidence", evidence)

@@ -14,6 +14,7 @@ from roami_agent.improvement.evaluation.artifact_evidence import (
     collect_artifact_evidence,
 )
 from roami_agent.improvement.evaluation.artifact_review_input import review_input
+from roami_agent.improvement.evaluation.artifact_sources import assert_review_sources
 from roami_agent.improvement.evaluation.grading import calibrated_grade
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.improvement.integrations.json_documents import load_json
@@ -203,7 +204,9 @@ class ArtifactReviewer:
         try:
             async with asyncio.timeout(self.profile["seconds"]):
                 pack = await collect_artifact_evidence(case, grade, root, executor)
+                assert_review_sources(case, grade, root, pack["artifacts"])
                 ratings = await self.rate(pack, budget, journal)
+                assert_review_sources(case, grade, root, pack["artifacts"])
             scored = calibrated_grade(
                 case, ratings, hard_passed=grade["hard_passed"], calibration_id=self.calibration_id
             )
