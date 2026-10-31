@@ -1,4 +1,4 @@
-"""Capture immutable images from the active Worker's already-bound file scope."""
+"""Capture immutable images from the reading role's admitted file scope."""
 
 import asyncio
 import hashlib
@@ -41,16 +41,20 @@ class WorkspaceImageReads:
             raise ValueError("VISION_IMAGE_INVALID") from None
 
     async def read(self, args, binding):
+        role = binding.get("role")
+        worker = role == "worker" and all(
+            binding.get(key) for key in ("taskId", "runId", "workspace")
+        )
+        main = role == "main" and not binding.get("taskId") and not binding.get("runId")
         visual = (
             PurePath(args["path"]).suffix.lower() in self.suffixes
-            and binding.get("role") == "worker"
+            and (worker or main)
             and all(
-                binding.get(key)
-                for key in ("taskId", "runId", "turnId", "assistantMessageId", "workspace")
+                binding.get(key) for key in ("owner", "turnId", "assistantMessageId", "toolCallId")
             )
-            and self.files.settings.route("worker").capabilities.get("images") is True
+            and self.files.settings.route(role).capabilities.get("images") is True
         )
-        if visual:
+        if visual and worker:
             active = await self.artifacts.db.call(
                 lambda db: row(
                     db,
@@ -68,9 +72,24 @@ class WorkspaceImageReads:
             )
             if not active:
                 raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
+        elif visual:
+            active = await self.artifacts.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT 1 FROM turns u JOIN conversations c ON c.id=u.conversation_id "
+                    "JOIN messages m ON m.id=? AND m.turn_id=u.id "
+                    "AND m.branch_id=u.branch_id AND m.conversation_id=u.conversation_id "
+                    "WHERE u.id=? AND u.state='running' AND c.owner_id=? "
+                    "AND NOT EXISTS(SELECT 1 FROM task_attempts r WHERE r.native_branch_id=u.branch_id)",
+                    (binding["assistantMessageId"], binding["turnId"], binding["owner"]),
+                )
+            )
+            if not active:
+                raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
         if not visual:
             return await self.files.read(args, binding)
-        path = "/".join(self.files.location(args["path"], binding)[1])
+        root, components = self.files.location(args["path"], binding)
+        path = str(root.joinpath(*components)) if main else "/".join(components)
         try:
             return await self._capture(args, binding, path)
         except DomainError as exc:
@@ -99,12 +118,13 @@ class WorkspaceImageReads:
             binding["owner"],
             body,
             mime_type=mime,
-            task_id=binding["taskId"],
+            task_id=binding.get("taskId"),
             message_id=binding["assistantMessageId"],
             name=PurePath(args["path"]).name[:180],
             metadata={
                 "source": "workspace_image",
-                "runId": binding["runId"],
+                "runId": binding.get("runId"),
+                "readerRole": binding["role"],
                 "turnId": binding["turnId"],
                 "toolCallId": binding["toolCallId"],
                 "sourceSha256": result["sha256"],
