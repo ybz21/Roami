@@ -53,7 +53,7 @@ OUTPUT_SUFFIXES = {
 }
 
 
-def reported_paths(text, root=None):
+def reported_paths(text, root=None, *, include_inline=True):
     if not isinstance(text, str):
         return []
     paths = re.findall(r"\[[^\]\n]*\]\(([^)\n]+)\)", text)
@@ -66,13 +66,14 @@ def reported_paths(text, root=None):
             + r")(?=$|[\s\"'`<>()[\]{}*，。；：！？、（）]|\\[nr])",
             text,
         )
-        paths += [
-            quote(name, safe="/")
-            for name in re.findall(r"(?<!`)`([^`\s]+)`(?!`)", text)
-            if not Path(name).is_absolute()
-            and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", name)
-            and Path(name).suffix.lower() in OUTPUT_SUFFIXES
-        ]
+        if include_inline:
+            paths += [
+                quote(name, safe="/")
+                for name in re.findall(r"(?<!`)`([^`\s]+)`(?!`)", text)
+                if not Path(name).is_absolute()
+                and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", name)
+                and Path(name).suffix.lower() in OUTPUT_SUFFIXES
+            ]
     return list(dict.fromkeys(paths))[:12]
 
 
@@ -204,10 +205,19 @@ class TaskDeliverables:
             sources = reported_paths(result.get("summary", ""), root) + reported_paths(
                 result.get("output", ""), root
             )
+            declared = set(
+                reported_paths(result.get("summary", ""), root, include_inline=False)
+                + reported_paths(result.get("output", ""), root, include_inline=False)
+            )
             reported_aliases = {}
             if progress.get("source") == "provider_transcript" and (
                 not attempt.get("finishedMs") or result.get("summary") == progress.get("summary")
             ):
+                declared.update(
+                    reported_paths(
+                        progress.get("summary", ""), progress.get("directory"), include_inline=False
+                    )
+                )
                 for source in reported_paths(
                     progress.get("summary", ""), progress.get("directory")
                 ):
@@ -236,6 +246,16 @@ class TaskDeliverables:
                 if isinstance(item["path"], str)
                 and (item["tool_name"] == "file_write" or item["path"] in result.get("summary", ""))
             ]
+            weak_names = {
+                name
+                for name in sources
+                if name not in declared and len(Path(unquote(name)).parts) == 1
+            }
+            observed_files = {
+                str(output_path(root, item["path"]))
+                for item in observed
+                if isinstance(root, str) and root and isinstance(item["path"], str)
+            }
             for source in dict.fromkeys(sources):
                 if (
                     any(item["downloadUrl"] == source for item in stored)
@@ -332,7 +352,15 @@ class TaskDeliverables:
                     references.append(reference)
                     if remaining is not None:
                         remaining -= size
-                except (OSError, ValueError, DomainError):
+                except (OSError, ValueError, DomainError) as error:
+                    # A bare inline filename can describe an input, rather than declare an output.
+                    if (
+                        isinstance(error, FileNotFoundError)
+                        and source in weak_names
+                        and canonical not in observed_files
+                        and error.filename == unquote(source)
+                    ):
+                        continue
                     unavailable.append(
                         {"sourcePath": source, "runId": attempt["id"], "state": "unavailable"}
                     )
