@@ -11,6 +11,7 @@ import httpx
 import pytest
 from PIL import Image
 
+from roami_agent.improvement.evaluation.case_catalog import case_resource
 from roami_agent.improvement.evaluation.execution import containers
 from roami_agent.improvement.evaluation.protocol_suite import protocol_suite
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
@@ -82,6 +83,11 @@ async def test_timeout_retains_gateway_errors_without_inventing_provider_usage(
             mount = next(a for a in args if "dst=/model," in a)
             socket = Path(mount.split("src=", 1)[1].split(",", 1)[0]) / "gateway.sock"
         if args[0] == "start":
+            for _ in range(3):
+                reader, writer = await asyncio.open_unix_connection(socket)
+                writer.close()
+                await writer.wait_closed()
+                await asyncio.sleep(0)
             for _ in range(2):
                 reader, writer = await asyncio.open_unix_connection(socket)
                 writer.write(
@@ -162,4 +168,57 @@ async def test_provider_exception_details_are_not_gateway_error_codes(tmp_path):
             )
         assert response.status_code == 200 and "RSI_GATEWAY_FAILED" in response.text
         assert "private.invalid" not in response.text
+        assert gateway.errors == ["RSI_GATEWAY_FAILED"]
+
+
+REQUEST_FIXTURES = json.loads(case_resource("MECH-GC01", "input/requests.json").read_text())
+
+
+async def close_raw_connection(socket, gateway, wire):
+    _reader, writer = await asyncio.open_unix_connection(socket)
+    async with asyncio.timeout(2):
+        while not gateway.clients:
+            await asyncio.sleep(0)
+        handlers = list(gateway.clients)
+        if wire:
+            writer.write(wire.encode())
+            await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+        await asyncio.gather(*handlers)
+
+
+@pytest.mark.parametrize("item", REQUEST_FIXTURES, ids=lambda item: item["name"])
+async def test_zero_byte_close_is_not_a_request_but_truncation_is_failure(tmp_path, item):
+    class Provider:
+        async def stream(self, messages, tools):
+            pytest.fail("No complete HTTP request was admitted")
+            yield
+
+    socket = tmp_path / "model.sock"
+    async with ModelGateway(socket, {"main": Provider()}) as gateway:
+        await close_raw_connection(socket, gateway, item["wire"])
+        assert gateway.errors == item["expected_errors"]
+        assert not gateway.clients
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [asyncio.IncompleteReadError(b"", 16), ConnectionResetError("private upstream detail")],
+    ids=["empty_upstream_read", "upstream_reset"],
+)
+async def test_upstream_disconnect_is_still_recorded_after_complete_request(tmp_path, failure):
+    class Provider:
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", "partial")
+            raise failure
+
+    socket = tmp_path / "model.sock"
+    async with ModelGateway(socket, {"main": Provider()}) as gateway:
+        async with httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(uds=str(socket))) as client:
+            response = await client.post(
+                "http://localhost/v1/main/chat/completions", json={"messages": []}
+            )
+        assert response.status_code == 200 and "RSI_GATEWAY_FAILED" in response.text
+        assert "private upstream detail" not in response.text
         assert gateway.errors == ["RSI_GATEWAY_FAILED"]

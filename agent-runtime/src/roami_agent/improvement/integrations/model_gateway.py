@@ -40,7 +40,13 @@ class ModelGateway:
         sent = False
         try:
             async with asyncio.timeout(20):
-                headers = (await reader.readuntil(b"\r\n\r\n")).decode("latin1")
+                try:
+                    headers = (await reader.readuntil(b"\r\n\r\n")).decode("latin1")
+                except asyncio.IncompleteReadError as error:
+                    # A peer may close a connected socket without starting an HTTP request.
+                    if not error.partial:
+                        return
+                    raise
                 method, path, _ = headers.split("\r\n", 1)[0].split(" ")
                 if method == "GET" and path.endswith("/models"):
                     writer.write(
