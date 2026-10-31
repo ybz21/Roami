@@ -449,7 +449,7 @@ def test_spec_requires_an_explicit_numeric_selection_even_when_empty(
     tmp_path, explicit
 ):
     _workspace, hashes = fixture(tmp_path)
-    args = export_spec(tmp_path, hashes, numeric=[])
+    args = export_spec(tmp_path, hashes, numeric=[], preserveNumericText=["units"])
     if not explicit:
         value = json.loads((tmp_path / "export.json").read_text())
         del value["numeric"]
