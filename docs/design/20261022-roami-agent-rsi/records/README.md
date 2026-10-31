@@ -132,3 +132,5 @@
 - [媒体验收分项证据](2026-10-31/media-verifier-diagnostics.md)
 
 - [音频分项在Case详情中的展示](2026-10-31/audio-evidence-ui.md)
+
+- [外挂整段视频拼接](2026-10-31/video-assembly.md)：Case72实际编码/解码与文件保护；区分工具完整性和原题视觉质量。

@@ -1,0 +1,54 @@
+{
+  "id": "MECH-VA01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "外挂视频拼接回归",
+  "prompt": "外挂完整拼接已选视频片段并生成对应清单；验证混合媒体时间线、源文件保护和持久输出。",
+  "preconditions": "公开合成素材配方、ffmpeg、ffprobe和零模型测试执行器。",
+  "expected_terminal": "external_video_assembly_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "完整视频与对应连续清单",
+    "源/输出哈希、实际帧数、JUnit及运行回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-VA01-H1",
+      "rule": "混合帧率、音轨长短不一和无音轨输入均完整拼接，视频帧数和音频时长可实际复验。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-VA01-H2",
+      "rule": "片段顺序、颜色与清单连续区间一致，分数不能只来自文件存在。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-VA01-H3",
+      "rule": "源文件和已存在输出不覆盖，越界、符号链接、无效输入及发布竞态拒绝或回滚。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/recipe.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
