@@ -253,7 +253,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 			seen[m.ID] = true
 			for _, c := range m.Candidates {
 				p, ok := sources[c.SourceID]
-				if !ok || p.Protocol != m.Protocol || c.Model == "" || len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
+				if !ok || c.SourceID == m.Candidates[0].SourceID && p.Protocol != m.Protocol || c.Model == "" || len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
 					return catalogError()
 				}
 			}
@@ -270,7 +270,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	for _, old := range s.value.Models {
 		retained := false
 		for _, m := range v.Models {
-			if m.ID == old.ID && m.Protocol == old.Protocol {
+			if m.ID == old.ID {
 				retained = true
 			}
 		}
@@ -280,7 +280,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		if len(uses[old.ID]) > 0 {
 			found := false
 			for _, m := range v.Models {
-				if m.ID == old.ID && m.Protocol == old.Protocol {
+				if m.ID == old.ID {
 					found = true
 				}
 			}

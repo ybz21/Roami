@@ -7,7 +7,7 @@ import (
 )
 
 func catalogProtocol(kind, protocol string) bool {
-	return containsField([]string{"anthropic-messages", "openai-responses", "openai-completions"}, protocol) && containsField([]string{"codex", "claude", "opencode", "pi"}, kind) && (kind != "codex" || protocol == "openai-responses") && (kind != "claude" || protocol == "anthropic-messages")
+	return containsField([]string{"anthropic-messages", "openai-responses", "openai-completions"}, protocol) && containsField([]string{"codex", "claude", "opencode", "pi"}, kind)
 }
 
 func (h *Handler) sourceModels(w http.ResponseWriter, r *http.Request) {
@@ -62,4 +62,15 @@ func (h *Handler) sourceModels(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, map[string]any{"data": map[string]any{"models": valid}})
+}
+
+func nativeProtocol(kind string) string {
+	switch kind {
+	case "claude":
+		return "anthropic-messages"
+	case "codex":
+		return "openai-responses"
+	default:
+		return "openai-completions"
+	}
 }

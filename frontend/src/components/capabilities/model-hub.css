@@ -30,3 +30,14 @@ html[data-pointer="coarse"] .tt-model-binding-mode .ant-radio-button-wrapper { m
 .tt-agent-model-advanced > summary { cursor:pointer; min-height:var(--tap); display:flex; align-items:center; color:var(--text-dim); font-size:var(--fs-sm); }
 
 .tt-model-binding-field { display:flex; flex-direction:column; gap:var(--sp-2); }
+
+.tt-model-connection { border-bottom:1px solid var(--border-subtle); padding-bottom:var(--sp-4); margin-bottom:var(--sp-4); }
+.tt-model-connection > .tt-model-hub-row { border-bottom:0; }
+.tt-model-connection-child { padding:var(--sp-2) 0 var(--sp-2) var(--sp-4); }
+.tt-model-connection-child strong { font-size:var(--fs-sm); font-weight:500; }
+.tt-model-connection-add { margin-top:var(--sp-2); }
+.tt-model-connection-models { border:0; padding:0; margin:0; min-width:0; }
+.tt-model-connection-models legend { margin-bottom:var(--sp-3); font-size:var(--fs-body); }
+.tt-model-connection-model { display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--sp-3); padding-bottom:var(--sp-4); margin-bottom:var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.tt-model-connection-model .agent-settings-field { flex:1 1 calc(var(--sp-5) * 8); min-width:0; margin:0; }
+html[data-pointer="coarse"] .tt-model-connection-confirm .ant-btn { min-height:var(--tap); }

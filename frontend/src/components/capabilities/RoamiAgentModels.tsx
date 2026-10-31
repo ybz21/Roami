@@ -12,7 +12,7 @@ export default function RoamiAgentModels({ onBack }: { onBack: () => void }) {
   const { t } = useI18n(), { phone } = useLayout()
   const { modal, message } = App.useApp(), catalog = useModelCatalog()
   const [main, setMain] = useState(''), [worker, setWorker] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [advanced, setAdvanced] = useState(false)
-  const options = (catalog.value?.models || []).filter(model => model.protocol === 'openai-completions').map(model => ({ value: model.id, label: model.name }))
+  const options = (catalog.value?.models || []).map(model => ({ value: model.id, label: model.name }))
   const chosen = (role: string, draft: string) => draft || (options.some(model => model.value === catalog.value?.roamiModels?.[role]) ? catalog.value?.roamiModels?.[role] : options[0]?.value)
   const apply = async (restore = false) => {
     if (!catalog.value || busy) return

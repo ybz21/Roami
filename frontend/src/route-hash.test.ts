@@ -63,3 +63,8 @@ it.each([
 ])('keeps retired settings links usable: %s', (old, current) => {
   expect(normalizeRoute(old + '?node=n1')).toBe(current)
 })
+
+it('merges old model-source links into the unified model page', () => {
+  expect(normalizeRoute('capabilities/models/sources')).toBe('capabilities/models/catalog')
+  expect(normalizeRoute('capabilities/models/sources/source/upstream')).toBe('capabilities/models/catalog/source/upstream')
+})

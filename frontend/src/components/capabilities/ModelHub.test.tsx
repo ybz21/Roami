@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from 'antd'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
@@ -77,4 +77,51 @@ it('opens the shared model list by default without exposing internal IDs or publ
   expect(screen.queryByText('coding')).toBeNull()
   expect(screen.queryByText('hub.state.published')).toBeNull()
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
+})
+
+it('shows connections and their models together and accepts old source-page links', async () => {
+  mount('sources')
+  const connection = await screen.findByRole('region', { name: 'Saved source' })
+  expect(connection.textContent).toContain('Coding')
+  expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
+  expect(screen.getAllByRole('tab')).toHaveLength(3)
+  expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByText('hub.consumers')).toBeNull()
+})
+
+it('creates a connection and its models in one confirmed save', async () => {
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'New source' } })
+  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'test-key' } })
+  fireEvent.change(screen.getByLabelText('hub.upstreamModel'), { target: { value: 'first-model' } })
+  fireEvent.click(screen.getAllByRole('button', { name: 'hub.addModel' }).slice(-1)[0])
+  fireEvent.change(screen.getAllByLabelText('hub.upstreamModel')[1], { target: { value: 'second-model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  expect(api).not.toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.anything())
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ name: 'New source', baseUrl: 'https://new.example/v1', apiKey: 'test-key' })]),
+    models: expect.arrayContaining([expect.objectContaining({ name: 'first-model' }), expect.objectContaining({ name: 'second-model' })]),
+  })))
+  const writes = vi.mocked(api).mock.calls.filter(([method, path]) => method === 'PUT' && path === '/agent/model-gateway/catalog')
+  expect(writes).toHaveLength(1)
+  const saved = writes[0][2] as ModelCatalog
+  const source = saved.sources.find(source => source.name === 'New source')!
+  expect(saved.models.slice(-2).every(model => model.candidates[0].sourceId === source.id)).toBe(true)
+  expect(saved.models[0]).toEqual(catalog.models[0])
+})
+
+it('keeps existing route IDs, credentials and failover candidates when editing a connection', async () => {
+  const backup = { ...catalog.sources[0], id: 'backup', name: 'Backup source' }
+  const saved = { ...catalog, sources: [...catalog.sources, backup], models: [{ ...catalog.models[0], strategy: 'failover', candidates: [...catalog.models[0].candidates, { sourceId: 'backup', model: 'backup-model' }] }] }
+  vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
+  mount('catalog/source/upstream')
+  fireEvent.change(await screen.findByLabelText('hub.upstreamModel'), { target: { value: 'updated-model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ id: 'upstream', hasKey: true, apiKey: '' })]),
+    models: [{ ...saved.models[0], candidates: [{ sourceId: 'upstream', model: 'updated-model' }, { sourceId: 'backup', model: 'backup-model' }] }],
+  })))
 })

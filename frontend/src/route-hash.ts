@@ -5,6 +5,7 @@
 // 旧链接兼容：/#/env → /#/settings，/#/overview → /#/projects（概览并进项目页，18 设计）
 export function normalizeRoute(raw: string): string {
   const route = raw.split('?')[0]
+  if (route === 'capabilities/models/sources' || route.startsWith('capabilities/models/sources/')) return route.replace('capabilities/models/sources', 'capabilities/models/catalog')
   if (route === 'capabilities/models/roles') return 'capabilities/agents/roami'
   if (route === 'settings/agent/runtime') {
     const tab = new URLSearchParams(raw.split('?')[1] || '').get('modelTab')

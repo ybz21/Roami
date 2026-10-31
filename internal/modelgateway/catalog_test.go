@@ -374,7 +374,7 @@ func TestSavedSourceDiscoveryIsReadOnlyAndKeepsCredentialsPrivate(t *testing.T) 
 	if _, err := os.Stat(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json")); !os.IsNotExist(err) {
 		t.Fatal("reading a source changed CLI settings")
 	}
-	if wrong := request("codex"); wrong.Code != 400 || hits.Load() != 1 {
+	if wrong := request("unknown"); wrong.Code != 400 || hits.Load() != 1 {
 		t.Fatal("incompatible discovery contacted the source")
 	}
 }

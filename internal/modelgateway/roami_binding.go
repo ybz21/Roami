@@ -76,7 +76,7 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		for _, name := range []string{input.Main, input.Worker} {
 			valid := false
 			for _, model := range s.value.Models {
-				if model.ID == name && model.Protocol == "openai-completions" {
+				if model.ID == name {
 					valid = true
 				}
 			}
