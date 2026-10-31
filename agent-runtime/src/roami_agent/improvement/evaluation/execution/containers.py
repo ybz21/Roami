@@ -26,6 +26,11 @@ from roami_agent.improvement.evaluation.verification_windows import (
     SLIDE_COMPARISON_SECONDS,
 )
 from roami_agent.improvement.integrations.artifact_files import materialize, private_json
+from roami_agent.improvement.integrations.container_failure_evidence import (
+    ContainerCommandFailure,
+    capture_failures,
+    failure_fields,
+)
 from roami_agent.improvement.integrations.json_documents import load_json
 from roami_agent.improvement.integrations.measurements import EpisodeBudget
 from roami_agent.improvement.integrations.model_gateway import ModelGateway
@@ -65,7 +70,8 @@ async def docker_command(*args, timeout=DOCKER_OPERATION_SECONDS, input=None, ma
 
             out, _err = await asyncio.gather(bounded(process.stdout), bounded(process.stderr))
             await process.wait()
-        require(process.returncode == 0, "RSI_DOCKER_COMMAND_FAILED")
+        if process.returncode != 0:
+            raise ContainerCommandFailure(args[0] if args else "command", process.returncode, _err)
         require(len(out) <= maximum, "RSI_DOCKER_OUTPUT_LIMIT")
         return out
     finally:
@@ -211,8 +217,11 @@ class ContainerExecutor:
     async def preflight(self, *, model_inputs=True):
         try:
             detail = json.loads(await docker_command("image", "inspect", self.image))[0]
-        except (DomainError, ValueError):
-            raise DomainError("RSI_CONTAINER_IMAGE_REQUIRED") from None
+        except (DomainError, ValueError) as error:
+            replacement = DomainError("RSI_CONTAINER_IMAGE_REQUIRED")
+            if fields := failure_fields(error):
+                replacement.execution_diagnostics = fields["execution_diagnostics"]
+            raise replacement from None
         labels = detail.get("Config", {}).get("Labels") or {}
         if model_inputs:
             require(
@@ -455,6 +464,7 @@ class ContainerExecutor:
             except OSError:
                 pass
 
+    @capture_failures
     async def run(self, case, policy, root):
         if not self.image_id:
             await self.preflight()

@@ -160,3 +160,5 @@
 - [导出前检查未决数值表示](2026-11-01/type-decisions.md)
 
 - [评分证据与产物版本绑定](2026-11-01/artifact-review-bindings.md)
+
+- [容器失败的私有错误证据](2026-11-01/container-failure-evidence.md)

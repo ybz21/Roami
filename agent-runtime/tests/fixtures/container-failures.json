@@ -1,0 +1,7 @@
+{
+  "name": "公开合成的容器命令失败",
+  "description": "只提供退出码、标准错误和预期证据来源，不含真实任务或模型配置。",
+  "exit_code": 23,
+  "stderr": "Traceback (most recent call last):\nOSError: [Errno 30] Read-only file system: '/workspace/output/example.json'\n",
+  "expected_public_code": "RSI_DOCKER_COMMAND_FAILED"
+}

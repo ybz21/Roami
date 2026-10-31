@@ -10,6 +10,7 @@ from roami_agent.improvement.evaluation.case_catalog import case_identity
 from roami_agent.improvement.evaluation.execution.interrupted_evidence import snapshot_metadata
 from roami_agent.improvement.evaluation.native_judgment import native_judgment
 from roami_agent.improvement.integrations.artifact_paths import relative_file
+from roami_agent.improvement.integrations.container_failure_evidence import failure_fields
 from roami_agent.protocol.errors import DomainError
 
 
@@ -194,4 +195,5 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         **({"execution_evidence": execution_evidence} if execution_evidence else {}),
         "roles": roles,
         "files": files,
+        **failure_fields(result),
     }

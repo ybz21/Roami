@@ -1,0 +1,53 @@
+{
+  "id": "MECH-CF01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "容器失败诊断",
+  "prompt": "失败的容器命令保留退出码和标准错误到私有Case证据，保持原失败状态、用量与不重放要求。",
+  "preconditions": "公开合成标准错误、脚本化子进程、真实只读Docker镜像、已有Case证据和GitHub公开报告边界。",
+  "expected_terminal": "failure_diagnostics_preserved_privately",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "失败命令的退出码和脱敏标准错误",
+    "同一Case错误聚合与并行隔离",
+    "已有Case证据入口可读取，公开报告不含标准错误"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-CF01-H1",
+      "rule": "失败命令保留退出码和脱敏标准错误，保持稳定错误码且不重放命令。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-CF01-H2",
+      "rule": "原生检查内部捕获、预检重新包装和清理错误不能丢失最早诊断，并行Case各自隔离。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-CF01-H3",
+      "rule": "证据归档到私有Case结果，不更改任务质量或用量，不把标准错误加入公开GitHub正文。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "sandbox_nonzero_exit_discarded_stderr",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/container-failures.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
