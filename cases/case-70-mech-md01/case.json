@@ -1,0 +1,54 @@
+{
+  "id": "MECH-MD01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "媒体验收证据回归",
+  "prompt": "保留原生音频判定的公开分项数值，在单个Case详情与运行汇总中可排查；不泄露参考素材或改变评分。",
+  "preconditions": "可见合成判定回执；无真实模型调用。",
+  "expected_terminal": "public_media_components_in_persistent_evidence",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "源码冻结哈希、JUnit及严格测试回执",
+    "单个Case详情和汇总中的音频分项证据"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-MD01-H1",
+      "rule": "公开分项经过真实判定进程、宿主过滤、持久记录与报告完整保留。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MD01-H2",
+      "rule": "参考窗口、模型、路径和任意未知字段不进入公开证据；非法和非有限数值显示不可用。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MD01-H3",
+      "rule": "总分、阈值和失败状态不变；缺失或失败回执不能合成零分，旧记录仍可读取。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/native-receipt.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

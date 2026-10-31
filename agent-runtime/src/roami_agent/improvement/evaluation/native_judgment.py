@@ -4,6 +4,7 @@ import re
 
 from roami_agent.improvement.domain.contracts import number
 from roami_agent.improvement.evaluation.csv_diagnostics import csv_diagnostic
+from roami_agent.improvement.evaluation.media_diagnostics import audio_diagnostic
 from roami_agent.protocol.errors import public_error_code
 
 
@@ -23,6 +24,12 @@ def _score_fields(grade):
     partial = grade.get("native_partial")
     if diagnostic := csv_diagnostic(grade.get("native_csv_diagnostic")):
         evidence["native_csv_diagnostic"] = diagnostic
+    if (
+        grade.get("grade_scope") == "original_media_verifier_plus_frozen_delivery_checks"
+        and grade.get("native_verifier_ran") is not False
+        and (diagnostic := audio_diagnostic(grade.get("native_audio_diagnostic")))
+    ):
+        evidence["native_audio_diagnostic"] = diagnostic
     keys = {"scored_points", "total_points", "unscored_points"}
     if (
         isinstance(partial, dict)
@@ -74,6 +81,7 @@ def native_judgment(grade):
         evidence["native_verifier_ran"] = ran
         if not ran:
             evidence.pop("native_metric", None)
+            evidence.pop("native_audio_diagnostic", None)
     if grade.get("grade_scope") == "original_pptx_state_comparison_not_gui_or_visual_quality":
         ran = grade.get("native_verifier_ran")
         if type(ran) is not bool:

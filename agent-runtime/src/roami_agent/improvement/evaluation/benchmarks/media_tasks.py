@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 from roami_agent.improvement.domain.contracts import DIMENSIONS, digest, require
 from roami_agent.improvement.domain.scoring import quality
 from roami_agent.improvement.evaluation.contracts import freeze_suite
+from roami_agent.improvement.evaluation.media_diagnostics import AUDIO_METRICS, audio_diagnostic
 from roami_agent.improvement.evaluation.verification_windows import MEDIA_VERIFICATION_SECONDS
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 
@@ -90,7 +91,11 @@ def import_media(root, archive, *, kind, revision, data_revision):
     )
 
 
-PROGRAM = r"""import base64,hashlib,json,math,pathlib,re,subprocess,sys,tempfile
+PROGRAM = (
+    "AUDIO_METRICS="
+    + repr(AUDIO_METRICS)
+    + "\n"
+    + r"""import base64,hashlib,json,math,pathlib,re,subprocess,sys,tempfile
 payload=json.loads(sys.stdin.read());work=pathlib.Path('/workspace')
 def duration(path):
  p=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(path)],capture_output=True,check=True,timeout=15)
@@ -115,7 +120,7 @@ with tempfile.TemporaryDirectory() as directory:
    assert len(set(used))==4 and abs(duration(work/'output/solution.mp4')-offset)<=0.1
   except (AssertionError,KeyError,TypeError,ValueError,subprocess.SubprocessError):checks['full_contiguous_ranges']=False
   args+=['--solution',str(work/'output/solution.json'),'--solution-mp4',str(work/'output/solution.mp4'),'--materials-dir',str(work/'materials')]
- result=None;data=None;score=None
+ result=None;data=None;score=None;receipt=None
  try:result=subprocess.run([sys.executable,str(judge),*args],cwd=root,capture_output=True,timeout=300)
  except subprocess.TimeoutExpired:pass
  checks['verifier_exited']=result is not None and result.returncode==0 and reward.is_file()
@@ -126,8 +131,18 @@ with tempfile.TemporaryDirectory() as directory:
  except (OSError,ValueError,UnicodeError):pass
  valid=checks['verifier_exited'] and type(score) in (int,float) and 0<=score<=1 and math.isfinite(score)
  checks['verifier_result_valid']=valid
- print(json.dumps({'checks':checks,'reward':score if valid else None,'native_result_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'diagnostic':result.stderr.decode(errors='replace')[-8000:] if result is not None and result.returncode else ''},allow_nan=False))
+ metrics={}
+ if valid and payload['media_kind']=='repair':
+  details=receipt.get('details',{})
+  for group,fields in AUDIO_METRICS.items():
+   if not fields:
+    if group in receipt:
+     value=receipt[group];metrics[group]=value if type(value) in (int,float) and -1e12<=value<=1e12 and math.isfinite(value) else None
+   elif isinstance(details,dict) and isinstance(details.get(group),dict):
+    values=details[group];metrics[group]={key:values[key] if type(values[key]) in (int,float) and -1e12<=values[key]<=1e12 and math.isfinite(values[key]) else None for key in fields if key in values}
+ print(json.dumps({'checks':checks,'reward':score if valid else None,'native_audio_diagnostic':metrics or None,'native_result_sha256':hashlib.sha256(data).hexdigest() if data is not None else None,'diagnostic':result.stderr.decode(errors='replace')[-8000:] if result is not None and result.returncode else ''},allow_nan=False))
 """
+)
 
 
 async def grade_media(case, workspace, executor):
@@ -199,6 +214,13 @@ async def grade_media(case, workspace, executor):
     return {
         **quality(dict.fromkeys(DIMENSIONS, 3 if passed else 0), hard_passed=passed),
         **({"native_metric": score} if valid else {}),
+        **(
+            {"native_audio_diagnostic": diagnostic}
+            if valid
+            and spec["media_kind"] == "repair"
+            and (diagnostic := audio_diagnostic(result.get("native_audio_diagnostic")))
+            else {}
+        ),
         "native_metric_minimum": spec["minimum_reward"],
         "reason": "assertions_passed"
         if passed

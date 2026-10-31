@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MD01",
+  "data": {
+    "kind": "synthetic_native_audio_receipt",
+    "inputs": [
+      "input/native-receipt.json"
+    ],
+    "generators": [
+      "agent-runtime/tests/test_improvement_media_diagnostics.py",
+      "agent-runtime/tests/test_improvement_media_receipts.py",
+      "agent-runtime/tests/test_improvement_media.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "native_verifier_and_persistent_case_evidence"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_improvement_media_diagnostics.py",
+      "agent-runtime/tests/test_improvement_media_receipts.py",
+      "agent-runtime/tests/test_improvement_media.py"
+    ],
+    "expected_collected": 39,
+    "no_skips": true,
+    "kind": "source_frozen_pytest_receipt"
+  }
+}
