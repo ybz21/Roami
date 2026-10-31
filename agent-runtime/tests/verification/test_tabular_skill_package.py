@@ -50,34 +50,37 @@ async def test_optional_csv_package_executes_and_persists_delivery(store, tmp_pa
             receipts = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
             if not receipts:
                 name, args = "read", {"path": "skill://tabular-analysis"}
-            elif len(receipts) < 5:
+            elif len(receipts) == 3:
+                first, second = [json.loads(r["stdout"]) for r in receipts[1:]]
+                spec = {
+                    "source": "raw.csv",
+                    "analysis": "analysis.csv",
+                    "destination": "cleaned.csv",
+                    "expectedSourceSha256": first["sha256"],
+                    "expectedAnalysisSha256": second["sha256"],
+                    "keys": ["date"],
+                    "dateKeys": ["date"],
+                    "values": "source",
+                    "numeric": ["unit count", "value"],
+                }
+                name, args = (
+                    "bash",
+                    {
+                        "argv": [
+                            sys.executable,
+                            "-c",
+                            "import pathlib,sys; pathlib.Path(sys.argv[1]).open('x').write(sys.argv[2])",
+                            str(workspace / "export.json"),
+                            json.dumps(spec),
+                        ]
+                    },
+                )
+            elif len(receipts) < 6:
                 script = str(Path(receipts[0]["packagePath"]) / "scripts/csv_export.py")
-                if len(receipts) == 3:
-                    first, second = [json.loads(r["stdout"]) for r in receipts[1:]]
-                    operation = [
-                        "export",
-                        "--source",
-                        "raw.csv",
-                        "--analysis",
-                        "analysis.csv",
-                        "--destination",
-                        "cleaned.csv",
-                        "--expected-source-sha256",
-                        first["sha256"],
-                        "--expected-analysis-sha256",
-                        second["sha256"],
-                        "--keys",
-                        "date",
-                        "--date-keys",
-                        "date",
-                        "--values",
-                        "source",
-                        "--numeric",
-                        "units",
-                        "value",
-                    ]
+                if len(receipts) == 4:
+                    operation = ["export", "--spec", "export.json"]
                 else:
-                    filename = {1: "raw.csv", 2: "analysis.csv", 4: "cleaned.csv"}[len(receipts)]
+                    filename = {1: "raw.csv", 2: "analysis.csv", 5: "cleaned.csv"}[len(receipts)]
                     operation = ["inspect", "--path", filename]
                 name, args = (
                     "bash",
@@ -86,9 +89,9 @@ async def test_optional_csv_package_executes_and_persists_delivery(store, tmp_pa
             else:
                 checked = json.loads(receipts[-1]["stdout"])
                 assert checked["rows"] == 2 and checked["columns"] == [
-                    "row_id",
+                    "record id",
                     "date",
-                    "units",
+                    "unit count",
                     "value",
                 ]
                 yield ModelEvent("text", "已导出2条，保留源字段与标识：[cleaned.csv](cleaned.csv)")

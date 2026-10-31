@@ -1,3 +1,3 @@
-row_id,date,units,value
+record id,date,unit count,value
 008,2026-01-02 00:00:00+00:00,3,2.50
 007,2026-01-01 00:00:00+00:00,2,1.25

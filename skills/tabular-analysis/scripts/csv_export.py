@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+from export_spec import load_spec
 from table_publication import PublicationError, Workspace
 
 
@@ -68,7 +69,15 @@ def export(
         or not set(numeric) <= set(wanted)
         or not set(date_keys) <= set(keys)
     ):
-        raise PublicationError("TABLE_FIELD_SELECTION_INVALID")
+        raise PublicationError(
+            "TABLE_FIELD_SELECTION_INVALID",
+            details={
+                "invalidNumericFields": sorted(set(numeric) - set(wanted)),
+                "invalidDateKeys": sorted(set(date_keys) - set(keys)),
+                "availableColumns": wanted,
+                "recovery": "Keep complete field names as argv items or arrays in --spec; correct the selection without dropping intended fields.",
+            },
+        )
     if value_mode not in {"source", "analysis"}:
         raise PublicationError("TABLE_VALUE_MODE_INVALID")
     missing = set(wanted) - set(available)
@@ -153,6 +162,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["inspect", "export"])
     parser.add_argument("--workspace", required=True)
+    parser.add_argument("--spec")
     parser.add_argument("--path")
     parser.add_argument("--source")
     parser.add_argument("--analysis")
@@ -181,18 +191,32 @@ def main(argv=None):
         args.numeric,
         args.columns,
     )
-    if args.operation == "inspect" and (not args.path or any(export_options)):
+    if args.operation == "inspect" and (
+        not args.path or args.spec or any(export_options)
+    ):
         parser.error("inspect requires only --path and --workspace")
-    if args.operation == "export" and (args.path or not all(export_options[:5])):
+    if args.spec and any(export_options):
+        parser.error("--spec cannot be combined with individual export options")
+    if args.operation == "export" and (
+        args.path or not args.spec and not all(export_options[:5])
+    ):
         parser.error(
             "export requires source, analysis, destination and both observed hashes"
         )
     try:
         workspace = Workspace(args.workspace)
-        result = (
-            inspect(workspace, args.path)
-            if args.operation == "inspect"
-            else export(
+        if args.operation == "inspect":
+            result = inspect(workspace, args.path)
+        elif args.spec:
+            specification, spec_sha = load_spec(workspace, args.spec)
+            if workspace.relative(args.spec) == workspace.relative(
+                specification["destination"]
+            ):
+                raise PublicationError("OUTPUT_MUST_DIFFER")
+            result = export(workspace, **specification)
+            result["specSha256"] = spec_sha
+        else:
+            result = export(
                 workspace,
                 args.source,
                 args.analysis,
@@ -207,7 +231,6 @@ def main(argv=None):
                 columns=args.columns,
                 expected_destination=args.expected_destination_sha256,
             )
-        )
         print(json.dumps({"ok": True, **result}))
         return 0
     except (PublicationError, OSError, UnicodeError, csv.Error) as error:
@@ -222,6 +245,11 @@ def main(argv=None):
                     "ok": False,
                     "code": code,
                     "writePublished": getattr(error, "published", False),
+                    **(
+                        {"details": error.details}
+                        if isinstance(error, PublicationError) and error.details
+                        else {}
+                    ),
                 }
             )
         )
