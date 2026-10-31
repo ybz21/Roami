@@ -53,10 +53,11 @@ func (s *Store) ModelOptions(ctx context.Context, kind string, query ModelQuery)
 			return nil, fmt.Errorf("MODEL_KEY_ENV_MISSING")
 		}
 	}
-	return readModelOptions(ctx, profile)
+	return ReadSourceModels(ctx, profile)
 }
 
-func readModelOptions(ctx context.Context, profile Profile) ([]string, error) {
+// ReadSourceModels lists models from an already validated source.
+func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	endpoint, err := url.Parse(profile.BaseURL)

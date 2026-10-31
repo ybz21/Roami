@@ -17,14 +17,18 @@ type applyJournal struct {
 }
 
 func (s *Store) Apply(ctx context.Context, kind, profileID, revision string) (View, error) {
-	return s.apply(ctx, kind, profileID, revision, false)
+	return s.apply(ctx, kind, profileID, revision, false, false)
 }
 
 func (s *Store) Restore(ctx context.Context, kind, revision string) (View, error) {
-	return s.apply(ctx, kind, "", revision, true)
+	return s.apply(ctx, kind, "", revision, true, false)
 }
 
-func (s *Store) apply(ctx context.Context, kind, profileID, revision string, restore bool) (View, error) {
+func (s *Store) UseOfficial(ctx context.Context, kind, revision string) (View, error) {
+	return s.apply(ctx, kind, "", revision, false, true)
+}
+
+func (s *Store) apply(ctx context.Context, kind, profileID, revision string, restore, official bool) (View, error) {
 	if err := validateKind(kind); err != nil {
 		return View{}, err
 	}
@@ -46,17 +50,21 @@ func (s *Store) apply(ctx context.Context, kind, profileID, revision string, res
 			}
 			fields = current.Original
 		} else {
-			for i := range current.Profiles {
-				if current.Profiles[i].ID == profileID {
-					selected = &current.Profiles[i]
+			if official {
+				fields = officialFields(kind)
+			} else {
+				for i := range current.Profiles {
+					if current.Profiles[i].ID == profileID {
+						selected = &current.Profiles[i]
+					}
 				}
-			}
-			if selected == nil {
-				return fmt.Errorf("MODEL_PROFILE_NOT_FOUND")
-			}
-			fields, err = profileFields(kind, *selected, config.Major)
-			if err != nil {
-				return err
+				if selected == nil {
+					return fmt.Errorf("MODEL_PROFILE_NOT_FOUND")
+				}
+				fields, err = profileFields(kind, *selected, config.Major)
+				if err != nil {
+					return err
+				}
 			}
 			if len(current.Original) == 0 || !reflect.DeepEqual(current.Paths, configPaths(config)) {
 				current.Original, err = config.capture(defaultFields(kind))
@@ -64,6 +72,24 @@ func (s *Store) apply(ctx context.Context, kind, profileID, revision string, res
 					return err
 				}
 				current.Paths = configPaths(config)
+			} else {
+				// Newly managed fields need a backup when upgrading an existing preset.
+				defaults, captureErr := config.capture(defaultFields(kind))
+				if captureErr != nil {
+					return captureErr
+				}
+				for _, candidate := range defaults {
+					found := false
+					for _, original := range current.Original {
+						if candidate.Document == original.Document && reflect.DeepEqual(candidate.Path, original.Path) {
+							found = true
+							break
+						}
+					}
+					if !found {
+						current.Original = append(current.Original, candidate)
+					}
+				}
 			}
 		}
 		after, err := config.render(fields)
@@ -104,8 +130,13 @@ func (s *Store) apply(ctx context.Context, kind, profileID, revision string, res
 		if restore {
 			current.ActiveID, current.ProfileDigest, current.NativeDigest = "", "", ""
 			current.AppliedFields = nil
+			current.Mode = ""
 		} else {
-			current.ActiveID, current.ProfileDigest = selected.ID, digest(selected)
+			if official {
+				current.ActiveID, current.ProfileDigest, current.Mode = "", "", "official"
+			} else {
+				current.ActiveID, current.ProfileDigest, current.Mode = selected.ID, digest(selected), "custom"
+			}
 			current.AppliedFields = fields
 			captured, captureErr := after.capture(fields)
 			if captureErr != nil {

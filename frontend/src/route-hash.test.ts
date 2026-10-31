@@ -49,6 +49,13 @@ it('moves professional agent links into capabilities and preserves the selected 
   expect(normalizeRoute('settings/agent/bin/codex')).toBe('capabilities/agents/codex')
 })
 
+it('moves legacy model pricing and usage links to their matching capability section', () => {
+  expect(normalizeRoute('settings/agent/runtime?node=n1&modelTab=prices')).toBe('capabilities/models/prices')
+  expect(normalizeRoute('settings/agent/runtime?modelTab=proxy')).toBe('capabilities/models/usage')
+  expect(normalizeRoute('settings/agent/runtime')).toBe('capabilities/models/catalog')
+  expect(normalizeRoute('env/agent/runtime?modelTab=prices')).toBe('capabilities/models/prices')
+})
+
 it.each([
   ['settings/common', 'settings/ui/look'],
   ['settings/ui/status', 'settings/ui/look'],

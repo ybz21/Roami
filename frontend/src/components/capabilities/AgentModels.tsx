@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, AutoComplete, Button, Empty, Input, Popconfirm, Select, Spin, message } from 'antd'
 import { type AgentKind } from '../../agent-kind'
 import { agentModels, agentModelOptions, applyAgentModel, deleteAgentModel, restoreAgentModel, saveAgentModel, type AgentModelInput, type AgentModelProfile, type AgentModelView } from '../../agent-registry'
 import { useI18n } from '../../i18n'
 import { ChevronDown, PlusIcon } from '../../icons'
 import { useLayout } from '../../layout'
+import GatewayModelBinding from './GatewayModelBinding'
 
 const protocolChoices = (kind: AgentKind) => kind === 'claude' ? ['anthropic-messages'] : kind === 'codex' ? ['openai-responses'] : ['openai-completions', 'openai-responses', 'anthropic-messages']
 const newDraft = (kind: AgentKind): AgentModelInput => ({ name: '', baseUrl: '', model: '', protocol: protocolChoices(kind)[0], authMode: 'api_key', apiKey: '', keyEnv: '', reasoningEffort: '' })
@@ -17,7 +18,7 @@ const errors: Record<string, string> = {
   AGENT_CONFIG_RESTORE_UNAVAILABLE: 'restoreUnavailable', OPENCODE_CONFIG_VERSION_UNKNOWN: 'unknownVersion', MODEL_STORE_TOO_LARGE: 'limit', AGENT_CONFIG_TOO_LARGE: 'limit',
 }
 
-export default function AgentModels({ kind }: { kind: AgentKind }) {
+export default function AgentModels({ kind, setup, installed = true }: { kind: AgentKind; setup?: ReactNode; installed?: boolean }) {
   const { t } = useI18n()
   const layout = useLayout()
   const scroll = useRef<HTMLDivElement>(null)
@@ -32,6 +33,8 @@ export default function AgentModels({ kind }: { kind: AgentKind }) {
     const frame = requestAnimationFrame(() => { if (document.activeElement instanceof HTMLElement) revealField(document.activeElement) })
     return () => cancelAnimationFrame(frame)
   }, [layout.phone, layout.keyboard])
+  const [advanced, setAdvanced] = useState(false)
+  const [hubModelLabel, setHubModelLabel] = useState('')
   const [view, setView] = useState<AgentModelView | null>(null)
   const [editing, setEditing] = useState<AgentModelProfile | 'new' | null>(null)
   const [draft, setDraft] = useState<AgentModelInput>(() => newDraft(kind))
@@ -86,7 +89,7 @@ export default function AgentModels({ kind }: { kind: AgentKind }) {
     finally { if (live.current) setBusy('') }
   }
   const edit = (profile?: AgentModelProfile) => {
-    setEditing(profile || 'new'); setError('')
+    setAdvanced(true); setEditing(profile || 'new'); setError('')
     setDraft(profile ? { name: profile.name, baseUrl: profile.baseUrl, model: profile.model, protocol: profile.protocol, authMode: profile.authMode, apiKey: '', keyEnv: profile.keyEnv || '', reasoningEffort: profile.reasoningEffort || '' } : newDraft(kind))
     setCredential(profile?.keyEnv ? 'env' : 'key')
   }
@@ -130,8 +133,11 @@ export default function AgentModels({ kind }: { kind: AgentKind }) {
     onChange={event => setDraft(previous => ({ ...previous, [name]: event.target.value }))} /></label>
   return <div className="tt-agent-models">
     <div className="tt-agent-model-scroll" ref={scroll}>
+      {setup}
+      {view && !editing && <GatewayModelBinding installed={installed} kind={kind} view={view} onModelLabel={setHubModelLabel} onChanged={reload} />}
       {error && <Alert type="error" showIcon message={error} action={<Button disabled={!!busy} loading={busy === 'load'} onClick={() => { void reload() }}>{t('capabilities.models.reread')}</Button>} />}
       {!view && !error && <Spin />}
+      <details className="tt-agent-model-advanced" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}><summary>{t('hub.advancedPresets')}</summary>
       {editing ? <form id="agent-model-editor" className="tt-agent-model-form" onFocusCapture={event => { const field = event.target; if (layout.phone && field instanceof HTMLInputElement) requestAnimationFrame(() => revealField(field)) }} onSubmit={event => { event.preventDefault(); void save() }}>
         <h3>{t(editing === 'new' ? 'capabilities.models.add' : 'capabilities.models.edit')}</h3>
         {field('name', 'capabilities.models.name')}
@@ -161,11 +167,11 @@ export default function AgentModels({ kind }: { kind: AgentKind }) {
         <p>{t('capabilities.models.saveHint')}</p>
       </form> : view && <>
         <div className="tt-agent-model-toolbar"><div className="tt-agent-model-current"><span>{t('capabilities.models.current')}</span>
-          <strong>{[view.current.provider, view.current.model].filter(Boolean).join(' / ') || t('capabilities.models.toolDefault')}</strong></div>
+          <strong>{view.current.provider === 'Roami Gateway' ? hubModelLabel || t('hub.useGateway') : [view.current.provider, view.current.model].filter(Boolean).join(' / ') || t('capabilities.models.toolDefault')}</strong></div>
           <Button icon={<PlusIcon size={16} />} disabled={!!busy} onClick={() => edit()}>{t('capabilities.models.add')}</Button></div>
         {view.changed && <Alert type="warning" showIcon message={t('capabilities.models.externalChange')} />}
         {!view.profiles.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('capabilities.models.empty')} />}
-        <div className="tt-agent-model-list">{view.profiles.map(profile => <article className="tt-agent-model-row" key={profile.id} aria-label={profile.name}>
+        <div className="tt-agent-model-list">{view.profiles.filter(profile => profile.name !== 'Roami Gateway').map(profile => <article className="tt-agent-model-row" key={profile.id} aria-label={profile.name}>
           <div className="tt-agent-model-heading"><strong>{profile.name}</strong>{profile.applied ? <span className="tt-agent-model-applied">{t('capabilities.models.applied')}</span>
             : view.activeId === profile.id && <span>{t('capabilities.models.pending')}</span>}</div>
           <span>{profile.model}</span><span className="tt-agent-model-endpoint">{profile.baseUrl}</span>
@@ -178,11 +184,12 @@ export default function AgentModels({ kind }: { kind: AgentKind }) {
         <p>{t('capabilities.models.effectHint')}</p>
         <details className="tt-agent-model-paths"><summary>{t('capabilities.models.configFiles')}</summary>{view.configPaths.map(path => <code key={path}>{path}</code>)}</details>
       </>}
+      {!editing && view?.canRestore && <Popconfirm title={t('capabilities.models.restoreConfirm')} onConfirm={() => apply()} okText={t('capabilities.models.restore')} cancelText={t('common.cancel')}><Button disabled={!!busy} loading={busy === 'restore'}>{t('capabilities.models.restore')}</Button></Popconfirm>}
+      </details>
     </div>
-    <div className="tt-agent-model-actions">{editing ? <>
+    {editing && <div className="tt-agent-model-actions">
       <Button disabled={!!busy} onClick={() => { setEditing(null); setDraft(newDraft(kind)); setError('') }}>{t('common.cancel')}</Button>
       <Button type="primary" htmlType="submit" form="agent-model-editor" loading={busy === 'save'} disabled={!!busy || !draft.name.trim() || !draft.baseUrl.trim() || !draft.model.trim()}>{t('capabilities.models.save')}</Button>
-    </> : view?.canRestore && <Popconfirm title={t('capabilities.models.restoreConfirm')} onConfirm={() => apply()} okText={t('capabilities.models.restore')} cancelText={t('common.cancel')}>
-      <Button disabled={!!busy} loading={busy === 'restore'}>{t('capabilities.models.restore')}</Button></Popconfirm>}</div>
+    </div>}
   </div>
 }

@@ -95,7 +95,7 @@ it('shows gateway quota recovery instead of an unknown-usage warning', () => {
   expect(screen.getByRole('status').textContent).toContain(zhCN['agent.models.gatewayQuota'])
   expect(screen.queryByText(zhCN['agent.rsiPrototype.usageUnknownHint'])).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: zhCN['agent.rsiPrototype.modelPage'] }))
-  expect(window.location.hash).toBe('#/settings/agent/runtime?modelTab=models')
+  expect(window.location.hash).toBe('#/capabilities/models/catalog?modelTab=models')
 })
 
 it('selects a blocked workflow stage and explains model configuration errors', () => {

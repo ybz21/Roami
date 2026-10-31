@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Input, Modal, Popconfirm, Select, Spin, message } from 'antd'
-import { AgentLogo, GearIcon, SearchIcon } from '../../icons'
+import { AgentLogo, BotIcon, GearIcon, SearchIcon } from '../../icons'
+import RoamiAgentModels from './RoamiAgentModels'
 import { type AgentKind, isAgentKind } from '../../agent-kind'
 import { checkAgent, discoverAgents, installAgent, upgradeAgent, type RegisteredAgent } from '../../agent-registry'
 import { useI18n } from '../../i18n'
@@ -18,6 +19,9 @@ const intervals = [30, 60, 300]
 const commandKey = (kind: AgentKind) => `${kind}Command` as 'claudeCommand' | 'codexCommand' | 'opencodeCommand' | 'piCommand'
 
 export function AgentCatalog({ initialKind, initialSection, onSelect, onLaunch }: { initialKind?: string; initialSection?: string; onSelect: (kind: string) => void; onLaunch?: (kind: AgentKind) => Promise<void> }) {
+  return initialKind === 'roami' ? <RoamiAgentModels onBack={() => onSelect('')} /> : <ProfessionalAgentCatalog initialKind={initialKind} initialSection={initialSection} onSelect={onSelect} onLaunch={onLaunch} />
+}
+function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLaunch }: { initialKind?: string; initialSection?: string; onSelect: (kind: string) => void; onLaunch?: (kind: AgentKind) => Promise<void> }) {
   const { t } = useI18n(), { phone } = useLayout()
   const [prefs, savePrefs] = usePreferences()
   const interval = intervals.includes(prefs.agentBalanceRefreshSeconds || 0) ? prefs.agentBalanceRefreshSeconds! : 60
@@ -83,7 +87,7 @@ export function AgentCatalog({ initialKind, initialSection, onSelect, onLaunch }
     try { await onLaunch(current) } catch { message.error(t('capabilities.agents.openFailed')) }
     finally { setLaunching(false) }
   }
-  const installAction = (kind: AgentKind, row?: RegisteredAgent) => row && <Popconfirm
+  const installAction = (kind: AgentKind, row?: RegisteredAgent) => row && <Popconfirm classNames={{ root: 'tt-agent-install-confirm' }}
     title={t(row.installed ? 'capabilities.agents.updateConfirm' : 'agentDiscovery.installConfirm', { name: names[kind] })}
     onConfirm={() => row.installed ? upgrade(kind) : install(kind)} okText={t(row.installed ? 'capabilities.agents.update' : 'agentDiscovery.install')} cancelText={t('common.cancel')}>
     <Button disabled={!!busy || (row.installed && row.canUpgrade === false)} loading={busy === (row.installed ? 'upgrade:' : 'install:') + kind}>{t(row.installed ? 'capabilities.agents.update' : 'agentDiscovery.install')}</Button>
@@ -104,13 +108,14 @@ export function AgentCatalog({ initialKind, initialSection, onSelect, onLaunch }
     <AgentCommandForm key={current} kind={current} />
     {selected?.installed && <AgentBalance agent={selected} detail />}
   </div>
+  const models = current && <AgentModels key={current} kind={current} installed={selected?.installed === true} setup={<div className="tt-agent-model-toolbar"><span>{installation(selected)}{selected?.version && ' · ' + selected.version}</span><div className="tt-agent-detail-actions">{installAction(current, selected)}{onLaunch && <Button disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}</div></div>} />
   const filtered = kinds.filter(kind => `${names[kind]} ${t('capabilities.agents.description.' + kind)}`.toLowerCase().includes(query.trim().toLowerCase()))
   return <section className="tt-capability-catalog" data-kind="agents">
     <div className="tt-capability-toolbar"><Input prefix={<SearchIcon size={16} />} aria-label={t('capabilities.agents.search')} placeholder={t('capabilities.agents.search')} value={query} onChange={event => setQuery(event.target.value)} allowClear /></div>
     {failed && <Alert type="error" className="tt-capability-alert" showIcon message={t('agent.professional.loadFailed')} action={<Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button>} />}
     {!agents && !failed && <Spin />}
     {!filtered.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('capabilities.agents.empty')} />}
-    <div className="tt-capability-list">{filtered.map(kind => {
+    <div className="tt-capability-list">{!query && <article className="tt-capability-row"><div className="tt-capability-cardhead"><BotIcon size={32} /><strong>Roami</strong></div><p className="tt-capability-description">{t('hub.roamiModels')}</p><button type="button" className="tt-act" onClick={() => onSelect('roami')}>{t('capabilities.agents.manage')}</button></article>}{filtered.map(kind => {
       const row = rows.find(row => row.kind === kind)
       return <article className="tt-capability-row" key={kind} aria-label={names[kind]}>
         <div className="tt-capability-cardhead tt-agent-cardhead"><span className="tt-agentmark"><AgentLogo kind={kind} size={32} /></span>
@@ -132,10 +137,10 @@ export function AgentCatalog({ initialKind, initialSection, onSelect, onLaunch }
     <div className="tt-agent-cadence"><span>{t('agent.professional.refreshInterval')}</span><Select aria-label={t('agent.professional.refreshInterval')} value={interval}
       options={intervals.map(seconds => ({ value: seconds, label: t('agent.professional.everySeconds', { seconds }) }))}
       onChange={seconds => { void savePrefs({ agentBalanceRefreshSeconds: seconds }).then(ok => { if (!ok) message.error(t('settings.preference.failed')) }) }} /></div>
-    {phone ? current && <MobileSubPage title={modelsOpen ? t('capabilities.models.title', { name: names[current] }) : names[current]} search={false} onBack={close} manageHistory={false}>
-      {modelsOpen ? <AgentModels key={current} kind={current} /> : <div className="tt-capability-detail-scroll">{detail}</div>}</MobileSubPage>
+    {phone ? current && <MobileSubPage title={modelsOpen ? t('capabilities.models.title', { name: names[current] }) : names[current]} search={false} onBack={close} manageHistory={false} keepBottomNav>
+      {modelsOpen ? models : <div className="tt-capability-detail-scroll">{detail}</div>}</MobileSubPage>
       : <Modal open={!!current} title={current ? modelsOpen ? t('capabilities.models.title', { name: names[current] }) : names[current] : ''} onCancel={close} footer={null} width="var(--content-form)" className={'tt-capability-modal' + (modelsOpen ? ' tt-agent-model-modal' : '')} destroyOnClose>
-        {modelsOpen && current ? <AgentModels key={current} kind={current} /> : detail}</Modal>}
+        {modelsOpen && current ? models : detail}</Modal>}
   </section>
 }
 

@@ -8,7 +8,7 @@ export function readModelSettingsTab(): ModelSettingsTab {
 export function modelSettingsHref(tab: ModelSettingsTab): string {
   const params = getHashParams()
   params.set('modelTab', tab)
-  return '#/settings/agent/runtime?' + params.toString()
+  return '#/capabilities/models/' + (tab === 'proxy' ? 'usage' : tab === 'prices' ? 'prices' : 'catalog') + '?' + params.toString()
 }
 export function writeModelSettingsTab(tab: ModelSettingsTab) {
   setHashParams({ ...Object.fromEntries(getHashParams()), modelTab: tab === 'models' ? '' : tab })

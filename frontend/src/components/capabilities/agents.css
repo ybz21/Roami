@@ -24,6 +24,7 @@
 .tt-agent-command .ant-input { width:100%; }
 .tt-agent-command > .ant-btn { align-self:flex-end; }
 .tt-agent-detail-actions { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+html[data-pointer="coarse"] .tt-agent-install-confirm .ant-btn { min-height:var(--tap); }
 html[data-pointer="coarse"] .tt-agent-detail .ant-btn,html[data-pointer="coarse"] .tt-agent-command .ant-input { min-height:var(--tap); }
 .tt-agent-upgrade-hint { margin:0; color:var(--text-dim); font-size:var(--fs-meta); }
 .tt-agent-models { display:flex; flex-direction:column; min-width:0; min-height:0; height:70dvh; }

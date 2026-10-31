@@ -21,7 +21,7 @@ CREATE TABLE gateway_calls(
  http_status INTEGER NOT NULL DEFAULT 0, error_code TEXT NOT NULL DEFAULT '', reconciliation TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX gateway_calls_day ON gateway_calls(day,started_ms);
-`}}
+`}, {Version: 2, Name: "model-catalog", SQL: `CREATE TABLE gateway_catalog(id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);`}}
 
 type Ledger struct {
 	paths metadb.Paths

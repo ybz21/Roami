@@ -4,7 +4,7 @@ import { api } from '../../api'
 export type AgentModelRole = { baseUrl: string; model: string; keyConfigured: boolean; images: boolean; contextWindow?: number | null; configuredContextWindow?: number | null; reasoningEffort?: string | null; reasoningEfforts?: string[] }
 export type AgentModelSettings = { proxy?: ModelProxyConfig; main: AgentModelRole; worker: AgentModelRole; connection?: { baseUrl: string; keyConfigured: boolean } }
 export const MODEL_SETTINGS_CHANGED = 'roami:agent-model-settings-changed'
-export const agentSettingsRoute = '#/settings/agent/runtime'
+export const agentSettingsRoute = '#/capabilities/agents/roami'
 export function modelFailure(error: any, t: (key: string) => string) {
   const code = error?.apiError?.code || error?.message
   return t(code === 'INVALID_MODEL_PROXY_CONFIG' ? 'agent.proxy.invalid' : code === 'AGENT_RUNTIME_UNAVAILABLE' ? 'agent.unavailable' : code === 'MODEL_REASONING_UNSUPPORTED' ? 'agent.reasoning.unsupported' : code === 'MODEL_CONFIGURATION_BUSY' ? 'agent.models.busy' : code === 'MODEL_KEY_REQUIRED_FOR_ENDPOINT' ? 'agent.models.newEndpointKey' : code === 'MODEL_ENDPOINT_REQUIRES_TLS' ? 'agent.models.httpsRequired' : 'agent.models.failed')
