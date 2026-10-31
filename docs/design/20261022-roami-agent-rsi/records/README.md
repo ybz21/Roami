@@ -146,3 +146,7 @@
 - [Main明确读取的本地图片输入](2026-10-31/main-file-image-inputs.md)
 
 - [派活前明确角色图片能力](2026-10-31/image-role-awareness.md)
+
+- [Native启动取消与续办卡住](2026-10-31/native-start-cancellation.md)
+
+- [极值的当前与前一记录证据](2026-10-31/tabular-extreme-records.md)

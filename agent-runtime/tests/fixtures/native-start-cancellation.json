@@ -1,0 +1,6 @@
+{
+  "afterCommit": [false, true],
+  "preparing": [false, true],
+  "goal": "Read the supplied data",
+  "continuation": "Include another check"
+}

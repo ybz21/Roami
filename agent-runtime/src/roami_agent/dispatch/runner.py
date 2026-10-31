@@ -118,11 +118,13 @@ class TaskDispatcher:
                 )
             return task, run, turn
 
-        started = await self.db.call(start, write=True)
-        if not started:
-            return
-        task, run, turn = started
+        starting = asyncio.create_task(self.db.call(start, write=True))
+        task = run = turn = None
         try:
+            started = await asyncio.shield(starting)
+            if not started:
+                return
+            task, run, turn = started
             forgotten = await self.db.call(
                 lambda db: row(
                     db,
@@ -151,6 +153,12 @@ class TaskDispatcher:
             else:
                 raise DomainError("EXTERNAL_EXECUTOR_NOT_CONFIGURED")
         except asyncio.CancelledError:
+            if task is None:
+                # Recover the committed start before resolving cancellation.
+                started = await starting
+                if not started:
+                    raise
+                task, run, turn = started
             if run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False):
                 # The Go runner outlives Python; restart observes the same launch key.
                 raise
@@ -199,6 +207,8 @@ class TaskDispatcher:
                 )
             raise
         except (DomainError, OSError, ValueError, httpx.HTTPError, TimeoutError) as exc:
+            if task is None:
+                raise
             if (
                 isinstance(exc, DomainError)
                 and exc.code == "SESSION_NOT_IDLE"
