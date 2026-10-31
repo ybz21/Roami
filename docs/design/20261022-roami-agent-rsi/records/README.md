@@ -128,3 +128,5 @@
 - [CSV字段边界与结构化导出规格](2026-10-31/csv-export-spec.md)
 
 - [演示文稿单页检查与命名颜色](2026-10-31/presentation-focused-inspection.md)
+
+- [媒体验收分项证据](2026-10-31/media-verifier-diagnostics.md)
