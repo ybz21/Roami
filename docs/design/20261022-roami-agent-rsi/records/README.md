@@ -158,3 +158,5 @@
 - [前台Runtime父进程生命周期](2026-10-31/agent-serve-parent-lifetime.md)
 
 - [导出前检查未决数值表示](2026-11-01/type-decisions.md)
+
+- [评分证据与产物版本绑定](2026-11-01/artifact-review-bindings.md)

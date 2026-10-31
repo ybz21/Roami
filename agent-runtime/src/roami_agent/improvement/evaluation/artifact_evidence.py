@@ -5,6 +5,10 @@ import hashlib
 import json
 
 from roami_agent.improvement.domain.contracts import digest, require
+from roami_agent.improvement.evaluation.artifact_sources import (
+    artifact_workspace,
+    assert_review_sources,
+)
 from roami_agent.improvement.integrations.artifact_files import private_json
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 
@@ -86,21 +90,13 @@ print(json.dumps({'images':images,'texts':texts}))"""
 
 async def collect_artifact_evidence(case, grade, root, executor):
     require(case["id"] in FILES, "RSI_ARTIFACT_REVIEW_UNSUPPORTED")
-    workspace = root / ("stock-remote" if case["judge"]["kind"] == "company_stock" else "workspace")
+    workspace = artifact_workspace(case, root)
+    assert_review_sources(case, grade, root)
     hashes = []
     for name in FILES[case["id"]]:
         path = relative_file(workspace, name)
         require(path.is_file() and path.stat().st_size <= 16_000_000, "RSI_ARTIFACT_UNAVAILABLE")
         hashes.append({"file": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
-    require(
-        all(
-            not e.get("path")
-            or next((h["sha256"] for h in hashes if h["file"] == e["path"]), e.get("sha256"))
-            == e.get("sha256")
-            for e in grade.get("evidence", [])
-        ),
-        "RSI_ARTIFACT_EVIDENCE_CHANGED",
-    )
     pack = json.loads(
         await executor.sandbox(
             workspace,
@@ -117,14 +113,6 @@ async def collect_artifact_evidence(case, grade, root, executor):
     )
     require(isinstance(pack["images"], list) and 1 <= len(pack["images"]) <= 16)
     require(not any(t.get("truncated") for t in pack["texts"]), "RSI_ARTIFACT_EVIDENCE_TRUNCATED")
-    require(
-        all(
-            hashlib.sha256(relative_file(workspace, h["file"]).read_bytes()).hexdigest()
-            == h["sha256"]
-            for h in hashes
-        ),
-        "RSI_ARTIFACT_EVIDENCE_CHANGED",
-    )
     require(len(json.dumps(pack).encode()) <= 3_000_000, "RSI_ARTIFACT_EVIDENCE_TOO_LARGE")
     for item in pack["images"]:
         raw = base64.b64decode(item["data"], validate=True)
@@ -143,6 +131,7 @@ async def collect_artifact_evidence(case, grade, root, executor):
                 input=json.dumps({"golden": case["judge"]["golden"]}).encode(),
             )
         )
+    assert_review_sources(case, grade, root, hashes)
     result = {
         "schema_version": 1,
         "renderer_image": executor.image_id,

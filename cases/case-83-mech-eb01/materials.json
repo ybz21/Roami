@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-EB01",
+  "data": {
+    "kind": "public_synthetic_artifact_bytes",
+    "inputs": [
+      "input/artifact-sources.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/artifact-sources.json",
+    "byte_identical_required": true,
+    "description": "合成PPT标记不是可渲染演示稿；哈希绑定检查使用脚本化渲染和模型。真实页面检查在临时目录生成受控PPT。"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "host_evidence_binding_and_renderer"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 46,
+    "no_skips": true,
+    "pytest_selectors": [
+      "agent-runtime/tests/test_improvement_artifact_sources.py",
+      "agent-runtime/tests/test_improvement_artifact_review.py",
+      "agent-runtime/tests/verification/test_artifact_page_coverage.py"
+    ]
+  }
+}

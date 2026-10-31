@@ -82,3 +82,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case81 / MECH-DE01](case-81-mech-de01/CASE.md)：成品优先、内部执行证据与输入简称范围，114项真实Runtime/进程与边界检查。
 
 - [Case82 / MECH-WR01](case-82-mech-wr01/CASE.md)：本轮已读工作流的版本指引，42项真实Native循环与上下文范围检查。
+
+- [Case83 / MECH-EB01](case-83-mech-eb01/CASE.md)：原评分、渲染及复核的证据绑定，含公开输入、工具和冻结回执。
