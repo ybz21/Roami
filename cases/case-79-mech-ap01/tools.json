@@ -1,0 +1,18 @@
+{
+  "go_package": "./cmd/roami",
+  "go_run": "^TestAgentServeFollowsParentLifetime$",
+  "test_names": [
+    "TestAgentServeFollowsParentLifetime",
+    "TestAgentServeFollowsParentLifetime/term",
+    "TestAgentServeFollowsParentLifetime/kill"
+  ],
+  "expected_collected": 3,
+  "runtime": [
+    "Linux with pidfd",
+    "Go",
+    "Python 3 standard library",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

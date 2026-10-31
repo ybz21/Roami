@@ -1,0 +1,48 @@
+{
+  "id": "MECH-AP01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "前台Runtime生命周期",
+  "prompt": "父级前台服务退出后，结束其拥有的Python Runtime，保留其他实例。",
+  "preconditions": "Linux pidfd、Go、Python标准库替身和私有临时目录；不调用模型。",
+  "expected_terminal": "foreground_runtime_lifetime_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "TERM与KILL后子进程观察到父管道EOF并退出",
+    "源码冻结与严格Go事件回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-AP01-H1",
+      "rule": "父进程收到TERM或KILL后，所拥有的Runtime均退出；使用pidfd核对而非宽泛进程名匹配。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-AP01-H2",
+      "rule": "两个子场景实际执行且无跳过；源码和公开时序配方不变，不触碰其他运行实例。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_owned_runtime_process_leak",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

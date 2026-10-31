@@ -150,3 +150,5 @@
 - [Native启动取消与续办卡住](2026-10-31/native-start-cancellation.md)
 
 - [极值的当前与前一记录证据](2026-10-31/tabular-extreme-records.md)
+
+- [前台Runtime父进程生命周期](2026-10-31/agent-serve-parent-lifetime.md)
