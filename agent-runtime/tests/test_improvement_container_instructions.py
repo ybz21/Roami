@@ -27,9 +27,13 @@ async def test_saved_policies_reach_actor_request_context(store, tmp_path, monke
     try:
         for role, instructions in zip(("main", "worker"), policies):
             actual = child.main_instructions if role == "main" else child.worker_instructions
-            context = runtime.loop.context._configuration({}, actual, runtime.tools.catalog(role))
-            assert context["instructions"] == instructions
-        assert runtime.context.request_context()["instructions"] == policies[0]
+            turn = {} if role == "main" else {"executionRunId": "native-attempt"}
+            context = runtime.loop.context._configuration(turn, actual, runtime.tools.catalog(role))
+            assert context["instructions"].startswith(instructions + "\nImage input availability")
+            assert f"Current role: {role}" in context["instructions"]
+        assert runtime.context.request_context()["instructions"].startswith(
+            policies[0] + "\nImage input availability"
+        )
     finally:
         await runtime.close()
     for private in [

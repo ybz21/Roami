@@ -144,3 +144,5 @@
 - [最终回复的HTML产物链接](2026-10-31/html-delivery-links.md)
 
 - [Main明确读取的本地图片输入](2026-10-31/main-file-image-inputs.md)
+
+- [派活前明确角色图片能力](2026-10-31/image-role-awareness.md)
