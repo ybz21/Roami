@@ -57,6 +57,7 @@ def test_export_receipt_identifies_only_the_retained_omission(
         observed["raw.csv"],
         observed["analysis.csv"],
         numeric=fields,
+        preserve_numeric_text=[] if normalize_identifier else [""],
     )
     assert receipt["numericFields"] == (
         ["", "units"] if normalize_identifier else ["units"]
@@ -139,6 +140,8 @@ def test_json_export_can_select_an_actual_empty_header(tmp_path, selector):
         spec[selector] = ["", "record id", "units", "ratio", "label"]
     else:
         spec[selector] = [""]
+    if selector != "numeric":
+        spec["preserveNumericText"] = [""]
     (tmp_path / "export.json").write_text(json.dumps(spec))
     result = subprocess.run(
         [

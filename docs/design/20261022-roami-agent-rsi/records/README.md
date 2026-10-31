@@ -156,3 +156,5 @@
 - [极值的当前与前一记录证据](2026-10-31/tabular-extreme-records.md)
 
 - [前台Runtime父进程生命周期](2026-10-31/agent-serve-parent-lifetime.md)
+
+- [导出前检查未决数值表示](2026-11-01/type-decisions.md)

@@ -21,6 +21,7 @@ OPTIONAL = {
     "columns": "columns",
     "values": "value_mode",
     "analysisKeyValues": "analysis_key_values",
+    "preserveNumericText": "preserve_numeric_text",
 }
 
 
@@ -55,7 +56,7 @@ def load_spec(workspace, path):
         if name not in value:
             continue
         item = value[name]
-        if name in {"keys", "dateKeys", "numeric", "columns"}:
+        if name in {"keys", "dateKeys", "numeric", "columns", "preserveNumericText"}:
             valid = isinstance(item, list) and all(
                 isinstance(part, str) and "\0" not in part for part in item
             )

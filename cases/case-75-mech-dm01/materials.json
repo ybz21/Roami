@@ -25,7 +25,7 @@
     "pytest_selectors": [
       "skills/tabular-analysis/tests"
     ],
-    "expected_collected": 76,
+    "expected_collected": 87,
     "no_skips": true
   }
 }
