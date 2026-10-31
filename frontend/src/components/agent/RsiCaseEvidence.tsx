@@ -1,5 +1,6 @@
 import { useI18n } from '../../i18n'
 import { ChevronRight } from '../../icons'
+import RsiAudioEvidence from './RsiAudioEvidence'
 type Fields = Record<string, unknown>
 const fields = (value: unknown): Fields => value && typeof value === 'object' && !Array.isArray(value) ? value as Fields : {}
 const score = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
@@ -23,6 +24,7 @@ function CaseEvidenceBody({ evidence }: { evidence: unknown }) {
       {references.length > 0 && <div><dt>{t('agent.rsiResults.nativeReferences')}</dt><dd>{references.map((value, index) => <span key={index}>{t('agent.rsiResults.nativeReference', { index: index + 1, score: value === null ? t('agent.rsiResults.nativeUnscored') : String(value) })}{index < references.length - 1 ? ' · ' : ''}</span>)}</dd></div>}
       {hasPartial && <div><dt>{t('agent.rsiResults.nativePoints')}</dt><dd>{partial.scored_points === null ? t('agent.rsiResults.nativeUnscored') : t('agent.rsiResults.nativePartial', { score: Number(partial.scored_points), total: Number(partial.total_points) })}{Number(partial.unscored_points) > 0 && <p>{t('agent.rsiResults.nativeUnscoredCount', { count: Number(partial.unscored_points) })}</p>}</dd></div>}
     </dl>}
+    <RsiAudioEvidence native={native} />
     {(assessmentError || tools.length > 0 || files.length > 0 || metrics.tokens !== undefined || metrics.model_calls !== undefined) && <details className="rsi-disclosure rsi-case-execution"><summary>{t('agent.rsiResults.executionRecords')}<ChevronRight size={15} /></summary>
       {assessmentError && <p>{t('agent.rsiResults.assessmentError')} <code>{assessmentError}</code></p>}
       {typeof metrics.model_calls === 'number' && <p>{t('agent.rsiResults.modelCalls', { count: metrics.model_calls })}</p>}
