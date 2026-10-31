@@ -63,6 +63,28 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 		return nil, err
 	}
 	handler := NewHandler(ledger)
+	catalog, err := openCatalog(ledger)
+	if err != nil {
+		listener.Close()
+		return nil, err
+	}
+	public, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", catalog.value.Port))
+	if err != nil {
+		listener.Close()
+		return nil, err
+	}
+	catalog.value.Port = public.Addr().(*net.TCPAddr).Port
+	catalog.baseURL = "http://" + public.Addr().String()
+	catalog.agentSocket = filepath.Join(filepath.Dir(socket), "agent-"+strings.TrimPrefix(filepath.Base(socket), "model-"))
+	if err = catalog.persist(catalog.value); err != nil {
+		public.Close()
+		listener.Close()
+		return nil, err
+	}
+	handler.Catalog = catalog
+	publicServer := &http.Server{Handler: http.HandlerFunc(handler.publicModels), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	publicDone := make(chan struct{})
+	go func() { defer close(publicDone); _ = publicServer.Serve(public) }()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan struct{})
 	go func() { defer close(done); _ = server.Serve(listener) }()
@@ -74,6 +96,8 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 			handler.closing = true
 			handler.mu.Unlock()
 			_ = server.Close()
+			_ = publicServer.Close()
+			<-publicDone
 			<-done
 			// Close cancels requests; wait for their deferred ledger writes before unlocking.
 			handler.wait.Wait()

@@ -14,6 +14,7 @@ import (
 )
 
 type Handler struct {
+	Catalog          *CatalogStore
 	Ledger           *Ledger
 	Client           *http.Client
 	wait             sync.WaitGroup
@@ -62,6 +63,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
+	if h.catalogManagement(w, r) {
+		return
+	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
 		h.forward(w, r)
 		return
@@ -158,6 +162,33 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	routingRole := r.Header.Get("X-Roami-Model-Role")
 	if routingRole == "" {
 		routingRole = "main"
+	}
+	if h.Catalog != nil {
+		configured, e := readNodeModels(h.Ledger.paths, routingRole)
+		if e == nil && configured.endpoint == h.Catalog.baseURL+"/v1" {
+			var requested map[string]any
+			_ = json.Unmarshal(body, &requested)
+			check := func() error {
+				current, err := readNodeModels(h.Ledger.paths, routingRole)
+				if err != nil {
+					return err
+				}
+				if current.endpoint != h.Catalog.baseURL+"/v1" || !current.accepts(requested, r.Header.Get("X-Roami-Model-Route")) {
+					return errors.New("MODEL_GATEWAY_ROUTE_CHANGED")
+				}
+				return nil
+			}
+			if err := check(); err != nil {
+				reject(w, 409, err.Error())
+				return
+			}
+			h.Catalog.mu.Lock()
+			snapshot := h.Catalog.snapshot()
+			h.Catalog.mu.Unlock()
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			h.forwardCatalog(w, r, snapshot, "roami_"+routingRole, "openai-completions", check)
+			return
+		}
 	}
 	var route nodeModelRoute
 	var requestBody map[string]any

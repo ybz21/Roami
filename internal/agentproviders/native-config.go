@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -220,14 +222,17 @@ func defaultFields(kind string) []field {
 	switch kind {
 	case "claude":
 		doc = "settings"
-		paths = [][]string{{"model"}}
-		for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL"} {
+		paths = [][]string{{"model"}, {"apiKeyHelper"}, {"modelPicker"}}
+		for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY", "ROAMI_MODEL_MANAGED"} {
 			paths = append(paths, []string{"env", name})
 		}
 	case "codex":
 		paths = [][]string{{"model_provider"}, {"model"}, {"model_reasoning_effort"}}
+		for _, key := range []string{"base_url", "env_key", "experimental_bearer_token", "wire_api", "name"} {
+			paths = append(paths, []string{"model_providers", "openai", key})
+		}
 	case "opencode":
-		paths = [][]string{{"model"}}
+		paths = [][]string{{"model"}, {"small_model"}}
 	case "pi":
 		doc = "settings"
 		paths = [][]string{{"defaultProvider"}, {"defaultModel"}}
@@ -239,6 +244,61 @@ func defaultFields(kind string) []field {
 	return result
 }
 
+func officialFields(kind string) []field {
+	fields := defaultFields(kind)
+	if kind == "claude" {
+		for i := range fields {
+			if reflect.DeepEqual(fields[i].Path, []string{"env", "ROAMI_MODEL_MANAGED"}) {
+				fields[i].Value = jsonValue("1")
+			}
+		}
+	}
+	if kind == "codex" {
+		for i := range fields {
+			if reflect.DeepEqual(fields[i].Path, []string{"model_provider"}) {
+				fields[i].Value = jsonValue("openai")
+			}
+		}
+	}
+	return fields
+}
+
+func (config nativeConfig) connectionMode(kind string) string {
+	for _, doc := range config.Documents {
+		values, _ := doc.values()
+		switch kind {
+		case "claude":
+			for _, path := range [][]string{{"apiKeyHelper"}, {"env", "ANTHROPIC_BASE_URL"}, {"env", "ANTHROPIC_API_KEY"}, {"env", "ANTHROPIC_AUTH_TOKEN"}} {
+				if textAt(values, path...) != "" {
+					return "custom"
+				}
+			}
+		case "codex":
+			provider := textAt(values, "model_provider")
+			if provider != "" && provider != "openai" || textAt(values, "model_providers", "openai", "base_url") != "" {
+				return "custom"
+			}
+		case "opencode", "pi":
+			provider := config.current(kind).Provider
+			if strings.HasPrefix(provider, "roami_") || textAt(values, "providers", provider, "settings", "baseURL") != "" || textAt(values, "provider", provider, "options", "baseURL") != "" || textAt(values, "providers", provider, "baseUrl") != "" {
+				return "custom"
+			}
+		}
+	}
+	return "official"
+}
+
+func currentEndpoint(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return ""
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+	return strings.TrimRight(u.String(), "/")
+}
+
 func (config nativeConfig) current(kind string) CurrentModel {
 	for _, doc := range config.Documents {
 		values, _ := doc.values()
@@ -248,19 +308,32 @@ func (config nativeConfig) current(kind string) CurrentModel {
 			if model == "" {
 				model = textAt(values, "model")
 			}
-			return CurrentModel{Model: model}
+			return CurrentModel{Model: model, BaseURL: currentEndpoint(textAt(values, "env", "ANTHROPIC_BASE_URL"))}
 		case "codex":
-			return CurrentModel{Provider: textAt(values, "model_provider"), Model: textAt(values, "model")}
+			provider := textAt(values, "model_provider")
+			return CurrentModel{Provider: provider, Model: textAt(values, "model"), BaseURL: currentEndpoint(textAt(values, "model_providers", provider, "base_url"))}
 		case "opencode":
 			ref := textAt(values, "model")
 			provider, model, found := strings.Cut(ref, "/")
 			if !found {
 				return CurrentModel{Model: ref}
 			}
-			return CurrentModel{Provider: provider, Model: model}
+			base := textAt(values, "providers", provider, "settings", "baseURL")
+			if base == "" {
+				base = textAt(values, "provider", provider, "options", "baseURL")
+			}
+			return CurrentModel{Provider: provider, Model: model, BaseURL: currentEndpoint(base)}
 		case "pi":
 			if doc.Name == "settings" {
-				return CurrentModel{Provider: textAt(values, "defaultProvider"), Model: textAt(values, "defaultModel")}
+				provider := textAt(values, "defaultProvider")
+				base := ""
+				for _, models := range config.Documents {
+					if models.Name == "models" {
+						data, _ := models.values()
+						base = textAt(data, "providers", provider, "baseUrl")
+					}
+				}
+				return CurrentModel{Provider: provider, Model: textAt(values, "defaultModel"), BaseURL: currentEndpoint(base)}
 			}
 		}
 	}
@@ -321,6 +394,13 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 	case "claude":
 		add("settings", profile.Model, "model")
 		add("settings", profile.Model, "env", "ANTHROPIC_MODEL")
+		for _, name := range []string{"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL"} {
+			add("settings", profile.Model, "env", name)
+		}
+		add("settings", nil, "apiKeyHelper")
+		add("settings", nil, "modelPicker")
+		add("settings", "1", "env", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY")
+		add("settings", "1", "env", "ROAMI_MODEL_MANAGED")
 		add("settings", profile.BaseURL, "env", "ANTHROPIC_BASE_URL")
 		keyName, clearName := "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"
 		if profile.AuthMode == "bearer" {

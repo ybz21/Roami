@@ -49,7 +49,7 @@ function AgentSettingsWorkspace() {
     { key: 'prices', label: t('agent.proxy.prices'), children: <GatewaySettingsForm controller={gateway} mode="prices" active={tab === 'prices'} models={models} /> },
   ]} /><GatewayReconciliation controller={gateway} /></div>
 }
-function AgentSettingsForm({ onModelNames }: { onModelNames: (models: string[]) => void }) {
+export function AgentSettingsForm({ onModelNames }: { onModelNames: (models: string[]) => void }) {
   const { t } = useI18n(), { message } = App.useApp()
   const [draft, setDraft] = useState<Draft | null>(null), [saved, setSaved] = useState<AgentModelSettings | null>(null)
   const [error, setError] = useState(''), [saving, setSaving] = useState(false), [version, setVersion] = useState(0)

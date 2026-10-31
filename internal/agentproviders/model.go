@@ -50,11 +50,13 @@ type ProfileSummary struct {
 }
 
 type CurrentModel struct {
+	BaseURL  string `json:"baseUrl,omitempty"`
 	Provider string `json:"provider,omitempty"`
 	Model    string `json:"model,omitempty"`
 }
 
 type View struct {
+	Mode          string           `json:"mode"`
 	Profiles      []ProfileSummary `json:"profiles"`
 	Current       CurrentModel     `json:"current"`
 	Revision      string           `json:"revision"`
@@ -72,6 +74,7 @@ type field struct {
 }
 
 type kindState struct {
+	Mode          string    `json:"mode,omitempty"`
 	Profiles      []Profile `json:"profiles"`
 	Original      []field   `json:"original,omitempty"`
 	ActiveID      string    `json:"activeId,omitempty"`

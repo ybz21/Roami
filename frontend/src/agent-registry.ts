@@ -56,6 +56,7 @@ export type AgentModelProfile = {
 
 export type AgentModelInput = Omit<AgentModelProfile, 'id' | 'hasKey' | 'applied'> & { apiKey?: string }
 export type AgentModelView = {
+  mode?: 'official' | 'custom'
   profiles: AgentModelProfile[]
   current: { provider?: string; model?: string }
   revision: string

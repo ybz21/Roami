@@ -5,6 +5,11 @@
 // 旧链接兼容：/#/env → /#/settings，/#/overview → /#/projects（概览并进项目页，18 设计）
 export function normalizeRoute(raw: string): string {
   const route = raw.split('?')[0]
+  if (route === 'capabilities/models/roles') return 'capabilities/agents/roami'
+  if (route === 'settings/agent/runtime') {
+    const tab = new URLSearchParams(raw.split('?')[1] || '').get('modelTab')
+    return 'capabilities/models/' + (tab === 'proxy' ? 'usage' : tab === 'prices' ? 'prices' : 'catalog')
+  }
   if (route === 'settings/common' || route === 'settings/ui/status') return 'settings/ui/look'
   if (route === 'settings/ui/keys/more') return 'settings/ui/keys'
   if (route === 'settings/agent/bin') return 'capabilities/agents'
@@ -12,7 +17,7 @@ export function normalizeRoute(raw: string): string {
   if (route === 'plugins') return 'capabilities/plugins'
   if (route.startsWith('plugins/')) return 'capabilities/plugins/' + route.slice(8)
   if (/^settings\/agent\/(capabilities|skills|mcp|cli|tools)$/.test(route)) return 'capabilities/' + (route.split('/')[2] === 'capabilities' ? 'skills' : route.split('/')[2])
-  if (route === 'env' || route.startsWith('env/')) return 'settings' + route.slice(3)
+  if (route === 'env' || route.startsWith('env/')) return normalizeRoute('settings' + raw.slice(3))
   if (route === 'overview' || route.startsWith('overview/')) return 'projects'
   if (route === 'inbox') return 'projects'
   if (route === 'about') return 'settings/about'  // 关于页并进设置（18 设计：设置页收下版本与安装）
