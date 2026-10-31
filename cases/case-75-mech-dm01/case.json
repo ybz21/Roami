@@ -23,6 +23,11 @@
       "id": "MECH-DM01-H2",
       "rule": "相邻变化不跨缺失值，零基数或非法数值显式拒绝，输入不改，CSV来源哈希正确。",
       "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DM01-H3",
+      "rule": "极值绑定当前输入记录和明确标签列；相邻变化保留前一记录，缺失值断开；并列保留首记录并报告总次数。",
+      "failure_effect": "case_failed"
     }
   ],
   "decision_domains": [
@@ -37,7 +42,8 @@
   },
   "resources": {
     "inputs": [
-      "input/moments.csv"
+      "input/moments.csv",
+      "input/extrema.csv"
     ],
     "tools": "tools.json",
     "generator": "scripts/run.py",

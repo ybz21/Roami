@@ -325,6 +325,15 @@ func agentPython(dir string, p agentruntime.Paths, initialize bool) error {
 			return err
 		}
 		defer stop()
+		// Foreground serve has the same parent ownership as the web supervisor.
+		reader, writer, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+		defer writer.Close()
+		cmd.ExtraFiles = []*os.File{reader}
+		cmd.Args = append(cmd.Args, "--parent-fd", "3")
 	}
 	return cmd.Run()
 }

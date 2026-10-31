@@ -1,0 +1,23 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_delivery_evidence.py",
+    "agent-runtime/tests/test_source_deliverables.py",
+    "agent-runtime/tests/test_native_observation_delivery.py",
+    "agent-runtime/tests/test_deliverable_collection_scope.py",
+    "agent-runtime/tests/test_artifact_links.py",
+    "agent-runtime/tests/test_workspace_image_inputs.py"
+  ],
+  "expected_collected": 114,
+  "runtime": [
+    "Python 3.12",
+    "SQLite, pytest/pytest-asyncio, Pillow",
+    "real Runtime and real private subprocess stdout",
+    "scripted model events and isolated workspace"
+  ],
+  "registered_tools": [
+    "bash",
+    "file_read",
+    "file_write"
+  ],
+  "model_calls": 0
+}

@@ -430,7 +430,7 @@ class ArtifactStore:
                 "JOIN task_attempts t ON t.native_branch_id=m.branch_id "
                 "WHERE a.owner_id=? AND a.task_id=? AND t.task_id=? AND t.id=? AND a.deleted_ms IS NULL "
                 "AND (? IS NULL OR COALESCE(json_extract(a.metadata_json,'$.source'),'') "
-                "NOT IN ('browser','computer','workspace_image') OR instr(?, '/api/agent/artifacts/'||a.id||'/content')>0) "
+                "NOT IN ('browser','computer','workspace_image','shell','tool_result') OR instr(?, '/api/agent/artifacts/'||a.id||'/content')>0) "
                 "ORDER BY a.created_ms DESC,a.id LIMIT ?",
                 (
                     owner,

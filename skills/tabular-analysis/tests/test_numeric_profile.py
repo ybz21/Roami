@@ -131,3 +131,103 @@ def test_cli_emits_parseable_evidence_without_creating_an_output(tmp_path):
     )
     assert json.loads(result.stdout)["columns"]["x"]["kurtosisExcessUnbiased"] == -6
     assert [p.name for p in tmp_path.iterdir()] == ["input.csv"]
+
+
+def test_return_extremes_belong_to_current_record_with_previous_record_evidence(
+    tmp_path,
+):
+    fixture = Path(__file__).parent / "fixtures/extrema.csv"
+    source = tmp_path / "input.csv"
+    source.write_bytes(fixture.read_bytes())
+    before = source.read_bytes()
+    result = profile(
+        Workspace(tmp_path),
+        "input.csv",
+        ["Price"],
+        "fractional_change",
+        labels=["Date", "Code"],
+    )
+    extrema = result["columns"]["Price"]["extrema"]
+    low, high = extrema["minimum"], extrema["maximum"]
+    assert low["value"] == pytest.approx(-0.25)
+    assert low["dataRow"] == 3 and low["labels"] == {
+        "Date": "2025-01-06",
+        "Code": "003",
+    }
+    assert low["previous"]["dataRow"] == 2
+    assert low["previous"]["labels"]["Date"] == "2025-01-03"
+    assert high["value"] == pytest.approx(0.5)
+    assert high["labels"]["Date"] == "2025-01-07"
+    assert high["previous"]["labels"]["Date"] == "2025-01-06"
+    assert high["sourceValue"] == "135" and high["previous"]["sourceValue"] == "90"
+    assert low["occurrences"] == high["occurrences"] == 1
+    assert source.read_bytes() == before
+
+
+def test_tied_extrema_count_all_occurrences_and_keep_first_input_record(tmp_path):
+    csv_file(
+        tmp_path, "value,label\n1,first low\n2,first high\n1,last low\n2,last high\n"
+    )
+    result = profile(Workspace(tmp_path), "input.csv", ["value"], labels=["label"])
+    extrema = result["columns"]["value"]["extrema"]
+    assert extrema["minimum"]["dataRow"] == 1
+    assert extrema["minimum"]["labels"] == {"label": "first low"}
+    assert extrema["maximum"]["dataRow"] == 2
+    assert extrema["maximum"]["labels"] == {"label": "first high"}
+    assert extrema["minimum"]["occurrences"] == extrema["maximum"]["occurrences"] == 2
+    assert "previous" not in extrema["maximum"]
+
+
+def test_missing_cells_break_extreme_pairing_and_unrequested_labels_are_omitted(
+    tmp_path,
+):
+    csv_file(tmp_path, 'price,private label\n100,a\n110,b\n"",c\n200,d\n180,e\n')
+    result = profile(Workspace(tmp_path), "input.csv", ["price"], "fractional_change")
+    extrema = result["columns"]["price"]["extrema"]
+    assert extrema["minimum"]["dataRow"] == 5
+    assert extrema["minimum"]["previous"]["dataRow"] == 4
+    assert extrema["maximum"]["dataRow"] == 2
+    assert extrema["maximum"]["previous"]["dataRow"] == 1
+    assert extrema["maximum"]["labels"] == {}
+    assert "private label" not in str(extrema)
+
+
+@pytest.mark.parametrize("labels", [["missing"], ["x", "x"]])
+def test_invalid_label_columns_are_rejected(tmp_path, labels):
+    csv_file(tmp_path, "x\n1\n")
+    with pytest.raises(PublicationError, match="TABLE_FIELD_SELECTION_INVALID"):
+        profile(Workspace(tmp_path), "input.csv", ["x"], labels=labels)
+
+
+def test_empty_observations_have_no_extreme_record(tmp_path):
+    csv_file(tmp_path, 'x\n""\n')
+    result = profile(Workspace(tmp_path), "input.csv", ["x"])
+    assert result["columns"]["x"]["extrema"] == {"minimum": None, "maximum": None}
+
+
+def test_cli_returns_source_labels_for_current_and_previous_record(tmp_path):
+    source = tmp_path / "input.csv"
+    source.write_bytes((Path(__file__).parent / "fixtures/extrema.csv").read_bytes())
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "numeric_profile.py"),
+            "--workspace",
+            str(tmp_path),
+            "--path",
+            "input.csv",
+            "--columns",
+            "Price",
+            "--transform",
+            "fractional_change",
+            "--labels",
+            "Date",
+            "Code",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    extrema = json.loads(result.stdout)["columns"]["Price"]["extrema"]
+    assert extrema["maximum"]["labels"]["Date"] == "2025-01-07"
+    assert extrema["minimum"]["previous"]["labels"]["Date"] == "2025-01-03"

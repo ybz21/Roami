@@ -4,6 +4,9 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-01 | [市场数据报告的证据边界](2026-11-01/market-data-evidence.md) |
+| 2026-11-01 | [成品交付与执行证据范围](2026-11-01/delivery-evidence.md) |
+| 2026-10-31 | [已存在执行窗口的上下文传播](2026-10-31/enclosing-execution-window.md) |
 | 2026-10-31 | [已安装工作流的执行上下文](2026-10-31/optional-workflow-context.md) |
 | 2026-10-31 | [外挂 Skill 的初始发现](2026-10-31/optional-skill-discovery.md) |
 | 2026-10-31 | [本地配置 Skill 的资源目录](2026-10-31/configured-skill-package.md) |
@@ -146,3 +149,9 @@
 - [Main明确读取的本地图片输入](2026-10-31/main-file-image-inputs.md)
 
 - [派活前明确角色图片能力](2026-10-31/image-role-awareness.md)
+
+- [Native启动取消与续办卡住](2026-10-31/native-start-cancellation.md)
+
+- [极值的当前与前一记录证据](2026-10-31/tabular-extreme-records.md)
+
+- [前台Runtime父进程生命周期](2026-10-31/agent-serve-parent-lifetime.md)

@@ -4,10 +4,15 @@
   "data": {
     "kind": "synthetic_distribution_sample",
     "inputs": [
-      "input/moments.csv"
+      "input/moments.csv",
+      "input/extrema.csv"
     ],
     "runtime_input": "skills/tabular-analysis/tests/fixtures/moments.csv",
-    "byte_identical_required": true
+    "byte_identical_required": true,
+    "runtime_inputs": {
+      "input/moments.csv": "skills/tabular-analysis/tests/fixtures/moments.csv",
+      "input/extrema.csv": "skills/tabular-analysis/tests/fixtures/extrema.csv"
+    }
   },
   "tools": {
     "kind": "standard_library_csv_and_moments",
@@ -20,7 +25,7 @@
     "pytest_selectors": [
       "skills/tabular-analysis/tests"
     ],
-    "expected_collected": 58,
+    "expected_collected": 76,
     "no_skips": true
   }
 }

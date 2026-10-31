@@ -57,7 +57,7 @@ def load_spec(workspace, path):
         item = value[name]
         if name in {"keys", "dateKeys", "numeric", "columns"}:
             valid = isinstance(item, list) and all(
-                isinstance(part, str) and part and "\0" not in part for part in item
+                isinstance(part, str) and "\0" not in part for part in item
             )
         elif name == "analysisKeyValues":
             valid = type(item) is bool

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-EW01",
+  "data": {
+    "kind": "public_timing_scenarios",
+    "inputs": [
+      "input/timing-scenarios.json"
+    ],
+    "runtime_input": "test_improvement_execution_window.py reads the public scenarios directly"
+  },
+  "tools": {
+    "kind": "real_runtime_tool_loop_with_scripted_model_events",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_junit",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 50,
+    "no_skips": true
+  }
+}

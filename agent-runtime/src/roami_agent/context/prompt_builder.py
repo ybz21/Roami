@@ -42,11 +42,13 @@ class PromptBuilder:
         chat_images=None,
         memory=None,
         skills=None,
+        execution_deadline=None,
     ):
         self.db, self.context, self.settings = database, context, settings
         self.vision = vision
         self.chat_images = chat_images
         self.skills = skills
+        self.execution_deadline = execution_deadline
         self.remembered = RememberedContext(memory, settings) if memory else None
 
     async def _images(self, turn, plan, prompt):
@@ -406,14 +408,25 @@ class PromptBuilder:
                 if recalled:
                     prompt.insert(1, recalled)
             plan, prompt = await self._images(turn, plan, prompt)
-            timing = execution_timing(turn, now_ms())
+            timing = execution_timing(
+                turn,
+                now_ms(),
+                enclosing_deadline_ms=self.execution_deadline()
+                if self.execution_deadline
+                else None,
+            )
             if timing:
                 plan["executionTiming"] = timing
                 # A changing clock must not invalidate the cached history prefix.
                 prompt.append(
                     {
                         "role": "system",
-                        "content": "Current native attempt timing (runtime data, not completion evidence): "
+                        "content": (
+                            "Current native attempt timing"
+                            if "runId" in timing
+                            else "Current execution window"
+                        )
+                        + " (runtime data, not completion evidence): "
                         + encoded(timing)
                         + ". Original task requirements still apply.",
                     }

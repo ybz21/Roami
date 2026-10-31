@@ -10,12 +10,26 @@ from distribution_moments import moments
 from table_publication import PublicationError, Workspace
 
 
-def profile(workspace, path, selected, transform="values", expected=None):
+def observe_extremes(extrema, value, source, previous=None):
+    point = {"value": value, **source, **({"previous": previous} if previous else {})}
+    for name in ("minimum", "maximum"):
+        prior = extrema[name]
+        if prior is None or (
+            value < prior["value"] if name == "minimum" else value > prior["value"]
+        ):
+            extrema[name] = {**point, "occurrences": 1}
+        elif value == prior["value"]:
+            prior["occurrences"] += 1
+
+
+def profile(workspace, path, selected, transform="values", expected=None, *, labels=()):
     columns, rows, sha = table(workspace, path, expected)
     if (
         not selected
         or len(set(selected)) != len(selected)
         or not set(selected) <= set(columns)
+        or len(set(labels)) != len(labels)
+        or not set(labels) <= set(columns)
     ):
         raise PublicationError(
             "TABLE_FIELD_SELECTION_INVALID", details={"availableColumns": columns}
@@ -24,13 +38,15 @@ def profile(workspace, path, selected, transform="values", expected=None):
         raise PublicationError("TABLE_TRANSFORM_INVALID")
     output = {}
     for column in selected:
-        index, previous, missing = columns.index(column), None, 0
+        index, previous, previous_source, missing = columns.index(column), None, None, 0
         values = []
+        extrema = {"minimum": None, "maximum": None}
         for row_number, row in enumerate(rows, 2):
             cell = row[index].strip()
             if not cell:
                 missing += 1
                 previous = None
+                previous_source = None
                 continue
             try:
                 value = float(cell)
@@ -44,8 +60,14 @@ def profile(workspace, path, selected, transform="values", expected=None):
                     "TABLE_NUMERIC_VALUE_INVALID",
                     details={"column": column, "row": row_number},
                 )
+            source = {
+                "dataRow": row_number - 1,
+                "sourceValue": row[index],
+                "labels": {name: row[columns.index(name)] for name in labels},
+            }
             if transform == "values":
                 values.append(value)
+                observe_extremes(extrema, value, source)
             elif previous is not None:
                 if not previous:
                     raise PublicationError(
@@ -59,14 +81,22 @@ def profile(workspace, path, selected, transform="values", expected=None):
                         details={"column": column, "row": row_number},
                     )
                 values.append(change)
+                observe_extremes(extrema, change, source, previous_source)
             previous = value
-        output[column] = {**moments(values), "sourceMissingCells": missing}
+            previous_source = source
+        output[column] = {
+            **moments(values),
+            "sourceMissingCells": missing,
+            "extrema": extrema,
+        }
     if hashlib.sha256(workspace.read(path)).hexdigest() != sha:
         raise PublicationError("SOURCE_CHANGED")
     return {
         "source": {"path": path, "sha256": sha, "rows": len(rows), "columns": columns},
         "transform": transform,
         "order": "input row order; missing cells break fractional-change sequences",
+        "extremaConvention": "dataRow is 1-based excluding the header; tied extrema retain the first input record and count all occurrences; fractional changes belong to the current record with previous-record evidence",
+        "labelColumns": list(labels),
         "conventions": {
             "standardDeviationSample": "sample standard deviation; ddof=1",
             "kurtosisPearsonPopulation": "m4 / m2^2; theoretical normal reference 3",
@@ -88,6 +118,7 @@ def main():
         "--transform", choices=["values", "fractional_change"], default="values"
     )
     parser.add_argument("--expected-sha256")
+    parser.add_argument("--labels", nargs="+", default=[])
     args = parser.parse_args()
     try:
         result = profile(
@@ -96,6 +127,7 @@ def main():
             args.columns,
             args.transform,
             args.expected_sha256,
+            labels=args.labels,
         )
     except (PublicationError, OSError, UnicodeError, ValueError) as error:
         result = {"error": str(error), "writePublished": False}
