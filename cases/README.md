@@ -78,3 +78,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case77 / MECH-MI01](case-77-mech-mi01/CASE.md)：Main本地读图与保存角色能力，含合成输入、真实Runtime和冻结回执。
 
 - [Case80 / MECH-EW01](case-80-mech-ew01/CASE.md)：已有执行窗口的上下文传播，含公开时序、真实Runtime循环与50项冻结机制检查。
+
+- [Case81 / MECH-DE01](case-81-mech-de01/CASE.md)：成品优先、内部执行证据与输入简称范围，114项真实Runtime/进程与边界检查。

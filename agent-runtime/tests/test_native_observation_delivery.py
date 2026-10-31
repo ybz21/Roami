@@ -18,6 +18,10 @@ from roami_agent.storage.database import row
         ("computer", False, 1, False),
         ("computer", True, 1, False),
         ("browser", False, 30, True),
+        ("shell", False, 1, False),
+        ("shell", True, 1, False),
+        ("tool_result", False, 30, True),
+        ("tool_result", True, 1, False),
     ],
 )
 async def test_internal_capture_is_retained_without_becoming_a_default_attachment(
