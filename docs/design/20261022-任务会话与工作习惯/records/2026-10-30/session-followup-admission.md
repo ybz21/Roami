@@ -68,3 +68,37 @@ PR 发布前的 `check.sh full` 通过：Python 2474 项通过（47 项跳过）
 测试实例通过 `isolated-roami.sh` 隔离并使用同一入口清理。
 本次没有 Web UI 修改；未更改线上实例或原截图任务的历史状态。
 本文为开发验收记录，使用中文，不属于产品界面的国际化文本。
+
+## Chrome 自动验收（2026-10-31）
+
+针对运行时代码 `f747226c3fbc961c0809ad1c459e63804c79078e`，通过 `roami chrome`
+操作构建后的真实前端、Go 网关与 Python 任务状态机。最终矩阵为五类执行器
+`native/codex/claude/opencode/pi` × 八种追加前状态
+`succeeded/waiting_user/failed/cancelled/interrupted/running/unknown/closed`，
+共 **40 个场景、485 条断言通过，失败 0**。Pi 对应此前需求中 PAI 的暂定解释。
+补充后的完整质量门禁为 Python 2696 项通过、47 项跳过，Go 与前端门禁通过。
+
+浏览器验收检查了以下行为：
+
+- 用真实按钮点击提交追加，检查按钮中心命中；已受理的输入清空，旧成果不充当新成果。
+- 忙状态下原 revision 2 保持排队，空闲后执行；重试保留同一提交标识，实际接收一次。
+  DOM 状态历史未出现新轮次误报失败；执行中的旧轮次停止确认前不提交新轮次。
+- 正常场景均产生原 Main 对话的完成回报；原生与 Claude 的已完成场景检查 Chrome
+  中回报文本、刷新后结果保留，并观察 6.8 秒，已结束详情没有继续轮询请求。
+- 未知结果时拒绝自动重放，保留追加草稿，刷新后仍保留；已关闭会话禁用追加入口。
+- 检查页面无横向溢出，另截取 412px 紧凑档排队与结束画面。
+
+执行器的忙状态、接收和完成回执及停止信号由受控夹具提供，Main 与原生任务使用注入
+测试模型；没有调用真实模型服务，也没有向真实外部编码器 TUI 发送输入。紧凑档为
+Chrome 截图视口，未做 Android 真机触控验收。本轮没有修改产品代码。
+
+测试在唯一回环主机地址、独立数据与 tmux 实例中运行；Chrome 确认安全上下文可用，
+测试 Cookie 与线上地址隔离，没有修改真实任务或模型路由。验收后关闭本任务标签页，
+停止测试服务，并通过原 `isolated-roami.sh` 入口清理该实例。
+
+截图已上传 [PR #540](https://github.com/ybz21/Roami/pull/540) 的 `pr-shots` 分支：
+
+- [追加后排队](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-claude-appended-queued.png)
+- [执行回报待核验](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-claude-appended-finished.png)
+- [紧凑档结果](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-claude-appended-finished-compact.png)
+- [Main 对话收到追加回报](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-540/chrome-completion-reply-in-main.png)
