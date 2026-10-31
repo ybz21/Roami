@@ -9,9 +9,10 @@ from pathlib import Path
 
 
 class PublicationError(ValueError):
-    def __init__(self, code, *, published=False):
+    def __init__(self, code, *, published=False, details=None):
         super().__init__(code)
         self.published = published
+        self.details = details
 
 
 class Workspace:

@@ -269,3 +269,197 @@ def test_complete_analysis_schema_still_validates_declared_keys(tmp_path, failur
     with pytest.raises(PublicationError, match=f"TABLE_SOURCE_KEYS_{failure}"):
         publish(workspace, hashes)
     assert not (tmp_path / "clean.csv").exists()
+
+
+def export_spec(root, hashes, **overrides):
+    value = {
+        "source": "raw.csv",
+        "analysis": "analysis.csv",
+        "destination": "clean.csv",
+        "expectedSourceSha256": hashes["raw.csv"],
+        "expectedAnalysisSha256": hashes["analysis.csv"],
+        "keys": ["date"],
+        "numeric": ["units", "value"],
+        **overrides,
+    }
+    (root / "export.json").write_text(json.dumps(value))
+    return [
+        sys.executable,
+        str(SCRIPTS / "csv_export.py"),
+        "export",
+        "--workspace",
+        str(root),
+        "--spec",
+        "export.json",
+    ]
+
+
+@pytest.mark.parametrize(
+    "field", ["total amount", "成交额", "value;$(touch pwned)'quote"]
+)
+def test_spec_preserves_field_boundaries_without_shell_interpretation(tmp_path, field):
+    import csv
+
+    workspace, hashes = fixture(tmp_path)
+    for name, header, rows in [
+        (
+            "raw.csv",
+            ["record id", "date", field],
+            [["007", "a", "2.0"], ["008", "b", "3.125"]],
+        ),
+        ("analysis.csv", ["date", field], [["b", "3.125"], ["a", "2.0"]]),
+    ]:
+        with (tmp_path / name).open("w", newline="") as out:
+            writer = csv.writer(out, lineterminator="\n")
+            writer.writerow(header)
+            writer.writerows(rows)
+    hashes = {name: inspect(workspace, name)["sha256"] for name in hashes}
+    args = export_spec(tmp_path, hashes, numeric=[field])
+    spec_before = (tmp_path / "export.json").read_bytes()
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    receipt = json.loads(result.stdout)
+    assert receipt["specSha256"] == hashlib.sha256(spec_before).hexdigest()
+    with (tmp_path / "clean.csv").open() as source:
+        assert list(csv.reader(source)) == [
+            ["record id", "date", field],
+            ["008", "b", "3.125"],
+            ["007", "a", "2"],
+        ]
+    assert (tmp_path / "export.json").read_bytes() == spec_before
+    assert not (tmp_path / "pwned").exists()
+    assert all(
+        inspect(workspace, name)["sha256"] == sha for name, sha in hashes.items()
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"numeric": "units value"},
+        {"analysisKeyValues": "false"},
+        {"expectedSourceSha256": "guessed"},
+        {"numericColumns": ["units"]},
+        {"keys": [123]},
+        {"source": None},
+    ],
+)
+def test_invalid_spec_does_not_publish(tmp_path, change):
+    _workspace, hashes = fixture(tmp_path)
+    result = subprocess.run(
+        export_spec(tmp_path, hashes, **change),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    receipt = json.loads(result.stdout)
+    assert receipt["code"] in ["TABLE_SPEC_VALUES_INVALID", "TABLE_SPEC_FIELDS_INVALID"]
+    assert receipt["details"] and receipt["writePublished"] is False
+    assert not (tmp_path / "clean.csv").exists()
+
+
+@pytest.mark.parametrize(
+    "body,code",
+    [
+        ('{"source":"a","source":"b"}', "TABLE_SPEC_DUPLICATE_FIELD"),
+        ("[]", "TABLE_SPEC_OBJECT_REQUIRED"),
+        ("{", "TABLE_SPEC_INVALID_JSON"),
+    ],
+)
+def test_invalid_spec_document_is_explicit(tmp_path, body, code):
+    _workspace, hashes = fixture(tmp_path)
+    args = export_spec(tmp_path, hashes)
+    (tmp_path / "export.json").write_text(body)
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    assert result.returncode == 1 and json.loads(result.stdout)["code"] == code
+    assert not (tmp_path / "clean.csv").exists()
+
+
+@pytest.mark.parametrize(
+    "failure", ["changed_input", "spec_destination", "mixed_options"]
+)
+def test_spec_retains_snapshot_and_output_guards(tmp_path, failure):
+    _workspace, hashes = fixture(tmp_path)
+    args = export_spec(
+        tmp_path,
+        hashes,
+        **({"destination": "export.json"} if failure == "spec_destination" else {}),
+    )
+    spec_before = (tmp_path / "export.json").read_bytes()
+    if failure == "changed_input":
+        (tmp_path / "raw.csv").write_text("changed")
+    if failure == "mixed_options":
+        args += ["--numeric", "units"]
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert not (tmp_path / "clean.csv").exists()
+    assert (tmp_path / "export.json").read_bytes() == spec_before
+    if failure != "mixed_options":
+        assert json.loads(result.stdout)["code"] == (
+            "SOURCE_CHANGED" if failure == "changed_input" else "OUTPUT_MUST_DIFFER"
+        )
+
+
+def test_split_field_error_explains_how_to_keep_the_intended_selection(tmp_path):
+    _workspace, hashes = fixture(tmp_path)
+    for name in hashes:
+        path = tmp_path / name
+        path.write_text(path.read_text().replace("units", "total amount"))
+    workspace = Workspace(tmp_path)
+    hashes = {name: inspect(workspace, name)["sha256"] for name in hashes}
+    args = export_spec(tmp_path, hashes, numeric=["total amount", "value"])
+    direct = [
+        sys.executable,
+        str(SCRIPTS / "csv_export.py"),
+        "export",
+        "--workspace",
+        str(tmp_path),
+        "--source",
+        "raw.csv",
+        "--analysis",
+        "analysis.csv",
+        "--destination",
+        "clean.csv",
+        "--expected-source-sha256",
+        hashes["raw.csv"],
+        "--expected-analysis-sha256",
+        hashes["analysis.csv"],
+        "--keys",
+        "date",
+        "--numeric",
+        "total",
+        "amount",
+        "value",
+    ]
+    failed = subprocess.run(direct, capture_output=True, text=True, check=False)
+    receipt = json.loads(failed.stdout)
+    assert failed.returncode == 1 and receipt["code"] == "TABLE_FIELD_SELECTION_INVALID"
+    assert receipt["details"]["invalidNumericFields"] == ["amount", "total"]
+    assert "total amount" in receipt["details"]["availableColumns"]
+    assert "--spec" in receipt["details"]["recovery"]
+    assert not (tmp_path / "clean.csv").exists()
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    assert result.returncode == 0
+    assert "008,b,3,2.50" in (tmp_path / "clean.csv").read_text()
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_spec_requires_an_explicit_numeric_selection_even_when_empty(
+    tmp_path, explicit
+):
+    _workspace, hashes = fixture(tmp_path)
+    args = export_spec(tmp_path, hashes, numeric=[])
+    if not explicit:
+        value = json.loads((tmp_path / "export.json").read_text())
+        del value["numeric"]
+        (tmp_path / "export.json").write_text(json.dumps(value))
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    if explicit:
+        assert result.returncode == 0
+        assert "008,b,3.0,2.50" in (tmp_path / "clean.csv").read_text()
+    else:
+        receipt = json.loads(result.stdout)
+        assert result.returncode == 1 and receipt["code"] == "TABLE_SPEC_FIELDS_INVALID"
+        assert receipt["details"]["missing"] == ["numeric"]
+        assert not (tmp_path / "clean.csv").exists()

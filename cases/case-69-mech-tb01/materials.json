@@ -11,7 +11,8 @@
     "generators": [
       "skills/tabular-analysis/tests",
       "agent-runtime/tests/verification/test_tabular_skill_package.py"
-    ]
+    ],
+    "description": "合成CSV包含带空格的record id与unit count字段；规格由既有bash工具以结构化argv创建并执行。"
   },
   "tools": {
     "configuration": "tools.json",
@@ -24,7 +25,7 @@
       "skills/tabular-analysis/tests",
       "agent-runtime/tests/verification/test_tabular_skill_package.py"
     ],
-    "expected_collected": 23,
+    "expected_collected": 41,
     "no_skips": true,
     "kind": "source_frozen_pytest_receipt"
   }

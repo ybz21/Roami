@@ -124,3 +124,5 @@
 - [RSI 保存角色指令的容器传递](2026-10-31/saved-role-instructions.md)
 
 - [源副本契约与可选表格导出](2026-10-31/tabular-export-prototype.md)
+
+- [CSV字段边界与结构化导出规格](2026-10-31/csv-export-spec.md)
