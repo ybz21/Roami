@@ -1,0 +1,92 @@
+{
+  "name": "已存在执行窗口的上下文传播",
+  "description": "只呈现实际外层窗口，保留节点和任务的不限配置。",
+  "scenarios": [
+    {
+      "name": "unlimited-native",
+      "native": true,
+      "own": 0,
+      "outer": null,
+      "observed": 19000,
+      "expected": {
+        "elapsedSeconds": 9
+      }
+    },
+    {
+      "name": "own-earlier",
+      "native": true,
+      "own": 25001,
+      "outer": 35001,
+      "observed": 19000,
+      "expected": {
+        "elapsedSeconds": 9,
+        "deadlineMs": 25001,
+        "remainingSeconds": 7
+      }
+    },
+    {
+      "name": "outer-earlier",
+      "native": true,
+      "own": 35001,
+      "outer": 25001,
+      "observed": 19000,
+      "expected": {
+        "elapsedSeconds": 9,
+        "deadlineMs": 25001,
+        "remainingSeconds": 7,
+        "deadlineSource": "enclosing_execution"
+      }
+    },
+    {
+      "name": "expired-outer",
+      "native": true,
+      "own": 0,
+      "outer": 25001,
+      "observed": 26001,
+      "expected": {
+        "elapsedSeconds": 16,
+        "deadlineMs": 25001,
+        "remainingSeconds": 0,
+        "deadlineSource": "enclosing_execution"
+      }
+    },
+    {
+      "name": "coordinator-window",
+      "native": false,
+      "own": 0,
+      "outer": 25001,
+      "observed": 19000,
+      "expected": {
+        "deadlineMs": 25001,
+        "remainingSeconds": 7,
+        "deadlineSource": "enclosing_execution"
+      }
+    },
+    {
+      "name": "boolean-is-not-a-deadline",
+      "native": true,
+      "own": true,
+      "outer": true,
+      "observed": 19000,
+      "expected": {
+        "elapsedSeconds": 9
+      }
+    },
+    {
+      "name": "negative-window",
+      "native": false,
+      "own": 0,
+      "outer": -1,
+      "observed": 19000,
+      "expected": null
+    },
+    {
+      "name": "text-is-not-a-deadline",
+      "native": false,
+      "own": 0,
+      "outer": "25001",
+      "observed": 19000,
+      "expected": null
+    }
+  ]
+}

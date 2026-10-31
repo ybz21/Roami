@@ -99,6 +99,7 @@ class Runtime:
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
         development_rsi=False,
+        execution_deadline: Callable[[], int | None] | None = None,
     ):
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
@@ -269,6 +270,7 @@ class Runtime:
                 self.settings,
                 memory=self.memory,
                 skills=self.tools.optional_skill_metadata,
+                execution_deadline=execution_deadline,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True
