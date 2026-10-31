@@ -1,0 +1,20 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_main_file_image_inputs.py",
+    "agent-runtime/tests/test_workspace_image_inputs.py",
+    "agent-runtime/tests/test_workspace_image_comparison.py",
+    "agent-runtime/tests/test_chat_attachments.py",
+    "agent-runtime/tests/test_image_preparation.py",
+    "agent-runtime/tests/test_model_settings.py"
+  ],
+  "expected_collected": 113,
+  "runtime": [
+    "Python 3.12",
+    "Pillow",
+    "actual Main Runtime and saved model settings API",
+    "SQLite, pytest/pytest-asyncio",
+    "local scripted model events"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

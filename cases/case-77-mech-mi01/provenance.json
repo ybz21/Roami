@@ -1,0 +1,8 @@
+{
+  "origin": "observed_runtime_regression",
+  "issue": 446,
+  "scope": "saved Main image route enabled, Worker disabled; no private media frames or benchmark answers",
+  "inputs_byte_identical_to_runtime_fixture": true,
+  "external_model_calls": false,
+  "historical_scores_changed": false
+}

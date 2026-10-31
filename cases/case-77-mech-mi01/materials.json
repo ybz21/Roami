@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MI01",
+  "data": {
+    "kind": "public_image_recipe",
+    "inputs": [
+      "input/image.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/main-file-image.json",
+    "byte_identical_required": true
+  },
+  "tools": {
+    "kind": "actual_role_scoped_main_image_boundary",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_main_file_image_inputs.py",
+      "agent-runtime/tests/test_workspace_image_inputs.py",
+      "agent-runtime/tests/test_workspace_image_comparison.py",
+      "agent-runtime/tests/test_chat_attachments.py",
+      "agent-runtime/tests/test_image_preparation.py",
+      "agent-runtime/tests/test_model_settings.py"
+    ],
+    "no_skips": true,
+    "expected_collected": 113
+  }
+}

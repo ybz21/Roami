@@ -194,7 +194,7 @@ class ToolGateway:
                     "contentOmitted": True,
                     "recovery": "Up to six recent distinct workspace image snapshots are attached for comparison within the model's combined image payload budget. Re-reading an unchanged path replaces its snapshot; do not page binary bytes."
                     if value.get("fileImage", {}).get("artifactId")
-                    else "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Use an image-capable Worker and read from offset 0, or report that visual inspection is unavailable.",
+                    else "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Report the visual limitation unless another configured image-capable role has independently inspected the file.",
                 }
             state = (
                 "failed"
