@@ -126,3 +126,5 @@
 - [源副本契约与可选表格导出](2026-10-31/tabular-export-prototype.md)
 
 - [CSV字段边界与结构化导出规格](2026-10-31/csv-export-spec.md)
+
+- [演示文稿单页检查与命名颜色](2026-10-31/presentation-focused-inspection.md)

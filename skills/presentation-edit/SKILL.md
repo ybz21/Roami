@@ -12,8 +12,10 @@ Use Python 3.12+ with the dependencies declared in the script metadata (`lxml` a
 Inspect the source before choosing objects:
 
 ```bash
-python <packagePath>/scripts/presentation.py inspect --workspace <workspace> --path input.pptx
+python <packagePath>/scripts/presentation.py inspect --workspace <workspace> --path input.pptx --slide <requested-slide-number>
 ```
+
+Use `--slide` for a slide-specific task so the requested objects and palette fit in the inspection result; omit it only when the task needs the entire deck.
 
 Use the observed `shapePath` for a specific text frame. `drawingOrdinal` identifies drawing traversal; `topToBottomRank` and `topToBottomPaths` describe geometric top-to-bottom order. These are different facts: a bottom caption can be drawn first. Unknown or overlapping placement needs inspection in the actual editor or a rendering. Structural inspection alone does not establish visual quality.
 
@@ -21,7 +23,7 @@ For ordinal references to visible textboxes, such as the first or second textbox
 
 If the shell externalizes a long inspection result, read its returned text artifact through `read artifact://ID` and follow the returned page offsets. A stdout preview is not the complete JSON document; do not infer missing objects from it.
 
-For a slide's full list of named text colors, use the names-only command. It maps the nonempty textboxes in geometric top-to-bottom order and resolves names from the installed editor's palette, avoiding a manual RGB translation:
+For a slide's full list of named text colors, use the names-only command below. Keep every requested color as a name; do not translate one of them to a guessed RGB literal or mix guessed RGB with named colors in a batch. It maps the nonempty textboxes in geometric top-to-bottom order and resolves names from the installed editor's palette, avoiding a manual RGB translation:
 
 ```bash
 python <packagePath>/scripts/presentation.py colors --workspace <workspace> --path input.pptx --destination updated.pptx --expected-sha256 <source-sha256> --slide 1 --names Blue Orange Purple

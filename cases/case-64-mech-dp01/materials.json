@@ -5,7 +5,8 @@
     "kind": "synthetic_generated_pptx",
     "recipe": "input/recipe.json",
     "generator": "skills/presentation-edit/tests/deck_fixture.py::deck_bytes",
-    "output": "input/deck.pptx and edited.pptx in a new external result directory"
+    "output": "input/deck.pptx and edited.pptx in a new external result directory",
+    "focused_inspection": "input/focused-slides.json"
   },
   "tools": {
     "configuration": "tools.json",
@@ -19,7 +20,7 @@
       "skills/presentation-edit/tests",
       "agent-runtime/tests/verification/test_presentation_skill_package.py"
     ],
-    "expected_collected": 48,
+    "expected_collected": 54,
     "no_skips": true,
     "kind": "source_frozen_pytest_receipt"
   }

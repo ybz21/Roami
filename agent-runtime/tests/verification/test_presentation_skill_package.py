@@ -97,6 +97,8 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
                 else:
                     argv = [
                         "inspect",
+                        "--slide",
+                        "1",
                         "--path",
                         "source.pptx" if len(receipts) == 1 else "edited.pptx",
                     ]
@@ -106,6 +108,7 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
                 )
             else:
                 checked = json.loads(receipts[-1]["stdout"])
+                assert checked["slideCount"] == 1 and len(checked["slides"]) == 1
                 assert (
                     checked["slides"][0]["textObjects"][1]["paragraphs"][0]["alignment"] == "center"
                 )

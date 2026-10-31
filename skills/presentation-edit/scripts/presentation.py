@@ -21,16 +21,24 @@ from pptx_edits import edit_presentation
 from pptx_package import PresentationError, presentation_metadata
 
 
-def inspect(workspace, path):
+def inspect(workspace, path, slide=None):
     if Path(path).suffix.lower() != ".pptx":
         raise PublicationError("PPTX_REQUIRED")
     body = workspace.read(path)
+    document = presentation_metadata(body)
+    document["slideCount"] = len(document["slides"])
+    if slide is not None:
+        if type(slide) is not int or not 1 <= slide <= document["slideCount"]:
+            raise PresentationError("PRESENTATION_TARGET_NOT_FOUND")
+        document["slides"] = [
+            item for item in document["slides"] if item["number"] == slide
+        ]
     return {
         "path": str(workspace.relative(path)),
         "sha256": hashlib.sha256(body).hexdigest(),
         "sourceSizeBytes": len(body),
         "editorPalette": installed_presentation_palette(),
-        **presentation_metadata(body),
+        **document,
     }
 
 
@@ -109,7 +117,7 @@ def main(argv=None):
         "--expected-destination-sha256", help="Observed existing output hash"
     )
     parser.add_argument(
-        "--slide", type=int, help="Slide number for colors (starts at 1)"
+        "--slide", type=int, help="Slide number for inspect/colors (starts at 1)"
     )
     parser.add_argument(
         "--names", nargs="+", help="Installed palette names in top-to-bottom order"
@@ -120,7 +128,6 @@ def main(argv=None):
             args.destination,
             args.expected_sha256,
             args.expected_destination_sha256,
-            args.slide is not None,
             args.names,
         )
     )
@@ -131,7 +138,12 @@ def main(argv=None):
         )
         or (
             args.operation == "edit"
-            and (not (args.request or args.request_json) or args.path or color_options)
+            and (
+                not (args.request or args.request_json)
+                or args.path
+                or color_options
+                or args.slide is not None
+            )
         )
         or (
             args.operation == "colors"
@@ -156,7 +168,7 @@ def main(argv=None):
     try:
         workspace = Workspace(args.workspace)
         if args.operation == "inspect":
-            result = inspect(workspace, args.path)
+            result = inspect(workspace, args.path, args.slide)
         elif args.operation == "colors":
             result = named_colors(
                 workspace,
