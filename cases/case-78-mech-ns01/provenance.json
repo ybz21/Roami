@@ -1,0 +1,8 @@
+{
+  "origin": "task steering remained stopping during CLI integration; committed-start cancellation reproduced deterministically",
+  "initial_cli_timeout_exact_cause_proven": false,
+  "data": "public timing phases and generic task strings; no historical model responses",
+  "model_calls": 0,
+  "historical_scores_updated": false,
+  "human_labels_updated": false
+}

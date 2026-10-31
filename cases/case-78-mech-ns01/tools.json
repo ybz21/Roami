@@ -1,0 +1,19 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_native_start_cancellation.py",
+    "agent-runtime/tests/test_task_topic.py",
+    "agent-runtime/tests/test_continuation_delivery.py",
+    "agent-runtime/tests/test_native_session_storage.py",
+    "agent-runtime/tests/test_cli_integration.py::test_go_cli_managed_runtime_round_trip"
+  ],
+  "expected_collected": 33,
+  "runtime": [
+    "Python 3.12",
+    "SQLite",
+    "asyncio/pytest",
+    "Go CLI and local HTTP fixture",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

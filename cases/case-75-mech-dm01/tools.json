@@ -2,7 +2,7 @@
   "pytest_selectors": [
     "skills/tabular-analysis/tests"
   ],
-  "expected_collected": 58,
+  "expected_collected": 65,
   "runtime": [
     "Python标准库",
     "pytest",
