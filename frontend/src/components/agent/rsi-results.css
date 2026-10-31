@@ -47,6 +47,8 @@ html[data-size="compact"] .rsi-results-selector { padding:var(--sp-4) 0; gap:var
 .rsi-run-history .rsi-result-disclosure { margin-left:var(--sp-3); }
 .rsi-native-evidence { margin:var(--sp-4) 0; }
 .rsi-case-execution { margin:var(--sp-4) 0; }
+.rsi-audio-details { margin:var(--sp-4) 0; }
+.rsi-audio-details > summary:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
 .rsi-case-execution ul { padding-left:var(--sp-5); font-size:var(--fs-meta); color:var(--text-dim); }
 .rsi-draft-notice { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-subtle); font-size:var(--fs-sm); }
 .rsi-draft-notice > span { flex:1; }

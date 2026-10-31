@@ -130,3 +130,5 @@
 - [演示文稿单页检查与命名颜色](2026-10-31/presentation-focused-inspection.md)
 
 - [媒体验收分项证据](2026-10-31/media-verifier-diagnostics.md)
+
+- [音频分项在Case详情中的展示](2026-10-31/audio-evidence-ui.md)
