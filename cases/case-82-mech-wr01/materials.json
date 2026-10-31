@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-WR01",
+  "data": {
+    "kind": "public_synthetic_registered_workflow",
+    "inputs": [
+      "input/workflow-reads.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/workflow-reads.json",
+    "byte_identical_required": true,
+    "description": "测试直接读取逐字节相同的夹具，通过真实CapabilityImports与Native循环取得读取回执。"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "existing_skill_read_and_prompt_projection"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_loaded_workflows.py",
+      "agent-runtime/tests/test_optional_workflow_context.py",
+      "agent-runtime/tests/test_execution_timing.py"
+    ],
+    "expected_collected": 42,
+    "no_skips": true,
+    "kind": "source_frozen_pytest_receipt"
+  }
+}

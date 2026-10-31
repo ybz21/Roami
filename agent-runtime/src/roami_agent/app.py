@@ -270,6 +270,7 @@ class Runtime:
                 self.settings,
                 memory=self.memory,
                 skills=self.tools.optional_skill_metadata,
+                workflow_reads=self.tools.loaded_workflow_metadata,
                 execution_deadline=execution_deadline,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)

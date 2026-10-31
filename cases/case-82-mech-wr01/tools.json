@@ -1,0 +1,19 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_loaded_workflows.py",
+    "agent-runtime/tests/test_optional_workflow_context.py",
+    "agent-runtime/tests/test_execution_timing.py"
+  ],
+  "expected_collected": 42,
+  "runtime": [
+    "Python 3.12",
+    "SQLite, pytest/pytest-asyncio",
+    "real Runtime and Native loop",
+    "scripted provider events; no external model calls"
+  ],
+  "registered_tools": [
+    "read",
+    "skill_read"
+  ],
+  "model_calls": 0
+}
