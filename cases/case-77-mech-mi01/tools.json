@@ -5,9 +5,10 @@
     "agent-runtime/tests/test_workspace_image_comparison.py",
     "agent-runtime/tests/test_chat_attachments.py",
     "agent-runtime/tests/test_image_preparation.py",
-    "agent-runtime/tests/test_model_settings.py"
+    "agent-runtime/tests/test_model_settings.py",
+    "agent-runtime/tests/test_image_role_awareness.py"
   ],
-  "expected_collected": 113,
+  "expected_collected": 123,
   "runtime": [
     "Python 3.12",
     "Pillow",
