@@ -76,3 +76,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case76 / MECH-AL01](case-76-mech-al01/CASE.md)：实际回复HTML属性与真实产物下载链接，含输入、工具和冻结回执。
 
 - [Case77 / MECH-MI01](case-77-mech-mi01/CASE.md)：Main本地读图与保存角色能力，含合成输入、真实Runtime和冻结回执。
+
+- [Case80 / MECH-EW01](case-80-mech-ew01/CASE.md)：已有执行窗口的上下文传播，含公开时序、真实Runtime循环与50项冻结机制检查。

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import math
 import os
 import signal
 import time
@@ -209,8 +210,14 @@ class NativeFilesExecutor:
         ]
         database = Database(root / "runtime.db", root / "runtime", managed=False)
         await database.open()
+        enclosing_deadline_ms = None
         runtime = Runtime(
-            database, models[0], settings=settings, worker_model=models[1], memory_model=models[2]
+            database,
+            models[0],
+            settings=settings,
+            worker_model=models[1],
+            memory_model=models[2],
+            execution_deadline=lambda: enclosing_deadline_ms,
         )
         # No shell, delegations, external capabilities, session operations or grader access.
         allowed = {
@@ -251,7 +258,11 @@ class NativeFilesExecutor:
         deferred_jobs = 0
         try:
             await runtime.start()
-            async with asyncio.timeout(case["limits"]["seconds"]):
+            async with asyncio.timeout(case["limits"]["seconds"]) as window:
+                # Describe the already-running evaluator window without changing task or route limits.
+                enclosing_deadline_ms = now_ms() + math.ceil(
+                    (window.when() - asyncio.get_running_loop().time()) * 1000
+                )
                 conversation = await runtime.conversations.create("rsi-evaluation")
                 prompts = [case["prompt"], *case.get("followups", [])]
                 for index, prompt in enumerate(prompts):

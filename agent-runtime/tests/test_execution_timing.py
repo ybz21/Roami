@@ -152,7 +152,10 @@ async def test_dispatcher_passes_persisted_attempt_start_instead_of_queue_timest
         await runtime.close()
 
 
-async def test_real_native_tool_loop_receives_one_fresh_clock_and_keeps_it_out_of_transcript(store):
+@pytest.mark.parametrize("enclosing_window", [False, True])
+async def test_real_native_tool_loop_receives_one_fresh_clock_and_keeps_it_out_of_transcript(
+    store, enclosing_window
+):
     from test_runtime import ConversationModel
 
     from roami_agent.app import Runtime
@@ -188,7 +191,12 @@ async def test_real_native_tool_loop_receives_one_fresh_clock_and_keeps_it_out_o
                 assert any(m["role"] == "tool" for m in messages)
                 yield ModelEvent("text", "Original task completed")
 
-    runtime = Runtime(store, ConversationModel(), worker_model=Worker())
+    from roami_agent.protocol.identity import now_ms
+
+    deadline = now_ms() + 60000 if enclosing_window else None
+    runtime = Runtime(
+        store, ConversationModel(), worker_model=Worker(), execution_deadline=lambda: deadline
+    )
     try:
         c = await runtime.conversations.create("alice")
         task = await runtime.tasks.create(
@@ -201,6 +209,12 @@ async def test_real_native_tool_loop_receives_one_fresh_clock_and_keeps_it_out_o
         )
         await runtime.dispatch.run(job)
         assert len(observed) == 2
+        persisted = await store.call(
+            lambda db: row(db, "SELECT budget_json FROM tasks WHERE id=?", (task["id"],))
+        )
+        assert json.loads(persisted["budget_json"])["deadlineMs"] == 0
+        assert runtime.settings.task_timeout_seconds == 0
+        assert runtime.settings.route("worker").timeout_seconds == 0
         assert observed[1][: len(observed[0]) - 1] == observed[0][:-1]
         parts = await store.call(
             lambda db: rows(db, "SELECT parts_json FROM prompt_manifests ORDER BY created_ms")
@@ -209,6 +223,12 @@ async def test_real_native_tool_loop_receives_one_fresh_clock_and_keeps_it_out_o
         for part, prompt in zip(parts, observed, strict=True):
             timing = json.loads(part["parts_json"])["executionTiming"]
             assert isinstance(timing, dict) and timing["runId"]
+            if enclosing_window:
+                assert timing["deadlineMs"] == deadline
+                assert 0 < timing["remainingSeconds"] <= 60
+                assert timing["deadlineSource"] == "enclosing_execution"
+            else:
+                assert "deadlineMs" not in timing
             assert (
                 json.dumps(timing, separators=(",", ":"), sort_keys=True) in prompt[-1]["content"]
             )
