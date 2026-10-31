@@ -22,6 +22,7 @@ from roami_agent.replies.task_progress import task_progress
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
+from roami_agent.storage.task_handoff import request_handoff_complete
 from roami_agent.storage.transcript_repository import message
 from roami_agent.tools.request_coverage_recovery import request_coverage_recovery
 from roami_agent.tools.workspace_images import WorkspaceImageReadError
@@ -108,9 +109,19 @@ class ToolGateway:
                     import json
 
                     completion = json.loads(callback["payload_json"]).get("completion", {})
-                    if completion.get("state") == "cancelled" or (
-                        completion.get("state") in {"failed", "interrupted"}
-                        and (completion.get("result") or {}).get("retryable") is False
+                    final_handoff = operation_name in {
+                        "delegate",
+                        "task_steer",
+                    } and await self.db.call(
+                        lambda db: request_handoff_complete(db, binding.get("originMessageId"))
+                    )
+                    if (
+                        final_handoff
+                        or completion.get("state") == "cancelled"
+                        or (
+                            completion.get("state") in {"failed", "interrupted"}
+                            and (completion.get("result") or {}).get("retryable") is False
+                        )
                     ):
                         raise DomainError("TASK_COMPLETION_RESTART_FORBIDDEN", 409)
 
@@ -225,7 +236,7 @@ class ToolGateway:
                 value.update(
                     executionStarted=False,
                     retryable=False,
-                    recovery="This is a cancelled or non-retryable task's completion report, not new authorization. Do not start work, send session instructions or change configuration. Report the committed outcome with reply/task_reply; a new user turn is required for further work.",
+                    recovery="This completion report is not a new user request. Do not restart, steer or replace accepted work, send session instructions or change configuration. Report the committed outcome and any blocker; a new user turn is required for further work.",
                 )
             if value["error"] in {
                 "REPLY_BOILERPLATE",

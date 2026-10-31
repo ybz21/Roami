@@ -82,7 +82,7 @@ class TaskDispatcher:
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?",
                 ("preparing" if preparing else "running", now_ms(), task["id"]),
             )
-            started_ms = now_ms()
+            started_ms = run["started_ms"] or now_ms()
             db.execute(
                 "UPDATE task_attempts SET state=?,started_ms=? WHERE id=?",
                 ("starting" if preparing else "running", started_ms, run["id"]),
@@ -103,18 +103,19 @@ class TaskDispatcher:
                 turn = dict(
                     row(db, "SELECT * FROM turns WHERE id=?", (tid,)), owner_id=task["owner_id"]
                 )
-            event(
-                db,
-                task["origin_conversation_id"],
-                "task.preparing" if preparing else "task.started",
-                {
-                    "taskId": task["id"],
-                    "runId": run["id"],
-                    "nativeTurnId": turn["id"] if turn else None,
-                },
-                task_id=task["id"],
-                turn_id=turn["id"] if turn else None,
-            )
+            if not json.loads(job["payload_json"]).get("waitingForSession"):
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task.preparing" if preparing else "task.started",
+                    {
+                        "taskId": task["id"],
+                        "runId": run["id"],
+                        "nativeTurnId": turn["id"] if turn else None,
+                    },
+                    task_id=task["id"],
+                    turn_id=turn["id"] if turn else None,
+                )
             return task, run, turn
 
         started = await self.db.call(start, write=True)
@@ -142,7 +143,8 @@ class TaskDispatcher:
             if turn:
                 result = await self.native_executor.run(task, run, turn=turn)
             elif self.executor:
-                await self.charge_budget(task["id"])
+                if not json.loads(job["payload_json"]).get("waitingForSession"):
+                    await self.charge_budget(task["id"])
                 result = await self.executor.run(task, run)
                 if result is None:  # External TUI is alive; report arrives via the CLI callback.
                     return
@@ -197,6 +199,13 @@ class TaskDispatcher:
                 )
             raise
         except (DomainError, OSError, ValueError, httpx.HTTPError, TimeoutError) as exc:
+            if (
+                isinstance(exc, DomainError)
+                and exc.code == "SESSION_NOT_IDLE"
+                and run["executor_kind"] == "cli"
+                and await self.defer_session_submission(task, run, job)
+            ):
+                return
             await self.end_prepared_turn(
                 turn, "failed", exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED"
             )
@@ -236,6 +245,40 @@ class TaskDispatcher:
                 await self.complete(task, run, result, "interrupted", unknown=True)
                 return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
+
+    async def defer_session_submission(self, task, run, job):
+        def write(db):
+            current = row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
+            if current["revision"] != run["task_revision"] or current["state"] not in {
+                "preparing",
+                "running",
+            }:
+                return False
+            pending = row(db, "SELECT * FROM jobs WHERE id=?", (job["id"],))
+            payload = json.loads(pending["payload_json"])
+            first = not payload.get("waitingForSession")
+            payload["waitingForSession"] = True
+            delay = min(30_000, 1000 * 2 ** min(pending["attempts"] - 1, 5))
+            db.execute(
+                "UPDATE jobs SET state='queued',payload_json=?,available_ms=? WHERE id=?",
+                (encoded(payload), now_ms() + delay, job["id"]),
+            )
+            db.execute("UPDATE tasks SET state='queued' WHERE id=?", (task["id"],))
+            db.execute(
+                "UPDATE task_attempts SET state='accepted' WHERE id=? AND result_json IS NULL",
+                (run["id"],),
+            )
+            if first:
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task.activity",
+                    {"taskId": task["id"], "runId": run["id"]},
+                    task_id=task["id"],
+                )
+            return True
+
+        return await self.db.call(write, write=True)
 
     @staticmethod
     def attempt_progress(db, task, run, turn):
@@ -667,6 +710,25 @@ class TaskDispatcher:
     async def recover(self):
         def write(db):
             for task in rows(db, "SELECT * FROM tasks WHERE state IN ('preparing','running')"):
+                submission = row(
+                    db,
+                    "SELECT j.id,a.id AS run_id FROM jobs j JOIN task_attempts a "
+                    "ON a.id=json_extract(j.payload_json,'$.runId') "
+                    "WHERE j.kind='task.run' AND j.aggregate_id=? "
+                    "AND j.state IN ('queued','running') "
+                    "AND json_extract(j.payload_json,'$.waitingForSession')=1 "
+                    "AND a.executor_kind='cli' AND a.task_revision=? AND a.result_json IS NULL",
+                    (task["id"], task["revision"]),
+                )
+                if submission:
+                    # The same Go launch key reconciles an admission interrupted by restart.
+                    db.execute("UPDATE tasks SET state='queued' WHERE id=?", (task["id"],))
+                    db.execute(
+                        "UPDATE task_attempts SET state='accepted' WHERE id=?",
+                        (submission["run_id"],),
+                    )
+                    db.execute("UPDATE jobs SET state='queued' WHERE id=?", (submission["id"],))
+                    continue
                 external = row(
                     db,
                     "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=? AND executor_kind='cli' AND result_json IS NULL",

@@ -153,6 +153,9 @@ class CodingExecutor:
                 spec=launch,
             )
         except DomainError as exc:
+            if exc.code == "SESSION_NOT_IDLE":
+                # Go rejects this before journaling or sending the new prompt.
+                raise
             if exc.code in SESSION_REJECTIONS:
                 return {"state": "failed", "summary": exc.code}
             await self.record(task, run, {"state": "unknown"})
