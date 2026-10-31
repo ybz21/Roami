@@ -80,6 +80,7 @@ async def test_visible_partial_output_is_never_retried_after_transport_failure()
             "request",
             "headers",
             "first_delta",
+            "transport_error",
         ]
     finally:
         await model.close()

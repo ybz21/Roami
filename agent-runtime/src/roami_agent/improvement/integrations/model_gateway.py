@@ -7,6 +7,7 @@ from contextlib import aclosing
 
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.providers.request_receipts import forwarded_receipt, usage_receipt
+from roami_agent.providers.transport_failures import transport_receipt
 
 # A supported 2 MiB image alone exceeds 2 MB after base64; keep transport bounds separate.
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
@@ -81,9 +82,13 @@ class ModelGateway:
                 async for event in events:
                     if event.kind == "telemetry":
                         receipt = forwarded_receipt(event.value)
-                        if receipt is None:
+                        failure = transport_receipt(event.value)
+                        if receipt is not None:
+                            data = {"choices": [], "roami_model_receipt": receipt}
+                        elif failure is not None:
+                            data = {"choices": [], "roami_model_transport": failure}
+                        else:
                             continue
-                        data = {"choices": [], "roami_model_receipt": receipt}
                     elif event.kind == "text":
                         data = {"choices": [{"index": 0, "delta": {"content": event.value}}]}
                     elif event.kind == "tool":

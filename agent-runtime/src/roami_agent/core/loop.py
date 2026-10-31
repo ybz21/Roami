@@ -161,6 +161,8 @@ class AgentLoop:
                                         "headers",
                                         "first_delta",
                                         "retry",
+                                        "transport_error",
+                                        "upstream_transport_error",
                                     }:
                                         await self.manifests.timing(turn, step + 1, timing)
                             elif part.kind == "text" and part.value and "firstTextMs" not in timing:
