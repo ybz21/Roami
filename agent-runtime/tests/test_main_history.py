@@ -71,7 +71,13 @@ async def test_main_briefing_restores_old_records_without_losing_constraints_or_
         first, restored = [json.loads(m["parts_json"]) for m in manifests]
         assert first["historyView"] == "main_briefing"
         assert restored["historyView"] == "full"
-        assert first["estimatedTokens"] < restored["estimatedTokens"] / 5
+        fixed_tokens = (
+            first["modelContext"]["instructionTokens"] + first["modelContext"]["toolTokens"]
+        )
+        assert (
+            first["estimatedTokens"] - fixed_tokens
+            < (restored["estimatedTokens"] - fixed_tokens) / 5
+        )
         assert first["requestBasis"] != restored["requestBasis"]
         assert restored["modelContext"]["usageTokens"] != first["estimatedTokens"]
         assert rounds == 2

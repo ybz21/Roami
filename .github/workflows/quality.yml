@@ -50,3 +50,9 @@ jobs:
           uv run --project agent-runtime --frozen ruff check skills/presentation-edit
           uv run --project agent-runtime --frozen ruff format --check skills/presentation-edit
           uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/presentation-edit/tests
+
+      - name: Check external tabular Skill
+        run: |
+          uv run --project agent-runtime --frozen ruff check skills/tabular-analysis
+          uv run --project agent-runtime --frozen ruff format --check skills/tabular-analysis
+          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/tabular-analysis/tests
