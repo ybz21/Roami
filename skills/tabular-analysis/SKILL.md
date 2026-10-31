@@ -1,6 +1,6 @@
 ---
 name: tabular-analysis
-description: Inspect CSV snapshots and publish cleaned source-schema exports with keyed recovery of source identifiers, explicit numeric normalization, and guarded file writes. Use for CSV cleaning alongside analyses, charts, or reports so derived analysis fields do not silently change the cleaned export.
+description: Inspect CSV snapshots and explicitly defined distribution moments, then publish cleaned source-schema exports with keyed recovery of source identifiers, explicit numeric normalization, and guarded file writes. Use for CSV cleaning alongside analyses, charts, or reports so derived analysis fields do not silently change the cleaned export.
 ---
 
 Use the bundled export command for a cleaned CSV copy. It projects the source column names and order, excludes analysis-only fields, and can recover omitted source columns through explicit keys. Decide the task-specific cleaning and analysis separately; this command does not choose invalid rows or analytical methods. Keep source identifiers by default, including unnamed columns; use `--columns` only for a different schema explicitly requested by the user.
@@ -47,3 +47,10 @@ The source and analysis files remain unchanged. The output is separate and creat
 Inspect the exported CSV and use it for the requested cleaned-data delivery, keeping derived features in the analysis data unless requested as output. When the destination is a service, use the task's authorized transfer interface and confirm remote delivery. Reopen requested charts or reports and state any unverified visual limitations.
 
 Preserving an identifier means preserving which record it denotes, not treating every identifier as text. Inspect its source values: a field of unpadded whole-number identifiers promoted to decimal text by missing values can be included in `numeric` when cleaning types. Keep identifiers with meaningful leading zeros, prefixes or punctuation as strings. Include every chosen numeric field in the spec, even when its header is unnamed or contains spaces; do not infer the decision from the header alone.
+
+
+For descriptive statistics, use `scripts/numeric_profile.py --workspace <directory> --path analysis.csv --columns "Daily return" --expected-sha256 <observed-sha>`. It reads without changing files and names the convention in every moment field. `--transform fractional_change` computes adjacent `current / previous - 1` values in input row order; prepare the intended chronological order first. Changes are fractions, not percent. Missing cells break sequences rather than bridging gaps; zero bases stop the calculation.
+
+Report the returned sample count and definition with a statistic. Pearson population kurtosis has normal reference 3; excess kurtosis has reference 0. The corrected sample excess is a separate estimate. Constant or insufficient data produce unavailable values, not an invented normal score. Use the same named metric consistently in chart labels, slide text and speaker notes; format values only for display.
+
+Separate what supplied fields establish from explanations requiring other evidence. Label unsupported explanations as hypotheses and identify the evidence needed; correlation alone does not establish a cause. External benchmarks need a cited source. A numerical profile is descriptive evidence, not confirmation of business causes or a substitute for reviewing the final charts and narrative.
