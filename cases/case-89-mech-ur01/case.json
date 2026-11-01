@@ -1,0 +1,55 @@
+{
+  "id": "MECH-UR01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "Skill资源地址",
+  "prompt": "读取已安装Skill的资源目录，通过给出的协议地址取得文档；不扩大文件工具的工作区范围。",
+  "preconditions": "公开Skill名称/文本样例、真实Runtime与注册器、临时配置/托管包；零模型调用。",
+  "expected_terminal": "discoverable_skill_protocol_resources_without_filesystem_escape",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "返回已注册且当前协议可读取的资源地址，不预加载正文",
+    "主/后台/研究角色通过给出的地址取得对应文本与Skill版本",
+    "禁用、包更新、重启、越界文件和不支持的路径仍按原边界处理"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-UR01-H1",
+      "rule": "已配置与托管包返回的资源地址可直接读取；普通包外文件路径仍拒绝。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-UR01-H2",
+      "rule": "目录不含未注册、外部软链接、二进制或当前引用Schema不支持的路径；不自动加载资源正文。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-UR01-H3",
+      "rule": "禁用Skill/read/skill_read后原地址不可绕过；更新和重启后目录只指向当前内容。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_skill_package_reference_read_as_outside_workspace_file",
+    "issue": 443,
+    "fixture_reproduction_only": true,
+    "historical_production_root_not_claimed": true,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/skill-resource-locations.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

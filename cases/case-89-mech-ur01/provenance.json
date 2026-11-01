@@ -1,0 +1,8 @@
+{
+  "case_id": "MECH-UR01",
+  "source": "Authored generic Skill resource paths and texts; route failure observed in isolated v176 stock probe",
+  "private_reference_material": false,
+  "actual_human_labels": false,
+  "historical_scores_changed": false,
+  "baseline": "892fc9f3"
+}

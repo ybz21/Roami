@@ -1,6 +1,7 @@
 """Versioned workflow instructions available to Main and workers."""
 
 import hashlib
+import re
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
@@ -54,6 +55,7 @@ def register_skills(registry, settings):
                 ),
             }
     if skills:
+        reference_pattern = r"^[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*$"
 
         async def skill(args, binding):
             name, reference_path = skill_location(args["name"], args.get("reference", ""))
@@ -68,6 +70,11 @@ def register_skills(registry, settings):
             return {
                 "text": value["text"],
                 "version": value["version"],
+                "resources": [
+                    "skill://" + name + "/" + path
+                    for path in sorted(value["references"])
+                    if re.fullmatch(reference_pattern, path)
+                ],
                 **({"packagePath": value["packagePath"]} if value.get("packagePath") else {}),
             }
 
@@ -81,7 +88,7 @@ def register_skills(registry, settings):
                         "name": {"type": "string", "enum": [*skills, *SKILL_ALIASES]},
                         "reference": {
                             "type": "string",
-                            "pattern": r"^[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*$",
+                            "pattern": reference_pattern,
                         },
                     },
                     ["name"],
