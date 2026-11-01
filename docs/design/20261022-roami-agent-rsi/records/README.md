@@ -164,3 +164,5 @@
 - [容器失败的私有错误证据](2026-11-01/container-failure-evidence.md)
 
 - [部分评分的回执与汇总](2026-11-01/partial-artifact-ratings.md)
+
+- [CSV列身份与数值表示](2026-11-01/tabular-column-types.md)
