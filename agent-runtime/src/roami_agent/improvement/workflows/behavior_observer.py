@@ -101,6 +101,7 @@ async def prefetch_reviews(workflow, action, settings, config, packets, saved):
             ],
         )
         value = json.loads(paid["text"])
+        require(isinstance(value, dict), "RSI_INVALID_OBSERVATION")
         results = value.get("reviews")
         require(
             isinstance(results, list)
@@ -204,7 +205,10 @@ async def observe_cycle(workflow, action, settings, config, *, provider_factory=
             if not reads:
                 final = value
                 break
-            require(len(reads) <= 4, "RSI_INVALID_EVIDENCE_REFERENCE")
+            require(
+                len(reads) <= 4 and all(isinstance(request, dict) for request in reads),
+                "RSI_INVALID_EVIDENCE_REFERENCE",
+            )
             chunks = []
             for request in reads:
                 ref = next((r for r in references if r["file"] == request.get("file")), None)

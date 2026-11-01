@@ -1,0 +1,55 @@
+{
+  "id": "MECH-RJ01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "模型JSON回执",
+  "prompt": "模型返回合法JSON但形状不符时，阻断该动作并保留回执与用量，后台队列继续处理下一项，恢复不重放。",
+  "preconditions": "公开错误JSON形状、脚本化模型、真实ResearchWorker队列及私有SQLite；零真实模型调用。",
+  "expected_terminal": "invalid_model_shapes_block_action_without_stopping_worker",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "错误模型JSON变成明确的领域错误",
+    "后台Worker保持运行并处理下一动作",
+    "已保存的回执与已知用量保持，恢复同一动作不再调用模型"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-RJ01-H1",
+      "rule": "复盘、批量观察、Issue计划和证据读取请求先验证对象形状，再读取字段。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RJ01-H2",
+      "rule": "错误Codex事件/用量形状仍拒绝；原身份、结束事件、单结果、无工具和用量规则保持。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RJ01-H3",
+      "rule": "真实队列在错误动作后继续处理下一项；失败保持blocked，缓存文本和120个合成Token保留，人工恢复不重放脚本模型。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "nonobject_model_json_attribute_error_terminates_research_worker",
+    "issue": 443,
+    "fixture_reproduction_only": true,
+    "historical_production_root_not_claimed": true,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/model-result-shapes.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
