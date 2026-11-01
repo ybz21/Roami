@@ -27,6 +27,10 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		h.applyRoamiModels(w, r)
 		return true
 	}
+	if r.URL.Path == "/v1/model-gateway/catalog/discover" && r.Method == "POST" {
+		h.discoverModels(w, r)
+		return true
+	}
 	if r.URL.Path == "/v1/model-gateway/catalog/source-models" && r.Method == "POST" {
 		h.sourceModels(w, r)
 		return true
@@ -98,7 +102,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				}
 			}
 			if model == nil {
-				if len(s.value.Models) >= 200 {
+				if len(s.value.Models) >= 1000 {
 					err = catalogError()
 					break
 				}

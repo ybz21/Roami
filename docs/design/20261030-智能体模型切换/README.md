@@ -2,7 +2,7 @@
 
 2026-10-31 修订。连接与模型合并管理，Roami 内置网关负责适配客户端协议。同一个上游、同一个模型可以供 CC、Codex、OpenCode、Pi 和 Roami 使用，不再为不同智能体重复建立来源。
 
-最新产品提案：[简化添加模型](add-model-design.md) · [交互稿](add-model.html)。默认只填地址与密钥、读取后勾选；已有来源直接选择。定价、聚合策略各放后置选项卡。此提案尚未实现到运行代码，下文为当前工作分支的实现说明。
+最新产品提案：[简化添加模型](add-model-design.md) · [交互稿](add-model.html)。默认只填地址与密钥、读取后勾选；已有来源直接选择。定价、聚合策略各放后置选项卡。配置源与批量拉取已在 2026-11-01 落地，见 [模型目录实现与验收](source-catalog-acceptance.md)。提案中的独立聚合策略页签仍是后续范围；下文保留此前实现说明。
 
 [连接合并验收](connections-acceptance.md) · [网关适配验收](gateway-adaptation.md) · [模式切换验收](modes-acceptance.md) · [早期实现记录](implementation.md) · [历史设计](records/2026-10-31/README.md)
 
