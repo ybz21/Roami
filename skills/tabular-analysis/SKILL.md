@@ -3,65 +3,13 @@ name: tabular-analysis
 description: Inspect CSV snapshots, compare chosen summary statistics with source hashes, and publish cleaned source-schema exports with explicit numeric normalization and guarded writes. Use for CSV cleaning and data-backed charts or reports; derived analysis fields stay separate from the cleaned export.
 ---
 
-Use the bundled export command for a cleaned CSV copy. It preserves source columns and order, excludes analysis-only fields, and can recover omitted source columns through explicit keys. Include unnamed identifier columns; use `--columns` only for a different schema requested by the user. Decide row cleaning and analysis from the task.
+Choose the workflow for the requested output. Read its linked instructions before the covered operations; several workflows may apply to one task. Use the supported scripts from the `packagePath` returned by `skill_read`. They use Python's standard library and need no package installation.
 
-Column identity and stored representation are separate choices. For requested numeric type cleanup, normalize unpadded whole-number identifiers promoted to decimal text, including unnamed columns, with `numeric`; their record identities stay the same. Keep meaningful leading zeros, prefixes, punctuation or explicitly requested text formats with `preserveNumericText`. Use the observed values and task to choose; an identifier-like header alone is not a reason to retain decimal-zero text.
+| Requested work | Instructions and command |
+| --- | --- |
+| Clean or publish a CSV | [CSV export](references/csv-export.md): `scripts/csv_export.py inspect` then `export`; preserve source columns and keep derived analysis fields separate. |
+| Summarize a distribution or identify dated extremes | [Descriptive statistics](references/descriptive-statistics.md): `scripts/numeric_profile.py`; choose the actual fields, transform and record labels. |
+| Compare periods, groups, levels or changes in a report | [Numeric comparisons](references/numeric-comparisons.md): `scripts/numeric_comparison.py`; prepare the actual cohorts and explicitly choose the statistic. |
+| Interpret price and volume evidence | [Market data evidence](references/market-data-evidence.md): distinguish descriptive associations from forecasts, causes and liquidity claims. |
 
-Read this Skill's `packagePath` from the tool result. The scripts use Python's standard library and need no package installation.
-
-Use the original downloaded input as `source`, before any normalization or rounding; a cleaned intermediate table is `analysis`, not a replacement source. Inspect both snapshots, then write the export choices as a JSON file. Arrays keep each full column name intact even when names contain spaces, quotes, Unicode or shell characters.
-
-```sh
-python <packagePath>/scripts/csv_export.py inspect --workspace <directory> --path raw.csv
-python <packagePath>/scripts/csv_export.py inspect --workspace <directory> --path analysis.csv
-```
-
-Write `export.json` using the actual columns and the two observed hashes:
-
-Inspection reports `integralDecimalFields`: exact field names and counts of decimal-form whole numbers, numeric values, and leading-zero representations. Review every listed field, including empty or unnamed headers, when cleaning types. These are observations, not automatic type decisions; mixed values and padded identifiers require deliberate treatment.
-
-```json
-{
-  "source": "raw.csv",
-  "analysis": "analysis.csv",
-  "destination": "cleaned.csv",
-  "expectedSourceSha256": "<observed-source-sha>",
-  "expectedAnalysisSha256": "<observed-analysis-sha>",
-  "keys": ["event date"],
-  "dateKeys": ["event date"],
-  "values": "source",
-  "numeric": ["record index", "units", "total amount"],
-  "preserveNumericText": ["padded code"]
-}
-```
-
-```sh
-python <packagePath>/scripts/csv_export.py export --workspace <directory> --spec export.json
-```
-
-`numeric` is required in a spec: list the fields whose numeric representations should be normalized, or explicitly use `[]` if none. Omitting it is rejected, so a forgotten selection cannot silently skip the decision. Every exported field retaining decimal-form whole numbers must be declared in either `numeric` or `preserveNumericText` (`--preserve-numeric-text`). Undeclared fields stop the write with their exact names and observed counts. Select preservation only when the task calls for unchanged text, such as padded or mixed identifiers; do not acknowledge a missed conversion merely to clear an error. A field cannot be in both lists. The spec accepts the same options as individual flags: `columns`, `analysisKeyValues`, and `expectedDestinationSha256` are optional. Do not mix `--spec` with individual export options. For direct flags, use structured `bash.argv` items for full field names. If field selection fails, use the returned rejected names and available columns to repair quoting or the JSON; do not drop intended conversions just to clear an error.
-
-For cleaning that only filters/reorders rows or normalizes selected numeric representations, `values: "source"` (`--values source`) retains the matching original field values and representations, including timestamp/time-zone text. The selected `numeric` conversions still run in source mode; type cleanup alone does not require analysis mode. For actual cell-value corrections or imputation, use the default `values: "analysis"` (`--values analysis`) to retain edited values; source mode would undo those edits.
-
-CSV stores text rather than in-memory column types. Parsing a key to datetime for filtering or sorting is not by itself a request to shorten its exported timestamp or remove its time zone. For type conversion alone, keep the matched source key text; choose analysis key text only for an explicitly requested serialization-format change.
-
-Choose keys from the actual input, not the example. Source rows matching those keys must be unique; ambiguous or unmatched keys stop publication. `--date-keys` explicitly compares ISO civil dates, allowing a timestamp to match its date-only form. It preserves the matched source date-key text even in analysis-value mode; use `--analysis-key-values` only when the user requests that format change. It does not infer time zones; use full or prepared keys when time-of-day matters. A collision is an error, not permission to pick a row.
-
-Choose `--numeric` only for fields established as numeric by the input and task. It validates finite numbers and removes incidental decimal-zero suffixes from ordinary integral representations; it does not round fractional data or convert undeclared identifier fields. Preserve full input precision during analysis and format chart labels separately.
-
-The source and analysis files remain unchanged. The output is separate and create-only by default; replacing an existing output requires its observed `--expected-destination-sha256`. Input changes fail before publication. The export receipt names `numericFields` and `retainedIntegralDecimalFields`; check that retained representations are intentional before delivery. If a field has no type choice, correct the selection before publication. Replacing a prior output still requires its observed destination hash. If a failure reports `writePublished: true`, inspect the output and reconcile its hash before considering another write.
-
-Inspect the exported CSV and use it for the requested cleaned-data delivery, keeping derived features in the analysis data unless requested as output. When the destination is a service, use the task's authorized transfer interface and confirm remote delivery. Reopen requested charts or reports and state any unverified visual limitations.
-
-
-For descriptive statistics, use `scripts/numeric_profile.py --workspace <directory> --path analysis.csv --columns "Daily return" --expected-sha256 <observed-sha>`. It reads without changing files and names the convention in every moment field. `--transform fractional_change` computes adjacent `current / previous - 1` values in input row order; prepare the intended chronological order first. Changes are fractions, not percent. Missing cells break sequences rather than bridging gaps; zero bases stop the calculation.
-
-For a report comparing periods or groups, read [numeric comparisons](references/numeric-comparisons.md). Use the comparison receipt for the chosen statistic before drafting comparative headlines; carry its computed percentage into both visible text and speaker notes instead of estimating phrases such as "halved" from memory.
-
-For dated extrema, add `--labels` with the actual date or record-identity columns, for example `--labels "event date" "record code"`. The extrema receipt names the current input record and, for fractional changes, the previous record used as the denominator. A change belongs to the current record, including across weekends or gaps in calendar dates. Preserve the returned label text in chart annotations, slides and notes; do not reconstruct dates from a prior row or hand-type labels from memory. Tied extrema retain the first input record and report the full occurrence count. Without `--labels`, only source row references are returned.
-
-Report the returned sample count and definition with a statistic. Pearson population kurtosis has normal reference 3; excess kurtosis has reference 0. The corrected sample excess is a separate estimate. Constant or insufficient data produce unavailable values, not an invented normal score. Use the same named metric consistently in chart labels, slide text and speaker notes; format values only for display.
-
-Separate what supplied fields establish from explanations requiring other evidence. Label unsupported explanations as hypotheses and identify the evidence needed; correlation alone does not establish a cause. External benchmarks need a cited source. A numerical profile is descriptive evidence, not confirmation of business causes or a substitute for reviewing the final charts and narrative.
-
-For reports drawing business or trading conclusions from daily market prices and volume, read [references/market-data-evidence.md](references/market-data-evidence.md) before drafting. Apply the same evidence boundaries to slide titles, speaker notes, charts, and the final summary.
+For numerical reports, build conclusions from the relevant receipts. Keep the statistic, periods, units and computed values consistent across charts, visible text, notes and the presenter script; do not estimate a percentage or a phrase such as "halved" from memory. Read and check the final requested artifacts, not just the analysis code. Reports still need task-specific analysis and visual review beyond what these scripts establish.
