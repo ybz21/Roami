@@ -20,7 +20,7 @@ func (t capabilityTransport) RoundTrip(r *http.Request) (*http.Response, error) 
 		return t.models.RoundTrip(r)
 	}
 	// Bundle downloads and MCP initialization exceed the ordinary API header budget.
-	if strings.HasPrefix(r.URL.Path, "/v1/capability-markets") ||
+	if r.URL.Path == "/v1/model-settings/verify" || strings.HasPrefix(r.URL.Path, "/v1/capability-markets") ||
 		(strings.HasPrefix(r.URL.Path, "/v1/capability-imports/mcp/") && strings.HasSuffix(r.URL.Path, "/connect")) {
 		return t.marketplace.RoundTrip(r)
 	}

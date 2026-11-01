@@ -1,3 +1,4 @@
+import { onboardingTitle, onboardingBack } from '../components/onboarding/onboarding-route'
 import { ICONS } from '../components/nav-icons'
 import { openPalette } from '../components/shell/palette'
 import { useI18n } from '../i18n'
@@ -6,6 +7,7 @@ import { BellIcon, ChevronLeft, PlusIcon, SearchIcon } from '../icons'
 import { MOBILE_NAV_KEYS, NAV, mobileNavRoot } from './navigation'
 type MobileNavigationProps = {
   tab: string
+  route?: string
   go: (route: string) => void
   unread: number
   notifications: () => void
@@ -13,12 +15,12 @@ type MobileNavigationProps = {
   search: () => void
   actionsHost: (element: HTMLSpanElement | null) => void
 }
-export function MobileTopBar({ tab, go, unread, notifications, newTask, search, actionsHost: setMobileActionsHost }: MobileNavigationProps) {
+export function MobileTopBar({ tab, route = tab, go, unread, notifications, newTask, search, actionsHost: setMobileActionsHost }: MobileNavigationProps) {
   const { t } = useI18n()
-  const navRoot = mobileNavRoot(tab)
+  const navRoot = mobileNavRoot(tab, route)
   const mobilePrimary = MOBILE_NAV_KEYS.includes(tab) || tab === 'sessions'
-  const mobileBack = tab === 'activity' ? 'home' : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
-  const mobileTitle = tab === 'install' ? t('install.pageTitle')
+  const mobileBack = tab === 'onboarding' ? onboardingBack(route) : tab === 'activity' ? 'home' : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
+  const mobileTitle = tab === 'onboarding' ? t(onboardingTitle(route)) : tab === 'install' ? t('install.pageTitle')
     : tab === 'about' ? t('nav.about')
       : tab === 'sessions' || tab === 'swarm' || tab === 'w' ? t('nav.projects')
         : tab === 'hub' ? t('hub.title')
@@ -47,9 +49,9 @@ export function MobileTopBar({ tab, go, unread, notifications, newTask, search, 
     </header>
   )
 }
-export function MobileBottomBar({ tab, go, offline }: { tab: string; go: (route: string) => void; offline: boolean }) {
+export function MobileBottomBar({ tab, route = tab, go, offline }: { tab: string; route?: string; go: (route: string) => void; offline: boolean }) {
   const { t } = useI18n()
-  const navRoot = mobileNavRoot(tab)
+  const navRoot = mobileNavRoot(tab, route)
   return (
     <div className="tt-bottomnav">
       {offline && <div className="tt-offline">{t('mobile.offline')}</div>}

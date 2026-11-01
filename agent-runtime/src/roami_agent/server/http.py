@@ -521,6 +521,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def model_settings(owner: Owner):
         return {"data": runtime.model_settings.view(owner)}
 
+    @app.post("/v1/model-settings/verify")
+    async def verify_model_settings(owner: Owner):
+        from roami_agent.server.model_verification import verify_models
+
+        return {"data": await verify_models(runtime.model_settings, owner)}
+
     @app.get("/v1/model-usage")
     async def model_usage(
         owner: Owner,

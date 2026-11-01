@@ -1,6 +1,8 @@
 import { api } from './api'
+import { nodeApi } from './components/cluster/node-url'
 
 export type RegisteredAgent = {
+  verified?: boolean
   kind: string
   installed: boolean
   binary?: string
@@ -22,9 +24,18 @@ export type RegisteredAgent = {
   }
 }
 
+const discoveryRequests = new Map<string, Promise<RegisteredAgent[]>>()
 export async function discoverAgents(signal?: AbortSignal): Promise<RegisteredAgent[]> {
-  const result = await api('GET', '/agent/professional', undefined, { signal })
-  return result?.agents || []
+  const scope = nodeApi('/agent/professional')
+  let request = discoveryRequests.get(scope)
+  if (!request) {
+    const abort = new AbortController(), timeout = setTimeout(() => abort.abort(), 15_000)
+    request = api('GET', '/agent/professional', undefined, { signal: abort.signal }).then(result => result?.agents || []).finally(() => { clearTimeout(timeout); discoveryRequests.delete(scope) })
+    discoveryRequests.set(scope, request)
+  }
+  const rows = await request
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+  return rows
 }
 
 export async function installAgent(kind: string): Promise<void> {
@@ -93,4 +104,9 @@ export async function restoreAgentModel(kind: string, revision: string): Promise
 export async function agentModelOptions(kind: string, input: AgentModelInput & { profileId?: string }, signal?: AbortSignal): Promise<string[]> {
   const result = await api('POST', `/agent/professional/${encodeURIComponent(kind)}/model-options`, input, { signal })
   return result.models
+}
+
+export async function verifyAgent(kind: string): Promise<RegisteredAgent> {
+  const result = await api('POST', `/agent/professional/${encodeURIComponent(kind)}/verify`)
+  return result.agent
 }

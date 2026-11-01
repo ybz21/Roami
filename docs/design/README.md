@@ -27,6 +27,7 @@
 ## 其它主题
 
 - [20261030-server-workspace-state](20261030-server-workspace-state/README.md)
+- [20261030-new-user-onboarding · 新用户引导](20261030-new-user-onboarding/README.md)
 
 - [20261030-对话文件链接](20261030-对话文件链接/README.md)
 

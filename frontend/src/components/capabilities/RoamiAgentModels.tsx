@@ -1,29 +1,37 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Select, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
 import { AgentSettingsForm } from '../settings/agent-settings'
+import { useSettingsDraft } from '../settings/settings-draft'
 import { catalogFailure, useModelCatalog } from './model-hub-api'
 import './model-hub.css'
 
-export default function RoamiAgentModels({ onBack }: { onBack: () => void }) {
+export default function RoamiAgentModels({ onBack, inline = false, onSelectionChange }: { onBack: () => void; inline?: boolean; onSelectionChange?: (applied: boolean) => void }) {
   const { t } = useI18n(), { phone } = useLayout()
   const { modal, message } = App.useApp(), catalog = useModelCatalog()
   const [main, setMain] = useState(''), [worker, setWorker] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [advanced, setAdvanced] = useState(false)
+  const live = useRef(true)
+  useEffect(() => { live.current = true; return () => { live.current = false } }, [])
   const options = (catalog.value?.models || []).map(model => ({ value: model.id, label: model.name }))
   const chosen = (role: string, draft: string) => draft || (options.some(model => model.value === catalog.value?.roamiModels?.[role]) ? catalog.value?.roamiModels?.[role] : options[0]?.value)
+  const draftNotice = useSettingsDraft('onboarding-role-binding', { main: chosen('main', main) || '', worker: chosen('worker', worker) || '' }, { main: catalog.value?.roamiModels?.main || '', worker: catalog.value?.roamiModels?.worker || '' }, draft => { setMain(draft.main); setWorker(draft.worker) }, inline && !!catalog.value)
+  const selectionApplied = options.length > 0 && !!catalog.value && ['main', 'worker'].every(role => chosen(role, role === 'main' ? main : worker) === catalog.value?.roamiModels?.[role])
+  useEffect(() => { onSelectionChange?.(selectionApplied && !busy) }, [selectionApplied, busy, onSelectionChange])
   const apply = async (restore = false) => {
     if (!catalog.value || busy) return
     setBusy(true); setError('')
     try {
       await api('POST', '/agent/model-gateway/catalog/roles', { main: chosen('main', main) || '', worker: chosen('worker', worker) || '', revision: catalog.value.revision, restore })
+      if (!live.current) return
       setAdvanced(false); catalog.retry(); message.success(t(restore ? 'capabilities.models.restored' : 'agent.models.saved'))
       window.dispatchEvent(new Event('roami:agent-model-settings-changed'))
     } catch (cause) { setError(catalogFailure(cause)) } finally { setBusy(false) }
   }
-  const body = <div className="tt-model-hub-scroll"><div className="agent-settings-form">
+  const body = <div className={inline ? 'onboarding-model-binding' : 'tt-model-hub-scroll'}><div className="agent-settings-form">
+    {draftNotice}
     {(error || catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={catalog.retry}>{t('capabilities.models.reread')}</Button>} />}
     {!catalog.value && !catalog.error ? <Spin /> : <>
       <p className="agent-settings-hint">{t('hub.roamiBindingHint')}</p>
@@ -34,5 +42,6 @@ export default function RoamiAgentModels({ onBack }: { onBack: () => void }) {
     </>}
     <details open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}><summary>{t('agent.models.advanced')}</summary>{advanced && <AgentSettingsForm key={catalog.value?.revision} onModelNames={() => {}} />}</details>
   </div></div>
+  if (inline) return body
   return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><h3>{t('hub.roamiModels')}</h3><Button onClick={onBack}>{t('common.back')}</Button></div>{body}</div>
 }

@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
 import { PlusIcon, LinkIcon } from '../../icons'
+import { useSettingsDraft } from '../settings/settings-draft'
 import MobileSubPage from '../MobileSubPage'
 import { GatewaySettingsForm, GatewayReconciliation, useGatewaySettings } from '../settings/gateway-settings'
 import { useModelCatalog, modelProtocols, type ModelSource, type CatalogModel } from './model-hub-api'
@@ -12,7 +13,7 @@ import './model-hub.css'
 
 const tabs = ['catalog', 'usage', 'prices']
 const newID = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36)
-export default function ModelHub({ sub = '', onNav }: { sub?: string; onNav: (path: string) => void }) {
+export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: string; onNav: (path: string) => void; embedded?: boolean }) {
   const { t } = useI18n(), { message, modal } = App.useApp(), layout = useLayout()
   const controller = useModelCatalog(), loaded = controller.value
   const value = loaded || { revision: '', sources: [], models: [], drafts: [], baseUrl: '', uses: {} }
@@ -23,6 +24,7 @@ export default function ModelHub({ sub = '', onNav }: { sub?: string; onNav: (pa
   const [newSourceId, setNewSourceId] = useState(newID), [newModelId, setNewModelId] = useState(newID), [newConnectionModelId, setNewConnectionModelId] = useState(newID)
   const [sourceModelDrafts, setSourceModelDrafts] = useState<Record<string, CatalogModel[]>>({})
   const [sourceDrafts, setSourceDrafts] = useState<Record<string, ModelSource>>({}), [modelDrafts, setModelDrafts] = useState<Record<string, CatalogModel>>({})
+  const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts, sourceModelDrafts }, { sourceDrafts: {}, modelDrafts: {}, sourceModelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts); setSourceModelDrafts(draft.sourceModelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
   const back = () => navigate(tab)
   const error = controller.error && <Alert type="error" role="alert" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />
@@ -129,7 +131,9 @@ export default function ModelHub({ sub = '', onNav }: { sub?: string; onNav: (pa
     </section>
   })
   const consumers = Object.entries(value.uses).filter(([, users]) => users.length)
-  return <div className="tt-model-hub">
+  if (embedded && detail) return <div className="onboarding-model-editor">{draftNotice}{editor}</div>
+  return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
+    {draftNotice}
     {(!detail || !layout.phone) && <div className="tt-model-hub-scroll">
       {error}
       <details className="tt-model-hub-entry"><summary><LinkIcon />{t('hub.entry')}</summary><p>{t('hub.entryHint')}</p><code>{value.baseUrl}</code><p>{t('hub.continuationHint')}</p></details>

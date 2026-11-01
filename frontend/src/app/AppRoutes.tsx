@@ -12,6 +12,8 @@ import { backAgentPage } from '../components/agent/agent-page-route'
 import { useI18n } from '../i18n'
 import type { AppRoute } from './useAppRoute'
 import type { TaskWorkspace } from './useTaskWorkspace'
+const OnboardingPage = lazyRetry(() => import('../components/onboarding/OnboardingPage'))
+const OnboardingHome = lazyRetry(() => import('../components/onboarding/OnboardingHome'))
 const FilesPage = lazyRetry(() => import('../components/files/FilesPage'))
 const Sessions = lazyRetry(() => import('../components/sessions/Sessions'))
 const SettingsPage = lazyRetry(() => import('../components/settings/SettingsPage'))
@@ -75,10 +77,11 @@ export default function AppRoutes({ routing, isMobile, active, projects, actions
       onInstall={() => go('install')} fullscreen={fullscreen} />,
     hub: <HubPage />,
     capabilities: <CapabilitiesPage sub={pluginSub} onNav={go} onLaunchAgent={kind => newTerminalAt(kind, '')} />,
-    home: <>
+    onboarding: <OnboardingPage key={curNodeId || 'local'} sub={route.split('/').slice(1).join('/')} onNav={go} onLaunch={kind => newTerminalAt(kind, '')} onSession={openTerm} />,
+    home: <OnboardingHome active={!agentPage && !inlineNative} onNav={go}>
       {(!agentPage || agentParts[0] === 'home' || inlineNative) && <AgentChat inactive={!!agentPage && !inlineNative} nativeSession={inlineNative ? agentPage?.task : undefined} onCloseNative={() => { if (agentPage) backAgentPage(agentPage) }} cid={inlineNative ? agentCID || agentInbox.conversations[0]?.id || '' : agentCID} branch={agentBranch} focusMessage={agentMessage} node={curNodeId} inbox={agentInbox} inboxOpen={agentInboxOpen} select={selectAgent} notifications={agent.notifications} projects={projects.map((p) => ({ id: p.key, name: p.name }))} onSession={openTerm} onOverview={() => go('activity')} mobileActionsHost={mobileActionsHost} />}
       {agentPage && !inlineNative && <AgentHomePage key={`${curNodeId || 'local'}:${agentPage.view}:${agentPage.origin}`} page={agentPage} node={curNodeId} inbox={agentInbox} projects={projects.map(p => ({ id: p.key, name: p.name }))} select={selectAgent} onSession={openTerm} onChanged={agentInbox.refresh} />}
-    </>,
+    </OnboardingHome>,
     activity: <MobileHome key={curNodeId || ''} last={active} onOpen={(n) => openTerm(n)} onNav={(k) => go(k)}
       onOpenProject={actions.openProject}
     />,

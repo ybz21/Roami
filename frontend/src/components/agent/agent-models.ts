@@ -2,7 +2,7 @@ import type { ModelProxyConfig } from '../settings/model-proxy-settings'
 import { api } from '../../api'
 
 export type AgentModelRole = { baseUrl: string; model: string; keyConfigured: boolean; images: boolean; contextWindow?: number | null; configuredContextWindow?: number | null; reasoningEffort?: string | null; reasoningEfforts?: string[] }
-export type AgentModelSettings = { proxy?: ModelProxyConfig; main: AgentModelRole; worker: AgentModelRole; connection?: { baseUrl: string; keyConfigured: boolean } }
+export type AgentModelSettings = { verified?: boolean; proxy?: ModelProxyConfig; main: AgentModelRole; worker: AgentModelRole; connection?: { baseUrl: string; keyConfigured: boolean } }
 export const MODEL_SETTINGS_CHANGED = 'roami:agent-model-settings-changed'
 export const agentSettingsRoute = '#/capabilities/agents/roami'
 export function modelFailure(error: any, t: (key: string) => string) {

@@ -116,6 +116,7 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/agent/professional", h.ProfessionalAgents)
 		g.POST("/agent/professional/:kind/install", h.InstallProfessionalAgent)
 		g.POST("/agent/professional/:kind/check", h.CheckProfessionalAgent)
+		g.POST("/agent/professional/:kind/verify", h.VerifyProfessionalAgent)
 		g.POST("/agent/professional/:kind/upgrade", h.UpgradeProfessionalAgent)
 		g.GET("/agent/professional/:kind/models", h.AgentModelProfiles)
 		g.POST("/agent/professional/:kind/model-options", h.AgentModelOptions)
