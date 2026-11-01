@@ -36,19 +36,18 @@ type CatalogModel struct {
 	Candidates []ModelCandidate `json:"candidates"`
 }
 type ModelCatalog struct {
-	Revision        string                      `json:"revision"`
-	Sources         []ModelSource               `json:"sources"`
-	Models          []CatalogModel              `json:"models"`
-	Drafts          []CatalogModel              `json:"drafts"`
-	BaseURL         string                      `json:"baseUrl,omitempty"`
-	Uses            map[string][]string         `json:"uses"`
-	Port            int                         `json:"-"`
-	Token           string                      `json:"-"`
-	RolesBackup     map[string]any              `json:"-"`
-	AgentKeys       map[string]agentKeyState    `json:"-"`
-	AgentKeyStatus  map[string]catalogKeyStatus `json:"agentKeys,omitempty"`
-	CanRestoreRoami bool                        `json:"canRestoreRoami"`
-	RoamiModels     map[string]string           `json:"roamiModels"`
+	Revision        string                   `json:"revision"`
+	Sources         []ModelSource            `json:"sources"`
+	Models          []CatalogModel           `json:"models"`
+	Drafts          []CatalogModel           `json:"drafts"`
+	BaseURL         string                   `json:"baseUrl,omitempty"`
+	Uses            map[string][]string      `json:"uses"`
+	Port            int                      `json:"-"`
+	Token           string                   `json:"-"`
+	RolesBackup     map[string]any           `json:"-"`
+	AgentKeys       map[string]agentKeyState `json:"-"`
+	CanRestoreRoami bool                     `json:"canRestoreRoami"`
+	RoamiModels     map[string]string        `json:"roamiModels"`
 }
 type catalogDisk struct {
 	Catalog     ModelCatalog             `json:"catalog"`
@@ -203,11 +202,6 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 		v.Sources[i].HasKey = v.Sources[i].APIKey != ""
 		v.Sources[i].APIKey = ""
 	}
-	v.AgentKeyStatus = map[string]catalogKeyStatus{}
-	for _, kind := range gatewayAgentKinds {
-		key := s.credential(kind)
-		v.AgentKeyStatus[kind] = catalogKeyStatus{Pending: s.value.AgentKeys[kind].Pending, Suffix: key[len(key)-8:], Disabled: s.value.AgentKeys[kind].Disabled}
-	}
 	v.Token = ""
 	return v
 }
@@ -316,7 +310,6 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	for kind, key := range s.value.AgentKeys {
 		v.AgentKeys[kind] = key
 	}
-	v.AgentKeyStatus = nil
 	v.BaseURL = ""
 	v.Uses = nil
 	return s.persist(v)

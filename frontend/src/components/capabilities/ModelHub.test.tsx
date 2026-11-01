@@ -84,7 +84,7 @@ it('shows connections and their models together and accepts old source-page link
   const connection = await screen.findByRole('region', { name: 'Saved source' })
   expect(connection.textContent).toContain('Coding')
   expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
-  expect(screen.getAllByRole('tab')).toHaveLength(4)
+  expect(screen.getAllByRole('tab')).toHaveLength(3)
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })

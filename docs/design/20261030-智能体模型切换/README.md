@@ -80,3 +80,5 @@ CC/Codex 默认附带的厂商专用思考配置不跨协议强制注入，按�
 协议参考：[OpenAI Responses 迁移与类型化事件](https://developers.openai.com/api/docs/guides/migrate-to-responses)、[Responses 流事件](https://developers.openai.com/api/reference/resources/responses/streaming-events)、[命名空间工具](https://developers.openai.com/api/docs/guides/tools-tool-search)、[Claude 消息流](https://platform.claude.com/docs/en/build-with-claude/streaming)。历史 HTML、发布流程和同协议限制仅用于早期设计对照，不代表当前实现。
 
 默认智能体网关记账 V1 已实现：[模块设计与验收](gateway-billing-implementation.md)。支持本地源导入、独立 Key 的自动应用与轮换、按默认智能体归集费用；无需另建接入身份。
+
+交互修订：下游智能体密钥由内部自动管理，移除密钥页面、尾号和手工操作；模型来源与智能体费用统计保留。

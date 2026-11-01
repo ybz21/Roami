@@ -29,12 +29,6 @@ type agentKeyState struct {
 	Updated       int64  `json:"updatedMs"`
 }
 
-type catalogKeyStatus struct {
-	Pending  bool   `json:"pending"`
-	Suffix   string `json:"suffix"`
-	Disabled bool   `json:"disabled"`
-}
-
 type agentKeyView struct {
 	Pending        bool   `json:"pending"`
 	Kind           string `json:"agentKind"`

@@ -2,6 +2,13 @@
 
 基线：`5d66fbe8`；分支：`feat/agent-gateway-billing`。本次实现直接使用 OpenCode、Claude Code、Codex、Pi、Roami，不新增接入身份。设计入口：[HTML](gateway-billing.html)。
 
+## 最新交互修订
+
+按用户后续要求，密钥完全由内部管理。移除独立密钥标签、密钥尾号、换发/停用/复制界面；模型页只展示来源与模型。网页目录不返回下游密钥状态，网页路由不再代理密钥管理接口；Go 私有接口继续支持内部维护。费用仍按默认智能体自动归集，原有本地源 API Key 配置保留。下方初次验收中涉及手工密钥界面的内容是本次修订前的历史记录。
+
+修订验收：前端 158 文件 / 1163 测试通过，typecheck / i18n / hover / production build 通过；网关与 server Go 测试通过。桌面目录只有模型、用量与限额、模型定价三个标签，目录响应不含 agentKeys，网页密钥接口为 404。Android 真机确认无密钥入口、尾号与横向溢出，点按用量标签仍可查看既有按智能体账目。截图：`/tmp/gateway-hidden-keys-desktop.png`、`/tmp/gateway-hidden-keys-phone.png`。
+
+
 ## 产品与用户故事
 
 - 已在 CLI 中配置模型服务的用户，可以在模型目录中显式导入本地源，再拉取全部模型。扫描不改原配置，凭据只在 Go 进程内读取、导入，不通过浏览器中转。

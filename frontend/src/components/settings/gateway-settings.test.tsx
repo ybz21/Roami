@@ -186,6 +186,6 @@ it('opens a default-agent billing link with server-side attribution filtering', 
   })
   setup()
   await screen.findByText('agent.usage.empty')
-  expect(screen.getByRole('combobox', { name: 'hub.keys.agent' }).closest('.ant-select')?.textContent).toContain('OpenCode')
+  expect(screen.getByRole('combobox', { name: 'hub.billing.agent' }).closest('.ant-select')?.textContent).toContain('OpenCode')
   expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-gateway/usage?days=7&agentKind=opencode')).toBe(true)
 })
