@@ -6,6 +6,8 @@
 
 [播放全流程视频（MP4）](/api/file/tmp/roami-new-user-onboarding.mp4) · [录像说明](walkthrough-video.md)
 
+合入前已同步至 `892fc9f3`（包含 #576）；最新检查及前后对照见[合入前验收](merge-acceptance.md)。
+
 [打开交互原型](index.html) · [原型验收](acceptance.md) · [实现说明](implementation.md) · [初版实现验收](implementation-acceptance.md) · [PR #550 适配验收](pr550-rebase-acceptance.md) · [PR #564 流程与验收](pr564-models-first.md)
 
 ## 产品设计

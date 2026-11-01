@@ -1,6 +1,6 @@
 # 实现说明
 
-2026-11-01。工作分支 `feat/new-user-onboarding` 已 rebase 到 `3b62f1f2`（PR #564），四步调整为配置模型、配置智能体、创建项目、首个任务。
+2026-11-01。工作分支 `feat/new-user-onboarding` 已 rebase 到 `892fc9f3`（包含 PR #564 至 #576），四步为配置模型、配置智能体、创建项目、首个任务。最终门禁与前后对照见[合入前验收](merge-acceptance.md)。
 
 ## 产品行为
 
