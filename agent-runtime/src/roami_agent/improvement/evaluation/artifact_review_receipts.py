@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import DIMENSIONS, require
+from roami_agent.improvement.domain.reference_authority import HUMAN_ONLY, validate_reference_policy
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.protocol.errors import DomainError, public_error_code
 
@@ -37,7 +38,24 @@ def review_summary(receipt):
         require(evidence_hash is None or bool(re.fullmatch(r"[a-f0-9]{64}", evidence_hash)))
         error = receipt.get("error")
         require(error is None or public_error_code(error) == error)
+        provenance = {}
+        if "reference_policy" in receipt:
+            policy = validate_reference_policy(receipt["reference_policy"])
+            counts = receipt.get("reference_basis_counts")
+            require(
+                counts is None
+                or isinstance(counts, dict)
+                and set(counts) == {"human", "user_authorized_ai"}
+                and all(type(value) is int and value >= 0 for value in counts.values())
+                and 12 <= sum(counts.values()) <= 100
+                and (policy != HUMAN_ONLY or counts["user_authorized_ai"] == 0)
+            )
+            provenance = {
+                "reference_policy": policy,
+                "reference_basis_counts": dict(counts) if counts is not None else None,
+            }
         return {
+            **provenance,
             "evidence_hash": evidence_hash,
             "completed_raters": len(ratings),
             "expected_raters": 2,
