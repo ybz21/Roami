@@ -222,7 +222,13 @@ node browser-metric-connector.mjs --spec creator-console.json --target &lt;标�
 <p>复用现有 Swarm 成员、任务看板与广场能力：<code>backend/api/swarm.go</code> 通过现有会话 CLI 转发建群、成员与协作操作。新方案需要一个受控的目标/任务桥接器，把 OKR 行动、真实 task/run、Swarm task 和成员回报关联起来；成员自报完成不覆盖任务验证。规划、数据与复盘继续走已有 jobs 和 Go 网关，Swarm 的角色与共享状态持续存在，不依赖浏览器页面或一个不能恢复的模型调用。</p>
 <p>Leader 持有目标与策略，执行、数据、复盘成员按职责接收任务并在共享事件/看板上报告；没有当前工作时标为待命并显示唤醒条件。相邻业务日使用同一 swarm_id，保留上一轮 Review、未结束任务、来源连接和计划修订。重启后按持久 jobs、lease 与回执恢复，只补当前有效工作，不重发已交付 PR、视频或过期发布动作。</p>
 <p>运行态的战术调整生成 PlanRevision，继续执行现有目标；战略或口径变更创建新的 DesignRevision 草稿，校验后原子切换 active_design_revision，任务继续引用其启动时的修订。暂停阻止新派发，运行中的任务不被显示为已取消。周期结束进入目标回顾，归档保留事实；Swarm 整体完成必须有目标与集成验收，不能因为一个成员交付就结束整个持续循环。</p>
-<p>设计书用 <code>sceneLifecycle()</code> 明确搭建/运行切换；<code>okr-swarm-state.ts</code> 从当前阶段快照投影稳定 Swarm 身份、成员和任务；<code>okr-swarm-runtime.tsx</code> 展示全宽运行工作台，并提供主责对话、配置查看和派发控制。它们是本地回放，未接入真实 Swarm API 或常驻调度。</p>
+<p>设计书用 <code>sceneLifecycle()</code> 明确搭建/运行切换；<code>okr-swarm-state.ts</code> 从当前阶段快照投影稳定 Swarm 身份、成员和任务；<code>okr-swarm-runtime.tsx</code> 展示全宽运行工作台，并提供共享群聊、配置查看和派发控制。它们是本地回放，未接入真实 Swarm API 或常驻调度。</p>
+<h3 id="shared-swarm-protocol">同群协作与单一共享看板协议</h3>
+<p>每个长期 Swarm 绑定稳定 <code>room_id</code>、<code>board_id</code> 和成员身份；主责、执行、数据、反思拥有各自的任务上下文和运行记录，按事件唤醒。切日和换轮不更换群或复制看板。一个 project 可以提供执行资源，不能因此另建一份孤立的 OKR 事实。</p>
+<p>群消息包含 <code>message_id, swarm_id, room_id, author_id, round_id, task_refs, observation_refs, review_ref, event_watermark</code>。群里的 @接棒是通知与协作；任务创建、领取、验收、观测和计划仍经领域服务验证，不能靠一句聊天覆盖事实。前端消息中的任务链接解析到同一看板对象，支持当前轮与历史轮详情；没有已验证任务时不展示虚假的完成回执。</p>
+<p>闭环依次为派发、执行交付、采集校验、独立反思、采用建议与再执行。反思读取冻结的任务/观测水位；主责采用有效 Review 后生成 <code>PlanRevision.source_review_id</code>，下一轮任务保存原 Review 和 Plan 的引用。迟到数据使反思失效，已交付任务不重派；计划采用的幂等键防止重复任务。独立角色可并行处理互不依赖的任务，但反思不能越过所需证据。</p>
+<p>任务/观测事件提交后通过 outbox 产生看板投影更新与群通知，两种视图按相同水位恢复；群消息去重不能导致原始观测丢失。暂停只阻止新派发，讨论仍开放；执行中的任务需单独核对。用户在群里的新意图先形成可检查的变更，不能把聊天文本当任意工具指令执行。</p>
+<p>原型的 <code>swarmProjection()</code> 同时提供组织、共享看板、五环节状态、当轮与历史任务；<code>swarmMessages()</code> 从同一场景快照生成有明确作者和任务引用的群聊回放。<code>okr-swarm-loop.tsx</code> 展示执行、取数、反思、调整、再执行，<code>okr-swarm-conversation.tsx</code> 展示同群接棒；第二轮任务引用第一轮反思。没有启动真实 Swarm、消息服务或智能体。</p>
 <h3 id="cycle-runtime">3.1 长短 KR、project 与执行资源</h3>
 <p>KR 增加 <code>parent_kr_id?, horizon, start_date, end_date, evaluation_policy_revision</code>。horizon 支持长期周期、短期检查点，以及确有业务需要的日结果；每天的执行清单仍属于计划，不强制变成日 KR。父子关联检查同一 owner/目标、无环和时间边界；允许短期使用独立诊断指标，不能把子目标达成率相加冒充父 KR 的业务结果。周期滚动产生新记录，旧合同、观测和结论保持可追溯。</p>
 <p>新增 <code>okr_project_links</code>：<code>objective_id, kr_id?, project_id, node_id, contribution, execution_scope_ref, revision, state</code>，支持多对多。一个行动引用一个主要执行项目及当前绑定修订，辅助产物引用其他任务，不把多个可写目录塞进一次未经校验的执行范围。对同一项目下多个目标的行动统一排队、去重和资源协调，避免每个目标独立重复派发。</p>
