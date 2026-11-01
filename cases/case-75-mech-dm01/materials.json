@@ -5,13 +5,17 @@
     "kind": "synthetic_distribution_sample",
     "inputs": [
       "input/moments.csv",
-      "input/extrema.csv"
+      "input/extrema.csv",
+      "input/comparison-before.csv",
+      "input/comparison-after.csv"
     ],
     "runtime_input": "skills/tabular-analysis/tests/fixtures/moments.csv",
     "byte_identical_required": true,
     "runtime_inputs": {
       "input/moments.csv": "skills/tabular-analysis/tests/fixtures/moments.csv",
-      "input/extrema.csv": "skills/tabular-analysis/tests/fixtures/extrema.csv"
+      "input/extrema.csv": "skills/tabular-analysis/tests/fixtures/extrema.csv",
+      "input/comparison-before.csv": "skills/tabular-analysis/tests/fixtures/comparison-before.csv",
+      "input/comparison-after.csv": "skills/tabular-analysis/tests/fixtures/comparison-after.csv"
     }
   },
   "tools": {
@@ -25,7 +29,7 @@
     "pytest_selectors": [
       "skills/tabular-analysis/tests"
     ],
-    "expected_collected": 87,
+    "expected_collected": 118,
     "no_skips": true
   }
 }

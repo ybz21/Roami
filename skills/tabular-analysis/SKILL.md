@@ -1,6 +1,6 @@
 ---
 name: tabular-analysis
-description: Inspect CSV snapshots and explicitly defined distribution moments, then publish cleaned source-schema exports with keyed recovery of source identifiers, explicit numeric normalization, and guarded file writes. Use for CSV cleaning alongside analyses, charts, or reports so derived analysis fields do not silently change the cleaned export.
+description: Inspect CSV snapshots, compare chosen summary statistics with source hashes, and publish cleaned source-schema exports with explicit numeric normalization and guarded writes. Use for CSV cleaning and data-backed charts or reports; derived analysis fields stay separate from the cleaned export.
 ---
 
 Use the bundled export command for a cleaned CSV copy. It preserves source columns and order, excludes analysis-only fields, and can recover omitted source columns through explicit keys. Include unnamed identifier columns; use `--columns` only for a different schema requested by the user. Decide row cleaning and analysis from the task.
@@ -55,6 +55,8 @@ Inspect the exported CSV and use it for the requested cleaned-data delivery, kee
 
 
 For descriptive statistics, use `scripts/numeric_profile.py --workspace <directory> --path analysis.csv --columns "Daily return" --expected-sha256 <observed-sha>`. It reads without changing files and names the convention in every moment field. `--transform fractional_change` computes adjacent `current / previous - 1` values in input row order; prepare the intended chronological order first. Changes are fractions, not percent. Missing cells break sequences rather than bridging gaps; zero bases stop the calculation.
+
+For a report comparing periods or groups, read [numeric comparisons](references/numeric-comparisons.md). Use the comparison receipt for the chosen statistic before drafting comparative headlines; carry its computed percentage into both visible text and speaker notes instead of estimating phrases such as "halved" from memory.
 
 For dated extrema, add `--labels` with the actual date or record-identity columns, for example `--labels "event date" "record code"`. The extrema receipt names the current input record and, for fractional changes, the previous record used as the denominator. A change belongs to the current record, including across weekends or gaps in calendar dates. Preserve the returned label text in chart annotations, slides and notes; do not reconstruct dates from a prior row or hand-type labels from memory. Tied extrema retain the first input record and report the full occurrence count. Without `--labels`, only source row references are returned.
 

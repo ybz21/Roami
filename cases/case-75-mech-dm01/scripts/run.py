@@ -24,10 +24,9 @@ def main():
         parser.error("Output must be a new directory outside the checkout")
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     tools = json.loads((case / "tools.json").read_text())
-    for name in ("moments.csv", "extrema.csv"):
-        assert (case / "input" / name).read_bytes() == (
-            repository / "skills/tabular-analysis/tests/fixtures" / name
-        ).read_bytes()
+    materials = json.loads((case / "materials.json").read_text())
+    for local, runtime in materials["data"]["runtime_inputs"].items():
+        assert (case / local).read_bytes() == (repository / runtime).read_bytes()
     files = {
         path
         for folder in (

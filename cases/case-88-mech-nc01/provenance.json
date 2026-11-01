@@ -1,0 +1,8 @@
+{
+  "case_id": "MECH-NC01",
+  "source": "Authored generic comparison CSVs and hand-computed invariants",
+  "private_reference_material": false,
+  "actual_human_labels": false,
+  "historical_scores_changed": false,
+  "baseline": "45e5b095"
+}
