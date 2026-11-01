@@ -205,11 +205,40 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	v.Token = ""
 	return v
 }
+func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (ModelSource, error) {
+	p.BaseURL = strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
+	u, err := url.Parse(p.BaseURL)
+	if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
+		return ModelSource{}, catalogError()
+	}
+	if u.Scheme != "https" && !(u.Scheme == "http" && containsField([]string{"127.0.0.1", "localhost", "::1"}, u.Hostname())) {
+		return ModelSource{}, catalogError()
+	}
+	if s.baseURL != "" && strings.HasPrefix(p.BaseURL, s.baseURL) {
+		return ModelSource{}, catalogError()
+	}
+	if !containsField([]string{"openai-completions", "openai-responses", "anthropic-messages"}, p.Protocol) || !containsField([]string{"api_key", "bearer"}, p.AuthMode) {
+		return ModelSource{}, catalogError()
+	}
+	if p.APIKey == "" {
+		old := previous
+		if old.BaseURL != p.BaseURL && old.APIKey != "" {
+			return ModelSource{}, errors.New("MODEL_KEY_REQUIRED_FOR_ENDPOINT")
+		}
+		p.APIKey = old.APIKey
+	}
+	if len(p.APIKey) > 8192 {
+		return ModelSource{}, catalogError()
+	}
+	p.HasKey = false
+	return p, nil
+}
+
 func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	if s.applying || v.Revision != s.value.Revision {
 		return errors.New("MODEL_CATALOG_CHANGED")
 	}
-	if len(v.Sources) > 64 || len(v.Models) > 200 || len(v.Drafts) > 200 {
+	if len(v.Sources) > 64 || len(v.Models) > 1000 || len(v.Drafts) > 200 {
 		return catalogError()
 	}
 	previous := map[string]ModelSource{}
@@ -219,34 +248,14 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	sources := map[string]ModelSource{}
 	for i := range v.Sources {
 		p := &v.Sources[i]
-		p.BaseURL = strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
-		u, err := url.Parse(p.BaseURL)
-		if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
-			return catalogError()
-		}
-		if u.Scheme != "https" && !(u.Scheme == "http" && containsField([]string{"127.0.0.1", "localhost", "::1"}, u.Hostname())) {
-			return catalogError()
-		}
-		if s.baseURL != "" && strings.HasPrefix(p.BaseURL, s.baseURL) {
-			return catalogError()
-		}
-		if !containsField([]string{"openai-completions", "openai-responses", "anthropic-messages"}, p.Protocol) || !containsField([]string{"api_key", "bearer"}, p.AuthMode) {
-			return catalogError()
+		validated, err := s.validatedSource(*p, previous[p.ID])
+		if err != nil {
+			return err
 		}
 		if _, exists := sources[p.ID]; exists {
 			return catalogError()
 		}
-		if p.APIKey == "" {
-			old := previous[p.ID]
-			if old.BaseURL != p.BaseURL && old.APIKey != "" {
-				return errors.New("MODEL_KEY_REQUIRED_FOR_ENDPOINT")
-			}
-			p.APIKey = old.APIKey
-		}
-		if len(p.APIKey) > 8192 {
-			return catalogError()
-		}
-		p.HasKey = false
+		*p = validated
 		sources[p.ID] = *p
 	}
 	validate := func(rows []CatalogModel) error {

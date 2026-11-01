@@ -131,3 +131,19 @@ func TestModelOptionsRejectsOversizedOrLoopingLists(t *testing.T) {
 		})
 	}
 }
+
+func TestSourceModelsReadsBeyondTenPages(t *testing.T) {
+	pages := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pages++
+		if pages > 1 && r.URL.Query().Get("after_id") != fmt.Sprintf("model-%d", pages-1) {
+			t.Error("missing pagination cursor")
+		}
+		_, _ = fmt.Fprintf(w, `{"data":[{"id":"model-%d"}],"has_more":%t,"last_id":"model-%d"}`, pages, pages < 12, pages)
+	}))
+	defer server.Close()
+	models, err := ReadSourceModels(context.Background(), Profile{BaseURL: server.URL, Protocol: "anthropic-messages", AuthMode: "api_key", APIKey: "test-key"})
+	if err != nil || len(models) != 12 || pages != 12 {
+		t.Fatalf("incomplete directory: %v, %d models, %d pages", err, len(models), pages)
+	}
+}

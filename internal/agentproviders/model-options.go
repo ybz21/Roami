@@ -74,7 +74,7 @@ func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 	models := map[string]bool{}
 	cursors := map[string]bool{}
 	remaining := int64(maxFileSize)
-	for page := 0; page < 10; page++ {
+	for page := 0; page < 1000; page++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("MODEL_LIST_FAILED")

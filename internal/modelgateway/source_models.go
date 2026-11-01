@@ -39,9 +39,48 @@ func (h *Handler) sourceModels(w http.ResponseWriter, r *http.Request) {
 		reject(w, 400, "INVALID_MODEL_PROTOCOL")
 		return
 	}
-	models, err := agentproviders.ReadSourceModels(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+	h.readSourceModels(w, r, *source, input.Revision)
+}
+
+func (h *Handler) discoverModels(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Source   ModelSource `json:"source"`
+		Revision string      `json:"revision"`
+	}
+	if decodeBody(w, r, &input) != nil {
+		reject(w, 400, "INVALID_MODEL_CATALOG")
+		return
+	}
+	s := h.Catalog
 	s.mu.Lock()
-	changed := input.Revision != s.value.Revision
+	if input.Revision != s.value.Revision {
+		s.mu.Unlock()
+		reject(w, 409, "MODEL_CATALOG_CHANGED")
+		return
+	}
+	var previous ModelSource
+	for _, row := range s.value.Sources {
+		if row.ID == input.Source.ID {
+			previous = row
+			break
+		}
+	}
+	// Discovery does not require the source's display name to be finished.
+	input.Source.Name = "Model list"
+	source, err := s.validatedSource(input.Source, previous)
+	s.mu.Unlock()
+	if err != nil {
+		reject(w, 400, err.Error())
+		return
+	}
+	h.readSourceModels(w, r, source, input.Revision)
+}
+
+func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, source ModelSource, revision string) {
+	models, err := agentproviders.ReadSourceModels(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+	s := h.Catalog
+	s.mu.Lock()
+	changed := revision != s.value.Revision
 	s.mu.Unlock()
 	if changed {
 		reject(w, 409, "MODEL_CATALOG_CHANGED")

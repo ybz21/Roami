@@ -20,8 +20,7 @@ beforeEach(() => {
 afterEach(cleanup)
 const show = (navigate = vi.fn()) => ({ navigate, ...render(<App><OnboardingModels sub="catalog/source/new" onNav={navigate} /></App>) })
 const save = async () => {
-  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  fireEvent.click((await screen.findByRole('dialog')).querySelector('.ant-btn-primary')!)
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
 }
 
 it('adds a connection and its models before any agent configuration or call verification', async () => {
@@ -29,7 +28,8 @@ it('adds a connection and its models before any agent configuration or call veri
   fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'First connection' } })
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://models.example/v1' } })
   fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'test-key' } })
-  fireEvent.change(screen.getByLabelText('hub.upstreamModel'), { target: { value: 'shared-model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'shared-model' } })
   await save()
   await waitFor(() => expect(page.navigate).toHaveBeenCalledWith('onboarding/model/catalog'))
   const writes = vi.mocked(api).mock.calls.filter(([method]) => method !== 'GET')
@@ -42,10 +42,11 @@ it('restores connection and model drafts together without storing the credential
   fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'Draft connection' } })
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://models.example/v1' } })
   fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'draft-key' } })
-  fireEvent.change(screen.getByLabelText('hub.upstreamModel'), { target: { value: 'draft-model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'draft-model' } })
   first.unmount()
   const second = show()
-  await waitFor(() => expect((screen.getByLabelText('hub.upstreamModel') as HTMLInputElement).value).toBe('draft-model'))
+  await waitFor(() => expect((screen.getByLabelText('hub.directory.manual') as HTMLInputElement).value).toBe('draft-model'))
   expect((screen.getByLabelText('hub.name') as HTMLInputElement).value).toBe('Draft connection')
   expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('draft-key')
   expect(JSON.stringify(localStorage) + JSON.stringify(sessionStorage)).not.toContain('draft-key')

@@ -89,39 +89,132 @@ it('shows connections and their models together and accepts old source-page link
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })
 
-it('creates a connection and its models in one confirmed save', async () => {
+it('adds a source and a deduplicated manual batch in one save without confirmation', async () => {
   mount('catalog/source/new')
-  fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'New source' } })
-  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
   fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'test-key' } })
-  fireEvent.change(screen.getByLabelText('hub.upstreamModel'), { target: { value: 'first-model' } })
-  fireEvent.click(screen.getAllByRole('button', { name: 'hub.addModel' }).slice(-1)[0])
-  fireEvent.change(screen.getAllByLabelText('hub.upstreamModel')[1], { target: { value: 'second-model' } })
-  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  expect(api).not.toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.anything())
-  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'agent.models.save' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'first-model\nsecond-model\nfirst-model\n' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
-    sources: expect.arrayContaining([expect.objectContaining({ name: 'New source', baseUrl: 'https://new.example/v1', apiKey: 'test-key' })]),
+    sources: expect.arrayContaining([expect.objectContaining({ name: 'new.example', baseUrl: 'https://new.example/v1', apiKey: 'test-key' })]),
     models: expect.arrayContaining([expect.objectContaining({ name: 'first-model' }), expect.objectContaining({ name: 'second-model' })]),
   })))
-  const writes = vi.mocked(api).mock.calls.filter(([method, path]) => method === 'PUT' && path === '/agent/model-gateway/catalog')
+  expect(screen.queryByRole('dialog')).toBeNull()
+  const writes = vi.mocked(api).mock.calls.filter(([method]) => method === 'PUT')
   expect(writes).toHaveLength(1)
-  const saved = writes[0][2] as ModelCatalog
-  const source = saved.sources.find(source => source.name === 'New source')!
-  expect(saved.models.slice(-2).every(model => model.candidates[0].sourceId === source.id)).toBe(true)
-  expect(saved.models[0]).toEqual(catalog.models[0])
+  expect((writes[0][2] as ModelCatalog).models).toHaveLength(3)
+  expect((writes[0][2] as ModelCatalog).models[0]).toEqual(catalog.models[0])
 })
 
-it('keeps existing route IDs, credentials and failover candidates when editing a connection', async () => {
+it('fetches an unsaved source, selects all matches and keeps selection across searches', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? { data: { models: ['alpha', 'beta', 'gamma'] } } : original(method, path, body, options))
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'draft-key' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
+  await screen.findByRole('checkbox', { name: 'alpha' })
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/discover', expect.objectContaining({ revision: catalog.revision, source: expect.objectContaining({ apiKey: 'draft-key' }) }), expect.anything())
+  expect(vi.mocked(api).mock.calls.some(([method]) => method === 'PUT')).toBe(false)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'beta' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.search'), { target: { value: 'alpha' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'hub.directory.selectMatches' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.search'), { target: { value: '' } })
+  expect((screen.getByRole('checkbox', { name: 'beta' }) as HTMLInputElement).checked).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ name: 'alpha' }), expect.objectContaining({ name: 'beta' })]) })))
+})
+
+it('keeps existing IDs, credentials and failover candidates while adding discovered models', async () => {
   const backup = { ...catalog.sources[0], id: 'backup', name: 'Backup source' }
   const saved = { ...catalog, sources: [...catalog.sources, backup], models: [{ ...catalog.models[0], strategy: 'failover', candidates: [...catalog.models[0].candidates, { sourceId: 'backup', model: 'backup-model' }] }] }
-  vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
+  vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
   mount('catalog/source/upstream')
-  fireEvent.change(await screen.findByLabelText('hub.upstreamModel'), { target: { value: 'updated-model' } })
-  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'agent.models.save' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
+  expect((await screen.findByRole('checkbox', { name: 'priced-model' }) as HTMLInputElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'hub.directory.selectAll' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
     sources: expect.arrayContaining([expect.objectContaining({ id: 'upstream', hasKey: true, apiKey: '' })]),
-    models: [{ ...saved.models[0], candidates: [{ sourceId: 'upstream', model: 'updated-model' }, { sourceId: 'backup', model: 'backup-model' }] }],
+    models: [saved.models[0], expect.objectContaining({ name: 'new-model' })],
   })))
+})
+
+it('preserves inputs after authentication errors and allows manual recovery', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => { if (path.endsWith('/discover')) throw { apiError: { code: 'MODEL_LIST_UNAUTHORIZED' } }; return original(method, path, body, options) })
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'draft-key' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
+  await screen.findByText('hub.directory.unauthorized')
+  expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('draft-key')
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'manual-model' } })
+  expect((screen.getByRole('button', { name: 'hub.directory.saveModels' }) as HTMLButtonElement).disabled).toBe(false)
+})
+
+it('discards discovery responses after editing the endpoint', async () => {
+  let finish: (value: any) => void = () => {}
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? new Promise(resolve => { finish = resolve }) : original(method, path, body, options))
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://old.example/v1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
+  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  finish({ data: { models: ['obsolete'] } })
+  await waitFor(() => expect((screen.getByRole('button', { name: 'hub.directory.fetch' }) as HTMLButtonElement).disabled).toBe(false))
+  expect(screen.queryByRole('checkbox', { name: 'obsolete' })).toBeNull()
+})
+
+it('keeps selected models after save fails and retries without a new discovery request', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  let attempts = 0
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path.endsWith('/discover')) return { data: { models: ['recoverable-model'] } }
+    if (method === 'PUT' && attempts++ === 0) throw new Error('offline')
+    return original(method, path, body, options)
+  })
+  mount('catalog/source/upstream')
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'recoverable-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(screen.getAllByText('hub.error.failed').length).toBeGreaterThan(0))
+  expect((screen.getByRole('checkbox', { name: 'recoverable-model' }) as HTMLInputElement).checked).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(attempts).toBe(2))
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
+})
+
+it('retains each source draft when navigating back and reopening', async () => {
+  const navigate = vi.fn(), page = mount('catalog/source/new', navigate)
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://draft.example/v1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'draft-model' } })
+  page.rerender(<App><ModelHub sub="catalog" onNav={navigate} /></App>)
+  page.rerender(<App><ModelHub sub="catalog/source/new" onNav={navigate} /></App>)
+  expect((screen.getByLabelText('agent.models.baseUrl') as HTMLInputElement).value).toBe('https://draft.example/v1')
+  expect((screen.getByLabelText('hub.directory.manual') as HTMLTextAreaElement).value).toBe('draft-model')
+})
+
+it('blocks stale source configuration after rereading a conflicting catalog', async () => {
+  let reads = 0
+  const updated = { ...catalog, revision: 'revision-2', sources: [{ ...catalog.sources[0], baseUrl: 'https://changed.example/v1' }] }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (path.endsWith('/discover')) return { data: { models: ['selected-model'] } }
+    if (method === 'PUT') throw { apiError: { code: 'MODEL_CATALOG_CHANGED' } }
+    return { data: reads++ ? updated : catalog }
+  })
+  mount('catalog/source/upstream')
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'selected-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(screen.getAllByText('hub.error.changed').length).toBeGreaterThan(0))
+  fireEvent.click(screen.getAllByRole('button', { name: 'capabilities.models.reread' }).slice(-1)[0])
+  await screen.findByText('hub.directory.sourceChanged')
+  expect((screen.getByRole('button', { name: 'hub.directory.saveModels' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.useLatest' }))
+  expect((screen.getByLabelText('agent.models.baseUrl') as HTMLInputElement).value).toBe('https://changed.example/v1')
+  expect(screen.queryByRole('checkbox', { name: 'selected-model' })).toBeNull()
 })
