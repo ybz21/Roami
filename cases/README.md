@@ -90,3 +90,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case85 / MECH-RP01](case-85-mech-rp01/CASE.md)：部分独立评分的保留、汇总与恢复，34项脚本化机制检查。
 
 - [Case86 / MECH-RJ01](case-86-mech-rj01/CASE.md)：错误模型JSON的动作隔离、后台队列续办和缓存回执保留，35项脚本化机制检查。
+
+- [Case87 / MECH-RS01](case-87-mech-rs01/CASE.md)：评分对象形状校验、待评分状态与已完成回执保留，28项脚本化机制检查。

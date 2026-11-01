@@ -1,0 +1,55 @@
+{
+  "id": "MECH-RS01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "评分输入契约",
+  "prompt": "拒绝非对象评分维度/记录与校准输入，保留已完成盲评和已知用量，当前结果待评分而不是异常退出或冒充通过。",
+  "preconditions": "公开错误对象样例、真实ArtifactReviewer和私有JSON回执、两个脚本化评分角色；零真实模型调用。",
+  "expected_terminal": "invalid_rating_shapes_remain_pending_with_retained_receipts",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "评分维度与记录在使用字段前验证为对象",
+    "错误评分保留已有盲评和120/240合成Token，结果待评分而非通过",
+    "坏校准记录在目录、标记或模型调用之前拒绝，正常评分与原阈值保持"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-RS01-H1",
+      "rule": "评分、汇总和证书读取拒绝字段名数组冒充维度对象，返回领域错误。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RS01-H2",
+      "rule": "第一评分失败留0条、第二失败留1条；真实私有回执保留120/240合成Token且不把坏评分标成通过或中断。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RS01-H3",
+      "rule": "坏校准记录在开始标记或模型调用前拒绝；正常对象评分仍完成两名盲评。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "dimension_name_array_passes_set_check_then_attribute_error",
+    "issue": 443,
+    "fixture_reproduction_only": true,
+    "historical_production_root_not_claimed": true,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/rater-contract-shapes.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

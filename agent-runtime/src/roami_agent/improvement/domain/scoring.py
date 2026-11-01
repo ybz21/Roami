@@ -36,7 +36,7 @@ def same_json(actual, expected):
 
 def quality(dimensions, profile="mechanism", *, hard_passed, pending=False):
     require(profile in PROFILES, "RSI_UNKNOWN_PROFILE")
-    require(set(dimensions) == set(DIMENSIONS))
+    require(isinstance(dimensions, dict) and set(dimensions) == set(DIMENSIONS))
     require(all(type(v) is int and 0 <= v <= 4 for v in dimensions.values()))
     score = sum(
         POINTS[dimensions[key]] * weight

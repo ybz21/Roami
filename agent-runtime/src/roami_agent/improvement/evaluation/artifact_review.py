@@ -174,8 +174,11 @@ class ArtifactReviewer:
                         chunks.append(event.value)
                         require(sum(map(len, chunks)) <= 16000, "RSI_INVALID_MODEL_OUTPUT")
                 value = json.loads("".join(chunks))
-                require(set(value) == {"dimensions", "evidence"})
-                require(set(value["dimensions"]) == set(DIMENSIONS))
+                require(isinstance(value, dict) and set(value) == {"dimensions", "evidence"})
+                require(
+                    isinstance(value["dimensions"], dict)
+                    and set(value["dimensions"]) == set(DIMENSIONS)
+                )
                 require(all(type(v) is int and 0 <= v <= 3 for v in value["dimensions"].values()))
                 require(isinstance(value["evidence"], list) and 4 <= len(value["evidence"]) <= 16)
                 for observation in value["evidence"]:
@@ -280,21 +283,30 @@ def validate_calibration(certificate, route_hashes):
     )
     anchors = certificate.get("anchors")
     require(isinstance(anchors, list) and 12 <= len(anchors) <= 100)
+    require(all(isinstance(a, dict) and isinstance(a.get("id"), str) for a in anchors))
     require(len({a["id"] for a in anchors}) == len(anchors))
     coverage = {family: {True: 0, False: 0} for family in ("presentation", "plan", "web")}
     for anchor in anchors:
         require(anchor.get("family") in coverage and anchor.get("human_reference") is True)
         require(isinstance(anchor.get("evidence_hash"), str) and len(anchor["evidence_hash"]) == 64)
         expected = anchor["expected"]
-        require(set(expected) == set(DIMENSIONS))
+        require(isinstance(expected, dict) and set(expected) == set(DIMENSIONS))
         require(all(type(v) is int and 0 <= v <= 3 for v in expected.values()))
         require(
-            len(anchor["ratings"]) == 2
+            isinstance(anchor["ratings"], list)
+            and len(anchor["ratings"]) == 2
+            and all(
+                isinstance(r, dict) and isinstance(r.get("rater"), str) for r in anchor["ratings"]
+            )
             and {r["rater"] for r in anchor["ratings"]} == set(route_hashes)
         )
         coverage[anchor["family"]][all(v >= 3 for v in expected.values())] += 1
         for rating in anchor["ratings"]:
-            require(rating.get("blind") is True and set(rating["dimensions"]) == set(DIMENSIONS))
+            require(
+                rating.get("blind") is True
+                and isinstance(rating.get("dimensions"), dict)
+                and set(rating["dimensions"]) == set(DIMENSIONS)
+            )
             for key, reference in expected.items():
                 value = rating["dimensions"][key]
                 require(
@@ -306,7 +318,8 @@ def validate_calibration(certificate, route_hashes):
                 )
         usage = anchor["metrics"]
         require(
-            usage.get("token_coverage") == "complete"
+            isinstance(usage, dict)
+            and usage.get("token_coverage") == "complete"
             and type(usage.get("tokens")) is int
             and usage["tokens"] > 0
             and usage.get("model_calls") == 2
@@ -363,6 +376,7 @@ async def calibrate_artifacts(
     require(provider_factory is not None, "RSI_SHARED_MODEL_GATEWAY_REQUIRED")
     require(provider_mode in {None, "live_models", "protocol_fixture"})
     require(isinstance(anchors, list) and 12 <= len(anchors) <= 100)
+    require(all(isinstance(a, dict) and isinstance(a.get("id"), str) for a in anchors))
     require(len({a["id"] for a in anchors}) == len(anchors))
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     require(not root.is_symlink() and root.stat().st_mode & 0o077 == 0)
