@@ -11,6 +11,7 @@ from roami_agent.improvement.domain.contracts import digest, identifier, require
 from roami_agent.improvement.domain.policy import BOUNDS
 from roami_agent.improvement.evaluation.contracts import load_suite
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
+from roami_agent.improvement.integrations.container_failure_evidence import failure_fields
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
 from roami_agent.improvement.integrations.spending_policy import (
     uses_shared_model_limit,
@@ -156,7 +157,12 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
         shared_budget=budget,
         shared_daily_limit=True,
     )
-    fingerprint = await executor.preflight()
+    try:
+        fingerprint = await executor.preflight()
+    except (DomainError, OSError, ValueError) as error:
+        if fields := failure_fields(error):
+            records.artifact(owner, run_id, "evaluate", "environment-failure.json", fields)
+        raise
     from roami_agent.improvement.evaluation.comparison_context import comparison_context
 
     await asyncio.to_thread(
@@ -219,6 +225,7 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
                         "reason": getattr(exc, "code", "RSI_ENVIRONMENT_UNAVAILABLE"),
                     },
                     "metrics": {"tokens": None, "token_coverage": "unknown"},
+                    **failure_fields(exc),
                 }
         review_tokens = result.get("metrics", {}).get("artifact_review_tokens", 0)
         artifact_tokens = (

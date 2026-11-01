@@ -1,0 +1,15 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_improvement_container_failures.py",
+    "agent-runtime/tests/verification/test_container_failure_evidence.py"
+  ],
+  "expected_collected": 21,
+  "runtime": [
+    "Python 3.12",
+    "pytest",
+    "Docker and ROAMI_RSI_TEST_IMAGE",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

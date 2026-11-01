@@ -84,3 +84,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case82 / MECH-WR01](case-82-mech-wr01/CASE.md)：本轮已读工作流的版本指引，42项真实Native循环与上下文范围检查。
 
 - [Case83 / MECH-EB01](case-83-mech-eb01/CASE.md)：原评分、渲染及复核的证据绑定，含公开输入、工具和冻结回执。
+
+- [Case84 / MECH-CF01](case-84-mech-cf01/CASE.md)：容器命令失败的私有错误证据，21项检查含真实只读Docker失败。
