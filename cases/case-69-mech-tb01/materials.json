@@ -26,7 +26,7 @@
       "skills/tabular-analysis/tests",
       "agent-runtime/tests/verification/test_tabular_skill_package.py"
     ],
-    "expected_collected": 88,
+    "expected_collected": 119,
     "no_skips": true,
     "kind": "source_frozen_pytest_receipt"
   }
