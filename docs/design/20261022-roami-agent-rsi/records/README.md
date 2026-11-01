@@ -166,3 +166,5 @@
 - [部分评分的回执与汇总](2026-11-01/partial-artifact-ratings.md)
 
 - [CSV列身份与数值表示](2026-11-01/tabular-column-types.md)
+
+- [仅Main开启图片时的视觉交接原题对照](2026-11-01/main-visual-comparison.md)：真实行为与原生分数、失败规则撤回及保存配置边界。
