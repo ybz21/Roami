@@ -88,3 +88,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case84 / MECH-CF01](case-84-mech-cf01/CASE.md)：容器命令失败的私有错误证据，21项检查含真实只读Docker失败。
 
 - [Case85 / MECH-RP01](case-85-mech-rp01/CASE.md)：部分独立评分的保留、汇总与恢复，34项脚本化机制检查。
+
+- [Case86 / MECH-RJ01](case-86-mech-rj01/CASE.md)：错误模型JSON的动作隔离、后台队列续办和缓存回执保留，35项脚本化机制检查。

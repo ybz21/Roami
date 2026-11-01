@@ -6,7 +6,12 @@ from roami_agent.improvement.domain.contracts import require
 
 
 def completed_result(raw):
+    require(isinstance(raw, str), "RSI_INVALID_MODEL_OUTPUT")
     events = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    require(
+        all(isinstance(e, dict) and isinstance(e.get("type"), str) for e in events),
+        "RSI_INVALID_MODEL_OUTPUT",
+    )
     threads = [e.get("thread_id") for e in events if e.get("type") == "thread.started"]
     completed = [e for e in events if e.get("type") == "turn.completed"]
     require(
@@ -17,10 +22,11 @@ def completed_result(raw):
         len(completed) == 1 and not any(e.get("type") in {"error", "turn.failed"} for e in events),
         "RSI_CODEX_TURN_INCOMPLETE",
     )
-    observed_items = [e["item"] for e in events if e.get("type", "").startswith("item.")]
+    observed_items = [e.get("item") for e in events if e["type"].startswith("item.")]
     require(
         all(
             isinstance(i, dict)
+            and isinstance(i.get("type"), str)
             and (
                 i.get("type") in {"agent_message", "reasoning"}
                 or i.get("type") == "error"
@@ -38,6 +44,7 @@ def completed_result(raw):
         "RSI_INVALID_MODEL_OUTPUT",
     )
     usage = completed[0].get("usage", {})
+    require(isinstance(usage, dict), "RSI_USAGE_UNKNOWN")
     require(
         all(type(usage.get(k)) is int and usage[k] >= 0 for k in ("input_tokens", "output_tokens")),
         "RSI_USAGE_UNKNOWN",

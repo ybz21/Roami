@@ -168,3 +168,5 @@
 - [CSV列身份与数值表示](2026-11-01/tabular-column-types.md)
 
 - [仅Main开启图片时的视觉交接原题对照](2026-11-01/main-visual-comparison.md)：真实行为与原生分数、失败规则撤回及保存配置边界。
+
+- [错误模型JSON的动作隔离与队列续办](2026-11-01/model-result-shapes.md)：输入形状校验、后台存活及缓存回执不重放。

@@ -85,7 +85,9 @@ async def build_review_report(
     )
     value = json.loads(paid["text"])
     require(
-        isinstance(value.get("summary"), str) and 0 < len(value["summary"]) <= 12000,
+        isinstance(value, dict)
+        and isinstance(value.get("summary"), str)
+        and 0 < len(value["summary"]) <= 12000,
         "RSI_INVALID_REVIEW_REPORT",
     )
     document = (
@@ -179,6 +181,7 @@ async def compose_issue(workflow, action, settings, config, *, provider_factory=
         provider_factory=provider_factory,
     )
     value = json.loads(paid["text"])
+    require(isinstance(value, dict), "RSI_INVALID_ISSUE_PLAN")
     planned = value.get("points")
     require(
         isinstance(planned, list)

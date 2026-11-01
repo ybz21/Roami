@@ -1,0 +1,7 @@
+{
+  "name": "公开合成的错误JSON形状",
+  "description": "合法JSON但不是业务要求的对象，验证后台队列保留失败与已知用量；没有真实模型或人工标签。",
+  "invalid_objects": [[], null, 17, "not an object", true],
+  "invalid_read_requests": [[], null, 17, "not a read request", true],
+  "usage": {"inputTokens": 100, "outputTokens": 20, "requestAttempts": 1, "retryUsageKnown": true}
+}
