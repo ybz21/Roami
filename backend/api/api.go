@@ -32,25 +32,26 @@ import (
 const labelOption = "@roam_name"
 
 type API struct {
-	AgentProviders *agentproviders.Store
-	GitFootprints  *GitFootprintStore
-	Footprints     *AIFootprintStore
-	TT             *ttmux.Client
-	WT             *worktree.Service // Worktree 领域服务（独占 git worktree 操作）
-	BrowserHome    string            // 浏览器导航起始页地址（供前端设为默认主页）
-	Football       *FootballStore
-	Speech         *SpeechStore      // 语音识别(ASR)配置 + 转录
-	Prefs          *PreferencesStore // 用户偏好（主题/语言/Agent 命令等）
-	Workspace      *WorkspaceStore
-	Push           *PushStore        // Web Push：VAPID 密钥 + 设备订阅（api/push.go）
-	Inbox          *InboxStore       // 收件箱：会话事件 + 已读（api/inbox.go）
-	Live           liveTable         // 探测循环攒的活状态：agent / 等你 / 最近一句（api/sessions-overview.go）
-	Events         EventHub          // 会话事件长连接（api/events-ws.go），Android App 的通知来源
-	Races          *race.Store       // 竞赛（W5/W6）业务数据模型
-	Projects       *project.Store    // 项目（08）：knownRepos 弱台账 + UI 偏好
-	FileIndex      *search.FileIndex // 全局搜索（⌘K）的项目文件名索引，见 search.go
-	Meta           *metadb.DB        // 台账库直连；降级时各 store 自动退回 JSON
-	agentLink      *agentLinker      // 把手敲起来的 claude 会话认到它那段对话上
+	AgentVerification *AgentVerificationStore
+	AgentProviders    *agentproviders.Store
+	GitFootprints     *GitFootprintStore
+	Footprints        *AIFootprintStore
+	TT                *ttmux.Client
+	WT                *worktree.Service // Worktree 领域服务（独占 git worktree 操作）
+	BrowserHome       string            // 浏览器导航起始页地址（供前端设为默认主页）
+	Football          *FootballStore
+	Speech            *SpeechStore      // 语音识别(ASR)配置 + 转录
+	Prefs             *PreferencesStore // 用户偏好（主题/语言/Agent 命令等）
+	Workspace         *WorkspaceStore
+	Push              *PushStore        // Web Push：VAPID 密钥 + 设备订阅（api/push.go）
+	Inbox             *InboxStore       // 收件箱：会话事件 + 已读（api/inbox.go）
+	Live              liveTable         // 探测循环攒的活状态：agent / 等你 / 最近一句（api/sessions-overview.go）
+	Events            EventHub          // 会话事件长连接（api/events-ws.go），Android App 的通知来源
+	Races             *race.Store       // 竞赛（W5/W6）业务数据模型
+	Projects          *project.Store    // 项目（08）：knownRepos 弱台账 + UI 偏好
+	FileIndex         *search.FileIndex // 全局搜索（⌘K）的项目文件名索引，见 search.go
+	Meta              *metadb.DB        // 台账库直连；降级时各 store 自动退回 JSON
+	agentLink         *agentLinker      // 把手敲起来的 claude 会话认到它那段对话上
 }
 
 // New 组装 API。台账库的握手在这里做一次：库的位置由 ttmux 报，不是后端自己拼
@@ -67,7 +68,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 	}()
 	return &API{GitFootprints: NewGitFootprintStore(dataDir), Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir), AgentProviders: agentproviders.NewStore(dataDir),
-		Prefs: NewPreferencesStore(dataDir), Workspace: NewWorkspaceStore(dataDir), Races: race.NewStore(dataDir, meta),
+		AgentVerification: NewAgentVerificationStore(dataDir), Prefs: NewPreferencesStore(dataDir), Workspace: NewWorkspaceStore(dataDir), Races: race.NewStore(dataDir, meta),
 		Push: NewPushStore(dataDir), Inbox: NewInboxStore(dataDir, func() *sql.DB {
 			if meta.OK() {
 				return meta.SQL()

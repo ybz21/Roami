@@ -196,6 +196,9 @@ class ModelSettings:
             "baseUrl": result["main"]["baseUrl"],
             "keyConfigured": result["main"]["keyConfigured"],
         }
+        from roami_agent.server.model_verification import verified_routes
+
+        result["verified"] = verified_routes(self.runtime.settings, self.runtime.db.data_root)
         result["gatewayManaged"] = True
         return result
 

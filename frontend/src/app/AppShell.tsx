@@ -133,7 +133,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const canvasNode = (
     <Content ref={canvasRef} className="tt-canvas" data-cq={CQ_PAGES.has(tab) ? 'on' : undefined} style={{
       flex: 1, minWidth: 0, minHeight: 0, height: '100%', padding: 0,
-      overflow: tab === 'capabilities' || tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
+      overflow: tab === 'onboarding' || tab === 'capabilities' || tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
     }}>{pageNode}</Content>
   )
   const dockNode = (
@@ -182,7 +182,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-base)' }}>
 
-      {isMobile && <MobileTopBar tab={tab} go={go} unread={agentInbox.unread} notifications={notifications}
+      {isMobile && <MobileTopBar tab={tab} route={routing.route} go={go} unread={agentInbox.unread} notifications={notifications}
         newTask={projectActions.newTask}
         search={() => setMobileSearchNonce(n => n + 1)} actionsHost={setMobileActionsHost} />}
       {/* clip prevents focus inside the hidden dock from scrolling the shell. */}
@@ -266,7 +266,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
           )
         })()}
 
-        {isMobile && <MobileBottomBar tab={tab} go={go} offline={offline} />}
+        {isMobile && <MobileBottomBar tab={tab} route={routing.route} go={go} offline={offline} />}
 
         <AgentNotifications node={curNodeId} open={agentInboxOpen} close={() => setAgentInboxOpen(false)} inbox={agentInbox} select={selectAgent} />
         <GlobalSearch items={paletteItems} actions={paletteActions} dir={activeProject?.worktree || activeProject?.dir} />

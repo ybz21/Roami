@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { api } from './api'
 
 export interface Preferences {
+  onboarding?: Record<string, import("./components/onboarding/onboarding-state").OnboardingProgress>
   agentBalanceRefreshSeconds?: number
   theme: 'dark' | 'light'
   claudeThemeSync: boolean // 切 Roami 主题时把 Claude Code 的主题（~/.claude/settings.json）一起切，服务端做

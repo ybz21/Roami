@@ -23,8 +23,10 @@ export default function AgentModels({ kind, setup, installed = true }: { kind: A
   const layout = useLayout()
   const scroll = useRef<HTMLDivElement>(null)
   const revealField = (field: HTMLElement) => {
-    const pane = scroll.current
+    let pane: HTMLElement | null = scroll.current
     if (!pane?.contains(field)) return
+    while (pane && !['auto', 'scroll'].includes(getComputedStyle(pane).overflowY)) pane = pane.parentElement
+    if (!pane) return
     const input = field.getBoundingClientRect(), bounds = pane.getBoundingClientRect()
     pane.scrollTop += input.bottom + input.height / 2 - bounds.bottom
   }

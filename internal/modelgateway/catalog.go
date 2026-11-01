@@ -113,6 +113,10 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 		return err
 	}
 	value.Revision = revision
+	// Suspend route evidence until the committed catalog and its fingerprints agree.
+	if err := writeCatalogVerificationRevision(s.ledger.paths.Data, ModelCatalog{}); err != nil {
+		return err
+	}
 	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup})
 	if err != nil {
 		return err
@@ -123,6 +127,7 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 	})
 	if err == nil {
 		s.value = value
+		err = writeCatalogVerificationRevision(s.ledger.paths.Data, value)
 	}
 	return err
 }

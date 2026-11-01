@@ -1,3 +1,4 @@
+import { useSettingsDraft } from '../settings/settings-draft'
 import NativeProjectSessions from '../agent/NativeProjectSessions'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
@@ -319,8 +320,10 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
 
 // ── 新项目弹窗：创建的是「项目」这个存储对象（POST /projects），不建任何会话。
 // 项目 = 任意目录（git 可选）；开 session / 建 feature 是进项目之后 composer 的事。
-export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated?: () => void }) {
+export function NewProjectModal({ open, onClose, onCreated, inline = false }: { open: boolean; onClose: () => void; inline?: boolean; onCreated?: (project: { key: string; dir: string; git: boolean; name?: string }) => void }) {
   const { t } = useI18n()
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const { message } = AntApp.useApp()
   const [dir, setDir] = useState('')
   const [pick, setPick] = useState(false)
@@ -333,6 +336,8 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
   // 名字是不是用户自己写过：写过就不再被目录覆盖，否则改一次目录就把他写的名字冲掉
   const [nameTouched, setNameTouched] = useState(false)
   useEffect(() => { if (open) { setDir(''); setName(''); setNameTouched(false); setSource('existing'); setCloneUrl('') } }, [open])
+
+  const draftNotice = useSettingsDraft('onboarding-project', { dir, name, source, cloneUrl }, { dir: '', name: '', source: 'existing', cloneUrl: '' }, draft => { setDir(draft.dir); setName(draft.name); setSource(draft.source === 'clone' ? 'clone' : 'existing'); setCloneUrl(draft.cloneUrl); setNameTouched(true) }, inline && open)
 
   /** 从 git URL 猜仓库名：git@host:org/repo.git 或 https://host/org/repo(.git) → repo */
   const repoNameFromUrl = (u: string): string => {
@@ -355,26 +360,25 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
       setCreating(true)
       // 克隆可能要几分钟（大仓库），loading 里说清楚在干嘛，别让人以为卡死了
       if (source === 'clone') message.loading({ content: t('project.cloning'), key: 'newproj', duration: 0 })
+      if (!mounted.current) return
       const res = await api('POST', '/projects', {
         dir: dir.trim(), displayName: name.trim(),
         ...(source === 'clone' ? { cloneUrl: cloneUrl.trim() } : {}),
       })
+      if (!mounted.current) return
       message.destroy('newproj')
       pushRecentDir(dir.trim())
       // 目录是某个已在册仓库的 worktree：没有新项目，归到那个项目下，名字也没动
       if (res.data.created === false) message.info(res.data.worktree ? t('project.existsAsWorktree', { name: res.data.name }) : t('project.existsAlready', { name: res.data.name }), 6)
       else message.success(t('project.createdProject'))
-      onClose(); onCreated?.()
-      location.hash = '#/projects/' + encodeURIComponent(res.data.key)
+      onClose(); onCreated?.(res.data)
+      if (!inline) location.hash = '#/projects/' + encodeURIComponent(res.data.key)
     } catch (e: any) { message.destroy('newproj'); message.error(e.message) }
     finally { setCreating(false) }
   }
-  return (
-    <>
-      <Modal open={open} onCancel={onClose} onOk={ok} title={t('project.newModalTitle')}
-        okText={t('file.create')} destroyOnClose confirmLoading={creating}>
+  const fields = (
         <Space direction="vertical" style={{ width: '100%' }}>
-          <Segmented block value={source} onChange={(v) => setSource(v as 'existing' | 'clone')}
+          <Segmented block value={source} onChange={(v) => setSource(v as typeof source)}
             options={[
               { value: 'existing', label: t('project.sourceLocal') },
               { value: 'clone', label: t('project.sourceClone') },
@@ -393,8 +397,9 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
               }}
               placeholder={t('project.cloneUrlPlaceholder')} />
           )}
+          {inline && <label htmlFor="onboarding-project-directory">{t('onboarding.projectDirectory')}</label>}
           <Space.Compact style={{ width: '100%' }}>
-            <AutoComplete style={{ flex: 1, minWidth: 0 }} value={dir} onChange={setDir} autoFocus={source === 'existing'}
+            <AutoComplete id={inline ? 'onboarding-project-directory' : undefined} style={{ flex: 1, minWidth: 0 }} value={dir} onChange={setDir} autoFocus={!inline && source === 'existing'}
               onSelect={(v) => fillNameFromDir(String(v))}
               onBlur={() => fillNameFromDir(dir)}
               options={recentDirs().map((d) => ({ value: d }))}
@@ -402,13 +407,18 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
               placeholder={t('session.dirPlaceholder')} />
             <Button onClick={() => setPick(true)}>{t('common.browse')}</Button>
           </Space.Compact>
-          <Input placeholder={t('project.displayName')} value={name}
+          {inline && <label htmlFor="onboarding-project-name">{t('project.displayName')}</label>}<Input id={inline ? 'onboarding-project-name' : undefined} placeholder={t('project.displayName')} value={name}
             onChange={(e) => { setName(e.target.value); setNameTouched(true) }} />
           <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', lineHeight: 1.7 }}>
             {source === 'clone' ? t('project.cloneHint') : t('project.newHint')}
           </div>
         </Space>
-      </Modal>
+  )
+  return (
+    <>
+      {draftNotice}
+      {inline ? <div className="onboarding-project-form">{fields}<Button type="primary" loading={creating} disabled={!dir.trim()} onClick={() => { void ok() }}>{t('file.create')}</Button></div>
+        : <Modal open={open} onCancel={onClose} onOk={ok} title={t('project.newModalTitle')} okText={t('file.create')} destroyOnClose confirmLoading={creating}>{fields}</Modal>}
       <DirPicker open={pick} start={dir}
         onPick={(p) => { setDir(p); fillNameFromDir(p); setPick(false) }} onClose={() => setPick(false)} />
     </>

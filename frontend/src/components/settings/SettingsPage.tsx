@@ -148,7 +148,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const head = (
     <div className="tt-set-head">
       <div className="tt-set-headrow">
-        <span className="tt-pagename">{t('nav.env')}</span>
+        <span className="tt-pagename">{t('nav.env')}</span><Button type="text" onClick={() => onNav?.('onboarding')}>{t('onboarding.title')}</Button>
         <span className="tt-pagedivider" aria-hidden="true" />
         <div className={`tt-set-search${q ? ' has' : ''}`}>
           <SearchIcon size={15} />
@@ -207,7 +207,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
             onDismiss={() => { setQ(''); setMobileSearchOpen(false) }} />
         </div>}
         {query ? results : (
-          <div className="tt-set-catlist">
+          <div className="tt-set-catlist"><button type="button" className="tt-set-cat" onClick={() => onNav?.('onboarding')}><span>{t('onboarding.title')}</span><Chevron /></button>
             {model.groups.map(group => <section key={group.title}>
               <h3 className="tt-set-sec">{group.title}</h3>
               {group.pages.map(id => <button key={id} type="button" className="tt-set-cat" onClick={() => go(id)}>
