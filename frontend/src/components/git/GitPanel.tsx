@@ -1,3 +1,4 @@
+import { primaryShortcutLabel } from '../../keyboard-platform'
 // Git 面板 —— 会话/项目右侧的 Git 工作台。设计见 docs/design/web/11-git-panel.md（图版 G1–G6）。
 //
 // 四个 tab：改动（VSCode 式暂存/提交）、提交树（真 DAG 泳道图）、分支（本地/远端/worktree/标签/储藏）、
@@ -663,7 +664,7 @@ export default function GitPanel({ dir, accent = 'var(--accent)', onClose, openT
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
           onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doCommit('plain') } }}
-          placeholder={amend ? t('git.amendPlaceholder') : t('git.commitPlaceholder', { branch: status?.branch || 'HEAD' })}
+          placeholder={amend ? t('git.amendPlaceholder') : t('git.commitPlaceholder', { branch: status?.branch || 'HEAD', shortcut: primaryShortcutLabel() + 'Enter' })}
           autoSize={{ minRows: 1, maxRows: 5 }}
           style={{ fontSize: 12.5 }}
         />
