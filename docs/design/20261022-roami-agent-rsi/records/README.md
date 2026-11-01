@@ -4,6 +4,8 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-01 | [Skill资源的可读取协议地址](2026-11-01/skill-resource-locations.md) |
+| 2026-11-01 | [表格工作流入口的按需展开](2026-11-01/tabular-workflow-entry.md) |
 | 2026-11-01 | [数据快照绑定的数值比较](2026-11-01/numeric-comparison.md) |
 | 2026-11-01 | [评分对象契约与失败回执](2026-11-01/rater-contract-shapes.md) |
 | 2026-11-01 | [股票报告中相关性结论的证据范围](2026-11-01/tabular-correlation-claims.md) |

@@ -94,3 +94,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case87 / MECH-RS01](case-87-mech-rs01/CASE.md)：评分对象形状校验、待评分状态与已完成回执保留，28项脚本化机制检查。
 
 - [Case88 / MECH-NC01](case-88-mech-nc01/CASE.md)：源快照统计比较与变化率，31项只读机制检查。
+
+- [Case89 / MECH-UR01](case-89-mech-ur01/CASE.md)：Skill资源协议地址与读取边界，10项机制检查。

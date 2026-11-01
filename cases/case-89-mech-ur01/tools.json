@@ -1,0 +1,18 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_skill_resource_locations.py"
+  ],
+  "expected_collected": 10,
+  "runtime": [
+    "Python 3.12",
+    "pytest",
+    "真实Runtime及Skill注册/导入/协议读取",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [
+    "read",
+    "skill_read",
+    "file_read"
+  ],
+  "model_calls": 0
+}
