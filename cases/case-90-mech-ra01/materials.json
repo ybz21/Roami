@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-RA01",
+  "data": {
+    "kind": "public_synthetic_reference_authority",
+    "inputs": [
+      "input/reference-authority.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/reference-authority.json",
+    "byte_identical_required": true,
+    "description": "测试实际消费相同公开夹具；不包含私有证据或真实人工标签。"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "calibration_with_protocol_fixtures"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 24,
+    "no_skips": true,
+    "pytest_selectors": [
+      "agent-runtime/tests/test_reference_authority.py"
+    ]
+  }
+}
