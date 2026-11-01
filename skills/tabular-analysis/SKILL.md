@@ -3,7 +3,9 @@ name: tabular-analysis
 description: Inspect CSV snapshots and explicitly defined distribution moments, then publish cleaned source-schema exports with keyed recovery of source identifiers, explicit numeric normalization, and guarded file writes. Use for CSV cleaning alongside analyses, charts, or reports so derived analysis fields do not silently change the cleaned export.
 ---
 
-Use the bundled export command for a cleaned CSV copy. It projects the source column names and order, excludes analysis-only fields, and can recover omitted source columns through explicit keys. Decide the task-specific cleaning and analysis separately; this command does not choose invalid rows or analytical methods. Keep source identifiers by default, including unnamed columns; use `--columns` only for a different schema explicitly requested by the user.
+Use the bundled export command for a cleaned CSV copy. It preserves source columns and order, excludes analysis-only fields, and can recover omitted source columns through explicit keys. Include unnamed identifier columns; use `--columns` only for a different schema requested by the user. Decide row cleaning and analysis from the task.
+
+Column identity and stored representation are separate choices. For requested numeric type cleanup, normalize unpadded whole-number identifiers promoted to decimal text, including unnamed columns, with `numeric`; their record identities stay the same. Keep meaningful leading zeros, prefixes, punctuation or explicitly requested text formats with `preserveNumericText`. Use the observed values and task to choose; an identifier-like header alone is not a reason to retain decimal-zero text.
 
 Read this Skill's `packagePath` from the tool result. The scripts use Python's standard library and need no package installation.
 
@@ -28,8 +30,8 @@ Inspection reports `integralDecimalFields`: exact field names and counts of deci
   "keys": ["event date"],
   "dateKeys": ["event date"],
   "values": "source",
-  "numeric": ["units", "total amount"],
-  "preserveNumericText": ["record code"]
+  "numeric": ["record index", "units", "total amount"],
+  "preserveNumericText": ["padded code"]
 }
 ```
 
@@ -50,8 +52,6 @@ Choose `--numeric` only for fields established as numeric by the input and task.
 The source and analysis files remain unchanged. The output is separate and create-only by default; replacing an existing output requires its observed `--expected-destination-sha256`. Input changes fail before publication. The export receipt names `numericFields` and `retainedIntegralDecimalFields`; check that retained representations are intentional before delivery. If a field has no type choice, correct the selection before publication. Replacing a prior output still requires its observed destination hash. If a failure reports `writePublished: true`, inspect the output and reconcile its hash before considering another write.
 
 Inspect the exported CSV and use it for the requested cleaned-data delivery, keeping derived features in the analysis data unless requested as output. When the destination is a service, use the task's authorized transfer interface and confirm remote delivery. Reopen requested charts or reports and state any unverified visual limitations.
-
-Preserving an identifier means preserving which record it denotes, not treating every identifier as text. Inspect its source values: a field of unpadded whole-number identifiers promoted to decimal text by missing values can be included in `numeric` when cleaning types. Keep identifiers with meaningful leading zeros, prefixes or punctuation as strings. Include every chosen numeric field in the spec, even when its header is unnamed or contains spaces; do not infer the decision from the header alone.
 
 
 For descriptive statistics, use `scripts/numeric_profile.py --workspace <directory> --path analysis.csv --columns "Daily return" --expected-sha256 <observed-sha>`. It reads without changing files and names the convention in every moment field. `--transform fractional_change` computes adjacent `current / previous - 1` values in input row order; prepare the intended chronological order first. Changes are fractions, not percent. Missing cells break sequences rather than bridging gaps; zero bases stop the calculation.
