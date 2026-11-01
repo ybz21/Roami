@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { useLayout } from '../../../frontend/src/layout'
 import { CheckIcon, ChevronLeft, ChevronRight, FolderIcon, PlayIcon, TerminalIcon } from '../../../frontend/src/icons'
 import SwarmRuntime from './okr-swarm-runtime'
+import WatchQuality from './okr-watch-quality'
 import { CycleKind, cycleActions, cycleDefinitions, dailyDelta, latestCycleReview } from './okr-execution-cycle'
 import { BrowserObservation, formulaFields } from './okr-generation-contract'
 import { DateTrend, KrProposal } from './okr-generation'
@@ -44,7 +45,7 @@ const Workspace = React.memo(function Workspace({ kind, scene, flowPaused, onCon
       <section className="book-section"><h3>{scene.intentConfirmed ? '已知约束' : '需要聊清什么'}</h3><ul className="book-facts">{(scene.intentConfirmed ? ['八周周期',kind === 'creator' ? '每天参与半小时' : '每天留一小时评审','实际基线与可用数据来源待核对'] : ['主要追求什么结果','希望推进多久','每天能投入多少、哪些安排要保留']).map(item => <li key={item}>{item}</li>)}</ul><p className="meta">{scene.intentConfirmed ? '下一步由智能体提出 KR 和衡量方式。' : '尚未拆分 KR，也没有生成结果面板。'}</p></section>
     </>}
     {scene.view === 'goals' && <>
-      {kind === 'creator' && scene.revision === 2 && <p className="book-change" role="status">方案已调整：KR 从 2 条变 3 条，增加互动诊断和短期验收要求。</p>}
+      {kind === 'creator' && scene.revision === 2 && <p className="book-change" role="status">方案已调整：KR 从 4 条变 5 条，保留增长、完播率、平均观看时长三项结果，增加互动诊断和短期验收。</p>}
       <div className="generated-krs">{plan.keyResults.map((kr,index) => <KrProposal key={kr.id} kr={kr} index={index} />)}</div>
       <section className="book-section"><h3>近期先验证什么</h3><p>{definition.shortResult}</p><small>长期结果与短期检查点分开衡量，实际起点待读取。</small></section>
     </>}
@@ -54,11 +55,11 @@ const Workspace = React.memo(function Workspace({ kind, scene, flowPaused, onCon
     </>}
     {scene.view === 'source' && <>
       <section className="book-section"><div className="section-head"><h3>{kind === 'creator' ? '创作者后台 / 浏览器读取' : '发布监控 / 浏览器或报告读取'}</h3><span className={scene.sampled ? 'ok-text' : 'warn-text'}>{scene.sampled ? '回放样本已核对' : '候选连接 · 待验证'}</span></div><ol className="connector-steps"><li>发现可用能力与后台入口。</li><li>核对登录、稳定账号或项目身份。</li><li>读取观测日期、字段、单位和版本。</li><li>保存回执，验证通过后登记连接。</li></ol></section>
-      {scene.sampled ? <div className="book-receipt"><CheckIcon size={20} /><div><h3>{kind === 'creator' ? 'demo-creator / 2026-11-11' : 'demo-v0.4 / 固定负载'}</h3><strong>{kind === 'creator' ? '粉丝 328 人' : '发布版 p95 720ms'}</strong><small>{kind === 'creator' ? '周期从 11 月 12 日开始；可用作净增起点。单视频同龄结果另行核对。' : '候选环境独立记录，不覆盖这条发布事实。'}</small></div></div> : <p className="book-change">需要登录或没有访问能力时，停在待接入，不能把未知数据填成 0。</p>}
+      {scene.sampled ? <div className="book-receipt"><CheckIcon size={20} /><div><h3>{kind === 'creator' ? 'demo-creator / 2026-11-11' : 'demo-v0.4 / 固定负载'}</h3><strong>{kind === 'creator' ? '粉丝 328 人 · 完播 24% · 平均观看 14 秒' : '发布版 p95 720ms'}</strong><small>{kind === 'creator' ? '周期从 11 月 12 日开始；可用作净增起点。同日原始数已核对；单视频同龄结果另行核对。' : '候选环境独立记录，不覆盖这条发布事实。'}</small></div></div> : <p className="book-change">需要登录或没有访问能力时，停在待接入，不能把未知数据填成 0。</p>}
       <details className="book-section"><summary><TerminalIcon size={16} /> 连接描述与设计边界</summary><pre className="generation-code">{JSON.stringify(plan.connectors[0],null,2)}</pre><p className="meta">这是回放中的连接描述。本地夹具 runner 的可执行验证和真实平台接入边界见技术文档。</p><a href="technical-design.html#dynamic-connector">查看 connector 机理</a></details>
     </>}
     {scene.view === 'board' && <>
-      <p className="book-change">整体看板已生成并保存（回放） · {scene.id === 'schedule' ? '更新约定已设定' : '等待设置更新约定'}</p>{boardStats}
+      <p className="book-change">整体看板已生成并保存（回放） · {scene.id === 'schedule' ? '更新约定已设定' : '等待设置更新约定'}</p>{boardStats}{kind === 'creator' && <WatchQuality state={state} date={latest.date} />}
       <section className="book-section"><h3>日期趋势</h3><DateTrend metric={metric} records={records} /><small>目前只有已核对的起点样本，其他日期等待有效观测。</small></section>
       <section className="book-section"><h3>关键区域和状态</h3><div className="book-widget-map">{plan.widgets.map(w => <span key={w.id}>{w.title}<small>{w.type === 'checks' ? '等待产物与验收事件' : w.metricIds.includes(metric.id) ? '起点已核对，持续积累日期数据' : '等待所需字段或有效观测'}</small></span>)}</div></section>
       <section className="book-section"><h3>更新约定</h3><ul className="book-facts"><li>任务验收事件更新交付区，保留产物与时间。</li><li>账号/发布数据按约定取数，观测到达后更新结果和趋势。</li><li>单视频按观察龄采集；来源失效保留旧值并提示处理。</li></ul></section>

@@ -6,8 +6,8 @@ export type CycleDefinition = {
   metricName: string; unit: string; target: number; baseline: number; direction: 'up' | 'down';
   projects: CycleProject[]; actions: CycleAction[];
 }
-export type CycleObservation = { date: string; value: number; revision: number; source: string; dataReadyAt: string }
-export type VariantObservation = { videoId: string; variant: 'A'|'B'; ageHours: number; plays: number; completed: number; collectedDate: string; source: string }
+export type CycleObservation = { date: string; value: number; revision: number; source: string; dataReadyAt: string; plays?: number; completed?: number; watchSeconds?: number }
+export type VariantObservation = { videoId: string; variant: 'A'|'B'; ageHours: number; plays: number; completed: number; watchSeconds?: number; durationSeconds?: number; collectedDate: string; source: string }
 export type CandidateResult = { date: string; actionId: string; commit: string; p95: number; environment: string }
 export type CycleReview = { date: string; inputKey: string; facts: string[]; hypotheses: string[]; decision: string; nextAction: string; waiting: boolean }
 export type CycleDayPlan = { date: string; revision: number; sourceReviewKey: string|null; focus: string; mode: 'production'|'measurement' }
@@ -17,7 +17,7 @@ export type CycleState = {
 }
 export const cycleDefinitions: Record<CycleKind,CycleDefinition> = {
   creator:{
-    kind:'creator',objective:'让 AI 编程短视频持续获得真实关注',longResult:'八周净增 200 个真实粉丝',shortResult:'本周验证更短开场；发布后 24 小时完播率参考目标 30%',experiment:'保持主题和时长相近，只调整开场；无法随机分流，按探索性内容对比记录。',
+    kind:'creator',objective:'让 AI 编程短视频持续获得真实关注',longResult:'八周净增 200 个真实粉丝',shortResult:'本周验证更短开场；同为约 45 秒视频，T+24h 完播率参考目标 30%、平均观看 18 秒',experiment:'保持主题和时长相近，只调整开场；无法随机分流，按探索性内容对比记录。',
     metricName:'粉丝总量',unit:'人',target:200,baseline:328,direction:'up',
     projects:[
       { id:'content-studio',name:'AI 编程栏目',directory:'/workspace/ai-content',git:false,contribution:'选题、脚本、视频与发布记录' },
@@ -25,7 +25,7 @@ export const cycleDefinitions: Record<CycleKind,CycleDefinition> = {
     ],
     actions:[
       { id:'video-draft',projectId:'content-studio',title:'制作 5 秒开场的候选视频',artifact:'video-v2.mp4 + script-v2.md',acceptance:'演示可复现、字幕与步骤一致，发布沿用既有授权',preview:'00:00 展示完成后的公众号草稿\n00:05 演示 AI 编程生成步骤\n00:35 给出复现入口\n候选文件需要任务产物与验收记录；本页仅回放。' },
-      { id:'capture-contract',projectId:'content-tools',title:'核对视频 ID 与发布后 24 小时取数口径',artifact:'connector revision + sample receipt',acceptance:'账号、视频 ID、发布时间、观察龄与分母一致',preview:'variant_id / video_id / published_at\nobservation_age_hours = 24\nplays / completed / likes\n没有视频归因字段时，账号涨粉不能归因到某条视频。' },
+      { id:'capture-contract',projectId:'content-tools',title:'核对视频 ID 与发布后 24 小时取数口径',artifact:'connector revision + sample receipt',acceptance:'账号、视频 ID、发布时间、观察龄与分母一致',preview:'variant_id / video_id / published_at\nobservation_age_hours = 24\nplays / completed / watch_seconds / likes\n没有视频归因字段时，账号涨粉不能归因到某条视频。' },
     ],
   },
   repo:{
@@ -37,7 +37,7 @@ export const cycleDefinitions: Record<CycleKind,CycleDefinition> = {
 }
 export function initialCycle(kind: CycleKind): CycleState {
   const definition = cycleDefinitions[kind]
-  return { linkedProjects:[],delivered:{},observations:[{ date:'2026-11-11',value:definition.baseline,revision:1,source:kind === 'creator' ? '示例账号 creator-01 / 粉丝快照' : '示例发布版 demo-v0.4 / 固定负载',dataReadyAt:'2026-11-11 21:00' }],variantObservations:[],candidateResults:[],reviews:[],activeDate:'2026-11-12',plans:[{ date:'2026-11-12',revision:1,sourceReviewKey:null,focus:definition.actions[0].title,mode:'production' }],events:[] }
+  return { linkedProjects:[],delivered:{},observations:[{ date:'2026-11-11',value:definition.baseline,revision:1,source:kind === 'creator' ? '示例账号 creator-01 / 粉丝快照' : '示例发布版 demo-v0.4 / 固定负载',dataReadyAt:'2026-11-11 21:00',...(kind === 'creator' ? {plays:600,completed:144,watchSeconds:8400} : {}) }],variantObservations:[],candidateResults:[],reviews:[],activeDate:'2026-11-12',plans:[{ date:'2026-11-12',revision:1,sourceReviewKey:null,focus:definition.actions[0].title,mode:'production' }],events:[] }
 }
 export function activeCyclePlan(state: CycleState): CycleDayPlan|undefined { return state.plans.findLast(plan => plan.date === state.activeDate) }
 export function cycleActions(state: CycleState, kind: CycleKind): CycleAction[] {
@@ -61,22 +61,22 @@ export function collectCycleData(state: CycleState, kind: CycleKind): CycleState
   const accountExists = state.observations.some(row => row.date === state.activeDate)
   const value = kind === 'creator' ? state.activeDate === '2026-11-12' ? 334 : 332 : 720
   const incoming: VariantObservation[] = kind === 'creator' ? [
-    {videoId:'video-a',variant:'A',ageHours:24,plays:1000,completed:240,collectedDate:state.activeDate,source:'示例视频 A / T+24h 历史快照回放'},
-    {videoId:'video-b',variant:'B',ageHours:state.activeDate === '2026-11-12' ? 3 : 24,plays:state.activeDate === '2026-11-12' ? 300 : 1000,completed:state.activeDate === '2026-11-12' ? 90 : 320,collectedDate:state.activeDate,source:'示例视频 B / 观察龄与原始数回放'},
+    {videoId:'video-a',variant:'A',ageHours:24,plays:1000,completed:240,watchSeconds:14000,durationSeconds:45,collectedDate:state.activeDate,source:'示例视频 A / T+24h 历史快照回放'},
+    {videoId:'video-b',variant:'B',ageHours:state.activeDate === '2026-11-12' ? 3 : 24,plays:state.activeDate === '2026-11-12' ? 300 : 1000,completed:state.activeDate === '2026-11-12' ? 90 : 320,watchSeconds:state.activeDate === '2026-11-12' ? 4800 : 19000,durationSeconds:45,collectedDate:state.activeDate,source:'示例视频 B / 观察龄与原始数回放'},
   ] : []
   const newVariants = incoming.filter(row => !state.variantObservations.some(old => old.videoId === row.videoId && old.ageHours === row.ageHours))
   if (accountExists && !newVariants.length) return state
-  return { ...state,observations:accountExists ? state.observations : [...state.observations,{ date:state.activeDate,value,revision:1,source:kind === 'creator' ? '示例 creator-01 / 浏览器 connector 回放' : '示例发布版 demo-v0.4 / 监控回放',dataReadyAt:`${state.activeDate} 21:00` }],variantObservations:[...state.variantObservations,...newVariants],events:[...state.events,`${state.activeDate} · 数据角色核对账号、日期、观察龄与字段后写入（回放）`] }
+  return { ...state,observations:accountExists ? state.observations : [...state.observations,{ date:state.activeDate,value,revision:1,source:kind === 'creator' ? '示例 creator-01 / 浏览器 connector 回放' : '示例发布版 demo-v0.4 / 监控回放',dataReadyAt:`${state.activeDate} 21:00`,...(kind === 'creator' ? state.activeDate === '2026-11-12' ? {plays:700,completed:224,watchSeconds:12600} : {plays:600,completed:162,watchSeconds:10200} : {}) }],variantObservations:[...state.variantObservations,...newVariants],events:[...state.events,`${state.activeDate} · 数据角色核对账号、日期、观察龄与字段后写入（回放）`] }
 }
 export function matureComparison(state: CycleState, date: string) {
   const control = state.variantObservations.findLast(row => row.variant === 'A' && row.ageHours === 24 && row.collectedDate <= date)
   const treatment = state.variantObservations.findLast(row => row.variant === 'B' && row.ageHours === 24 && row.collectedDate <= date)
   if (!control || !treatment || control.plays <= 0 || treatment.plays <= 0) return null
   const a = control.completed/control.plays*100, b = treatment.completed/treatment.plays*100
-  return { control,treatment,a,b,change:b-a }
+  return { control,treatment,a,b,change:b-a,averageA:control.watchSeconds === undefined ? null : control.watchSeconds/control.plays,averageB:treatment.watchSeconds === undefined ? null : treatment.watchSeconds/treatment.plays }
 }
 export function reviewInputKey(state: CycleState): string {
-  return JSON.stringify({ date:state.activeDate,observations:state.observations.filter(row => row.date <= state.activeDate).map(row => [row.date,row.value,row.revision]),variants:state.variantObservations.filter(row => row.collectedDate <= state.activeDate),candidates:state.candidateResults.filter(row => row.date === state.activeDate),delivered:state.delivered[state.activeDate] ?? [] })
+  return JSON.stringify({ date:state.activeDate,observations:state.observations.filter(row => row.date <= state.activeDate).map(row => [row.date,row.value,row.revision,row.plays,row.completed,row.watchSeconds]),variants:state.variantObservations.filter(row => row.collectedDate <= state.activeDate),candidates:state.candidateResults.filter(row => row.date === state.activeDate),delivered:state.delivered[state.activeDate] ?? [] })
 }
 export function latestCycleReview(state: CycleState): CycleReview|undefined {
   return state.reviews.findLast(review => review.date === state.activeDate)
@@ -95,6 +95,8 @@ export function reviewCycle(state: CycleState, kind: CycleKind): CycleState {
     decision = '先补齐观测，不判断实验效果。'; nextAction = '恢复取数并核对观察窗口，保留原实验条件。'
   } else if (kind === 'creator') {
     facts.push(`账号粉丝 ${row.value} 人；较前日 ${delta > 0 ? '+' : ''}${delta} 人；周期净增 ${row.value-definition.baseline} 人。`)
+    const quality = watchQuality(row)
+    facts.push(`账号当日完播率 ${quality.completion === null ? '未知' : quality.completion+'%'}（参考目标 30%）；平均观看 ${quality.average === null ? '未知' : quality.average+' 秒'}（参考目标 18 秒），与粉丝 KR 分别衡量。`)
     const comparison = matureComparison(state,state.activeDate)
     if (!comparison) {
       const young = state.variantObservations.findLast(row => row.variant === 'B' && row.collectedDate <= state.activeDate)
@@ -102,7 +104,8 @@ export function reviewCycle(state: CycleState, kind: CycleKind): CycleState {
       decision = '继续观察，不因当日涨粉就判定开场有效。'; nextAction = '保留主题与风格，采集同一观察龄的数据，再准备下一条单变量样片。'
     } else {
       facts.push(`两条历史样片的 T+24h 快照：A ${comparison.control.completed}/${comparison.control.plays}=${comparison.a}%，B ${comparison.treatment.completed}/${comparison.treatment.plays}=${comparison.b}%；差 ${comparison.change} 个百分点。`)
-      decision = '样例 B 达到参考线，但没有随机分流；仍需多轮验证。'; nextAction = '保持主题与时长相近，继续验证短开场；下一条只改变一个因素。'
+      facts.push(`T+24h 平均观看：A ${comparison.averageA === null ? '未知' : comparison.averageA+' 秒'}，B ${comparison.averageB === null ? '未知' : comparison.averageB+' 秒'}；视频片长分别为 ${comparison.control.durationSeconds ?? '未知'} / ${comparison.treatment.durationSeconds ?? '未知'} 秒。`)
+      decision = '样例 B 完播率达到参考线；平均观看另行核对，不能据此宣布整体 KR 达标。没有随机分流，仍需多轮验证。'; nextAction = '结合账号完播率与平均观看的差距，保持主题与片长，继续验证短开场；下一条只改变一个因素。'
     }
     hypotheses.push('短开场可能改善观看，但发布时间、受众和推荐流量也可能造成差异；账号净增没有单视频归因。')
   } else {
@@ -124,4 +127,9 @@ export function applyNextPlan(state: CycleState): CycleState {
   if (state.delivered[nextDate]?.length) throw new Error('次日已有任务交付，保留原任务；需要另建增量调整。')
   const plan: CycleDayPlan = { date:nextDate,revision:(existing?.revision ?? 0)+1,sourceReviewKey:review.inputKey,focus:review.nextAction,mode:review.waiting ? 'measurement' : 'production' }
   return { ...state,plans:[...state.plans,plan],events:[...state.events,`${state.activeDate} · 主智能体将复盘建议纳入 ${nextDate} 计划 r${plan.revision}（回放）`] }
+}
+
+export function watchQuality(row?: Pick<CycleObservation,'plays'|'completed'|'watchSeconds'>) {
+  const plays = row?.plays
+  return { completion:plays && row?.completed !== undefined ? row.completed/plays*100 : null,average:plays && row?.watchSeconds !== undefined ? row.watchSeconds/plays : null }
 }

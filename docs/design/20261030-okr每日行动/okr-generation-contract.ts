@@ -2,7 +2,7 @@ export type KrView = 'number' | 'milestones' | 'checklist'
 export type GeneratedKr = { id: string; title: string; rationale: string; view: KrView; metricId?: string; target?: number; unit?: string; items?: string[]; horizon?: 'long'|'short'|'daily'; parentKrId?: string; period?: { start: string; end: string } }
 export type GeneratedMetric = {
   id: string; krId: string; name: string; unit: string; rationale: string; connectorId: string;
-  formula: { op: 'field'; field: string } | { op: 'difference'; field: string; baseline: number | null } | { op: 'ratio'; numerator: string; denominator: string };
+  formula: { op: 'field'; field: string } | { op: 'difference'; field: string; baseline: number | null } | { op: 'ratio'; numerator: string; denominator: string } | { op: 'average'; numerator: string; denominator: string };
 }
 export type BrowserConnector = {
   id: string; revision: number; name: string; method: 'browser'; origin: string; path: string;
@@ -22,7 +22,7 @@ export type BrowserObservation = {
   values: Record<string, { value: number; unit: string }>;
 }
 export function formulaFields(metric: GeneratedMetric): string[] {
-  return metric.formula.op === 'ratio' ? [metric.formula.numerator,metric.formula.denominator] : [metric.formula.field]
+  return metric.formula.op === 'ratio' || metric.formula.op === 'average' ? [metric.formula.numerator,metric.formula.denominator] : [metric.formula.field]
 }
 const plain = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 const text = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= 4000
@@ -56,12 +56,13 @@ export function parsePlan(input: string): GeneratedPlan {
   for (const m of metrics) {
     if (![m.name,m.unit,m.rationale].every(text) || !krs.some(k => k.id === m.krId) || !plain(m.formula)) fail('指标缺少 KR、口径或理由。')
     const f = m.formula
-    if (!['field','difference','ratio'].includes(String(f.op)) || (f.op === 'ratio' ? !text(f.numerator) || !text(f.denominator) : !text(f.field)) || f.op === 'difference' && f.baseline !== null && (typeof f.baseline !== 'number' || !Number.isFinite(f.baseline))) fail('不支持该计算口径。')
+    if (!['field','difference','ratio','average'].includes(String(f.op)) || (['ratio','average'].includes(String(f.op)) ? !text(f.numerator) || !text(f.denominator) : !text(f.field)) || f.op === 'difference' && f.baseline !== null && (typeof f.baseline !== 'number' || !Number.isFinite(f.baseline))) fail('不支持该计算口径。')
     if (f.op === 'difference' && f.baseline !== null) fail('净增起点须由有效观测建立，模型方案不能直接填写。')
     const source = connectors.find(c => c.id === m.connectorId)
     if (!source || formulaFields(m as unknown as GeneratedMetric).some(id => !(source.fields as Record<string,unknown>[]).some(field => field.id === id))) fail('指标引用了不存在的来源字段。')
     const fields = source.fields as Record<string,unknown>[]
-    if (f.op === 'ratio' ? m.unit !== '%' || fields.find(x => x.id === f.numerator)?.unit !== fields.find(x => x.id === f.denominator)?.unit : fields.find(x => x.id === f.field)?.unit !== m.unit) fail('指标与来源字段单位不兼容。')
+    const compatible = f.op === 'ratio' ? m.unit === '%' && fields.find(x => x.id === f.numerator)?.unit === fields.find(x => x.id === f.denominator)?.unit : f.op === 'average' ? m.unit === '秒' && fields.find(x => x.id === f.numerator)?.unit === '秒' && fields.find(x => x.id === f.denominator)?.unit === '次' : fields.find(x => x.id === f.field)?.unit === m.unit
+    if (!compatible) fail('指标与来源字段单位不兼容。')
   }
   for (const k of krs) {
     if (![k.title,k.rationale].every(text) || !['number','milestones','checklist'].includes(String(k.view))) fail('KR 缺少内容或使用了未知展现形式。')
@@ -111,5 +112,5 @@ export function measuredValue(metric: GeneratedMetric, observations: BrowserObse
   if (f.op === 'field') return value(f.field)
   if (f.op === 'difference') { const current = value(f.field); return current === null || f.baseline === null ? null : current - f.baseline }
   const numerator = value(f.numerator), denominator = value(f.denominator)
-  return numerator === null || denominator === null || denominator === 0 ? null : numerator / denominator * 100
+  return numerator === null || denominator === null || denominator === 0 ? null : numerator / denominator * (f.op === 'ratio' ? 100 : 1)
 }

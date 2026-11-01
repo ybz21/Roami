@@ -12,10 +12,10 @@ export default function SourceBinding({ draft, onChange }: { draft: SetupDraft; 
     if (binding.scenario === 'failed') return setBinding({ status: 'failed', sample: undefined })
     const account = binding.account.trim() || (draft.kind === 'creator' ? 'AI 创作实验室（示例）' : 'PocketBoard 本机项目（示例）')
     const sample: Snapshot = draft.kind === 'creator'
-      ? { date: '2026-11-11', followers: 328, likes: 10, plays: 636, completed: binding.scenario === 'partial' ? undefined : 160, author: '取样智能体', received: '2026-11-12 08:30', source: `${binding.platform} / ${account} / ${binding.method === 'browser' ? '后台页面取样' : binding.method === 'api' ? '授权接口样本' : '导入文件样本'}（示例）` }
+      ? { date: '2026-11-11', followers: 328, likes: 10, plays: 636, completed: binding.scenario === 'partial' ? undefined : 160, watchSeconds: binding.scenario === 'partial' ? undefined : 10176, author: '取样智能体', received: '2026-11-12 08:30', source: `${binding.platform} / ${account} / ${binding.method === 'browser' ? '后台页面取样' : binding.method === 'api' ? '授权接口样本' : '导入文件样本'}（示例）` }
       : { date: '2026-11-11', journeys: 4, p95: 720, retained: 0, author: '取样智能体', received: '2026-11-12 08:30', source: 'PocketBoard 发布版与基准取样（示例）' }
     const required = requiredFacts(draft.metrics)
-    for (const key of ['followers','likes','plays','completed','journeys','p95','retained']) if (!required.includes(key)) delete (sample as unknown as Record<string,unknown>)[key]
+    for (const key of ['followers','likes','plays','completed','watchSeconds','journeys','p95','retained']) if (!required.includes(key)) delete (sample as unknown as Record<string,unknown>)[key]
     setBinding({ status: 'sample', account, accountId: `${binding.platform}-demo-${Array.from(account).reduce((hash,char) => (hash * 31 + char.charCodeAt(0)) >>> 0,7).toString(16)}`, sample, checkedAt: '2026-11-12 08:30', evidence: `${binding.entry || entryFor(binding.platform)} · 样本字段与日期已读取（示例）` })
   }
   const previewBinding = { ...binding, status: 'bound' as const }
@@ -32,7 +32,7 @@ export default function SourceBinding({ draft, onChange }: { draft: SetupDraft; 
     {(binding.status === 'sample' || binding.status === 'bound') && binding.sample && <section className="source-sample">
       <div className="section-head"><h3>{binding.status === 'bound' ? '已绑定的来源（示例）' : '取到一条样本，请核对'}</h3><span className={binding.status === 'bound' ? 'ok-text meta' : 'meta'}>{binding.status === 'bound' ? '已核对' : '待核对'}</span></div>
       <p>{binding.platform} / {binding.account}</p><p className="meta">示例账号标识 {binding.accountId} · 观测日期 {binding.sample.date} · 取样时间 {binding.checkedAt}</p>
-      <div className="sample-grid">{Object.entries(binding.sample).filter(([key]) => ['followers','likes','plays','completed','journeys','p95','retained'].includes(key)).map(([key,value]) => <div key={key}><small>{({ followers:'粉丝总量', likes:'当日点赞量', plays:'当日有效播放量', completed:'当日完整播放量', journeys:'通过旅程',p95:'发布版 p95',retained:'四周使用' } as Record<string,string>)[key]}</small><strong>{value ?? '未读取到'}</strong></div>)}</div>
+      <div className="sample-grid">{Object.entries(binding.sample).filter(([key]) => ['followers','likes','plays','completed','watchSeconds','journeys','p95','retained'].includes(key)).map(([key,value]) => <div key={key}><small>{({ followers:'粉丝总量', likes:'当日点赞量', plays:'当日有效播放量', completed:'当日完整播放量', watchSeconds:'当日总观看秒数', journeys:'通过旅程',p95:'发布版 p95',retained:'四周使用' } as Record<string,string>)[key]}</small><strong>{value ?? '未读取到'}</strong></div>)}</div>
       <p className="meta">{binding.evidence}</p>
       <p className="meta">先核对账号、字段、观测日期与周期起点。若样本无法建立周期基线，粉丝总量可读，周期净增仍待补起点数据。</p><h3>哪些指标能接上</h3>{draft.metrics.map(metric => <div className="binding-metric" key={metric.id}><span>{metric.name}</span><span className={hasField(previewBinding,metric) ? 'ok-text' : 'warn-text'}>{hasField(previewBinding,metric) ? metric.id === 'netFollowers' ? '可由已读字段计算' : '所需字段已读到' : '缺少字段，待接入'}</span></div>)}
       <label className="check-row"><input type="checkbox" checked={binding.importSample} onChange={e => setBinding({ importSample:e.target.checked })} /><span>将核对后的样本作为首条记录<small>粉丝起点使用本次有效取样；不生成未读取的历史曲线。</small></span></label>

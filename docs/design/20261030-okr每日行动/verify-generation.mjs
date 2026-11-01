@@ -10,17 +10,17 @@ const require = createRequire(path.resolve(directory,'../../../frontend/package.
 const temporary = await mkdtemp(path.join(tmpdir(),'okr-generation-check-'))
 try {
   const outfile = path.join(temporary,'contract.mjs')
-  await require('esbuild').build({ stdin:{ contents:"export * from './okr-generation-contract'; export * from './okr-generation-replays'; export * from './okr-execution-cycle'; export * from './okr-dialogue-scenes'; export * from './okr-swarm-state'",resolveDir:directory,loader:'ts' },bundle:true,platform:'node',format:'esm',outfile })
-  const { parsePlan, growthReplay, qualityReplay, repoReplay, validateObservation, replayObservation, measuredValue, initialCycle, cycleDefinitions, cycleActions, deliverAction, collectCycleData, dailyDelta, reviewCycle, reviewIsCurrent, latestCycleReview, applyNextPlan, matureComparison } = await import(pathToFileURL(outfile).href)
+  await require('esbuild').build({ stdin:{ contents:"export * from './okr-generation-contract'; export * from './okr-generation-replays'; export * from './okr-execution-cycle'; export * from './okr-dialogue-scenes'; export * from './okr-swarm-state'; export * from './prototype-data'; export * from './okr-setup-model'",resolveDir:directory,loader:'ts' },bundle:true,platform:'node',format:'esm',outfile })
+  const { parsePlan, growthReplay, qualityReplay, repoReplay, validateObservation, replayObservation, measuredValue, initialCycle, cycleDefinitions, cycleActions, deliverAction, collectCycleData, dailyDelta, reviewCycle, reviewIsCurrent, latestCycleReview, applyNextPlan, matureComparison, watchQuality, initialGoals, valueAt, creatorMetrics, starter, analyze, requiredFacts } = await import(pathToFileURL(outfile).href)
   for (const plan of [growthReplay,qualityReplay,repoReplay]) assert.equal(parsePlan(JSON.stringify(plan)).objective,plan.objective)
-  assert.equal(growthReplay.keyResults.length,2)
-  assert.equal(qualityReplay.keyResults.length,3)
+  assert.equal(growthReplay.keyResults.length,4)
+  assert.equal(qualityReplay.keyResults.length,5)
   assert.deepEqual(new Set(qualityReplay.keyResults.map(kr => kr.view)),new Set(['number','milestones','checklist']))
-  assert.equal(growthReplay.connectors[0].fields.length,1)
-  assert.equal(qualityReplay.connectors[0].fields.length,3)
+  assert.equal(growthReplay.connectors[0].fields.length,4)
+  assert.equal(qualityReplay.connectors[0].fields.length,5)
   assert.ok(qualityReplay.connectors[0].revision > growthReplay.connectors[0].revision)
   assert.equal(growthReplay.keyResults[0].horizon,'long')
-  assert.equal(growthReplay.keyResults[1].parentKrId,growthReplay.keyResults[0].id)
+  assert.equal(growthReplay.keyResults.find(kr=>kr.id==='publishing-loop').parentKrId,growthReplay.keyResults[0].id)
   const unfamiliar = structuredClone(growthReplay)
   unfamiliar.statement = '降低检索耗时'; unfamiliar.objective = '让文档更容易找到'
   unfamiliar.keyResults = [{ id:'search-result',title:'检索耗时低于20秒',view:'number',metricId:'find-time',target:20,unit:'秒',rationale:'以任务计时观察' }]
@@ -31,7 +31,7 @@ try {
   const sample = validateObservation(replayObservation(qualityReplay),qualityReplay)
   assert.equal(measuredValue(qualityReplay.metrics[0],[sample],sample.date),328)
   assert.equal(measuredValue(qualityReplay.metrics[1],[sample],sample.date),null)
-  assert.equal(measuredValue(qualityReplay.metrics[2],[sample],sample.date),40/700*100)
+  assert.equal(measuredValue(qualityReplay.metrics.find(m=>m.id==='engagement-rate'),[sample],sample.date),40/600*100)
   assert.equal(measuredValue(qualityReplay.metrics[0],[],'2026-11-11'),null)
   for (const mutate of [
     p => { p.widgets[0].metricIds = ['missing'] },
@@ -41,8 +41,8 @@ try {
     p => { p.metrics[1].formula.baseline = 0 },
     p => { p.cycleStart = '2026-02-30' },
     p => { p.keyResults.push(p.keyResults[0]) },
-    p => { p.keyResults[0].parentKrId = p.keyResults[1].id },
-    p => { p.keyResults[1].period.end = '2027-02-01' },
+    p => { p.keyResults[0].parentKrId = 'publishing-loop' },
+    p => { p.keyResults.find(kr=>kr.id==='publishing-loop').period.end = '2027-02-01' },
   ]) { const plan = structuredClone(qualityReplay); mutate(plan); assert.throws(() => parsePlan(JSON.stringify(plan))) }
   for (const mutate of [
     row => { row.accountId = 'other' },
@@ -53,9 +53,26 @@ try {
     row => { row.values.plays.value = 1 },
     row => { row.sourceUrl = 'https://other.example/a' },
   ]) { const row = structuredClone(sample); mutate(row); assert.throws(() => validateObservation(row,qualityReplay)) }
-  const zero = structuredClone(sample); zero.values.plays.value = 0; zero.values.likes.value = 0
+  const zero = structuredClone(sample); zero.values.plays.value = 0; zero.values.likes.value = 0; zero.values.completed.value = 0
   validateObservation(zero,qualityReplay)
-  assert.equal(measuredValue(qualityReplay.metrics[2],[zero],zero.date),null)
+  assert.equal(measuredValue(qualityReplay.metrics.find(m=>m.id==='engagement-rate'),[zero],zero.date),null)
+  const qualityMetric = id => qualityReplay.metrics.find(metric=>metric.id===id)
+  assert.equal(measuredValue(qualityMetric('completion-rate'),[sample],sample.date),24)
+  assert.equal(measuredValue(qualityMetric('average-watch'),[sample],sample.date),14)
+  assert.equal(measuredValue(qualityMetric('average-watch'),[zero],zero.date),null)
+  const missingWatch = structuredClone(sample);delete missingWatch.values['watch-seconds']
+  assert.throws(()=>validateObservation(missingWatch,qualityReplay))
+  const wrongWatchUnit = structuredClone(qualityReplay);wrongWatchUnit.connectors[0].fields.find(field=>field.id==='watch-seconds').unit='ms'
+  assert.throws(()=>parsePlan(JSON.stringify(wrongWatchUnit)))
+  const panel = initialGoals()[0], averageMetric = creatorMetrics.find(metric=>metric.id==='averageWatch')
+  const dates = Object.keys(panel.observations).sort().slice(-7)
+  const expectedAverage = dates.reduce((sum,date)=>sum+panel.observations[date].watchSeconds,0)/dates.reduce((sum,date)=>sum+panel.observations[date].plays,0)
+  assert.equal(valueAt(panel,averageMetric,dates.at(-1)),expectedAverage)
+  const incompletePanel = structuredClone(panel);delete incompletePanel.observations[dates[0]].watchSeconds
+  assert.equal(valueAt(incompletePanel,averageMetric,dates.at(-1)),null)
+  const candidates = analyze(starter('creator'))
+  assert.ok(candidates.some(metric=>metric.id==='averageWatch' && metric.krId==='watch-time'))
+  assert.ok(requiredFacts(candidates).includes('watchSeconds'))
   let cycle = initialCycle('creator')
   assert.throws(() => deliverAction(cycle,'creator','video-draft'))
   cycle = reviewCycle(cycle,'creator')
@@ -84,10 +101,21 @@ try {
   assert.equal(dailyDelta(cycle,'2026-11-13'),-2)
   assert.equal(matureComparison(cycle,'2026-11-12'),null)
   assert.equal(matureComparison(cycle,'2026-11-13').change,8)
+  assert.equal(matureComparison(cycle,'2026-11-13').averageA,14)
+  assert.equal(matureComparison(cycle,'2026-11-13').averageB,19)
+  assert.deepEqual(watchQuality(cycle.observations.at(-1)),{completion:27,average:17})
+  assert.deepEqual(watchQuality({plays:0,completed:0,watchSeconds:0}),{completion:null,average:null})
+  assert.deepEqual(watchQuality({plays:1000}),{completion:null,average:null})
+  const revisedQuality = structuredClone(cycle);revisedQuality.observations.at(-1).watchSeconds=10000
+  assert.equal(reviewIsCurrent(revisedQuality),false)
   const missingVideos = reviewCycle({ ...cycle,variantObservations:[] },'creator')
   assert.ok(latestCycleReview(missingVideos).facts.some(fact => fact.includes('缺少可比较')))
   cycle = reviewCycle(cycle,'creator')
   assert.ok(latestCycleReview(cycle).decision.includes('没有随机分流'))
+  const changedWatch = structuredClone(cycle);changedWatch.observations.at(-1).watchSeconds=11000
+  assert.equal(reviewIsCurrent(changedWatch),false)
+  const missingAverage = structuredClone(cycle);delete missingAverage.variantObservations.find(row=>row.videoId==='video-b'&&row.ageHours===24).watchSeconds
+  assert.equal(matureComparison(missingAverage,'2026-11-13').averageB,null)
   assert.equal(cycleDefinitions.creator.target,200)
   let repo = initialCycle('repo')
   repo = { ...repo,linkedProjects:['pocketboard'] }
