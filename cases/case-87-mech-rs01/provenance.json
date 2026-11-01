@@ -1,0 +1,9 @@
+{
+  "case_id": "MECH-RS01",
+  "source": "Public dimension-name array and nonobject JSON recipes with scripted providers",
+  "private_reference_material": false,
+  "actual_human_labels": false,
+  "historical_scores_changed": false,
+  "baseline": "6c65a8f8",
+  "historical_production_root_not_claimed": true
+}

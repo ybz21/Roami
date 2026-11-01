@@ -76,11 +76,19 @@ def calibrated_grade(case, ratings, *, hard_passed, calibration_id):
     require(isinstance(calibration_id, str) and bool(calibration_id))
     require(isinstance(ratings, list) and len(ratings) == 2)
     require(
+        all(
+            isinstance(r, dict) and isinstance(r.get("rater"), str) and bool(r["rater"])
+            for r in ratings
+        )
+    )
+    require(
         len({r.get("rater") for r in ratings}) == 2 and all(r.get("blind") is True for r in ratings)
     )
-    require(all(isinstance(r.get("rater"), str) and bool(r["rater"]) for r in ratings))
     for rating in ratings:
-        require(set(rating["dimensions"]) == set(DIMENSIONS))
+        require(
+            isinstance(rating.get("dimensions"), dict)
+            and set(rating["dimensions"]) == set(DIMENSIONS)
+        )
         require(all(type(v) is int and 0 <= v <= 4 for v in rating["dimensions"].values()))
     dimensions = {key: min(r["dimensions"][key] for r in ratings) for key in DIMENSIONS}
     disputed = any(
