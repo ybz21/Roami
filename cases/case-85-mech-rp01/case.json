@@ -1,0 +1,53 @@
+{
+  "id": "MECH-RP01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "部分评分回执",
+  "prompt": "独立评分中断时保留已完成部分，并在Case证据显示完成数量，维持原待复核状态和用量，不重放。",
+  "preconditions": "公开合成评分响应、脚本化独立评分者、已有校准和渲染输入夹具；零真实模型调用。",
+  "expected_terminal": "completed_ratings_survive_later_failure",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "私有评分回执保留已完成的评分",
+    "Case证据显示完成评分者数量和维度汇总",
+    "未完成不通过，失败不重放，评分者保持盲评"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-RP01-H1",
+      "rule": "后续JSON/HTTP/长度/关闭错误及超时或取消不能清空先前已完成评分，保留既有用量和待复核状态。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RP01-H2",
+      "rule": "调用次数不增加，评分者仍接收相同独立输入，同一评分器的并行运行不能共享部分结果。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RP01-H3",
+      "rule": "Case证据只导出完成数量与维度汇总，不复制评分理由；恢复可读取私有回执，坏文件和符号链接不能变成有效评分。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "completed_first_rating_missing_from_review_receipt_after_second_failure",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/partial-artifact-ratings.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

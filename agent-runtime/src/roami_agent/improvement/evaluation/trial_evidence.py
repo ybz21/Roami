@@ -6,6 +6,7 @@ from pathlib import Path
 from roami_agent.improvement.domain.admission_blocking import blocking_code
 from roami_agent.improvement.domain.contracts import digest
 from roami_agent.improvement.domain.run_configuration import code
+from roami_agent.improvement.evaluation.artifact_review_receipts import recorded_review
 from roami_agent.improvement.evaluation.case_catalog import case_identity
 from roami_agent.improvement.evaluation.execution.interrupted_evidence import snapshot_metadata
 from roami_agent.improvement.evaluation.native_judgment import native_judgment
@@ -163,6 +164,9 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
     )
     identity = case_identity(case)
     judgment = native_judgment(grade)
+    review = grade.get("artifact_review") if grade.get("rubric_required") is True else None
+    if not isinstance(review, dict):
+        review = recorded_review(root)
     return {
         "case_id": case["id"],
         **({"blocked_by": blocked_by} if blocked_by else {}),
@@ -195,5 +199,6 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         **({"execution_evidence": execution_evidence} if execution_evidence else {}),
         "roles": roles,
         "files": files,
+        **({"artifact_review": review} if review else {}),
         **failure_fields(result),
     }

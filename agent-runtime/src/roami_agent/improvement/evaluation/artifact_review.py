@@ -14,6 +14,7 @@ from roami_agent.improvement.evaluation.artifact_evidence import (
     collect_artifact_evidence,
 )
 from roami_agent.improvement.evaluation.artifact_review_input import review_input
+from roami_agent.improvement.evaluation.artifact_review_receipts import review_summary
 from roami_agent.improvement.evaluation.artifact_sources import assert_review_sources
 from roami_agent.improvement.evaluation.grading import calibrated_grade
 from roami_agent.improvement.integrations.artifact_files import private_json
@@ -141,7 +142,7 @@ class ArtifactReviewer:
     def budget(self):
         return EpisodeBudget({})
 
-    async def rate(self, pack, budget, journal):
+    async def rate(self, pack, budget, journal, *, ratings=None):
         from roami_agent.providers.factory import configured_provider
 
         labels, content = review_input(pack, self.profile["renderer_image"])
@@ -149,7 +150,8 @@ class ArtifactReviewer:
             {"role": "system", "content": INSTRUCTIONS},
             {"role": "user", "content": content},
         ]
-        ratings = []
+        ratings = [] if ratings is None else ratings
+        require(isinstance(ratings, list) and not ratings, "RSI_ARTIFACT_REVIEW_REQUIRED")
         for name, route in sorted(self.routes.items()):
             actual = RATER_ROLES[name]
             provider = (
@@ -205,7 +207,7 @@ class ArtifactReviewer:
             async with asyncio.timeout(self.profile["seconds"]):
                 pack = await collect_artifact_evidence(case, grade, root, executor)
                 assert_review_sources(case, grade, root, pack["artifacts"])
-                ratings = await self.rate(pack, budget, journal)
+                ratings = await self.rate(pack, budget, journal, ratings=ratings)
                 assert_review_sources(case, grade, root, pack["artifacts"])
             scored = calibrated_grade(
                 case, ratings, hard_passed=grade["hard_passed"], calibration_id=self.calibration_id
@@ -225,19 +227,21 @@ class ArtifactReviewer:
             )
             result = {**grade, "quality": 0, "passed": False, "pending": True, "reason": error}
         finally:
-            private_json(
-                root / "artifact-review.json",
-                {
-                    "schema_version": 1,
-                    "calibration_id": self.calibration_id,
-                    "protocol_hash": PROTOCOL_HASH,
-                    "route_hashes": self.route_hashes,
-                    "evidence_hash": pack["content_hash"] if pack else None,
-                    "ratings": ratings,
-                    "error": error,
-                    "metrics": budget.metrics(),
-                },
-            )
+            receipt = {
+                "schema_version": 1,
+                "calibration_id": self.calibration_id,
+                "protocol_hash": PROTOCOL_HASH,
+                "route_hashes": self.route_hashes,
+                "evidence_hash": pack["content_hash"] if pack else None,
+                "ratings": ratings,
+                "completed_raters": len(ratings),
+                "expected_raters": len(self.routes),
+                "error": error,
+                "metrics": budget.metrics(),
+            }
+            private_json(root / "artifact-review.json", receipt)
+        result["rubric_required"] = True
+        result["artifact_review"] = review_summary(receipt)
         return result
 
 

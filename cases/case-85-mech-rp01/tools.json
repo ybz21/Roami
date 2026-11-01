@@ -1,0 +1,14 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_improvement_partial_artifact_ratings.py",
+    "agent-runtime/tests/test_improvement_artifact_review.py"
+  ],
+  "expected_collected": 34,
+  "runtime": [
+    "Python 3.12",
+    "pytest",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

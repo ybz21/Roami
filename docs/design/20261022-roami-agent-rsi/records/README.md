@@ -162,3 +162,5 @@
 - [评分证据与产物版本绑定](2026-11-01/artifact-review-bindings.md)
 
 - [容器失败的私有错误证据](2026-11-01/container-failure-evidence.md)
+
+- [部分评分的回执与汇总](2026-11-01/partial-artifact-ratings.md)
