@@ -75,3 +75,19 @@ Redmi Note 8、392 CSS px、coarse、LAN HTTPS，实际 `roami adb` 点按及滑
 ## 清理
 
 已停止本任务专用服务进程，使用同一隔离入口 `isolated-roami.sh --stop` 清理测试 tmux；关闭本任务桌面及手机测试页、移除专用 ADB 转发。未操作其他会话、页面和用户配置。
+
+## 欢迎区精简（2026-11-01）
+
+按截图反馈移除标题上方的机器人装饰图标及其留白，四步清单与操作继续复用原组件。基于 `eae0ac74`，仅修改欢迎区 JSX 和对应无用样式；前端 typecheck、i18n、hover、1154 项测试和生产构建通过。Android 真机确认内容从标题开始、无独立装饰图标，四项清单完整、无横向溢出，只有一层顶栏。
+
+[桌面效果](/api/file/tmp/onboarding-welcome-no-icon-desktop.png) · [手机效果](/api/file/tmp/onboarding-welcome-no-icon-phone.png)。截图采集于本地验收，未部署。
+
+## 桌面起步页精简（2026-11-01）
+
+标题缩短为「设置 Roami」，删除重复介绍四步顺序的说明。使用统一 `.tt-pagehead`，桌面标题与开始设置、模块介绍、稍后操作同排；次要操作使用文字按钮。上下留白和清单间距收紧，手机自动堆叠标题与按钮，并保留触控高度。
+
+前端 typecheck、i18n（4704 keys）、hover、1154 项测试和生产构建通过。中英文各 7 个宽度共 14 组检查通过：无横向溢出或文档滚动，四项清单完整，桌面标题与主操作同排。Redmi Note 8 实际点通模块介绍、返回与开始设置，只有一层顶栏。
+
+[桌面效果](/api/file/tmp/onboarding-compact-desktop.png) · [手机效果](/api/file/tmp/onboarding-compact-phone.png) · [布局证据](/api/file/tmp/onboarding-compact-layout.json)。截图采集于本地验收，未部署。
+
+合入前同步至 `5d66fbe8`（PR #579），模型源编辑及批量拉取沿用上游组件，本次只调整起步页。同步备份为 stash `f90756f0a73af12383154ae6459932c93254ea19`；合入检查见对应 PR。
