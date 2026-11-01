@@ -4,13 +4,13 @@ import { api } from '../../api'
 export type ModelSource = { id: string; name: string; baseUrl: string; protocol: string; authMode: string; hasKey?: boolean; apiKey?: string }
 export type ModelCandidate = { sourceId: string; model: string }
 export type CatalogModel = { id: string; name: string; protocol: string; strategy: 'fixed' | 'failover'; candidates: ModelCandidate[] }
-export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string> }
+export type ModelCatalog = { agentKeys?: Record<string, { suffix: string; disabled: boolean; pending?: boolean }>; revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string> }
 const normalizeCatalog = (data: ModelCatalog): ModelCatalog => ({ ...data, sources: data.sources || [], models: data.models || [], drafts: data.drafts || [], uses: data.uses || {} })
 export const MODEL_CATALOG_CHANGED = 'roami:model-catalog-changed'
 export const modelProtocols = ['openai-completions', 'openai-responses', 'anthropic-messages']
 export function catalogFailure(cause: any): string {
   const code = cause?.apiError?.code || cause?.message
-  return code === 'MODEL_CONFIGURATION_BUSY' ? 'agent.models.busy' : code === 'MODEL_CATALOG_CHANGED' || code === 'AGENT_CONFIG_CHANGED' ? 'hub.error.changed' : code === 'MODEL_CATALOG_IN_USE' ? 'hub.error.inUse' : code === 'INVALID_MODEL_CATALOG' || code === 'INVALID_MODEL_PROTOCOL' ? 'hub.error.invalid' : code === 'MODEL_KEY_REQUIRED_FOR_ENDPOINT' ? 'agent.models.newEndpointKey' : 'hub.error.failed'
+  return code === 'MODEL_GATEWAY_KEY_DISABLED' ? 'hub.keys.disabledApply' : code === 'MODEL_CONFIGURATION_BUSY' ? 'agent.models.busy' : code === 'MODEL_CATALOG_CHANGED' || code === 'AGENT_CONFIG_CHANGED' ? 'hub.error.changed' : code === 'MODEL_CATALOG_IN_USE' ? 'hub.error.inUse' : code === 'INVALID_MODEL_CATALOG' || code === 'INVALID_MODEL_PROTOCOL' ? 'hub.error.invalid' : code === 'MODEL_KEY_REQUIRED_FOR_ENDPOINT' ? 'agent.models.newEndpointKey' : 'hub.error.failed'
 }
 export function useModelCatalog() {
   const [value, setValue] = useState<ModelCatalog | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [version, setVersion] = useState(0)

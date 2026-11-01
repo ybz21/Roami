@@ -78,3 +78,12 @@ html[data-keyboard="open"] .tt-model-source-footer { padding-bottom:calc(var(--s
 
 .onboarding-model-editor .tt-model-source-content { flex:none; overflow:visible; padding-inline:0; }
 .onboarding-model-editor .tt-model-source-footer { padding-inline:0; }
+
+.tt-agent-gateway-keys { display: flex; flex-direction: column; gap: var(--sp-3); }
+.tt-agent-gateway-key { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-4) 0; border-bottom: 1px solid var(--border-subtle); }
+.tt-agent-gateway-key > div:first-child { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.tt-agent-gateway-key span, .tt-agent-gateway-key code { color: var(--text-dim); font-size: var(--fs-meta); }
+.tt-model-key-issued .ant-modal-body { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+.tt-model-key-issued .ant-modal-body > .ant-btn { align-self: flex-start; }
+html[data-pointer="coarse"] .tt-model-key-issued .ant-btn { position: relative; }
+html[data-pointer="coarse"] .tt-model-key-issued .ant-btn::after { content: ''; position: absolute; inset: calc(var(--sp-1) * -1); min-height: var(--tap); }

@@ -2,7 +2,7 @@ package modelgateway
 
 import (
 	"bytes"
-	"crypto/subtle"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -21,6 +21,10 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 	}
 	if h.Catalog == nil {
 		reject(w, 503, "MODEL_GATEWAY_UNAVAILABLE")
+		return true
+	}
+	if r.URL.Path == "/v1/model-gateway/catalog/local-sources" {
+		h.localSourcesManagement(w, r)
 		return true
 	}
 	if r.URL.Path == "/v1/model-gateway/catalog/roles" && r.Method == "POST" {
@@ -139,6 +143,10 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				break
 			}
 		}
+		if s.value.AgentKeys[input.Kind].Disabled {
+			err = errors.New("MODEL_GATEWAY_KEY_DISABLED")
+			break
+		}
 		key := s.credential(input.Kind)
 		base := s.baseURL + "/v1"
 		protocol := nativeProtocol(input.Kind)
@@ -194,16 +202,11 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 	defer h.wait.Done()
 	s := h.Catalog
 	s.mu.Lock()
-	kind := ""
 	key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if key == "" {
 		key = r.Header.Get("X-Api-Key")
 	}
-	for _, candidate := range []string{"codex", "claude", "opencode", "pi", "roami"} {
-		if subtle.ConstantTimeCompare([]byte(key), []byte(s.credential(candidate))) == 1 {
-			kind = candidate
-		}
-	}
+	kind, keyID := s.authenticate(key)
 	snapshot := s.snapshot()
 	s.mu.Unlock()
 	if kind == "" {
@@ -235,6 +238,7 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 		reject(w, 400, "INVALID_MODEL_PROTOCOL")
 		return
 	}
+	r = r.WithContext(context.WithValue(r.Context(), gatewayKeyContext{}, keyID))
 	h.forwardCatalog(w, r, snapshot, kind, protocol)
 }
 
@@ -301,9 +305,32 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			reject(w, 400, "INVALID_MODEL_CONFIG")
 			return
 		}
-		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate)
+		agentKind := kind
+		if strings.HasPrefix(kind, "roami_") {
+			agentKind = "roami"
+		}
+		keyID, _ := r.Context().Value(gatewayKeyContext{}).(string)
+		if keyID != "" {
+			check := validate
+			validate = func() error {
+				if err := check(); err != nil {
+					return err
+				}
+				h.Catalog.mu.Lock()
+				allowed := h.Catalog.keyAllowed(agentKind, keyID)
+				h.Catalog.mu.Unlock()
+				if !allowed {
+					return errors.New("MODEL_GATEWAY_UNAUTHORIZED")
+				}
+				return nil
+			}
+		}
+		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID})
 		if e != nil {
 			status := 503
+			if e.Error() == "MODEL_GATEWAY_UNAUTHORIZED" {
+				status = 401
+			}
 			if e.Error() == "MODEL_PROXY_DAILY_LIMIT" {
 				status = 402
 			}
@@ -339,7 +366,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 			for name, values := range r.Header {
 				lower := strings.ToLower(name)
-				if containsField([]string{"authorization", "cookie", "x-api-key", "api-key", "proxy-authorization", "connection", "upgrade", "content-length", "host"}, lower) || strings.HasPrefix(lower, "x-roami-") {
+				if containsField([]string{"authorization", "cookie", "x-api-key", "api-key", "proxy-authorization", "connection", "upgrade", "content-length", "host"}, lower) || strings.HasPrefix(lower, "x-roami-") || strings.HasPrefix(lower, "x-eval-") {
 					continue
 				}
 				if bridge != nil && (lower == "accept-encoding" || strings.HasPrefix(lower, "anthropic-") || strings.HasPrefix(lower, "openai-")) {

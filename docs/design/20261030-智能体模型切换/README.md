@@ -2,6 +2,8 @@
 
 2026-10-31 修订。连接与模型合并管理，Roami 内置网关负责适配客户端协议。同一个上游、同一个模型可以供 CC、Codex、OpenCode、Pi 和 Roami 使用，不再为不同智能体重复建立来源。
 
+新增提案：[本地网关与 Agent 独立计费（HTML）](gateway-billing.html)。覆盖本地模型库复用、本机连接导入、默认智能体各自的 Key、直接按智能体归账和托管会话明细，以及产品交互和技术迁移方案；目前仅设计，未改运行代码。[原型验收](gateway-billing-review.md)。
+
 最新产品提案：[简化添加模型](add-model-design.md) · [交互稿](add-model.html)。默认只填地址与密钥、读取后勾选；已有来源直接选择。定价、聚合策略各放后置选项卡。配置源与批量拉取已在 2026-11-01 落地，见 [模型目录实现与验收](source-catalog-acceptance.md)。提案中的独立聚合策略页签仍是后续范围；下文保留此前实现说明。
 
 [连接合并验收](connections-acceptance.md) · [网关适配验收](gateway-adaptation.md) · [模式切换验收](modes-acceptance.md) · [早期实现记录](implementation.md) · [历史设计](records/2026-10-31/README.md)
@@ -76,3 +78,5 @@ flowchart LR
 CC/Codex 默认附带的厂商专用思考配置不跨协议强制注入，按上游默认行为执行并通过响应头标明；显式保存的 Chat 推理参数仍按对应字段转发。可见思考文本可进入后续上下文，不伪造提供商签名。CC 的流事件先输出思考再输出正文；若上游在正文后继续追加思考而无法保持这一顺序，明确报错，避免客户端最终回复被覆盖为空。跨协议不接受提供商加密状态、文件 ID 等无法移植的内容；`previous_response_id`、WebSocket 及跨协议的 `responses/compact` 仍不支持。模型本身的图片、推理和上下文能力由上游决定，协议转换不改变模型能力。
 
 协议参考：[OpenAI Responses 迁移与类型化事件](https://developers.openai.com/api/docs/guides/migrate-to-responses)、[Responses 流事件](https://developers.openai.com/api/reference/resources/responses/streaming-events)、[命名空间工具](https://developers.openai.com/api/docs/guides/tools-tool-search)、[Claude 消息流](https://platform.claude.com/docs/en/build-with-claude/streaming)。历史 HTML、发布流程和同协议限制仅用于早期设计对照，不代表当前实现。
+
+默认智能体网关记账 V1 已实现：[模块设计与验收](gateway-billing-implementation.md)。支持本地源导入、独立 Key 的自动应用与轮换、按默认智能体归集费用；无需另建接入身份。

@@ -175,3 +175,17 @@ it('does not present unfiltered receipts as RSI when an older node ignores the s
   await screen.findByText('agent.usage.empty')
   expect(screen.queryByText('agent.proxy.loadFailed')).toBeNull()
 })
+
+it('opens a default-agent billing link with server-side attribution filtering', async () => {
+  history.replaceState(null, '', '#/settings/agent/runtime?modelTab=proxy&agentKind=opencode')
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-settings') return { data: connection }
+    if (path === '/agent/model-gateway/settings') return { data: currentConfig }
+    if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, agentKind: 'opencode' } }
+    return { data: {} }
+  })
+  setup()
+  await screen.findByText('agent.usage.empty')
+  expect(screen.getByRole('combobox', { name: 'hub.keys.agent' }).closest('.ant-select')?.textContent).toContain('OpenCode')
+  expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-gateway/usage?days=7&agentKind=opencode')).toBe(true)
+})

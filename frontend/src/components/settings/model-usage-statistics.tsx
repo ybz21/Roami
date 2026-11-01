@@ -10,7 +10,7 @@ export type UsageModelPart = UsageTotals & { model: string | null }
 export type UsagePoint = UsageTotals & { models?: UsageModelPart[] }
 export type UsageStatistics = { days: number; startDay: string; endDay: string; dailyStartDay: string; total: UsageTotals; daily: (UsagePoint & { day: string })[]; hourly?: (UsagePoint & { hour: number })[]; seriesModels?: string[]; seriesTruncated?: boolean; models: (UsageTotals & { model: string })[]; modelsTruncated: boolean }
 
-export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedDay, today, onDayChange, loading, disabled, sourceControl, filterHint }: { sourceControl?: ReactNode; filterHint?: string; statistics?: UsageStatistics; days: number; onDaysChange: (days: number) => void; selectedDay?: string; today?: string; onDayChange?: (day: string) => void; loading: boolean; disabled: boolean }) {
+export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedDay, today, onDayChange, loading, disabled, sourceControl, filterHint, summaryContent }: { summaryContent?: ReactNode; sourceControl?: ReactNode; filterHint?: string; statistics?: UsageStatistics; days: number; onDaysChange: (days: number) => void; selectedDay?: string; today?: string; onDayChange?: (day: string) => void; loading: boolean; disabled: boolean }) {
   const { t, locale } = useI18n()
   const [metric, setMetric] = useState('totalTokens'), [expandedPoint, setExpandedPoint] = useState(''), [selectedPoint, setSelectedPoint] = useState('')
   const previousColors = useRef(new Map<string, number>())
@@ -62,6 +62,7 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
       <p className="agent-settings-hint">{t('agent.usage.tokenBreakdown', { input: count(statistics.total.inputTokens), output: count(statistics.total.outputTokens), cache: count(statistics.total.cacheReadTokens) })}</p>
       {status(statistics.total) && <p className="agent-settings-hint" role="status">{status(statistics.total)}</p>}
       {statistics.total.missingUsage > 0 && <p className="agent-settings-hint">{t('agent.usage.incomplete', { missing: count(statistics.total.missingUsage) })}</p>}
+      {summaryContent}
       {statistics.total.requests === 0 ? <p className="agent-settings-hint">{t('agent.usage.empty')}</p> : <>
         <div className="agent-usage-toolbar"><h4>{t(hourly ? 'agent.usage.hourly' : 'agent.usage.daily')}</h4><Select aria-label={t('agent.usage.chartMetric')} value={selectedMetric} disabled={disabled} virtual={false} options={[{ value: 'totalTokens', label: t('agent.proxy.tokens') }, { value: 'requests', label: t('agent.proxy.requests') }, ...currencies.map(currency => ({ value: currency, label: t('agent.usage.cost') + ' · ' + currency }))]} onChange={setMetric} /></div>
         {statistics.dailyStartDay !== statistics.startDay && <p className="agent-settings-hint">{t('agent.usage.dailyWindow', { count: count(statistics.daily.length) })}</p>}
