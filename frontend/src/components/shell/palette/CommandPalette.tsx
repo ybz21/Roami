@@ -1,3 +1,4 @@
+import { isPrimaryShortcut, primaryShortcutLabel } from '../../../keyboard-platform'
 // ⌘K 面板：全局搜索的门面。数据在 useSearchResults，行在 PaletteRow/PaletteList，
 // 这里只剩「壳 + 键盘」。
 //
@@ -45,7 +46,7 @@ export function CommandPalette({ items, actions, dir, onClose }: {
     else if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)) }
     else if (e.key === 'Enter') {
       e.preventDefault()
-      if (e.metaKey || e.ctrlKey) runContentSearch() // ⌘⏎ = 去文件内容里找
+      if (isPrimaryShortcut(e)) runContentSearch() // ⌘⏎ = 去文件内容里找
       else runAt(cursor)
     } else if (e.key === 'Escape') { e.preventDefault(); onClose() }
   }
@@ -83,4 +84,4 @@ export function CommandPalette({ items, actions, dir, onClose }: {
   )
 }
 
-const modLabel = () => (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘' : 'Ctrl+')
+const modLabel = primaryShortcutLabel

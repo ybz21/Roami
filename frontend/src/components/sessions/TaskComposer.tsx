@@ -1,3 +1,4 @@
+import { primaryShortcutLabel } from '../../keyboard-platform'
 // 「开任务」的 composer（23 设计 §3.1 #1）：描述 ⏎ 就在新 worktree 里开干。
 //
 // 原来长在项目主页里（Projects.tsx 的 ProjectHome），一份状态一份 JSX 只能在那一页用；
@@ -245,7 +246,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         )}
         <span className="tt-cend">
           <VoiceInput inline accent="var(--accent)" onResult={(text) => setPrompt((v) => (v ? v + ' ' : '') + text)} />
-          <button type="button" className="tt-pill ico" title={t('project.attachImage')} aria-label={t('project.attachImage')}
+          <button type="button" className="tt-pill ico" title={t('project.attachImage', { shortcut: primaryShortcutLabel() + 'V' })} aria-label={t('project.attachImage', { shortcut: primaryShortcutLabel() + 'V' })}
             disabled={uploading} onClick={() => fileRef.current?.click()}>
             <PaperclipIcon size={13} />
           </button>
