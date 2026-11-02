@@ -100,5 +100,22 @@
   "runner_and_catalog_tests": {
     "passed": 32,
     "skipped": 0
+  },
+  "quality": {
+    "full": {
+      "passed": true,
+      "python_passed": 3095,
+      "python_skipped": 48,
+      "python_seconds": 838.97,
+      "production_build_seconds": 44.04
+    },
+    "commit_quick": {
+      "passed": true,
+      "python_passed": 3095,
+      "python_skipped": 48,
+      "python_seconds": 838.18
+    },
+    "implementation_commit": "88e3e3ca",
+    "process_environment": "env -u ROAM_HOME; saved settings unchanged"
   }
 }
