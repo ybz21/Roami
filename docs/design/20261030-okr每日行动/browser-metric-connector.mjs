@@ -8,7 +8,7 @@ try {
   const target = option('--target'), out = option('--out')
   if (spec.method !== 'browser' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(spec.id) || !Number.isInteger(spec.revision) || spec.revision < 1) throw new Error('Invalid connector identity')
   const origin = new URL(spec.origin)
-  if (!['127.0.0.1','localhost'].includes(origin.hostname) || !['http:','https:'].includes(origin.protocol) || origin.origin !== spec.origin || spec.path !== '/fixtures/creator-console.html') throw new Error('This design runner only reads the local creator fixture')
+  if (!['127.0.0.1','localhost'].includes(origin.hostname) || !['http:','https:'].includes(origin.protocol) || origin.origin !== spec.origin || !['/fixtures/creator-console.html','/fixtures/roami-promotion-console.html'].includes(spec.path)) throw new Error('This design runner only reads the local design fixtures')
   if (typeof spec.expectedAccountId !== 'string' || !spec.expectedAccountId || ![spec.account,spec.date].every(item => item && typeof item.selector === 'string' && item.selector && typeof item.attribute === 'string' && item.attribute)) throw new Error('Missing account/date contract')
   if (!Array.isArray(spec.fields) || spec.fields.length < 1 || spec.fields.length > 40 || spec.fields.some(f => !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(f.id) || typeof f.selector !== 'string' || !f.selector || typeof f.unit !== 'string' || !f.unit) || new Set(spec.fields.map(f => f.id)).size !== spec.fields.length) throw new Error('Invalid field contract')
   const expression = `(() => {

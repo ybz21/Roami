@@ -5,6 +5,7 @@ import { CheckIcon, ChevronLeft, ChevronRight, FolderIcon, PlayIcon, TerminalIco
 import SwarmRuntime from './okr-swarm-runtime'
 import SwarmConversation from './okr-swarm-conversation'
 import WatchQuality from './okr-watch-quality'
+import PromotionBoard from './okr-promotion-board'
 import { CycleKind, cycleActions, cycleDefinitions, dailyDelta, latestCycleReview } from './okr-execution-cycle'
 import { BrowserObservation, formulaFields } from './okr-generation-contract'
 import { DateTrend, KrProposal } from './okr-generation'
@@ -29,24 +30,24 @@ const Workspace = React.memo(function Workspace({ kind, scene, flowPaused, onCon
   const plan = scenePlan(kind,scene.revision), definition = cycleDefinitions[kind], state = sceneSnapshot(kind,scene)
   const review = latestCycleReview(state), latest = state.observations.at(-1)!
   const current = state.observations.find(row => row.date === state.activeDate), delivered = state.delivered[state.activeDate] ?? []
-  const net = kind === 'creator' ? latest.value-definition.baseline : latest.value
+  const net = kind !== 'repo' ? latest.value-definition.baseline : latest.value
   const responsibilities = [
     ['主责',flowPaused ? '暂停后续派发' : scene.checkpoint === 'next' ? '已生成次日计划' : '维护当前计划与接力'],
     ['执行',flowPaused ? '不启动新动作，已有产物保留' : delivered.length ? '交付已核验并回填' : '待执行，按项目验收'],
     ['数据',current ? '观测已校验并回填' : '等待采集窗口或来源恢复'],
     ['复盘',review ? '已形成依据与建议' : current ? '接棒，待独立分析' : '等待交付与观测证据'],
   ]
-  const boardStats = <div className="book-board-stats"><article><small>{kind === 'creator' ? '周期净增 / 长期目标' : '发布版 p95 / 长期目标'}</small><strong>{net} / {definition.target}{definition.unit}</strong></article><article><small>{latest.date} 最新有效观测</small><strong>{latest.value}{definition.unit}</strong><small>{current ? `较前日 ${dailyDelta(state,state.activeDate)! > 0 ? '+' : ''}${dailyDelta(state,state.activeDate)}${definition.unit}` : `${state.activeDate} 尚无新观测`}</small></article></div>
+  const boardStats = kind === 'promotion' ? <PromotionBoard state={state} date={latest.date}/> : <div className="book-board-stats"><article><small>{kind === 'creator' ? '周期净增 / 长期目标' : '发布版 p95 / 长期目标'}</small><strong>{net} / {definition.target}{definition.unit}</strong></article><article><small>{latest.date} 最新有效观测</small><strong>{latest.value}{definition.unit}</strong><small>{current ? `较前日 ${dailyDelta(state,state.activeDate)! > 0 ? '+' : ''}${dailyDelta(state,state.activeDate)}${definition.unit}` : `${state.activeDate} 尚无新观测`}</small></article></div>
   const metric = plan.metrics.find(m => m.formula.op === 'field')!
-  const records: BrowserObservation[] = state.observations.map(row => ({ connectorId:metric.connectorId,connectorRevision:1,accountId:kind === 'creator' ? 'demo-creator' : 'pocketboard-demo',date:row.date,capturedAt:`${row.date}T13:00:00Z`,sourceUrl:'https://example.invalid/replay',evidenceKind:'replay',values:Object.fromEntries(formulaFields(metric).map(field => [field,{value:row.value,unit:metric.unit}])) }))
+  const records: BrowserObservation[] = state.observations.map(row => ({ connectorId:metric.connectorId,connectorRevision:1,accountId:kind === 'promotion' ? 'ybz21/Roami' : kind === 'creator' ? 'demo-creator' : 'pocketboard-demo',date:row.date,capturedAt:`${row.date}T13:00:00Z`,sourceUrl:'https://example.invalid/replay',evidenceKind:'replay',values:Object.fromEntries(formulaFields(metric).map(field => [field,{value:row.value,unit:metric.unit}])) }))
   return <>
     <header className="book-output-head"><span className="eyebrow">生成结果 / {scene.title}</span><h2>{plan.objective}</h2><p className="meta">{scene.view === 'intent' ? scene.intentConfirmed ? '目标约定' : 'O 草稿' : `方案 r${scene.revision}`}</p></header>
     {scene.view === 'intent' && <>
-      <section className="book-section"><p className="eyebrow">{scene.intentConfirmed ? '已聊清的目标约定' : '先聊方向'}</p><p>{scene.intentConfirmed ? definition.longResult : kind === 'creator' ? '希望持续分享 AI 编程内容，成功标准还需要确认。' : '希望完成基本功能并持续维护，使用场景与结果还需要确认。'}</p></section>
-      <section className="book-section"><h3>{scene.intentConfirmed ? '已知约束' : '需要聊清什么'}</h3><ul className="book-facts">{(scene.intentConfirmed ? ['八周周期',kind === 'creator' ? '每天参与半小时' : '每天留一小时评审','实际基线与可用数据来源待核对'] : ['主要追求什么结果','希望推进多久','每天能投入多少、哪些安排要保留']).map(item => <li key={item}>{item}</li>)}</ul><p className="meta">{scene.intentConfirmed ? '下一步由智能体提出 KR 和衡量方式。' : '尚未拆分 KR，也没有生成结果面板。'}</p></section>
+      <section className="book-section"><p className="eyebrow">{scene.intentConfirmed ? '已聊清的目标约定' : '先聊方向'}</p><p>{scene.intentConfirmed ? definition.longResult : kind === 'promotion' ? '宣传 Roami，准备通过 X 图文和 B站配音技巧推进，增长目标还需确认。' : kind === 'creator' ? '希望持续分享 AI 编程内容，成功标准还需要确认。' : '希望完成基本功能并持续维护，使用场景与结果还需要确认。'}</p></section>
+      <section className="book-section"><h3>{scene.intentConfirmed ? '已知约束' : '需要聊清什么'}</h3><ul className="book-facts">{(scene.intentConfirmed ? ['八周周期',kind === 'promotion' ? 'B站每天一个带配音小技巧，X 节奏可调整' : kind === 'creator' ? '每天参与半小时' : '每天留一小时评审','实际基线与可用数据来源待核对'] : ['主要追求什么结果','希望推进多久','每天能投入多少、哪些安排要保留']).map(item => <li key={item}>{item}</li>)}</ul><p className="meta">{scene.intentConfirmed ? '下一步由智能体提出 KR 和衡量方式。' : '尚未拆分 KR，也没有生成结果面板。'}</p></section>
     </>}
     {scene.view === 'goals' && <>
-      {kind === 'creator' && scene.revision === 2 && <p className="book-change" role="status">方案已调整：KR 从 4 条变 5 条，保留增长、完播率、平均观看时长三项结果，增加互动诊断和短期验收。</p>}
+      {kind === 'promotion' && scene.revision === 2 && <p className="book-change">star、fork 独立衡量，短期交付与每日配音验收分别呈现。</p>}{kind === 'creator' && scene.revision === 2 && <p className="book-change" role="status">方案已调整：KR 从 4 条变 5 条，保留增长、完播率、平均观看时长三项结果，增加互动诊断和短期验收。</p>}
       <div className="generated-krs">{plan.keyResults.map((kr,index) => <KrProposal key={kr.id} kr={kr} index={index} />)}</div>
       <section className="book-section"><h3>近期先验证什么</h3><p>{definition.shortResult}</p><small>长期结果与短期检查点分开衡量，实际起点待读取。</small></section>
     </>}
@@ -55,9 +56,9 @@ const Workspace = React.memo(function Workspace({ kind, scene, flowPaused, onCon
       <section className="book-section"><h3>看板随指标组成</h3><div className="book-widget-map">{plan.widgets.map(w => <span key={w.id}>{w.title}<small>{({metric:'指标卡',trend:'日期趋势',records:'明细',checks:'验收清单'})[w.type]}</small></span>)}</div></section>
     </>}
     {scene.view === 'source' && <>
-      <section className="book-section"><div className="section-head"><h3>{kind === 'creator' ? '创作者后台 / 浏览器读取' : '发布监控 / 浏览器或报告读取'}</h3><span className={scene.sampled ? 'ok-text' : 'warn-text'}>{scene.sampled ? '回放样本已核对' : '候选连接 · 待验证'}</span></div><ol className="connector-steps"><li>发现可用能力与后台入口。</li><li>核对登录、稳定账号或项目身份。</li><li>读取观测日期、字段、单位和版本。</li><li>保存回执，验证通过后登记连接。</li></ol></section>
-      {scene.sampled ? <div className="book-receipt"><CheckIcon size={20} /><div><h3>{kind === 'creator' ? 'demo-creator / 2026-11-11' : 'demo-v0.4 / 固定负载'}</h3><strong>{kind === 'creator' ? '粉丝 328 人 · 完播 24% · 平均观看 14 秒' : '发布版 p95 720ms'}</strong><small>{kind === 'creator' ? '周期从 11 月 12 日开始；可用作净增起点。同日原始数已核对；单视频同龄结果另行核对。' : '候选环境独立记录，不覆盖这条发布事实。'}</small></div></div> : <p className="book-change">需要登录或没有访问能力时，停在待接入，不能把未知数据填成 0。</p>}
-      <details className="book-section"><summary><TerminalIcon size={16} /> 连接描述与设计边界</summary><pre className="generation-code">{JSON.stringify(plan.connectors[0],null,2)}</pre><p className="meta">这是回放中的连接描述。本地夹具 runner 的可执行验证和真实平台接入边界见技术文档。</p><a href="technical-design.html#dynamic-connector">查看 connector 机理</a></details>
+      <section className="book-section"><div className="section-head"><h3>{kind === 'promotion' ? 'GitHub 仓库 + X 图文后台 + B站视频后台' : kind === 'creator' ? '创作者后台 / 浏览器读取' : '发布监控 / 浏览器或报告读取'}</h3><span className={scene.sampled ? 'ok-text' : 'warn-text'}>{scene.sampled ? '回放样本已核对' : '候选连接 · 待验证'}</span></div><ol className="connector-steps"><li>发现可用能力与后台入口。</li><li>核对登录、稳定账号或项目身份。</li><li>读取观测日期、字段、单位和版本。</li><li>保存回执，验证通过后登记连接。</li></ol></section>
+      {scene.sampled ? <div className="book-receipt"><CheckIcon size={20} /><div><h3>{kind === 'promotion' ? 'ybz21/Roami / 虚构样本 / 2026-11-11' : kind === 'creator' ? 'demo-creator / 2026-11-11' : 'demo-v0.4 / 固定负载'}</h3><strong>{kind === 'promotion' ? '120 star · 18 fork' : kind === 'creator' ? '粉丝 328 人 · 完播 24% · 平均观看 14 秒' : '发布版 p95 720ms'}</strong><small>{kind === 'promotion' ? '两个起点已核对；渠道字段与内容观察窗口另行读取，未知项不补零。' : kind === 'creator' ? '周期从 11 月 12 日开始；可用作净增起点。同日原始数已核对；单视频同龄结果另行核对。' : '候选环境独立记录，不覆盖这条发布事实。'}</small></div></div> : <p className="book-change">需要登录或没有访问能力时，停在待接入，不能把未知数据填成 0。</p>}
+      <details className="book-section"><summary><TerminalIcon size={16} /> 连接描述与设计边界</summary><pre className="generation-code">{JSON.stringify(kind === 'promotion' ? plan.connectors : plan.connectors[0],null,2)}</pre><p className="meta">这是回放中的连接描述。本地夹具 runner 的可执行验证和真实平台接入边界见技术文档。</p><a href="technical-design.html#dynamic-connector">查看 connector 机理</a></details>
     </>}
     {scene.view === 'board' && <>
       <p className="book-change">整体看板已生成并保存（回放） · {scene.id === 'schedule' ? '更新约定已设定' : '等待设置更新约定'}</p>{boardStats}{kind === 'creator' && <WatchQuality state={state} date={latest.date} />}
@@ -78,10 +79,10 @@ const Workspace = React.memo(function Workspace({ kind, scene, flowPaused, onCon
     </>}
     {['review','decision','next'].includes(scene.view) && review && <>
       {boardStats}
-      {scene.view !== 'next' && <section className="book-section"><h3>{kind === 'creator' ? '粉丝按日期变化' : '发布环境趋势'}</h3><DateTrend metric={metric} records={records} /></section>}
+      {scene.view !== 'next' && <section className="book-section"><h3>{kind === 'promotion' ? 'star 按日期变化（fork 独立见结果记录）' : kind === 'creator' ? '粉丝按日期变化' : '发布环境趋势'}</h3><DateTrend metric={metric} records={records} /></section>}
       <section className="book-section"><h3>事实与判断</h3><ul className="book-facts">{review.facts.map(fact => <li key={fact}>{fact}</li>)}</ul><p className="book-decision">{review.decision}</p></section>
       {scene.view === 'review' && <details className="book-section"><summary>原始观测与可能的解释</summary>{state.variantObservations.map(row => <p className="meta" key={`${row.videoId}:${row.ageHours}`}>{row.videoId} · {row.ageHours}h · 完整 {row.completed} / 有效 {row.plays} · {row.source}</p>)}{review.hypotheses.map(h => <p key={h}>{h}</p>)}</details>}
-      {scene.view === 'decision' && <section className="book-section"><h3>根据当前证据做决定</h3><p>可以继续验证，也可以暂停后续自动执行。目标、看板和已发生的事实保留。</p>{onContinue && onPause ? <div className="choice-row"><button type="button" className="button primary" disabled={flowPaused} onClick={onContinue}>{kind === 'creator' ? '继续单变量验证' : '继续评审与验证'}</button><button type="button" className="button" disabled={flowPaused} onClick={onPause}>暂停后续执行</button></div> : <ul className="book-facts"><li>继续验证：形成关联本次 Review 的新计划。</li><li>暂停：不再启动新动作，历史和已交付内容保留。</li></ul>}{flowPaused && <p className="warn-text">后续执行已暂停（回放）；可继续查看数据，恢复后从当前决定继续。</p>}</section>}
+      {scene.view === 'decision' && <section className="book-section"><h3>根据当前证据做决定</h3><p>可以继续验证，也可以暂停后续自动执行。目标、看板和已发生的事实保留。</p>{onContinue && onPause ? <div className="choice-row"><button type="button" className="button primary" disabled={flowPaused} onClick={onContinue}>{kind === 'promotion' ? '继续两条宣传路径' : kind === 'creator' ? '继续单变量验证' : '继续评审与验证'}</button><button type="button" className="button" disabled={flowPaused} onClick={onPause}>暂停后续执行</button></div> : <ul className="book-facts"><li>继续验证：形成关联本次 Review 的新计划。</li><li>暂停：不再启动新动作，历史和已交付内容保留。</li></ul>}{flowPaused && <p className="warn-text">后续执行已暂停（回放）；可继续查看数据，恢复后从当前决定继续。</p>}</section>}
       <section className="book-section"><p className="eyebrow">{scene.view === 'next' ? `进入下一轮的计划 / ${state.plans.at(-1)?.date}` : '下一步行动'}</p><h3>{review.nextAction}</h3><small>关联原始 Review 和输入版本；长期 KR 不被这段建议改写。</small></section>
     </>}
   </>
@@ -91,7 +92,7 @@ function DesignNote({ scene }: { scene: DialogueScene }) {
   return <div className="book-design-note"><p className="eyebrow">交互设计说明 / {scene.title}</p>{([['输入',notes.input],['系统处理',notes.processing],['界面输出',notes.output],['状态边界',notes.boundary]] as const).map(([name,value]) => <section className="book-section" key={name}><h3>{name}</h3><p>{value}</p></section>)}<p><a href="technical-design.html">阅读完整技术设计</a></p></div>
 }
 type PendingTurn = { text: string; after: number }
-const previousSceneIds = {creator:['result','goal','revise','metrics','discover','sample','projects','work','first-review','second-review','next'],repo:['result','goal','metrics','discover','sample','projects','work','first-review','next']}
+const previousSceneIds:Record<CycleKind,string[]> = {promotion:dialogueScenes.promotion.map(scene=>scene.id),creator:['result','goal','revise','metrics','discover','sample','projects','work','first-review','second-review','next'],repo:['result','goal','metrics','discover','sample','projects','work','first-review','next']}
 function restoreDialogue(kind: CycleKind) {
   try {
     const saved = JSON.parse(localStorage.getItem(`roami-okr-design-book:${kind}`) ?? 'null')
@@ -157,7 +158,7 @@ function Book({ kind, setKind }: { kind: CycleKind; setKind: (kind: CycleKind) =
   function jump(i: number) { setElapsed(offsets[i]);setPlaying(false);setPane(sceneLifecycle(scenes[i]) === 'running' && !layout.phone ? 'chat' : 'output') }
   return <div className="interaction-book">
     <header className="book-topbar tt-pagehead"><div><h1>从目标到每天的行动</h1><p className="desktop-only">OKR 交互设计书 · 用户输入、智能体响应与生成结果</p></div><a href="index.html">产品设计</a></header>
-    <div className="book-toolbar"><label>场景<select aria-label="选择故事" value={kind} onChange={e => setKind(e.target.value as CycleKind)}><option value="creator">AI 编程短视频</option><option value="repo">持续维护 repo</option></select></label><div className="book-mode" aria-label="设计书体验方式"><button type="button" aria-pressed={mode === 'story'} onClick={() => changeMode('story')}>看故事</button><button type="button" aria-pressed={mode === 'interactive'} onClick={() => changeMode('interactive')}>自己推进</button></div><span className="book-replay-label">{isRuntime ? '运行态 · 长期 Swarm 工作台 · 回放' : '搭建态 · KR 与看板生成 · 回放'}</span></div>
+    <div className="book-toolbar"><label>场景<select aria-label="选择故事" value={kind} onChange={e => setKind(e.target.value as CycleKind)}><option value="creator">AI 编程短视频</option><option value="repo">持续维护 repo</option><option value="promotion">宣传 Roami</option></select></label><div className="book-mode" aria-label="设计书体验方式"><button type="button" aria-pressed={mode === 'story'} onClick={() => changeMode('story')}>看故事</button><button type="button" aria-pressed={mode === 'interactive'} onClick={() => changeMode('interactive')}>自己推进</button></div><span className="book-replay-label">{isRuntime ? '运行态 · 长期 Swarm 工作台 · 回放' : '搭建态 · KR 与看板生成 · 回放'}</span></div>
     <nav className="book-chapters book-storylines" aria-label="四条故事线的顺序">{chapters.map(chapter => <button type="button" className={chapter === scene.chapter ? 'active' : ''} key={chapter} aria-current={chapter === scene.chapter ? 'step' : undefined} onClick={() => {if (mode === 'interactive') changeMode('story');jump(scenes.findIndex(s => s.chapter === chapter))}}>{chapter}</button>)}</nav>
     {mode === 'interactive' && flowPaused && <div className="book-pause-state" role="status"><span>后续执行已暂停（回放），目标和看板保留。</span><button type="button" className="button" onClick={() => setFlowPaused(false)}>恢复推进</button></div>}
     <nav className="book-mobile-tabs" aria-label="查看对话或结果">{([['chat','对话'],['output','生成结果'],['notes','设计说明']] as const).map(([value,label]) => <button type="button" key={value} className={pane === value ? 'active' : ''} aria-pressed={pane === value} onClick={() => {setPane(value);if (value !== 'output') setPlaying(false)}}>{isRuntime && value === 'chat' ? '共享群聊' : isRuntime && value === 'output' ? '共享看板' : label}</button>)}</nav>
@@ -179,7 +180,7 @@ function Book({ kind, setKind }: { kind: CycleKind; setKind: (kind: CycleKind) =
   </div>
 }
 function App() {
-  const [kind,setKind] = useState<CycleKind>(() => new URLSearchParams(location.search).get('case') === 'repo' ? 'repo' : 'creator')
+  const [kind,setKind] = useState<CycleKind>(() => (['creator','repo','promotion'].includes(new URLSearchParams(location.search).get('case') ?? '') ? new URLSearchParams(location.search).get('case') : 'creator') as CycleKind)
   return <Book key={kind} kind={kind} setKind={value => { const url = new URL(location.href);url.searchParams.set('case',value);url.searchParams.delete('scene');history.replaceState(null,'',url);setKind(value) }} />
 }
 createRoot(document.getElementById('root')!).render(<App />)

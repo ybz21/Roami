@@ -1,3 +1,5 @@
+import { promotionReplay } from './okr-promotion-plan'
+export { promotionReplay, promotionQualityReplay } from './okr-promotion-plan'
 import { BrowserObservation, GeneratedPlan, BrowserConnector } from './okr-generation-contract'
 
 const consoleSource: BrowserConnector = {
@@ -55,9 +57,9 @@ export const repoReplay: GeneratedPlan = {
   widgets:[{ id:'latency',type:'metric',title:'性能结果',metricIds:['release-latency'] },{ id:'release-checks',type:'checks',title:'功能验收',krId:'release-ready',metricIds:[] },{ id:'latency-line',type:'trend',title:'发布版性能变化',metricIds:['release-latency'] },{ id:'maintenance-checks',type:'checks',title:'维护底线',krId:'maintenance-ready',metricIds:[] }],
   dailyAction:'先完成核心任务流程，再以固定负载验证发布候选；发布后独立复验。',
 }
-export const replayOptions = [{ label:'内容增长',plan:growthReplay },{ label:'项目维护',plan:repoReplay }]
+export const replayOptions = [{ label:'内容增长',plan:growthReplay },{ label:'项目维护',plan:repoReplay },{ label:'宣传 Roami',plan:promotionReplay }]
 export function replayObservation(plan: GeneratedPlan, date = '2026-11-11'): BrowserObservation {
   const c = plan.connectors[0]
-  const values: Record<string,{value:number;unit:string}> = c.id === 'creator-console' ? { audience:{ value:date === '2026-11-11' ? 328 : 334,unit:'人' },likes:{ value:40,unit:'次' },plays:{ value:date === '2026-11-11' ? 600 : 700,unit:'次' },completed:{ value:date === '2026-11-11' ? 144 : 224,unit:'次' },'watch-seconds':{ value:date === '2026-11-11' ? 8400 : 12600,unit:'秒' } } : { latency:{ value:date === '2026-11-11' ? 720 : 690,unit:'ms' } }
+  const values: Record<string,{value:number;unit:string}> = c.id === 'roami-repo' ? {stars:{value:date === '2026-11-11' ? 120 : date === '2026-11-12' ? 128 : 125,unit:'star'},forks:{value:date === '2026-11-11' ? 18 : date === '2026-11-12' ? 19 : 21,unit:'fork'}} : c.id === 'creator-console' ? { audience:{ value:date === '2026-11-11' ? 328 : 334,unit:'人' },likes:{ value:40,unit:'次' },plays:{ value:date === '2026-11-11' ? 600 : 700,unit:'次' },completed:{ value:date === '2026-11-11' ? 144 : 224,unit:'次' },'watch-seconds':{ value:date === '2026-11-11' ? 8400 : 12600,unit:'秒' } } : { latency:{ value:date === '2026-11-11' ? 720 : 690,unit:'ms' } }
   return { connectorId:c.id,connectorRevision:c.revision,accountId:c.expectedAccountId,date,capturedAt:`${date}T13:00:00Z`,sourceUrl:`${c.origin}${c.path}`,evidenceKind:'replay',values:Object.fromEntries(c.fields.map(f => [f.id,values[f.id]])) }
 }

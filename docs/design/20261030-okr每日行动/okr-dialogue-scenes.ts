@@ -1,3 +1,5 @@
+import { promotionScenes } from './okr-promotion-scenes'
+import { promotionReplay, promotionQualityReplay } from './okr-promotion-plan'
 import { applyNextPlan, collectCycleData, cycleDefinitions, CycleKind, CycleState, cycleActions, deliverAction, initialCycle, reviewCycle } from './okr-execution-cycle'
 import { GeneratedPlan } from './okr-generation-contract'
 import { growthReplay, qualityReplay, repoReplay } from './okr-generation-replays'
@@ -10,9 +12,10 @@ export const storylines = [
 ] as const
 export type DialogueView = 'intent'|'goals'|'metrics'|'source'|'board'|'projects'|'launch'|'handoff'|'work'|'review'|'decision'|'next'
 export type CycleCheckpoint = 'assigned'|'delivered'|'observed'|'reviewed'|'next'
-export type DialogueScene = { id: string; chapter: string; title: string; user: string; reply: string; caption: string; view: DialogueView; duration: number; revision: number; day?: 1|2; sampled?: boolean; action?: string; checkpoint?: CycleCheckpoint; intentConfirmed?: boolean }
+export type DialogueScene = { id: string; chapter: string; title: string; user: string; reply: string; caption: string; view: DialogueView; duration: number; revision: number; day?: 1|2; sampled?: boolean; action?: string; checkpoint?: CycleCheckpoint; intentConfirmed?: boolean; deliveredActionIds?:string[] }
 const [talk,split,build,operate] = storylines.map(line => line.title)
 export const dialogueScenes: Record<CycleKind,DialogueScene[]> = {
+  promotion:promotionScenes,
   creator:[
     {id:'goal',chapter:talk,title:'先聊想做成什么',user:'我想持续讲 AI 编程，教大家做公众号和短视频。希望 Roami 帮我长期推进。',reply:'先把方向聊清楚：你更想扩大内容影响力，还是获得有效咨询？准备做多久，每天能投入多少时间？现在先不要求你列 KR 或指标。',caption:'故事从一个还不完整的想法开始，先聊 OKR。',view:'intent',duration:9000,revision:1,action:'说清周期和期待'},
     {id:'clarify',chapter:talk,title:'把方向变成明确约定',user:'先扩大影响力。做八周，希望净增 200 个真实粉丝，每天我能投入半小时。',reply:'O 是让 AI 编程内容持续获得真实关注。八周净增 200 人是你明确的期待，日投入半小时是约束；实际粉丝起点还未知。接下来由我提出衡量和推进方案。',caption:'这一步只确认目标与约束，不提前假装 KR 和数据都已齐备。',view:'intent',intentConfirmed:true,duration:9000,revision:1,action:'请智能体拆分 KR'},
@@ -62,7 +65,7 @@ export const dialogueScenes: Record<CycleKind,DialogueScene[]> = {
 export function sceneOffsets(kind: CycleKind): number[] { let total = 0;return dialogueScenes[kind].map(scene => { const start = total;total += scene.duration;return start }) }
 export function sceneAt(kind: CycleKind, time: number): number { const offsets = sceneOffsets(kind);return Math.max(0,offsets.findLastIndex(offset => offset <= time)) }
 export function storyDuration(kind: CycleKind): number { return dialogueScenes[kind].reduce((sum,scene) => sum+scene.duration,0) }
-export function scenePlan(kind: CycleKind, revision: number): GeneratedPlan { return kind === 'repo' ? repoReplay : revision === 1 ? growthReplay : qualityReplay }
+export function scenePlan(kind: CycleKind, revision: number): GeneratedPlan { return kind === 'promotion' ? revision === 1 ? promotionReplay : promotionQualityReplay : kind === 'repo' ? repoReplay : revision === 1 ? growthReplay : qualityReplay }
 export function sceneCycle(kind: CycleKind, day: 1|2 = 1): CycleState {
   let state = initialCycle(kind)
   state = { ...state,linkedProjects:cycleDefinitions[kind].projects.map(project => project.id) }
@@ -85,7 +88,7 @@ export function sceneSnapshot(kind: CycleKind, scene: DialogueScene): CycleState
     state = { ...state,activeDate:'2026-11-13' }
   }
   if (scene.view === 'projects' || scene.checkpoint) state = { ...state,linkedProjects:cycleDefinitions[kind].projects.map(project => project.id) }
-  if (scene.checkpoint && scene.checkpoint !== 'assigned') for (const action of cycleActions(state,kind)) state = deliverAction(state,kind,action.id)
+  if (scene.checkpoint && scene.checkpoint !== 'assigned') for (const action of cycleActions(state,kind).filter(action=>!scene.deliveredActionIds || scene.deliveredActionIds.includes(action.id))) state = deliverAction(state,kind,action.id)
   if (scene.checkpoint && ['observed','reviewed','next'].includes(scene.checkpoint)) state = collectCycleData(state,kind)
   if (scene.checkpoint && ['reviewed','next'].includes(scene.checkpoint)) state = reviewCycle(state,kind)
   if (scene.checkpoint === 'next') state = applyNextPlan(state)

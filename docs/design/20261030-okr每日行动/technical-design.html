@@ -223,6 +223,13 @@ node browser-metric-connector.mjs --spec creator-console.json --target &lt;标�
 <p>Leader 持有目标与策略，执行、数据、复盘成员按职责接收任务并在共享事件/看板上报告；没有当前工作时标为待命并显示唤醒条件。相邻业务日使用同一 swarm_id，保留上一轮 Review、未结束任务、来源连接和计划修订。重启后按持久 jobs、lease 与回执恢复，只补当前有效工作，不重发已交付 PR、视频或过期发布动作。</p>
 <p>运行态的战术调整生成 PlanRevision，继续执行现有目标；战略或口径变更创建新的 DesignRevision 草稿，校验后原子切换 active_design_revision，任务继续引用其启动时的修订。暂停阻止新派发，运行中的任务不被显示为已取消。周期结束进入目标回顾，归档保留事实；Swarm 整体完成必须有目标与集成验收，不能因为一个成员交付就结束整个持续循环。</p>
 <p>设计书用 <code>sceneLifecycle()</code> 明确搭建/运行切换；<code>okr-swarm-state.ts</code> 从当前阶段快照投影稳定 Swarm 身份、成员和任务；<code>okr-swarm-runtime.tsx</code> 展示全宽运行工作台，并提供共享群聊、配置查看和派发控制。它们是本地回放，未接入真实 Swarm API 或常驻调度。</p>
+<h3 id="roami-promotion-contract">宣传 Roami：双执行线与三个来源</h3>
+<p><code>promotion</code> 是第三个场景，复用 GeneratedPlan、CycleState、场景快照、同群消息与共享任务看板。<code>okr-promotion-plan.ts</code> 定义 star/fork 结果、双渠道指标与连接提案；<code>okr-promotion-scenes.ts</code> 记录 21 幕；<code>okr-roami-promotion.ts</code> 定义两个执行任务、虚构日观测与分别调整的建议；<code>okr-promotion-board.tsx</code> 展示结果与渠道明细。</p>
+<p>每个行动可指定独立执行身份。X 图文智能体和 B站视频智能体与主责、数据、反思共享稳定的 room_id、board_id；任务以日期和行动 ID 区分。局部交付快照可只验收 X，不能提前将 B站或整个执行环节置为完成。Review 保存 <code>nextActions</code>，Plan 保存 <code>actionFocus</code>，下一轮分别继承两条任务的动作；采用建议幂等，已交付产物不重派。</p>
+<p>仓库来源以稳定仓库身份、full_name、业务时区、observed_at、received_at 和连接修订保存 <code>stargazers_count</code>、<code>forks_count</code> 快照。日变化要求相邻有效日期，周期净增要求核对起点；快照差不等于新增事件数，取消 star 或口径修订可导致下跌。GitHub 的<a href="https://docs.github.com/en/rest/repos/repos#get-a-repository">仓库读取接口</a>提供这两个字段；真实实施优先复用已有 GitHub 能力，不需要浏览器模拟每次点击。</p>
+<p>X 与 B站保留平台账号、post ID/BVID、素材版本、发布时间、观察窗口、可取得的原始数与来源回执。录屏、音频、字幕、合成视频和发布凭据是独立产物，不因生成 MP4 就标记已发布。后台未开放的链接点击或观看字段保持未知；若用自有落地页补测，记录它自己的事件和身份，不能冒充平台原始数。</p>
+<p><a href="https://docs.github.com/en/rest/metrics/traffic">GitHub 流量接口</a>的引用来源与访问统计有权限和窗口要求。仅凭这些聚合结果，本方案无法核验逐条 X/B站内容到 star/fork 的完整转化链路。结合渠道记录作解释属于推断，缺少归因证据时不计算伪转化率、不分摊增长。各平台窗口和时区独立核对，不跨平台直接相加。</p>
+<p>可运行示例使用 <a href="fixtures/roami-promotion-console.html">本地宣传后台夹具</a>与响应回放；浏览器 runner 的白名单仅增加这个已知本地路径。三个来源分别校验身份和字段；X 点击空白时该来源读取失败，不影响仓库的有效样本。未实施 GitHub 线上采集、社交平台连接、配音合成或发布任务。</p>
 <h3 id="shared-swarm-protocol">同群协作与单一共享看板协议</h3>
 <p>每个长期 Swarm 绑定稳定 <code>room_id</code>、<code>board_id</code> 和成员身份；主责、执行、数据、反思拥有各自的任务上下文和运行记录，按事件唤醒。切日和换轮不更换群或复制看板。一个 project 可以提供执行资源，不能因此另建一份孤立的 OKR 事实。</p>
 <p>群消息包含 <code>message_id, swarm_id, room_id, author_id, round_id, task_refs, observation_refs, review_ref, event_watermark</code>。群里的 @接棒是通知与协作；任务创建、领取、验收、观测和计划仍经领域服务验证，不能靠一句聊天覆盖事实。前端消息中的任务链接解析到同一看板对象，支持当前轮与历史轮详情；没有已验证任务时不展示虚假的完成回执。</p>

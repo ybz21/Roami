@@ -1,21 +1,23 @@
-export type CycleKind = 'creator' | 'repo'
+import { promotionDefinition, promotionFacts, promotionNextActions } from './okr-roami-promotion'
+export type CycleKind = 'creator' | 'repo' | 'promotion'
 export type CycleProject = { id: string; name: string; directory: string; git: boolean; contribution: string }
-export type CycleAction = { id: string; projectId: string; title: string; artifact: string; acceptance: string; preview: string }
+export type CycleAction = { id: string; agent?: string; projectId: string; title: string; artifact: string; acceptance: string; preview: string }
 export type CycleDefinition = {
   kind: CycleKind; objective: string; longResult: string; shortResult: string; experiment: string;
   metricName: string; unit: string; target: number; baseline: number; direction: 'up' | 'down';
   projects: CycleProject[]; actions: CycleAction[];
 }
-export type CycleObservation = { date: string; value: number; revision: number; source: string; dataReadyAt: string; plays?: number; completed?: number; watchSeconds?: number }
+export type CycleObservation = { date: string; value: number; revision: number; source: string; dataReadyAt: string; plays?: number; completed?: number; watchSeconds?: number; forks?:number; xViews?:number; xClicks?:number; biliPlays?:number; biliCompleted?:number; biliWatchSeconds?:number }
 export type VariantObservation = { videoId: string; variant: 'A'|'B'; ageHours: number; plays: number; completed: number; watchSeconds?: number; durationSeconds?: number; collectedDate: string; source: string }
 export type CandidateResult = { date: string; actionId: string; commit: string; p95: number; environment: string }
-export type CycleReview = { date: string; inputKey: string; facts: string[]; hypotheses: string[]; decision: string; nextAction: string; waiting: boolean }
-export type CycleDayPlan = { date: string; revision: number; sourceReviewKey: string|null; focus: string; mode: 'production'|'measurement' }
+export type CycleReview = { date: string; inputKey: string; facts: string[]; hypotheses: string[]; decision: string; nextAction: string; nextActions?:Record<string,string>; waiting: boolean }
+export type CycleDayPlan = { date: string; revision: number; sourceReviewKey: string|null; focus: string; mode: 'production'|'measurement'; actionFocus?:Record<string,string> }
 export type CycleState = {
   linkedProjects: string[]; delivered: Record<string,string[]>; observations: CycleObservation[]; variantObservations: VariantObservation[]; candidateResults: CandidateResult[];
   reviews: CycleReview[]; activeDate: string; plans: CycleDayPlan[]; events: string[];
 }
 export const cycleDefinitions: Record<CycleKind,CycleDefinition> = {
+  promotion:promotionDefinition,
   creator:{
     kind:'creator',objective:'让 AI 编程短视频持续获得真实关注',longResult:'八周净增 200 个真实粉丝',shortResult:'本周验证更短开场；同为约 45 秒视频，T+24h 完播率参考目标 30%、平均观看 18 秒',experiment:'保持主题和时长相近，只调整开场；无法随机分流，按探索性内容对比记录。',
     metricName:'粉丝总量',unit:'人',target:200,baseline:328,direction:'up',
@@ -37,13 +39,13 @@ export const cycleDefinitions: Record<CycleKind,CycleDefinition> = {
 }
 export function initialCycle(kind: CycleKind): CycleState {
   const definition = cycleDefinitions[kind]
-  return { linkedProjects:[],delivered:{},observations:[{ date:'2026-11-11',value:definition.baseline,revision:1,source:kind === 'creator' ? '示例账号 creator-01 / 粉丝快照' : '示例发布版 demo-v0.4 / 固定负载',dataReadyAt:'2026-11-11 21:00',...(kind === 'creator' ? {plays:600,completed:144,watchSeconds:8400} : {}) }],variantObservations:[],candidateResults:[],reviews:[],activeDate:'2026-11-12',plans:[{ date:'2026-11-12',revision:1,sourceReviewKey:null,focus:definition.actions[0].title,mode:'production' }],events:[] }
+  return { linkedProjects:[],delivered:{},observations:[{ date:'2026-11-11',value:definition.baseline,revision:1,source:kind === 'promotion' ? 'ybz21/Roami · GitHub 仓库快照（虚构回放）' : kind === 'creator' ? '示例账号 creator-01 / 粉丝快照' : '示例发布版 demo-v0.4 / 固定负载',dataReadyAt:'2026-11-11 21:00',...(kind === 'promotion' ? promotionFacts('2026-11-11') : {}),...(kind === 'creator' ? {plays:600,completed:144,watchSeconds:8400} : {}) }],variantObservations:[],candidateResults:[],reviews:[],activeDate:'2026-11-12',plans:[{ date:'2026-11-12',revision:1,sourceReviewKey:null,focus:definition.actions[0].title,mode:'production' }],events:[] }
 }
 export function activeCyclePlan(state: CycleState): CycleDayPlan|undefined { return state.plans.findLast(plan => plan.date === state.activeDate) }
 export function cycleActions(state: CycleState, kind: CycleKind): CycleAction[] {
   const plan = activeCyclePlan(state)
   if (!plan || plan.mode === 'measurement') return []
-  return cycleDefinitions[kind].actions.map((action,index) => index === 0 ? { ...action,title:plan.focus } : action)
+  return cycleDefinitions[kind].actions.map((action,index) => kind === 'promotion' ? {...action,title:plan.actionFocus?.[action.id] ?? action.title,artifact:state.activeDate === '2026-11-13' ? action.id === 'x-post' ? 'x-post-en-v2.md + result-shot.png + 发布回执（回放）' : 'tip-02-script.md + voice-02.wav + captions-02.srt + tip-02.mp4 + 发布回执（回放）' : action.artifact} : index === 0 ? { ...action,title:plan.focus } : action)
 }
 export function dailyDelta(state: CycleState, date: string): number|null {
   const previous = new Date(Date.parse(`${date}T12:00:00Z`) - 86400000).toISOString().slice(0,10)
@@ -59,14 +61,14 @@ export function deliverAction(state: CycleState, kind: CycleKind, actionId: stri
 }
 export function collectCycleData(state: CycleState, kind: CycleKind): CycleState {
   const accountExists = state.observations.some(row => row.date === state.activeDate)
-  const value = kind === 'creator' ? state.activeDate === '2026-11-12' ? 334 : 332 : 720
+  const value = kind === 'promotion' ? promotionFacts(state.activeDate).value! : kind === 'creator' ? state.activeDate === '2026-11-12' ? 334 : 332 : 720
   const incoming: VariantObservation[] = kind === 'creator' ? [
     {videoId:'video-a',variant:'A',ageHours:24,plays:1000,completed:240,watchSeconds:14000,durationSeconds:45,collectedDate:state.activeDate,source:'示例视频 A / T+24h 历史快照回放'},
     {videoId:'video-b',variant:'B',ageHours:state.activeDate === '2026-11-12' ? 3 : 24,plays:state.activeDate === '2026-11-12' ? 300 : 1000,completed:state.activeDate === '2026-11-12' ? 90 : 320,watchSeconds:state.activeDate === '2026-11-12' ? 4800 : 19000,durationSeconds:45,collectedDate:state.activeDate,source:'示例视频 B / 观察龄与原始数回放'},
   ] : []
   const newVariants = incoming.filter(row => !state.variantObservations.some(old => old.videoId === row.videoId && old.ageHours === row.ageHours))
   if (accountExists && !newVariants.length) return state
-  return { ...state,observations:accountExists ? state.observations : [...state.observations,{ date:state.activeDate,value,revision:1,source:kind === 'creator' ? '示例 creator-01 / 浏览器 connector 回放' : '示例发布版 demo-v0.4 / 监控回放',dataReadyAt:`${state.activeDate} 21:00`,...(kind === 'creator' ? state.activeDate === '2026-11-12' ? {plays:700,completed:224,watchSeconds:12600} : {plays:600,completed:162,watchSeconds:10200} : {}) }],variantObservations:[...state.variantObservations,...newVariants],events:[...state.events,`${state.activeDate} · 数据角色核对账号、日期、观察龄与字段后写入（回放）`] }
+  return { ...state,observations:accountExists ? state.observations : [...state.observations,{ date:state.activeDate,value,revision:1,source:kind === 'promotion' ? 'GitHub 仓库快照 + X/B站导出（虚构回放）' : kind === 'creator' ? '示例 creator-01 / 浏览器 connector 回放' : '示例发布版 demo-v0.4 / 监控回放',dataReadyAt:`${state.activeDate} 21:00`,...(kind === 'promotion' ? promotionFacts(state.activeDate) : {}),...(kind === 'creator' ? state.activeDate === '2026-11-12' ? {plays:700,completed:224,watchSeconds:12600} : {plays:600,completed:162,watchSeconds:10200} : {}) }],variantObservations:[...state.variantObservations,...newVariants],events:[...state.events,`${state.activeDate} · 数据角色核对账号、日期、观察龄与字段后写入（回放）`] }
 }
 export function matureComparison(state: CycleState, date: string) {
   const control = state.variantObservations.findLast(row => row.variant === 'A' && row.ageHours === 24 && row.collectedDate <= date)
@@ -76,7 +78,7 @@ export function matureComparison(state: CycleState, date: string) {
   return { control,treatment,a,b,change:b-a,averageA:control.watchSeconds === undefined ? null : control.watchSeconds/control.plays,averageB:treatment.watchSeconds === undefined ? null : treatment.watchSeconds/treatment.plays }
 }
 export function reviewInputKey(state: CycleState): string {
-  return JSON.stringify({ date:state.activeDate,observations:state.observations.filter(row => row.date <= state.activeDate).map(row => [row.date,row.value,row.revision,row.plays,row.completed,row.watchSeconds]),variants:state.variantObservations.filter(row => row.collectedDate <= state.activeDate),candidates:state.candidateResults.filter(row => row.date === state.activeDate),delivered:state.delivered[state.activeDate] ?? [] })
+  return JSON.stringify({ date:state.activeDate,observations:state.observations.filter(row => row.date <= state.activeDate).map(row => [row.date,row.value,row.revision,row.plays,row.completed,row.watchSeconds,row.forks,row.xViews,row.xClicks,row.biliPlays,row.biliCompleted,row.biliWatchSeconds]),variants:state.variantObservations.filter(row => row.collectedDate <= state.activeDate),candidates:state.candidateResults.filter(row => row.date === state.activeDate),delivered:state.delivered[state.activeDate] ?? [] })
 }
 export function latestCycleReview(state: CycleState): CycleReview|undefined {
   return state.reviews.findLast(review => review.date === state.activeDate)
@@ -93,6 +95,13 @@ export function reviewCycle(state: CycleState, kind: CycleKind): CycleState {
     facts.push('当日或前一日数据未齐，今日增量未知；未补零。')
     hypotheses.push('数据缺失可能来自延迟或登录失效，需由采集任务核实。')
     decision = '先补齐观测，不判断实验效果。'; nextAction = '恢复取数并核对观察窗口，保留原实验条件。'
+  } else if (kind === 'promotion') {
+    const previous = state.observations.find(item=>item.date === new Date(Date.parse(`${state.activeDate}T12:00:00Z`)-86400000).toISOString().slice(0,10))
+    facts.push(`GitHub star ${row.value}，日变化 ${delta > 0 ? '+' : ''}${delta}，周期净增 ${row.value-definition.baseline}；fork ${row.forks ?? '未知'}，日变化 ${row.forks === undefined || previous?.forks === undefined ? '未知' : row.forks-previous.forks}，周期净增 ${row.forks === undefined ? '未知' : row.forks-18}。`)
+    facts.push(`X 曝光 ${row.xViews ?? '未知'}，链接点击 ${row.xClicks ?? '待接入'}；B站播放 ${row.biliPlays ?? '未知'}，完播 ${row.biliPlays && row.biliCompleted !== undefined ? (row.biliCompleted/row.biliPlays*100).toFixed(1)+'%' : '未知'}，平均观看 ${row.biliPlays && row.biliWatchSeconds !== undefined ? (row.biliWatchSeconds/row.biliPlays).toFixed(1)+' 秒' : '未知'}。平台窗口分别保留，不相加。`)
+    hypotheses.push('曝光和观看不等于仓库转化；没有可核验的归因链路，无法断言是哪条 X 图文或 B站视频带来了 star/fork。')
+    decision = row.xClicks === undefined ? 'X 点击来源尚缺，先补测；继续每天一个带配音的小技巧，不因涨 star 就认定内容有效。' : 'star 回落而 fork 增长，两项结果分别追踪；保留 B站日更，继续验证 X 的结果展示与视频开场。'
+    nextAction = 'X 改为先展示使用结果并补测点击；B站继续每日一条带配音技巧，只调整前 5 秒。'
   } else if (kind === 'creator') {
     facts.push(`账号粉丝 ${row.value} 人；较前日 ${delta > 0 ? '+' : ''}${delta} 人；周期净增 ${row.value-definition.baseline} 人。`)
     const quality = watchQuality(row)
@@ -116,7 +125,7 @@ export function reviewCycle(state: CycleState, kind: CycleKind): CycleState {
     decision = '候选交付与线上结果分开，不提前更新长期 KR。'; nextAction = '完成候选评审和回归；具备发布授权后发布，并独立复验发布版。'
   }
   if (actions.length && !delivered.length) hypotheses.push('没有已核验的今日交付，不能声称计划已经执行。')
-  const review: CycleReview = { date:state.activeDate,inputKey:reviewInputKey(state),facts,hypotheses,decision,nextAction,waiting:!row || delta === null }
+  const review: CycleReview = { date:state.activeDate,inputKey:reviewInputKey(state),facts,hypotheses,decision,nextAction,...(kind === 'promotion' && row && delta !== null ? {nextActions:promotionNextActions} : {}),waiting:!row || delta === null }
   return { ...state,reviews:[...state.reviews,review],events:[...state.events,`${state.activeDate} · 复盘角色基于观测水位生成回顾 r${state.reviews.filter(r => r.date === state.activeDate).length+1}（回放）`] }
 }
 export function applyNextPlan(state: CycleState): CycleState {
@@ -125,7 +134,7 @@ export function applyNextPlan(state: CycleState): CycleState {
   const review = latestCycleReview(state)!, existing = state.plans.findLast(plan => plan.date === nextDate)
   if (existing?.sourceReviewKey === review.inputKey) return state
   if (state.delivered[nextDate]?.length) throw new Error('次日已有任务交付，保留原任务；需要另建增量调整。')
-  const plan: CycleDayPlan = { date:nextDate,revision:(existing?.revision ?? 0)+1,sourceReviewKey:review.inputKey,focus:review.nextAction,mode:review.waiting ? 'measurement' : 'production' }
+  const plan: CycleDayPlan = { date:nextDate,revision:(existing?.revision ?? 0)+1,sourceReviewKey:review.inputKey,focus:review.nextAction,actionFocus:review.nextActions,mode:review.waiting ? 'measurement' : 'production' }
   return { ...state,plans:[...state.plans,plan],events:[...state.events,`${state.activeDate} · 主智能体将复盘建议纳入 ${nextDate} 计划 r${plan.revision}（回放）`] }
 }
 

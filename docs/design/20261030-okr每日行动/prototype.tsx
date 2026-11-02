@@ -92,7 +92,7 @@ function App() {
   const isNew = route === '/new'
   const isGeneration = route.startsWith('/generate')
   const isCycle = route === '/cycle' || route.startsWith('/cycle/')
-  const cycleKind = route.split('/')[2] === 'repo' ? 'repo' : 'creator'
+  const cycleKind = route.split('/')[2] === 'promotion' ? 'promotion' : route.split('/')[2] === 'repo' ? 'repo' : 'creator'
   const generationStep = Math.max(0,Math.min(5,Number(route.split('/')[2]) || 0))
   const isCheck = route === '/checkin'
   const isBlueprint = route === '/blueprint'

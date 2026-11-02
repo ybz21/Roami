@@ -9,7 +9,7 @@ function restore(): { plan: GeneratedPlan | null; records: BrowserObservation[];
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
     const plan = saved?.plan ? parsePlan(JSON.stringify(saved.plan)) : null
-    return { plan,records:plan ? saved.records.map((row: unknown) => validateObservation(row,plan)) : [],replayIndex:saved?.replayIndex === 1 ? 1 : 0,baseline:saved?.baseline === true,degraded:Array.isArray(saved?.degraded) ? saved.degraded.filter((id:unknown) => typeof id === 'string') : [] }
+    return { plan,records:plan ? saved.records.map((row: unknown) => validateObservation(row,plan)) : [],replayIndex:Number.isInteger(saved?.replayIndex) && saved.replayIndex >= 0 && saved.replayIndex < replayOptions.length ? saved.replayIndex : 0,baseline:saved?.baseline === true,degraded:Array.isArray(saved?.degraded) ? saved.degraded.filter((id:unknown) => typeof id === 'string') : [] }
   } catch { return { plan:null,records:[],replayIndex:0,baseline:false,degraded:[] } }
 }
 const shown = (value: number | null, unit: string) => value === null ? '待取得有效数据' : `${Number(value.toFixed(2)).toLocaleString('zh-CN')}${unit}`

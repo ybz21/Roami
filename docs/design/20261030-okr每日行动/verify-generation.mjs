@@ -11,8 +11,8 @@ const temporary = await mkdtemp(path.join(tmpdir(),'okr-generation-check-'))
 try {
   const outfile = path.join(temporary,'contract.mjs')
   await require('esbuild').build({ stdin:{ contents:"export * from './okr-generation-contract'; export * from './okr-generation-replays'; export * from './okr-execution-cycle'; export * from './okr-dialogue-scenes'; export * from './okr-swarm-state'; export * from './prototype-data'; export * from './okr-setup-model'",resolveDir:directory,loader:'ts' },bundle:true,platform:'node',format:'esm',outfile })
-  const { parsePlan, growthReplay, qualityReplay, repoReplay, validateObservation, replayObservation, measuredValue, initialCycle, cycleDefinitions, cycleActions, deliverAction, collectCycleData, dailyDelta, reviewCycle, reviewIsCurrent, latestCycleReview, applyNextPlan, matureComparison, watchQuality, initialGoals, valueAt, creatorMetrics, starter, analyze, requiredFacts } = await import(pathToFileURL(outfile).href)
-  for (const plan of [growthReplay,qualityReplay,repoReplay]) assert.equal(parsePlan(JSON.stringify(plan)).objective,plan.objective)
+  const { parsePlan, growthReplay, qualityReplay, repoReplay, promotionReplay, promotionQualityReplay, validateObservation, replayObservation, measuredValue, initialCycle, cycleDefinitions, cycleActions, deliverAction, collectCycleData, dailyDelta, reviewCycle, reviewIsCurrent, latestCycleReview, applyNextPlan, matureComparison, watchQuality, initialGoals, valueAt, creatorMetrics, starter, analyze, requiredFacts } = await import(pathToFileURL(outfile).href)
+  for (const plan of [growthReplay,qualityReplay,repoReplay,promotionReplay,promotionQualityReplay]) assert.equal(parsePlan(JSON.stringify(plan)).objective,plan.objective)
   assert.equal(growthReplay.keyResults.length,4)
   assert.equal(qualityReplay.keyResults.length,5)
   assert.deepEqual(new Set(qualityReplay.keyResults.map(kr => kr.view)),new Set(['number','milestones','checklist']))
@@ -125,7 +125,7 @@ try {
   repo = reviewCycle(repo,'repo')
   assert.ok(latestCycleReview(repo).facts.some(fact => fact.includes('280ms') && fact.includes('720ms')))
   const { dialogueScenes,sceneOffsets,sceneAt,storyDuration,scenePlan,sceneCycle,sceneSnapshot,storylines,sceneLifecycle,swarmProjection,swarmMessages } = await import(pathToFileURL(outfile).href)
-  for (const kind of ['creator','repo']) {
+  for (const kind of ['creator','repo','promotion']) {
     const scenes = dialogueScenes[kind], offsets = sceneOffsets(kind)
     assert.equal(scenes[0].view,'intent')
     assert.equal(sceneLifecycle(scenes[0]),'building')
@@ -147,9 +147,9 @@ try {
     }
     const launch = swarmProjection(kind,scenes.find(scene=>scene.id==='activate')), active = swarmProjection(kind,scenes.find(scene=>scene.id==='work')), final = swarmProjection(kind,scenes.at(-1))
     assert.equal(launch.id,final.id)
-    assert.equal(launch.members.length,4)
+    assert.equal(launch.members.length,kind === 'promotion' ? 5 : 4)
     assert.ok(launch.tasks.every(task=>task.state==='waiting'))
-    assert.ok(active.tasks.some(task=>task.member==='执行'&&task.state==='done'))
+    assert.ok(active.tasks.some(task=>!['数据','复盘','主责'].includes(task.member)&&task.state==='done'))
     assert.ok(active.tasks.some(task=>task.member==='数据'&&task.state!=='done'))
     assert.ok(final.nextPlan)
     assert.equal(launch.boardId,final.boardId)
@@ -161,14 +161,16 @@ try {
     const secondExecution = swarmProjection(kind,scenes.find(scene=>scene.id==='second-work'))
     assert.ok(secondExecution.inheritedPlan.sourceReviewKey)
     assert.equal(secondExecution.inheritedPlan.focus,firstReview.review.nextAction)
-    assert.equal(secondExecution.tasks.find(task=>task.member==='执行').title,firstReview.review.nextAction)
+    if(kind === 'promotion') {
+      for(const [actionId,title] of Object.entries(firstReview.review.nextActions)) assert.equal(secondExecution.tasks.find(task=>task.id.endsWith(':'+actionId)).title,title)
+    } else assert.equal(secondExecution.tasks.find(task=>task.member==='执行').title,firstReview.review.nextAction)
     assert.ok(secondExecution.allTasks.some(task=>task.id.startsWith('2026-11-12:')))
     assert.ok(secondExecution.allTasks.some(task=>task.id.startsWith('2026-11-13:')))
     const room = swarmMessages(kind,scenes.at(-1))
-    assert.deepEqual(new Set(room.filter(message=>message.author!=='你').map(message=>message.author)),new Set(['主责智能体','执行智能体','数据智能体','反思智能体']))
+    assert.deepEqual(new Set(room.filter(message=>message.author!=='你').map(message=>message.author)),new Set(kind === 'promotion' ? ['主责智能体','X 图文智能体','B站视频智能体','数据智能体','反思智能体'] : ['主责智能体','执行智能体','数据智能体','反思智能体']))
     assert.ok(room.filter(message=>message.taskId).every(message=>final.allTasks.some(task=>task.id===message.taskId)))
     assert.ok(swarmMessages(kind,scenes.find(scene=>scene.id==='work')).every(message=>message.author!=='反思智能体'))
-    assert.ok(room.some(message=>message.author==='执行智能体'&&message.date==='2026-11-13'))
+    assert.ok(room.some(message=>(kind === 'promotion' ? ['X 图文智能体','B站视频智能体'].includes(message.author) : message.author==='执行智能体')&&message.date==='2026-11-13'))
 
     const deliveredStage = sceneSnapshot(kind,scenes.find(scene => scene.id === 'work'))
     assert.ok(deliveredStage.delivered['2026-11-12'].length>0)
@@ -190,9 +192,28 @@ try {
     assert.equal(snapshot.activeDate,'2026-11-13')
     assert.equal(snapshot.observations.length,3)
     if (kind === 'creator') assert.equal(dailyDelta(snapshot,snapshot.activeDate),-2)
-    else assert.equal(snapshot.observations.at(-1).value,720)
+    else if(kind === 'repo') assert.equal(snapshot.observations.at(-1).value,720)
+    else {
+      assert.equal(snapshot.observations.at(-1).value,125);assert.equal(snapshot.observations.at(-1).forks,21)
+      assert.equal(dailyDelta(snapshot,snapshot.activeDate),-3)
+      const partial=swarmProjection(kind,scenes.find(scene=>scene.id==='x-work'))
+      assert.equal(partial.state.delivered['2026-11-12'].length,1)
+      assert.equal(partial.tasks.find(task=>task.member==='X 图文智能体').state,'done')
+      assert.equal(partial.tasks.find(task=>task.member==='B站视频智能体').state,'working')
+      assert.equal(partial.loop.find(step=>step.id==='execute').status,'working')
+      const partialRoom=swarmMessages(kind,scenes.find(scene=>scene.id==='x-work'))
+      assert.ok(!partialRoom.some(message=>message.author==='B站视频智能体'&&message.text.startsWith('已回填')))
+      assert.equal(snapshot.plans.at(-1).actionFocus['bili-tip'],snapshot.reviews.at(-1).nextActions['bili-tip'])
+      assert.equal(snapshot.observations[1].xClicks,undefined)
+      assert.ok(snapshot.reviews[0].decision.includes('补测'))
+      assert.ok(snapshot.reviews[1].facts.some(fact=>fact.includes('日变化 -3')))
+    }
   }
-  console.log('PASS: generated plans, daily learning cycle, evidence boundaries, dialogue scenes and seek checkpoints for both stories')
+  const promotionSample=validateObservation(replayObservation(promotionReplay),promotionReplay)
+  assert.equal(measuredValue(promotionReplay.metrics.find(metric=>metric.id==='forks-total'),[promotionSample],promotionSample.date),18)
+  const missingFork=structuredClone(promotionSample);delete missingFork.values.forks
+  assert.throws(()=>validateObservation(missingFork,promotionReplay))
+  console.log('PASS: generated plans, daily learning cycle, evidence boundaries, dialogue scenes and seek checkpoints for three stories')
 } finally {
   await rm(temporary,{ recursive:true,force:true })
 }
