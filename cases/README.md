@@ -98,3 +98,5 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case89 / MECH-UR01](case-89-mech-ur01/CASE.md)：Skill资源协议地址与读取边界，10项机制检查。
 
 - [Case90 / MECH-RA01](case-90-mech-ra01/CASE.md)：用户委托AI参考的显式准入、证据绑定和混合校准，24项零外部模型机制检查。
+
+- [Case91 / MECH-UG01](case-91-mech-ug01/CASE.md)：Go网关上游响应关联、内部标记边界与旧账本迁移，6组、25项叶检查，零外部模型调用。

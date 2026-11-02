@@ -397,10 +397,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				return false
 			}
 			defer response.Body.Close()
+			call.upstream = responseReceipt(response)
 			status = response.StatusCode
 			for name, values := range response.Header {
 				lower := strings.ToLower(name)
-				if containsField([]string{"connection", "transfer-encoding", "content-length", "set-cookie", "upgrade"}, lower) {
+				if strings.HasPrefix(lower, "x-roami-") || containsField([]string{"connection", "transfer-encoding", "content-length", "set-cookie", "upgrade"}, lower) {
 					continue
 				}
 				if bridge != nil && containsField([]string{"content-type", "content-encoding"}, lower) {
@@ -415,7 +416,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			if bridge != nil {
 				if status < 200 || status >= 300 {
 					code = "MODEL_HTTP_" + strconv.Itoa(status)
-					newProtocolEncoder(w, bridge).fail(code)
+					newProtocolEncoder(w, bridge).failStatus(code, status)
 					return false
 				}
 				complete, conversionError := bridge.forward(w, response, &capture)

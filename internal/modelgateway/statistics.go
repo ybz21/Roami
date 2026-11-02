@@ -28,28 +28,30 @@ type UsageGroup struct {
 }
 
 type CallRecord struct {
-	PriceStatus    string  `json:"priceStatus"`
-	AgentKind      string  `json:"agentKind"`
-	KeyID          string  `json:"keyId"`
-	SourceID       string  `json:"sourceId"`
-	RouteID        string  `json:"routeId"`
-	Source         string  `json:"source"`
-	ID             string  `json:"id"`
-	Day            string  `json:"day"`
-	Role           string  `json:"role"`
-	Model          string  `json:"model"`
-	Currency       string  `json:"currency"`
-	State          string  `json:"state"`
-	Started        int64   `json:"startedMs"`
-	Input          *int64  `json:"inputTokens"`
-	Output         *int64  `json:"outputTokens"`
-	Cached         *int64  `json:"cacheReadTokens"`
-	Cost           *string `json:"cost"`
-	Status         int     `json:"httpStatus"`
-	Error          string  `json:"errorCode"`
-	Reconciliation string  `json:"reconciliation"`
-	Session        string  `json:"sessionId"`
-	Request        string  `json:"requestId"`
+	UpstreamStatus  int     `json:"upstreamHttpStatus"`
+	UpstreamRequest string  `json:"upstreamRequestId,omitempty"`
+	PriceStatus     string  `json:"priceStatus"`
+	AgentKind       string  `json:"agentKind"`
+	KeyID           string  `json:"keyId"`
+	SourceID        string  `json:"sourceId"`
+	RouteID         string  `json:"routeId"`
+	Source          string  `json:"source"`
+	ID              string  `json:"id"`
+	Day             string  `json:"day"`
+	Role            string  `json:"role"`
+	Model           string  `json:"model"`
+	Currency        string  `json:"currency"`
+	State           string  `json:"state"`
+	Started         int64   `json:"startedMs"`
+	Input           *int64  `json:"inputTokens"`
+	Output          *int64  `json:"outputTokens"`
+	Cached          *int64  `json:"cacheReadTokens"`
+	Cost            *string `json:"cost"`
+	Status          int     `json:"httpStatus"`
+	Error           string  `json:"errorCode"`
+	Reconciliation  string  `json:"reconciliation"`
+	Session         string  `json:"sessionId"`
+	Request         string  `json:"requestId"`
 }
 
 type Statistics struct {
@@ -194,7 +196,7 @@ func (l *Ledger) StatisticsForSource(days int, selected, source string, agents .
 				result.Hourly = append(result.Hourly, *g)
 			}
 		}
-		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id,agent_kind,key_id,source_id,route_id,price_status,`+usageSourceSQL+` FROM gateway_calls WHERE day>=? AND day<=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?) ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To, source, source, agent, agent)
+		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id,agent_kind,key_id,source_id,route_id,price_status,upstream_http_status,upstream_request_id,`+usageSourceSQL+` FROM gateway_calls WHERE day>=? AND day<=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?) ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To, source, source, agent, agent)
 		if err != nil {
 			return err
 		}
@@ -202,7 +204,7 @@ func (l *Ledger) StatisticsForSource(days int, selected, source string, agents .
 		for rows.Next() {
 			var record CallRecord
 			var nano *int64
-			if err = rows.Scan(&record.ID, &record.Day, &record.Role, &record.Model, &record.Currency, &record.State, &record.Started, &record.Input, &record.Output, &record.Cached, &nano, &record.Status, &record.Error, &record.Reconciliation, &record.Session, &record.Request, &record.AgentKind, &record.KeyID, &record.SourceID, &record.RouteID, &record.PriceStatus, &record.Source); err != nil {
+			if err = rows.Scan(&record.ID, &record.Day, &record.Role, &record.Model, &record.Currency, &record.State, &record.Started, &record.Input, &record.Output, &record.Cached, &nano, &record.Status, &record.Error, &record.Reconciliation, &record.Session, &record.Request, &record.AgentKind, &record.KeyID, &record.SourceID, &record.RouteID, &record.PriceStatus, &record.UpstreamStatus, &record.UpstreamRequest, &record.Source); err != nil {
 				return err
 			}
 			if nano != nil {
