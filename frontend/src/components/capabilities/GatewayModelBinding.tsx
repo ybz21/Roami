@@ -18,9 +18,10 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const sources = catalog.value?.sources || []
   const models = catalog.value?.models || []
   const profile = view.profiles.find(profile => profile.applied || profile.id === view.activeId)
-  const currentModel = models.find(model => model.id === view.current.model) || models.find(model => {
+  const throughGateway = !!profile && !!catalog.value?.baseUrl && endpoint(profile.baseUrl) === endpoint(catalog.value.baseUrl)
+  const currentModel = (throughGateway ? models.find(model => model.id === view.current.model) : undefined) || models.find(model => {
     const source = sources.find(source => source.id === model.candidates[0].sourceId)
-    return profile && source && endpoint(source.baseUrl) === endpoint(profile.baseUrl) && model.candidates[0].model === view.current.model
+    return profile && source && source.protocol === profile.protocol && endpoint(source.baseUrl) === endpoint(profile.baseUrl) && model.candidates[0].model === view.current.model
   })
   const currentMode = view.mode || (profile || view.current.provider && view.current.provider !== 'openai' ? 'custom' : 'official')
   const selectedMode = mode || currentMode
@@ -48,7 +49,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const selectedOption = options.find(option => option.value === model) || (pendingModel ? options.find(option => option.upstreamModel === pendingModel) : undefined) || (selectedSource === currentModel?.candidates[0].sourceId ? options.find(option => option.value === currentModel?.id) : undefined)
   const selected = selectedOption?.value
   const currentLabel = currentModel?.name || (view.current.provider === 'Roami Gateway' ? t('hub.mode.custom') : view.current.model || t('hub.mode.custom'))
-  const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || !!selected && selected === currentModel?.id && !!profile?.applied)
+  const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || throughGateway && !!selected && selected === currentModel?.id && !!profile?.applied)
   const valid = installed && (selectedMode === 'official' || !!selectedSource && !!selected && !!catalog.value)
   useEffect(() => { onModelLabel?.(currentModel?.name || '') }, [currentModel?.name, onModelLabel])
   const apply = async () => {
@@ -64,6 +65,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const params = getHashParams().toString()
   return <section className="tt-model-binding">
     <p className="tt-model-binding-current">{t('hub.currentMode')}<strong>{currentMode === 'official' ? t('hub.mode.official') : currentLabel}</strong></p>
+    {currentMode === 'custom' && profile?.applied && !view.changed && !throughGateway && <p role="status">{t('hub.directConnection')}</p>}
     <Radio.Group className="tt-model-binding-mode" aria-label={t('hub.connectionMode')} value={selectedMode} optionType="button" onChange={event => setMode(event.target.value)} disabled={busy} options={['official', 'custom'].map(value => ({ value, label: t('hub.mode.' + value) }))} />
     {!installed && <p>{t('hub.installFirst')}</p>}
     {(error || selectedMode === 'custom' && catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={() => { catalog.retry(); void onChanged() }}>{t('capabilities.models.reread')}</Button>} />}

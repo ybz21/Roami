@@ -4637,6 +4637,7 @@ const enUS = {
   'hub.modelSaved': "Model saved and available to all clients",
   'hub.modelImpact': "Consumers: {users}. Future requests use the new configuration; active requests keep their route.",
   'hub.currentMode': "Currently using",
+  'hub.directConnection': "Currently connected directly. Apply to track usage in Roami.",
   'hub.connectionMode': "Model mode",
   'hub.mode.official': "Factory mode (Default)",
   'hub.mode.custom': "Custom mode",

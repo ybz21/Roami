@@ -21,6 +21,28 @@ const select = async (label: string, option: string) => {
   fireEvent.mouseDown(screen.getByRole('combobox', { name: label }))
   fireEvent.click(await screen.findByText(option, { selector: '.ant-select-item-option-content' }))
 }
+it('allows applying a direct native preset that already matches a saved source and model', async () => {
+  mount({ ...view, profiles: [{ ...view.profiles[0], name: 'Native preset', baseUrl: sources[0].baseUrl + '/v1', model: 'upstream-a' }], current: { provider: 'Native preset', model: 'upstream-a' } })
+  await screen.findByText('Source a')
+  expect(screen.getByText('hub.directConnection')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.apply' }))
+  fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.models.apply' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/apply', { kind: 'claude', sourceId: 'a', model: 'model-a', revision: 'native-r1', catalogRevision: 'catalog-r1' }))
+})
+it('marks a matching gateway profile as applied', async () => {
+  mount({ ...view, profiles: [{ ...view.profiles[0], baseUrl: view.profiles[0].baseUrl + '/v1/' }] })
+  await screen.findByText('Source a')
+  expect((screen.getByRole('button', { name: 'capabilities.models.applied' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByText('hub.directConnection')).toBeNull()
+})
+it.each(['upstream-a', 'model-a'])('does not match a direct preset to a different protocol or a gateway alias: %s', async model => {
+  mount({ ...view, profiles: [{ ...view.profiles[0], baseUrl: sources[0].baseUrl, protocol: 'openai-completions', model }], current: { provider: 'Native preset', model } })
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/catalog', undefined, expect.anything()))
+  await screen.findByText('hub.chooseSource')
+  expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(api).not.toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/source-models', expect.anything(), expect.anything())
+})
 it('chooses a saved source first and exposes only that source’s models', async () => {
   mount(); await screen.findByText('Source a')
   await select('hub.source', 'Source b')
@@ -75,7 +97,7 @@ it('reads models from a saved source without requiring prior model registration'
 it('allows a known model ID when a source has no model-list endpoint', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path.endsWith('/source-models')) throw Object.assign(new Error('unsupported'), { apiError: { code: 'MODEL_LIST_UNSUPPORTED' } })
-    return { data: { revision: 'catalog-r1', sources, models, drafts: [], uses: {} } }
+    return { data: { revision: 'catalog-r1', sources, models, drafts: [], uses: {}, baseUrl: view.profiles[0].baseUrl } }
   })
   mount(); await screen.findByText('hub.sourceListUnsupported')
   const field = screen.getByRole('combobox', { name: 'hub.tab.catalog' })
