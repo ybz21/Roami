@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [任务回报失败时保留交付入口](2026-11-03/task-fallback-deliverables.md) |
 | 2026-11-03 | [当前核心机制与行情修订稿](2026-11-03/current-core-mechanisms-and-report.md) |
 | 2026-11-03 | [本机网关就绪与鉴权准入拒绝](2026-11-03/gateway-readiness-admission.md) |
 | 2026-11-03 | [网关结算状态与回报失败原因](2026-11-03/gateway-pending-and-report-errors.md) |

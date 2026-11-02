@@ -10,6 +10,27 @@ from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.transcript_repository import message
 
 
+def completion_artifacts(db, turn, completion):
+    references = completion_for_reply(completion or {}).get("result", {}).get("artifactRefs", [])
+    if not isinstance(references, list):
+        return []
+    identifiers = [
+        item["id"]
+        for item in references[:4]
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    ]
+    if not identifiers:
+        return []
+    retained = rows(
+        db,
+        "SELECT id,name FROM artifacts WHERE owner_id=? AND task_id=? "
+        "AND deleted_ms IS NULL AND id IN (" + ",".join("?" for _ in identifiers) + ")",
+        (turn["owner_id"], completion["taskId"], *identifiers),
+    )
+    by_id = {item["id"]: item for item in retained}
+    return [by_id[aid] for aid in dict.fromkeys(identifiers) if aid in by_id]
+
+
 class TurnJournal:
     def __init__(self, database):
         self.db = database
@@ -144,27 +165,8 @@ class TurnJournal:
         def write(db):
             assert_context_admitted(db, turn)
             delivery = text
-            references = (
-                completion_for_reply(completion or {}).get("result", {}).get("artifactRefs", [])
-            )
-            if final and isinstance(references, list):
-                identifiers = [
-                    item["id"]
-                    for item in references[:4]
-                    if isinstance(item, dict) and isinstance(item.get("id"), str)
-                ]
-                if identifiers:
-                    retained = rows(
-                        db,
-                        "SELECT id,name FROM artifacts WHERE owner_id=? AND task_id=? "
-                        "AND deleted_ms IS NULL AND id IN ("
-                        + ",".join("?" for _ in identifiers)
-                        + ")",
-                        (turn["owner_id"], completion["taskId"], *identifiers),
-                    )
-                    by_id = {item["id"]: item for item in retained}
-                    retained = [by_id[aid] for aid in dict.fromkeys(identifiers) if aid in by_id]
-                    delivery = deliverable_links(text, retained)
+            if final:
+                delivery = deliverable_links(text, completion_artifacts(db, turn, completion))
             content = {"text": delivery, **({"tool_calls": calls} if calls else {})}
             if question:
                 content["question"] = question
@@ -287,12 +289,16 @@ class TurnJournal:
                 "reportError": public_error_code(code),
                 "errorCode": public_error_code(completion.get("result", {}).get("summary")),
             }
+            content = {"source": "task", "taskStatus": fact}
+            artifacts = completion_artifacts(db, turn, completion)
+            if artifacts:
+                content["text"] = deliverable_links("", artifacts).lstrip("\n")
             mid = message(
                 db,
                 turn["conversation_id"],
                 turn["branch_id"],
                 "assistant",
-                {"source": "task", "taskStatus": fact},
+                content,
                 turn_id=turn["id"],
             )
             event(

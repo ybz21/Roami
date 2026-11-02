@@ -1,0 +1,52 @@
+{
+  "id": "MECH-TF02",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "任务交付",
+  "prompt": "总结被网关拒绝时保留可信产物入口和任务真实状态。",
+  "preconditions": "冻结的 Python 开发依赖、前端依赖和隔离启动器；仅使用本地 UDS。",
+  "expected_terminal": "owned_deliverables_preserved_without_changing_task_state",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "后端10项及前端6项无跳过测试回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-TF02-H1",
+      "rule": "回报失败不丢失同用户同任务未删除产物，不采用执行器伪造文件名或任意 URL。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TF02-H2",
+      "rule": "保留实际任务状态和独立回报错误，禁止过期、遗忘、中断或重复回报恢复产物。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TF02-H3",
+      "rule": "网页证据不足时已被扣留的候选产物不得恢复。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_task_completion_fallback",
+    "issue": 616,
+    "fixture_reproduction_only": true
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
