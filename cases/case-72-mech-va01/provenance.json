@@ -1,0 +1,8 @@
+{
+  "origin": "synthetic_tool_contract",
+  "issue": 446,
+  "recipe": "input/recipe.json",
+  "reference_pick_ids_used": false,
+  "model_calls": 0,
+  "formal_suite_updated": false
+}

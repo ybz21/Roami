@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -38,4 +40,29 @@ jobs:
         run: npm ci
 
       - name: Run quality gate
+        env:
+          QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          QUALITY_HEAD_SHA: ${{ github.sha }}
         run: scripts/dev/quality/check.sh full
+
+      - name: Check external presentation Skill
+        run: |
+          uv run --project agent-runtime --frozen ruff check skills/presentation-edit
+          uv run --project agent-runtime --frozen ruff format --check skills/presentation-edit
+          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/presentation-edit/tests
+
+      - name: Check external tabular Skill
+        run: |
+          uv run --project agent-runtime --frozen ruff check skills/tabular-analysis
+          uv run --project agent-runtime --frozen ruff format --check skills/tabular-analysis
+          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/tabular-analysis/tests
+
+      - name: Check external video assembly Skill
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          uv run --project agent-runtime --frozen ruff check skills/video-assembly
+          uv run --project agent-runtime --frozen ruff format --check skills/video-assembly
+          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/video-assembly/tests

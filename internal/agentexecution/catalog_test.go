@@ -24,8 +24,8 @@ func TestExecutorDiscoveryDoesNotRunCommandsOrInferAccounts(t *testing.T) {
 		if candidate.Kind == "codex" {
 			found = candidate.Installed && candidate.Tracked
 		}
-		if candidate.Kind == "opencode" && candidate.Tracked {
-			t.Fatal("unimplemented tracked adapter exposed")
+		if candidate.Kind == "opencode" && !candidate.Tracked {
+			t.Fatal("OpenCode tracked adapter missing")
 		}
 	}
 	if !found {
@@ -44,5 +44,31 @@ func TestExecutorDiscoveryDoesNotRunCommandsOrInferAccounts(t *testing.T) {
 		if err := catalog.ProbeCommands([]string{command}); err == nil {
 			t.Fatalf("invalid command accepted: %s", command)
 		}
+	}
+}
+
+func TestNativeOpenCodeExecutorDiscovery(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	path := filepath.Join(home, ".opencode", "bin", "opencode")
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 99\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	catalog := DiscoverExecutors()
+	found := false
+	for _, candidate := range catalog.Candidates {
+		if candidate.Kind == "opencode" {
+			found = candidate.Installed && candidate.Tracked && candidate.Authentication == "unknown"
+		}
+	}
+	if !found {
+		t.Fatal("native OpenCode not discovered")
+	}
+	if err := catalog.ProbeCommands([]string{"opencode"}); err != nil || catalog.CommandAvailability["opencode"] {
+		t.Fatalf("bare command outside PATH reported available: %+v, %v", catalog.CommandAvailability, err)
 	}
 }

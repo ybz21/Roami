@@ -3,7 +3,7 @@
 //
 // 排版要点：助手消息按「正文段 / 工具段」分开——正文进气泡，**工具段平铺全宽不套气泡**。
 // 工具本来就不是「说的话」，塞进气泡里等于给每次 Read 描一道框，一屏十几次就全是框。
-import { memo, type ReactNode } from 'react'
+import { memo, type ReactNode, type ComponentProps } from 'react'
 import Markdown from '../markdown/Markdown'
 import { Collapsible, copyText, fmtTs, localizeSentinels, MONO } from './blocks'
 import { useI18n } from '../../i18n'
@@ -14,10 +14,12 @@ import { splitAtPaths } from '../../agent-paths'
 import { noticePrefixOf } from '../shell/session-drop'
 import { IMG_EXT } from '../files/file-utils'
 import { MentionedImage } from './MentionedImage'
+import './conversation.css'
 
 export const CODEX_ACCENT = 'var(--accent)'
 
-export type Side = 'claude' | 'codex' | 'opencode'
+export type Side = 'claude' | 'codex' | 'opencode' | 'native'
+type ResolveHref = ComponentProps<typeof Markdown>['resolveHref']
 
 // 后端对 redacted_thinking 只能给个占位；文案在前端出，后端不写死中文（见 backend/api/claude.go）
 const REDACTED_THINKING = '[redacted_thinking]'
@@ -60,17 +62,17 @@ function messageText(m: Msg): string {
 }
 
 // 消息尾巴：时间 + 复制。工具段不给尾巴——那不是「谁说的话」。
-function Footer({ m, align }: { m: Msg; align: 'flex-start' | 'flex-end' }) {
+function Footer({ m, align, actions }: { m: Msg; align: 'flex-start' | 'flex-end'; actions?: ReactNode }) {
   const { t } = useI18n()
   return (
-    <span style={{ display: 'inline-flex', alignSelf: align, alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-micro)', color: 'var(--text-dimmer)', padding: '0 var(--sp-1)' }}>
+    <span className="conversation-message-footer" style={{ display: 'inline-flex', alignSelf: align, alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', padding: '0 var(--sp-1)' }}>
       {m.ts && fmtTs(m.ts)}
-      <button className="cc-msg-copy" onClick={() => copyText(messageText(m))}>{t('common.copy')}</button>
+      <button type="button" className="cc-msg-copy" onClick={() => copyText(messageText(m))}>{t('common.copy')}</button>{actions}
     </span>
   )
 }
 
-function Prose({ blocks, accent, side }: { blocks: Block[]; accent: string; side: Side }) {
+function Prose({ blocks, accent, side, resolveHref }: { blocks: Block[]; accent: string; side: Side; resolveHref?: ResolveHref }) {
   const { t } = useI18n()
   const thinkLabel = side === 'claude' ? t('chat.thinking') : t('chat.reasoning')
   return (
@@ -80,7 +82,7 @@ function Prose({ blocks, accent, side }: { blocks: Block[]; accent: string; side
           const text = b.text === REDACTED_THINKING ? t('chat.thinkingRedacted') : localizeSentinels(b.text || '', t)
           return <Collapsible key={i} label={thinkLabel} text={text} color="var(--text-dim)" />
         }
-        return <Markdown key={i} accent={accent}>{localizeSentinels(b.text || '', t)}</Markdown>
+        return <Markdown key={i} accent={accent} resolveHref={resolveHref}>{localizeSentinels(b.text || '', t)}</Markdown>
       })}
     </>
   )
@@ -126,7 +128,7 @@ function RoamNotice({ m }: { m: Msg }) {
   )
 }
 
-function UserMessage({ m, accent }: { m: Msg; accent: string }) {
+function UserMessage({ m, accent, renderUserText }: { m: Msg; accent: string; renderUserText?: (text: string) => ReactNode }) {
   const { t } = useI18n()
   const parsed = m.blocks.map((b) => (b.kind === 'text' ? parseUserText(b.text || '') : null))
   const extras = parsed.filter(Boolean) as UserText[]
@@ -148,7 +150,7 @@ function UserMessage({ m, accent }: { m: Msg; accent: string }) {
                     <TerminalIcon size={12} />{p.command}{p.args ? ` ${p.args}` : ''}
                   </span>
                 )}
-                {p.body && <BodyWithImages text={p.body} accent="#fff" />}
+                {p.body && (renderUserText ? renderUserText(p.body) : <BodyWithImages text={p.body} accent="#fff" />)}
               </div>
             )
           })}
@@ -161,7 +163,7 @@ function UserMessage({ m, accent }: { m: Msg; accent: string }) {
   )
 }
 
-export const ChatMessage = memo(function ChatMessage({ m, results, side }: { m: Msg; results: Record<string, Block>; side: Side }) {
+export const ChatMessage = memo(function ChatMessage({ m, results, side, renderUserText, resolveHref, footerActions }: { m: Msg; results: Record<string, Block>; side: Side; renderUserText?: (text: string) => ReactNode; resolveHref?: ResolveHref; footerActions?: ReactNode }) {
   const accent = 'var(--accent)'
   const solid = 'var(--accent-solid)'
 
@@ -169,7 +171,7 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side }: { m: 
   // SendPromptSubmit 投进输入框并回车的，转录里就记成一个 user turn——可它不是
   // 你说的话，画成实心蓝气泡会把对话搅浑。收成一条可展开的通知。
   if (m.role === 'user' && isRoamNotice(m)) return <RoamNotice m={m} />
-  if (m.role === 'user') return <UserMessage m={m} accent={solid} />
+  if (m.role === 'user') return <UserMessage m={m} accent={solid} renderUserText={renderUserText} />
 
   const segs = segments(m.blocks)
   const hasProse = segs.some((sg) => !sg.tool)
@@ -185,10 +187,10 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side }: { m: 
         </div>
       ) : (
         <div key={i} style={{ background: 'var(--bg-container)', border: '1px solid var(--border)', borderRadius: 'var(--r-card)', padding: 'var(--sp-2) var(--sp-3)', color: 'var(--text-bright)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
-          <Prose blocks={sg.blocks} accent={accent} side={side} />
+          <Prose blocks={sg.blocks} accent={accent} side={side} resolveHref={resolveHref} />
         </div>
       )))}
-      {hasProse && <Footer m={m} align="flex-start" />}
+      {hasProse && <Footer m={m} align="flex-start" actions={footerActions} />}
     </div>
   )
 })

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-NC01",
+  "data": {
+    "kind": "public_synthetic_comparison_cohorts",
+    "inputs": [
+      "input/comparison-before.csv",
+      "input/comparison-after.csv"
+    ],
+    "runtime_input": "skills/tabular-analysis/tests/fixtures/comparison-before.csv",
+    "runtime_inputs": {
+      "input/comparison-before.csv": "skills/tabular-analysis/tests/fixtures/comparison-before.csv",
+      "input/comparison-after.csv": "skills/tabular-analysis/tests/fixtures/comparison-after.csv"
+    },
+    "byte_identical_required": true,
+    "description": "公开CSV由测试实际读取，未包含股票原题答案或人工标签。"
+  },
+  "tools": {
+    "kind": "standard_library_readonly_decimal_comparison",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "skills/tabular-analysis/tests/test_numeric_comparison.py"
+    ],
+    "expected_collected": 31,
+    "no_skips": true
+  }
+}

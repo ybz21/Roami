@@ -1,0 +1,53 @@
+{
+  "id": "MECH-EB01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "评分证据绑定",
+  "prompt": "保持产物、原生快照与评分证据的哈希绑定；任一阶段发生变动时拒绝准入或保持待复核，不重放模型请求。",
+  "preconditions": "公开合成文件与哈希、实际评分输入收集器、脚本化渲染器和评分模型；另执行真实LibreOffice页面回归。",
+  "expected_terminal": "changed_sources_cannot_pass_review",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "原评分remote_path/path及快照哈希核对",
+    "渲染、依据提取和评分阶段的变更回执",
+    "不重放已完成评分请求，保留待评分状态"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-EB01-H1",
+      "rule": "原生评分记录中的产物及快照在复核前、渲染后和评分后保持相同哈希；变更不能产生通过评分。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-EB01-H2",
+      "rule": "路径别名、冲突哈希、越界与符号链接不能混淆证据；非法来源在模型调用前拒绝。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-EB01-H3",
+      "rule": "评分途中变更保持pending，已发生用量与回执保留，不重放请求；有效证据的盲评协议和原分数规则不改。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "stock_remote_path_not_checked_by_artifact_review",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/artifact-sources.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

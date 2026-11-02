@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TE02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_persistence.py::test_recovery_marks_partial_and_unknown_tools",
+      "test_task_delivery_benchmark.py::test_B05_unknown_outcome_blocks_new_launch_immediately"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_persistence.py::test_recovery_marks_partial_and_unknown_tools",
+      "test_task_delivery_benchmark.py::test_B05_unknown_outcome_blocks_new_launch_immediately"
+    ]
+  }
+}

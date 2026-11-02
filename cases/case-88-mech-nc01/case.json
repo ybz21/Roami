@@ -1,0 +1,56 @@
+{
+  "id": "MECH-NC01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "数值比较回执",
+  "prompt": "比较明确统计量对应的源CSV快照，保留哈希、样本量、差值、带定义的变化率；不修改输入，不把近似用语当作数值结论。",
+  "preconditions": "公开两组CSV配方、Python标准库、只读Workspace与确定性比较脚本；零模型调用。",
+  "expected_terminal": "source_bound_numeric_comparison_without_mutating_inputs",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "给出两份快照哈希、明确统计量和观察数量",
+    "比较差值、变化率及一位小数百分比，零基数无虚构值",
+    "输入变化、坏数字、路径越界和非法统计量拒绝；源字节保持"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-NC01-H1",
+      "rule": "手算100到30的中位数变化是-70.0%，其余明确统计量按各自定义计算。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NC01-H2",
+      "rule": "零与负基数、小相对变化、抵消、缺失和数值范围保持明确口径，不静默替代。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NC01-H3",
+      "rule": "双源哈希及只读路径约束保持，变化或坏输入返回结构化错误，不发布文件。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_report_qualifier_mismatched_to_computed_change",
+    "issue": 443,
+    "fixture_reproduction_only": true,
+    "historical_production_root_not_claimed": true,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/comparison-before.csv",
+      "input/comparison-after.csv"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

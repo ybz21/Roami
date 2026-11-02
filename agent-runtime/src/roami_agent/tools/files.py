@@ -3,13 +3,13 @@
 from roami_agent.protocol.tools import Tool, object_schema
 
 
-def register_file_tools(registry, files):
+def register_file_tools(registry, files, *, images=None):
     path = {"type": "string", "minLength": 1, "maxLength": 4096}
     digest = {"type": "string", "pattern": "^[a-f0-9]{64}$"}
     registry.add(
         Tool(
             "file_read",
-            "Read a prepared workspace file in bounded byte pages, returning its full content hash. Non-UTF-8 pages are base64. This is not an OS sandbox.",
+            "Read one file in bounded byte pages with its original content hash. Raw non-UTF-8 pages are base64. Main: delegate repository/code work when only a directory is known; do not guess filenames.",
             object_schema(
                 {
                     "path": path,
@@ -18,7 +18,7 @@ def register_file_tools(registry, files):
                 },
                 ["path"],
             ),
-            files.read,
+            images.read if images else files.read,
         )
     )
     registry.add(

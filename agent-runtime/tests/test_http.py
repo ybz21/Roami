@@ -6,8 +6,116 @@ import uvicorn
 from test_runtime import ConversationModel, until
 
 from roami_agent.app import Runtime
+from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.http import create_app
-from roami_agent.storage.database import row
+from roami_agent.storage.database import event, row
+
+
+async def test_live_text_stream_wakes_on_commit_without_idle_database_polling(
+    store, tmp_path, monkeypatch
+):
+    monkeypatch.setattr("roami_agent.server.http.EVENT_HEARTBEAT_SECONDS", 0.05)
+    next_text, finish = asyncio.Event(), asyncio.Event()
+
+    class PausedModel:
+        model = "paused-text-fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", "First part")
+            await next_text.wait()
+            yield ModelEvent("text", " and second part")
+            await finish.wait()
+
+    runtime = Runtime(store, PausedModel())
+    reads = []
+    raced = False
+    events = runtime.conversations.events
+
+    async def counted_events(*args):
+        nonlocal raced
+        reads.append(True)
+        batch = await events(*args)
+        if not batch and not raced:
+            raced = True
+            await store.call(lambda db: event(db, args[1], "fixture.during_read", {}), write=True)
+        return batch
+
+    runtime.conversations.events = counted_events
+    socket_path = tmp_path / "live-text.sock"
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_app(runtime),
+            uds=str(socket_path),
+            log_level="error",
+            timeout_graceful_shutdown=2,
+        )
+    )
+    running = asyncio.create_task(server.serve())
+    reader = None
+    try:
+        async with asyncio.timeout(5):
+            while not server.started:
+                await asyncio.sleep(0.01)
+        async with httpx.AsyncClient(
+            transport=httpx.AsyncHTTPTransport(uds=str(socket_path)),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "local"},
+            timeout=5,
+        ) as client:
+            c = (await client.post("/v1/conversations", json={})).json()["data"]
+            incoming = asyncio.Queue()
+            pings = []
+
+            async def consume():
+                async with client.stream("GET", f"/v1/conversations/{c['id']}/events") as response:
+                    async for line in response.aiter_lines():
+                        if line == ": ping":
+                            pings.append(True)
+                        if line.startswith("data:"):
+                            await incoming.put(json.loads(line[5:]))
+
+            async def receive(kind):
+                async with asyncio.timeout(2):
+                    while True:
+                        item = await incoming.get()
+                        if item["kind"] == kind:
+                            return item
+
+            reader = asyncio.create_task(consume())
+            await receive("conversation.created")
+            await receive("fixture.during_read")
+            await client.post(
+                f"/v1/conversations/{c['id']}/messages",
+                json={"requestKey": "live-text", "text": "hello"},
+            )
+            first = await receive("message.delta")
+            assert first["payload"]["text"] == "First part"
+            assert not next_text.is_set() and not finish.is_set()
+            await asyncio.sleep(0.05)
+            count = len(reads)
+            await asyncio.sleep(0.45)
+            assert len(reads) == count
+            assert pings
+            next_text.set()
+            second = await receive("message.delta")
+            assert second["payload"]["text"] == " and second part"
+            assert second["payload"]["offset"] == len("First part")
+            assert not finish.is_set()
+            finish.set()
+            await receive("message.completed")
+            reader.cancel()
+            await asyncio.gather(reader, return_exceptions=True)
+            async with asyncio.timeout(2):
+                while store.conversation_events.listeners:
+                    await asyncio.sleep(0.01)
+    finally:
+        next_text.set()
+        finish.set()
+        if reader:
+            reader.cancel()
+            await asyncio.gather(reader, return_exceptions=True)
+        server.should_exit = True
+        await running
 
 
 async def test_http_owner_scope_slash_commands_and_task_intent(store):

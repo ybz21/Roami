@@ -1,0 +1,14 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_reference_authority.py"
+  ],
+  "expected_collected": 24,
+  "runtime": [
+    "Python 3.12",
+    "pytest",
+    "真实参考准入/校准/证书加载",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "model_provider": "explicit_protocol_fixture",
+  "external_model_calls": 0
+}

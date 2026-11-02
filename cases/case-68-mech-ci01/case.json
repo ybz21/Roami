@@ -1,0 +1,54 @@
+{
+  "id": "MECH-CI01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "容器配置传递回归",
+  "prompt": "将保存的角色指令原样传入独立 Actor，拒绝不支持该合同的旧镜像，模型连接与准入留在宿主 Go 网关。",
+  "preconditions": "本地合成素材；完整可选 Skill；无真实模型调用。",
+  "expected_terminal": "saved_role_policies_preserved_in_actor",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "冻结源哈希、JUnit 和严格执行回执",
+    "私有传输与实际 Runtime 上下文的断言"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-CI01-H1",
+      "rule": "主、后台的多行 Unicode 和空指令原样保留，Runtime 实际请求上下文一致。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-CI01-H2",
+      "rule": "旧 Actor 镜像在启动前拒绝；旧请求兼容保持，原始固定判定镜像不需要新标签。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-CI01-H3",
+      "rule": "非法或混入连接字段的角色配置拒绝，指令变化使运行指纹不同，连接与凭据不进入传输。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "limit_profile": "standard",
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 445,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

@@ -8,6 +8,10 @@ class DomainError(Exception):
         super().__init__(code)
 
 
+class ModelAdmissionRejected(DomainError):
+    """The trusted model transport rejected admission before sending a request."""
+
+
 class ToolPreflightError(DomainError):
     """An unavailable dependency prevents starting the tool action."""
 

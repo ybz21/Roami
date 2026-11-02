@@ -39,7 +39,8 @@ async def test_reference_is_loaded_on_demand_and_changes_catalog_version(store, 
         await runtime.tools.invoke(read("skill://cli-guide/references/commands.md"), "main", {})
 
 
-async def test_reference_cannot_escape_skill_or_bypass_research_profile(store, tmp_path):
+@pytest.mark.parametrize("role", ["main", "worker", "research"])
+async def test_reference_cannot_escape_skill(store, tmp_path, role):
     root = tmp_path / "skills"
     folder = root / "cli-guide"
     references = folder / "references"
@@ -55,11 +56,8 @@ async def test_reference_cannot_escape_skill_or_bypass_research_profile(store, t
         "skill://cli-guide/../private.md",
     ):
         with pytest.raises(DomainError):
-            await runtime.tools.invoke(read(path), "main", {})
-    with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-        await runtime.tools.invoke(
-            read("skill://roami/references/node-operations.md"), "research", {}
-        )
+            await runtime.tools.invoke(read(path), role, {})
+    assert (await runtime.tools.invoke(read("skill://cli-guide"), role, {}))["text"]
     assert any(
         item["name"] == "browser_use"
         for item in runtime.tools.directory.list("截图", "skill")["items"]

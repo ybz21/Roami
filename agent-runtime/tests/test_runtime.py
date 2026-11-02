@@ -1,7 +1,9 @@
 import asyncio
 import json
+import re
 
 import pytest
+from native_prompt_messages import dialogue_messages
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.models import ModelEvent
@@ -12,6 +14,7 @@ class ConversationModel:
     model = "injected-model"
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if messages[-1]["role"] == "tool":
             yield ModelEvent("text", "Task delegated; you can keep chatting.")
         elif any(m["content"].startswith("Background task result") for m in messages):
@@ -192,7 +195,10 @@ class NestedModel(ConversationModel):
         self.completions = []
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         last = messages[-1]
+        goals = re.findall(r"\nDelegated goal[^\n]*:\n(parent|leaf)(?:\n|$)", last["content"])
+        assigned = goals[-1] if goals else last["content"]
         if last["role"] == "tool":
             yield ModelEvent("text", "Delegated; awaiting descendants.")
         elif any(m["content"].startswith("Background task result") for m in messages):
@@ -204,7 +210,7 @@ class NestedModel(ConversationModel):
                 )
             )
             yield ModelEvent("text", "All delegated work is joined.")
-        elif last["content"] == "root":
+        elif assigned == "root":
             yield ModelEvent(
                 "tool",
                 {
@@ -216,7 +222,7 @@ class NestedModel(ConversationModel):
                     },
                 },
             )
-        elif last["content"] == "parent":
+        elif assigned == "parent":
             yield ModelEvent(
                 "tool",
                 {
@@ -228,7 +234,7 @@ class NestedModel(ConversationModel):
                     },
                 },
             )
-        elif last["content"] == "leaf":
+        elif assigned == "leaf":
             self.leaf_started.set()
             await self.leaf_release.wait()
             yield ModelEvent("text", "Leaf evidence.")
@@ -350,8 +356,8 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
     await context.run(job["id"])
     await store.call(enlarge_recent, write=True)
     before = (await context.project("alice", c["id"]))["snapshotId"]
-    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 6000
-    runtime = Runtime(store, model, settings=Settings(context_window=6000))
+    assert (await context.project("alice", c["id"]))["estimatedTokens"] > 7000
+    runtime = Runtime(store, model, settings=Settings(context_window=7000))
     await runtime.start()
     try:
         receipt = await runtime.chat.submit(
@@ -365,7 +371,7 @@ async def test_auto_compaction_reduces_recent_rounds_when_previous_cut_still_ove
         )
         plan = await context.project("alice", c["id"])
         assert plan["snapshotId"] != before
-        assert plan["estimatedTokens"] < 6000
+        assert plan["estimatedTokens"] < 7000
         messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
         assert len(messages) == 14
         assert messages[-1]["content"]["text"] == "Answer: Please fix this screenshot layout."

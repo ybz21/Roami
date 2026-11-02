@@ -38,12 +38,14 @@ export default function Markdown({
   resolveHref,
   onLinkClick,
   fill,
+  allowImages = true,
 }: {
   children: string
   accent?: string
   resolveHref?: (href: string, kind: 'link' | 'image') => string
   onLinkClick?: (href: string, event: MouseEvent<HTMLAnchorElement>) => void
   fill?: boolean // 整块代码/JSON 预览：让唯一的代码块撑满父容器高度
+  allowImages?: boolean
 }) {
   const { t } = useI18n()
   const { phone } = useLayout()
@@ -51,6 +53,7 @@ export default function Markdown({
   return (
     <div style={{ fontSize: 13.5, lineHeight: 1.55, wordBreak: 'break-word', height: fill ? '100%' : undefined }}>
       <ReactMarkdown
+        disallowedElements={allowImages ? undefined : ['img']}
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
         components={{

@@ -8,7 +8,6 @@ from copy import deepcopy
 from dataclasses import replace
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.research import research_call_allowed
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
@@ -37,7 +36,6 @@ WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
     "task_queue_reply",
     "reply",
 }
-RESEARCH_FOUNDATIONS = {"read", "bash", "tool_list"}
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 
 
@@ -53,33 +51,27 @@ class ToolDirectory:
             and tool.name not in FILE_OPERATIONS
             and tool.name != "web_research"
             and (role != "main" or tool.main or tool.name == "artifact_read")
-            and (
-                role != "research"
-                or tool.name in {"browser_open", "browser_observe", "browser_act"}
-            )
+        ]
+
+    def skill_entries(self):
+        if {"read", "skill_read"} & self.registry.disabled_tools:
+            return []
+        return [
+            {
+                "id": "skill:" + name,
+                "kind": "skill",
+                "name": name,
+                "description": value["description"],
+                "version": value["version"],
+                "location": "skill://" + name,
+            }
+            for name, value in self.registry.skills.items()
+            if name not in self.registry.disabled_skills
         ]
 
     def list(self, query="", kind="all", limit=10, role="main", offset=0):
         limit, offset = min(max(limit, 1), 20), max(offset, 0)
-        entries = []
-        if "read" not in self.registry.disabled_tools:
-            for name, value in self.registry.skills.items():
-                if (
-                    name in self.registry.disabled_skills
-                    or role == "research"
-                    and name != "browser_use"
-                ):
-                    continue
-                entries.append(
-                    {
-                        "id": "skill:" + name,
-                        "kind": "skill",
-                        "name": name,
-                        "description": value["description"],
-                        "version": value["version"],
-                        "location": "skill://" + name,
-                    }
-                )
+        entries = self.skill_entries()
         if "bash" not in self.registry.disabled_tools:
             entries.extend(self.command_entries(role))
             for tool in self.operations(role):
@@ -136,6 +128,8 @@ class ToolDirectory:
             "任务": "task",
             "技能": "skill roami",
             "能力": "capability overview",
+            "市场": "market capability search install",
+            "安装": "market install",
             "联网": "web research browser",
             "天气": "web research weather forecast",
             "股价": "web research stock quote",
@@ -168,14 +162,22 @@ class ToolDirectory:
         ranked.sort(key=lambda entry: (-entry[0], entry[2]["id"]))
         selected = [entry for entry in ranked if kind == "all" or entry[2]["kind"] == kind]
         alternatives = [entry for entry in ranked if kind != "all" and entry[2]["kind"] != kind]
-        if alternatives and alternatives[0][1] and not any(entry[1] for entry in selected):
+        if (
+            alternatives
+            and alternatives[0][1]
+            and not any(entry[1] for entry in selected)
+            and not any(
+                normalize(query) in normalize(entry[2]["name"] + " " + entry[2]["description"])
+                for entry in selected
+            )
+        ):
             selected = []
         result = {
             "scope": "current_role",
             "hint": (
                 "Local capabilities callable in this role only, not web search results. Zero matches "
                 "do not prove a worker lacks integrations or external services are unavailable. "
-                "For requested external facts, retrieve sources through a delegated browser lookup."
+                "For external facts, use the requested enabled MCP or an appropriate delegated browser lookup."
             ),
             "catalogVersion": version,
             "items": [item for _, _, item in selected[offset : offset + limit]],
@@ -226,7 +228,7 @@ class ToolDirectory:
                     "kind": "cli",
                     "name": "roami",
                     "skill": "roami",
-                    "description": "Roami projects, sessions, tasks, executors, reminders and memory.",
+                    "description": "Roami projects, sessions, tasks, executors, reminders, memory, local host process CPU/memory/load diagnostics and capability marketplace search/install.",
                     "argv": ["roami", "help"],
                     "commands": commands,
                     "searchTerms": list(COMMANDS),
@@ -243,16 +245,15 @@ class ToolDirectory:
                 ["screenshot", "--resource", "RESOURCE_ID"],
                 ["goto", "URL", "--observation", "OBSERVATION_ID"],
             ]
-            if role != "research":
-                browser_commands.extend(
-                    [
-                        ["observe", "--target", "TARGET_ID"],
-                        ["click", "SELECTOR", "--observation", "OBSERVATION_ID"],
-                        ["fill", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
-                        ["type", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
-                        ["press", "KEY", "--observation", "OBSERVATION_ID"],
-                    ]
-                )
+            browser_commands.extend(
+                [
+                    ["observe", "--target", "TARGET_ID"],
+                    ["click", "SELECTOR", "--observation", "OBSERVATION_ID"],
+                    ["fill", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
+                    ["type", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
+                    ["press", "KEY", "--observation", "OBSERVATION_ID"],
+                ]
+            )
             entries.append(
                 {
                     "id": "cli:roami chrome",
@@ -357,14 +358,20 @@ class ToolDirectory:
                     },
                 )
             else:
-                if role == "research":
-                    raise DomainError("TOOL_UNAVAILABLE")
                 return replace(self.registry.registry["file_read"], main=True), args
         elif tool.name in {"edit", "write"}:
             name = "file_patch" if tool.name == "edit" else "file_write"
             return replace(self.registry.registry[name], main=True), args
         elif tool.name == "bash":
             argv = self.argv(args)
+            if args.get("scope") == "host":
+                if role != "main":
+                    raise DomainError("HOST_SCOPE_UNAVAILABLE")
+                if "cwd" in args:
+                    raise DomainError("HOST_SCOPE_CWD_NOT_ALLOWED")
+                if argv and argv[0] in {"roami", self.settings.cli_bin}:
+                    raise DomainError("HOST_SCOPE_REGISTERED_COMMAND")
+                return tool, args
             if (
                 argv
                 and argv[0] in {"roami", self.settings.cli_bin}
@@ -373,8 +380,6 @@ class ToolDirectory:
                 return self.help_tool(argv, role)
             operation = self.operation(argv)
             if operation is None:
-                if role == "research":
-                    raise DomainError("TOOL_UNAVAILABLE")
                 argv = self.argv(args)
                 if (
                     argv
@@ -399,8 +404,6 @@ class ToolDirectory:
         if not original or name in self.registry.disabled_tools:
             raise DomainError("TOOL_DISABLED" if original else "TOOL_UNAVAILABLE")
         validate_tool_arguments(original.schema, args)
-        if role == "research" and not research_call_allowed(name, args):
-            raise DomainError("TOOL_UNAVAILABLE")
         return original, args
 
 
@@ -412,14 +415,11 @@ def register_foundations(registry, settings):
         result = directory.list(
             args.get("query", ""),
             args.get("kind", "all"),
-            args.get("limit", 10),
+            args.get("limit", settings.tool_directory_page_size),
             binding.get("role", "main"),
             args.get("offset", 0),
         )
-        if binding.get("role", "main") != "research":
-            result["availability"] = await registry.registry["capability_overview"].handler(
-                {}, binding
-            )
+        result["availability"] = await registry.registry["capability_overview"].handler({}, binding)
         return result
 
     async def bash(args, binding):
@@ -444,16 +444,19 @@ def register_foundations(registry, settings):
             )
             return result
         shell_args = {key: value for key, value in args.items() if key != "command"}
-        shell_args["argv"] = ["bash", "-lc", args["command"]] if "command" in args else argv
+        shell_args["argv"] = ["bash", "-c", args["command"]] if "command" in args else argv
         return await registry.registry["shell"].handler(shell_args, binding)
 
     async def resolved_only(args, binding):
         raise DomainError("INVALID_TOOL_ARGUMENTS")
 
+    # Built-in tools are supplied directly; tool_list discovers extra capabilities.
     registry.add(
         Tool(
             "tool_list",
-            "List local MCP, Skill and CLI capabilities callable in this role, with name/intent/category filters and pagination. Returns skill:// paths or exact bash argv and schemas. Known operations can run directly. This is not web results or an external service/pricing directory; empty matches do not prevent delegated browser lookup.",
+            "Discover extra Skills, MCP and CLI capabilities; built-in tools are already supplied. "
+            "Filter by name/intent/category and paginate. Returns skill:// paths or exact bash argv and schemas. "
+            "Known operations can run directly. This is a local capability directory, not web results or service pricing.",
             object_schema(
                 {
                     "query": {"type": "string", "maxLength": 1000},
@@ -469,7 +472,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "read",
-            "Read a file, skill://NAME workflow, skill://NAME/references/FILE.md, or artifact://ID. Load only relevant skill references. File access uses the bound workspace or configured roots.",
+            "Read files within bound/configured roots, skill://NAME[/references/FILE.md] or artifact://ID. Load relevant references only. First-page local images reach Main or Worker when that role is configured for image input; other roles receive metadata.",
             registry.registry["file_read"].schema,
             resolved_only,
             main=True,
@@ -505,6 +508,11 @@ def register_foundations(registry, settings):
             "argv": argv_schema,
             "command": {"type": "string", "minLength": 1, "maxLength": 100000},
             "cwd": {"type": "string"},
+            "scope": {
+                "enum": ["workspace", "host"],
+                "default": "workspace",
+                "description": "Host scope is for user-authorized local machine operations in Main, without cwd or a task workspace. It is general execution, not a read-only sandbox. Workspace scope preserves configured roots and bound task directories.",
+            },
             "timeout": {"type": "integer", "minimum": 0},
         }
     )
@@ -515,7 +523,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "bash",
-            "Execute Roami CLI argv discovered by tool_list, or shell commands in a prepared workspace. Use roami or roami chrome command families from tool_list; load their associated Skill as needed. Registered read/write effects and receipts are enforced by runtime. General shell needs cwd inside allowed roots; no implicit code workspace is created.",
+            "Execute Roami CLI or shell with write effects, cancellation and receipts. Workspace uses a bound directory or configured-root cwd. Main scope=host needs user-authorized machine work and no cwd; its temporary cwd is not a sandbox. Use registered commands for managed resources. Calls reap process groups: test temporary server/client in one call; clean up captured child PIDs, not command patterns.",
             schema,
             bash,
             main=True,

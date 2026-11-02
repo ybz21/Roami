@@ -1,0 +1,60 @@
+{
+  "same_read_snapshot": true,
+  "measurement": "readonly production SQLite and native payload reads; JSON byte sizes; local function timing is not HTTP or user-device latency",
+  "samples": [
+    {
+      "name": "messages_legacy",
+      "bytes": 4266688,
+      "read_ms": 213.38,
+      "counts": {
+        "messages": 847,
+        "turns": 162,
+        "activities": 268
+      }
+    },
+    {
+      "name": "messages_page",
+      "bytes": 57800,
+      "read_ms": 15.76,
+      "counts": {
+        "messages": 49,
+        "turns": 162,
+        "activities": 71
+      }
+    },
+    {
+      "name": "tasks_legacy",
+      "bytes": 221133,
+      "read_ms": 5.94,
+      "items": 48
+    },
+    {
+      "name": "tasks_page",
+      "bytes": 9990,
+      "read_ms": 0.7,
+      "counts": {
+        "items": 20
+      }
+    },
+    {
+      "name": "notices_legacy",
+      "bytes": 305638,
+      "read_ms": 4.68,
+      "items": 175
+    },
+    {
+      "name": "notices_page",
+      "bytes": 9014,
+      "read_ms": 3.39,
+      "counts": {
+        "items": 20
+      }
+    },
+    {
+      "name": "notice_badge",
+      "bytes": 36,
+      "read_ms": 2.19,
+      "counts": {}
+    }
+  ]
+}

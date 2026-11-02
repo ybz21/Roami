@@ -18,6 +18,10 @@ from roami_agent.storage.database import row
         ("computer", False, 1, False),
         ("computer", True, 1, False),
         ("browser", False, 30, True),
+        ("shell", False, 1, False),
+        ("shell", True, 1, False),
+        ("tool_result", False, 30, True),
+        ("tool_result", True, 1, False),
     ],
 )
 async def test_internal_capture_is_retained_without_becoming_a_default_attachment(
@@ -95,6 +99,7 @@ async def test_internal_capture_is_retained_without_becoming_a_default_attachmen
         assert (await runtime.artifacts.read("alice", capture["id"]))[1].startswith(b"capture")
         messages = (await runtime.conversations.messages("alice", c["id"]))["messages"]
         delivered = messages[-1]["content"]["text"]
+        assert messages[-1]["content"]["answerText"] == "查询完成。"
         result = json.loads(
             (
                 await store.call(

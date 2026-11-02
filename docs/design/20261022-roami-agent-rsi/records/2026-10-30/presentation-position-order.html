@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Agent 演示文稿位置与绘制顺序</title><body>
+<h1>Agent 演示文稿位置与绘制顺序</h1>
+<h2>Product Design</h2><p>文稿读取分别展示原始绘制顺序和幻灯片中的位置。定位“第一个文本框”时检查位置和内容，不能把 XML 中先绘制的正文当成排在上方的标题。缺失、继承或无法换算的几何不伪造顺序；结构边界不声称已渲染或识别重叠、可见性与语义阅读顺序。</p>
+<h2>User Stories</h2><ul><li>文本标题在上但绘制在正文之后时，可以观察两种顺序的区别。</li><li>组合的局部坐标经过缩放、旋转、翻转及嵌套后，与同一幻灯片中的其他文本框可比较。</li><li>读写后保留稳定 shapePath 与原 ordinal，位置未知时继续检查原生应用，而不是猜测目标。</li></ul>
+<h2>Technical Design</h2><p>documents/presentation_geometry.py 只换算显式 DrawingML 仿射变换和边界；documents/presentation.py 保留解析、对象身份及段落，新增 slideBounds、坐标单位、objectOrder 和 topToBottomPaths。位置列表只在全部非空文本框有边界时给出，按上边界、左边界及原序号稳定排序；局部坐标和原 shapePath 不变。tools/workspace_presentations.py 与 context/document_intake.py 复用原读取、作用域、哈希及分页。内置 presentation_files 工作流区分绘制顺序和位置。</p><p>组合坐标中 chOff、chExt 的含义参考 <a href="https://python-pptx.readthedocs.io/en/latest/dev/analysis/shp-group-shape.html">python-pptx 原始开发文档</a>。变换覆盖平移、非均匀缩放、旋转、翻转与嵌套；位置缺失或无效时保持未知。</p>
+<h2>Acceptance</h2><p>修复前 5 项新增断言失败。新增 10 项参数化回归，以独立手算验证组合变换，并通过真实注册读取验证源文件未改。相关 57 项通过；独立 Case 63 / MECH-DL01 包含实际输入参数、PPTX 生成器、工具、冻结哈希和严格执行回执，不加入原正式 60 项。</p><p>对原失败 PPTX，确定性程序通过实际 file_read view=document 的新位置数据选框，只修改原要求的对齐属性。编辑程序看不到参考文件或判定器，不修改尺寸、文本或源输入。未更改的原比较返回 [1,0]，满足任一参考通过的既有规则。这是组件与确定性选择诊断，不是模型自主执行、稳定成功率或新的正式成绩。</p><p>原生编辑器与字体诊断没有建立完整修复，不推广实验 UNO 或字体镜像。本次沿用 v73 基础镜像，仅冻结新 Agent 核心及工作流。最终 v74 冻结镜像中不挂载宿主 Actor，再次通过同一真实注册读取与原始比较 [1,0]；204 个执行文件与源码哈希一致。完整门禁与 CI 证据随 PR 交付。模型、参数、能力、重试、Go 限额、历史分数和人工标签不改；本次真实模型调用 0，不部署或启用日程。</p>
+</body></html>

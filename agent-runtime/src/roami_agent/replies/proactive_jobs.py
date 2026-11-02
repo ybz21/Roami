@@ -22,9 +22,9 @@ CURSOR_KEY = "proactive.scan:v1"
 
 
 class ProactiveJobs:
-    def __init__(self, database, model, policy, *, daily_budget=3, timeout=None, clock=now_ms):
+    def __init__(self, database, model, policy, *, timeout=None, clock=now_ms):
         self.db, self.model, self.policy = database, model, policy
-        self.daily_budget, self.timeout, self.clock = daily_budget, timeout, clock
+        self.timeout, self.clock = timeout, clock
         self.lock = asyncio.Lock()
 
     async def recover(self):
@@ -135,17 +135,6 @@ class ProactiveJobs:
             source = self._source(db, payload["eventId"])
             if not source:
                 self._finish(db, job["id"], "done", {"skipped": "source_unavailable_or_disabled"})
-                continue
-            preferences = self.policy.read(db, source["owner_id"])
-            history = rows(
-                db,
-                "SELECT json_extract(payload_json,'$.startedMs') AS started FROM jobs "
-                "WHERE kind='proactive.evaluate' AND attempts>0 AND json_extract(payload_json,'$.owner')=? "
-                "AND json_extract(payload_json,'$.startedMs')>?",
-                (source["owner_id"], self.clock() - 86_400_000),
-            )
-            hourly = sum(item["started"] > self.clock() - 3_600_000 for item in history)
-            if len(history) >= self.daily_budget or hourly >= preferences["maxSuggestionsPerHour"]:
                 continue
             completion = completion_evidence(json.loads(source["payload_json"]), budget=6000)
             origin = json.loads(source["content_json"]).get("text", "")

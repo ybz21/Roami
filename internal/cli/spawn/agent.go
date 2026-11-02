@@ -68,7 +68,7 @@ func (c AgentConfig) resolve() agent.Agent {
 // bin 可执行文件：配置里指定了就用指定的（装在别处 / 用 wrapper 包了一层），
 // 否则用这一型的默认名。
 //
-// ClaudeBin/CodexBin 是**历史字段**，只对这两型有效。新增的型直接用 a.Bin()——
+// ClaudeBin/CodexBin 是**历史字段**，只对这两型有效。新增的型解析自己的默认程序——
 // 不这么写的话它会掉进 claude 那条分支，拿到一个完全不相干的可执行名。
 // 真要给新型加覆盖，该做的是把这两个字段换成 map[kind]string，而不是再加一个 case。
 func (c AgentConfig) bin(a agent.Agent) string {
@@ -80,6 +80,9 @@ func (c AgentConfig) bin(a agent.Agent) string {
 		return orDefault(c.ClaudeBin, a.Bin())
 	case "codex":
 		return orDefault(c.CodexBin, a.Bin())
+	}
+	if path, err := agent.ResolveBinary(a.Kind()); err == nil {
+		return path
 	}
 	return a.Bin()
 }

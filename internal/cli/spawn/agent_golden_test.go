@@ -42,7 +42,7 @@ func TestLaunchCommandGolden(t *testing.T) {
 			ac:          AgentConfig{CodexBin: "codex", Kind: "codex", Permission: "auto", Workdir: "/w", Model: "gpt"},
 			wantCommand: "cd '/w' && codex exec --skip-git-repo-check -m gpt --dangerously-bypass-approvals-and-sandbox - <<'TTMUX_TASK_EOF'\nT\nTTMUX_TASK_EOF",
 			wantFromFn:  "cd '/w' && codex exec --skip-git-repo-check -m gpt --dangerously-bypass-approvals-and-sandbox - < '/p.txt'",
-			wantInterFn: "cd '/w' && codex -m gpt \"$(cat '/p.txt')\"",
+			wantInterFn: "cd '/w' && codex -m gpt --dangerously-bypass-approvals-and-sandbox \"$(cat '/p.txt')\"",
 		},
 		{
 			name: "codex/交互/给了对话 id 也不该出现在命令里",

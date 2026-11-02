@@ -1,0 +1,7 @@
+{
+  "human_rater": "Fixture human",
+  "ai_reviewer": "Fixture AI reviewer",
+  "authorization": "Synthetic user explicitly delegates these reference decisions.",
+  "delegated_indices": [2, 6, 7, 10],
+  "source_kind": "public_protocol_fixture_not_actual_human_or_model_review"
+}

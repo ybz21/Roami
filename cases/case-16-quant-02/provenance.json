@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "synthetic",
+  "dataset": "roami-quant-180-bars-v1",
+  "real_market_data": false,
+  "generator": "generate.py",
+  "input": "inputs/prices.json",
+  "records": 180,
+  "close_formula": "round(100 + 8 * sin(bar / 3) + bar / 8, 2)",
+  "open_formula": "round(close + (3 if bar % 9 == 0 else -1), 2)",
+  "randomness": "Bars are deterministic. A per-run receipt is added when the suite is frozen; it does not change prices.",
+  "scope": "Engineering checks for parameter-selection records, causal execution and test-set isolation; not real-market investment performance."
+}

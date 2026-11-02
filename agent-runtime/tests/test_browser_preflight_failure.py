@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_argument_repair_progress import claimed_turn
 from test_tool_rejection_progress import Calls
 
@@ -287,6 +288,7 @@ async def test_later_driver_failure_allows_only_delivery_of_current_attempt_evid
         model = "deliver-after-driver-failure"
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             nonlocal phase
             phase += 1
             if phase <= 2:

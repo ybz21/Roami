@@ -1,0 +1,7 @@
+{
+  "kind": "observed_runtime_failure",
+  "issue": "https://github.com/ybz21/Roami/issues/523",
+  "observed": ["HTML and screenshots existed", "task running with unknown attempt and no result", "four large Read callbacks rejected"],
+  "fixture_adaptation": "Task, provider, paths and contents are synthetic; no private transcript or research conclusion is included.",
+  "scope": "Lifecycle, report provenance and file retention; not live-model reasoning or research accuracy."
+}

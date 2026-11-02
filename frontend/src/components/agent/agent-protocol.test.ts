@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { agentEvents, projectAgentEvent, type AgentSnapshot } from './agent-protocol'
+import { agentTimeline } from './agent-timeline'
 
 const snapshot = (): AgentSnapshot => ({ conversation: { id: 'c', title: 'Conversation', active_branch_id: 'b', updated_ms: 0 }, branchId: 'b', messages: [], turns: [], snapshotCursor: 1 })
 
@@ -35,14 +36,58 @@ it('stops the running indicator immediately when a turn fails', () => {
   expect(failed.reload).toBe(true)
   expect(failed.view.turns[0].state).toBe('failed')
   expect(failed.view.messages[0].status).toBe('failed')
+  expect(failed.view.activities).toEqual([expect.objectContaining({
+    id: 'turn:t', kind: 'turn', anchorMessageId: 'm', state: 'failed', errorCode: 'CONTEXT_TOO_LARGE',
+  })])
+  expect(agentTimeline(failed.view.messages, failed.view.activities || []).map(entry => entry.id)).toEqual(['turn:t'])
+  expect(projectAgentEvent(failed.view, { id: 3, kind: 'turn.failed', payload: { turnId: 't' } }).view.activities).toHaveLength(1)
 })
 
-it('hides routine tools while retaining unknown outcomes and replay ordering', () => {
+it('settles a turn that fails before the first assistant message or POST receipt', () => {
+  const view = { ...snapshot(), turns: [], messages: [] }
+  const failed = projectAgentEvent(view, { id: 2, created_ms: 120, kind: 'turn.failed', payload: { turnId: 'early', error: 'CONTEXT_TOO_LARGE' } }).view
+  expect(failed.turns).toEqual([{ id: 'early', state: 'failed' }])
+  expect(failed.activities?.[0]).toMatchObject({ state: 'failed', errorCode: 'CONTEXT_TOO_LARGE' })
+})
+
+it('retains partial reply text and places its failure after the initiating user message', () => {
+  const view = snapshot()
+  view.messages = [{ id: 'user', role: 'user', branch_id: 'b', seq: 1, created_ms: 100, turn_id: 't', status: 'completed', content: { text: 'Check again' } }]
+  const started = projectAgentEvent(view, { id: 2, kind: 'message.started', created_ms: 110, payload: { messageId: 'reply', turnId: 't' } }).view
+  const partial = projectAgentEvent(started, { id: 3, kind: 'message.delta', payload: { messageId: 'reply', offset: 0, text: 'Partial' } }).view
+  const failed = projectAgentEvent(partial, { id: 4, created_ms: 120, kind: 'turn.failed', payload: { turnId: 't', error: 'MODEL_PROXY_USAGE_UNKNOWN' } }).view
+  expect(failed.messages[1].content.text).toBe('Partial')
+  expect(failed.activities?.[0]).toMatchObject({ startedMs: 100, updatedMs: 120, errorCode: 'MODEL_PROXY_USAGE_UNKNOWN' })
+  expect(agentTimeline(failed.messages, failed.activities || []).map(entry => entry.id)).toEqual(['user', 'turn:t', 'reply'])
+})
+
+it('settles tool-call messages before the next reply starts while history is delayed', () => {
+  const calls = [{ id: 'read', function: { name: 'read', arguments: '{}' } }]
+  let view = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'tools', turnId: 't' } }).view
+  const settled = projectAgentEvent(view, { id: 3, kind: 'message.tool_calls', payload: { messageId: 'tools', calls } })
+  expect(settled.view.messages[0]).toMatchObject({ status: 'completed', content: { tool_calls: calls } })
+  expect(settled.view.turns[0].state).toBe('running')
+  expect(settled.reload).toBe(false)
+  view = projectAgentEvent(settled.view, { id: 4, kind: 'message.started', payload: { messageId: 'reply', turnId: 't' } }).view
+  expect(agentTimeline(view.messages, []).map(entry => entry.id)).toEqual(['reply'])
+})
+
+it('clears the old typing indicator immediately when a new message defers the turn', () => {
+  const started = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'old', turnId: 'old-turn' } }).view
+  const deferred = projectAgentEvent(started, { id: 3, kind: 'turn.deferred', payload: { turnId: 'old-turn', reason: 'NEW_USER_INTENT' } })
+  expect(deferred.view.messages[0].status).toBe('interrupted')
+  expect(deferred.view.turns[0].state).toBe('queued')
+  expect(agentTimeline(deferred.view.messages, [])).toEqual([])
+  const next = projectAgentEvent(deferred.view, { id: 4, kind: 'message.started', payload: { messageId: 'new', turnId: 'new-turn' } }).view
+  expect(agentTimeline(next.messages, []).map(entry => entry.id)).toEqual(['new'])
+})
+
+it('streams routine tools and unknown outcomes without reloading or duplicating replay', () => {
   const activity = { id: 'tool:one', kind: 'tool', name: 'shell', anchorMessageId: 'm', state: 'running', startedMs: 100, updatedMs: 100 }
   const start = { id: 2, kind: 'tool.started', branchId: 'b', payload: { activity } }
   const running = projectAgentEvent(snapshot(), start)
   expect(running.reload).toBe(false)
-  expect(running.view.activities).toEqual([])
+  expect(running.view.activities).toEqual([activity])
   const done = projectAgentEvent(running.view, { ...start, id: 3, kind: 'tool.completed', payload: { activity: { ...activity, state: 'unknown', updatedMs: 200 } } })
   expect(done.reload).toBe(false)
   expect(done.view.activities).toHaveLength(1)

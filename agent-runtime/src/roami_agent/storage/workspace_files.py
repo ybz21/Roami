@@ -83,13 +83,15 @@ class WorkspaceFiles:
             os.close(descriptor)
             raise
 
-    def _read(self, parent, name):
+    def _read(self, parent, name, maximum=None):
         descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
         with os.fdopen(descriptor, "rb") as file:
             info = os.fstat(file.fileno())
             if not stat.S_ISREG(info.st_mode):
                 raise DomainError("FILE_TYPE_OR_SIZE_UNSUPPORTED")
-            body = file.read()
+            if maximum is not None and info.st_size > maximum:
+                raise DomainError("FILE_TYPE_OR_SIZE_UNSUPPORTED")
+            body = file.read() if maximum is None else file.read(maximum + 1)
             after = os.fstat(file.fileno())
             if (info.st_size, info.st_mtime_ns, info.st_ctime_ns) != (
                 after.st_size,
@@ -97,7 +99,23 @@ class WorkspaceFiles:
                 after.st_ctime_ns,
             ):
                 raise DomainError("FILE_CHANGED", 409)
+            if len(body) != info.st_size:
+                raise DomainError("FILE_CHANGED", 409)
             return body, info
+
+    def _snapshot(self, location, maximum):
+        parent, name = self._parent(location)
+        try:
+            body, _ = self._read(parent, name, maximum)
+            return body
+        finally:
+            os.close(parent)
+
+    async def snapshot(self, path, binding, *, maximum):
+        try:
+            return await self._io(self._snapshot, self.location(path, binding), maximum)
+        except OSError:
+            raise DomainError("FILE_ACCESS_FAILED") from None
 
     def _read_page(self, location, offset, limit):
         parent, name = self._parent(location)

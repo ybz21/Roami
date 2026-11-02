@@ -3,7 +3,7 @@ import io
 import pytest
 from PIL import Image
 
-from roami_agent.context.image_preparation import encoded_size, prepare_image
+from roami_agent.context.image_preparation import encoded_size, prepare_image, prepare_image_bundle
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.image_limits import MAX_PIXELS, ImageLimits
 from roami_agent.server.configuration import Settings
@@ -96,3 +96,38 @@ def test_transparent_jpeg_fallback_is_white_not_black():
     assert result["mimeType"] == "image/jpeg"
     with Image.open(io.BytesIO(result["body"])) as rendered:
         assert min(rendered.getpixel((0, 0))) >= 250
+
+
+def test_six_compliant_images_preserve_each_source_and_index():
+    bodies = [picture(color=(index, 20, 30)) for index in range(6)]
+    prepared = prepare_image_bundle(bodies, ImageLimits())
+    assert [index for index, _ in prepared] == list(range(6))
+    assert all(image["body"] is bodies[index] for index, image in prepared)
+
+
+def test_combined_base64_budget_resizes_all_images_without_changing_sources():
+    output = io.BytesIO()
+    Image.effect_noise((400, 300), 80).convert("RGB").save(output, "PNG")
+    body = output.getvalue()
+    limits = ImageLimits(max_encoded_bytes=500_000)
+    assert encoded_size(body) <= limits.max_encoded_bytes
+    bodies = [body] * 6
+    prepared = prepare_image_bundle(bodies, limits)
+    assert len(prepared) == 6
+    assert sum(encoded_size(image["body"]) for _, image in prepared) <= limits.max_encoded_bytes
+    assert all(image["optimized"] and image["width"] < 400 for _, image in prepared)
+    assert all(
+        (image["originalWidth"], image["originalHeight"]) == (400, 300) for _, image in prepared
+    )
+    assert bodies == [body] * 6
+
+
+def test_minimum_header_budget_keeps_newest_valid_image_and_original_index():
+    body = picture(size=(1, 1))
+    prepared = prepare_image_bundle([b"invalid", body, body], ImageLimits(max_encoded_bytes=100))
+    assert [index for index, _ in prepared] == [1]
+    assert encoded_size(prepared[0][1]["body"]) <= 100
+
+
+def test_impossible_bundle_returns_no_images():
+    assert prepare_image_bundle([picture(), b"invalid"], ImageLimits(max_encoded_bytes=1)) == []

@@ -1,11 +1,11 @@
 "Scoped, source-backed memories with CJK-aware FTS and logical deletion."
 
-import json
-
 from roami_agent.memory.catalog import MemoryCatalog
 from roami_agent.memory.daily import DailyMemories
+from roami_agent.memory.detail import MemoryDetails
+from roami_agent.memory.evidence import read_evidence
 from roami_agent.memory.provenance import seed_dependencies
-from roami_agent.memory.writer import commit_memory, source_snapshot
+from roami_agent.memory.writer import commit_memory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.retrieval.memory_search import FORGOTTEN_PROMOTED_PREFERENCE, MemorySearch
@@ -18,6 +18,7 @@ class Memories:
         self.db = database
         self.cancel_forgotten = cancel_forgotten
         self.catalog = MemoryCatalog(database)
+        self.details = MemoryDetails(database)
         self.retrieval = MemorySearch(database)
         self.search = self.retrieval.search
         self.recall = self.retrieval.recall
@@ -160,53 +161,11 @@ class Memories:
             )
             if not record:
                 raise DomainError("MEMORY_NOT_FOUND", 404)
-            result = []
-            for ref in rows(
-                db,
-                "SELECT * FROM memory_sources WHERE memory_id=? ORDER BY source_key LIMIT 16",
-                (memory_id,),
-            ):
-                try:
-                    source = source_snapshot(db, owner, ref["source_key"])
-                    content = json.loads(source["content_json"])
-                    if isinstance(content, list):
-                        payload = json.loads(content[1])
-                        text = (
-                            (payload.get("result") or {}).get("summary")
-                            or payload.get("summary")
-                            or ""
-                        )
-                    else:
-                        text = content.get("text", "")
-                    result.append(
-                        {
-                            "sourceKey": ref["source_key"],
-                            "sha256": ref["source_sha256"],
-                            "unchanged": source["sha256"] == ref["source_sha256"],
-                            "conversationId": source["conversation_id"]
-                            or record["conversation_id"],
-                            "branchId": source.get("branch_id")
-                            or (
-                                row(
-                                    db,
-                                    "SELECT active_branch_id FROM conversations WHERE id=? AND owner_id=?",
-                                    (source["conversation_id"] or record["conversation_id"], owner),
-                                )
-                                or {}
-                            ).get("active_branch_id"),
-                            "messageId": source.get("message_id"),
-                            "text": str(text)[:4000],
-                            "kind": source.get("kind", "message"),
-                            "createdMs": source["created_ms"],
-                        }
-                    )
-                except DomainError:
-                    result.append({"sourceKey": ref["source_key"], "available": False})
-            return result
+            return read_evidence(db, owner, record)
 
         return await self.db.call(read)
 
-    async def confirm(self, owner, memory_id, accepted=True):
+    async def confirm(self, owner, memory_id, accepted=True, *, expected_current_id=None):
         if not accepted:
             return await self.forget(owner, memory_id, forget_sources=False, candidate_only=True)
 
@@ -227,6 +186,14 @@ class Memories:
                 if candidate["state"] == "superseded" and active:
                     return active
                 raise DomainError("MEMORY_CANDIDATE_ALREADY_RESOLVED", 409)
+            if expected_current_id is not None:
+                current = row(
+                    db,
+                    "SELECT id FROM memory_records WHERE owner_id=? AND canonical_key=? AND state='active'",
+                    (owner, candidate["canonical_key"]),
+                )
+                if (current["id"] if current else "") != expected_current_id:
+                    raise DomainError("MEMORY_CURRENT_CHANGED", 409)
             sources = rows(db, "SELECT * FROM memory_sources WHERE memory_id=?", (memory_id,))
             result = commit_memory(
                 db,
@@ -314,7 +281,7 @@ class Memories:
                     "JOIN prompt_manifests p ON p.turn_id=m.turn_id JOIN json_each(p.parts_json,'$.sourceMessageIds') j "
                     "JOIN affected a ON a.id=j.value WHERE c.owner_id=? AND m.role IN ('assistant','tool') "
                     "UNION SELECT m.id FROM messages m JOIN conversations c ON c.id=m.conversation_id "
-                    "JOIN json_each(m.content_json,'$.sourceMessageIds') j JOIN affected a ON a.id=j.value "
+                    "JOIN json_each(native_content(m.content_json),'$.sourceMessageIds') j JOIN affected a ON a.id=j.value "
                     "WHERE c.owner_id=? AND m.role='assistant' "
                     "UNION SELECT paired.id FROM messages original JOIN affected a ON a.id=original.id "
                     "JOIN messages paired ON paired.turn_id=original.turn_id "

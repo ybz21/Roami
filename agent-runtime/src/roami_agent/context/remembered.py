@@ -5,8 +5,9 @@ from roami_agent.protocol.serialization import encoded
 
 
 class RememberedContext:
-    def __init__(self, memory):
+    def __init__(self, memory, settings=None):
         self.retrieval = memory.retrieval
+        self.settings = settings
 
     async def recall(self, turn, messages):
         query = next(
@@ -19,10 +20,12 @@ class RememberedContext:
         )
         if not isinstance(query, str):
             query = ""
+        limit = getattr(self.settings, "memory_recall_limit", 8)
+        token_limit = getattr(self.settings, "memory_recall_tokens", 2000)
         scope = {
             "conversation_id": turn["conversation_id"],
             "include_global": True,
-            "limit": 8,
+            "limit": limit,
         }
         preferences = await self.retrieval.recall(turn["owner_id"], "", kind="preference", **scope)
         relevant = (
@@ -41,11 +44,11 @@ class RememberedContext:
                 "title": hit["title"],
                 "body": hit["body"],
             }
-            if text_tokens(encoded([*selected, item])) > 2000:
+            if text_tokens(encoded([*selected, item])) > token_limit:
                 continue
             selected.append(item)
             evidence.append({"memoryId": hit["id"], "revision": hit["revision"]})
-            if len(selected) == 8:
+            if len(selected) == limit:
                 break
         if not selected:
             return None, []

@@ -50,9 +50,8 @@ export function SettingRow({ item, q = '' }: { item: SettingItem; q?: string }) 
     <div className="tt-set-row">
       <div className="t">
         <span className="name"><Hi text={item.label} q={q} /></span>
-        {item.key && <span className="key"><Hi text={item.key} q={q} /></span>}
+        {item.scope && <span className="tt-set-scope">{t('set.scope' + ({ mine: 'Mine', node: 'Node', cluster: 'Cluster', browser: 'Browser' }[item.scope]))}</span>}
         {badge && <span className={`tt-set-badge${item.badge === 'restart' ? ' warn' : ''}`}>{badge}</span>}
-        {item.from && <span className="from">{t('set.aliasFrom', { page: item.from })}</span>}
         {inline && <><span className="grow" />{control}</>}
       </div>
       {item.desc && <p className="d"><Hi text={item.desc} q={q} /></p>}

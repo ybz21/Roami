@@ -38,8 +38,9 @@ const SETTLE_AT = [200, 250, 350, 500, 700]
 // 一路按过去的上限：轮一圈没遇到目标档就停（bypassPermissions 要配置允许才轮得到）
 const MAX_PRESSES = 8
 
-export function ComposerPlus({ name, agent, status, uploading, onFiles, onCycleMode, onCommand, onOpenGit, onMouseDown }: {
+export function ComposerPlus({ name, agent, status, uploading, modeTrigger = false, onFiles, onCycleMode, onCommand, onOpenGit, onMouseDown }: {
   /** 会话名：面板要自己回读终端画面，看当前是哪一档、目标跑成什么样 */
+  modeTrigger?: boolean
   name: string
   agent?: 'claude' | 'codex' | 'opencode'
   status?: AgentStatus
@@ -157,13 +158,13 @@ export function ComposerPlus({ name, agent, status, uploading, onFiles, onCycleM
   const choices = modeChoices(agent, mode?.id)
 
   return (
-    <Dropdown trigger={['click']} placement="topLeft" open={open} onOpenChange={setOpen}
+    <Dropdown trigger={['click']} placement="topLeft" open={open} onOpenChange={next => { setOpen(next); if (next && modeTrigger) setShowModes(true) }}
       popupRender={() => (
         <div className="cc-plus" role="menu">
-          {groups.map((g) => (
+          {groups.filter(group => !modeTrigger || group.rows.some(row => row.id === 'mode')).map((g) => (
             <div className="cc-plus-grp" key={g.id}>
-              {GROUP_LABEL[g.id] && <div className="cc-plus-head">{t(GROUP_LABEL[g.id])}</div>}
-              {g.rows.map((r) => (
+              {!modeTrigger && GROUP_LABEL[g.id] && <div className="cc-plus-head">{t(GROUP_LABEL[g.id])}</div>}
+              {g.rows.filter(row => !modeTrigger || row.id === 'mode').map((r) => (
                 <div key={r.id}>
                   <button type="button" role="menuitem"
                     className={`cc-plus-row${r.pending ? ' is-pending' : ''}`}
@@ -216,8 +217,9 @@ export function ComposerPlus({ name, agent, status, uploading, onFiles, onCycleM
           ))}
         </div>
       )}>
-      <button type="button" className="tt-pill ico" aria-label={t('chat.more')} title={t('chat.more')}
-        onMouseDown={onMouseDown}><PlusIcon size={14} /></button>
+      <button type="button" className={modeTrigger ? 'tt-pill sel' : 'tt-pill ico'} aria-label={t(modeTrigger ? 'chat.plus.mode' : 'chat.more')} title={t(modeTrigger ? 'chat.plus.modeHint' : 'chat.more')} onMouseDown={onMouseDown}>
+        {modeTrigger ? <><span>{mode ? t(modeKey(mode.id)).startsWith('chat.mode.') ? mode.id : t(modeKey(mode.id)) : t('chat.plus.mode')}</span><ChevronRight size={12} /></> : <PlusIcon size={14} />}
+      </button>
     </Dropdown>
   )
 }

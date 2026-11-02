@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-VD02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_task_cancellation.py::test_cancel_with_unknown_own_stop_never_claims_confirmed_cancelled",
+      "test_task_cancellation.py::test_shutdown_during_verification_rechecks_evidence_after_restart"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_task_cancellation.py::test_cancel_with_unknown_own_stop_never_claims_confirmed_cancelled",
+      "test_task_cancellation.py::test_shutdown_during_verification_rechecks_evidence_after_restart"
+    ]
+  }
+}

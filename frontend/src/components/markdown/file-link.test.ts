@@ -4,6 +4,12 @@ import { fileLink } from './file-link'
 const parse = (href: string) => fileLink(href, 'https://roami.test', '/api/file/raw')
 
 describe('mobile file links', () => {
+  it('opens artifact content through its own node metadata instead of navigating to an attachment response', () => {
+    expect(parse('/api/agent/artifacts/report/content')).toMatchObject({ metadataUrl: 'https://roami.test/api/agent/artifacts/report', resolvePath: false })
+    expect(parse('/n/other/api/agent/artifacts/report/content')).toMatchObject({ metadataUrl: 'https://roami.test/n/other/api/agent/artifacts/report' })
+    expect(parse('/api/agent/artifacts/report/content?dl=1')).toBeNull()
+    expect(parse('https://other.test/api/agent/artifacts/report/content')).toBeNull()
+  })
   it('decodes query paths without losing special characters', () => {
     expect(parse('/api/file/raw?path=%2Ftmp%2F%E9%A2%84%E8%A7%88%20%2B%25.html')).toMatchObject({ path: '/tmp/预览 +%.html', name: '预览 +%.html' })
   })

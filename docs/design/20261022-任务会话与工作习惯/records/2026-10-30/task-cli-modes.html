@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>任务提示词与 Agent 自动模式验收</title>
+<body>
+<h1>任务提示词与 Agent 自动模式</h1>
+<p>2026-10-30 · 分支 fix/task-agent-cli-modes</p>
+<h2>产品设计与用户故事</h2>
+<p>从项目、会话或文件入口启动专业 Agent 时，默认采用该 Agent 的自动权限模式。
+任务提示词优先指引使用 Roami CLI；升级后的用户也应获得新的内置能力说明。
+用户编辑过的说明、启动路径、模型参数和明确的权限设置保持有效。</p>
+<h2>技术设计</h2>
+<p><code>frontend/src/agent-command.ts</code> 的统一启动函数补充自动参数，覆盖
+TaskComposer、NewSessionModal 和 FilesPage；Pi 不添加不存在的 YOLO 参数。
+自定义命令已经包含明确权限参数时沿用原值。</p>
+<p><code>backend/api/agent_capabilities.go</code> 在读取能力说明时，对 #317、#328、#399、#403
+发布的完整默认内容计算 SHA-256，只升级匹配的旧默认模板。
+升级使用同目录临时文件和 rename，权限保持 0600。自定义内容不覆盖。
+历史模板保存在 testdata，验证升级、重复读取和自定义说明保护。</p>
+<p><code>backend/api/prompts/agent-capabilities.md</code> 明确 Roami CLI 优先、派生 shell
+后各 Agent 的自动启动参数，并保留 Git、依赖安装和项目测试的原有约定。</p>
+<h2>实际命令接收结果</h2>
+<p>在独立 HTTPS 实例内，通过桌面项目任务表单依次创建四类任务。
+配置的测试程序记录实际 argv；不调用真实模型，不验证 Agent 完成业务任务的能力。</p>
+<table border="1" cellpadding="8">
+<tr><th>入口 / Agent</th><th>收到的参数（任务正文之前）</th><th>结果</th></tr>
+<tr><td>桌面 / Claude Code</td><td><code>--dangerously-skip-permissions</code></td><td>通过</td></tr>
+<tr><td>桌面 / Codex</td><td><code>--dangerously-bypass-approvals-and-sandbox</code></td><td>通过</td></tr>
+<tr><td>桌面 / OpenCode</td><td><code>--auto --prompt</code></td><td>通过</td></tr>
+<tr><td>桌面 / Pi</td><td>无额外权限参数</td><td>通过</td></tr>
+<tr><td>Android / Codex</td><td><code>--dangerously-bypass-approvals-and-sandbox</code></td><td>通过</td></tr>
+</table>
+<p>所有接收到的任务正文均含 <code>roami session</code>、<code>roami chrome</code>
+能力指引，任务原文保留。实例从 #317 的旧模板开始，读取后已自动保存新版说明。</p>
+<h2>检查与边界</h2>
+<ul>
+<li>隔离实例运行 <code>scripts/dev/quality/check.sh full</code>：通过。
+包含 Go 全量测试、CLI 入口审计、i18n、hover、typecheck 和生产构建。</li>
+<li><code>npx vitest run</code>：146 个文件，1,086 项通过。</li>
+<li>未修改 Python；质量门禁确认跳过相关检查。</li>
+<li>Redmi Note 8，Android Chrome：compact / coarse，392 CSS px；
+真实触控打开任务框、选择 Codex、输入任务、收起键盘、提交成功。
+首页、项目、工具、设置均可触控进入；页面无横向溢出。</li>
+<li>桌面通过 <code>roami chrome</code> 操作，手机使用 <code>roami adb</code> 截图及键盘操作。
+本机 roami chrome 连接手机 CDP 返回 CHROME_BROWSER_IDENTITY_UNAVAILABLE，
+手机元素断言和触控采用直接 CDP，未用 DOM click 代替命中测试。</li>
+<li>仅验证任务创建与命令投递。测试程序不是 Agent TUI，未将终端连接或模型执行计为通过。</li>
+<li>能力说明是 Agent 对话正文，中文沿用项目 i18n 允许的例外；未新增产品 UI 文案或布局。</li>
+<li>服务及 tmux 实例均通过 <code>scripts/dev/isolated-roami.sh</code> 隔离和清理。</li>
+</ul>
+</body>
+</html>

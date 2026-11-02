@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-SK01",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
+      "test_foundations.py::test_search_skill_loading_and_disable_policy"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
+      "test_foundations.py::test_search_skill_loading_and_disable_policy"
+    ]
+  }
+}

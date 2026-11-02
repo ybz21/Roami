@@ -1,0 +1,48 @@
+{
+  "id": "MECH-MT01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "模型传输证据回归",
+  "prompt": "记录模型传输失败的脱敏位置和类型，保留既有重试、失败状态、请求关联与未知用量。",
+  "preconditions": "公开传输错误配方、httpx本地替身及实际Runtime存储。",
+  "expected_terminal": "transport_failure_evidence_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "带阶段和错误类别的真实执行记录",
+    "源文件、素材哈希及严格JUnit回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-MT01-H1",
+      "rule": "连接、等待响应头、接收响应体、发送及连接池错误可区分，不泄露异常文本、URL或密钥。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MT01-H2",
+      "rule": "保存的重试上限、HTTP重试间隔、未知用量和最终失败状态不变；实际Agent Trace保留证据。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/failures.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

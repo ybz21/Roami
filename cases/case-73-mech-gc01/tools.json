@@ -1,0 +1,16 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_improvement_gateway_transport.py",
+    "agent-runtime/tests/test_improvement_auth_blocking.py"
+  ],
+  "expected_collected": 33,
+  "runtime": [
+    "Python 3.12",
+    "asyncio Unix sockets",
+    "httpx fake local transport",
+    "pytest",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

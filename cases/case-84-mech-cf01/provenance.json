@@ -1,0 +1,6 @@
+{
+  "case_id": "MECH-CF01",
+  "source": "public synthetic error stream, controlled subprocesses and a real read-only Docker command",
+  "private_reference_material": false,
+  "historical_scores_changed": false
+}

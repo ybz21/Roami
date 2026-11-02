@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "instanceId": "instance-demo",
+  "nativeSessionId": "20261022T073812345Z-7b2f9a64e318",
+  "ownerId": "owner-demo",
+  "nodeId": "local",
+  "title": "梳理消息队列",
+  "createdAt": "2026-10-22T07:38:12.345Z",
+  "nativeConversationId": "native-demo-02",
+  "activeBranchId": "branch-demo-02",
+  "parentNativeSessionId": null,
+  "taskId": "task-queue",
+  "projectId": "roami",
+  "workspaceId": "ws-queue",
+  "directory": "/example/project/.worktrees/queue-review",
+  "lifecycle": "open"
+}

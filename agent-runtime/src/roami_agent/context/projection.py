@@ -16,6 +16,7 @@ from roami_agent.context.token_estimate import (
 from roami_agent.conversation.attachments import context_attachments
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
+from roami_agent.protocol.improvement import policy_value
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.task_request import task_user_request
@@ -259,8 +260,8 @@ class Context:
                 for r in rows(
                     db,
                     "SELECT DISTINCT turn_id FROM tool_calls WHERE turn_id IN (SELECT id FROM turns WHERE conversation_id=?) AND state='succeeded' AND "
-                    "((tool_name='reply' AND json_extract(arguments_json,'$.mode') IN ('debug','detailed')) "
-                    "OR (tool_name='task_status' AND json_extract(arguments_json,'$.includeResult')=1))",
+                    "((tool_name='reply' AND json_extract(native_content(arguments_json),'$.mode') IN ('debug','detailed')) "
+                    "OR (tool_name='task_status' AND json_extract(native_content(arguments_json),'$.includeResult')=1))",
                     (cid,),
                 )
             }
@@ -489,7 +490,9 @@ class Context:
                 if desired_tokens is not None
                 else messages_tokens(model_messages(messages))
             )
-            retained = min(self.keep_recent_tokens, available // 2)
+            retained = min(
+                policy_value("keep_recent_tokens", self.keep_recent_tokens), available // 2
+            )
             cut = 0
             # Cut only complete rounds, with room for a summary and the current turn.
             for candidate in boundaries:

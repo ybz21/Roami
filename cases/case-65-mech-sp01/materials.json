@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-SP01",
+  "data": {
+    "kind": "synthetic_local_skill_and_generated_editable_pptx",
+    "recipe": "input/scenarios.json",
+    "generator": [
+      "agent-runtime/tests/test_configured_skill_package.py",
+      "agent-runtime/tests/verification/test_configured_presentation_skill.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "configured_optional_skill"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_configured_skill_package.py",
+      "agent-runtime/tests/verification/test_configured_presentation_skill.py"
+    ],
+    "expected_collected": 5,
+    "no_skips": true,
+    "kind": "source_frozen_pytest_receipt"
+  }
+}

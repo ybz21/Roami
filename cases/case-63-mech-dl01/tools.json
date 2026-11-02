@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-DL01",
+  "runtime": "Optional Skill package, Python 3.12, lxml/jsonschema/pytest and isolated-roami launcher",
+  "test_module": "skills/presentation-edit/tests/test_layout.py",
+  "expected_collected": 10,
+  "data_generator": "test_layout.layout_presentation",
+  "actual_reader": "External Skill pptx_package.presentation_metadata; the standalone inspection CLI is exercised by the tests",
+  "model_calls": 0,
+  "network": "not required"
+}

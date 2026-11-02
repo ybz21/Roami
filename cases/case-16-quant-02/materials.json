@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "case_id": "QUANT-02",
+  "data": {
+    "kind": "authored_generated",
+    "generator": {
+      "path": "generate.py"
+    },
+    "workspace_files": [
+      "prices.json",
+      "tools.json"
+    ],
+    "workspace_binary_files": [],
+    "frozen_in": "suite.cases[].files and suite.cases[].asset_files",
+    "per_run_receipt": true,
+    "local_inputs": true,
+    "input": "inputs/prices.json",
+    "provenance": "provenance.json"
+  },
+  "tools": {
+    "kind": "isolated_native_worker",
+    "workspace": "/workspace",
+    "network": "disabled",
+    "coordinator": [
+      "read",
+      "write",
+      "edit",
+      "tool_list",
+      "delegate",
+      "task_status",
+      "task_reply",
+      "reply"
+    ],
+    "worker": [
+      "read",
+      "write",
+      "edit",
+      "bash"
+    ],
+    "configured_by": "roami_agent.improvement.evaluation.execution.executors.NativeFilesExecutor",
+    "permissions": "The executor owns the allowlist; this declaration does not grant extra capabilities.",
+    "manifest": "tools.json"
+  },
+  "acceptance": {
+    "kind": "authored",
+    "required_deliverables": [
+      "analysis.py",
+      "result.json",
+      "report.md",
+      "selection-log.json"
+    ],
+    "reference_answer": "Kept in the host-side frozen judge; not supplied to the agent.",
+    "contract": "acceptance.md"
+  }
+}

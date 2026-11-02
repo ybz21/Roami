@@ -20,3 +20,11 @@ it('summarizes reports while keeping real PR links separate from ordinary source
   expect(taskOutcome({ ...attempt, result: { summary: {} as string } })).toBe('')
   expect(taskReportLinks({ ...attempt, result: { summary: 42 as unknown as string } })).toEqual([])
 })
+
+it('prefers the final snapshot over a provisional copy without hiding other runs', async () => {
+  const { currentTaskArtifacts } = await import('./agent-task-protocol')
+  const provisional = { id: 'provisional', name: 'index.html', mimeType: 'text/html', sizeBytes: 20, metadata: { sourceFile: '/workspace/index.html', runId: 'run', provisional: true } }
+  const final = { ...provisional, id: 'final', metadata: { ...provisional.metadata, provisional: false } }
+  const previous = { ...provisional, id: 'previous-run', metadata: { ...provisional.metadata, runId: 'previous-run' } }
+  expect(currentTaskArtifacts([provisional, previous, final]).map(item => item.id)).toEqual(['previous-run', 'final'])
+})

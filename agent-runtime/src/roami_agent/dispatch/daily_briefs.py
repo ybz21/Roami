@@ -27,9 +27,9 @@ INSTRUCTIONS = (
 
 
 class DailyBriefs:
-    def __init__(self, database, model, *, daily_budget=3, timeout=None, clock=now_ms):
+    def __init__(self, database, model, *, timeout=None, clock=now_ms):
         self.db, self.model, self.clock = database, model, clock
-        self.daily_budget, self.timeout = daily_budget, timeout
+        self.timeout = timeout
         self.lock = asyncio.Lock()
 
     def _schedule(self, db, owner, schedule_id):
@@ -85,12 +85,6 @@ class DailyBriefs:
                 if payload["spec"] != spec or existing["aggregate_id"] != cid:
                     raise DomainError("BRIEF_KEY_CONFLICT", 409)
                 return self._view(existing)
-            active = db.execute(
-                "SELECT COUNT(*) FROM jobs WHERE kind='brief.schedule' AND state='queued' AND json_extract(payload_json,'$.owner')=?",
-                (owner,),
-            ).fetchone()[0]
-            if active >= self.daily_budget:
-                raise DomainError("BRIEF_SCHEDULE_LIMIT", 409)
             if row(
                 db,
                 "SELECT a.id FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=?",
@@ -258,14 +252,6 @@ class DailyBriefs:
             schedule = self._schedule(db, payload["owner"], payload["scheduleId"])
             if schedule["state"] != "queued" or now - payload["dueMs"] > 86_400_000:
                 self._finish(db, job["id"], "done", {"skipped": "cancelled_or_expired"})
-                continue
-            if (
-                db.execute(
-                    "SELECT COUNT(*) FROM jobs WHERE kind='brief.generate' AND attempts>0 AND json_extract(payload_json,'$.owner')=? AND json_extract(payload_json,'$.startedMs')>?",
-                    (payload["owner"], now - 86_400_000),
-                ).fetchone()[0]
-                >= self.daily_budget
-            ):
                 continue
             start, end = day_bounds(payload["dayKey"], payload["spec"]["timezone"])
             candidates = rows(

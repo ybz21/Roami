@@ -6,6 +6,8 @@ import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
 
 /** 自签证书的 TOFU：系统 / 用户 CA 认的直接过；不认的看叶子证书指纹是不是这台主机上信任过的那张。 */
 object Tls {
@@ -31,4 +33,14 @@ object Tls {
     }
 
     fun sslContext(tm: X509TrustManager): SSLContext = SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), null) }
+
+    fun hostnameVerifier(ctx: Context, host: String) = HostnameVerifier { name, session ->
+        name.equals(host, ignoreCase = true) && (
+            HttpsURLConnection.getDefaultHostnameVerifier().verify(name, session) ||
+                runCatching {
+                    val certificate = session.peerCertificates.first() as X509Certificate
+                    Prefs(ctx).trusted(host) == fingerprint(certificate)
+                }.getOrDefault(false)
+            )
+    }
 }

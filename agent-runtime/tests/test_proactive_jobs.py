@@ -8,7 +8,6 @@ from test_runtime import ConversationModel, until
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row, rows
@@ -140,38 +139,6 @@ async def test_default_opt_out_and_initial_watermark_do_not_evaluate_archive(sto
         await runtime.proactive.tick()
         assert model.calls == [] and await evaluations(store) == []
         assert runtime.settings.proactive_enabled is False
-    finally:
-        await runtime.close()
-
-
-async def test_silence_and_failures_consume_owner_hourly_and_daily_evaluation_budget(store):
-    runtime = Runtime(store, ConversationModel(), verifier=verified)
-    model = SuggestionModel('{"send":false,"text":""}')
-    runtime.proactive.model = model
-    runtime.proactive.daily_budget = 2
-    clock = [now_ms()]
-    runtime.proactive.clock = lambda: clock[0]
-    try:
-        await runtime.proactive.recover()
-        await enable(runtime)
-        for key in ["one", "two", "three"]:
-            await completed_task(runtime, key=key)
-        await runtime.proactive.tick()
-        await runtime.proactive.tick()
-        assert len(model.calls) == 1
-        clock[0] += 3_600_001
-        model.output = "invalid JSON"
-        await runtime.proactive.tick()
-        assert len(model.calls) == 2
-        clock[0] += 3_600_001
-        await runtime.proactive.tick()
-        assert len(model.calls) == 2
-        assert [job["state"] for job in await evaluations(store)] == ["done", "failed", "queued"]
-        assert await suggestions(store) == []
-        clock[0] += 86_400_001
-        await runtime.proactive.tick()
-        assert len(model.calls) == 2
-        assert (await evaluations(store))[-1]["state"] == "done"
     finally:
         await runtime.close()
 
@@ -325,27 +292,6 @@ async def test_recovery_fences_late_generation_and_does_not_replay_it(store):
         await runtime.close()
 
 
-async def test_owner_budget_does_not_block_another_owners_evaluation(store):
-    runtime = Runtime(store, ConversationModel(), verifier=verified)
-    model = SuggestionModel()
-    runtime.proactive.model = model
-    runtime.proactive.daily_budget = 1
-    try:
-        await runtime.proactive.recover()
-        await enable(runtime)
-        await enable(runtime, "bob")
-        await completed_task(runtime, key="alice-one")
-        await runtime.proactive.tick()
-        await completed_task(runtime, key="alice-two")
-        bob, _ = await completed_task(runtime, "bob", "bob-one")
-        await runtime.proactive.tick()
-        assert len(model.calls) == 2
-        assert len(await suggestions(store)) == 2
-        assert (await suggestions(store))[-1]["conversation_id"] == bob["id"]
-    finally:
-        await runtime.close()
-
-
 async def test_blocked_background_evaluation_does_not_occupy_main_slot(store):
     runtime = Runtime(
         store, ConversationModel(), verifier=verified, settings=Settings(proactive_enabled=True)
@@ -379,9 +325,6 @@ async def test_blocked_background_evaluation_does_not_occupy_main_slot(store):
     "configuration",
     [
         "enabled=1",
-        "daily_budget=true",
-        "daily_budget=0",
-        "daily_budget=11",
         "timeout_seconds=false",
         "timeout_seconds=-1",
         'timeout_seconds="31"',

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-CT02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_native_workspace.py::test_native_task_carries_original_attachment_and_honors_artifact_deletion",
+      "test_task_continuation_affinity.py::test_followup_preserves_task_provider_and_session"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_native_workspace.py::test_native_task_carries_original_attachment_and_honors_artifact_deletion",
+      "test_task_continuation_affinity.py::test_followup_preserves_task_provider_and_session"
+    ]
+  }
+}

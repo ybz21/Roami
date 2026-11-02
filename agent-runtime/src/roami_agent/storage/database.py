@@ -13,9 +13,15 @@ from typing import TypeVar
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.conversation_events import ConversationEvents
 from roami_agent.storage.migrations import SCHEMA_VERSION, initial_schema, upgrade_schema
 
 T = TypeVar("T")
+
+
+class NativeConnection(sqlite3.Connection):
+    native_payloads = None
+    event_conversations = None
 
 
 class Database:
@@ -27,6 +33,7 @@ class Database:
         self.closed = False
         self.pending = 0
         self.instance_paths = None
+        self.conversation_events = ConversationEvents()
 
     async def open(self):
         try:
@@ -67,7 +74,7 @@ class Database:
             if entry["state"] == "ready" and not self.path.exists():
                 raise DomainError("DATABASE_MISSING", 503)
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self.connection = sqlite3.connect(self.path, isolation_level=None)
+        self.connection = sqlite3.connect(self.path, isolation_level=None, factory=NativeConnection)
         os.chmod(self.path, 0o600)
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=1000;")
@@ -89,6 +96,28 @@ class Database:
             raise DomainError("AGENT_SCHEMA_UNSUPPORTED", 503)
         self.connection.executescript("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
         upgrade_schema(self.connection, version)
+        from roami_agent.storage.native_payloads import NativePayloads
+
+        home = (self.instance_paths or {}).get("homeRoot") or self.data_root
+        if self.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='native_storage_config'"
+        ).fetchone():
+            key = self.connection.execute(
+                "SELECT reference_key FROM native_storage_config WHERE id=1"
+            ).fetchone()[0]
+            self.connection.native_payloads = NativePayloads(
+                Path(home) / "agents" / "native", bytes.fromhex(key)
+            )
+        self.connection.create_function(
+            "native_content",
+            1,
+            self.connection.native_payloads.resolve
+            if self.connection.native_payloads
+            else lambda value: value,
+        )
+        from roami_agent.storage.native_public_record import public_json
+
+        self.connection.create_function("native_public", 1, public_json)
 
     async def call(self, fn: Callable[[sqlite3.Connection], T], *, write: bool = False) -> T:
         if self.closed:
@@ -96,21 +125,30 @@ class Database:
         if self.pending >= 256:
             raise DomainError("WRITER_BUSY", 503)
         self.pending += 1
+        loop = asyncio.get_running_loop()
 
         def execute():
             try:
                 if write:
                     self.connection.execute("BEGIN IMMEDIATE")
+                    self.connection.event_conversations = set()
                 result = fn(self.connection)
                 if write:
                     self.connection.execute("COMMIT")
+                    if self.connection.event_conversations:
+                        loop.call_soon_threadsafe(
+                            self.conversation_events.publish, self.connection.event_conversations
+                        )
                 return result
             except BaseException:
                 if write and self.connection.in_transaction:
                     self.connection.execute("ROLLBACK")
                 raise
+            finally:
+                if write:
+                    self.connection.event_conversations = None
 
-        future = asyncio.get_running_loop().run_in_executor(self.pool, execute)
+        future = loop.run_in_executor(self.pool, execute)
         # A cancelled HTTP request must not release capacity while its transaction is running.
         future.add_done_callback(lambda _: setattr(self, "pending", self.pending - 1))
         return await asyncio.shield(future)
@@ -131,13 +169,23 @@ class Database:
         self.pool.shutdown(wait=True)
 
 
+def hydrated(connection, value):
+    result = dict(value)
+    resolver = getattr(connection, "native_payloads", None)
+    if resolver:
+        for key, content in result.items():
+            if key.endswith("_json"):
+                result[key] = resolver.resolve(content)
+    return result
+
+
 def row(connection, sql: str, args=()):
     value = connection.execute(sql, args).fetchone()
-    return dict(value) if value else None
+    return hydrated(connection, value) if value else None
 
 
 def rows(connection, sql: str, args=()):
-    return [dict(r) for r in connection.execute(sql, args)]
+    return [hydrated(connection, r) for r in connection.execute(sql, args)]
 
 
 def event(connection, conversation_id: str, kind: str, payload, *, key=None, **refs) -> int:
@@ -151,6 +199,9 @@ def event(connection, conversation_id: str, kind: str, payload, *, key=None, **r
     }
     keys = ",".join(fields)
     values = ",".join("?" for _ in fields)
-    return connection.execute(
+    cursor = connection.execute(
         f"INSERT INTO events ({keys}) VALUES ({values})", tuple(fields.values())
     ).lastrowid
+    if getattr(connection, "event_conversations", None) is not None:
+        connection.event_conversations.add(conversation_id)
+    return cursor

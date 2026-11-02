@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-RJ01",
+  "data": {
+    "kind": "public_synthetic_json_shapes",
+    "inputs": [
+      "input/model-result-shapes.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/model-result-shapes.json",
+    "byte_identical_required": true,
+    "description": "错误对象形状被测试实际消费；120 Token为协议夹具，不是实际模型计费。",
+    "generated_fixtures": [
+      "agent-runtime/tests/test_improvement_workflow.py:setup,FixtureExecutor",
+      "agent-runtime/tests/test_improvement_model_result_shapes.py:ScriptedModel"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "real_async_worker_and_durable_cached_protocol_response"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 35,
+    "no_skips": true,
+    "pytest_selectors": [
+      "agent-runtime/tests/test_improvement_model_result_shapes.py"
+    ]
+  }
+}

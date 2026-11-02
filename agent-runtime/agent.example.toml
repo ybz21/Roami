@@ -62,12 +62,10 @@ gc_interval_seconds = 300
 # Evaluates fresh task outcome events with the Worker model; no model polling.
 [proactive]
 enabled = false
-daily_budget = 3 # model evaluations per owner over 24 hours, including failures/silence
 timeout_seconds = 0 # separate background queue; no generation deadline
 
 # Explicit daily briefs use the same reminder CLI/UI, with kind=daily_brief.
 [briefs]
-daily_budget = 3 # evaluations per owner over 24 hours; also bounds active schedules
 timeout_seconds = 0 # no request deadline
 
 [tools]

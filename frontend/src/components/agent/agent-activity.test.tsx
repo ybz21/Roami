@@ -92,3 +92,25 @@ it('keeps past tool failures factual inside records without presenting a current
   expect(document.querySelector('[data-state=failed]')).toBeTruthy()
   expect(screen.queryByText('agent.activity.needsAttention')).toBeNull()
 })
+
+it('uses streamed input and output previews immediately without a detail request', async () => {
+  const { api } = await import('../../api')
+  const item: AgentActivityItem = { ...task('running'), id: 'tool:skill', kind: 'tool', name: 'skill_read', preview: { input: { text: '{"name":"browser_use"}', truncated: false }, output: null } }
+  const view = render(<AgentActivity items={[item]} conversationId="c" onSession={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button'))
+  await screen.findByText('agent.activity.noOutput')
+  expect(api).not.toHaveBeenCalled()
+  view.rerender(<AgentActivity items={[{ ...item, state: 'succeeded', updatedMs: 3000, preview: { ...item.preview!, output: { text: 'Browser skill instructions', truncated: false } } }]} conversationId="c" onSession={vi.fn()} />)
+  await screen.findByText('Browser skill instructions')
+  expect(screen.getByText('{"name":"browser_use"}')).toBeTruthy()
+  expect(api).not.toHaveBeenCalled()
+})
+
+it('shows a declined assignment as not accepted rather than queued or an unknown outcome', () => {
+  const item: AgentActivityItem = { ...task('blocked'), id: 'tool:declined', kind: 'tool', name: 'delegate', errorCode: 'TASK_CONTINUATION_REQUIRED' }
+  render(<AgentActivity items={[item]} onSession={vi.fn()} />)
+  expect(document.querySelector('[data-state="blocked"]')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toContain('agent.activity.continueTask')
+  expect(screen.queryByText('agent.activity.accepted')).toBeNull()
+  expect(screen.queryByText('agent.activity.outcomeUnknown')).toBeNull()
+})

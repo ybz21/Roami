@@ -1,0 +1,9 @@
+{
+  "origin": "transport exceptions collapse to MODEL_TRANSPORT_FAILED without safe failure-stage evidence",
+  "fixtures": "synthetic exception categories; no original traffic or credentials",
+  "model_calls": 0,
+  "saved_retry_policy_changed": false,
+  "historical_root_cause_proven": false,
+  "formal_history_updated": false,
+  "human_labels_updated": false
+}

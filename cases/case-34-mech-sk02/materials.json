@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-SK02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
+      "test_skill_references.py::test_reference_cannot_escape_skill",
+      "test_native_input_policy.py::test_native_preparation_never_reads_named_inputs_implicitly",
+      "test_native_input_policy.py::test_explicit_file_reads_obey_current_policy",
+      "test_native_input_policy.py::test_explicit_skill_reads_obey_current_policy"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories.",
+    "explicit_input_variant": "Arbitrary input bytes in disposable workspaces; filenames do not trigger implicit reads. Generic file/Skill reads obey current disable policy, including changes between rounds. No provider constructed."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score.",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_skill_references.py::test_reference_is_loaded_on_demand_and_changes_catalog_version",
+      "test_skill_references.py::test_reference_cannot_escape_skill",
+      "test_native_input_policy.py::test_native_preparation_never_reads_named_inputs_implicitly",
+      "test_native_input_policy.py::test_explicit_file_reads_obey_current_policy",
+      "test_native_input_policy.py::test_explicit_skill_reads_obey_current_policy"
+    ]
+  }
+}

@@ -2,24 +2,22 @@ import type { MenuProps } from 'antd'
 import { NodeMark, nodeDotColor } from '../components/cluster/NodeMark'
 import { hubReasonText, useHubHealth } from '../components/cluster/hub-health'
 import { setCurrentNode, useClusterNodes, useCurrentNodeId } from '../components/cluster/node-url'
-import { loadTabs } from '../components/terminal/term-tabs-store'
 import { useI18n } from '../i18n'
 import { CloudIcon } from '../icons'
-import { NO_TERMS, setHashParams } from '../route-hash'
+import { getHashParams, setHashParams } from '../route-hash'
 
-export function useClusterNavigation(noTabs: { readonly current: boolean }, go: (route: string) => void) {
+export function useClusterNavigation(go: (route: string) => void) {
   const { t } = useI18n()
   const clusterNodes = useClusterNodes()
   const curNodeId = useCurrentNodeId()
   const curNode = clusterNodes.find((n) => n.id === curNodeId) || null
   const hubHealth = useHubHealth()
   const switchNode = (id: string) => {
-    const back = loadTabs(id)
     setCurrentNode(id)
-    setHashParams({
-      terms: noTabs.current ? NO_TERMS : back.terms.map(encodeURIComponent).join(','),
-      active: noTabs.current || !back.active ? '' : encodeURIComponent(back.active),
-    })
+    const params = Object.fromEntries(getHashParams())
+    delete params.terms; delete params.active
+    params.node = id
+    setHashParams(params)
     location.reload()
   }
 

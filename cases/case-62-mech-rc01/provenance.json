@@ -1,0 +1,9 @@
+{
+  "origin": "observed_runtime_regression",
+  "issue": 443,
+  "observation": "A failed native request had no upstream ID; Agent omitted the Go call ID and the private bridge discarded response and retry metadata.",
+  "private_data_included": false,
+  "synthetic": true,
+  "fixture_source": "input/receipts.json and repository tests",
+  "historical_suite_modified": false
+}

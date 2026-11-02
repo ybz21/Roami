@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Roami Agent RSI · 资料目录</title>
+  <link rel="stylesheet" href="assets/design.css">
+  <link rel="stylesheet" href="assets/rsi-overview.css">
+</head>
+<body><main><article class="rsi-overview">
+  <h1>Roami Agent RSI</h1>
+  <p class="rsi-lead"><a href="prototypes/roami-rsi-design.html">打开最新设计与交互原型 · 2026-10-27</a></p>
+  <p>按工作流、运行结果、Issue 三个 Tab 查看每轮汇总、折叠明细和多轮修复对比，区分 fix / feature 与 P0 至 P3。额度统一由模型页管理，保留七环节 Workflow。正式页面与共享模型限额已接入；原型始终使用演示数据。验收边界见 AGENTS.md，真实 Android 触控验收尚未完成。</p>
+  <nav aria-label="资料分类"><a href="#prototype">原型</a> · <a href="#architecture">架构</a> · <a href="#evaluation">评测</a> · <a href="#research">调研</a> · <a href="#records">记录</a></nav>
+
+  <section id="prototype">
+    <h2>最新原型 · prototypes/</h2>
+    <p><a href="prototypes/roami-rsi-design.html">设计说明与交互原型</a> · <a href="prototypes/roami-rsi-prototype.html">独立原型</a></p>
+    <p>支持桌面与手机预览、深浅主题、中英文及运行状态切换。设计源文档维护在仓库根目录 AGENTS.md；生成入口为 frontend/scripts/build-rsi-design.mjs。</p>
+  </section>
+
+  <section id="architecture">
+    <h2>架构与工作流 · architecture/</h2>
+    <p><a href="architecture/overview.html">总体方案</a> · <a href="architecture/automation-roles.html">角色、执行手段与闭环</a> · <a href="architecture/workflow-engineering.html">工作流工程设计</a> · <a href="architecture/workflow-contract.json">工作流合同 JSON</a></p>
+    <p>评测、复盘、汇总 Issue、修复、独立验收、提交 PR、连续观察，各环节的职责和交接条件均保留。</p>
+    <details><summary>架构图与可编辑源文件 · assets/</summary>
+      <p><a href="assets/architecture.svg">整体架构图</a> · <a href="assets/architecture-mobile.svg">手机架构图</a> · <a href="assets/architecture.excalidraw" download>架构图源文件</a></p>
+      <p><a href="assets/decision-space.svg">决策空间图</a> · <a href="assets/decision-space.excalidraw" download>决策空间源文件</a></p>
+      <p><a href="assets/design.css">文档样式</a> · <a href="assets/rsi-overview.css">概览样式</a></p>
+    </details>
+  </section>
+
+  <section id="evaluation">
+    <p>任务定义：<a href="../../../cases/README.md">cases/ 格式说明</a> · <a href="../../../cases/case-1-code-01/CASE.md">第一个 Case</a>。每项任务独立目录，可包含多个文件；名称和描述统一放在 CASE.md。</p>
+    <h2>评测标准与材料 · evaluation/</h2>
+    <p><a href="evaluation/evaluation.html">任务规格与评分标准</a> · <a href="evaluation/sampling-plan.html">每日 60 项清单</a> · <a href="evaluation/public-benchmarks.html">公开基准</a></p>
+    <details><summary>机器可读合同、清单与材料锁</summary>
+      <p><a href="evaluation/evaluation-standard.json">指标与晋级标准</a> · <a href="evaluation/cases.json">任务规格</a> · <a href="evaluation/fixtures.json">夹具要求</a> · <a href="evaluation/sampling-plan.json">60 项组合</a></p>
+      <p><a href="evaluation/public-benchmarks.json">公开基准清单</a> · <a href="evaluation/public-sample-lock.json">公开样本锁</a> · <a href="evaluation/public-materials-lock.json">公开材料锁</a> · <a href="evaluation/private-validation-lock.json">私有验证范围</a></p>
+    </details>
+  </section>
+
+  <section id="research">
+    <h2>调研 · research/</h2>
+    <p><a href="research/research.html">开源方案与源码核对</a> · <a href="research/research-sources.json">来源与版本快照</a></p>
+  </section>
+
+  <section id="records">
+    <h2>实施与运行记录 · records/</h2>
+    <p><a href="records/README.md">按日期查看设计修订与验收记录</a></p>
+    <p><a href="records/implementation.html">实施与验收历史快照</a> · <a href="records/light-run-20261024.html">2026-10-24 诊断试跑</a></p>
+    <p>这些页面保留当时的结果与未完成条件。演示原型不代表问题已解决，也不代表历史记录已经更新。</p>
+  </section>
+  <p><a href="../../development/agent-rsi.md">配置、运行与恢复手册</a></p>
+</article></main></body></html>

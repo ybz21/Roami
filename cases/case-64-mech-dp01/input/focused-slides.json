@@ -1,0 +1,88 @@
+{
+  "name": "多页文稿单页检查",
+  "description": "12页合成文稿，用于验证聚焦输出仍保留原始文件身份与全部目标对象字段。",
+  "slides": [
+    {
+      "number": 1,
+      "label": "Slide 1: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 2,
+      "label": "Slide 2: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 3,
+      "label": "Slide 3: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 4,
+      "label": "Slide 4: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 5,
+      "label": "Slide 5: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 6,
+      "label": "Slide 6: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 7,
+      "label": "Slide 7: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 8,
+      "label": "Slide 8: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 9,
+      "label": "Slide 9: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 10,
+      "label": "Slide 10: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 11,
+      "label": "Slide 11: ",
+      "text": "readable source ",
+      "repeat": 150
+    },
+    {
+      "number": 12,
+      "label": "Slide 12: ",
+      "text": "readable source ",
+      "repeat": 150
+    }
+  ],
+  "position_inches": {
+    "left": 1,
+    "top": 1,
+    "width": 5,
+    "height": 2
+  },
+  "expected": {
+    "total_slides": 12,
+    "selected_slide": 3
+  }
+}

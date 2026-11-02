@@ -37,7 +37,8 @@ class CreateTask(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     conversationId: str
     goal: str = Field(min_length=1)
-    executor: Literal["native", "codex", "claude"] = "native"
+    executor: Literal["native", "codex", "claude", "opencode", "pi"] = "native"
+    model: str | None = Field(default=None, min_length=1, max_length=300)
     target: dict | None = None
     fromMessageId: str | None = None
     parentTaskId: str | None = None
@@ -92,6 +93,10 @@ class SessionReport(Payload):
 
 class Confirm(Payload):
     accepted: bool
+
+
+class ConfirmMemory(Confirm):
+    expectedCurrentId: str | None = Field(default=None, max_length=200)
 
 
 class ConfirmTask(Confirm):

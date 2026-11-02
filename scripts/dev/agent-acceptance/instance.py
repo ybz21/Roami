@@ -178,6 +178,15 @@ def start(args):
                         start_new_session=True,
                     )
                 )
+            if name == "agent":
+                for _ in range(120):
+                    try:
+                        cli("agent", "status")
+                        break
+                    except RuntimeError:
+                        time.sleep(0.25)
+                else:
+                    raise RuntimeError("Acceptance Agent socket did not become ready")
         jar = http.cookiejar.CookieJar()
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 

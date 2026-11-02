@@ -1,15 +1,52 @@
 package agentproxy
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/modelgateway"
 )
+
+func TestGatewayManagementUsesPrivateGoSocket(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "agent.sock")
+	listener, err := net.Listen("unix", modelgateway.Socket(socket))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/model-gateway/usage" || r.URL.RawQuery != "days=30&source=rsi&day=2026-10-28" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
+			t.Errorf("invalid gateway request: %s", r.URL)
+		}
+		_, _ = io.WriteString(w, `{"data":{"groups":[]}}`)
+	})}
+	go func() { _ = server.Serve(listener) }()
+	defer server.Close()
+	r := httptest.NewRequest("GET", "/api/agent/model-gateway/usage?days=30&source=rsi&day=2026-10-28", nil)
+	r.Header.Set("Authorization", "private-browser-credential")
+	r.Header.Set("Cookie", "private-browser-cookie")
+	w := httptest.NewRecorder()
+	Proxy(socket).ServeHTTP(w, r)
+	if w.Code != 200 || w.Body.String() != `{"data":{"groups":[]}}` {
+		t.Fatalf("management did not reach Go gateway: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCapabilityDownloadUsesBoundedLongerHeaderBudget(t *testing.T) {
+	proxy := Proxy("/tmp/unused-roami-test.sock").(*httputil.ReverseProxy)
+	transport := proxy.Transport.(capabilityTransport)
+	if transport.standard.ResponseHeaderTimeout != 15*time.Second || transport.marketplace.ResponseHeaderTimeout != 100*time.Second {
+		t.Fatal("ordinary requests and capability downloads must keep distinct bounded budgets")
+	}
+}
 
 func TestProxyIdentityStreamingAndPath(t *testing.T) {
 	socket := filepath.Join(t.TempDir(), "agent.sock")
@@ -18,6 +55,7 @@ func TestProxyIdentityStreamingAndPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	released := make(chan struct{})
+	finished := make(chan struct{})
 	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/conversations/c1/events" || r.Header.Get("X-Roami-Owner") != "local" || r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
 			t.Errorf("invalid forwarded request: %s owner=%s", r.URL.Path, r.Header.Get("X-Roami-Owner"))
@@ -28,11 +66,24 @@ func TestProxyIdentityStreamingAndPath(t *testing.T) {
 		select {
 		case <-released:
 		case <-r.Context().Done():
+			return
+		}
+		_, _ = io.WriteString(w, "id: 2\nevent: message.delta\ndata: {\"text\":\"second\"}\n\n")
+		w.(http.Flusher).Flush()
+		select {
+		case <-finished:
+		case <-r.Context().Done():
 		}
 	})}
 	go func() { _ = server.Serve(listener) }()
 	defer server.Close()
-	proxy := httptest.NewServer(Proxy(socket))
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	handler := Proxy(socket)
+	router.GET("/api/agent/conversations/:cid/events", func(c *gin.Context) {
+		handler.ServeHTTP(c.Writer, c.Request)
+	})
+	proxy := httptest.NewServer(router)
 	defer proxy.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -45,12 +96,19 @@ func TestProxyIdentityStreamingAndPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	chunk := make([]byte, 5)
-	if _, err = io.ReadFull(res.Body, chunk); err != nil {
-		t.Fatal(err)
-	}
-	if string(chunk) != "id: 1" {
-		t.Fatalf("stream was changed: %q", chunk)
+	reader := bufio.NewReader(res.Body)
+	for _, expected := range []string{"id: 1\n", "event: message.delta\n", "data: {}\n", "\n"} {
+		line, err := reader.ReadString('\n')
+		if err != nil || line != expected {
+			t.Fatalf("first event before release: got %q, want %q: %v", line, expected, err)
+		}
 	}
 	close(released)
+	for _, expected := range []string{"id: 2\n", "event: message.delta\n", "data: {\"text\":\"second\"}\n", "\n"} {
+		line, err := reader.ReadString('\n')
+		if err != nil || line != expected {
+			t.Fatalf("second event before finish: got %q, want %q: %v", line, expected, err)
+		}
+	}
+	close(finished)
 }

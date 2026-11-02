@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "protocol_hash": "0cda7e9d76a26814b44501b67a0ae3bb608a413ee3af12423306c46792f95a74",
+  "reference_policy": "human_or_user_authorized_ai",
+  "renderer_image": "sha256:db9379a43dacf2c5ee5fc185a30d74f4d0c914c8c51be3f3e41e9d2af3ac708d",
+  "reference_count": 14,
+  "coverage": {
+    "plan": {
+      "positive": 2,
+      "negative": 2
+    },
+    "presentation": {
+      "positive": 2,
+      "negative": 4
+    },
+    "web": {
+      "positive": 2,
+      "negative": 2
+    }
+  },
+  "reference_basis_counts": {
+    "human": 0,
+    "user_authorized_ai": 14
+  },
+  "input_validation_passed": true,
+  "native_sales_charts_checked": 2,
+  "reviewed_unique_image_count": 21,
+  "reviewed_image_count": 28,
+  "full_balanced_anchor_pool_created": true,
+  "saved_rater_preflight_error": "MODEL_IMAGES_UNSUPPORTED",
+  "model_calls": 0,
+  "saved_configuration_unchanged": true,
+  "historical_files_unchanged": true,
+  "historical_human_labels_unchanged": true,
+  "calibration_executed": false,
+  "new_certificate_created": false,
+  "independently_calibrated": false,
+  "formal_rsi_goal_complete": false,
+  "snapshot_kind": "acceptance_summary_not_executable_profile",
+  "anchors": [
+    {
+      "id": "plan-backup-complete",
+      "family": "plan",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 3,
+        "grounding": 3
+      },
+      "evidence_hash": "1225717788a002a4329a9df44e0464b8367d79b926d342825bcbae8d40fa208a"
+    },
+    {
+      "id": "plan-backup-incomplete",
+      "family": "plan",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 1,
+        "completeness": 1,
+        "usability": 1,
+        "grounding": 1
+      },
+      "evidence_hash": "836224e903c6ff7edc027e627c2cc2f90d157b123462869b9e9b75585c0bceb2"
+    },
+    {
+      "id": "plan-import-complete",
+      "family": "plan",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 3,
+        "grounding": 3
+      },
+      "evidence_hash": "a758bae5731c662c0e7130864ae2b7c42f40aeb7f458e741daaf8265048ddc68"
+    },
+    {
+      "id": "plan-import-incomplete",
+      "family": "plan",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 1,
+        "completeness": 1,
+        "usability": 1,
+        "grounding": 1
+      },
+      "evidence_hash": "323755e4f4db867c725ab019eee3feb02c4da7dbe2788097ea3314895b785e70"
+    },
+    {
+      "id": "presentation-release-complete",
+      "family": "presentation",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 3,
+        "grounding": 3
+      },
+      "evidence_hash": "34c9118d8675d1982fb16c05b3f0be4131550734760de8988480a3ab47141da5"
+    },
+    {
+      "id": "presentation-release-incomplete",
+      "family": "presentation",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 1,
+        "completeness": 1,
+        "usability": 1,
+        "grounding": 1
+      },
+      "evidence_hash": "e3f1833587a4083f80376a5d1523fe425a324398fde265566354726b1092400b"
+    },
+    {
+      "id": "presentation-release-plain-negative",
+      "family": "presentation",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 2,
+        "grounding": 3
+      },
+      "evidence_hash": "3eccd76350bdb62a18691292df2da0cff490b441b7ce622e39dfc99f250a3da6"
+    },
+    {
+      "id": "presentation-sales-complete",
+      "family": "presentation",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 3,
+        "grounding": 3
+      },
+      "evidence_hash": "52c2288498a412f030e84532854812abe5aafc87fdd3e76e5838795538013671"
+    },
+    {
+      "id": "presentation-sales-incomplete",
+      "family": "presentation",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 1,
+        "completeness": 1,
+        "usability": 1,
+        "grounding": 1
+      },
+      "evidence_hash": "5d961038b913785e7303b2be5ffcd097a3d555b981ff105a51d0e5a06d47738b"
+    },
+    {
+      "id": "presentation-sales-plain-negative",
+      "family": "presentation",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 2,
+        "grounding": 3
+      },
+      "evidence_hash": "421db3f24f75cb5b3c211b402307a60c056718c294907cd6c748df5aa43b66fd"
+    },
+    {
+      "id": "web-counter-complete",
+      "family": "web",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 3,
+        "grounding": 3
+      },
+      "evidence_hash": "b565bd3d9e3152345c9d3ace74cb58fad9a7a3f8d14f8c971af3c6813311392d"
+    },
+    {
+      "id": "web-counter-incomplete",
+      "family": "web",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 1,
+        "completeness": 1,
+        "usability": 1,
+        "grounding": 1
+      },
+      "evidence_hash": "647d62220a72d13f46d41d5d59aaaeee61c934234691959782eb86cb7d58b811"
+    },
+    {
+      "id": "web-filter-complete",
+      "family": "web",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 3,
+        "completeness": 3,
+        "usability": 3,
+        "grounding": 3
+      },
+      "evidence_hash": "10e9fde2e8695ce45acc989d48059ce932674556d367e0dae8b44d147a1d28bc"
+    },
+    {
+      "id": "web-filter-incomplete",
+      "family": "web",
+      "reference_kind": "user_authorized_ai",
+      "human_reviewed": false,
+      "independent_rater_reviewed": false,
+      "expected": {
+        "correctness": 1,
+        "completeness": 1,
+        "usability": 1,
+        "grounding": 1
+      },
+      "evidence_hash": "22578e80dfb54c4136f45bc92bddb1f0afba59739637a0461b4ccdcc137f9f16"
+    }
+  ]
+}

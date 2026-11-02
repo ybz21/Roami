@@ -17,6 +17,7 @@ from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
 from roami_agent.context.token_estimate import request_context
 from roami_agent.context.vision_inputs import VisionInputs
+from roami_agent.context.workflow_instructions import workflow_instructions
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
 from roami_agent.conversation.service import ConversationService
@@ -31,6 +32,7 @@ from roami_agent.dispatch.routing import TaskRouter
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.task_sessions import TaskSessions
+from roami_agent.dispatch.task_workspace_cleanup import TaskWorkspaceCleanup
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
@@ -38,24 +40,29 @@ from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
+from roami_agent.improvement.domain.policy import BOUNDS
+from roami_agent.improvement.service import ImprovementStatus
 from roami_agent.memory.jobs import MemoryJobs
 from roami_agent.memory.records import Memories
 from roami_agent.observability.execution_debug import ExecutionDebug
-from roami_agent.observability.execution_traces import ExecutionTraces
+from roami_agent.observability.execution_traces import ExecutionTraces, origin_turn
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
-from roami_agent.providers.chat_completions import ChatCompletions
+from roami_agent.protocol.improvement import policy_binding
+from roami_agent.providers.factory import configured_provider
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
 from roami_agent.server.capability_imports import CapabilityImports
+from roami_agent.server.capability_markets import CapabilityMarkets
 from roami_agent.server.capability_settings import CapabilitySettings
 from roami_agent.server.configuration import Settings
 from roami_agent.server.model_settings import ModelSettings, RuntimeSettings, load_model_settings
 from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
+from roami_agent.storage.native_sessions import NativeSessions
 from roami_agent.storage.task_deliverables import TaskDeliverables
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
@@ -67,11 +74,15 @@ from roami_agent.tools.files import register_file_tools
 from roami_agent.tools.foundations import register_foundations
 from roami_agent.tools.gateway import ToolGateway
 from roami_agent.tools.main_catalog import register_main_tools
+from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
+from roami_agent.tools.mcp_broker import MCPBroker, node_socket
+from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
+from roami_agent.tools.workspace_images import WorkspaceImageReads
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +98,8 @@ class Runtime:
         memory_model=None,
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
+        development_rsi=False,
+        execution_deadline: Callable[[], int | None] | None = None,
     ):
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
@@ -124,6 +137,7 @@ class Runtime:
             self.memory,
             self.memory.daily,
             artifacts=self.artifacts,
+            timeout_seconds=lambda: self.settings.route("worker").timeout_seconds,
         )
         self.notifications = Notifications(database)
         self.notification_policy = NotificationPolicy(
@@ -133,7 +147,6 @@ class Runtime:
         self.briefs = DailyBriefs(
             database,
             self.worker_model,
-            daily_budget=self.settings.brief_daily_budget,
             timeout=self.settings.brief_timeout_seconds,
         )
         self.deliveries = DeliveryOutbox(database, self.notification_policy)
@@ -141,7 +154,6 @@ class Runtime:
             database,
             self.worker_model,
             self.notification_policy,
-            daily_budget=self.settings.proactive_daily_budget,
             timeout=self.settings.proactive_timeout_seconds,
         )
         self.context = Context(
@@ -164,6 +176,8 @@ class Runtime:
         self.brief_monitor = None
         self.artifact_monitor = None
         self.native_reconciliation_monitor = None
+        self.native_session_monitor = None
+        self.native_sessions = NativeSessions(database)
         self.native_reconciliation = NativeWorkspaceReconciliation(
             database, self.settings, resources=self.resources
         )
@@ -184,9 +198,19 @@ class Runtime:
             self.briefs,
         )
         add_worker_tools(self.tools, self.settings, self.artifacts)
-        register_file_tools(self.tools, self.files)
+        register_file_tools(
+            self.tools, self.files, images=WorkspaceImageReads(self.files, self.artifacts)
+        )
         register_artifact_tools(self.tools, self.artifacts)
-        self.mcp = MCPConnections(self.tools, self.settings.mcp_servers, self.artifacts)
+        mcp_socket = node_socket(database.data_root)
+        self.mcp = MCPConnections(
+            self.tools,
+            self.settings.mcp_servers,
+            self.artifacts,
+            broker=MCPBroker(Path(mcp_socket), data_root=database.data_root)
+            if mcp_socket
+            else None,
+        )
         self.browser = BrowserDriver(database, self.settings, self.resources, self.artifacts)
         if self.browser.config.get("enabled"):
             register_browser_tools(self.tools, self.browser)
@@ -198,7 +222,11 @@ class Runtime:
         register_foundations(self.tools, self.settings)
 
         self.context.request_context = lambda: request_context(
-            self.settings, self.settings.main_instructions, self.tools.catalog("main")
+            self.settings,
+            workflow_instructions(
+                self.settings.main_instructions, self.tools.optional_skill_metadata()
+            ),
+            self.tools.catalog("main"),
         )
 
         self.mailbox = TurnMailbox(database)
@@ -207,6 +235,7 @@ class Runtime:
         self.cli_commands = CLICommands(database, self.tools, self.journal)
         self.manifests = PromptManifests(database)
         self.traces = ExecutionTraces(database)
+        self.improvement = ImprovementStatus(database.data_root) if development_rsi else None
         self.debug = ExecutionDebug(database, self.context, self.settings, self.traces)
         self.dispatch = TaskDispatcher(
             database,
@@ -214,7 +243,7 @@ class Runtime:
             executor,
             verifier,
             NativeExecutor(
-                lambda *args, **kwargs: self.loop.run(*args, **kwargs),
+                lambda *args, **kwargs: self.run_turn(*args, **kwargs),
                 database,
                 self.settings,
                 resources=self.resources
@@ -225,7 +254,12 @@ class Runtime:
             self.wakeup,
             self.active,
         )
-        self.task_sessions = TaskSessions(database, self.executor, self.dispatch.confirm)
+        self.task_sessions = TaskSessions(
+            database,
+            self.executor,
+            self.dispatch.confirm,
+            cleanup=TaskWorkspaceCleanup(database, self.settings, self.tasks),
+        )
         self.loop = AgentLoop(
             model,
             self.worker_model,
@@ -235,8 +269,11 @@ class Runtime:
                 self.context,
                 self.settings,
                 memory=self.memory,
+                skills=self.tools.optional_skill_metadata,
+                workflow_reads=self.tools.loaded_workflow_metadata,
+                execution_deadline=execution_deadline,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
-                vision=VisionInputs(database, self.artifacts)
+                vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True
                 else None,
             ),
@@ -254,10 +291,11 @@ class Runtime:
             self.context,
             self.dispatch,
             self.mailbox,
-            self.loop.run,
+            self.run_turn,
             self.wakeup,
             self.active,
             self.memory_jobs,
+            task_sessions=self.task_sessions,
         )
         self.chat = ConversationService(
             database,
@@ -270,16 +308,61 @@ class Runtime:
             self.loop.preempt,
         )
         self.model_settings = ModelSettings(self, configured_provider)
+        if self.improvement is not None:
+            self.improvement.ledger.shared_daily_limit = True
+            self.improvement.provider_factory = self.improvement_provider
+            self.improvement.research.provider_factory = self.improvement_provider
         self.capability_imports = CapabilityImports(self)
         self.capability_settings = CapabilitySettings(self)
+        self.capability_markets = CapabilityMarkets(self)
+        register_market_commands(self.tools, self.capability_markets)
+        self.professional_capabilities = ProfessionalCapabilities(self)
+        if isinstance(self.executor, CodingExecutor):
+            self.executor.capabilities = self.professional_capabilities
+
+    def improvement_provider(self, settings, role):
+        actual = "main" if role in {"main", "artifact_a"} else "worker"
+        return configured_provider(settings, actual)
+
+    async def run_turn(self, turn, *args, **kwargs):
+        if self.improvement is None or not self.improvement.ledger.path.exists():
+            return await self.loop.run(turn, *args, **kwargs)
+
+        def scope(db):
+            root = origin_turn(db, turn["owner_id"], turn_id=turn["id"])
+            return dict(
+                db.execute(
+                    "SELECT id,created_ms FROM conversations WHERE id=? AND owner_id=?",
+                    (root["conversation_id"], turn["owner_id"]),
+                ).fetchone()
+            )
+
+        conversation = await self.db.call(scope)
+        baseline = {key: getattr(self.settings.current, key) for key in BOUNDS}
+        binding = await asyncio.to_thread(
+            self.improvement.releases.bind,
+            turn["owner_id"],
+            conversation["id"],
+            conversation["created_ms"],
+            baseline,
+        )
+        token = policy_binding.set(binding)
+        try:
+            return await self.loop.run(turn, *args, **kwargs)
+        finally:
+            policy_binding.reset(token)
 
     async def start(self):
+        self.mcp.start()
+        await self.mcp.refresh()
+        await self.professional_capabilities.recover()
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
         await self.resources.recover()
         await self.dispatch.recover()
         await self.briefs.recover()
+        await self.native_sessions.recover()
         if self.settings.proactive_enabled:
             await self.proactive.recover()
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
@@ -291,6 +374,7 @@ class Runtime:
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
         self.brief_monitor = asyncio.create_task(self._monitor_briefs())
         self.artifact_monitor = asyncio.create_task(self._monitor_artifacts())
+        self.native_session_monitor = asyncio.create_task(self._monitor_native_sessions())
         if self.db.managed:
             self.native_reconciliation_monitor = asyncio.create_task(
                 self._monitor_native_reconciliation()
@@ -298,6 +382,29 @@ class Runtime:
         if self.settings.proactive_enabled:
             self.proactive_monitor = asyncio.create_task(self._monitor_proactive())
         self.wakeup.set()
+        if self.db.managed and self.improvement is not None:
+            from roami_agent.improvement.workflows.worker import EvaluationWorker
+
+            self.improvement.worker = EvaluationWorker(self, self.improvement)
+            await self.improvement.worker.start()
+            from roami_agent.improvement.workflows.research_worker import ResearchWorker
+
+            self.improvement.research_worker = ResearchWorker(self, self.improvement)
+            await self.improvement.research_worker.start()
+            from roami_agent.improvement.workflows.pipeline_reports import PipelineReportWorker
+
+            self.improvement.report_worker = PipelineReportWorker(
+                self.improvement, settings=lambda: self.settings.current
+            )
+            await self.improvement.report_worker.start()
+
+    async def _monitor_native_sessions(self):
+        while not self.stopping:
+            try:
+                await self.native_sessions.maintain()
+            except (DomainError, OSError, ValueError):
+                log.exception("Native session projection failed")
+            await asyncio.sleep(5)
 
     async def _monitor_native_reconciliation(self):
         while not self.stopping:
@@ -393,6 +500,13 @@ class Runtime:
 
     async def close(self):
         self.stopping = True
+        self.mcp.shutting_down = True
+        if self.improvement is not None and self.improvement.report_worker:
+            await self.improvement.report_worker.close()
+        if self.improvement is not None and self.improvement.research_worker:
+            await self.improvement.research_worker.close()
+        if self.improvement is not None and self.improvement.worker:
+            await self.improvement.worker.close()
         self.scheduler.stopping = True
         self.wakeup.set()
         if self.supervisor:
@@ -424,31 +538,22 @@ class Runtime:
         if self.control_monitor:
             self.control_monitor.cancel()
             await asyncio.gather(self.control_monitor, return_exceptions=True)
+        if self.native_session_monitor:
+            self.native_session_monitor.cancel()
+            await asyncio.gather(self.native_session_monitor, return_exceptions=True)
         running = [item["handle"] for item in self.active.values()]
         for handle in running:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
+        await self.native_sessions.flush()
+        await self.professional_capabilities.close()
+        await self.capability_markets.close()
         await self.mcp.close()
         await self.desktop.close()
         await self.files.close()
         await self.artifact_retention.close()
         await self.artifacts.close()
         await self.model_settings.close()
-
-
-def configured_provider(settings, role, *, client=None):
-    route = settings.route(role)
-    return ChatCompletions(
-        route.endpoint,
-        route.name,
-        settings.credentials(role),
-        timeout=route.timeout_seconds,
-        max_retries=route.max_retries,
-        capabilities=route.capabilities,
-        cache=route.cache,
-        parameters=route.parameters,
-        client=client,
-    )
 
 
 async def serve(args):
@@ -463,18 +568,16 @@ async def serve(args):
         return
 
     provider = configured_provider(settings, "main")
-    worker = (
-        provider
-        if settings.route("main") == settings.route("worker")
-        else configured_provider(settings, "worker")
-    )
+    worker = configured_provider(settings, "worker")
     runtime = Runtime(
         database,
         provider,
         settings=settings,
         worker_model=worker,
         executor=CodingExecutor(database, settings),
+        development_rsi=getattr(args, "development_rsi", False),
     )
+    runtime.managed_parent = getattr(args, "parent_fd", None) is not None
     try:
         args.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(args.socket.parent, 0o700)
@@ -503,7 +606,22 @@ async def serve(args):
                     timeout_graceful_shutdown=3,
                 )
             )
-            await server.serve(sockets=[bound])
+            parent_fd = getattr(args, "parent_fd", None)
+            loop = asyncio.get_running_loop()
+            if parent_fd is not None:
+
+                def parent_closed():
+                    if not os.read(parent_fd, 1):
+                        server.should_exit = True
+                        loop.remove_reader(parent_fd)
+
+                loop.add_reader(parent_fd, parent_closed)
+            try:
+                await server.serve(sockets=[bound])
+            finally:
+                if parent_fd is not None:
+                    loop.remove_reader(parent_fd)
+                    os.close(parent_fd)
     finally:
         await runtime.close()
         await provider.close()
@@ -521,6 +639,8 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--socket", type=Path)
     parser.add_argument("--initialize", action="store_true")
+    parser.add_argument("--development-rsi", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--parent-fd", type=int)
     args = parser.parse_args()
     if not args.initialize and not args.socket:
         parser.error("--socket is required when serving")

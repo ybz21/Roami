@@ -2,8 +2,9 @@ import type { AgentTask } from './agent-protocol'
 import { taskGoal } from './agent-task-protocol'
 
 export function taskTopic(task: AgentTask): string {
+  if (task.title) return task.title
   try {
-    const intent = JSON.parse(task.intent_json), title = intent.initialIntent?.title || intent.title
+    const intent = JSON.parse(task.intent_json || '{}'), title = intent.initialIntent?.title || intent.title
     if (typeof title === 'string' && title.trim()) return title.replace(/\s+/g, ' ').trim()
   } catch { /* Legacy tasks derive their topic from the original goal. */ }
   const goal = taskGoal(task)

@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_browser_driver import BrowserFixture
 from test_runtime import ConversationModel, until
 
@@ -21,6 +22,7 @@ class NavigationModel:
         self.mode, self.calls = mode, 0
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         self.calls += 1
         if self.mode == "act" and self.calls > 1:
             name, arguments = (

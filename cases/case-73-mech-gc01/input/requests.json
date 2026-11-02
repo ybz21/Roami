@@ -1,0 +1,28 @@
+[
+  {
+    "name": "idle",
+    "wire": "",
+    "expected_errors": []
+  },
+  {
+    "name": "partial_headers",
+    "wire": "POST /v1/main/chat/completions HTTP/1.1\r\n",
+    "expected_errors": [
+      "RSI_GATEWAY_FAILED"
+    ]
+  },
+  {
+    "name": "missing_body",
+    "wire": "POST /v1/main/chat/completions HTTP/1.1\r\nContent-Length: 16\r\n\r\n",
+    "expected_errors": [
+      "RSI_GATEWAY_FAILED"
+    ]
+  },
+  {
+    "name": "partial_body",
+    "wire": "POST /v1/main/chat/completions HTTP/1.1\r\nContent-Length: 16\r\n\r\n{\"messages\":",
+    "expected_errors": [
+      "RSI_GATEWAY_FAILED"
+    ]
+  }
+]

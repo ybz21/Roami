@@ -70,7 +70,7 @@ class TurnJournal:
             origin = await self.db.call(
                 lambda db: row(
                     db,
-                    "SELECT m.id,json_extract(m.content_json,'$.text') AS text FROM jobs j JOIN tasks t "
+                    "SELECT m.id,json_extract(native_content(m.content_json),'$.text') AS text FROM jobs j JOIN tasks t "
                     "ON t.id=json_extract(j.payload_json,'$.completion.taskId') "
                     "JOIN messages m ON m.id=t.origin_message_id "
                     "WHERE j.aggregate_id=? AND j.kind='turn.run' AND t.owner_id=? "
@@ -87,7 +87,7 @@ class TurnJournal:
         return await self.db.call(
             lambda db: row(
                 db,
-                "SELECT id,json_extract(content_json,'$.text') AS text FROM messages WHERE turn_id=? AND role='user' AND deleted_ms IS NULL ORDER BY seq LIMIT 1",
+                "SELECT id,json_extract(native_content(content_json),'$.text') AS text FROM messages WHERE turn_id=? AND role='user' AND deleted_ms IS NULL ORDER BY seq LIMIT 1",
                 (turn["id"],),
             )
         )
@@ -159,16 +159,19 @@ class TurnJournal:
                         "SELECT id,name FROM artifacts WHERE owner_id=? AND task_id=? "
                         "AND deleted_ms IS NULL AND id IN ("
                         + ",".join("?" for _ in identifiers)
-                        + ") "
-                        "ORDER BY created_ms,id",
+                        + ")",
                         (turn["owner_id"], completion["taskId"], *identifiers),
                     )
+                    by_id = {item["id"]: item for item in retained}
+                    retained = [by_id[aid] for aid in dict.fromkeys(identifiers) if aid in by_id]
                     delivery = deliverable_links(text, retained)
             content = {"text": delivery, **({"tool_calls": calls} if calls else {})}
             if question:
                 content["question"] = question
             if completion:
                 content["source"] = "task"
+                if final:
+                    content["answerText"] = text
             db.execute(
                 "UPDATE messages SET content_json=?,status='completed' WHERE id=?",
                 (encoded(content), mid),

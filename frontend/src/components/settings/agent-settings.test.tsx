@@ -6,8 +6,9 @@ import { AgentSettings } from './agent-settings'
 import { api } from '../../api'
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: false }) }))
 vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t }) } })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { for (const button of screen.queryAllByRole('button', { name: 'agent.models.discard' })) fireEvent.click(button); cleanup(); vi.clearAllMocks(); history.replaceState(null, '', '#/') })
 const role = { baseUrl: 'https://models.example/v1', keyConfigured: true, model: 'fast', images: false }
 const settings = { connection: { baseUrl: role.baseUrl, keyConfigured: true }, main: role, worker: { ...role, model: 'strong' } }
 const mainModel = () => screen.getByRole('combobox', { name: 'agent.models.role.main agent.composer.model' })
@@ -54,4 +55,34 @@ it('shows catalog errors without disabling manual selection or saving the draft'
   await screen.findByRole('alert')
   expect((mainModel() as HTMLInputElement).disabled).toBe(false)
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT')).toBe(false)
+})
+
+it('identifies an unavailable local runtime and retries the settings request', async () => {
+  vi.mocked(api).mockRejectedValueOnce(Object.assign(new Error('AGENT_RUNTIME_UNAVAILABLE'), { apiError: { code: 'AGENT_RUNTIME_UNAVAILABLE' } })).mockResolvedValue({ data: settings })
+  setup()
+  expect((await screen.findByRole('alert')).textContent).toContain('agent.unavailable')
+  expect(screen.queryByText('agent.models.failed')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByLabelText('agent.models.baseUrl')
+})
+
+it('restores local billing and price tabs without reading the archived ledger', async () => {
+  vi.mocked(api).mockResolvedValue({ data: settings })
+  setup()
+  await screen.findByLabelText('agent.models.baseUrl')
+  expect(screen.getByRole('tab', { name: 'agent.proxy.tab' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'agent.proxy.prices' })).toBeTruthy()
+  expect(screen.queryByRole('link', { name: 'agent.models.gatewayOpen' })).toBeNull()
+  expect(vi.mocked(api).mock.calls.some(call => call[1] === '/agent/model-usage')).toBe(false)
+})
+
+it('preserves connection drafts after a failed save without sending local billing settings', async () => {
+  vi.mocked(api).mockImplementation(async method => { if (method === 'PUT') throw new Error('MODEL_CONFIGURATION_BUSY'); return { data: settings } })
+  setup()
+  await screen.findByLabelText('agent.models.apiKey')
+  fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'fixture' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await screen.findByText('agent.models.busy')
+  expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('fixture')
+  expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).not.toHaveProperty('proxy')
 })

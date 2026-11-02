@@ -29,9 +29,9 @@ type ExecutorCatalog struct {
 func DiscoverExecutors() ExecutorCatalog {
 	result := ExecutorCatalog{Version: 1, ObservedMS: time.Now().UnixMilli(), Candidates: []ExecutorCandidate{}}
 	for _, kind := range agent.Kinds() {
-		_, err := exec.LookPath(agent.Get(kind).Bin())
+		_, err := agent.ResolveBinary(kind)
 		result.Candidates = append(result.Candidates, ExecutorCandidate{
-			Kind: kind, Installed: err == nil, Tracked: kind == "codex" || kind == "claude",
+			Kind: kind, Installed: err == nil, Tracked: true,
 			Authentication: "unknown", Usage: "unknown",
 		})
 	}

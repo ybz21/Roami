@@ -5,31 +5,44 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agent"
 )
 
 type ProfessionalAgent struct {
+	Verified       bool       `json:"verified"`
 	Kind           string     `json:"kind"`
 	Installed      bool       `json:"installed"`
 	Binary         string     `json:"binary,omitempty"`
 	Version        string     `json:"version,omitempty"`
 	VersionState   string     `json:"versionState,omitempty"`
 	Authentication string     `json:"authentication"`
+	UpgradeMethod  string     `json:"upgradeMethod,omitempty"`
+	CanUpgrade     bool       `json:"canUpgrade"`
+	ModelPreset    string     `json:"modelPreset,omitempty"`
 	Quota          AgentQuota `json:"quota"`
 }
 
 func DiscoverProfessionalAgents(ctx context.Context) []ProfessionalAgent {
-	rows := make([]ProfessionalAgent, 0)
-	for _, kind := range agent.Kinds() {
-		rows = append(rows, discoverProfessionalAgent(ctx, kind))
+	kinds := agent.Kinds()
+	rows := make([]ProfessionalAgent, len(kinds))
+	var pending sync.WaitGroup
+	for i, kind := range kinds {
+		pending.Add(1)
+		go func() {
+			defer pending.Done()
+			rows[i] = discoverProfessionalAgent(ctx, kind)
+			readProfessionalVersion(ctx, &rows[i], false)
+		}()
 	}
+	pending.Wait()
 	return rows
 }
 
 func discoverProfessionalAgent(ctx context.Context, kind string) ProfessionalAgent {
-	path, err := exec.LookPath(agent.Get(kind).Bin())
+	path, err := agent.ResolveBinary(kind)
 	installed := err == nil
 	q := AgentQuota{State: "unknown", Reason: "provider_managed"}
 	if installed {
@@ -50,23 +63,22 @@ func discoverProfessionalAgent(ctx context.Context, kind string) ProfessionalAge
 	if q.Reason == "login_expired" {
 		authentication = "expired"
 	}
-	return ProfessionalAgent{Kind: kind, Installed: installed, Binary: path, Authentication: authentication, Quota: q}
+	row := ProfessionalAgent{Kind: kind, Installed: installed, Binary: path, Authentication: authentication, Quota: q}
+	if installed {
+		if plan, err := ProfessionalUpgradePlan(kind); err == nil {
+			row.CanUpgrade, row.UpgradeMethod = true, plan.Method
+		}
+	}
+	return row
 }
 
-// Version probes are explicit; automatic status reads never start a CLI.
+// Explicit checks bypass completed cache entries and join any matching in-flight probe.
 func CheckProfessionalAgent(ctx context.Context, kind string) (ProfessionalAgent, error) {
 	if agent.Get(kind) == nil {
 		return ProfessionalAgent{}, fmt.Errorf("INVALID_AGENT_KIND")
 	}
 	row := discoverProfessionalAgent(ctx, kind)
-	if !row.Installed {
-		return row, nil
-	}
-	row.VersionState = "unavailable"
-	row.Version = probeProfessionalVersion(ctx, row.Binary)
-	if row.Version != "" {
-		row.VersionState = "available"
-	}
+	readProfessionalVersion(ctx, &row, true)
 	return row, nil
 }
 
@@ -114,5 +126,17 @@ func ProfessionalInstallArgs(kind string) ([]string, error) {
 }
 
 func InstallProfessionalAgent(ctx context.Context, args []string) error {
-	return exec.CommandContext(ctx, "npm", args...).Run()
+	select {
+	case professionalMaintenance <- struct{}{}:
+		defer func() { <-professionalMaintenance }()
+	default:
+		return fmt.Errorf("AGENT_MAINTENANCE_BUSY")
+	}
+	if err := exec.CommandContext(ctx, "npm", args...).Run(); err != nil {
+		return err
+	}
+	professionalVersions.Lock()
+	clear(professionalVersions.entries)
+	professionalVersions.Unlock()
+	return nil
 }

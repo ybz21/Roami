@@ -1,9 +1,11 @@
+import { isAgentKind, type AgentKind } from '../../agent-kind'
 import type { AgentTask } from './agent-protocol'
 
 export type TaskSteering = { operationId: string; taskId: string; state: string; revision: number; errorCode?: string; text?: string }
-export type TaskAttempt = { id: string; revision: number; attemptNo?: number; state: string; hasConversation?: boolean; sessionId?: string | null; agentConversationId?: string | null; startedMs?: number | null; finishedMs?: number | null; result?: { summary?: string; stderr?: string; output?: string; exitCode?: number; outcomeKnown?: boolean } | null }
+export type TaskReportedProgress = { source: 'provider_transcript'; summary: string; directory: string; observedMs: number }
+export type TaskAttempt = { id: string; revision: number; progress?: TaskReportedProgress | null; attemptNo?: number; state: string; hasConversation?: boolean; sessionId?: string | null; agentConversationId?: string | null; startedMs?: number | null; finishedMs?: number | null; result?: { summary?: string; stderr?: string; output?: string; exitCode?: number; outcomeKnown?: boolean } | null }
 export type TaskDetail = { sessionClosure?: { state: 'closing' | 'closed' | 'failed' | 'unknown'; error_code?: string | null } | null; outcome?: { state: string; errorCode?: string | null } | null; task: AgentTask; attempts: TaskAttempt[]; children: AgentTask[]; steering?: TaskSteering | null; attemptsTruncated: boolean; childrenTruncated: boolean; delivery?: { artifacts: TaskArtifact[]; unavailable: { sourcePath: string; runId: string; state: string }[] } }
-export type TaskArtifact = { id: string; name: string; mimeType: string; sizeBytes: number; createdMs?: number; metadata?: { sourcePath?: string; runId?: string } }
+export type TaskArtifact = { id: string; name: string; mimeType: string; sizeBytes: number; createdMs?: number; metadata?: { sourcePath?: string; sourceFile?: string; runId?: string; provisional?: boolean; reportedAliases?: string[] } }
 export type TaskResource = {
   browserId?: string | null; targetId?: string | null; id: string; kind: string; state: string; controlReleased: boolean; takeoverReady: boolean; canPause: boolean; canResume: boolean
   observation?: { title?: string; url?: string; screenshotRef?: string }
@@ -11,16 +13,27 @@ export type TaskResource = {
 export type TaskControls = { resources: TaskResource[]; resourcesTruncated: boolean; actions: { id: string; state: string; inputStopped?: boolean; outcomeKnown?: boolean }[]; actionsTruncated: boolean }
 
 export function taskGoal(task: AgentTask): string {
-  try { const intent = JSON.parse(task.intent_json); const goal = intent.initialIntent?.goal || intent.goal; return typeof goal === 'string' ? goal : task.id } catch { return task.id }
+  try { const intent = JSON.parse(task.intent_json || '{}'); const goal = intent.initialIntent?.goal || intent.goal; return typeof goal === 'string' ? goal : task.id } catch { return task.id }
 }
 
 export function taskInstructions(task: AgentTask): string {
-  try { const goal = JSON.parse(task.intent_json).goal; return typeof goal === 'string' ? goal : '' } catch { return '' }
+  try { const goal = JSON.parse(task.intent_json || '{}').goal; return typeof goal === 'string' ? goal : '' } catch { return '' }
 }
 
-export function taskExecutor(task: AgentTask): 'native' | 'codex' | 'claude' | null {
+export function taskExecutor(task: AgentTask): 'native' | AgentKind | null {
   const kind = task.latestAttempt?.executorKind
-  if (kind === 'native' || kind === 'codex' || kind === 'claude') return kind
+  if (kind === 'native' || isAgentKind(kind)) return kind
+  if (task.executor === 'native' || isAgentKind(task.executor)) return task.executor
   if (kind !== 'cli') return null
-  try { const executor = JSON.parse(task.intent_json).executor; return executor === 'codex' || executor === 'claude' ? executor : null } catch { return null }
+  try { const executor = JSON.parse(task.intent_json || '{}').executor; return isAgentKind(executor) ? executor : null } catch { return null }
+}
+
+export function taskExecutionUnconfirmed(task: AgentTask): boolean {
+  return ['running', 'preparing'].includes(task.state) && task.latestAttempt?.state === 'unknown'
+}
+
+export function currentTaskArtifacts(artifacts: TaskArtifact[]): TaskArtifact[] {
+  const key = (item: TaskArtifact) => item.metadata?.sourceFile && item.metadata?.runId ? item.metadata.runId + '\0' + item.metadata.sourceFile : null
+  const settled = new Set(artifacts.filter(item => !item.metadata?.provisional).map(key).filter(Boolean))
+  return artifacts.filter(item => !item.metadata?.provisional || !settled.has(key(item)))
 }

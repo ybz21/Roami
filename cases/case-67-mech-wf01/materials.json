@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-WF01",
+  "data": {
+    "kind": "synthetic_workflow_metadata_and_editable_pptx",
+    "scenarios": "input/scenarios.json",
+    "generators": [
+      "agent-runtime/tests/test_optional_workflow_context.py",
+      "agent-runtime/tests/verification/test_presentation_skill_package.py",
+      "agent-runtime/tests/verification/test_configured_presentation_skill.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "optional_skill_metadata_and_generic_tools"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_optional_workflow_context.py",
+      "agent-runtime/tests/verification/test_presentation_skill_package.py",
+      "agent-runtime/tests/verification/test_configured_presentation_skill.py"
+    ],
+    "expected_collected": 8,
+    "no_skips": true,
+    "kind": "source_frozen_pytest_receipt"
+  }
+}

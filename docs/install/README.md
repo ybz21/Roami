@@ -25,7 +25,7 @@ ttmux 有 **两种使用模式**，按需取用，也可叠加：
 
 ## 依赖速查
 
-> 预构建的 `roami` 二进制**零运行时依赖**——`go`、`node`+`npm` 只在**从源码构建**（`./start.sh --dev`）时才需要。
+> 默认安装下载完整包，携带独立 Python、智能体 wheel 及全部生产依赖（含时区数据）；在目标目录创建 venv，无需用户预装 Python、uv、Go 或 Node。裸二进制不含 Python 运行时，不能单独提供内置智能体。
 > 下表标「仅源码构建」的两项，用预构建二进制时可略过。
 
 | 依赖 | 用途 | 没有它会怎样 | 安装 |
@@ -94,7 +94,7 @@ roami session status build
 
 ## 二、远程控制台
 
-远程控制台是 `roami` —— 一个**内嵌前端 + 统一会话核心 的自包含二进制**，发布为 `roami-<os>-<arch>`（linux/darwin，amd64/arm64）。配置与数据都在 `~/.roami/`（`config.yaml` 首次运行自动生成）。装在你的开发机 / 长期常驻的机器上，本节先让它在本机 / 局域网跑起来；要从外网随地访问，见 [四、远程办公](#四远程办公--frp-内网穿透)。
+远程控制台使用完整包 `roami-<os>-<arch>.tar.gz`（linux/darwin，amd64/arm64），内含主程序、前端、独立 Python 和智能体生产依赖；裸二进制资产继续提供给只使用会话核心的高级用户。配置与数据都在 `~/.roami/`（`config.yaml` 首次运行自动生成）。装在你的开发机 / 长期常驻的机器上，本节先让它在本机 / 局域网跑起来；要从外网随地访问，见 [四、远程办公](#四远程办公--frp-内网穿透)。
 
 三种装法，任选其一：
 
@@ -400,3 +400,16 @@ rm -rf ~/.roami                                # 配置 + 数据 + 蜂群 meta.d
 | 浏览器标签连不上 | 确认装了 `google-chrome`；检查 `TTMUX_CHROME_CDP` 指向的端口。 |
 | 忘了口令 | 在控制台 **设置 → 修改密码** 里改；或编辑 `~/.roami/config.yaml` 的 `web.password` 后 `./start.sh stop && ./start.sh`。 |
 | 看后端日志 | `./start.sh logs`（默认 `/tmp/ttmux-web.log`）。 |
+
+### 独立 MCP 后台服务（Linux 用户级 systemd）
+
+MCP 可由节点上的独立进程维护。开启后即自动心跳和断线重连；Web 和 Agent 停止或重启不结束其上游连接。首次部署独立服务时，在同一节点环境中执行：
+
+```bash
+roami agent mcp install
+roami agent mcp status
+```
+
+源码安装可指定 `--runtime-dir /absolute/path/agent-runtime`。安装器将当前环境保存到节点的私有文件，用于解析 MCP 凭据引用；不要把该文件上传或提交。按实例命名的用户 systemd 单元独立启用并自动重启，不设置 Web/Agent 的依赖或联动停止关系。首次由原进程内模式切换时需重启一次 Agent 来采用本机客户端；以后添加、编辑、开启、停用或删除 MCP 都通过配置同步生效，不需要重启服务。
+
+独立服务自身升级或退出时，上游连接需要重新建立；已经发出的工具调用不会自动重放。守护不可用时 Agent 显示重连，不退回进程内模式另起连接。其他服务管理器可使用 `roami agent mcp serve` 并配置 `ROAMI_MCP_SOCKET`；`install` 仅支持用户级 systemd，不自动修改系统级服务或 launchd。

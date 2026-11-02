@@ -25,7 +25,7 @@ export default function MobilePullRefresh({ enabled }: { enabled: boolean }) {
       if (event.touches.length !== 1) { pull.current = null; setShown(0); return }
       if (refreshing) return
       const target = event.target
-      if (!(target instanceof Element) || target.closest('input, textarea, select, [contenteditable="true"], [role="slider"], .xterm')) return
+      if (!(target instanceof Element) || target.closest('input, textarea, select, [contenteditable="true"], [role="slider"], .xterm, [data-pagination-edge="start"]')) return
       const root = target.closest('.tt-canvas, [data-mobile-refresh-root]')
       if (!root || !atTop(target, root)) return
       pull.current = { x: event.touches[0].clientX, y: event.touches[0].clientY, root, target, active: false }

@@ -116,6 +116,16 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/agent/professional", h.ProfessionalAgents)
 		g.POST("/agent/professional/:kind/install", h.InstallProfessionalAgent)
 		g.POST("/agent/professional/:kind/check", h.CheckProfessionalAgent)
+		g.POST("/agent/professional/:kind/verify", h.VerifyProfessionalAgent)
+		g.POST("/agent/professional/:kind/upgrade", h.UpgradeProfessionalAgent)
+		g.GET("/agent/professional/:kind/models", h.AgentModelProfiles)
+		g.POST("/agent/professional/:kind/model-options", h.AgentModelOptions)
+		g.POST("/agent/professional/:kind/models", h.SaveAgentModelProfile)
+		g.PUT("/agent/professional/:kind/models/:profile", h.SaveAgentModelProfile)
+		g.DELETE("/agent/professional/:kind/models/:profile", h.DeleteAgentModelProfile)
+		g.POST("/agent/professional/:kind/models/:profile/apply", h.ApplyAgentModelProfile)
+		g.POST("/agent/professional/:kind/models/restore", h.RestoreAgentModelProfile)
+		g.POST("/agent/professional/:kind/models/default", h.UseOfficialAgentModel)
 
 		g.GET("/fs", h.FS)
 		g.GET("/files", h.Files)            // 文件侧栏：列目录
@@ -324,6 +334,9 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/preferences", h.GetPreferences)          // 用户偏好（主题/语言/Agent 命令等）
 		g.PUT("/preferences", h.SetPreferences)          //
 		g.POST("/speech/transcribe", h.SpeechTranscribe) // 上传录音 → 返回识别文本
+
+		g.GET("/workspace", h.GetWorkspace)
+		g.PATCH("/workspace", h.ChangeWorkspace)
 
 		g.POST("/password", a.ChangePassword) // 设置页改密（校验旧口令）→ /api/password
 

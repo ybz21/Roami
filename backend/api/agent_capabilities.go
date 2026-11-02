@@ -1,11 +1,14 @@
 package api
 
 import (
+	"crypto/sha256"
 	"embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +51,42 @@ func readAgentCapabilities() (string, error) {
 			}
 		}
 	}
+	if err == nil && isShippedAgentCapabilities(data) {
+		data, err = defaultAgentCapabilities.ReadFile("prompts/" + agentCapabilitiesFile)
+		if err == nil {
+			err = replaceAgentCapabilities(path, data)
+		}
+	}
 	return string(data), err
+}
+
+// Match shipped defaults exactly so upgrades never overwrite an edited guide.
+func isShippedAgentCapabilities(data []byte) bool {
+	content := strings.TrimSpace(strings.ReplaceAll(string(data), "\r\n", "\n"))
+	switch fmt.Sprintf("%x", sha256.Sum256([]byte(content))) {
+	case "0d50a9e28f927ed484a75c9fe898ec72d47823574f2f71b1f4f8d92f9ee66786", // #317
+		"8774efb02f7ffef268c3cfa6cdd51a5b2eb8af9be5969ee529302e6095894dda", // #328
+		"a7b402f283e8182fedbd330dd5ca775ad9d210985a148f364cdbbc3e19af6aec", // #399
+		"731ca3553ff6cfedc7f5560ae54351c362a388a7d4913adfeda1478b03dea849": // #403
+		return true
+	}
+	return false
+}
+
+func replaceAgentCapabilities(path string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(path), ".agent-capabilities-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	_, err = f.Write(data)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), path)
 }
 
 func (a *API) AgentCapabilities(c *gin.Context) {

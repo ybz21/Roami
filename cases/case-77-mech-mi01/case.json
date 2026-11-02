@@ -1,0 +1,48 @@
+{
+  "id": "MECH-MI01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "主Agent本地读图",
+  "prompt": "按保存的角色图片能力读取明确本地图片，Main与Worker独立，来源必须是当前真实读取回执。",
+  "preconditions": "公开合成图片配方、真实Runtime及保存接口、本地模型事件替身。",
+  "expected_terminal": "main_file_pixels_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "受约束的Main图片输入及来源记录",
+    "源码冻结与JUnit回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-MI01-H1",
+      "rule": "保存Main图片开启和Worker关闭后，Main实际执行循环收到原图像素；反向权限不越过，输入字节不改。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MI01-H2",
+      "rule": "当前回执、所有者、会话和来源路径匹配；删除/遗忘撤销、非法文件边界和最新失效读取生效；附件与文件共享角色载荷参数。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/image.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

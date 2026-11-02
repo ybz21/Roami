@@ -71,7 +71,13 @@ async def test_main_briefing_restores_old_records_without_losing_constraints_or_
         first, restored = [json.loads(m["parts_json"]) for m in manifests]
         assert first["historyView"] == "main_briefing"
         assert restored["historyView"] == "full"
-        assert first["estimatedTokens"] < restored["estimatedTokens"] / 5
+        fixed_tokens = (
+            first["modelContext"]["instructionTokens"] + first["modelContext"]["toolTokens"]
+        )
+        assert (
+            first["estimatedTokens"] - fixed_tokens
+            < (restored["estimatedTokens"] - fixed_tokens) / 5
+        )
         assert first["requestBasis"] != restored["requestBasis"]
         assert restored["modelContext"]["usageTokens"] != first["estimatedTokens"]
         assert rounds == 2
@@ -123,6 +129,13 @@ async def test_agent_continuation_plans_are_not_promoted_to_user_constraints(sto
                 (operation,),
             )[0]
         )
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE messages SET content_json=json_set(content_json,'$.text','ASSISTANT_ONLY_STEP_BUDGET') WHERE id=?",
+                (generated["id"],),
+            ),
+            write=True,
+        )
         if legacy:
             await store.call(
                 lambda db: db.execute(
@@ -137,6 +150,9 @@ async def test_agent_continuation_plans_are_not_promoted_to_user_constraints(sto
         source = await store.call(lambda db: task_user_request(db, generated))
         assert "Perform the requested operations" in source["content_json"]
         assert source["id"] != generated["id"]
+        snapshot = await runtime.conversations.messages("alice", turn["conversation_id"])
+        assert source["id"] in {m["id"] for m in snapshot["messages"]}
+        assert generated["id"] not in {m["id"] for m in snapshot["messages"]}
         configuration = runtime.loop.context._configuration(
             turn, runtime.settings.main_instructions, runtime.tools.catalog()
         )

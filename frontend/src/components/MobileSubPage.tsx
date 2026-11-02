@@ -22,7 +22,7 @@ import { ChevronLeft, SearchIcon } from '../icons'
 export default function MobileSubPage({ title, onBack, action, search, dialogLabel, manageHistory = true, layer = 'page', keepBottomNav = false, children }: {
   title?: ReactNode
   onBack: () => void
-  action?: { label: string; icon: ReactNode; onClick: () => void }
+  action?: { label: string; icon: ReactNode } & ({ onClick: () => void; href?: never; download?: never } | { href: string; download?: string; onClick?: never })
   search?: false | { label: string; onClick: () => void }
   dialogLabel?: string
   manageHistory?: boolean
@@ -41,7 +41,7 @@ export default function MobileSubPage({ title, onBack, action, search, dialogLab
     root.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return
-      const items = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]')]
+      const items = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]')]
       const first = items[0], last = items[items.length - 1]
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
@@ -68,7 +68,9 @@ export default function MobileSubPage({ title, onBack, action, search, dialogLab
             <ChevronLeft size={20} />
           </button>
           <strong>{title}</strong>
-          {action && <button type="button" onClick={action.onClick} aria-label={action.label}>{action.icon}</button>}
+          {action && (action.href !== undefined
+            ? <a href={action.href} download={action.download} aria-label={action.label}>{action.icon}</a>
+            : <button type="button" onClick={action.onClick} aria-label={action.label}>{action.icon}</button>)}
           {search !== false && <button type="button" onClick={search?.onClick || openPalette} aria-label={search?.label || t('workspace.search')}>
             <SearchIcon size={20} />
           </button>}

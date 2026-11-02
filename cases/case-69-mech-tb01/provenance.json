@@ -1,0 +1,7 @@
+{
+  "origin": "observed source-column deletion and derived-column leakage in separate stock diagnostics",
+  "fixture_kind": "locally authored CSV with record identifiers, ISO timestamp keys and separate analytical values",
+  "benchmark_reference_data_included": false,
+  "model_calls": 0,
+  "formal_history_updated": false
+}

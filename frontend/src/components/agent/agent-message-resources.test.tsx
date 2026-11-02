@@ -24,3 +24,13 @@ it('keeps rendered links, images and attachments on the message origin after the
   rerender(<AgentMessageView item={item} node={null} focused={false} remember={vi.fn()} />)
   expect(screen.getByRole('link', { name: 'report' }).getAttribute('href')).toBe('/api/agent/artifacts/report/content')
 })
+
+it('opens legacy local file links from reported results through the origin file service', () => {
+  const path = '/home/ai/.roami/workspaces/agent-coding/'
+  const report = { ...item, content: { text: `[index.html](${path}index.html)\n\n[shot-desktop.png](${path}shot-desktop.png)\n\n![mobile](${path}shot-mobile-full.png)` } }
+  setCurrentNode('different-node')
+  render(<AgentMessageView item={report} node="origin" focused={false} remember={vi.fn()} />)
+  expect(screen.getByRole('link', { name: 'index.html' }).getAttribute('href')).toBe('/n/origin/api/file' + path + 'index.html')
+  expect(screen.getByRole('link', { name: 'shot-desktop.png' }).getAttribute('href')).toBe('/n/origin/api/file' + path + 'shot-desktop.png')
+  expect(screen.getByRole('img', { name: 'mobile' }).getAttribute('src')).toBe('/n/origin/api/file' + path + 'shot-mobile-full.png')
+})

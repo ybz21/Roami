@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MG01",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_automatic_memory.py::test_remember_request_persists_before_reply_and_is_idempotent",
+      "test_automatic_memory.py::test_questions_negations_and_examples_do_not_activate"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_automatic_memory.py::test_remember_request_persists_before_reply_and_is_idempotent",
+      "test_automatic_memory.py::test_questions_negations_and_examples_do_not_activate"
+    ]
+  }
+}

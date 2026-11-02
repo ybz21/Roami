@@ -1,10 +1,12 @@
 package agentexecution
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,6 +34,9 @@ type SessionBinding struct {
 }
 
 type sessionLifecycle struct {
+	Structured    bool            `json:"structured,omitempty"`
+	Model         string          `json:"model,omitempty"`
+	Permission    string          `json:"permission,omitempty"`
 	InitialLaunch bool            `json:"initialLaunch,omitempty"`
 	Binding       SessionBinding  `json:"binding"`
 	Executor      string          `json:"executor"`
@@ -283,7 +288,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 }
 
 func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error) {
-	if (spec.Executor != "codex" && spec.Executor != "claude") || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
+	if (spec.Executor != "codex" && spec.Executor != "claude" && !structuredExecutor(spec.Executor)) || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)
@@ -323,6 +328,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	var state sessionLifecycle
 	if readJSON(path, &state) != nil || state.Executor != spec.Executor || state.Binding.ProviderID == "" {
 		return Status{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
+	}
+	if structuredExecutor(spec.Executor) && (!state.Structured || !sessionProcessesStopped(state.Binding)) {
+		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 	}
 	if state.State != "idle" || state.LaunchKey != "" || len(state.Tools) != 0 {
 		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
@@ -372,6 +380,13 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	if err = writeJSON(path, state); err != nil {
 		return Status{}, err
 	}
+	if state.Structured {
+		// The resident runner consumes this journal entry exactly once.
+		lease()
+		stateUnlock()
+		stateUnlock = func() {}
+		return s.Status(spec.Key)
+	}
 	rt := s.Runtime
 	rt.Context = ctx
 	if err = rt.SendPromptSubmit(binding.Pane, sessionPrompt(dir, spec)); err != nil {
@@ -393,13 +408,35 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if err != nil {
 		return status, err
 	}
+	unlock, err := lock(filepath.Join(filepath.Dir(path), "state.lock"))
+	if err != nil {
+		return status, err
+	}
+	defer unlock()
+	dir, _ := s.directory(key)
+	var completed Result
+	if resultErr := readJSON(filepath.Join(dir, "result.json"), &completed); resultErr == nil {
+		status.State, status.Result = completed.State, &completed
+		return status, nil
+	} else if !errors.Is(resultErr, os.ErrNotExist) {
+		return status, resultErr
+	}
 	var state sessionLifecycle
-	if readJSON(path, &state) != nil || state.LaunchKey != key || state.State != "busy" {
+	if readJSON(path, &state) != nil {
+		status.State = "unknown"
+		return status, nil
+	}
+	if recovered, ok, problem := s.reconcileCodexCompletion(key, status, &state, path); ok || problem != nil {
+		return recovered, problem
+	}
+	if state.LaunchKey == key && state.Executor == "claude" && state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.resourceID() == binding.resourceID() {
+		status.Progress = claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
+	}
+	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State = "unknown"
 		return status, nil
 	}
 	status.State = "running"
-	dir, _ := s.directory(key)
 	if _, err := os.Stat(filepath.Join(dir, "cancel.json")); err == nil {
 		status.State = "cancelling"
 	}
@@ -415,10 +452,23 @@ func HookConfiguration(executable, executor string) (map[string]any, error) {
 }
 
 func DecodeSessionEvent(content []byte) (SessionEvent, error) {
+	return ReadSessionEvent(bytes.NewReader(content))
+}
+
+// Tool responses are not lifecycle evidence and can be much larger than the event metadata.
+func ReadSessionEvent(input io.Reader) (SessionEvent, error) {
 	var event SessionEvent
-	if len(content) > 100000 {
-		return event, fmt.Errorf("INVALID_SESSION_EVENT")
+	bounded := &io.LimitedReader{R: input, N: (64 << 20) + 1}
+	decoder := json.NewDecoder(bounded)
+	if err := decoder.Decode(&event); err != nil {
+		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
 	}
-	err := json.Unmarshal(content, &event)
-	return event, err
+	if decoder.Decode(new(any)) != io.EOF || bounded.N == 0 {
+		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
+	}
+	metadata, err := json.Marshal(event)
+	if err != nil || len(metadata) > 100000 {
+		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
+	}
+	return event, nil
 }

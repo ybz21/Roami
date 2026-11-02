@@ -1,6 +1,9 @@
 package spawn
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClaudeOneShot(t *testing.T) {
 	ac := AgentConfig{ClaudeBin: "claude", Kind: "claude", Permission: "dangerously-skip-permissions", Workdir: "/work"}
@@ -35,6 +38,26 @@ func TestCodexInteractive(t *testing.T) {
 	want := "cd '/w' && codex -m gpt 'go'"
 	if got != want {
 		t.Fatalf("codex interactive mismatch:\n got=%q\nwant=%q", got, want)
+	}
+}
+
+func TestCodexResumeKeepsAutoMode(t *testing.T) {
+	ac := AgentConfig{CodexBin: "codex", Kind: "codex", Interactive: true, Permission: "auto", Workdir: "/w"}
+	want := "cd '/w' && codex --dangerously-bypass-approvals-and-sandbox resume 'existing-id'"
+	if got := ac.ResumeInteractive("existing-id"); got != want {
+		t.Fatalf("resume command: got %q, want %q", got, want)
+	}
+}
+
+func TestOpenCodeAutoModePrecedesPrompt(t *testing.T) {
+	ac := AgentConfig{Kind: "opencode", Interactive: true, Permission: "auto", Workdir: "/w"}
+	for _, command := range []string{ac.Command("task"), ac.InteractiveFromPromptFile("/prompt.txt")} {
+		if !strings.Contains(command, " --auto --prompt ") {
+			t.Fatalf("auto flag must not become part of the prompt: %s", command)
+		}
+	}
+	if got := ac.CommandFromPromptFile("/prompt.txt"); !strings.Contains(got, " run --auto ") {
+		t.Fatalf("one-shot command omitted auto mode: %s", got)
 	}
 }
 

@@ -1,0 +1,37 @@
+{
+  "name": "公开合成的部分评分回执",
+  "description": "使用脚本化独立评分者测试中断，不是实际模型或人工参考。",
+  "provider_mode": "protocol_fixture",
+  "first_rating": {
+    "dimensions": {
+      "correctness": 3,
+      "completeness": 3,
+      "usability": 3,
+      "grounding": 3
+    },
+    "evidence": [
+      {
+        "dimension": "correctness",
+        "label": "rendered page",
+        "reason": "Synthetic visible observation for correctness"
+      },
+      {
+        "dimension": "completeness",
+        "label": "rendered page",
+        "reason": "Synthetic visible observation for completeness"
+      },
+      {
+        "dimension": "usability",
+        "label": "rendered page",
+        "reason": "Synthetic visible observation for usability"
+      },
+      {
+        "dimension": "grounding",
+        "label": "rendered page",
+        "reason": "Synthetic visible observation for grounding"
+      }
+    ]
+  },
+  "second_invalid_text": "invalid fixture JSON",
+  "original_native_unscored_points": 7
+}

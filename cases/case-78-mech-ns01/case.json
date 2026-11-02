@@ -1,0 +1,48 @@
+{
+  "id": "MECH-NS01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "Native启动取消",
+  "prompt": "在真实启动事务边界取消Native任务，保留停止证据，使用户续办能够应用。",
+  "preconditions": "公开时序配方、真实Runtime/SQLite、异步取消和本地CLI模型替身。",
+  "expected_terminal": "native_start_cancellation_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "取消后无运行中的Native回合且续办可应用",
+    "源码冻结与严格JUnit回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-NS01-H1",
+      "rule": "启动事务提交前后取消均不执行工作；准备与运行状态均可续办到修订2。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NS01-H2",
+      "rule": "已提交Native回合被结束；启动错误保持原错误，停机保持中断，不改原CLI时限。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

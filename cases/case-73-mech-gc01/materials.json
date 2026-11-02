@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-GC01",
+  "data": {
+    "kind": "public_http_bytes",
+    "inputs": [
+      "input/requests.json"
+    ],
+    "generators": []
+  },
+  "tools": {
+    "kind": "private_unix_socket_and_scripted_provider",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "agent-runtime/tests/test_improvement_gateway_transport.py",
+      "agent-runtime/tests/test_improvement_auth_blocking.py"
+    ],
+    "expected_collected": 33,
+    "no_skips": true
+  }
+}

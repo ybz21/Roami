@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>RSI CLI 继承节点模型与每日限额</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>RSI CLI 继承节点模型与每日限额</h1>
+<h2>Product Design</h2><p>独立原生评测与校准命令统一使用节点保存的模型配置和现有 Go 网关每日金额限额。运行入口不能再因遗漏模型页设置而调用旧模型、截短输出、关闭重试或使用校准文件自带的评分模型。缺少网关绑定时在推理前阻断。</p>
+<h2>User Stories</h2><ul><li>修改模型页后，CLI 使用相同的 Main/Worker、参数、能力、上下文窗口和重试。</li><li>真实评测不必另填 Token 或调用次数预算；旧预算不能成为第二道限制。</li><li>离线协议夹具仍能独立运行，失败和未知调用不能自动重放；缺少人工标签或独立评分能力仍不能生成证书。</li></ul>
+<h2>Technical Design</h2><p>entrypoints/node_models.py 负责检查 ROAMI_MODEL_GATEWAY_SOCKET，并复用 load_runtime_model_settings 加载 TOML、私有模型页设置和自动容量。CLI 原生 cycle/watch 将账本及 NativeFilesExecutor 绑定 shared_daily_limit；原生执行器在该模式返回零 Token 预留，冻结评分和执行时限不变。calibrate-artifacts 显式接收 --agent-config、--data-root，沿 configured_provider 和 Go 传输，证书标记 live_models，忽略旧 --token-limit；配置文件中的评分模型不覆盖节点路由。离线 protocol_fixture 保留旧协议预算；无法证明模型与账本绑定的 external 模式在启动前拒绝，与正式工作流一致。未改变服务部署、日程或节点配置。</p>
+<h2>验收记录</h2><p>12项新增回归在旧实现11失败、1通过；修复后72项相关检查通过。包含真实 Unix socket 的每日限额拒绝、真实 Runtime 在旧 Case 额度之上保留模型参数及重试、自动容量解析、配置权限和损坏保护，以及离线夹具。当前节点只读预检继承 deepseek-4.1-flash，Main图片开启、Worker关闭，窗口1048576、重试2和 reasoning_effort=low；每日100 CNY及配置哈希未变，0推理调用。冻结v55全部193个执行核心/资源/入口文件与源码匹配。本地完整门禁Python2402项无跳过、Go全量及前端typecheck/i18n/hover/生产构建通过。实际校准CLI在当前Worker图片关闭时返回MODEL_IMAGES_UNSUPPORTED，创建模型提供方0、启动锚点0、证书0；人工参考原稿逐字私有副本使用，四项标签仍未确认。最初准入材料副本权限未收紧被拒的日志、扩展外部执行器覆盖前中止的门禁及首轮测试夹具配置错误日志均保留。本轮不产生新的任务质量成绩，不关闭仍未通过的三个Issue。</p>
+</main></body></html>

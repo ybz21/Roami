@@ -3,6 +3,7 @@
 import asyncio
 import math
 import time
+from pathlib import PurePath
 
 import httpx
 from jsonschema import ValidationError
@@ -21,7 +22,10 @@ from roami_agent.replies.task_progress import task_progress
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
 from roami_agent.storage.task_context import model_task_projection
+from roami_agent.storage.task_handoff import request_handoff_complete
 from roami_agent.storage.transcript_repository import message
+from roami_agent.tools.request_coverage_recovery import request_coverage_recovery
+from roami_agent.tools.workspace_images import WorkspaceImageReadError
 
 
 class ToolGateway:
@@ -105,9 +109,19 @@ class ToolGateway:
                     import json
 
                     completion = json.loads(callback["payload_json"]).get("completion", {})
-                    if completion.get("state") == "cancelled" or (
-                        completion.get("state") in {"failed", "interrupted"}
-                        and (completion.get("result") or {}).get("retryable") is False
+                    final_handoff = operation_name in {
+                        "delegate",
+                        "task_steer",
+                    } and await self.db.call(
+                        lambda db: request_handoff_complete(db, binding.get("originMessageId"))
+                    )
+                    if (
+                        final_handoff
+                        or completion.get("state") == "cancelled"
+                        or (
+                            completion.get("state") in {"failed", "interrupted"}
+                            and (completion.get("result") or {}).get("retryable") is False
+                        )
                     ):
                         raise DomainError("TASK_COMPLETION_RESTART_FORBIDDEN", 409)
 
@@ -168,6 +182,20 @@ class ToolGateway:
             value = await self.tools.invoke(
                 call, role, dict(binding, progress=progress, assistantMessageId=mid)
             )
+            if (
+                operation_name == "file_read"
+                and isinstance(value, dict)
+                and PurePath(args["path"]).suffix.lower()
+                in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+            ):
+                value = {
+                    **value,
+                    "data": "",
+                    "contentOmitted": True,
+                    "recovery": "Up to six recent distinct workspace image snapshots are attached for comparison within the model's combined image payload budget. Re-reading an unchanged path replaces its snapshot; do not page binary bytes."
+                    if value.get("fileImage", {}).get("artifactId")
+                    else "This image file read returns metadata, not a visual observation. Do not read more byte pages to inspect it: base64 text is not image input. Report the visual limitation unless another configured image-capable role has independently inspected the file.",
+                }
             state = (
                 "failed"
                 if isinstance(value, dict)
@@ -177,6 +205,27 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if isinstance(exc, WorkspaceImageReadError):
+                value["fileImage"] = {"path": exc.path, "unavailable": exc.code}
+            if value["error"] in {
+                "REQUEST_COVERAGE_REQUIRED",
+                "REQUEST_COVERAGE_SOURCE_REQUIRED",
+                "REQUEST_OUTCOME_DROPPED",
+                "REQUEST_OUTCOMES_PENDING",
+                "REQUEST_HANDOFF_REQUIRED",
+                "REQUEST_BLOCKER_REQUIRED",
+                "REQUEST_HANDOFF_SCOPE_REQUIRED",
+            }:
+                value.update(
+                    executionStarted=False,
+                    recovery=request_coverage_recovery(operation_name),
+                )
+            if value["error"] == "FILE_CHANGED":
+                value["recovery"] = (
+                    "Read the same file again with read, review its current contents, then use that read's exact sha256 as expectedSha256. JSON null is only for creating a missing file. Preserve unrelated changes; do not retry the stale edit or bypass the check with shell redirection."
+                )
+                if operation_name in {"file_write", "file_patch"}:
+                    value["writePublished"] = False
             if value["error"] in {"TASK_RESULT_REQUIRED", "TASK_REPLY_TASK_MISMATCH"}:
                 value["recovery"] = (
                     "This is a completion report for one task. Deliver its actual requested findings, "
@@ -187,7 +236,7 @@ class ToolGateway:
                 value.update(
                     executionStarted=False,
                     retryable=False,
-                    recovery="This is a cancelled or non-retryable task's completion report, not new authorization. Do not start work, send session instructions or change configuration. Report the committed outcome with reply/task_reply; a new user turn is required for further work.",
+                    recovery="This completion report is not a new user request. Do not restart, steer or replace accepted work, send session instructions or change configuration. Report the committed outcome and any blocker; a new user turn is required for further work.",
                 )
             if value["error"] in {
                 "REPLY_BOILERPLATE",
@@ -247,7 +296,7 @@ class ToolGateway:
             ):
                 value["recovery"] = (
                     "This source could not be read. Do not reopen the same URL or repeat identical failed observations. "
-                    "If its read-only navigation input has stopped, use another relevant public URL in a task-owned tab. "
+                    "If its read-only navigation input has stopped, use another relevant public URL in a task-owned tab, or an enabled MCP or CLI. "
                     "Keep unknown outcomes and source limitations explicit; human takeover and unknown writes still stop input."
                 )
             if isinstance(exc, ToolArgumentsError):
@@ -272,13 +321,8 @@ class ToolGateway:
             elif tool is None and value["error"] in {"TOOL_UNAVAILABLE", "INVALID_CLI_ARGUMENTS"}:
                 value["recovery"] = (
                     "This call was rejected before execution. "
-                    + (
-                        "Research has no standalone shell: do not probe with echo, curl or Python. "
-                        "Read skill://browser_use and use roami chrome help for admitted browser commands. "
-                        if role == "research"
-                        else "Use tool_list to find a registered operation available in this role. "
-                    )
-                    + "Use the exact command argv returned by tool_list or command-family help, with "
+                    "Use tool_list to find a registered operation available in this role. "
+                    "Use the exact command argv returned by tool_list or command-family help, with "
                     "real returned resource/observation IDs. Correct the intended "
                     "call instead of repeating the rejected command."
                 )
@@ -305,6 +349,9 @@ class ToolGateway:
             }:
                 value["recovery"] = (
                     "Main has no shell workspace for this operation. Do not retry shell commands or guess cwd. "
+                    "For a user-authorized local machine operation independent of project files, "
+                    "use bash scope=host without cwd. Host scope is general execution, not read-only; "
+                    "it requires no project or delegation. resourceOnly skips coding-workspace preparation, not enabled capabilities. "
                     "An error affects only this attempted operation: preserve every other part of the current request. "
                     "Resolve project/session metadata through target_search/target_resolve; a project edit still needs its own handoff. "
                     "Keep requestComplete=false until all requested parts have been handled or handed off. Do not reduce a mixed request to its lookup part. "
@@ -315,6 +362,18 @@ class ToolGateway:
                     "target={kind:new_session,resourceOnly:true} with bounded routing; complex work goes to a professional executor with concrete routing evidence. For bounded file deliverables use "
                     "target={kind:new_session,directory:the_user_requested_directory}. "
                     "The worker loads the requested Skills and executes the task."
+                )
+            if value["error"] in {
+                "HOST_SCOPE_UNAVAILABLE",
+                "HOST_SCOPE_CWD_NOT_ALLOWED",
+                "HOST_SCOPE_REGISTERED_COMMAND",
+            }:
+                value.update(
+                    executionStarted=False,
+                    recovery="Host scope is available only in Main without a task, workspace or cwd. "
+                    "Keep task work in its bound workspace; report a profile mismatch to Main. "
+                    "For registered Roami operations omit scope=host and use their admitted command schemas. "
+                    "Do not change scope to bypass a denied or disabled operation.",
                 )
             state = (
                 "unknown"
@@ -329,9 +388,11 @@ class ToolGateway:
                 "TASK_TARGET_REVIEW_REQUIRED",
             }:
                 value["recovery"] = (
-                    "The destination was rejected before task acceptance. Stop delegation for this turn. "
-                    "Do not remove the directory, switch targets or invent a replacement to bypass the error. "
-                    "Explain the rejected path and ask the user for a corrected existing destination."
+                    "No task was accepted. This does not establish that other directories are unwritable. "
+                    "Preserve any user-selected destination and executor. If the rejected path was guessed by you "
+                    "for new native work, retry target={kind:new_session} without a directory so the runtime "
+                    "allocates a private task directory. Do not substitute another guessed path, a project, "
+                    "resourceOnly or another executor. For a user-selected path, ask for its correction."
                 )
             if role == "main" and value["error"] == "TASK_CONTINUATION_ALREADY_REQUESTED":
                 value["recovery"] = (
@@ -344,7 +405,7 @@ class ToolGateway:
                 value["recovery"] = (
                     "Do not change or drop the rejected executor choice to bypass this error. "
                     "For a user-requested executor use routing.explicitExecutor with an exact userQuote; "
-                    "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching."
+                    "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching; never use a native shell wrapper."
                 )
             if role == "main" and value["error"] == "ROUTING_EXPLICIT_SOURCE_REQUIRED":
                 value["recovery"] = (
@@ -356,9 +417,9 @@ class ToolGateway:
                 )
             if role == "main" and value["error"] == "INVALID_RESOURCE_ONLY_TARGET":
                 value["recovery"] = (
-                    "resourceOnly is a web/navigation-only profile and cannot include a directory, "
-                    "project or workspace. For public lookup/chat-only work, KEEP resourceOnly=true "
-                    "and remove directory/workspace fields; do not drop read-only scope to repair arguments. "
+                    "resourceOnly skips coding-workspace preparation and cannot include a directory, "
+                    "project or workspace. External lookups can use enabled MCP, CLI or browser tools; keep resourceOnly=true "
+                    "and remove directory/workspace fields instead of adding an unrelated coding workspace. "
                     "Use a regular Native workspace only for actual filesystem work authorized by the user."
                 )
             if role == "main" and value["error"] in {
@@ -440,9 +501,9 @@ class ToolGateway:
             ):
                 value["recovery"] = (
                     "Main has no bound file workspace for this turn. Dispatch the original file work "
-                    "in the user's verified directory; for bounded work without an explicit executor "
-                    "choice use a regular native worker with target.kind=new_session and target.directory. "
-                    "Do not use resourceOnly for file writes. Preserve explicit executor choices; complex "
+                    "in the user-selected workspace. For new native file work without a selected destination, "
+                    "use target={kind:new_session} without directory; a private writable task directory is prepared. "
+                    "Use a prepared workspace for local file edits. Preserve explicit executor choices; complex "
                     "work stays with a professional. Keep the exact requested file and read-back scope; "
                     "never guess hashes, substitute paths or create an unrelated project."
                 )

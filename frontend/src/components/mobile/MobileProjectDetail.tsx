@@ -7,6 +7,7 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { AgentLogo, ChevronRight, DiffIcon, TerminalIcon } from '../../icons'
 import AdaptivePanel from '../shell/AdaptivePanel'
+import NativeProjectSessions from '../agent/NativeProjectSessions'
 
 const GitPanel = lazy(() => import('../git/GitPanel'))
 import { BranchIcon } from '../git/parts'
@@ -14,7 +15,8 @@ import type { OverviewItem } from './MobileSessions'
 
 type Wt = { path: string; branch: string; isMain: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; pushed?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
 
-export default function MobileProjectDetail({ dir, onOpenSession, onNewInWorktree }: {
+export default function MobileProjectDetail({ projectId, dir, onOpenSession, onNewInWorktree }: {
+  projectId?: string
   dir: string
   onOpenSession: (name: string) => void
   onNewInWorktree: (kind: 'claude' | 'codex' | 'shell', path: string) => void
@@ -61,6 +63,7 @@ export default function MobileProjectDetail({ dir, onOpenSession, onNewInWorktre
   const shown = [...all.filter((w) => busy(w) || w.isMain).sort((a, b) => rank(a) - rank(b)), ...(showQuiet ? quiet : [])]
   return (
     <div className="tt-mproj">
+      {projectId && <NativeProjectSessions projectId={projectId} />}
       {wts === null && <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}><Spin /></div>}
       {shown.map((w) => (
         <div key={w.path} className="tt-mproj-wt">

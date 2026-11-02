@@ -7,7 +7,9 @@ from roami_agent.app import Runtime
 from roami_agent.context.prompt_builder import PromptBuilder
 from roami_agent.conversation.transcript import Conversations
 from roami_agent.memory.intake import direct_user_preference
+from roami_agent.memory.preference import commit_extracted_memory
 from roami_agent.memory.records import Memories
+from roami_agent.memory.writer import source_snapshot
 from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.memory import MemoryProposal
@@ -217,14 +219,16 @@ async def test_late_automatic_preference_cannot_override_newer_user_source(store
 class UserScopePreferenceModel:
     model = "user-scope-preference-fixture"
 
-    def __init__(self, scope="user_preference", direct=True):
-        self.scope, self.direct = scope, direct
+    def __init__(self, scope="user_preference", direct=True, strip_request=False):
+        self.scope, self.direct, self.strip_request = scope, direct, strip_request
 
     async def stream(self, messages, tools):
         source = next(
             item for item in json.loads(messages[-1]["content"]) if item["role"] == "user"
         )
         quote = json.loads(source["content"])["text"]
+        if self.strip_request:
+            quote = quote.split("：", 1)[-1]
         yield ModelEvent(
             "text",
             json.dumps(
@@ -242,6 +246,48 @@ class UserScopePreferenceModel:
                 }
             ),
         )
+
+
+@pytest.mark.parametrize("scope", ["source", "user_preference"])
+@pytest.mark.parametrize("strip_request", [False, True])
+async def test_explicit_preference_extraction_keeps_one_active_memory(store, scope, strip_request):
+    runtime = Runtime(
+        store,
+        ConversationModel(),
+        memory_model=UserScopePreferenceModel(scope, strip_request=strip_request),
+    )
+    conversation = await runtime.conversations.create("alice")
+    receipt = await runtime.conversations.accept(
+        "alice", conversation["id"], "remember", "帮我记住：以后分配复杂任务，首选codex"
+    )
+    original = (await runtime.memory.search("alice", "codex"))[0]
+    await runtime.start()
+    try:
+        await until(
+            store,
+            lambda db: row(db, "SELECT id FROM jobs WHERE kind='memory.extract' AND state='done'"),
+        )
+        catalog = await runtime.memory.catalog.list("alice", kind="preference")
+        assert catalog["total"] == 1
+        memory = catalog["items"][0]
+        assert memory["conversation_id"] == (
+            None if scope == "user_preference" else conversation["id"]
+        )
+        assert (await runtime.memory.evidence("alice", memory["id"]))[0]["messageId"] == receipt[
+            "messageId"
+        ]
+        assert len(await runtime.memory.search("alice", "codex")) == 1
+        if scope == "source":
+            assert memory["id"] == original["id"]
+        else:
+            historical = await store.call(
+                lambda db: row(db, "SELECT state FROM memory_records WHERE id=?", (original["id"],))
+            )
+            assert historical["state"] == "superseded"
+        await runtime.memory.delete("alice", memory["id"])
+        assert not await runtime.memory.search("alice", "codex")
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.parametrize(
@@ -291,7 +337,7 @@ async def test_personal_preference_scope_requires_direct_source_and_forgetting_i
             local = await store.call(
                 lambda db: row(
                     db,
-                    "SELECT id FROM memory_records WHERE conversation_id=? AND state='active' ORDER BY created_ms LIMIT 1",
+                    "SELECT id FROM memory_records WHERE conversation_id=? AND state='superseded' ORDER BY created_ms LIMIT 1",
                     (first["id"],),
                 )
             )
@@ -347,11 +393,154 @@ async def test_forgetting_user_preference_excludes_other_records_of_original_sou
         )
         records = await runtime.memory.search("alice", "pine-3571")
         global_record = next(item for item in records if item["conversation_id"] is None)
-        local_record = next(item for item in records if item["conversation_id"] is not None)
+        assert len(records) == 1
+        local_record = await store.call(
+            lambda db: row(
+                db,
+                "SELECT id FROM memory_records WHERE conversation_id=? AND state='superseded'",
+                (conversation["id"],),
+            )
+        )
         await runtime.memory.forget("alice", global_record["id"])
         assert not await runtime.memory.search("alice", "pine-3571")
         assert (await runtime.memory.catalog.list("alice", query="pine-3571"))["total"] == 0
-        with pytest.raises(DomainError, match="MEMORY_SOURCE_NOT_FOUND"):
+        with pytest.raises(DomainError, match="MEMORY_NOT_FOUND"):
             await runtime.memory.get("alice", local_record["id"])
     finally:
         await runtime.close()
+
+
+async def test_reextraction_reuses_promoted_preference_and_retires_legacy_duplicate(store):
+    conversations, memory = Conversations(store), Memories(store)
+    conversation = await conversations.create("alice")
+    text = "帮我记下，以后分配复杂任务，首选codex"
+    receipt = await conversations.accept("alice", conversation["id"], "remember", text)
+    local = (await memory.search("alice", "codex"))[0]
+    promoted = await memory.save(
+        "alice", "复杂任务首选 Codex", text, receipt["messageId"], kind="preference"
+    )
+
+    def extract(db, scope):
+        source = source_snapshot(db, "alice", receipt["messageId"])
+        return commit_extracted_memory(
+            db,
+            "alice",
+            MemoryProposal(
+                title="另一种标题",
+                body="以后分配复杂任务，首选codex",
+                kind="preference",
+                sourceIds=[source["id"]],
+                evidenceQuote="以后分配复杂任务，首选codex",
+                proposedScope=scope,
+            ),
+            [source],
+            {"conversation_id": conversation["id"], "project_id": None, "task_id": None},
+            {source["id"]: source["sha256"]},
+            None,
+        )
+
+    for scope in ("user_preference", "source", "user_preference"):
+        assert (await store.call(lambda db, scope=scope: extract(db, scope), write=True))[
+            "id"
+        ] == promoted["id"]
+        assert (await memory.catalog.list("alice", kind="preference"))["total"] == 1
+    assert (
+        await store.call(lambda db: db.execute("SELECT COUNT(*) FROM memory_records").fetchone()[0])
+        == 2
+    )
+    await memory.delete("alice", local["id"])
+    assert not await memory.search("alice", "codex")
+
+
+@pytest.mark.parametrize("different", ["body", "source", "project"])
+async def test_preference_reconciliation_preserves_distinct_content_sources_and_scopes(
+    store, different
+):
+    conversations, memory = Conversations(store), Memories(store)
+    conversation = await conversations.create("alice")
+    text = "记住：以后复杂任务优先 Codex，简单任务优先 Claude"
+    first = await conversations.accept("alice", conversation["id"], "first", text)
+    source_id = first["messageId"]
+    if different == "source":
+        second = await conversations.accept("alice", conversation["id"], "second", text)
+        source_id = second["messageId"]
+    body = "简单任务优先 Claude" if different == "body" else text
+
+    def extract(db):
+        source = source_snapshot(db, "alice", source_id)
+        return commit_extracted_memory(
+            db,
+            "alice",
+            MemoryProposal(
+                title="独立偏好",
+                body=body,
+                kind="preference",
+                sourceIds=[source_id],
+                evidenceQuote=body,
+                proposedScope="user_preference",
+            ),
+            [source],
+            {
+                "conversation_id": conversation["id"],
+                "project_id": "project" if different == "project" else None,
+                "task_id": None,
+            },
+            {source_id: source["sha256"]},
+            None,
+        )
+
+    extracted = await store.call(extract, write=True)
+    assert (await memory.catalog.list("alice", kind="preference"))["total"] == 2
+    if different == "project":
+        assert extracted["project_id"] == "project"
+        assert extracted["conversation_id"] == conversation["id"]
+
+
+@pytest.mark.parametrize("difference", [None, "body", "source", "project", "expired"])
+async def test_startup_reconciles_only_equivalent_legacy_promotions(store, difference):
+    runtime = Runtime(store, ConversationModel())
+    conversation = await runtime.conversations.create("alice")
+    body = "以后分配复杂任务，首选codex"
+    text = "帮我记下，" + body
+    receipt = await runtime.conversations.accept("alice", conversation["id"], "first", text)
+    local = (await runtime.memory.search("alice", "codex"))[0]
+    if difference == "project":
+        local = await runtime.memory.save(
+            "alice",
+            "项目执行偏好",
+            body,
+            receipt["messageId"],
+            kind="preference",
+            conversation_id=conversation["id"],
+            project_id="project",
+        )
+    source_id = receipt["messageId"]
+    if difference == "source":
+        other = await runtime.conversations.accept("alice", conversation["id"], "second", body)
+        source_id = other["messageId"]
+    promoted = await runtime.memory.save(
+        "alice",
+        "复杂任务首选 Codex",
+        "首选codex" if difference == "body" else text,
+        source_id,
+        kind="preference",
+    )
+
+    def seed(db):
+        db.execute("INSERT INTO memory_edges VALUES(?,?)", (local["id"], promoted["id"]))
+        if difference == "expired":
+            db.execute("UPDATE memory_records SET expires_ms=1 WHERE id=?", (promoted["id"],))
+
+    await store.call(seed, write=True)
+    await runtime.memory_jobs.recover()
+    await runtime.memory_jobs.recover()
+    state = await store.call(
+        lambda db: row(db, "SELECT state FROM memory_records WHERE id=?", (local["id"],))
+    )
+    assert state["state"] == ("superseded" if difference is None else "active")
+    if difference != "expired":
+        assert (await runtime.memory.get("alice", promoted["id"]))["id"] == promoted["id"]
+    if difference is None:
+        assert (await runtime.memory.catalog.list("alice", kind="preference"))["total"] == 1
+        await runtime.memory.delete("alice", local["id"])
+        assert not await runtime.memory.search("alice", "codex")

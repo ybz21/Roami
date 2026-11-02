@@ -10,13 +10,16 @@ from roami_agent.dispatch.navigation_recovery import stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_revisions import TaskRevisions
 from roami_agent.dispatch.task_sessions import session_closure
+from roami_agent.executors.task_directory import automatic_task_directory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.native_session_registry import register as register_native_session
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.task_continuation import continuation_candidates
+from roami_agent.storage.task_reports import reported_progress
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -60,6 +63,7 @@ class Tasks:
         key,
         parent_task_id=None,
         executor="native",
+        model=None,
         target=None,
         from_message_id=None,
         origin_message_id=None,
@@ -68,14 +72,24 @@ class Tasks:
         source_assistant_message_id=None,
         routing_decision=None,
         title=None,
+        independent_project_outcome=False,
     ):
         if (
             not key
             or len(key) > 200
             or not goal.strip()
-            or executor not in {"native", "codex", "claude"}
+            or executor not in {"native", "codex", "claude", "opencode", "pi"}
         ):
             raise DomainError("INVALID_TASK")
+        if model is not None and (
+            executor == "native"
+            or target
+            and target.get("kind") == "session"
+            or not isinstance(model, str)
+            or not model.strip()
+            or len(model) > 300
+        ):
+            raise DomainError("INVALID_TASK_MODEL")
         if title is not None:
             if not isinstance(title, str) or not title.strip() or len(title) > 80:
                 raise DomainError("INVALID_TASK")
@@ -115,7 +129,7 @@ class Tasks:
             )
         ):
             raise DomainError("INVALID_RESOURCE_ONLY_TARGET")
-        if executor in {"codex", "claude"} and target.get("kind") == "session":
+        if executor in {"codex", "claude", "opencode", "pi"} and target.get("kind") == "session":
             if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if any(target.get(k) for k in ["directory", "workspaceId", "base", "remote"]):
@@ -130,6 +144,8 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if model is not None:
+            spec["model"] = model
         if title is not None:
             spec["title"] = title
         if routing_decision is not None:
@@ -186,7 +202,10 @@ class Tasks:
                     error = rejected_result.get("error")
                     if error == "TASK_SESSION_BINDING_REQUIRED":
                         raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
-                    if error in {"ROUTING_EXECUTOR_CONFLICT", "ROUTING_EXPLICIT_UNAVAILABLE"}:
+                    if error in {
+                        "ROUTING_EXECUTOR_CONFLICT",
+                        "ROUTING_EXPLICIT_UNAVAILABLE",
+                    }:
                         rejected_args = json.loads(rejection["arguments_json"])
                         requested = (rejected_args.get("routing") or {}).get(
                             "explicitExecutor"
@@ -195,14 +214,21 @@ class Tasks:
                             raise DomainError("ROUTING_EXECUTOR_CONFLICT", 409)
                 rejected = row(
                     db,
-                    "SELECT x.id FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                    "SELECT COALESCE(json_extract(e.payload_json,'$.decision.executor'),"
+                    "json_extract(x.arguments_json,'$.executor'),'native') AS executor "
+                    "FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                    "LEFT JOIN events e ON e.event_key='routing:'||x.idempotency_key "
                     "WHERE x.turn_id=? AND x.tool_name='delegate' AND x.state='failed' AND "
-                    "CASE WHEN json_valid(json_extract(m.content_json,'$.text')) THEN "
-                    "json_extract(json_extract(m.content_json,'$.text'),'$.error') END "
+                    "CASE WHEN json_valid(json_extract(native_content(m.content_json),'$.text')) THEN "
+                    "json_extract(json_extract(native_content(m.content_json),'$.text'),'$.error') END "
                     "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') LIMIT 1",
                     (source_turn_id,),
                 )
-                if rejected:
+                if rejected and not (
+                    executor == "native"
+                    and automatic_task_directory(target)
+                    and rejected["executor"] == "native"
+                ):
                     raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
                 for steering in rows(
                     db,
@@ -217,9 +243,19 @@ class Tasks:
                         (previous_id, owner),
                     )
                     old_target = json.loads(previous["intent_json"])["target"] if previous else {}
-                    if previous_id in goal or any(
-                        target.get(key) and target.get(key) == old_target.get(key)
-                        for key in ("projectId", "sessionId", "directory")
+                    same_project = (
+                        target.get("kind") == "project"
+                        and target.get("projectId")
+                        and target.get("projectId") == old_target.get("projectId")
+                        and not target.get("workspaceId")
+                    )
+                    if (
+                        previous_id in goal
+                        or (same_project and not independent_project_outcome)
+                        or any(
+                            target.get(key) and target.get(key) == old_target.get(key)
+                            for key in ("workspaceId", "sessionId", "directory")
+                        )
                     ):
                         raise DomainError("TASK_CONTINUATION_ALREADY_REQUESTED", 409)
             path_key = {"new_session": "directory", "new_project": "baseDir"}.get(target["kind"])
@@ -382,17 +418,28 @@ class Tasks:
                 db.execute(
                     "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
                 )
-                seed = goal
-                if (spec.get("target") or {}).get("resourceOnly"):
-                    original = json.loads(origin["content_json"]).get("text", "")
+                register_native_session(db, tid, child, branch_id)
+                source_content = json.loads(origin["content_json"])
+                resource_only = (spec.get("target") or {}).get("resourceOnly")
+                child_content = {"text": goal}
+                if not fork_point or resource_only:
                     seed = (
                         "Original user request (defines the requested facts and scope):\n"
-                        + original
+                        + source_content.get("text", "")
                         + "\n\nDelegated goal (context only; do not broaden or change the original request):\n"
                         + goal
                     )
-                source_content = json.loads(origin["content_json"])
-                child_content = {"text": seed}
+                    child_content["text"] = seed
+                    if not resource_only:
+                        child_content.update(
+                            text=seed
+                            + "\n\nComplete only the delegated part. Original user contracts override conflicting "
+                            "coordinator interpretations. If the user supplied an output schema, keep its "
+                            "exact fields/types; extra factual metadata belongs in a requested report unless "
+                            "the user allowed extensions. Coordinator-added formulas or checks are proposals, "
+                            "not user requirements.",
+                            displayText=goal,
+                        )
                 if source_content.get("attachments"):
                     child_content["attachments"] = source_content["attachments"]
                 message(db, child, branch_id, "user", child_content)
@@ -420,6 +467,17 @@ class Tasks:
 
     @staticmethod
     def _view(db, task):
+        native = row(
+            db, "SELECT id,conversation_id FROM native_sessions WHERE task_id=?", (task["id"],)
+        )
+        task["nativeSession"] = (
+            {"id": native["id"], "conversationId": native["conversation_id"]} if native else None
+        )
+        task["sessionClosure"] = session_closure(db, task["id"])
+        target = json.loads(task.get("target_json") or "null") or json.loads(
+            task["intent_json"]
+        ).get("target", {})
+        task["projectId"] = target.get("projectId")
         task["latestAttempt"] = row(
             db,
             "SELECT id AS runId,state,session_id AS sessionId,agent_conversation_id AS agentConversationId,executor_kind AS executorKind,result_json AS inspectionResultJson,"
@@ -537,6 +595,7 @@ class Tasks:
                 attempt["hasConversation"] = bool(attempt.pop("native_branch_id"))
                 result_json = attempt.pop("result_json")
                 attempt["result"] = json.loads(result_json) if result_json else None
+                attempt["progress"] = reported_progress(db, task_id, attempt["id"])
             children = rows(
                 db,
                 "SELECT * FROM tasks WHERE parent_task_id=? AND owner_id=? ORDER BY created_ms DESC LIMIT 101",
@@ -581,6 +640,15 @@ class Tasks:
         if self.deliverables:
             detail["delivery"] = await self.deliverables.collect(owner, detail)
         return detail
+
+    async def page(self, owner, cid=None, *, before=None, limit=20, state_filter="all"):
+        from roami_agent.dispatch.task_list import task_page
+
+        return await self.db.call(
+            lambda db: task_page(
+                db, owner, cid, before=before, limit=limit, state_filter=state_filter
+            )
+        )
 
     async def list(self, owner, cid=None, *, for_model=False, task_id=None, exclude_task_ids=()):
         def read(db):

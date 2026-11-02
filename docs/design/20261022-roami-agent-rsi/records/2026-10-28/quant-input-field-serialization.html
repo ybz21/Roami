@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QUANT-05 输入字段序列化合同</title><link rel="stylesheet" href="../../assets/design.css"></head><body><main>
+<p><a href="../README.md">RSI 设计修订与验收记录</a></p>
+<h1>QUANT-05 输入字段序列化合同 · 2026-10-28</h1>
+<h2>Product Design</h2>
+<p>公开说明 result.json 的 receipt、execution_prices、signal_prices 原样复制 prices.json 对应字符串；分析解释放入 report.md。文件工具的哈希回执不能替代案例数据中的 receipt。trades_on_unavailable_bars 只报告实际发生的违规成交，不是禁用 bar 或被阻止信号的清单。保留原严格判定，不把旧输出中的说明句自动改成字段值。</p>
+<h2>User Stories</h2>
+<ul><li>执行器能从 Case 文件夹和公开任务看到字段来源，避免只有类型声明却按未说明的字符串等值规则判错。</li><li>用户能区分新合同下的独立生成、旧合同的原始失败和模型能力提升。</li><li>旧冻结套件保持原字节，错误替换字段的结果继续失败。</li></ul>
+<h2>Technical Design</h2>
+<p>cases/case-19-quant-05/case.json 的 output_format 显式声明 copy_input_fields 与解释文件；evaluation/authored_fixtures.py 将相同要求加入公开执行说明。此 Case 标记 authored-v15-input-field-serialization，evaluation/corpus.py 新生成 roami-authored-40-v15 / authored-40-v15.json。v14 及更早冻结文件继续保留，不覆盖或迁移旧 Case。</p>
+<p>判定器、输入数据和期望值均未放宽。回归验证旧冻结文件原字节保留，以及替换 receipt、execution_prices 或 signal_prices 时，结构和独立重跑两项仍失败。新合同需要新的独立生成，不能修改旧产物后将其登记为已修复，也不能把格式澄清造成的差异计算为模型优化收益。</p>
+</main></body></html>

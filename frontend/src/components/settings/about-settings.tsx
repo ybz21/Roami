@@ -7,9 +7,8 @@ import { CheckIcon, GithubIcon } from '../../icons'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { usePwaInstall } from '../auth/install'
-import { CertDownloadButton } from './security-settings'
 
-export function AboutSettings() {
+export function AboutSettings({ onInstall }: { onInstall?: () => void }) {
   const { t } = useI18n()
   const { message } = AntApp.useApp()
   const { installed: pwaInstalled, install: doInstall, guide: installGuide } = usePwaInstall()
@@ -69,18 +68,17 @@ export function AboutSettings() {
         {pwaInstalled
           ? <span style={{ color: 'var(--text-bright)', display: 'inline-flex', alignItems: 'center', gap: 5 }}><CheckIcon size={13} />{t('install.installed')}</span>
           : <Button type="primary" onClick={doInstall}>{t('install.button')}</Button>}
-        <CertDownloadButton />
+        <Button size="small" onClick={() => { if (onInstall) onInstall(); else location.hash = '#/install' }}>{t('install.aboutOpen')}</Button>
       </Space>
       <span style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-meta)' }}>{t('install.settingsHelp')}</span>
       {installGuide}
       {/* 证书与推送（24 稿 §7）：连通性和证书都是部署者的事，这里只把话说清楚、给链接 */}
-      <div style={{ marginTop: 'var(--sp-3)', padding: 'var(--sp-3)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--r-sm)', background: 'var(--bg-base)', fontSize: 'var(--fs-meta)', color: 'var(--text-dim)', lineHeight: 1.7 }}>
-        <div style={{ color: 'var(--text-bright)', fontWeight: 600, marginBottom: 2 }}>{t('about.certTitle')}</div>
+      <details className="tt-set-advanced">
+        <summary>{t('about.certTitle')}</summary>
         <div>{t('about.certAndroid')}</div>
-        <div>{t('about.certIphone')} <a href="/cert.crt" target="_blank" rel="noreferrer">{t('about.certDownload')}</a></div>
+        <div>{t('about.certIphone')} <a href="#/settings/sec">{t('set.pageSecurity')}</a></div>
         <div>{t('about.certOwn')}</div>
-        <div style={{ marginTop: 6 }}><Button size="small" onClick={() => { location.hash = '#/install' }}>{t('install.aboutOpen')}</Button></div>
-      </div>
+      </details>
     </Space>
   )
 }

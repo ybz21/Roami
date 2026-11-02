@@ -1,0 +1,49 @@
+{
+  "id": "MECH-EW01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "已存在执行窗口的上下文",
+  "prompt": "把调用方已有的执行窗口如实传给协调和执行上下文，不创建新的模型或任务限额。",
+  "preconditions": "Python 3.12、pytest及独立临时SQLite数据库；脚本化模型事件，不调用外部模型。",
+  "expected_terminal": "enclosing_execution_window_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "协调与Native工具循环收到剩余时间事实",
+    "未设置窗口时不生成截止时间，保存路由与任务预算不变",
+    "源码冻结与严格零跳过回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-EW01-H1",
+      "rule": "实际NativeFilesExecutor外层窗口进入模型上下文；有更早任务截止时间时选择较早者。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-EW01-H2",
+      "rule": "真实Native工具循环刷新时钟，任务预算及模型路由不变，未设置窗口时不发明截止时间。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_native_case_window_missing_from_prompt",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/timing-scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

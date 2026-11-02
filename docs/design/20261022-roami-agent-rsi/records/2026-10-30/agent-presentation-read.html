@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Agent 演示文稿读取能力</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>Agent 演示文稿读取能力</h1>
+<h2>Product Design</h2><p>原始 PPTX 任务暴露了 Agent 的通用能力缺口：二进制读取不能直接看到组合内文本；空装饰框和实际文本混淆；命名颜色与目标编辑器不一致。修复放在可复用的 Agent 文档层、读取工具和内置工作流中，供普通任务与 RSI 共同使用。</p>
+<h2>User Stories</h2><ul><li>我能读取每页有内容的文本对象及其组合路径，单独识别空文本框，避免误改装饰对象。</li><li>我能按已安装编辑器公开的色板确认命名颜色，保留不相关的内容和格式。</li><li>读取和修改仍受现有工作区与文件哈希约束，结构检查与视觉验收分别记录。</li></ul>
+<h2>Technical Design</h2><p><code>documents/presentation.py</code> 仅解析 OOXML，按 presentation 关系顺序递归收集文本、段落对齐、原始颜色声明和组合索引；保留颜色变换，不把基础 RGB 或主题引用声称为最终显示颜色。限制压缩包条目与解压 XML 大小，拒绝外部幻灯片和实体声明。<code>documents/office_palettes.py</code> 从已安装 LibreOffice 的公开文件读取色板，不写入 Case 答案或固定 RGB。</p>
+<p><code>tools/workspace_presentations.py</code> 复用 WorkspaceFiles 的工作区边界、禁止符号链接的快照和完整哈希核验，提供只读、分页的 <code>view=document</code>；<code>sha256</code> 始终属于原文件，<code>viewSha256</code> 标识检查结果。现有 raw 读取与图像能力保持兼容。新内置 <code>presentation_files</code> 工作流指导读取、格式感知编辑和回读核对，不参与打分。工具目录支持中文演示文稿检索，基础工具数量不变；生产 Worker 指引关联该内置工作流。工具说明保持简短，历史上下文精简比例断言不放宽。</p>
+<p>额度、模型路由、参数和能力仍由节点保存配置及 Go 网关管理。此次不修改 improvement、Case 提示、输入材料、判定器或参考答案。此前添加 Case 提示的分支只作为未合入实验保留，其分数不作为框架改进验收。</p>
+<h2>Acceptance</h2><p>最终针对性 34 项通过，包括组合定位、空框分离、原文件保持、分页重组、工作区越界和符号链接拒绝、读取中变化、损坏压缩包、外部关系、实体声明、无色板时不编造颜色、过深组合拒绝、生产 Runtime 注册调用与原有上下文精简比例。原始正式套件的两份 PPTX 分别在 v65、v66 独立镜像复测，两轮均各为 [0,0]。v66 的生产指引已进入真实 Worker 请求，但实际未调用文稿读取或 Skill，继续使用 Shell。两轮共 109 次调用、1094474 Token，与本地 Go 网关已知 HTTP 200 回执一致，合计本地计费 0.3258621 元；这不是上游账单证明。读取能力已接通不等于任务质量修复，后续需解决能力选择与编辑结果。最终门禁以本 PR 结果为准，不改写旧正式 60 项成绩、人工参考或日程。此次不部署正式服务。</p>
+</main></body></html>

@@ -1,0 +1,5 @@
+{
+  "dimension_names": ["correctness", "completeness", "usability", "grounding"],
+  "nonobjects": [null, 17, false, "not an object", ["correctness", "completeness", "usability", "grounding"]],
+  "usage": {"inputTokens": 100, "outputTokens": 20, "requestAttempts": 1, "retryUsageKnown": true}
+}

@@ -1,0 +1,49 @@
+{
+  "id": "MECH-DE01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "交付证据范围",
+  "prompt": "保留真实成品和用户要求的日志，内部执行记录按需展开；输入简称不当作缺失成品。",
+  "preconditions": "Python 3.12、SQLite、真实子进程与脚本化模型事件；隔离临时工作区，不调用外部模型。",
+  "expected_terminal": "delivery_evidence_scope_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "成品下载链接按交付优先级排列",
+    "内部日志默认留在记录，显式报告时仍可下载",
+    "缺失链接、目录缺失、符号链接和越界错误保持可见"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-DE01-H1",
+      "rule": "真实进程日志持久保留，不自动挤占主会话成品附件；显式日志请求保持可下载。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DE01-H2",
+      "rule": "仅未观察的无路径简称缺失不升级为缺失产物；显式链接、带目录路径、已观察文件与边界错误仍保留原保护。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_v138_completion_links_and_false_missing_input_names",
+    "issue": 443,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/delivery-evidence.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

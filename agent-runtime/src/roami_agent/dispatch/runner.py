@@ -82,10 +82,12 @@ class TaskDispatcher:
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?",
                 ("preparing" if preparing else "running", now_ms(), task["id"]),
             )
+            started_ms = run["started_ms"] or now_ms()
             db.execute(
                 "UPDATE task_attempts SET state=?,started_ms=? WHERE id=?",
-                ("starting" if preparing else "running", now_ms(), run["id"]),
+                ("starting" if preparing else "running", started_ms, run["id"]),
             )
+            run = dict(run, started_ms=started_ms)
             turn = None
             if run["executor_kind"] == "native":
                 b = row(db, "SELECT * FROM branches WHERE id=?", (run["native_branch_id"],))
@@ -101,25 +103,28 @@ class TaskDispatcher:
                 turn = dict(
                     row(db, "SELECT * FROM turns WHERE id=?", (tid,)), owner_id=task["owner_id"]
                 )
-            event(
-                db,
-                task["origin_conversation_id"],
-                "task.preparing" if preparing else "task.started",
-                {
-                    "taskId": task["id"],
-                    "runId": run["id"],
-                    "nativeTurnId": turn["id"] if turn else None,
-                },
-                task_id=task["id"],
-                turn_id=turn["id"] if turn else None,
-            )
+            if not json.loads(job["payload_json"]).get("waitingForSession"):
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task.preparing" if preparing else "task.started",
+                    {
+                        "taskId": task["id"],
+                        "runId": run["id"],
+                        "nativeTurnId": turn["id"] if turn else None,
+                    },
+                    task_id=task["id"],
+                    turn_id=turn["id"] if turn else None,
+                )
             return task, run, turn
 
-        started = await self.db.call(start, write=True)
-        if not started:
-            return
-        task, run, turn = started
+        starting = asyncio.create_task(self.db.call(start, write=True))
+        task = run = turn = None
         try:
+            started = await asyncio.shield(starting)
+            if not started:
+                return
+            task, run, turn = started
             forgotten = await self.db.call(
                 lambda db: row(
                     db,
@@ -140,13 +145,20 @@ class TaskDispatcher:
             if turn:
                 result = await self.native_executor.run(task, run, turn=turn)
             elif self.executor:
-                await self.charge_budget(task["id"])
+                if not json.loads(job["payload_json"]).get("waitingForSession"):
+                    await self.charge_budget(task["id"])
                 result = await self.executor.run(task, run)
                 if result is None:  # External TUI is alive; report arrives via the CLI callback.
                     return
             else:
                 raise DomainError("EXTERNAL_EXECUTOR_NOT_CONFIGURED")
         except asyncio.CancelledError:
+            if task is None:
+                # Recover the committed start before resolving cancellation.
+                started = await starting
+                if not started:
+                    raise
+                task, run, turn = started
             if run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False):
                 # The Go runner outlives Python; restart observes the same launch key.
                 raise
@@ -195,6 +207,15 @@ class TaskDispatcher:
                 )
             raise
         except (DomainError, OSError, ValueError, httpx.HTTPError, TimeoutError) as exc:
+            if task is None:
+                raise
+            if (
+                isinstance(exc, DomainError)
+                and exc.code == "SESSION_NOT_IDLE"
+                and run["executor_kind"] == "cli"
+                and await self.defer_session_submission(task, run, job)
+            ):
+                return
             await self.end_prepared_turn(
                 turn, "failed", exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED"
             )
@@ -235,12 +256,46 @@ class TaskDispatcher:
                 return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
 
+    async def defer_session_submission(self, task, run, job):
+        def write(db):
+            current = row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
+            if current["revision"] != run["task_revision"] or current["state"] not in {
+                "preparing",
+                "running",
+            }:
+                return False
+            pending = row(db, "SELECT * FROM jobs WHERE id=?", (job["id"],))
+            payload = json.loads(pending["payload_json"])
+            first = not payload.get("waitingForSession")
+            payload["waitingForSession"] = True
+            delay = min(30_000, 1000 * 2 ** min(pending["attempts"] - 1, 5))
+            db.execute(
+                "UPDATE jobs SET state='queued',payload_json=?,available_ms=? WHERE id=?",
+                (encoded(payload), now_ms() + delay, job["id"]),
+            )
+            db.execute("UPDATE tasks SET state='queued' WHERE id=?", (task["id"],))
+            db.execute(
+                "UPDATE task_attempts SET state='accepted' WHERE id=? AND result_json IS NULL",
+                (run["id"],),
+            )
+            if first:
+                event(
+                    db,
+                    task["origin_conversation_id"],
+                    "task.activity",
+                    {"taskId": task["id"], "runId": run["id"]},
+                    task_id=task["id"],
+                )
+            return True
+
+        return await self.db.call(write, write=True)
+
     @staticmethod
     def attempt_progress(db, task, run, turn):
         counts = row(
             db,
             "SELECT COALESCE(SUM(x.state='succeeded'),0) AS completed,"
-            "COALESCE(SUM(x.state!='succeeded' AND COALESCE(json_extract(json_extract(m.content_json,'$.text'),'$.executionStarted'),1)!=0),0) AS uncertain "
+            "COALESCE(SUM(x.state!='succeeded' AND COALESCE(json_extract(json_extract(native_content(m.content_json),'$.text'),'$.executionStarted'),1)!=0),0) AS uncertain "
             "FROM tool_calls x LEFT JOIN messages m ON m.id=x.result_message_id WHERE x.turn_id=?",
             (turn["id"] if turn else None,),
         )
@@ -393,42 +448,20 @@ class TaskDispatcher:
                 sources = await self.db.call(
                     lambda db: retrieved_sources(db, task, run, result.get("summary", ""))
                 )
-                verified = bool(sources)
+                verified = bool(sources) and await self.native_result_verified(task, run, result)
                 result["verification"] = {
                     "kind": "browser_retrieval",
-                    "state": "retrieved" if verified else "missing",
+                    "state": "retrieved" if sources else "missing",
                     "sources": sources,
                 }
-                if not verified:
+                if not sources:
                     result = {
                         **result,
                         "state": "failed",
                         "errorCode": "WEB_RETRIEVAL_EVIDENCE_MISSING",
                     }
             else:
-                # Native read-only answers can finish; writes require explicit acceptance.
-                continuation = json.loads(task["intent_json"]).get("continuation", {})
-                verified_through = continuation.get("verifiedThroughRevision", 0)
-
-                def written(db):
-                    return row(
-                        db,
-                        "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id "
-                        "WHERE t.branch_id=? AND x.effect='write' AND x.tool_name!='delegate' "
-                        "AND (?=0 OR EXISTS(SELECT 1 FROM events e JOIN task_attempts a "
-                        "ON a.id=json_extract(e.payload_json,'$.runId') "
-                        "WHERE e.turn_id=x.turn_id AND e.kind IN ('task.started','task.preparing') "
-                        "AND a.task_id=? AND a.task_revision>?)) LIMIT 1",
-                        (run["native_branch_id"], verified_through, task["id"], verified_through),
-                    )
-
-                writes = await self.db.call(written)
-                verified = (
-                    run["executor_kind"] == "native"
-                    and not continuation.get("requiresAcceptance", False)
-                    and not writes
-                    and bool(result.get("summary", "").strip())
-                )
+                verified = await self.native_result_verified(task, run, result)
         state = (
             "interrupted"
             if uncertain_result
@@ -439,6 +472,40 @@ class TaskDispatcher:
             else "waiting_user"
         )
         await self.complete(task, run, result, state, job_id=job["id"])
+
+    async def native_result_verified(self, task, run, result):
+        # Native read-only answers can finish; writes require explicit acceptance.
+        continuation = json.loads(task["intent_json"]).get("continuation", {})
+        verified_through = continuation.get("verifiedThroughRevision", 0)
+        retrieval = json.loads(task["intent_json"]).get("target", {}).get("resourceOnly") is True
+
+        def written(db):
+            return row(
+                db,
+                "SELECT x.id FROM tool_calls x JOIN turns t ON t.id=x.turn_id "
+                "WHERE t.branch_id=? AND x.effect='write' AND x.tool_name!='delegate' "
+                "AND (?=0 OR (x.tool_name!='browser_open' AND (x.tool_name!='browser_act' "
+                "OR COALESCE(json_extract(x.arguments_json,'$.kind'),'')!='goto'))) "
+                "AND (?=0 OR EXISTS(SELECT 1 FROM events e JOIN task_attempts a "
+                "ON a.id=json_extract(e.payload_json,'$.runId') "
+                "WHERE e.turn_id=x.turn_id AND e.kind IN ('task.started','task.preparing') "
+                "AND a.task_id=? AND a.task_revision>?)) LIMIT 1",
+                (
+                    run["native_branch_id"],
+                    retrieval,
+                    verified_through,
+                    task["id"],
+                    verified_through,
+                ),
+            )
+
+        writes = await self.db.call(written)
+        return (
+            run["executor_kind"] == "native"
+            and not continuation.get("requiresAcceptance", False)
+            and not writes
+            and bool(result.get("summary", "").strip())
+        )
 
     async def complete(
         self, task, run, result, state, *, job_id=None, unknown=False, confirmation=False
@@ -529,7 +596,8 @@ class TaskDispatcher:
                 if job_id:
                     db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
                 return
-            if row(
+            # Acceptance records the user's decision without repeating the result in Main.
+            if (confirmation and state == "succeeded") or row(
                 db,
                 "SELECT id FROM jobs WHERE kind='task.steer' AND aggregate_id=? AND state='queued'",
                 (task["id"],),
@@ -652,6 +720,25 @@ class TaskDispatcher:
     async def recover(self):
         def write(db):
             for task in rows(db, "SELECT * FROM tasks WHERE state IN ('preparing','running')"):
+                submission = row(
+                    db,
+                    "SELECT j.id,a.id AS run_id FROM jobs j JOIN task_attempts a "
+                    "ON a.id=json_extract(j.payload_json,'$.runId') "
+                    "WHERE j.kind='task.run' AND j.aggregate_id=? "
+                    "AND j.state IN ('queued','running') "
+                    "AND json_extract(j.payload_json,'$.waitingForSession')=1 "
+                    "AND a.executor_kind='cli' AND a.task_revision=? AND a.result_json IS NULL",
+                    (task["id"], task["revision"]),
+                )
+                if submission:
+                    # The same Go launch key reconciles an admission interrupted by restart.
+                    db.execute("UPDATE tasks SET state='queued' WHERE id=?", (task["id"],))
+                    db.execute(
+                        "UPDATE task_attempts SET state='accepted' WHERE id=?",
+                        (submission["run_id"],),
+                    )
+                    db.execute("UPDATE jobs SET state='queued' WHERE id=?", (submission["id"],))
+                    continue
                 external = row(
                     db,
                     "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=? AND executor_kind='cli' AND result_json IS NULL",

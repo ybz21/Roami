@@ -8,6 +8,7 @@ import { resetStack, stackSize } from '../shell/useBackDismiss'
 const device = vi.hoisted(() => ({ phone: true }))
 vi.mock('../../layout', () => ({ useLayout: () => device }))
 vi.mock('../files/fileview/FileView', () => ({ FileView: ({ path }: { path: string }) => <div data-testid="file-view">{path}</div> }))
+vi.mock('../documents/DocumentPreview', async importOriginal => ({ ...await importOriginal<any>(), default: ({ src, name }: { src: string; name: string }) => <div data-testid="document-preview" data-src={src}>{name}</div> }))
 
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, headers: new Headers() }))) })
 afterEach(() => { cleanup(); resetStack(); device.phone = true; vi.unstubAllGlobals() })
@@ -17,6 +18,25 @@ const show = (href = '/api/file/serve/tmp/demo.html', onLinkClick?: (href: strin
 )
 
 describe('Markdown mobile file navigation', () => {
+  it('can render private reviews without loading model-authored image URLs', () => {
+    const content = 'Review evidence.\n\n![untrusted image](https://example.invalid/image?evidence=private)'
+    const { container } = render(<I18nProvider><Markdown allowImages={false}>{content}</Markdown></I18nProvider>)
+    expect(screen.getByText('Review evidence.')).toBeTruthy()
+    expect(container.querySelector('img')).toBeNull()
+  })
+  it('previews PDF and PPTX artifacts and keeps a named download on the originating node', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'report', name: '架构.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', sizeBytes: 512 } }), { headers: { 'Content-Type': 'application/json' } }))
+    show('/n/other/api/agent/artifacts/report/content')
+    fireEvent.click(screen.getByRole('link', { name: 'demo' }))
+    const preview = await screen.findByTestId('document-preview')
+    expect(preview.textContent).toBe('架构.pptx')
+    expect(preview.getAttribute('data-src')).toContain('/n/other/api/agent/artifacts/report/content')
+    const download = screen.getByRole('link', { name: /下载|Download/ })
+    expect(download.getAttribute('download')).toBe('架构.pptx')
+    expect(download.getAttribute('href')).toContain('/n/other/api/agent/artifacts/report/content?dl=1')
+    expect(download.closest('.tt-mobile-subpage-head')).toBeTruthy()
+    expect(document.querySelector('.document-preview-download')).toBeNull()
+  })
   it('opens one full-screen preview and returns without leaving the conversation', async () => {
     show()
     const originalURL = location.href
@@ -34,6 +54,18 @@ describe('Markdown mobile file navigation', () => {
     show('/api/file/raw?path=%2Ftmp%2Fnotes.md')
     fireEvent.click(screen.getByRole('link', { name: 'demo' }))
     expect((await screen.findByTestId('file-view')).textContent).toBe('/tmp/notes.md')
+  })
+  it('opens PDF query paths directly with one return bar and a header download', async () => {
+    show('/api/file/raw?path=%2Ftmp%2Freport.pdf')
+    fireEvent.click(screen.getByRole('link', { name: 'demo' }))
+    const preview = await screen.findByTestId('document-preview')
+    expect(preview.getAttribute('data-src')).toContain('/api/file/raw?path=%2Ftmp%2Freport.pdf')
+    expect(screen.queryByTestId('file-view')).toBeNull()
+    const download = screen.getByRole('link', { name: /下载|Download/ })
+    expect(download.getAttribute('href')).toContain('&dl=1')
+    expect(download.getAttribute('download')).toBe('report.pdf')
+    expect(download.closest('.tt-mobile-subpage-head')).toBeTruthy()
+    expect(document.querySelectorAll('.tt-mobile-subpage-head')).toHaveLength(1)
   })
   it('resolves relative aliases before rendering Markdown', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { headers: { 'X-Roami-File-Path': encodeURIComponent('/workspace/docs/说明.md') } }))

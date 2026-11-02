@@ -24,6 +24,9 @@ func boundCommand(args []string) (string, string, bool) {
 }
 
 func runBoundCommand(args []string) (bool, int) {
+	if len(args) >= 3 && slices.Equal(args[:3], []string{"agent", "capability", "market"}) {
+		return false, 0
+	}
 	name, input, matched := boundCommand(args)
 	if !matched {
 		return false, 0
@@ -40,7 +43,7 @@ func commandFamilyHelp(args []string) bool {
 		return false
 	}
 	prefix := args[:len(args)-1]
-	if !slices.Equal(prefix, []string{"agent", "task"}) && !slices.Equal(prefix, []string{"agent", "memory"}) && !slices.Equal(prefix, []string{"agent", "target"}) {
+	if !slices.Equal(prefix, []string{"agent", "task"}) && !slices.Equal(prefix, []string{"agent", "memory"}) && !slices.Equal(prefix, []string{"agent", "target"}) && !slices.Equal(prefix, []string{"agent", "host"}) {
 		return false
 	}
 	var lines []string

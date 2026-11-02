@@ -14,23 +14,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { ArrowToBottom, ChecklistIcon, ChevronRight, ClockIcon, WarnIcon } from '../../icons'
+import { ArrowToBottom, ChecklistIcon, ChevronRight, UsageRing, WarnIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { CTX_FULL, CTX_TIGHT, MODE_COLOR, fmtElapsed, fmtTokens, modeKey, type AgentStatus } from './status'
 import { TodoPane } from './tool-parts'
-
-// 占用环。用 stroke-dasharray 画：16px 的图形上，一根描边比任何数字都快读。
-function Ring({ percent, color, size = 16 }: { percent: number; color: string; size?: number }) {
-  const r = 15
-  const c = 2 * Math.PI * r
-  return (
-    <svg width={size} height={size} viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)', flex: '0 0 auto' }} aria-hidden>
-      <circle cx="18" cy="18" r={r} fill="none" stroke="var(--border)" strokeWidth="3.4" />
-      <circle cx="18" cy="18" r={r} fill="none" stroke={color} strokeWidth="3.4" strokeLinecap="round"
-        strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0, Math.min(1, percent / 100)))} />
-    </svg>
-  )
-}
+import { UsageIndicator } from './UsageIndicator'
 
 function Chip({ onClick, title, tone, expanded, children }: {
   onClick?: () => void
@@ -60,7 +48,8 @@ export type StatusActions = {
   onCompact?: () => void
 }
 
-export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
+export function StatusBar({ status, accent, unread, onJump, actions = {}, hideModel = false }: {
+  hideModel?: boolean
   status: AgentStatus
   accent: string
   unread: number
@@ -92,13 +81,11 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
     return () => ro.disconnect()
   }, [syncFade, status])
 
-  const ctx = status.context
+  const ctx = hideModel ? undefined : status.context
   // 上下文接近满了要变色：85% 起黄，95% 起红。这是唯一会「越用越糟」的指标。
   const tight = !!ctx && ctx.percent >= CTX_TIGHT
   const ctxColor = !ctx ? accent : ctx.percent >= CTX_FULL ? 'var(--danger)' : tight ? 'var(--warn)' : accent
-  const quotaColor = status.quota != null && status.quota >= CTX_FULL ? 'var(--danger)'
-    : status.quota != null && status.quota >= CTX_TIGHT ? 'var(--warn)' : accent
-  const hasAny = status.mode || ctx || status.tasks || status.quota || status.branch || status.errors || unread > 0
+  const hasAny = (!hideModel && status.mode) || ctx || status.tasks || status.quota != null || status.elapsed != null || status.branch || status.errors || unread > 0
   if (!hasAny) return null
 
   const modeLabel = status.mode ? t(modeKey(status.mode.id)) : ''
@@ -113,7 +100,7 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
         data-l={fade.l ? '' : undefined} data-r={fade.r ? '' : undefined}>
         {/* 条头是模型名，点了换模型；权限模式（auto / plan …）只在信息面板里列——
             条上一枚写着「auto」的 pill 没人看得懂是什么的 auto */}
-        {(status.model || actions.onPickModel) && (
+        {!hideModel && (status.model || actions.onPickModel) && (
           <button type="button" className={`cc-st-pill${actions.onPickModel ? ' is-btn' : ''}`}
             style={status.mode ? { color: MODE_COLOR[status.mode.tone] } : undefined} disabled={!actions.onPickModel}
             onClick={actions.onPickModel} title={actions.onPickModel ? t('chat.modelPick') : t('chat.model')}>
@@ -124,19 +111,14 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
         {ctx && (
           <Chip onClick={() => toggle('info')} expanded={panel === 'info'}
             title={`${fmtTokens(ctx.used)} / ${fmtTokens(ctx.window)}`}>
-            <Ring percent={ctx.percent} color={ctxColor} />
+            <UsageRing percent={ctx.percent} color={ctxColor} />
             <span>{t(phone ? 'chat.contextShort' : 'chat.contextUsed')}</span>
             <span style={{ color: ctxColor, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
           </Chip>
         )}
 
-        {status.quota != null && (
-          <Chip title={t('chat.quotaTitle')}>
-            <Ring percent={status.quota} color={quotaColor} />
-            <span>{t(phone ? 'chat.quotaShort' : 'chat.quotaTitle')}</span>
-            <span style={{ color: quotaColor, fontVariantNumeric: 'tabular-nums' }}>{Math.round(status.quota)}%</span>
-          </Chip>
-        )}
+        <UsageIndicator quota={status.quota} elapsed={status.elapsed} accent={accent}
+          onElapsedClick={() => toggle('info')} elapsedExpanded={panel === 'info'} />
 
         {status.tasks && (
           <Chip onClick={() => toggle('tasks')} expanded={panel === 'tasks'} title={status.tasks.doing || t('chat.taskPanel')}>
@@ -160,13 +142,6 @@ export function StatusBar({ status, accent, unread, onJump, actions = {} }: {
           <Chip onClick={actions.onOpenGit} title={status.cwd || status.branch}>
             <BranchIcon size={12} />
             <span className="cc-st-ellip">{status.branch}</span>
-          </Chip>
-        )}
-
-        {status.elapsed != null && (
-          <Chip onClick={() => toggle('info')} expanded={panel === 'info'} title={t('chat.elapsedTitle')}>
-            <ClockIcon size={12} />
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtElapsed(status.elapsed)}</span>
           </Chip>
         )}
 

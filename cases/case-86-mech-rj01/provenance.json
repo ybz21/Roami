@@ -1,0 +1,9 @@
+{
+  "case_id": "MECH-RJ01",
+  "source": "public malformed JSON recipe with scripted provider and real worker/ledger",
+  "private_reference_material": false,
+  "actual_human_labels": false,
+  "historical_scores_changed": false,
+  "baseline": "6b749199",
+  "historical_production_root_not_claimed": true
+}

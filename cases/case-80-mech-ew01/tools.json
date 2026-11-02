@@ -1,0 +1,17 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_improvement_execution_window.py",
+    "agent-runtime/tests/test_execution_timing.py",
+    "agent-runtime/tests/test_improvement_model_deadlines.py",
+    "agent-runtime/tests/test_improvement_configured_routes.py"
+  ],
+  "expected_collected": 50,
+  "runtime": [
+    "Python 3.12",
+    "pytest/pytest-asyncio",
+    "actual Runtime and NativeFilesExecutor",
+    "isolated SQLite databases and scripted model events"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

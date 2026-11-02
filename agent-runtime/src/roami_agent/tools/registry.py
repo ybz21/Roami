@@ -4,10 +4,10 @@ from copy import deepcopy
 from jsonschema import Draft202012Validator, ValidationError
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.research import RESEARCH_TOOLS, research_call_allowed
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import validate_tool_arguments
-from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.protocol.tools import Tool
+from roami_agent.tools.skill_reads import loaded_workflows
 
 
 class Tools:
@@ -25,57 +25,70 @@ class Tools:
         Draft202012Validator.check_schema(tool.schema)
         self.registry[tool.name] = tool
 
+    def optional_skill_metadata(self):
+        if not self.directory:
+            return []
+        return [
+            {key: item[key] for key in ("name", "description", "location")}
+            for item in self.directory.skill_entries()
+            if self.skills[item["name"]].get("source") in {"configured", "managed"}
+        ]
+
+    def loaded_workflow_metadata(self, messages):
+        if "skill_read" not in self.registry or {"read", "skill_read"} & self.disabled_tools:
+            return []
+        return loaded_workflows(
+            messages,
+            {
+                name: value
+                for name, value in self.skills.items()
+                if name not in self.disabled_skills
+                and value.get("source") in {"configured", "managed"}
+            },
+        )
+
     def catalog(self, role="main"):
         result = []
         for tool in self.registry.values():
             if self.directory:
                 from roami_agent.tools.foundations import (
                     FOUNDATIONS,
-                    RESEARCH_FOUNDATIONS,
                     WORKER_FOUNDATIONS,
                 )
 
-                names = (
-                    RESEARCH_FOUNDATIONS
-                    if role == "research"
-                    else WORKER_FOUNDATIONS
-                    if role != "main"
-                    else FOUNDATIONS
-                )
+                names = FOUNDATIONS if role == "main" else WORKER_FOUNDATIONS
                 if tool.name not in names:
                     continue
-            if (
-                tool.name in self.disabled_tools
-                or role == "main"
-                and not tool.main
-                or role == "research"
-                and not self.directory
-                and tool.name not in RESEARCH_TOOLS
-            ):
+            if tool.name in self.disabled_tools or role == "main" and not tool.main:
                 continue
             wire = tool.wire()
             if role == "main" and self.directory and tool.name == "delegate":
                 wire = deepcopy(wire)
                 wire["function"]["parameters"]["required"] = ["goal", "routing", "requestComplete"]
                 wire["function"]["parameters"]["properties"].pop("executor", None)
-            if role == "research":
+            if role == "main" and self.directory and tool.name == "bash":
                 wire = deepcopy(wire)
-                parameters = wire["function"]["parameters"]
-                if tool.name == "bash" and self.directory:
-                    wire["function"]["description"] = (
-                        "Use only roami chrome browser navigation and observation commands through bash argv. "
-                        "Read skill://browser_use or roami chrome help. Research has no standalone shell, echo, curl or Python."
+                wire["function"]["description"] = (
+                    "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
+                    "For user-authorized local machine operations, set scope=host and omit cwd; "
+                    "host scope is general execution in a temporary working directory, not a read-only sandbox. "
+                    "For project code or file deliverables, keep workspace scope and delegate to a worker "
+                    "with the user-selected directory, or an automatic private directory for new native work. "
+                    "Registered permissions and execution receipts remain enforced."
+                )
+            elif role != "main" and self.directory and tool.name == "bash":
+                wire = deepcopy(wire)
+                if "scope" in wire["function"]["parameters"]["properties"]:
+                    wire["function"]["parameters"]["properties"]["scope"]["enum"] = ["workspace"]
+            if self.directory and tool.name == "read":
+                skills = self.optional_skill_metadata()
+                if skills:
+                    wire = deepcopy(wire)
+                    wire["function"]["description"] += (
+                        "\nAvailable optional Skills (metadata only): "
+                        + encoded(skills)
+                        + ". Read the relevant Skill's instructions before using its workflow."
                     )
-                    wire["function"]["parameters"] = object_schema(
-                        {"argv": parameters["properties"]["argv"]}, ["argv"]
-                    )
-                elif tool.name == "browser_act":
-                    parameters["properties"]["kind"]["enum"] = ["goto"]
-                    parameters["required"] = ["observationId", "kind", "url"]
-                elif tool.name == "browser_open":
-                    parameters["properties"].pop("targetId", None)
-                elif tool.name == "skill_read":
-                    parameters["properties"]["name"]["enum"] = ["browser_use", "web-research"]
             result.append(wire)
         return result
 
@@ -111,12 +124,6 @@ class Tools:
                 validate_tool_arguments(tool.schema, args)
             except ValidationError as exc:
                 raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
-        if (
-            role == "research"
-            and tool.name != "tool_list"
-            and not research_call_allowed(tool.name, args)
-        ):
-            raise DomainError("TOOL_UNAVAILABLE")
         return tool, args
 
     async def invoke(self, call, role, binding):

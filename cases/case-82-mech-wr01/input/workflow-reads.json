@@ -1,0 +1,7 @@
+{
+  "name": "station-flow",
+  "description": "Read the station-record workflow and its field reference.",
+  "text": "STATION_WORKFLOW_BODY: use the supplied workflow for covered steps; follow the user's request.",
+  "reference": "references/fields.md",
+  "referenceText": "STATION_REFERENCE_BODY: preserve station identifiers and report missing measurements."
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "kind": "connect_error",
+    "stage": "connect",
+    "response_started": false
+  },
+  {
+    "kind": "connect_timeout",
+    "stage": "connect",
+    "response_started": false
+  },
+  {
+    "kind": "read_error",
+    "stage": "response_headers",
+    "response_started": false
+  },
+  {
+    "kind": "read_timeout",
+    "stage": "response_headers",
+    "response_started": false
+  },
+  {
+    "kind": "protocol_error",
+    "stage": "response_headers",
+    "response_started": false
+  },
+  {
+    "kind": "read_error",
+    "stage": "response_body",
+    "response_started": true
+  },
+  {
+    "kind": "read_timeout",
+    "stage": "response_body",
+    "response_started": true
+  },
+  {
+    "kind": "protocol_error",
+    "stage": "response_body",
+    "response_started": true
+  },
+  {
+    "kind": "write_error",
+    "stage": "request_body",
+    "response_started": false
+  },
+  {
+    "kind": "write_timeout",
+    "stage": "request_body",
+    "response_started": false
+  },
+  {
+    "kind": "pool_timeout",
+    "stage": "connection_pool",
+    "response_started": false
+  }
+]

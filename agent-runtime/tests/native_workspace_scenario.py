@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from native_prompt_messages import dialogue_messages
+
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
@@ -25,6 +27,7 @@ class Worker:
     model = "fixture-worker"
 
     async def stream(self, messages, tools):
+        messages = dialogue_messages(messages)
         if any(m["role"] == "user" and "write checked file" in m["content"] for m in messages):
             results = [json.loads(m["content"]) for m in messages if m["role"] == "tool"]
             step = len(results)
@@ -78,7 +81,13 @@ class Worker:
             return
         code = "from pathlib import Path; import os; assert 'GIT_DIR' not in os.environ; Path('native-proof.txt').write_text('native')"
         if "cancel" in goal:
-            code = "from pathlib import Path; import os,time; Path('native-pid.txt').write_text(str(os.getpid())); time.sleep(60); Path('late-write.txt').write_text('unexpected')"
+            # Publish readiness only after the complete PID is readable.
+            code = (
+                "from pathlib import Path; import os,time; "
+                "Path('native-pid.tmp').write_text(str(os.getpid())); "
+                "Path('native-pid.tmp').replace('native-pid.txt'); "
+                "time.sleep(60); Path('late-write.txt').write_text('unexpected')"
+            )
         yield ModelEvent(
             "tool",
             {

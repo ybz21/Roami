@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RSI 诊断收尾修复 · 2026-10-28</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-diagnostic-completion-20261028" lang="zh-CN">
+  <h2>RSI 诊断收尾修复 · 2026-10-28</h2>
+  <h3>Product Design</h3>
+  <p>诊断沿用模型页的每日限额，不要求额外配置输出 Token 上限。正常产出的文件不会因为重名、中文名或长文件名阻断运行汇总；历史结果不重写。</p>
+  <h3>User Stories</h3>
+  <ul><li>用户不填写输出上限也能完成诊断，实际调用仍通过统一模型代理计费。</li><li>任务在不同目录生成同名报告，或使用中文及长文件名时，所有产物均能分别归档并生成汇总。</li><li>维护者能用保留的失败记录、当前版本定向复验和独立验收区分源码修复与正式能力通过。</li></ul>
+  <h3>Technical Design</h3>
+  <p>workflows/pipeline_runner.py 的计量包装器读取可选 max_tokens；缺省时仅以 0 代表不追加输出预留，不向模型请求注入 0 或新增 RSI 输出限制。宿主将 shared_daily_limit 显式写入私有容器请求，容器入口只接受布尔 true 并传给 NativeFilesExecutor，使内部计量器沿用同一模式；旧请求缺省保留旧行为，执行协议指纹单列 v23。镜像声明 org.roami.rsi.shared-daily-policy=1，统一限额模式预检会拒绝未支持该协议的旧镜像，避免更新宿主后容器静默沿用旧限制；显式旧模式仍兼容。评测 Main 的系统指令与工具目录统一要求先委派 Native，移除仅限此隔离配置中 Main 的 shell／交付写入能力，Worker 能力不变，消除简单任务可绕过执行凭证的冲突提示。归档身份包含 Case ID 与完整相对路径的摘要，展示文件名部分规范成账本允许的 ASCII 并限长，保留原有账本名称边界；Case 运行记录中的原始文件路径不改写。测试从诊断队列到结果汇总覆盖缺省／显式输出参数、嵌套重名、中文与长文件名。</p>
+  <p>真实复验使用独立工作区、冻结输入和容器；模型调用使用模型页配置与同一每日计费账本，不重放历史未知费用、不启动自动日程。人工参考分仍由人工确认，不把代码回归、文件存在或脚本模型误记为独立质量验收。</p>
+  <p>真实定向复验：相同 FinQA 两题由无 Native 凭证失败转为 2/2 通过，STOCK-01 通过；公开方向格式明确后的 QUANT-03 新生成通过；长历史原产物经修复判定器在容器中零模型重放通过且哈希不变。各版本及原始失败分别保留，不拼接为完整轮次。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

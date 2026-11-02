@@ -138,11 +138,17 @@ func (s Service) CloseSession(ctx context.Context, key string) (Status, error) {
 	}
 	meta := sessmeta.New(s.Runtime.HomeDir)
 	meta.DataDir = s.Runtime.DataDir
+	if err = os.MkdirAll(filepath.Join(s.Runtime.DataDir, "agents", "closed-sessions"), 0700); err != nil {
+		return Status{}, err
+	}
 	if err = application.NewSessions(s.Runtime, meta, nil).Kill(ctx, binding.ID, false); err != nil {
 		return Status{}, err
 	}
 	closed = Status{Receipt: receipt}
 	closed.State = "closed"
+	if err = writeJSON(filepath.Join(s.Runtime.DataDir, "agents", "closed-sessions", binding.resourceID()+".json"), closed); err != nil {
+		return Status{}, err
+	}
 	if err = writeJSON(filepath.Join(dir, "closed.json"), closed); err != nil {
 		return Status{}, err
 	}

@@ -14,9 +14,11 @@ import (
 )
 
 type artifactRestorePlan struct {
-	VerifyOnly bool
-	Stage      string
-	Files      []ArtifactBackupEntry
+	NativeStage string
+	NativeFiles []NativeBackupEntry
+	VerifyOnly  bool
+	Stage       string
+	Files       []ArtifactBackupEntry
 }
 
 type ArtifactBackupEntry struct {

@@ -1,0 +1,49 @@
+import { readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { build } from 'vite'
+import react from '@vitejs/plugin-react'
+
+const root = fileURLToPath(new URL('../../', import.meta.url))
+const frontend = path.join(root, 'frontend')
+const outputPath = path.resolve(process.argv[2] || '/tmp/memory-browsing-design.html')
+const prototypePath = path.join(path.dirname(outputPath), 'memory-browsing-prototype.html')
+const result = await build({
+  root: frontend, configFile: false, logLevel: 'warn',
+  plugins: [{ name: 'prototype-markdown', enforce: 'pre', resolveId(source) { if (source.endsWith('/markdown/Markdown')) return path.join(frontend, 'prototypes/prototype-markdown.tsx') } }, react()],
+  build: { write: false, target: 'es2020', assetsInlineLimit: Infinity, cssCodeSplit: false, chunkSizeWarningLimit: 2500, rollupOptions: { input: path.join(frontend, 'prototypes/memory-browser.tsx'), output: { inlineDynamicImports: true } } },
+})
+const chunks = result.output
+const js = chunks.filter(item => item.type === 'chunk').map(item => item.code).join('\n').replace(/<\/script/gi, '<\\/script')
+const css = chunks.filter(item => item.type === 'asset' && item.fileName.endsWith('.css')).map(item => item.source).join('\n')
+const isolation = `try{if(navigator.virtualKeyboard)navigator.virtualKeyboard.overlaysContent=true}catch{}const memoryStore=new Map([['ttmux-locale','zh-CN'],['ttmux-theme','dark']]);Object.defineProperty(window,'localStorage',{value:{getItem:k=>memoryStore.get(k)??null,setItem:(k,v)=>memoryStore.set(k,String(v)),removeItem:k=>memoryStore.delete(k),clear:()=>memoryStore.clear()}});window.fetch=async()=>new Response(JSON.stringify({data:{}}),{headers:{'Content-Type':'application/json'}});`
+const prototype = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=overlays-content"><title>记忆浏览 · 交互原型</title><style>${css}</style></head><body><div id="root"></div><script>${isolation}</script><script type="module">${js}</script></body></html>`
+await writeFile(prototypePath, prototype)
+const agents = await readFile(path.join(root, 'AGENTS.md'), 'utf8')
+const sectionStart = agents.indexOf('<section id="memory-browsing-design"')
+const section = agents.slice(sectionStart, agents.indexOf('</section>', sectionStart) + 10)
+const product = section.slice(section.indexOf('<h2 id="memory-browsing-product"'), section.indexOf('<h2 id="memory-browsing-stories"')).replace(/<div id="memory-browsing-prototype">[\s\S]*?<\/div>/, '')
+const stories = section.slice(section.indexOf('<h2 id="memory-browsing-stories"'), section.indexOf('<h2 id="memory-browsing-technical"'))
+const technical = section.slice(section.indexOf('<h2 id="memory-browsing-technical"'), section.lastIndexOf('</section>'))
+const baseCss = await readFile(path.join(frontend, 'src/index.css'), 'utf8')
+const tokenStart = baseCss.indexOf(':root {')
+const tokens = baseCss.slice(tokenStart, baseCss.indexOf('\n}', tokenStart) + 2)
+const serialized = JSON.stringify(prototype).replace(/</g, '\\u003c')
+const html = `<!doctype html><html lang="zh-CN" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>记忆浏览 · 设计与交互原型</title><style>
+${tokens}
+:root{--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--fs-meta:12px;--fs-sm:13px;--fs-body:14px;--fs-lg:16px;--fs-title:22px;--r-xs:6px;--r-sm:10px;--r-card:14px;--tap:44px;--content-form:920px}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden}body{display:flex;flex-direction:column;font:var(--fs-body)/1.6 Inter,system-ui,sans-serif;background:var(--bg-base);color:var(--text-bright)}
+html[data-theme="light"]{--bg-base:#f6f8fa;--bg-container:#fff;--bg-elevated:#fff;--text-bright:#1f2328;--text-dim:#57606a;--text-dimmer:#8c959f;--border:#d0d7de;--border-subtle:#e6e9ec;--accent:#0969da;--sel-bg:rgb(27 31 36 / 5.5%)}
+header{display:flex;align-items:center;gap:var(--sp-4);flex-wrap:wrap;padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--border-subtle)}header strong{font-size:var(--fs-lg)}header span{font-size:var(--fs-meta);color:var(--text-dim)}nav{display:flex;align-items:center;gap:var(--sp-1);flex-wrap:wrap;margin-left:auto}
+button,a{font:inherit}select{font:inherit;min-height:var(--tap);max-width:100%;padding:var(--sp-2);color:var(--text-dim);background:var(--bg-container);border:1px solid var(--border);border-radius:var(--r-xs)}.controls label{font-size:var(--fs-meta);color:var(--text-dim)}button{min-height:var(--tap);padding:var(--sp-2) var(--sp-3);border:1px solid transparent;border-radius:var(--r-xs);color:var(--text-dim);background:transparent;cursor:pointer}button[aria-pressed="true"]{color:var(--accent);background:var(--sel-bg)}button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}
+main{flex:1;min-height:0;display:flex;flex-direction:column}.view{display:none;min-height:0;flex:1}.view.active{display:flex;flex-direction:column}.controls{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;padding:var(--sp-2) var(--sp-5);border-bottom:1px solid var(--border-subtle)}.controls small{color:var(--text-dim);font-size:var(--fs-meta);margin-right:auto}.controls a{color:var(--accent);font-size:var(--fs-sm);padding:var(--sp-2)}
+.stage{flex:1;min-height:0;display:flex;justify-content:center;padding:var(--sp-4);overflow:hidden}iframe{height:100%;width:100%;border:1px solid var(--border-subtle);background:var(--bg-base)}.stage.phone iframe{width:390px;max-width:100%;border-radius:var(--r-card)}.document{flex:1;min-height:0;overflow:auto;padding:var(--sp-5)}article{max-width:var(--content-form);margin:auto}h2{font-size:var(--fs-title);margin:0 0 var(--sp-5)}h3{font-size:var(--fs-lg);margin:var(--sp-5) 0 var(--sp-3)}p,li{color:var(--text-dim)}li{margin:var(--sp-2) 0}pre{padding:var(--sp-4);background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:var(--r-sm);overflow:auto;font-size:var(--fs-sm)}a{color:var(--accent)}
+</style></head><body><header><strong>记忆浏览</strong><span>设计与交互原型 · 2026.10.22</span><nav aria-label="设计章节"><button type="button" data-view="prototype" aria-pressed="true">交互原型</button><button type="button" data-view="product" aria-pressed="false">产品设计</button><button type="button" data-view="stories" aria-pressed="false">用户故事</button><button type="button" data-view="technical" aria-pressed="false">技术设计</button></nav></header><main>
+<section class="view active" id="prototype"><div class="controls"><small>可搜索、筛选、查看全文与来源、确认冲突、删除及返回；示例数据仅供本页演示。</small><button type="button" data-device="desktop" aria-pressed="true">桌面</button><button type="button" data-device="phone" aria-pressed="false">手机</button><select id="mode" aria-label="浏览布局"><option value="library">完整浏览</option><option value="rail">首页工作台</option></select><select id="scenario" aria-label="页面状态"><option value="normal">正常</option><option value="loading">加载中</option><option value="error">加载失败</option><option value="empty">空结果</option><option value="source-missing">来源不可用</option></select><label><input id="changed" type="checkbox">来源变化</label><button type="button" id="theme">切换浅色</button><button type="button" id="language">English</button><a href="${path.basename(prototypePath)}" download>下载独立原型</a></div><div class="stage"><iframe title="记忆浏览可交互原型" sandbox="allow-scripts allow-forms allow-downloads"></iframe></div></section>
+<section class="view" id="product"><div class="document"><article>${product}</article></div></section><section class="view" id="stories"><div class="document"><article>${stories}</article></div></section><section class="view" id="technical"><div class="document"><article>${technical}</article></div></section></main><script>
+const frame=document.querySelector('iframe');const settings={theme:'dark',locale:'zh-CN',mode:'library',scenario:'normal',sourceChanged:false};frame.srcdoc=${serialized};function send(extra={}){frame.contentWindow.postMessage({type:'memory-design-settings',...settings,...extra},'*')}window.addEventListener('message',e=>{if(e.source===frame.contentWindow&&e.data?.type==='memory-design-ready')send()});
+document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{document.querySelectorAll('[data-view]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id===button.dataset.view))});document.querySelectorAll('[data-device]').forEach(button=>button.onclick=()=>{document.querySelector('.stage').classList.toggle('phone',button.dataset.device==='phone');document.querySelectorAll('[data-device]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));send({device:button.dataset.device})});document.querySelector('#theme').onclick=()=>{settings.theme=settings.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=settings.theme;document.querySelector('#theme').textContent=settings.theme==='dark'?'切换浅色':'切换深色';send()};document.querySelector('#language').onclick=()=>{settings.locale=settings.locale==='zh-CN'?'en-US':'zh-CN';document.querySelector('#language').textContent=settings.locale==='zh-CN'?'English':'中文';send()};
+document.querySelector('#mode').onchange=e=>{settings.mode=e.target.value;send()};document.querySelector('#scenario').onchange=e=>{settings.scenario=e.target.value;send()};document.querySelector('#changed').onchange=e=>{settings.sourceChanged=e.target.checked;send()};
+</script></body></html>`
+await writeFile(outputPath, html)
+console.log(`Design: ${outputPath}\nPrototype: ${prototypePath}\nSingle-file prototype: ${Math.round(Buffer.byteLength(prototype) / 1024)} KiB`)

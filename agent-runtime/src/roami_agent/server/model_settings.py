@@ -6,12 +6,15 @@ import os
 import stat
 import tempfile
 from contextlib import suppress
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.improvement import policy_value
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
+from roami_agent.providers.model_capacity import resolve_model_capacity
 from roami_agent.providers.model_catalog import fetch_catalog
 from roami_agent.providers.reasoning_effort import reasoning_efforts, with_reasoning_effort
 
@@ -24,7 +27,15 @@ class RuntimeSettings:
         self.updating = False
 
     def __getattr__(self, name):
-        return getattr(self.current, name)
+        value = getattr(self.current, name)
+        if name in {
+            "memory_recall_limit",
+            "memory_recall_tokens",
+            "tool_directory_page_size",
+            "keep_recent_tokens",
+        }:
+            return policy_value(name, value)
+        return value
 
 
 def settings_path(root):
@@ -46,7 +57,7 @@ def read_saved(root):
         raise DomainError("MODEL_SETTINGS_PRIVATE_FILE_REQUIRED", 503)
     try:
         saved = json.loads(path.read_text())
-        if not isinstance(saved, dict) or set(saved) - {"main", "worker", "connection"}:
+        if not isinstance(saved, dict) or set(saved) - {"main", "worker", "connection", "proxy"}:
             raise ValueError
         return saved
     except (ValueError, OSError):
@@ -147,6 +158,10 @@ def load_model_settings(base, root):
     return effective_settings(base, saved) if saved else base
 
 
+async def load_runtime_model_settings(base, root):
+    return await resolve_model_capacity(load_model_settings(base, root), fetch=fetch_catalog)
+
+
 class ModelSettings:
     def __init__(self, runtime, factory):
         self.runtime, self.factory = runtime, factory
@@ -181,6 +196,10 @@ class ModelSettings:
             "baseUrl": result["main"]["baseUrl"],
             "keyConfigured": result["main"]["keyConfigured"],
         }
+        from roami_agent.server.model_verification import verified_routes
+
+        result["verified"] = verified_routes(self.runtime.settings, self.runtime.db.data_root)
+        result["gatewayManaged"] = True
         return result
 
     def merge(self, patch):
@@ -190,7 +209,7 @@ class ModelSettings:
             or set(patch) - {"main", "worker", "connection"}
         ):
             raise DomainError("INVALID_MODEL_CONFIG")
-        saved = {role: dict(value) for role, value in self.saved.items()}
+        saved = deepcopy(self.saved)
         if "connection" in patch:
             changes = patch["connection"]
             if not isinstance(changes, dict) or set(changes) - {"baseUrl", "apiKey"}:
@@ -220,7 +239,7 @@ class ModelSettings:
                     item["contextWindow"] = None
                     item["reasoningEffort"] = None
         for role, changes in patch.items():
-            if role == "connection":
+            if role in {"connection", "proxy"}:
                 continue
             if (
                 "connection" in saved
@@ -293,6 +312,8 @@ class ModelSettings:
         async with self.lock:
             saved = self.merge(patch)
             for role, change in patch.items():
+                if role == "proxy":
+                    continue
                 route = self.runtime.settings.route("main" if role == "connection" else role)
                 if (
                     change.get("baseUrl", route.endpoint).rstrip("/") != route.endpoint
@@ -346,7 +367,7 @@ class ModelSettings:
                 from roami_agent.context.vision_inputs import VisionInputs
 
                 runtime.loop.context.vision = (
-                    VisionInputs(runtime.db, runtime.artifacts)
+                    VisionInputs(runtime.db, runtime.artifacts, runtime.settings)
                     if settings.route("worker").capabilities.get("images") is True
                     else None
                 )
@@ -413,18 +434,7 @@ class ModelSettings:
         }
 
     async def resolve_capacity(self, settings):
-        async def resolve(role):
-            route = settings.route(role)
-            if route.context_window is not None or not route.endpoint or not route.name:
-                return route
-            try:
-                catalog = await fetch_catalog(route.endpoint, settings.credentials(role))
-            except DomainError:
-                return route
-            return replace(route, context_window=catalog.get(route.name))
-
-        main, worker = await asyncio.gather(resolve("main"), resolve("worker"))
-        return replace(settings, context_window=main.context_window, worker_route=worker)
+        return await resolve_model_capacity(settings, fetch=fetch_catalog)
 
     async def refresh_capacity(self):
         self.runtime.settings.current = await self.resolve_capacity(self.runtime.settings.current)

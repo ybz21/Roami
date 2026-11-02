@@ -23,6 +23,15 @@ const solid = (d: ReactNode, size: number) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>{d}</svg>
 )
 
+export function UsageRing({ percent, color = 'currentColor', size = 16 }: P & { percent: number; color?: string }) {
+  const circumference = 2 * Math.PI * 10
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" strokeWidth="1.8" aria-hidden>
+    <circle cx="12" cy="12" r="10" stroke="var(--border)" />
+    <circle cx="12" cy="12" r="10" stroke={color} strokeLinecap="round" transform="rotate(-90 12 12)"
+      strokeDasharray={circumference} strokeDashoffset={circumference * (1 - Math.max(0, Math.min(1, percent / 100)))} />
+  </svg>
+}
+
 // ── 基础动作 ──
 export const CloseIcon = ({ size = 14 }: P) => line(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, size, 2)
 export const CheckIcon = ({ size = 14 }: P) => line(<path d="m5 12.5 4.5 4.5L19 7" />, size, 2.2)
@@ -127,6 +136,7 @@ export const BotIcon = ({ size = 14 }: P) => line(
 export const UserIcon = ({ size = 14 }: P) => line(<><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></>, size)
 export const ClockIcon = ({ size = 13 }: P) => line(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5.2l3.2 2" /></>, size)
 export const CircleIcon = ({ size = 13 }: P) => line(<circle cx="12" cy="12" r="8" />, size)
+export const MicrophoneIcon = ({ size = 16 }: P) => line(<><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" /></>, size)
 export const DotIcon = ({ size = 13 }: P) => solid(<circle cx="12" cy="12" r="4.5" />, size)
 /** 指挥/领队：原来写作 ◆ */
 export const DiamondIcon = ({ size = 13 }: P) => solid(<path d="m12 3.5 8.5 8.5-8.5 8.5L3.5 12Z" />, size)
@@ -202,6 +212,8 @@ export const AppLaunchIcon = ({ size = 13 }: P) => line(
   <><rect x="3.5" y="3.5" width="17" height="17" rx="3" /><path d="M9 12h6" /><path d="m12.5 9 3 3-3 3" /></>, size)
 
 // ── Agent 品牌标 ──
+export const RoamiLogo = ({ size = 13 }: P) => <img src="/logo-mark.svg" width={size} height={size} alt="" aria-hidden style={{ flexShrink: 0 }} />
+
 // Claude / Codex 的会话标记原来是手画的两枚几何件（三线星 + 同心圆），既不是品牌标
 // 也认不出来；这里换成官方 mark 的官方路径（取自 simple-icons 的 claude / openai，
 // 24×24 viewBox、实心）。品牌标是全站唯一不继承父级颜色的图标：画法和颜色都按人家的来，
