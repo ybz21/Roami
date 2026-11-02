@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-UG01",
+  "data": {"kind":"public_synthetic_request_receipts","inputs":["input/upstream-receipts.json"],"runtime_input":"internal/modelgateway/testdata/upstream-receipts.json","byte_identical_required":true,"description":"本地HTTP夹具及实际Go测试消费的相同请求编号样本，不包含生产凭据或历史错误响应。"},
+  "tools": {"configuration":"tools.json","kind":"isolated_go_gateway_http_and_migration"},
+  "acceptance": {"kind":"source_frozen_go_json_receipt","entry":"scripts/run.py","contract":"acceptance.md","expected_groups":6,"expected_leaf_tests":25,"no_skips":true}
+}

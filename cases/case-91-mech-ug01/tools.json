@@ -1,0 +1,10 @@
+{
+  "runtime": ["Go repository toolchain", "Python standard library for the runner", "scripts/dev/isolated-roami.sh"],
+  "go_packages": ["./internal/modelgateway"],
+  "go_test_pattern": "^TestUpstreamResponseReceipt",
+  "expected_groups": 6,
+  "expected_leaf_tests": 25,
+  "runtime_fixture": "internal/modelgateway/testdata/upstream-receipts.json",
+  "model_provider": "local_http_fixture_only",
+  "external_model_calls": 0
+}

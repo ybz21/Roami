@@ -29,6 +29,9 @@ ALTER TABLE gateway_calls ADD COLUMN route_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE gateway_calls ADD COLUMN price_status TEXT NOT NULL DEFAULT 'priced';
 UPDATE gateway_calls SET agent_kind=substr(role,5),key_id='legacy' WHERE role IN ('cli_opencode','cli_claude','cli_codex','cli_pi','cli_roami');
 CREATE INDEX gateway_calls_agent_day ON gateway_calls(agent_kind,day,started_ms);
+`}, {Version: 4, Name: "upstream-response-receipts", SQL: `
+ALTER TABLE gateway_calls ADD COLUMN upstream_http_status INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE gateway_calls ADD COLUMN upstream_request_id TEXT NOT NULL DEFAULT '';
 `}}
 
 type Ledger struct {
@@ -104,6 +107,7 @@ func (l *Ledger) Configure(c Configuration) error {
 }
 
 type Call struct {
+	upstream    upstreamReceipt
 	PriceStatus string       `json:"priceStatus"`
 	AgentKind   string       `json:"agentKind"`
 	KeyID       string       `json:"keyId"`
@@ -193,7 +197,7 @@ func (l *Ledger) Settle(call Call, usage *Usage, status int, code string, notSen
 		state = "failed"
 	}
 	return l.db.Tx(func(tx *sql.Tx) error {
-		_, err := tx.Exec(`UPDATE gateway_calls SET state=?,finished_ms=?,input_tokens=?,output_tokens=?,cache_read_tokens=?,cost_nano=?,http_status=?,error_code=? WHERE id=? AND state='pending'`, state, l.now().UnixMilli(), input, output, cached, cost, status, code, call.ID)
+		_, err := tx.Exec(`UPDATE gateway_calls SET state=?,finished_ms=?,input_tokens=?,output_tokens=?,cache_read_tokens=?,cost_nano=?,http_status=?,error_code=?,upstream_http_status=?,upstream_request_id=? WHERE id=? AND state='pending'`, state, l.now().UnixMilli(), input, output, cached, cost, status, code, call.upstream.status, call.upstream.request, call.ID)
 		return err
 	})
 }

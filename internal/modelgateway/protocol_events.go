@@ -433,6 +433,9 @@ func (e *protocolEncoder) finish(r *protocolResult, u *Usage) error {
 	}
 }
 func (e *protocolEncoder) fail(code string) {
+	e.failStatus(code, http.StatusBadGateway)
+}
+func (e *protocolEncoder) failStatus(code string, status int) {
 	if e.failed {
 		return
 	}
@@ -442,7 +445,7 @@ func (e *protocolEncoder) fail(code string) {
 	}
 	errorValue := map[string]any{"type": "api_error", "code": code, "message": code}
 	if !e.started {
-		writeJSON(e.writer, 502, map[string]any{"type": "error", "error": errorValue})
+		writeJSON(e.writer, status, map[string]any{"type": "error", "error": errorValue})
 		return
 	}
 	if e.bridge.from == "openai-responses" {

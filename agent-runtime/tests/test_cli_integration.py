@@ -111,7 +111,11 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
             )
             + "\n\ndata: [DONE]\n\n"
         )
-        return StreamingResponse(iter([text]), media_type="text/event-stream")
+        return StreamingResponse(
+            iter([text]),
+            media_type="text/event-stream",
+            headers={"X-Request-Id": "fixture-cli-response"},
+        )
 
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
@@ -184,8 +188,12 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                     await asyncio.sleep(0.05)
             assert messages[-1]["content"]["text"] == "Live transport answer"
             usage = await cli("gateway", "usage")
-            assert usage["data"]["recent"][0]["model"] == "injected-http-model"
-            assert usage["data"]["recent"][0]["cost"] == "0.000000000"
+            call = usage["data"]["recent"][0]
+            assert call["model"] == "injected-http-model"
+            assert call["priceStatus"] == "unpriced" and call["cost"] is None
+            assert call["state"] == "unknown"
+            assert call["upstreamHttpStatus"] == 200
+            assert call["upstreamRequestId"] == "fixture-cli-response"
             await cli(
                 "notify", "--conversation", cid, "--key", "reminder-1", "--text", "Time to review"
             )

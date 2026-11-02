@@ -277,6 +277,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer response.Body.Close()
+	call.upstream = responseReceipt(response)
 	status = response.StatusCode
 	for _, key := range []string{"Content-Type", "Cache-Control", "Retry-After", "X-Request-Id", "Request-Id"} {
 		if value := response.Header.Get(key); value != "" {
