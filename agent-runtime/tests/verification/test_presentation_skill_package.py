@@ -90,6 +90,7 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
                                 "slide": 1,
                                 "target": {"order": "top_to_bottom", "ordinal": 1},
                                 "alignment": "center",
+                                "replaceText": {"old": "Heading", "new": "Revised heading"},
                             }
                         ],
                     }
@@ -112,6 +113,7 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
                 assert (
                     checked["slides"][0]["textObjects"][1]["paragraphs"][0]["alignment"] == "center"
                 )
+                assert checked["slides"][0]["textObjects"][1]["text"] == "Revised heading"
                 yield ModelEvent("text", "已验证：[edited.pptx](edited.pptx)")
                 return
             calls.append(name)
@@ -175,7 +177,7 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
         task = await runtime.tasks.create(
             "alice",
             conversation["id"],
-            "Use the external Skill to inspect source.pptx and center its top heading in edited.pptx.",
+            "Use the external Skill to replace Heading with Revised heading and center it in edited.pptx.",
             key="external-skill",
             target={"kind": "new_session", "directory": str(workspace)},
             record_intent=True,
@@ -197,6 +199,8 @@ async def exercise_external_skill_package(store, tmp_path, monkeypatch, *, confi
         result = Presentation(io.BytesIO(artifact))
         assert result.slides[0].shapes[0].text_frame.paragraphs[0].alignment == PP_ALIGN.LEFT
         assert result.slides[0].shapes[1].text_frame.paragraphs[0].alignment == PP_ALIGN.CENTER
+        assert result.slides[0].shapes[0].text == "Body"
+        assert result.slides[0].shapes[1].text == "Revised heading"
         assert (
             hashlib.sha256(original).hexdigest() == hashlib.sha256(source.read_bytes()).hexdigest()
         )

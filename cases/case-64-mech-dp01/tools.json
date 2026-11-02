@@ -3,7 +3,7 @@
     "skills/presentation-edit/tests",
     "agent-runtime/tests/verification/test_presentation_skill_package.py"
   ],
-  "expected_collected": 54,
+  "expected_collected": 80,
   "generator": "skills/presentation-edit/tests/deck_fixture.py::deck_bytes",
   "registered_tools": [
     "read",
@@ -17,5 +17,6 @@
   ],
   "model_calls": 0,
   "execution": "Standalone optional Skill CLI plus the existing managed Skill/NativeExecutor contracts",
-  "focused_input": "input/focused-slides.json"
+  "focused_input": "input/focused-slides.json",
+  "text_input": "input/text-replacement.json"
 }

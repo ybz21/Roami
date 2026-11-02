@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-02 | [外挂演示稿的精确文本修订](2026-11-02/presentation-text-replacement.md) |
 | 2026-11-02 | [Go网关上游关联与错误状态传播](2026-11-02/upstream-response-receipts.md) |
 | 2026-11-01 | [完整正反参考池与定量演示稿](2026-11-01/reference-pool.md) |
 | 2026-11-01 | [Skill资源的可读取协议地址](2026-11-01/skill-resource-locations.md) |
