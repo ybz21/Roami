@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "case_id": "TASK-STACK01",
+  "data": {
+    "kind": "public_synthetic_multi_turn_conversations",
+    "inputs": [
+      "input/conversations.json"
+    ],
+    "description": "真实模型只接收text和附件，expect和fixture留在宿主；PNG由名称hash生成32x24图像，不含真实截图。"
+  },
+  "tools": {
+    "kind": "isolated_runtime_main_decisions_and_task_state",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "independent_per_turn_state_oracle",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_conversations": 4,
+    "expected_user_turns": 17
+  }
+}

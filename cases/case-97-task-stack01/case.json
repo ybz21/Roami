@@ -1,0 +1,52 @@
+{
+  "id": "TASK-STACK01",
+  "kind": "mechanism_regression",
+  "category": "TASK",
+  "category_label": "多轮对话与任务构建",
+  "prompt": "执行原任务反复追加与跨任务隔离的所有对话，逐轮核验任务和回复是否正确。",
+  "preconditions": "独立SQLite与合成项目/执行器目录；无生产会话和真实后台写入。真实模型模式须绑定节点现有模型路由和Go网关。",
+  "expected_terminal": "all_conversation_checkpoints_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_conversation_scenario",
+  "required_deliverables": [
+    "逐对话、逐轮的独立判定与失败码",
+    "原始合成对话、任务状态、工具和模型用量证据",
+    "冻结源码及输入hash；未测和未知不能计通过"
+  ],
+  "hard_assertions": [
+    {
+      "id": "TASK-STACK01-H1",
+      "rule": "每轮任务数量、身份、revision、要求及附件匹配冻结合同，不误建、不丢失、不串任务。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "TASK-STACK01-H2",
+      "rule": "未来轮输入和宿主expect/fixture脚本不进入真实模型请求；需澄清时不猜目标，重复请求不重复创建。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "TASK-STACK01-H3",
+      "rule": "机制夹具通过不等于真实模型语义通过；真实模型沿保存配置计量，未知调用不重放。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "user_requested_repeated_conversation_and_task_creation",
+    "private_history_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/conversations.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

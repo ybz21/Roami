@@ -430,3 +430,20 @@ Main在同一任务完成回合中通过文件工具修正产物后，下载项�
 任务定义维护在仓库根部 [`cases/`](../../cases/README.md)，目录名为 `case-<序号>-<标识>/`，一个目录可包含多个文件及子目录。`CASE.md` 的 `name:` 和 `description:` 必填，`case.json` 保存执行合同；输入、公开验收说明与脚本按需放入同目录。附件须由执行定义或任务装配明确引用后随套件冻结。
 
 40 个自有和机制任务从目录读取；20 个公开任务保存来源引用，输入与判定器仍来自已登记套件。新运行冻结名称与描述；修改 Case 不覆盖历史套件或历史运行快照。普通安装包及源码包均包含这些目录，隔离 Agent 镜像不包含宿主评测材料。
+
+### 多轮聊天与任务叠加
+
+[Case95–98](../../cases/README.md) 是独立扩展案例：16段公开合成对话、62个用户轮次。每轮检查聊天回复、任务数量、持续身份、修订、要求、执行器、项目及附件；覆盖只聊天、多项交办、连续新建、原任务追加、澄清和请求重放。
+
+```bash
+uv run --frozen --project agent-runtime python scripts/dev/run-conversation-scenarios.py \
+  --mode fixture --output .roami/rsi-conversations/new-fixture-run
+
+uv run --frozen --project agent-runtime python scripts/dev/run-conversation-scenarios.py \
+  --mode saved-model --agent-config /path/to/node/agent.toml --data-root /path/to/node \
+  --output .roami/rsi-conversations/new-saved-model-run
+```
+
+运行器创建并清理自己的隔离实例，输出目录必须尚不存在。`--case`选择一个完整Case，`--scenario`可选一个或多个对话做诊断；部分对话即使`selected_passed=true`，`passed`仍为false，不代表整个Case通过。每段保留逐轮判定、模型用量、轨迹及原始SQLite，源码与输入执行前后须一致。
+
+`fixture`脚本不计模型能力；`saved-model`只将用户消息与附件送入正常Main上下文，宿主保留expect与fixture，不覆盖模型、参数或费用准入。未知用量或执行错误停批，不重试未知调用。任务完成状态为显式模拟，shell、文件修改、MCP、浏览器及真实session发送关闭；只评估Main能否正确建任务和续作，不评估后台产物质量。这些Case不替换历史40/60项，不作为晋级成绩。

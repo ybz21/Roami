@@ -1,0 +1,12 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "entry": "scripts/dev/run-conversation-scenarios.py",
+  "fixture_mode": "scripted Actor, real Runtime/intake/tools/SQLite; zero external model calls",
+  "saved_model_mode": "--mode saved-model --agent-config NODE_AGENT_TOML --data-root NODE_DATA_ROOT; node_model_settings and configured_provider; no model/parameter override flags",
+  "background_execution": "synthetic_checkpoint",
+  "allowed_tool_profile": "conversation_scenarios.ALLOWED; shell/file mutation/browser/MCP/session_send disabled",
+  "input": "input/conversations.json"
+}
