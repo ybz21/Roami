@@ -14,6 +14,11 @@ const enUS = {
   'hub.local.title': "Import local source",
   'hub.billing.all': "All agents",
   'hub.billing.agent': "Agent",
+  'agent.pagination.more': 'Load more',
+  'agent.pagination.earlier': 'Earlier messages',
+  'agent.pagination.loading': 'Loading',
+  'agent.pagination.fullMessage': 'Read full message',
+
   'agent.task.executionUnconfirmed': "Execution unconfirmed",
   'agent.task.executionUnconfirmedHint': "View retained files or open the work session to check the outcome.",
   'agent.task.reportUnconfirmedTitle': "Unconfirmed report",

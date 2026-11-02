@@ -1,0 +1,40 @@
+{
+  "desktop": {
+    "idleSeconds": 30,
+    "messages": 50,
+    "nextPages": 0,
+    "messageDetails": 0,
+    "unopenedNotificationPages": 0,
+    "bodyScroll": 0,
+    "horizontalOverflow": false,
+    "size": "large",
+    "app": "index-cGYDaU-t.js"
+  },
+  "phone": {
+    "idleSeconds": 30,
+    "messages": 50,
+    "nextPages": 0,
+    "messageDetails": 0,
+    "unopenedNotificationPages": 0,
+    "bodyScroll": 0,
+    "horizontalOverflow": false,
+    "size": "compact",
+    "app": "index-cGYDaU-t.js"
+  },
+  "final_build_recheck": {
+    "bundle": "index-dpRZctRA.js",
+    "desktop": {
+      "initialMessages": 50,
+      "afterPageUp": 100,
+      "nextPageRequests": 1,
+      "readingAnchorDeltaCssPx": -0.5
+    },
+    "android": {
+      "initialMessages": 50,
+      "afterAdbSwipe": 100,
+      "nextPageRequests": 1,
+      "bodyScrollTop": 0,
+      "horizontalOverflow": false
+    }
+  }
+}

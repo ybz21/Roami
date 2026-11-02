@@ -11,7 +11,9 @@ import AgentTaskRecord from './AgentTaskRecord'
 import TaskDescription from './TaskDescription'
 import { taskTopic } from './task-topic'
 import { taskOutcome, taskReportLinks, taskReportSummary } from './task-outcome'
-import { useAgentData } from './useAgentData'
+import { usePagedAgentData } from './usePagedAgentData'
+import { useBoundaryLoad } from './useBoundaryLoad'
+import AgentPageBoundary from './AgentPageBoundary'
 import { useAgentTask } from './useAgentTask'
 import { useAgentDraft } from './useAgentDraft'
 import { agentDataKey } from './agent-data-cache'
@@ -25,6 +27,8 @@ const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
 const active = new Set(['queued', 'preparing', 'running', 'verifying', 'cancelling'])
 const taskFilters = ['all', 'attention', 'active', 'open', 'ended'] as const
 type TaskFilter = typeof taskFilters[number]
+
+
 
 function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   if (filter === 'all') return true
@@ -45,11 +49,12 @@ export default function AgentTasks({ projects = [], cid, onSession, onChanged, s
   const setFilter = (value: TaskFilter) => { changeFilter(value); try { localStorage.setItem(filterKey, value) } catch { /* Keep filtering without storage. */ } }
   const selected = selectedTask ?? localSelected
   const setSelected = (id: string) => { if (onSelectTask) onSelectTask(id); else setLocalSelected(id) }
-  const list = useAgentData<AgentTask[]>(cid ? '/agent/tasks?conversationId=' + encodeURIComponent(cid) : null, 3000, 3000, 'GET', !selected)
-  const tasks = list.value || [], { loading, failed } = list
+  const list = usePagedAgentData<AgentTask>(cid && !selected ? '/agent/task-list?conversationId=' + encodeURIComponent(cid) + '&limit=20&filter=' + filter : null, filter === 'ended' ? 0 : 3000)
+  const tasks = list.items, { loading, failed } = list
   const roots = tasks.filter(task => !task.parent_task_id || !tasks.some(parent => parent.id === task.parent_task_id))
   const visible = roots.filter(task => matchesTaskFilter(task, filter))
   const container = useRef<HTMLDivElement>(null), restored = useRef('')
+  useBoundaryLoad(container, () => { void list.loadMore() }, !selected && list.hasMore && !list.loadingMore && !list.moreFailed)
   const scrollKey = filterKey + ':scroll:' + filter
   useLayoutEffect(() => {
     if (selected || loading || restored.current === scrollKey) return
@@ -67,10 +72,11 @@ export default function AgentTasks({ projects = [], cid, onSession, onChanged, s
   return <div ref={container} className={`agent-tasks${compact ? ' agent-tasks-compact' : ''}`}>
     {selected ? <TaskInspector hideBack={hideBack} key={agentDataKey('/agent/tasks/' + encodeURIComponent(selected))} id={selected} onBack={() => { setSelected(''); list.refresh() }} select={setSelected} projects={projects} onSession={onSession} onChanged={() => { list.refresh(); onChanged() }} /> : <>
       {loading && <Spin />}{failed && <p role="alert">{t('agent.requestFailed')}</p>}
-      {!loading && !failed && !tasks.length && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
-      {!!roots.length && <div className="agent-task-filters" role="group" aria-label={t('agent.task.filter.label')}>{taskFilters.map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t('agent.task.filter.' + value)}</button>)}</div>}
-      {!loading && !failed && !!roots.length && !visible.length && <p className="agent-muted" role="status">{t('agent.task.filter.empty')}</p>}
+      {!loading && !failed && !tasks.length && filter === 'all' && (compact ? <div className="agent-workspace-empty"><ChecklistIcon size={28} /><strong>{t('agent.noTasks')}</strong></div> : <p className="agent-muted">{t('agent.noTasks')}</p>)}
+      {(!!roots.length || filter !== 'all') && <div className="agent-task-filters" role="group" aria-label={t('agent.task.filter.label')}>{taskFilters.map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t('agent.task.filter.' + value)}</button>)}</div>}
+      {!loading && !failed && filter !== 'all' && !visible.length && <p className="agent-muted" role="status">{t('agent.task.filter.empty')}</p>}
       <TaskTimeline tasks={visible} compact={compact} select={setSelected} projects={projects} onSession={onSession} />
+      <AgentPageBoundary more={list.hasMore} loading={list.loadingMore} failed={list.moreFailed} load={() => { void list.loadMore() }} />
     </>}
   </div>
 }

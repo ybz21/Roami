@@ -17,6 +17,7 @@ import { openAgentPage } from './agent-page-route'
 import type { AgentMessage, AgentSnapshot } from './agent-protocol'
 import { taskTopic } from './task-topic'
 import { taskSessionError } from './task-session-error'
+import { useBoundaryLoad } from './useBoundaryLoad'
 import { useAgentData } from './useAgentData'
 import { useAgentDraft } from './useAgentDraft'
 import { useAgentTask } from './useAgentTask'
@@ -49,7 +50,13 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
   const scroll = useRef<HTMLDivElement>(null), follow = useRef(true), prepend = useRef<number | null>(null)
   const draftRef = useRef(draft); draftRef.current = draft
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null), sending = useRef(false), alive = useRef(true)
+  const olderRequest = useRef<AbortController | null>(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => {
+    const hidden = () => { if (document.hidden) olderRequest.current?.abort() }
+    document.addEventListener('visibilitychange', hidden)
+    return () => { olderRequest.current?.abort(); document.removeEventListener('visibilitychange', hidden) }
+  }, [path, tab])
   const restoredSteering = useRef(''), observed = useRef('')
   const steering = detail?.steering
   const progressKey = task ? [task.revision,detail?.attempts[0]?.id,detail?.attempts[0]?.state,detail?.attempts[0]?.finishedMs].join(':') : ''
@@ -88,14 +95,18 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
   }
   const loadOlder = async () => {
     const cursor = before === undefined ? conversation.value?.before : before
-    if (!cursor || sending.current) return
-    sending.current = true; setBusy(true)
+    if (!cursor || sending.current || document.hidden) return
+    const controller = new AbortController(); olderRequest.current = controller
+    let timedOut = false
+    const timeout = setTimeout(() => { timedOut = true; controller.abort() }, 15_000)
+    sending.current = true; setBusy(true); setError('')
     try {
-      const response = await api('GET', path + '?before=' + cursor)
-      if (alive.current) { prepend.current = scroll.current?.scrollHeight || 0; follow.current = false; setOlder(previous => [...response.data.messages, ...previous]); setBefore(response.data.before) }
-    } catch { if (alive.current) setError(t('agent.requestFailed')) }
-    finally { sending.current = false; if (alive.current) setBusy(false) }
+      const response = await api('GET', path + '?before=' + cursor, undefined, { signal: controller.signal })
+      if (alive.current && !controller.signal.aborted) { prepend.current = scroll.current?.scrollHeight || 0; follow.current = false; setOlder(previous => [...response.data.messages, ...previous]); setBefore(response.data.before) }
+    } catch { if (alive.current && (!controller.signal.aborted || timedOut)) setError(t('agent.requestFailed')) }
+    finally { clearTimeout(timeout); if (olderRequest.current === controller) olderRequest.current = null; sending.current = false; if (alive.current) setBusy(false) }
   }
+  useBoundaryLoad(scroll, () => { void loadOlder() }, tab === 'conversation' && !!(before === undefined ? conversation.value?.before : before) && !busy && !error, 'start')
   const messages = useMemo(() => [...new Map([...older, ...(conversation.value?.messages || [])].map(item => [item.id, item])).values()]
     .filter(item => ['user', 'assistant', 'tool'].includes(item.role) && (item.content.text || item.content.tool_calls?.length || item.content.question || item.content.taskStatus || item.content.attachments?.length || item.status === 'streaming'))
     .sort((a, b) => a.seq - b.seq), [older, conversation.value?.messages])
@@ -120,7 +131,7 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3
       switchTab(tabs[next]); document.getElementById('native-tab-' + tabs[next])?.focus()
     }}>{t('agent.task.sessionTab.' + value)}</button>)}</div>
-    <div ref={scroll} onScroll={event => { const element = event.currentTarget; if (tab === 'conversation') follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80 }} className="native-session-content" role="tabpanel" id="native-session-panel" aria-labelledby={'native-tab-' + tab}>
+    <div ref={scroll} onScroll={event => { const element = event.currentTarget; if (tab === 'conversation') follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80 }} data-pagination-edge={tab === 'conversation' ? 'start' : undefined} className="native-session-content" role="tabpanel" id="native-session-panel" aria-labelledby={'native-tab-' + tab}>
       {(!detail && !snapshot.detail.failed) && <Spin />}
       {snapshot.detail.failed && <p role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={snapshot.refresh}>{t('agent.retry')}</button></p>}
       {tab === 'conversation' && <div className="native-session-messages conversation-transcript" role="log" aria-label={t('agent.task.conversation')}>

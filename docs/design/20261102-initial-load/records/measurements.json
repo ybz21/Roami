@@ -1,0 +1,665 @@
+{
+  "measured_at": "2026-11-02T09:50:00+08:00 to 2026-11-02T10:02:00+08:00",
+  "deployment": "vmain-5d66fbe8",
+  "source_baseline": "20f5005f",
+  "method": {
+    "local": "HTTPS loopback; ProxyHandler({}); existing production service; normal login; Accept-Encoding identity except explicit compression probe",
+    "public_direct": "HTTPS public endpoint; ProxyHandler({}); normal login; Accept-Encoding gzip, br; serial complete body reads",
+    "public_environment_proxy": "HTTPS public endpoint; urllib environment proxy; normal login; Accept-Encoding gzip, br",
+    "browser": "roami chrome on a task-owned tab; Resource/Navigation/Paint Timing; existing production assets; authenticated reload has warm static cache",
+    "sqlite": "mode=ro and query_only; row counts, file sizes and EXPLAIN only",
+    "body_retention": "Only counts, byte sizes, query plans and timings; no messages, credentials or raw identity values"
+  },
+  "local_api_samples": [
+    {
+      "path": "/api/me",
+      "status": 200,
+      "ttfb_ms": 1.3,
+      "total_ms": 1.3,
+      "bytes": 69,
+      "encoding": null,
+      "contentType": "application/json; charset=utf-8",
+      "counts": {}
+    },
+    {
+      "path": "/api/agent/status",
+      "status": 200,
+      "ttfb_ms": 2.0,
+      "total_ms": 2.0,
+      "bytes": 609,
+      "encoding": null,
+      "contentType": "application/json",
+      "counts": {
+        "commands": 6
+      },
+      "writerBacklog": 0
+    },
+    {
+      "path": "/api/agent/notifications?includeRead=true",
+      "status": 200,
+      "ttfb_ms": 12.3,
+      "total_ms": 14.5,
+      "bytes": 305659,
+      "encoding": null,
+      "contentType": "application/json",
+      "counts": {
+        "items": 175
+      }
+    },
+    {
+      "path": "/api/agent/tasks?conversationId=:cid",
+      "status": 200,
+      "ttfb_ms": 12.5,
+      "total_ms": 13.7,
+      "bytes": 221133,
+      "encoding": null,
+      "contentType": "application/json",
+      "items": 48
+    },
+    {
+      "path": "/api/agent/conversations/:cid/messages",
+      "status": 200,
+      "ttfb_ms": 213.9,
+      "total_ms": 241.5,
+      "bytes": 4266688,
+      "encoding": null,
+      "contentType": "application/json",
+      "counts": {
+        "messages": 847,
+        "turns": 162,
+        "activities": 268
+      },
+      "field_bytes": {
+        "compaction": 300,
+        "conversation": 219,
+        "branchId": 34,
+        "messages": 3539939,
+        "turns": 10651,
+        "snapshotCursor": 5,
+        "activities": 752573
+      }
+    },
+    {
+      "path": "/api/projects",
+      "status": 200,
+      "ttfb_ms": 2391.7,
+      "total_ms": 2392.5,
+      "bytes": 9088,
+      "encoding": null,
+      "contentType": "application/json; charset=utf-8",
+      "counts": {
+        "loose": 2,
+        "projects": 17
+      }
+    },
+    {
+      "path": "/api/sessions",
+      "status": 200,
+      "total_ms": 167.2,
+      "ttfb_ms": 167.0,
+      "bytes": 6567,
+      "item_count": 26,
+      "sample": "repeat after correcting array response parser"
+    },
+    {
+      "path": "/api/sessions/annotations",
+      "status": 200,
+      "ttfb_ms": 123.7,
+      "total_ms": 123.9,
+      "bytes": 10046,
+      "encoding": null,
+      "contentType": "application/json; charset=utf-8",
+      "counts": {}
+    },
+    {
+      "path": "/api/swarms",
+      "status": 200,
+      "total_ms": 36.8,
+      "ttfb_ms": 36.6,
+      "bytes": 2989,
+      "item_count": 12,
+      "sample": "repeat after correcting array response parser"
+    }
+  ],
+  "public_direct_samples": [
+    {
+      "path": "/api/agent/status",
+      "ttfb_ms": 34.7,
+      "total_ms": 34.8,
+      "bytes": 609,
+      "encoding": null,
+      "status": 200,
+      "proxy": false
+    },
+    {
+      "path": "/api/agent/tasks?conversationId=:cid",
+      "ttfb_ms": 89.2,
+      "total_ms": 2052.0,
+      "bytes": 221133,
+      "encoding": null,
+      "status": 200,
+      "proxy": false
+    },
+    {
+      "path": "/api/agent/conversations/:cid/messages",
+      "ttfb_ms": 306.3,
+      "total_ms": 43714.3,
+      "bytes": 4266688,
+      "encoding": null,
+      "status": 200,
+      "proxy": false
+    }
+  ],
+  "public_environment_proxy_samples": [
+    {
+      "path": "/api/agent/status",
+      "ttfb_ms": 66.0,
+      "total_ms": 70.9,
+      "bytes": 609,
+      "encoding": null,
+      "status": 200
+    },
+    {
+      "path": "/api/agent/conversations/:cid/messages",
+      "ttfb_ms": 326.1,
+      "total_ms": 35903.8,
+      "bytes": 4266688,
+      "encoding": null,
+      "status": 200
+    }
+  ],
+  "browser_authenticated_warm": {
+    "url": "https://47.94.183.77:13579/#/home/:cid",
+    "navigation": [
+      {
+        "ttfb": 21,
+        "dcl": 79.39999961853027,
+        "load": 80.39999961853027
+      }
+    ],
+    "paint": [
+      {
+        "name": "first-paint",
+        "ms": 80
+      },
+      {
+        "name": "first-contentful-paint",
+        "ms": 220
+      }
+    ],
+    "resources": [
+      {
+        "name": "/assets/index-DF_jv6x6.js",
+        "start": 26.09999990463257,
+        "duration": 19.799999713897705,
+        "ttfb": 6.900000095367432,
+        "transfer": 0,
+        "encoded": 1210741,
+        "decoded": 1210741,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/react-Dg4_kEEP.js",
+        "start": 26.299999713897705,
+        "duration": 14.900000095367432,
+        "ttfb": 8.600000381469727,
+        "transfer": 0,
+        "encoded": 142858,
+        "decoded": 142858,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/xterm-DYP7pi_n.css",
+        "start": 26.399999618530273,
+        "duration": 10.400000095367432,
+        "ttfb": 7.599999904632568,
+        "transfer": 0,
+        "encoded": 4150,
+        "decoded": 4150,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/vendor-D0rn63mv.js",
+        "start": 26.399999618530273,
+        "duration": 12.900000095367432,
+        "ttfb": 9,
+        "transfer": 0,
+        "encoded": 80013,
+        "decoded": 80013,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/xterm-e_0T9ORP.js",
+        "start": 26.399999618530273,
+        "duration": 17.100000381469727,
+        "ttfb": 9.800000190734863,
+        "transfer": 0,
+        "encoded": 395555,
+        "decoded": 395555,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/antd-Cz0yWZDE.js",
+        "start": 26.399999618530273,
+        "duration": 21.300000190734863,
+        "ttfb": 9.400000095367432,
+        "transfer": 0,
+        "encoded": 1099237,
+        "decoded": 1099237,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/index-CYJLpb3s.css",
+        "start": 26.5,
+        "duration": 14,
+        "ttfb": 11.699999809265137,
+        "transfer": 0,
+        "encoded": 211109,
+        "decoded": 211109,
+        "protocol": ""
+      },
+      {
+        "name": "/manifest.webmanifest?v=2",
+        "start": 32.89999961853027,
+        "duration": 9.300000190734863,
+        "ttfb": 7.199999809265137,
+        "transfer": 0,
+        "encoded": 683,
+        "decoded": 683,
+        "protocol": ""
+      },
+      {
+        "name": "/api/me",
+        "start": 117.89999961853027,
+        "duration": 16.200000286102295,
+        "ttfb": 14.5,
+        "transfer": 369,
+        "encoded": 69,
+        "decoded": 69,
+        "protocol": "h2"
+      },
+      {
+        "name": "/logo-mark.svg",
+        "start": 122.19999980926514,
+        "duration": 2,
+        "ttfb": 1.700000286102295,
+        "transfer": 0,
+        "encoded": 710,
+        "decoded": 710,
+        "protocol": ""
+      },
+      {
+        "name": "/logo-mark.svg",
+        "start": 125.2999997138977,
+        "duration": 1.9000000953674316,
+        "ttfb": 1.6999998092651367,
+        "transfer": 0,
+        "encoded": 710,
+        "decoded": 710,
+        "protocol": ""
+      },
+      {
+        "name": "/api/hub/bootstrap",
+        "start": 139.59999990463257,
+        "duration": 16.299999713897705,
+        "ttfb": 14.700000286102295,
+        "transfer": 330,
+        "encoded": 30,
+        "decoded": 30,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/preferences",
+        "start": 156.7999997138977,
+        "duration": 15.5,
+        "ttfb": 13.800000190734863,
+        "transfer": 1501,
+        "encoded": 1201,
+        "decoded": 1201,
+        "protocol": "h2"
+      },
+      {
+        "name": "/assets/OnboardingHome-B0KeLvNj.js",
+        "start": 175.59999990463257,
+        "duration": 58.19999980926514,
+        "ttfb": 56.799999713897705,
+        "transfer": 0,
+        "encoded": 556,
+        "decoded": 556,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/onboarding-state-fA0ujmDQ.js",
+        "start": 175.59999990463257,
+        "duration": 59.299999713897705,
+        "ttfb": 58.30000019073486,
+        "transfer": 0,
+        "encoded": 5735,
+        "decoded": 5735,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/agent-models-Iyj9nP_e.js",
+        "start": 175.7999997138977,
+        "duration": 58.30000019073486,
+        "ttfb": 57.10000038146973,
+        "transfer": 0,
+        "encoded": 1035,
+        "decoded": 1035,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/OnboardingChecklist-D4pKg7Go.js",
+        "start": 175.89999961853027,
+        "duration": 59.40000009536743,
+        "ttfb": 58.799999713897705,
+        "transfer": 0,
+        "encoded": 1744,
+        "decoded": 1744,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/OnboardingChecklist-CZtLjTSr.css",
+        "start": 176,
+        "duration": 58.89999961853027,
+        "ttfb": 57.799999713897705,
+        "transfer": 0,
+        "encoded": 8664,
+        "decoded": 8664,
+        "protocol": ""
+      },
+      {
+        "name": "/api/plugins",
+        "start": 187.2999997138977,
+        "duration": 61.80000019073486,
+        "ttfb": 46.69999980926514,
+        "transfer": 28515,
+        "encoded": 28215,
+        "decoded": 28215,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/sessions/agents",
+        "start": 192,
+        "duration": 3160.199999809265,
+        "ttfb": 3158.4000000953674,
+        "transfer": 982,
+        "encoded": 682,
+        "decoded": 682,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/agent/main-conversation",
+        "start": 192.39999961853027,
+        "duration": 57.700000286102295,
+        "ttfb": 56.40000009536743,
+        "transfer": 515,
+        "encoded": 215,
+        "decoded": 215,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/agent/notifications?includeRead=true",
+        "start": 192.69999980926514,
+        "duration": 3158.199999809265,
+        "ttfb": 290.59999990463257,
+        "transfer": 305959,
+        "encoded": 305659,
+        "decoded": 305659,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/sessions",
+        "start": 192.89999961853027,
+        "duration": 3380.2000002861023,
+        "ttfb": 3373.5999999046326,
+        "transfer": 6867,
+        "encoded": 6567,
+        "decoded": 6567,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/projects",
+        "start": 193.59999990463257,
+        "duration": 290.5,
+        "ttfb": 58.5,
+        "transfer": 0,
+        "encoded": 9088,
+        "decoded": 9088,
+        "protocol": ""
+      },
+      {
+        "name": "/api/sessions/annotations",
+        "start": 193.69999980926514,
+        "duration": 3373.5,
+        "ttfb": 3319,
+        "transfer": 10346,
+        "encoded": 10046,
+        "decoded": 10046,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/swarms",
+        "start": 193.7999997138977,
+        "duration": 3163.0999999046326,
+        "ttfb": 3157.3999996185303,
+        "transfer": 3289,
+        "encoded": 2989,
+        "decoded": 2989,
+        "protocol": "h2"
+      },
+      {
+        "name": "/api/version",
+        "start": 194,
+        "duration": 57.69999980926514,
+        "ttfb": 55.09999990463257,
+        "transfer": 356,
+        "encoded": 56,
+        "decoded": 56,
+        "protocol": "h2"
+      },
+      {
+        "name": "/logo-mark.svg",
+        "start": 198.09999990463257,
+        "duration": 2.0999999046325684,
+        "ttfb": 1.9000000953674316,
+        "transfer": 0,
+        "encoded": 710,
+        "decoded": 710,
+        "protocol": ""
+      },
+      {
+        "name": "/api/plugins/roam.host-monitor/run",
+        "start": 254.39999961853027,
+        "duration": 3000.2000002861023,
+        "ttfb": 0,
+        "transfer": 0,
+        "encoded": 0,
+        "decoded": 0,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/AgentChat-BEQXVRjr.js",
+        "start": 255,
+        "duration": 3258.199999809265,
+        "ttfb": 3112,
+        "transfer": 0,
+        "encoded": 52661,
+        "decoded": 52661,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/AgentMemory-Bw0l3856.js",
+        "start": 255.09999990463257,
+        "duration": 3258.2999997138977,
+        "ttfb": 3112.5,
+        "transfer": 0,
+        "encoded": 22008,
+        "decoded": 22008,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/AgentMemory-BsR8D-Q4.css",
+        "start": 255.19999980926514,
+        "duration": 3113.300000190735,
+        "ttfb": 3108.7000002861023,
+        "transfer": 0,
+        "encoded": 10595,
+        "decoded": 10595,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/TaskOutput-DOCVE3gv.js",
+        "start": 255.2999997138977,
+        "duration": 3257.300000190735,
+        "ttfb": 3113,
+        "transfer": 0,
+        "encoded": 6476,
+        "decoded": 6476,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/NativeSession-Bz5kRzw6.js",
+        "start": 255.2999997138977,
+        "duration": 3258.0999999046326,
+        "ttfb": 3112.6000003814697,
+        "transfer": 0,
+        "encoded": 68323,
+        "decoded": 68323,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/document-preview-CRGtULCl.css",
+        "start": 255.5,
+        "duration": 3113.3999996185303,
+        "ttfb": 3109,
+        "transfer": 0,
+        "encoded": 2321,
+        "decoded": 2321,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/agent-reasoning-BDODZ82l.js",
+        "start": 255.69999980926514,
+        "duration": 3257.199999809265,
+        "ttfb": 3113.800000190735,
+        "transfer": 0,
+        "encoded": 201,
+        "decoded": 201,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/file-link-CWWXFUy3.js",
+        "start": 255.7999997138977,
+        "duration": 3257.0999999046326,
+        "ttfb": 3114,
+        "transfer": 0,
+        "encoded": 708,
+        "decoded": 708,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/NativeSession-dqY3997a.css",
+        "start": 255.89999961853027,
+        "duration": 3113,
+        "ttfb": 3109.5,
+        "transfer": 0,
+        "encoded": 17779,
+        "decoded": 17779,
+        "protocol": ""
+      },
+      {
+        "name": "/assets/AgentChat-BZ9oChVK.css",
+        "start": 256.09999990463257,
+        "duration": 3113.4000000953674,
+        "ttfb": 3110.5,
+        "transfer": 0,
+        "encoded": 3151,
+        "decoded": 3151,
+        "protocol": ""
+      },
+      {
+        "name": "/api/plugins/roam.host-monitor/run",
+        "start": 3255.3999996185303,
+        "duration": 2999.6000003814697,
+        "ttfb": 0,
+        "transfer": 0,
+        "encoded": 0,
+        "decoded": 0,
+        "protocol": ""
+      },
+      {
+        "name": "/api/speech/config",
+        "start": 3538.8999996185303,
+        "duration": 29.600000381469727,
+        "ttfb": 0,
+        "transfer": 0,
+        "encoded": 0,
+        "decoded": 0,
+        "protocol": ""
+      }
+    ]
+  },
+  "browser_unauthenticated_cold": {
+    "html_ttfb_ms": 52.3,
+    "domcontentloaded_end_ms": 1017.5,
+    "fcp_ms": 1124,
+    "core_static_encoded_bytes": 728204,
+    "core_static_decoded_bytes": 3143663,
+    "protocol": "h2",
+    "static_compression": "br confirmed on entry asset; immutable max-age=31536000"
+  },
+  "browser_failures": [
+    {
+      "path": "/api/agent/conversations/:cid/messages",
+      "duration_ms": 15000.3,
+      "completed_bytes_reported": 0,
+      "explanation": "cancelled resource timing is not a measurement of bytes already sent by server"
+    },
+    {
+      "path": "/api/agent/tasks?conversationId=:cid",
+      "duration_ms": 15004.2
+    }
+  ],
+  "database": {
+    "layout": "all registered paths local under one databaseRoot",
+    "registered_files": 16,
+    "historical_swarm_files": 12,
+    "main_file_bytes": 643072,
+    "agent_runtime_file_bytes": 38350848,
+    "agent_runtime_wal_bytes": 4132392,
+    "agent_tables": {
+      "messages": 2856,
+      "tasks": 51,
+      "events": 11819,
+      "conversations": 44
+    },
+    "main_conversation_rows": {
+      "messages_in_database": 852,
+      "messages_in_api": 847,
+      "tasks": 48,
+      "events": 6093
+    },
+    "note": "API filters visibility/deleted entries and projects inherited history; database count is not API item count",
+    "query_plan_messages": "SEARCH messages USING INDEX sqlite_autoindex_messages_2 (branch_id=? AND seq<?)",
+    "query_plan_task_event": "SCAN events",
+    "writer_backlog_sample": 0
+  },
+  "offline_body_experiments": {
+    "original_bytes": 4266688,
+    "remove_content_json_bytes": 2541905,
+    "gzip_bytes": 755235,
+    "messages_with_both_raw_and_parsed_content": 847,
+    "activity_preview_json_bytes": 635607,
+    "note": "Offline transformations of the same response; no new endpoint or performance gain has been deployed"
+  },
+  "limitations": [
+    "Small observational samples, no production p95 inference",
+    "Server-origin public traversal, not the user network",
+    "Public relay and bandwidth shaping configuration not inspected",
+    "Concurrent traffic from other clients was not controlled",
+    "Initial request parser expected object responses; sessions and swarms were remeasured after correcting it",
+    "Cache hit resource entries may have transferSize=0; decoded bytes are not network bytes",
+    "No changes to runtime, data, model routes or service configuration"
+  ]
+}

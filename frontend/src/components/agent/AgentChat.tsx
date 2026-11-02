@@ -1,5 +1,5 @@
 import { agentTimeline, groupAgentTimeline } from './agent-timeline'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
@@ -18,7 +18,8 @@ import { useAgentWorkspace } from './useAgentWorkspace'
 import './agent-workspace.css'
 import { useAgentThread } from './useAgentThread'
 import { useAgentData } from './useAgentData'
-import { useAgentHistory } from './useAgentHistory'
+import { useBoundaryLoad } from './useBoundaryLoad'
+import AgentPageBoundary from './AgentPageBoundary'
 import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentDraft } from './useAgentDraft'
 import { useAgentMessageFocus } from './useAgentMessageFocus'
@@ -54,7 +55,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   mobileActionsHost?: HTMLElement | null
 }) {
   const { t } = useI18n(), { phone, size } = useLayout(), { message } = App.useApp()
-  const thread = useAgentThread(cid, branch, node)
+  const thread = useAgentThread(cid, branch, node, focusMessage)
   const rsi = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60_000)
   const workspace = useAgentWorkspace(node), wide = size === 'large'
   const workspaceSelectionKey = 'roami.task.selection.' + (node || 'local') + ':' + cid
@@ -108,7 +109,21 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const settledDispatches = useMemo(() => new Set(bodies.filter(m => ['completed', 'failed'].includes(m.content.sessionReply?.status || '')).map(m => m.content.sessionReply!.dispatchId)), [bodies])
   const timeline = useMemo(() => groupAgentTimeline(agentTimeline(bodies, mainTaskActivities(thread.view?.activities || []))), [bodies, thread.view?.activities])
   const visible = useMemo(() => bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming'), [bodies])
-  const history = useAgentHistory(`${node || 'local'}:${cid}:${branch}:${thread.view?.branchId || ''}`, timeline, focusMessage, scroll)
+  const history = { entries: timeline }
+  const prepend = useRef<{ top: number; height: number } | null>(null)
+  const older = () => {
+    if (!scroll.current || thread.loadingOlder) return
+    prepend.current = { top: scroll.current.scrollTop, height: scroll.current.scrollHeight }
+    stick.current = false
+    void thread.loadOlder()
+  }
+  useBoundaryLoad(scroll, older, !!thread.view?.page?.hasMore && !thread.loadingOlder && !thread.olderFailed, 'start')
+  useLayoutEffect(() => {
+    if (!thread.loadingOlder && prepend.current && scroll.current) {
+      scroll.current.scrollTop = prepend.current.top + scroll.current.scrollHeight - prepend.current.height
+      prepend.current = null
+    }
+  }, [thread.view?.messages, thread.loadingOlder])
   const eventIds = history.entries.map(entry => entry.message?.completedEventId || '').join(',')
   useVisibleAgentReads(!inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
@@ -264,8 +279,8 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
-      <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current); history.expand() } }}>
-        <div className="agent-thread conversation-transcript">{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <div key={entry.id} className="agent-execution-steps">{groupExecutionSteps(entry.activities).map(group => group[0].kind === 'tool' ? <AgentActivity key={group[0].id} items={group} onSession={onSession} conversationId={cid} branchId={thread.view?.branchId} /> : <AgentTaskActivity key={group[0].id} items={group} onTask={id => { if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>)}</div>
+      <div className="agent-messages" role="region" aria-label={t('agent.title')} tabIndex={0} data-pagination-edge="start" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
+        <div className="agent-thread conversation-transcript"><AgentPageBoundary earlier more={!!thread.view?.page?.hasMore} loading={!!thread.loadingOlder} failed={!!thread.olderFailed} load={older} />{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} conversationId={cid} branchId={thread.view?.branchId} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <div key={entry.id} className="agent-execution-steps">{groupExecutionSteps(entry.activities).map(group => group[0].kind === 'tool' ? <AgentActivity key={group[0].id} items={group} onSession={onSession} conversationId={cid} branchId={thread.view?.branchId} /> : <AgentTaskActivity key={group[0].id} items={group} onTask={id => { if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>

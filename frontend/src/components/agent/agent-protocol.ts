@@ -3,17 +3,17 @@ import { mainTaskActivities } from './main-task-activity'
 export type AgentQuestion = { prompt: string; options: { label: string; description?: string }[] }
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
 export type AgentMessage = {
-  id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number
+  id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number; contentTruncated?: boolean; contentOffset?: number
   content: { question?: AgentQuestion; text?: string; tool_call_id?: string; toolState?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentRoutingDecision = { version: number; policyVersion: string; action: string; executor: string; complexity: 'bounded' | 'complex'; complexityBasis: Record<string, string>; routingExplanation: string; reasonCode: string; capabilityVerification?: string }
 export type AgentActivityPreview = { input: { text: string; truncated: boolean }; output: { text: string; truncated: boolean } | null }
 export type AgentActivityItem = { preview?: AgentActivityPreview; id: string; kind: 'tool' | 'task' | 'turn'; routingDecision?: AgentRoutingDecision; name: string; title?: string; anchorMessageId: string; taskId?: string; parentTaskId?: string | null; state: string; target?: string; delivered?: boolean; external?: boolean; startedMs: number; updatedMs: number; errorCode?: string | null }
 export type AgentTurn = { id: string; state: string }
-export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
+export type AgentSnapshot = { conversation: AgentConversation; branchId: string; messages: AgentMessage[]; turns: AgentTurn[]; activities?: AgentActivityItem[]; snapshotCursor: number; page?: { hasMore: boolean; olderCursor: string | null }; compaction?: { operationId: string; state: string; snapshotId?: string; error?: string } | null }
 export type AgentEvent = { id: number; kind: string; created_ms?: number; branchId?: string; message_id?: string; turn_id?: string; payload: Record<string, any> }
-export type AgentNotice = { id: number; read?: boolean | number; message_id?: string; conversation_id: string; branch_id: string; title: string; content_json: string; created_ms: number }
-export type AgentTask = { projectId?: string | null; nativeSession?: { id: string; conversationId: string } | null; sessionClosure?: { state: string } | null; id: string; state: string; revision: number; parent_task_id?: string | null; intent_json: string; created_ms?: number; updated_ms?: number; latestAttempt?: { sessionId?: string; agentConversationId?: string | null; executorKind?: string; summary?: string | null; workspace?: { directory: string; branch?: string }; state: string } | null }
+export type AgentNotice = { id: number; read?: boolean | number; message_id?: string; conversation_id: string; branch_id: string; title: string; content_json?: string; summary?: string; created_ms: number }
+export type AgentTask = { projectId?: string | null; nativeSession?: { id: string; conversationId: string } | null; sessionClosure?: { state: string } | null; id: string; state: string; revision: number; parent_task_id?: string | null; title?: string; executor?: string; intent_json?: string; created_ms?: number; updated_ms?: number; latestAttempt?: { sessionId?: string; agentConversationId?: string | null; executorKind?: string; summary?: string | null; workspace?: { directory: string; branch?: string }; state: string } | null }
 
 export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { view: AgentSnapshot; reload: boolean } {
   if (event.id <= view.snapshotCursor) return { view, reload: false }
@@ -62,8 +62,8 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   }
   if (event.kind === 'message.delta') {
     const message = view.messages.find((m) => m.id === data.messageId)
-    if (!message || Array.from(message.content.text || '').length !== data.offset) return { view: next, reload: true }
-    next.messages = view.messages.map((m) => m.id === message.id ? { ...m, content: { ...m.content, text: (m.content.text || '') + data.text } } : m)
+    if (!message || (message.contentOffset ?? Array.from(message.content.text || '').length) !== data.offset) return { view: next, reload: true }
+    next.messages = view.messages.map((m) => m.id === message.id ? { ...m, contentOffset: data.offset + Array.from(data.text as string).length, content: { ...m.content, text: m.contentTruncated ? m.content.text : (m.content.text || '') + data.text } } : m)
     return { view: next, reload: false }
   }
   if (event.kind.startsWith('context.compaction.')) next.compaction = { operationId: data.operationId, state: event.kind.split('.').pop() || '', snapshotId: data.snapshotId }
