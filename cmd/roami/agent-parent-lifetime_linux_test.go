@@ -93,8 +93,10 @@ func TestAgentServeFollowsParentLifetime(t *testing.T) {
 			var pid int
 			for time.Now().Before(deadline) {
 				if body, e := os.ReadFile(childFile); e == nil {
-					pid, _ = strconv.Atoi(string(body))
-					break
+					if candidate, parseErr := strconv.Atoi(string(body)); parseErr == nil && candidate > 0 {
+						pid = candidate
+						break
+					}
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
@@ -116,7 +118,19 @@ func TestAgentServeFollowsParentLifetime(t *testing.T) {
 			_ = parent.Wait()
 			waited = true
 			events := []unix.PollFd{{Fd: int32(childFD), Events: unix.POLLIN}}
-			if _, err = unix.Poll(events, 5000); err != nil || events[0].Revents&unix.POLLIN == 0 {
+			deadline = time.Now().Add(5 * time.Second)
+			for {
+				remaining := int((time.Until(deadline) + time.Millisecond - 1) / time.Millisecond)
+				if remaining <= 0 {
+					break
+				}
+				_, err = unix.Poll(events, remaining)
+				// Runtime signals can interrupt poll without saying anything about child lifetime.
+				if err != unix.EINTR || !time.Now().Before(deadline) {
+					break
+				}
+			}
+			if err != nil || events[0].Revents&unix.POLLIN == 0 {
 				t.Fatalf("owned Python runtime survived parent %s: %v", name, err)
 			}
 			if body, e := os.ReadFile(childExit); e != nil || string(body) != "parent closed" {
