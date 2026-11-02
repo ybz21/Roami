@@ -1,0 +1,63 @@
+{
+  "id": "MECH-TF01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "后台任务失败分类与取消围栏",
+  "prompt": "验证截止、中断、未知结果、工作区停止证明、错误原因及旧步数限制的处理。",
+  "preconditions": "隔离临时SQLite、ArtifactStore与私有tmux实例；脚本化模型/CLI、本地进程和公开合成图文；无生产读写。",
+  "expected_terminal": "complete_source_frozen_task_recovery_receipts",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "输入清单、源代码和回归用例SHA256快照",
+    "零跳过且身份完全匹配的测试回执与原始输出",
+    "隔离实例清理与源码前后未变证明"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-TF01-H1",
+      "rule": "截止与父上下文中断分码，保留部分输出；有效公开原因码不被通用失败覆盖，私有诊断不进入结果。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TF01-H2",
+      "rule": "未知生命周期仍拒绝取消后的新工具；未知副作用不伪造停止、成功或重放，普通异常有停止证明才释放工作区。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TF01-H3",
+      "rule": "不支持的native会话及无效路径在创建任务前拒绝；旧限制不带到续作，超过16步仍可继续。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "task_failure_and_followup_input_regressions",
+    "issues": [
+      590,
+      591,
+      592,
+      593,
+      594,
+      595,
+      596
+    ],
+    "pull_request": 597,
+    "fixture_reproduction_only": true,
+    "private_history_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

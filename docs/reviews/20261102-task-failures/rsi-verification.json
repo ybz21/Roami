@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "receipts": [
+    {
+      "case": "MECH-TF01",
+      "passed": true,
+      "checks": {
+        "pytest": {
+          "tests": 47,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "identities_match": true,
+          "passed": true
+        },
+        "go": {
+          "groups": 6,
+          "leaf_tests": 12,
+          "failures_or_skips": 0,
+          "identities_match": true,
+          "passed": true
+        }
+      },
+      "commands": [
+        {
+          "kind": "pytest",
+          "exit_code": 0
+        },
+        {
+          "kind": "go",
+          "exit_code": 0
+        }
+      ],
+      "error_type": null,
+      "cleanup_exit_code": 0,
+      "implementation_unchanged": true,
+      "source_commit": "208323f44e3a74501a8a081e4075cb5e01b75ed4",
+      "frozen_sha256": "36bf641d9fcc554b655f46b2101b080f84537925cabb00c90c45a2e4ade05b64",
+      "external_model_calls": 0,
+      "historical_suite_updated": false,
+      "scope": "Synthetic protocol and process fixtures; not production replay or drawing-model acceptance"
+    },
+    {
+      "case": "MECH-SI01",
+      "passed": true,
+      "checks": {
+        "pytest": {
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "identities_match": true,
+          "passed": true
+        }
+      },
+      "commands": [
+        {
+          "kind": "pytest",
+          "exit_code": 0
+        }
+      ],
+      "error_type": null,
+      "cleanup_exit_code": 0,
+      "implementation_unchanged": true,
+      "source_commit": "208323f44e3a74501a8a081e4075cb5e01b75ed4",
+      "frozen_sha256": "36bf641d9fcc554b655f46b2101b080f84537925cabb00c90c45a2e4ade05b64",
+      "external_model_calls": 0,
+      "historical_suite_updated": false,
+      "scope": "Synthetic protocol and process fixtures; not production replay or drawing-model acceptance"
+    },
+    {
+      "case": "MECH-TC01",
+      "passed": true,
+      "checks": {
+        "pytest": {
+          "tests": 41,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "identities_match": true,
+          "passed": true
+        }
+      },
+      "commands": [
+        {
+          "kind": "pytest",
+          "exit_code": 0
+        }
+      ],
+      "error_type": null,
+      "cleanup_exit_code": 0,
+      "implementation_unchanged": true,
+      "source_commit": "208323f44e3a74501a8a081e4075cb5e01b75ed4",
+      "frozen_sha256": "36bf641d9fcc554b655f46b2101b080f84537925cabb00c90c45a2e4ade05b64",
+      "external_model_calls": 0,
+      "historical_suite_updated": false,
+      "scope": "Synthetic protocol and process fixtures; not production replay or drawing-model acceptance"
+    }
+  ],
+  "runner_and_catalog_tests": {
+    "passed": 32,
+    "skipped": 0
+  },
+  "quality": {
+    "full": {
+      "passed": true,
+      "python_passed": 3095,
+      "python_skipped": 48,
+      "python_seconds": 838.97,
+      "production_build_seconds": 44.04
+    },
+    "commit_quick": {
+      "passed": true,
+      "python_passed": 3095,
+      "python_skipped": 48,
+      "python_seconds": 838.18
+    },
+    "implementation_commit": "88e3e3ca",
+    "process_environment": "env -u ROAM_HOME; saved settings unchanged"
+  }
+}

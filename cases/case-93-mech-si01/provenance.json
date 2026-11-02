@@ -1,0 +1,8 @@
+{
+  "origin": "public_synthetic_runtime_and_protocol_fixtures",
+  "issues": [
+    "https://github.com/ybz21/Roami/issues/599"
+  ],
+  "fix": "https://github.com/ybz21/Roami/pull/597",
+  "description": "来自已确认产品缺陷的合成反例和正确拒绝。历史对话、项目内容、真实截图、凭据、旧任务运行状态均不进入Case；pytest夹具生成图片与文件。"
+}
