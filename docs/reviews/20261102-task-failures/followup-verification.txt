@@ -31,3 +31,41 @@ Affected workflow regression
 Final attachment/receipt and rejection coverage
 .............................                                            [100%]
 29 passed in 6.18s
+
+Follow-up full quality gate
+==> CLI entry audit
+CLI entry audit passed
+Install storage preflight passed: legacy/error preserve current installation; fresh layout accepted
+Python check scope passed: staged, branch, CI range, additions, deletions, renames, resources, dependencies, and missing history
+==> Shell syntax
+==> Go formatting
+==> Go tests
+==> Python Agent runtime
+All checks passed!
+3080 passed, 48 skipped in 816.78s (0:13:36)
+==> Frontend checks
+i18n audit passed: 4763 locale keys checked.
+==> Frontend build
+i18n audit passed: 4763 locale keys checked.
+✓ built in 43.48s
+compress-dist: 78 个文件生成 .br/.gz，较原文件省 19.5/17.9 MB 传输量
+==> Secret scan
+==> Staged file policy
+==> Quality gate passed
+
+Follow-up pre-commit quick gate
+==> CLI entry audit
+CLI entry audit passed
+Install storage preflight passed: legacy/error preserve current installation; fresh layout accepted
+Python check scope passed: staged, branch, CI range, additions, deletions, renames, resources, dependencies, and missing history
+==> Shell syntax
+==> Go formatting
+==> Go tests
+==> Python Agent runtime
+All checks passed!
+3080 passed, 48 skipped in 818.22s (0:13:38)
+==> Frontend checks
+i18n audit passed: 4763 locale keys checked.
+==> Secret scan
+==> Staged file policy
+==> Quality gate passed

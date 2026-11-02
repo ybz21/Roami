@@ -24,6 +24,8 @@
 | task_steer | `TASK_OUTCOME_UNRESOLVED` | 1 |
 | task_steer | `TASK_REVISION_CHANGED` | 1 |
 
+额外核对了 91 个 Main bash 调用：12 个含 Roami/session/attach 相关参数的失败或未知候选，包括 `USE_REGISTERED_CLI_CAPABILITY` 10 次、`WORKSPACE_REQUIRED` 1 次、缺少结构化错误码 1 次。候选包含一般项目管理和巡检，不全部属于续作失败；没有把它们累加为新的任务失败。当前源码未找到旧 `USE_REGISTERED_CLI_CAPABILITY` 生产点，当前注册 CLI 与工作区参数已有恢复说明；无结构化记录的那条无法断言根因，不重放旧命令取证。
+
 有 2 条带附件且已经接受的 handoff：
 
 - 2026-10-19 的已有会话发送：来源消息有 1 张截图，delegate 的 target.kind=session。当前实现只向 session 写文字与回报通道；未传入已校验的附件路径/MIME/hash。此代码缺陷可复现；旧目标是否通过其他办法读过图片没有充分记录，不能断言。
@@ -62,7 +64,10 @@
 - 旧基线 `654e16f7` 通过 `git archive` 提取到临时目录，只切换测试的 PYTHONPATH；未修改工作区源码或生产数据库。针对新增 21 个输入/恢复用例，基线为 **18 failed / 3 passed（4.90s）**，失败均为预期反例，正向保护仍有 3 项原本通过。结果见 [基线输出摘录](followup-verification.txt)。
 - 182 项受影响路径回归全部通过（41.35s）；最终附件、回执保留、拒绝说明与既有回报通道 29 项全部通过（6.18s）。
 - 覆盖带图与文件发送、缺失/篡改/删除/遗忘、校验期间撤回、旧审计来源、连续两次纯文字续作、native 附图复制、原执行器/session 保留、unknown 不重发，以及 stale revision / pending / missing session / unknown outcome 的拒绝与说明持久化。
-- 全仓 quick/full 门禁待完成，完成后补入真实结果。没有运行旧业务、真实绘图模型或旧任务外部写入，因此不声称完成了生产独立验收。
+- **最终完整门禁通过**：`env -u ROAM_HOME bash scripts/dev/quality/check.sh full`，Go 全仓测试、Python **3080 passed / 48 skipped**（816.78s）、ruff、i18n 4763 keys、hover、typecheck、生产 build（43.48s）及压缩产物、秘密扫描、文件策略均通过。
+- **提交钩子 quick 通过**，Python 3080 passed / 48 skipped（818.22s），没有跳过钩子。48 个跳过项仍按测试原有外部环境/opt-in 条件处理，不当成独立验收成功。
+- 修复提交 `41e89f07`；与补充文档一起推送同一 [draft PR #597](https://github.com/ybz21/Roami/pull/597)。[实际回归日志截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-597/followup-regression.png) 只存 pr-shots 分支，不进 main。
+- Markdown 已实际渲染，两个表格分别 14 行与 4 行，每行三列，本地链接均存在。没有运行旧业务、真实绘图模型或旧任务外部写入，因此不声称完成了生产独立验收；追加提交的远端 CI 需要等待实际结果。
 
 ## 保留限制
 

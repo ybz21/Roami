@@ -314,5 +314,158 @@
       "sourcePointerPresent": false
     }
   ],
-  "privacy": "No raw conversation text, private project content, raw images, source attachment IDs, tool arguments or reference keys exported."
+  "privacy": "No raw conversation text, private project content, raw images, source attachment IDs, tool arguments or reference keys exported.",
+  "additionalShellReview": {
+    "capturedUTC": "2026-11-02T12:24:57.168757+00:00",
+    "mainShellCallsRead": 91,
+    "matchingRejectedCandidates": 12,
+    "candidateRule": "failed/unknown Main bash argv containing Roami/retired CLI/attach/task_steer; includes project and inspection operations, not all are continuation failures",
+    "counts": {
+      "USE_REGISTERED_CLI_CAPABILITY": 10,
+      "(no structured code)": 1,
+      "WORKSPACE_REQUIRED": 1
+    },
+    "evidence": [
+      {
+        "toolCallId": "e3c339b5be3241938e71064465dac70f",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "project",
+          "help"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "6aff2ac8803f465eb4ff6eccd0cf281a",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "agent",
+          "help"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "dc035dfd99b44fcbbbb308fd4cb3b6ec",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "project",
+          "create"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "084987b3940547ffbcaa03f48cfc51a5",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "session",
+          "help"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "9627987bf1b2483389034a95caf9217e",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "project",
+          "prefs"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "d78d059936044375906a022fa817e063",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "project",
+          "prefs"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "3c88eeab76d944d1b3e9055938eac61c",
+        "turnId": "7c634609c82a483a9c802570d5bc74d3",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "project",
+          "create"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "0c61fe351216419a854bc6fd12f7a083",
+        "turnId": "a9b780249cdf49339080df59b47b37e0",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "project",
+          "create"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "f0d7a22bd0ed489aa75e8e355a10d647",
+        "turnId": "73f14e84378f4bfe9150bd5b2dad2ce6",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "session",
+          "help"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "b473ecb34705471b9889b37e17ba479d",
+        "turnId": "73f14e84378f4bfe9150bd5b2dad2ce6",
+        "state": "failed",
+        "commandFamily": [
+          "roami",
+          "session",
+          "capture"
+        ],
+        "errorCode": "USE_REGISTERED_CLI_CAPABILITY",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "f3a1658ea3af47ba8bf5abdd4bc988e7",
+        "turnId": "bc6b09e6aac64a31ad3da0469bab7163",
+        "state": "failed",
+        "commandFamily": [
+          "bash"
+        ],
+        "errorCode": "(no structured code)",
+        "hasResultMessage": true
+      },
+      {
+        "toolCallId": "844a89e5a8274987ad4150d5e6b84803",
+        "turnId": "bc6b09e6aac64a31ad3da0469bab7163",
+        "state": "failed",
+        "commandFamily": [
+          "bash"
+        ],
+        "errorCode": "WORKSPACE_REQUIRED",
+        "hasResultMessage": true
+      }
+    ]
+  }
 }
