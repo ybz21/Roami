@@ -17,6 +17,29 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row, rows
 
 
+@pytest.mark.parametrize("scope", ["host", "workspace"])
+@pytest.mark.parametrize("form", ["argv", "command"])
+async def test_disabled_shell_blocks_foundation_bash_before_process_start(
+    store, tmp_path, scope, form
+):
+    import shlex
+
+    runtime = Runtime(store, ConversationModel(), settings=Settings(shell_roots=(tmp_path,)))
+    target = tmp_path / "must-not-start"
+    argv = [sys.executable, "-c", f"from pathlib import Path; Path({str(target)!r}).touch()"]
+    args = {"scope": scope, **({"argv": argv} if form == "argv" else {"command": shlex.join(argv)})}
+    if scope == "workspace":
+        args["cwd"] = str(tmp_path)
+    runtime.tools.disabled_tools.add("shell")
+    try:
+        with pytest.raises(DomainError, match="^TOOL_DISABLED$"):
+            await runtime.tools.invoke(call("bash", args), "main", {"owner": "alice"})
+        assert not target.exists()
+        assert not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize(
     "argv", [["ps", "-p", str(os.getpid()), "-o", "pid="], ["df", "-k"], ["uname", "-s"]]
 )

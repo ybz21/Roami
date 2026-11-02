@@ -1,0 +1,337 @@
+{
+  "schema_version": 1,
+  "input_revision": "source-bound-oracle-v4",
+  "case_id": "CHAT-STACK01",
+  "scenarios": [
+    {
+      "id": "chat-constraints-accumulate",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "只聊天，不建任务或文件。整理读书会约束：人数30，预算3000。只返回JSON，键为主题、人数、预算。",
+          "fixture": [
+            {
+              "text": "{\"主题\": \"读书会\", \"人数\": 30, \"预算\": 3000}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "主题": "读书会",
+              "人数": 30,
+              "预算": 3000
+            }
+          }
+        },
+        {
+          "text": "读书会预算改为5000，其他不变。仍只返回这三个键的JSON。",
+          "fixture": [
+            {
+              "text": "{\"主题\": \"读书会\", \"人数\": 30, \"预算\": 5000}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "主题": "读书会",
+              "人数": 30,
+              "预算": 5000
+            }
+          }
+        },
+        {
+          "text": "再给读书会加上场地二楼，原有字段保留。只返回完整JSON。",
+          "fixture": [
+            {
+              "text": "{\"主题\": \"读书会\", \"人数\": 30, \"预算\": 5000, \"场地\": \"二楼\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "主题": "读书会",
+              "人数": 30,
+              "预算": 5000,
+              "场地": "二楼"
+            }
+          }
+        },
+        {
+          "text": "读书会人数改成45，场地和预算沿用刚才的值。只返回完整JSON。",
+          "fixture": [
+            {
+              "text": "{\"主题\": \"读书会\", \"人数\": 45, \"预算\": 5000, \"场地\": \"二楼\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "主题": "读书会",
+              "人数": 45,
+              "预算": 5000,
+              "场地": "二楼"
+            }
+          }
+        },
+        {
+          "text": "现在汇总读书会所有已确认字段，只返回JSON；仍然只是聊天，不创建后台任务。",
+          "fixture": [
+            {
+              "text": "{\"主题\": \"读书会\", \"人数\": 45, \"预算\": 5000, \"场地\": \"二楼\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "主题": "读书会",
+              "人数": 45,
+              "预算": 5000,
+              "场地": "二楼"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat-correction-and-removal",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "先讨论海报，不建任务。约束为颜色蓝色、版式双栏、语言中文。只返回JSON，键为颜色、版式、语言。",
+          "fixture": [
+            {
+              "text": "{\"颜色\": \"蓝色\", \"版式\": \"双栏\", \"语言\": \"中文\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "颜色": "蓝色",
+              "版式": "双栏",
+              "语言": "中文"
+            }
+          }
+        },
+        {
+          "text": "海报颜色改成绿色，双栏和中文保持。只返回完整JSON。",
+          "fixture": [
+            {
+              "text": "{\"颜色\": \"绿色\", \"版式\": \"双栏\", \"语言\": \"中文\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "颜色": "绿色",
+              "版式": "双栏",
+              "语言": "中文"
+            }
+          }
+        },
+        {
+          "text": "取消海报的版式约束，删除版式这个键，其他已确认项保留。只返回JSON。",
+          "fixture": [
+            {
+              "text": "{\"颜色\": \"绿色\", \"语言\": \"中文\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "颜色": "绿色",
+              "语言": "中文"
+            }
+          }
+        },
+        {
+          "text": "海报再加标题一起阅读。只返回当前全部约束的JSON。",
+          "fixture": [
+            {
+              "text": "{\"颜色\": \"绿色\", \"语言\": \"中文\", \"标题\": \"一起阅读\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "颜色": "绿色",
+              "语言": "中文",
+              "标题": "一起阅读"
+            }
+          }
+        },
+        {
+          "text": "复核最后确认的海报约束，不要恢复已取消的版式。只返回JSON。",
+          "fixture": [
+            {
+              "text": "{\"颜色\": \"绿色\", \"语言\": \"中文\", \"标题\": \"一起阅读\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "颜色": "绿色",
+              "语言": "中文",
+              "标题": "一起阅读"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat-language-and-format",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "Discussion only, no tasks or files. Track topic reading, audience students, tone plain. Return only JSON with topic, audience and tone.",
+          "fixture": [
+            {
+              "text": "{\"topic\": \"reading\", \"audience\": \"students\", \"tone\": \"plain\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "topic": "reading",
+              "audience": "students",
+              "tone": "plain"
+            }
+          }
+        },
+        {
+          "text": "Change the audience to parents and retain the other fields. Return only JSON.",
+          "fixture": [
+            {
+              "text": "{\"topic\": \"reading\", \"audience\": \"parents\", \"tone\": \"plain\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "topic": "reading",
+              "audience": "parents",
+              "tone": "plain"
+            }
+          }
+        },
+        {
+          "text": "Add length as the number 120. Keep all current fields. Return only JSON.",
+          "fixture": [
+            {
+              "text": "{\"topic\": \"reading\", \"audience\": \"parents\", \"tone\": \"plain\", \"length\": 120}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "topic": "reading",
+              "audience": "parents",
+              "tone": "plain",
+              "length": 120
+            }
+          }
+        },
+        {
+          "text": "把tone改成warm，键和值仍使用上面的英文，其他保持不变。只返回JSON，不建任务。",
+          "fixture": [
+            {
+              "text": "{\"topic\": \"reading\", \"audience\": \"parents\", \"tone\": \"warm\", \"length\": 120}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "topic": "reading",
+              "audience": "parents",
+              "tone": "warm",
+              "length": 120
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat-topic-interleave",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "只聊天：小组会地点三楼、预算800、人数12，只返回键为地点、预算、人数的JSON。",
+          "fixture": [
+            {
+              "text": "{\"地点\": \"三楼\", \"预算\": 800, \"人数\": 12}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "地点": "三楼",
+              "预算": 800,
+              "人数": 12
+            }
+          }
+        },
+        {
+          "text": "插问一个独立算术题：13乘17是多少？只返回整数，别创建任务。",
+          "fixture": [
+            {
+              "text": "221"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": 221
+          }
+        },
+        {
+          "text": "回到刚才的小组会，只返回已确认全部字段的JSON。",
+          "fixture": [
+            {
+              "text": "{\"地点\": \"三楼\", \"预算\": 800, \"人数\": 12}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "地点": "三楼",
+              "预算": 800,
+              "人数": 12
+            }
+          }
+        },
+        {
+          "text": "小组会再增加两个人，其他不改。只返回完整JSON。",
+          "fixture": [
+            {
+              "text": "{\"地点\": \"三楼\", \"预算\": 800, \"人数\": 14}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "地点": "三楼",
+              "预算": 800,
+              "人数": 14
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
