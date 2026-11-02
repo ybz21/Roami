@@ -1,0 +1,33 @@
+Baseline 654e16f7 (unmodified source/migrations extracted by git archive; current regression tests, temporary PYTHONPATH)
+
+agent-runtime/tests/test_followup_rejection_recovery.py:76: KeyError
+=========================== short test summary info ============================
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_existing_session_receives_current_image_and_file_once
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[tamper]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[missing]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[deleted]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_task_inputs_survive_multiple_text_followups_without_unrelated_images
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_continuation_inputs_follow_real_source_not_audit_copy[False-False]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_continuation_inputs_follow_real_source_not_audit_copy[True-False]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_continuation_inputs_follow_real_source_not_audit_copy[False-True]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_continuation_inputs_follow_real_source_not_audit_copy[True-True]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_session_input_forgotten_during_integrity_check_does_not_send
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_unknown_image_delivery_is_not_replayed
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_native_followup_uses_actual_source_after_legacy_snapshot_loss[None]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_native_followup_uses_actual_source_after_legacy_snapshot_loss[source]
+FAILED agent-runtime/tests/test_followup_input_handoff.py::test_native_followup_uses_actual_source_after_legacy_snapshot_loss[attachment]
+FAILED agent-runtime/tests/test_followup_rejection_recovery.py::test_continuation_rejection_has_recovery_without_new_work[revision]
+FAILED agent-runtime/tests/test_followup_rejection_recovery.py::test_continuation_rejection_has_recovery_without_new_work[pending]
+FAILED agent-runtime/tests/test_followup_rejection_recovery.py::test_continuation_rejection_has_recovery_without_new_work[session]
+FAILED agent-runtime/tests/test_followup_rejection_recovery.py::test_continuation_rejection_has_recovery_without_new_work[outcome]
+18 failed, 3 passed in 4.90s
+
+Affected workflow regression
+........................................................................ [ 39%]
+........................................................................ [ 79%]
+......................................                                   [100%]
+182 passed in 41.35s
+
+Final attachment/receipt and rejection coverage
+.............................                                            [100%]
+29 passed in 6.18s

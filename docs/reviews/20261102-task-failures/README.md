@@ -2,6 +2,10 @@
 
 排查基线：`08ad956b`；日期：2026-11-02；项目：`2026-0728-1202-30xe`；仓库：[ybz21/Roami](https://github.com/ybz21/Roami)。
 
+## 续作与附图补充调查
+
+[历史 attach / 原任务续作 / 附图输入追加报告](followup-history.md)：从历史消息与工具记录发现并修复新增 3 类问题，新增 issue #599、#600、#601；继续提交到同一 draft PR #597。首轮统计和验证保持原口径。
+
 ## 结论与范围
 
 这批失败并非同一个根因。最大历史类别是旧执行步数限制（8 次），其次是无法区分 deadline 与中断的旧混合码（5 次）。当前代码仍有 7 个可复现缺陷，本次分别建 issue 并修复：停止判定、异常原因链、CLI 中断分类、项目错误透传、native 目标准入；截图补充的 unknown 生命周期取消围栏、观测原因丢失。**2 次历史 NATIVE_WORKSPACE_OUTCOME_UNKNOWN 的内层事件与工具记录确有 TOOL_OUTCOME_UNKNOWN，不能认定它们属于“已停止异常被误判”的新发现缺陷。**
@@ -119,12 +123,12 @@ COMMIT;
 
 运行时修复提交：`508abe62`；分支：`agent/a731ff893788cf273fba8922`。
 
-PR：[draft #597](https://github.com/ybz21/Roami/pull/597)。本分支修复均未合并、未部署，因此历史数据不变，不能宣称线上失败率已经下降。PR 已确认 draft / OPEN / MERGEABLE；GitHub CI 仍在运行，本地门禁通过不代替 CI 结论。
+PR：[draft #597](https://github.com/ybz21/Roami/pull/597)。本分支修复均未合并、未部署，因此历史数据不变，不能宣称线上失败率已经下降。PR 已确认 draft / OPEN / MERGEABLE；首轮提交 654e16f7 的 GitHub 检查已全部通过；追加修复的验证与 CI 状态见补充报告和 PR，首轮结果不替代新增提交的检查。
 
 剩余事项：
 
 - #350 的真实模型历史对话全量重跑、上线配置审计与部署验收仍待原 issue 完成；本次不改变节点保存的模型路线或参数。
-- #398 的旧未知恢复仍需逐任务停止与副作用核验。`dispatch/tasks.py:497-503` 的 stopConfirmed 派生仍要求 outcomeKnown 非 false，因此“inputStopped=true 但最终结果未知”的旧任务也会回报 stopConfirmed=false；此字段的语义拆分仍需与恢复/重放契约一起审计，未在本次局部放开。当前 stopped_navigation 只支持 resourceOnly 的纯导航且有明确停止证据；两个 project 工作区未知任务不能被无条件套入这个恢复入口。
+- #398 的旧未知恢复仍需逐任务停止与副作用核验。首轮指出的 stopConfirmed 混用已在追加调查中修正：明确 inputStopped=true 时确认停止，同时保留 outcomeKnown=false 与未知写入保护。旧 project 工作区未知任务仍不能无条件套入只读导航恢复入口。
 - 工作区 lease 的 Go deadline 与 Python 最终释放确认可能发生竞态；本次只修正已观察的分类路径，没有为原 hold 协议设计新的停止宽限/接管协议。必须继续保持 unknown，不能因 deadline 到期便声称工具已停。
 - 凭据失效、旧 session 无回调、工作区实际失效、当时浏览器驱动不可用均未替用户更改环境；旧通用错误缺证据，无法恢复未保存的原诊断。
 - 平台 capability read 返回 ACTIVE_TASK_CONTEXT_REQUIRED；使用仓库同源 Roami Skill 与本机只读数据库完成调查，未读取或复制私有 context 内容。

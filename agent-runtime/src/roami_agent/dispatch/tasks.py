@@ -494,7 +494,7 @@ class Tasks:
             task["latestAttempt"]["outcomeKnown"] = result.get(
                 "outcomeKnown", False if task["latestAttempt"]["state"] == "unknown" else None
             )
-            task["latestAttempt"]["stopConfirmed"] = (
+            task["latestAttempt"]["stopConfirmed"] = result.get("inputStopped") is True or (
                 task["latestAttempt"]["state"] in {"succeeded", "failed", "cancelled"}
                 and bool(result)
                 and result.get("outcomeKnown") is not False

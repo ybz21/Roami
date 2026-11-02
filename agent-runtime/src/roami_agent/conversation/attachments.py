@@ -59,6 +59,21 @@ def context_attachments(db, owner, content):
     return previews, evidence
 
 
+async def verified_attachment_inputs(artifacts, owner, references):
+    if references and artifacts is None:
+        raise DomainError("ATTACHMENT_INPUTS_UNAVAILABLE", 503)
+    files = []
+    for attachment in {item["id"]: item for item in references}.values():
+        reference, path = await artifacts.verified_path(owner, attachment["id"])
+        files.append(
+            {
+                **{k: reference[k] for k in ("id", "name", "mimeType", "sha256", "sizeBytes")},
+                "path": str(path),
+            }
+        )
+    return files
+
+
 class Attachments:
     def __init__(self, database, artifacts):
         self.db, self.artifacts = database, artifacts

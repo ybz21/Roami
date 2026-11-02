@@ -1,0 +1,318 @@
+{
+  "capturedUTC": "2026-11-02T12:12:44.213037+00:00",
+  "baseCommit": "654e16f7",
+  "source": "SQLite mode=ro explicit BEGIN read snapshot with authenticated immutable native archive resolution available via O_RDONLY/O_NOFOLLOW; no runtime initialization or archive writes",
+  "messagesRead": 2909,
+  "toolCallsRead": 1327,
+  "userTurns": 178,
+  "nativePayloadsResolved": 0,
+  "payloadsUnavailable": 0,
+  "handoffErrors": [
+    {
+      "tool": "delegate",
+      "errorCode": "EXECUTION_DIRECTORY_UNAVAILABLE",
+      "count": 1
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "INVALID_TASK_TARGET",
+      "count": 3
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "INVALID_TOOL_ARGUMENTS",
+      "count": 1
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "REQUEST_COVERAGE_SOURCE_REQUIRED",
+      "count": 1
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "REQUEST_HANDOFF_REQUIRED",
+      "count": 2
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "count": 11
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "TASK_COMPLETION_RESTART_FORBIDDEN",
+      "count": 1
+    },
+    {
+      "tool": "delegate",
+      "errorCode": "TASK_TARGET_REVIEW_REQUIRED",
+      "count": 1
+    },
+    {
+      "tool": "session_send",
+      "errorCode": "SESSION_TARGET_NOT_FOUND",
+      "count": 1
+    },
+    {
+      "tool": "target_resolve",
+      "errorCode": "SESSION_TARGET_NOT_FOUND",
+      "count": 2
+    },
+    {
+      "tool": "task_steer",
+      "errorCode": "REQUEST_HANDOFF_REQUIRED",
+      "count": 1
+    },
+    {
+      "tool": "task_steer",
+      "errorCode": "TASK_OUTCOME_UNRESOLVED",
+      "count": 1
+    },
+    {
+      "tool": "task_steer",
+      "errorCode": "TASK_REVISION_CHANGED",
+      "count": 1
+    }
+  ],
+  "failedHandoffEvidence": [
+    {
+      "toolCallId": "63ebcdf3c7d045d3b3af3f1caebf6fb9",
+      "turnId": "c15cbed0ed5c4818b991787af317aa26",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "INVALID_TASK_TARGET",
+      "createdMs": 1792295452871
+    },
+    {
+      "toolCallId": "9ccf62cfc31343d284a4a23c7d4101cf",
+      "turnId": "c15cbed0ed5c4818b991787af317aa26",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "INVALID_TASK_TARGET",
+      "createdMs": 1792295464372
+    },
+    {
+      "toolCallId": "6bf10cef873b413d9573328498aa2545",
+      "turnId": "c15cbed0ed5c4818b991787af317aa26",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "INVALID_TASK_TARGET",
+      "createdMs": 1792295477656
+    },
+    {
+      "toolCallId": "619bb849317742ddac47c35e516207e1",
+      "turnId": "8fc3ddc49a504291952b76ba33ffcbc8",
+      "tool": "target_resolve",
+      "state": "failed",
+      "errorCode": "SESSION_TARGET_NOT_FOUND",
+      "createdMs": 1792318036235
+    },
+    {
+      "toolCallId": "5b94ffbf533c4d279020e98247f762c3",
+      "turnId": "8fc3ddc49a504291952b76ba33ffcbc8",
+      "tool": "target_resolve",
+      "state": "failed",
+      "errorCode": "SESSION_TARGET_NOT_FOUND",
+      "createdMs": 1792318051550
+    },
+    {
+      "toolCallId": "128f00bd270f4a04b5fbc9f2de679d13",
+      "turnId": "7ca02d31d1e94b6fba70046ea2657bb9",
+      "tool": "session_send",
+      "state": "failed",
+      "errorCode": "SESSION_TARGET_NOT_FOUND",
+      "createdMs": 1792401527638
+    },
+    {
+      "toolCallId": "bb49720d93fc4617bfd32f226be3e4ab",
+      "turnId": "d78489175d2344e0b1209ec73ad02cec",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792410874020
+    },
+    {
+      "toolCallId": "60dfff39205d45358583f6db445e0849",
+      "turnId": "d78489175d2344e0b1209ec73ad02cec",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792410896412
+    },
+    {
+      "toolCallId": "1d53ede91e5d4fc88beb33e108049f51",
+      "turnId": "0f0cc7b46f0449229cfe480d371b267d",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792417087455
+    },
+    {
+      "toolCallId": "2b812e51304742f0ad0aad53c5a0d324",
+      "turnId": "a423cb6470ab429d9bf9864645a77929",
+      "tool": "task_steer",
+      "state": "failed",
+      "errorCode": "TASK_REVISION_CHANGED",
+      "createdMs": 1792417519409
+    },
+    {
+      "toolCallId": "ba6e09e3822e4205a2dcf3d2aded3702",
+      "turnId": "45d9aa8c18024b5094b3ff501e34eb8e",
+      "tool": "task_steer",
+      "state": "failed",
+      "errorCode": "TASK_OUTCOME_UNRESOLVED",
+      "createdMs": 1792560196004
+    },
+    {
+      "toolCallId": "66fda350512b4023842342d608667971",
+      "turnId": "12339bd02bb24e50bd91bd187793d079",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792625630852
+    },
+    {
+      "toolCallId": "a5cfcbb25402465a96043bb77da2c508",
+      "turnId": "bc8f759e413144968bd0f54ff19c493e",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792649199340
+    },
+    {
+      "toolCallId": "bdcab449b4c64914af79c46dedbbfb1d",
+      "turnId": "7c634609c82a483a9c802570d5bc74d3",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "INVALID_TOOL_ARGUMENTS",
+      "createdMs": 1792768870054
+    },
+    {
+      "toolCallId": "a88c43e988e543ac907ba49687551e87",
+      "turnId": "7c634609c82a483a9c802570d5bc74d3",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792768889476
+    },
+    {
+      "toolCallId": "012681431b924138b8f89d04b48b267d",
+      "turnId": "a9b780249cdf49339080df59b47b37e0",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792768927372
+    },
+    {
+      "toolCallId": "55442bb7ac5a40de9c49a0fa18827bda",
+      "turnId": "a9b780249cdf49339080df59b47b37e0",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792768936348
+    },
+    {
+      "toolCallId": "059c9d5cb2bd462caf4efd5fe684b87c",
+      "turnId": "3288146ed0324ec5a274e6717bb805a8",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792857392295
+    },
+    {
+      "toolCallId": "389d67313e914ed6a6e8f74b2b94d6a7",
+      "turnId": "73f14e84378f4bfe9150bd5b2dad2ce6",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1792916925922
+    },
+    {
+      "toolCallId": "a4e85dd40599422085bdddc4455319a2",
+      "turnId": "0ca322b2c3f44cb0aa7c297db8608581",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "EXECUTION_DIRECTORY_UNAVAILABLE",
+      "createdMs": 1793236314328
+    },
+    {
+      "toolCallId": "2e8b71533e874852a3771f7ae0221152",
+      "turnId": "0ca322b2c3f44cb0aa7c297db8608581",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "TASK_TARGET_REVIEW_REQUIRED",
+      "createdMs": 1793236323611
+    },
+    {
+      "toolCallId": "d5bc2a9da1c944d38c1a779f2b519707",
+      "turnId": "c3f8e226fa534bbebf7548beae8ffbaf",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "ROUTING_EXPLICIT_SOURCE_REQUIRED",
+      "createdMs": 1793245744275
+    },
+    {
+      "toolCallId": "82340940b1d1449a8263456800ba4170",
+      "turnId": "fff5c200998c49b9b4a565147e68ba5c",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "REQUEST_HANDOFF_REQUIRED",
+      "createdMs": 1793254053573
+    },
+    {
+      "toolCallId": "1932ea2012cc4612aeb18af4e2b23898",
+      "turnId": "46cc0c4394e44b9f98d959f6b23b9023",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "TASK_COMPLETION_RESTART_FORBIDDEN",
+      "createdMs": 1793266899049
+    },
+    {
+      "toolCallId": "cd40ad47425f42c8b3551f29ce60eceb",
+      "turnId": "2e0d46502da04e43a89a32592c927b24",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "REQUEST_COVERAGE_SOURCE_REQUIRED",
+      "createdMs": 1793355522008
+    },
+    {
+      "toolCallId": "1ac91a1fac9149cabae28bf2a3da3020",
+      "turnId": "9709c91dacd64618b75720a2ec7a5e84",
+      "tool": "delegate",
+      "state": "failed",
+      "errorCode": "REQUEST_HANDOFF_REQUIRED",
+      "createdMs": 1793615158407
+    },
+    {
+      "toolCallId": "035fe9c9076d40fbbc0c97d2dfd48007",
+      "turnId": "e9165ce2db3a4ce1b82f8845540ddde0",
+      "tool": "task_steer",
+      "state": "failed",
+      "errorCode": "REQUEST_HANDOFF_REQUIRED",
+      "createdMs": 1793615300400
+    }
+  ],
+  "imageHandoffEvidence": [
+    {
+      "toolCallId": "ded4b8ca43b0443395befda9a0ca94f9",
+      "turnId": "6f19dbd1de394ab58bbd70c70b645349",
+      "tool": "delegate",
+      "state": "succeeded",
+      "sourceImageOrFileCount": 1,
+      "targetKind": "session"
+    },
+    {
+      "toolCallId": "a5a4bba2c9f54be3ba9cba208fc3ff9c",
+      "turnId": "42c1e20b444f4b078fd2f3da7a72c508",
+      "tool": "task_steer",
+      "state": "succeeded",
+      "sourceImageOrFileCount": 1,
+      "targetKind": null,
+      "operationId": "5b8df1df7ba3404eb25a7eabc01d4d74",
+      "payloadAttachmentCount": 0,
+      "auditAttachmentCount": 0,
+      "sourcePointerPresent": false
+    }
+  ],
+  "privacy": "No raw conversation text, private project content, raw images, source attachment IDs, tool arguments or reference keys exported."
+}
