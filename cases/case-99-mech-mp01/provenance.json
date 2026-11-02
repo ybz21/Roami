@@ -1,0 +1,8 @@
+{
+  "case_id": "MECH-MP01",
+  "origin": "Repository-authored synthetic CSV and independent arithmetic expectations",
+  "source": "input/calendar-series.csv",
+  "contains_private_inputs": false,
+  "contains_benchmark_answers": false,
+  "historical_suite_updated": false
+}

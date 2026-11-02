@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MP01",
+  "data": {
+    "kind": "public_synthetic_market_series",
+    "inputs": [
+      "input/calendar-series.csv",
+      "input/crossing-series.csv"
+    ],
+    "description": "四行乱序跨年数据，价格100→50→75→75，成交量1、9、3、100；可独立手算收益、回撤与分组中位数。 另一份八行乱序材料覆盖均线相等、恢复原符号和跨年反向交叉；日期由实际观测索引定位。"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "offline_external_skill_report"
+  },
+  "acceptance": {
+    "kind": "frozen_pytest_and_real_render_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "no_skips": true
+  },
+  "scope": "Mechanism regression only; not a human visual grade or original stock benchmark acceptance"
+}

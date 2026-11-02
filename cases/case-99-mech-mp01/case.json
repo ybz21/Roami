@@ -1,0 +1,54 @@
+{
+  "id": "MECH-MP01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "外挂报告",
+  "prompt": "从公开跨年价格和成交量材料生成事实一致的图表、可编辑报告与讲稿，并校验实际保存文件的渲染、字段合同和不可覆盖发布。",
+  "preconditions": "本地隔离镜像具备 tools.json 中的依赖；不连接模型、网关、用户云盘或生产调度。",
+  "expected_terminal": "source_bound_report_and_final_render_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "公开材料和源码冻结清单",
+    "16项无跳过测试回执",
+    "实际九页PPTX、讲稿与匹配文件哈希的渲染图"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-MP01-H1",
+      "rule": "按日期排序计算，区分价格变化、运行峰值回撤、日历分组和有序依赖；保留未定义系数。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MP01-H2",
+      "rule": "原始与清洗CSV字段不匹配时在发布前失败；已有目标不被覆盖，输入保持不变。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MP01-H3",
+      "rule": "LibreOffice实际渲染保存后的九页报告，成品和每页PNG与回执哈希匹配；渲染不冒充视觉验收。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_calendar_price_volume",
+    "issue": 446,
+    "fixture_reproduction_only": true
+  },
+  "resources": {
+    "inputs": [
+      "input/calendar-series.csv",
+      "input/crossing-series.csv"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

@@ -57,6 +57,14 @@ jobs:
           uv run --project agent-runtime --frozen ruff format --check skills/tabular-analysis
           uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/tabular-analysis/tests
 
+      - name: Check external market report Skill
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-impress poppler-utils fontconfig fonts-liberation
+          uv run --project agent-runtime --frozen ruff check skills/market-series-report cases/case-99-mech-mp01/scripts
+          uv run --project agent-runtime --frozen ruff format --check skills/market-series-report cases/case-99-mech-mp01/scripts
+          uv run --isolated --with 'pandas>=2.2,<4' --with 'matplotlib>=3.8,<4' --with 'python-pptx>=1,<2' --with pytest pytest -q -p no:cacheprovider skills/market-series-report/tests
+
       - name: Check external video assembly Skill
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
