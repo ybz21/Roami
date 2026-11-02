@@ -1,6 +1,6 @@
 {
   "capturedUTC": "2026-11-02T10:28:00.402402+00:00",
-  "source": "local runtime.db read-only transaction; no task contents, credentials or raw tool arguments exported",
+  "source": "local runtime.db read-only queries; no task contents, credentials or raw tool arguments exported",
   "tasks": 53,
   "attempts": 77,
   "taskStates": {
