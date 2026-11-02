@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN" data-pointer="fine" data-size="large">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>思考强度四档 · 设计示意</title>
+  <link rel="stylesheet" href="assets/tokens.css">
+  <style>
+    * { box-sizing:border-box; }
+    html,body { height:100%; overflow:hidden; margin:0; }
+    body { display:flex; flex-direction:column; background:var(--bg-base); color:var(--text-bright); font:var(--fs-body)/1.6 system-ui,sans-serif; }
+    button { font:inherit; color:inherit; cursor:pointer; }
+    button:focus-visible { outline:1px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
+    .toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+    .toolbar strong { margin-right:auto; font-size:var(--fs-body); }
+    .toolbar button { min-height:var(--tap); background:transparent; border:1px solid var(--border-subtle); border-radius:var(--r-xs); padding:var(--sp-2) var(--sp-3); }
+    .toolbar button[aria-pressed="true"] { background:var(--sel-bg); color:var(--accent); }
+    .scroll { flex:1; min-height:0; overflow:auto; padding:var(--sp-5) var(--sp-4); }
+    .intro { max-width:calc(var(--sp-5) * 32); margin:0 auto var(--sp-4); color:var(--text-dim); font-size:var(--fs-sm); }
+    .stage { margin:auto; width:100%; max-width:calc(var(--sp-5) * 32); min-height:calc(var(--tap) * 12); display:flex; flex-direction:column; justify-content:flex-end; gap:var(--sp-4); }
+    .sample-message { padding:var(--sp-4); margin-bottom:auto; border-bottom:1px solid var(--border-subtle); }
+    .sample-message p { margin:0; }
+    .sample-message small { display:block; color:var(--text-dim); font-size:var(--fs-meta); margin-top:var(--sp-2); }
+    .picker { background:var(--bg-elevated); border-radius:var(--r-card); width:calc(var(--sp-4) * 20); max-width:100%; align-self:flex-end; overflow:hidden; }
+    .picker[hidden] { display:none; }
+    .picker-head { display:flex; align-items:center; padding:var(--sp-2) var(--sp-4); border-bottom:1px solid var(--border-subtle); gap:var(--sp-2); }
+    .picker-head strong { flex:1; font-size:var(--fs-body); font-weight:500; }
+    .close { display:grid; place-items:center; width:var(--tap); height:var(--tap); margin-right:calc(-1 * var(--sp-2)); border:0; border-radius:var(--r-xs); background:transparent; }
+    .icon { display:block; width:var(--sp-4); height:var(--sp-4); background:currentColor; mask:var(--icon) center/contain no-repeat; }
+    .close .icon { --icon:url('assets/close.svg'); }
+    .choices { padding:var(--sp-2); }
+    .choice { display:grid; grid-template-columns:minmax(0,1fr) var(--sp-5); align-items:center; gap:var(--sp-3); padding:var(--sp-2); width:100%; min-height:var(--tap); border:0; border-radius:var(--r-xs); text-align:left; background:transparent; }
+    .choice strong { display:block; font-weight:500; }
+    .choice small { display:block; font-size:var(--fs-meta); color:var(--text-dim); }
+    .choice .icon { --icon:url('assets/check.svg'); visibility:hidden; justify-self:end; color:var(--accent); }
+    .choice[aria-checked="true"] { background:var(--sel-bg); }
+    .choice[aria-checked="true"] .icon { visibility:visible; }
+    :where(html[data-pointer="fine"]) .choice:hover,:where(html[data-pointer="fine"]) .close:hover { background:var(--list-hover); }
+    .composer { background:var(--bg-container); border:1px solid var(--border-subtle); border-radius:var(--r-card); padding:var(--sp-3) var(--sp-4); }
+    .draft { min-height:var(--tap); color:var(--text-dim); }
+    .composer-actions { display:flex; align-items:center; gap:var(--sp-2); }
+    .model { font-size:var(--fs-sm); color:var(--text-dim); overflow-wrap:anywhere; }
+    .trigger { min-height:var(--tap); padding:var(--sp-2) var(--sp-3); border:0; border-radius:var(--r-xs); background:transparent; white-space:nowrap; margin-left:auto; }
+    .trigger[aria-expanded="true"] { background:var(--sel-bg); }
+    .stage[data-device="phone"] { max-width:calc(var(--tap) * 9); min-height:calc(var(--tap) * 14); }
+    .stage[data-device="phone"] .picker { width:100%; border-radius:var(--r-card) var(--r-card) 0 0; }
+    .status { margin:var(--sp-4) auto 0; max-width:calc(var(--sp-5) * 32); font-size:var(--fs-meta); color:var(--text-dim); }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>思考强度 · 设计示意</strong>
+    <button type="button" data-device="desktop" aria-pressed="true">桌面</button>
+    <button type="button" data-device="phone" aria-pressed="false">手机</button>
+  </header>
+  <main class="scroll">
+    <p class="intro">默认计入四档。局部布局示意，可点选预览；未连接模型服务。</p>
+    <section class="stage" data-device="desktop" aria-label="对话局部预览">
+      <div class="sample-message"><p>请帮我比较这两个方案。</p><small>示例对话</small></div>
+      <section class="picker" role="dialog" aria-labelledby="picker-title">
+        <header class="picker-head"><strong id="picker-title">思考强度</strong><button type="button" class="close" aria-label="关闭"><span class="icon" aria-hidden="true"></span></button></header>
+        <div class="choices" role="menu" aria-label="思考强度">
+          <button type="button" class="choice" data-value="default" role="menuitemradio" aria-checked="false"><span><strong>默认</strong><small>使用模型默认设置</small></span><span class="icon" aria-hidden="true"></span></button>
+          <button type="button" class="choice" data-value="low" role="menuitemradio" aria-checked="false"><span><strong>低</strong><small>简单任务，优先响应速度</small></span><span class="icon" aria-hidden="true"></span></button>
+          <button type="button" class="choice" data-value="medium" role="menuitemradio" aria-checked="false"><span><strong>中</strong><small>日常任务，兼顾速度与深度</small></span><span class="icon" aria-hidden="true"></span></button>
+          <button type="button" class="choice" data-value="high" role="menuitemradio" aria-checked="true"><span><strong>高</strong><small>复杂任务，投入更多思考</small></span><span class="icon" aria-hidden="true"></span></button>
+        </div>
+      </section>
+      <div class="composer"><div class="draft">输入消息</div><div class="composer-actions"><span class="model">当前模型</span><button type="button" class="trigger" aria-haspopup="dialog" aria-expanded="true" aria-label="思考强度：高">高</button></div></div>
+    </section>
+    <p class="status" role="status">当前：高。选择只影响本页示意。</p>
+  </main>
+  <script>
+    const picker=document.querySelector('.picker'),trigger=document.querySelector('.trigger');
+    const choices=[...document.querySelectorAll('.choice')];
+    function close(){picker.hidden=true;trigger.setAttribute('aria-expanded','false');trigger.focus()}
+    trigger.onclick=()=>{picker.hidden=!picker.hidden;trigger.setAttribute('aria-expanded',String(!picker.hidden));if(!picker.hidden)choices.find(b=>b.getAttribute('aria-checked')==='true').focus()};
+    document.querySelector('.close').onclick=close;
+    choices.forEach(button=>button.onclick=()=>{
+      choices.forEach(item=>item.setAttribute('aria-checked',String(item===button)));
+      const label=button.querySelector('strong').textContent;
+      trigger.textContent=label;trigger.setAttribute('aria-label','思考强度：'+label);
+      document.querySelector('.status').textContent='当前：'+label+'。选择只影响本页示意。';close();
+    });
+    picker.onkeydown=event=>{
+      if(event.key==='Escape'){event.preventDefault();close();return}
+      if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+      event.preventDefault();const index=choices.indexOf(document.activeElement);
+      choices[event.key==='Home'?0:event.key==='End'?choices.length-1:(index+(event.key==='ArrowUp'?-1:1)+choices.length)%choices.length].focus();
+    };
+    document.querySelectorAll('.toolbar button').forEach(button=>button.onclick=()=>{
+      document.querySelector('.stage').dataset.device=button.dataset.device;
+      document.documentElement.dataset.size=button.dataset.device==='phone'?'compact':'large';
+      document.querySelectorAll('.toolbar button').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+    });
+  </script>
+</body>
+</html>
