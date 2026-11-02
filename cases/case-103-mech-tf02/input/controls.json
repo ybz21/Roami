@@ -1,0 +1,25 @@
+{
+  "task_states": [
+    "succeeded",
+    "failed",
+    "waiting_user"
+  ],
+  "report_error": "MODEL_PROXY_USAGE_PENDING",
+  "artifact_controls": [
+    "same_owner_same_task",
+    "foreign_owner",
+    "unrelated_task",
+    "deleted",
+    "forged_name"
+  ],
+  "guards": [
+    "revision",
+    "state",
+    "owner",
+    "branch",
+    "interrupted",
+    "forgotten",
+    "duplicate"
+  ],
+  "withheld_error": "WEB_RETRIEVAL_EVIDENCE_MISSING"
+}
