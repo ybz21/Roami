@@ -1,4 +1,4 @@
-"""Property-only PPTX edits over observed objects and explicit color specifications."""
+"""PPTX edits over observed objects, literal text and explicit colors."""
 
 import copy
 import io
@@ -13,6 +13,7 @@ from pptx_package import (
     presentation_metadata,
     slide_parts,
 )
+from pptx_text import replace_text
 
 ALIGNMENTS = {"left": "l", "center": "ctr", "right": "r", "justify": "just"}
 FILLS = {"noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"}
@@ -147,7 +148,13 @@ def edit_presentation(body, operations, palette=None):
                     raise PresentationError("PRESENTATION_EDIT_CONFLICT")
                 properties.add(identity)
                 change[key] = color if key == "color" else operation[key]
-            for paragraph in shape.findall("p:txBody/a:p", NS):
+            if "replaceText" in operation:
+                change["replaceText"] = replace_text(shape, operation["replaceText"])
+            for paragraph in (
+                shape.findall("p:txBody/a:p", NS)
+                if "alignment" in operation or color
+                else []
+            ):
                 props = paragraph.find("a:pPr", NS)
                 if props is None:
                     props = etree.Element("{" + NS["a"] + "}pPr")

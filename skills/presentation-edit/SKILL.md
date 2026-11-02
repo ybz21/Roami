@@ -1,6 +1,6 @@
 ---
 name: presentation-edit
-description: Edit existing PPTX textbox alignment and named text colors while preserving editable objects. Use before PowerPoint/Impress alignment or color changes (演示文稿、幻灯片); resolves visible textbox order and the installed editor's named palette instead of assuming drawing order or guessing RGB values.
+description: Edit existing PPTX text, textbox alignment and named text colors while preserving editable objects. Use before PowerPoint/Impress text corrections, duplicate-text removal, alignment or color changes (演示文稿、幻灯片); resolves visible textbox order and the installed editor's named palette instead of assuming drawing order or guessing RGB values.
 ---
 
 # Presentation editing
@@ -31,7 +31,7 @@ python <packagePath>/scripts/presentation.py colors --workspace <workspace> --pa
 
 Replace the slide and names with the user's request. The name count must equal that slide's nonempty textbox count. Unknown colors, ambiguous placement or changed input publish nothing. The destination must be new; to revise an observed existing output, also pass `--expected-destination-sha256 <output-sha256>`. For a subset of objects, mixed changes or an explicit RGB request, use the batch edit form below.
 
-For supported alignment or color changes, use the bundled edit command after inspection. It handles object selection and source/destination checks. A minimal request is:
+For text, alignment or color changes, use the bundled edit command after inspection. It handles object selection and source/destination checks. A minimal request is:
 
 ```json
 {
@@ -47,6 +47,8 @@ For supported alignment or color changes, use the bundled edit command after ins
 
 Use the requested slide, object and alignment; add operations for additional changes. For a specific observed object use `"target": {"shapePath": [0, 1]}` instead of a rank. For a named color, add `"color": {"editor": "<observed editorPalette.editor>", "palette": "<observed editorPalette.name>", "name": "<requested color>"}`. Detailed validation and receipt fields are in [the request reference](references/operations.md).
 
+For a text correction, use `"replaceText": {"old": "<exact observed text>", "new": "<replacement>", "expectedCount": 1}` on the observed object. An empty `new` removes duplicate text. Matches can cross ordinary formatting runs within a paragraph; the replacement inherits the first matched run's formatting and surrounding text keeps its original formatting. The exact count must match (default 1). Fields, line/paragraph breaks and unknown inline content cannot be replaced across; preserve them or use an appropriate editor. Reinspect text and render the result to check layout; a successful edit does not validate the claim being written.
+
 Run the complete request as one batch:
 
 ```bash
@@ -59,4 +61,4 @@ Pass the JSON as one shell argv element. For a large batch, `--request changes.j
 
 Inspect the saved output and verify the requested changes and object scope. Return the output path as a usable file link in the task result, with verified changes and any unmet requirements. A shell success or file hash does not prove the user's full task passed. If the receipt says publication is unknown, inspect the existing source/destination before any further mutation.
 
-Other presentation operations can use suitable offline editors or scripts; this package currently edits alignment and text color only. It does not select models, call a provider, impose token/spending limits or modify the Agent runtime. Dependencies are declared on the script and resolved by `uv` outside the core environment.
+Other presentation operations can use suitable offline editors or scripts. This package does not select models, call a provider, impose token/spending limits or modify the Agent runtime. Dependencies are declared on the script and resolved by `uv` outside the core environment.

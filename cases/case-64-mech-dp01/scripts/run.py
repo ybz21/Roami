@@ -101,6 +101,49 @@ def main():
         edited["slides"][0]["textObjects"][1]["paragraphs"][0]["alignment"] == "center"
     )
     (output / "observed-edited.json").write_text(json.dumps(edited, indent=2) + "\n")
+    text_contract = json.loads((case / "input/text-replacement.json").read_text())
+    text_body = fixture.text_deck_bytes(text_contract["source_runs"])
+    text_source = output / "input/text.pptx"
+    text_source.write_bytes(text_body)
+    text_request = {
+        "path": "input/text.pptx",
+        "expectedSha256": digest(text_source),
+        "destination": "text-edited.pptx",
+        "expectedDestinationSha256": None,
+        "operations": [
+            {
+                "slide": 1,
+                "target": {"shapePath": [0]},
+                "replaceText": text_contract["replacement"],
+            }
+        ],
+    }
+    text_result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "edit",
+            "--request-json",
+            json.dumps(text_request),
+            "--workspace",
+            str(output),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    (output / "text-edit.stderr").write_text(text_result.stderr)
+    (output / "text-edit-receipt.json").write_text(text_result.stdout)
+    assert text_result.returncode == 0 and json.loads(text_result.stdout)["ok"] is True
+    text_edited = presentation_metadata((output / "text-edited.pptx").read_bytes())
+    assert (
+        text_edited["slides"][0]["textObjects"][0]["text"]
+        == text_contract["expected_text"]
+    )
+    assert text_source.read_bytes() == text_body
+    (output / "observed-text-edited.json").write_text(
+        json.dumps(text_edited, ensure_ascii=False, indent=2) + "\n"
+    )
     entry = output / "pytest-entry.py"
     entry.write_text("""import json,sys
 from pathlib import Path
@@ -160,11 +203,13 @@ sys.exit(int(result))
         digest(repository / name) == value for name, value in tracked.items()
     )
     source_unchanged = source.read_bytes() == body
+    text_source_unchanged = text_source.read_bytes() == text_body
     passed = (
         result.returncode == 0
         and cleanup.returncode == 0
         and unchanged
         and source_unchanged
+        and text_source_unchanged
         and receipt
         == {"collected": expected_count, "passed": expected_count, "skipped": 0}
     )
@@ -177,6 +222,7 @@ sys.exit(int(result))
         "implementation_unchanged": unchanged,
         "input_sha256": digest(source),
         "input_unchanged": source_unchanged,
+        "text_input_unchanged": text_source_unchanged,
         "model_calls": 0,
         "historical_suite_updated": False,
         "scope": "external Skill and generic delivery contract, not model acceptance",
