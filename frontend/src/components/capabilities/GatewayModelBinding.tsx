@@ -48,7 +48,8 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   }
   const selectedOption = options.find(option => option.value === model) || (pendingModel ? options.find(option => option.upstreamModel === pendingModel) : undefined) || (selectedSource === currentModel?.candidates[0].sourceId ? options.find(option => option.value === currentModel?.id) : undefined)
   const selected = selectedOption?.value
-  const currentLabel = currentModel?.name || (view.current.provider === 'Roami Gateway' ? t('hub.mode.custom') : view.current.model || t('hub.mode.custom'))
+  const currentLabel = currentModel?.name || view.current.model || t('agent.models.notConfigured')
+  const gatewayApplied = throughGateway && !!profile?.applied && !view.changed
   const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || throughGateway && !!selected && selected === currentModel?.id && !!profile?.applied)
   const valid = installed && (selectedMode === 'official' || !!selectedSource && !!selected && !!catalog.value)
   useEffect(() => { onModelLabel?.(currentModel?.name || '') }, [currentModel?.name, onModelLabel])
@@ -64,13 +65,13 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   }
   const params = getHashParams().toString()
   return <section className="tt-model-binding">
-    <p className="tt-model-binding-current">{t('hub.currentMode')}<strong>{currentMode === 'official' ? t('hub.mode.official') : currentLabel}</strong></p>
+    <p className="tt-model-binding-current">{t('hub.currentMode')}<strong>{currentMode === 'official' ? t('hub.mode.official') : gatewayApplied ? t('hub.gatewayCurrent', { model: currentLabel }) : currentLabel}</strong></p>
     {currentMode === 'custom' && profile?.applied && !view.changed && !throughGateway && <p role="status">{t('hub.directConnection')}</p>}
     <Radio.Group className="tt-model-binding-mode" aria-label={t('hub.connectionMode')} value={selectedMode} optionType="button" onChange={event => setMode(event.target.value)} disabled={busy} options={['official', 'custom'].map(value => ({ value, label: t('hub.mode.' + value) }))} />
     {!installed && <p>{t('hub.installFirst')}</p>}
     {(error || selectedMode === 'custom' && catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={() => { catalog.retry(); void onChanged() }}>{t('capabilities.models.reread')}</Button>} />}
     {selectedMode === 'official' ? <p>{t('hub.factoryHint')}</p> : <>
-      <div className="tt-model-binding-field"><label htmlFor={'agent-source-' + kind}>{t('hub.source')}</label><Select id={'agent-source-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.source')} placeholder={t('hub.chooseSource')} value={selectedSource} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={source => { setSource(source); setModel(''); setSearch('') }} disabled={busy || !installed} loading={!catalog.value && !catalog.error} /></div>
+      <div className="tt-model-binding-field"><label htmlFor={'agent-source-' + kind}>{t('hub.upstreamSource')}</label><Select id={'agent-source-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.upstreamSource')} placeholder={t('hub.chooseSource')} value={selectedSource} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={source => { setSource(source); setModel(''); setSearch('') }} disabled={busy || !installed} loading={!catalog.value && !catalog.error} /></div>
       <div className="tt-model-binding-field"><label htmlFor={'agent-model-' + kind}>{t('hub.tab.catalog')}</label><Select id={'agent-model-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.tab.catalog')} placeholder={t('hub.chooseModel')} value={selected} options={options} placement={phone ? 'topLeft' : 'bottomLeft'} showSearch loading={remote.loading} onSearch={setSearch} onChange={value => { setModel(value); setSearch('') }} filterOption={(input, option) => String(option?.label || '').toLowerCase().includes(input.toLowerCase()) || String(option?.upstreamModel || '').toLowerCase().includes(input.toLowerCase())} disabled={busy || !installed || !selectedSource} /></div>
       {remote.error && <div className="tt-model-binding-actions"><p role="status">{t(remote.error)}</p><Button onClick={() => { catalog.retry(); setDirectoryVersion(value => value + 1) }}>{t('agent.retry')}</Button></div>}
       {catalog.value && (!sources.length || selectedSource && !remote.loading && !remote.error && !options.length) && <p>{t(sources.length ? 'hub.sourceNoModels' : 'hub.noCompatibleSource')}</p>}

@@ -60,7 +60,7 @@ it('saves an added model directly and makes it selectable by agents without publ
   page.unmount()
   render(<App><GatewayModelBinding kind="codex" view={{ current: {}, profiles: [], revision: 'cli-r1', canRestore: false, changed: false, configPaths: [] }} onChanged={async () => {}} /></App>)
   fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
-  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.source' }))
+  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.upstreamSource' }))
   fireEvent.click(await screen.findByTitle('Saved source'))
   fireEvent.mouseDown(screen.getByRole('combobox', { name: 'hub.tab.catalog' }))
   expect(await screen.findByText('New coding model')).toBeTruthy()
