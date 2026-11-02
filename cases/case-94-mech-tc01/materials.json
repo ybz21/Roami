@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TC01",
+  "data": {
+    "kind": "synthetic_fixtures_selected_by_frozen_manifest",
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "description": "runner实际读取清单执行选择器；图片由tests/test_followup_input_handoff.py的screenshot生成32x24 PNG，其他文件/DB/CLI按冻结测试生成。没有将描述清单冒充真实生产素材。",
+    "source_tests": [
+      "agent-runtime/tests/test_followup_input_handoff.py",
+      "agent-runtime/tests/test_followup_rejection_recovery.py",
+      "agent-runtime/tests/test_task_continuation_affinity.py",
+      "agent-runtime/tests/test_task_revisions.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "isolated_runtime_and_protocol_fixtures"
+  },
+  "acceptance": {
+    "kind": "source_frozen_exact_identity_test_receipt",
+    "entry": "scripts/run.py",
+    "runner": "scripts/dev/run-task-recovery-cases.py",
+    "contract": "acceptance.md",
+    "selection": "input/scenarios.json",
+    "no_skips": true
+  }
+}

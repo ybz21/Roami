@@ -30,4 +30,12 @@
 
 ## Acceptance
 
-[排查报告、频次与验收记录](../../reviews/20261102-task-failures/README.md)。仅修改当前分支，不部署、不合并、不重放历史未知任务。
+[排查报告、频次与验收记录](../../reviews/20261102-task-failures/README.md)。修复已按用户要求经 [PR #597](https://github.com/ybz21/Roami/pull/597) 合入，不部署、不重放历史未知任务。
+
+## RSI 机制回归
+
+- `cases/case-92-mech-tf01`：失败分类、原因保留、未知观测、取消围栏和旧步数限制。
+- `cases/case-93-mech-si01`：原会话图文输入、来源完整性、单次投递和稳定回执。
+- `cases/case-94-mech-tc01`：任务输入来源、连续续作、原执行器绑定及恢复边界。
+- 三项各自读取公开执行清单，调用 `scripts/dev/run-task-recovery-cases.py` 冻结仓库文件，再通过既有隔离入口执行真实Runtime/SQLite与脚本化协议用例。测试身份逐项匹配，失败、跳过、缺项、重复、源码变化或清理失败均不接受。运行器拒绝错误回执的独立反例测试位于 `agent-runtime/tests/verification/`。
+- 不修改自有40项和正式60项的既有冻结合同，不把机制回归称为模型能力或生产独立验收。执行证据见 [RSI追加报告](../../reviews/20261102-task-failures/rsi-cases.md)。

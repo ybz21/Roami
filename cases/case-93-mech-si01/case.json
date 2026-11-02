@@ -1,0 +1,57 @@
+{
+  "id": "MECH-SI01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "原会话附图与文件的单次传递",
+  "prompt": "验证原会话收到当前图片和文件，来源撤回立即拒绝，未知投递和已有回执不重复发送。",
+  "preconditions": "隔离临时SQLite、ArtifactStore与私有tmux实例；脚本化模型/CLI、本地进程和公开合成图文；无生产读写。",
+  "expected_terminal": "complete_source_frozen_task_recovery_receipts",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "输入清单、源代码和回归用例SHA256快照",
+    "零跳过且身份完全匹配的测试回执与原始输出",
+    "隔离实例清理与源码前后未变证明"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-SI01-H1",
+      "rule": "当前绑定的图片及文件以原名、MIME、hash和已验证路径传给原session，不混入Main中的无关图片。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-SI01-H2",
+      "rule": "缺失、篡改、删除、遗忘及校验期间撤回在持久投递前拒绝。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-SI01-H3",
+      "rule": "未知投递只发送一次；文件后来移除也保留delivered或unknown回执，原回报通道保持幂等与权限边界。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "task_failure_and_followup_input_regressions",
+    "issues": [
+      599
+    ],
+    "pull_request": 597,
+    "fixture_reproduction_only": true,
+    "private_history_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TF01",
+  "data": {
+    "kind": "synthetic_fixtures_selected_by_frozen_manifest",
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "description": "runner实际读取清单执行选择器；临时SQLite、异常、协议CLI及Go钩子/本地进程由冻结测试生成。",
+    "source_tests": [
+      "agent-runtime/tests/test_execution_failure_diagnostics.py",
+      "agent-runtime/tests/test_execution_limits.py",
+      "agent-runtime/tests/test_project_provision_errors.py",
+      "agent-runtime/tests/test_session_observation_codes.py",
+      "agent-runtime/tests/test_task_target_admission.py",
+      "agent-runtime/tests/test_workspace_failure_classification.py"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "isolated_runtime_and_protocol_fixtures"
+  },
+  "acceptance": {
+    "kind": "source_frozen_exact_identity_test_receipt",
+    "entry": "scripts/run.py",
+    "runner": "scripts/dev/run-task-recovery-cases.py",
+    "contract": "acceptance.md",
+    "selection": "input/scenarios.json",
+    "no_skips": true
+  }
+}

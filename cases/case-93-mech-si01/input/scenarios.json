@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-SI01",
+  "pytest_selectors": [
+    "agent-runtime/tests/test_followup_input_handoff.py::test_existing_session_receives_current_image_and_file_once",
+    "agent-runtime/tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch",
+    "agent-runtime/tests/test_followup_input_handoff.py::test_session_input_forgotten_during_integrity_check_does_not_send",
+    "agent-runtime/tests/test_followup_input_handoff.py::test_unknown_image_delivery_is_not_replayed",
+    "agent-runtime/tests/test_followup_input_handoff.py::test_recorded_image_delivery_keeps_its_receipt_after_blob_removal",
+    "agent-runtime/tests/test_session_dispatches.py"
+  ],
+  "expected_pytest_ids": [
+    "tests/test_followup_input_handoff.py::test_existing_session_receives_current_image_and_file_once",
+    "tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[tamper]",
+    "tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[missing]",
+    "tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[deleted]",
+    "tests/test_followup_input_handoff.py::test_unavailable_session_input_rejects_before_dispatch[forgotten]",
+    "tests/test_followup_input_handoff.py::test_session_input_forgotten_during_integrity_check_does_not_send",
+    "tests/test_followup_input_handoff.py::test_unknown_image_delivery_is_not_replayed",
+    "tests/test_followup_input_handoff.py::test_recorded_image_delivery_keeps_its_receipt_after_blob_removal[delivered]",
+    "tests/test_followup_input_handoff.py::test_recorded_image_delivery_keeps_its_receipt_after_blob_removal[unknown]",
+    "tests/test_session_dispatches.py::test_delivery_includes_stable_callback_and_never_replays_an_unknown_send",
+    "tests/test_session_dispatches.py::test_reports_return_only_to_original_branch_survive_service_recreation_and_dedupe",
+    "tests/test_session_dispatches.py::test_progress_and_choices_precede_final_failure_and_http_rejects_spoofed_routes",
+    "tests/test_session_dispatches.py::test_forgotten_origin_cannot_return_to_context_or_leak_through_status",
+    "tests/test_session_dispatches.py::test_callback_keeps_instance_paths_and_uses_shell_quoting_without_credentials",
+    "tests/test_session_dispatches.py::test_pending_callback_survives_database_reopen_and_missing_report_stays_unconfirmed",
+    "tests/test_session_dispatches.py::test_known_delivery_rejection_stays_failed_without_resending_or_accepting_a_result",
+    "tests/test_session_dispatches.py::test_schema_seven_upgrades_without_rewriting_main_history"
+  ],
+  "expected_go_tests": [],
+  "assertions": [
+    "当前绑定的图片及文件以原名、MIME、hash和已验证路径传给原session，不混入Main中的无关图片。",
+    "缺失、篡改、删除、遗忘及校验期间撤回在持久投递前拒绝。",
+    "未知投递只发送一次；文件后来移除也保留delivered或unknown回执，原回报通道保持幂等与权限边界。"
+  ]
+}
