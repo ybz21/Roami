@@ -110,7 +110,7 @@ func (s *Store) LocalSources(ctx context.Context, kind string) ([]LocalSource, e
 						if current := config.current(kind); current.Provider == id {
 							model = current.Model
 						}
-						add("native:"+group+":"+id, Profile{Name: id, BaseURL: textAt(values, group, id, options, "baseURL"), APIKey: textAt(values, group, id, options, "apiKey"), Model: model, Protocol: protocol, AuthMode: "bearer"}, supported)
+						add("native:"+group+":"+id, Profile{Name: id, BaseURL: textAt(values, group, id, options, "baseURL"), APIKey: textAt(values, group, id, options, "apiKey"), Model: model, Protocol: protocol, AuthMode: "api_key"}, supported)
 					}
 				}
 			case "pi":
@@ -126,7 +126,7 @@ func (s *Store) LocalSources(ctx context.Context, kind string) ([]LocalSource, e
 					if current.Provider == id {
 						model = current.Model
 					}
-					add("native:"+id, Profile{Name: id, BaseURL: textAt(values, "providers", id, "baseUrl"), APIKey: textAt(values, "providers", id, "apiKey"), Model: model, Protocol: protocol, AuthMode: "bearer"}, supported)
+					add("native:"+id, Profile{Name: id, BaseURL: textAt(values, "providers", id, "baseUrl"), APIKey: textAt(values, "providers", id, "apiKey"), Model: model, Protocol: protocol, AuthMode: "api_key"}, supported)
 				}
 			}
 		}
