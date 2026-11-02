@@ -1,0 +1,23 @@
+{
+  "http_status": 409,
+  "codes": [
+    "MODEL_PROXY_USAGE_PENDING",
+    "MODEL_PROXY_USAGE_UNKNOWN"
+  ],
+  "scenario": "local_admission_before_upstream",
+  "expected_state": "blocked",
+  "expected_upstream_attempts": 0,
+  "recovery_control": "new invocation after fixture settlement uses the same provider; no automatic replay",
+  "report_control": {
+    "task_error": "SESSION_NOT_IDLE",
+    "task_state": "failed",
+    "report_error": "original gateway decision"
+  },
+  "display_controls": [
+    "zh-CN",
+    "en-US",
+    "pending differs from unknown",
+    "report failure does not change actual task state",
+    "legacy record without reportError"
+  ]
+}

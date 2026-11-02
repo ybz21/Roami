@@ -1,0 +1,12 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "Node with frontend dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "python_test": "agent-runtime/tests/verification/test_gateway_pending_identity.py",
+  "frontend_test": "src/components/agent/gateway-admission-display.test.tsx",
+  "expected_python_tests": 5,
+  "expected_frontend_tests": 8,
+  "external_model_calls": 0
+}

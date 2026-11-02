@@ -93,9 +93,9 @@ async def test_local_quota_rejection_is_not_retried(tmp_path, monkeypatch, statu
             Settings(endpoint="https://must-not-connect.invalid/v1", model="fixture"), "main"
         )
         try:
-            expected = "MODEL_PROXY_USAGE_UNKNOWN" if code == "MODEL_PROXY_USAGE_PENDING" else code
-            with pytest.raises(ModelAdmissionRejected, match=expected):
+            with pytest.raises(ModelAdmissionRejected) as error:
                 await consume(provider)
+            assert error.value.code == code
         finally:
             await provider.close()
     assert len(seen) == 1
