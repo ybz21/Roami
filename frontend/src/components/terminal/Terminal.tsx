@@ -11,6 +11,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 // 终端符号补字集（约 46KB，仅覆盖框线/箭头/技术符号等区段）：见 FONT_FAMILY 的说明
 import '../../assets/fonts/roam-symbols.css'
+import { terminalCopyAction } from './terminal-copy-key'
 import { paneCellsToPixelRect } from './terminal-geometry'
 import { RESUME_RESYNC_MS, resumeHealFor, shouldJiggleAfterAttach } from './terminal-resize'
 import type { ResumeHeal, TerminalDimensions } from './terminal-resize'
@@ -794,8 +795,7 @@ const Term = forwardRef<TermHandle, {
       applyResize()
     }).catch(() => {})
 
-    // Ctrl/Cmd+C 智能复制：有选区 → 复制并清除选区（交上层弹「已复制」），无选区 → 放行发 ^C 中断。
-    // Ctrl/Cmd+Shift+C 始终复制（与浏览器习惯一致）。返回 false 表示该按键不再发给终端。
+// xterm does not translate Command+C to the terminal interrupt byte.
     let nativePasteSeen = true // Ctrl+V 之后浏览器有没有真的送来 paste 事件（见下）
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
@@ -825,19 +825,18 @@ const Term = forwardRef<TermHandle, {
         window.setTimeout(() => { if (!nativePasteSeen) onPaste?.() }, 250)
         return false
       }
-      const isC = e.key === 'c' || e.key === 'C'
-      if (!isC) return true
-      const copyCombo = (e.ctrlKey && e.shiftKey) || (e.metaKey && !e.ctrlKey) // Ctrl+Shift+C 或 Cmd+C
-      const plainCtrlC = e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
-      if (!copyCombo && !plainCtrlC) return true
-      const sel = term.getSelection()
-      if (sel && sel.trim()) {
-        onSelectionMenu?.({ x: 0, y: 0, selection: sel })
+      const selection = term.getSelection()
+      const action = terminalCopyAction(e, selection)
+      if (action === 'pass') return true
+      e.preventDefault()
+      if (action === 'copy') {
+        onSelectionMenu?.({ x: 0, y: 0, selection })
         term.clearSelection()
-        return false // 已复制，不把按键发给终端
+      } else if (action === 'interrupt') {
+        const ws = wsRef.current
+        if (ws && ws.readyState === 1) ws.send('\x03')
       }
-      // 无选区：复制组合键吞掉（避免误发中断），普通 Ctrl+C 放行去中断进程
-      return !copyCombo
+      return false
     })
 
     // 跟随全局黑/白主题：监听 <html data-theme> 变化，热更新终端配色

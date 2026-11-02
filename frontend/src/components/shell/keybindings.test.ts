@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { parseHotkey, matchHotkey, hotkeyFromEvent, formatHotkey, DEFAULT_KEYBINDINGS, resolveKeybindings, keybindingConflicts } from './keybindings'
 
 const ev = (o: Partial<KeyboardEvent>) => ({ ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, code: '', key: '', ...o }) as KeyboardEvent
@@ -39,5 +39,18 @@ describe('语音快捷键', () => {
     expect(c.newTask).toBe('closeTab')
     expect(c.closeTab).toBe('newTask')
     expect(c.voice).toBeUndefined()
+  })
+})
+
+
+describe('Mac 默认快捷键', () => {
+  it('Mod 使用 Command，显式 Control 偏好继续生效', () => {
+    vi.stubGlobal('navigator', { platform: 'MacIntel' })
+    try {
+      const search = parseHotkey('Mod+KeyK')
+      expect(matchHotkey(ev({ code: 'KeyK', ctrlKey: true }), search)).toBe(false)
+      expect(matchHotkey(ev({ code: 'KeyK', metaKey: true }), search)).toBe(true)
+      expect(matchHotkey(ev({ code: 'KeyK', ctrlKey: true }), parseHotkey('Ctrl+KeyK'))).toBe(true)
+    } finally { vi.unstubAllGlobals() }
   })
 })
