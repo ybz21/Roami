@@ -1,0 +1,460 @@
+{
+  "capturedUTC": "2026-11-02T10:28:00.402402+00:00",
+  "source": "local runtime.db read-only transaction; no task contents, credentials or raw tool arguments exported",
+  "tasks": 53,
+  "attempts": 77,
+  "taskStates": {
+    "failed": 20,
+    "waiting_user": 8,
+    "succeeded": 18,
+    "interrupted": 5,
+    "cancelled": 1,
+    "running": 1
+  },
+  "dateRangeMs": [
+    1792295501402,
+    1793615167851
+  ],
+  "counts": [
+    {
+      "code": "(other/no summary)",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "(other/no summary)",
+      "state": "unknown",
+      "nodeCount": 1,
+      "projectCount": 1
+    },
+    {
+      "code": "AGENT_STEP_LIMIT",
+      "state": "failed",
+      "nodeCount": 8,
+      "projectCount": 6
+    },
+    {
+      "code": "BROWSER_DRIVER_UNAVAILABLE",
+      "state": "failed",
+      "nodeCount": 2,
+      "projectCount": 0
+    },
+    {
+      "code": "CODING_SESSION_TARGET_CONFLICT",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 1
+    },
+    {
+      "code": "EXECUTION_DEADLINE_OR_INTERRUPTION",
+      "state": "failed",
+      "nodeCount": 5,
+      "projectCount": 4
+    },
+    {
+      "code": "EXECUTION_FAILED",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "MODEL_DEADLINE",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "MODEL_HTTP_401",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "NATIVE_TARGET_ADAPTER_NOT_IMPLEMENTED",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
+      "state": "unknown",
+      "nodeCount": 2,
+      "projectCount": 0
+    },
+    {
+      "code": "NATIVE_WORKSPACE_UNAVAILABLE",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "PROJECT_PROVISION_UNAVAILABLE",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "SESSION_LIFECYCLE_UNAVAILABLE",
+      "state": "failed",
+      "nodeCount": 2,
+      "projectCount": 1
+    },
+    {
+      "code": "SESSION_NOT_IDLE",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "TOOL_ARGUMENT_REPAIR_STALLED",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 0
+    },
+    {
+      "code": "TOOL_OUTCOME_UNKNOWN",
+      "state": "unknown",
+      "nodeCount": 2,
+      "projectCount": 0
+    },
+    {
+      "code": "WORKSPACE_STALE",
+      "state": "failed",
+      "nodeCount": 1,
+      "projectCount": 1
+    }
+  ],
+  "attemptEvidence": [
+    {
+      "taskId": "4e10c9277a1c466eaedd7702da0a17e0",
+      "attemptId": "8b750976e4ba4f85b349bd8347b72512",
+      "code": "NATIVE_TARGET_ADAPTER_NOT_IMPLEMENTED",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792295501415,
+      "finishedMs": 1792295501435
+    },
+    {
+      "taskId": "f8804c4d9824468a8d53aee914c346ac",
+      "attemptId": "d0d393797ff1497b855e659e9735f061",
+      "code": "SESSION_LIFECYCLE_UNAVAILABLE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792295533219,
+      "finishedMs": 1792295533274
+    },
+    {
+      "taskId": "7aec86596e2b42c79cc8afb6b7500640",
+      "attemptId": "1e311cf04913474b89513a70f689dbb6",
+      "code": "CODING_SESSION_TARGET_CONFLICT",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": true,
+      "startedMs": 1792298326028,
+      "finishedMs": 1792298326038
+    },
+    {
+      "taskId": "d5ada09ff23142148c1e81d69a55bcd9",
+      "attemptId": "a768f5fb0e594f4fab14e0d7a8fff655",
+      "code": "SESSION_LIFECYCLE_UNAVAILABLE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": true,
+      "startedMs": 1792310808654,
+      "finishedMs": 1792310808712
+    },
+    {
+      "taskId": "1a4674d91bde4962b49ad75e4415b568",
+      "attemptId": "7ef5d3bf726f4ead8d687966790125f2",
+      "code": "EXECUTION_FAILED",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792338355353,
+      "finishedMs": 1792338475779
+    },
+    {
+      "taskId": "15cbcf4c3c9b404486055f6080d422bf",
+      "attemptId": "84ddb5b56f0544d99452c4eda137aa1b",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792372278544,
+      "finishedMs": 1792372412627
+    },
+    {
+      "taskId": "402256aa17fb4f95b188a01929680080",
+      "attemptId": "97dc281e022e412a94269bdb708e652a",
+      "code": "PROJECT_PROVISION_UNAVAILABLE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792400403373,
+      "finishedMs": 1792400403424
+    },
+    {
+      "taskId": "6e8e1fa600ae42e6a897cbe05feb15ff",
+      "attemptId": "4b7579134f3848c6974ba882c59ea5ad",
+      "code": "NATIVE_WORKSPACE_UNAVAILABLE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792400417343,
+      "finishedMs": 1792400417403
+    },
+    {
+      "taskId": "7b76c3b22c7f4a44a3b1248d3ec5a5b7",
+      "attemptId": "9ec993dcba5742b793a1ba2664f01717",
+      "code": "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
+      "attemptState": "unknown",
+      "taskState": "interrupted",
+      "projectMatched": false,
+      "startedMs": 1792400503722,
+      "finishedMs": null
+    },
+    {
+      "taskId": "dc9f365e72d041d1a53466c5f22c3afb",
+      "attemptId": "8b901791843d43a2a0332bd1d3e21dd4",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792400651562,
+      "finishedMs": 1792400810188
+    },
+    {
+      "taskId": "aaf789103a78477bbff9db04c012303a",
+      "attemptId": "901a4d97dc50400f89f71f0592e11ef0",
+      "code": "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
+      "attemptState": "unknown",
+      "taskState": "interrupted",
+      "projectMatched": false,
+      "startedMs": 1792400838354,
+      "finishedMs": null
+    },
+    {
+      "taskId": "6aabbad0f49b4455b34927b419ee8c4a",
+      "attemptId": "f5a71ea0358c4f178f93cdfb6964bd5f",
+      "code": "EXECUTION_DEADLINE_OR_INTERRUPTION",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792400906052,
+      "finishedMs": 1792401506218
+    },
+    {
+      "taskId": "b4e788d54021406b89ecd0a5700b8574",
+      "attemptId": "cd4a3ca81a4745ac82d870176fe2189e",
+      "code": "MODEL_DEADLINE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792401543542,
+      "finishedMs": 1792401679477
+    },
+    {
+      "taskId": "4eb82dfa765d4bd6b020bf0a936fd54b",
+      "attemptId": "a107fb7675fc4fb7a1195250815dcfa8",
+      "code": "MODEL_HTTP_401",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792401728999,
+      "finishedMs": 1792401745728
+    },
+    {
+      "taskId": "ef590b63fb604e2d9e22b83af13e63d3",
+      "attemptId": "00bea6e904df4c7a80e3a97811d865cb",
+      "code": "EXECUTION_DEADLINE_OR_INTERRUPTION",
+      "attemptState": "failed",
+      "taskState": "waiting_user",
+      "projectMatched": true,
+      "startedMs": 1792413355631,
+      "finishedMs": 1792413955839
+    },
+    {
+      "taskId": "66a6fa98b33a4e0589bfe1f9eea1476e",
+      "attemptId": "076232537cbc4c15adf39baccff81e25",
+      "code": "EXECUTION_DEADLINE_OR_INTERRUPTION",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": true,
+      "startedMs": 1792415749448,
+      "finishedMs": 1792416349930
+    },
+    {
+      "taskId": "66a6fa98b33a4e0589bfe1f9eea1476e",
+      "attemptId": "a87c39526cd342888f147e5f247e6090",
+      "code": "WORKSPACE_STALE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": true,
+      "startedMs": 1792416394994,
+      "finishedMs": 1792416395226
+    },
+    {
+      "taskId": "4913fa1efc944edd91b2fc069a0b62f5",
+      "attemptId": "c7e0dbf4c290465d8db8de70e4e58c02",
+      "code": "EXECUTION_DEADLINE_OR_INTERRUPTION",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": true,
+      "startedMs": 1792416440240,
+      "finishedMs": 1792417041113
+    },
+    {
+      "taskId": "da4b424c860d48559bb1525ecc06bb15",
+      "attemptId": "d53f1b0384594988a06abdcb55857d0e",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "succeeded",
+      "projectMatched": true,
+      "startedMs": 1792417167679,
+      "finishedMs": 1792417278200
+    },
+    {
+      "taskId": "9b2f87dfbe1d4fe08a0605544cb65828",
+      "attemptId": "88bc62996e30474fb17f750e2cf8770e",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "waiting_user",
+      "projectMatched": true,
+      "startedMs": 1792417259223,
+      "finishedMs": 1792417359035
+    },
+    {
+      "taskId": "4913fa1efc944edd91b2fc069a0b62f5",
+      "attemptId": "a5ab3fda397547b9b0333db54c8d4991",
+      "code": "EXECUTION_DEADLINE_OR_INTERRUPTION",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": true,
+      "startedMs": 1792417328624,
+      "finishedMs": 1792417929616
+    },
+    {
+      "taskId": "da4b424c860d48559bb1525ecc06bb15",
+      "attemptId": "c111ac5b754146ae89e39f971391b5c1",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "succeeded",
+      "projectMatched": true,
+      "startedMs": 1792417370619,
+      "finishedMs": 1792417490763
+    },
+    {
+      "taskId": "9b2f87dfbe1d4fe08a0605544cb65828",
+      "attemptId": "026a9db13d754a9ea2185473a2bf6367",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "waiting_user",
+      "projectMatched": true,
+      "startedMs": 1792417389514,
+      "finishedMs": 1792417491357
+    },
+    {
+      "taskId": "9b2f87dfbe1d4fe08a0605544cb65828",
+      "attemptId": "206073dc26174f15990b7e1fad36b344",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "waiting_user",
+      "projectMatched": true,
+      "startedMs": 1792417575284,
+      "finishedMs": 1792417674432
+    },
+    {
+      "taskId": "da4b424c860d48559bb1525ecc06bb15",
+      "attemptId": "903a16f4d6884cf4af4b13613fe54e63",
+      "code": "AGENT_STEP_LIMIT",
+      "attemptState": "failed",
+      "taskState": "succeeded",
+      "projectMatched": true,
+      "startedMs": 1792418013845,
+      "finishedMs": 1792418186201
+    },
+    {
+      "taskId": "42a49bfcc6214607b645f9efe21abf0a",
+      "attemptId": "1d1fa65bfbfa436e80be4908febb1835",
+      "code": "BROWSER_DRIVER_UNAVAILABLE",
+      "attemptState": "failed",
+      "taskState": "succeeded",
+      "projectMatched": false,
+      "startedMs": 1792506643910,
+      "finishedMs": 1792506757194
+    },
+    {
+      "taskId": "80ae85e32cce48cca43d647ed9fd1bc6",
+      "attemptId": "31e3703a303e4af795f9f088bab2c198",
+      "code": "TOOL_OUTCOME_UNKNOWN",
+      "attemptState": "unknown",
+      "taskState": "interrupted",
+      "projectMatched": false,
+      "startedMs": 1792556569040,
+      "finishedMs": null
+    },
+    {
+      "taskId": "b07c8026a9d6457aa6de41c43a63f8a0",
+      "attemptId": "f0d292d871a740dca954263c34feee11",
+      "code": "TOOL_ARGUMENT_REPAIR_STALLED",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792560173415,
+      "finishedMs": 1792560195232
+    },
+    {
+      "taskId": "7963195a570b401989c5ada09de2c9d7",
+      "attemptId": "6d08b8171d9c46f88eb6e91bd8343a22",
+      "code": "BROWSER_DRIVER_UNAVAILABLE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1792594141273,
+      "finishedMs": 1792594158983
+    },
+    {
+      "taskId": "53ccf708305145fcae45b4877503b141",
+      "attemptId": "09d5167b140945c78d23671fc2a7d117",
+      "code": "(other/no summary)",
+      "attemptState": "failed",
+      "taskState": "interrupted",
+      "projectMatched": false,
+      "startedMs": 1793019973350,
+      "finishedMs": 1793537254197
+    },
+    {
+      "taskId": "d5b7ce2f859f4fdc9ba7cef809bc70d0",
+      "attemptId": "686c5f04640c445b9cba68727d9252a1",
+      "code": "TOOL_OUTCOME_UNKNOWN",
+      "attemptState": "unknown",
+      "taskState": "interrupted",
+      "projectMatched": false,
+      "startedMs": 1793266876601,
+      "finishedMs": null
+    },
+    {
+      "taskId": "365dec53f78d4ec784c6d4433d0d0c26",
+      "attemptId": "6e0f5a997e8b4c4ca8a357e307b70746",
+      "code": "SESSION_NOT_IDLE",
+      "attemptState": "failed",
+      "taskState": "failed",
+      "projectMatched": false,
+      "startedMs": 1793360619077,
+      "finishedMs": 1793360619281
+    },
+    {
+      "taskId": "f169ed78c1614449a6f18d65b222a2c6",
+      "attemptId": "f8676518c89047df8f357efc2e9bcca8",
+      "code": "(other/no summary)",
+      "attemptState": "unknown",
+      "taskState": "running",
+      "projectMatched": true,
+      "startedMs": 1793615168219,
+      "finishedMs": null
+    }
+  ]
+}

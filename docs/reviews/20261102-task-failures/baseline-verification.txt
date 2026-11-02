@@ -1,0 +1,49 @@
+Python baseline 08ad956b: expected regression failures
+=========================== short test summary info ============================
+FAILED tests/test_workspace_failure_classification.py::test_workspace_failure_release_and_unknown_protection[True-os]
+FAILED tests/test_workspace_failure_classification.py::test_workspace_failure_release_and_unknown_protection[True-value]
+FAILED tests/test_workspace_failure_classification.py::test_workspace_failure_release_and_unknown_protection[True-unknown]
+FAILED tests/test_workspace_failure_classification.py::test_workspace_failure_release_and_unknown_protection[False-os]
+FAILED tests/test_workspace_failure_classification.py::test_workspace_failure_release_and_unknown_protection[False-value]
+FAILED tests/test_workspace_failure_classification.py::test_workspace_failure_release_and_unknown_protection[False-unknown]
+FAILED tests/test_execution_failure_diagnostics.py::test_dispatch_failure_result_survives_verification[timeout]
+FAILED tests/test_execution_failure_diagnostics.py::test_dispatch_failure_result_survives_verification[os]
+FAILED tests/test_execution_failure_diagnostics.py::test_dispatch_failure_result_survives_verification[workspace]
+FAILED tests/test_project_provision_errors.py::test_project_error_code_preserved[REMOTE_REQUIRED-REMOTE_REQUIRED]
+FAILED tests/test_project_provision_errors.py::test_project_error_code_preserved[AUTH_REQUIRED-AUTH_REQUIRED]
+FAILED tests/test_project_provision_errors.py::test_project_error_code_preserved[PROJECT_private account-PROJECT_PROVISION_UNAVAILABLE]
+FAILED tests/test_task_target_admission.py::test_native_session_target_rejected_before_background_task_creation
+13 failed, 12 passed in 2.24s
+
+Go baseline 08ad956b: expected regression failures
+--- FAIL: TestDeadlineRetainsPartialOutputForInspection (1.03s)
+    execution_test.go:196: lost deadline evidence: &{InputStopped:<nil> OutcomeKnown:<nil> StopEvidence: State:failed Summary:EXECUTION_DEADLINE_OR_INTERRUPTION ExitCode:-1 Stderr:diagnostic Output:partial deliverable evidence FinishedMS:1793615631356}
+--- FAIL: TestParentInterruptionRemainsDistinctFromDeadline (0.04s)
+    execution_test.go:280: unexpected result: {InputStopped:<nil> OutcomeKnown:<nil> StopEvidence: State:failed Summary:EXECUTION_DEADLINE_OR_INTERRUPTION ExitCode:-1 Stderr:diagnostic Output:partial output FinishedMS:1793615631399}
+--- FAIL: TestStructuredInterruptionReasons (0.00s)
+    --- FAIL: TestStructuredInterruptionReasons/deadline (0.00s)
+        structured-output_test.go:168: unexpected interruption: {InputStopped:<nil> OutcomeKnown:<nil> StopEvidence: State:failed Summary:EXECUTION_DEADLINE_OR_INTERRUPTION ExitCode:-1 Stderr: Output: FinishedMS:1793615631406}
+    --- FAIL: TestStructuredInterruptionReasons/interrupted (0.00s)
+        structured-output_test.go:168: unexpected interruption: {InputStopped:<nil> OutcomeKnown:<nil> StopEvidence: State:failed Summary:EXECUTION_DEADLINE_OR_INTERRUPTION ExitCode:-1 Stderr: Output: FinishedMS:1793615631406}
+FAIL
+FAIL	github.com/ybz21/Roami/internal/agentexecution	1.082s
+FAIL
+
+Screenshot-related baseline 08ad956b (data-only UnknownReason field added so new tests compile; no behavioral changes)
+--- FAIL: TestUnknownLifecycleStillHonorsCancellationFence (0.52s)
+    --- FAIL: TestUnknownLifecycleStillHonorsCancellationFence/codex (0.26s)
+        session-observation_test.go:37: unknown lifecycle bypassed cancellation: <nil>
+    --- FAIL: TestUnknownLifecycleStillHonorsCancellationFence/claude (0.26s)
+        session-observation_test.go:37: unknown lifecycle bypassed cancellation: <nil>
+--- FAIL: TestSessionObservationDistinguishesUnknownReasons (0.90s)
+    --- FAIL: TestSessionObservationDistinguishesUnknownReasons/missing-lifecycle (0.21s)
+        session-observation_test.go:104: lost observation reason: {Receipt:{Session:2026-1017-0900-0001 State:unknown Workspace:0xc00066efc0 DeadlineMS:1793616238509 Binding:0xc00059a210} Result:<nil> Progress:<nil> ObservationErrorCode:}, <nil>
+    --- FAIL: TestSessionObservationDistinguishesUnknownReasons/launch-mismatch (0.23s)
+        session-observation_test.go:104: lost observation reason: {Receipt:{Session:2026-1017-0900-0001 State:unknown Workspace:0xc000781ec0 DeadlineMS:1793616238730 Binding:0xc00059a210} Result:<nil> Progress:<nil> ObservationErrorCode:}, <nil>
+    --- FAIL: TestSessionObservationDistinguishesUnknownReasons/deadline (0.25s)
+        session-observation_test.go:104: lost observation reason: {Receipt:{Session:2026-1017-0900-0001 State:unknown Workspace:0xc0005d46c0 DeadlineMS:1 Binding:0xc0000e46e0} Result:<nil> Progress:<nil> ObservationErrorCode:}, <nil>
+    --- FAIL: TestSessionObservationDistinguishesUnknownReasons/binding-missing (0.22s)
+        session-observation_test.go:104: lost observation reason: {Receipt:{Session:2026-1017-0900-0001 State:unknown Workspace:0xc00068e660 DeadlineMS:1793616239201 Binding:0xc0000e44d0} Result:<nil> Progress:<nil> ObservationErrorCode:}, <nil>
+FAIL
+FAIL	github.com/ybz21/Roami/internal/agentexecution	1.431s
+FAIL

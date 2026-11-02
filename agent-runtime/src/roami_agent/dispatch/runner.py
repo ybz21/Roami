@@ -8,12 +8,38 @@ import httpx
 
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.web_evidence import retrieved_sources
-from roami_agent.protocol.errors import DomainError, ToolPreflightError
+from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
 
 log = logging.getLogger(__name__)
+
+
+def execution_failure(exc):
+    code = (
+        exc.code
+        if isinstance(exc, DomainError)
+        else "EXECUTION_TIMEOUT"
+        if isinstance(exc, TimeoutError)
+        else "EXECUTION_FAILED"
+    )
+    causes, seen, cause = [], set(), exc
+    while cause is not None and id(cause) not in seen and len(seen) < 8:
+        seen.add(id(cause))
+        if (
+            isinstance(cause, DomainError)
+            and (public := public_error_code(cause.code))
+            and public not in causes
+        ):
+            causes.append(public)
+        cause = cause.__cause__ or (None if cause.__suppress_context__ else cause.__context__)
+    return {
+        "state": "failed",
+        "summary": code,
+        "errorCode": code,
+        "failure": {"exceptionType": type(exc).__name__, "causeCodes": causes},
+    }
 
 
 class TaskDispatcher:
@@ -216,13 +242,8 @@ class TaskDispatcher:
                 and await self.defer_session_submission(task, run, job)
             ):
                 return
-            await self.end_prepared_turn(
-                turn, "failed", exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED"
-            )
-            result = {
-                "state": "failed",
-                "summary": exc.code if isinstance(exc, DomainError) else "EXECUTION_FAILED",
-            }
+            result = execution_failure(exc)
+            await self.end_prepared_turn(turn, "failed", result["summary"])
             if isinstance(exc, ToolPreflightError):
                 progress = await self.db.call(lambda db: self.attempt_progress(db, task, run, turn))
                 result.update(

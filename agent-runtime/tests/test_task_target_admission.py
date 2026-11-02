@@ -10,6 +10,25 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 
 
+async def test_native_session_target_rejected_before_background_task_creation(store):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        with pytest.raises(DomainError, match="^NATIVE_TARGET_ADAPTER_NOT_IMPLEMENTED$"):
+            await runtime.tasks.create(
+                "alice",
+                binding["conversation"],
+                "Continue session",
+                key="unsupported-native-target",
+                target={"kind": "session", "sessionId": "exact"},
+                record_intent=True,
+            )
+        assert not await runtime.tasks.list("alice")
+        assert not await store.call(lambda db: row(db, "SELECT id FROM task_attempts"))
+        assert not await store.call(lambda db: row(db, "SELECT id FROM jobs WHERE kind='task.run'"))
+    finally:
+        await runtime.close()
+
+
 async def test_resource_only_empty_optional_directory_is_not_a_workspace_request(store):
     runtime, _, _, _, binding = await setup(store)
     try:

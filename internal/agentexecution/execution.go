@@ -65,8 +65,9 @@ type Result struct {
 
 type Status struct {
 	Receipt
-	Result   *Result           `json:"result,omitempty"`
-	Progress *ReportedProgress `json:"progress,omitempty"`
+	Result               *Result           `json:"result,omitempty"`
+	Progress             *ReportedProgress `json:"progress,omitempty"`
+	ObservationErrorCode string            `json:"observationErrorCode,omitempty"`
 }
 
 type Service struct {
@@ -449,7 +450,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if runCtx.Err() != nil {
 		result.State = "failed"
 		result.Output = output.String()
-		result.Summary = "EXECUTION_DEADLINE_OR_INTERRUPTION"
+		result.Summary = executionInterruptionCode(runCtx)
 		if _, e := os.Stat(filepath.Join(dir, "cancel.json")); e == nil {
 			result.State = "cancelled"
 			result.Summary = "Execution cancelled"
@@ -485,6 +486,13 @@ func truncate(s string, n int) string {
 		return string(r[:n])
 	}
 	return s
+}
+
+func executionInterruptionCode(ctx context.Context) string {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return "EXECUTION_DEADLINE"
+	}
+	return "EXECUTION_INTERRUPTED"
 }
 
 // Zero denotes no task-wide deadline; cancellation remains owned by the caller.
