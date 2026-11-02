@@ -16,6 +16,7 @@ vi.mock('../components/cluster/node-url', () => ({ bootstrapCluster: mock.bootst
 vi.mock('../preferences', () => ({ loadPreferences: mock.preferences }))
 vi.mock('../components/auth/Login', () => ({ default: ({ onOk }: { onOk: () => void }) => <button onClick={onOk}>Login</button> }))
 vi.mock('../components/terminal/SoloTerminal', () => ({ default: ({ name }: { name: string }) => <div>Solo {name}</div> }))
+vi.mock('../components/agent/ArtifactPreviewPage', () => ({ default: ({ route }: any) => <div>Preview {route.id}</div> }))
 vi.mock('./AppShell', () => ({
   default: () => {
     useEffect(() => mock.unmount, [])
@@ -74,6 +75,13 @@ describe('application mount boundary', () => {
     history.replaceState(null, '', '#/term/test%20session')
     render(<App />)
     await screen.findByText('Solo test session')
+    expect(screen.queryByText('Workspace')).toBeNull()
+  })
+
+  it('opens an authenticated artifact page without mounting the workspace', async () => {
+    history.replaceState(null, '', '#/artifact/report%20html?node=origin')
+    render(<App />)
+    await screen.findByText('Preview report html')
     expect(screen.queryByText('Workspace')).toBeNull()
   })
 

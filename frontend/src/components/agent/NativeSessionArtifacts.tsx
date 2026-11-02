@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Modal } from 'antd'
 import { FileTextIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { nodeApi } from '../cluster/node-url'
-import MobileSubPage from '../MobileSubPage'
-import { TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
+import { canPreviewArtifact } from './TaskOutput'
+import { TaskArtifactLink, TaskArtifactMobilePreview } from './TaskArtifactLink'
 import type { TaskArtifact, TaskDetail } from './agent-task-protocol'
 import { taskFailureKey } from './task-failure'
 import { taskOutcome, taskReportLinks } from './task-outcome'
@@ -36,9 +35,9 @@ export default function NativeSessionArtifacts({ detail, artifacts, failed, retr
       const run = detail.attempts.find(attempt => attempt.id === file.metadata?.runId)
       return <div className="native-artifact-row" key={file.id}>
       <FileTextIcon size={20} /><div className="native-artifact-info"><b>{file.name}</b><small><span>{file.name.includes('.') ? file.name.split('.').pop()?.toUpperCase() : file.mimeType}</span><span>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</span>{!!file.createdMs && <time>{new Date(file.createdMs).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}</time>}</small>{group.key === 'history' && run && <small>{t('agent.task.executionNumber', { n: run.attemptNo ?? run.revision })}</small>}</div>
-      <div className="agent-task-actions">{canPreviewArtifact(file) && <button type="button" className="tt-act" aria-label={t('agent.task.previewNamed', { name: file.name })} onClick={() => setPreviewId(file.id)}>{t('agent.task.preview')}</button>}{download(file)}</div>
+      <div className="agent-task-actions">{canPreviewArtifact(file) && <TaskArtifactLink artifact={file} onPreview={setPreviewId} />}{download(file)}</div>
     </div>})}</section>)}
     {!files.length && !failed && !detail.delivery?.unavailable.length && <p className="agent-muted">{t('agent.task.noArtifacts')}</p>}
-    {preview && (phone ? <MobileSubPage title={preview.name} onBack={() => setPreviewId('')} layer="session" search={false}><div className="native-artifact-preview"><div className="native-artifact-preview-actions">{download(preview)}</div><TaskArtifactPreview key={preview.id} artifact={preview} fullHeight /></div></MobileSubPage> : <Modal open title={preview.name} onCancel={() => setPreviewId('')} footer={download(preview)} width="min(90vw, var(--content-form))"><div className="native-artifact-preview"><TaskArtifactPreview key={preview.id} artifact={preview} fullHeight /></div></Modal>)}
+    {phone && preview && <TaskArtifactMobilePreview artifact={preview} onBack={() => setPreviewId('')} />}
   </div>
 }
