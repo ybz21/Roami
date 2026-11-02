@@ -1,0 +1,366 @@
+{
+  "plan_version": "roami-rsi-mixed-v4-daily-full-public-course-20261023",
+  "status": "all60_contracts_materialized_seven_artifact_reviews_and_operational_configuration_pending",
+  "target_size": 60,
+  "public_target": 20,
+  "authored_selected": 40,
+  "authored_real_selected": 20,
+  "authored_mechanism_selected": 20,
+  "public_sampling": [
+    {
+      "benchmark_id": "swe_verified",
+      "name": "SWE-bench Verified",
+      "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified",
+      "target_count": 2,
+      "selected_upstream_ids": [
+        "pylint-dev__pylint-6903",
+        "scikit-learn__scikit-learn-13496"
+      ],
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "status": "two_native_project_environment_contracts_accepted"
+    },
+    {
+      "benchmark_id": "terminal_bench",
+      "name": "Terminal-Bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "target_count": 2,
+      "selected_upstream_ids": [
+        "cancel-async-tasks",
+        "db-wal-recovery"
+      ],
+      "dataset_revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "status": "two_adapted_agent_contracts_materialized_upstream_assertions_container_accepted_not_model_evaluated"
+    },
+    {
+      "benchmark_id": "the_agent_company",
+      "name": "TheAgentCompany",
+      "source_url": "https://github.com/TheAgentCompany/TheAgentCompany",
+      "target_count": 2,
+      "selected_upstream_ids": [
+        "ds-stock-analysis-slides",
+        "hr-make-slides-introduce-leadership"
+      ],
+      "dataset_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "status": "two_native_environment_contracts_accepted_independent_artifact_quality_pending"
+    },
+    {
+      "benchmark_id": "osworld",
+      "name": "OSWorld",
+      "source_url": "https://github.com/xlang-ai/OSWorld",
+      "target_count": 2,
+      "selected_upstream_ids": [
+        "04578141-1d42-4146-b9cf-6fab4ce5fd74",
+        "05dd4c1d-c489-4c85-8389-a7836c4f0567"
+      ],
+      "dataset_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "status": "two_extracted_pptx_state_contracts_accepted_not_gui"
+    },
+    {
+      "benchmark_id": "agentic_vbench",
+      "name": "AgenticVBench",
+      "source_url": "https://github.com/PhiloLabs/agentic-vbench",
+      "target_count": 2,
+      "selected_upstream_ids": [
+        "exp-codec-restore-task01",
+        "agentic-vbench-assembly-task1"
+      ],
+      "dataset_revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "status": "two_native_media_contracts_original_verifier_acceptance_passed_not_live_agent"
+    },
+    {
+      "benchmark_id": "dsbench",
+      "name": "DSBench",
+      "source_url": "https://github.com/LiqiangJing/DSBench",
+      "target_count": 2,
+      "selected_upstream_ids": [
+        "00000018:question24",
+        "00000013:question19"
+      ],
+      "dataset_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+      "status": "two_frozen_workbook_question_contracts_materialized_with_exact_json_grade_not_model_evaluated"
+    },
+    {
+      "benchmark_id": "spreadsheetbench",
+      "name": "SpreadsheetBench",
+      "source_url": "https://github.com/Reality2byte/SpreadsheetBench",
+      "target_count": 1,
+      "selected_upstream_ids": [
+        "verified400:38703"
+      ],
+      "dataset_revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+      "status": "adapted_component_contract_materialized_grader_accepted_not_model_evaluated"
+    },
+    {
+      "benchmark_id": "gaia",
+      "name": "GAIA",
+      "source_url": "https://huggingface.co/learn/agents-course/unit4/hands-on",
+      "target_count": 1,
+      "selected_upstream_ids": [
+        "6f37996b-2ac7-44b0-8e68-6d28256631b4"
+      ],
+      "dataset_revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+      "status": "official_public_course_sample_complete_table_reasoning_with_added_exhaustive_proof_accepted",
+      "scope": "Official public course20-question API sample; no gated corpus or leaderboard submission."
+    },
+    {
+      "benchmark_id": "longmemeval_v2",
+      "name": "LongMemEval-V2",
+      "source_url": "https://github.com/xiaowu0162/LongMemEval-V2",
+      "target_count": 1,
+      "selected_upstream_ids": [
+        "4ed01379"
+      ],
+      "dataset_revision": "f152293e235517d504809563c833d7190b8c713b",
+      "status": "complete100_textual_history_native_deterministic_grade_accepted_not_persisted_memory"
+    },
+    {
+      "benchmark_id": "finqa",
+      "name": "FinQA",
+      "source_url": "https://github.com/czyssrs/FinQA",
+      "target_count": 3,
+      "selected_upstream_ids": [
+        "L/2015/page_59.pdf-1",
+        "PM/2018/page_24.pdf-2",
+        "IP/2012/page_93.pdf-4"
+      ],
+      "dataset_revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+      "status": "sampled_adapted_component_contract_not_model_evaluated"
+    },
+    {
+      "benchmark_id": "convfinqa",
+      "name": "ConvFinQA",
+      "source_url": "https://github.com/czyssrs/ConvFinQA",
+      "target_count": 1,
+      "selected_upstream_ids": [
+        "Double_KHC/2016/page_23.pdf"
+      ],
+      "dataset_revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6",
+      "status": "sampled_adapted_component_contract_not_model_evaluated"
+    },
+    {
+      "benchmark_id": "mlagentbench",
+      "name": "MLAgentBench",
+      "source_url": "https://github.com/snap-stanford/MLAgentBench",
+      "target_count": 1,
+      "selected_upstream_ids": [
+        "vectorization"
+      ],
+      "dataset_revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+      "status": "adapted_numpy_forward_contract_container_correctness_and_host_clock_accepted_not_live_model_evaluated"
+    }
+  ],
+  "authored_case_ids": [
+    "DEMO-01",
+    "DEMO-02",
+    "DEMO-05",
+    "QUANT-01",
+    "QUANT-02",
+    "QUANT-03",
+    "QUANT-04",
+    "QUANT-05",
+    "NEWS-01",
+    "NEWS-02",
+    "NEWS-04",
+    "STOCK-01",
+    "STOCK-03",
+    "STOCK-04",
+    "STOCK-05",
+    "DOC-03",
+    "DOC-05",
+    "LAB-05",
+    "CODE-01",
+    "OPS-04",
+    "MECH-MG01",
+    "MECH-MG02",
+    "MECH-MR01",
+    "MECH-MR02",
+    "MECH-CT01",
+    "MECH-CT02",
+    "MECH-TL01",
+    "MECH-TL02",
+    "MECH-TE01",
+    "MECH-TE02",
+    "MECH-TR01",
+    "MECH-TR02",
+    "MECH-SK01",
+    "MECH-SK02",
+    "MECH-PL01",
+    "MECH-PL02",
+    "MECH-MB01",
+    "MECH-MB02",
+    "MECH-VD01",
+    "MECH-VD02"
+  ],
+  "authored_case_bank": {
+    "path": "cases.json",
+    "total_specifications": 80,
+    "selected": 40,
+    "remaining_pool": 40,
+    "fixtures": "authored_v3_known_answer_and_mutation_grader_acceptance_complete",
+    "runs": "container_grader_acceptance_not_live_agent_trials"
+  },
+  "sampling_rules": [
+    "按场景、难度、任务时长和环境分层抽取，冻结seed与抽样清单；不根据候选得分换题。",
+    "同仓库、同来源文档或同任务模板按组划分，变体不冒充独立题。",
+    "保留upstream_sample_id、原始split、数据revision/hash、环境与grader版本。",
+    "先遵守上游访问条件、数据/素材范围和可用split；GAIA等未获访问时该配额保持待补，不将受限题复制到公开仓库。",
+    "能用原题和原verifier则保留；翻译、简化、改变工具或修改判定器后另标adapted，不能宣称官方可比结果。",
+    "公开test仅作冻结对照，不向候选反思和经验提取回传题目/答案；允许开发的train/dev任务才进入优化数据。",
+    "缺失环境或许可不足时标不完整；只有新建套件版本并说明原因才可更换来源。"
+  ],
+  "evaluation": {
+    "separate_reports": [
+      "public_agent_tasks",
+      "public_component_tasks_QA_memory",
+      "authored_real_tasks",
+      "authored_mechanism_regressions"
+    ],
+    "native_scores": "保留上游原生分数，不把不同量纲直接平均。",
+    "roami_metrics": "附加任务完成状态、产物核验、同机耗时、全链路Token与过程指标。",
+    "private_splits": "公开抽样不等于隐藏集；正式晋级仍需独立私有验证与隐藏证据，按需分批积累，不新增每日全量运行集，不降低统计门槛换取通过。",
+    "nonregression": "保护基线已通过的任务与必要机制；发布阻断与质量门槛继续适用。",
+    "private_implementation": {
+      "schema_version": 1,
+      "suite_id": "roami-private-contracts-54-v1",
+      "suite_hash": "822288431e74df604d4a7937bbba9fae34672641144d965ed7d10e27678f249a",
+      "cases": 54,
+      "validation_rule_families": 24,
+      "holdout_rule_families": 30,
+      "scope": "54 different business-rule families; common function interface is the grader protocol. No seed variants count as extra clusters. This measures bounded code contracts alongside the full daily suite, not private end-to-end office or GUI generalization.",
+      "private_inputs_and_oracles_published": false,
+      "removed_shared_template_families": 7,
+      "acceptance": {
+        "reference_outputs_passed": 54,
+        "mutations_rejected": 54,
+        "kind": "container_grader_acceptance_not_live_model_generalization"
+      },
+      "scope_limit": "Does not replace unseen office, GUI or media workflows. Family partitions are an operational sampling rule, not proof of statistical independence."
+    }
+  },
+  "scheduling": {
+    "materialization_gate": "20项公开task ID和revision绑定、40项自有夹具验收、预算和机器就绪后，才标为完整60项可执行套件。",
+    "daily": "每天完整执行冻结的60项正式任务，不抽样、不轮换省略。出现失败也继续执行其余用例并回顾。",
+    "cases_per_day_default": 60,
+    "full_suite": "60项每天全跑；稳定版与候选版各执行一轮A/B时共120个episode，不是120个不同case。",
+    "budget_scope": "所有测试机共用owner日预算。按实际执行组数预留整套最坏成本：无版本差异60次，对照120次；预算不足整套阻断，观察、修改与复核也计入同一预算。",
+    "model_free_regressions": 20,
+    "current_state": "no_automatic_schedule_created",
+    "coverage_mode": "full_suite",
+    "new_ideas": "正式60项不被替换；新想法是剩余预算内的额外开发实验，不足时延期。",
+    "no_candidate": "无版本差异时完整60项只跑稳定版一次，参数搜索默认关闭；基线观察不准晋级。仍在源码对照中的版本保持120次。",
+    "development_only": true
+  },
+  "next_steps": [
+    "接齐剩余3项公开任务（公司环境2、GAIA访问1）；PPT只测文档状态，长记忆只测完整100条文本历史检索，不含记忆摄入或图片。",
+    "为5项复杂产物接入独立校准评分，并扩充办公/GUI私有隐藏场景",
+    "在开发服务内共享现有模型配置，绑定测试机及明确每日Token预算；完整套件齐全后才启用全60项",
+    "回顾全部指标与原始日志，在预算内积累真实同机对照收益证据"
+  ],
+  "implementation": {
+    "public_materialized": 17,
+    "authored_selected_materialized": 40,
+    "protocol_smoke_cases": 2,
+    "active_machine_bindings": 0,
+    "live_model_trials": 1,
+    "sample_lock": "public-sample-lock.json",
+    "runbook": "../../development/agent-rsi.md",
+    "authored_acceptance": "20_container_mechanisms_and_20_known_answer_mutation_grader_fixtures_passed_visual_rubrics_pending",
+    "public_source_ids_selected": 19,
+    "public_materials_lock": "public-materials-lock.json",
+    "completed_live_agent_trials": 0,
+    "live_preflight_status": "isolated_CLI_without_credentials_HTTP_401_not_live_service_auth_verdict",
+    "private_validation_lock": "private-validation-lock.json"
+  },
+  "autonomous_research": {
+    "primary_inputs": [
+      "scheduled_test_cases",
+      "agent_proposed_development_experiments"
+    ],
+    "loop": [
+      "run_tests",
+      "inspect_behavior_traces_and_artifacts",
+      "form_evidence_backed_hypothesis",
+      "modify_isolated_source_or_strategy",
+      "run_targeted_regression",
+      "archive_change_and_evidence"
+    ],
+    "personal_usage_required": false,
+    "new_experiment_rules": "正式60项每日完整执行；新想法只能作为独立development实验，不替换正式题。先冻结输入和断言，不根据结果改标准；纳入正式集须版本化替换。",
+    "promotion": "实际代码改动和参数搜索分别留证；改代码不等于自动发布到现用实例。"
+  },
+  "daily_review": {
+    "required": true,
+    "coverage": "全部60项的各次执行，成功与失败都回顾。",
+    "metrics": [
+      "quality_and_hard_assertions",
+      "verified_delivery_time",
+      "all_role_tokens_including_failures",
+      "model_rounds_and_retries",
+      "tool_calls_errors_and_unknown_outcomes",
+      "measurement_coverage"
+    ],
+    "logs": [
+      "model-log.json",
+      "execution-log.json",
+      "regression.log",
+      "external_stdout_stderr_and_adapter_execution_log"
+    ],
+    "output": [
+      "review.json",
+      "report.json",
+      "evidence_hashes_and_record_references",
+      "observations_and_revision_suggestions"
+    ],
+    "incomplete_policy": "缺少用例、具体日志无法读取或回顾未完成，不记作当日完整结束，也不能晋级。用量未知保留null并明确提出计量修复建议。",
+    "implementation": "deterministic rules plus metered per-trial semantic review with hash-checked evidence expansion; formal live-model acceptance pending",
+    "review_model_tokens": 0,
+    "semantic_model_cost": "charged to shared owner/day budget; rule scan has no model calls",
+    "review_model_tokens_scope": "deterministic rule scan only; semantic review cost metered separately"
+  },
+  "closed_loop": {
+    "version": "rsi-closed-loop-proposal-v1-20261023",
+    "implementation_status": "workflow_implemented_fixture_and_container_verified_formal_run_disabled",
+    "system_of_record": "Roami private improvement ledger and persistent ResearchWorker actions",
+    "external_issue_sync": "optional_disabled_until_configured",
+    "daily_service": "persistent Roami RSI worker; independent of chat window",
+    "states": [
+      "observed",
+      "diagnosing",
+      "queued",
+      "implementing",
+      "verifying",
+      "ready",
+      "observing",
+      "closed_fixed",
+      "reopened",
+      "waiting_budget",
+      "blocked",
+      "closed_duplicate",
+      "closed_not_a_bug",
+      "cancelled"
+    ],
+    "closure_requires": [
+      "actual_patch_and_parent_version",
+      "independent_regression_and_full_60_evidence",
+      "existing_private_promotion_gate_when_applicable",
+      "applied_version_record",
+      "at_least_two_successful_daily_observation_cycles_proposed",
+      "complete_measurement_and_no_protected_regression"
+    ],
+    "non_closing_events": [
+      "issue_created",
+      "executor_claimed_success",
+      "pr_opened",
+      "pr_merged",
+      "candidate_tests_failed",
+      "daily_score_published"
+    ],
+    "durable_dispatch": "transactional outbox in RSI ledger; idempotent Tasks.create key; leased/fenced work and restart reconciliation",
+    "code_candidates": "Arm-specific source hashes, immutable image environment and independent host grader; dedicated RSI runner binding only",
+    "budget": "Reserve all formal daily evaluation first; diagnosis/edit/verify/observe share remaining owner budget",
+    "traceability": "cycle -> finding -> improvement -> task -> candidate -> verification -> release -> observation",
+    "fallback": "Unresolved work remains open or explicitly blocked; formal daily 60 continue when their setup and budget are ready",
+    "issue_publication_performed": false,
+    "repair_executor": "native_patch; all model requests metered with hard admission; Codex automatic repair not enabled"
+  }
+}

@@ -4,6 +4,7 @@ import json
 
 import httpx
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_browser_driver import PNG, BrowserFixture, BrowserModel
 from test_resource_leases import controller
 
@@ -120,6 +121,7 @@ async def test_native_browser_loop_passes_current_png_to_worker_and_keeps_storag
             self.images = 0
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             if isinstance(messages[-1].get("content"), list):
                 assert "bash" in {tool["function"]["name"] for tool in tools}
                 assert messages[-1]["content"][1]["image_url"]["url"].startswith(

@@ -111,7 +111,11 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
             )
             + "\n\ndata: [DONE]\n\n"
         )
-        return StreamingResponse(iter([text]), media_type="text/event-stream")
+        return StreamingResponse(
+            iter([text]),
+            media_type="text/event-stream",
+            headers={"X-Request-Id": "fixture-cli-response"},
+        )
 
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
@@ -146,9 +150,10 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
 
     try:
         with tempfile.TemporaryDirectory(prefix="agent-uds-") as short_root:
-            env["XDG_RUNTIME_DIR"] = short_root
+            env["ROAMI_DATA"] = short_root
+            env["XDG_RUNTIME_DIR"] = "/unused-interactive-runtime-dir"
             await cli("init", "--runtime-dir", str(runtime_dir))
-            catalog = json.loads((tmp_path / "database/catalog.json").read_text())
+            catalog = json.loads((Path(short_root) / "database/catalog.json").read_text())
             entry = next(d for d in catalog["databases"] if d["id"] == "agent-runtime")
             assert entry["state"] == "ready" and entry["path"] == "agents/runtime.db"
             service = await asyncio.create_subprocess_exec(
@@ -162,10 +167,14 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                 stderr=asyncio.subprocess.DEVNULL,
             )
             async with asyncio.timeout(10):
-                while not list(Path(short_root).rglob("*.sock")):
+                while True:
                     assert service.returncode is None
-                    await asyncio.sleep(0.05)
-            actual_socket = next(Path(short_root).rglob("*.sock"))
+                    try:
+                        await cli("status")
+                        break
+                    except AssertionError:
+                        await asyncio.sleep(0.05)
+            actual_socket = next(Path(short_root).rglob("agent-*.sock"))
             assert actual_socket.stat().st_mode & 0o777 == 0o600
             created = await cli("new", "--title", "CLI round trip")
             cid = created["data"]["id"]
@@ -178,6 +187,13 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                         break
                     await asyncio.sleep(0.05)
             assert messages[-1]["content"]["text"] == "Live transport answer"
+            usage = await cli("gateway", "usage")
+            call = usage["data"]["recent"][0]
+            assert call["model"] == "injected-http-model"
+            assert call["priceStatus"] == "unpriced" and call["cost"] is None
+            assert call["state"] == "unknown"
+            assert call["upstreamHttpStatus"] == 200
+            assert call["upstreamRequestId"] == "fixture-cli-response"
             await cli(
                 "notify", "--conversation", cid, "--key", "reminder-1", "--text", "Time to review"
             )
@@ -337,6 +353,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
 ):
     """Real isolated tmux and Go runners; fake agent binaries avoid paid/account calls."""
     import shlex
+    import sqlite3
 
     if not shutil.which("tmux"):
         pytest.skip("tmux required for coding executor integration")
@@ -408,6 +425,7 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
             spec = {
                 "key": kind,
                 "executor": kind,
+                "title": "修复报告链接",
                 "directory": str(binary_dir),
                 "prompt": "literal $(touch SHOULD_NOT_EXIST) `uname` ' 中文\nnext line",
                 "timeoutSeconds": 20,
@@ -417,6 +435,11 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
             result = await finished(kind)
             assert result["result"]["state"] == "succeeded"
             assert result["result"]["summary"] == "Answer: " + spec["prompt"]
+            with sqlite3.connect(tmp_path / "home/database/meta.db") as metadata:
+                label = metadata.execute(
+                    "SELECT label FROM sessions WHERE id=?", (first["session"],)
+                ).fetchone()[0]
+            assert label == "修复报告链接"
             assert not (binary_dir / "SHOULD_NOT_EXIST").exists()
             assert await cli("launch", "--file", "-", spec=spec) == result
             assert "LAUNCH_KEY_CONFLICT" in await cli(
@@ -666,7 +689,7 @@ async def test_existing_legacy_codex_receives_main_message_through_real_go_cli(
                 await asyncio.sleep(0.05)
         assert received.read_text() == "Fix the layout"
         view = await runtime.conversations.messages("alice", c["id"])
-        assert view["activities"] == []
+        assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])
         delivery = next(
             e["payload"]["activity"]

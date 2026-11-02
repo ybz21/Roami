@@ -3,6 +3,8 @@
 // 原来长在项目主页里（Projects.tsx 的 ProjectHome），一份状态一份 JSX 只能在那一页用；
 // 项目行的「+」、⌘N 都要同一个框——抽出来，项目主页和弹窗各挂一份。
 // 提交流程（先会话后 worktree、开工约定、自动互审）和 NewSessionModal 同款，不改。
+import { useLayout } from '../../layout'
+import { useSettingsDraft } from '../settings/settings-draft'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { App as AntApp, Button, Dropdown, Input } from 'antd'
 import { api, upload, makeClipboardImageFile } from '../../api'
@@ -21,7 +23,7 @@ import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } fr
 import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-brief'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
-export type TaskComposerHandle = { focus: () => void; insert: (text: string) => void }
+export type TaskComposerHandle = { focus: () => void; insert: (text: string) => void; appendInstruction: (text: string) => void }
 
 export const TaskComposer = forwardRef<TaskComposerHandle, {
   dir: string
@@ -30,15 +32,20 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   /** 建完（会话已开）：项目主页刷新列表，弹窗关掉自己 */
   onCreated?: (name: string) => void
   autoFocus?: boolean
-}>(function TaskComposer({ dir, isGit: gitHint, openTerm, onCreated, autoFocus }, ref) {
+  draftKey?: string
+  initialAgent?: AgentKind
+  initialPrompt?: string
+}>(function TaskComposer({ dir, isGit: gitHint, openTerm, onCreated, autoFocus, draftKey, initialAgent = 'claude', initialPrompt = '' }, ref) {
   const { t } = useI18n()
+  const { phone, keyboard } = useLayout()
   const { message } = AntApp.useApp()
   const [prefs] = usePreferences()
   const setup = useRepositorySetup(dir, gitHint)
   const isGit = setup.ready
-  const [prompt, setPrompt] = useState('')
+  const [prompt, setPrompt] = useState(initialPrompt)
+  const draftNotice = useSettingsDraft(draftKey || 'task:' + dir, prompt, '', setPrompt, !!draftKey)
   const [wtMode, setWtMode] = useState<'new' | 'existing'>('new')
-  const [agent, setAgent] = useState<AgentKind | 'none'>('claude')
+  const [agent, setAgent] = useState<AgentKind | 'none'>(initialAgent)
   const [wtsAll, setWtsAll] = useState<any[]>([])
   // 「已有」选中值：'wt:<路径>'（进这个工作区）/ 'br:<分支>'（为这条分支开一个工作区）
   const [existing, setExisting] = useState('')
@@ -51,9 +58,25 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const promptRef = useRef<any>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!draftKey || !phone || !keyboard || !composerRef.current?.contains(document.activeElement)) return
+    const frame = requestAnimationFrame(() => {
+      const composer = composerRef.current
+      let pane = composer?.parentElement
+      while (pane && !['auto', 'scroll'].includes(getComputedStyle(pane).overflowY)) pane = pane.parentElement
+      const submit = composer?.querySelector('.prj-go')
+      if (!pane || !submit) return
+      const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tap')) || 0
+      const delta = submit.getBoundingClientRect().bottom + gap - pane.getBoundingClientRect().bottom
+      if (delta > 0) pane.scrollTo({ top: pane.scrollTop + delta, behavior: 'instant' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [phone, keyboard, prompt, draftKey])
   useImperativeHandle(ref, () => ({
     focus: () => promptRef.current?.focus?.(),
     insert: (text) => setPrompt((cur) => appendPaths(cur, [text])),
+    appendInstruction: (text) => setPrompt(cur => cur ? cur + '\n' + text : text),
   }))
   useEffect(() => { if (autoFocus) setTimeout(() => promptRef.current?.focus?.(), 0) }, [autoFocus])
 
@@ -188,12 +211,12 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   }
 
   return (
-    <div className="tt-composer prj-in" style={{ animationDelay: '60ms' }}>
-      <RepositorySetup setup={setup} />
+    <div className="tt-composer prj-in" ref={composerRef} style={{ animationDelay: '60ms' }}>
+      {draftNotice}<RepositorySetup setup={setup} />
       <Input.TextArea ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
         placeholder={isGit ? t('project.composerPlaceholder') : t('project.composerPlain')} autoSize={{ minRows: 2, maxRows: 6 }} variant="borderless"
         onPaste={onPaste}
-        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void goCreate() } }} />
+        onKeyDown={(e) => { if (!phone && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void goCreate() } }} />
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; e.target.value = ''; if (fs.length) void uploadImages(fs) }} />
       {/* 控制条按「在哪干活 / 谁来干 / 动作」三组排，组内 6px、组间 16px，不画分隔线 */}

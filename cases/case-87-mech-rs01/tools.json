@@ -1,0 +1,14 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_improvement_rater_contract_shapes.py"
+  ],
+  "expected_collected": 28,
+  "runtime": [
+    "Python 3.12",
+    "pytest",
+    "scripts/dev/isolated-roami.sh",
+    "private artifact-review JSON receipts"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

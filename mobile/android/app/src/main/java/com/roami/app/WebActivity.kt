@@ -2,12 +2,8 @@ package com.roami.app
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.DownloadManager
 import android.net.Uri
-import android.os.Environment
-import android.webkit.URLUtil
 import android.webkit.ValueCallback
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -32,6 +28,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.security.cert.X509Certificate
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import org.json.JSONObject
 
 /** Roami WebView 容器：自签证书、系统键盘、摇一摇切环境与通知服务。 */
 class WebActivity : AppCompatActivity() {
@@ -39,6 +38,10 @@ class WebActivity : AppCompatActivity() {
     private lateinit var base: String
     private lateinit var shake: ShakeDetector
     private lateinit var apkUpdate: ApkUpdate
+    private lateinit var documentDownload: DocumentDownload
+    private val saveDocument = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (::documentDownload.isInitialized) documentDownload.save(result.resultCode, result.data?.data)
+    }
     private var askingSsl = false
     private var pendingAudio: PermissionRequest? = null
     private var lastImeHeight = -1
@@ -71,6 +74,7 @@ class WebActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
         base = intent.getStringExtra("url") ?: Prefs(this).current ?: run { finish(); return }
         apkUpdate = ApkUpdate(this, base)
+        documentDownload = DocumentDownload(this, base) { saveDocument.launch(it) }
         web = WebView(this)
         setContentView(web)
         // adjustNothing keeps the page stable; WebView does not expose its IME height to JS.
@@ -96,7 +100,43 @@ class WebActivity : AppCompatActivity() {
         }
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            val origin = Uri.parse(base).buildUpon().path(null).query(null).fragment(null).build().toString().trimEnd('/')
+            WebViewCompat.addWebMessageListener(web, "roamiDocument", setOf(origin)) { view, message, source, mainFrame, _ ->
+                if (mainFrame && ServerOrigin.matches(base, source.toString())) {
+                    runCatching {
+                        val data = JSONObject(message.data.orEmpty())
+                        val url = data.getString("url")
+                        if (ServerOrigin.matches(base, url)) {
+                            val name = data.optString("name")
+                            val disposition = name.takeIf { it.isNotBlank() }?.let { "attachment; filename*=utf-8''" + Uri.encode(it) }
+                            val mime = when (name.substringAfterLast('.').lowercase()) {
+                                "pdf" -> "application/pdf"
+                                "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                else -> "application/octet-stream"
+                            }
+                            documentDownload.start(url, view.settings.userAgentString, disposition, mime)
+                        }
+                    }
+                }
+            }
+        }
         web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String) {
+                if (!ServerOrigin.matches(base, url)) return
+                // WebView's download network stack can reject a certificate already trusted by the page.
+                view.evaluateJavascript("""
+                    if (window.roamiDocument && !window.roamiDocumentClicks) {
+                        window.roamiDocumentClicks = true;
+                        document.addEventListener('click', function(event) {
+                            const link = event.target.closest && event.target.closest('a[download]');
+                            if (event.defaultPrevented || !event.isTrusted || !link || new URL(link.href).origin !== location.origin || new URL(link.href).pathname === '/api/apk') return;
+                            event.preventDefault();
+                            window.roamiDocument.postMessage(JSON.stringify({url:link.href, name:link.download}));
+                        });
+                    }
+                """.trimIndent(), null)
+            }
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 // 站内照常；外链交给系统浏览器
                 if (!req.isForMainFrame) return false
@@ -149,24 +189,13 @@ class WebActivity : AppCompatActivity() {
                 return try { pickFiles.launch(Intent.createChooser(i, null)); true } catch (_: Exception) { fileCb = null; false }
             }
         }
-        // APK 使用已信任的自签证书直接安装；其他文件仍交给系统下载管理器。
         web.setDownloadListener { url, ua, disposition, mime, _ ->
             if (ServerOrigin.matches(base, url) && Uri.parse(url).path == "/api/apk") {
                 apkUpdate.download(url)
                 return@setDownloadListener
             }
-            runCatching {
-                val name = URLUtil.guessFileName(url, disposition, mime)
-                val req = DownloadManager.Request(Uri.parse(url))
-                    .addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url) ?: "")
-                    .addRequestHeader("User-Agent", ua)
-                    .setMimeType(mime).setTitle(name)
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
-                (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
-                Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                // 自签证书下系统下载器会拒绝连接：退给浏览器去下
+            if (ServerOrigin.matches(base, url)) documentDownload.start(url, ua, disposition, mime)
+            else {
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             }
         }

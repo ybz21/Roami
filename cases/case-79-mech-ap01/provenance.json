@@ -1,0 +1,7 @@
+{
+  "origin": "observed_test_runtime_process_leak",
+  "public_input": "TERM and KILL signal names; no private logs or tasks",
+  "actual_test": "cmd/roami/agent-parent-lifetime_linux_test.go",
+  "historical_scores_changed": false,
+  "scope": "foreground Go/Python parent ownership, not Agent task quality"
+}

@@ -4,6 +4,8 @@ import hashlib
 import math
 from dataclasses import asdict
 
+from roami_agent.context.image_role_instructions import image_role_instructions
+from roami_agent.protocol.improvement import policy_binding
 from roami_agent.protocol.serialization import encoded
 
 ESTIMATOR = "pi-usage-plus-chars-v1"
@@ -43,7 +45,7 @@ def request_basis(context):
 
 def request_context(settings, instructions, catalog, role="main"):
     return {
-        "instructions": instructions,
+        "instructions": image_role_instructions(settings, instructions, role),
         "catalog": catalog,
         "route": asdict(settings.route(role)),
         "inputBudget": settings.route(role).context_window,
@@ -52,6 +54,7 @@ def request_context(settings, instructions, catalog, role="main"):
         "compactionThreshold": settings.threshold_for(role),
         "compactionRatio": settings.compaction_ratio,
         "capacityBasis": "model_window" if settings.route(role).context_window else "unknown",
+        **({"improvement": policy_binding.get()} if policy_binding.get() else {}),
     }
 
 

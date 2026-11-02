@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import httpx
@@ -25,6 +26,34 @@ def cli(name, args):
     )
 
 
+async def test_bash_command_preserves_workspace_environment_without_login_profiles(
+    store, tmp_path, monkeypatch
+):
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    probe = binary / "rsi-path-probe"
+    probe.write_text('#!/bin/sh\nprintf "workspace-environment"\n')
+    probe.chmod(0o700)
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = tmp_path / "login-profile-ran"
+    (home / ".bash_profile").write_text(f"touch '{marker}'\n")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("PATH", str(binary) + os.pathsep + os.environ["PATH"])
+    monkeypatch.delenv("BASH_ENV", raising=False)
+    runtime = Runtime(store, ConversationModel(), settings=Settings(shell_roots=(tmp_path,)))
+    try:
+        result = await runtime.tools.invoke(
+            call("bash", {"command": "rsi-path-probe"}),
+            "worker",
+            {"owner": "alice", "workspace": {"directory": str(tmp_path)}},
+        )
+        assert result["exitCode"] == 0 and result["stdout"] == "workspace-environment"
+        assert not marker.exists()
+    finally:
+        await runtime.close()
+
+
 async def test_actual_catalog_and_settings_have_only_seven_tools(store):
     runtime = Runtime(store, ConversationModel())
     assert {x["function"]["name"] for x in runtime.tools.catalog()} == set(FOUNDATIONS)
@@ -35,11 +64,9 @@ async def test_actual_catalog_and_settings_have_only_seven_tools(store):
         "write",
         "tool_list",
     }
-    assert {x["function"]["name"] for x in runtime.tools.catalog("research")} == {
-        "read",
-        "bash",
-        "tool_list",
-    }
+    assert runtime.tools.catalog("research") == runtime.tools.catalog("worker")
+    assert "tool_list" in runtime.tools.registry
+    assert "extra_tool_list" not in runtime.tools.registry
     view = runtime.capability_settings.view("local")
     assert {x["name"] for x in view["tools"]} == set(FOUNDATIONS)
     operations = {x["name"] for group in view["cli"] for x in group["commands"]}
@@ -142,26 +169,34 @@ async def test_bash_cli_records_actual_read_effect_and_timeline(store):
             "succeeded",
         )
         view = await runtime.conversations.messages("alice", c["id"])
-        assert view["activities"] == []
+        assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])
         assert any(e["payload"].get("activity", {}).get("name") == "memory_search" for e in events)
     finally:
         await runtime.close()
 
 
-async def test_research_and_main_cannot_escape_cli_admission(store):
+async def test_background_roles_share_workspace_and_registered_cli_rules(store):
     runtime = Runtime(store, ConversationModel())
-    for wire in [
-        call("bash", {"command": "pwd"}),
-        call("read", {"path": "/etc/passwd"}),
-        cli("session_send", {"sessionId": "x", "text": "x"}),
-    ]:
-        with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
-            await runtime.tools.invoke(wire, "research", {})
-    with pytest.raises(DomainError, match="USE_REGISTERED_CLI_CAPABILITY"):
-        await runtime.tools.invoke(
-            call("bash", {"argv": ["roami", "session", "kill-session"]}), "main", {}
-        )
+    try:
+        for wire in [call("bash", {"command": "pwd"}), call("read", {"path": "/etc/passwd"})]:
+            errors = []
+            for role in ("worker", "research"):
+                with pytest.raises(DomainError) as rejected:
+                    await runtime.tools.invoke(wire, role, {})
+                errors.append(rejected.value.code)
+            assert errors[0] == errors[1] and errors[0] != "TOOL_UNAVAILABLE"
+        for role in ("worker", "research"):
+            tool, _ = runtime.tools.validate(
+                cli("session_send", {"sessionId": "x", "text": "x"}), role
+            )
+            assert tool.name == "session_send"
+        with pytest.raises(DomainError, match="USE_REGISTERED_CLI_CAPABILITY"):
+            await runtime.tools.invoke(
+                call("bash", {"argv": ["roami", "session", "kill-session"]}), "main", {}
+            )
+    finally:
+        await runtime.close()
 
 
 async def test_cli_directory_and_unbound_call_rejection(store):
@@ -250,9 +285,8 @@ async def test_tool_list_lists_categories_pages_and_removes_old_entry(store):
     assert not main_mcp["items"]
     assert main_mcp["scope"] == "current_role"
     assert "not web search results" in main_mcp["hint"]
-    assert not (await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {}))[
-        "items"
-    ]
+    research_mcp = await runtime.tools.invoke(call("tool_list", {"kind": "mcp"}), "research", {})
+    assert research_mcp["items"][0]["name"] == "mcp_fixture_echo"
     await runtime.capability_settings.save(
         "local", {"kind": "tools", "name": "mcp_fixture_echo", "enabled": False}
     )
@@ -317,6 +351,107 @@ async def test_malformed_cli_arguments_have_an_executable_recovery_example(store
         await runtime.close()
 
 
+async def test_file_conflict_recovery_rereads_and_preserves_concurrent_edit(store, tmp_path):
+    source = tmp_path / "answer.txt"
+    source.write_text("original")
+
+    class Repair:
+        model = "file-conflict-recovery"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            if self.calls in {2, 4}:
+                failure = json.loads(messages[-1]["content"])
+                assert failure["error"] == "FILE_CHANGED"
+                assert failure["writePublished"] is False
+                assert "read" in failure["recovery"] and "shell redirection" in failure["recovery"]
+                assert source.read_text() == ("original" if self.calls == 2 else "human edit")
+                arguments, name = {"path": str(source)}, "read"
+            elif self.calls in {1, 3, 5}:
+                observed = json.loads(messages[-1]["content"]) if self.calls != 1 else None
+                if self.calls == 3:
+                    source.write_text("human edit")
+                arguments, name = (
+                    {
+                        "path": str(source),
+                        "expectedSha256": observed["sha256"] if observed else None,
+                        "content": observed["data"] + " + fix" if observed else "replace",
+                    },
+                    "write",
+                )
+            else:
+                assert source.read_text() == "human edit + fix"
+                yield ModelEvent("text", "Saved the corrected file.")
+                return
+            wire = call(name, arguments)
+            wire["id"] = "step-" + str(self.calls)
+            yield ModelEvent("tool", wire)
+
+    model = Repair()
+    runtime = Runtime(store, model, settings=Settings(shell_roots=(tmp_path,)))
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        receipt = await runtime.chat.submit("alice", conversation["id"], "fix", "Fix the file")
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (receipt["turnId"],)
+            ),
+        )
+        assert source.read_text() == "human edit + fix"
+    finally:
+        await runtime.close()
+
+
+async def test_model_image_read_keeps_hash_without_sending_binary_text(store, tmp_path):
+    import hashlib
+
+    from PIL import Image
+
+    image = tmp_path / "preview.png"
+    Image.new("RGB", (80, 60), color="red").save(image)
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+
+    class Reader:
+        model = "image-file-read"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                yield ModelEvent("tool", call("read", {"path": str(image)}))
+            else:
+                value = json.loads(messages[-1]["content"])
+                assert value["data"] == "" and value["contentOmitted"] is True
+                assert value["sha256"] == digest and value["sizeBytes"] == image.stat().st_size
+                assert "not a visual observation" in value["recovery"]
+                yield ModelEvent("text", "The file is saved; visual inspection is unavailable.")
+
+    model = Reader()
+    runtime = Runtime(store, model, settings=Settings(shell_roots=(tmp_path,)))
+    await runtime.start()
+    try:
+        raw = await runtime.files.read({"path": str(image)}, {})
+        assert raw["encoding"] == "base64" and raw["data"]
+        conversation = await runtime.conversations.create("alice")
+        receipt = await runtime.chat.submit(
+            "alice", conversation["id"], "image", "Inspect the file"
+        )
+        await until(
+            store,
+            lambda db: row(
+                db, "SELECT id FROM turns WHERE id=? AND state='completed'", (receipt["turnId"],)
+            ),
+        )
+        messages = (await runtime.conversations.messages("alice", conversation["id"]))["messages"]
+        assert raw["data"] not in json.dumps(messages)
+        assert model.calls == 2
+    finally:
+        await runtime.close()
+
+
 async def test_exact_task_status_filters_before_page_limit_and_preserves_scope(store):
     runtime = Runtime(store, ConversationModel())
     try:
@@ -357,3 +492,24 @@ async def test_exact_task_status_filters_before_page_limit_and_preserves_scope(s
             )
     finally:
         await runtime.close()
+
+
+def test_main_catalog_does_not_advertise_an_implicit_shell_workspace():
+    from roami_agent.protocol.tools import Tool, object_schema
+    from roami_agent.tools.registry import Tools
+
+    registry = Tools()
+    registry.directory = object()
+    registry.add(
+        Tool(
+            "bash",
+            "Shell in a prepared workspace",
+            object_schema({}),
+            lambda *args: None,
+            main=True,
+        )
+    )
+    main = registry.catalog("main")[0]["function"]["description"]
+    worker = registry.catalog("worker")[0]["function"]["description"]
+    assert "Main has no implicit shell workspace" in main and "delegate" in main
+    assert worker == "Shell in a prepared workspace"

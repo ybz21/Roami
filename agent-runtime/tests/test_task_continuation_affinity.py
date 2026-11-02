@@ -254,3 +254,44 @@ async def test_missing_session_never_falls_back_to_new_provider(store):
         )
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("state", ["waiting_user", "succeeded", "failed"])
+async def test_finished_generic_native_directory_does_not_own_all_its_descendants(store, state):
+    runtime, _, _, _, binding = await setup(store)
+    try:
+        parent = store.data_root / "home"
+        child = parent / "documents"
+        child.mkdir(parents=True)
+        task = await seed(runtime, binding, parent, executor="native", state=state)
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET intent_json=json_set(intent_json,'$.target',json(?)),target_json=? WHERE id=?",
+                (
+                    json.dumps({"kind": "new_session", "directory": str(parent)}),
+                    json.dumps({"workdir": str(parent)}),
+                    task["id"],
+                ),
+            ),
+            write=True,
+        )
+        candidates = lambda target: runtime.db.call(
+            lambda db: continuation_candidates(
+                db, "alice", binding["conversation"], binding["turnId"], target
+            )
+        )
+        assert await candidates({"kind": "new_session", "directory": str(child)}) == []
+        assert (await candidates({"kind": "new_session", "directory": str(parent)}))[0][
+            "taskId"
+        ] == task["id"]
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE task_attempts SET state='unknown' WHERE task_id=?", (task["id"],)
+            ),
+            write=True,
+        )
+        assert (await candidates({"kind": "new_session", "directory": str(child)}))[0][
+            "taskId"
+        ] == task["id"]
+    finally:
+        await runtime.close()

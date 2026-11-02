@@ -15,6 +15,13 @@ RECORD_FIELDS = (
     "r.*,c.title AS conversation_title,json_extract(t.intent_json,'$.goal') AS task_title,"
     "(SELECT COUNT(*) FROM memory_sources s WHERE s.memory_id=r.id) AS source_count"
 )
+LIST_FIELDS = (
+    "r.id,r.title,r.state,r.kind,r.project_id,r.conversation_id,r.task_id,r.day_key,r.timezone,"
+    "r.updated_ms,r.created_ms,r.revision,"
+    "CASE WHEN r.day_key IS NOT NULL AND json_valid(r.body) THEN json_object('counts',json_extract(r.body,'$.counts')) ELSE substr(r.body,1,200) END AS body,"
+    "c.title AS conversation_title,substr(json_extract(t.intent_json,'$.goal'),1,120) AS task_title,"
+    "(SELECT COUNT(*) FROM memory_sources s WHERE s.memory_id=r.id) AS source_count"
+)
 ACTIVE = (
     "r.valid_from_ms<=? AND (r.valid_until_ms IS NULL OR r.valid_until_ms>?) "
     "AND (r.expires_ms IS NULL OR r.expires_ms>?) AND NOT "
@@ -78,6 +85,7 @@ class MemoryCatalog:
         scope="all",
         limit=20,
         offset=0,
+        compact=False,
     ):
         conditions, args = catalog_conditions(owner, state, category)
         if scope not in {"all", *SCOPES}:
@@ -127,7 +135,7 @@ class MemoryCatalog:
             items = rows(
                 db,
                 "SELECT "
-                + RECORD_FIELDS
+                + (LIST_FIELDS if compact else RECORD_FIELDS)
                 + RECORD_JOINS
                 + "WHERE "
                 + where
@@ -136,7 +144,13 @@ class MemoryCatalog:
                 + " LIMIT ? OFFSET ?",
                 (*args, limit, offset),
             )
-            return {"items": items, "total": total, "offset": offset, "limit": limit}
+            return {
+                "items": items,
+                "total": total,
+                "offset": offset,
+                "limit": limit,
+                "nextCursor": str(offset + len(items)) if offset + len(items) < total else None,
+            }
 
         return await self.db.call(read)
 

@@ -1,0 +1,9 @@
+{
+  "name": "交付文件与内部执行证据",
+  "description": "真实子进程创建报告并产生大日志；输入文件简称不是缺失产物。",
+  "input_name": "source-a.txt",
+  "input_content": "supplied source material\n",
+  "output_path": "output/report.txt",
+  "output_content": "verified report\n",
+  "capture_bytes": 50001
+}

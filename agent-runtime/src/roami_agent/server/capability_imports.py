@@ -7,7 +7,9 @@ import os
 import re
 import stat
 import tempfile
+import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from jsonschema import Draft202012Validator, SchemaError
 
@@ -15,6 +17,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.skill_names import SKILL_ALIASES
 from roami_agent.protocol.tools import Tool
 from roami_agent.server.model_settings import ModelSettings
+from roami_agent.server.skill_package import materialize_package, package_files
 from roami_agent.tools.mcp import Connection, validate_servers
 
 NAME = re.compile(r"[a-z][a-z0-9_-]{0,63}")
@@ -60,6 +63,15 @@ class CapabilityImports:
         if kind not in KINDS or not isinstance(value, dict):
             raise DomainError("INVALID_CAPABILITY_IMPORT")
         value = dict(value)
+        if kind == "mcp" and "name" not in value:
+            label = value.get("displayName", "")
+            if not isinstance(label, str) or not label.strip():
+                raise DomainError("INVALID_CAPABILITY_NAME")
+            value["name"] = (
+                label
+                if re.fullmatch(r"[a-z][a-z0-9_-]{0,19}", label)
+                else "server-" + uuid.uuid4().hex[:12]
+            )
         name = value.get("name")
         if (
             not isinstance(name, str)
@@ -67,20 +79,34 @@ class CapabilityImports:
             or (kind == "mcp" and len(name) > 20)
         ):
             raise DomainError("INVALID_CAPABILITY_NAME")
-        if len(json.dumps(value, ensure_ascii=False).encode()) > MAX_BYTES:
+        if len(json.dumps(value, ensure_ascii=False).encode()) > (
+            600_000 if kind == "skills" and value.get("files") else MAX_BYTES
+        ):
             raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
         if kind == "skills":
-            if set(value) - {"name", "description", "text"}:
+            if set(value) - {"name", "description", "text", "files", "origin"}:
                 raise DomainError("INVALID_CAPABILITY_IMPORT")
+            package_files(value)
             if (
                 not isinstance(value.get("text"), str)
                 or not value["text"].strip()
+                or len(value["text"].encode()) > MAX_BYTES
                 or not isinstance(value.get("description", ""), str)
                 or len(value.get("description", "")) > 2000
             ):
                 raise DomainError("INVALID_CAPABILITY_IMPORT")
         elif kind == "cli":
-            if set(value) - {"name", "description", "argv", "cwd", "schema"}:
+            if set(value) - {
+                "name",
+                "description",
+                "argv",
+                "cwd",
+                "schema",
+                "argumentMode",
+                "origin",
+            }:
+                raise DomainError("INVALID_CAPABILITY_IMPORT")
+            if value.get("argumentMode", "json") not in ("json", "argv"):
                 raise DomainError("INVALID_CAPABILITY_IMPORT")
             argv = value.get("argv")
             if (
@@ -105,7 +131,24 @@ class CapabilityImports:
                 raise DomainError("INVALID_CAPABILITY_SCHEMA") from None
             value["schema"] = schema
         else:
-            if set(value) != {"name", "config"} or not isinstance(value["config"], dict):
+            if set(value) - {
+                "name",
+                "displayName",
+                "description",
+                "enabled",
+                "config",
+                "origin",
+            } or not isinstance(value.get("config"), dict):
+                raise DomainError("INVALID_MCP_CONFIG")
+            if (
+                not isinstance(value.get("displayName", name), str)
+                or not value.get("displayName", name).strip()
+                or len(value.get("displayName", name)) > 80
+                or any(ord(char) < 32 for char in value.get("displayName", name))
+                or not isinstance(value.get("description", ""), str)
+                or len(value.get("description", "")) > 2000
+                or type(value.get("enabled", False)) is not bool
+            ):
                 raise DomainError("INVALID_MCP_CONFIG")
             config = dict(value["config"])
             if set(config) - {
@@ -123,11 +166,17 @@ class CapabilityImports:
             }:
                 raise DomainError("INVALID_MCP_CONFIG")
             transport = config.pop("type", None)
+            if transport is not None and not isinstance(transport, str):
+                raise DomainError("INVALID_MCP_CONFIG")
             config.setdefault(
                 "transport",
-                "streamable_http" if config.get("url") or transport == "http" else "stdio",
+                ("streamable_http" if transport == "http" else transport)
+                or ("streamable_http" if config.get("url") else "stdio"),
             )
-            if transport not in {None, "http", "stdio", "streamable_http"}:
+            if transport not in {None, "http", "stdio", "sse", "streamable_http"} or (
+                transport
+                and config["transport"] != ("streamable_http" if transport == "http" else transport)
+            ):
                 raise DomainError("INVALID_MCP_CONFIG")
             if "cwd" in config and (not isinstance(config["cwd"], str) or "\0" in config["cwd"]):
                 raise DomainError("INVALID_MCP_CONFIG")
@@ -147,6 +196,19 @@ class CapabilityImports:
             if any("\0" in part for part in [config.get("command", ""), *config.get("args", [])]):
                 raise DomainError("INVALID_MCP_CONFIG")
             value["config"] = config
+        if "origin" in value and (
+            not isinstance(value["origin"], dict)
+            or set(value["origin"]) != {"source", "id", "version", "url"}
+            or any(
+                not isinstance(part, str) or len(part) > 2000 for part in value["origin"].values()
+            )
+        ):
+            raise DomainError("INVALID_CAPABILITY_IMPORT")
+        if (
+            value.get("origin", {}).get("url")
+            and urlsplit(value["origin"]["url"]).scheme != "https"
+        ):
+            raise DomainError("INVALID_CAPABILITY_IMPORT")
         return value
 
     def check_collisions(self, entries, replacing=None):
@@ -175,12 +237,26 @@ class CapabilityImports:
     def install(self, kind, value):
         name, tools = value["name"], self.runtime.tools
         if kind == "skills":
+            references = {}
+            for path, raw in package_files(value).items():
+                if path == "SKILL.md":
+                    continue
+                try:
+                    text = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    continue
+                references[path] = {"text": text, "version": hashlib.sha256(raw).hexdigest()}
             tools.skills[name] = {
                 "text": value["text"],
                 "description": value.get("description", ""),
-                "version": hashlib.sha256(value["text"].encode()).hexdigest(),
+                "version": hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest(),
                 "source": "managed",
-                "references": {},
+                "references": references,
+                **(
+                    {"packagePath": materialize_package(self.runtime.db.data_root, value)}
+                    if value.get("files")
+                    else {}
+                ),
             }
             tools.registry["skill_read"].schema["properties"]["name"]["enum"] = list(tools.skills)
         elif kind == "cli":
@@ -190,6 +266,13 @@ class CapabilityImports:
                     part.replace("{input}", json.dumps(args, ensure_ascii=False))
                     for part in value["argv"]
                 ]
+                if value.get("argumentMode") == "argv":
+                    arguments = args.get("args", [])
+                    if not isinstance(arguments, list) or not all(
+                        isinstance(arg, str) and "\0" not in arg for arg in arguments
+                    ):
+                        raise DomainError("INVALID_TOOL_ARGUMENTS")
+                    argv.extend(arguments)
                 payload = {"argv": argv}
                 if value.get("cwd"):
                     payload["cwd"] = value["cwd"]
@@ -203,12 +286,22 @@ class CapabilityImports:
                     invoke,
                     effect="write",
                     source="external",
+                    main=True,
                     cancellation_stops_execution=True,
                 )
             )
         else:
-            self.runtime.mcp.connections[name] = Connection(name, value["config"])
+            connection = Connection(
+                name,
+                value["config"],
+                enabled=value.get("enabled", False),
+                display_name=value.get("displayName", name),
+                description=value.get("description", ""),
+            )
+            self.runtime.mcp.connections[name] = connection
             self.runtime.mcp.register_discovery()
+            if self.runtime.mcp.running and connection.enabled:
+                self.runtime.mcp.activate(connection)
 
     async def uninstall(self, kind, name):
         tools = self.runtime.tools
@@ -219,9 +312,7 @@ class CapabilityImports:
             tools.registry.pop("cli_" + name, None)
         else:
             connection = self.runtime.mcp.connections.pop(name)
-            if connection.task and not connection.task.done():
-                connection.task.cancel()
-                await asyncio.gather(connection.task, return_exceptions=True)
+            await self.runtime.mcp.stop(connection)
             self.runtime.mcp._remove(connection)
             self.runtime.mcp.register_discovery()
 
@@ -251,12 +342,15 @@ class CapabilityImports:
         if kind not in KINDS:
             raise DomainError("INVALID_CAPABILITY_IMPORT")
         async with self.lock, self.runtime.capability_settings.lock:
+            if kind == "mcp":
+                await self.runtime.mcp.refresh()
             if name is not None and name not in self.saved[kind]:
                 raise DomainError("MANAGED_CAPABILITY_NOT_FOUND", 404)
             if kind == "mcp" and name:
                 connection = self.runtime.mcp.connections[name]
                 if (
                     connection.current
+                    or connection.remote_busy
                     or not connection.queue.empty()
                     or (connection.ready and not connection.ready.done())
                 ):
@@ -276,18 +370,59 @@ class CapabilityImports:
                 if name is not None and name != value["name"]:
                     raise DomainError("INVALID_CAPABILITY_NAME")
                 incoming = {value["name"]: value}
+            metadata_only = False
+            if kind == "mcp" and name and not remove:
+                value = incoming[name]
+                value["enabled"] = self.runtime.mcp.connections[name].enabled
+                metadata_only = value["config"] == self.saved[kind][name]["config"]
             self.check_collisions({kind: incoming}, (kind, name) if name else None)
             updated = {**self.saved, kind: {**self.saved[kind], **incoming}}
             if remove:
                 updated[kind].pop(name)
             if len(updated[kind]) > 64:
                 raise DomainError("CAPABILITY_IMPORT_LIMIT", 409)
+            for value in incoming.values():
+                if kind == "skills":
+                    materialize_package(self.runtime.db.data_root, value)
             self.persist(updated)
-            if name:
+            if name and not metadata_only:
                 await self.uninstall(kind, name)
             for value in incoming.values():
-                self.install(kind, value)
+                if metadata_only:
+                    self.runtime.mcp.update_metadata(
+                        connection, value.get("displayName", name), value.get("description", "")
+                    )
+                else:
+                    self.install(kind, value)
             self.saved = updated
+            self.runtime.capability_settings.apply()
+            if kind == "mcp":
+                await self.runtime.mcp.refresh(sync=True)
+            return self.runtime.capability_settings.view(owner)
+
+    async def connect_mcp(self, owner, name):
+        ModelSettings.owner(owner)
+        async with self.lock:
+            if name not in self.runtime.mcp.connections:
+                raise DomainError("CAPABILITY_NOT_FOUND", 404)
+            if name in self.saved["mcp"] and not self.saved["mcp"][name].get("enabled"):
+                updated = {
+                    **self.saved,
+                    "mcp": {
+                        **self.saved["mcp"],
+                        name: {
+                            **self.saved["mcp"][name],
+                            "enabled": True,
+                        },
+                    },
+                }
+                self.persist(updated)
+                self.saved = updated
+            try:
+                async with asyncio.timeout(30):
+                    await self.runtime.mcp.discover({"server": name}, {})
+            except TimeoutError:
+                raise DomainError("MCP_TIMEOUT", 504) from None
             self.runtime.capability_settings.apply()
             return self.runtime.capability_settings.view(owner)
 

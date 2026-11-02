@@ -1,12 +1,14 @@
 # Roami 文档
 
-> **Code anywhere, anytime.** — 品牌名 **Roami**，命令行工具名 `ttmux`。
+> **随时随地，掌控众多 Agent。** — 品牌名 **Roami**，统一命令入口 `roami`。
 
 | 目录 | 内容 |
 |------|------|
 | [features.md](./features.md) ｜ [features.zh-CN.md](./features.zh-CN.md) | **完整功能列表** — 按能力分类 |
+| [Roadmap](../ROADMAP.md) ｜ [中文路线图](../ROADMAP.zh-CN.md) | **下一阶段** — RSI 自进化、接入 SuperWork 构建数字分身、OKR 自动执行 |
+| [deploy/mobile.md](./deploy/mobile.md) | **手机与 Android App** — 安装、签名、通知与构建 |
 | [install/](./install/) | **安装与部署** — CLI 一键/源码安装、Web 控制台启动、`.env` 配置、远程访问、故障排查 |
-| [design/](./design/) | **设计文档** — 按主题分子目录：swarm / plugin / web / cluster / mockups |
+| [design/](./design/) | **历史设计文档** — swarm / plugin / web / cluster；新设计按根 AGENTS.md 维护 |
 
 ## design/ 速览
 
@@ -32,12 +34,10 @@
 [architecture.html](./design/cluster/architecture.html) 技术架构 ｜
 [mockups/index.html](./design/cluster/mockups/index.html) 可点原型（多机只加的那三样）
 
-**[mockups/](./design/mockups/)** — 静态原型
-
 ## 相关
 
 - [Roami UI 设计规范](./development/ui-design-system.md) — 配色、布局、尺寸、手机与桌面规则（强制）；[手机 Material 细则](./development/mobile-material-ui.md)
 - 根 [README](../README.md) ｜ [README.zh-CN](../README.zh-CN.md)
-- CLI 源码说明 [`cli/ttmux-cli/README.md`](../cli/ttmux-cli/README.md) — `ttmux` 主命令
-- 浏览器自动化 CLI [`cli/chrome-cli/README.md`](../cli/chrome-cli/README.md) — `chrome`（Playwright over CDP）
+- [会话 CLI](./development/session-cli.md) — `roami session`
+- [统一命令入口](../cmd/roami/cli.go) — `roami`、`roami chrome`、`roami agent` 等
 - Web 后端说明 [`backend/README.md`](../backend/README.md)

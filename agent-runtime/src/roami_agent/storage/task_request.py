@@ -5,7 +5,7 @@ import json
 from roami_agent.storage.database import row
 
 
-def task_user_request(db, message):
+def task_user_request(db, message, *, identity_only=False):
     content = json.loads(message["content_json"])
     if not content.get("taskSteer"):
         return message
@@ -25,7 +25,9 @@ def task_user_request(db, message):
         return message
     return row(
         db,
-        "SELECT m.* FROM messages m JOIN conversations c ON c.id=m.conversation_id "
+        "SELECT "
+        + ("m.id" if identity_only else "m.*")
+        + " FROM messages m JOIN conversations c ON c.id=m.conversation_id "
         "WHERE m.id=? AND m.conversation_id=? AND m.deleted_ms IS NULL AND NOT EXISTS "
         "(SELECT 1 FROM context_omissions o WHERE o.owner_id=c.owner_id AND o.message_id=m.id)",
         (source_id, message["conversation_id"]),

@@ -37,7 +37,7 @@ class Targets:
                     "authentication": "unknown",
                     "usage": "unknown",
                 }
-                for k in ["codex", "claude"]
+                for k in ["codex", "claude", "opencode", "pi"]
             ],
         }
 
@@ -93,6 +93,56 @@ async def setup(store, *, user="Please investigate", settings=None):
     registry = Tools()
     register_main_tools(registry, runtime.tasks, runtime.memory, targets, router)
     return runtime, targets, router, registry, binding
+
+
+@pytest.mark.parametrize("resource_only", [False, True])
+@pytest.mark.parametrize("forgotten", [False, True])
+async def test_native_seed_retains_user_contract_and_display_goal(store, resource_only, forgotten):
+    from test_task_delivery_benchmark import admit
+
+    original = 'Return only {"recordId":"string","count":"number"}; do not deploy anything.'
+    delegated = "Write the result with extra audit metadata."
+    runtime, _, _, _, binding = await setup(store, user=original)
+    try:
+        task = await admit(
+            runtime,
+            binding,
+            delegated,
+            "contract",
+            executor="native",
+            target={"kind": "new_session", "resourceOnly": resource_only},
+        )
+        message = await store.call(
+            lambda db: row(
+                db,
+                "SELECT m.content_json,n.id AS session_id FROM native_sessions n "
+                "JOIN task_attempts a ON a.task_id=n.task_id "
+                "JOIN messages m ON m.branch_id=a.native_branch_id WHERE n.task_id=?",
+                (task["id"],),
+            )
+        )
+        content = json.loads(message["content_json"])
+        assert original in content["text"] and delegated in content["text"]
+        assert content.get("displayText") == (None if resource_only else delegated)
+        if forgotten:
+            await store.call(
+                lambda db: db.execute(
+                    "INSERT INTO context_omissions(owner_id,message_id,reason,created_ms) VALUES(?,?,?,0)",
+                    ("alice", binding["originMessageId"], "forgotten"),
+                ),
+                write=True,
+            )
+            with pytest.raises(DomainError, match="NATIVE_SESSION_NOT_FOUND"):
+                await runtime.native_sessions.conversation("alice", message["session_id"])
+        else:
+            view = await runtime.native_sessions.conversation("alice", message["session_id"])
+            assert view["messages"][0]["content"]["text"] == (
+                content["text"] if resource_only else delegated
+            )
+            with pytest.raises(DomainError, match="NATIVE_SESSION_NOT_FOUND"):
+                await runtime.native_sessions.conversation("bob", message["session_id"])
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.parametrize(
@@ -528,6 +578,29 @@ async def test_professional_brief_passes_only_admitted_verified_input_paths(stor
             assert file["sha256"] == hashlib.sha256(body).hexdigest()
             assert file["name"] == "data.csv"
             assert "read them as data" in brief
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("executor", ["opencode", "pi"])
+async def test_new_professional_executor_and_model_reach_the_accepted_task(store, executor):
+    runtime, targets, _, tools, binding = await setup(
+        store, user="Use " + executor + " with smoke/local-smoke"
+    )
+    targets.installed.add(executor)
+    try:
+        args = request(
+            explicitExecutor=executor,
+            userQuote="Use " + executor,
+            model={"id": "smoke/local-smoke", "quote": "with smoke/local-smoke"},
+        )
+        result = await tools.invoke(
+            {"function": {"name": "delegate", "arguments": json.dumps(args)}}, "main", binding
+        )
+        assert result["executor"] == executor
+        task = (await runtime.tasks.list("alice"))[0]
+        intent = json.loads(task["intent_json"])
+        assert intent["executor"] == executor and intent["model"] == "smoke/local-smoke"
     finally:
         await runtime.close()
 

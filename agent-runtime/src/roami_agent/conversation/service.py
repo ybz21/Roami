@@ -139,6 +139,7 @@ class ConversationService:
 
         result = await self.db.call(write, write=True)
         handle = self.turn_tasks.get(result["turnId"])
-        if handle:
+        # The durable stop still wins over deferral while cancellation cleanup finishes.
+        if handle and not handle.done() and not handle.cancelling():
             handle.cancel()
         return result

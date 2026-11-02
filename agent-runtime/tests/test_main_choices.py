@@ -78,7 +78,7 @@ async def test_main_existing_session_delegate_sends_without_provider_hooks_or_co
             await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
         )
         view = await runtime.conversations.messages("alice", c["id"])
-        assert view["activities"] == []
+        assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])
         delivery = next(
             e["payload"]["activity"]

@@ -3,18 +3,29 @@
 import json
 
 from roami_agent.dispatch.routing import public_routing, routing_schema
+from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import validate_answer
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
+from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
+from roami_agent.storage.request_quotes import quote_text
 from roami_agent.storage.task_continuation import continuation_candidates
 from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
 
 def register_main_tools(registry, tasks, memory, targets, router=None):
+    async def coverage(args, binding, *, handoff=False):
+        return await tasks.db.call(lambda db: check_coverage(db, binding, args, handoff=handoff))
+
+    async def record(binding, outcomes, receipt=None):
+        if outcomes is None:
+            return
+        await tasks.db.call(lambda db: record_coverage(db, binding, outcomes, receipt), write=True)
+
     async def reply_source(binding):
         source = await tasks.db.call(
             lambda db: row(
@@ -30,19 +41,23 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         return json.loads(source["content_json"]).get("text", "") if source else ""
 
     async def reply(args, binding):
-        return {"reply": validate_answer(args, await reply_source(binding))}
+        outcomes = await coverage(args, binding)
+        result = {"reply": validate_answer(args, await reply_source(binding))}
+        await record(binding, outcomes)
+        return result
 
     registry.add(
         Tool(
             "reply",
-            "Deliver the final answer and end this turn, without an extra model request. Call alone, no text preamble. "
-            "Use brief for ordinary concise answers, detailed for explicitly requested full/detail content, debug for explicitly requested raw fields/records. "
-            "detailed/debug require scopeQuote copied exactly from the original user's request. Keep requested quotes and content intact. "
-            "Brief rejects boilerplate offers, internal status fields and a Chinese answer to an English request; correct the answer if rejected. "
-            "Use task_reply for pure progress or routine file handoffs. Use ask_user for a missing decision.",
+            "Final answer with requestCoverage, language override or raw/debug metadata. "
+            "Stream ordinary prose as assistant text. Call alone, no preamble; ends the turn. "
+            "brief is concise; detailed/debug preserve explicitly requested content and require an exact user scopeQuote. "
+            "Brief rejects boilerplate, internal fields and Chinese for an English request; correct rejected answers. "
+            "Use task_reply only for explicit progress questions and ask_user for missing decisions.",
             object_schema(
                 {
                     "text": {"type": "string", "minLength": 1},
+                    "requestCoverage": coverage_schema(),
                     "mode": {"type": "string", "enum": ["brief", "detailed", "debug"]},
                     "language": {"type": "string", "enum": ["zh", "en"]},
                     "scopeQuote": {"type": "string", "minLength": 1},
@@ -273,6 +288,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def delegate(args, binding):
+        outcomes = await coverage(args, binding, handoff=True)
         decision = await router.decide(args, binding) if args.get("routing") and router else None
         executor = decision["executor"] if decision else args.get("executor", "native")
         target = args.get("target") or {}
@@ -300,7 +316,14 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             if decision:
                 result["routingDecision"] = public_routing(decision)
             return result
-        routing_args = {"routing_decision": decision} if decision else {}
+        routing_args = (
+            {
+                "routing_decision": decision,
+                **({"model": decision["model"]} if "model" in decision else {}),
+            }
+            if decision
+            else {}
+        )
         try:
             task = await tasks.create(
                 binding["owner"],
@@ -318,6 +341,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 from_message_id=args.get("fromMessageId"),
                 origin_message_id=binding["originMessageId"],
                 **routing_args,
+                **(
+                    {"independent_project_outcome": True}
+                    if outcomes and any(item["status"] == "delegated" for item in outcomes)
+                    else {}
+                ),
             )
         except DomainError as exc:
             if exc.code == "TASK_CONTINUATION_REQUIRED":
@@ -334,8 +362,10 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "nextAction": "This workspace belongs to tracked work. For edits, additions or missing deliverables, "
                     "call task_steer with the referenced taskId and current revision. Preserve its executor, workspace "
                     "and session; no new executor quote is needed. If ambiguous, inspect task_status or ask which task. "
-                    "Do not drop the executor, change directory or create a replacement. Genuinely independent work "
-                    "uses a separate workspace through the discovered project, never a second agent in this workspace.",
+                    "Do not change executor or create a replacement for a continuation. Genuinely independent native work "
+                    "without a user-selected destination can omit directory with target={kind:new_session} for a private "
+                    "task directory. Independent project work uses a separate workspace through the discovered project, "
+                    "never a second agent in this workspace.",
                 }
             if exc.code != "TASK_FAILURE_REVIEW_REQUIRED":
                 raise
@@ -360,7 +390,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 "a corrected continuation must use task_steer on the existing task after user direction.",
             }
         stored_decision = json.loads(task["intent_json"]).get("routingDecision")
-        return {
+        receipt = {
             "id": task["id"],
             "taskId": task["id"],
             "kind": "background_task",
@@ -372,6 +402,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             **({"requestComplete": args["requestComplete"]} if "requestComplete" in args else {}),
             **({"routingDecision": public_routing(stored_decision)} if stored_decision else {}),
         }
+        await record(binding, outcomes, receipt)
+        return receipt
 
     async def status(args, binding):
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
@@ -412,12 +444,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     "runId"
                 ):
                     continue
-                captured = row(
-                    db,
-                    "SELECT MAX(captured_ms) AS latest FROM resource_observations WHERE task_id=? AND run_id=? "
-                    "AND length(trim(json_extract(body_json,'$.domText')))>0",
-                    (item["id"], attempt["runId"]),
-                )["latest"]
+                sources = retrieved_sources(db, item, {"id": attempt["runId"]})
+                captured = max((source["retrievedMs"] for source in sources), default=None)
                 completion_report = bool(turn and turn["trigger_kind"] == "completion")
                 fresh = bool(turn and captured and captured >= turn["created_ms"])
                 attempt["retrievalEvidence"] = {
@@ -467,6 +495,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         return await tasks.db.call(annotate)
 
     async def progress_reply(args, binding):
+        outcomes = await coverage(args, binding)
+
         def callback_result(db):
             callback = row(
                 db,
@@ -481,15 +511,6 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 raise DomainError("TASK_REPLY_TASK_MISMATCH", 409)
             if completion.get("state") not in {"succeeded", "failed", "waiting_user"}:
                 return
-            references = (completion.get("result") or {}).get("artifactRefs", [])
-            if completion.get("state") in {"succeeded", "waiting_user"}:
-                for reference in references if isinstance(references, list) else []:
-                    if isinstance(reference, dict) and row(
-                        db,
-                        "SELECT id FROM artifacts WHERE id=? AND owner_id=? AND task_id=? AND deleted_ms IS NULL",
-                        (reference.get("id"), binding["owner"], completion.get("taskId")),
-                    ):
-                        return
             raise DomainError("TASK_RESULT_REQUIRED", 409)
 
         await tasks.db.call(callback_result)
@@ -499,6 +520,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             args.get("language", "zh"),
             args.get("languageQuote"),
         )
+        await record(binding, outcomes)
         return [dict(item, replyLanguage=language) for item in items]
 
     registry.add(
@@ -508,7 +530,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             "Use this instead of composing a status answer from history. Reads actual task state and delivers "
             "one short answer in the user's language, ending this turn without another model call. Call alone without a text preamble. "
             "taskId is required: resolve the referenced task from context. Never substitute a queue overview. "
-            "Completion callbacks without verified downloadable files must use reply to deliver the actual findings or blocker. "
+            "Completion callbacks must report actual findings, file links and pending acceptance or blockers with assistant text or reply; downloadable files do not replace an outcome summary. "
             "For detailed results, explanations, raw/debug fields, mixed requests or other languages use task_status instead.",
             object_schema(
                 {
@@ -613,9 +635,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "delegate",
-            "Delegate with routing={explicitExecutor:native|codex|claude|null,complexity:bounded|complex,complexityBasis:{dimension:fact},routingExplanation:reason}. "
-            "Task kinds are open. Host selects native for bounded work and an available professional for complex work; source-backed explicit executors win. "
-            "Omit executor for configured project/preference/node selection; requests without routing retain legacy defaults. "
+            "Delegate with routing assessment and explicitExecutor (user choice or null). "
+            "Host routes bounded work to native, complex work to an available professional. Source-backed user choices win; omit legacy executor. "
             "Main session targets send directly, including legacy sessions without callbacks: delivery only. "
             "Other targets return queued background_task/taskId, not completion. Task/native-branch IDs are not session IDs. "
             "Edits, additions and missing deliverables of tracked work use task_steer, even after completion; "
@@ -638,10 +659,14 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                     },
                     "requestComplete": {
                         "type": "boolean",
-                        "description": "Required: applies to the ENTIRE current user message, not this goal alone. Inventory every independent requested outcome. false while ANY other part remains unhandled (including target discovery); true only on the final handoff. Never wait or poll for delegated work.",
+                        "description": "Required for the whole user message: false while any independent part remains (including target discovery); true only on the last handoff. Never wait or poll after acceptance.",
                     },
+                    "requestCoverage": coverage_schema(),
                     "routing": routing_schema(),
-                    "executor": {"type": "string", "enum": ["native", "codex", "claude"]},
+                    "executor": {
+                        "type": "string",
+                        "enum": ["native", "codex", "claude", "opencode", "pi"],
+                    },
                     "target": {
                         **object_schema(
                             {
@@ -660,12 +685,15 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                                 "nodeId": {"type": "string", "enum": ["local"]},
                                 "label": {"type": "string", "maxLength": 160},
                                 "archived": {"type": "boolean"},
-                                "resourceOnly": {"type": "boolean"},
+                                "resourceOnly": {
+                                    "type": "boolean",
+                                    "description": "External lookup without preparing a coding workspace. Enabled Skills, MCP and CLI remain available. User-authorized local host operations use bash scope=host in Main.",
+                                },
                                 "state": {"type": "string", "enum": ["live"]},
                             },
                             ["kind"],
                         ),
-                        "description": "Existing session: kind=session, exact sessionId (+nodeId/label); no directory/workspaceId/base/remote; projectId cannot override the session. Existing project: kind=project, discovered projectId; workspaceId reuses work without base/remote/directory overrides. Loose work: kind=new_session, directory=actual absolute work directory, NEVER baseDir. File output does not authorize a new project. Use kind=new_project, name (+existing absolute baseDir) ONLY when the user requests a new project. Resolve actual project IDs; ask for missing destinations, never invent paths. Reuse preserves local work.",
+                        "description": "Session: kind=session, exact sessionId (+nodeId/label), no directory/workspaceId/base/remote overrides. Project: kind=project, discovered projectId; workspaceId reuses work without path/base/remote overrides. New native work: kind=new_session omits directory for a private writable task directory; preserve a user-selected existing directory. Never use baseDir for new_session. Only a user-requested new project uses new_project, name (+existing absolute baseDir). Never invent IDs or paths.",
                     },
                     "fromMessageId": {"type": "string"},
                 },
@@ -678,6 +706,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def steer_task(args, binding):
+        outcomes = await coverage(args, binding, handoff=True)
+        source_quote = args.get("sourceQuote")
+        if outcomes:
+            current_quote = next(item["quote"] for item in outcomes if item["status"] == "current")
+            if source_quote and quote_text(source_quote) != quote_text(current_quote):
+                raise DomainError("REQUEST_HANDOFF_SCOPE_REQUIRED")
+            source_quote = current_quote
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
         if args["taskId"] in handoffs:
             raise DomainError("TASK_ALREADY_HANDED_OFF", 409)
@@ -689,13 +724,16 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             binding["turnId"] + ":" + binding["toolCallId"],
             source_turn_id=binding["turnId"],
             source_conversation_id=binding["conversation"],
+            source_quote=source_quote,
         )
-        return {
+        result = {
             **receipt,
             "acceptedOnly": receipt["state"] in {"stopping", "applied"},
             "kind": "task_continuation",
             **({"requestComplete": args["requestComplete"]} if "requestComplete" in args else {}),
         }
+        await record(binding, outcomes, result)
+        return result
 
     registry.add(
         Tool(
@@ -710,6 +748,12 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "description": "Required: applies to the ENTIRE current user message, not this task alone. false while ANY other requested part remains unhandled; true only on the final handoff. Never wait or poll for delegated work.",
                     },
                     "text": {"type": "string", "minLength": 1},
+                    "sourceQuote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact current user wording for this task only; omit independent outcomes being handled separately. Sent verbatim to the existing executor. Do not expand merge permission into release or deployment permission.",
+                    },
+                    "requestCoverage": coverage_schema(),
                 },
                 ["taskId", "revision", "text", "requestComplete"],
             ),

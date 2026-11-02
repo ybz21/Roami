@@ -1,0 +1,7 @@
+{
+  "origin": "optional package existed during an original-task diagnostic but was never read; initial catalog had no optional Skill metadata",
+  "fixture_kind": "synthetic metadata plus generated editable PPTX",
+  "model_calls": 0,
+  "formal_history_updated": false,
+  "human_labels_updated": false
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-UR01",
+  "data": {
+    "kind": "public_synthetic_skill_resource_names_and_text",
+    "inputs": [
+      "input/skill-resource-locations.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/skill-resource-locations.json",
+    "byte_identical_required": true,
+    "description": "样例由测试实际消费，配置与托管包使用同一内容；无私有任务答案或人工标签。"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "real_runtime_skill_resource_routing"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 10,
+    "no_skips": true,
+    "pytest_selectors": [
+      "agent-runtime/tests/test_skill_resource_locations.py"
+    ]
+  }
+}

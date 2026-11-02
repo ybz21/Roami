@@ -47,3 +47,10 @@ it('resolves professional CLI identity from recorded intent and leaves unsupport
  expect(taskExecutor({ ...task, latestAttempt: { executorKind: 'native', state: 'running' } })).toBe('native')
  expect(taskExecutor({ ...task, latestAttempt: { executorKind: 'future', state: 'running' } })).toBeNull()
 })
+
+
+it.each(['opencode', 'pi'] as const)('keeps %s task identity for managed CLI attempts', executor => {
+ const task = { id: 'task', revision: 1, state: 'succeeded', intent_json: JSON.stringify({ executor }), latestAttempt: { executorKind: 'cli', state: 'succeeded' } }
+ expect(taskExecutor(task)).toBe(executor)
+ expect(taskExecutor({ ...task, latestAttempt: { executorKind: executor, state: 'running' } })).toBe(executor)
+})

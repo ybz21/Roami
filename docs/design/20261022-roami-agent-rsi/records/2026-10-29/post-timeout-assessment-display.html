@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>区分超时运行与产物核验</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>区分超时运行与产物核验</h1>
+<h2>Product Design</h2><p>Case 详情先说明核验发生在执行超时后，以及该次运行仍未通过，再展示已有产物的真实分数。产物达到阈值也不覆盖运行超时。核验失败保留未评分，具体错误放进默认折叠的执行记录。</p>
+<h2>User Stories</h2><ul><li>我能区分整次任务失败与已有产物的核验结果，不会把局部高分当作运行通过。</li><li>我可展开核验错误排查；正常核验不增加无关提示，基线和候选各自显示自己的来源。</li></ul>
+<h2>Technical Design</h2><p>RsiCaseEvidence 只接受严格布尔 artifact_assessment_after_timeout；复用既有事实列表、执行记录折叠、中英语言包与样式。无分数时也保留核验时机；native_verifier_ran=false 时继续抑制伪分数。artifact_assessment_error 仅在超时后核验中、且符合后端公共错误码格式时出现在执行记录，不增加请求、轮询、入口或布局。</p>
+<h2>验收记录</h2><p>新增6项旧代码5失败/1通过；修复后前端1073项、typecheck/i18n/hover及生产构建通过。完整门禁及Go全量通过，Python按纯前端变更正确跳过。生产包桌面7档宽度×中英×深浅主题共28组、Redmi Note 8真机4组通过，真实命中/展开、触控滚动、软键盘开闭、顶部/底部导航与安全上下文/溢出检查通过。仅客户端修订，没有修改模型设置、运行状态或Case分数，未部署。界面验收数据为明确标记的隔离样例，包含产物满分但运行超时、核验未完成、正常评分和成对结果，不代表真实Case通过。实际音频新轮次另外记录，不改其结果。</p>
+</main></body></html>

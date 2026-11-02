@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MG02",
+  "data": {
+    "kind": "runtime_regression",
+    "pytest_selectors": [
+      "test_automatic_memory.py::test_forgetting_user_preference_excludes_other_records_of_original_source",
+      "test_memory_pipeline.py::test_ordinary_delete_invalidates_derived_memories_but_forget_tracks_prompt_dependencies"
+    ],
+    "local_inputs": false,
+    "load_from": "Fixtures in the listed repository regression tests, executed in disposable directories."
+  },
+  "tools": {
+    "kind": "scripted_test_runtime",
+    "model_calls": "Scripted providers; not a live-model capability score."
+  },
+  "acceptance": {
+    "kind": "pytest_assertions",
+    "pytest_selectors": [
+      "test_automatic_memory.py::test_forgetting_user_preference_excludes_other_records_of_original_source",
+      "test_memory_pipeline.py::test_ordinary_delete_invalidates_derived_memories_but_forget_tracks_prompt_dependencies"
+    ]
+  }
+}

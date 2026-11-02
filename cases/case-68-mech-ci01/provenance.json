@@ -1,0 +1,7 @@
+{
+  "origin": "container_settings created default Main/Worker policies instead of inheriting saved settings",
+  "fixture_kind": "synthetic policies and private transport; no user credentials",
+  "model_calls": 0,
+  "formal_history_updated": false,
+  "human_labels_updated": false
+}

@@ -38,3 +38,7 @@ Go 备份恢复兼容上限同步为 8，Python schema 8 新增 `session_dispatc
 - 端到端采用可控流式供应商和隔离 tmux 执行器；实际经过主对话工具网关、Go CLI、paste-buffer / Enter、Unix Socket、SQLite、SSE 和前端。桌面与 Redmi Note 8 同时先看到进展，再收到结果；执行器重复调用实际 CLI 只有一份结果，刷新后历史仍可读，文档无横向溢出。
 - 这不是供应商真实 Codex / Claude 的模型遵循率或 Hook 信任验收，不向生产专业会话发测试消息。旧 PR 结果补回属于用户授权的真实通信，和隔离测试分开记录。
 - 运行证据见 [verification.json](verification.json)，PR 附桌面 / Android 改前改后截图；运行日志、凭据和临时数据库不提交。
+
+## 设计修订与验收记录
+
+[按日期查看记录](records/README.md)。

@@ -24,6 +24,10 @@ def main():
                 result = {"config": {}} if request["method"] == "config/read" else {}
                 print(json.dumps({"id": request["id"], "result": result}), flush=True)
         return
+    if provider == "claude":
+        assert args[args.index("--permission-mode") + 1] == "auto", args
+    else:
+        assert "--dangerously-bypass-approvals-and-sandbox" in args, args
     hooks, notifier = {}, None
     if provider == "claude":
         hooks = json.loads(args[args.index("--settings") + 1])["hooks"]

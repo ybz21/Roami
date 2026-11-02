@@ -70,11 +70,11 @@ func stateFor(state *catalog, kind string) *kindState {
 }
 
 func makeView(kind string, state *kindState, config nativeConfig) (View, error) {
-	view := View{Profiles: []ProfileSummary{}, Current: config.current(kind), Revision: config.revision(), ConfigPaths: configPaths(config), OpenCodeMajor: config.Major}
+	view := View{Mode: config.connectionMode(kind), Profiles: []ProfileSummary{}, Current: config.current(kind), Revision: config.revision(), ConfigPaths: configPaths(config), OpenCodeMajor: config.Major}
 	samePaths := reflect.DeepEqual(state.Paths, configPaths(config))
 	view.CanRestore = len(state.Original) > 0 && samePaths
 	var active bool
-	if state.ActiveID != "" && samePaths {
+	if (state.ActiveID != "" || state.Mode == "official") && samePaths {
 		current, err := config.capture(state.AppliedFields)
 		if err != nil {
 			return View{}, err
@@ -82,9 +82,14 @@ func makeView(kind string, state *kindState, config nativeConfig) (View, error) 
 		active = digest(current) == state.NativeDigest
 		if active {
 			view.ActiveID = state.ActiveID
+			if state.Mode == "official" {
+				view.Mode = "official"
+			} else {
+				view.Mode = "custom"
+			}
 		}
 	}
-	view.Changed = state.ActiveID != "" && !active
+	view.Changed = (state.ActiveID != "" || state.Mode == "official") && !active
 	for _, p := range state.Profiles {
 		view.Profiles = append(view.Profiles, ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, Protocol: p.Protocol,
 			AuthMode: p.AuthMode, KeyEnv: p.KeyEnv, ReasoningEffort: p.ReasoningEffort, HasKey: p.APIKey != "",

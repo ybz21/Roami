@@ -1,0 +1,29 @@
+{
+  "reward": 0.595,
+  "in_window_reward": 0.55,
+  "out_window_reward": 1.0,
+  "details": {
+    "in_window": {
+      "pesq_wb": 3.2,
+      "stoi": 0.9,
+      "lsd_full": 0.4,
+      "lsd_4_8kHz": 0.45,
+      "f0_corr": 0.7,
+      "dnsmos_sig": 3.2,
+      "dnsmos_bak": 3.3,
+      "dnsmos_ovl": 3.1,
+      "dnsmos_ref_ovl": 4.0,
+      "reference_path": "PRIVATE_REFERENCE_PATH"
+    },
+    "out_window": {
+      "out_si_sdr_db": 32.0,
+      "out_n_samples": 32000
+    },
+    "window": {
+      "private_start": 1.25,
+      "private_end": 2.5
+    },
+    "private_reference": "PRIVATE_REFERENCE_BYTES"
+  },
+  "private_verifier": "PRIVATE_VERIFIER_BODY"
+}

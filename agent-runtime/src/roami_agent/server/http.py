@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
@@ -31,9 +32,11 @@ from roami_agent.protocol.http import (
     SessionReport,
     SteerTask,
 )
+from roami_agent.server.installation import Installation
 from roami_agent.server.model_settings import ModelSettings
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
+EVENT_HEARTBEAT_SECONDS = 10
 
 
 def create_app(runtime, *, manage_lifecycle=True):
@@ -49,6 +52,26 @@ def create_app(runtime, *, manage_lifecycle=True):
         title="Roami Agent", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
     )
 
+    installation = Installation(runtime)
+
+    @app.middleware("http")
+    async def installation_fence(request, call_next):
+        if (
+            installation.active
+            and request.method not in {"GET", "HEAD"}
+            and request.url.path != "/internal/installation/quiesce"
+        ):
+            return JSONResponse({"error": {"code": "AGENT_UPGRADE_IN_PROGRESS"}}, status_code=503)
+        return await call_next(request)
+
+    @app.post("/internal/installation/quiesce")
+    async def quiesce(request: Request, owner: Owner):
+        try:
+            body = await request.json()
+        except ValueError:
+            raise DomainError("INVALID_REQUEST") from None
+        return {"data": await installation.quiesce(owner, body)}
+
     @app.exception_handler(DomainError)
     async def domain_error(request, exc):
         return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status)
@@ -62,15 +85,17 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime.capability_settings.view(owner)
         return {"data": {"available": True, "maxBytes": 65536, "kinds": ["skills", "cli", "mcp"]}}
 
-    async def capability_payload(request):
+    async def capability_payload(request, maximum=65536):
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > 65536:
+            if len(body) > maximum:
                 raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
         try:
             return json.loads(body)
         except (ValueError, RecursionError):
+            if len(body) > 65536:
+                raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413) from None
             raise DomainError("INVALID_CAPABILITY_IMPORT") from None
 
     @app.post("/v1/capability-imports/{kind}")
@@ -80,7 +105,9 @@ def create_app(runtime, *, manage_lifecycle=True):
         ModelSettings.owner(owner)
         return {
             "data": await runtime.capability_imports.save(
-                owner, kind, await capability_payload(request)
+                owner,
+                kind,
+                await capability_payload(request, 600_000 if kind == "skills" else 65536),
             )
         }
 
@@ -91,7 +118,10 @@ def create_app(runtime, *, manage_lifecycle=True):
         ModelSettings.owner(owner)
         return {
             "data": await runtime.capability_imports.save(
-                owner, kind, await capability_payload(request), name
+                owner,
+                kind,
+                await capability_payload(request, 600_000 if kind == "skills" else 65536),
+                name,
             )
         }
 
@@ -101,17 +131,7 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/capability-imports/mcp/{name}/connect")
     async def connect_capability(name: str, owner: Owner):
-        ModelSettings.owner(owner)
-        async with runtime.capability_imports.lock:
-            if name not in runtime.mcp.connections:
-                raise DomainError("CAPABILITY_NOT_FOUND", 404)
-            try:
-                async with asyncio.timeout(30):
-                    await runtime.mcp.discover({"server": name}, {})
-            except TimeoutError:
-                raise DomainError("MCP_TIMEOUT", 504) from None
-            runtime.capability_settings.apply()
-            return {"data": runtime.capability_settings.view(owner)}
+        return {"data": await runtime.capability_imports.connect_mcp(owner, name)}
 
     @app.get("/v1/tool-directory")
     async def tool_directory(
@@ -123,6 +143,53 @@ def create_app(runtime, *, manage_lifecycle=True):
     ):
         runtime.capability_settings.view(owner)
         return {"data": runtime.tools.directory.list(query, kind, limit, "worker", offset=offset)}
+
+    @app.get("/v1/capability-markets")
+    async def markets(owner: Owner):
+        return {"data": runtime.capability_markets.view(owner)}
+
+    @app.put("/v1/capability-markets")
+    async def save_markets(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.save(owner, await capability_payload(request))
+        }
+
+    @app.get("/v1/capability-markets/{source}/search")
+    async def search_market(
+        source: str,
+        owner: Owner,
+        query: str = Query(min_length=1, max_length=200),
+        cursor: str = Query(default="", max_length=1000),
+    ):
+        return {"data": await runtime.capability_markets.search(owner, source, query, cursor)}
+
+    @app.post("/v1/capability-markets/preview")
+    async def preview_market(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.preview(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/prepare")
+    async def prepare_market_install(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.prepare(
+                owner, await capability_payload(request)
+            )
+        }
+
+    @app.post("/v1/capability-markets/install")
+    async def install_market_option(owner: Owner, request: Request):
+        ModelSettings.owner(owner)
+        return {
+            "data": await runtime.capability_markets.installations.install(
+                owner, await capability_payload(request)
+            )
+        }
 
     @app.get("/v1/traces")
     async def execution_trace(
@@ -136,6 +203,226 @@ def create_app(runtime, *, manage_lifecycle=True):
                 owner, turn_id=turn_id, task_id=task_id, chrome=format == "chrome"
             )
         }
+
+    if runtime.improvement is not None:
+
+        @app.get("/v1/improvement/cycles")
+        async def improvement_cycles(owner: Owner, limit: int = Query(default=20, ge=1, le=100)):
+            return {"data": await runtime.improvement.list(owner, limit)}
+
+        @app.get("/v1/improvement/cycles/{cycle_id}")
+        async def improvement_cycle(cycle_id: str, owner: Owner):
+            return {"data": await runtime.improvement.get(owner, cycle_id)}
+
+        async def improvement_payload(request):
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > 8192:
+                    raise DomainError("RSI_PAYLOAD_TOO_LARGE", 413)
+            try:
+                result = json.loads(body)
+            except (ValueError, RecursionError):
+                raise DomainError("RSI_INVALID_REQUEST") from None
+            if not isinstance(result, dict):
+                raise DomainError("RSI_INVALID_REQUEST")
+            return result
+
+        @app.get("/v1/improvement")
+        async def improvement_overview(owner: Owner):
+            return {"data": await runtime.improvement.overview(owner)}
+
+        @app.put("/v1/improvement/pipeline/settings")
+        async def pipeline_settings(request: Request, owner: Owner):
+            from roami_agent.improvement.integrations.github_client import publication_profile
+
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if (
+                payload.get("auto_publish")
+                and publication_profile(runtime.improvement.ledger.path.parent, owner) is None
+            ):
+                raise DomainError("RSI_PUBLICATION_SETUP_REQUIRED")
+            return {
+                "data": await asyncio.to_thread(runtime.improvement.runs.configure, owner, payload)
+            }
+
+        @app.post("/v1/improvement/pipeline/requests")
+        async def pipeline_request(request: Request, owner: Owner):
+            from roami_agent.improvement.workflows.pipeline_runner import enqueue_diagnostic
+
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                enqueue_diagnostic,
+                runtime.improvement,
+                owner,
+                await improvement_payload(request),
+                runtime.settings.current,
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.get("/v1/improvement/cases")
+        async def improvement_case_catalog(owner: Owner):
+            from roami_agent.improvement.presentation.run_results import catalog_view
+
+            ModelSettings.owner(owner)
+            return {"data": await asyncio.to_thread(catalog_view)}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}/results")
+        async def pipeline_results(run_id: str, owner: Owner):
+            from roami_agent.improvement.presentation.run_results import results_view
+
+            return {
+                "data": await asyncio.to_thread(
+                    results_view, runtime.improvement.runs, owner, run_id
+                )
+            }
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}")
+        async def pipeline_run(run_id: str, owner: Owner):
+            return {"data": await asyncio.to_thread(runtime.improvement.runs.get, owner, run_id)}
+
+        @app.get("/v1/improvement/pipeline/runs/{run_id}/artifacts/{artifact_id}")
+        async def pipeline_artifact(run_id: str, artifact_id: str, owner: Owner):
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.runs.read_artifact, owner, run_id, artifact_id
+                )
+            }
+
+        @app.post("/v1/improvement/pipeline/runs/{run_id}/resume")
+        async def pipeline_resume(run_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            return {"data": await asyncio.to_thread(runtime.improvement.runs.resume, owner, run_id)}
+
+        @app.post("/v1/improvement/pipeline/runs/{run_id}/publish")
+        async def pipeline_publish(run_id: str, owner: Owner):
+            from roami_agent.improvement.workflows.pipeline_reports import publish_run_issue
+
+            ModelSettings.owner(owner)
+            records = runtime.improvement.runs
+            value = await asyncio.to_thread(records.get, owner, run_id)
+            plan = next((a for a in value["artifacts"] if a["name"] == "issue-plan.json"), None)
+            if plan is None or not any(a["name"] == "review.md" for a in value["artifacts"]):
+                raise DomainError("RSI_REVIEW_REPORT_UNAVAILABLE")
+            body = await asyncio.to_thread(records.read_artifact, owner, run_id, plan["id"])
+            receipt = await publish_run_issue(records, owner, run_id, json.loads(body["text"]))
+            records.node(owner, run_id, "issue", "succeeded")
+            if value["mode"] in {"diagnostic", "imported"} and value["state"] in {
+                "completed",
+                "blocked",
+            }:
+                records.set_state(owner, run_id, "completed")
+            return {"data": receipt}
+
+        @app.get("/v1/improvement/research")
+        async def improvement_research(owner: Owner):
+            return {"data": await asyncio.to_thread(runtime.improvement.research.snapshot, owner)}
+
+        @app.put("/v1/improvement/research")
+        async def improvement_experiment_settings(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                runtime.improvement.research.configure_experiment,
+                owner,
+                await improvement_payload(request),
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.post("/v1/improvement/preview")
+        async def improvement_preview(owner: Owner):
+            from roami_agent.improvement.presentation.experiment_preview import preview
+
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    preview, runtime.improvement, owner, runtime.settings.current
+                )
+            }
+
+        @app.post("/v1/improvement/research/{action_id}/resume")
+        async def improvement_research_resume(action_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.research.resume, owner, action_id
+                )
+            }
+
+        @app.put("/v1/improvement/preferences")
+        async def improvement_preferences(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            value = await asyncio.to_thread(
+                runtime.improvement.control.save, owner, await improvement_payload(request)
+            )
+            runtime.improvement.wakeup.set()
+            return {"data": value}
+
+        @app.post("/v1/improvement/machines")
+        async def improvement_machine(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.control.register_machine,
+                    owner,
+                    await improvement_payload(request),
+                    local_only=True,
+                )
+            }
+
+        @app.post("/v1/improvement/requests")
+        async def improvement_request(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if set(payload) != {"machine_id", "request_key"}:
+                raise DomainError("RSI_INVALID_REQUEST")
+            result = await asyncio.to_thread(runtime.improvement.control.enqueue, owner, **payload)
+            runtime.improvement.wakeup.set()
+            return {"data": result}
+
+        @app.post("/v1/improvement/requests/{request_id}/cancel")
+        async def cancel_improvement_request(request_id: str, owner: Owner):
+            ModelSettings.owner(owner)
+            result = await asyncio.to_thread(runtime.improvement.control.cancel, owner, request_id)
+            runtime.improvement.wakeup.set()
+            return {"data": result}
+
+        @app.post("/v1/improvement/releases")
+        async def release_improvement(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if set(payload) != {"cycle_ids", "expected_seq", "request_key"}:
+                raise DomainError("RSI_INVALID_REQUEST")
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.releases.publish, owner, **payload
+                )
+            }
+
+        @app.post("/v1/improvement/rollback")
+        async def rollback_improvement(request: Request, owner: Owner):
+            ModelSettings.owner(owner)
+            payload = await improvement_payload(request)
+            if not {"expected_seq", "request_key"} <= set(payload) or set(payload) - {
+                "expected_seq",
+                "request_key",
+                "release_id",
+            }:
+                raise DomainError("RSI_INVALID_REQUEST")
+            return {
+                "data": await asyncio.to_thread(
+                    runtime.improvement.releases.rollback, owner, **payload
+                )
+            }
+
+        @app.post("/v1/improvement/prepare")
+        async def prepare_improvement(owner: Owner):
+            ModelSettings.owner(owner)
+            from roami_agent.improvement.evaluation.corpus import prepare_corpus
+
+            return {"data": await asyncio.to_thread(prepare_corpus, runtime.improvement, owner)}
 
     @app.get("/v1/tool-directory/{name}")
     async def tool_operation(name: str, owner: Owner):
@@ -207,10 +494,14 @@ def create_app(runtime, *, manage_lifecycle=True):
             payload = json.loads(body)
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
+        if isinstance(payload, dict) and "executionContext" in payload:
+            return {"data": await runtime.professional_capabilities.call(name, payload, owner)}
         return {"data": await runtime.cli_commands.call(name, payload, owner)}
 
     @app.get("/v1/capability-settings")
     async def capabilities(owner: Owner):
+        ModelSettings.owner(owner)
+        await runtime.mcp.refresh()
         return {"data": runtime.capability_settings.view(owner)}
 
     @app.put("/v1/capability-settings")
@@ -229,6 +520,30 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/model-settings")
     async def model_settings(owner: Owner):
         return {"data": runtime.model_settings.view(owner)}
+
+    @app.post("/v1/model-settings/verify")
+    async def verify_model_settings(owner: Owner):
+        from roami_agent.server.model_verification import verify_models
+
+        return {"data": await verify_models(runtime.model_settings, owner)}
+
+    @app.get("/v1/model-usage")
+    async def model_usage(
+        owner: Owner,
+        days: int = Query(default=7, ge=0, le=90),
+        day: str | None = Query(default=None, max_length=10),
+    ):
+        ModelSettings.owner(owner)
+        from roami_agent.providers.model_billing import ModelBilling
+
+        history = ModelBilling(runtime.db, lambda: None, lambda: runtime.settings.memory_timezone)
+        return {
+            "data": {
+                **await history.view(days=days, day=day),
+                "archived": True,
+                "gatewayManaged": True,
+            }
+        }
 
     @app.put("/v1/model-settings")
     async def save_model_settings(request: Request, owner: Owner):
@@ -341,9 +656,13 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def status(owner: Owner):
         return {
             "data": {
+                "managed": getattr(runtime, "managed_parent", False),
+                "pid": os.getpid(),
+                "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "memoryTimezone": runtime.memory.daily.timezone,
+                "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
                 "images": runtime.settings.route("main").capabilities.get("images") is True,
                 "writerBacklog": runtime.db.pending,
@@ -427,8 +746,25 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.conversations.activity_detail(owner, cid, aid, branchId)}
 
     @app.get("/v1/conversations/{cid}/messages")
-    async def messages(cid: str, owner: Owner, branch: str | None = None):
+    async def messages(
+        cid: str,
+        owner: Owner,
+        branch: str | None = None,
+        limit: int | None = Query(None, ge=1, le=100),
+        before: str | None = Query(None, max_length=200),
+        anchor: str | None = Query(None, max_length=200),
+    ):
+        if limit is not None:
+            return {
+                "data": await runtime.conversations.page(
+                    owner, cid, branch, before=before, anchor=anchor, limit=limit
+                )
+            }
         return {"data": await runtime.conversations.messages(owner, cid, branch)}
+
+    @app.get("/v1/conversations/{cid}/messages/{mid}")
+    async def full_message(cid: str, mid: str, owner: Owner, branch: str | None = None):
+        return {"data": await runtime.conversations.message_detail(owner, cid, mid, branch)}
 
     @app.post("/v1/conversations/{cid}/messages", status_code=202)
     async def send(cid: str, body: SendMessage, owner: Owner):
@@ -448,6 +784,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         request: Request,
         owner: Owner,
         after: int = Query(0, ge=0),
+        summaries: bool = False,
         last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     ):
         await runtime.conversations.get(owner, cid)
@@ -460,21 +797,26 @@ def create_app(runtime, *, manage_lifecycle=True):
 
         async def stream():
             nonlocal cursor
-            idle = 0
-            yield ": connected\n\n"
-            while not await request.is_disconnected():
-                batch = await runtime.conversations.events(owner, cid, cursor)
-                for item in batch:
-                    cursor = item["id"]
-                    yield f"id: {cursor}\nevent: {item['kind']}\ndata: {json.dumps(item, ensure_ascii=False)}\n\n"
-                if batch:
-                    idle = 0
-                    continue
-                idle += 1
-                if idle >= 50:
-                    yield ": ping\n\n"
-                    idle = 0
-                await asyncio.sleep(0.2)
+            with runtime.db.conversation_events.subscribe(cid) as changed:
+                yield ": connected\n\n"
+                while not await request.is_disconnected():
+                    # Clear before reading so a commit during replay cannot lose its wakeup.
+                    changed.clear()
+                    batch = (
+                        await runtime.conversations.events(owner, cid, cursor, summaries=True)
+                        if summaries
+                        else await runtime.conversations.events(owner, cid, cursor)
+                    )
+                    for item in batch:
+                        cursor = item["id"]
+                        yield f"id: {cursor}\nevent: {item['kind']}\ndata: {json.dumps(item, ensure_ascii=False)}\n\n"
+                    if batch:
+                        continue
+                    while not changed.is_set():
+                        try:
+                            await asyncio.wait_for(changed.wait(), timeout=EVENT_HEARTBEAT_SECONDS)
+                        except TimeoutError:
+                            yield ": ping\n\n"
 
         return StreamingResponse(
             stream(),
@@ -489,6 +831,9 @@ def create_app(runtime, *, manage_lifecycle=True):
         result = await runtime.context.project(owner, cid, branch_id=branch)
         return {
             "data": {
+                "managed": getattr(runtime, "managed_parent", False),
+                "pid": os.getpid(),
+                "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 **{k: v for k, v in result.items() if k != "messages"},
             }
@@ -515,6 +860,41 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.post("/v1/conversations/{cid}/read")
     async def mark_read(cid: str, body: ReadCursor, owner: Owner):
         return {"data": await runtime.notifications.mark_read(owner, cid, body.eventId)}
+
+    @app.get("/v1/notifications/summary")
+    async def notice_summary(owner: Owner):
+        return {"data": await runtime.notifications.summary(owner)}
+
+    @app.post("/v1/notifications/read")
+    async def read_notices(owner: Owner, body: ReadCursor):
+        return {"data": await runtime.notifications.mark_all_read(owner, body.eventId)}
+
+    @app.get("/v1/notification-list")
+    async def notice_list(
+        owner: Owner,
+        limit: int = Query(20, ge=1, le=50),
+        before: int | None = Query(None, ge=1),
+        unreadOnly: bool = False,
+    ):
+        return {
+            "data": await runtime.notifications.page(
+                owner, before=before, limit=limit, unread_only=unreadOnly
+            )
+        }
+
+    @app.get("/v1/task-list")
+    async def task_list(
+        owner: Owner,
+        conversationId: str | None = None,
+        limit: int = Query(20, ge=1, le=50),
+        before: str | None = Query(None, max_length=200),
+        filter: str = "all",
+    ):
+        return {
+            "data": await runtime.tasks.page(
+                owner, conversationId, before=before, limit=limit, state_filter=filter
+            )
+        }
 
     @app.get("/v1/notifications")
     async def notifications(owner: Owner, includeRead: bool = False):
@@ -584,6 +964,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             key=body.requestKey,
             parent_task_id=body.parentTaskId,
             executor=body.executor,
+            model=body.model,
             target=body.target,
             from_message_id=body.fromMessageId,
             record_intent=True,
@@ -605,9 +986,9 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/tasks/{task_id}/close-session")
     async def close_task_session(task_id: str, body: CloseTaskSession, owner: Owner):
-        return {
-            "data": await runtime.task_sessions.close(owner, task_id, body.revision, body.runId)
-        }
+        result = await runtime.task_sessions.request(owner, task_id, body.revision, body.runId)
+        runtime.wakeup.set()
+        return {"data": result}
 
     @app.post("/v1/tasks/{task_id}/cancel")
     async def cancel_task(task_id: str, owner: Owner):
@@ -697,6 +1078,8 @@ def create_app(runtime, *, manage_lifecycle=True):
         category: Literal["all", "knowledge", "activity"] = "all",
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
+        before: int | None = Query(None, ge=0),
+        compact: bool = False,
     ):
         if dayKey:
             timezone = timezone or runtime.memory.daily.timezone
@@ -716,7 +1099,8 @@ def create_app(runtime, *, manage_lifecycle=True):
                 scope=scope,
                 category=category,
                 limit=limit,
-                offset=offset,
+                offset=offset if before is None else before,
+                compact=compact,
             )
         }
 

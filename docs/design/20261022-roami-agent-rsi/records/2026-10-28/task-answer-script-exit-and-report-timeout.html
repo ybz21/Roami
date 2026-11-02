@@ -1,0 +1,16 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>交付原文、脚本退出与复盘超时</title><link rel="stylesheet" href="../../assets/design.css"></head><body><main>
+<p><a href="../README.md">RSI 设计修订与验收记录</a></p>
+<h1>交付原文、脚本退出与复盘超时 · 2026-10-28</h1>
+<h2>Product Design</h2>
+<p>任务交付保留附链接前的提交原文，页面继续提供可点击产物。数值判定使用本轮 Main 的最终提交；仅有任务通知时使用其原文，不从解释中挑选匹配数字。量化分析正常产出结果时以 0 退出，“业务结论未完成”和“脚本执行失败”分别表述。Codex 超时保留具体原因及免费总结，不冒称已生成付费复盘。</p>
+<h2>User Stories</h2>
+<ul><li>正确答案不会因系统添加下载链接而失败；错误答案和带解释的原文继续失败。</li><li>我能从 Case 文件夹看到退出码要求，未解决的业务分析不必伪装成成功回测。</li><li>付费复盘超时后，我仍可查看全部 Case 的免费总结，知道哪个阶段失败，不自动重复未知付费调用。</li></ul>
+<h2>Technical Design</h2>
+<p>storage/turn_journal.py 在最终任务通知中保存 answerText，取值为主智能体已提交且尚未附系统链接的 text；content.text 保留原有交付显示，历史通知不回写。evaluation/execution/executors.py 优先当前 turn_id 的非工具调用 Main 文本，仅在没有时使用 task 来源的 answerText；非任务消息不能用该字段替换正文，不截取数字、不去除原文链接。Native 执行与目标验证仍独立生效。</p>
+<p>cases/case-19-quant-05/case.json 声明 success_exit_code=0；authored_fixtures.py 公开相同执行要求。新增 roami-authored-40-v16，保留 v15 及以前冻结字节；价格数据、期望 JSON 与非零退出失败规则不变。共享镜像标签升至 4，执行器身份为 container-uds-v27-task-answer-provenance，拒绝旧通知协议镜像。</p>
+<p>integrations/codex_cli.py 将进程 TimeoutError 映射为 RSI_CODEX_TIMEOUT，以 0600 保存 process-failure.json，保留 stdout/stderr 私有日志。成本操作继续未知，不结算成零；同一已发出但未知的调用保持禁止重放。工作流沿用现有具体 DomainError 传播，不改写旧运行的 RSI_REPORT_FAILED。</p>
+<h2>验收与剩余问题</h2>
+<p>定向 155 项通过；包含真实子进程超时、免费总结可读取、未知用量不重放、任务通知原文与下载链接同时保留、严格数值反例、脚本非零退出失败及旧套件保留。v31 真实 Native 容器的脚本化提供方验证：仅任务交付数值与系统产物链接同时存在时严格数值判定通过；未调用外部模型，缺失 Token 仍为未知。</p>
+<p>原 v16 真实完整诊断为 60 项：47 通过、4 待评分、9 失败，无跳过；已知生成 Token 下界 14,762,212，总量未知。其付费 Codex 复盘 180 秒超时，免费 evaluation-summary.md 可读，付费 review.md 未生成，不能称整个工作流完成。v18 新执行为 3 项：DEMO-05 客观检查通过但待独立评分，QUANT-05 因退出码 2 失败，FinQA 因只有附链接任务通知失败；原记录保留。新的 v19 独立真实生成中 QUANT-05 与 FinQA 两项均通过原有严格判定；生成用量 211501 Token。此结果单独记录，不拼接为完整套件成绩；本轮仍处于 report_queued，未宣称付费复盘完成。</p>
+<p>本轮实际 Codex 调用使用 CLI 的默认连接，未改用户 Codex 配置或认证；不能据内置 Main/Worker 通过 Go 网关，声称外部 CLI 连接也已接入该网关。模型连接选择、四份更新参考的人工确认、当前协议盲评校准、正式全套与两次完整日观察继续待办。RSI Issue 保持开放。</p>
+</main></body></html>

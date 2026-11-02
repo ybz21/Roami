@@ -3262,14 +3262,12 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 600; }
 
-/* ── 设置页（settings/）：搜索 + 两级树 + 一类一页 ─────────────────────────
-   右边只画选中的那一类，页内不滚——一页装不下就是这一类该拆（registry 的 MAX_ROWS
-   在 dev 下会喊）。唯一允许滚的是搜索结果页 .tt-set-pane.scroll，它跨类、条数不可控。 */
+/* 设置：分组导航与独立内容滚动区。 */
 .tt-set { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .tt-set-save-state { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-2) var(--pad-page); font-size: var(--fs-meta); color: var(--text-dim); }
 .tt-set-save-state[role="alert"] { color: var(--danger); background: var(--danger-soft); }
 .tt-set-head { flex: 0 0 auto; padding: var(--sp-3) var(--pad-page); border-bottom: 1px solid var(--border-subtle); }
-/* 页名 + 搜索 + JSON 一行（与会话页同一套：.tt-pagename 在手机档自动隐藏） */
+/* 页名与搜索共用一行。 */
 .tt-set-headrow { display: flex; align-items: center; gap: var(--sp-2); }
 .tt-set-search {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-2);
@@ -3292,36 +3290,22 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
 
 .tt-set-body { flex: 1; min-height: 0; display: flex; }
 
-/* 分类树：纵向两级，没有横向 tab 的数量上限 */
+/* 分组标题下直接列出入口。 */
 .tt-set-tree {
-  width: 196px; flex: 0 0 196px; overflow: auto;
-  padding: var(--sp-3) var(--sp-2) var(--sp-5) var(--pad-page); border-right: 1px solid var(--border-subtle);
+  width:var(--nav-w); flex:0 0 var(--nav-w); overflow:auto;
+  padding:var(--sp-3) var(--sp-2) var(--sp-5) var(--pad-page); border-right:1px solid var(--border-subtle);
 }
-.tt-set-tree .grp {
-  padding: 14px 10px 5px; font-size: var(--fs-micro); font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--text-dimmer);
-}
-.tt-set-tree > .grp:first-child { padding-top: 2px; }
-.tt-set-tree .grp .m {
-  display: block; margin-top: 3px; letter-spacing: 0; text-transform: none;
-  font-weight: 400; opacity: .8;
-}
+.tt-set-tree .grp { margin:0; padding:var(--sp-4) var(--sp-3) var(--sp-1); font-size:var(--fs-sm); font-weight:500; color:var(--text-dim); }
+.tt-set-tree > section:first-child .grp { padding-top:var(--sp-1); }
 .tt-set-tree .row {
-  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 0 10px;
-  border: 0; border-radius: var(--r-sm); background: none; color: var(--text-dim);
-  font-size: var(--fs-sm); text-align: left; cursor: pointer;
+  display:flex; align-items:center; width:100%; min-height:var(--ctl-h); padding:var(--sp-1) var(--sp-3);
+  border:0; border-radius:var(--r-sm); background:none; color:var(--text-bright); font:inherit;
+  font-size:var(--fs-sm); text-align:left; cursor:pointer;
 }
-.tt-set-tree .row.kid, .tt-set-tree .row.solo { padding-left: 28px; }
-:where(html[data-pointer="fine"]) .tt-set-tree .row:hover { background: var(--list-hover); color: var(--text-bright); }
-.tt-set-tree .row.on { background: var(--sel-bg); color: var(--accent); font-weight: 500; }
-.tt-set-tree .row.dim { opacity: .35; }
-.tt-set-tree .row .cv { flex: 0 0 12px; color: var(--text-dimmer); transition: transform .12s; }
-.tt-set-tree .row .n {
-  margin-left: auto; font-size: var(--fs-micro); color: var(--text-dimmer);
-  font-variant-numeric: tabular-nums;
-}
-.tt-set-tree .row.on .n { color: var(--accent); }
-.tt-set-tree .row:focus-visible { outline: 1px solid var(--accent-border); outline-offset: -1px; }
+:where(html[data-pointer="fine"]) .tt-set-tree .row:hover { background:var(--list-hover); }
+.tt-set-tree .row.on { background:var(--sel-bg); color:var(--accent); font-weight:500; }
+.tt-set-tree .row.dim { opacity:.55; }
+.tt-set-tree .row:focus-visible { outline:2px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
 
 /* 一类一页 */
 .tt-set-pane {
@@ -3329,7 +3313,7 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
   padding: var(--sp-4) var(--pad-page) var(--sp-2) var(--sp-4); overflow: hidden;
 }
 .tt-set-pane .crumb { font-size: var(--fs-meta); color: var(--text-dimmer); }
-.tt-set-pane .ptitle { display: flex; align-items: center; gap: var(--sp-2); margin: 2px 0; }
+.tt-set-pane .ptitle { display:flex; align-items:center; gap:var(--sp-2); margin:0 0 var(--sp-3); flex:none; }
 .tt-set-pane .ptitle .grow { flex: 1; }
 .tt-set-pane .ptitle h2 { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
 .tt-set-pane .pnote { margin: 0 0 var(--sp-2); font-size: var(--fs-meta); color: var(--text-dim); max-width: 74ch; }
@@ -3349,10 +3333,6 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
 .tt-set-row .t { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .tt-set-row .t .grow { flex: 1; }
 .tt-set-row .name { font-size: var(--fs-body); font-weight: 600; color: var(--text-bright); }
-.tt-set-row .key {
-  font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-dimmer);
-}
-.tt-set-row .from { font-size: var(--fs-meta); color: var(--text-dimmer); }
 .tt-set-row .d { margin: 2px 0 0; font-size: var(--fs-meta); color: var(--text-dim); max-width: 68ch; }
 .tt-set-row .ctl { margin-top: var(--sp-2); }
 .tt-set-hit { background: var(--warn-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
@@ -3365,28 +3345,27 @@ html[data-size="compact"] .cc-st-jump::after { content: ''; position: absolute; 
 
 /* 手机档：树摊成一页列表，点进去是子页 */
 .tt-set-catlist { flex: 1; min-height: 0; overflow: auto; margin: 0 calc(-1 * var(--sp-2)); }
-.tt-set-sec {
-  padding: var(--sp-3) var(--sp-2) var(--sp-1); font-size: var(--fs-micro);
-  letter-spacing: .1em; text-transform: uppercase; color: var(--text-dimmer);
-}
+.tt-set-sec { margin:0; padding:var(--sp-4) var(--sp-2) var(--sp-1); font-size:var(--fs-sm); font-weight:500; color:var(--text-dim); }
 .tt-set-cat {
   display: flex; align-items: center; gap: var(--sp-2); width: 100%;
   min-height: var(--tap); padding: 0 var(--sp-2);
   border: 0; border-bottom: 1px solid var(--border-subtle); background: none;
   color: var(--text-bright); font-size: var(--fs-body); text-align: left; cursor: pointer;
 }
-.tt-set-cat .cv { margin-left: auto; color: var(--text-dimmer); flex: 0 0 12px; }
-.tt-set-cat-app { min-height: calc(var(--tap) + var(--sp-4)); color: var(--accent); }
-.tt-set-cat-app .copy { display: flex; flex: 1; flex-direction: column; gap: var(--sp-1); min-width: 0; }
-.tt-set-cat-app .copy b { color: var(--text-bright); font-size: var(--fs-body); font-weight: 600; }
-.tt-set-cat-app .copy small { color: var(--text-dim); font-size: var(--fs-meta); }
+.tt-set-cat .cv { display:flex; margin-left:auto; color:var(--text-dim); flex:none; }
 .tt-set-cat:active { background: var(--list-hover); }
-@media (pointer: coarse) {
-  /* 手机上不画「已改」竖条：44px 行里那 2px 看不清，改用文字入口 */
-  .tt-set-tree .row { min-height: var(--tap); }
-  .tt-set-row { padding: var(--sp-2) 0 var(--sp-3); }
-}
-.tt-set-bare { padding-top: var(--sp-2); }
+html[data-pointer="coarse"] .tt-set-tree .row { min-height:var(--tap); }
+html[data-pointer="coarse"] .tt-set-row { padding:var(--sp-2) 0 var(--sp-3); }
+.tt-set-scope { font-size:var(--fs-meta); font-weight:400; color:var(--text-dim); }
+.tt-set-advanced { margin-top:var(--sp-4); color:var(--text-dim); font-size:var(--fs-sm); }
+.tt-set-advanced > summary { display:flex; align-items:center; min-height:var(--tap); cursor:pointer; color:var(--text-bright); }
+.tt-set-advanced > summary:focus-visible { outline:2px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
+html[data-pointer="coarse"] .tt-set-row .ant-switch::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
+html[data-pointer="coarse"] .tt-set-row .ant-btn { position:relative; }
+html[data-pointer="coarse"] .tt-set-row .ant-btn::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:max(100%, var(--tap)); min-width:var(--tap); transform:translateY(-50%); }
+.tt-set-bare { padding-top:var(--sp-2); }
+.tt-set-memory > .rows { display:flex; flex-direction:column; overflow:hidden; padding-right:0; }
+.tt-set-memory > .rows > .tt-set-bare { display:flex; flex:1; min-height:0; padding-top:0; }
 
 /* ── 机器切换器的下拉行（侧栏底座那枚按钮弹出来的列表）─────────────────
    方章原来走 antd 的 icon 槽，间距归 antd 管，实测贴着名字（「JE|Jetson」）；

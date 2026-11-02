@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>任务回报与待确认产物</title><link rel="stylesheet" href="../../assets/design.css"><body><main>
+<h1>任务回报与待确认产物</h1>
+<h2>Product Design</h2><p>对应 Issue #523：工作会话已有报告和文件，但任务停留执行中、回报为空。任务页优先提供可用文件和已记录的会话回报；执行未完成对账时显示“执行待确认”，不能凭文本或文件把任务改成通过。</p>
+<h2>User Stories</h2><ul><li>我能先查看或下载已经留存的 HTML 和截图，并知道它们尚未验收。</li><li>我能从待处理列表找到执行不确定的任务，打开原工作会话核对；不重新派发未知任务。</li><li>读取大文档不丢失工具结束回调，正常 Stop 与空闲确认仍按原安全条件完成任务。</li></ul>
+<h2>Technical Design</h2><p>Go 的 hook 专用 reader 丢弃不参与生命周期的 tool_response 等字段，再校验保留的事件元数据。原通用 CLI 输入合同不变；对原始传输与保留元数据分别做有界读取。成功和失败的 PostToolUse 均保留工具身份，不能留下幽灵工具。</p>
+<p>agentexecution/session-claude-report.go 只从稳定、同属主、不可共享写入的本地提供方转录提取文本回报，绑定会话、promptId、原提示摘要与工作区，忽略思考块和侧链，拒绝后续独立用户请求。快照缓存避免反复扫描稳定转录；Progress 与 Result 分离，不生成完成或停止证据。</p>
+<p>storage/task_reports.py 将回报保存为绑定原轮次的幂等事件；dispatch/tasks.py 投影到 attempt.progress；task_deliverables.py 只保留明确报告且位于原工作区内的文件，相对路径按报告目录解释并保留别名。未完成产物标记 provisional；最终回报重新冻结当前文件，旧快照保留，不把旧字节当新交付。</p>
+<p>AgentTasks 显示不确定状态、简短会话回报和已有文件，完整报告在执行记录中查看，继续使用原预览/下载动作。TaskOutput 按执行轮次解析文件别名，不能串到其他轮次。正式文件替代同轮次临时副本的主列表位置，历史快照不删除。新文案走中英 i18n，无新增版式、颜色、字号或图标。</p>
+<h2>Case 与验证</h2><p>新增 cases/case-61-mech-vd03，CASE.md 的 name/description 是唯一展示元数据；包含输入配方、工具入口、来源、断言和可执行 runner。实际大回调与文件测试使用其输入，runner 冻结 Case 资源及被测实现 SHA，保存 Go/Python 日志、退出码、无跳过检查和清理回执。该扩展独立运行，既有 authored-40 与正式 60 项不变。</p>
+<p>已完成的针对性检查包含 Go 大回调/提供方回报、Python 回报与文件留存、前端状态与链接回归，以及真实现场转录的只读提取。真实转录没有修改，没有重跑任务或调用模型；该提取只证明已有回报可恢复，不能证明研究内容正确或任务已完成。完整门禁、浏览器与真机验收按本次 PR 的最终记录核对。</p>
+</main></body></html>

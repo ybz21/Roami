@@ -1,0 +1,689 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-23",
+  "selection_seed": 20261023,
+  "source_tasks_selected_in_this_lock": 16,
+  "total_selected_with_financial_samples": 20,
+  "public_target": 20,
+  "runnable_public_contracts": 20,
+  "source_selection_is_not_environment_acceptance": true,
+  "sources": [
+    {
+      "benchmark": "terminal_bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "selected_upstream_ids": [
+        "cancel-async-tasks",
+        "db-wal-recovery"
+      ],
+      "status": "two_adapted_agent_contracts_materialized_upstream_assertions_container_accepted_not_model_evaluated",
+      "files": [
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/README.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/README.md",
+          "sha256": "9adf86b1279cc44f83fe16e6d340595aa992240f1d87243d204cae32e453693b",
+          "bytes": 1627,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/environment/Dockerfile",
+          "sha256": "1ee7bdb4a7536f5f114c11a3ac6ff42790abfea901fcba6b2a8ea8685f19140e",
+          "bytes": 213,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/instruction.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/instruction.md",
+          "sha256": "23d22f7039b50682941652c716f96dac314b8585c32c133614cac77dc067f47e",
+          "bytes": 537,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/solution/solve.sh",
+          "sha256": "4938ca4ad5b7dcd36b414b42a1abb10c058ecefce7462b678f9bd05c9fae1844",
+          "bytes": 709,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/task.toml",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/task.toml",
+          "sha256": "14db0675e04408f2133b0067e8dbddf66a1d6e7baf6b8d38bef8ecccfc4e58a8",
+          "bytes": 927,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/tests/test.py",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/tests/test.py",
+          "sha256": "f533c0a64db068f582b4733c5b81f2e66b8fa52fcd3efa65752e6bd6d24780aa",
+          "bytes": 701,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/tests/test.sh",
+          "sha256": "79600a6b863def31b4daa008297423010cd2d6243e689d67503e118e4dc53397",
+          "bytes": 639,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/cancel-async-tasks/tests/test_outputs.py",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/cancel-async-tasks/tests/test_outputs.py",
+          "sha256": "d6f510b51fafc81b4e9b5cc95535aa13491c8753e0e4171db42c45f4de460ee7",
+          "bytes": 4225,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/README.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/README.md",
+          "sha256": "600762031a1a02ecc3b46d70f7683f3ff930b47c8a3d0e27cc31b146158c3126",
+          "bytes": 2040,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/environment/Dockerfile",
+          "sha256": "63a260531c62f4ae72060db17f295c0aa03cfc6321f8162c324b7aa6b3f81302",
+          "bytes": 407,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/instruction.md",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/instruction.md",
+          "sha256": "5a20375162921b8911c67035d1905df7fd335d1bed03044271e608b2c3c93b26",
+          "bytes": 658,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/solution/solve.sh",
+          "sha256": "ed8530c94103bf19783a1d41bc63fe4db478cdd9629f22fee25c45a45699f5e8",
+          "bytes": 3080,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/task.toml",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/task.toml",
+          "sha256": "1cdc2c615e259bc10265efbe71b518332070c1c002e226566399e9788f18d0aa",
+          "bytes": 926,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/tests/test.sh",
+          "sha256": "4770437ea96c3cc84684b4f99d55fb148fcac09f9ea1e8ef49de487716e6c334",
+          "bytes": 608,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/tests/test_outputs.py",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/tests/test_outputs.py",
+          "sha256": "88dc5c2a3abba75bca0e0f9136223ae5bb585d5984b8d9eba51a7829c1d2ba49",
+          "bytes": 4263,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/environment/main.db",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/environment/main.db",
+          "sha256": "68cb288eb29e76d814b4e7ee6887b37c415675e644f88173bc191348e290d119",
+          "bytes": 8192,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "harbor-framework__terminal-bench-2/selected/db-wal-recovery/environment/main.db-wal.encrypted",
+          "url": "https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/2fd12b88aafdd04a52c298e3940bcb189f9766d6/db-wal-recovery/environment/main.db-wal.encrypted",
+          "sha256": "68753bdce26196a53194260d001544cc6bb8f9f38e2f2f6826d09798e31e6e26",
+          "bytes": 16512,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "the_agent_company",
+      "source_url": "https://github.com/TheAgentCompany/TheAgentCompany",
+      "revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "selected_upstream_ids": [
+        "ds-stock-analysis-slides",
+        "hr-make-slides-introduce-leadership"
+      ],
+      "status": "two_native_services_and_post_exit_contracts_accepted_independent_artifact_quality_pending",
+      "files": [
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/Dockerfile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/Dockerfile",
+          "sha256": "6461bc23e041f9a706c53510611ebadb729b2cb0d4101f43c4dacf1266be9ee7",
+          "bytes": 242,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/Makefile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/Makefile",
+          "sha256": "3081bfd0b98d836021cde3e64b69a5fc8c34fdeb0b07fca03a032905a57559e2",
+          "bytes": 356,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/checkpoints.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/checkpoints.md",
+          "sha256": "d601aa5e9905fea1cfcbe4a44fa8ed8c789b2667fa35d4fba40e4a06d6bd609a",
+          "bytes": 742,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/dependencies.yml",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/dependencies.yml",
+          "sha256": "7a002a095bf9d24020d890667ecccfc725fb25abd474f408a343f019878a8a92",
+          "bytes": 10,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/evaluator.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/evaluator.py",
+          "sha256": "b4926f32e89fe6ba01c0e7697e6f71100608c415dc7c2911eae1c03ae69f67a9",
+          "bytes": 5519,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/stock_data.csv",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/stock_data.csv",
+          "sha256": "1b8940d298205bed6700b1f7aea0321385c5aff0599f3fcec173300c9bb3fcbf",
+          "bytes": 370122,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/ds-stock-analysis-slides/task.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/ds-stock-analysis-slides/task.md",
+          "sha256": "621281d20fa3e0b4dbf6903ff871e035c99bb194a80b4fe3e1188f7f7954281b",
+          "bytes": 1733,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/Dockerfile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/Dockerfile",
+          "sha256": "c20a3a6eec33f98715a41984a0691c992b909a3b607dc736acfc097f3f4e03a8",
+          "bytes": 86,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/Makefile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/Makefile",
+          "sha256": "bd5b6c42578f04072eafab8fd86d8204a65ec49f61a6f0ff1a257cd095abf158",
+          "bytes": 386,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/checkpoints.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/checkpoints.md",
+          "sha256": "e25aaa3a3c39ed2041c77636eb9ffbc5720e9b9f7168a13f245161c52a454e31",
+          "bytes": 419,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/dependencies.yml",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/dependencies.yml",
+          "sha256": "508a1e726cb62011a11096d4772546116aef14d260df43ca9a834fcec52368a2",
+          "bytes": 12,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/evaluator.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/evaluator.py",
+          "sha256": "ee7cf7c01e5064a5b4e7810c74a8a760220f2bf30049bdcaba3f3bac45cf5137",
+          "bytes": 2581,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/tasks/hr-make-slides-introduce-leadership/task.md",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/hr-make-slides-introduce-leadership/task.md",
+          "sha256": "bcfd6d66d62abeac8cf166735d09c6d71e0797507f2be0980d319f72345dda2f",
+          "bytes": 740,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/base_image/common.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/base_image/common.py",
+          "sha256": "32f5365249e5995f417c8fadf337572a8748222f5c812ae1dfe87367a60c4adc",
+          "bytes": 28775,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/workspaces/base_image/scoring.py",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/base_image/scoring.py",
+          "sha256": "446dec4587f0e2f6d65968cbc13f01be099939de01d0045bb8b37419140b7ecb",
+          "bytes": 5914,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/docker-compose.yml",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/docker-compose.yml",
+          "sha256": "da46a8200800776e1aae0b585005f860cdb1db808e3320b9041bd594c2846c4d",
+          "bytes": 4518,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/owncloud/Dockerfile",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/owncloud/Dockerfile",
+          "sha256": "aa507c035283cd421feb1b3976cc329b5f79dfb4e8715cd3a5e699366cd33115",
+          "bytes": 403,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/owncloud/init.sh",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/owncloud/init.sh",
+          "sha256": "56a7b41b41b5efe89644f34a030ab23ed9afd091781500dddfdc8fc48a2b404d",
+          "bytes": 1479,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/servers/rocketchat/data_restore/restore.sh",
+          "url": "https://raw.githubusercontent.com/TheAgentCompany/TheAgentCompany/98b68ef82a47690c316f42fddb05baafaab56851/servers/rocketchat/data_restore/restore.sh",
+          "sha256": "e339c58211716ef88adfaa4f2d84b1dadc5592e5ff2657a9d6788327a5ad5b49",
+          "bytes": 889,
+          "exposure": "host_only_native_environment_or_grader_source"
+        },
+        {
+          "path": "TheAgentCompany__TheAgentCompany/selected/environment/db.dump",
+          "url": "https://github.com/TheAgentCompany/the-agent-company-backup-data/releases/download/rocketchat-20241123/db.dump",
+          "sha256": "d3826434819eb1630c0547770ba94232d846799aa8d8469d0448f18570eb1e59",
+          "bytes": 1144726,
+          "exposure": "host_only_original_database_snapshot_not_agent_input"
+        }
+      ],
+      "snapshot_authenticity": "Publisher release asset pinned by locally computed digest; no publisher digest was supplied.",
+      "service_images": {
+        "mongo": "mongo@sha256:9fe0747650162376edd9f67a0b8e48a43e920cca54f134be82e45ce46ae7fc8d",
+        "rocketchat": "rocketchat/rocket.chat@sha256:55e17e7ee850c0757c66b53bd0adf49bcea349fb985f4bec2cdcf8c7a7276ec4",
+        "owncloud": "ghcr.io/theagentcompany/servers-owncloud@sha256:326406d88345899db22fc1081aa8fa15415c542a71b80486c0a2cebf59f56f63"
+      },
+      "stock_raw_csv_sha256": "5e83e1084cdebcfe78892cc345d38a8d584d2533e58efab722294a94edf1874c",
+      "grading_scope": "HR original5 checkpoints plus fresh recipient/sender state; stock original strict CSV checkpoint reported separately from explicit rtol1e-12/atol1e-10 gate. Two artifacts still require calibrated quality. API workflows exclude browser and NPC evaluation."
+    },
+    {
+      "benchmark": "osworld",
+      "source_url": "https://github.com/xlang-ai/OSWorld",
+      "revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "selected_upstream_ids": [
+        "04578141-1d42-4146-b9cf-6fab4ce5fd74",
+        "05dd4c1d-c489-4c85-8389-a7836c4f0567"
+      ],
+      "status": "two_extracted_slide_state_contracts_original_metric_accepted_not_gui",
+      "files": [
+        {
+          "path": "xlang-ai__OSWorld/selected/evaluation_examples/examples/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74.json",
+          "url": "https://raw.githubusercontent.com/xlang-ai/OSWorld/04718eab9327856efe8192cc58161acc7a7627e2/evaluation_examples/examples/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74.json",
+          "sha256": "36f63b205a16e2889c287738c6c0e5dfefcf1ddf00e17e750c5bc903d86c1b71",
+          "bytes": 3024,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "xlang-ai__OSWorld/selected/evaluation_examples/examples/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567.json",
+          "url": "https://raw.githubusercontent.com/xlang-ai/OSWorld/04718eab9327856efe8192cc58161acc7a7627e2/evaluation_examples/examples/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567.json",
+          "sha256": "ac8fe4b98fb5d3497939f5f5cd5a0897dd5ab0c401551d1fa249d13c6e3094fd",
+          "bytes": 2546,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "osworld_materials/45_2.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74/45_2.pptx",
+          "sha256": "0cc143e4f7587ecd5b7af54ff6e0b9cd40c0a32c485340f6e8ce0b082571ccb1",
+          "bytes": 21107729,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/45_2_Gold.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74/45_2_Gold.pptx",
+          "sha256": "739850a630bf25b77c6789903dd425bedf508b9cfa9834bace9475a0a5b492a5",
+          "bytes": 21107754,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/45_2_Gold_all_fonts.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/04578141-1d42-4146-b9cf-6fab4ce5fd74/45_2_Gold_all_fonts.pptx",
+          "sha256": "52075c0d24304b1e2ffe97dfa5f02d003041512743a27a9f733c5bce0439d6e6",
+          "bytes": 21107759,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/38_1.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567/38_1.pptx",
+          "sha256": "67b6e43fd65bde152c532c5f579cfd04e23855f39bee6c9cb4d0cb6f12e2dd7d",
+          "bytes": 6166120,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/38_1_Gold.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567/38_1_Gold.pptx",
+          "sha256": "66dcccc5560e9cd1b684477dce5dbdda2a65fe6d8c4aefa12e2768f3a5e7de5a",
+          "bytes": 6166278,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/38_1_Gold_all_fonts.pptx",
+          "url": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_file_cache/resolve/1e112283c4ecb08d6fed8069bca7de74fa2f12aa/libreoffice_impress/05dd4c1d-c489-4c85-8389-a7836c4f0567/38_1_Gold_all_fonts.pptx",
+          "sha256": "f59294d3b30b8c1e7a86618f54bf2a4b32844ea9d69d19e41b5a921e5c373ec9",
+          "bytes": 6166281,
+          "exposure": "reference_files_host_only_agent_receives_original_input_only"
+        },
+        {
+          "path": "osworld_materials/slides.py",
+          "url": "https://raw.githubusercontent.com/xlang-ai/OSWorld/04718eab9327856efe8192cc58161acc7a7627e2/desktop_env/evaluators/metrics/slides.py",
+          "sha256": "c8f56352659b23985d01b7b301207caa429a628dc32f6f2693d4a5ed3378628d",
+          "bytes": 76151,
+          "exposure": "host_only_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "agentic_vbench",
+      "source_url": "https://github.com/PhiloLabs/agentic-vbench",
+      "revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "selected_upstream_ids": [
+        "exp-codec-restore-task01",
+        "agentic-vbench-assembly-task1"
+      ],
+      "status": "two_native_media_contracts_original_verifier_acceptance_passed_not_live_agent",
+      "files": [
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/environment/Dockerfile",
+          "sha256": "8b936a8b07ee5409425084570320a0042dcfbba95d221fec4a290849e7e437d7",
+          "bytes": 894,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/instruction.md",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/instruction.md",
+          "sha256": "f355d25db0a87069ecac430fc5ae419d334dd14cfe6014908898457a9947e799",
+          "bytes": 16272,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/solution/solve.sh",
+          "sha256": "5cc925d6454e62989151f18fc80caeace7105404e0ac6b6cab9eb5a8c69b699b",
+          "bytes": 2147,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/judge.py",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/judge.py",
+          "sha256": "61a3ec3270a5ecf9ea394c6f7216d08a9af1d9ef794bf6ac297752f30fee168e",
+          "bytes": 10284,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/tests/test.sh",
+          "sha256": "77090cecd2e77160a80ee0cfbed6d65a948d4170aaa8fb56141b621eedb685a1",
+          "bytes": 684,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/workdir/setup.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/steps/solve/workdir/setup.sh",
+          "sha256": "a3ccba68e567fdbf0692a7bdd860a81b158f099ce5405efdd2f754f3b75d77b9",
+          "bytes": 404,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/task.toml",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_assembly/agentic-vbench-assembly-task1/task.toml",
+          "sha256": "6202ea523a43bbc4028445b4e85a0f68e0b39ab3fc42641982a4981e408e1f97",
+          "bytes": 507,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/environment/Dockerfile",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/environment/Dockerfile",
+          "sha256": "e3eb0a77b92534d5bda881cb15b37f15be8c7dd007faf0a22cb054ffb6c779c4",
+          "bytes": 1014,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/instruction.md",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/instruction.md",
+          "sha256": "e0d003085f36df7debe69467fb557e5e634437c00665fd03182165cfbab5f54c",
+          "bytes": 640,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/solution/solve.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/solution/solve.sh",
+          "sha256": "0fb4193148a19e4b8de5afdba2424f019b373b1c516e6fb2e3d70578062c5146",
+          "bytes": 772,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/judge.py",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/judge.py",
+          "sha256": "54e638bd0f283c7499d8364942c7d096da83c7d7aee3087ecacc67455088b29c",
+          "bytes": 10525,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/test.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/tests/test.sh",
+          "sha256": "5f2efb43fa8fe585db5748247d8db37ecd2eeb09680cf9e60cfaad42d2fa3416",
+          "bytes": 1090,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/workdir/setup.sh",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/steps/solve/workdir/setup.sh",
+          "sha256": "34d48ba3de6536f571093cb70c6ec7b7bfe5521bdab09c24293fcf6f6f87562f",
+          "bytes": 402,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "PhiloLabs__agentic-vbench/selected/tasks/agentic_vbench_repair/exp-codec-restore-task01/task.toml",
+          "url": "https://raw.githubusercontent.com/PhiloLabs/agentic-vbench/b2764ed4b2a4b5a1737026b63887b50bba62f793/tasks/agentic_vbench_repair/exp-codec-restore-task01/task.toml",
+          "sha256": "7820afc5f626f519319d248d1871a9303efd9eb28c93e508078d45b777916994",
+          "bytes": 887,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "agentic_vbench_materials/assembly.zip",
+          "url": "https://huggingface.co/datasets/ameddserM/agentic_vbench_video_assembly/resolve/66b983e7552edba9dedb6858705bae8f2b6fa945/materials/1.zip",
+          "bytes": 14452898,
+          "sha256": "fa5613c8e303501a5aa44d943367b9e025fc2b9f9008f12e532541596de1781f"
+        },
+        {
+          "path": "agentic_vbench_materials/repair.zip",
+          "url": "https://huggingface.co/datasets/ameddserM/agentic_vbench_video_repair/resolve/9f2b57edfa70a7b1e22f84c646b44c8838652f95/materials/exp-codec-restore-task01.zip",
+          "bytes": 3078521,
+          "sha256": "68be3fd036112bf3b7d7db7613065cdfa24fe66a25226c944f4056bfa0df6d93"
+        }
+      ]
+    },
+    {
+      "benchmark": "mlagentbench",
+      "source_url": "https://github.com/snap-stanford/MLAgentBench",
+      "revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+      "selected_upstream_ids": [
+        "vectorization"
+      ],
+      "status": "adapted_numpy_forward_contract_container_correctness_and_host_clock_accepted_not_live_model_evaluated",
+      "files": [
+        {
+          "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/env/train.py",
+          "url": "https://raw.githubusercontent.com/snap-stanford/MLAgentBench/5d71205cc20a8e95d43aa7cb7120e89ca3323e31/MLAgentBench/benchmarks/vectorization/env/train.py",
+          "sha256": "fe9442577dc78d1e53657f9ddf0904272d70de2b8e8759a531a484c68e2cbcf5",
+          "bytes": 8691,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/scripts/eval.py",
+          "url": "https://raw.githubusercontent.com/snap-stanford/MLAgentBench/5d71205cc20a8e95d43aa7cb7120e89ca3323e31/MLAgentBench/benchmarks/vectorization/scripts/eval.py",
+          "sha256": "991953c1c4e770a9335f1d8cff3a7edead961cbee81842133a0ef2b007b41d55",
+          "bytes": 364,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "snap-stanford__MLAgentBench/selected/MLAgentBench/benchmarks/vectorization/scripts/research_problem.txt",
+          "url": "https://raw.githubusercontent.com/snap-stanford/MLAgentBench/5d71205cc20a8e95d43aa7cb7120e89ca3323e31/MLAgentBench/benchmarks/vectorization/scripts/research_problem.txt",
+          "sha256": "49ccb7b07a615230acb7d29826d2ff6a1b343192741b558f2443acb4eb1e61ab",
+          "bytes": 360,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "swe_verified",
+      "source_url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified",
+      "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "selected_upstream_ids": [
+        "pylint-dev__pylint-6903",
+        "scikit-learn__scikit-learn-13496"
+      ],
+      "status": "two_native_project_image_contracts_reference_and_baseline_controls_passed_not_real_Agent",
+      "files": [
+        {
+          "path": "swe_verified/data/test-00000-of-00001.parquet",
+          "url": "https://huggingface.co/datasets/SWE-bench/SWE-bench_Verified/resolve/78f471bf655a3137b2e8a75af1501690ec009ec3/data/test-00000-of-00001.parquet",
+          "sha256": "030cfd7f2a704c4c0226e7f104c725a3b41230b1d3517f9c915ad7ea5be3fa25",
+          "bytes": 6304616,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ],
+      "environment_images": [
+        {
+          "task": "pylint-dev__pylint-6903",
+          "image_digest": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-6903@sha256:bad80b1c20eeb5d49a6e82dc485ee40fbd67b91df47b56740e1be5471b678f5b",
+          "native_required_tests": 9
+        },
+        {
+          "task": "scikit-learn__scikit-learn-13496",
+          "image_digest": "swebench/sweb.eval.x86_64.scikit-learn_1776_scikit-learn-13496@sha256:adee9f4911a853e64f9ae4ebd7b1bf32615cbf52c3210873e9a752fb5fb975e6",
+          "native_required_tests": 20
+        }
+      ]
+    },
+    {
+      "benchmark": "longmemeval_v2",
+      "source_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2",
+      "revision": "f152293e235517d504809563c833d7190b8c713b",
+      "selected_upstream_ids": [
+        "4ed01379"
+      ],
+      "status": "one_complete100_textual_history_retrieval_contract_accepted_no_ingestion_or_screenshots",
+      "files": [
+        {
+          "path": "longmemeval_v2/questions.jsonl",
+          "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/resolve/f152293e235517d504809563c833d7190b8c713b/questions.jsonl",
+          "sha256": "0a3ae5ebea938c24d7800e1e0b0828e08ae1646f939a53853b2b8cdc08e292b7",
+          "bytes": 286186,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "longmemeval_v2/haystacks/lme_v2_small.json",
+          "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/resolve/f152293e235517d504809563c833d7190b8c713b/haystacks/lme_v2_small.json",
+          "sha256": "9b5301defb23a088a5f06e45ff8d5f35e569d78305a66d492046a9fff9b46593",
+          "bytes": 822632,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "longmemeval_v2/trajectories.jsonl",
+          "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-v2/resolve/f152293e235517d504809563c833d7190b8c713b/trajectories.jsonl",
+          "sha256": "363cec9a8e87aa8d9101ce4e600aadbf7031d674056ebe4f969e8424abc5f3c6",
+          "bytes": 1195604539,
+          "exposure": "host_only_adapter_selects_all100_original_textual_trajectories_answer_and_metric_remain_host_only"
+        },
+        {
+          "path": "longmemeval_v2/qa_eval_metrics.py",
+          "url": "https://raw.githubusercontent.com/xiaowu0162/LongMemEval-V2/2cc8c540bdb87fe6761629b585e727e1c4704520/evaluation/qa_eval_metrics.py",
+          "sha256": "f8ba659e237c4282a07a92538090ea500ce8483820b390b1d19af187c01417ac",
+          "bytes": 20800,
+          "exposure": "host_only_adapter_selects_all100_original_textual_trajectories_answer_and_metric_remain_host_only"
+        }
+      ],
+      "code_revision": "2cc8c540bdb87fe6761629b585e727e1c4704520"
+    },
+    {
+      "benchmark": "dsbench",
+      "source_url": "https://github.com/LiqiangJing/DSBench",
+      "revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+      "selected_upstream_ids": [
+        "00000018:question24",
+        "00000013:question19"
+      ],
+      "selection_groups": [
+        {
+          "group_id": "00000018",
+          "group_name": "2017-finals-castles-in-the-air",
+          "question_id": "question24",
+          "source_url": "https://www.eloquens.com/tool/PGqTr5/finance/modeloff-sample-past-questions/2017-finals-castles-in-the-air"
+        },
+        {
+          "group_id": "00000013",
+          "group_name": "2017-round-2-late-again",
+          "question_id": "question19",
+          "source_url": "https://www.eloquens.com/tool/8QEc23/finance/modeloff-sample-past-questions/2017-round-2-late-again"
+        }
+      ],
+      "status": "two_frozen_workbook_question_contracts_materialized_with_exact_json_grade_not_model_evaluated",
+      "files": [
+        {
+          "path": "LiqiangJing__DSBench/selected/data_analysis/data.json",
+          "url": "https://raw.githubusercontent.com/LiqiangJing/DSBench/ba786096137a5108af11c016ad3f09cdb97beefd/data_analysis/data.json",
+          "sha256": "ff822b69d46e08b384fa9b93ff39762c33b9887d315a5653bb536aeaba7572ea",
+          "bytes": 19407,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "dsbench-data.json",
+          "url": "https://huggingface.co/datasets/liqiang888/DSBench/resolve/1196d6553ec200e1262841efc89cda5954ffe89f/data_analysis/data.json",
+          "sha256": "ff822b69d46e08b384fa9b93ff39762c33b9887d315a5653bb536aeaba7572ea",
+          "bytes": 19407,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        },
+        {
+          "path": "dsbench-data.zip",
+          "url": "https://huggingface.co/datasets/liqiang888/DSBench/resolve/1196d6553ec200e1262841efc89cda5954ffe89f/data_analysis/data.zip",
+          "sha256": "3a53d89bf0307978522d684fc2b49c8697a754444c0c2dd2e4771d0d8fdfb4e0",
+          "bytes": 8027257,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ],
+      "data_revision": "1196d6553ec200e1262841efc89cda5954ffe89f"
+    },
+    {
+      "benchmark": "spreadsheetbench",
+      "source_url": "https://huggingface.co/datasets/KAKA22/SpreadsheetBench",
+      "revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+      "selected_upstream_ids": [
+        "verified400:38703"
+      ],
+      "status": "adapted_component_contract_materialized_grader_accepted_not_model_evaluated",
+      "files": [
+        {
+          "path": "spreadsheet_verified_400.tar.gz",
+          "url": "https://huggingface.co/datasets/KAKA22/SpreadsheetBench/resolve/ab0b742b0fc95b946f212d80ac7771b5531272e4/spreadsheetbench_verified_400.tar.gz",
+          "sha256": "10ef893dd29cb13ab97143ea787e68cdc9574a13873ab9a54e50b31dc03fc949",
+          "bytes": 14958255,
+          "exposure": "host_only_until_adapter_separates_agent_inputs_and_verifier"
+        }
+      ]
+    },
+    {
+      "benchmark": "gaia",
+      "source_url": "https://huggingface.co/learn/agents-course/unit4/hands-on",
+      "revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+      "selected_upstream_ids": [
+        "6f37996b-2ac7-44b0-8e68-6d28256631b4"
+      ],
+      "status": "official_public_course_sample_complete_table_with_added_proof_accepted_not_gated_full_corpus",
+      "files": [
+        {
+          "path": "HuggingFace__agents-course/selected/questions.json",
+          "url": "https://agents-course-unit4-scoring.hf.space/questions",
+          "sha256": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+          "bytes": 7458,
+          "exposure": "public_questions_only_no_remote_submission"
+        }
+      ],
+      "scope": "Original complete supplied table from official20-question course API; added exhaustive counterexample proof. No gated corpus or leaderboard submission."
+    }
+  ],
+  "large_materials_explicit_max_total_bytes": 1500000000
+}

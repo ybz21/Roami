@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RSI 输入往返精度与请求身份 · 2026-10-26</title><base href="../../../../../"></head><body>
+<nav><a href="docs/design/20261022-roami-agent-rsi/records/README.md">历史设计索引</a></nav>
+<!-- archived-source:start -->
+<section id="rsi-input-roundtrip-request-identity-20261026" lang="zh-CN">
+  <h2>RSI 输入往返精度与请求身份 · 2026-10-26</h2>
+  <h3>Product Design</h3>
+  <p>表格保存验证区分分数数值的序列化尾差与真实改值。两个有限非整数值仅允许 2e-15 相对误差，不设绝对容差；整数、零值、文本、布尔与缺失仍精确比较。比较策略写进评分结果和新版公开合同，adapter 标为 spreadsheet-values-v2-fractional-roundtrip，不是官方排行榜分数。</p>
+  <p>CSV 题公开说明原判定器已有的新操作与重试语义：重新选文件发起新导入，内容相同也使用新键；同次请求遇503后直接重试才保留原键。服务、断言和额度不变。只有该题 recipe 升为 authored-v8-csv-request-identity；语料使用新的 v8 ID 与文件，旧冻结语料不覆盖。</p>
+  <h3>User Stories</h3>
+  <p>用户只取消合并并保存表格时，不因浮点表示尾差被记为改动其他数据，真实数值变化仍失败。Agent 从题面知道新导入与重试的界线，维护者能区分合同修订与旧题复验。</p>
+  <h3>Technical Design</h3>
+  <p>spreadsheet.same_cell_value 仅供该适配器的目标值及输入保存校验，不改全局 same_json 或量化误差。非整数相对界限是对<a href="https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/floating-point-arithmetic-inaccurate-result">Microsoft 浮点与 15 位精度说明</a>的保守工程处理，整数及跨类型值不走近似。authored_fixtures 补公开请求身份说明，corpus 版本与缓存地址升级。评测协议单列 container-uds-v12-input-roundtrip-and-request-identity，不重写旧 v6 记录、题面、产物或成绩。</p>
+  <h3>验证证据</h3>
+  <p>67 项表格和语料／量化回归通过。原 spreadsheetbench:38703 的21处差异均是分数数值尾差，最大5.56e-16；新比较策略下重放通过，主动修改一个数值的反例仍失败，原 trial 和产物 SHA 不变。这是验证器重放，不是新增 Agent 通过或同合同性能收益。整数长编号、布尔、文本、零附近差异、非有限值和较大数值变化仍拒绝。缓存回归证明旧 v7 文件保留，新 v8 文件独立登记。CSV 新版仍需真实隔离执行，人工评分与后续完整日观察未完成，父 issue 保持开放。</p>
+</section>
+
+<!-- archived-source:end -->
+</body></html>

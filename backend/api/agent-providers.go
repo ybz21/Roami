@@ -88,10 +88,12 @@ func (a *API) DeleteAgentModelProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": true})
 }
 
-func (a *API) ApplyAgentModelProfile(c *gin.Context)   { a.changeAgentModel(c, false) }
-func (a *API) RestoreAgentModelProfile(c *gin.Context) { a.changeAgentModel(c, true) }
+func (a *API) ApplyAgentModelProfile(c *gin.Context)   { a.changeAgentModel(c, "custom") }
+func (a *API) RestoreAgentModelProfile(c *gin.Context) { a.changeAgentModel(c, "restore") }
 
-func (a *API) changeAgentModel(c *gin.Context, restore bool) {
+func (a *API) UseOfficialAgentModel(c *gin.Context) { a.changeAgentModel(c, "official") }
+
+func (a *API) changeAgentModel(c *gin.Context, mode string) {
 	if a.AgentProviders == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "MODEL_STORE_UNAVAILABLE"}})
 		return
@@ -104,7 +106,9 @@ func (a *API) changeAgentModel(c *gin.Context, restore bool) {
 	}
 	var view agentproviders.View
 	var err error
-	if restore {
+	if mode == "official" {
+		view, err = a.AgentProviders.UseOfficial(c.Request.Context(), c.Param("kind"), body.Revision)
+	} else if mode == "restore" {
 		view, err = a.AgentProviders.Restore(c.Request.Context(), c.Param("kind"), body.Revision)
 	} else {
 		view, err = a.AgentProviders.Apply(c.Request.Context(), c.Param("kind"), c.Param("profile"), body.Revision)

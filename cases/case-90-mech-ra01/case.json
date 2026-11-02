@@ -1,0 +1,55 @@
+{
+  "id": "MECH-RA01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "参考评审来源",
+  "prompt": "仅在显式授权策略下使用委托AI参考，保留来源与证据版本，不冒充人工或复用已开始的评分。",
+  "preconditions": "公开合成参考授权与评分夹具、临时证据目录、真实校准流程；零外部模型调用。",
+  "expected_terminal": "explicit_reference_authority_with_bound_evidence_and_no_replay",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "默认仅接受人工参考；显式策略才接收用户委托AI参考",
+    "AI来源不标成人工，证据与期望分变化必须拒绝",
+    "混合校准证书保留来源并以策略加载；已开始评分不可重放"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-RA01-H1",
+      "rule": "缺失授权、错误来源、变更证据或评分在首个提供方调用前拒绝。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RA01-H2",
+      "rule": "8个人工加4个委托AI的公开夹具完整校准，证书保留false人工标志、绑定和来源计数。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-RA01-H3",
+      "rule": "默认策略不能加载混合证书；重复已开始的校准不调用提供方。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "user_authorized_ai_reference_review",
+    "issue": 443,
+    "fixture_reproduction_only": true,
+    "actual_human_labels": false,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/reference-authority.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

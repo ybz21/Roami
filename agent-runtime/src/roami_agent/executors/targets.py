@@ -185,7 +185,7 @@ class TargetDirectory:
             "label": self._text(entry, "name")[:160],
             "archived": entry.get("archived") is True,
         }
-        if entry.get("defaultAgent") in {"codex", "claude", "native"}:
+        if entry.get("defaultAgent") in {"codex", "claude", "opencode", "pi", "native"}:
             result["defaultExecutor"] = entry["defaultAgent"]
         return result
 
@@ -251,7 +251,7 @@ class TargetDirectory:
             item = self._project(entry) if project else self._session(entry)
             if project_id:
                 item["projectId"] = project_id
-                if entry.get("agent") in {"codex", "claude"}:
+                if entry.get("agent") in {"codex", "claude", "opencode", "pi"}:
                     item["executor"] = entry["agent"]
             identifier = item["projectId" if project else "sessionId"]
             if (

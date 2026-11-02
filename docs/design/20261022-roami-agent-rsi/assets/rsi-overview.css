@@ -1,0 +1,20 @@
+/* Compact reading layout; product UI is unchanged. */
+.rsi-overview { max-width: calc(var(--content-form) + var(--sp-5) * 8); }
+.rsi-overview header { margin-bottom: var(--sp-5); }
+.rsi-overview h1 { margin-bottom: var(--sp-2); }
+.rsi-lead { color: var(--text-bright); font-size: var(--fs-lg); }
+.rsi-status, .rsi-footnote { font-size: var(--fs-sm); }
+.rsi-overview figure { margin: var(--sp-3) 0; }
+.rsi-overview picture, .rsi-overview img { display: block; width: 100%; height: auto; }
+.rsi-overview table { table-layout: fixed; }
+.rsi-overview th, .rsi-overview td { min-width: 0; overflow-wrap: anywhere; }
+.rsi-overview th:first-child { width: 21%; }
+.rsi-overview th:last-child { width: 24%; }
+.rsi-overview td { color: var(--text-bright); }
+.rsi-outcomes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--sp-5) * 12)), 1fr)); gap: var(--sp-5); padding-top: var(--sp-2); }
+.rsi-outcomes strong { font-size: var(--fs-body); }
+.rsi-outcomes p { margin-bottom: 0; }
+.rsi-overview details { margin-top: var(--sp-5); border-top: 1px solid var(--border-subtle); }
+.rsi-overview summary { display: list-item; min-height: var(--tap); padding: var(--sp-3) 0; color: var(--accent); cursor: pointer; }
+.rsi-overview summary:focus-visible { outline: 2px solid var(--accent); outline-offset: var(--sp-1); }
+.rsi-overview details > section { padding-top: var(--sp-4); }

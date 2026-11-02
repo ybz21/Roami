@@ -12,6 +12,7 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.native_session_files import NativeSessionFiles
 from roami_agent.storage.native_session_registry import backfill
+from roami_agent.storage.native_transcript import native_content
 from roami_agent.storage.transcript_repository import owned
 
 
@@ -66,7 +67,7 @@ class NativeSessions:
             session = self._get(db, owner, ident)
             messages = rows(
                 db,
-                "SELECT * FROM messages m WHERE m.conversation_id=? AND m.branch_id=? AND m.deleted_ms IS NULL AND m.status!='deleted' AND m.role IN ('user','assistant') AND (? IS NULL OR m.seq<?) AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND o.message_id=m.id) ORDER BY m.seq DESC LIMIT ?",
+                "SELECT m.* FROM messages m WHERE m.conversation_id=? AND m.branch_id=? AND m.deleted_ms IS NULL AND m.status!='deleted' AND m.role IN ('user','assistant','tool') AND (? IS NULL OR m.seq<?) AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND o.message_id=m.id) ORDER BY m.seq DESC LIMIT ?",
                 (
                     session["conversation_id"],
                     session["branch_id"],
@@ -78,7 +79,19 @@ class NativeSessions:
             )
             has_more = len(messages) > limit
             messages = list(reversed(messages[:limit]))
-            content = [(m, json.loads(m["content_json"])) for m in messages]
+            content = []
+            for item in messages:
+                value = json.loads(item["content_json"])
+                call = None
+                if item["role"] == "tool" and isinstance(value.get("tool_call_id"), str):
+                    call = row(
+                        db,
+                        "SELECT state FROM tool_calls WHERE idempotency_key=? AND result_message_id=?",
+                        (str(item["turn_id"]) + ":" + value["tool_call_id"], item["id"]),
+                    )
+                content.append(
+                    (item, native_content(value, item["role"], call["state"] if call else None))
+                )
             revisions = {
                 value.get("taskRevision")
                 for _, value in content
@@ -97,7 +110,12 @@ class NativeSessions:
                     steering[payload["appliedRevision"]] = payload["text"]
             visible = [
                 dict(
-                    m,
+                    {
+                        key: item
+                        for key, item in m.items()
+                        if key not in {"content_json", "tool_state"}
+                    },
+                    content_json=encoded(value),
                     content={
                         **value,
                         "text": value.get("displayText")

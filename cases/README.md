@@ -1,0 +1,102 @@
+# RSI Cases
+
+每项任务放在独立目录：`cases/case-<序号>-<标识>/`。现有编号保持稳定，不因排序或新增目录重新编号。
+
+```text
+cases/case-1-code-01/
+  CASE.md          名称与描述，唯一的展示元数据来源
+  case.json        执行合同、前置条件、交付与验收要求
+  input/           可选：公开输入材料
+  expected.md      可选：公开验收说明
+  scripts/         可选：任务专用脚本
+```
+
+`CASE.md` 必须以以下元数据开头，名称和描述不能为空；可使用单行文字或 JSON 引号字符串：
+
+```yaml
+---
+name: 新增分页接口
+description: 给附件仓库增加分页接口，补齐排序、边界与回归测试。
+---
+```
+
+执行合同不要再复制 `name`、`description` 或 `title`，避免修改后显示不一致。任务标识 `id` 与目录末尾的标识一致。
+
+一个目录可以包含任意多个相关文件和子目录。附件不会仅因放进目录而自动执行或成为验收依据；需要由执行定义或任务装配明确引用，并随套件一起冻结。`CASE.md` 元数据后的正文可补充操作步骤、文件说明及公开验收要求。
+
+- 40 项自有任务和机制任务包含执行合同，运行时直接读取这些目录。
+- 20 项公开任务保存来源、原始标识与冻结版本，实际输入和判定从登记的套件加载。来源引用不等于已经运行或通过。
+- 扩展机制 Case 单独运行，不加入既有 authored-40 或正式 60 项；例如 [MECH-VD03](case-61-mech-vd03/CASE.md) 的脚本会冻结输入并保存实际 Go/Python 断言回执。
+- 不把私有答案、隐藏集或本机凭证放进公开目录。
+- 任务、输入或验收规则改变后，建立新套件版本；不覆盖历史运行的冻结合同。
+
+## 数据、工具和验收
+
+每个目录的 `materials.json` 说明数据来源、隔离工作区中的文件、工具配置入口、交付物和判定位置：
+
+- 自有任务：记录生成器和每次运行冻结的文件。生成输入不等于真实业务数据，运行 receipt 与私有答案分别处理。
+- 机制任务：记录实际 pytest 测试入口和脚本化模型环境，不把回归夹具称为真实模型评测。
+- 公开来源：记录原始任务和来源版本；`local_inputs: false` 表示该目录没有原始输入，要从已登记的冻结套件加载。
+
+`case.json.resources` 可声明 `inputs`、`tools`、`generator`、`provenance`、`acceptance`、`materials`。
+路径必须指向该 Case 内的普通文件，不接受越界路径或符号链接。资源 SHA256 写入新套件，历史套件不覆盖。
+工具清单描述任务环境，不能授予额外权限；实际工具白名单、Native 派活和网络隔离由执行器配置。
+Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶段记录和判定结果查看是否运行、是否通过。
+
+[QUANT-02](case-16-quant-02/CASE.md) 提供完整示例：`inputs/prices.json` 是 180 根合成行情，
+`generate.py` 可重建它，`tools.json` 列出工具需求，`provenance.json` 和 `acceptance.md` 说明来源与验收。
+运行时直接读取公开输入并追加本次 receipt，不再另藏一份行情生成逻辑。该任务只能验证回测实现和泄漏防护，不能证明真实投研能力。
+
+- [MECH-RC01 / 模型请求回执与重试用量](case-62-mech-rc01/CASE.md)：数据、工具与独立 runner 齐备；不加入历史正式套件。
+
+- [Case 63：演示文稿位置与绘制顺序](case-63-mech-dl01/CASE.md)：独立结构回归，保留原正式套件。
+
+- [Case 64：外挂演示文稿编辑](case-64-mech-dp01/CASE.md)：独立 Skill、实际材料与通用 Agent 交付合同，不扩大基础工具接口。
+
+- [Case 65：本地 Skill 完整目录执行](case-65-mech-sp01/CASE.md)：本地配置目录中的脚本、素材和通用文件交付，不需要额外导入。
+
+- [Case 66：外挂 Skill 的初始发现](case-66-mech-sd01/CASE.md)：元数据在首次请求中可见，正文按需加载，权限变化即时生效。
+
+- [Case 67：已安装工作流的执行上下文](case-67-mech-wf01/CASE.md)：持久化指令、按需加载、权限及压缩估算保持一致。
+
+- `case-68-mech-ci01/`：保存角色指令的容器传递，含数据、工具和严格运行回执；独立机制回归，不计入历史正式套件。
+
+- `case-69-mech-tb01/`：表格外挂导出与持久交付，输入、预期、工具、来源和运行器齐全；119项机制检查，不加入历史正式套件。
+
+- `case-70-mech-md01/`：媒体验收分项证据保留，合成回执、工具、来源和运行器齐全；39项机制检查，不加入历史正式套件。
+
+- [Case 72：外挂整段视频拼接](case-72-mech-va01/CASE.md)：实际合成素材、FFmpeg/FFprobe、16项检查与冻结运行器；不加入历史正式套件。
+
+- [Case73 · 空模型连接与截断请求分类](case-73-mech-gc01/CASE.md)
+
+- [Case74 · 模型传输失败位置与脱敏证据](case-74-mech-mt01/CASE.md)
+
+- [Case75 · 分布统计口径与报告证据](case-75-mech-dm01/CASE.md)
+
+- [Case76 / MECH-AL01](case-76-mech-al01/CASE.md)：实际回复HTML属性与真实产物下载链接，含输入、工具和冻结回执。
+
+- [Case77 / MECH-MI01](case-77-mech-mi01/CASE.md)：Main本地读图与保存角色能力，含合成输入、真实Runtime和冻结回执。
+
+- [Case80 / MECH-EW01](case-80-mech-ew01/CASE.md)：已有执行窗口的上下文传播，含公开时序、真实Runtime循环与50项冻结机制检查。
+
+- [Case81 / MECH-DE01](case-81-mech-de01/CASE.md)：成品优先、内部执行证据与输入简称范围，114项真实Runtime/进程与边界检查。
+
+- [Case82 / MECH-WR01](case-82-mech-wr01/CASE.md)：本轮已读工作流的版本指引，42项真实Native循环与上下文范围检查。
+
+- [Case83 / MECH-EB01](case-83-mech-eb01/CASE.md)：原评分、渲染及复核的证据绑定，含公开输入、工具和冻结回执。
+
+- [Case84 / MECH-CF01](case-84-mech-cf01/CASE.md)：容器命令失败的私有错误证据，21项检查含真实只读Docker失败。
+
+- [Case85 / MECH-RP01](case-85-mech-rp01/CASE.md)：部分独立评分的保留、汇总与恢复，34项脚本化机制检查。
+
+- [Case86 / MECH-RJ01](case-86-mech-rj01/CASE.md)：错误模型JSON的动作隔离、后台队列续办和缓存回执保留，35项脚本化机制检查。
+
+- [Case87 / MECH-RS01](case-87-mech-rs01/CASE.md)：评分对象形状校验、待评分状态与已完成回执保留，28项脚本化机制检查。
+
+- [Case88 / MECH-NC01](case-88-mech-nc01/CASE.md)：源快照统计比较与变化率，31项只读机制检查。
+
+- [Case89 / MECH-UR01](case-89-mech-ur01/CASE.md)：Skill资源协议地址与读取边界，10项机制检查。
+
+- [Case90 / MECH-RA01](case-90-mech-ra01/CASE.md)：用户委托AI参考的显式准入、证据绑定和混合校准，24项零外部模型机制检查。
+
+- [Case91 / MECH-UG01](case-91-mech-ug01/CASE.md)：Go网关上游响应关联、内部标记边界与旧账本迁移，6组、25项叶检查，零外部模型调用。

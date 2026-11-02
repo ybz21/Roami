@@ -1,5 +1,5 @@
 import { Layout } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentKinds } from '../agent-kind'
 import '../components/agent/agent-chat.css'
 import { openAgentPage } from '../components/agent/agent-page-route'
@@ -60,16 +60,17 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const [prefs] = usePreferences()
   const { phone: isMobile, desktop: hasSider } = useLayout()
   const curNodeId = useCurrentNodeId()
-  const agentInbox = useAgentInbox(true, curNodeId)
+  const agentInbox = useAgentInbox(true, curNodeId, tab === 'home' && !routing.agentPage && !routing.agentBranch)
   const data = useSessionDirectory()
   const workspace = useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: hasSider, mobile: isMobile, page: tab, navigate: go })
-  const { terms, active, curFile, activeTask, space, taskView, overlay, noTabs, returnToTask, openFileTab } = workspace
-  const cluster = useClusterNavigation(noTabs, go)
+  const { terms, active, curFile, activeTask, space, taskView, overlay, returnToTask, openFileTab } = workspace
+  const cluster = useClusterNavigation(go)
   const { clusterNodes, curNode, hubHealth, nodeItems } = cluster
   const activeProject = useSessionProject(active)
   const directory = useProjectDirectory(hasSider, activeProject?.worktree || activeProject?.dir || '')
   const { treeSrc, unfinished, swarmCount, git } = directory
-  const runtime = useTerminalRuntime(terms, isMobile)
+  const runtimeTerms = useMemo(() => isMobile ? (overlay && active ? [active] : []) : terms, [terms, active, isMobile, overlay])
+  const runtime = useTerminalRuntime(runtimeTerms, isMobile)
   const { claudeMap, codexMap, mobileWaiting } = runtime
   const inspector = useTabInspector(workspace, data.sessIds)
   const { panel, pickPanel, toggleInspector, searchNonce } = inspector
@@ -135,7 +136,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const canvasNode = (
     <Content ref={canvasRef} className="tt-canvas" data-cq={CQ_PAGES.has(tab) ? 'on' : undefined} style={{
       flex: 1, minWidth: 0, minHeight: 0, height: '100%', padding: 0,
-      overflow: tab === 'capabilities' || tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
+      overflow: tab === 'onboarding' || tab === 'capabilities' || tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
     }}>{pageNode}</Content>
   )
   const dockNode = (
@@ -184,7 +185,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-base)' }}>
 
-      {isMobile && <MobileTopBar tab={tab} go={go} unread={agentInbox.unread} notifications={notifications}
+      {isMobile && <MobileTopBar tab={tab} route={routing.route} go={go} unread={agentInbox.unread} notifications={notifications}
         newTask={projectActions.newTask}
         search={() => setMobileSearchNonce(n => n + 1)} actionsHost={setMobileActionsHost} />}
       {/* clip prevents focus inside the hidden dock from scrolling the shell. */}
@@ -268,7 +269,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
           )
         })()}
 
-        {isMobile && <MobileBottomBar tab={tab} go={go} offline={offline} />}
+        {isMobile && <MobileBottomBar tab={tab} route={routing.route} go={go} offline={offline} />}
 
         <AgentNotifications node={curNodeId} open={agentInboxOpen} close={() => setAgentInboxOpen(false)} inbox={agentInbox} select={selectAgent} />
         <GlobalSearch items={paletteItems} actions={paletteActions} dir={activeProject?.worktree || activeProject?.dir} />

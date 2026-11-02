@@ -1,0 +1,12 @@
+{
+  "name": "report-guide",
+  "entry": "Use the selected report reference.",
+  "referencePath": "references/report.md",
+  "referenceText": "Use the supplied observations; do not invent missing facts.",
+  "scriptPath": "scripts/show.py",
+  "scriptText": "print(42)\n",
+  "unaddressablePath": "references/with space.md",
+  "unaddressableText": "Readable through package execution, not the current Skill reference schema.",
+  "binaryPath": "assets/sample.bin",
+  "privateText": "This is outside the registered package."
+}

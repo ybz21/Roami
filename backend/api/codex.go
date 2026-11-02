@@ -124,7 +124,11 @@ func codexRollout(cwd string, pid int, capture string) string {
 			started = info.ModTime()
 		}
 	}
-	return pickCodexRolloutWithHistory(files, cwd, resumeID, started, strings.Contains(capture, "Worked for "))
+	file := pickCodexRolloutWithHistory(files, cwd, resumeID, started, strings.Contains(capture, "Worked for "))
+	if file == "" {
+		file = codexStateRollout(cwd, started)
+	}
+	return file
 }
 
 func pickCodexRollout(files []string, cwd, resumeID string, started time.Time) string {

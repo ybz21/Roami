@@ -25,6 +25,9 @@ func TestPersistentSessionsRetainContextUntilExplicitClosure(t *testing.T) {
 		t.Fatal(err)
 	}
 	recordRuntimeSources(t, repository, "persistent_session_scenario.py")
+	if _, err := os.ReadFile(filepath.Join(repository, "agent-runtime", "tests", "persistent_provider.py")); err != nil {
+		t.Fatal(err)
+	}
 	root := t.TempDir()
 	binary := filepath.Join(root, "roami")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/roami")

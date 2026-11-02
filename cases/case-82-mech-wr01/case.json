@@ -1,0 +1,53 @@
+{
+  "id": "MECH-WR01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "已读工作流上下文",
+  "prompt": "仅把本轮可见的成功读取标为已读工作流，按当前启用版本继续执行，不加载未读正文或扩展权限。",
+  "preconditions": "隔离数据库、注册的外挂Skill、脚本化Main/Worker和Native循环；不调用外部模型。",
+  "expected_terminal": "visible_workflow_reads_projected",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "下一次模型请求的已读版本标记",
+    "保留原Tool正文且不重复注入",
+    "伪造、旧版本、禁用、遗忘与其他请求边界回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-WR01-H1",
+      "rule": "真实Native循环在成功读取后显示本轮已读Skill及引用的版本，读取前不显示；已读正文不再次复制。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-WR01-H2",
+      "rule": "非Skill工具、无匹配调用、错误或伪造回执不生效；替换、禁用、删除、遗忘和新请求均不沿用旧标记。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-WR01-H3",
+      "rule": "不增加基础工具权限或修改保存角色指令，附加上下文计入估算，不改原始会话消息。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_v143_read_skill_without_using_its_workflow",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/workflow-reads.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

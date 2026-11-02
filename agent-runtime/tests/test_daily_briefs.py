@@ -355,31 +355,9 @@ async def test_publication_receipt_failure_rolls_back_message_and_outbox_without
     assert "private-fixture" not in json.dumps(last)
 
 
-async def test_schedule_capacity_is_owner_scoped_and_cancel_releases_it(store):
-    briefs, _, _, conversation, _, schedule = await fixture(store)
-    briefs.daily_budget = 1
-    with pytest.raises(DomainError, match="BRIEF_SCHEDULE_LIMIT"):
-        await briefs.create(
-            "alice", conversation["id"], "Another brief", "another", daily_at="09:00"
-        )
-    other = await Conversations(store).create("bob")
-    assert (await briefs.create("bob", other["id"], "Bob's brief", "daily", daily_at="09:00"))[
-        "enabled"
-    ]
-    await briefs.cancel("alice", schedule["id"])
-    assert (
-        await briefs.create(
-            "alice", conversation["id"], "Another brief", "another", daily_at="09:00"
-        )
-    )["enabled"]
-
-
 @pytest.mark.parametrize(
     "configuration",
     [
-        "daily_budget=true",
-        "daily_budget=0",
-        "daily_budget=11",
         "timeout_seconds=false",
         "timeout_seconds=-1",
         'timeout_seconds="61"',

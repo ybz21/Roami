@@ -12,6 +12,7 @@ import (
 )
 
 type ProfessionalAgent struct {
+	Verified       bool       `json:"verified"`
 	Kind           string     `json:"kind"`
 	Installed      bool       `json:"installed"`
 	Binary         string     `json:"binary,omitempty"`

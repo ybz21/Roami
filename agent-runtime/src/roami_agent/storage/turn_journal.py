@@ -159,16 +159,19 @@ class TurnJournal:
                         "SELECT id,name FROM artifacts WHERE owner_id=? AND task_id=? "
                         "AND deleted_ms IS NULL AND id IN ("
                         + ",".join("?" for _ in identifiers)
-                        + ") "
-                        "ORDER BY created_ms,id",
+                        + ")",
                         (turn["owner_id"], completion["taskId"], *identifiers),
                     )
+                    by_id = {item["id"]: item for item in retained}
+                    retained = [by_id[aid] for aid in dict.fromkeys(identifiers) if aid in by_id]
                     delivery = deliverable_links(text, retained)
             content = {"text": delivery, **({"tool_calls": calls} if calls else {})}
             if question:
                 content["question"] = question
             if completion:
                 content["source"] = "task"
+                if final:
+                    content["answerText"] = text
             db.execute(
                 "UPDATE messages SET content_json=?,status='completed' WHERE id=?",
                 (encoded(content), mid),

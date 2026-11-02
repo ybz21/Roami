@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
 import { useBackDismiss } from '../shell/useBackDismiss'
-import { agentSettingsRoute, modelFailure, modelLabel } from './agent-models'
+import { agentSettingsRoute, modelFailure } from './agent-models'
 import { reasoningChoices, reasoningValue } from './agent-reasoning'
 import type { useAgentModels } from './useAgentModels'
 import './agent-model-picker.css'
@@ -23,7 +23,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
   const modelTrigger = useRef<HTMLButtonElement>(null), effortTrigger = useRef<HTMLButtonElement>(null)
   const search = useRef<InputRef>(null), returnFocus = useRef<HTMLButtonElement | null>(null)
   const retry = useRef<Choice | null>(null), saving = useRef(false), saveSequence = useRef(0)
-  const role = models.settings?.main, model = role?.model || '', effort = reasoningValue(role?.reasoningEffort)
+  const roleKey = models.role || 'main', role = models.settings?.[roleKey], model = role?.model || '', effort = reasoningValue(role?.reasoningEffort)
   const options = reasoningChoices(role)
   const close = () => setOpen(null)
   useBackDismiss(phone && open === 'reasoning', close)
@@ -72,6 +72,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
     buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length].focus()
   }
   const content = <div className="agent-model-picker-body" aria-busy={models.busy}>
+    <p className="agent-menu-note">{t(roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>
     {open === 'model' && <Input ref={search} allowClear prefix={<SearchIcon size={16} />} aria-label={t('agent.models.search')} placeholder={t('agent.models.search')} value={query} disabled={models.busy}
       onChange={event => setQuery(event.target.value)} onKeyDown={event => {
         if (event.key === 'Enter' && (names.length || query.trim())) { event.preventDefault(); chooseModel(names[0] || query.trim()) }
@@ -92,8 +93,8 @@ export default function AgentModelPicker({ models, disabled, node }: {
     </div>
   </div>
   return <>
-    <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: model || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{modelLabel(model || t('agent.composer.model'))}</span><ChevronDown size={14} /></button>
-    {role && options.length > 1 && <button type="button" ref={effortTrigger} className="tt-pill agent-thinking-trigger" disabled={disabled || models.busy} aria-label={t('agent.reasoning.picker', { effort: t('agent.reasoning.' + effort) })} aria-haspopup="dialog" aria-expanded={open === 'reasoning'} onClick={() => show('reasoning')}><span>{t('agent.reasoning.' + effort)}</span><ChevronDown size={14} /></button>}
+    <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: model || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{model || t('agent.composer.model')}</span><ChevronDown size={14} /></button>
+    {role && options.length > 1 && <button type="button" ref={effortTrigger} className="tt-pill agent-thinking-trigger" disabled={disabled || models.busy} aria-label={t('agent.reasoning.picker', { effort: t('agent.reasoning.' + effort) })} aria-haspopup="dialog" aria-expanded={open === 'reasoning'} onClick={() => show('reasoning')}><span>{t('composer.effort.' + effort)}</span></button>}
     {phone && open === 'model' ? <MobileSubPage title={title} dialogLabel={title} onBack={close} search={false} action={{ label: t('agent.models.settings'), icon: <GearIcon size={20} />, onClick: settings }}>
       <section className="agent-model-picker-page" aria-label={title}>{content}</section>
     </MobileSubPage> : <Modal open={!!open} onCancel={close} footer={null} title={<div className="agent-model-picker-head"><strong>{title}</strong>{open === 'model' && <button type="button" className="tt-act" aria-label={t('agent.models.settings')} onClick={settings}><GearIcon size={18} /></button>}<button type="button" className="tt-act" aria-label={t('common.close')} onClick={close}><CloseIcon size={18} /></button></div>} closable={false} destroyOnClose focusTriggerAfterClose={false}

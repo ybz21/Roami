@@ -202,7 +202,7 @@ async def test_missing_executor_field_reports_its_path_and_accepts_a_corrected_r
         {"kind": "project", "projectId": "other"},
     ],
 )
-async def test_rejected_destination_cannot_be_removed_or_replaced_until_a_new_user_turn(
+async def test_rejected_destination_can_only_recover_into_a_private_native_task_directory(
     store, tmp_path, fallback
 ):
     runtime, _, _, _, binding = await setup(store)
@@ -240,6 +240,11 @@ async def test_rejected_destination_cannot_be_removed_or_replaced_until_a_new_us
             "main",
             binding,
         )
+        if fallback == {"kind": "new_session"}:
+            assert second["acceptedOnly"] is True
+            task = (await runtime.tasks.list("alice"))[0]
+            assert json.loads(task["intent_json"])["target"] == fallback
+            return
         assert second["error"] == "TASK_TARGET_REVIEW_REQUIRED"
         assert not await runtime.tasks.list("alice")
         await store.call(
@@ -416,5 +421,174 @@ async def test_accepted_steering_cannot_be_replaced_with_another_task_in_the_sam
         )
         assert independent["id"] != task["id"]
         assert len(await runtime.tasks.list("alice")) == 2
+    finally:
+        await runtime.close()
+
+
+async def test_separate_user_outcome_can_start_another_worktree_before_steering_advances(store):
+    runtime, _, _, _, binding = await setup(store, user="合入代码，并修复报告链接")
+    try:
+        task = await admit(
+            runtime,
+            binding,
+            "Original implementation",
+            "original",
+            executor="codex",
+            target={"kind": "project", "projectId": "p"},
+        )
+        await mark(runtime, task, "succeeded", {"state": "succeeded", "summary": "PR ready"})
+        turn = await active_turn(store, binding)
+        accepted = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "steer",
+                "task_steer",
+                {
+                    "taskId": task["id"],
+                    "revision": 1,
+                    "text": "合入代码",
+                    "sourceQuote": "合入代码",
+                    "requestComplete": False,
+                    "requestCoverage": [
+                        {"quote": "合入代码", "status": "current"},
+                        {"quote": "修复报告链接", "status": "pending"},
+                    ],
+                },
+            ),
+            "main",
+            binding,
+        )
+        assert accepted["acceptedOnly"] is True
+        independent = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "independent",
+                "delegate",
+                {
+                    "goal": "修复报告链接",
+                    "executor": "codex",
+                    "target": {"kind": "project", "projectId": "p"},
+                    "requestComplete": True,
+                    "requestCoverage": [
+                        {"quote": "合入代码", "status": "delegated", "taskId": task["id"]},
+                        {"quote": "修复报告链接", "status": "current"},
+                    ],
+                },
+            ),
+            "main",
+            {**binding, "toolCallId": "independent"},
+        )
+        assert independent["acceptedOnly"] is True
+        assert independent["taskId"] != task["id"]
+        original = (await runtime.tasks.get("alice", task["id"]))["task"]
+        assert original["revision"] == 1
+        assert json.loads(original["intent_json"])["target"]["kind"] == "project"
+        duplicate = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "duplicate",
+                "delegate",
+                {
+                    "goal": "Repeat merge",
+                    "requestComplete": True,
+                    "requestCoverage": [
+                        {"quote": "合入代码", "status": "current"},
+                        {
+                            "quote": "修复报告链接",
+                            "status": "delegated",
+                            "taskId": independent["taskId"],
+                        },
+                    ],
+                },
+            ),
+            "main",
+            {**binding, "toolCallId": "duplicate"},
+        )
+        assert duplicate["error"] == "TASK_ALREADY_HANDED_OFF"
+        assert len(await runtime.tasks.list("alice")) == 2
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("executor", ["opencode", "pi"])
+async def test_untracked_user_executor_is_explained_and_cannot_be_hidden_in_native_wrapper(
+    store, executor
+):
+    runtime, targets, _, tools, binding = await setup(
+        store, user="Use " + executor + " for the architecture report"
+    )
+    runtime.gateway.tools = tools
+    try:
+        turn = await active_turn(store, binding)
+        args = request(explicitExecutor=executor, userQuote="Use " + executor)
+        rejected = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call("unsupported", "delegate", args),
+            "main",
+            binding,
+        )
+        assert rejected["error"] == "ROUTING_EXPLICIT_UNAVAILABLE"
+        assert "native shell wrapper" in rejected["recovery"]
+        assert not targets.sends and not await runtime.tasks.list("alice")
+        binding["toolCallId"] = "wrapper"
+        wrapper = request("bounded")
+        wrapper["goal"] = "Use a native shell driver to invoke the requested professional CLI"
+        fallback = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call("wrapper", "delegate", wrapper),
+            "main",
+            binding,
+        )
+        assert fallback["error"] == "ROUTING_EXECUTOR_CONFLICT"
+        assert not await runtime.tasks.list("alice")
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("routed", [False, True])
+async def test_rejected_professional_directory_does_not_allow_executor_downgrade(
+    store, tmp_path, routed
+):
+    runtime, _, _, tools, binding = await setup(store)
+    if routed:
+        runtime.gateway.tools = tools
+    try:
+        turn = await active_turn(store, binding)
+        binding["toolCallId"] = "bad-professional-path"
+        first = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "bad-professional-path",
+                "delegate",
+                {
+                    "goal": "Save report",
+                    **(request() if routed else {"executor": "codex"}),
+                    "target": {"kind": "new_session", "directory": str(tmp_path / "missing")},
+                },
+            ),
+            "main",
+            binding,
+        )
+        assert first["error"] == "EXECUTION_DIRECTORY_UNAVAILABLE"
+        binding["toolCallId"] = "native-fallback"
+        fallback = await runtime.gateway.invoke(
+            turn,
+            binding["assistantMessageId"],
+            call(
+                "native-fallback",
+                "delegate",
+                {"goal": "Save report", "executor": "native", "target": {"kind": "new_session"}},
+            ),
+            "main",
+            binding,
+        )
+        assert fallback["error"] == "TASK_TARGET_REVIEW_REQUIRED"
+        assert not await runtime.tasks.list("alice")
     finally:
         await runtime.close()

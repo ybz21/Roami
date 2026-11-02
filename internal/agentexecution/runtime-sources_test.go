@@ -9,7 +9,7 @@ import (
 )
 
 // Go's test cache must observe sources and migrations executed by Python children.
-func recordRuntimeSources(t *testing.T, repository, scenario string) {
+func recordRuntimeSources(t *testing.T, repository string, scenarios ...string) {
 	t.Helper()
 	for _, directory := range []string{"src", "migrations"} {
 		err := filepath.WalkDir(filepath.Join(repository, "agent-runtime", directory), func(path string, entry fs.DirEntry, problem error) error {
@@ -25,7 +25,9 @@ func recordRuntimeSources(t *testing.T, repository, scenario string) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := os.ReadFile(filepath.Join(repository, "agent-runtime", "tests", scenario)); err != nil {
-		t.Fatal(err)
+	for _, scenario := range scenarios {
+		if _, err := os.ReadFile(filepath.Join(repository, "agent-runtime", "tests", scenario)); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

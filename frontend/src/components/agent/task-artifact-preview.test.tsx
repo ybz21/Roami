@@ -14,7 +14,17 @@ it('isolates HTML reports from scripts, same-origin access and network requests'
   expect(frame.getAttribute('srcdoc')).toContain("form-action 'none'")
 })
 it('keeps large files and unsupported formats downloadable without eager preview', () => {
-  expect(canPreviewArtifact({ id: 'ppt', name: 'slides.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', sizeBytes: 100 })).toBe(false)
+  expect(canPreviewArtifact({ id: 'ppt', name: 'slides.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', sizeBytes: 100 })).toBe(true)
+  expect(canPreviewArtifact({ id: 'ppt', name: 'slides.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', sizeBytes: 9 * 1024 * 1024 })).toBe(false)
   expect(canPreviewArtifact({ id: 'pdf', name: 'report.pdf', mimeType: 'application/pdf', sizeBytes: 9 * 1024 * 1024 })).toBe(false)
   expect(canPreviewArtifact({ id: 'pdf', name: 'report.pdf', mimeType: 'application/pdf', sizeBytes: 1024 })).toBe(true)
+})
+
+it('resolves report-relative file links within the matching execution only', async () => {
+  const { taskOutputHref } = await import('./TaskOutput')
+  const old = { id: 'old', name: 'index.html', mimeType: 'text/html', sizeBytes: 20, metadata: { sourcePath: '/workspace/old/index.html', reportedAliases: ['index.html'], runId: 'old-run' } }
+  const current = { ...old, id: 'current', metadata: { ...old.metadata, sourcePath: '/workspace/research/index.html', runId: 'current-run' } }
+  expect(taskOutputHref('index.html', [old, current], 'current-run')).toBe('/api/agent/artifacts/current/content')
+  expect(taskOutputHref('index.html', [old, current], 'old-run')).toBe('/api/agent/artifacts/old/content')
+  expect(taskOutputHref('index.html', [old], 'current-run')).toBe('index.html')
 })

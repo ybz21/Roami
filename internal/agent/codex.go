@@ -34,8 +34,14 @@ func (codex) InteractiveArgs(opt StartOpts) []string {
 		a = append(a, "-m", opt.Model)
 	}
 	// ConvID 故意忽略：这一型指定不了，硬塞一个参数上去只会让它起不来。
-	// Permission 也忽略：codex 交互式没有权限档的概念。
-	return a
+	return append(a, codexPermissionArgs(opt.Permission)...)
+}
+
+func codexPermissionArgs(permission string) []string {
+	if permission == "auto" || permission == "dangerously-skip-permissions" {
+		return []string{"--dangerously-bypass-approvals-and-sandbox"}
+	}
+	return nil
 }
 
 func (codex) OneShotArgs(opt StartOpts) []string {
@@ -43,11 +49,7 @@ func (codex) OneShotArgs(opt StartOpts) []string {
 	if opt.Model != "" {
 		a = append(a, "-m", opt.Model)
 	}
-	// codex 只有一个「全放开」开关，没有档位。Roami 这边的 auto 和
-	// dangerously-skip-permissions 都映射到它——都是「别停下来问」的意思。
-	if opt.Permission == "dangerously-skip-permissions" || opt.Permission == "auto" {
-		a = append(a, "--dangerously-bypass-approvals-and-sandbox")
-	}
+	a = append(a, codexPermissionArgs(opt.Permission)...)
 	// MaxTurns 支持不了，忽略。
 	//
 	// 末尾这个 `-` 是「从 stdin 读 prompt」，claude 那边由 -p 隐含。

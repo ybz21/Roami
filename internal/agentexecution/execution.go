@@ -37,6 +37,7 @@ type Spec struct {
 	Base           string `json:"base,omitempty"`
 	Remote         string `json:"remote,omitempty"`
 	Prompt         string `json:"prompt"`
+	Title          string `json:"title,omitempty"`
 	Model          string `json:"model,omitempty"`
 	Permission     string `json:"permission,omitempty"`
 	TimeoutSeconds int    `json:"timeoutSeconds"`
@@ -64,7 +65,8 @@ type Result struct {
 
 type Status struct {
 	Receipt
-	Result *Result `json:"result,omitempty"`
+	Result   *Result           `json:"result,omitempty"`
+	Progress *ReportedProgress `json:"progress,omitempty"`
 }
 
 type Service struct {
@@ -143,7 +145,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	if spec.Executor != "codex" && spec.Executor != "claude" {
+	if a := agent.Get(spec.Executor); a == nil || a.Kind() != spec.Executor {
 		return Status{}, fmt.Errorf("INVALID_EXECUTOR")
 	}
 	invalidTarget := (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) ||
@@ -170,7 +172,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Status{}, err
 	}
-	if _, err = exec.LookPath(agent.Get(spec.Executor).Bin()); err != nil {
+	if _, err = agent.ResolveBinary(spec.Executor); err != nil {
 		return Status{}, err
 	}
 	if err = ctx.Err(); err != nil {
@@ -200,7 +202,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		return Status{}, err
 	}
 	command := "exec " + quote(s.Executable) + " agent execution run --key " + quote(spec.Key)
-	opt := runtime.CreateOpts{Label: spec.Executor + ": " + truncate(strings.Join(strings.Fields(spec.Prompt), " "), 60), Dir: workspace.Directory, Extra: []string{
+	opt := runtime.CreateOpts{Label: executionTitle(spec), Dir: workspace.Directory, Extra: []string{
 		"-e", "ROAMI_HOME=" + s.Runtime.HomeDir, "-e", "ROAMI_DATA=" + s.Runtime.DataDir,
 		"-e", "TMUX_BIN=" + s.Runtime.TmuxBin, "-e", "PATH=" + os.Getenv("PATH"),
 		"-e", "ROAMI_AGENT_LAUNCH=" + hash, command,
@@ -223,12 +225,25 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	return s.Status(spec.Key)
 }
 
-func (s Service) Status(key string) (Status, error) {
+func executionTitle(spec Spec) string {
+	title := strings.Join(strings.Fields(spec.Title), " ")
+	if title == "" {
+		title = strings.Join(strings.Fields(spec.Prompt), " ")
+	}
+	return truncate(title, 80)
+}
+
+func (s Service) Status(key string) (status Status, err error) {
+	// A controller identity is not a confirmed native conversation binding.
+	defer func() {
+		if status.Binding != nil && status.Binding.ProviderID == "" {
+			status.Binding = nil
+		}
+	}()
 	dir, err := s.directory(key)
 	if err != nil {
 		return Status{}, err
 	}
-	var status Status
 	if err = readJSON(filepath.Join(dir, "receipt.json"), &status.Receipt); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			if _, specErr := os.Stat(filepath.Join(dir, "spec.json")); errors.Is(specErr, os.ErrNotExist) {
@@ -343,7 +358,13 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 		return fmt.Errorf("SESSION_RUNNER_UNSUPPORTED")
 	}
 	if spec.Persistent {
+		if structuredExecutor(spec.Executor) {
+			return s.runStructuredSession(ctx, dir, spec, stdout, stderr)
+		}
 		return s.runPersistent(ctx, dir, spec)
+	}
+	if structuredExecutor(spec.Executor) {
+		return s.runStructuredOnce(ctx, dir, spec, stdout, stderr)
 	}
 	a := agent.Get(spec.Executor)
 	if a == nil {

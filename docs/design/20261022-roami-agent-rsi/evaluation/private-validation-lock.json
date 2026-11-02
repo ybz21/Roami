@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "suite_id": "roami-private-contracts-54-v1",
+  "suite_hash": "822288431e74df604d4a7937bbba9fae34672641144d965ed7d10e27678f249a",
+  "cases": 54,
+  "validation_rule_families": 24,
+  "holdout_rule_families": 30,
+  "scope": "54 different business-rule families; common function interface is the grader protocol. No seed variants count as extra clusters. This measures bounded code contracts alongside the full daily suite, not private end-to-end office or GUI generalization.",
+  "private_inputs_and_oracles_published": false,
+  "removed_shared_template_families": 7,
+  "acceptance": {
+    "reference_outputs_passed": 54,
+    "mutations_rejected": 54,
+    "kind": "container_grader_acceptance_not_live_model_generalization"
+  },
+  "scope_limit": "Does not replace unseen office, GUI or media workflows. Family partitions are an operational sampling rule, not proof of statistical independence."
+}

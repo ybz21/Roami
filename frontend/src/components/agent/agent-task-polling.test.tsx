@@ -85,3 +85,18 @@ it('cannot refresh the same task ID on another node through an old scoped listen
   await waitFor(() => expect(hook.result.current.controls.version).toBe(0))
   expect(api).toHaveBeenCalledTimes(6)
 })
+
+it('observes pending cleanup after task execution ends and stops when closure finishes', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  let closure = 'closing'
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/resources') ? { resources: [], actions: [] } : path.startsWith('/agent/artifacts') ? [] : { ...reply('cancelled'), sessionClosure: { state: closure } } }))
+  const hook = renderHook(() => useAgentTask('t'))
+  await act(async () => {})
+  await waitFor(() => expect(hook.result.current.detail.value?.sessionClosure?.state).toBe('closing'))
+  closure = 'closed'
+  await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+  expect(hook.result.current.detail.value?.sessionClosure?.state).toBe('closed')
+  const calls = vi.mocked(api).mock.calls.length
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+  expect(api).toHaveBeenCalledTimes(calls)
+})

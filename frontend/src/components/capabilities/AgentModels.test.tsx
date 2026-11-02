@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render as renderView, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import AgentModels from './AgentModels'
 import { agentModels, agentModelOptions, applyAgentModel, deleteAgentModel, restoreAgentModel, saveAgentModel, type AgentModelProfile, type AgentModelView } from '../../agent-registry'
 
+vi.mock('./GatewayModelBinding', () => ({ default: () => null }))
 vi.mock('../../agent-registry', () => ({ agentModels: vi.fn(), agentModelOptions: vi.fn(), applyAgentModel: vi.fn(), deleteAgentModel: vi.fn(), restoreAgentModel: vi.fn(), saveAgentModel: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 const preset: AgentModelProfile = { id: 'profile-1', name: 'Work gateway', baseUrl: 'https://gateway.example/v1', model: 'custom-model', protocol: 'openai-responses', authMode: 'api_key', hasKey: true, applied: false }
@@ -14,6 +15,12 @@ beforeAll(() => {
 })
 beforeEach(() => vi.mocked(agentModels).mockResolvedValue(view))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+const render = (element: Parameters<typeof renderView>[0]) => {
+  const result = renderView(element)
+  fireEvent.click(screen.getByText('hub.advancedPresets'))
+  return result
+}
 
 it('applies a preset only after confirmation using the current revision', async () => {
   vi.mocked(applyAgentModel).mockResolvedValue({ ...view, profiles: [{ ...preset, applied: true }], current: { model: preset.model }, activeId: preset.id, canRestore: true })

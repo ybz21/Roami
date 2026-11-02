@@ -1,0 +1,19 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_skill_discovery.py",
+    "agent-runtime/tests/verification/test_presentation_skill_package.py",
+    "agent-runtime/tests/verification/test_configured_presentation_skill.py"
+  ],
+  "expected_collected": 8,
+  "registered_tools": [
+    "read",
+    "tool_list",
+    "bash"
+  ],
+  "runtime": [
+    "Python 3.12",
+    "pytest/pytest-asyncio/python-pptx",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "model_calls": 0
+}

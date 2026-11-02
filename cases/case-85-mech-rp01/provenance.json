@@ -1,0 +1,7 @@
+{
+  "case_id": "MECH-RP01",
+  "source": "public synthetic ratings and fault injection; fixture images and calibration references",
+  "private_reference_material": false,
+  "actual_human_labels": false,
+  "historical_scores_changed": false
+}

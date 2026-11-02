@@ -1,12 +1,20 @@
+import { api } from '../../api'
 import AgentQuestion from './AgentQuestion'
-import { memo, useCallback, useState } from 'react'
-import { App, Image } from 'antd'
-import { CheckIcon, CopyIcon, FileTextIcon, NotebookIcon } from '../../icons'
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Image } from 'antd'
+import { FileTextIcon, NotebookIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { agentResourceUrl } from './agent-resource-url'
-import Markdown from '../markdown/Markdown'
+import { ChatMessage } from '../chat/Message'
+import type { Msg } from '../chat/types'
 import type { AgentMessage } from './agent-protocol'
 import { activityReason } from './AgentActivity'
+import { useLayout } from '../../layout'
+import { lazyRetry } from '../lazy-retry'
+import { fileLink, type FileLink } from '../markdown/file-link'
+import { canPreviewArtifact } from './TaskOutput'
+
+const MobileFilePreview = lazyRetry(() => import('../markdown/MobileFilePreview'))
 
 type Attachment = NonNullable<AgentMessage['content']['attachments']>[number]
 
@@ -36,28 +44,47 @@ function AgentImageAttachment({ file, node }: { file: Attachment; node: string |
   </span>
 }
 
-function AgentMessageView({ item, node, focused, remember, canAnswer = false, answer, readOnly = false, author = 'Roami' }: { item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; author?: string; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
-  const { t, locale } = useI18n(), { message } = App.useApp(), [copied, setCopied] = useState(false)
+function AgentMessageView({ item: source, node, focused, remember, canAnswer = false, answer, readOnly = false, conversationId, branchId }: { conversationId?: string; branchId?: string; item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
+  const { t, locale } = useI18n()
+  const { phone } = useLayout()
+  const [preview, setPreview] = useState<FileLink | null>(null)
+  const [full, setFull] = useState<AgentMessage | null>(null), [loading, setLoading] = useState(false), [failed, setFailed] = useState(false)
+  const request = useRef<AbortController | null>(null)
+  useEffect(() => { setFull(null); setFailed(false); setLoading(false); return () => request.current?.abort() }, [source.id, source.status, node, conversationId, branchId])
+  const item = full?.id === source.id ? { ...source, ...full, status: source.status } : source
+  const readFull = async () => {
+    if (!conversationId || loading) return
+    const controller = new AbortController(); request.current = controller
+    setLoading(true); setFailed(false)
+    try {
+      const { data } = await api('GET', `/agent/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(source.id)}${branchId ? '?branch=' + encodeURIComponent(branchId) : ''}`, undefined, { signal: controller.signal })
+      if (!controller.signal.aborted) setFull(data)
+    } catch { if (!controller.signal.aborted) setFailed(true) } finally { if (!controller.signal.aborted) setLoading(false) }
+  }
   const assistant = item.role === 'assistant'
   const resolveResource = useCallback((href: string) => agentResourceUrl(href, node), [node])
   const report = item.content.sessionReply
   const reportStatus = report && ['progress', 'blocked', 'completed', 'failed'].includes(report.status) ? report.status : 'unknown'
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(item.content.text || ''); setCopied(true); setTimeout(() => setCopied(false), 1500) }
-    catch { message.error(t('agent.composer.copyFailed')) }
-  }
+  const transcript = useMemo<Msg>(() => ({ id: item.id, role: item.role, blocks: item.content.text ? [{ kind: 'text', text: item.content.text }] : [], ...(item.created_ms ? { ts: new Date(item.created_ms).toISOString() } : {}) }), [item.id, item.role, item.content.text, item.created_ms])
+  const rememberAction = !readOnly && !item.contentTruncated && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length ? <button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button> : undefined
   return <article data-message-id={item.id} data-notification-focus={focused || undefined} className={`agent-message ${item.role}`}>
-    {assistant && <div className="agent-author">{author}{item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}</div>}
+    {assistant && item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}
     {report && <div className="agent-session-reply" role="status"><strong>{t('agent.sessionReply.' + reportStatus)}</strong><code>{report.sessionId}</code><small>{t('agent.sessionReply.unverified')}</small></div>}
-    {item.content.text && (assistant ? <Markdown resolveHref={resolveResource}>{item.content.text}</Markdown> : <p className="agent-user-text">{item.content.text}</p>)}
-    {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer} answer={answer && (text => answer(report ? t('agent.sessionReply.answer', { sessionId: report.sessionId, dispatchId: report.dispatchId, answer: text }) : text))} />}
+    {item.content.text && <ChatMessage m={transcript} results={{}} side="native" resolveHref={resolveResource} footerActions={rememberAction} />}
+    {item.contentTruncated && conversationId && <button type="button" className="tt-act" disabled={loading} onClick={() => { void readFull() }}>{t(loading ? 'agent.pagination.loading' : failed ? 'agent.retry' : 'agent.pagination.fullMessage')}</button>}
+    {failed && <p role="alert">{t('agent.requestFailed')}</p>}
+    {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer || item.contentTruncated} answer={answer && (text => answer(report ? t('agent.sessionReply.answer', { sessionId: report.sessionId, dispatchId: report.dispatchId, answer: text }) : text))} />}
     {item.content.taskStatus && <div className="agent-task-status" role="status"><strong>{t('agent.activity.result', { state: t('agent.state.' + item.content.taskStatus.state) })}</strong><span>{item.content.taskStatus.errorCode ? activityReason(item.content.taskStatus.errorCode, t) : t('agent.activity.resultRecorded')}</span><small>{t('agent.activity.reportUnavailable')}</small><code>{item.content.taskStatus.taskId}</code></div>}
     {!!item.content.attachments?.length && <div className="agent-message-files">{item.content.attachments.map(file => file.mimeType?.startsWith('image/') && file.previewState !== 'unavailable'
       ? <AgentImageAttachment key={file.id} file={file} node={node} />
-      : <a key={file.id} className="agent-file-card" href={attachmentUrl(file, node)} download={file.name}><FileTextIcon size={20} /><span>{file.name}<small>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</small></span></a>)}</div>}
+      : <a key={file.id} className="agent-file-card" href={attachmentUrl(file, node)} download={file.name} onClick={event => {
+        if (!phone || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !canPreviewArtifact(file)) return
+        const link = fileLink(attachmentUrl(file, node), location.origin, '/api/file/raw')
+        if (link) { event.preventDefault(); setPreview(link) }
+      }}><FileTextIcon size={20} /><span>{file.name}<small>{new Intl.NumberFormat(locale, { style: 'unit', unit: file.sizeBytes < 1024 ? 'byte' : 'kilobyte', unitDisplay: 'short', maximumFractionDigits: 1 }).format(file.sizeBytes / (file.sizeBytes < 1024 ? 1 : 1024))}</small></span></a>)}</div>}
     {['failed', 'interrupted'].includes(item.status) && <small className="agent-muted">{t('agent.interrupted')}</small>}
-    {!readOnly && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length && <div className="agent-message-actions"><button type="button" className="agent-message-action" aria-label={t(copied ? 'agent.composer.copied' : 'agent.composer.copy')} onClick={() => { void copy() }}>{copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}</button><button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button></div>}
     {assistant && item.completedEventId && <span className="agent-read-sentinel" data-event-id={item.completedEventId} aria-hidden />}
+    {preview && <Suspense fallback={null}><MobileFilePreview link={preview} onBack={() => setPreview(null)} /></Suspense>}
   </article>
 }
 

@@ -1,3 +1,4 @@
+import { useSettingsDraft } from '../settings/settings-draft'
 import NativeProjectSessions from '../agent/NativeProjectSessions'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
@@ -198,21 +199,6 @@ html[data-size="compact"] .prj-subbar.searching .prj-iconbtn.find{display:none}
 .prj-chip .n{font-family:ui-monospace,monospace;font-size:var(--fs-micro);color:var(--text-dimmer)}
 .prj-chip.on .n{color:var(--accent)}
 
-/* 「其他项目」：没有会话在跑的项目不值一张卡（图纸 14-desktop-workspace/desktop-ia.html §二）——
-   实测 4 个空项目占掉 467px 的栅格。折成一行一个：名字 + 路径 + 可清理标。 */
-.prj-quiet{display:grid;grid-template-columns:minmax(96px,150px) minmax(0,1fr) auto;align-items:center;
-  gap:var(--sp-3);min-height:36px;padding:var(--sp-1) var(--sp-2);border-radius:var(--r-sm);
-  cursor:pointer;transition:background .14s}
-.prj-quiet+.prj-quiet{border-top:1px solid var(--border-subtle)}
-:where(html[data-pointer="fine"]) .prj-quiet:hover{background:var(--list-hover)}
-.prj-quiet .nm{font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prj-quiet .p{font-family:ui-monospace,monospace;font-size:var(--fs-meta);color:var(--text-dimmer);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-html[data-size="compact"] .prj-quiet{grid-template-columns:minmax(0,1fr) auto;min-height:44px}
-html[data-size="compact"] .prj-quiet .p{display:none}
-/* 右列：可清理标签或「空闲多久」。两者互斥——有活要干时不必再说它闲着。 */
-.prj-quiet .qt{font-size:var(--fs-micro);color:var(--text-dimmer);white-space:nowrap}
-
 .prj-panel{background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:12px;margin-top:8px}
 .prj-wtrow{padding:13px 16px}
 .prj-wtrow+.prj-wtrow{border-top:1px solid var(--border-subtle)}
@@ -334,8 +320,10 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
 
 // ── 新项目弹窗：创建的是「项目」这个存储对象（POST /projects），不建任何会话。
 // 项目 = 任意目录（git 可选）；开 session / 建 feature 是进项目之后 composer 的事。
-export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated?: () => void }) {
+export function NewProjectModal({ open, onClose, onCreated, inline = false }: { open: boolean; onClose: () => void; inline?: boolean; onCreated?: (project: { key: string; dir: string; git: boolean; name?: string }) => void }) {
   const { t } = useI18n()
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const { message } = AntApp.useApp()
   const [dir, setDir] = useState('')
   const [pick, setPick] = useState(false)
@@ -348,6 +336,8 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
   // 名字是不是用户自己写过：写过就不再被目录覆盖，否则改一次目录就把他写的名字冲掉
   const [nameTouched, setNameTouched] = useState(false)
   useEffect(() => { if (open) { setDir(''); setName(''); setNameTouched(false); setSource('existing'); setCloneUrl('') } }, [open])
+
+  const draftNotice = useSettingsDraft('onboarding-project', { dir, name, source, cloneUrl }, { dir: '', name: '', source: 'existing', cloneUrl: '' }, draft => { setDir(draft.dir); setName(draft.name); setSource(draft.source === 'clone' ? 'clone' : 'existing'); setCloneUrl(draft.cloneUrl); setNameTouched(true) }, inline && open)
 
   /** 从 git URL 猜仓库名：git@host:org/repo.git 或 https://host/org/repo(.git) → repo */
   const repoNameFromUrl = (u: string): string => {
@@ -370,26 +360,25 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
       setCreating(true)
       // 克隆可能要几分钟（大仓库），loading 里说清楚在干嘛，别让人以为卡死了
       if (source === 'clone') message.loading({ content: t('project.cloning'), key: 'newproj', duration: 0 })
+      if (!mounted.current) return
       const res = await api('POST', '/projects', {
         dir: dir.trim(), displayName: name.trim(),
         ...(source === 'clone' ? { cloneUrl: cloneUrl.trim() } : {}),
       })
+      if (!mounted.current) return
       message.destroy('newproj')
       pushRecentDir(dir.trim())
       // 目录是某个已在册仓库的 worktree：没有新项目，归到那个项目下，名字也没动
       if (res.data.created === false) message.info(res.data.worktree ? t('project.existsAsWorktree', { name: res.data.name }) : t('project.existsAlready', { name: res.data.name }), 6)
       else message.success(t('project.createdProject'))
-      onClose(); onCreated?.()
-      location.hash = '#/projects/' + encodeURIComponent(res.data.key)
+      onClose(); onCreated?.(res.data)
+      if (!inline) location.hash = '#/projects/' + encodeURIComponent(res.data.key)
     } catch (e: any) { message.destroy('newproj'); message.error(e.message) }
     finally { setCreating(false) }
   }
-  return (
-    <>
-      <Modal open={open} onCancel={onClose} onOk={ok} title={t('project.newModalTitle')}
-        okText={t('file.create')} destroyOnClose confirmLoading={creating}>
+  const fields = (
         <Space direction="vertical" style={{ width: '100%' }}>
-          <Segmented block value={source} onChange={(v) => setSource(v as 'existing' | 'clone')}
+          <Segmented block value={source} onChange={(v) => setSource(v as typeof source)}
             options={[
               { value: 'existing', label: t('project.sourceLocal') },
               { value: 'clone', label: t('project.sourceClone') },
@@ -408,8 +397,9 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
               }}
               placeholder={t('project.cloneUrlPlaceholder')} />
           )}
+          {inline && <label htmlFor="onboarding-project-directory">{t('onboarding.projectDirectory')}</label>}
           <Space.Compact style={{ width: '100%' }}>
-            <AutoComplete style={{ flex: 1, minWidth: 0 }} value={dir} onChange={setDir} autoFocus={source === 'existing'}
+            <AutoComplete id={inline ? 'onboarding-project-directory' : undefined} style={{ flex: 1, minWidth: 0 }} value={dir} onChange={setDir} autoFocus={!inline && source === 'existing'}
               onSelect={(v) => fillNameFromDir(String(v))}
               onBlur={() => fillNameFromDir(dir)}
               options={recentDirs().map((d) => ({ value: d }))}
@@ -417,13 +407,18 @@ export function NewProjectModal({ open, onClose, onCreated }: { open: boolean; o
               placeholder={t('session.dirPlaceholder')} />
             <Button onClick={() => setPick(true)}>{t('common.browse')}</Button>
           </Space.Compact>
-          <Input placeholder={t('project.displayName')} value={name}
+          {inline && <label htmlFor="onboarding-project-name">{t('project.displayName')}</label>}<Input id={inline ? 'onboarding-project-name' : undefined} placeholder={t('project.displayName')} value={name}
             onChange={(e) => { setName(e.target.value); setNameTouched(true) }} />
           <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', lineHeight: 1.7 }}>
             {source === 'clone' ? t('project.cloneHint') : t('project.newHint')}
           </div>
         </Space>
-      </Modal>
+  )
+  return (
+    <>
+      {draftNotice}
+      {inline ? <div className="onboarding-project-form">{fields}<Button type="primary" loading={creating} disabled={!dir.trim()} onClick={() => { void ok() }}>{t('file.create')}</Button></div>
+        : <Modal open={open} onCancel={onClose} onOk={ok} title={t('project.newModalTitle')} okText={t('file.create')} destroyOnClose confirmLoading={creating}>{fields}</Modal>}
       <DirPicker open={pick} start={dir}
         onPick={(p) => { setDir(p); fillNameFromDir(p); setPick(false) }} onClose={() => setPick(false)} />
     </>
@@ -495,8 +490,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
   // 置顶与其余共用同一套栅格，只靠 section header 分组（14 §6.1）——两套栅格会让
   // 卡片宽度在分组之间对不齐
   const pinned = visible.filter((p) => p.pinned)
-  // 没有会话、也没有待收尾/竞赛的项目折到页尾（图纸 desktop-ia.html §二）：它们和「正在跑
-  // 两个任务」的项目占同样大的卡，还被同一行最高的卡撑高，页面下三分之一因此全是空卡。
+  // 空闲项目单独分组，卡片与操作仍复用 ProjectCard。
   const isQuiet = (p: Proj) => p.sessions <= 0 && p.unfinished <= 0 && p.races <= 0
   const rest = visible.filter((p) => !p.pinned && !isQuiet(p))
   // 不活跃那节按「什么时候空下来的」排：刚空的在前，久无人问津的沉底。
@@ -644,20 +638,7 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
                 <span className="hint">{t('project.quietHint')}</span>
                 <span className="ln" />
               </div>
-              <div>
-                {quiet.map((p) => (
-                  <div key={p.key} className="prj-quiet" onClick={() => goProject(p.key)}
-                    role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); goProject(p.key) } }}>
-                    <span className="nm">{p.name}</span>
-                    <span className="p" title={p.dir}>{p.dir}</span>
-                    <span className="qt">
-                      {p.cleanable > 0
-                        ? <Tag color="success" style={{ margin: 0 }}>{t('project.cleanableCount', { count: p.cleanable })}</Tag>
-                        : (p.archivedAt ? t('project.quietSince', { when: relTime(p.archivedAt, t) }) : null)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <div className="prj-grid" onKeyDown={onGridKey}>{quiet.map(card)}</div>
             </>
           )}
 

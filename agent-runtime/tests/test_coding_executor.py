@@ -234,7 +234,49 @@ async def test_coding_new_project_resolves_before_launch_without_using_loose_dir
     assert calls == ["provision", "launch"]
 
 
-@pytest.mark.parametrize("provider", ["codex", "claude"])
+@pytest.mark.parametrize("provider", ["claude", "codex", "opencode"])
+@pytest.mark.parametrize("persistent", [True, False])
+@pytest.mark.parametrize("target_kind", ["new_session", "project"])
+async def test_new_delegated_tasks_launch_in_auto_mode(
+    store, tmp_path, provider, persistent, target_kind
+):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    target = {"kind": target_kind}
+    if target_kind == "project":
+        target["projectId"] = "existing-project"
+    else:
+        target["directory"] = str(tmp_path)
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "Update the project",
+        key="auto-mode",
+        executor=provider,
+        target=target,
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings(), persistent=persistent)
+    launches = []
+
+    async def command(sub, *args, spec=None):
+        assert sub == "launch"
+        launches.append(spec)
+        return {"state": "unknown"}
+
+    executor.command = command
+    assert await executor.run(task, run) is None
+    assert len(launches) == 1
+    assert launches[0]["executor"] == provider
+    assert launches[0]["persistent"] is persistent
+    assert launches[0]["permission"] == "auto"
+
+
+@pytest.mark.parametrize("provider", ["codex", "claude", "opencode", "pi"])
 async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(
     store, tmp_path, provider
 ):
@@ -269,6 +311,7 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
         assert spec["executor"] == provider
         assert spec["sessionId"] == "stable-session"
         assert "directory" not in spec and "projectId" not in spec
+        assert "permission" not in spec
         return receipt
 
     executor.command = command
@@ -324,7 +367,7 @@ async def test_session_preflight_rejection_is_distinct_from_submission_uncertain
     assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "unknown"
 
 
-@pytest.mark.parametrize("executor", ["native", "codex", "claude"])
+@pytest.mark.parametrize("executor", ["native", "codex", "claude", "opencode", "pi"])
 async def test_loose_task_rejects_project_parent_directory_before_recording_intent(store, executor):
     from roami_agent.protocol.errors import DomainError
 
@@ -366,3 +409,81 @@ async def test_restored_loose_task_does_not_fall_back_when_directory_field_is_wr
                 pytest.fail("Invalid task reached the workspace")
         else:
             await CodingExecutor(store, settings).run(task, {})
+
+
+async def test_observation_recovery_updates_feed_and_later_uncertainty_without_relaunch(store):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "work",
+        key="observation-recovery",
+        executor="codex",
+        record_intent=True,
+    )
+    executor = CodingExecutor(store, Settings())
+    calls = []
+    receipt = {"state": "unknown"}
+
+    async def command(*args, **kwargs):
+        calls.append(args)
+        return receipt
+
+    executor.command = command
+
+    def launched(db):
+        db.execute("UPDATE tasks SET state='running' WHERE id=?", (task["id"],))
+        db.execute("UPDATE task_attempts SET state='running' WHERE task_id=?", (task["id"],))
+        db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (task["id"],))
+
+    await store.call(launched, write=True)
+    await executor.poll(tasks)
+    receipt = {"state": "running", "session": "observed-session"}
+    await executor.poll(tasks)
+    await executor.poll(tasks)
+    events = await conversations.events("alice", conversation["id"])
+    resumed = [e for e in events if e["kind"] == "task.observation_recovered"]
+    assert len(resumed) == 1
+    assert resumed[0]["payload"]["activity"]["state"] == "running"
+    assert not resumed[0]["payload"]["activity"]["errorCode"]
+    assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "running"
+    receipt = {"state": "unknown"}
+    await executor.poll(tasks)
+    await executor.poll(tasks)
+    events = await conversations.events("alice", conversation["id"])
+    unknown = [e for e in events if e["kind"] == "task.observation_unknown"]
+    assert len(unknown) == 2 and unknown[-1]["id"] > resumed[0]["id"]
+    assert unknown[-1]["payload"]["activity"]["state"] == "unknown"
+    assert all(call[0] == "status" for call in calls)
+    assert (await tasks.list("alice"))[0]["state"] == "running"
+
+
+async def test_unknown_preparing_execution_is_visible_without_ending_task(store):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "work",
+        key="preparing-observation",
+        executor="codex",
+        record_intent=True,
+    )
+    await store.call(
+        lambda db: db.execute("UPDATE tasks SET state='preparing' WHERE id=?", (task["id"],)),
+        write=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings())
+    await executor.record(task, run, {"state": "unknown"})
+    await executor.record(task, run, {"state": "unknown"})
+    events = await conversations.events("alice", conversation["id"])
+    unknown = [e for e in events if e["kind"] == "task.observation_unknown"]
+    assert len(unknown) == 1
+    assert unknown[0]["payload"]["activity"]["state"] == "unknown"
+    assert (await tasks.list("alice"))[0]["state"] == "preparing"

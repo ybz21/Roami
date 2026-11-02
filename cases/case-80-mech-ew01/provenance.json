@@ -1,0 +1,12 @@
+{
+  "origin": "observed_native_video_run_v135",
+  "public_inputs": "synthetic timestamps only; no benchmark clips, reference answers or private logs",
+  "actual_tests": [
+    "agent-runtime/tests/test_improvement_execution_window.py",
+    "agent-runtime/tests/test_execution_timing.py",
+    "agent-runtime/tests/test_improvement_model_deadlines.py",
+    "agent-runtime/tests/test_improvement_configured_routes.py"
+  ],
+  "historical_scores_changed": false,
+  "scope": "existing execution-window metadata only; no new runtime or financial limits"
+}

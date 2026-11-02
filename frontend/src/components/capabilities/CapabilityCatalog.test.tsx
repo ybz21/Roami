@@ -128,3 +128,38 @@ it('shows command families with their skill guide while retaining external CLI a
   expect(screen.queryByRole('switch')).toBeNull()
   expect(screen.queryByText('browser_open')).toBeNull()
 })
+
+it('edits a Chinese MCP name and description while preserving its tool identity and failed draft', async () => {
+  const entry = { name: 'exa', displayName: '网页搜索', description: '搜索网页', config: { transport: 'streamable_http', url: 'https://example.com/mcp' } }
+  const data = { ...catalog, mcp: [{ name: 'exa', displayName: entry.displayName, description: entry.description, transport: 'streamable_http', state: 'connected', tools: 1, toolNames: ['mcp_exa_echo'] }], managed: { ...catalog.managed, mcp: { exa: entry } } }
+  vi.mocked(api).mockResolvedValueOnce({ data }).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: { ...data, mcp: [{ ...data.mcp[0], displayName: '资料检索', description: '查找和读取资料' }] } })
+  render(<CapabilityCatalog kind="mcp" />)
+  expect(await screen.findByRole('button', { name: '网页搜索' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'capabilities.connect' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.edit' }))
+  const name = screen.getByRole('textbox', { name: 'capabilities.name' }) as HTMLInputElement
+  const description = screen.getByRole('textbox', { name: 'capabilities.description' }) as HTMLInputElement
+  expect(name.disabled).toBe(false)
+  fireEvent.change(name, { target: { value: '资料检索' } })
+  fireEvent.change(description, { target: { value: '查找和读取资料' } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.saveChanges' }))
+  await screen.findByRole('alert')
+  expect(name.value).toBe('资料检索')
+  expect(description.value).toBe('查找和读取资料')
+  expect(api).toHaveBeenLastCalledWith('PUT', '/agent/capability-imports/mcp/exa', { ...entry, displayName: '资料检索', description: '查找和读取资料' })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.saveChanges' }))
+  expect(await screen.findByRole('button', { name: '资料检索' })).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.capabilities.search' }), { target: { value: '读取资料' } })
+  expect(screen.getByRole('button', { name: '资料检索' })).toBeTruthy()
+})
+
+it('creates an MCP with a Chinese name without asking for an internal identifier', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { ...catalog, mcp: [] } })
+  render(<CapabilityCatalog kind="mcp" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.createAction.mcp' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.name' }), { target: { value: '知识库检索' } })
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.description' }), { target: { value: '查找团队文档' } })
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.url' }), { target: { value: 'https://example.com/mcp' } })
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'capabilities.createAction.mcp' }))
+  await waitFor(() => expect(api).toHaveBeenLastCalledWith('POST', '/agent/capability-imports/mcp', { displayName: '知识库检索', description: '查找团队文档', config: { transport: 'streamable_http', url: 'https://example.com/mcp' } }))
+})

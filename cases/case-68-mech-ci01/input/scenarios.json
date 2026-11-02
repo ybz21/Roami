@@ -1,0 +1,34 @@
+{
+  "roles": [
+    "main",
+    "worker"
+  ],
+  "policies": [
+    [
+      "保存的主指令\nexact Main",
+      "保存的后台指令\nexact Worker"
+    ],
+    [
+      "",
+      ""
+    ]
+  ],
+  "image_support_labels": [
+    null,
+    "",
+    "0",
+    "2",
+    "1"
+  ],
+  "malformed": [
+    "null",
+    "empty mapping",
+    "missing role",
+    "boolean policy",
+    "array policy",
+    "unexpected connection field"
+  ],
+  "connection_fixture": "test_improvement_container_context.configured",
+  "runtime_fixture": "test_runtime.ConversationModel",
+  "model_calls": 0
+}

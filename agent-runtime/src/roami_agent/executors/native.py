@@ -1,9 +1,10 @@
-"""Native branches bind to Go-prepared workspaces before model/tool admission."""
+"""Native branches bind private task directories or selected workspaces before file admission."""
 
 import asyncio
 import json
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.executors.task_directory import automatic_task_directory, prepare_task_directory
 from roami_agent.executors.workspace import hold_workspace
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -33,7 +34,8 @@ class NativeExecutor:
         if target["kind"] == "new_session" and target.get("resourceOnly") is True:
             return False
         return (
-            target["kind"] != "new_session"
+            (self.db is not None and automatic_task_directory(target))
+            or target["kind"] != "new_session"
             or target.get("nodeId", "local") != "local"
             or bool(target.get("directory") or getattr(self.settings, "coding_directory", None))
         )
@@ -50,7 +52,11 @@ class NativeExecutor:
             raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
 
         deadline = json.loads(task["budget_json"]).get("deadlineMs")
-        remaining = max(0, (deadline - now_ms()) / 1000) if deadline else None
+        observed = now_ms()
+        started = run.get("started_ms")
+        if type(started) is not int or started <= 0:
+            started = observed
+        remaining = max(0, (deadline - observed) / 1000) if deadline else None
 
         profile = (
             "research"
@@ -64,6 +70,8 @@ class NativeExecutor:
                     prepared,
                     executionRunId=run["id"],
                     executionProfile=profile,
+                    executionStartedMs=started,
+                    executionDeadlineMs=deadline,
                     executionTimeoutSeconds=remaining,
                 ),
                 profile,
@@ -159,10 +167,7 @@ class NativeExecutor:
                 )
                 return pending is None
 
-            async with self.workspace_factory(
-                self.settings, task, run, stopped=stopped
-            ) as workspace:
-
+            async def execute_bound(workspace):
                 def bind(db):
                     assert_context_admitted(db, turn)
                     changed = db.execute(
@@ -206,3 +211,12 @@ class NativeExecutor:
 
                 await self.db.call(bind, write=True)
                 return await execute(dict(turn, workspace=workspace))
+
+            target = json.loads(task["intent_json"])["target"]
+            if automatic_task_directory(target):
+                workspace = await prepare_task_directory(self.db.data_root, task["id"])
+                return await execute_bound(workspace)
+            async with self.workspace_factory(
+                self.settings, task, run, stopped=stopped
+            ) as workspace:
+                return await execute_bound(workspace)

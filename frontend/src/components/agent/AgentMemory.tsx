@@ -21,9 +21,9 @@ function localDay(timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
   return ['year', 'month', 'day'].map(name => parts.find(part => part.type === name)?.value).join('-')
 }
-export default function AgentMemory({ cid = '', projects, select, fullPage = false, compact = false, defaultGroup = 'all', onBack }: {
+export default function AgentMemory({ cid = '', projects, select, fullPage = false, embedded = false, compact = false, defaultGroup = 'all', onBack }: {
   cid?: string; projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void
-  fullPage?: boolean; compact?: boolean; defaultGroup?: MemoryScope; onBack?: () => void
+  fullPage?: boolean; embedded?: boolean; compact?: boolean; defaultGroup?: MemoryScope; onBack?: () => void
 }) {
   const { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const navigation = useMemoryRoute(defaultGroup), route = navigation.value
@@ -39,7 +39,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
   refresh.current = () => { catalog.refresh(); catalog.facets.refresh(); detail.refresh(); setRevision(value => value + 1) }
   useEffect(() => subscribeMemoryChanges(() => refresh.current()), [catalog.scope])
   useEffect(() => { setMutationError(''); setMobileMenu(false) }, [route.id, catalog.scope])
-  const items = catalog.value?.items || [], total = catalog.value?.total || 0
+  const items = catalog.value?.items || []
   const record = detail.value?.record?.id === route.id ? detail.value.record : items.find(item => item.id === route.id)
   const data = detail.value?.record?.id === route.id ? detail.value : undefined
   const missing = ['MEMORY_NOT_FOUND', 'MEMORY_SOURCE_NOT_FOUND'].includes(detail.errorCode || '')
@@ -55,7 +55,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
   }
   const scroll = useRef<HTMLDivElement>(null), scrollKey = catalog.scope + ':' + route.view + ':' + route.scope + ':' + route.entity + ':' + route.kind + ':' + route.query + ':' + route.page + ':' + route.date
   const saveScroll = () => { if (!route.id && scroll.current) rememberScroll(scrollKey, scroll.current.scrollTop) }
-  useLayoutEffect(() => { if (scroll.current && !route.id) scroll.current.scrollTop = positions.get(scrollKey) || 0 }, [scrollKey, route.id, catalog.value])
+  useLayoutEffect(() => { if (scroll.current && !route.id) scroll.current.scrollTop = positions.get(scrollKey) || 0 }, [scrollKey, route.id, catalog.loading])
   const choose = (id: string) => { if (scroll.current) rememberScroll(scrollKey, scroll.current.scrollTop); navigation.change({ id }, true) }
   const clear = () => navigation.change({ query: '', scope: 'all', kind: 'all', entity: '', page: 0, date: '', id: '' })
   const mutate = async (item: MemoryRecord, suffix: string, body?: unknown) => {
@@ -106,7 +106,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
     {filters && <div className="memory-filters">{route.view !== 'activity' ? <label>{t('agent.memoryBrowse.type')}<Select aria-label={t('agent.memoryBrowse.type')} value={route.kind} onChange={kind => navigation.change({ kind, page: 0, id: '' })} options={['all', 'preference', 'decision', 'fact', 'summary'].map(value => ({ value, label: t(value === 'all' ? 'agent.memoryBrowse.allTypes' : 'agent.memoryKind.' + value) }))} /></label> : <label>{t('agent.memoryDate')}<Input type="date" aria-label={t('agent.memoryDate')} value={route.date} onChange={event => navigation.change({ date: event.target.value, page: 0, id: '' })} /></label>}{route.view === 'activity' && <button type="button" className="tt-act" disabled={!status.value?.memoryTimezone} onClick={() => navigation.change({ date: localDay(status.value.memoryTimezone), page: 0, id: '' })}>{t('agent.memoryToday')}</button>}<button type="button" className="tt-act" onClick={clear}>{t('agent.memoryBrowse.clear')}</button></div>}
     {catalog.failed && <div className="memory-alert" role="alert"><p>{t('agent.memoryBrowse.loadFailed')}</p><Button onClick={catalog.refresh}>{t('agent.retry')}</Button></div>}
     {catalog.facets.failed && <div className="memory-alert" role="alert"><p>{t('agent.memoryBrowse.filtersFailed')}</p><Button onClick={catalog.facets.refresh}>{t('agent.retry')}</Button></div>}
-    <MemoryList activity={route.view === 'activity'} items={items} loading={catalog.loading} failed={catalog.failed} selected={route.id} total={total} page={route.page} date={date} scope={scope} choose={choose} changePage={page => navigation.change({ page, id: '' })} filtered={filtered} clear={clear} scroll={scroll} onScroll={saveScroll} />
+    <MemoryList activity={route.view === 'activity'} items={items} loading={catalog.loading} failed={catalog.failed} selected={route.id} date={date} scope={scope} choose={choose} filtered={filtered} clear={clear} scroll={scroll} onScroll={saveScroll} hasMore={catalog.hasMore} loadMore={() => { void catalog.loadMore() }} loadingMore={catalog.loadingMore} moreFailed={catalog.moreFailed} />
   </section>
   const body = <div className={`memory-browser${route.id ? ' has-selection' : ''}${panel ? ' is-panel' : ''}`}>
     {list}<section className="memory-detail-pane" aria-label={t('agent.memoryBrowse.detail')}>
@@ -115,6 +115,6 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
     </section>
   </div>
   if (phone && fullPage && onBack) return <>{record?.state === 'active' && !missing && <Dropdown open={mobileMenu} onOpenChange={setMobileMenu} menu={menu} trigger={['click']}><span className="memory-mobile-menu-anchor" /></Dropdown>}<MobileSubPage title={route.id ? t(record?.day_key ? 'agent.memoryBrowse.activityDetail' : 'agent.memoryBrowse.detail') : t('agent.memory')} manageHistory={false} keepBottomNav search={false} onBack={route.id ? navigation.back : onBack} action={record?.state === 'active' && !missing ? { label: t('agent.memoryMore', { title: record.title }), icon: <MoreIcon size={20} />, onClick: () => setMobileMenu(value => !value) } : undefined}>{body}</MobileSubPage></>
-  if (fullPage) return <section className="memory-page"><header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={18} />{t('common.back')}</button></div>}</header>{body}</section>
+  if (fullPage) return <section className="memory-page">{!embedded && <header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={18} />{t('common.back')}</button></div>}</header>}{body}</section>
   return <div className={compact ? 'memory-panel' : 'memory-dialog'}>{body}</div>
 }

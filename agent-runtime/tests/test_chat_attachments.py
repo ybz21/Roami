@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 from dataclasses import replace
@@ -10,6 +11,7 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from roami_agent.app import Runtime
 from roami_agent.context.chat_images import ChatImages
+from roami_agent.context.image_preparation import encoded_size
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
@@ -178,5 +180,64 @@ async def test_real_http_upload_limits_commands_and_draft_delete(store):
                     content=b"x" * (10 * 1024 * 1024 + 1),
                 )
             ).status_code == 413
+    finally:
+        await runtime.close()
+
+
+async def test_all_six_uploads_reach_main_with_shared_payload_budget_and_scope(store):
+    settings = Settings(
+        model_capabilities={"images": True}, image_limits={"max_encoded_bytes": 600}
+    )
+    runtime = Runtime(store, Model(), settings=settings)
+    try:
+        conversation = await runtime.conversations.create("local")
+        images = []
+        for index in range(6):
+            output = io.BytesIO()
+            Image.new("RGB", (60, 40), (index * 40, 20, 30)).save(output, "PNG")
+            images.append(
+                await runtime.attachments.upload(
+                    "local", f"{index}.png", f"six-{index}", output.getvalue()
+                )
+            )
+        await runtime.chat.submit(
+            "local", conversation["id"], "six-images", "compare", [image["id"] for image in images]
+        )
+        plan = await runtime.context.project("local", conversation["id"])
+        adapter = ChatImages(store, runtime.artifacts, settings)
+        attached, payload = await adapter.attach({"owner_id": "local"}, plan, plan["messages"])
+        assert [image["artifactId"] for image in attached["imageEvidence"]] == [
+            image["id"] for image in images
+        ]
+        bodies = [
+            base64.b64decode(part["image_url"]["url"].split(",", 1)[1])
+            for part in payload[-1]["content"]
+            if part["type"] == "image_url"
+        ]
+        assert len(bodies) == 6 and sum(encoded_size(body) for body in bodies) <= 600
+        assert all(
+            image["originalWidth"] == 60 and image["originalHeight"] == 40
+            for image in attached["imageEvidence"]
+        )
+        assert "data:image" not in json.dumps(attached)
+        _, foreign = await adapter.attach({"owner_id": "other"}, plan, plan["messages"])
+        assert foreign == plan["messages"]
+        await runtime.artifacts.delete("local", images[0]["id"])
+        await store.call(
+            lambda db: db.execute(
+                "INSERT INTO memory_tombstones VALUES(?,?,?,1)",
+                ("local", images[1]["sha256"], "test"),
+            ),
+            write=True,
+        )
+        attached, _ = await adapter.attach({"owner_id": "local"}, plan, plan["messages"])
+        assert [image["artifactId"] for image in attached["imageEvidence"]] == [
+            image["id"] for image in images[2:]
+        ]
+        assert (
+            await adapter.attach(
+                {"owner_id": "local"}, {**plan, "sourceMessageIds": []}, plan["messages"]
+            )
+        )[1] == plan["messages"]
     finally:
         await runtime.close()

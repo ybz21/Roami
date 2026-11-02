@@ -31,7 +31,7 @@ func DiscoverExecutors() ExecutorCatalog {
 	for _, kind := range agent.Kinds() {
 		_, err := agent.ResolveBinary(kind)
 		result.Candidates = append(result.Candidates, ExecutorCandidate{
-			Kind: kind, Installed: err == nil, Tracked: kind == "codex" || kind == "claude",
+			Kind: kind, Installed: err == nil, Tracked: true,
 			Authentication: "unknown", Usage: "unknown",
 		})
 	}

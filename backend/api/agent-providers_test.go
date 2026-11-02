@@ -23,6 +23,7 @@ func TestAgentModelHTTPPrivateApplyAndConflicts(t *testing.T) {
 	r.GET("/:kind/models", a.AgentModelProfiles)
 	r.POST("/:kind/models", a.SaveAgentModelProfile)
 	r.POST("/:kind/models/restore", a.RestoreAgentModelProfile)
+	r.POST("/:kind/models/default", a.UseOfficialAgentModel)
 	r.POST("/:kind/models/:profile/apply", a.ApplyAgentModelProfile)
 	r.GET("/:kind/check", a.CheckProfessionalAgent)
 	request := func(method, path, body string) *httptest.ResponseRecorder {
@@ -58,6 +59,22 @@ func TestAgentModelHTTPPrivateApplyAndConflicts(t *testing.T) {
 	stale := request("POST", "/claude/models/"+body.Profile.ID+"/apply", `{"revision":"`+view.Revision+`"}`)
 	if stale.Code != 409 || !strings.Contains(stale.Body.String(), "AGENT_CONFIG_CHANGED") {
 		t.Fatalf("stale: %d %s", stale.Code, stale.Body)
+	}
+	get = request("GET", "/claude/models", "")
+	if json.Unmarshal(get.Body.Bytes(), &view) != nil {
+		t.Fatal("invalid custom view")
+	}
+	factory := request("POST", "/claude/models/default", `{"revision":"`+view.Revision+`"}`)
+	if factory.Code != 200 || strings.Contains(factory.Body.String(), secret) {
+		t.Fatalf("factory: %d %s", factory.Code, factory.Body)
+	}
+	var official agentproviders.View
+	if json.Unmarshal(factory.Body.Bytes(), &official) != nil || official.Mode != "official" || official.ActiveID != "" {
+		t.Fatal("factory mode was not read back")
+	}
+	stale = request("POST", "/claude/models/default", `{"revision":"`+view.Revision+`"}`)
+	if stale.Code != 409 {
+		t.Fatal("factory mode accepted a stale revision")
 	}
 	for _, input := range []string{`{"unknown":"` + secret + `"}`, `{} {}`, `{"name":"` + strings.Repeat("x", 65536) + `"}`} {
 		result := request("POST", "/claude/models", input)

@@ -1,0 +1,8 @@
+{
+  "origin": "repository_authored_mechanism_fixture",
+  "purpose": "separate drawing traversal from explicit slide placement",
+  "fixture_contains_private_data": false,
+  "upstream_task_or_oracle_copied": false,
+  "model_calls": 0,
+  "official_benchmark_score": false
+}

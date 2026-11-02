@@ -1,0 +1,544 @@
+{
+  "schema_version": 1,
+  "status": "20_public_contracts_imported_no_completed_live_agent_benchmark",
+  "materialized_public": 20,
+  "target_public": 20,
+  "sampled_on": "2026-10-23",
+  "suites": [
+    {
+      "suite_id": "finqa-sample-v1",
+      "suite_hash": "9d0da4f71672d602678160bc56c6c631d5db443f886c9ba3887dae1af32aaca2",
+      "source_url": "https://github.com/czyssrs/FinQA",
+      "license_url": "https://github.com/czyssrs/FinQA/blob/0f16e2867befa6840783e58be38c9efb9229d742/LICENSE",
+      "benchmark": "finqa",
+      "source_revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+      "source_split": "dev",
+      "source_sha256": "a847fb7e0d61a3125a1e2909852df6b89f1ee64d2c5ff1bf689e332214deee51",
+      "seed": 20261023,
+      "source_records": 883,
+      "eligible_records": 873,
+      "excluded": [
+        {
+          "id": "PNC/2009/page_46.pdf-3",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "UNP/2011/page_76.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "PPG/2013/page_40.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "PPG/2013/page_40.pdf-1",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "BLL/2010/page_28.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "JPM/2014/page_65.pdf-4",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "AES/2002/page_46.pdf-1",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "PNC/2013/page_207.pdf-2",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "ETR/2016/page_418.pdf-3",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "JPM/2014/page_65.pdf-5",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        }
+      ],
+      "selected": [
+        {
+          "case_id": "finqa:4f978c08853a6db6",
+          "upstream_id": "L/2015/page_59.pdf-1",
+          "stratum": "short_small_table",
+          "upstream_sample_sha256": "ffacd3deddd39fabad6277fa4b4cf1754db0d07fafeb5aa772eb4bc609075bb3",
+          "case_sha256": "cd78208d4d18e2bd007d6f2ace639a0d5cd54d126820987ff411642dbf153638",
+          "benchmark": "finqa",
+          "task_id": "L/2015/page_59.pdf-1",
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "source_split": "dev",
+          "input_sha256": "59abcb7950d24f0bda80af417fd7425a64488d8f5b3ec7b603bed7b4d074481b",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        },
+        {
+          "case_id": "finqa:ab5bf9f64e475b1a",
+          "upstream_id": "PM/2018/page_24.pdf-2",
+          "stratum": "multi_large_table",
+          "upstream_sample_sha256": "6bf7925a70f99d84bad0d5e17c3dec0efe002c32f60eb8670a6a6940040a4116",
+          "case_sha256": "36c2c82f89c5c0d6c4dea95d0d8700074a54bbf006bc8827c89c99ac4595ee5f",
+          "benchmark": "finqa",
+          "task_id": "PM/2018/page_24.pdf-2",
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "source_split": "dev",
+          "input_sha256": "d1815a031fe84f824e4ff9c0eece85818970f3d45d45817851efdff18cd74ff4",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        },
+        {
+          "case_id": "finqa:d587661d9420b7e1",
+          "upstream_id": "IP/2012/page_93.pdf-4",
+          "stratum": "multi_small_table",
+          "upstream_sample_sha256": "a5ba21bf59a4478713aa60dbaad731239aa7067c6e25cdfc28be617b83d94d2c",
+          "case_sha256": "667ccabb68ddcd2ce2e655040fa4c66cce3846fd5b9b74040d21066da1db5c9e",
+          "benchmark": "finqa",
+          "task_id": "IP/2012/page_93.pdf-4",
+          "revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+          "source_split": "dev",
+          "input_sha256": "c3a53c86677c80b3fda6850e9bed3c9599f25cc25e15cd0afb62d56168bc9fac",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        }
+      ],
+      "official_leaderboard_comparable": false
+    },
+    {
+      "suite_id": "convfinqa-sample-v1",
+      "suite_hash": "7604a9e813122bbcbcaaf7c7e22cfb22a8b048735f0d11ebb73f625e919b02e0",
+      "source_url": "https://github.com/czyssrs/ConvFinQA",
+      "license_url": "https://github.com/czyssrs/ConvFinQA/blob/cf3eed2d5984960bf06bb8145bcea5e80b0222a6/LICENSE",
+      "benchmark": "convfinqa",
+      "source_revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6",
+      "source_split": "dev",
+      "source_sha256": "9665dd60f106e5cd41d37537edac97bbd26eb7629ad63ca2390b19d4619ba51b",
+      "seed": 20261023,
+      "source_records": 421,
+      "eligible_records": 417,
+      "excluded": [
+        {
+          "id": "Double_PNC/2013/page_207.pdf",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "Single_AES/2002/page_46.pdf-1",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "Double_AES/2002/page_46.pdf",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        },
+        {
+          "id": "Double_BLL/2010/page_28.pdf",
+          "reason": "unsupported_non_numeric_or_missing_oracle"
+        }
+      ],
+      "selected": [
+        {
+          "case_id": "convfinqa:85d9a548c6a57df1",
+          "upstream_id": "Double_KHC/2016/page_23.pdf",
+          "stratum": "short_small_table",
+          "upstream_sample_sha256": "d4a3864c8458c0f73f960ebb20fb22a67872e7c3820e8dd15671a2684f95f816",
+          "case_sha256": "8bf73398f38b206a2c54e4c9b7fae4642e24388986f314d347003505cbf3aa1e",
+          "benchmark": "convfinqa",
+          "task_id": "Double_KHC/2016/page_23.pdf",
+          "revision": "cf3eed2d5984960bf06bb8145bcea5e80b0222a6",
+          "source_split": "dev",
+          "input_sha256": "2480821666cc1b8c8afde61eb954258a8f2734e2d80da5319e231b082c97b237",
+          "adapter_revision": "financial-numeric-v1",
+          "adapted": true,
+          "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation."
+        }
+      ],
+      "official_leaderboard_comparable": false
+    },
+    {
+      "suite_id": "spreadsheetbench-verified400-sample-v1",
+      "suite_hash": "6af1caa4944df0d79fa445fa84770635a4e7fbaf1d46007b17453e9d7eedc436",
+      "benchmark": "spreadsheetbench",
+      "source_url": "https://huggingface.co/datasets/KAKA22/SpreadsheetBench",
+      "source_revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+      "source_split": "verified_400",
+      "selected": [
+        {
+          "case_id": "spreadsheetbench:38703",
+          "benchmark": "spreadsheetbench",
+          "task_id": "verified400:38703",
+          "revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4",
+          "upstream_revision": "49b73a94775fb489063f60ca1865e3a650079a79",
+          "source_split": "verified_400",
+          "input_sha256": "eaa432b7490153d195b2cb86208ee5fbe085f75f660c6a6262390a75d386d80d",
+          "adapter_revision": "spreadsheet-values-v1",
+          "adapted": true,
+          "adaptation": "One workbook; saved target values, preserved input cells and unmerged cells; no formula recalculation or official OJ comparability."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "golden_saved_values_passed_original_and_corrupted_outputs_rejected"
+    },
+    {
+      "suite_id": "terminal-bench-cancel-async-tasks-v1",
+      "suite_hash": "64f4d2fe9aa824986e43b18b23f4a1584c0d0d222402c3aaabdd27868f5975fc",
+      "benchmark": "terminal_bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "source_revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "selected": [
+        {
+          "case_id": "terminal_bench:cancel-async-tasks",
+          "benchmark": "terminal_bench",
+          "task_id": "cancel-async-tasks",
+          "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+          "source_split": "released_tasks",
+          "input_sha256": "d2040b3b0a9f8836b84504c28e0b268858d24efa22a3bedc30913303bd09d48f",
+          "verifier_sha256": "9614aa8684e7882bf41042e18b94e7c8dcb7004fbac6d6bb34c870eaaa17a9e9",
+          "adapter_revision": "terminal-offline-v1",
+          "adapted": true,
+          "adaptation": "Original result assertions; path /app remapped, Python 3.12 offline image, no upstream installation bootstrap. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "actual_container_reference_solution_passed_and_broken_output_rejected"
+    },
+    {
+      "suite_id": "terminal-bench-db-wal-recovery-v1",
+      "suite_hash": "07b2833d125dff1a39f816c94ab11965bd5504d572346586b8424281aa686db1",
+      "benchmark": "terminal_bench",
+      "source_url": "https://github.com/harbor-framework/terminal-bench-2",
+      "source_revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+      "selected": [
+        {
+          "case_id": "terminal_bench:db-wal-recovery",
+          "benchmark": "terminal_bench",
+          "task_id": "db-wal-recovery",
+          "revision": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+          "source_split": "released_tasks",
+          "input_sha256": "1107ba1e5c7086de9dae5119f859cf12cbed9152a942d66cfbf23fc01a1eff75",
+          "verifier_sha256": "cbecfc42ea658756577bb85f9f9be5ab35f5a34527950184bd2003da39257da7",
+          "adapter_revision": "terminal-offline-v1",
+          "adapted": true,
+          "adaptation": "Original result assertions; path /app remapped, Python 3.12 offline image, no upstream installation bootstrap. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "actual_container_reference_solution_passed_and_broken_output_rejected"
+    },
+    {
+      "suite_id": "mlagentbench-vectorization-sample-v1",
+      "suite_hash": "a2103febb526576e001db2fb42716baf39bacec605727b252ffba6926d6db843",
+      "benchmark": "mlagentbench",
+      "source_revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+      "selected": [
+        {
+          "case_id": "mlagentbench:vectorization",
+          "benchmark": "mlagentbench",
+          "task_id": "vectorization",
+          "revision": "5d71205cc20a8e95d43aa7cb7120e89ca3323e31",
+          "source_split": "released_tasks",
+          "input_sha256": "eaf2d53dc47acd160fd7f2b33a88d5090216f584bf79bbb9af6ded98e6714313",
+          "upstream_source_digest": "6d100a69b37008c077fd0550c32870ce6d0573f7dfeaa4ec1141100ca2167e45",
+          "compatibility_patch": "explicit_size_one_scalar_conversion",
+          "adapter_revision": "numpy-vectorization-host-v1",
+          "adapted": true,
+          "adaptation": "Explicit scalar conversion for modern NumPy; frozen forward-only edit, numerical checks and four alternating host sandbox time pairs (median ratio <=0.9); not official environment or submitted-time comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "frozen_answer_or_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "dsbench-00000018-question24-v1",
+      "suite_hash": "e57760a02f0c4deb338b9ca33005a863c08af210adbed7f1050d7a6bf3021ab9",
+      "benchmark": "dsbench",
+      "source_revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+      "selected": [
+        {
+          "case_id": "dsbench:00000018:question24",
+          "benchmark": "dsbench",
+          "task_id": "00000018:question24",
+          "revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+          "upstream_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+          "source_split": "data_analysis",
+          "input_sha256": "c6b21cfba4aa6643658313a029e95c5f083a0ad8e3d6ab61fa92e3c4024787fe",
+          "adapter_revision": "dsbench-final-value-v1",
+          "adapted": true,
+          "adaptation": "Frozen original workbook, introduction and questions; exact selected JSON answer instead of the upstream LLM judge. Not official-score comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "frozen_answer_or_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "dsbench-00000013-question19-v1",
+      "suite_hash": "c02ca6a2943412aac355f0fae4f1ef52551dfc2913630fc48b3f05a46bfddc8e",
+      "benchmark": "dsbench",
+      "source_revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+      "selected": [
+        {
+          "case_id": "dsbench:00000013:question19",
+          "benchmark": "dsbench",
+          "task_id": "00000013:question19",
+          "revision": "1196d6553ec200e1262841efc89cda5954ffe89f",
+          "upstream_revision": "ba786096137a5108af11c016ad3f09cdb97beefd",
+          "source_split": "data_analysis",
+          "input_sha256": "20b3ff07eeb3ebea9ac709aa50989eb6a3c788a0b89496cc312cce5dc6c7b173",
+          "adapter_revision": "dsbench-final-value-v1",
+          "adapted": true,
+          "adaptation": "Frozen original workbook, introduction and questions; exact selected JSON answer instead of the upstream LLM judge. Not official-score comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "frozen_answer_or_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "agentic-vbench-assembly-sample-v1",
+      "suite_hash": "97a66b19a353ade07fa7ed09122b18d2d3734f0792bba91d1cb84e4b5652e69f",
+      "benchmark": "agentic_vbench",
+      "source_revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "selected": [
+        {
+          "case_id": "agentic_vbench:agentic-vbench-assembly-task1",
+          "benchmark": "agentic_vbench",
+          "task_id": "agentic-vbench-assembly-task1",
+          "revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+          "data_revision": "66b983e7552edba9dedb6858705bae8f2b6fa945",
+          "source_split": "released_tasks",
+          "input_sha256": "fed3e6dab8fdd8e0e78b2a3ed3aa0110f2a74bf8c176bf18c47fa85a68f3cecc",
+          "verifier_sha256": "e2fcaca05502ff0cacd6908745cc6049b4b5ec0d204cfc9402eec03c825b8724",
+          "adapter_revision": "native-media-host-v1",
+          "adapted": true,
+          "adaptation": "Original verifier; offline dependency image; frozen source hashes, audio PCM/sample-count or video full-range/contiguity checks; fixed RSI reward thresholds. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "original_verifier_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "agentic-vbench-repair-sample-v1",
+      "suite_hash": "0ed1c04767f33ace13b5e3478c798247a7d4d512dfd60b451515b0943b1ae473",
+      "benchmark": "agentic_vbench",
+      "source_revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "selected": [
+        {
+          "case_id": "agentic_vbench:exp-codec-restore-task01",
+          "benchmark": "agentic_vbench",
+          "task_id": "exp-codec-restore-task01",
+          "revision": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+          "data_revision": "9f2b57edfa70a7b1e22f84c646b44c8838652f95",
+          "source_split": "released_tasks",
+          "input_sha256": "a55ba5b388d7dca44ee396f2e9732e0ef74052fd47bcb737c5b2c79880408535",
+          "verifier_sha256": "280af643499383fb6cf435dadfb012ce9ac868cfa8e058370a021a7b940d3cf5",
+          "adapter_revision": "native-media-host-v1",
+          "adapted": true,
+          "adaptation": "Original verifier; offline dependency image; frozen source hashes, audio PCM/sample-count or video full-range/contiguity checks; fixed RSI reward thresholds. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "original_verifier_reference_passed_mutation_rejected_not_live_agent_ability"
+    },
+    {
+      "suite_id": "swe-pylint-dev__pylint-6903-v1",
+      "suite_hash": "40ea5e9b270e7d0d91eda316e4b30766992e7be27718fe126e79f2bdfd201d06",
+      "benchmark": "swe_verified",
+      "source_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "selected": [
+        {
+          "case_id": "swe_verified:pylint-dev__pylint-6903",
+          "benchmark": "swe_verified",
+          "task_id": "pylint-dev__pylint-6903",
+          "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+          "source_split": "test",
+          "input_sha256": "21fae4f08ddb16aa8cde1cae86d37459cf5eacb0f7e363c1059b3cd5f2338617",
+          "base_commit": "ca80f03a43bc39e4cc2c67dc99817b3c9f13b8a6",
+          "runtime_image": "swebench/sweb.eval.x86_64.pylint-dev_1776_pylint-6903@sha256:bad80b1c20eeb5d49a6e82dc485ee40fbd67b91df47b56740e1be5471b678f5b",
+          "adapter_revision": "native-project-snapshot-v1",
+          "adapted": true,
+          "adaptation": "Frozen upstream image and project interpreter; clean source snapshot without future Git history; native tests through a scoped broker; original held-out test patch and required pass lists, no dependency reinstall. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "swe-scikit-learn__scikit-learn-13496-v1",
+      "suite_hash": "0fa0f82d54c65a8f0dbc8ff6f2aa68c1c9d2d1329489eb7109354e2fcc47dedf",
+      "benchmark": "swe_verified",
+      "source_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "selected": [
+        {
+          "case_id": "swe_verified:scikit-learn__scikit-learn-13496",
+          "benchmark": "swe_verified",
+          "task_id": "scikit-learn__scikit-learn-13496",
+          "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+          "source_split": "test",
+          "input_sha256": "1c809317fdf186f1fbfa738b3456b869eb4db6ec198a4428fbc5205acb70e315",
+          "base_commit": "3aefc834dce72e850bff48689bea3c7dff5f3fad",
+          "runtime_image": "swebench/sweb.eval.x86_64.scikit-learn_1776_scikit-learn-13496@sha256:adee9f4911a853e64f9ae4ebd7b1bf32615cbf52c3210873e9a752fb5fb975e6",
+          "adapter_revision": "native-project-snapshot-v1",
+          "adapted": true,
+          "adaptation": "Frozen upstream image and project interpreter; clean source snapshot without future Git history; native tests through a scoped broker; original held-out test patch and required pass lists, no dependency reinstall. Not official environment-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "osworld-05dd4c1d-c489-4c85-8389-a7836c4f0567-slide-state-v1",
+      "suite_hash": "a7b89a282b52fc768cf6d6ed116bec80ddb3f62b4ec48cecc87acd60d3cda11a",
+      "benchmark": "osworld",
+      "source_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "selected": [
+        {
+          "case_id": "osworld:05dd4c1d-c489-4c85-8389-a7836c4f0567",
+          "benchmark": "osworld",
+          "task_id": "05dd4c1d-c489-4c85-8389-a7836c4f0567",
+          "revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+          "data_revision": "1e112283c4ecb08d6fed8069bca7de74fa2f12aa",
+          "source_split": "libreoffice_impress",
+          "input_sha256": "3d93e2180aa5428e5c2ab3156d014cda42c880479a403c5f37625932718bcb6b",
+          "verifier_sha256": "d3107ee1db4ccf4473996c207e49b4dac595197c9607cbece1ba51cac3b9c430",
+          "adapter_revision": "slide-state-original-comparison-v1",
+          "adapted": true,
+          "adaptation": "Original source file, instructions, two alternative references and original compare_pptx_files options. Extracted document-state contract, no VM/GUI interaction or visual quality score; not official leaderboard-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "osworld-04578141-1d42-4146-b9cf-6fab4ce5fd74-slide-state-v1",
+      "suite_hash": "a044c5598d91e1dad84289b505b92bafa17d6e944be5d43f23ad506faef46f01",
+      "benchmark": "osworld",
+      "source_revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+      "selected": [
+        {
+          "case_id": "osworld:04578141-1d42-4146-b9cf-6fab4ce5fd74",
+          "benchmark": "osworld",
+          "task_id": "04578141-1d42-4146-b9cf-6fab4ce5fd74",
+          "revision": "04718eab9327856efe8192cc58161acc7a7627e2",
+          "data_revision": "1e112283c4ecb08d6fed8069bca7de74fa2f12aa",
+          "source_split": "libreoffice_impress",
+          "input_sha256": "14c59bb4d0784ecc15adefa6ccf575f12ad9cbf67efdba71d519605aea55725f",
+          "verifier_sha256": "d3107ee1db4ccf4473996c207e49b4dac595197c9607cbece1ba51cac3b9c430",
+          "adapter_revision": "slide-state-original-comparison-v1",
+          "adapted": true,
+          "adaptation": "Original source file, instructions, two alternative references and original compare_pptx_files options. Extracted document-state contract, no VM/GUI interaction or visual quality score; not official leaderboard-comparable."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "reference_passed_unfixed_baseline_rejected_and_scripted_role_execution_not_real_Agent_ability"
+    },
+    {
+      "suite_id": "longmemeval-v2-4ed01379-textual-v1",
+      "suite_hash": "ded9a4328b717247d07cc696d9465555d3f8fff3ec4a90b7e6ae391bb5a15c60",
+      "benchmark": "longmemeval_v2",
+      "source_revision": "f152293e235517d504809563c833d7190b8c713b",
+      "selected": [
+        {
+          "case_id": "longmemeval-v2:4ed01379",
+          "benchmark": "longmemeval_v2",
+          "task_id": "4ed01379",
+          "revision": "f152293e235517d504809563c833d7190b8c713b",
+          "code_revision": "2cc8c540bdb87fe6761629b585e727e1c4704520",
+          "source_split": "small:enterprise:static-environment",
+          "input_sha256": "be12a68ad99f2f4a68e3d69638135bdc8e9b73d168b761c5e5a5ec9f7db9776e",
+          "source_trajectories_sha256": "363cec9a8e87aa8d9101ce4e600aadbf7031d674056ebe4f969e8424abc5f3c6",
+          "verifier_sha256": "f8ba659e237c4282a07a92538090ea500ce8483820b390b1d19af187c01417ac",
+          "adapter_revision": "textual-complete-small-haystack-v1",
+          "adapted": true,
+          "adaptation": "All100 original small-tier textual trajectories and original deterministic metric; no screenshots, memory ingestion, persisted learning or official latency comparison. Added exact final-answer and citation-integrity gates."
+        }
+      ],
+      "official_leaderboard_comparable": false,
+      "grader_acceptance": "full100_textual_trajectories_reference_and5_negatives_and_scripted_Main_Worker_not_real_Agent_memory_ability"
+    },
+    {
+      "suite_id": "the-agent-company-leadership-native-v1",
+      "suite_hash": "e208f9794ff28ebaaf07baaafdccb2449e3efb4ba3c6332fdff2d4e1ca0a1a03",
+      "benchmark": "the_agent_company",
+      "source_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "source_split": "company_hr_workflow",
+      "adapted": true,
+      "official_leaderboard_comparable": false,
+      "selected": [
+        {
+          "case_id": "the-agent-company:hr-make-slides-introduce-leadership",
+          "upstream_id": "hr-make-slides-introduce-leadership",
+          "case_sha256": "9818310a4f4c88f9a953db831b8c6b79b74700de1918d8ae0f98431bcb752719",
+          "benchmark": "the_agent_company",
+          "task_id": "hr-make-slides-introduce-leadership",
+          "revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+          "source_split": "company_hr_workflow",
+          "adapter_revision": "native-rocketchat-with-post-exit-snapshot-v1",
+          "snapshot_revision": "rocketchat-20241123:asset-208611276",
+          "snapshot_sha256": "d3826434819eb1630c0547770ba94232d846799aa8d8469d0448f18570eb1e59",
+          "verifier_sha256": "ee7cf7c01e5064a5b4e7810c74a8a760220f2bf30049bdcaba3f3bac45cf5137",
+          "input_sha256": "6e37fed10ed756362aa6b0ac0feb072997aabedefc521b3398d2e7df3085bf52",
+          "adapted": true,
+          "adaptation": "Native RocketChat5.3 and Mongo5 services, pinned snapshot restored per trial, internal unpublished network, authenticated allowlisted Unix-socket API bridge. Original5 checkpoint predicates/scoring are retained; transport reads a post-exit native snapshot using correct direct-room lookup. Added new-notification and unchanged-directory gates. Browser/NPC interaction excluded; biography/visual quality remains pending calibrated review."
+        }
+      ],
+      "acceptance": "native_contract_and_logs_accepted_quality_pending",
+      "scope": "Native RocketChat5.3 and Mongo5 services, pinned snapshot restored per trial, internal unpublished network, authenticated allowlisted Unix-socket API bridge. Original5 checkpoint predicates/scoring are retained; transport reads a post-exit native snapshot using correct direct-room lookup. Added new-notification and unchanged-directory gates. Browser/NPC interaction excluded; biography/visual quality remains pending calibrated review."
+    },
+    {
+      "suite_id": "the-agent-company-stock-native-v1",
+      "suite_hash": "398d04fe411473276e297edadbad2ebd7e69210b281886ccafb939c3728b0b00",
+      "benchmark": "the_agent_company",
+      "source_revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "source_split": "company_stock_workflow",
+      "adapted": true,
+      "official_leaderboard_comparable": false,
+      "selected": [
+        {
+          "case_id": "the-agent-company:ds-stock-analysis-slides",
+          "upstream_id": "ds-stock-analysis-slides",
+          "case_sha256": "624d32f581418655807991107d8d2acfa22f238488b4d3db83cd97d1dd92c43a",
+          "benchmark": "the_agent_company",
+          "task_id": "ds-stock-analysis-slides",
+          "revision": "98b68ef82a47690c316f42fddb05baafaab56851",
+          "source_split": "company_stock_workflow",
+          "adapter_revision": "native-owncloud-post-exit-webdav-v1",
+          "input_sha256": "4085ce54fd870ba80bd82ad5a64bc9a5d4da04acfdd5075dcfe4e9eda2075aec",
+          "verifier_sha256": "b4926f32e89fe6ba01c0e7697e6f71100608c415dc7c2911eae1c03ae69f67a9",
+          "adapted": true,
+          "adaptation": "Publisher ownCloud1.0.0 seeded image pinned by digest, fresh anonymous data volume per trial, non-root internal unpublished service, allowlisted Unix-socket WebDAV. Original CSV equality checkpoint retained; original seven LLM chart/script points unscored pending independent calibration. Adapted numeric gate rtol=1e-12/atol=1e-10 handles seven published float roundoff artifacts; the original strict equality result remains separately reported. Extra source-immutability and remote-delivery structural gates. No browser or official full score."
+        }
+      ],
+      "acceptance": "native_contract_and_logs_accepted_quality_pending",
+      "scope": "Publisher ownCloud1.0.0 seeded image pinned by digest, fresh anonymous data volume per trial, non-root internal unpublished service, allowlisted Unix-socket WebDAV. Original CSV equality checkpoint retained; original seven LLM chart/script points unscored pending independent calibration. Adapted numeric gate rtol=1e-12/atol=1e-10 handles seven published float roundoff artifacts; the original strict equality result remains separately reported. Extra source-immutability and remote-delivery structural gates. No browser or official full score."
+    },
+    {
+      "suite_id": "gaia-course-counterexamples-v1",
+      "suite_hash": "2efc738e2e423d3d595000c49a5da34bddd0db6b6290de136dd32fdcb9a32cc0",
+      "benchmark": "gaia",
+      "source_revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+      "source_split": "official_agents_course:gaia_validation_level1",
+      "adapted": true,
+      "official_leaderboard_comparable": false,
+      "selected": [
+        {
+          "case_id": "gaia-course:6f37996b-2ac7-44b0-8e68-6d28256631b4",
+          "upstream_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+          "case_sha256": "271103561b6bb76d0cc4fb3abd33b47e8ee5744b9b3bc155b940109820483b5c",
+          "benchmark": "gaia",
+          "task_id": "6f37996b-2ac7-44b0-8e68-6d28256631b4",
+          "revision": "f7e71746f7b93f311f9cc993be432ca7a7f8cb6aad644f441d3868966aa3432d",
+          "source_split": "official_agents_course:gaia_validation_level1",
+          "source_url": "https://agents-course-unit4-scoring.hf.space/questions",
+          "source_documentation": "https://huggingface.co/learn/agents-course/unit4/hands-on",
+          "input_sha256": "7a2d441e7b205a98c5c12708326ee6b921cc5a628d762b372254d45ac87a80c9",
+          "adapter_revision": "complete-table-exhaustive-proof-v1",
+          "adapted": true,
+          "adaptation": "Original public-course question and complete operator table. Expected result independently derived by exhaustive enumeration; added immutable-input and complete-proof assertions. Does not access the gated GAIA repository or submit to any leaderboard; not official-score comparable."
+        }
+      ],
+      "acceptance": "official_public_course_complete_table_and_exhaustive_proof_accepted",
+      "scope": "Original public-course question and complete operator table. Expected result independently derived by exhaustive enumeration; added immutable-input and complete-proof assertions. Does not access the gated GAIA repository or submit to any leaderboard; not official-score comparable."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-DL01",
+  "data": {
+    "kind": "synthetic_minimal_ooxml_zip",
+    "contract": "input/layout.json",
+    "generator_source": "skills/presentation-edit/tests/test_layout.py",
+    "package_fixture_source": "skills/presentation-edit/tests/presentation_fixture.py",
+    "actual_output": "<output>/input/deck.pptx",
+    "scope": "Structural parser/layout fixture, not a full editable deck or GUI acceptance."
+  },
+  "tools": {
+    "kind": "isolated_scripted_regression",
+    "configuration": "tools.json",
+    "model_calls": 0
+  },
+  "acceptance": {
+    "kind": "strict_pytest_receipt_and_source_hash",
+    "test_module": "skills/presentation-edit/tests/test_layout.py",
+    "expected_collected": 10,
+    "skips_or_xfail_allowed": false
+  },
+  "historical_suite_updated": false
+}

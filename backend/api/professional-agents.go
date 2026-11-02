@@ -12,6 +12,7 @@ import (
 func (a *API) ProfessionalAgents(c *gin.Context) {
 	rows := agentinventory.DiscoverProfessionalAgents(c.Request.Context())
 	a.annotateProfessionalPresets(c.Request.Context(), rows)
+	a.annotateAgentVerification(c.Request.Context(), rows)
 	c.JSON(http.StatusOK, gin.H{"agents": rows})
 }
 
@@ -51,6 +52,7 @@ func (a *API) CheckProfessionalAgent(c *gin.Context) {
 	}
 	rows := []agentinventory.ProfessionalAgent{row}
 	a.annotateProfessionalPresets(c.Request.Context(), rows)
+	a.annotateAgentVerification(c.Request.Context(), rows)
 	c.JSON(http.StatusOK, gin.H{"agent": rows[0]})
 }
 
@@ -71,5 +73,6 @@ func (a *API) UpgradeProfessionalAgent(c *gin.Context) {
 	}
 	rows := []agentinventory.ProfessionalAgent{row}
 	a.annotateProfessionalPresets(c.Request.Context(), rows)
+	a.annotateAgentVerification(c.Request.Context(), rows)
 	c.JSON(http.StatusOK, gin.H{"agent": rows[0]})
 }

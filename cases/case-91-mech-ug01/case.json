@@ -1,0 +1,26 @@
+{
+  "id": "MECH-UG01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "网关响应关联",
+  "prompt": "保存实际上游响应的安全关联字段，不让上游响应头冒充本地网关决策；保留原客户端编号、账务状态及历史记录。",
+  "preconditions": "隔离临时网关与SQLite、本地HTTP合成响应、公开请求编号夹具；不使用生产服务或真实模型。",
+  "expected_terminal": "persisted_upstream_receipts_and_gateway_owned_headers",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "直连、模型目录、协议转换的200/401/429/500响应关联记录",
+    "非法请求编号拒绝与合法备用编号选择",
+    "旧账本迁移、转换失败、无响应及重复结算保持原账务语义"
+  ],
+  "hard_assertions": [
+    {"id":"MECH-UG01-H1","rule":"三条调用路径保留客户端与上游两个编号；上游X-Roami响应头不能冒充网关决定。","failure_effect":"case_failed"},
+    {"id":"MECH-UG01-H2","rule":"只保留受限请求编号及真实上游状态，不保存原始响应体、完整响应头或连接异常文本。","failure_effect":"case_failed"},
+    {"id":"MECH-UG01-H3","rule":"历史缺失上游状态为0、编号为空，不回填；转换错误与原始HTTP状态可区分，重复结算不覆盖。","failure_effect":"case_failed"}
+  ],
+  "decision_domains": ["CT"],
+  "grading_profile": "mechanism",
+  "provenance": {"origin":"auth_diagnostic_gap_and_gateway_header_trust_boundary","issue":443,"fixture_reproduction_only":true,"historical_root_cause_proven":false},
+  "resources": {"inputs":["input/upstream-receipts.json"],"tools":"tools.json","generator":"scripts/run.py","provenance":"provenance.json","acceptance":"acceptance.md","materials":"materials.json"}
+}

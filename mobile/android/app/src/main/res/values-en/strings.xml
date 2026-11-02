@@ -28,4 +28,9 @@
     <string name="event_prompt_changed">The question changed. Open the session to see the current choices.</string>
     <string name="event_all_choices">All choices</string>
     <string name="ch_task_history">Task history</string>
+    <string name="document_downloading">Saving file…</string>
+    <string name="document_saved">Saved: %1$s</string>
+    <string name="document_failed">Could not save. Please retry.</string>
+    <string name="document_login">Your session expired. Sign in again to save.</string>
+    <string name="document_busy">Finish saving the current file first</string>
 </resources>

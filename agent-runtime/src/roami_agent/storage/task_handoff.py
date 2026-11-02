@@ -2,7 +2,21 @@
 
 import json
 
-from roami_agent.storage.database import rows
+from roami_agent.storage.database import row, rows
+from roami_agent.storage.task_request import task_user_request
+
+
+def request_handoff_complete(db, message_id):
+    source = row(db, "SELECT * FROM messages WHERE id=?", (message_id,))
+    source = task_user_request(db, source) if source else None
+    return bool(
+        source
+        and source["turn_id"]
+        and any(
+            receipt.get("requestComplete") is True
+            for receipt in accepted_handoffs(db, source["turn_id"]).values()
+        )
+    )
 
 
 def accepted_handoffs(db, turn_id):

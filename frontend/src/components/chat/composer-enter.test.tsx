@@ -10,6 +10,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { ChatShell } from './ChatShell'
 import { I18nProvider } from '../../i18n'
 
+vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, coarse: false }) }))
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }

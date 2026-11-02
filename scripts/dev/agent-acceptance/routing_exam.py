@@ -22,7 +22,7 @@ from roami_agent.app import Runtime, configured_provider
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.server.configuration import Settings
-from roami_agent.server.model_settings import load_model_settings
+from roami_agent.server.model_settings import load_runtime_model_settings
 from roami_agent.storage.database import Database, rows
 
 
@@ -660,7 +660,7 @@ async def main():
     args.output = args.output.expanduser().resolve()
     args.output.mkdir(parents=True, exist_ok=True, mode=0o700)
     load_dotenv(args.provider_root / "agent-service.env", override=False)
-    base = load_model_settings(Settings.load(args.config), args.provider_root)
+    base = await load_runtime_model_settings(Settings.load(args.config), args.provider_root)
     settings = replace(
         base,
         shell_roots=(),
@@ -673,9 +673,7 @@ async def main():
         cli_bin="/nonexistent/routing-exam-cli",
         professional_executor="codex",
         workers=0,
-        timeout_seconds=0,
         max_depth=0,
-        context_window=base.context_window or 200000,
     )
     provider = configured_provider(settings, "main")
     selected = [c for c in CASES if not args.cases or c[0] in args.cases.split(",")]

@@ -4,12 +4,14 @@ import asyncio
 import hashlib
 import json
 import math
+import re
 import time
 from copy import deepcopy
 
 import httpx
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
+from roami_agent.protocol.model_observation import model_observation
 from roami_agent.protocol.models import ModelEvent, model_endpoint
 from roami_agent.protocol.serialization import encoded
 from roami_agent.providers.generation_parameters import generation_parameters
@@ -18,6 +20,40 @@ from roami_agent.providers.request_policy import (
     request_identity,
     request_policy,
     retry_delay,
+)
+from roami_agent.providers.request_receipts import (
+    BRIDGE_EXTENSION,
+    relayed_receipt,
+    response_receipt,
+    usage_receipt,
+)
+from roami_agent.providers.transport_failures import relayed_transport_failure, transport_failure
+
+STREAM_ERROR_CODES = frozenset(
+    {
+        "MODEL_OUTPUT_LENGTH",
+        "MODEL_OUTPUT_CONTENT_FILTER",
+        "MODEL_IMAGES_UNSUPPORTED",
+        "MODEL_TOOLS_UNSUPPORTED",
+        "MODEL_DEADLINE",
+        "MODEL_RETRY_DEADLINE",
+        "MODEL_TRANSPORT_FAILED",
+        "MODEL_STREAM_INVALID",
+        "MODEL_USAGE_INVALID",
+        "MODEL_STREAM_INCOMPLETE",
+        "MODEL_PROXY_DAILY_LIMIT",
+        "MODEL_GATEWAY_ROUTE_CHANGED",
+        "MODEL_GATEWAY_CONFIGURATION_INVALID",
+        "MODEL_PROXY_USAGE_PENDING",
+        "MODEL_PROXY_USAGE_UNKNOWN",
+        "MODEL_PROXY_CURRENCY_MISMATCH",
+        "MODEL_GATEWAY_STORAGE_FAILED",
+        "MODEL_GATEWAY_REQUIRED",
+        "RSI_TOKEN_BUDGET",
+        "RSI_REQUEST_BUDGET",
+        "RSI_TIME_BUDGET",
+        "RSI_USAGE_UNKNOWN",
+    }
 )
 
 
@@ -82,12 +118,19 @@ class ChatCompletions:
         try:
             async with asyncio.timeout(self.timeout):
                 for attempt in range(self.max_retries + 1):
+                    response_started, transport = False, {}
                     yield ModelEvent("telemetry", {"phase": "request", "attempt": attempt + 1})
                     try:
                         async for event in self._stream_once(messages, tools, attempt):
+                            if event.kind == "telemetry" and event.value.get("phase") == "headers":
+                                response_started = True
                             emitted = emitted or event.kind != "telemetry"
                             yield event
                         return
+                    except ModelAdmissionRejected as exc:
+                        if attempt:
+                            raise DomainError(exc.code, exc.status) from exc
+                        raise
                     except RetryableResponse as exc:
                         code, delay = "MODEL_HTTP_" + str(exc.status), exc.delay
                     except (
@@ -96,12 +139,30 @@ class ChatCompletions:
                         httpx.ReadError,
                         httpx.ReadTimeout,
                         httpx.RemoteProtocolError,
-                    ):
+                    ) as exc:
                         code, delay = "MODEL_TRANSPORT_FAILED", retry_delay(None, attempt)
-                    if emitted or attempt >= self.max_retries:
-                        raise DomainError(code, 502)
-                    if deadline is not None and delay >= deadline - time.monotonic():
-                        raise DomainError("MODEL_RETRY_DEADLINE", 502)
+                        transport = transport_failure(exc, response_started)
+                    terminal = (
+                        code
+                        if emitted or attempt >= self.max_retries
+                        else (
+                            "MODEL_RETRY_DEADLINE"
+                            if deadline is not None and delay >= deadline - time.monotonic()
+                            else None
+                        )
+                    )
+                    if terminal:
+                        if transport:
+                            yield ModelEvent(
+                                "telemetry",
+                                {
+                                    "phase": "transport_error",
+                                    "attempt": attempt + 1,
+                                    "errorCode": terminal,
+                                    **transport,
+                                },
+                            )
+                        raise DomainError(terminal, 502)
                     yield ModelEvent(
                         "telemetry",
                         {
@@ -109,16 +170,36 @@ class ChatCompletions:
                             "attempt": attempt + 1,
                             "errorCode": code,
                             "delayMs": delay * 1000,
+                            **transport,
                         },
                     )
                     await self.sleep(delay)
         except TimeoutError as exc:
             raise DomainError("MODEL_DEADLINE", 502) from exc
         except httpx.HTTPError as exc:
+            yield ModelEvent(
+                "telemetry",
+                {
+                    "phase": "transport_error",
+                    "attempt": attempt + 1,
+                    "errorCode": "MODEL_TRANSPORT_FAILED",
+                    **transport_failure(exc, response_started),
+                },
+            )
             raise DomainError("MODEL_TRANSPORT_FAILED", 502) from exc
 
     async def _stream_once(self, messages, tools, attempt):
         headers = {"Authorization": "Bearer " + self.api_key} if self.api_key else {}
+        observation = model_observation.get()
+        if observation:
+            headers.update(
+                {
+                    "X-Eval-Session-Id": observation["session"],
+                    "X-Eval-Agent-Id": observation["role"],
+                    "X-Eval-Call-Role": observation["role"],
+                    "X-Request-Id": observation["request"],
+                }
+            )
         body = {
             **self.parameters,
             "model": self.model,
@@ -168,6 +249,7 @@ class ChatCompletions:
             json=body,
             follow_redirects=False,
         ) as response:
+            yield ModelEvent("telemetry", response_receipt(response, attempt + 1))
             if response.status_code in {408, 429, 500, 502, 503, 504}:
                 raise RetryableResponse(
                     response.status_code, retry_delay(response.headers.get("retry-after"), attempt)
@@ -177,7 +259,6 @@ class ChatCompletions:
             if response.status_code >= 400:
                 # Provider bodies can contain echoed prompts and credentials; do not relay them.
                 raise DomainError("MODEL_HTTP_" + str(response.status_code), 502)
-            yield ModelEvent("telemetry", {"phase": "headers", "attempt": attempt + 1})
             first_delta = True
             lines = response.aiter_lines()
             async for line in lines:
@@ -195,10 +276,42 @@ class ChatCompletions:
                     raise DomainError("MODEL_STREAM_INVALID", 502) from exc
                 if not isinstance(data, dict):
                     raise DomainError("MODEL_STREAM_INVALID", 502)
+                if response.extensions.get(BRIDGE_EXTENSION) is True:
+                    receipt = relayed_receipt(data.get("roami_model_receipt"), attempt + 1)
+                    if receipt is not None:
+                        yield ModelEvent("telemetry", receipt)
+                    failure = relayed_transport_failure(
+                        data.get("roami_model_transport"), attempt + 1
+                    )
+                    if failure is not None:
+                        yield ModelEvent("telemetry", failure)
                 if data.get("usage"):
                     if not isinstance(data["usage"], dict):
                         raise DomainError("MODEL_USAGE_INVALID", 502)
-                    yield ModelEvent("usage", normalized_usage(data["usage"], attempt + 1))
+                    usage = normalized_usage(data["usage"], attempt + 1)
+                    if (
+                        response.extensions.get(BRIDGE_EXTENSION) is True
+                        and "roami_model_metering" in data
+                    ):
+                        usage.update(usage_receipt(data["roami_model_metering"]))
+                        if attempt:
+                            # Earlier interrupted relay calls may have reached the provider.
+                            usage.update(requestAttempts=None, retryUsageKnown=False)
+                    yield ModelEvent("usage", usage)
+                if data.get("error") is not None:
+                    error = data["error"]
+                    code = error.get("code") if isinstance(error, dict) else None
+                    # An SSE error cannot prove admission was rejected before dispatch.
+                    raise DomainError(
+                        code
+                        if isinstance(code, str)
+                        and (
+                            code in STREAM_ERROR_CODES
+                            or re.fullmatch(r"MODEL_HTTP_[45][0-9]{2}", code)
+                        )
+                        else "MODEL_STREAM_INVALID",
+                        502,
+                    )
                 choices = data.get("choices", [])
                 if not isinstance(choices, list):
                     raise DomainError("MODEL_STREAM_INVALID", 502)

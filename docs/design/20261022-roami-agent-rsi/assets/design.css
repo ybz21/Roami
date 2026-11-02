@@ -1,0 +1,146 @@
+:root{
+  color-scheme: dark;
+  --bg-base: #0d1117;
+  --bg-container: #161b22;
+  --bg-elevated: #1b222b;
+  --bg-term: #0b0f14;
+  --border: #30363d;
+  --border-subtle: #21262d;
+  --text-bright: #e6edf3;
+  --text-dim: #8b949e;
+  --text-dimmer: #6e7681;
+  --brand-grad: linear-gradient(180deg, #f5f7fa 0%, #c3c9d1 46%, #9aa1ab 56%, #e7ebef 100%);
+  /* Agent 品牌标：用官方色，不许按我们的强调色重新上色。Claude 是陶土橙 #D97757；
+     OpenAI/Codex 的标官方就是单色（深底走白），所以跟前景色走。 */
+  --brand-claude: #d97757;
+  --brand-codex: var(--text-bright);
+  /* 强调色：全站只有这一组，实心块用 --accent-solid，线/文字用 --accent（见 theme.tsx） */
+  --accent: #58a6ff;
+  --accent-solid: #1f6feb;
+  --accent-soft: rgba(31, 111, 235, .14);
+  --accent-border: rgba(88, 166, 255, .45);
+  /* 选中行的底：中性提亮，不带色相（见 theme.tsx 的注释）。
+     --accent-soft 留给强调件（芯片/徽标/聚焦光晕），两者不再混用。 */
+  --sel-bg: rgba(255, 255, 255, .065);
+  /* 成功/运行绿：全站也只有这一组（见 theme.tsx） */
+  --ok: #3fb950;
+  --ok-solid: #238636;
+  --ok-soft: rgba(63, 185, 80, .14);
+  --ok-border: rgba(63, 185, 80, .42);
+  /* 危险/断开红、警示黄：各只有一组（见 theme.tsx） */
+  --danger: #f85149;
+  --danger-soft: rgba(248, 81, 73, .16);
+  --danger-border: rgba(248, 81, 73, .45);
+  --warn: #d29922;
+  --warn-soft: rgba(210, 153, 34, .12);
+  --warn-border: rgba(210, 153, 34, .40);
+  /* 蜂群紫：一直散在 Overview/Projects/App 里各写一遍 #a371f7，现在收成一组 */
+  --swarm: #a371f7;
+  --swarm-soft: rgba(163, 113, 247, .12);
+  --swarm-border: rgba(163, 113, 247, .38);
+  --list-hover: rgba(255, 255, 255, .025);
+  --scroll-thumb: #2a313a;
+  --scroll-thumb-hover: #3d444d;
+  --card-hover-shadow: 0 8px 24px rgba(1, 4, 9, .5);
+  --elevated-shadow: 0 16px 48px rgba(1, 4, 9, .55);
+  --xterm-bg: #0b0f14;
+  --xterm-fg: #e6edf3;
+  /* highlight.js token 配色（深色，GitHub-ish） */
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-title: #d2a8ff;
+  --hl-attr: #7ee787;
+  --hl-built: #ffa657;
+
+  /* 密度：留白是给眼睛的，触控区是给手指的，两者独立 */
+  --tap: 44px;                    /* 最小命中边长 */
+  --ctl-h: 32px;                  /* 控件高（桌面档） */
+  --pad-page: 16px;               /* 页面四周留白 */
+  --gap: 10px;
+  /* 字号刻度（只有这六档）。此前一个页面上能数出 10 种字号，最常用的三种是
+     11.5 / 11 / 10.5——半像素级的差别没人看得出是刻意的，只会读成"随手写的"。
+     除眉标/角标外不许低于 12。 */
+  --fs-micro: 11px;               /* 眉标、角标，唯一允许 <12 的一档 */
+  --fs-meta: 12px;                /* 次要信息：时间、路径、计数 */
+  --fs-sm: 13px;                  /* 密集列表行 */
+  --fs-body: 14px;                /* 正文 */
+  --fs-lg: 16px;                  /* 区块标题 */
+  --fs-title: 22px;               /* 页面标题 */
+  --fs-chip: 12px;
+
+  /* 圆角刻度（四档）：控件 / 行 / 卡片 / 胶囊 */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-card: 14px;
+  --r-pill: 999px;
+  --r-sheet: 16px;
+
+  /* 间距刻度（五档）：4 的倍数，不再出现 3/5/7/9/11/13 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --row-cozy: 42px;
+  --row-compact: 34px;
+
+  /* 桌面壳层：Navigation ｜ Canvas ｜ rail ｜ Dock 的尺寸契约 */
+  --nav-w: 280px;
+  --nav-rail: 48px;
+  --topbar-h: 40px;
+  --status-h: 24px;               /* 底部状态条；粗指针下长到 --tap（见 .tt-statusbar） */
+  --canvas-min: 560px;
+  --split-rail: 8px;
+  --split-hit: 20px;
+  --activity-rail: 320px;
+  --content-overview: 1680px;
+  --content-form: 920px;
+
+  /* 层级：九个具名层，取代 50/90/100/1000/1199/1200/1201/1300/9999 那堆魔数。
+     同层不叠——并排显示的两个 sheet 由栈管理器决定谁在上，不靠差 1 硬顶。 */
+  --z-sticky: 10;                 /* 页面内粘性头 */
+  --z-fab: 30;                    /* 悬浮按钮 / 方向键簇 */
+  --z-nav: 50;                    /* 底栏 / 导航轨 */
+  --z-subpage: 90;                /* 全屏二级页 */
+  --z-session: 100;               /* 会话全屏 */
+  --z-session-sub: 110;           /* 会话全屏里再开的二级页（Git/文件从终端里唤起） */
+  --z-scrim: 900;                 /* 遮罩 */
+  --z-sheet: 1000;                /* 底部 sheet / 抽屉 */
+  --z-panel: 1200;                /* 桌面右侧浮动面板：压过 sheet(1000)，低于 antd 弹层基座(1300) */
+  --z-popup: 1300;                /* antd 弹层基座 */
+  --z-toast: 1500;
+  --z-drag: 9999;                 /* 拖拽幽灵 */
+
+  /* 边界：所有 position:fixed 的层必须显式吃安全区；--kb 由 layout.ts 回填 */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --kb: 0px;}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body { background: var(--bg-base); color: var(--text-bright); font: var(--fs-body)/1.85 system-ui, sans-serif; }
+main { height: 100%; overflow: auto; padding: var(--sp-5); }
+article { max-width: var(--content-form); margin: auto; }
+h1 { font-size: var(--fs-title); margin: 0 0 var(--sp-4); }
+h2 { font-size: var(--fs-lg); margin: var(--sp-5) 0 var(--sp-3); border-top: 1px solid var(--border-subtle); padding-top: var(--sp-4); }
+h3 { font-size: var(--fs-body); margin: var(--sp-5) 0 var(--sp-2); }
+p, li, td { color: var(--text-dim); }
+p { margin: var(--sp-3) 0; }
+a { color: var(--accent); overflow-wrap: anywhere; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: var(--sp-1); }
+li + li { margin-top: var(--sp-2); }
+ul, ol { padding-left: var(--sp-5); }
+.tablewrap { overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+th, td { text-align: left; padding: var(--sp-3); border-bottom: 1px solid var(--border-subtle); vertical-align: top; min-width: calc(var(--sp-5) * 5); }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--sp-4); background: var(--bg-container); }
+pre, code { font: var(--fs-meta)/1.8 ui-monospace, monospace; overflow-wrap: anywhere; }
+
+figure { margin: var(--sp-4) 0; }
+figcaption { font-size: var(--fs-meta); color: var(--text-dim); padding: var(--sp-2) 0; }
+nav { display: flex; flex-wrap: wrap; gap: var(--sp-3); border-bottom: 1px solid var(--border-subtle); padding-bottom: var(--sp-3); margin-bottom: var(--sp-5); }
+nav a { display: inline-flex; align-items: center; min-height: var(--tap); font-size: var(--fs-sm); }

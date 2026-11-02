@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-AP01",
+  "data": {
+    "kind": "public_parent_termination_scenarios",
+    "inputs": [
+      "input/scenarios.json"
+    ],
+    "runtime_input": "cmd/roami/agent-parent-lifetime_linux_test.go directly reads input/scenarios.json"
+  },
+  "tools": {
+    "kind": "real_os_parent_child_pipe_and_pidfd",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "source_frozen_go_events",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 3,
+    "no_skips": true
+  }
+}

@@ -16,7 +16,14 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	gate := auth.New("test-only-login", "", "", 5, 30, nil)
 	group := router.Group("/api", gate.Middleware())
 	mountAgentRuntime(group, Config{DataDir: t.TempDir()})
-	for _, path := range []string{"/api/agent/conversations/probe/debug", "/api/agent/conversations/probe/debug/trace", "/api/agent/traces", "/api/agent/capability-settings", "/api/agent/main-conversation", "/api/agent/notification-deliveries", "/api/agent/reminders", "/api/agent/notification-preferences", "/api/agent/status", "/api/agent/conversations", "/api/agent/notifications", "/api/agent/artifacts", "/api/agent/artifacts/probe", "/api/agent/artifacts/probe/content", "/api/agent/tasks/probe/resources", "/api/agent/tasks/probe/activities", "/api/agent/tasks/probe/activities/tool:probe", "/api/agent/tasks/probe/conversation?runId=run", "/api/agent/native-sessions", "/api/agent/native-sessions/probe", "/api/agent/native-sessions/probe/conversation", "/api/agent/native-sessions/probe/events", "/api/agent/resources/probe", "/api/agent/tasks/probe/steering/operation"} {
+	for _, path := range []string{"/api/agent/improvement/cycles", "/api/agent/improvement/cycles/probe", "/api/agent/improvement/cases", "/api/agent/improvement/pipeline/runs/probe/results"} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest("GET", path, nil))
+		if recorder.Code != http.StatusUnauthorized {
+			t.Errorf("improvement report bypassed auth: %s: %d", path, recorder.Code)
+		}
+	}
+	for _, path := range []string{"/api/agent/conversations/probe/debug", "/api/agent/conversations/probe/debug/trace", "/api/agent/traces", "/api/agent/capability-settings", "/api/agent/main-conversation", "/api/agent/notification-deliveries", "/api/agent/reminders", "/api/agent/notification-preferences", "/api/agent/status", "/api/agent/conversations", "/api/agent/notifications/summary", "/api/agent/notification-list", "/api/agent/task-list", "/api/agent/conversations/probe/messages/probe", "/api/agent/notifications", "/api/agent/artifacts", "/api/agent/artifacts/probe", "/api/agent/artifacts/probe/content", "/api/agent/tasks/probe/resources", "/api/agent/tasks/probe/activities", "/api/agent/tasks/probe/activities/tool:probe", "/api/agent/tasks/probe/conversation?runId=run", "/api/agent/native-sessions", "/api/agent/native-sessions/probe", "/api/agent/native-sessions/probe/conversation", "/api/agent/native-sessions/probe/events", "/api/agent/resources/probe", "/api/agent/tasks/probe/steering/operation"} {
 		recorder := httptest.NewRecorder()
 		method := "GET"
 		if path == "/api/agent/main-conversation" {
@@ -35,6 +42,13 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		}
 	}
 	for _, request := range []struct{ method, path string }{
+		{"GET", "/api/agent/capability-markets"},
+		{"PUT", "/api/agent/capability-markets"},
+		{"GET", "/api/agent/capability-markets/npm/search?query=cli"},
+		{"POST", "/api/agent/capability-markets/preview"},
+		{"POST", "/api/agent/capability-markets/prepare"},
+		{"POST", "/api/agent/capability-markets/install"},
+		{"POST", "/api/agent/notifications/read"},
 		{"POST", "/api/agent/tasks/probe/close-session"},
 		{"POST", "/api/agent/capability-imports/skills"},
 		{"PUT", "/api/agent/capability-imports/cli/fixture"},
@@ -57,6 +71,11 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/internal/report", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("private route mounted publicly: %d", recorder.Code)
+	}
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/internal/installation/quiesce", nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("private installation route mounted publicly: %d", recorder.Code)
 	}
 }
 

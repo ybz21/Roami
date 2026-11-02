@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>外挂演示文稿编辑</title><body>
+<h1>外挂演示文稿编辑与最小核心</h1>
+<h2>Product Design</h2><p>PPTX 属性编辑属于可选专业能力，通过完整外挂 presentation-edit Skill 提供。基础 edit 保持通用文本补丁接口；不注册 PPTX 编辑工具，不向基础工具 schema 添加格式参数，不在核心加入编辑器色板、对象选择和 ZIP/XML 变换逻辑。Skill 独立发布、导入与移除。</p>
+<h2>User Stories</h2><ul><li>用户导入完整 Skill 包，Agent 通过既有发现、读取和 bash 执行机制使用。</li><li>从实际源文件观察对象位置，按显式路径或从上到下的排名修改对齐；命名颜色来自实际编辑器调色板。</li><li>完整验证后另存独立可编辑 PPTX；源或目标变化、未知颜色、无效批次和路径越界不发布。</li><li>执行后重新检查输出，在任务结果中明确提供文件链接，由通用交付机制保存。结构检查不替代视觉质量；缺少文件链接时不声称已验证自动发现。</li></ul>
+<h2>Technical Design</h2><p>skills/presentation-edit/SKILL.md 只保留流程和能力边界；references/operations.md 描述 JSON 请求和未知发布的恢复。scripts/presentation.py 是独立 CLI，以脚本依赖元数据声明 lxml/jsonschema；pptx_package、pptx_geometry、pptx_edits、office_palette 处理格式逻辑，document_publication 处理显式工作区、哈希和原子发布。脚本不导入 roami_agent，不调用模型或网关，不设置 Token/财务额度。依赖由 uv 的脚本环境提供，不新增核心依赖。</p><p>复用现有完整 Skill 导入，脚本从返回的 packagePath 运行。包未安装时不进入能力目录，导入与移除不改变基础工具目录/schema。仅新增宿主合同测试，原有读取能力不在本次增加接口或依赖；RSI 执行器和判定器不变，不把专业编辑搬入 improvement。Case 64 独立存储配方、工具、来源、运行器和严格回执，不写入历史正式套件。</p>
+<h2>Acceptance</h2><p>独立包 22 项测试涵盖真实 CLI、位置、颜色、源/目标并发哈希、符号链接及越界、无效批次、保留部件、发布后未知状态。另 1 项真实 NativeExecutor 合同导入完整外挂包，经 read/bash 检查、编辑和复查，最终文件由已有交付机制保存且跨所有者拒绝读取；导入/卸载前后基础工具目录与 schema 一致。Case 64 严格要求 23 项全通过、0 跳过/xfail，保留实际材料与哈希。</p><p>先前原生编辑方案的测试、冻结镜像和候选已撤回作为交付依据，保留在私有历史证据。其真实模型原题两份仍失败；不将独立脚本或协议合同的通过记作模型自主质量，也不据此关闭原 issue。保存模型、Go 限额、原 formal60 和人工标签不变；不部署或启用日程。开发协议/指令文字沿用英文，无新增产品 UI 文案。</p>
+</body></html>

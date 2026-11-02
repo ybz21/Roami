@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:,">
+  <title>公网首屏诊断与整改设计 · Roami</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-base: #0d1117; --bg-container: #161b22; --border-subtle: #21262d;
+      --border: #30363d; --text-bright: #e6edf3; --text-dim: #8b949e;
+      --accent: #58a6ff; --accent-solid: #1f6feb; --ok: #3fb950; --warn: #d29922;
+      --fs-micro: 11px; --fs-meta: 12px; --fs-sm: 13px; --fs-body: 14px; --fs-lg: 16px; --fs-title: 22px;
+      --r-xs: 6px; --r-sm: 10px; --r-card: 14px; --r-pill: 999px;
+      --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --tap: 44px;
+      --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg-base); color: var(--text-bright); }
+    body { display: flex; flex-direction: column; font: var(--fs-body)/1.6 Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    a { color: var(--accent); text-underline-offset: var(--sp-1); overflow-wrap: anywhere; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: var(--sp-1); }
+    .tt-pagehead { flex: none; padding: calc(var(--sp-4) + var(--safe-t)) var(--sp-4) var(--sp-2); border-bottom: 1px solid var(--border-subtle); }
+    .head, main > article { max-width: calc(var(--sp-5) * 48); margin-inline: auto; }
+    h1 { margin: 0; font-size: var(--fs-title); line-height: 1.4; }
+    .meta { margin-block: var(--sp-1) var(--sp-2); color: var(--text-dim); font-size: var(--fs-meta); }
+    nav { display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
+    nav a { min-height: var(--tap); display: inline-flex; align-items: center; font-size: var(--fs-sm); }
+    main { min-height: 0; flex: 1; overflow: auto; padding: 0 var(--sp-4) calc(var(--sp-5) + var(--safe-b)); scroll-behavior: smooth; }
+    section { padding-block: var(--sp-5); border-bottom: 1px solid var(--border-subtle); scroll-margin-top: var(--sp-4); }
+    section:last-child { border: 0; }
+    h2 { font-size: var(--fs-lg); margin: 0 0 var(--sp-3); }
+    h3 { font-size: var(--fs-sm); margin-block: var(--sp-5) var(--sp-2); }
+    p { margin-block: var(--sp-2) var(--sp-3); }
+    ul, ol { padding-left: var(--sp-5); margin-block: var(--sp-2) var(--sp-3); }
+    li + li { margin-top: var(--sp-2); }
+    .dim, small { color: var(--text-dim); } small { font-size: var(--fs-meta); }
+    .lead { font-size: var(--fs-lg); max-width: calc(var(--sp-5) * 38); }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: var(--sp-4); margin-block: var(--sp-5); }
+    .metric { border-top: 1px solid var(--border); padding-top: var(--sp-3); }
+    .metric strong { display: block; font-size: var(--fs-title); color: var(--accent); }
+    .metric span, .metric small { display: block; }
+    .callout { padding: var(--sp-3) var(--sp-4); border-left: var(--sp-1) solid var(--accent); margin-block: var(--sp-4); }
+    .callout p:last-child { margin-bottom: 0; }
+    .table-scroll { max-width: 100%; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); text-align: left; }
+    th, td { padding: var(--sp-3); border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+    th { color: var(--text-dim); font-weight: 500; }
+    .measurements { min-width: 690px; }
+    #list-detail table, #scroll-loading table { min-width: calc(var(--sp-5) * 32); }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+    pre { padding: var(--sp-4); margin-block: var(--sp-3); border: 1px solid var(--border-subtle); overflow: auto; border-radius: var(--r-xs); font-size: var(--fs-sm); }
+    pre code { overflow-wrap: normal; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--sp-4); }
+    .step { border-top: 1px solid var(--border); padding-top: var(--sp-3); }
+    .step b { display: block; color: var(--accent); }
+    .step p { margin-bottom: 0; }
+    .tag { font-size: var(--fs-meta); color: var(--warn); margin-right: var(--sp-2); }
+    details { border-top: 1px solid var(--border-subtle); margin-block: var(--sp-3); }
+    summary { cursor: pointer; min-height: var(--tap); padding-block: var(--sp-3); font-size: var(--fs-sm); }
+    .calculator { padding: var(--sp-4); background: var(--bg-container); border-radius: var(--r-card); }
+    label { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+    input { accent-color: var(--accent-solid); font: inherit; }
+    input[type="range"] { min-height: var(--tap); width: min(100%, 360px); }
+    output { font-variant-numeric: tabular-nums; }
+    .bars { display: grid; gap: var(--sp-4); margin-top: var(--sp-4); }
+    .barhead { display: flex; justify-content: space-between; gap: var(--sp-3); }
+    .track { height: var(--sp-2); background: var(--border-subtle); margin-top: var(--sp-2); }
+    .fill { height: 100%; background: var(--accent); min-width: var(--sp-1); }
+    .fill.goal { background: var(--ok); }
+    .status { color: var(--warn); } .good { color: var(--ok); }
+    .budget { font-size: var(--fs-meta); color: var(--text-dim); margin-top: var(--sp-3); }
+    .sources td:first-child { white-space: nowrap; }
+    footer { padding-top: var(--sp-5); color: var(--text-dim); font-size: var(--fs-meta); }
+  </style>
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="head">
+      <h1>公网首屏诊断与整改设计</h1>
+      <p class="meta">Roami · 2026-11-02 · 轻量列表与滚动分页已实现，尚未部署</p>
+      <nav aria-label="文档目录">
+        <a href="#implementation">已实现</a><a href="#conclusion">诊断结论</a><a href="#evidence">测量证据</a><a href="#design">整改设计</a><a href="#acceptance">实施与验收</a>
+      </nav>
+    </div>
+  </header>
+  <main id="document">
+    <article>
+      <section id="implementation">
+        <h2>本轮交付：轻量列表、滚动分页、详情按需读取</h2>
+        <p class="lead">代码与测试已在独立工作区完成。正式服务尚未更新；以下体积对比来自同一份线上数据的只读快照。</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>读取内容</th><th>整改前</th><th>本轮首批</th><th>何时继续请求</th></tr></thead>
+          <tbody>
+            <tr><td>主对话</td><td>4,266,688 B</td><td>57,800 B，减少 98.6%</td><td>首次最多 50 条可见消息；上翻至顶部才取更早一页</td></tr>
+            <tr><td>任务列表</td><td>221,133 B</td><td>9,990 B / 20 条</td><td>列表触底续读；点选任务才读取完整要求与执行详情</td></tr>
+            <tr><td>通知列表</td><td>305,638 B</td><td>9,014 B / 20 条</td><td>打开面板才取列表，触底续读；未打开时只读 36 B 的未读摘要</td></tr>
+            <tr><td>记忆目录</td><td>已有服务端分页</td><td>20 条短摘要</td><td>触底取下一页；选择记录后读取正文和来源</td></tr>
+          </tbody>
+        </table></div>
+        <p>单页请求防重复，超时可重试；切页、换筛选、后台隐藏时取消后续页。静置、程序恢复滚动位置、短页布局变化都不会自动扫完历史。主对话只发送一份 content，长内容提供“展开全文”；工具输入输出留在详情中。SSE 继续承接实时状态。</p>
+        <p><b>本轮没有迁移或拆表。</b>任务查询只投影短标题与必要状态，现有 JSON 大字段仍在原 tasks 表中。物理拆分是否值得做，应继续依据查询与 I/O 测量决定。</p>
+        <p>桌面键盘和 Android 真机触控已验证；完整门禁与证据见 <a href="records/implementation.md">实现与验收记录</a>，原始体积元数据见 <a href="records/pagination-comparison.json">同快照比较</a>。本轮没有取得部署后公网耗时、CPU 或内存收益。</p>
+        <details><summary>本轮之外的后续工作</summary><p>普通 JSON 压缩、task_details 物理拆表、原生会话进一步字段精简、项目扫描解耦、终端代码按需载入、活动视图内存上限和 DOM 窗口化仍是后续任务。共享缓存沿用 16 MB 预算，主动翻页后的活动视图仍会增长。</p></details>
+      </section>
+      <section id="conclusion">
+        <h2>先处理首屏数据量与传输</h2>
+        <p class="lead">主对话没有分页，一次发送全部历史、重复内容和执行预览。公网下载超过前端 15 秒预算，导致首页长时间加载并显示连接失败。</p>
+        <div class="metrics">
+          <div class="metric"><strong>4.27 MB</strong><span>首页消息响应</span><small>847 条消息，未压缩</small></div>
+          <div class="metric"><strong>43.71 秒</strong><span>直连公网完整下载</span><small>首字节 0.306 秒；禁用系统代理</small></div>
+          <div class="metric"><strong>0.242 秒</strong><span>同接口本机完整返回</span><small>同一数据集与现有正式服务</small></div>
+          <div class="metric"><strong>15 秒</strong><span>前端主动取消预算</span><small>已在浏览器复现消息与任务超时</small></div>
+        </div>
+        <p><b>关于数据库分散：</b>本节点登记了 16 个 SQLite 文件，其中 12 个是历史蜂群库。主对话、任务和通知都在同一个 <code>agents/runtime.db</code> 中；Go 与 Python 在同机通过 Unix socket 通信。此次没有发现跨数据库服务器的查询延迟。</p>
+        <p><b>整改顺序：</b>分页与字段精简、普通 JSON 压缩优先；再拆分摘要、延后 Git/tmux 扫描和无关资源。数据库排队和缺失索引作为后续测量项，目前不安排合库。</p>
+        <div class="callout"><b>证据边界</b><p>测量来自服务器上的正式服务、托管 Chrome 和公网地址。主要公网样本已禁用系统代理，另保留经环境代理的 35.90 秒样本。它们不代表用户手机的 p95；尚未定位公网中转设备、链路限速或运营商。不能把“下载慢”直接归因到某台代理或带宽套餐。</p></div>
+      </section>
+
+      <section id="evidence">
+        <h2>测量证据</h2>
+        <p class="dim">线上 <code>vmain-5d66fbe8</code>，工作区基线 <code>20f5005f</code>。相关启动、历史读取和代理源码在两版间无差异。MB 为十进制，KiB 为 1,024 字节。</p>
+        <div class="table-scroll">
+          <table class="measurements">
+            <thead><tr><th>测量项</th><th>本机回环</th><th>公网 / 浏览器</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>入口 HTML</td><td>3.1 ms</td><td>38.2 ms（代理路径）</td><td>2,251 B，入口本身很小</td></tr>
+              <tr><td>主对话消息</td><td>TTFB 213.9 ms<br>总计 241.5 ms</td><td>TTFB 306.3 ms<br>总计 43,714.3 ms（直连公网）</td><td>4,266,688 B；<code>Content-Encoding</code> 缺失</td></tr>
+              <tr><td>任务列表</td><td>13.7 ms</td><td>直连单独读取 2,052 ms；浏览器并发约 15 秒被取消</td><td>48 项，221,133 B</td></tr>
+              <tr><td>通知列表</td><td>14.5 ms</td><td>浏览器一个样本 3,158 ms</td><td>175 项，305,659 B；每 5 秒请求</td></tr>
+              <tr><td>Agent 状态</td><td>2.0 ms</td><td>34.8 ms（直连公网）</td><td>609 B，采样 <code>writerBacklog=0</code></td></tr>
+              <tr><td>项目列表</td><td>2,156–2,393 ms</td><td>有缓存命中的样本，不能直接比较</td><td>17 个项目，仅约 9 KB；耗时在聚合</td></tr>
+              <tr><td>会话 / 蜂群列表</td><td>167.2 / 36.8 ms</td><td>浏览器部分请求等待约 3 秒</td><td>26 个会话、12 个蜂群；等待还受并发链路影响</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="budget">完整原始数值、直连公网复测及采样条件见 <a href="records/measurements.json">measurements.json</a>。首次脚本对数组型响应的解析错误已在复测中修正，不作为接口错误计入。</p>
+
+        <h3>首次资源与数据不是同一个问题</h3>
+        <p>一个未登录冷访问样本中，HTML 的浏览器 TTFB 为 52.3 ms，FCP 为 1,124 ms，DOMContentLoaded 为 1,017.5 ms。入口静态闭包包含约 <b>728 KB 压缩后的 JS/CSS</b>（解压后约 3.14 MB），含 antd、xterm；认证请求在脚本准备后才开始。这个样本不能证明手机首次访问也只需一秒。</p>
+        <p>静态资源已有 Brotli 和一年 immutable 缓存；普通 Agent JSON 则仍未压缩。已登录的缓存访问能在约 220 ms 出现首屏文字，但随后消息和任务请求超时。<b>FCP 快不等于历史可读或页面可用。</b></p>
+
+        <h3>4.27 MB 是如何产生的</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>内容</th><th>证据</th><th>影响</th></tr></thead>
+          <tbody>
+            <tr><td>全部分支历史</td><td><code>history()</code> 无 LIMIT，递归拼接父分支；当前响应 847 条</td><td>返回量随历史增长，不能只在浏览器隐藏旧行</td></tr>
+            <tr><td>重复内容</td><td>847 条均同时带 <code>content_json</code> 与 <code>content</code></td><td>离线删除前者后，整体从 4.27 MB 降至 2.54 MB</td></tr>
+            <tr><td>执行记录预览</td><td>268 项 activity，含约 636 KB 的 preview 序列化内容</td><td>未展开的工具输入输出也随主对话下载</td></tr>
+            <tr><td>普通 JSON 无压缩</td><td>声明 <code>Accept-Encoding: gzip, br</code> 后仍返回原文</td><td>同一原文离线 gzip 为 755,235 B，仅为体积实验</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>数据库是否读了全库</h3>
+        <p>运行库约 38.35 MB，另有约 4.13 MB WAL；全库有 2,856 条 message、11,819 条 event 和 51 项 task。主分支读取命中了既有 <code>(branch_id, seq)</code> 索引。问题是<b>读取并展开该分支的全部消息</b>，并非浏览器下载整个数据库文件，也不是每次遍历所有 16 个库。</p>
+        <p>Python 的数据库读写共用一个 worker，重查询会排队；<code>events WHERE task_id=…</code> 的一个查询计划出现全表扫描。这是增长风险，但该次本机消息接口约 0.24 秒，状态采样队列为 0，不能据此解释公网约 44 秒的完整下载。</p>
+      </section>
+
+      <section id="budget">
+        <h2>体积如何消耗等待预算</h2>
+        <div class="calculator">
+          <label for="bandwidth">假设有效下载速率 <input id="bandwidth" type="range" min="32" max="1024" step="8" value="120"><output id="bandwidth-value" for="bandwidth">120 KB/s</output></label>
+          <div class="bars" aria-live="polite">
+            <div><div class="barhead"><span>当前全部响应 · 实测体积</span><output id="current-time"></output></div><div class="track"><div class="fill" id="current-bar"></div></div></div>
+            <div><div class="barhead"><span>仅 gzip · 离线体积实验</span><output id="gzip-time"></output></div><div class="track"><div class="fill" id="gzip-bar"></div></div></div>
+            <div><div class="barhead"><span>分页后 64 KiB · 设计预算</span><output id="target-time"></output></div><div class="track"><div class="fill goal" id="target-bar"></div></div></div>
+          </div>
+          <p id="timeout-assessment" class="status"></p>
+          <p class="budget">计算式为字节数 /（KB/s × 1,000），仅估算传输，不含请求、查询、解压、解析或绘制。64 KiB 是待验收预算，不是已实现结果。压缩本身不足以保证首屏达标。</p>
+        </div>
+      </section>
+
+      <section id="design">
+        <h2>Product Design · 先读最近内容</h2>
+        <div class="steps">
+          <div class="step"><b>1. 对话先可用</b><p>认证和节点归属确认后展示输入区，读取最近一页。加载期间保留草稿；发送前依现有业务状态校验。</p></div>
+          <div class="step"><b>2. 历史按需补齐</b><p>向上滚动时读取较早消息，保留顶部锚点。只为当前分支加载，读取失败在原位置提供“重试”。</p></div>
+          <div class="step"><b>3. 详情单独读取</b><p>主对话保留任务进展和阻塞事项；执行预览、完整指令、工具参数和输出在展开详情时读取。</p></div>
+          <div class="step"><b>4. 辅助区独立更新</b><p>未打开消息时只查未读摘要。任务区先显示短列表，Git/worktree 扫描完成后补充，不阻塞对话。</p></div>
+        </div>
+        <h3>User Stories</h3>
+        <ul>
+          <li>首次公网打开首页，我先看到最近对话和输入区，不等待全部历史。</li>
+          <li>回看更早消息时，上滚连续加载；分叉继承、任务锚点和工具调用结果保持完整。</li>
+          <li>从项目或设置进入时，不预取主对话；徽标与导航仍可独立使用。</li>
+          <li>网络失败时保留已读内容、草稿和滚动位置；只重试失败的区域。</li>
+        </ul>
+        <h3>桌面与手机</h3>
+        <p>沿用现有桌面任务／消息／记忆工作区，不增加新的导航。手机继续使用顶栏与首页、项目、工具、设置四入口底栏；任务与消息详情使用 <code>MobileSubPage</code>。首屏不加常驻刷新按钮，不把连接错误等同于任务失败。</p>
+        <p>长正文通过有标识的“展开全文”读取内容，不静默截断；已展开内容随当前阅读状态保留。加载提示用一句话，局部失败不盖住已经显示的对话或输入区。后续实现统一走中英 i18n。</p>
+
+        <h3>Technical Design · 启动数据链</h3>
+        <pre><code>静态最小壳层
+  认证与节点归属（保持鉴权、选节点先于业务请求）
+    最近消息页 + SSE（首屏关键路径）
+    任务短列表（当前工作区可见时）
+    未读摘要（不附历史通知正文）
+    项目目录快照（独立加载，不与对话 Promise.all）
+      后台 Git / worktree 聚合，事件或低频恢复
+
+较早历史、执行详情、通知历史、文件预览、终端：按需读取</code></pre>
+        <p>保留 <code>useAppBootstrap</code> 的登录与节点寻址顺序，避免把请求提前发往错误节点。先减少请求体和无关请求；只有测量证实引导 RTT 显著后，才考虑可兼容旧端的合并 bootstrap 响应。</p>
+      </section>
+
+      <section id="list-detail">
+        <h2>列表与详情分开读取</h2>
+        <p class="lead">列表只读身份、短摘要、状态和必要动作；长正文、完整指令、执行结果和历史记录进入详情。接口、SQL 投影和适合纵向拆分的表一起调整。</p>
+        <p>整改前的任务列表使用 <code>SELECT * FROM tasks</code> 并通过 <code>_view()</code> 返回整行，包含 <code>intent_json / target_json / budget_json</code>；通知列表关联读取 <code>m.content_json</code>。列表即使只画一行，也已经付出了大字段读取和传输成本。本轮 Web 已改用独立轻量查询，旧接口保留兼容；后续再按测量决定物理拆表。</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>对象与优先级</th><th>列表保留</th><th>详情按需读取</th><th>存储与查询调整</th></tr></thead>
+          <tbody>
+            <tr><td>任务 · P0</td><td>id、短标题、真实 state、revision、归属、时间、父任务关系、可用动作与必要会话引用</td><td>完整指令、target/budget、修订、attempt、产物、报告和执行记录</td><td>先提供独立 TaskListItem 查询；P1 将大 JSON 纵向移入 task_details，最新 attempt 用轻量投影批量关联</td></tr>
+            <tr><td>消息与活动 · P0</td><td>当前页可读消息、任务进展、阻塞状态；工具活动只有身份、状态、时间和详情引用</td><td>超长正文、工具 arguments/result、执行预览与原始记录</td><td>messages/tool_calls 使用明确列查询；已有 native payload 引用继续复用，列表不解引用未展开的工具载荷</td></tr>
+            <tr><td>通知 · P0</td><td>id、短标题、短摘要、read、时间、来源引用；徽标只取计数</td><td>来源消息正文与相关任务详情</td><td>当前没有独立 notifications 表，事实来自 events/messages；先补短摘要投影，避免为列表读取完整 content_json</td></tr>
+            <tr><td>记忆 · P1</td><td>id、title、短摘要、kind、state、作用域、时间、sourceCount、必要操作状态</td><td>body、来源证据、关联历史、版本和完整来源列表</td><td>MemoryCatalog 已有分页与详情，但 RECORD_FIELDS 含 r.*；先分开查询字段，确有收益再纵向拆 memory_bodies；复用现有 memory_sources</td></tr>
+            <tr><td>原生会话 · P1</td><td>id、短标题、归属、taskState、lifecycle、更新时间、打开入口</td><td>完整工作目录、归档序号、archiveError、存储诊断与对话正文</td><td>当前列表经 _get() 读取 task JSON；改为批量轻量联查。对话已有 before/limit，继续复用并去掉重复内容字段</td></tr>
+            <tr><td>项目 · P1</td><td>身份、展示名、状态摘要和必要计数，附快照时间</td><td>worktree 清单、Git 文件变化、分支和诊断详情</td><td>存储不新建重复真相；列表读摘要快照，昂贵扫描独立更新</td></tr>
+          </tbody>
+        </table></div>
+        <h3>任务表纵向拆分的目标结构</h3>
+        <p>以下为待实施的目标，不是现有 schema。保留原任务 id 和关系；列表与详情仍在同一个 runtime 库中，以主键关联，避免引入跨库一致性问题。</p>
+        <pre><code>tasks                         task_details
+  id (PK)                       task_id (PK, FK tasks.id)
+  owner_id                      revision
+  origin / parent references    intent_json
+  title / bounded summary       target_json
+  state / revision              budget_json
+  indexed scope / timestamps
+
+task_attempts                 task_attempt_results（后续按实测决定）
+  id / task_id / revision        attempt_id (PK, FK task_attempts.id)
+  state / session references     result_json
+  bounded summary / timestamps
+
+列表：tasks + 必要的轻量状态投影，显式列查询，分页
+详情：先校验 tasks.owner_id，再按 task_id / revision 读取详情
+执行历史和产物：独立分页子资源，不随任务详情一次加载全部记录</code></pre>
+        <p>短标题、摘要和用于列表筛选的 projectId 等字段在写入时维护；列表不能每次读取 intent_json 再截取标题。摘要与详情修订、真实状态及投影版本在同一事务更新；执行器报告仍须经过现有任务状态与验证规则，不直接写成“已完成”。详情读取与预期 revision 不一致时明确返回新 revision，由当前详情视图重新读取。</p>
+        <h3>查询和接口的硬边界</h3>
+        <ul>
+          <li>分别定义 TaskListItem / TaskDetail 等 DTO；SQL 显式列名，列表不调用详情组装器，不执行 SELECT * 后再删字段。</li>
+          <li>分页必须先发生在 SQL，再批量补齐本页必要状态；不逐条调用 _get() 或查询来源、attempt、产物。查询次数不随本页条数线性增长。</li>
+          <li>列表中的 summary 使用有上限的独立字段；不在列表 SQL 中对大正文 substr/json_extract/native_content 后当成已避免载荷读取。</li>
+          <li>完整 instructions、content_json、arguments_json、result_json、sourceRefs 和历史数组不得作为隐藏字段跟随列表。必要会话入口和下一步动作保留为短引用与状态。</li>
+          <li>切详情前列表数据即可展示选中项；进入后才请求详情，执行记录展开后再请求。返回恢复原筛选、游标和滚动位置；详情失败不清空列表。</li>
+          <li>数据库分表不能替代接口精简。消息已使用 native 载荷引用的部分，不再复制一套正文表；通知也不另存一份完整消息作为详情。</li>
+        </ul>
+        <h3>迁移与回退</h3>
+        <p>P0 先上线短列表读模型；P1 再新增 task_details 和摘要列，通过主键游标分批回填，避免单个长事务。回填与并发修订按 revision 校验，摘要不从旧版本覆盖新版本。核对行数、关联完整性和 JSON 内容一致性后切换读取；兼容期同一事务维护旧列与新结构，暂不删除旧列。</p>
+        <p>迁移前清点所有直接读取任务 JSON 的路径，包括 native_sessions、模型任务上下文、任务修订、记忆来源与遗忘传播；统一通过仓库查询或兼容视图读取。不能只改 Web 列表和 tasks 服务，就删除被其他 SQL 使用的旧列。</p>
+        <p>写入、读取和数据库升级兼容检查必须同批设计；旧版运行时不能误写新 schema。回退期间保留兼容写路径并复核数据，不能只回退二进制就假定安全。记忆若后续拆正文，全文索引、遗忘传播、来源校验与删除必须同步，先以查询投影改善 Web 列表。</p>
+        <h3>列表与详情的专项验收</h3>
+        <p>向某个任务详情追加大段指令、工具输出和修订历史，列表响应体积与详情读取次数应保持不变；单个列表项设计上限 2 KiB，默认 20 项页面不超过 48 KiB 未压缩数据。断言列表查询没有读取详情列或解析 native 工具载荷，列表首次请求不触发详情网络请求。验证分页、修订一致性、越权访问、删除与回退；性能收益仍以实现后的生产构建实测为准。</p>
+      </section>
+
+      <section id="scroll-loading">
+        <h2>滚动到边界，才请求下一页</h2>
+        <p class="lead">首次只请求当前可见内容的一页。聊天回看触达顶部才取更早消息，普通列表浏览到底部才取后续记录；未浏览的页不请求、不解析、不渲染。</p>
+        <p><b>整改前基线：</b><code>useAgentHistory</code> 用 <code>entries.slice(start)</code> 每次多显示 24 组，属于已经下载后的分批渲染，不会减少全量消息响应。原生会话已有 before 分页与“加载更早”按钮，记忆目录已有 limit/offset 与翻页按钮；这些入口应复用服务端能力，再统一滚动触发和资源预算。本轮主对话已使用真实服务端分页，普通列表已按浏览意图续读；以下完整规则还包含窗口化等后续目标。</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>推广对象</th><th>首次读取</th><th>后续请求触发</th><th>更新与位置规则</th></tr></thead>
+          <tbody>
+            <tr><td>主对话、原生会话</td><td>最近一页；与前文消息/字节预算统一</td><td>用户回看至内容顶部，再用 olderCursor/before 请求一页</td><td>prepend 保持原消息锚点；新消息用 SSE，用户回看时不强制跳到底部</td></tr>
+            <tr><td>任务、通知、记忆、搜索结果</td><td>当前筛选下第一批，默认 20 项</td><td>用户向下浏览至列表底部，再请求一页</td><td>返回详情恢复筛选、游标和滚动；已有页不因返回而重复请求</td></tr>
+            <tr><td>执行记录、任务修订、来源历史、日志</td><td>用户展开对应区域后，读取一页</td><td>继续浏览到边界，按顺序游标读取下一批</td><td>日志另有行数与字节上限；已结束记录不持续轮询</td></tr>
+            <tr><td>项目/会话、文件目录、树节点</td><td>当前可见列表或已展开节点的一页</td><td>当前列表触底或用户展开具体节点后读取</td><td>子节点单独分页；折叠后停止加载，摘要计数从独立事实源获取</td></tr>
+            <tr><td>插件市场等长目录</td><td>进入目录或提交筛选后的一页</td><td>用户继续向下浏览时读取下一页</td><td>筛选在服务端分页前执行，取消旧筛选请求；不得抓全量后前端筛选</td></tr>
+          </tbody>
+        </table></div>
+        <h3>滚动加载与下拉刷新各有职责</h3>
+        <p>“向下浏览到列表底部”读取后续记录；“在列表顶部下拉”沿用现有手机刷新入口，更新最新内容，不顺带把全部历史重新拉一遍。对话顶部的回看手势归对话历史容器处理，不能同时触发全页下拉刷新。嵌套容器只由实际滚动的一层接收加载事件。</p>
+        <p>用户一直停在当前页时，后续分页请求应为零。SSE 或既有摘要刷新只更新当前窗口、状态和计数，不以“数据有变化”为由重新遍历所有已加载页。未打开的标签、折叠区和不可见面板不预取列表正文或下一页。</p>
+        <h3>一次用户浏览，最多增加一页</h3>
+        <pre><code>打开可见列表：请求首批一页
+  用户向内容边界滚动 / 主动加载
+    可见、hasMore、非 loading、游标有效、当前上下文一致
+      锁定 scope + cursor，请求下一页
+        成功：按 id 去重，保存 nextCursor，恢复阅读锚点
+        失败：保留当前内容，边界显示“重试”
+        结束：hasMore=false，停止观察
+
+一页完成不自动触发另一页；需要后续用户浏览或主动加载。
+切换筛选 / 节点 / 分支 / 页面：中止旧请求并禁止晚到结果写回。</code></pre>
+        <ul>
+          <li>触发器使用实际内容滚动容器作为 IntersectionObserver root，或复用该容器的滚动事件。页面挂载、尺寸变化、恢复位置、程序化滚动和新数据插入不视作新的用户浏览意图。</li>
+          <li>不设置跨多屏的预取区域。首批不足一屏、哨兵持续可见或过滤后返回空页时，也不能自动循环补满整个视口；保留一个可触达的“加载更多”作为短列表与键盘操作的入口。</li>
+          <li>滚动请求在同步锁中按 scope/cursor 去重，复用同一 in-flight。重复 observer 回调、快速滑动与多个消费者不能把同一游标发多次；每个列表最多一个分页请求在执行。</li>
+          <li>hasMore=false、游标缺失或游标没有前进时停止加载。空页但游标前进的情况保留用户继续操作入口，不在后台自动穿透多页。失败不自动无限重试，用户在原边界恢复。</li>
+          <li>切换机器、身份、会话、分支、筛选或排序时使用新的查询代次；卸载、隐藏或折叠后取消在途分页。旧代次的成功、失败和 finally 均不能覆盖新代次状态。</li>
+          <li>任务根列表按根任务分页，子任务由展开动作读取；通知未读数、项目计数与任务总状态由摘要接口提供，不能用当前页长度代替全局事实，也不为徽标遍历所有页。</li>
+        </ul>
+        <h3>服务端和缓存也必须有界</h3>
+        <p>接口在 SQL 中执行筛选、稳定排序与 LIMIT，再读取本页详情；hasMore 可通过多取一条判断，不默认执行昂贵全量 COUNT。增量较多的列表优先使用稳定游标；已有 offset 接口可先复用，但必须校验并发变化带来的重复/遗漏，再渐进迁移。</p>
+        <p><b>后续窗口化目标：</b>前端以节点、身份、资源、筛选与排序作为页缓存身份，缓存键包括游标；页数与字节数同时受限。当前共享缓存已有 16 MB 上限，活动视图未实现正文淘汰和 DOM 窗口。活动阅读窗口和草稿独立保留，远离窗口的页可淘汰正文，保留锚点、游标和必要高度占位；用户重新浏览到已淘汰区域才补读。虚拟列表用于控制 DOM 数量，不能替代服务端分页。</p>
+        <p>长列表重新进入时优先恢复仍有效的缓存，刷新最新摘要或最近页，不从第一页自动串行请求到原位置。消息、通知或任务的深链接用按 id 定位的有界邻近窗口，不通过翻完全部历史来找目标。删除、遗忘与权限变化仍要失效相应缓存，不能为了少请求继续展示已不可见内容。</p>
+        <h3>请求量验收</h3>
+        <ul>
+          <li>未打开面板：列表和详情正文请求均为零；打开面板：只请求首批一页，下一页请求为零。</li>
+          <li>首批加载完静置 30 秒：后续页请求为零；摘要刷新与 SSE 单独计量，不能混入分页预算。</li>
+          <li>真实滚动到边界：恰好增加一页请求；一页返回后继续停留：不追加请求；再次用户浏览才允许再取一页。</li>
+          <li>同一游标多次回调、快速往返滚动和网络慢于滑动：仍只有一个在途请求，没有重复游标请求。</li>
+          <li>短列表、空页、无下一页、删除后缩短列表、布局变化和程序化恢复滚动：均不触发自动扫页。</li>
+          <li>Android 真机分别验证聊天顶部回看、普通列表底部续读、顶部下拉刷新，确保没有双重触发；历史 prepend 后原消息仍停在原视觉位置。</li>
+        </ul>
+      </section>
+
+      <section id="contracts">
+        <h2>分页接口与读模型</h2>
+        <p>本轮采用兼容的现有 v1 命名空间。Go 明确挂载新增路由，仍将 <code>/api/agent/…</code> 映射到 Python <code>/v1/…</code>，后端与前端须配套发布。消息接口有 limit 时返回分页 DTO，无 limit 时保持旧契约；任务与通知通过独立列表路径返回分页对象。模型内部读取保持原语义。</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>本轮接口</th><th>默认与边界</th><th>只返回</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/agent/conversations/:cid/messages?limit=50&amp;before=…</code></td><td>消息分页需传 limit；Web 首批 50、最多 100；目标单页预算 256 KB</td><td>消息 DTO、分页信息、分支身份、snapshotCursor、在页内有锚点的进展摘要</td></tr>
+            <tr><td><code>GET /api/agent/task-list?conversationId=…&amp;limit=20&amp;before=…&amp;filter=…</code></td><td>默认 20、最多 50；按 created_ms 与 id 稳定排序</td><td>短标题、真实状态、revision、时间、必要关联和下一步动作</td></tr>
+            <tr><td><code>GET /api/agent/notifications/summary</code></td><td>小摘要；沿用已有未读事实源</td><td>未读数、最新事件游标，不带正文</td></tr>
+            <tr><td><code>GET /api/agent/notification-list?limit=20&amp;before=…</code></td><td>默认 20、最多 50；按 event id 降序</td><td>摘要、已读状态与来源链接，保持已读游标单调</td></tr>
+            <tr><td>消息正文 / activity / task 详情</td><td>长消息通过 messages/:mid 取全文；activity 和 task 详情复用既有权限校验</td><td>完整内容或当前详情；主列表不附完整工具参数、输出和旧 revision</td></tr>
+          </tbody>
+        </table></div>
+        <pre><code>{
+  "data": {
+    "branchId": "opaque-branch",
+    "messages": [{"id": "m", "role": "assistant", "content": {"text": "…"}}],
+    "activities": [{"id": "a", "anchorMessageId": "m", "state": "running"}],
+    "page": {"olderCursor": "opaque-cursor", "hasMore": true},
+    "snapshotCursor": 1234
+  }
+}</code></pre>
+        <h3>游标必须覆盖分支继承</h3>
+        <ul>
+          <li>不要直接对当前 branch 做 <code>seq &lt; before LIMIT 50</code> 后宣称完成：父分支消息也属于可见历史，且 seq 不是跨分支唯一位置。</li>
+          <li>分页仓库从当前分支倒序读取有限行；不足时沿父分支和 fork 截点继续读取，复用既有最大深度约束。游标使用消息 ID，读取时验证 owner、conversation、选定分支谱系和 fork 截点；越权或不匹配游标返回明确错误。</li>
+          <li>多取一条判断 hasMore；按页面预算逐步读取，不先调用无界 <code>history()</code> 再在 Python 切片。仅对选中行做 native payload 解析和序列化。</li>
+          <li>超过字节预算的单条消息返回可见的摘要与内容引用，通过鉴权的正文接口完整读取；分页游标必须前进。工具参数、结果配对和活动锚点不能因跨页而遗失，缺少的配对摘要单独补取。</li>
+          <li>页面内去重以 message id 为准，保持稳定展示顺序；较早页只 prepend，不替换已有最新消息或改变当前输入草稿。</li>
+        </ul>
+        <h3>SSE 与翻页的一致性</h3>
+        <p>最近页、活动摘要和 <code>snapshotCursor</code> 在一次短只读快照中取得。只读事务内不做网络或文件传输。页面拿到快照后从该游标订阅 SSE，补齐期间的新事件；历史页返回的游标不能让活动流后退。</p>
+        <p>继续复用现有事件投影，事件按 id 去重；晚到的历史页不得覆盖 SSE 已更新的状态。分支切换中止旧请求并隔离缓存。删除、折叠和修订事件要更新已加载各页；窗口外消息不主动拉取完整正文。断线只恢复最近窗口与事件缺口，保留先前阅读锚点。</p>
+        <h3>字段与状态的边界</h3>
+        <p>新的消息 DTO 仅保留 <code>content</code>，不发送 <code>content_json</code>。任务摘要保留真实 task 状态和可用操作，不能把 executor 的 succeeded 当成验证成功。模型上下文、审计和原始记录仍使用既有仓库；不要为了加速 Web 删除历史、执行记录或压缩用户记忆。</p>
+      </section>
+
+      <section id="modules">
+        <h2>代码与模块职责</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>模块</th><th>变更职责</th></tr></thead>
+          <tbody>
+            <tr><td><code>conversation/transcript.py</code><br>新增 <code>conversation/pages.py</code></td><td>Web 分页读模型；有限行的谱系遍历和字节预算。保留模型使用的 history 语义。</td></tr>
+            <tr><td><code>server/http.py</code><br><code>dispatch/tasks.py</code><br><code>replies/notifications.py</code></td><td>注册兼容的 Web 契约、校验 cursor 和 limit；独立摘要查询与详情 DTO；现有客户端兼容。落实<a href="#list-detail">列表与详情字段边界</a>。</td></tr>
+            <tr><td>新增 <code>dispatch/task_list.py</code><br><code>replies/notification_pages.py</code></td><td>显式投影任务和通知摘要，保持所有权与可见性校验。task_details 迁移仍在后续设计中。</td></tr>
+            <tr><td><code>backend/server/agent-runtime.go</code><br>后续：<code>backend/server/json-compression.go</code></td><td>本轮显式挂载列表、摘要和消息详情路由。普通 JSON 压缩为后续工作，须旁路 SSE、WebSocket、文件字节和模型流。</td></tr>
+            <tr><td><code>useAgentThread.ts</code><br><code>agent-protocol.ts</code><br><code>agent-data-cache.ts</code></td><td>按节点、身份、会话、分支缓存有限页；复用 SSE；加载较早页，保存阅读锚点，logout 清理。</td></tr>
+            <tr><td>新增 <code>useBoundaryLoad.ts</code><br><code>usePagedAgentData.ts</code><br><code>NativeSession.tsx / MemoryList.tsx</code></td><td>统一<a href="#scroll-loading">滚动边界触发</a>、单页请求锁、查询代次、取消和停止条件；区分服务端分页与本地渲染窗口，避免短页自动扫完全部数据。</td></tr>
+            <tr><td><code>useAgentInbox.ts</code><br><code>AgentTasks.tsx</code><br><code>AgentWorkspaceRail.tsx</code></td><td>徽标只读摘要，面板可见时读短列表；Ended task 不增加轮询；进展与交付优先。</td></tr>
+            <tr><td><code>app/useProjectDirectory.ts</code><br><code>backend/api/project.go</code><br><code>session-poll.ts</code></td><td>后续：共享目录订阅与快照；响应不等待每个项目 Git 扫描。复用会话概览，后台单次聚合并更新。</td></tr>
+            <tr><td><code>App.tsx / AppShell.tsx</code><br><code>vite.config.ts</code></td><td>后续：缩小静态入口依赖闭包，按实际打开的终端加载 xterm；以生产包闭包检查验证，避免 preload helper 再拉入重块。</td></tr>
+          </tbody>
+        </table></div>
+        <h3>普通 JSON 压缩</h3>
+        <p>建议在 Go 出口按路由和 Content-Type 明确选择性压缩，先用 gzip，再比较 Brotli 的 CPU 成本。遵守 Accept-Encoding 与 q 值、设置 Vary，移除失效 Content-Length；已有编码不重复压缩，小响应跳过。动态私有 JSON 保持 no-store。</p>
+        <p>不对 event-stream、WebSocket、模型 token 流、文件下载、Range 和已压缩资源套缓冲压缩器；不得拖延 SSE 首事件和心跳。若外层已有压缩，先验证端到端响应头，避免两层压缩。压缩故障能独立关闭，分页仍然可用。</p>
+        <h3>目录、刷新与索引</h3>
+        <p>项目接口当前会遍历项目、列 worktree、解析仓库、关联会话并检查 Agent，且只有约 5 秒响应缓存。先返回最近快照和更新时间，后台单飞刷新；昂贵统计独立刷新，不让慢 swarms 阻塞已经返回的 projects。旧值须标记过期，错误不能清空列表或伪造实时状态。</p>
+        <p>新增轮询通过 <code>pollWhileVisible</code>，共享 in-flight，隐藏中止，失败退避；优先沿用已有事件和 <code>useSessionOverview</code>，不新增逐会话轮询。索引候选包括 <code>events(task_id, kind, id)</code>，须以实际查询计划、队列等待及写入成本决定；不在本轮盲目对所有库加索引。</p>
+      </section>
+
+      <section id="acceptance">
+        <h2>实施顺序与验收目标</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>阶段</th><th>交付</th><th>退出条件</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tag">P0</span>有界首屏</td><td>已实现分页 DTO、滚动续读、独立列表/详情查询、摘要；普通 JSON 压缩和部署后端到端计时待办</td><td>首次只一页，静置不取下一页；新 UI 不走无界消息 API；列表不读完整指令/工具载荷；首屏无重复 content_json、无未展开执行预览；新旧契约兼容</td></tr>
+            <tr><td><span class="tag">P1</span>缩短等待链</td><td>task_details 纵向拆分、记忆/原生会话轻量列表、目录快照与单飞、懒加载无关资源</td><td>详情变大不扩大列表；迁移可校验和回退；非首页不请求主对话；非关键失败不阻塞对话；测量实际生产闭包</td></tr>
+            <tr><td><span class="tag">P2</span>治理增长</td><td>队列等待与慢查询观测，必要索引、读连接评估</td><td>只有测出排队或扫描占比后才改；WAL 一致性与事务边界不退化</td></tr>
+          </tbody>
+        </table></div>
+        <h3>后续综合验收预算（本轮结果见顶部）</h3>
+        <ul>
+          <li>最近消息默认 50 条、解压后单页不超过 256 KiB、压缩传输目标不超过 64 KiB；极长正文走显式详情。</li>
+          <li>未读摘要不超过 2 KiB；首屏任务和消息摘要合计目标不超过 48 KiB 压缩数据；首屏 API 合计目标不超过 128 KiB。</li>
+          <li>在 RTT 100 ms、下行 1 Mbps、CPU 降速 4 倍的统一条件下，分开测“新客户端静态缓存空”和“登录后静态缓存命中”。后者最近消息可读 p95 不超过 3 秒；前者先把登录/主壳可交互 p95 控制在 5 秒并继续跟踪。</li>
+          <li>至少各 20 次访问，记录客户端真实可读/可输入标记、TTFB、下载、JSON 解析和绘制；静置 30 秒另采请求数。未登录、已登录、已选分支和长历史分别测，不能混成一个百分位。</li>
+          <li>100、1,000、10,000 条历史与多级 fork 数据下，首屏响应量有上界，SQL 读取行数不随全部历史线性增长。预算失败就调整 DTO，不扩大默认页或隐藏错误。</li>
+        </ul>
+        <h3>行为与真实设备</h3>
+        <p>覆盖父分支继承、工具配对、并发新消息、删除和 revision、分页交错返回、切换节点、logout、断线追赶、极长正文与加载失败。Android 真机用 ADB 点按和上滑验证阅读锚点、顶栏/底栏、安全区、键盘、草稿与恢复；CDP 同时断言内部滚动和文档无横向溢出。</p>
+        <p>实现时按影响范围执行仓库 quick/full 与前端完整门禁；Python 改动再同步运行其 lint、格式和测试。性能结论必须来自正式构建的相同数据与相同网络条件。减少请求数不等于减少 CPU 或内存。</p>
+        <h3>发布与回退</h3>
+        <p>先发兼容后端，再发新前端；按节点启用 Web 分页读模型，分别观测体积、超时、错误和队列。新页面契约失败时保留已加载内容并给局部重试；自动降级不能重新触发无界全历史。回退前端、分页读模型与压缩可以分开进行，原始数据不做迁移或删除。</p>
+      </section>
+
+      <section id="sources">
+        <h2>证据与源码索引</h2>
+        <div class="table-scroll"><table class="sources">
+          <thead><tr><th>编号</th><th>位置</th><th>支撑结论</th></tr></thead>
+          <tbody>
+            <tr><td>E1</td><td><a href="records/measurements.json">脱敏测量记录</a></td><td>响应体积、回环与公网计时、缓存和数据库现状</td></tr>
+            <tr><td>S1</td><td><a href="../../../agent-runtime/src/roami_agent/storage/transcript_repository.py">transcript_repository.py · history</a></td><td>父分支递归，消息 SQL 没有 LIMIT</td></tr>
+            <tr><td>S2</td><td><a href="../../../agent-runtime/src/roami_agent/conversation/transcript.py">transcript.py · messages</a></td><td>全历史、重复字段、activity 与事件组装</td></tr>
+            <tr><td>S3</td><td><a href="../../../frontend/src/components/agent/agent-data-cache.ts">agent-data-cache.ts</a></td><td>15,000 ms 主动取消，缓存预算</td></tr>
+            <tr><td>S4</td><td><a href="../../../frontend/src/components/agent/useAgentInbox.ts">useAgentInbox.ts</a></td><td>原完整通知读取已替换为小摘要，仅首页预取最近消息页</td></tr>
+            <tr><td>S5</td><td><a href="../../../agent-runtime/src/roami_agent/storage/database.py">database.py</a></td><td>本地 SQLite、单 worker、WAL、native payload hydration</td></tr>
+            <tr><td>S6</td><td><a href="../../../backend/agentproxy/proxy.go">proxy.go</a> · <a href="../../../backend/server/server.go">server.go</a></td><td>Unix socket 转发、流式刷新；静态 br/gzip 与缓存已存在</td></tr>
+            <tr><td>S7</td><td><a href="../../../backend/api/project.go">project.go</a> · <a href="../../../frontend/src/app/useProjectDirectory.ts">useProjectDirectory.ts</a></td><td>项目聚合、Git/worktree 扫描、目录等待链与刷新</td></tr>
+            <tr><td>S8</td><td><a href="../../../agent-runtime/src/roami_agent/dispatch/tasks.py">tasks.py</a> · <a href="../../../agent-runtime/src/roami_agent/replies/notifications.py">notifications.py</a></td><td>旧接口有 LIMIT 200；本轮新增轻量列表分页接口</td></tr>
+            <tr><td>S9</td><td><a href="../../../agent-runtime/src/roami_agent/memory/catalog.py">memory/catalog.py</a> · <a href="../../../agent-runtime/src/roami_agent/storage/native_sessions.py">native_sessions.py</a> · <a href="../../../agent-runtime/src/roami_agent/storage/native_payloads.py">native_payloads.py</a></td><td>已有分页/详情与载荷引用；仍需收紧列表整行查询与诊断字段，避免重复建设正文存储</td></tr>
+            <tr><td>S10</td><td><a href="../../../frontend/src/components/agent/useAgentHistory.ts">useAgentHistory.ts</a> · <a href="../../../frontend/src/components/agent/NativeSession.tsx">NativeSession.tsx</a> · <a href="../../../frontend/src/components/agent/MemoryList.tsx">MemoryList.tsx</a></td><td>整改前主对话仅本地切片；本轮主对话、任务、通知和记忆已按浏览意图续读，原生会话复用已有 before 请求</td></tr>
+          </tbody>
+        </table></div>
+        <details><summary>复测方法与当前限制</summary><p>正常登录获取测量会话，不在文件中保存密码、Cookie、聊天内容或真实会话 ID。回环采样禁用系统代理；公网样本分别标明代理和直连路径。SQLite 只以 mode=ro、query_only 读取表计数与查询计划，不执行清理、迁移、VACUUM 或 checkpoint。</p><p>页面时间来自 performance resource/navigation entries；被取消的资源大小为 0 不代表后端没有发送任何数据。FCP、下载完成与真实可用分别计算。当前没有用户端网络瀑布图、云中转配置和长期负载样本，未据此给出 p95 或整机收益承诺。</p></details>
+        <footer>本次交付包含诊断、设计和本地实现，尚未改变线上运行行为。<a href="records/acceptance.md">查看文档验证记录</a> · <a href="README.md">设计入口</a></footer>
+      </section>
+    </article>
+  </main>
+  <script>
+    const bandwidth = document.getElementById('bandwidth');
+    const seconds = bytes => bytes / (Number(bandwidth.value) * 1000);
+    function updateBudget() {
+      document.getElementById('bandwidth-value').value = `${bandwidth.value} KB/s`;
+      const values = { current: 4266688, gzip: 755235, target: 65536 };
+      for (const [key, bytes] of Object.entries(values)) {
+        document.getElementById(`${key}-time`).value = `${seconds(bytes).toFixed(2)} 秒`;
+        document.getElementById(`${key}-bar`).style.width = `${bytes / values.current * 100}%`;
+      }
+      const assessment = document.getElementById('timeout-assessment');
+      const exceeds = seconds(values.current) > 15;
+      assessment.textContent = exceeds ? '当前响应仅传输就超过 15 秒取消预算。' : '当前响应的纯传输估算低于 15 秒，仍需计入查询和渲染。';
+      assessment.className = exceeds ? 'status' : 'good';
+    }
+    bandwidth.addEventListener('input', updateBudget);
+    updateBudget();
+    const initialSection = document.getElementById(location.hash.slice(1));
+    if (initialSection) requestAnimationFrame(() => initialSection.scrollIntoView({ behavior: 'instant' }));
+  </script>
+</body>
+</html>

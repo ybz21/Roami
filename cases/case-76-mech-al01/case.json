@@ -1,0 +1,48 @@
+{
+  "id": "MECH-AL01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "产物链接回归",
+  "prompt": "在普通Agent最终回复中保留有效HTML属性，并提供指向当前任务真实产物的独立Markdown下载链接。",
+  "preconditions": "公开HTML消息配方、真实Runtime及SQLite、本地模型替身。",
+  "expected_terminal": "artifact_links_verified",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "可渲染的当前产物下载链接",
+    "来源冻结及JUnit回执"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-AL01-H1",
+      "rule": "HTML属性内不插入Markdown；HTML标签中的URL不冒充已展示的下载链接。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-AL01-H2",
+      "rule": "只关联当前所有者、当前任务且未删除的产物；保留JSON数据和既有普通Markdown行为。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT",
+    "VD"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "observed_runtime_regression",
+    "issue": 446,
+    "private_records_published": false
+  },
+  "resources": {
+    "inputs": [
+      "input/delivery.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

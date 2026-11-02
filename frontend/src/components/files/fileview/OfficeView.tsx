@@ -11,6 +11,7 @@ const OfficePreviewers = () => import('../OfficePreviewers')
 const DocxFilePreview = lazyRetry(() => OfficePreviewers().then((m) => ({ default: m.DocxFilePreview })))
 const ExcelFilePreview = lazyRetry(() => OfficePreviewers().then((m) => ({ default: m.ExcelFilePreview })))
 const PptxFilePreview = lazyRetry(() => OfficePreviewers().then((m) => ({ default: m.PptxFilePreview })))
+const PdfDocument = lazyRetry(() => import('../../documents/PdfDocument'))
 
 // 后端 soffice 转 PDF 后内嵌（doc/xls/ppt/odt 等无专用前端渲染器的类型）。
 function OfficePdfPreview({ name, previewUrl, rawUrl, downloadUrl, downloadName, height }: { name: string; previewUrl: string; rawUrl: string; downloadUrl: string; downloadName: string; height: string }) {
@@ -54,7 +55,7 @@ function OfficePdfPreview({ name, previewUrl, rawUrl, downloadUrl, downloadName,
     )
   }
   if (!url) return <div style={{ height, display: 'grid', placeItems: 'center' }}><Spin /></div>
-  return <iframe title={name} src={url} style={{ width: '100%', height, border: 0, background: '#fff' }} />
+  return <Suspense fallback={<Spin />}><PdfDocument src={url} name={name} /></Suspense>
 }
 
 export function OfficeView({ kind, path, name, rawUrl, previewUrl, downloadUrl, downloadName, inline, truncated }: {

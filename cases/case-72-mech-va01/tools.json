@@ -1,0 +1,14 @@
+{
+  "pytest_selectors": [
+    "skills/video-assembly/tests/test_assembly.py"
+  ],
+  "expected_collected": 16,
+  "runtime": [
+    "Python标准库",
+    "ffmpeg与ffprobe",
+    "固定roami-rsi-eval镜像",
+    "pytest"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

@@ -1,0 +1,8 @@
+{
+  "case_id": "MECH-RA01",
+  "source": "Authored protocol fixtures for explicit delegated reference decisions",
+  "actual_human_labels": false,
+  "real_model_quality_claimed": false,
+  "historical_scores_changed": false,
+  "baseline": "87e0dbaa"
+}

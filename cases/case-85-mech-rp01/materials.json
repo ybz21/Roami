@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-RP01",
+  "data": {
+    "kind": "public_synthetic_reviewer_responses",
+    "inputs": [
+      "input/partial-artifact-ratings.json"
+    ],
+    "runtime_input": "agent-runtime/tests/fixtures/partial-artifact-ratings.json",
+    "byte_identical_required": true,
+    "description": "首位评分者返回公开合成的完整评分，后续故障由脚本注入；图像/校准参考来自现有测试夹具，不是实际图片或人工确认。",
+    "generated_fixtures": [
+      "agent-runtime/tests/test_improvement_artifact_review.py:pack,certificate,fixture_settings"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "scripted_blind_review_and_private_receipt_recovery"
+  },
+  "acceptance": {
+    "kind": "source_frozen_pytest_receipt",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_collected": 34,
+    "no_skips": true,
+    "pytest_selectors": [
+      "agent-runtime/tests/test_improvement_partial_artifact_ratings.py",
+      "agent-runtime/tests/test_improvement_artifact_review.py"
+    ]
+  }
+}

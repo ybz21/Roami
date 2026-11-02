@@ -1,0 +1,11 @@
+[
+  {"name":"primary","primary":"req-A_1.2:3","secondary":"other","expected":"req-A_1.2:3"},
+  {"name":"secondary","primary":"","secondary":"request-2","expected":"request-2"},
+  {"name":"invalid-primary-fallback","primary":"Bearer private-token","secondary":"request-3","expected":"request-3"},
+  {"name":"empty","primary":"","secondary":"","expected":""},
+  {"name":"whitespace","primary":" request-4 ","secondary":"","expected":""},
+  {"name":"control","primary":"request\nprivate","secondary":"","expected":""},
+  {"name":"unicode","primary":"请求-5","secondary":"","expected":""},
+  {"name":"url","primary":"https://private.example/secret","secondary":"","expected":""},
+  {"name":"long","primary":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","secondary":"request-6","expected":"request-6"}
+]

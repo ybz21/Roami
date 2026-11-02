@@ -1,4 +1,5 @@
 export const NAV = [
+  { key: 'onboarding', labelKey: 'onboarding.title' },
   { key: 'home', labelKey: 'nav.home' },
   { key: 'activity', labelKey: 'agent.overview' },
   { key: 'projects', labelKey: 'nav.projects' },
@@ -13,7 +14,7 @@ export const NAV = [
 
 export const NAV_WORKSPACE = ['home', 'projects', 'files']
 export const NAV_TOOLS = ['browser', 'phone', 'capabilities']
-export const DESKTOP_PAGE_KEYS = new Set(['home', 'activity', 'projects', 'files', 'browser', 'phone', 'capabilities', 'settings', 'sessions', 'swarm', 'hub'])
+export const DESKTOP_PAGE_KEYS = new Set(['onboarding', 'home', 'activity', 'projects', 'files', 'browser', 'phone', 'capabilities', 'settings', 'sessions', 'swarm', 'hub'])
 export const PAGE_TABS_KEY = 'roam.pageTabs'
 export function loadPageTabs(): string[] {
   try {
@@ -27,7 +28,8 @@ export const MOBILE_NAV_KEYS = ['home', 'projects', 'tools', 'settings']
 
 export const CQ_PAGES = new Set(['projects', 'sessions'])
 
-export function mobileNavRoot(tab: string): string {
+export function mobileNavRoot(tab: string, route = tab): string {
+  if (tab === 'onboarding') { const part = route.split('/')[1]; return part === 'model' || part === 'agents' ? 'tools' : part === 'project' || part === 'task' ? 'projects' : 'home' }
   if (tab === 'activity') return 'home'
   if (['sessions', 'swarm', 'w'].includes(tab)) return 'projects'
   if (['install', 'about'].includes(tab)) return 'settings'

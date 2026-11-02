@@ -1,9 +1,10 @@
 import { agentTimeline, groupAgentTimeline } from './agent-timeline'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
-import { AgentLogo, ArrowDown, ArrowUp, BellIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PanelRightIcon, RefreshIcon, StopIcon } from '../../icons'
+import { agentName, isAgentKind, type AgentKind } from '../../agent-kind'
+import { AgentLogo, ArrowDown, BellIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PanelRightIcon, RefreshIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import Markdown from '../markdown/Markdown'
@@ -16,7 +17,9 @@ import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
 import './agent-workspace.css'
 import { useAgentThread } from './useAgentThread'
-import { useAgentHistory } from './useAgentHistory'
+import { useAgentData } from './useAgentData'
+import { useBoundaryLoad } from './useBoundaryLoad'
+import AgentPageBoundary from './AgentPageBoundary'
 import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentDraft } from './useAgentDraft'
 import { useAgentMessageFocus } from './useAgentMessageFocus'
@@ -24,9 +27,12 @@ import { useVisibleAgentReads } from './useVisibleAgentReads'
 import type { AgentInboxState } from './useAgentInbox'
 import type { AgentMessage } from './agent-protocol'
 import AgentComposerPlus from './AgentComposerPlus'
+import ConversationComposer from '../chat/ConversationComposer'
+import VoiceInput from '../chat/VoiceInput'
 import AgentMessageView from './AgentMessageView'
 import AgentTaskActivity from './AgentTaskActivity'
-import { mainTaskActivities } from './main-task-activity'
+import AgentActivity from './AgentActivity'
+import { mainTaskActivities, groupExecutionSteps } from './main-task-activity'
 import { useAgentAttachments } from './useAgentAttachments'
 import { useAgentModels } from './useAgentModels'
 import { useAgentOutbox } from './useAgentOutbox'
@@ -48,15 +54,16 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
   mobileActionsHost?: HTMLElement | null
 }) {
-  const { t } = useI18n(), { phone, landscape, size } = useLayout(), { message } = App.useApp()
-  const thread = useAgentThread(cid, branch, node)
+  const { t } = useI18n(), { phone, size } = useLayout(), { message } = App.useApp()
+  const thread = useAgentThread(cid, branch, node, focusMessage)
+  const rsi = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60_000)
   const workspace = useAgentWorkspace(node), wide = size === 'large'
   const workspaceSelectionKey = 'roami.task.selection.' + (node || 'local') + ':' + cid
   const [workspaceTask, editWorkspaceTask] = useAgentDraft(workspaceSelectionKey)
   const setWorkspaceTask = (value: string) => { editWorkspaceTask(value); try { if (value) localStorage.setItem(workspaceSelectionKey, value); else localStorage.removeItem(workspaceSelectionKey) } catch { /* Keep selection in memory. */ } }
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
-  const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState('codex')
+  const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState<AgentKind>('codex')
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const showPanel = (next: 'tasks' | 'memory' | 'context') => {
     if (phone && next !== 'context') { openAgentPage(next); return }
@@ -102,7 +109,21 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
   const settledDispatches = useMemo(() => new Set(bodies.filter(m => ['completed', 'failed'].includes(m.content.sessionReply?.status || '')).map(m => m.content.sessionReply!.dispatchId)), [bodies])
   const timeline = useMemo(() => groupAgentTimeline(agentTimeline(bodies, mainTaskActivities(thread.view?.activities || []))), [bodies, thread.view?.activities])
   const visible = useMemo(() => bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming'), [bodies])
-  const history = useAgentHistory(`${node || 'local'}:${cid}:${branch}:${thread.view?.branchId || ''}`, timeline, focusMessage, scroll)
+  const history = { entries: timeline }
+  const prepend = useRef<{ top: number; height: number } | null>(null)
+  const older = () => {
+    if (!scroll.current || thread.loadingOlder) return
+    prepend.current = { top: scroll.current.scrollTop, height: scroll.current.scrollHeight }
+    stick.current = false
+    void thread.loadOlder()
+  }
+  useBoundaryLoad(scroll, older, !!thread.view?.page?.hasMore && !thread.loadingOlder && !thread.olderFailed, 'start')
+  useLayoutEffect(() => {
+    if (!thread.loadingOlder && prepend.current && scroll.current) {
+      scroll.current.scrollTop = prepend.current.top + scroll.current.scrollHeight - prepend.current.height
+      prepend.current = null
+    }
+  }, [thread.view?.messages, thread.loadingOlder])
   const eventIds = history.entries.map(entry => entry.message?.completedEventId || '').join(',')
   useVisibleAgentReads(!inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox.refresh)
 
@@ -225,11 +246,12 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onSkill: (name: string) => { setTarget('direct'); changeDraft((draft ? draft + '\n\n' : '') + t('agent.composer.skillDraft', { name, path: 'skill://' + name }) + '\n') },
   }
   const moreMenu = { items: [
+    ...(rsi.value?.developmentRsi === true ? [{ key: 'improvement', label: t('agent.improvement'), icon: <ClockIcon size={16} /> }] : []),
     { key: 'debug', label: t('agent.debug'), icon: <CodeIcon size={16} /> },
     ...(!wide ? [
       { key: 'memory', label: t('agent.memory'), icon: <NotebookIcon size={16} /> },
     ] : []),
-  ], onClick: ({ key }: { key: string }) => { if (key === 'debug') openAgentPage('debug'); else showPanel(key as 'tasks' | 'memory') } }
+  ], onClick: ({ key }: { key: string }) => { if (key === 'debug' || key === 'improvement') openAgentPage(key); else showPanel(key as 'tasks' | 'memory') } }
   const secondaryActions = <>
     <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-act" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={18} /></button></Dropdown>
     <button type="button" className="tt-act agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon />{!!inbox.unread && <span className="agent-badge">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</button>
@@ -257,50 +279,36 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     {(inbox.unavailable || thread.failed) && <div className="agent-feedback" role="status"><span>{t(thread.view ? 'agent.reconnecting' : 'agent.unavailable')}</span><button type="button" className="tt-act" aria-label={t('agent.retry')} onClick={() => { inbox.refresh(); thread.refresh() }}><RefreshIcon /></button></div>}
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
-      <div className="agent-messages" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current); history.expand() } }}>
-        <div className="agent-thread">{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <AgentTaskActivity key={entry.id} items={entry.activities} onTask={id => { if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>
+      <div className="agent-messages" role="region" aria-label={t('agent.title')} tabIndex={0} data-pagination-edge="start" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
+        <div className="agent-thread conversation-transcript"><AgentPageBoundary earlier more={!!thread.view?.page?.hasMore} loading={!!thread.loadingOlder} failed={!!thread.olderFailed} load={older} />{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} conversationId={cid} branchId={thread.view?.branchId} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <div key={entry.id} className="agent-execution-steps">{groupExecutionSteps(entry.activities).map(group => group[0].kind === 'tool' ? <AgentActivity key={group[0].id} items={group} onSession={onSession} conversationId={cid} branchId={thread.view?.branchId} /> : <AgentTaskActivity key={group[0].id} items={group} onTask={id => { if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>
     {error && <div className="agent-feedback error" role="alert">{error}</div>}
     <div className="agent-composer">
       <AgentOutbox key={draftKey} outbox={outbox} ready={outboxReady} running={running} />
-      <div className="tt-composer agent-compose-card">
-        {!!attachments.items.length && <div className="agent-draft-files">{attachments.items.map(item => <div className={`agent-file-card is-${item.state}`} key={item.key}>
+      <ConversationComposer className="agent-compose-card" value={draft} onChange={value => { changeDraft(value); setCommandsDismissed(false); setCommandIndex(0); if (!value) setCommandsOpen(false) }} label={t('agent.message')} placeholder={t(target === 'direct' ? 'agent.placeholder' : 'composer.taskPlaceholder')} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly} hasAttachments={!!attachments.ids.length}
+        send={{ label: t(queueDraft ? 'agent.outbox.add' : target !== 'direct' ? 'composer.createTask' : 'agent.send'), disabled: sending || attachments.blocked || (target !== 'direct' && draft.trim().length > 20000), pending: sending, icon: queueDraft ? <ClockIcon size={16} /> : undefined, onClick: sendDraft }}
+        stop={running ? { label: t('agent.stop'), onClick: () => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) } } : undefined}
+        attachments={!!attachments.items.length && <div className="agent-draft-files">{attachments.items.map(item => <div className={`agent-file-card is-${item.state}`} key={item.key}>
           <FileTextIcon size={20} /><span>{item.name}<small>{t(item.state === 'uploading' ? item.processing ? 'agent.composer.imagePreparing' : 'agent.composer.uploading' : item.state === 'failed' ? item.preparationFailed ? 'agent.composer.imagePrepareFailed' : 'agent.composer.uploadFailed' : item.reference?.previewState === 'unsupported' ? 'agent.composer.fileStoredOnly' : item.reference?.previewState === 'image' && !models.settings?.main.images ? 'agent.composer.imageUnavailable' : ['unavailable', 'encrypted', 'no_text'].includes(item.reference?.previewState || '') ? 'agent.composer.fileUnavailable' : item.optimized ? 'agent.composer.imageOptimized' : 'agent.composer.fileReady')}</small></span>
           {item.state === 'uploading' ? <Spin size="small" /> : <>{item.state === 'failed' && <button type="button" aria-label={t('agent.retry')} disabled={sending} onClick={() => { void attachments.retry(item) }}><RefreshIcon size={15} /></button>}<button type="button" aria-label={t('agent.composer.removeFile', { name: item.name })} disabled={sending} onClick={() => { void attachments.remove(item).catch(() => message.error(t('agent.requestFailed'))) }}><CloseIcon size={15} /></button></>}
         </div>)}</div>}
-        <form onSubmit={event => { event.preventDefault(); sendDraft() }}>
-          <Input.TextArea variant="borderless" aria-label={t('agent.message')} placeholder={t('agent.placeholder')} value={draft} onChange={event => { changeDraft(event.target.value); setCommandsDismissed(false); setCommandIndex(0); if (!event.target.value) setCommandsOpen(false) }} autoSize={{ minRows: 1, maxRows: !phone ? 8 : landscape ? 1 : 5 }} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly}
-            onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
-            onKeyDown={event => {
-              if (event.nativeEvent.isComposing) return
-              if (slash.length && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
-                if (event.key === 'Escape') { event.preventDefault(); setCommandsOpen(false); setCommandsDismissed(true); return }
-                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setCommandIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + slash.length) % slash.length); return }
-                if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (commandsOpen) openCommand(slash[commandIndex % slash.length]); else if (draft === '/' + slash[commandIndex % slash.length]) { void submit() } else { changeDraft('/' + slash[commandIndex % slash.length] + (slash[commandIndex % slash.length] === 'compact' ? ' ' : '')); setCommandsOpen(false) }; return }
-              }
-              if (!phone && event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendDraft() }
-            }} />
-          {slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
-          {(compacting || attachments.items.length > 0) && <div className="agent-compose-status"><span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span></div>}
-          <div className="tt-cbar agent-compose-bar">
-            <div className="tt-cgrp">
-              <AgentComposerPlus {...composerActions} />
-              {target !== 'direct' && <Dropdown trigger={['click']} menu={{ selectedKeys: [target !== 'direct' ? 'task' : 'direct'], items: [{ key: 'direct', label: t('agent.composer.chatMode') }, { key: 'task', label: t('agent.composer.taskMode'), disabled: !!attachments.items.length }], onClick: ({ key }) => setTarget(key === 'task' ? 'loose' : 'direct') }}><button type="button" className="tt-pill agent-mode-trigger" disabled={readOnly || sending} aria-label={t('agent.composer.mode')}>{t(target !== 'direct' ? 'agent.composer.taskMode' : 'agent.composer.chatMode')}<ChevronDown size={14} /></button></Dropdown>}
-            </div>
-            <div className="tt-cend">
-              <AgentComposerPlus {...composerActions} modelTrigger />
-              {running && <button type="button" className={draft.trim() || attachments.items.length ? 'tt-pill ico' : 'tt-send agent-stop'} aria-label={t('agent.stop')} onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) }}><StopIcon size={16} /></button>}
-              {(!running || !!draft.trim() || !!attachments.items.length) && <button type="submit" className="tt-send" aria-label={t(queueDraft ? 'agent.outbox.add' : 'agent.send')} disabled={sending || attachments.blocked || (!draft.trim() && !attachments.ids.length) || readOnly || (target !== 'direct' && draft.trim().length > 20000)}>{sending ? <Spin size="small" /> : queueDraft ? <ClockIcon size={20} /> : <ArrowUp size={20} />}</button>}
-            </div>
-          </div>
-        </form>
-        {target !== 'direct' && <div className="agent-task-options">
+        suggestions={<>{slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
+          {(compacting || attachments.items.length > 0) && <div className="agent-compose-status"><span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span></div>}</>}
+        onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
+        onKeyDown={event => {
+          if (slash.length && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+            if (event.key === 'Escape') { event.preventDefault(); setCommandsOpen(false); setCommandsDismissed(true); return }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setCommandIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + slash.length) % slash.length); return }
+            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (commandsOpen) openCommand(slash[commandIndex % slash.length]); else if (draft === '/' + slash[commandIndex % slash.length]) { void submit() } else { changeDraft('/' + slash[commandIndex % slash.length] + (slash[commandIndex % slash.length] === 'compact' ? ' ' : '')); setCommandsOpen(false) } }
+          }
+        }}
+        leading={<AgentComposerPlus {...composerActions} mode={{ task: target !== 'direct', onChange: task => setTarget(task ? 'loose' : 'direct') }} options={<>
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
-          <Dropdown trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'codex', label: 'Codex', icon: <AgentLogo kind="codex" /> }, { key: 'claude', label: 'Claude Code', icon: <AgentLogo kind="claude" /> }], onClick: ({ key }) => setExecutor(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor as 'codex' | 'claude'} />{executor === 'codex' ? 'Codex' : 'Claude Code'}<ChevronDown /></button></Dropdown>
-        </div>}
-      </div>
+          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: (['codex', 'claude', 'opencode', 'pi'] as const).map(kind => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
+        settings={<AgentComposerPlus {...composerActions} modelTrigger />}
+        voice={<VoiceInput inline scope={draftKey} hotkey={!inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}
@@ -320,6 +328,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
-  {wide && nativeSession ? <aside className="agent-workspace-rail agent-native-workspace" aria-label={t('agent.session')}><div className="agent-native-workspace-nav"><button type="button" className="tt-act" onClick={onCloseNative}>{t('common.back')}</button><span>{t('agent.session')}</span></div><NativeSession id={nativeSession} node={node} projects={projects} onChanged={() => { thread.refresh(); inbox.refresh() }} /></aside> : !inactive && wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  {wide && nativeSession ? <aside className="agent-workspace-rail agent-native-workspace" aria-label={t('agent.session')}><div className="agent-native-workspace-nav"><button type="button" className="tt-act" onClick={onCloseNative}>{t('common.back')}</button><span>{t('agent.session')}</span></div><NativeSession id={nativeSession} node={node} projects={projects} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} /></aside> : !inactive && wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
   </div>
 }

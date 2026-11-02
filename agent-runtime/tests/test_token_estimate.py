@@ -113,12 +113,13 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
             yield ModelEvent("text", "Received")
 
     model = CapturedModel()
-    # Isolate admission from post-turn compaction as the default tool catalog grows.
-    runtime = Runtime(store, model, settings=Settings(context_window=8000, compaction_ratio=0.99))
+    runtime = Runtime(store, model, settings=Settings(compaction_ratio=0.99))
     await runtime.start()
     try:
         c = await runtime.conversations.create("alice")
         text = "界面布局测试" * 1000
+        input_budget = len(text.encode("utf-8")) // 2
+        runtime.settings.current = replace(runtime.settings.current, context_window=input_budget)
         receipt = await runtime.chat.submit("alice", c["id"], "multibyte", text)
         await until(
             store,
@@ -129,7 +130,8 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
         messages, tools = model.received
         assert messages[-1]["content"] == text
         assert tools
-        assert request_tokens(messages, tools) < 8000
+        assert request_tokens(messages, tools) < input_budget
+        assert len(text.encode("utf-8")) > input_budget
         assert (await runtime.context.project("alice", c["id"]))["snapshotId"] is None
     finally:
         await runtime.close()

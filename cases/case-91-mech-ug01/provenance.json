@@ -1,0 +1,9 @@
+{
+  "case_id": "MECH-UG01",
+  "source": "Authored local response fixtures for Go gateway receipt persistence and reserved response headers",
+  "baseline": "7a3d74432b0dfe9eeb99b255631f1f5c94d45293",
+  "private_records_published": false,
+  "real_model_quality_claimed": false,
+  "historical_401_root_cause_proven": false,
+  "historical_scores_changed": false
+}

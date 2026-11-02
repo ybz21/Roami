@@ -1,0 +1,214 @@
+{
+  "version": "rsi-v1.1-draft-20261022",
+  "status": "contracts_and_oracles_only_assets_not_materialized",
+  "global": {
+    "reset": "每个A/B和trial从相同仓库、数据库、记忆、浏览器和媒体快照独立克隆",
+    "clock": "2026-10-22T09:00:00+08:00；新闻和市场时间另以case指定为准",
+    "seed": "每轮冻结seed、资源hash、as-of和oracle版本；两组使用相同seed",
+    "oracle_isolation": "本文件和公开规格不能视为隐藏测试；真正oracle在执行端外部，答案和评分器不得出现在Agent挂载目录",
+    "production": "仅测试用户、测试账户、模拟交易与专用资源，不使用真实持仓或生产写接口"
+  },
+  "category_resources": {
+    "CODE": [
+      "可重置小型仓库",
+      "冻结依赖与锁文件",
+      "外部行为测试",
+      "用户未提交修改快照"
+    ],
+    "DEBUG": [
+      "故障注入仓库",
+      "带版本日志",
+      "请求回执",
+      "并发重放脚本"
+    ],
+    "REVIEW": [
+      "原始补丁与测试",
+      "访问范围夹具",
+      "验证器保管的变异版本",
+      "公开API行为oracle"
+    ],
+    "OPS": [
+      "私有实例和tmux身份",
+      "固定端口与进程清单",
+      "备份与附件hash",
+      "等效CI环境"
+    ],
+    "DOC": [
+      "issue与提交快照",
+      "可编辑PPT模板",
+      "固定事实与图表数据",
+      "渲染器与逐页检查",
+      "图稿和模板使用范围"
+    ],
+    "DEMO": [
+      "隔离API与响应序列",
+      "初始数据",
+      "桌面和触控视口",
+      "指定交互与故障脚本"
+    ],
+    "VIDEO": [
+      "有合法使用范围的合成/许可媒体",
+      "帧号与音频同步标记",
+      "字幕和brief",
+      "目标时间轴",
+      "验证器侧参考片段",
+      "固定解码器与测量参数"
+    ],
+    "NEWS": [
+      "文章和官方更正快照",
+      "发布/发生/抓取时间",
+      "事件与转载关系",
+      "可观察原始链接"
+    ],
+    "DATA": [
+      "CSV/SQL数据及hash",
+      "缺失与重复标记",
+      "独立计算oracle",
+      "固定时区和精度"
+    ],
+    "STOCK": [
+      "虚构或许可的股票数据快照",
+      "公告与财报原文",
+      "as-of时间与可见性",
+      "币种/单位/报告期",
+      "只读持仓样本"
+    ],
+    "QUANT": [
+      "点时可见的OHLCV与股票池",
+      "交易日与可成交标记",
+      "复权事件",
+      "费用与滑点",
+      "冻结切分",
+      "独立逐笔与净值oracle"
+    ],
+    "LAB": [
+      "固定论文和代码commit",
+      "小规模公开许可数据",
+      "模型与硬件能力",
+      "预登记实验协议",
+      "原作者结果与本次结果分开的记录"
+    ],
+    "MECH": [
+      "同一记忆与会话快照",
+      "随机凭证",
+      "工具目录和完整schema",
+      "HTTP与runner故障脚本",
+      "来源图和遗忘关系"
+    ]
+  },
+  "numeric_oracles": {
+    "CODE-01": {
+      "total": 12,
+      "default_page_size": 5,
+      "third_page_count": 2
+    },
+    "DOC-03": {
+      "page_3_metric": 135,
+      "page_5_plan_day": 8,
+      "slide_count": 6
+    },
+    "DATA-01": {
+      "revenue": [
+        100,
+        200,
+        300
+      ],
+      "refund": 50,
+      "net_revenue": 550
+    },
+    "DATA-02": {
+      "successes": [
+        99,
+        9
+      ],
+      "requests": [
+        100,
+        10
+      ],
+      "aggregate_success": 108,
+      "aggregate_requests": 110,
+      "percentage": 98.18181818181819,
+      "minimum_success": 109,
+      "additional_success_required": 1
+    },
+    "STOCK-02": {
+      "current_revenue": 120,
+      "prior_revenue": 100,
+      "current_net_profit": 12,
+      "unit": "百万元",
+      "revenue_yoy": 0.2,
+      "net_profit_margin": 0.1
+    },
+    "QUANT-04": {
+      "equity": [
+        100,
+        110,
+        99,
+        120
+      ],
+      "zero_cost_total_return": 0.2,
+      "zero_cost_max_drawdown": 0.1
+    },
+    "MECH-TE01": {
+      "A": 17,
+      "B": 23,
+      "sum": 40,
+      "read_latency_ms": 600
+    },
+    "MECH-TR01": {
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "sum": 276,
+      "count": 23,
+      "page_size": 5
+    },
+    "MECH-MB01": {
+      "a": 17,
+      "b": 19,
+      "product": 323
+    }
+  },
+  "precision": {
+    "integers": "精确相等",
+    "money": "以最小货币单位整数或Decimal核对，不用二进制浮点直接比较",
+    "ratios": "固定输入下绝对误差≤1e-6；展示百分比按case位数四舍五入",
+    "video_cut": "VIDEO-01最大1帧误差，30fps即1/30秒",
+    "av_sync": "≤100ms",
+    "video_creative_duration": "case目标±0.5秒",
+    "audio_local_repair": "目标区改善与区外保留阈值必须在造夹具时按参考样本冻结，尚未测得时不填通过",
+    "visual": "PPT与Demo按渲染和实际交互核验，不仅依赖文字提取"
+  },
+  "materialization_checklist": [
+    "资源许可和可访问范围确认",
+    "所有预条件可由干净快照复建",
+    "oracle solver得到预期结果",
+    "broken/empty/random基线不能错误通过",
+    "故障注入确实生效",
+    "依赖、时钟和资源hash冻结",
+    "Agent看不到私有答案、验证器凭证与隐藏题",
+    "产物能读回且测量覆盖率有记录"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "case_id": "PUBLIC-14",
+  "data": {
+    "kind": "upstream_registered_suite",
+    "source": {
+      "benchmark": "spreadsheetbench",
+      "task_id": "verified400:38703",
+      "revision": "ab0b742b0fc95b946f212d80ac7771b5531272e4"
+    },
+    "source_case_id": "spreadsheetbench:38703",
+    "local_inputs": false,
+    "load_from": "Registered frozen suite files/asset_files after the benchmark importer completes. Source registration alone does not include or execute the dataset."
+  },
+  "tools": {
+    "kind": "benchmark_environment",
+    "load_from": "The registered suite and its executor image/environment fingerprint; no capabilities are inferred from this source reference."
+  },
+  "acceptance": {
+    "kind": "upstream_adapter",
+    "load_from": "The frozen registered suite judge; not an answer file in this folder."
+  }
+}

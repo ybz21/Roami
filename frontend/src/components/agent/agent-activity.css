@@ -50,3 +50,5 @@ html[data-size="compact"] .agent-activity-toggle time { display:none; }
 .agent-task-progress.is-failed > p { color:var(--danger); }
 
 .agent-task-tool-steps { display:flex; flex-direction:column; gap:var(--sp-3); }
+
+.agent-execution-steps { display:flex; flex-direction:column; gap:var(--sp-2); min-width:0; }

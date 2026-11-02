@@ -1,0 +1,14 @@
+{
+  "origin": "actual_v138_completion_artifact_order_and_unavailable_input_basenames",
+  "public_materials": "synthetic text, names and stdout bytes; no original clips, prompts, private references or transcripts",
+  "actual_tests": [
+    "agent-runtime/tests/test_delivery_evidence.py",
+    "agent-runtime/tests/test_source_deliverables.py",
+    "agent-runtime/tests/test_native_observation_delivery.py",
+    "agent-runtime/tests/test_deliverable_collection_scope.py",
+    "agent-runtime/tests/test_artifact_links.py",
+    "agent-runtime/tests/test_workspace_image_inputs.py"
+  ],
+  "model_calls": 0,
+  "historical_scores_changed": false
+}

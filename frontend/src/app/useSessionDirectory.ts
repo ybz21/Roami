@@ -25,7 +25,8 @@ export function useSessionDirectory() {
           if (s?.name && s?.label) labels[s.name] = s.label
           if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined })
         }
-        setSessIds({ byId, byName })
+        const ids = Object.keys(byId)
+        setSessIds(current => current && ids.length === Object.keys(current.byId).length && ids.every(id => current.byId[id] === byId[id]) ? current : { byId, byName })
         setSessListLoaded(true)
         setSessList((cur) => (cur.length === names.length && cur.every((x, i) => x.name === names[i].name && x.label === names[i].label && x.lastActivity === names[i].lastActivity && x.agent === names[i].agent) ? cur : names))
         setSessionLabels(labels) // 展示名（@roam_name）：界面显示「名字（id）」，handle 仍是会话名

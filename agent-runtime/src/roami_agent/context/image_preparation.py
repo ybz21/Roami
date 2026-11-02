@@ -1,6 +1,7 @@
 """Fit image dimensions and encoded payload while retaining readable source formats."""
 
 import io
+from dataclasses import replace
 
 from PIL import Image, ImageOps
 
@@ -9,6 +10,33 @@ from roami_agent.protocol.image_limits import MAX_PIXELS, ImageLimits
 
 def encoded_size(body):
     return ((len(body) + 2) // 3) * 4
+
+
+def prepare_image_bundle(bodies, limits):
+    """Keep newest-first images within one role payload budget, retaining source indices."""
+    selected = list(enumerate(bodies))
+    current = limits
+    while selected:
+        prepared = []
+        for index, body in selected:
+            try:
+                prepared.append((index, prepare_image(body, current)))
+            except (OSError, ValueError):
+                continue
+        if sum(encoded_size(image["body"]) for _, image in prepared) <= limits.max_encoded_bytes:
+            return prepared
+        width = max(image["width"] for _, image in prepared)
+        height = max(image["height"] for _, image in prepared)
+        if width == height == 1:
+            # Even minimum-size images need headers. Prefer the newest valid sources.
+            valid = {index for index, _ in prepared[:-1]}
+            selected = [(index, body) for index, body in selected if index in valid]
+            current = limits
+        else:
+            current = replace(
+                current, max_width=max(1, int(width * 0.75)), max_height=max(1, int(height * 0.75))
+            )
+    return []
 
 
 def encoded_candidates(image, jpeg_quality):

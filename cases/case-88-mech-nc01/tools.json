@@ -1,0 +1,13 @@
+{
+  "pytest_selectors": [
+    "skills/tabular-analysis/tests/test_numeric_comparison.py"
+  ],
+  "expected_collected": 31,
+  "runtime": [
+    "Python 3.12 standard library",
+    "pytest",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

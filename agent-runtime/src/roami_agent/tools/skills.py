@@ -1,6 +1,7 @@
 """Versioned workflow instructions available to Main and workers."""
 
 import hashlib
+import re
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
@@ -43,6 +44,7 @@ def register_skills(registry, settings):
                 "version": digest.hexdigest(),
                 "references": references,
                 "source": "builtin" if root == builtin else "configured",
+                **({"packagePath": str(resolved.parent)} if root != builtin else {}),
                 "description": next(
                     (
                         line.partition(":")[2].strip().strip("\"'")
@@ -53,6 +55,7 @@ def register_skills(registry, settings):
                 ),
             }
     if skills:
+        reference_pattern = r"^[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*$"
 
         async def skill(args, binding):
             name, reference_path = skill_location(args["name"], args.get("reference", ""))
@@ -64,7 +67,16 @@ def register_skills(registry, settings):
                 if not reference:
                     raise DomainError("SKILL_REFERENCE_NOT_FOUND", 404)
                 return {**reference, "skillVersion": value["version"]}
-            return {"text": value["text"], "version": value["version"]}
+            return {
+                "text": value["text"],
+                "version": value["version"],
+                "resources": [
+                    "skill://" + name + "/" + path
+                    for path in sorted(value["references"])
+                    if re.fullmatch(reference_pattern, path)
+                ],
+                **({"packagePath": value["packagePath"]} if value.get("packagePath") else {}),
+            }
 
         registry.add(
             Tool(
@@ -76,7 +88,7 @@ def register_skills(registry, settings):
                         "name": {"type": "string", "enum": [*skills, *SKILL_ALIASES]},
                         "reference": {
                             "type": "string",
-                            "pattern": r"^references/[a-zA-Z0-9_-]+\.md$",
+                            "pattern": reference_pattern,
                         },
                     },
                     ["name"],

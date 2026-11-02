@@ -29,5 +29,14 @@ it('replaces typing and filtering instead of adding back entries', () => {
 it('validates unknown filters and invalid page numbers from external links', () => {
   history.replaceState(null, '', '#/home?memoryView=unknown&memoryScope=unsafe&memoryType=other&memoryPage=-2&memoryDate=no')
   expect(readMemoryRoute()).toMatchObject({ view: 'saved', scope: 'all', kind: 'all', page: 0, date: '' })
-  expect(normalizeRoute('settings/agent/memory')).toBe('home/memory/home')
+  expect(normalizeRoute('settings/agent/memory')).toBe('settings/agent/memory')
+})
+
+it('keeps settings navigation and query state while reading a memory', () => {
+  history.replaceState({}, '', '#/settings/agent/memory?node=n1&terms=s1')
+  writeMemoryRoute({ ...readMemoryRoute(), view: 'review', query: 'preference', id: 'memory/one' }, true)
+  expect(normalizeRoute(location.hash.slice(2))).toBe('settings/agent/memory')
+  expect(readMemoryRoute()).toMatchObject({ view: 'review', query: 'preference', id: 'memory/one' })
+  expect(new URLSearchParams(location.hash.split('?')[1]).get('node')).toBe('n1')
+  expect(new URLSearchParams(location.hash.split('?')[1]).get('terms')).toBe('s1')
 })

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "task": {"alias": "research-page-task", "state": "running", "revision": 1},
+  "attempt": {"alias": "research-page-run", "state": "unknown", "result": null, "finished_ms": null},
+  "hook_sequence": ["UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "Notification:idle_prompt"],
+  "large_response_recipe": {"field": "tool_response.content", "unit": "page content", "repeat": 20000, "model_tokens": false},
+  "missing_callback_variant": {"lost_post_tool_use_count": 4, "completion_evidence_available": false},
+  "reported_outputs": ["research/index.html", "research/shot.png"],
+  "unreported_file": "unrelated.txt",
+  "data_kind": "synthetic_fixture_derived_from_observed_failure"
+}

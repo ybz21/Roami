@@ -272,3 +272,183 @@ func TestFirstApplyThroughConfigDirectorySymlinkKeepsRestoreState(t *testing.T) 
 		t.Fatal("configuration directory symlink was replaced")
 	}
 }
+
+func TestClaudeDefaultsAndCredentialsFollowSelectedModelAndRestore(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(map[bool]string{false: "first-apply", true: "existing-backup"}[legacy], func(t *testing.T) {
+			store, home := isolatedProviderStore(t)
+			ctx := context.Background()
+			path := filepath.Join(home, ".claude", "settings.json")
+			original := []byte(`{"model":"old-main","apiKeyHelper":"old-key-helper","modelPicker":{"replaceBuiltInOptions":true,"options":[{"model":"old-picker"}]},"env":{"ANTHROPIC_DEFAULT_SONNET_MODEL":"old-sonnet","ANTHROPIC_DEFAULT_OPUS_MODEL":"old-opus","ANTHROPIC_DEFAULT_HAIKU_MODEL":"old-haiku","KEEP":"yes"},"hooks":{"SessionStart":[]},"permissions":{"allow":["Read"]}}`)
+			if err := writePrivate(path, original); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := loadNative(ctx, "claude")
+			beforeFields, _ := before.capture(defaultFields("claude"))
+			if legacy {
+				err := store.locked(func(state *catalog) error {
+					current := stateFor(state, "claude")
+					current.Paths = configPaths(before)
+					for _, f := range beforeFields {
+						if len(f.Path) == 1 && f.Path[0] == "model" || len(f.Path) == 2 && containsLegacyClaudeField(f.Path[1]) {
+							current.Original = append(current.Original, f)
+						}
+					}
+					return store.save(state)
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			input := modelInput("claude")
+			input.AuthMode = "bearer"
+			profile, err := store.Save(ctx, "claude", "", input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view, err := store.Apply(ctx, "claude", profile.ID, before.revision())
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, _ := os.ReadFile(path)
+			values, _ := jsonDocument(data)
+			for _, key := range []string{"ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL"} {
+				if textAt(values, "env", key) != input.Model {
+					t.Fatalf("%s kept the old model", key)
+				}
+			}
+			if valueAt(values, []string{"apiKeyHelper"}) != nil || valueAt(values, []string{"modelPicker"}) != nil || textAt(values, "env", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY") != "1" {
+				t.Fatal("stale helper or picker overrides gateway configuration")
+			}
+			if textAt(values, "env", "KEEP") != "yes" || valueAt(values, []string{"hooks"}) == nil || valueAt(values, []string{"permissions"}) == nil {
+				t.Fatal("changed unrelated Claude settings")
+			}
+			if _, err = store.Restore(ctx, "claude", view.Revision); err != nil {
+				t.Fatal(err)
+			}
+			restored, _ := loadNative(ctx, "claude")
+			afterFields, _ := restored.capture(defaultFields("claude"))
+			if digest(beforeFields) != digest(afterFields) {
+				t.Fatal("did not restore model aliases, helper and picker")
+			}
+		})
+	}
+}
+func containsLegacyClaudeField(key string) bool {
+	switch key {
+	case "ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL":
+		return true
+	}
+	return false
+}
+
+func TestFactoryModeClearsCustomConnectionAndKeepsOriginalBackup(t *testing.T) {
+	for _, kind := range []string{"claude", "codex", "opencode", "pi"} {
+		t.Run(kind, func(t *testing.T) {
+			store, home := isolatedProviderStore(t)
+			ctx := context.Background()
+			config, err := loadNative(ctx, kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, doc := range config.Documents {
+				raw := []byte(`{"model":"previous-model","hooks":{"keep":true},"permissions":{"keep":true}}`)
+				if doc.IsTOML {
+					raw = []byte("model = 'previous-model'\nmodel_provider = 'custom-before-roami'\n[mcp_servers.keep]\ncommand = 'preserve'\n[model_providers.openai]\nbase_url = 'https://old-relay.example'\n")
+				} else if kind == "claude" {
+					raw = []byte(`{"model":"previous-model","env":{"ANTHROPIC_BASE_URL":"https://old-relay.example","ANTHROPIC_AUTH_TOKEN":"original-token","KEEP":"yes"},"apiKeyHelper":"original-helper","hooks":{"keep":true},"permissions":{"keep":true}}`)
+				}
+				if err := writePrivate(doc.Path, raw); err != nil {
+					t.Fatal(err)
+				}
+			}
+			loginPath := filepath.Join(home, ".codex", "auth.json")
+			if err := writePrivate(loginPath, []byte(`{"account":"keep"}`)); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := loadNative(ctx, kind)
+			original, _ := before.capture(defaultFields(kind))
+			profile, err := store.Save(ctx, kind, "", modelInput(kind))
+			if err != nil {
+				t.Fatal(err)
+			}
+			custom, err := store.Apply(ctx, kind, profile.ID, before.revision())
+			if err != nil {
+				t.Fatal(err)
+			}
+			official, err := store.UseOfficial(ctx, kind, custom.Revision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if official.Mode != "official" || official.ActiveID != "" || official.Profiles[0].Applied || !official.CanRestore {
+				t.Fatalf("factory mode state: %+v", official)
+			}
+			cfg, _ := loadNative(ctx, kind)
+			if cfg.current(kind).Model != "" {
+				t.Fatal("factory mode kept custom model")
+			}
+			if kind == "claude" {
+				raw, _ := os.ReadFile(cfg.Documents[0].Path)
+				values, _ := jsonDocument(raw)
+				if textAt(values, "env", "ANTHROPIC_BASE_URL") != "" || textAt(values, "env", "ANTHROPIC_AUTH_TOKEN") != "" || textAt(values, "apiKeyHelper") != "" {
+					t.Fatal("factory mode restored the old custom provider")
+				}
+				if textAt(values, "env", "ROAMI_MODEL_MANAGED") != "1" || textAt(values, "env", "KEEP") != "yes" || valueAt(values, []string{"hooks"}) == nil {
+					t.Fatal("lost ownership or unrelated settings")
+				}
+			}
+			if kind == "codex" {
+				if cfg.current(kind).Provider != "openai" {
+					t.Fatal("factory Codex did not select OpenAI")
+				}
+				for _, doc := range cfg.Documents {
+					if doc.Name == "config" {
+						v, _ := doc.values()
+						if textAt(v, "model_providers", "openai", "base_url") != "" || valueAt(v, []string{"mcp_servers", "keep"}) == nil {
+							t.Fatal("kept OpenAI relay override or removed MCP")
+						}
+					}
+				}
+			}
+			reopened := NewStore(filepath.Join(home, "roami-data"))
+			v, err := reopened.View(ctx, kind)
+			if err != nil || v.Mode != "official" || v.Changed {
+				t.Fatalf("lost factory mode after reopen: %+v %v", v, err)
+			}
+			if len(reopened.Observations(ctx)) != 0 {
+				t.Fatal("factory mode reported a custom provider preset")
+			}
+			if _, err := store.UseOfficial(ctx, kind, custom.Revision); err == nil || err.Error() != "AGENT_CONFIG_CHANGED" {
+				t.Fatal("accepted stale factory switch")
+			}
+			if _, err := store.Restore(ctx, kind, v.Revision); err != nil {
+				t.Fatal(err)
+			}
+			restored, _ := loadNative(ctx, kind)
+			fields, _ := restored.capture(defaultFields(kind))
+			if digest(original) != digest(fields) {
+				t.Fatal("factory switch replaced the original recovery backup")
+			}
+			login, _ := os.ReadFile(loginPath)
+			if string(login) != `{"account":"keep"}` {
+				t.Fatal("changed account sign-in")
+			}
+		})
+	}
+}
+
+func TestExistingOpenCodeConnectionIsShownAsCustom(t *testing.T) {
+	store, _ := isolatedProviderStore(t)
+	ctx := context.Background()
+	cfg, err := loadNative(ctx, "opencode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writePrivate(cfg.Documents[0].Path, []byte(`{"model":"team/model-a","providers":{"team":{"settings":{"baseURL":"https://custom.example"}}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	v, err := store.View(ctx, "opencode")
+	if err != nil || v.Mode != "custom" {
+		t.Fatalf("existing custom provider shown as factory: %+v %v", v, err)
+	}
+}

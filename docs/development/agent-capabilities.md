@@ -2,7 +2,9 @@
 
 桌面和手机的新建任务弹窗、项目任务输入框，以及文件页的“用 Agent 打开”都会在创建会话前读取 `GET /api/agent/capabilities`，把能力说明放在用户任务之前。新任务保留已有工作区简报；文件入口保留原文件任务。用户任务以独立一级标题 `# 任务：`（英文为 `# Task:`）开始，标题前后留空行，与能力说明分开。未选择 Agent 或未填写任务时不注入。
 
-说明保存在 `~/.roami/agent-capabilities.md`；配置了 `ROAMI_HOME` 时随该目录迁移，兼容 `ROAM_HOME` / `TTMUX_HOME`。首次读取时从 `backend/api/prompts/agent-capabilities.md` 创建，权限为 `0600`。已有文件不会被覆盖，每次创建任务都会重新读取，因此编辑后无需重启。留空文件可关闭能力说明注入；删除文件后下次读取会重新生成默认内容。
+说明保存在 `~/.roami/agent-capabilities.md`；配置了 `ROAMI_HOME` 时随该目录迁移，兼容 `ROAM_HOME` / `TTMUX_HOME`。首次读取时从 `backend/api/prompts/agent-capabilities.md` 创建，权限为 `0600`。读取时自动升级内容完全匹配的已知历史内置模板，保留用户编辑过的文件。每次创建任务都会重新读取，因此编辑后无需重启。留空文件可关闭能力说明注入；删除文件后下次读取会重新生成默认内容。
+
+专业 Agent 启动命令统一补充自动权限参数：Claude Code 使用 `--dangerously-skip-permissions`，Codex 使用 `--dangerously-bypass-approvals-and-sandbox`，OpenCode 使用 `--auto`，Pi 无需额外权限参数。用户自定义命令中的明确权限参数保持有效。
 
 默认内容作为 Roami 能力索引：先引导读取本机 `roami-session` skill，覆盖会话查询、派生、派活、续派、swarm 建群、成员、看板、消息、巡检与验收；复杂协作再按需读 `cc-swarm`、`dev-roles`。安装器通过 `skills/sync-skills.sh` 同步到 `~/.claude/skills` 和已存在的 `~/.codex/skills`；自定义目录以实际安装为准。Skill 不可读时回退到 `roami session help` 和索引中的命令，不自动安装。当前 CLI 没有 `swarm help`，子命令也不统一支持 `--help`。
 
@@ -44,4 +46,4 @@ Android 能力通过 `roami adb <参数...>` 调用本机系统 ADB，保留原�
 
 模板是提供给 Agent 的可编辑文件内容，按 i18n 规范的文件内容例外保留中文；产品错误提示同时提供中文和英文。
 
-更新仓库默认模板不会自动迁移已保存的 `agent-capabilities.md`。已有安装需手动同步文件链接段，或在备份自定义内容后删除该文件，使下次读取生成新默认模板。
+自动迁移仅覆盖已登记指纹的历史默认模板。自定义模板需手动同步新增内容，或在备份后删除该文件，使下次读取生成新默认模板。

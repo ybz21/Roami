@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "case_id": "STOCK-04",
+  "data": {
+    "kind": "authored_generated",
+    "generator": {
+      "module": "roami_agent.improvement.evaluation.authored_fixtures",
+      "function": "recipe",
+      "case_id": "STOCK-04"
+    },
+    "workspace_files": [
+      "market.json"
+    ],
+    "workspace_binary_files": [],
+    "frozen_in": "suite.cases[].files and suite.cases[].asset_files",
+    "per_run_receipt": true,
+    "local_inputs": false
+  },
+  "tools": {
+    "kind": "isolated_native_worker",
+    "workspace": "/workspace",
+    "network": "disabled",
+    "coordinator": [
+      "read",
+      "write",
+      "edit",
+      "tool_list",
+      "delegate",
+      "task_status",
+      "task_reply",
+      "reply"
+    ],
+    "worker": [
+      "read",
+      "write",
+      "edit",
+      "bash"
+    ],
+    "configured_by": "roami_agent.improvement.evaluation.execution.executors.NativeFilesExecutor",
+    "permissions": "The executor owns the allowlist; this declaration does not grant extra capabilities."
+  },
+  "acceptance": {
+    "kind": "authored",
+    "required_deliverables": [
+      "report.md",
+      "result.json"
+    ],
+    "reference_answer": "Kept in the host-side frozen judge; not supplied to the agent."
+  }
+}

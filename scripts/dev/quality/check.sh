@@ -35,6 +35,7 @@ tracked_source_files() {
 section "CLI entry audit"
 node scripts/dev/quality/cli-entry-audit.mjs
 bash scripts/dev/selftest/install-storage-preflight.sh
+bash scripts/dev/selftest/install-release-discovery.sh
 bash scripts/dev/selftest/retired-session-entries.sh
 bash scripts/dev/selftest/python-check-scope.sh
 

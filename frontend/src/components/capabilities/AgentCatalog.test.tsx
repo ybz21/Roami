@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   prefs: { agentBalanceRefreshSeconds: 60, codexCommand: 'codex --model configured', claudeCommand: 'claude', piCommand: 'pi', opencodeCommand: 'opencode' },
   loaded: true, phone: false, save: vi.fn(), polls: [] as Array<(signal: AbortSignal) => Promise<unknown>>, stop: vi.fn(),
 }))
+vi.mock('./AgentModels', () => ({ default: ({ setup }: { setup?: import('react').ReactNode }) => <div>{setup}</div> }))
+vi.mock('./RoamiAgentModels', () => ({ default: () => <div>roami-models</div> }))
 vi.mock('../../agent-registry', () => ({ discoverAgents: vi.fn(), installAgent: vi.fn(), checkAgent: vi.fn(), upgradeAgent: vi.fn() }))
 vi.mock('../../preferences', () => ({ usePreferences: () => [state.prefs, state.save], preferencesLoaded: () => state.loaded }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: state.phone }) }))
@@ -29,6 +31,38 @@ beforeAll(() => {
 beforeEach(() => { vi.mocked(discoverAgents).mockResolvedValue([snapshot]); state.save.mockResolvedValue(true) })
 afterEach(() => { cleanup(); vi.clearAllMocks(); state.polls = []; state.loaded = true; state.phone = false; state.prefs = { agentBalanceRefreshSeconds: 60, codexCommand: 'codex --model configured', claudeCommand: 'claude', piCommand: 'pi', opencodeCommand: 'opencode' } })
 
+it('keeps Roami model configuration separate from professional agent polling', () => {
+  render(<AgentCatalog initialKind="roami" onSelect={vi.fn()} />)
+  expect(screen.getByText('roami-models')).toBeTruthy()
+  expect(discoverAgents).not.toHaveBeenCalled()
+  expect(state.polls).toHaveLength(0)
+})
+
+it('embeds the full agent catalog without hiding executors or existing controls', async () => {
+  const select = vi.fn()
+  render(<AgentCatalog embedded mainVerified={false} onSelect={select} />)
+  const main = screen.getByRole('article', { name: 'hub.roamiModels' })
+  expect(screen.getAllByRole('article')[0]).toBe(main)
+  expect(main.querySelector('img')?.getAttribute('src')).toBe('/logo-mark.svg')
+  expect(within(main).getByText('onboarding.pending')).toBeTruthy()
+  await screen.findByRole('article', { name: 'Codex' })
+  expect(screen.getAllByRole('article').map(row => row.getAttribute('aria-label'))).toEqual(['hub.roamiModels', 'Claude Code', 'Codex', 'OpenCode', 'Pi'])
+  expect(screen.getByRole('combobox', { name: 'agent.professional.refreshInterval' })).toBeTruthy()
+  expect(screen.getByText('agent.professional.remaining{"percent":75}')).toBeTruthy()
+  fireEvent.click(within(main).getByRole('button', { name: 'capabilities.agents.manage' }))
+  expect(select).toHaveBeenCalledWith('roami')
+  fireEvent.click(within(screen.getByRole('article', { name: 'OpenCode' })).getByRole('button', { name: 'capabilities.agents.manage' }))
+  expect(select).toHaveBeenLastCalledWith('opencode')
+})
+
+it('embeds the existing executor details without a second mobile return bar', async () => {
+  state.phone = true
+  render(<AgentCatalog embedded initialKind="pi" onSelect={vi.fn()} onLaunch={vi.fn()} />)
+  expect(await screen.findByRole('textbox', { name: 'capabilities.agents.command' })).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'common.back' })).toBeNull()
+})
+
 it('shows exhausted and weekly balances and hides expired snapshots', () => {
   const view = render(<AgentBalance agent={snapshot} />)
   expect(screen.getByText('agent.professional.remaining{"percent":0}')).toBeTruthy()
@@ -42,7 +76,7 @@ it('shows agent cards without opening details and keeps installation separate fr
   const select = vi.fn()
   render(<AgentCatalog onSelect={select} />)
   await screen.findByText('agent.professional.remaining{"percent":75}')
-  expect(screen.getAllByRole('article')).toHaveLength(4)
+  expect(screen.getAllByRole('article')).toHaveLength(5)
   const card = screen.getByRole('article', { name: 'Codex' })
   expect(within(card).getByText('agent.professional.installed')).toBeTruthy()
   expect(within(card).getByText('capabilities.agents.auth.unknown')).toBeTruthy()
@@ -146,4 +180,15 @@ it('keeps mobile details in URL history and returns to the agent catalog', async
   expect(useBackDismiss).toHaveBeenCalledWith(false, expect.any(Function))
   fireEvent.click(screen.getByRole('button', { name: 'common.back' }))
   expect(select).toHaveBeenCalledWith('')
+})
+
+it('installs Claude Code directly from its model settings page', async () => {
+  vi.mocked(discoverAgents).mockResolvedValue([{ kind: 'claude', installed: false, quota: { state: 'unknown' } }])
+  vi.mocked(installAgent).mockResolvedValue()
+  render(<AgentCatalog initialKind="claude" initialSection="models" onSelect={vi.fn()} />)
+  const dialog = screen.getByRole('dialog')
+  fireEvent.click(await within(dialog).findByRole('button', { name: 'agentDiscovery.install' }))
+  expect(installAgent).not.toHaveBeenCalled()
+  fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'agentDiscovery.install' }))
+  await waitFor(() => expect(installAgent).toHaveBeenCalledWith('claude'))
 })

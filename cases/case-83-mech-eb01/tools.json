@@ -1,0 +1,16 @@
+{
+  "pytest_selectors": [
+    "agent-runtime/tests/test_improvement_artifact_sources.py",
+    "agent-runtime/tests/test_improvement_artifact_review.py",
+    "agent-runtime/tests/verification/test_artifact_page_coverage.py"
+  ],
+  "expected_collected": 46,
+  "runtime": [
+    "Python 3.12",
+    "pytest",
+    "LibreOffice/Poppler in ROAMI_RSI_TEST_IMAGE",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}

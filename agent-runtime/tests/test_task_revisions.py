@@ -5,6 +5,7 @@ import json
 
 import httpx
 import pytest
+from native_prompt_messages import dialogue_messages
 from test_runtime import ConversationModel, until
 from test_task_cancellation import task_run, verification
 
@@ -416,9 +417,13 @@ async def test_continuation_cannot_bypass_unaccepted_writes_but_accepted_history
         model = "write-then-read"
 
         async def stream(self, messages, tools):
+            messages = dialogue_messages(messages)
             if messages[-1]["role"] == "tool":
                 yield ModelEvent("text", "Created the proof file")
-            elif messages[-1]["content"].startswith("Continue the existing task"):
+            elif messages[-1]["content"] in {
+                "Answer a follow-up without writing",
+                "Another read-only follow-up",
+            }:
                 yield ModelEvent("text", "Read-only follow-up answer")
             else:
                 yield ModelEvent(

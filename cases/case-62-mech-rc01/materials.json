@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-RC01",
+  "data": {
+    "kind": "observed_failure_synthetic_replay",
+    "local_inputs": true,
+    "recipe": "input/receipts.json",
+    "load_from": "The frozen runtime test pack reads its adjacent fixture snapshot. scripts/run.py and the host catalog regression require byte equality with canonical input/receipts.json; the evaluator does not mount the Case catalog or benchmark oracles into the Agent.",
+    "test_pack_snapshot": "agent-runtime/tests/fixtures/model-request-receipts.json"
+  },
+  "tools": {
+    "kind": "isolated_host_regression",
+    "configuration": "tools.json",
+    "model_calls": "No inference; local scripted responses only."
+  },
+  "acceptance": {
+    "kind": "go_and_pytest_assertions",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "pytest_selectors": [
+      "test_request_receipts.py"
+    ]
+  }
+}

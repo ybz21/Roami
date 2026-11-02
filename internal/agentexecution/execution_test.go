@@ -18,6 +18,25 @@ func testService(t *testing.T) Service {
 	return Service{Runtime: runtime.Runtime{HomeDir: root, DataDir: root, Now: time.Now}}
 }
 
+func TestExecutionTitleUsesTaskTopicBeforeInfrastructurePrompt(t *testing.T) {
+	spec := Spec{Executor: "codex", Title: "修复报告链接", Prompt: "[Roami platform capabilities] Discover installed Skills, MCP and CLI"}
+	if got := executionTitle(spec); got != "修复报告链接" {
+		t.Fatalf("session label must be the task topic: %q", got)
+	}
+	spec.Title = "  修复报告\n链接  "
+	if got := executionTitle(spec); got != "修复报告 链接" {
+		t.Fatalf("normalize whitespace: %q", got)
+	}
+	spec.Title = strings.Repeat("修", 81)
+	if got := executionTitle(spec); len([]rune(got)) != 80 {
+		t.Fatalf("title truncation must preserve UTF-8: %q", got)
+	}
+	spec.Title, spec.Prompt = "", "Repair report links"
+	if got := executionTitle(spec); got != spec.Prompt {
+		t.Fatalf("legacy launch must retain its topic without executor prefix: %q", got)
+	}
+}
+
 func TestUnknownLaunchNeverExecutesAgain(t *testing.T) {
 	s := testService(t)
 	dir, _ := s.directory("lost-receipt")

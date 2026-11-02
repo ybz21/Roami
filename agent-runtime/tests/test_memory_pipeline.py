@@ -973,3 +973,241 @@ async def test_task_status_revalidates_forgetting_before_tool_result_commit(stor
         assert "contextExcluded" in tool["content_json"]
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "error,terminal",
+    [
+        ("MODEL_OUTPUT_LENGTH", True),
+        ("MODEL_OUTPUT_CONTENT_FILTER", True),
+        ("MODEL_HTTP_503", False),
+    ],
+)
+async def test_extraction_does_not_repeat_nonrecoverable_generation(store, error, terminal):
+    class FaultyMemory:
+        model = "fixture-memory-failure"
+        calls = 0
+
+        async def stream(self, messages, tools):
+            self.calls += 1
+            yield ModelEvent("usage", {"input_tokens": 12, "output_tokens": 8})
+            raise DomainError(error)
+
+    extractor = FaultyMemory()
+    runtime = Runtime(store, ConversationModel(), memory_model=extractor)
+    await runtime.start()
+    try:
+        conversation = await runtime.conversations.create("alice")
+        await runtime.chat.submit(
+            "alice", conversation["id"], "one", "Use a separate worktree for this project"
+        )
+        expected = "failed" if terminal else "queued"
+        await until(
+            store,
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='memory.extract' AND state=? AND attempts=1",
+                (expected,),
+            ),
+        )
+        assert extractor.calls == 1
+        assert await runtime.memory.candidates("alice") == []
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("assistant_text", ["", "The report is saved."])
+@pytest.mark.parametrize("cite_assistant", [False, True])
+async def test_memory_projects_visible_sources_without_tool_intents(
+    store, assistant_text, cite_assistant
+):
+    from roami_agent.storage.transcript_repository import message
+
+    conversation, receipt, user_source = await source(store, text="接口按名称排序")
+    tool_intent = {
+        "text": assistant_text,
+        "tool_calls": [
+            {
+                "id": "planning-call",
+                "type": "function",
+                "function": {"name": "delegate", "arguments": "UNOBSERVED_TOOL_ARGUMENT" * 300},
+            }
+        ],
+    }
+
+    def append(db):
+        mid = message(
+            db,
+            conversation["id"],
+            conversation["active_branch_id"],
+            "assistant",
+            tool_intent,
+            turn_id=receipt["turnId"],
+        )
+        event(db, conversation["id"], "message.completed", {}, message_id=mid)
+        return mid
+
+    assistant_id = await store.call(append, write=True)
+    assistant_source = await store.call(lambda db: source_snapshot(db, "alice", assistant_id))
+
+    class Extractor:
+        model = "fixture-memory-projection"
+
+        async def stream(self, messages, tools):
+            evidence = json.loads(messages[-1]["content"])
+            assert not tools and "UNOBSERVED_TOOL_ARGUMENT" not in messages[-1]["content"]
+            assert evidence[0]["content"] == user_source["content_json"]
+            assert [s["id"] for s in evidence] == [receipt["messageId"]] + (
+                [assistant_id] if assistant_text else []
+            )
+            if assistant_text:
+                assert json.loads(evidence[-1]["content"]) == {"text": assistant_text}
+            yield ModelEvent(
+                "text",
+                json.dumps(
+                    {
+                        "memories": [
+                            {
+                                "title": "source fact",
+                                "body": (assistant_text or "unobserved intent")
+                                if cite_assistant
+                                else "接口按名称排序",
+                                "kind": "fact",
+                                "sourceIds": [
+                                    assistant_id if cite_assistant else receipt["messageId"]
+                                ],
+                            }
+                        ]
+                    }
+                ),
+            )
+
+    runtime = Runtime(store, ConversationModel(), memory_model=Extractor())
+    try:
+        await runtime.memory_jobs.scan()
+        job = await store.call(lambda db: row(db, "SELECT * FROM jobs WHERE kind='memory.extract'"))
+        await runtime.memory_jobs.run(job)
+        current = await store.call(
+            lambda db: row(db, "SELECT * FROM jobs WHERE id=?", (job["id"],))
+        )
+        if cite_assistant and not assistant_text:
+            assert current["state"] == "failed"
+            assert "MEMORY_EXTRACTION_INVALID_SOURCE" in current["payload_json"]
+            assert await runtime.memory.candidates("alice") == []
+        else:
+            assert current["state"] == "done"
+            candidates = await runtime.memory.candidates("alice")
+            assert len(candidates) == 1
+            refs = await store.call(
+                lambda db: rows(
+                    db, "SELECT * FROM memory_sources WHERE memory_id=?", (candidates[0]["id"],)
+                )
+            )
+            expected = assistant_source if cite_assistant else user_source
+            assert refs[0]["source_sha256"] == expected["sha256"]
+        assert await runtime.memory.search("alice", "接口") == []
+        assert (await store.call(lambda db: source_snapshot(db, "alice", assistant_id)))[
+            "content_json"
+        ] == assistant_source["content_json"]
+    finally:
+        await runtime.close()
+
+
+async def test_memory_with_only_tool_intents_never_calls_model(store):
+    from roami_agent.storage.transcript_repository import message
+
+    class ForbiddenExtractor:
+        model = "fixture-never-called"
+
+        def stream(self, messages, tools):
+            raise AssertionError("no observed evidence must not invoke a provider")
+
+    runtime = Runtime(store, ConversationModel(), memory_model=ForbiddenExtractor())
+    conversation = await runtime.conversations.create("alice")
+
+    def append(db):
+        mid = message(
+            db,
+            conversation["id"],
+            conversation["active_branch_id"],
+            "assistant",
+            {"text": "", "tool_calls": [{"id": "planned", "function": {"name": "bash"}}]},
+        )
+        event(db, conversation["id"], "message.completed", {}, message_id=mid)
+
+    try:
+        await store.call(append, write=True)
+        await runtime.memory_jobs.scan()
+        job = await store.call(lambda db: row(db, "SELECT * FROM jobs WHERE kind='memory.extract'"))
+        await runtime.memory_jobs.run(job)
+        await runtime.memory_jobs.run(job)
+        current = await store.call(
+            lambda db: row(db, "SELECT * FROM jobs WHERE id=?", (job["id"],))
+        )
+        assert current["state"] == "done"
+        assert json.loads(current["payload_json"])["usage"]["requestAttempts"] == 0
+        assert await runtime.memory.candidates("alice") == []
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("timeout_seconds", [0, 45])
+async def test_memory_extraction_follows_current_worker_timeout(
+    store, monkeypatch, timeout_seconds
+):
+    from dataclasses import replace
+
+    from roami_agent.protocol.model_routes import settings_with_route
+    from roami_agent.server.configuration import Settings
+
+    seen = []
+    original_timeout = asyncio.timeout
+
+    def observed_timeout(value):
+        seen.append(value)
+        return original_timeout(value)
+
+    monkeypatch.setattr(asyncio, "timeout", observed_timeout)
+
+    class Empty:
+        model = "memory-timeout-fixture"
+
+        async def stream(self, messages, tools):
+            yield ModelEvent("text", '{"memories":[]}')
+
+    settings = Settings()
+    settings = settings_with_route(
+        settings, "worker", replace(settings.route("worker"), timeout_seconds=timeout_seconds)
+    )
+    runtime = Runtime(store, ConversationModel(), settings=settings, memory_model=Empty())
+    try:
+        for timeout in (timeout_seconds, 12):
+            runtime.settings.current = settings_with_route(
+                runtime.settings.current,
+                "worker",
+                replace(runtime.settings.route("worker"), timeout_seconds=timeout),
+            )
+            c, receipt, _ = await source(store, text="A one-off task needs no durable memory.")
+            await store.call(
+                lambda db, c=c, receipt=receipt: event(
+                    db, c["id"], "message.completed", {}, message_id=receipt["messageId"]
+                ),
+                write=True,
+            )
+            await runtime.memory_jobs.scan()
+            job = await store.call(
+                lambda db: row(
+                    db, "SELECT * FROM jobs WHERE kind='memory.extract' AND state='queued'"
+                )
+            )
+            assert job
+            seen.clear()
+            await runtime.memory_jobs.run(job)
+            assert (timeout or None) in seen
+            assert (
+                await store.call(
+                    lambda db, job=job: row(db, "SELECT state FROM jobs WHERE id=?", (job["id"],))
+                )
+            )["state"] == "done"
+    finally:
+        await runtime.close()

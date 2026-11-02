@@ -44,7 +44,8 @@ class AgentLoop:
 
     def preempt(self, turn_id):
         handle = self.turn_tasks.get(turn_id)
-        if turn_id in self.preemptible and handle and not handle.done():
+        # Repeated cancellation can interrupt the journal cleanup and strand a running turn.
+        if turn_id in self.preemptible and handle and not handle.done() and not handle.cancelling():
             handle.cancel("NEW_USER_INTENT")
 
     async def build_context(self, turn, instructions, catalog, completion):
@@ -160,6 +161,8 @@ class AgentLoop:
                                         "headers",
                                         "first_delta",
                                         "retry",
+                                        "transport_error",
+                                        "upstream_transport_error",
                                     }:
                                         await self.manifests.timing(turn, step + 1, timing)
                             elif part.kind == "text" and part.value and "firstTextMs" not in timing:
@@ -299,6 +302,14 @@ class AgentLoop:
                                 "TASK_RESULT_REQUIRED",
                                 "TASK_REPLY_TASK_MISMATCH",
                                 "TASK_COMPLETION_RESTART_FORBIDDEN",
+                                "REQUEST_COVERAGE_REQUIRED",
+                                "REQUEST_COVERAGE_SOURCE_REQUIRED",
+                                "REQUEST_OUTCOME_DROPPED",
+                                "REQUEST_OUTCOMES_PENDING",
+                                "REQUEST_HANDOFF_REQUIRED",
+                                "REQUEST_BLOCKER_REQUIRED",
+                                "REQUEST_HANDOFF_SCOPE_REQUIRED",
+                                "TASK_STEER_SOURCE_REQUIRED",
                             }
                         ):
                             rejected_arguments = call["function"].get("arguments", "")

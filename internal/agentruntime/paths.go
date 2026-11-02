@@ -30,17 +30,23 @@ func Resolve(home, data string) (Paths, error) {
 		return Paths{}, err
 	}
 	root := filepath.Join(p.Data, "run")
-	if candidate := os.Getenv("XDG_RUNTIME_DIR"); candidate != "" {
-		if info, e := os.Stat(candidate); e == nil && info.IsDir() && info.Mode().Perm()&0022 == 0 {
-			if st, ok := info.Sys().(*syscall.Stat_t); ok && int(st.Uid) == os.Geteuid() {
-				root = filepath.Join(candidate, "roami")
-			}
-		}
-	}
+
 	sum := sha256.Sum256([]byte(layout.Instance + ":" + p.Data))
 	socket := filepath.Join(root, "agent-"+hex.EncodeToString(sum[:8])+".sock")
 	if len(socket) > 103 {
-		return Paths{}, fmt.Errorf("AGENT_SOCKET_PATH_TOO_LONG: configure a shorter XDG_RUNTIME_DIR")
+		root = filepath.Join("/tmp", fmt.Sprintf("roami-agent-%d", os.Geteuid()))
+		if err := os.Mkdir(root, 0700); err != nil && !os.IsExist(err) {
+			return Paths{}, err
+		}
+		info, err := os.Lstat(root)
+		if err != nil {
+			return Paths{}, err
+		}
+		st, ok := info.Sys().(*syscall.Stat_t)
+		if !info.IsDir() || info.Mode().Perm() != 0700 || !ok || int(st.Uid) != os.Geteuid() {
+			return Paths{}, fmt.Errorf("AGENT_SOCKET_DIRECTORY_UNSAFE")
+		}
+		socket = filepath.Join(root, "agent-"+hex.EncodeToString(sum[:8])+".sock")
 	}
 	return Paths{Storage: p, Database: filepath.Join(p.Database, "agents", "runtime.db"), Socket: socket,
 		Config: filepath.Join(p.Home, "agent.toml"), InstanceID: layout.Instance}, nil

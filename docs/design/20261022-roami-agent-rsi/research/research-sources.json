@@ -1,0 +1,514 @@
+{
+  "checked_at": "2026-10-22",
+  "method": "Primary repositories/papers; immutable commit snapshots; selected source inspection. Downloaded evidence is not a full code audit. No upstream benchmarks reproduced.",
+  "repositories": [
+    {
+      "full_name": "microsoft/agent-lightning",
+      "html_url": "https://github.com/microsoft/agent-lightning",
+      "sha": "05c7fe133175653e48c990546a3509e52dc56512",
+      "archived": false,
+      "pushed_at": "2026-10-20T02:25:57Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "MIT",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/microsoft/agent-lightning/blob/05c7fe133175653e48c990546a3509e52dc56512/README.md",
+          "sha256": "aabd3c1ff7dbf32f717cc98b6cbcaece27bf13de52f46d46acde9108c8f61edf"
+        },
+        {
+          "path": "agentlightning/verl/trainer.py",
+          "url": "https://github.com/microsoft/agent-lightning/blob/05c7fe133175653e48c990546a3509e52dc56512/agentlightning/verl/trainer.py",
+          "sha256": "24fcf0100a2f5a4d707c51c13768a9c785c9f0c61945554c1ddae7636eb24586"
+        },
+        {
+          "path": "docs/20-trainer-configuration.md",
+          "url": "https://github.com/microsoft/agent-lightning/blob/05c7fe133175653e48c990546a3509e52dc56512/docs/20-trainer-configuration.md",
+          "sha256": "8d488d0fa71c3701a70ca32b5692ab7206701197c46645fc8046ebe8b2f73512"
+        }
+      ]
+    },
+    {
+      "full_name": "xiaowu0162/LongMemEval",
+      "html_url": "https://github.com/xiaowu0162/LongMemEval",
+      "sha": "9e0b455f4ef0e2ab8f2e582289761153549043fc",
+      "archived": false,
+      "pushed_at": "2026-05-11T22:49:24Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "MIT",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/xiaowu0162/LongMemEval/blob/9e0b455f4ef0e2ab8f2e582289761153549043fc/README.md",
+          "sha256": "c4ff45676683d9e2f7cf7d9099d26426f14635ec110dbb1da818d1019a142573"
+        },
+        {
+          "path": "src/evaluation/evaluate_qa.py",
+          "url": "https://github.com/xiaowu0162/LongMemEval/blob/9e0b455f4ef0e2ab8f2e582289761153549043fc/src/evaluation/evaluate_qa.py",
+          "sha256": "ecce9c4c79dc89d99534ac17b383a5cbb5b9f0c69ee98adaf0684742e3d95251"
+        },
+        {
+          "path": "src/evaluation/print_retrieval_metrics.py",
+          "url": "https://github.com/xiaowu0162/LongMemEval/blob/9e0b455f4ef0e2ab8f2e582289761153549043fc/src/evaluation/print_retrieval_metrics.py",
+          "sha256": "58b70c0b562ea57372a7774a554c347cd908e901b77ac0149fc90b097b6f1b8f"
+        }
+      ]
+    },
+    {
+      "full_name": "FoundationAgents/AFlow",
+      "html_url": "https://github.com/FoundationAgents/AFlow",
+      "sha": "3f457218fc716093fe53f6df8a5d5e6379d66346",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "license_file_header": "MIT License /  / Copyright (c) 2025 FoundationAgents",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/FoundationAgents/AFlow/blob/3f457218fc716093fe53f6df8a5d5e6379d66346/LICENSE",
+          "sha256": "bce279a8f86499db0f9b1962884544108e4f81705d7c966ad59c66917b1131e5"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/FoundationAgents/AFlow/blob/3f457218fc716093fe53f6df8a5d5e6379d66346/README.md",
+          "sha256": "33845595c1f3f7a102cd31f171a11045415802972487beab8ce6e05e2c24cd46"
+        }
+      ]
+    },
+    {
+      "full_name": "AI4Finance-Foundation/FinRL",
+      "html_url": "https://github.com/AI4Finance-Foundation/FinRL",
+      "sha": "c0018c25de864157dc8470f0047b0d10ec721715",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "license_file_header": "The MIT License (MIT) /  / Copyright (c) 2024 AI4Finance Foundation Inc.",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/AI4Finance-Foundation/FinRL/blob/c0018c25de864157dc8470f0047b0d10ec721715/LICENSE",
+          "sha256": "486a06be9075686b75b35649de0adf9076508c5d0cc5b00af7928b7a96bffe65"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/AI4Finance-Foundation/FinRL/blob/c0018c25de864157dc8470f0047b0d10ec721715/README.md",
+          "sha256": "498bb3870ec65e5b1a885d4faf4070f3c4f28ba4dab9558cb657b5e096d22063"
+        }
+      ]
+    },
+    {
+      "full_name": "TheAgentCompany/TheAgentCompany",
+      "html_url": "https://github.com/TheAgentCompany/TheAgentCompany",
+      "sha": "98b68ef82a47690c316f42fddb05baafaab56851",
+      "archived": false,
+      "pushed_at": "2025-11-17T20:31:16Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "MIT",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/TheAgentCompany/TheAgentCompany/blob/98b68ef82a47690c316f42fddb05baafaab56851/README.md",
+          "sha256": "d1646f67d49d38ef1e81bf7b5057dfc3d6f172b4c8a7413a2cc78741ccb08723"
+        },
+        {
+          "path": "docs/EVALUATION.md",
+          "url": "https://github.com/TheAgentCompany/TheAgentCompany/blob/98b68ef82a47690c316f42fddb05baafaab56851/docs/EVALUATION.md",
+          "sha256": "3350645a8dac63db2191a11af3649a5dc91400493ce3fabb78dca09093956681"
+        },
+        {
+          "path": "workspaces/tasks/pm-present-gitlab-info-as-ppt/evaluator.py",
+          "url": "https://github.com/TheAgentCompany/TheAgentCompany/blob/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/pm-present-gitlab-info-as-ppt/evaluator.py",
+          "sha256": "c003be33d24e15a60e1d0b8bfc5390e72960be2386e0beca8ddd424a4398f1a3"
+        },
+        {
+          "path": "workspaces/tasks/pm-present-gitlab-info-as-ppt/task.md",
+          "url": "https://github.com/TheAgentCompany/TheAgentCompany/blob/98b68ef82a47690c316f42fddb05baafaab56851/workspaces/tasks/pm-present-gitlab-info-as-ppt/task.md",
+          "sha256": "c8f04427aa726c69a25ab593c0ef65ea6a0a9503d79c9138d6b4afa296d57a37"
+        }
+      ]
+    },
+    {
+      "full_name": "zlwang-cs/OfficeBench",
+      "html_url": "https://github.com/zlwang-cs/OfficeBench",
+      "sha": "b978b808667c32b52ce19a67ce1def1de9ae02b7",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "license_file_header": "                                 Apache License /                            Version 2.0, January 2004 /                         http://www.apache.org/licenses/",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/zlwang-cs/OfficeBench/blob/b978b808667c32b52ce19a67ce1def1de9ae02b7/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/zlwang-cs/OfficeBench/blob/b978b808667c32b52ce19a67ce1def1de9ae02b7/README.md",
+          "sha256": "04104d99107c2f109ea57d06f75541051efd4e7b5a8b2e41083315b3d21d5ed2"
+        }
+      ]
+    },
+    {
+      "full_name": "PhiloLabs/agentic-vbench",
+      "html_url": "https://github.com/PhiloLabs/agentic-vbench",
+      "sha": "b2764ed4b2a4b5a1737026b63887b50bba62f793",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "license_file_header": "                                 Apache License /                            Version 2.0, January 2004 /                         http://www.apache.org/licenses/",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/PhiloLabs/agentic-vbench/blob/b2764ed4b2a4b5a1737026b63887b50bba62f793/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/PhiloLabs/agentic-vbench/blob/b2764ed4b2a4b5a1737026b63887b50bba62f793/README.md",
+          "sha256": "0f7d656694b94a22a2a22ab4d229d0eff47e657643673b6f42753eda83277cb7"
+        },
+        {
+          "path": "docs/VERIFIER_DESIGN.md",
+          "url": "https://github.com/PhiloLabs/agentic-vbench/blob/b2764ed4b2a4b5a1737026b63887b50bba62f793/docs/VERIFIER_DESIGN.md",
+          "sha256": "baa008be5b34f2105e864f2ca17f5030b32f8037aed2b5abc387b4fb87b36baf"
+        }
+      ]
+    },
+    {
+      "full_name": "ace-agent/ace",
+      "html_url": "https://github.com/ace-agent/ace",
+      "sha": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+      "archived": false,
+      "pushed_at": "2026-08-24T18:50:00Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "Apache-2.0",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/ace-agent/ace/blob/82709de050e1db6e6ef2f07bcb0393560b94992a/README.md",
+          "sha256": "49ade80bc5d5947a439f8c9861b57bde31531e2962638f78ff53b57b90428cd0"
+        },
+        {
+          "path": "ace/core/curator.py",
+          "url": "https://github.com/ace-agent/ace/blob/82709de050e1db6e6ef2f07bcb0393560b94992a/ace/core/curator.py",
+          "sha256": "a22f7f233761acfb00852914d78112a776274c55bc022738af7defca95897617"
+        },
+        {
+          "path": "ace/core/reflector.py",
+          "url": "https://github.com/ace-agent/ace/blob/82709de050e1db6e6ef2f07bcb0393560b94992a/ace/core/reflector.py",
+          "sha256": "fe5ae8fb006fd16fdef7b8e7ad38dc746195a4bf0a366a82e69c473c9982b811"
+        },
+        {
+          "path": "playbook_utils.py",
+          "url": "https://github.com/ace-agent/ace/blob/82709de050e1db6e6ef2f07bcb0393560b94992a/playbook_utils.py",
+          "sha256": "c67943f06cb0ee747be04d0599216e40d6c00e0cdf96ddc6af38fc26143e3a07"
+        }
+      ]
+    },
+    {
+      "full_name": "xiaowu0162/LongMemEval-V2",
+      "html_url": "https://github.com/xiaowu0162/LongMemEval-V2",
+      "sha": "2cc8c540bdb87fe6761629b585e727e1c4704520",
+      "archived": false,
+      "pushed_at": "2026-08-09T22:31:22Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "Apache-2.0",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/xiaowu0162/LongMemEval-V2/blob/2cc8c540bdb87fe6761629b585e727e1c4704520/README.md",
+          "sha256": "399cc61c9540e587017fccdde28b29b62ed66326425f16f08b5fe0457a593abd"
+        },
+        {
+          "path": "evaluation/harness.py",
+          "url": "https://github.com/xiaowu0162/LongMemEval-V2/blob/2cc8c540bdb87fe6761629b585e727e1c4704520/evaluation/harness.py",
+          "sha256": "93fe5855a74ad46d7e8b489cebac24de38a9b30ba7ec1de2dd8708bd4aeebdb6"
+        },
+        {
+          "path": "evaluation/qa_eval_metrics.py",
+          "url": "https://github.com/xiaowu0162/LongMemEval-V2/blob/2cc8c540bdb87fe6761629b585e727e1c4704520/evaluation/qa_eval_metrics.py",
+          "sha256": "f8ba659e237c4282a07a92538090ea500ce8483820b390b1d19af187c01417ac"
+        }
+      ]
+    },
+    {
+      "full_name": "AI4Finance-Foundation/FinRobot",
+      "html_url": "https://github.com/AI4Finance-Foundation/FinRobot",
+      "sha": "2717499b8e30f242640af08c4ad9afd1113c2d45",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "license_file_header": "                                 Apache License /                            Version 2.0, January 2004 /                         http://www.apache.org/licenses/",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/AI4Finance-Foundation/FinRobot/blob/2717499b8e30f242640af08c4ad9afd1113c2d45/LICENSE",
+          "sha256": "bbcb4226500b503737713f0c9a9da17efce56fa6989b9f0538071dcb60826af5"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/AI4Finance-Foundation/FinRobot/blob/2717499b8e30f242640af08c4ad9afd1113c2d45/README.md",
+          "sha256": "a18b26396e0ca785364e0379dc9c40d2efa988d1b591d5199e357478f1f911eb"
+        }
+      ]
+    },
+    {
+      "full_name": "jennyzzt/dgm",
+      "html_url": "https://github.com/jennyzzt/dgm",
+      "sha": "a565fd2d1dca504ef5104a7cc0f3bdc4ab9b4fd2",
+      "archived": false,
+      "pushed_at": "2025-08-13T10:40:14Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "Apache-2.0",
+      "evidence_files": [
+        {
+          "path": "DGM_outer.py",
+          "url": "https://github.com/jennyzzt/dgm/blob/a565fd2d1dca504ef5104a7cc0f3bdc4ab9b4fd2/DGM_outer.py",
+          "sha256": "239bc76f0e1b78210b8f7b3757b1082f6ca07db3537d6af50a45bf97709795ed"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/jennyzzt/dgm/blob/a565fd2d1dca504ef5104a7cc0f3bdc4ab9b4fd2/README.md",
+          "sha256": "9760f30330e519946592ae88178f579dd717c3e55d3d461322e5facfa09c6bd4"
+        },
+        {
+          "path": "self_improve_step.py",
+          "url": "https://github.com/jennyzzt/dgm/blob/a565fd2d1dca504ef5104a7cc0f3bdc4ab9b4fd2/self_improve_step.py",
+          "sha256": "6f2ec364b11e7f6d35391ea66896fa2394cbca3bc59d68cf7352c2a77aa8cca7"
+        }
+      ]
+    },
+    {
+      "full_name": "gepa-ai/gepa",
+      "html_url": "https://github.com/gepa-ai/gepa",
+      "sha": "8f287de942f41a6d1e0e7e5b2d576247c4bedee9",
+      "archived": false,
+      "pushed_at": "2026-10-21T06:24:48Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "MIT",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/gepa-ai/gepa/blob/8f287de942f41a6d1e0e7e5b2d576247c4bedee9/README.md",
+          "sha256": "10d7f30035b21bb38fde51fb3ccc0fc64d5e8b64ab51c09731606132782a57b2"
+        },
+        {
+          "path": "src/gepa/core/adapter.py",
+          "url": "https://github.com/gepa-ai/gepa/blob/8f287de942f41a6d1e0e7e5b2d576247c4bedee9/src/gepa/core/adapter.py",
+          "sha256": "ba79fb40682f7372f386f0d39358fa4866c3d06978d4a658fcbc711617e80694"
+        },
+        {
+          "path": "src/gepa/core/engine.py",
+          "url": "https://github.com/gepa-ai/gepa/blob/8f287de942f41a6d1e0e7e5b2d576247c4bedee9/src/gepa/core/engine.py",
+          "sha256": "96779c98be8568eeb3899044cb37b0fb87d07a91af2979403dff2a7b6eeba365"
+        },
+        {
+          "path": "src/gepa/core/state.py",
+          "url": "https://github.com/gepa-ai/gepa/blob/8f287de942f41a6d1e0e7e5b2d576247c4bedee9/src/gepa/core/state.py",
+          "sha256": "8bd83dea732bc3942a6c6bddfe8c296460544272b743272bf8b7e1fba4a4e0e7"
+        }
+      ]
+    },
+    {
+      "full_name": "xlang-ai/OSWorld",
+      "html_url": "https://github.com/xlang-ai/OSWorld",
+      "sha": "f9885c9e5d4b23486afd1568a3e3f7a8daf76a5d",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/xlang-ai/OSWorld/blob/f9885c9e5d4b23486afd1568a3e3f7a8daf76a5d/README.md",
+          "sha256": "f5171d847a3331334dfc198c5fb8d6b4ad398298d53651fa43bd627f7b6c2bb6"
+        },
+        {
+          "path": "desktop_env/evaluators/metrics/slides.py",
+          "url": "https://github.com/xlang-ai/OSWorld/blob/f9885c9e5d4b23486afd1568a3e3f7a8daf76a5d/desktop_env/evaluators/metrics/slides.py",
+          "sha256": "c8f56352659b23985d01b7b301207caa429a628dc32f6f2693d4a5ed3378628d"
+        }
+      ]
+    },
+    {
+      "full_name": "ANative-Lab/EvoAgentX",
+      "html_url": "https://github.com/ANative-Lab/EvoAgentX",
+      "sha": "f3d1ea5e46f3adf40ce252716440a154d81c91c6",
+      "archived": false,
+      "pushed_at": "2026-10-22T12:08:12Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "NOASSERTION",
+      "license_file_header": "MIT License /  / Copyright (c) 2025 EvoAgentX ",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/ANative-Lab/EvoAgentX/blob/f3d1ea5e46f3adf40ce252716440a154d81c91c6/LICENSE",
+          "sha256": "496b34e5351d8e96ef9f7220a0c25ecea5ffe49f8d4aa137d8aa1ceed5d6a12d"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/ANative-Lab/EvoAgentX/blob/f3d1ea5e46f3adf40ce252716440a154d81c91c6/README.md",
+          "sha256": "2b01b62fc0c4ef5cf43231f69859fc485e79fbe190dcce4943aa4b174d144670"
+        },
+        {
+          "path": "evoagentx/optimizers/aflow_optimizer.py",
+          "url": "https://github.com/ANative-Lab/EvoAgentX/blob/f3d1ea5e46f3adf40ce252716440a154d81c91c6/evoagentx/optimizers/aflow_optimizer.py",
+          "sha256": "92c2f1b88ebec8fd41a3dd3266b7c1fd08ce0a74d25bb6df5ac52491fccc2aa9"
+        },
+        {
+          "path": "evoagentx/optimizers/optimizer_core.py",
+          "url": "https://github.com/ANative-Lab/EvoAgentX/blob/f3d1ea5e46f3adf40ce252716440a154d81c91c6/evoagentx/optimizers/optimizer_core.py",
+          "sha256": "f3a8a7f66dc0c5fc3c5afa175f0fa2401234759139319b9b03c6c2c132cbb53f"
+        }
+      ]
+    },
+    {
+      "full_name": "kayba-ai/agentic-context-engine",
+      "html_url": "https://github.com/kayba-ai/agentic-context-engine",
+      "sha": "3a319831785ede6ba4a3a4002756233095c59e17",
+      "archived": false,
+      "pushed_at": "2026-09-24T08:13:44Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "Apache-2.0",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/kayba-ai/agentic-context-engine/blob/3a319831785ede6ba4a3a4002756233095c59e17/README.md",
+          "sha256": "348dc8fdf06b2656a970116f3ba2c6bb14d449b361a702d6df3c3a1f42a93379"
+        }
+      ]
+    },
+    {
+      "full_name": "harbor-framework/harbor",
+      "html_url": "https://github.com/harbor-framework/harbor",
+      "sha": "209a48a7424218828465c3c716b042f2b381dbed",
+      "archived": false,
+      "pushed_at": "2026-10-22T07:15:07Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "Apache-2.0",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/harbor-framework/harbor/blob/209a48a7424218828465c3c716b042f2b381dbed/README.md",
+          "sha256": "7b5e24d0974e623c44209361019746167d4938dff76e847f3d5b5a1157cf805c"
+        },
+        {
+          "path": "examples/tasks/hello-world/task.toml",
+          "url": "https://github.com/harbor-framework/harbor/blob/209a48a7424218828465c3c716b042f2b381dbed/examples/tasks/hello-world/task.toml",
+          "sha256": "8df59d13077f5da3cb525722fe81f9b90fa177c26fdcbb54e3e7049bc610896e"
+        },
+        {
+          "path": "examples/tasks/hello-world/tests/test.sh",
+          "url": "https://github.com/harbor-framework/harbor/blob/209a48a7424218828465c3c716b042f2b381dbed/examples/tasks/hello-world/tests/test.sh",
+          "sha256": "0aefd5b2381807175220c8a7e87d0eb43686be07a38aa82ae124778377c47c60"
+        }
+      ]
+    },
+    {
+      "full_name": "stanfordnlp/dspy",
+      "html_url": "https://github.com/stanfordnlp/dspy",
+      "sha": "3fdb93f205b0f24a9338449c5bbad0092b5cce1c",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/stanfordnlp/dspy/blob/3fdb93f205b0f24a9338449c5bbad0092b5cce1c/README.md",
+          "sha256": "9b2fa5d078b4e4aafe6f8a91d5677c735427e149a235708d98a18c28db8efdea"
+        },
+        {
+          "path": "dspy/teleprompt/gepa/gepa.py",
+          "url": "https://github.com/stanfordnlp/dspy/blob/3fdb93f205b0f24a9338449c5bbad0092b5cce1c/dspy/teleprompt/gepa/gepa.py",
+          "sha256": "52af685c894ea7070816abc2769fef2568f5f61a430b83d7b6be850142c68867"
+        }
+      ]
+    },
+    {
+      "full_name": "Open-Finance-Lab/AgenticTrading",
+      "html_url": "https://github.com/Open-Finance-Lab/AgenticTrading",
+      "sha": "d10b28db516839912b04820b418ec1f6ddfe3d31",
+      "checked_at": "2026-10-22",
+      "license_metadata": "not_queried",
+      "license_file_header": "OpenMDW License Agreement, version 1.0 (OpenMDW-1.0) /  / Copyright (c) SecureFinAI Lab",
+      "evidence_files": [
+        {
+          "path": "LICENSE",
+          "url": "https://github.com/Open-Finance-Lab/AgenticTrading/blob/d10b28db516839912b04820b418ec1f6ddfe3d31/LICENSE",
+          "sha256": "a4a4801044fb20fbcf7e1ea73ccfc1a9b9efeaec310fb92d11f7cf3402adc0b6"
+        },
+        {
+          "path": "README.md",
+          "url": "https://github.com/Open-Finance-Lab/AgenticTrading/blob/d10b28db516839912b04820b418ec1f6ddfe3d31/README.md",
+          "sha256": "8d2a894fba0c4c55ecf4a386be3b36f7d4b2f9bacac3912d6c35e9bdc030336f"
+        },
+        {
+          "path": "orchestration/README.md",
+          "url": "https://github.com/Open-Finance-Lab/AgenticTrading/blob/d10b28db516839912b04820b418ec1f6ddfe3d31/orchestration/README.md",
+          "sha256": "bccaf854b85ee3e6f7b0bf9751509e111ee6ca59571548b302df41d061098530"
+        }
+      ]
+    },
+    {
+      "full_name": "algorithmicsuperintelligence/openevolve",
+      "html_url": "https://github.com/algorithmicsuperintelligence/openevolve",
+      "sha": "515d1bcb7b36ac64bbe028f8d83b5d08315ca4b5",
+      "archived": false,
+      "pushed_at": "2026-10-22T07:27:39Z",
+      "checked_at": "2026-10-22",
+      "license_metadata": "Apache-2.0",
+      "evidence_files": [
+        {
+          "path": "README.md",
+          "url": "https://github.com/algorithmicsuperintelligence/openevolve/blob/515d1bcb7b36ac64bbe028f8d83b5d08315ca4b5/README.md",
+          "sha256": "51df92c06affe4d2cebee41161e755c6bce825403655d18915a8404462ec9fdc"
+        },
+        {
+          "path": "openevolve/config.py",
+          "url": "https://github.com/algorithmicsuperintelligence/openevolve/blob/515d1bcb7b36ac64bbe028f8d83b5d08315ca4b5/openevolve/config.py",
+          "sha256": "a1a779990064aa89f04ceffcd1f3f22925d59cd7065b16daa2a73521da15c01f"
+        },
+        {
+          "path": "openevolve/database.py",
+          "url": "https://github.com/algorithmicsuperintelligence/openevolve/blob/515d1bcb7b36ac64bbe028f8d83b5d08315ca4b5/openevolve/database.py",
+          "sha256": "5fe668f274099ab820634f0154a9a0cc64c4ee3dc032b9d0a31e283bf9b51c6b"
+        },
+        {
+          "path": "openevolve/evaluator.py",
+          "url": "https://github.com/algorithmicsuperintelligence/openevolve/blob/515d1bcb7b36ac64bbe028f8d83b5d08315ca4b5/openevolve/evaluator.py",
+          "sha256": "0b14a5b3b145f4b2d808aad3ef3dcea830d22f69d9113400abac62f1d74075fb"
+        }
+      ]
+    }
+  ],
+  "papers": [
+    {
+      "title": "GEPA",
+      "url": "https://arxiv.org/abs/2507.19457"
+    },
+    {
+      "title": "ACE",
+      "url": "https://arxiv.org/abs/2510.04618"
+    },
+    {
+      "title": "DGM",
+      "url": "https://arxiv.org/abs/2505.22954"
+    },
+    {
+      "title": "AFlow",
+      "url": "https://arxiv.org/abs/2410.10762"
+    },
+    {
+      "title": "Agent Lightning v1.0",
+      "url": "https://arxiv.org/abs/2608.17528"
+    },
+    {
+      "title": "LongMemEval",
+      "url": "https://arxiv.org/abs/2410.10813"
+    },
+    {
+      "title": "LongMemEval-V2",
+      "url": "https://arxiv.org/abs/2605.12493"
+    },
+    {
+      "title": "OfficeBench",
+      "url": "https://arxiv.org/abs/2407.19056"
+    },
+    {
+      "title": "TheAgentCompany",
+      "url": "https://arxiv.org/abs/2412.14161"
+    }
+  ]
+}

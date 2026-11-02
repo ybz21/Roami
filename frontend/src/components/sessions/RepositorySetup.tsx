@@ -4,7 +4,7 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import './repository-setup.css'
 
-type RepositoryState = { repo: boolean; hasCommits: boolean; root?: string }
+type RepositoryState = { repo: boolean; hasCommits?: boolean; root?: string }
 
 export function useRepositorySetup(dir: string, hint?: boolean) {
   const [snapshot, setSnapshot] = useState<{ dir: string; data?: RepositoryState; error?: boolean }>()
@@ -19,7 +19,7 @@ export function useRepositorySetup(dir: string, hint?: boolean) {
     setSnapshot(undefined)
     api('GET', `/git/is-repo?path=${encodeURIComponent(dir)}`, undefined, { signal: controller.signal })
       .then((r) => {
-        if (typeof r.data?.repo !== 'boolean' || typeof r.data?.hasCommits !== 'boolean') throw new Error('GIT_PROBE_FAILED')
+        if (typeof r.data?.repo !== 'boolean' || (r.data.repo && typeof r.data.hasCommits !== 'boolean')) throw new Error('GIT_PROBE_FAILED')
         if (!controller.signal.aborted) setSnapshot({ dir, data: r.data })
       })
       .catch(() => { if (!controller.signal.aborted) setSnapshot({ dir, error: true }) })
@@ -44,7 +44,8 @@ export function useRepositorySetup(dir: string, hint?: boolean) {
     checking, failed, initializing,
     ready: !!data?.repo && data.hasCommits === true,
     repo: !!data?.repo,
-    blocked: checking || failed || initializing,
+    // Git discovery gates worktrees; a failed probe still permits a plain session.
+    blocked: checking || initializing,
     initialize,
     retry: () => setRevision((v) => v + 1),
   }
