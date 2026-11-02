@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_local_gateway_controls",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "UDS服务模拟Go准入合同，不声称真实上游执行；不更改历史40/60项或原始任务质量成绩。"
+}
