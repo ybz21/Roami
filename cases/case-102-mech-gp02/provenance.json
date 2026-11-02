@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_local_gateway_readiness",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "仅重现 #613 的核心传输与用量分类；不代表 #605 或音视频、演示稿实际质量通过。"
+}

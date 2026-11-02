@@ -1,0 +1,52 @@
+{
+  "id": "MECH-GP02",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "网关准入",
+  "prompt": "保留本机网关就绪和鉴权拒绝，同时保护远端响应及先前未知用量的信任边界。",
+  "preconditions": "冻结的 agent-runtime 开发依赖与隔离启动器；不连接真实网关。",
+  "expected_terminal": "trusted_preflight_rejection_without_retry_or_false_unknown_usage",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "后端7项及前端4项无跳过测试回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-GP02-H1",
+      "rule": "三种可信本机准入拒绝保留原码、不重试，未发生上游调用，用量已知为零。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-GP02-H2",
+      "rule": "远端同名响应头不能声称可信准入拒绝或已知零用量。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-GP02-H3",
+      "rule": "后续准入拒绝不能清除先前上游尝试的未知用量。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_local_gateway_readiness",
+    "issue": 613,
+    "fixture_reproduction_only": true
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
