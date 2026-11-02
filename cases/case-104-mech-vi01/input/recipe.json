@@ -1,0 +1,15 @@
+{
+  "colors": [
+    "#ff0000",
+    "#00ff00",
+    "#0000ff",
+    "#ffff00"
+  ],
+  "variableDurations": [
+    0.04,
+    0.24,
+    0.32,
+    0.04
+  ],
+  "origin": "public_synthetic_color_sequences"
+}

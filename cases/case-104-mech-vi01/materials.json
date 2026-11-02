@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-VI01",
+  "data": {
+    "kind": "public_synthetic_video_sampling",
+    "inputs": [
+      "input/recipe.json"
+    ],
+    "generator": "skills/video-assembly/tests/test_clip_inspection.py::media"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "actual_offline_video_decoding"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "frame_time_pixel_and_publication_boundaries",
+    "expected_collected": 19
+  }
+}

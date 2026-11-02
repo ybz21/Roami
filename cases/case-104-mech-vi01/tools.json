@@ -1,0 +1,15 @@
+{
+  "pytest_selectors": [
+    "skills/video-assembly/tests/test_clip_inspection.py"
+  ],
+  "expected_collected": 19,
+  "runtime": [
+    "Python标准库",
+    "Pillow>=10.1",
+    "ffmpeg与ffprobe",
+    "固定roami-rsi-eval镜像",
+    "pytest"
+  ],
+  "registered_tools": [],
+  "model_calls": 0
+}
