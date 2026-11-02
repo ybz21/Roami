@@ -40,3 +40,12 @@ it('labels historical RSI sessions and new roles without guessing untagged reque
   const raw = { ...usage([group]), recent: [call, { ...call, sessionId: 'rsi-legacy' }, { ...call, role: 'rsi_artifact_b' }, { ...call, role: 'rsiXworker', sessionId: 'rsiXlegacy' }] }
   expect(gatewayUsage(raw, 'CNY').recent.map(row => row.source)).toEqual(['other', 'rsi', 'rsi', 'other'])
 })
+
+it('keeps an unset default price separate from an explicitly configured zero price', () => {
+  const unset = { ...config, pricing: { ...config.pricing, defaultConfigured: false, default: { input_per_million: 0, output_per_million: 0, cache_read_per_million: 0 } } }
+  const draft = gatewayDraft(unset)
+  expect(draft.defaultPrice.input).toBe('')
+  expect(gatewayConfiguration(draft).pricing.defaultConfigured).toBe(false)
+  const free = { ...draft, defaultPrice: { ...draft.defaultPrice, input: '0', output: '0', cacheRead: '0' } }
+  expect(gatewayConfiguration(free).pricing.defaultConfigured).toBe(true)
+})

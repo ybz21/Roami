@@ -21,7 +21,15 @@ CREATE TABLE gateway_calls(
  http_status INTEGER NOT NULL DEFAULT 0, error_code TEXT NOT NULL DEFAULT '', reconciliation TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX gateway_calls_day ON gateway_calls(day,started_ms);
-`}, {Version: 2, Name: "model-catalog", SQL: `CREATE TABLE gateway_catalog(id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);`}}
+`}, {Version: 2, Name: "model-catalog", SQL: `CREATE TABLE gateway_catalog(id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL);`}, {Version: 3, Name: "agent-gateway-attribution", SQL: `
+ALTER TABLE gateway_calls ADD COLUMN agent_kind TEXT NOT NULL DEFAULT 'roami';
+ALTER TABLE gateway_calls ADD COLUMN key_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE gateway_calls ADD COLUMN source_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE gateway_calls ADD COLUMN route_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE gateway_calls ADD COLUMN price_status TEXT NOT NULL DEFAULT 'priced';
+UPDATE gateway_calls SET agent_kind=substr(role,5),key_id='legacy' WHERE role IN ('cli_opencode','cli_claude','cli_codex','cli_pi','cli_roami');
+CREATE INDEX gateway_calls_agent_day ON gateway_calls(agent_kind,day,started_ms);
+`}}
 
 type Ledger struct {
 	paths metadb.Paths
@@ -45,7 +53,7 @@ func Open(paths metadb.Paths) (*Ledger, error) {
 func (l *Ledger) Recover() error {
 	return l.db.Tx(func(tx *sql.Tx) error {
 		zero, _ := json.Marshal(ModelPricing{})
-		_, err := tx.Exec(`UPDATE gateway_calls SET state=CASE WHEN price_json=? THEN 'failed' ELSE 'unknown' END,cost_nano=CASE WHEN price_json=? THEN 0 ELSE NULL END,finished_ms=?,error_code='MODEL_PROXY_INTERRUPTED' WHERE state='pending'`, string(zero), string(zero), l.now().UnixMilli())
+		_, err := tx.Exec(`UPDATE gateway_calls SET state=CASE WHEN price_json=? AND price_status='priced' THEN 'failed' ELSE 'unknown' END,cost_nano=CASE WHEN price_json=? AND price_status='priced' THEN 0 ELSE NULL END,finished_ms=?,error_code='MODEL_PROXY_INTERRUPTED' WHERE state='pending'`, string(zero), string(zero), l.now().UnixMilli())
 		return err
 	})
 }
@@ -96,21 +104,34 @@ func (l *Ledger) Configure(c Configuration) error {
 }
 
 type Call struct {
-	ID       string       `json:"id"`
-	Day      string       `json:"day"`
-	Timezone string       `json:"timezone"`
-	Role     string       `json:"role"`
-	Model    string       `json:"model"`
-	Session  string       `json:"sessionId"`
-	Request  string       `json:"requestId"`
-	Started  int64        `json:"startedMs"`
-	State    string       `json:"state"`
-	Currency string       `json:"currency"`
-	Price    ModelPricing `json:"price"`
+	PriceStatus string       `json:"priceStatus"`
+	AgentKind   string       `json:"agentKind"`
+	KeyID       string       `json:"keyId"`
+	SourceID    string       `json:"sourceId"`
+	RouteID     string       `json:"routeId"`
+	ID          string       `json:"id"`
+	Day         string       `json:"day"`
+	Timezone    string       `json:"timezone"`
+	Role        string       `json:"role"`
+	Model       string       `json:"model"`
+	Session     string       `json:"sessionId"`
+	Request     string       `json:"requestId"`
+	Started     int64        `json:"startedMs"`
+	State       string       `json:"state"`
+	Currency    string       `json:"currency"`
+	Price       ModelPricing `json:"price"`
 }
 
-func (l *Ledger) Admit(role, model, session, request string) (Call, error) {
+type CallAttribution struct{ AgentKind, KeyID, SourceID, RouteID string }
+type gatewayKeyContext struct{}
+
+func (l *Ledger) Admit(role, model, session, request string, attribution ...CallAttribution) (Call, error) {
 	call := Call{ID: uuid.NewString(), Role: role, Model: model, Session: session, Request: request, Started: l.now().UnixMilli(), State: "pending"}
+	call.AgentKind = "roami"
+	if len(attribution) > 0 {
+		a := attribution[0]
+		call.AgentKind, call.KeyID, call.SourceID, call.RouteID = a.AgentKind, a.KeyID, a.SourceID, a.RouteID
+	}
 	err := l.db.Tx(func(tx *sql.Tx) error {
 		c, err := configuration(tx)
 		if err != nil {
@@ -121,7 +142,11 @@ func (l *Ledger) Admit(role, model, session, request string) (Call, error) {
 			return err
 		}
 		call.Day, call.Timezone, call.Currency = l.now().In(zone).Format("2006-01-02"), c.Timezone, c.Currency
-		call.Price = c.Pricing.Lookup(model)
+		call.Price = c.Pricing.LookupExit(call.RouteID, call.SourceID, model)
+		call.PriceStatus = "priced"
+		if !c.Pricing.configured(call.RouteID, call.SourceID, model) {
+			call.PriceStatus = "unpriced"
+		}
 		if c.DailyLimit != nil {
 			var spent, unknown, pending int64
 			err := tx.QueryRow(`SELECT COALESCE(SUM(cost_nano),0),COALESCE(SUM(state='unknown'),0),COALESCE(SUM(state='pending'),0) FROM gateway_calls WHERE day=?`, call.Day).Scan(&spent, &unknown, &pending)
@@ -142,7 +167,7 @@ func (l *Ledger) Admit(role, model, session, request string) (Call, error) {
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(`INSERT INTO gateway_calls(id,day,timezone,role,model,session_id,request_id,started_ms,state,currency,price_json) VALUES(?,?,?,?,?,?,?,?,'pending',?,?)`, call.ID, call.Day, call.Timezone, role, model, session, request, call.Started, call.Currency, string(price))
+		_, err = tx.Exec(`INSERT INTO gateway_calls(id,day,timezone,role,model,session_id,request_id,started_ms,state,currency,price_json,agent_kind,key_id,source_id,route_id,price_status) VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)`, call.ID, call.Day, call.Timezone, role, model, session, request, call.Started, call.Currency, string(price), call.AgentKind, call.KeyID, call.SourceID, call.RouteID, call.PriceStatus)
 		return err
 	})
 	return call, err
@@ -154,7 +179,14 @@ func (l *Ledger) Settle(call Call, usage *Usage, status int, code string, notSen
 	if usage != nil {
 		input, output, cached, cost = usage.Input, usage.Output, usage.Cached, costNano(call.Price, *usage)
 		state = "known"
-	} else if notSent || call.Price == (ModelPricing{}) {
+		if call.PriceStatus == "unpriced" {
+			cost = nil
+			state = "unknown"
+			if code == "" {
+				code = "MODEL_GATEWAY_PRICE_MISSING"
+			}
+		}
+	} else if notSent || call.Price == (ModelPricing{}) && call.PriceStatus != "unpriced" {
 		cost, state = int64(0), "known"
 	}
 	if code != "" && state == "known" && !(status >= 200 && status < 300 && code == "MODEL_PROXY_USAGE_UNKNOWN") {

@@ -28,7 +28,7 @@ func (s *Store) UseOfficial(ctx context.Context, kind, revision string) (View, e
 	return s.apply(ctx, kind, "", revision, false, true)
 }
 
-func (s *Store) apply(ctx context.Context, kind, profileID, revision string, restore, official bool) (View, error) {
+func (s *Store) apply(ctx context.Context, kind, profileID, revision string, restore, official bool, keyChanges ...gatewayKeyChange) (View, error) {
 	if err := validateKind(kind); err != nil {
 		return View{}, err
 	}
@@ -41,6 +41,16 @@ func (s *Store) apply(ctx context.Context, kind, profileID, revision string, res
 		}
 		if revision == "" || revision != config.revision() {
 			return fmt.Errorf("AGENT_CONFIG_CHANGED")
+		}
+		if len(keyChanges) > 0 {
+			view, viewErr := makeView(kind, current, config)
+			if viewErr != nil {
+				return viewErr
+			}
+			if view.Changed || view.ActiveID == "" {
+				return fmt.Errorf("AGENT_CONFIG_CHANGED")
+			}
+			profileID = view.ActiveID
 		}
 		var fields []field
 		var selected *Profile
@@ -60,6 +70,13 @@ func (s *Store) apply(ctx context.Context, kind, profileID, revision string, res
 				}
 				if selected == nil {
 					return fmt.Errorf("MODEL_PROFILE_NOT_FOUND")
+				}
+				if len(keyChanges) > 0 {
+					change := keyChanges[0]
+					if selected.BaseURL != change.base && selected.BaseURL != change.base+"/v1" {
+						return fmt.Errorf("AGENT_CONFIG_CHANGED")
+					}
+					selected.APIKey, selected.KeyEnv = change.key, ""
 				}
 				fields, err = profileFields(kind, *selected, config.Major)
 				if err != nil {

@@ -2,9 +2,7 @@ package modelgateway
 
 import (
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -38,23 +36,25 @@ type CatalogModel struct {
 	Candidates []ModelCandidate `json:"candidates"`
 }
 type ModelCatalog struct {
-	Revision        string              `json:"revision"`
-	Sources         []ModelSource       `json:"sources"`
-	Models          []CatalogModel      `json:"models"`
-	Drafts          []CatalogModel      `json:"drafts"`
-	BaseURL         string              `json:"baseUrl,omitempty"`
-	Uses            map[string][]string `json:"uses"`
-	Port            int                 `json:"-"`
-	Token           string              `json:"-"`
-	RolesBackup     map[string]any      `json:"-"`
-	CanRestoreRoami bool                `json:"canRestoreRoami"`
-	RoamiModels     map[string]string   `json:"roamiModels"`
+	Revision        string                   `json:"revision"`
+	Sources         []ModelSource            `json:"sources"`
+	Models          []CatalogModel           `json:"models"`
+	Drafts          []CatalogModel           `json:"drafts"`
+	BaseURL         string                   `json:"baseUrl,omitempty"`
+	Uses            map[string][]string      `json:"uses"`
+	Port            int                      `json:"-"`
+	Token           string                   `json:"-"`
+	RolesBackup     map[string]any           `json:"-"`
+	AgentKeys       map[string]agentKeyState `json:"-"`
+	CanRestoreRoami bool                     `json:"canRestoreRoami"`
+	RoamiModels     map[string]string        `json:"roamiModels"`
 }
 type catalogDisk struct {
-	Catalog     ModelCatalog   `json:"catalog"`
-	Port        int            `json:"port"`
-	Token       string         `json:"token"`
-	RolesBackup map[string]any `json:"rolesBackup,omitempty"`
+	Catalog     ModelCatalog             `json:"catalog"`
+	Port        int                      `json:"port"`
+	Token       string                   `json:"token"`
+	RolesBackup map[string]any           `json:"rolesBackup,omitempty"`
+	AgentKeys   map[string]agentKeyState `json:"agentKeys,omitempty"`
 }
 type CatalogStore struct {
 	mu          sync.Mutex
@@ -89,6 +89,7 @@ func openCatalog(l *Ledger) (*CatalogStore, error) {
 		s.value.Port = d.Port
 		s.value.Token = d.Token
 		s.value.RolesBackup = d.RolesBackup
+		s.value.AgentKeys = d.AgentKeys
 	} else if err == sql.ErrNoRows {
 		token, e := randomCatalogID()
 		if e != nil {
@@ -117,7 +118,7 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 	if err := writeCatalogVerificationRevision(s.ledger.paths.Data, ModelCatalog{}); err != nil {
 		return err
 	}
-	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup})
+	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys})
 	if err != nil {
 		return err
 	}
@@ -138,12 +139,11 @@ func (s *CatalogStore) snapshot() ModelCatalog {
 	v.Token = s.value.Token
 	v.Port = s.value.Port
 	v.RolesBackup = s.value.RolesBackup
+	v.AgentKeys = map[string]agentKeyState{}
+	for kind, key := range s.value.AgentKeys {
+		v.AgentKeys[kind] = key
+	}
 	return v
-}
-func (s *CatalogStore) credential(kind string) string {
-	mac := hmac.New(sha256.New, []byte(s.value.Token))
-	_, _ = mac.Write([]byte(kind))
-	return hex.EncodeToString(mac.Sum(nil))
 }
 func (s *CatalogStore) uses(ctx context.Context) map[string][]string {
 	uses, _ := s.modelReferences(ctx, true)
@@ -214,7 +214,7 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 	if u.Scheme != "https" && !(u.Scheme == "http" && containsField([]string{"127.0.0.1", "localhost", "::1"}, u.Hostname())) {
 		return ModelSource{}, catalogError()
 	}
-	if s.baseURL != "" && strings.HasPrefix(p.BaseURL, s.baseURL) {
+	if s.isGatewaySource(p.BaseURL) {
 		return ModelSource{}, catalogError()
 	}
 	if !containsField([]string{"openai-completions", "openai-responses", "anthropic-messages"}, p.Protocol) || !containsField([]string{"api_key", "bearer"}, p.AuthMode) {
@@ -306,6 +306,10 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	v.Port = s.value.Port
 	v.Token = s.value.Token
 	v.RolesBackup = s.value.RolesBackup
+	v.AgentKeys = map[string]agentKeyState{}
+	for kind, key := range s.value.AgentKeys {
+		v.AgentKeys[kind] = key
+	}
 	v.BaseURL = ""
 	v.Uses = nil
 	return s.persist(v)

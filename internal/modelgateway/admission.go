@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-func (h *Handler) admit(ctx context.Context, role, model, session, request string, validate func() error) (Call, error) {
+func (h *Handler) admit(ctx context.Context, role, model, session, request string, validate func() error, attribution ...CallAttribution) (Call, error) {
 	for {
 		h.mu.Lock()
 		if err := ctx.Err(); err != nil {
@@ -20,7 +20,7 @@ func (h *Handler) admit(ctx context.Context, role, model, session, request strin
 			h.mu.Unlock()
 			return Call{}, err
 		}
-		call, err := h.Ledger.Admit(role, model, session, request)
+		call, err := h.Ledger.Admit(role, model, session, request, attribution...)
 		if err == nil {
 			h.activeForwards++
 			h.mu.Unlock()

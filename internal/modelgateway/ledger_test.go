@@ -118,6 +118,12 @@ func TestLedgerRecoveryUnknownReconciliationAndZeroDefault(t *testing.T) {
 	if err = l.Reconcile(call.ID, 0, "overwrite"); err == nil {
 		t.Fatal("known charge overwritten")
 	}
+	explicitZero := true
+	cfg, _ := l.Configuration()
+	cfg.Pricing.DefaultConfigured = &explicitZero
+	if err = l.Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
 	call, err = l.Admit("memory", "unpriced", "", "")
 	if err != nil {
 		t.Fatal(err)

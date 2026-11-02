@@ -6,6 +6,7 @@ import { getHashParams } from '../../route-hash'
 import { PlusIcon, LinkIcon } from '../../icons'
 import { useSettingsDraft } from '../settings/settings-draft'
 import MobileSubPage from '../MobileSubPage'
+import LocalModelSources from './LocalModelSources'
 import ModelSourceEditor, { initialSourceDraft, type SourceDraft } from './ModelSourceEditor'
 import { GatewaySettingsForm, GatewayReconciliation, useGatewaySettings } from '../settings/gateway-settings'
 import { useModelCatalog, type ModelSource, type CatalogModel } from './model-hub-api'
@@ -29,7 +30,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const back = () => navigate(tab)
   const error = controller.error && <Alert type="error" role="alert" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />
   const models = value?.models || [], sources = value?.sources || []
-  const priceModels = [...new Set(models.flatMap(model => model.candidates.map(candidate => candidate.model)))]
+  const priceModels = [...new Set(models.flatMap(model => model.candidates.map(candidate => candidate.model)).concat(models.flatMap(model => [model.id, ...model.candidates.map(candidate => candidate.sourceId + "/" + candidate.model)])))]
   if (!loaded && tab !== 'usage' && tab !== 'prices') return <div className="tt-model-hub-scroll">{error || <Spin />}</div>
   const sourceBase: ModelSource = sources.find(source => source.id === id) || { id: newSourceId, name: '', baseUrl: '', protocol: 'openai-completions', authMode: 'api_key', apiKey: '' }
   const sourceDraft = sourceDrafts[id] || initialSourceDraft(sourceBase, id !== 'new')
@@ -81,8 +82,8 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     <p className="agent-settings-hint">{t('hub.availableHint')}</p>
     <div className="agent-settings-save"><Button onClick={back}>{t('common.back')}</Button><Button type="primary" htmlType="submit" disabled={!validModel || controller.busy} loading={controller.busy}>{t('agent.models.save')}</Button></div>
   </form>
-  const editor = detail === 'source' ? sourceEditor : <div className="tt-model-hub-scroll">{error}{modelEditor}</div>
-  const editorTitle = t(detail === 'source' ? id === 'new' ? 'hub.addSource' : 'hub.editSource' : 'hub.editModel')
+  const editor = detail === 'local' ? <LocalModelSources onImported={() => { controller.retry(); back() }} /> : detail === 'source' ? sourceEditor : <div className="tt-model-hub-scroll">{error}{modelEditor}</div>
+  const editorTitle = t(detail === 'local' ? 'hub.local.title' : detail === 'source' ? id === 'new' ? 'hub.addSource' : 'hub.editSource' : 'hub.editModel')
   const rows = sources.map(source => {
     const attached = models.filter(model => model.candidates[0].sourceId === source.id)
     const backupUsed = models.some(model => model.candidates[0].sourceId !== source.id && model.candidates.some(candidate => candidate.sourceId === source.id))
@@ -107,7 +108,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <details className="tt-model-hub-entry"><summary><LinkIcon />{t('hub.entry')}</summary><p>{t('hub.entryHint')}</p><code>{value.baseUrl}</code><p>{t('hub.continuationHint')}</p></details>
       <Tabs activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key) }))} />
       {tab === 'usage' || tab === 'prices' ? <><GatewaySettingsForm controller={billing} mode={tab === 'usage' ? 'proxy' : 'prices'} active models={priceModels} /><GatewayReconciliation controller={billing} /></>
-        : <><div className="tt-model-hub-actions"><Button type="primary" icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button><Button onClick={() => onNav('capabilities/agents')}>{t('hub.configureAgents')}</Button></div>{rows.length ? rows : <p>{t('hub.empty.connections')}</p>}
+        : <><div className="tt-model-hub-actions"><Button type="primary" icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button><Button onClick={() => navigate('catalog/local')}>{t('hub.local.title')}</Button><Button onClick={() => onNav('capabilities/agents')}>{t('hub.configureAgents')}</Button></div>{rows.length ? rows : <p>{t('hub.empty.connections')}</p>}
         {!!consumers.length && <section className="tt-model-hub-consumers"><div className="tt-model-hub-actions"><h3>{t('hub.consumers')}</h3></div>{consumers.map(([model, users]) => <div className="tt-model-hub-row" key={model}><div><strong>{models.find(row => row.id === model)?.name || model}</strong><small>{[...new Set(users)].join(', ')}</small></div><Button onClick={() => onNav('capabilities/agents/' + users[0] + '/models')}>{t('hub.configure')}</Button></div>)}</section>}</>}
     </div>}
     {detail && (layout.phone ? <MobileSubPage title={editorTitle} search={false} onBack={back} manageHistory={false} keepBottomNav>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><h3>{editorTitle}</h3><Button onClick={back}>{t('common.back')}</Button></div>{editor}</aside>)}

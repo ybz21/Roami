@@ -18,7 +18,8 @@ type Configuration struct {
 }
 
 func defaultConfiguration() Configuration {
-	return Configuration{Currency: "CNY", Timezone: "UTC", Pricing: PricingConfig{Models: map[string]ModelPricing{}}}
+	configured := false
+	return Configuration{Currency: "CNY", Timezone: "UTC", Pricing: PricingConfig{DefaultConfigured: &configured, Models: map[string]ModelPricing{}}}
 }
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
@@ -87,6 +88,7 @@ func money(nano int64) string {
 
 func decodeConfiguration(raw []byte) (Configuration, error) {
 	c := defaultConfiguration()
+	c.Pricing.DefaultConfigured = nil // Legacy saved defaults were explicit, including zero.
 	err := json.Unmarshal(raw, &c)
 	if err == nil {
 		err = c.validate()

@@ -75,7 +75,7 @@ export function GatewaySettingsForm({ controller: c, mode, active, models }: { c
       <p className="agent-settings-hint">{t('agent.gateway.periodHint')}</p>
     </> : <>
       <p className="agent-settings-hint">{t('agent.gateway.priceCurrency', { currency: draft.currency })}</p>
-      <fieldset><legend>{t('agent.gateway.defaultPrice')}</legend><div className="agent-proxy-price-fields">{priceFields.map(key => <div className="agent-settings-field" key={key}><label htmlFor={`agent-default-price-${key}`}>{t('agent.proxy.price.' + key)}</label><Input id={`agent-default-price-${key}`} type="number" min={0} max={1_000_000} step="any" disabled={c.saving} value={draft.defaultPrice[key]} onChange={event => c.setDraft({ ...draft, defaultPrice: { ...draft.defaultPrice, [key]: event.target.value } })} /></div>)}</div></fieldset>
+      <fieldset><legend>{t('agent.gateway.defaultPrice')}</legend><p className="agent-settings-hint">{t('hub.billing.priceHint')}</p><div className="agent-proxy-price-fields">{priceFields.map(key => <div className="agent-settings-field" key={key}><label htmlFor={`agent-default-price-${key}`}>{t('agent.proxy.price.' + key)}</label><Input id={`agent-default-price-${key}`} type="number" min={0} max={1_000_000} step="any" disabled={c.saving} value={draft.defaultPrice[key]} onChange={event => c.setDraft({ ...draft, defaultPrice: { ...draft.defaultPrice, [key]: event.target.value } })} /></div>)}</div></fieldset>
       <ModelPriceSettings value={draft} models={models} catalog={c.models} loadingCatalog={c.loadingModels} catalogError={c.catalogError} loadCatalog={() => { void c.catalog() }} disabled={c.saving} onChange={update} />
     </>}
     {c.error && <p className="agent-settings-error" role="alert">{c.error}</p>}

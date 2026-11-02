@@ -12,8 +12,9 @@ type ModelPricing struct {
 
 // PricingConfig 计费配置。
 type PricingConfig struct {
-	Default ModelPricing            `yaml:"default" json:"default"`
-	Models  map[string]ModelPricing `yaml:"models" json:"models"`
+	DefaultConfigured *bool                   `yaml:"default_configured,omitempty" json:"defaultConfigured,omitempty"`
+	Default           ModelPricing            `yaml:"default" json:"default"`
+	Models            map[string]ModelPricing `yaml:"models" json:"models"`
 }
 
 // lookup 返回某模型名的配置价格（精确 → 前缀），以及是否命中。
@@ -97,4 +98,17 @@ func (pc *PricingConfig) CalcCostExit(requested, sourceID, native string, inputT
 		return 0
 	}
 	return calc(pc.LookupExit(requested, sourceID, native), inputTokens, outputTokens, cacheReadTokens)
+}
+
+func (pc *PricingConfig) configured(requested, sourceID, model string) bool {
+	if _, ok := pc.lookup(requested); ok {
+		return true
+	}
+	if _, ok := pc.Models[sourceID+"/"+model]; sourceID != "" && ok {
+		return true
+	}
+	if _, ok := pc.lookup(model); ok {
+		return true
+	}
+	return pc.Default != (ModelPricing{}) || pc.DefaultConfigured == nil || *pc.DefaultConfigured
 }

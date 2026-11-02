@@ -72,6 +72,11 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		reject(w, 409, "MODEL_CATALOG_CHANGED")
 		return
 	}
+	if !input.Restore && s.value.AgentKeys["roami"].Disabled {
+		s.mu.Unlock()
+		reject(w, 403, "MODEL_GATEWAY_KEY_DISABLED")
+		return
+	}
 	if !input.Restore {
 		for _, name := range []string{input.Main, input.Worker} {
 			valid := false

@@ -2,6 +2,7 @@ package modelgateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -63,7 +64,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.catalogManagement(w, r) {
+	if h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
@@ -82,6 +83,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		case "PUT":
 			c := defaultConfiguration()
+			c.Pricing.DefaultConfigured = nil
 			if decodeBody(w, r, &c) != nil || c.validate() != nil {
 				reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
 				return
@@ -113,9 +115,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			reject(w, 400, "INVALID_MODEL_USAGE_DAY")
 			return
 		}
-		data, err := h.Ledger.StatisticsForSource(days, r.URL.Query().Get("day"), r.URL.Query().Get("source"))
+		data, err := h.Ledger.StatisticsForSource(days, r.URL.Query().Get("day"), r.URL.Query().Get("source"), r.URL.Query().Get("agentKind"))
 		if err != nil {
-			if err.Error() == "INVALID_MODEL_USAGE_DAY" || err.Error() == "INVALID_MODEL_USAGE_SOURCE" {
+			if err.Error() == "INVALID_MODEL_USAGE_DAY" || err.Error() == "INVALID_MODEL_USAGE_SOURCE" || err.Error() == "INVALID_AGENT_KIND" {
 				reject(w, 400, err.Error())
 				return
 			}
@@ -183,9 +185,16 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			h.Catalog.mu.Lock()
+			if h.Catalog.value.AgentKeys["roami"].Disabled {
+				h.Catalog.mu.Unlock()
+				reject(w, 403, "MODEL_GATEWAY_KEY_DISABLED")
+				return
+			}
+			keyID := keyID(h.Catalog.value.AgentKeys["roami"].ID)
 			snapshot := h.Catalog.snapshot()
 			h.Catalog.mu.Unlock()
 			r.Body = io.NopCloser(bytes.NewReader(body))
+			r = r.WithContext(context.WithValue(r.Context(), gatewayKeyContext{}, keyID))
 			h.forwardCatalog(w, r, snapshot, "roami_"+routingRole, "openai-completions", check)
 			return
 		}
