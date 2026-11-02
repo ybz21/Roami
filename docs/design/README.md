@@ -28,6 +28,7 @@
 
 - [20261030-server-workspace-state](20261030-server-workspace-state/README.md)
 - [20261030-new-user-onboarding · 新用户引导](20261030-new-user-onboarding/README.md)
+- [20261030-OKR 每日行动](20261030-okr每日行动/README.md)：[交互形式设计书](20261030-okr每日行动/interaction-design.html)、[智能体动态构建原型](20261030-okr每日行动/prototype.html#/generate)、[每日实验闭环](20261030-okr每日行动/prototype.html#/cycle/creator)、[用户故事](20261030-okr每日行动/user-stories.html)、[产品调研与交互](20261030-okr每日行动/index.html)、[技术设计](20261030-okr每日行动/technical-design.html)。
 
 - [20261030-对话文件链接](20261030-对话文件链接/README.md)
 

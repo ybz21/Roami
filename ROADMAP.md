@@ -156,6 +156,11 @@ sessions, scheduled jobs, reminders and daily briefs, notifications, and
 traceable execution results. The next step ties scheduling and execution to
 OKR goals, metrics, and cycles.
 
+Design proposal (Chinese): [user stories](docs/design/20261030-okr每日行动/user-stories.html),
+[product research and interaction](docs/design/20261030-okr每日行动/index.html), and
+[technical design](docs/design/20261030-okr每日行动/technical-design.html). These are proposals,
+not implemented capabilities.
+
 ## How the tracks fit together
 
 | Part | Role |

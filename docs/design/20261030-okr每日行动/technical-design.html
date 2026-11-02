@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-pointer="fine">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><meta name="description" content="复用现有任务与会话，把跨天推进、结果证据与恢复机制接起来。"><title>技术设计 · OKR 每日行动 · Roami</title><link rel="stylesheet" href="design.css"><script src="design.js" defer></script></head>
+<body><a class="skip" href="#content">跳到正文</a><header class="doc-header"><div class="topbar"><a class="brand" href="index.html">Roami <span>设计提案 · 2026.10.30</span></a><button type="button" id="theme-toggle" aria-label="切换阅读主题">深色</button></div><nav class="doc-nav" aria-label="三份设计文档"><a href="user-stories.html">01 用户故事</a><a href="index.html">02 产品与交互</a><a href="technical-design.html" aria-current="page">03 技术设计</a></nav></header>
+<main id="content" class="doc-scroll" tabindex="-1"><article><div class="tt-pagehead"><p class="eyebrow">OKR 持续工作 / 03</p><h1>技术设计</h1><p class="lede">复用现有任务与会话，把跨天推进、结果证据与恢复机制接起来。</p><p class="meta">规划能力，尚未实施。文中指标和执行结果均为虚构示例。</p></div><details class="toc"><summary>本文目录</summary><div class="toc-links"><ul><li class="toc-level-2"><a href="#1">1. 状态与架构边界</a></li><li class="toc-level-2"><a href="#2">2. 模块与调用链</a></li><li class="toc-level-3"><a href="#board-construction">2.1 KR、指标提案、用户确认与来源绑定</a></li><li class="toc-level-3"><a href="#model-generated-board">2.2 模型动态生成指标与看板</a></li><li class="toc-level-3"><a href="#measurement-plan">2.3 分析器输入、输出与修订</a></li><li class="toc-level-3"><a href="#agent-implementation">2.4 接入后台智能体</a></li><li class="toc-level-3"><a href="#dynamic-connector">2.5 动态连接机理</a></li><li class="toc-level-3"><a href="#dynamic-prototype">2.6 可运行原型</a></li><li class="toc-level-3"><a href="#generation-acceptance">2.7 真实推理验收</a></li><li class="toc-level-3"><a href="#interaction-book-architecture">2.8 交互设计书实现边界</a></li><li class="toc-level-2"><a href="#3">3. 数据模型与不变量</a></li><li class="toc-level-3"><a href="#persistent-swarm">3.0 长期 Swarm 生命周期</a></li><li class="toc-level-3"><a href="#cycle-runtime">3.1 长短 KR 与 project</a></li><li class="toc-level-3"><a href="#experiment-records">3.2 实验与独立复盘</a></li><li class="toc-level-2"><a href="#4">4. 每日调度与规划</a></li><li class="toc-level-3"><a href="#41">4.1 触发、幂等与时间</a></li><li class="toc-level-3"><a href="#42">4.2 规划步骤</a></li><li class="toc-level-3"><a href="#43">4.3 计划与任务之间的崩溃恢复</a></li><li class="toc-level-3"><a href="#daily-loop-protocol">4.4 每日闭环协议</a></li><li class="toc-level-2"><a href="#5">5. 执行状态、控制与授权</a></li><li class="toc-level-2"><a href="#6-kr">6. KR 观测、进展和证据</a></li><li class="toc-level-3"><a href="#61">6.1 数值投影</a></li><li class="toc-level-3"><a href="#62-kr">6.2 八个示例指标的口径</a></li><li class="toc-level-3"><a href="#63">6.3 更新流程与迟到数据</a></li><li class="toc-level-3"><a href="#64">6.4 每日原始数、窗口投影与修订</a></li><li class="toc-level-2"><a href="#7-api">7. 拟议 API 与事件契约</a></li><li class="toc-level-2"><a href="#8">8. 前端、缓存和跨端恢复</a></li><li class="toc-level-2"><a href="#9">9. 交付顺序与验收</a></li></ul></div>
+</details><h2 id="1">1. 状态与架构边界</h2>
+<p>本节均为实施提案。当前仓库已有任务、持久会话、验证、jobs 调度、日报与通知，但没有本方案完整的 OKR 领域模型、每日规划与结果投影。下面列出的新增模块、表名、接口和事件尚未实现。</p>
+<table>
+<thead>
+<tr>
+<th>已有实现</th>
+<th>本方案如何复用</th>
+<th>需要新增的连接</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td data-label="已有实现"><code>backend/server/agent-runtime.go</code>、<code>backend/api/project.go</code>、<code>backend/project/</code></td>
+<td data-label="本方案如何复用">Go 统一鉴权、节点路由、项目身份与资源访问</td>
+<td data-label="需要新增的连接">注册 OKR 路由；解析可信项目关联，不让模型任意拼目标目录</td>
+</tr>
+<tr>
+<td data-label="已有实现"><code>agent-runtime/src/roami_agent/storage/database.py</code>、<code>storage/migrations.py</code></td>
+<td data-label="本方案如何复用">受管理的 runtime SQLite、单写线程、事务与迁移</td>
+<td data-label="需要新增的连接">OKR 表、事件和读投影，纳入既有数据库备份与恢复</td>
+</tr>
+<tr>
+<td data-label="已有实现"><code>dispatch/tasks.py</code>、<code>task_revisions.py</code>、<code>runner.py</code></td>
+<td data-label="本方案如何复用">创建任务、版本、续作、派发、验证与恢复</td>
+<td data-label="需要新增的连接">行动与 task 的稳定关联，任务结果事件进入目标回顾</td>
+</tr>
+<tr>
+<td data-label="已有实现"><code>dispatch/scheduler.py</code>、<code>schedule_clock.py</code>、<code>daily_briefs.py</code></td>
+<td data-label="本方案如何复用">持久 jobs、并发控制、本地日期和时区计算、简报投递方式</td>
+<td data-label="需要新增的连接">增加 OKR 计划、观测、回顾 job 类型；日报触发本身不等于 OKR 调度已存在</td>
+</tr>
+<tr>
+<td data-label="已有实现"><code>storage/task_deliverables.py</code>、<code>replies/notifications.py</code></td>
+<td data-label="本方案如何复用">持久产物与统一通知</td>
+<td data-label="需要新增的连接">KR 证据引用任务产物、观测来源和待决事项</td>
+</tr>
+<tr>
+<td data-label="已有实现"><code>frontend/src/components/projects/Projects.tsx</code>、<code>components/agent/</code></td>
+<td data-label="本方案如何复用">项目入口、现有任务详情、跨节点访问与干预</td>
+<td data-label="需要新增的连接">目标视图、每日计划和独立 KR 结果展示</td>
+</tr>
+</tbody>
+</table>
+<p>Python Agent runtime 持有目标与规划领域，Go 维持统一网关与资源边界，前端只展示服务端状态。模型提出候选计划与解释；确定性的领域校验决定其能否入库和派发。模型不能直接填写“已经达成”的 KR。</p>
+<h2 id="2">2. 模块与调用链</h2>
+<p>拟新增目录如下；命名按实际领域职责划分：</p>
+<pre><code class="language-text">agent-runtime/src/roami_agent/goals/
+  service.py              # 目标、周期和修订入口
+  metric_contracts.py      # 指标口径与确定性校验
+  roadmap.py              # 阶段与依赖
+  planning.py             # 候选行动生成、选择与解释
+  plan_dispatch.py        # 计划到已有任务的幂等连接
+  observations.py         # 观测校验、去重、更正和投影
+  reviews.py              # 日周回顾与调整提案
+  schedules.py            # 日期窗口、触发与恢复
+  repository.py           # OKR 事务与查询
+frontend/src/components/goals/
+  Goals.tsx
+  GoalDetail.tsx
+  GoalToday.tsx
+  GoalRoadmap.tsx
+  GoalResults.tsx
+  GoalReviews.tsx
+  goal-api.ts
+  goal-events.ts
+</code></pre>
+<p>HTTP 入口挂到现有 <code>server/http.py</code>；应用装配放在 <code>app.py</code>，迁移继续经过 <code>storage/migrations.py</code>。调度使用既有 jobs 表与 worker 控制，不增加另一套常驻调度进程。</p>
+<p>执行链：目标服务保存约定；日期调度创建计划 job；规划读取结果和行动；领域校验形成计划；派发器调用现有任务服务；任务执行与验证返回事实；观测服务更新 KR 投影；回顾解释变化并产生下一步候选。任何一步失败都有持久状态，聊天文本只引用事实。</p>
+<h3 id="board-construction">2.1 KR、指标提案、用户确认与来源绑定</h3>
+<p>领域链改为 Objective、KeyResult、MetricProposal、ConfirmedMetric、SourceBinding、Observation、Board。KR 与 Metric 不是一对一：增长 KR 可关联粉丝总量和净增；诊断指标不作为额外 KR 计分。模型只生成候选、理由与口径建议，用户确认所选指标修订后，才允许针对这些指标创建发现/取样任务。</p>
+<p>拟新增 okr_metric_proposals（KR 关联、候选角色、理由、单位、窗口、计算依赖、proposal_revision）、okr_metric_confirmations（用户、确认时间、accepted metric ids、revision）、okr_metrics（稳定身份、口径、目标、有效基线、基线日期）和 okr_source_bindings（指标字段映射、节点、owner、平台、稳定账号 ID、适配器、能力范围、授权引用、验证样本、观测时间、水位与状态）。原始凭据使用现有安全存储引用，不存入提案、消息或看板 JSON。</p>
+<p>状态分开保存：指标 proposed / confirmed；来源 unbound / discovering / needs_login / sampling / verified / bound / degraded / unavailable。某字段读到不表示所有指标都能接上。比率须具备兼容分母，净增须有有效起点；首次读到当前总量，不能反推过去的周期基线。用户修改指标选择或口径会使相关提案确认与绑定校验失效，不静默扩大采集字段。</p>
+<p>取样任务依次发现已安装能力、复用已有授权、定位后台/接口/文件、核对登录态与账号、读取最小所需字段、保存日期和证据、验证指标契约，最后提交绑定。已授权且账号身份确定时可以自动绑定；需登录或存在歧义时才询问用户。登录结果需重新检查，不以“用户说已登录”直接转 bound。</p>
+<p>绑定与读数均按 owner/node/platform/account/metric contract 隔离。API 适配器先检查实际权限、账号与日期能力；网页适配器复用 roami chrome 和对应可信浏览器会话，不凭模型生成的字段路径确认成功；导入适配器校验文件与统计口径。登录过期、页面变化或验证失败时旧值附时间保留，对应指标标记待处理，不盲重试副作用。更换账号不把旧事实重贴新来源：保留历史来源作用域，重新确认新的基线与窗口。</p>
+<p>绑定提交幂等键覆盖 owner、metric confirmation revision、source account、capability revision 与 sample evidence；只接受与当前确认修订匹配的结果。先前已取消的发现任务晚到，不能覆盖新选择。Board 只引用已确认指标与版本化来源，不重复保存其当前数值；可包含明确待接入的指标组件。</p>
+<p>拟议入口：POST /objectives/:id/metric-proposals、POST /metric-proposals/:id/confirm、POST /objectives/:id/source-discoveries、GET /source-discoveries/:id、POST /source-discoveries/:id/bind。API 真实路径通过既有 /api/agent 网关，读写检查归属、确认修订与幂等键。看板生成事务可保存待接入项，只有已验证且当前授权有效的绑定进入每日采集队列。</p>
+<h3 id="model-generated-board">2.2 让模型分析目标，动态生成指标与看板</h3>
+<p><strong>当前原型没有调用模型。</strong>原六步向导的 <code>okr-setup-model.ts</code> 的 <code>starter()</code> 和 <code>analyze()</code> 返回两组预设，字段依赖和看板也按示例指标编写。这验证了流程，但不能证明后台具备通用分析能力。生产实现必须替换这条语义决策链，不能只把固定文案改成模型润色。</p>
+<p>目标架构：对话与目标上下文进入分析器，模型提出 MeasurementPlan；用户确认衡量方案后，来源智能体通过实际工具发现和取样；领域服务验证绑定，模型据此提出 BoardSpec；前端按组件目录渲染。结构化是双方的通信协议，指标内容、数量、依赖、提问与组件组合由本次推理决定。</p>
+<table><thead><tr><th>决策</th><th>模型负责</th><th>领域服务负责</th></tr></thead><tbody>
+<tr><td data-label="决策">理解目标</td><td data-label="模型负责">区分用户明确要求、合理假设和未知项；提出 O、KR 与最影响决策的问题</td><td data-label="领域服务负责">保存原话、回答与提案修订；没有周期、方向或可衡量口径时保留草稿</td></tr>
+<tr><td data-label="决策">推导指标</td><td data-label="模型负责">提出任意领域的指标、角色、理由、窗口、公式依赖、备选和所需字段</td><td data-label="领域服务负责">校验单位、窗口、引用、循环依赖、目标与基线状态；用户确认具体修订</td></tr>
+<tr><td data-label="决策">发现来源</td><td data-label="模型负责">从实际可用工具中选择访问路径、定位字段、解释口径差异</td><td data-label="领域服务负责">执行受授权工具，记录账号、日期、样本与回执；凭证引用和字段校验通过后才绑定</td></tr>
+<tr><td data-label="决策">组织看板</td><td data-label="模型负责">选择指标卡、趋势、分组比较或明细；给出每块内容的用途与引用</td><td data-label="领域服务负责">只接收组件目录内的配置；查询层计算数值，渲染层执行设计系统和可访问性规则</td></tr>
+<tr><td data-label="决策">每日行动</td><td data-label="模型负责">结合历史观测提出解释、优先行动和验证方法</td><td data-label="领域服务负责">区分事实与因果假设；按日期写观测、派发已有任务并保留结果证据</td></tr>
+</tbody></table>
+<h3 id="measurement-plan">2.3 分析器输入、输出与修订</h3>
+<p>输入包含用户原话与回答、已确认目标、当前提案修订、已授权的能力摘要、实际样本的字段/单位/日期/来源引用，以及允许的公式运算和组件目录。未验证的网页文字作为外部数据处理，不能改变执行权限。能力摘要不存在某连接器时，不向模型暗示它已经可用。</p>
+<p>分析指令要求：先识别要改变的结果，再提出最小充分的衡量集合。仅说涨粉时，候选可以只有粉丝总量与周期净增；不能默认追加点赞和完播 KR。无法判断商业转化还是内容影响力时，只问会改变指标选择的问题。每个建议提供简短依据、待验证假设和所需证据；不索要或保存模型的内部思考过程。</p>
+<pre><code class="language-typescript">type MeasurementPlan = {
+  schemaVersion: 1;
+  proposalId: string;
+  revision: number;
+  basedOnRevision: number;
+  objective: { title: string; cycle: string | null };
+  keyResults: Array&lt;{ id: string; outcome: string; metricIds: string[] }&gt;;
+  metrics: Array&lt;{
+    id: string; krId: string; name: string; unit: string;
+    role: 'outcome' | 'diagnostic' | 'guardrail';
+    valueKind: 'snapshot' | 'flow' | 'ratio' | 'duration';
+    direction: 'increase' | 'decrease' | 'range';
+    window: { basis: 'calendar' | 'rolling' | 'cycle'; days?: number };
+    definition: string; expression: FormulaNode | null;
+    requiredFields: FieldRequirement[];
+    target: number | null; baseline: number | null;
+    rationale: string; assumptionIds: string[];
+  }&gt;;
+  assumptions: Array&lt;{ id: string; statement: string; evidenceIds: string[] }&gt;;
+  questions: Array&lt;{ id: string; text: string; blocks: string[] }&gt;;
+};
+type BoardSpec = {
+  schemaVersion: 1; revision: number; metricConfirmationRevision: number;
+  widgets: Array&lt;{
+    id: string; type: 'metric' | 'trend' | 'comparison' | 'records';
+    metricIds: string[]; groupBy?: string; title: string;
+  }&gt;;
+};</code></pre>
+<p>上述是契约轮廓，正式 JSON Schema 必须关闭额外属性并限制规模；具体指标 ID 是动态身份，不枚举 followers、likes、p95。FormulaNode 是有类型的运算树，FieldRequirement 描述单位、粒度、聚合语义与所需维度。允许引用、差值、窗口求和、比率和百分位等经过验证的运算；禁止 eval、任意 SQL 或模型生成的脚本。百分位需要分布或同口径平台统计，不能平均每天的 p95。数据来源、单位与分母不兼容的表达式拒绝执行。</p>
+<p>用户补充“我更看重咨询，粉丝只是辅助”时，把原提案、修订号与新增要求送回分析器，生成差异：新增有效咨询指标，降级粉丝角色，移除不相关组件。界面显示变更及原因，保留未受影响的选择。目标、口径或采集范围变化后需确认对应修订；单纯调整展示顺序无需重新授权。旧推理晚到不能覆盖新回答，失败则保留原稿并提供重试。</p>
+<h3 id="agent-implementation">2.4 接入现有后台智能体</h3>
+<p>新增 <code>goals/measurement_analysis.py</code> 组织上下文和模型调用，<code>measurement_schema.py</code> 校验提案，<code>source_discovery.py</code> 管工具回执与发现状态，<code>board_specs.py</code> 校验组件引用与版本；前端增加 <code>MetricProposalReview.tsx</code>、<code>BoardRenderer.tsx</code> 与 <code>board-catalog.ts</code>。不是为两个故事各写一个页面分支，而是让同一份分析协议和渲染器处理新的领域。</p>
+<p>模型通过现有 <code>protocol/model_routes.py</code>、<code>providers/factory.py</code> 使用节点保存的路由与 Go 网关。优先复用已支持的工具调用提交 <code>propose_measurement_plan</code> 参数，经 <code>tools/registry.py</code> 的 JSON Schema 校验和领域语义校验后才保存为提案。未支持工具调用的路由可采用严格解析的 JSON 文本提案；不假定所有路由都支持 response_format，也不向能力声明中临时加入未知配置。校验失败把具体错误送回模型有限修正；仍失败显示未生成成功，不降级成假装由模型推导的默认方案。</p>
+<p>来源发现是模型选择工具、工具返回事实、模型解释字段、领域服务验证绑定的闭环。截图识别可提供候选映射；账号身份、观测日期和统计口径无法核实时不能升级为可信绑定。找不到登录态、工具或字段时明确待接入，并给出登录、文件导入或手动记录的下一步。确认指标不代表已取得数据。</p>
+<p>BoardSpec 不包含真实数值、凭据、任意 HTML/JavaScript 或可执行事件代码。组件通过已确认的指标 ID 查询同一个按日期的数据层，模型不算账、不直接写 KR 达成状态。模型可以建议新组件类型，但当前目录不支持时使用合适的明细回退并说明限制。首次生成后保存看板；每日只刷新事实与分析，不重新排列用户已熟悉的界面。新布局作为可预览的修订。</p>
+<p>推理记录保存输入上下文版本、实际调用/路由引用、工具回执、结构校验结果与最终提案；密钥和不必要的原始个人信息不进入日志。以这些记录证明真实模型参与，而不是依靠动画、延迟或“AI 已分析”的文案。</p>
+<h3 id="dynamic-connector">2.5 动态构建机理：目标、KR、看板和 connector 同时演化</h3>
+<p>用户确认的是方案，智能体负责生成草稿。不能要求用户手工填完 KR、指标和来源才说“生成完成”。每一轮分析的输入是原话、已确认约束、实际可用能力和工具证据；输出包含新增、修改、移除和待核实项。用户补充后，受影响的下游配置重新生成，未改变的定义和历史保留。</p>
+<pre><code class="language-text">用户目标 / 补充
+  目标分析：提出 KR 及简短依据
+  KR 提案：数值结果、阶段验收、检查清单等不同形式
+  衡量分析：指标、公式、时间窗口、诊断关系与所需证据
+  看板草稿：由组件目录、指标引用与数据形态组合
+  用户确认衡量方案
+  来源发现：可用工具 / API 文档 / 浏览器页面 / 文件
+  connector 候选：读取步骤、字段映射、身份与日期约束
+  受控试运行：采样、校验、登记连接
+  每日复用：读取、验证、按日期写入、确定性计算
+  失效恢复：保留旧事实，重新发现、生成修订、复验</code></pre>
+<p>KR 的表达形式由它要证明的结果决定。数值型可以引用目标指标；阶段型引用验收节点；清单型引用必须具备的交付条件。模型选择呈现类型与内容；前端组件目录提供稳定实现。未支持的类型先回退成可读描述与证据明细，不能让未知 schema 使整页崩溃，也不把所有 KR 强行压成一个百分比。</p>
+<p>connector 是持久、可复验的执行产物，不是一句“去后台看看”。最小产物包括 transport、受授权 origin/path、账号身份约束、字段和单位、日期提取方式、契约版本、验证样本及运行记录。API 模式绑定接口和权限；浏览器模式绑定页面定位与读取步骤；代码模式可生成适配模块，但必须在隔离执行环境中运行并经同样的账号、字段、日期验证。生成代码本身没有资格把状态置为 connected。</p>
+<p>浏览器场景的真实循环：发现已安装的浏览器能力，打开或复用获授权页面，观察 DOM/可访问树或截图，定位“粉丝总量”，核对稳定账号和日期，再提出选择器/字段映射。没有固定选择器可先用受控浏览器行动读取，定位稳定后再固化成 connector。页面结构变化时，模型根据新观察生成候选 v2，试读成功后替换当前绑定，v1 的历史回执继续可追溯。登录、验证码等由用户在原后台完成，不能把 cookie、密码或临时页面内容放进生成代码或看板配置。</p>
+<p>连接注册流程拟分为 proposed、sampling、validated、active、degraded、retired。生成器不能直接写 active；注册服务只接受匹配当前 metric confirmation revision 的验证结果。字段范围、账号、来源、日期口径或执行步骤变更提升 connector revision，并触发相关校验；布局排序不触发重新采集。重复调度和迟到回执按 connector revision、账号、日期、口径版本去重。常规只读采集在已授权范围内自动执行；遇到账号歧义、需登录或新增授权范围时才向用户提问。</p>
+<h3 id="dynamic-prototype">2.6 本次可运行的机理原型</h3>
+<p><a href="prototype.html#/generate">动态构建原型</a>使用 <code>okr-generation-contract.ts</code> 定义 GeneratedPlan 和观测契约，<code>okr-generation.tsx</code> 按配置渲染 KR、指标映射、connector 与看板。<code>okr-generation-replays.ts</code> 提供明确标注的响应回放：内容目标由四条 KR 修订为五条，呈现数值、阶段、清单三种形式；v1 读取粉丝、完整播放、有效播放、总观看秒数，v2 再增加点赞字段。项目维护复用同一渲染器。</p>
+<p>原型允许粘贴和导入其他 GeneratedPlan，未知领域不按关键词套用两个故事。已验证“减少文档检索耗时”的单 KR 方案由同一组件渲染。自由输入但没有模型响应时明确提示需要接入或导入，不伪造推理。前述 MeasurementPlan / BoardSpec 是完整实施契约轮廓；GeneratedPlan 是本次原型的简化协议，不等同于已实现的后端服务。</p>
+<p><a href="browser-metric-connector.mjs">browser-metric-connector.mjs</a> 是真实可执行的浏览器 runner，使用 <code>roami chrome eval --target</code> 读取 <a href="fixtures/creator-console.html">本地创作者后台夹具</a>。模型候选的 JSON 描述指定选择器、身份、日期和字段，runner 用固定读取与校验实现执行；没有 eval 任意模型生成脚本。夹具数据是虚构数据，runner 只允许 loopback 的这个夹具路径，不能拿它声称已接入抖音、视频号或真实监控。</p>
+<pre><code class="language-sh"># 从原型的连接详情下载 creator-console.json，使用本任务专用浏览器标签。
+roami chrome new https://127.0.0.1:18684/fixtures/creator-console.html
+node browser-metric-connector.mjs --spec creator-console.json --target &lt;标签ID&gt; --out sample.json
+# 在“验证取数”导入 sample.json；切换夹具日期后再运行，输出另一个文件。</code></pre>
+<p>夹具通过本机隔离的 HTTPS 静态服务提供；生产实施应接入现有安全存储与任务执行器，不增加一套临时服务。样本包含 connector ID/revision、稳定账号、观测日期、采集时间、来源 URL、原始字段与单位。导入前按当前协议校验；原型导入 JSON 不能单独证明文件真实性，生产回执必须由受信执行器保存并通过服务端关联。基线确认独立保存，缺少周期前一日快照时净增仍未知；不会根据当前粉丝数倒造历史。</p>
+<p>本轮验证范围：浏览器 runner 实读夹具的两天数据并导入原型，校验净增与比率；账号切换、字段消失时停止且不输出新样本。模型推理为回放；真实第三方账号采集、生产 connector 注册、调度与自动修复尚未实施。</p>
+<h3 id="generation-acceptance">2.7 如何证明没有把两套模板包装成智能</h3>
+<ul><li>用未写入示例的目标测试，例如“减少文档检索耗时”：应提出任务成功率、检索耗时等有依据的候选，或询问场景，不能出现粉丝或固定 repo 指标。</li><li>同一句“提升账号”分别补充“扩大影响力”与“获得有效咨询”：结果指标和看板组件应随意图变化；澄清前保持假设可见。</li><li>只有涨粉要求时不自动增加三个 KR；用户明确要求点赞率、完播率时再纳入，且区分结果与诊断。</li><li>真实取样缺少分母、账号不符或日期未知时，模型输出“已绑定”也会被服务拒绝；缺数据不填零。</li><li>对口径改变、取消发现、并发修订、无效公式和未知组件做校验；两种目标共用渲染器，无按故事枚举的组件分支。</li><li>接入保存的模型路由跑真实调用并记录提案差异；样例回放、模型推理、真实工具采集三种验证结果分开标注。本次尚未进行真实调用验收。</li></ul>
+<p>补充调研（2026-10-31）：<a href="https://github.com/vercel-labs/json-render">Vercel json-render</a> 使用组件目录、JSON 规格与渲染器；<a href="https://ai-sdk.dev/docs/ai-sdk-ui/generative-user-interfaces">AI SDK Generative UI</a> 将模型选择的工具调用结果映射到 React 组件。这些是实现模式参考，不代表 Roami 已接入这些库。此处选择沿用仓库组件与现有模型基础设施。</p>
+<h3 id="interaction-book-architecture">2.8 交互形式设计书的实现边界</h3><p><code>interaction-design.html</code> 是可离线打开的设计书，不是新注册的产品页面。<code>okr-dialogue-scenes.ts</code> 定义输入、响应、字幕、输出视图和时长；<code>interaction-book.tsx</code> 用同一组场景支持章节播放与主动推进。KR 和趋势复用配置驱动组件，数据与复盘复用 <code>okr-execution-cycle.ts</code>；播放跳转从纯状态快照重建，不重放真实任务。</p><p>故事按四条线顺序组织：先聊 OKR，再拆 KR 与看板，再完成来源/样本/建板，最后执行与复盘。<code>sceneSnapshot()</code> 显式区分派发、交付、观测、复盘、次日计划，避免前期场景提前包含执行后的数据。两个场景在交付幕只有交付事件，到观测幕才加入当日数据，复盘幕才加入分析；第二轮任务来自前次有效 Review。决策幕支持本地继续、暂停和恢复，既有事实保持。
+</p><p>叙事状态与交互输入分别保存。自定义输入没有对应的响应时仅保留并明确说明，不改变 KR 或生成虚构事实；切回故事不插入用户的临时输入。播放支持暂停、拖动和倍速，页面隐藏后暂停；移动端不缩小桌面画布，而是切换对话、结果和设计说明。没有模型或账号请求，也不会因播放产生文件、任务、PR 或发布。未来真实接口应接入前述提案与执行协议，不能拿这段回放当运行时实现。</p><h2 id="3">3. 数据模型与不变量</h2>
+<p>以下为逻辑结构，实施时需写正式迁移、索引与约束，不直接作为生产 DDL。所有时间戳存 UTC 毫秒，业务日期另存本地 <code>local_date</code>，所有读写按 owner 和来源节点校验。</p>
+<table>
+<thead>
+<tr>
+<th>对象 / 拟议表</th>
+<th>主要字段与约束</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td data-label="对象 / 拟议表">Objective / <code>okr_objectives</code></td>
+<td data-label="主要字段与约束"><code>id, owner_id, node_id, title, cycle_start, cycle_end, timezone, state, revision, policy_revision, source_conversation_id</code>；个人目标允许无项目，多个项目通过独立关联表绑定；归档保留周期快照</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">KR / <code>okr_key_results</code></td>
+<td data-label="主要字段与约束">稳定 KR 身份、结果陈述、目标边界、关联指标和达成规则；数值口径迁移到独立 Metric 与其 contract revision，允许一条 KR 关联多个指标。</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">MetricContractRevision / <code>okr_metric_contracts</code></td>
+<td data-label="主要字段与约束">指标每版基线、目标、单位、环境、来源、有效时间和修改原因；旧观测始终绑定原口径，不能因修改目标而重算旧周期结论</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">Milestone / <code>okr_milestones</code></td>
+<td data-label="主要字段与约束"><code>id, objective_id, title, target_date, exit_criteria, pinned, revision</code>；依赖边单独存，入库检查无环；通过关联表支持多个 KR</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">Action / <code>okr_actions</code></td>
+<td data-label="主要字段与约束"><code>id, objective_id, primary_kr_id, milestone_id?, title, acceptance, artifact_spec, actor, human_minutes, dependencies, state, revision, task_id?</code>；已执行任务状态由任务域提供，不能被行动表反向覆盖</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">Plan / <code>okr_daily_plans</code></td>
+<td data-label="主要字段与约束"><code>id, objective_id, local_date, revision, state, input_revision, observed_watermark, policy_revision, created_ms</code>；同一目标日期只有一个生效版本，历史版本保留</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">PlanItem / <code>okr_plan_items</code></td>
+<td data-label="主要字段与约束"><code>plan_id, action_id, order, reason, reserved_human_minutes, disposition</code>；引用原行动，变更计划不复制执行任务</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">ExecutionLink / <code>okr_execution_links</code></td>
+<td data-label="主要字段与约束"><code>action_id, action_revision, task_id, request_key</code>；同一行动修订最多一个初始 task，后续 run 由原任务系统管理</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">Observation / <code>okr_observations</code></td>
+<td data-label="主要字段与约束"><code>id, kr_id, contract_revision, source_id, source_record_key, observed_at, received_at, window, value, unit, environment?, release_commit?, evidence_refs, verification, supersedes?</code>；追加记录，更正引用原记录</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">Review / <code>okr_reviews</code></td>
+<td data-label="主要字段与约束"><code>objective_id, period_kind, period_key, evidence_watermark, facts, hypotheses, next_actions, proposed_changes</code>；重复生成形成修订，不重复投递</td>
+</tr>
+<tr>
+<td data-label="对象 / 拟议表">Event / <code>okr_events</code></td>
+<td data-label="主要字段与约束"><code>id, owner_id, objective_id, sequence, kind, revision, payload, created_ms</code>；与对象更新同事务持久化，供 SSE 重放与通知去重</td>
+</tr>
+</tbody>
+</table>
+<p>策略包括用户参与时段、每日总可用时间、各目标优先级、免打扰、执行与发布范围。用户总容量放在 owner/node 对应的工作约定；目标只保存分配和优先级，不能各自复制一份全部容量。跨节点的同一用户时间分配先要求显式配额分配或统一协调，P0 不宣称多个独立服务已能原子抢占同一时段。</p>
+<p>事务不变量：目标、KR、行动、项目和 task 的 owner/node 归属一致；主要 KR 必须属于目标；依赖无环；来源能回到有权限的记录；<code>current_value</code> 只由有效观测投影更新；修改已关闭周期不覆盖快照。备份时连同产物证据保留，引用不可读时显示不可用，不继续宣称有完整验证证据。</p>
+<h3 id="persistent-swarm">3.0 生效定义与长期 Swarm 的生命周期</h3>
+<p>拟新增 ObjectiveSwarmBinding，关联 objective_id、active_design_revision、swarm_id、member_role_revisions、schedule_policy_revision、state、next_wakeup 与事件水位。搭建草稿和运行实例分别持久化：draft、validated、published 属于定义；active、waiting、blocked、paused、reviewing、archived 属于 Swarm 工作生命周期。发布启动用目标与定义修订作为幂等键，重试不能重复建群或成员。</p>
+<p>复用现有 Swarm 成员、任务看板与广场能力：<code>backend/api/swarm.go</code> 通过现有会话 CLI 转发建群、成员与协作操作。新方案需要一个受控的目标/任务桥接器，把 OKR 行动、真实 task/run、Swarm task 和成员回报关联起来；成员自报完成不覆盖任务验证。规划、数据与复盘继续走已有 jobs 和 Go 网关，Swarm 的角色与共享状态持续存在，不依赖浏览器页面或一个不能恢复的模型调用。</p>
+<p>Leader 持有目标与策略，执行、数据、复盘成员按职责接收任务并在共享事件/看板上报告；没有当前工作时标为待命并显示唤醒条件。相邻业务日使用同一 swarm_id，保留上一轮 Review、未结束任务、来源连接和计划修订。重启后按持久 jobs、lease 与回执恢复，只补当前有效工作，不重发已交付 PR、视频或过期发布动作。</p>
+<p>运行态的战术调整生成 PlanRevision，继续执行现有目标；战略或口径变更创建新的 DesignRevision 草稿，校验后原子切换 active_design_revision，任务继续引用其启动时的修订。暂停阻止新派发，运行中的任务不被显示为已取消。周期结束进入目标回顾，归档保留事实；Swarm 整体完成必须有目标与集成验收，不能因为一个成员交付就结束整个持续循环。</p>
+<p>设计书用 <code>sceneLifecycle()</code> 明确搭建/运行切换；<code>okr-swarm-state.ts</code> 从当前阶段快照投影稳定 Swarm 身份、成员和任务；<code>okr-swarm-runtime.tsx</code> 展示全宽运行工作台，并提供共享群聊、配置查看和派发控制。它们是本地回放，未接入真实 Swarm API 或常驻调度。</p>
+<h3 id="shared-swarm-protocol">同群协作与单一共享看板协议</h3>
+<p>每个长期 Swarm 绑定稳定 <code>room_id</code>、<code>board_id</code> 和成员身份；主责、执行、数据、反思拥有各自的任务上下文和运行记录，按事件唤醒。切日和换轮不更换群或复制看板。一个 project 可以提供执行资源，不能因此另建一份孤立的 OKR 事实。</p>
+<p>群消息包含 <code>message_id, swarm_id, room_id, author_id, round_id, task_refs, observation_refs, review_ref, event_watermark</code>。群里的 @接棒是通知与协作；任务创建、领取、验收、观测和计划仍经领域服务验证，不能靠一句聊天覆盖事实。前端消息中的任务链接解析到同一看板对象，支持当前轮与历史轮详情；没有已验证任务时不展示虚假的完成回执。</p>
+<p>闭环依次为派发、执行交付、采集校验、独立反思、采用建议与再执行。反思读取冻结的任务/观测水位；主责采用有效 Review 后生成 <code>PlanRevision.source_review_id</code>，下一轮任务保存原 Review 和 Plan 的引用。迟到数据使反思失效，已交付任务不重派；计划采用的幂等键防止重复任务。独立角色可并行处理互不依赖的任务，但反思不能越过所需证据。</p>
+<p>任务/观测事件提交后通过 outbox 产生看板投影更新与群通知，两种视图按相同水位恢复；群消息去重不能导致原始观测丢失。暂停只阻止新派发，讨论仍开放；执行中的任务需单独核对。用户在群里的新意图先形成可检查的变更，不能把聊天文本当任意工具指令执行。</p>
+<p>原型的 <code>swarmProjection()</code> 同时提供组织、共享看板、五环节状态、当轮与历史任务；<code>swarmMessages()</code> 从同一场景快照生成有明确作者和任务引用的群聊回放。<code>okr-swarm-loop.tsx</code> 展示执行、取数、反思、调整、再执行，<code>okr-swarm-conversation.tsx</code> 展示同群接棒；第二轮任务引用第一轮反思。没有启动真实 Swarm、消息服务或智能体。</p>
+<h3 id="cycle-runtime">3.1 长短 KR、project 与执行资源</h3>
+<p>KR 增加 <code>parent_kr_id?, horizon, start_date, end_date, evaluation_policy_revision</code>。horizon 支持长期周期、短期检查点，以及确有业务需要的日结果；每天的执行清单仍属于计划，不强制变成日 KR。父子关联检查同一 owner/目标、无环和时间边界；允许短期使用独立诊断指标，不能把子目标达成率相加冒充父 KR 的业务结果。周期滚动产生新记录，旧合同、观测和结论保持可追溯。</p>
+<p>新增 <code>okr_project_links</code>：<code>objective_id, kr_id?, project_id, node_id, contribution, execution_scope_ref, revision, state</code>，支持多对多。一个行动引用一个主要执行项目及当前绑定修订，辅助产物引用其他任务，不把多个可写目录塞进一次未经校验的执行范围。对同一项目下多个目标的行动统一排队、去重和资源协调，避免每个目标独立重复派发。</p>
+<p>现有 <code>backend/project/service.go</code> 的项目 ID 是稳定身份，Dir 是可变工作根；<code>backend/api/project.go</code> 已聚合 Git 与非 Git 项目。创建目录可复用 <code>backend/project/provision.go</code>，执行目标复用 <code>dispatch/tasks.py</code> 的 project/new_project/new_session/session 路径。不能从 API 文件开头的历史注释推断所有项目必须是 Git，也不能用目录 hash 作为新的 OKR 身份。</p>
+<p>目标与观测存 runtime 领域库，不依赖用户目标目录存在。仅跟踪的目标可没有 project；需要写脚本、生成素材或改代码时，先解析可信项目和授权目录，再创建工作空间。素材使用明确的日期/实验产物目录，Git 写任务使用已有隔离工作区链路。任务的 run/workspace/session 与 project 分别有身份；会话重建不创建新目标。浏览器账号与 connector 属于受授权数据来源，不因关联 project 自动获得其他账号的访问权限。</p>
+<p>项目移动保留稳定关联；项目删除、明确停用或不可访问时保留 OKR 和历史，新写任务标记阻塞并允许重新关联。自动归档表示空闲展示状态，不应阻止已有授权范围内的任务重新激活项目。取消关联不隐式停止已在运行的任务，已有停止链单独控制。P0 继续在同一 owner/runtime 节点内原子协调；跨节点绑定显式记录节点并走既有授权和派发协议，不宣称多节点目录锁或计划事务已统一。</p>
+<h3 id="experiment-records">3.2 实验、数据成熟度与独立复盘</h3>
+<p>新增 <code>okr_experiments</code> 与修订记录：长期/短期 KR 引用、假设、改动因素、比较方式、对象/版本、主要指标与约束指标、观察窗口、数据质量条件、预先约定的评估/停止规则及状态。方式至少区分随机实验、探索性比较和固定环境基准；方式未知时不得输出因果胜出结论。正式统计检验必须引用实际随机化单位、分流配置与分析策略，不能让模型临时拼一个 p 值或样本阈值。</p>
+<p>观测补充 <code>experiment_id?, variant_id?, subject_id?, published_at?, exposure_window?, observation_age?, maturity, quality_flags</code>。账号自然日快照与单视频发布后固定观察龄属于不同事实；日增量只在相邻日期和同口径下计算，滚动窗口变化不替代当日新增。项目基准必须带候选/发布环境与 commit。无法取得精确 T+24h 的来源保留实际观察龄，不能从 T+27h 快照虚构 T+24h。</p>
+<p>主责身份关联目标，连续记忆保存在目标修订、实验日志、已核验交付和 Review 中，不依赖常驻的长对话。执行、取数、复盘可以使用同一保存的模型路由，通过不同任务上下文、工具与写权限运行。复盘任务读取 <code>ReviewInputSnapshot</code>：目标/短周期合同修订、计划、执行和发布状态、观测水位、质量/成熟度、上次判断；不能只读取执行者的自然语言总结。</p>
+<p>数据角色只能提交带回执的观测，由领域服务验证入库；复盘角色不能修改原始数据，只提交 facts/evidence_refs、hypotheses、missing_evidence、decision、next_actions。facts 里的数值来自投影，解释保持为可验证假设。主责把建议转成 <code>PlanRevision</code>，记录 source_review_id/revision 与 input_watermark，继续沿用 task 派发与验证；Review 本身不自动创建无版本、无归属的任务。</p>
+<p>建议新增 <code>goals/project_links.py</code>、<code>experiments.py</code>、<code>review_snapshots.py</code>、<code>role_dispatch.py</code>。调度与验证仍走既有任务服务和 Go 网关，不增加一套 Token/调用/花费限额。角色分离本身不保证独立性或客观性，事实可信度来自工具回执、固定合同和领域校验。</p>
+<h2 id="4">4. 每日调度与规划</h2>
+<h3 id="41">4.1 触发、幂等与时间</h3>
+<p>逻辑 key 使用 <code>objective_id + local_date + trigger_kind</code>；job key 再包含计划输入修订，以区分同日的合法重排。主计划日期沿用 <code>schedule_clock.py</code> 的本地日期计算：夏令时缺失分钟用第一个有效时刻，重复时段同一业务日期只生成一次主计划。</p>
+<p>每日窗口到达，事务插入 job 并推进下次触发时间。服务重启只为当前有效日期补一次计划；漏掉的历史日期记录未运行，不追补几十份过期发布任务。当天结果回顾在约定窗口生成，迟到观测触发原回顾修订，不产生另一个“今天”。时区修改从下一个计划窗口生效，保留原日期计划的时区快照。</p>
+<p>目标暂停或到期后不创建新派发。恢复先核对既有任务，重新计算当前日期的余量和依赖。周期截止后允许接收“观测窗口在周期内、补录在截止后”的证据；已归档快照只能追加有标记的更正，不静默重写结论。</p>
+<h3 id="42">4.2 规划步骤</h3>
+<ol>
+<li>读取目标、口径、策略和观测水位；读取原任务的最新状态与待决事项。</li>
+<li>先保留用户固定安排，扣除正在执行和已承诺的用户时间；多个目标共同分配剩余容量。</li>
+<li>确定性过滤无权执行、依赖未满足、重复、过期或护栏禁止的行动；已运行未知结果进入核对队列。</li>
+<li>模型在有效集合内给出选择与理由，必要时提出细化行动；结果必须符合结构 schema，不直接执行任意命令。</li>
+<li>校验依赖、时间、人机职责、关联 KR、验收标准、资源和版本。默认预留 20% 用户时间，用户可改；Agent 并发由既有 scheduler 管理。</li>
+<li>比较 <code>input_revision</code> 和观测水位，未变化则复用原计划；有实质变化才保存新版本及差异，事务写派发意图。</li>
+<li>同步到今日视图。网关准入通过后，通过任务服务推进已授权行动；失败或未知保持可恢复状态。</li>
+</ol>
+<p>首版用可解释的规则排序加受约束的模型建议，不训练无基线的收益打分。预算/Token/请求数/花费准入继续由 Go 网关负责；Python 记录并传播决定，不新增一套额度上限。模型调用使用节点已保存的模型路由、参数和能力，验收也不临时硬编码模型。</p>
+<h3 id="43">4.3 计划与任务之间的崩溃恢复</h3>
+<p>计划提交事务写 <code>okr.dispatch</code> 意图；派发 job 使用稳定 <code>request_key=action_id:action_revision</code> 调用已有任务创建路径。创建 task、记录关联与意图完成在同一受控写事务实现，或通过任务服务幂等回查收敛，不能在数据库事务中等待模型/网络。</p>
+<p>如果创建已成功、进程在保存关联前崩溃，重试以同一个 key 找到原 task；不会再开会话或 PR。修改验收要求优先走原 task 的 revision/steer，计划重排只调整关联。只有用户明确改变工作范围且原任务已妥善处理，才允许新行动修订绑定新任务。</p>
+<p>专业执行器工作目录和会话复用现有可信目标、隔离 worktree 与持久 session。发送提示通过既有可靠提交路径；不新增原生 tmux 清理命令，不把用户活跃会话当测试资源。</p>
+<h3 id="daily-loop-protocol">4.4 规划、执行、取数、复盘与次日计划</h3>
+<p>同一目标在一个业务日期的流转由持久状态和事件驱动，不用主智能体不断自我唤醒。每个阶段以目标、日期、阶段、输入修订建立稳定 job 身份；调度 lease 防止重复协调。角色任务必须带 objective/KR/experiment、project link revision、plan revision、actor role、输入证据与验收要求。并行仅用于可独立验收的任务，项目写冲突交给现有工作区和执行调度协调。</p>
+<table><thead><tr><th>阶段</th><th>触发与输入</th><th>持久输出</th></tr></thead><tbody>
+<tr><td data-label="阶段">规划</td><td data-label="触发与输入">日期窗口、上次有效复盘、未结束任务、短周期假设与用户固定安排</td><td data-label="持久输出">PlanRevision 与任务创建意图；主责按实际能力决定制作视频、提交 PR 或先建立测量</td></tr>
+<tr><td data-label="阶段">执行与验证</td><td data-label="触发与输入">任务服务派发至已解析项目/工作空间</td><td data-label="持久输出">产物、验证与发布状态；task 完成事件不能直接更新业务 KR</td></tr>
+<tr><td data-label="阶段">取数</td><td data-label="触发与输入">账号每日读取 job，以及单个发布对象达到观察龄的独立 job</td><td data-label="持久输出">带账号、对象、日期、契约版本和回执的观测；失败原因、数据水位和下次可读时间</td></tr>
+<tr><td data-label="阶段">复盘</td><td data-label="触发与输入">约定回顾窗口与数据到达事件；冻结 ReviewInputSnapshot</td><td data-label="持久输出">事实、缺项、候选解释、继续/调整/停止/补测决定与行动建议；依赖输入水位</td></tr>
+<tr><td data-label="阶段">次日计划</td><td data-label="触发与输入">当前有效 Review 与既有策略</td><td data-label="持久输出">关联 source_review_revision 的新计划；例行范围内自动采用，改变目标、口径或授权范围时按相应变更流程处理</td></tr>
+</tbody></table>
+<p>数据未齐时允许形成“先补测”的回顾和次日测量任务，不能把未知填成 0。新数据或交付晚到使旧 Review 标记 superseded 并按同一业务日期重算，旧文本保留。如果次日还未执行，按新 Review 形成计划修订；如果任务已经运行或交付，保留其身份，形成增量调整，不能删除已发生的事实或重发同一 PR/视频。</p>
+<p>每日观察、短周期评估与长期记分分开。没有随机化或可比样本时，复盘只提出探索性方向；数据质量不合格时优先修 connector。诊断信号好转不能直接抬高长期 KR。策略可以按护栏停止明显有害实验，但停止规则和统计方法必须来自实验合同，不由一次模型回复临时决定。</p>
+<p>本轮可运行示例：<code>okr-execution-cycle.ts</code> 保存项目关联、日计划修订、回放交付、日期观测、Review 输入键与次日计划来源；<code>okr-cycle.tsx</code> 展示“目标与项目 / 今日行动 / 取数与复盘 / 明日计划”。关联不足阻止执行，数据晚到使复盘过期，旧复盘不能被采用，同日采集和重复采用幂等；次日可以出现负增量。这个状态机是设计原型，不是已实现的生产调度器或智能体运行系统。</p>
+<h2 id="5">5. 执行状态、控制与授权</h2>
+<table>
+<thead>
+<tr>
+<th>领域</th>
+<th>状态或展示</th>
+<th>约束</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td data-label="领域">目标生命周期</td>
+<td data-label="状态或展示">draft / active / paused / reviewing / closed / archived</td>
+<td data-label="约束">周期到期进 reviewing，停止新派发；归档不删除事实</td>
+</tr>
+<tr>
+<td data-label="领域">行动规划状态</td>
+<td data-label="状态或展示">proposed / ready / scheduled / deferred / cancelled</td>
+<td data-label="约束">持有是否可选与安排；派发后关联真实 task</td>
+</tr>
+<tr>
+<td data-label="领域">任务执行状态</td>
+<td data-label="状态或展示">复用现有 task/run/verification 状态</td>
+<td data-label="约束">不新增第二套 succeeded 或用规划状态覆盖任务终态</td>
+</tr>
+<tr>
+<td data-label="领域">KR 数据状态</td>
+<td data-label="状态或展示">pending_baseline / current / stale / disputed</td>
+<td data-label="约束">与目标生命周期、任务状态独立</td>
+</tr>
+<tr>
+<td data-label="领域">KR 健康提示</td>
+<td data-label="状态或展示">未知 / 按计划 / 有风险 / 偏离 / 已达成</td>
+<td data-label="约束">由有效观测、计划检查点和护栏解释；不会把业务指标都按线性日均增长判定</td>
+</tr>
+</tbody>
+</table>
+<p>计划调度与用户干预必须带期望 revision；执行控制沿用 <code>task_revision</code>、run 和 controlFence。双端修改冲突返回当前版本与差异，保留用户草稿，不静默覆盖。</p>
+<p>“暂停目标”先阻止新派发，随后展示原任务是否仍在运行。用户选择停止时，调用既有取消链；取消请求提交与已停止分开呈现。扩大发布范围、更改 KR 与目标周期生成可审阅变更，不用一段模型回复代替授权。已有范围内的例行执行不添加确认卡。</p>
+<h2 id="6-kr">6. KR 观测、进展和证据</h2>
+<h3 id="61">6.1 数值投影</h3>
+<p>增长型示意：<code>progress = clamp((v - b) / (t - b), 0, 1)</code>；降低型：<code>progress = clamp((b - v) / (b - t), 0, 1)</code>。<code>b</code> 是已确认基线，<code>t</code> 是目标，<code>v</code> 是有效当前值；要求目标方向正确、分母非零。无基线不算百分比。阈值类是否达标直接比较 <code>v &lt;= t</code> 或配置的方向；固定验收项按固定集合内通过的项计数，不能随意加任务扩大分母。</p>
+<p>百分比只是详情中的辅助解释，主界面优先原单位与差距；原始超额或负向变化保留。O 不默认平均 KR 得出总分；只有全部必要 KR 达标、证据有效且护栏通过，才可标为结果已达成。周期关闭也允许未达成。</p>
+<p>R2 示例：基线 900ms，发布值 720ms，目标 300ms，改善进度为 30%；候选分支 280ms 不覆盖正式值。发布版 290ms 经同条件复验后才达到阈值。缺采样或环境变化，保留记录但不与原口径混算。</p>
+<h3 id="62-kr">6.2 八个示例指标的口径</h3>
+<table>
+<thead>
+<tr>
+<th>指标示例</th>
+<th>投影规则</th>
+<th>去重与证据</th>
+</tr>
+</thead>
+<tbody>
+<tr><td data-label="KR">M1，视频号粉丝</td><td data-label="投影规则">周期起点 300；同一视频号最新有效快照，目标 500；差值为净增，可下降</td><td data-label="去重与证据">来源账号、观测日期和快照键去重，不跨平台相加</td></tr>
+<tr><td data-label="KR">M2，视频号近七日点赞量</td><td data-label="投影规则">周期起点的七日窗口 80 次，目标 300；保留每日新增原始数，按窗口求和</td><td data-label="去重与证据">来源账号、自然日、事实类型和来源记录去重；窗口差不等于当日新增</td></tr>
+<tr><td data-label="KR">M3，视频号点赞率</td><td data-label="投影规则">基线 3%，目标 5%；同窗口点赞总量除以有效播放总量</td><td data-label="去重与证据">保留分子分母、样本量与口径版本，七天不足或分母为零时未知</td></tr>
+<tr><td data-label="KR">M4，视频号完播率</td><td data-label="投影规则">基线 25%，目标 40%；同窗口完整播放总量除以有效播放总量</td><td data-label="去重与证据">同口径事实先求和再相除，不平均日比例；变化显示百分点</td></tr>
+<tr><td data-label="KR">M5，视频号平均观看时长</td><td data-label="投影规则">建议基线 14 秒、目标 18 秒；同窗口总观看秒数除以对应有效播放量，具体以核对后的口径为准</td><td data-label="去重与证据">保留总时长、播放量、窗口和账号；视频片长单列，先合计权重再计算，变化以秒显示</td></tr>
+<tr>
+<td data-label="KR">R1，4 条用户旅程</td>
+<td data-label="投影规则">固定旅程集合在当前发布版本通过的项数；起点 0</td>
+<td data-label="去重与证据">发布 commit、journey_id 与复验记录；候选测试保留在交付层；回归失败可减少当前通过数</td>
+</tr>
+<tr>
+<td data-label="KR">R2，看板 API p95</td>
+<td data-label="投影规则">固定环境、数据集、并发、预热/采样口径下，当前发布 commit 的有效基准；基线待测，故事示例 900ms</td>
+<td data-label="去重与证据">脚本与数据摘要、原始样本、环境指纹、测试区间、commit、样本充分性规则；不同发布和环境不混为同一结果</td>
+</tr>
+<tr>
+<td data-label="KR">R3，连续四周有效使用</td>
+<td data-label="投影规则">五位固定入组试用者中，在本周期完成四个连续自然周、每周至少一次真实状态变更的人数；起点 0</td>
+<td data-label="去重与证据">时区 Asia/Shanghai，周一至周日；用户同意后采最小事件，排除测试账号和自动任务；两周活跃不提前算达标</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63">6.3 更新流程与迟到数据</h3>
+<p>采集适配器或用户上传写入原始证据引用；领域校验来源、单位、口径版本、观测区间与最小证据要求。通过后追加 Observation，并在同事务更新读投影、写事件。任务报告可提出候选观测，但执行器的成功措辞不能跳过校验。</p>
+<p><code>observed_at</code> 是结果发生/采样的时间，<code>received_at</code> 是系统收到的时间。快照型指标按有效观测时间取最新，不按到达顺序；累计型按去重后的事实重算，窗口型按约定窗口计算。更正以 <code>supersedes</code> 追加、保留原因；失效的旧观测不继续参与当前投影。</p>
+<p>明确区分自动验证、用户核对与未核验。只凭人工输入无法证明的指标保留“用户填报”标记，是否可用于 KR 由开始时的口径决定。来源过期时保留上次值和时间，标 stale，不补零。来源不可用只阻塞相关观测，独立的任务可继续。</p>
+<p>外部发布、合并、部署的实际状态先从其来源核对，未知时不自动重试副作用。P0 支持文件证据与本机测试；GitHub webhook 和内容渠道直连是独立适配器，未接入时不宣称已经同步。</p>
+<h3 id="64">6.4 每日原始数、窗口投影与修订</h3>
+<p>新增 <code>okr_daily_facts</code> 逻辑对象：<code>owner_id, node_id, objective_id, source_account_id, metric_contract_revision, local_date, fact_kind, value, source_record_key, observed_window, received_at, author_kind, author_id, evidence_ref, revision, supersedes, correction_reason</code>。一个导出含多个指标时用 <code>submission_id</code> 绑定同一批事实；分子分母必须来自兼容口径和同一窗口。</p>
+<p>每天的智能体填数任务沿用 jobs 与网关授权路径。去重键至少覆盖来源账号、口径、日期、事实类型与来源记录；同一批结果重试只产生一次有效事实。每日新增量、累计快照和预聚合窗口值有不同类型，不允许靠字段名猜测。微信公众号与视频号保留各自账号身份。</p>
+<p>写入顺序：读取实际来源，解析原始数，检查日期与窗口，校验非负整数/比例分母和证据，事务追加事实及 Observation，再更新受影响的投影和事件。Agent 只提交事实，不直接提交任意达成百分比。已授权的正常写入自动完成；来源缺失、重复冲突或口径漂移进入待处理，不制造数据。</p>
+<p>对于七日窗口，日期 d 的点赞率为 <code>sum(likes[d-6:d]) / sum(plays[d-6:d])</code>，完播率为 <code>sum(completed[d-6:d]) / sum(plays[d-6:d])</code>。平均观看时长为 <code>sum(watch_seconds[d-6:d]) / sum(plays[d-6:d])</code>，单位为秒，不乘 100、不平均各天均值。七天不完整或分母为零时为未知。点赞量窗口变化为 <code>window(d)-window(d-1)</code>；当天新增点赞取 <code>daily_likes(d)</code>，二者不得混用。百分比变化以百分点显示，不能把 3% 到 3.5% 写成 +0.5%。</p>
+<p>更正 d 日原始数时保留旧版本、原因、填写人与接收时间；重算 d 至 d+6 的有效窗口以及相应回顾，超出已有观测日期的部分不生成虚构数据。原始事实的接收顺序不能改变业务日期。读接口支持“最新有效口径下的历史曲线”，后续可用 <code>received_before</code> 查看当时已知的数据，区分补录后重算与当时决策所见。</p>
+<p>新增面板查询提案：<code>GET /api/agent/objectives/:id/metrics?from=:date&amp;to=:date&amp;asOf=:receivedTime</code> 返回有界日期序列、当前值、前一日差、周期净增、分子分母、来源水位与数据状态；<code>GET /api/agent/objectives/:id/daily-records</code> 分页读取原始日记录和修订。提交仍走 observations 领域入口，不让前端直接写读投影。大跨度趋势按明确的聚合粒度下采样，同时保留按日明细，不把缺失值当零。</p>
+<p>原型对应验收：11 月 12 日写入粉丝 334、当日点赞 40、播放 700、完整播放 340；七日结果应为点赞 150、播放 4286、完整播放 1200，点赞率约 3.50%、完播率约 28.00%。11 月 11 日保持粉丝 328、七日点赞 120、播放 4000、完整播放 1000。更正历史日期后相关窗口重算、旧值可见；未受影响日期的原始数保持不变。</p>
+<h3 id="watch-quality-contract">观看质量的结果 KR 与度量契约</h3>
+<p>粉丝净增、完播率、平均观看时长各自拥有 KR 身份、目标、口径与日期序列。不能由涨粉推定另两项达标，也不能把交付清单算成观看效果。约 45 秒视频的 30% / 18 秒仅是回放建议，实际基线来自取样；用户采用目标时固定统计窗口与验收规则。</p>
+<p>连接最少提供 <code>completed, plays, watch_seconds</code>，带账号、业务日期、平台口径、时间窗口与来源版本。分子分母必须来自同一兼容播放集合；平台直接提供平均观看时长时记录其口径，缺少总时长或权重不能反推，也不能跨窗口聚合。单视频另存 <code>video_id, published_at, age_hours, duration_seconds</code>；播放时长与片长不同，重播的处理遵循平台口径，不猜字段。</p>
+<p>原型新增受限公式 <code>{op:'average', numerator:'watch-seconds', denominator:'plays'}</code>；仅接受秒/次，计算总观看秒数 / 对应播放量。比例公式仍乘 100；缺字段、单位不符拒绝样本，零播放结果未知。新数据进入 <code>reviewInputKey</code>，晚到或更正观看秒数也使旧 Review 失效。<code>okr-watch-quality.tsx</code> 共用于搭建预览、长期 Swarm 和每日闭环；主面板支持七日加权计算、原始秒数填报和更正。</p>
+<p>日期样本：11 日 144/600=24%、8400/600=14 秒；12 日 224/700=32%、12600/700=18 秒；13 日 162/600=27%、10200/600=17 秒。与之独立的两条视频 T+24h 为 24%/32%、14/19 秒。复盘同时保留账号整体回落和样片改善，不将探索性样片的参考线达成提升为整体周期成功。</p>
+<h2 id="7-api">7. 拟议 API 与事件契约</h2>
+<p>所有路径均为新增提案，由 Go <code>/api/agent/...</code> 转发 runtime；与已有 Go <code>/api/tasks</code> 编队接口和 <code>/api/agent/tasks</code> Agent 任务接口区分。以下采用目标父路径下的子资源，服务端仍检查对象归属，不能仅凭嵌套 URL 信任关联。</p>
+<table>
+<thead>
+<tr>
+<th>方法与路径</th>
+<th>用途与关键输入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td data-label="方法与路径"><code>GET/POST /api/agent/objectives</code></td>
+<td data-label="用途与关键输入">分页查目标 / 幂等创建草稿；支持个人、项目、周期与状态过滤</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>GET/PATCH /api/agent/objectives/:id</code></td>
+<td data-label="用途与关键输入">读取 / 修订约定；写请求带 <code>expectedRevision</code>、<code>requestKey</code></td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>POST /api/agent/objectives/:id/start</code></td>
+<td data-label="用途与关键输入">校验已具备的执行和测量条件，启动可执行部分；未知基线显示待测</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>POST /api/agent/objectives/:id/pause</code>、<code>resume</code>、<code>close</code></td>
+<td data-label="用途与关键输入">改生命周期；响应区分暂停新派发与现有任务控制，不隐式杀会话</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>GET /api/agent/objectives/:id/roadmap</code></td>
+<td data-label="用途与关键输入">阶段、出口、依赖和行动摘要</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>PATCH /api/agent/objectives/:id/roadmap</code></td>
+<td data-label="用途与关键输入">应用用户修改，检查 revision、依赖环、固定安排和周期影响</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>GET /api/agent/objectives/:id/plans/:localDate</code></td>
+<td data-label="用途与关键输入">读当日生效计划、差异和关联 task；服务端按目标时区解释日期</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>POST /api/agent/objectives/:id/replan</code></td>
+<td data-label="用途与关键输入">当前输入下增量重排，稳定请求键，返回原计划或新修订与原因</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>POST /api/agent/objectives/:id/observations</code></td>
+<td data-label="用途与关键输入">提交原始观测及来源，不接受直接写进度百分比；结果含接受/待核验/拒绝及原因</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>GET /api/agent/objectives/:id/results</code>、<code>reviews</code></td>
+<td data-label="用途与关键输入">指标投影 / 分页回顾；证据详情按需读取</td>
+</tr>
+<tr>
+<td data-label="方法与路径"><code>GET /api/agent/objectives/:id/events?after=:seq</code></td>
+<td data-label="用途与关键输入">快照后 SSE 增量与断线重放；序列缺口重新读快照</td>
+</tr>
+</tbody>
+</table>
+<p>行动的“进入任务、补充、停止、验收、继续”使用已有 task API，不在目标 API 平行实现。Agent 工具通过受控服务调用同一领域入口，不能直接写数据库 current_value。</p>
+<p>事件包括 <code>objective.updated</code>、<code>plan.changed</code>、<code>action.linked</code>、<code>observation.accepted</code>、<code>metric.changed</code>、<code>review.ready</code>。事件提供对象 revision 和 sequence，通知 key 绑定目标/事项/修订。相同阻塞只提醒一次，状态变化再更新；免打扰和渠道设置沿用现有通知策略。</p>
+<h2 id="8">8. 前端、缓存和跨端恢复</h2>
+<p>目标列表和详情按节点、用户、目标、周期分 cache key。进入先快照，后 SSE；事件过密合并读取，稳定数据保留引用。前端切节点或离开目标时丢弃旧请求，防止旧观测污染新目标。列表分页不拿最近任务窗口冒充全量目标历史。</p>
+<p>共享现有任务数据源，不为每个行动开启独立轮询。新目标视图优先事件更新，必要的活跃回退刷新使用 <code>pollWhileVisible</code>、共享在途请求与失败退避；结束任务及归档目标不周期轮询。导航、恢复前台、收到事件或明确恢复操作可读取最新快照。</p>
+<p>可见偏好先从 localStorage 恢复，再等 <code>preferencesLoaded()</code> 合并服务端权威值。草稿按节点/目标/修订保存，提交接受后才清空。结果数值仍以服务端投影为准，不能在浏览器自行判定 KR 达成。</p>
+<p>实施沿用主题 token、SVG 图标、i18n、<code>useLayout()</code>、MobileSubPage 与单滚动容器。手机详情用路由管理返回，不重复推 overlay history。草稿、展开状态、筛选、滚动位置跨来回导航保留；图文、视频和基准报告链接使用来源节点的现有文件/产物入口。</p>
+<h2 id="9">9. 交付顺序与验收</h2>
+<p>P0 先做 schema 和领域约束，再接计划与任务，最后提供界面和回顾。旧任务不强制归属 OKR；用户主动关联，历史报告不能伪造成历史指标。升级失败按现有存储迁移流程处理；停用功能后停止新调度，旧任务和成果仍从原入口可访问。</p>
+<table>
+<thead>
+<tr>
+<th>验收组</th>
+<th>必须证明的行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td data-label="验收组">用户故事</td>
+<td data-label="必须证明的行为">从一句话创建个人/项目目标，生成阶段和今日任务，交付可用产物，记录真实观测，次日计划反映差距；两个故事都需端到端通过</td>
+</tr>
+<tr>
+<td data-label="验收组">幂等与崩溃</td>
+<td data-label="必须证明的行为">双端同时重排、创建 task 后崩溃、重复 job/webhook、断线重放，不重复任务、会话、通知、PR 或发布动作</td>
+</tr>
+<tr>
+<td data-label="验收组">时间与恢复</td>
+<td data-label="必须证明的行为">跨日、夏令时、切时区、暂停、离线多日恢复和周期到期，不重放过期工作；迟到证据有明确周期归属</td>
+</tr>
+<tr>
+<td data-label="验收组">KR 正确性</td>
+<td data-label="必须证明的行为">草稿不算发布、PR 不算发布版达标、重复读者不重复计、快照不累加、未知不补零、回归能降进度、更正能追溯</td>
+</tr>
+<tr>
+<td data-label="验收组">资源与边界</td>
+<td data-label="必须证明的行为">并发和网关拒绝正确传播；不另设 Python 额度；跨 owner/node/项目访问被拒；过期 revision 无法控制新 run</td>
+</tr>
+<tr>
+<td data-label="验收组">策略与用户控制</td>
+<td data-label="必须证明的行为">多目标不超售用户时间，固定安排不被静默覆盖，无效果时给出可验证调整，改变 O/KR/周期保留采用记录</td>
+</tr>
+<tr>
+<td data-label="验收组">实际执行</td>
+<td data-label="必须证明的行为">隔离测试实例中真实运行一项内容样例准备、一项 repo 变更及验证；模拟数据界面只能证明展示，不能证明 Agent 已完成工作</td>
+</tr>
+<tr>
+<td data-label="验收组">桌面与真机</td>
+<td data-label="必须证明的行为">按仓库清单在 LAN HTTPS 做 Android 真实点按、滚动、返回、键盘与安全区；验证两栏、触控命中、无横向溢出及草稿保留</td>
+</tr>
+<tr>
+<td data-label="验收组">性能与刷新</td>
+<td data-label="必须证明的行为">对生产构建测请求、CPU、内存；终态无周期请求，隐藏暂停、失败退避，任务增长不增加逐项轮询；不凭请求下降宣称资源下降</td>
+</tr>
+</tbody>
+</table>
+<p>实施阶段按变更范围运行仓库 quick/full 门禁；前端运行规定的类型、i18n、hover、Vitest 与构建检查；修改 Python 时才同步依赖并运行相应 lint、格式与测试。测试实例经 <code>scripts/dev/isolated-roami.sh</code> 启动和清理，验证调用使用节点已保存的模型设置。验收记录留在本主题目录，PR 截图走 pr-shots，不把一次性图片放进主分支。</p>
+<p>当前交付为三份 HTML 设计文档与独立交互原型，模型分析为回放，来源读取仅验证本地夹具。上述运行时用例是未来实施出口，不是本次已通过的测试清单。</p><footer><p>三份文档描述同一机制：方向、结果、阶段、每日行动、证据与复盘。</p><nav aria-label="继续阅读"><a href="user-stories.html">01 用户故事</a><a href="index.html">02 产品与交互</a><a href="technical-design.html" aria-current="page">03 技术设计</a></nav><p class="meta">调研范围与验证状态见 <a href="index.html#verification">交付与验证</a>。</p></footer></article></main></body></html>
