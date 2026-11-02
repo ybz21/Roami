@@ -45,6 +45,7 @@ describe('FileBrowser folder context menu', () => {
           },
         })
       }
+      if (url.includes('/api/upload')) return jsonResponse({ data: { saved: ['/workspace/sample/note.txt'] } })
       return jsonResponse({ data: {} })
     }))
     nativeGetComputedStyle = window.getComputedStyle
@@ -76,6 +77,53 @@ describe('FileBrowser folder context menu', () => {
     fireEvent.contextMenu(row!)
     return screen.findByText('重命名')
   }
+
+  it('uploads a selected folder with its relative paths', async () => {
+    const { container } = renderBrowser()
+    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }))
+    fireEvent.click(await screen.findByText('上传文件夹'))
+
+    const input = container.querySelector('input[webkitdirectory]') as HTMLInputElement
+    expect(input).toBeTruthy()
+    const file = new File(['content'], 'note.txt', { type: 'text/plain' })
+    Object.defineProperty(file, 'webkitRelativePath', { value: 'sample/note.txt' })
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() => {
+      const request = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('/api/upload'))
+      expect(request).toBeTruthy()
+      const form = request![1]?.body as FormData
+      expect(form.get('dir')).toBe('/workspace')
+      expect(form.getAll('paths')).toEqual(['sample/note.txt'])
+      expect(form.getAll('files')).toHaveLength(1)
+    })
+  })
+
+  it('uploads into the folder selected from its context menu', async () => {
+    const { container } = renderBrowser()
+    await openFolderMenu()
+    fireEvent.click(screen.getByText('上传文件夹'))
+
+    const file = new File(['content'], 'note.txt')
+    Object.defineProperty(file, 'webkitRelativePath', { value: 'sample/note.txt' })
+    fireEvent.change(container.querySelector('input[webkitdirectory]')!, { target: { files: [file] } })
+
+    await waitFor(() => {
+      const request = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('/api/upload'))
+      expect((request?.[1]?.body as FormData).get('dir')).toBe('/workspace/folder')
+    })
+  })
+
+  it('refreshes the directory after the Android folder upload completes', async () => {
+    renderBrowser()
+    await screen.findByText('folder')
+    const callsBefore = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/files?')).length
+    window.dispatchEvent(new CustomEvent('roami-folder-upload', { detail: { saved: 2 } }))
+    await waitFor(() => {
+      const callsAfter = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/files?')).length
+      expect(callsAfter).toBeGreaterThan(callsBefore)
+    })
+  })
 
   it('stays open while moving over items and runs the selected folder action', async () => {
     renderBrowser()
