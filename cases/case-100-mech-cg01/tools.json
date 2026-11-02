@@ -1,0 +1,10 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "entry": "scripts/run.py",
+  "expected_tests": 9,
+  "test_file": "agent-runtime/tests/verification/test_conversation_execution_status.py",
+  "external_model_calls": 0
+}

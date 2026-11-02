@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-CG01",
+  "data": {
+    "kind": "public_synthetic_transport_controls",
+    "inputs": [
+      "input/controls.json"
+    ],
+    "contract_reference": "cases/case-95-chat-stack01/input/conversations.json"
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "isolated_runtime_with_scripted_transport"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_tests": 9,
+    "kind": "trusted_execution_status_and_content_negative_controls"
+  }
+}
