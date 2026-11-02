@@ -746,8 +746,25 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.conversations.activity_detail(owner, cid, aid, branchId)}
 
     @app.get("/v1/conversations/{cid}/messages")
-    async def messages(cid: str, owner: Owner, branch: str | None = None):
+    async def messages(
+        cid: str,
+        owner: Owner,
+        branch: str | None = None,
+        limit: int | None = Query(None, ge=1, le=100),
+        before: str | None = Query(None, max_length=200),
+        anchor: str | None = Query(None, max_length=200),
+    ):
+        if limit is not None:
+            return {
+                "data": await runtime.conversations.page(
+                    owner, cid, branch, before=before, anchor=anchor, limit=limit
+                )
+            }
         return {"data": await runtime.conversations.messages(owner, cid, branch)}
+
+    @app.get("/v1/conversations/{cid}/messages/{mid}")
+    async def full_message(cid: str, mid: str, owner: Owner, branch: str | None = None):
+        return {"data": await runtime.conversations.message_detail(owner, cid, mid, branch)}
 
     @app.post("/v1/conversations/{cid}/messages", status_code=202)
     async def send(cid: str, body: SendMessage, owner: Owner):
@@ -767,6 +784,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         request: Request,
         owner: Owner,
         after: int = Query(0, ge=0),
+        summaries: bool = False,
         last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     ):
         await runtime.conversations.get(owner, cid)
@@ -784,7 +802,11 @@ def create_app(runtime, *, manage_lifecycle=True):
                 while not await request.is_disconnected():
                     # Clear before reading so a commit during replay cannot lose its wakeup.
                     changed.clear()
-                    batch = await runtime.conversations.events(owner, cid, cursor)
+                    batch = (
+                        await runtime.conversations.events(owner, cid, cursor, summaries=True)
+                        if summaries
+                        else await runtime.conversations.events(owner, cid, cursor)
+                    )
                     for item in batch:
                         cursor = item["id"]
                         yield f"id: {cursor}\nevent: {item['kind']}\ndata: {json.dumps(item, ensure_ascii=False)}\n\n"
@@ -838,6 +860,41 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.post("/v1/conversations/{cid}/read")
     async def mark_read(cid: str, body: ReadCursor, owner: Owner):
         return {"data": await runtime.notifications.mark_read(owner, cid, body.eventId)}
+
+    @app.get("/v1/notifications/summary")
+    async def notice_summary(owner: Owner):
+        return {"data": await runtime.notifications.summary(owner)}
+
+    @app.post("/v1/notifications/read")
+    async def read_notices(owner: Owner, body: ReadCursor):
+        return {"data": await runtime.notifications.mark_all_read(owner, body.eventId)}
+
+    @app.get("/v1/notification-list")
+    async def notice_list(
+        owner: Owner,
+        limit: int = Query(20, ge=1, le=50),
+        before: int | None = Query(None, ge=1),
+        unreadOnly: bool = False,
+    ):
+        return {
+            "data": await runtime.notifications.page(
+                owner, before=before, limit=limit, unread_only=unreadOnly
+            )
+        }
+
+    @app.get("/v1/task-list")
+    async def task_list(
+        owner: Owner,
+        conversationId: str | None = None,
+        limit: int = Query(20, ge=1, le=50),
+        before: str | None = Query(None, max_length=200),
+        filter: str = "all",
+    ):
+        return {
+            "data": await runtime.tasks.page(
+                owner, conversationId, before=before, limit=limit, state_filter=filter
+            )
+        }
 
     @app.get("/v1/notifications")
     async def notifications(owner: Owner, includeRead: bool = False):
@@ -1021,6 +1078,8 @@ def create_app(runtime, *, manage_lifecycle=True):
         category: Literal["all", "knowledge", "activity"] = "all",
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
+        before: int | None = Query(None, ge=0),
+        compact: bool = False,
     ):
         if dayKey:
             timezone = timezone or runtime.memory.daily.timezone
@@ -1040,7 +1099,8 @@ def create_app(runtime, *, manage_lifecycle=True):
                 scope=scope,
                 category=category,
                 limit=limit,
-                offset=offset,
+                offset=offset if before is None else before,
+                compact=compact,
             )
         }
 

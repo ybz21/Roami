@@ -13,18 +13,19 @@ export type TaskResource = {
 export type TaskControls = { resources: TaskResource[]; resourcesTruncated: boolean; actions: { id: string; state: string; inputStopped?: boolean; outcomeKnown?: boolean }[]; actionsTruncated: boolean }
 
 export function taskGoal(task: AgentTask): string {
-  try { const intent = JSON.parse(task.intent_json); const goal = intent.initialIntent?.goal || intent.goal; return typeof goal === 'string' ? goal : task.id } catch { return task.id }
+  try { const intent = JSON.parse(task.intent_json || '{}'); const goal = intent.initialIntent?.goal || intent.goal; return typeof goal === 'string' ? goal : task.id } catch { return task.id }
 }
 
 export function taskInstructions(task: AgentTask): string {
-  try { const goal = JSON.parse(task.intent_json).goal; return typeof goal === 'string' ? goal : '' } catch { return '' }
+  try { const goal = JSON.parse(task.intent_json || '{}').goal; return typeof goal === 'string' ? goal : '' } catch { return '' }
 }
 
 export function taskExecutor(task: AgentTask): 'native' | AgentKind | null {
   const kind = task.latestAttempt?.executorKind
   if (kind === 'native' || isAgentKind(kind)) return kind
+  if (task.executor === 'native' || isAgentKind(task.executor)) return task.executor
   if (kind !== 'cli') return null
-  try { const executor = JSON.parse(task.intent_json).executor; return isAgentKind(executor) ? executor : null } catch { return null }
+  try { const executor = JSON.parse(task.intent_json || '{}').executor; return isAgentKind(executor) ? executor : null } catch { return null }
 }
 
 export function taskExecutionUnconfirmed(task: AgentTask): boolean {

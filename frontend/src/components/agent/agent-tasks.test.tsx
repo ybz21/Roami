@@ -38,7 +38,7 @@ it.each([
 ].flatMap(([code, reason]) => [true, false].map(compact => [code, reason, compact] as const)))('keeps %s diagnostics in detail and a concise status in the list', async (code, reason, compact) => {
   const failed = { ...task('one'), state: 'failed', latestAttempt: { state: 'failed', summary: code } }
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [failed] }
+    if (path.includes('?conversationId=')) return { data: { items: [failed], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     return { data: { ...detail('one'), task: failed, attempts: [{ id: 'attempt-one', revision: 1, state: 'failed', result: { summary: code } }] } }
@@ -57,7 +57,7 @@ it.each([
 
 it('shows main task data when an auxiliary request fails and keeps downloads on the selected node', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) throw new Error('offline')
     if (path.startsWith('/agent/artifacts')) return { data: [artifact('proof')] }
     return { data: detail('one') }
@@ -75,7 +75,7 @@ it('ignores an old task artifact response after opening a child, even if transpo
   const old = new Promise((resolve) => { finishOld = resolve })
   let signal: AbortSignal | undefined
   vi.mocked(api).mockImplementation(async (_method, path, _body, options) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path === '/agent/artifacts?taskId=one') { signal = options?.signal; return old }
     if (path.startsWith('/agent/artifacts')) return { data: [artifact('current')] }
@@ -97,7 +97,7 @@ it('waits for server-confirmed handoff and invalidates old readiness immediately
   let ready = false, resumed = false, finish!: (value: any) => void
   const pending = new Promise((resolve) => { finish = resolve })
   vi.mocked(api).mockImplementation(async (method, path) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (method === 'POST') { resumed = true; return { data: { ...resource, state: 'idle', takeoverReady: false } } }
     if (path.endsWith('/resources')) return resumed ? pending : { data: controls([{ ...resource, canResume: ready, takeoverReady: ready }]) }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
@@ -123,7 +123,7 @@ it('retries an uncertain steering response with the original request key and rev
   const requests: any[] = []
   let revision = 1
   vi.mocked(api).mockImplementation(async (method, path, body) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (method === 'POST') {
       requests.push(body); revision = 2
       if (requests.length === 1) throw new Error('lost response')
@@ -152,7 +152,7 @@ it('retries an uncertain steering response with the original request key and rev
 it('binds acceptance to the displayed revision and execution attempt', async () => {
   vi.mocked(api).mockImplementation(async (method, path) => {
     if (method === 'POST') return { data: {} }
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     const result = detail('one', [], 2)
@@ -165,8 +165,8 @@ it('binds acceptance to the displayed revision and execution attempt', async () 
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/verify', { accepted: true, revision: 2, runId: 'attempt-one' }))
 })
 
-it.each([false, true])('sorts by time across states and filters without extra requests (compact=%s)', async compact => {
-  vi.mocked(api).mockResolvedValue({ data: [
+it.each([false, true])('sorts by time across states and requests server-filtered pages (compact=%s)', async compact => {
+  vi.mocked(api).mockResolvedValue({ data: { items: [
     { ...task('failed'), state: 'failed', updated_ms: 2 },
     { ...task('active'), state: 'running', updated_ms: 7 },
     { ...task('waiting'), state: 'waiting_user', updated_ms: 3 },
@@ -175,7 +175,7 @@ it.each([false, true])('sorts by time across states and filters without extra re
     { ...task('cancelled'), state: 'cancelled', updated_ms: 4 },
     { ...task('interrupted'), state: 'interrupted', updated_ms: 1 },
     { ...task('queued'), state: 'queued', created_ms: 6 },
-  ] })
+  ], nextCursor: null } })
   const page = render(<AgentTasks compact={compact} cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   await screen.findByRole('button', { name: /Goal done/ })
   const titles = () => [...page.container.querySelectorAll('.agent-task-link b')].map(el => el.textContent)
@@ -184,22 +184,22 @@ it.each([false, true])('sorts by time across states and filters without extra re
   const reads = vi.mocked(api).mock.calls.length
   const choose = (value: string) => fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.' + value }))
   choose('attention')
-  expect(titles()).toEqual(['Goal unknown', 'Goal waiting', 'Goal failed', 'Goal interrupted'])
+  await waitFor(() => expect(titles()).toEqual(['Goal unknown', 'Goal waiting', 'Goal failed', 'Goal interrupted']))
   expect(screen.getByText('agent.state.unknown')).toBeTruthy()
   expect(screen.queryByText('agent.state.succeeded')).toBeNull()
   choose('active')
-  expect(titles()).toEqual(['Goal active', 'Goal queued'])
+  await waitFor(() => expect(titles()).toEqual(['Goal active', 'Goal queued']))
   choose('ended')
-  expect(titles()).toEqual(['Goal done', 'Goal cancelled', 'Goal failed', 'Goal interrupted'])
+  await waitFor(() => expect(titles()).toEqual(['Goal done', 'Goal cancelled', 'Goal failed', 'Goal interrupted']))
   choose('all')
   expect(titles()[0]).toBe('Goal done')
   expect(screen.getByRole('button', { name: 'agent.task.filter.all' }).getAttribute('aria-pressed')).toBe('true')
-  expect(api).toHaveBeenCalledTimes(reads)
+  expect(api).toHaveBeenCalledTimes(reads + 3)
 })
 
 it('keeps the filter when returning from task details', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [{ ...task('one'), state: 'failed' }, task('done')] }
+    if (path.includes('?conversationId=')) return { data: { items: path.includes('filter=active') ? [] : path.includes('filter=attention') ? [{ ...task('one'), state: 'failed' }] : [{ ...task('one'), state: 'failed' }, task('done')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     return { data: detail('one') }
@@ -207,7 +207,7 @@ it('keeps the filter when returning from task details', async () => {
   render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   await screen.findByRole('button', { name: /Goal one/ })
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.attention' }))
-  fireEvent.click(screen.getByRole('button', { name: /Goal one/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
   await screen.findByText('Result one')
   fireEvent.click(screen.getByRole('button', { name: 'agent.tasks' }))
   await screen.findByRole('button', { name: /Goal one/ })
@@ -216,11 +216,11 @@ it('keeps the filter when returning from task details', async () => {
 })
 
 it('can clear an empty filter without losing tasks', async () => {
-  vi.mocked(api).mockResolvedValue({ data: [task('one')] })
+  vi.mocked(api).mockResolvedValue({ data: { items: [task('one')], nextCursor: null } })
   render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   await screen.findByRole('button', { name: /Goal one/ })
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.active' }))
-  expect(screen.getByRole('status').textContent).toBe('agent.task.filter.empty')
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('agent.task.filter.empty'))
   expect(screen.queryByText('agent.noTasks')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.all' }))
   expect(screen.getByRole('button', { name: /Goal one/ })).toBeTruthy()
@@ -228,7 +228,7 @@ it('can clear an empty filter without losing tasks', async () => {
 })
 
 it('keeps compact task cards truthful and selects the exact task without a modal', async () => {
- vi.mocked(api).mockResolvedValue({ data: [{ ...task('waiting'), state: 'waiting_user' }, { ...task('unknown'), state: 'future-state' }] })
+ vi.mocked(api).mockResolvedValue({ data: { items: [{ ...task('waiting'), state: 'waiting_user' }, { ...task('unknown'), state: 'future-state' }], nextCursor: null } })
  const selected = vi.fn()
  const page = render(<AgentTasks compact cid="conversation" selectedTask="" onSelectTask={selected} onSession={vi.fn()} onChanged={vi.fn()} />)
  const waiting = await screen.findByRole('button', { name: /Goal waiting/ })
@@ -243,7 +243,7 @@ it('keeps compact task cards truthful and selects the exact task without a modal
 
 it('shows a chronological compact list with essential status and unknown timestamps', async () => {
  const now = Date.now()
- vi.mocked(api).mockResolvedValue({ data: [{ ...task('older'), updated_ms: now - 1000 }, { ...task('newer'), state: 'failed', updated_ms: now, latestAttempt: { state: 'succeeded', summary: 'Actual executor report' } }, { ...task('undated'), updated_ms: 0 }] })
+ vi.mocked(api).mockResolvedValue({ data: { items: [{ ...task('older'), updated_ms: now - 1000 }, { ...task('newer'), state: 'failed', updated_ms: now, latestAttempt: { state: 'succeeded', summary: 'Actual executor report' } }, { ...task('undated'), updated_ms: 0 }], nextCursor: null } })
  const page = render(<AgentTasks compact cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
  await screen.findByText('Goal newer')
  expect(screen.queryByText('Actual executor report')).toBeNull()
@@ -258,7 +258,7 @@ it('shows a chronological compact list with essential status and unknown timesta
 
 it('opens retained execution records after completion instead of a dead tmux session', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     const value: any = detail('one')
@@ -277,7 +277,7 @@ it('opens retained execution records after completion instead of a dead tmux ses
 
 it('keeps a live task linked to its exact working session', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     const value: any = detail('one')
@@ -294,7 +294,7 @@ it('keeps a live task linked to its exact working session', async () => {
 
 it('shows a backfilled report immediately with a retained download and text preview', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     return { data: { ...detail('one'), delivery: { artifacts: [{ id: 'report', name: 'review.md', mimeType: 'text/markdown', sizeBytes: 64, metadata: { sourcePath: '/work/review.md' } }], unavailable: [] } } }
@@ -308,7 +308,7 @@ it('shows a backfilled report immediately with a retained download and text prev
 
 it.each(['succeeded', 'failed'])('renders historical %s results with unsupported summary types without crashing', async state => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [task('one')] }
+    if (path.includes('?conversationId=')) return { data: { items: [task('one')], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     const value: any = detail('one')
@@ -495,7 +495,7 @@ it('keeps the completed professional session reachable and closes it only after 
   const professional = { ...task('one'), intent_json: JSON.stringify({ goal: 'Goal one', executor: 'codex' }), latestAttempt: { executorKind: 'cli', sessionId: 'original-codex', agentConversationId: 'original-context' } }
   vi.mocked(api).mockImplementation(async (method, path) => {
     if (method === 'POST') { closed = true; return { data: { state: 'closed' } } }
-    if (path.includes('?conversationId=')) return { data: [professional] }
+    if (path.includes('?conversationId=')) return { data: { items: [professional], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     return { data: { ...detail('one'), task: professional, sessionClosure: closed ? { state: 'closed' } : null, attempts: [{ ...detail('one').attempts[0], sessionId: 'original-codex', finishedMs: 1 }] } }
@@ -522,7 +522,7 @@ it('keeps filters across remounts and exposes original session and project as se
   const openSession = vi.fn()
   const native = { ...task('native'), projectId: 'project-a', nativeSession: { id: 'native-identity', conversationId: 'child' } }
   const professional = { ...task('codex'), latestAttempt: { state: 'succeeded', executorKind: 'cli', sessionId: 'original-codex', agentConversationId: 'provider-context' } }
-  vi.mocked(api).mockResolvedValue({ data: [native, professional] })
+  vi.mocked(api).mockResolvedValue({ data: { items: [native, professional], nextCursor: null } })
   const first = render(<AgentTasks cid="conversation" projects={[{ id: 'project-a', name: 'Roami' }]} onSession={openSession} onChanged={vi.fn()} />)
   await screen.findByRole('button', { name: /Goal native/ })
   expect(screen.getByRole('link', { name: 'Roami' }).getAttribute('href')).toBe('#/projects/project-a')
@@ -532,7 +532,7 @@ it('keeps filters across remounts and exposes original session and project as se
   first.unmount()
   render(<AgentTasks cid="conversation" onSession={openSession} onChanged={vi.fn()} />)
   expect(screen.getByRole('button', { name: 'agent.task.filter.open' }).getAttribute('aria-pressed')).toBe('true')
-  fireEvent.click(screen.getAllByRole('button', { name: 'agent.task.enterSession' })[1])
+  fireEvent.click((await screen.findAllByRole('button', { name: 'agent.task.enterSession' }))[1])
   expect(location.hash).toContain('/session/')
   expect(decodeURIComponent(location.hash)).toContain('native-identity')
 })
@@ -589,11 +589,11 @@ it('refreshes a fast native continuation without Main events and stops reading a
 
 it('keeps a running professional session visible while its provider context is still being registered', async () => {
   const starting = { ...task('starting'), state: 'running', latestAttempt: { state: 'running', executorKind: 'cli', sessionId: 'original-session', agentConversationId: null } }
-  vi.mocked(api).mockResolvedValue({ data: [starting] })
+  vi.mocked(api).mockResolvedValue({ data: { items: [starting], nextCursor: null } })
   render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   await screen.findByRole('button', { name: /Goal starting/ })
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.open' }))
-  expect(screen.getByRole('button', { name: /Goal starting/ })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: /Goal starting/ })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'agent.task.enterSession' })).toBeTruthy()
 })
 
@@ -687,7 +687,7 @@ it('shows existing reports and downloads while execution remains unconfirmed', a
   const output = { id: 'report-html', name: 'index.html', mimeType: 'text/html', sizeBytes: 200, metadata: { runId: 'attempt-pending', sourceFile: '/workspace/research/index.html', sourcePath: '/workspace/research/index.html', provisional: true, reportedAliases: ['index.html'] } }
   const session = vi.fn()
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path.includes('?conversationId=')) return { data: [pending] }
+    if (path.includes('?conversationId=')) return { data: { items: [pending], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [output] }
     return { data: { ...detail('pending'), task: pending, attempts: [{ id: 'attempt-pending', revision: 1, state: 'unknown', sessionId: 'work-session', result: null, progress }], delivery: { artifacts: [output], unavailable: [] } } }
@@ -714,7 +714,7 @@ it('accepts closing a running session and shows asynchronous cleanup failures wi
   const professional = { ...task('one'), state: 'running', intent_json: JSON.stringify({ goal: 'Goal one', executor: 'codex' }), latestAttempt: { executorKind: 'cli', sessionId: 'original-codex', agentConversationId: 'original-context' } }
   vi.mocked(api).mockImplementation(async (method, path) => {
     if (method === 'POST') { phase = 'closing'; return { data: { state: 'closing' } } }
-    if (path.includes('?conversationId=')) return { data: [professional] }
+    if (path.includes('?conversationId=')) return { data: { items: [professional], nextCursor: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
     return { data: { ...detail('one'), task: { ...professional, state: phase === 'failed' ? 'cancelled' : 'running' }, sessionClosure: phase === 'running' ? null : { state: phase, error_code: phase === 'failed' ? 'WORKTREE_DIRTY' : null }, attempts: [{ ...detail('one').attempts[0], sessionId: 'original-codex' }] } }

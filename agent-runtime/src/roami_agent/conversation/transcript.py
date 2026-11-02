@@ -107,6 +107,20 @@ class Conversations:
 
         return await self.db.call(lambda db: activity_payload(db, owner, cid, aid, branch_id))
 
+    async def page(self, owner, cid, branch=None, *, before=None, anchor=None, limit=50):
+        from roami_agent.conversation.pages import conversation_page
+
+        return await self.db.call(
+            lambda db: conversation_page(
+                db, owner, cid, branch, before=before, anchor=anchor, limit=limit
+            )
+        )
+
+    async def message_detail(self, owner, cid, mid, branch=None):
+        from roami_agent.conversation.pages import message_detail
+
+        return await self.db.call(lambda db: message_detail(db, owner, cid, mid, branch))
+
     async def messages(self, owner, cid, branch_id=None):
         def read(db):
             c = owned(db, owner, cid)
@@ -299,7 +313,7 @@ class Conversations:
 
         return await self.db.call(write, write=True)
 
-    async def events(self, owner, cid, cursor=0):
+    async def events(self, owner, cid, cursor=0, *, summaries=False):
         def read(db):
             owned(db, owner, cid)
             batch = [
@@ -312,6 +326,45 @@ class Conversations:
                     (cid, cursor),
                 )
             ]
+            if summaries:
+                from roami_agent.conversation.pages import lineage
+
+                lineages = {}
+                for item in batch:
+                    item.pop("payload_json", None)
+                    if item["kind"] == "message.tool_calls":
+                        item["payload"]["calls"] = [
+                            {"id": call.get("id")} for call in item["payload"].get("calls", [])
+                        ]
+                    activity = item["payload"].get("activity")
+                    if not activity:
+                        continue
+                    branch = item["branchId"]
+                    if not branch:
+                        item["payload"].pop("activity", None)
+                        continue
+                    if branch not in lineages:
+                        lineages[branch] = dict(lineage(db, cid, branch))
+                    anchor = row(
+                        db,
+                        "SELECT branch_id,seq FROM messages m WHERE id=? AND conversation_id=? AND deleted_ms IS NULL AND status!='deleted' AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND o.message_id=m.id)",
+                        (activity["anchorMessageId"], cid, owner),
+                    )
+                    hidden_output = activity["id"].startswith("tool:") and row(
+                        db,
+                        "SELECT 1 AS found FROM tool_calls t JOIN messages m ON m.id=t.result_message_id WHERE t.id=? AND (m.deleted_ms IS NOT NULL OR m.status='deleted')",
+                        (activity["id"][5:],),
+                    )
+                    if (
+                        not anchor
+                        or anchor["seq"] > lineages[branch].get(anchor["branch_id"], -1)
+                        or hidden_output
+                    ):
+                        item["payload"].pop("activity", None)
+                    else:
+                        activity.pop("preview", None)
+                        activity.pop("routingDecision", None)
+                return batch
             visible_by_branch = {}
             for item in batch:
                 activity = item["payload"].get("activity")

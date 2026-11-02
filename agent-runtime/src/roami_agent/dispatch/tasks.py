@@ -641,6 +641,15 @@ class Tasks:
             detail["delivery"] = await self.deliverables.collect(owner, detail)
         return detail
 
+    async def page(self, owner, cid=None, *, before=None, limit=20, state_filter="all"):
+        from roami_agent.dispatch.task_list import task_page
+
+        return await self.db.call(
+            lambda db: task_page(
+                db, owner, cid, before=before, limit=limit, state_filter=state_filter
+            )
+        )
+
     async def list(self, owner, cid=None, *, for_model=False, task_id=None, exclude_task_ids=()):
         def read(db):
             if cid:

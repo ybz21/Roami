@@ -153,3 +153,6 @@ html[data-pointer="coarse"] .agent-executor-menu .ant-dropdown-menu-item::before
 .agent-plus-modes > button:disabled { opacity:.4; cursor:default; }
 :where(html[data-pointer="fine"]) .agent-plus-modes > button:hover { background:var(--list-hover); }
 .agent-plus-menu .conversation-composer-options { display:flex; flex-wrap:wrap; padding:var(--sp-2) 0; }
+
+.agent-page-boundary { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-2); padding: var(--sp-3); }
+.agent-page-boundary .tt-act { min-height: var(--tap); }

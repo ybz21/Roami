@@ -14,6 +14,11 @@ const zhCN = {
   'hub.local.title': "导入本地源",
   'hub.billing.all': "全部智能体",
   'hub.billing.agent': "智能体",
+  'agent.pagination.more': '加载更多',
+  'agent.pagination.earlier': '加载更早消息',
+  'agent.pagination.loading': '正在加载',
+  'agent.pagination.fullMessage': '展开全文',
+
   'agent.task.executionUnconfirmed': "执行待确认",
   'agent.task.executionUnconfirmedHint': "已有文件可先查看，或打开工作会话核对执行结果。",
   'agent.task.reportUnconfirmedTitle': "待确认的回报",

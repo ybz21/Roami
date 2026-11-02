@@ -1,5 +1,6 @@
+import { api } from '../../api'
 import AgentQuestion from './AgentQuestion'
-import { memo, Suspense, useCallback, useMemo, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image } from 'antd'
 import { FileTextIcon, NotebookIcon } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -43,21 +44,36 @@ function AgentImageAttachment({ file, node }: { file: Attachment; node: string |
   </span>
 }
 
-function AgentMessageView({ item, node, focused, remember, canAnswer = false, answer, readOnly = false }: { item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
+function AgentMessageView({ item: source, node, focused, remember, canAnswer = false, answer, readOnly = false, conversationId, branchId }: { conversationId?: string; branchId?: string; item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
   const { t, locale } = useI18n()
   const { phone } = useLayout()
   const [preview, setPreview] = useState<FileLink | null>(null)
+  const [full, setFull] = useState<AgentMessage | null>(null), [loading, setLoading] = useState(false), [failed, setFailed] = useState(false)
+  const request = useRef<AbortController | null>(null)
+  useEffect(() => { setFull(null); setFailed(false); setLoading(false); return () => request.current?.abort() }, [source.id, source.status, node, conversationId, branchId])
+  const item = full?.id === source.id ? { ...source, ...full, status: source.status } : source
+  const readFull = async () => {
+    if (!conversationId || loading) return
+    const controller = new AbortController(); request.current = controller
+    setLoading(true); setFailed(false)
+    try {
+      const { data } = await api('GET', `/agent/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(source.id)}${branchId ? '?branch=' + encodeURIComponent(branchId) : ''}`, undefined, { signal: controller.signal })
+      if (!controller.signal.aborted) setFull(data)
+    } catch { if (!controller.signal.aborted) setFailed(true) } finally { if (!controller.signal.aborted) setLoading(false) }
+  }
   const assistant = item.role === 'assistant'
   const resolveResource = useCallback((href: string) => agentResourceUrl(href, node), [node])
   const report = item.content.sessionReply
   const reportStatus = report && ['progress', 'blocked', 'completed', 'failed'].includes(report.status) ? report.status : 'unknown'
   const transcript = useMemo<Msg>(() => ({ id: item.id, role: item.role, blocks: item.content.text ? [{ kind: 'text', text: item.content.text }] : [], ...(item.created_ms ? { ts: new Date(item.created_ms).toISOString() } : {}) }), [item.id, item.role, item.content.text, item.created_ms])
-  const rememberAction = !readOnly && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length ? <button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button> : undefined
+  const rememberAction = !readOnly && !item.contentTruncated && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length ? <button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button> : undefined
   return <article data-message-id={item.id} data-notification-focus={focused || undefined} className={`agent-message ${item.role}`}>
     {assistant && item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}
     {report && <div className="agent-session-reply" role="status"><strong>{t('agent.sessionReply.' + reportStatus)}</strong><code>{report.sessionId}</code><small>{t('agent.sessionReply.unverified')}</small></div>}
     {item.content.text && <ChatMessage m={transcript} results={{}} side="native" resolveHref={resolveResource} footerActions={rememberAction} />}
-    {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer} answer={answer && (text => answer(report ? t('agent.sessionReply.answer', { sessionId: report.sessionId, dispatchId: report.dispatchId, answer: text }) : text))} />}
+    {item.contentTruncated && conversationId && <button type="button" className="tt-act" disabled={loading} onClick={() => { void readFull() }}>{t(loading ? 'agent.pagination.loading' : failed ? 'agent.retry' : 'agent.pagination.fullMessage')}</button>}
+    {failed && <p role="alert">{t('agent.requestFailed')}</p>}
+    {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer || item.contentTruncated} answer={answer && (text => answer(report ? t('agent.sessionReply.answer', { sessionId: report.sessionId, dispatchId: report.dispatchId, answer: text }) : text))} />}
     {item.content.taskStatus && <div className="agent-task-status" role="status"><strong>{t('agent.activity.result', { state: t('agent.state.' + item.content.taskStatus.state) })}</strong><span>{item.content.taskStatus.errorCode ? activityReason(item.content.taskStatus.errorCode, t) : t('agent.activity.resultRecorded')}</span><small>{t('agent.activity.reportUnavailable')}</small><code>{item.content.taskStatus.taskId}</code></div>}
     {!!item.content.attachments?.length && <div className="agent-message-files">{item.content.attachments.map(file => file.mimeType?.startsWith('image/') && file.previewState !== 'unavailable'
       ? <AgentImageAttachment key={file.id} file={file} node={node} />

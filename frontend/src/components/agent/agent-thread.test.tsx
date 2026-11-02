@@ -50,7 +50,7 @@ it('publishes live task transitions without waiting for another history response
 })
 
 it('renders warm history immediately and replays missed stream events from its cursor', async () => {
-  storeAgentData(agentDataKey('/agent/conversations/warm/messages'), snapshot('warm'))
+  storeAgentData(agentDataKey('/agent/conversations/warm/messages?limit=50'), snapshot('warm'))
   let stream!: ReadableStreamDefaultController<Uint8Array>
   vi.mocked(openEventStream).mockImplementation(async (_path, signal) => new Response(new ReadableStream({
     start(controller) { stream = controller; signal.addEventListener('abort', () => controller.close(), { once: true }) },
@@ -59,12 +59,12 @@ it('renders warm history immediately and replays missed stream events from its c
   expect(hook.result.current.view?.conversation.id).toBe('warm')
   expect(hook.result.current.loading).toBe(false)
   await waitFor(() => expect(hook.result.current.connected).toBe(true))
-  expect(openEventStream).toHaveBeenLastCalledWith('/agent/conversations/warm/events?after=1', expect.anything())
+  expect(openEventStream).toHaveBeenLastCalledWith('/agent/conversations/warm/events?after=1&summaries=true', expect.anything())
   expect(api).not.toHaveBeenCalled()
   await act(async () => stream.enqueue(new TextEncoder().encode('data: ' + JSON.stringify({ id: 2, branchId: 'warm', kind: 'message.started', payload: { messageId: 'new-message', turnId: 'turn' } }) + '\n\n')))
   await waitFor(() => expect(hook.result.current.view?.messages[0].id).toBe('new-message'))
   hook.unmount()
-  expect(peekAgentData<any>(agentDataKey('/agent/conversations/warm/messages'))?.snapshotCursor).toBe(2)
+  expect(peekAgentData<any>(agentDataKey('/agent/conversations/warm/messages?limit=50'))?.snapshotCursor).toBe(2)
 })
 
 it.each([true, false])('keeps an immediate failure visible with a late receipt and failed history GET (assistant started: %s)', async started => {

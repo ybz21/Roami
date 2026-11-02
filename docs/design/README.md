@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 公网首次加载诊断 | [20261102-initial-load](20261102-initial-load/README.md) | 公网响应传输、消息分页与数据库布局排查 |
 | 大模型与智能体统一管理 | [20261030-智能体模型切换](20261030-智能体模型切换/README.md) | 多上游、聚合策略与能力入口第二版 |
 | Roami Agent RSI | [20261022-roami-agent-rsi](20261022-roami-agent-rsi/README.md) | [42 条](20261022-roami-agent-rsi/records/README.md) |
 | 对话体验优化 | [20261018-对话体验优化](20261018-对话体验优化/README.md) | [1 条](20261018-对话体验优化/records/README.md) |
