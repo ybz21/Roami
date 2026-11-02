@@ -142,3 +142,31 @@ func TestUnconfirmedNativeIdentityIsNotPublishedAsASessionBinding(t *testing.T) 
 		t.Fatal(status, err)
 	}
 }
+
+func TestStructuredInterruptionReasons(t *testing.T) {
+	for _, reason := range []string{"deadline", "interrupted"} {
+		t.Run(reason, func(t *testing.T) {
+			s := testService(t)
+			dir := t.TempDir()
+			bin := filepath.Join(dir, "pi")
+			if err := os.WriteFile(bin, []byte("#!/bin/sh\nsleep 5\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			receipt := Receipt{Workspace: &Workspace{Directory: dir}}
+			expected := "EXECUTION_INTERRUPTED"
+			if reason == "deadline" {
+				receipt.DeadlineMS = 1
+				expected = "EXECUTION_DEADLINE"
+			} else {
+				cancel()
+			}
+			r, _ := s.structuredProcess(ctx, dir, Spec{Executor: "pi", Prompt: "test"}, receipt, "", io.Discard, io.Discard)
+			if r.State != "failed" || r.Summary != expected {
+				t.Fatalf("unexpected interruption: %+v", r)
+			}
+		})
+	}
+}

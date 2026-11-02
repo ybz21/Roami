@@ -7,7 +7,7 @@ from pathlib import Path
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.executors.professional_brief import professional_brief
 from roami_agent.executors.project import provision_project
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
@@ -25,6 +25,16 @@ SESSION_REJECTIONS = {
     "SESSION_PROCESS_OBSERVATION_UNAVAILABLE",
     "INVALID_SESSION_EXECUTION_SPEC",
 }
+
+
+def observation_code(exc):
+    if isinstance(exc, DomainError) and (code := public_error_code(exc.code)):
+        return code
+    return (
+        "CODING_EXECUTOR_TIMEOUT"
+        if isinstance(exc, TimeoutError)
+        else "CODING_EXECUTOR_OBSERVATION_FAILED"
+    )
 
 
 class CodingExecutor:
@@ -170,6 +180,10 @@ class CodingExecutor:
         state = {"running": "running", "cancelling": "stopping"}.get(receipt.get("state"))
         if receipt.get("result") is None and state is None:
             state = "unknown"
+        observation_error = (
+            public_error_code(receipt.get("observationErrorCode"))
+            or "CODING_EXECUTOR_OBSERVATION_UNKNOWN"
+        )
 
         def write(db):
             current = row(db, "SELECT * FROM task_attempts WHERE id=?", (run["id"],))
@@ -266,7 +280,24 @@ class CodingExecutor:
                 and not was_preparing
             )
             uncertain = state == "unknown" and current["state"] != "unknown"
-            if recovered or uncertain:
+            last_observation = (
+                row(
+                    db,
+                    "SELECT kind,payload_json FROM events WHERE task_id=? "
+                    "AND kind IN ('task.observation_unknown','task.observation_recovered') "
+                    "AND json_extract(payload_json,'$.runId')=? ORDER BY id DESC LIMIT 1",
+                    (task["id"], run["id"]),
+                )
+                if state == "unknown"
+                else None
+            )
+            changed_reason = state == "unknown" and (
+                not last_observation
+                or last_observation["kind"] != "task.observation_unknown"
+                or json.loads(last_observation["payload_json"]).get("errorCode")
+                != observation_error
+            )
+            if recovered or uncertain or changed_reason:
                 updated = db.execute(
                     "UPDATE tasks SET updated_ms=? WHERE id=? AND revision=? "
                     "AND state IN ('preparing','running','cancelling')",
@@ -278,7 +309,11 @@ class CodingExecutor:
                     db,
                     task["origin_conversation_id"],
                     "task.observation_recovered" if recovered else "task.observation_unknown",
-                    {"taskId": task["id"], "runId": run["id"]},
+                    {
+                        "taskId": task["id"],
+                        "runId": run["id"],
+                        **({"errorCode": observation_error} if state == "unknown" else {}),
+                    },
                     task_id=task["id"],
                 )
 
@@ -332,9 +367,11 @@ class CodingExecutor:
                         run["owner_id"], run["task_id"], run["id"], run["task_revision"], result
                     )
                     continue
-            except (DomainError, OSError, TimeoutError):
+            except (DomainError, OSError, TimeoutError) as exc:
                 # A failed observation is neither a terminal report nor permission to relaunch.
-                await self.record(task, run, {"state": "unknown"})
+                await self.record(
+                    task, run, {"state": "unknown", "observationErrorCode": observation_code(exc)}
+                )
             if (
                 task["state"] != "interrupted"
                 and (deadline := json.loads(task["budget_json"]).get("deadlineMs"))
@@ -348,5 +385,7 @@ class CodingExecutor:
         try:
             receipt = await self.command("cancel", "--key", run["launch_id"])
             await self.record(task, run, receipt)
-        except (DomainError, OSError, TimeoutError):
-            await self.record(task, run, {"state": "unknown"})
+        except (DomainError, OSError, TimeoutError) as exc:
+            await self.record(
+                task, run, {"state": "unknown", "observationErrorCode": observation_code(exc)}
+            )

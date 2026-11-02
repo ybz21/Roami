@@ -41,6 +41,7 @@ type sessionLifecycle struct {
 	Binding       SessionBinding  `json:"binding"`
 	Executor      string          `json:"executor"`
 	State         string          `json:"state"`
+	UnknownReason string          `json:"unknownReason,omitempty"`
 	TurnID        string          `json:"turnId"`
 	PromptHash    string          `json:"promptHash"`
 	LaunchKey     string          `json:"launchKey,omitempty"`
@@ -143,6 +144,13 @@ func (s Service) ObserveSessionEvent(ctx context.Context, executor, pane string,
 	return s.applySessionEvent(executor, binding, event)
 }
 
+func markSessionUnknown(state *sessionLifecycle, reason string) {
+	if state.State != "unknown" || state.UnknownReason == "" {
+		state.UnknownReason = reason
+	}
+	state.State = "unknown"
+}
+
 func (s Service) applySessionEvent(executor string, binding SessionBinding, event SessionEvent) error {
 	if executor == "claude" {
 		if event.AgentID != "" && event.Hook != "SubagentStart" && event.Hook != "SubagentStop" {
@@ -177,12 +185,13 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		state.Tools = map[string]bool{}
 	}
 	if state.Binding.ProviderID != "" && (state.Binding.ProviderID != event.ProviderID || state.Executor != executor) {
-		state.State = "unknown"
+		markSessionUnknown(&state, "SESSION_PROVIDER_CHANGED")
 		state.UpdatedMS = time.Now().UnixMilli()
 		return writeJSON(path, state)
 	}
 	if (event.TurnID == "" && event.Hook != "SessionStart" && event.Hook != "SessionEnd") || len(event.TurnID) > 300 {
-		state.State, state.ClaudeStop = "unknown", nil
+		markSessionUnknown(&state, "SESSION_EVENT_INVALID_TURN")
+		state.ClaudeStop = nil
 		state.UpdatedMS = time.Now().UnixMilli()
 		if err := writeJSON(path, state); err != nil {
 			return err
@@ -202,7 +211,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		if state.InitialLaunch {
 			state.State = "submitting"
 		} else {
-			state.State = "unknown"
+			markSessionUnknown(&state, "SESSION_START_UNTRACKED")
 		}
 	case event.Hook == "UserPromptSubmit":
 		promptHash := workspaceHash(event.Prompt)
@@ -213,7 +222,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			dir, _ := s.directory(state.LaunchKey)
 			var spec Spec
 			if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || promptHash != workspaceHash(sessionPrompt(dir, spec)) || state.State != "submitting" {
-				state.State = "unknown"
+				markSessionUnknown(&state, "SESSION_PROMPT_MISMATCH")
 				return writeJSON(path, state)
 			}
 			if state.InitialLaunch {
@@ -224,14 +233,14 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		}
 		state.TurnID, state.PromptHash, state.State = event.TurnID, promptHash, "busy"
 	case event.Hook == "PreToolUse" || event.Hook == "PostToolUse":
-		if event.Hook == "PreToolUse" && state.LaunchKey != "" && state.State == "busy" && state.TurnID == event.TurnID {
+		if event.Hook == "PreToolUse" && state.LaunchKey != "" && state.TurnID == event.TurnID {
 			dir, _ := s.directory(state.LaunchKey)
 			if _, cancelErr := os.Stat(filepath.Join(dir, "cancel.json")); cancelErr == nil {
 				return fmt.Errorf("SESSION_TASK_CANCEL_REQUESTED")
 			}
 		}
 		if state.State != "busy" || state.TurnID != event.TurnID || event.ToolID == "" {
-			state.State = "unknown"
+			markSessionUnknown(&state, "SESSION_TOOL_EVENT_MISMATCH")
 		} else if event.Hook == "PreToolUse" {
 			state.Tools[event.ToolID] = true
 		} else {
@@ -239,12 +248,12 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		}
 	case event.Hook == "SubagentStart":
 		if event.AgentID == "" {
-			state.State = "unknown"
+			markSessionUnknown(&state, "SESSION_SUBAGENT_ID_MISSING")
 		} else {
 			state.Tools["subagent:"+event.AgentID] = true
 		}
 	case event.Hook == "Interrupt" || event.Hook == "SessionEnd":
-		state.State = "unknown"
+		markSessionUnknown(&state, "SESSION_INTERRUPTED")
 	case completed:
 		inputMatches := claudeCompleted
 		for _, input := range event.Inputs {
@@ -254,12 +263,12 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			if state.State == "idle" && state.TurnID == event.TurnID {
 				return nil
 			}
-			state.State = "unknown"
+			markSessionUnknown(&state, "SESSION_COMPLETION_MISMATCH")
 		} else if state.LaunchKey != "" {
 			dir, _ := s.directory(state.LaunchKey)
 			var receipt Receipt
 			if readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding == nil || !sessionProcessesStopped(*receipt.Binding) {
-				state.State = "unknown"
+				markSessionUnknown(&state, "SESSION_STOP_UNCONFIRMED")
 			} else {
 				result := Result{State: "succeeded", Summary: truncate(event.LastAssistant, 32000), FinishedMS: time.Now().UnixMilli()}
 				if _, cancelErr := os.Stat(filepath.Join(dir, "cancel.json")); cancelErr == nil {
@@ -273,6 +282,9 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		} else {
 			state.State = "idle"
 		}
+	}
+	if state.State != "unknown" {
+		state.UnknownReason = ""
 	}
 	if err := writeJSON(path, state); err != nil {
 		return err
@@ -401,7 +413,7 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 func (s Service) sessionExecutionStatus(key string, status Status) (Status, error) {
 	binding, err := s.paneBinding(status.Binding.Name, false)
 	if err != nil || binding.resourceID() != status.Binding.resourceID() {
-		status.State = "unknown"
+		status.State, status.ObservationErrorCode = "unknown", "SESSION_BINDING_UNAVAILABLE"
 		return status, nil
 	}
 	path, err := s.lifecycleFile(binding)
@@ -423,7 +435,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	}
 	var state sessionLifecycle
 	if readJSON(path, &state) != nil {
-		status.State = "unknown"
+		status.State, status.ObservationErrorCode = "unknown", "SESSION_LIFECYCLE_UNAVAILABLE"
 		return status, nil
 	}
 	if recovered, ok, problem := s.reconcileCodexCompletion(key, status, &state, path); ok || problem != nil {
@@ -433,7 +445,13 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 		status.Progress = claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
 	}
 	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
-		status.State = "unknown"
+		status.State, status.ObservationErrorCode = "unknown", state.UnknownReason
+		if status.ObservationErrorCode == "" {
+			status.ObservationErrorCode = "SESSION_LIFECYCLE_UNKNOWN"
+		}
+		if state.LaunchKey != key {
+			status.ObservationErrorCode = "SESSION_LAUNCH_MISMATCH"
+		}
 		return status, nil
 	}
 	status.State = "running"
@@ -441,7 +459,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 		status.State = "cancelling"
 	}
 	if status.DeadlineMS != 0 && time.Now().UnixMilli() >= status.DeadlineMS {
-		status.State = "unknown"
+		status.State, status.ObservationErrorCode = "unknown", "EXECUTION_DEADLINE"
 	}
 	return status, nil
 }

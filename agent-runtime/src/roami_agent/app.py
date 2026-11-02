@@ -181,7 +181,9 @@ class Runtime:
         self.native_reconciliation = NativeWorkspaceReconciliation(
             database, self.settings, resources=self.resources
         )
-        self.session_dispatches = SessionDispatches(database, self.settings)
+        self.session_dispatches = SessionDispatches(
+            database, self.settings, artifacts=self.artifacts
+        )
         targets = TargetDirectory(self.settings, self.session_dispatches)
         register_main_tools(
             self.tools,

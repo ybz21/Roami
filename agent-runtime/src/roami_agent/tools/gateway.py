@@ -514,13 +514,55 @@ class ToolGateway:
                     "outcome and necessary recovery action. A later explicit user request can continue "
                     "the original task through task_steer."
                 )
+            if role == "main" and value["error"] == "TASK_REVISION_CHANGED":
+                value.update(
+                    executionStarted=False,
+                    recovery="No continuation was accepted at that revision. Read task_status for the same taskId, "
+                    "review the current revision and pending user requirements, then correct this request if still applicable. "
+                    "Do not silently substitute a revision, create a replacement task, or change its executor/workspace.",
+                )
+            if role == "main" and value["error"] == "TASK_STEER_PENDING":
+                value.update(
+                    executionStarted=False,
+                    recovery="The original task already has a pending continuation. Preserve these additional user requirements "
+                    "and report the pending operation; do not repeatedly steer, poll, or create a replacement session.",
+                )
+            if role == "main" and value["error"] == "SESSION_TARGET_NOT_FOUND":
+                value.update(
+                    executionStarted=False,
+                    recovery="This target session was not found; this call submitted no input. Read the original task's "
+                    "task_status for its actual sessionId, or use target_search for a uniquely identified live target. "
+                    "Do not guess a session from project membership or create another task/executor to bypass the failure.",
+                )
             if role == "main" and value["error"] in {
                 "TASK_SESSION_BINDING_REQUIRED",
                 "TASK_OUTCOME_UNRESOLVED",
             }:
+                value.update(executionStarted=False, retryable=False)
                 value["recovery"] = (
                     "The original execution is unresolved. Do not message guessed sessions based on project membership "
-                    "or create a replacement task. Report the unresolved state and wait for actual stop evidence."
+                    "or create a replacement task. Read task_status and distinguish inputStopped/stopConfirmed from outcomeKnown. "
+                    "If stop is unconfirmed, wait for actual stop evidence. If inputStopped=true but the outcome is unknown, "
+                    "reconcile the existing result and external effects; waiting alone does not establish that outcome. "
+                    "Only an explicitly offered navigationRecoveryAvailable permits the limited read-only recovery; never replay unknown writes."
+                )
+            if (
+                role == "main"
+                and operation_name in {"session_send", "delegate", "task_steer"}
+                and value["error"]
+                in {
+                    "ATTACHMENT_NOT_FOUND",
+                    "ATTACHMENT_INPUTS_UNAVAILABLE",
+                    "ARTIFACT_FILE_MISSING",
+                    "ARTIFACT_INTEGRITY_FAILED",
+                }
+            ):
+                value.update(
+                    executionStarted=False,
+                    recovery="This handoff did not start because a source attachment is unavailable or changed. "
+                    "Preserve the original task/session and other user requirements. Ask for the original file again "
+                    "or repair its storage; do not silently omit the image, substitute another conversation's file, "
+                    "or resend an earlier unknown dispatch.",
                 )
         except asyncio.CancelledError as exc:
             stopped = tool and (

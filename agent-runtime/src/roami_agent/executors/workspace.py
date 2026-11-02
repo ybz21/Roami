@@ -63,7 +63,7 @@ async def hold_workspace(settings, task, run, *, stopped=None):
             if name not in settings.provider_key_environments()
         },
     )
-    state, confirmed = "failed", True
+    state, confirmed, needs_stop_evidence = "failed", True, False
     try:
         process.stdin.write((encoded(spec) + "\n").encode())
         await process.stdin.drain()
@@ -94,12 +94,17 @@ async def hold_workspace(settings, task, run, *, stopped=None):
         except DomainError as exc:
             confirmed = exc.code not in {"TOOL_OUTCOME_UNKNOWN", "MCP_OUTCOME_UNKNOWN"}
             raise
+        except Exception:
+            confirmed = False
+            needs_stop_evidence = True
+            raise
         except BaseException:
             confirmed = False
             raise
         finally:
             if stopped is not None:
-                confirmed = confirmed and await stopped()
+                tools_stopped = await stopped()
+                confirmed = tools_stopped and (confirmed or needs_stop_evidence)
             if not confirmed:
                 raise DomainError("NATIVE_WORKSPACE_OUTCOME_UNKNOWN")
             if confirmed:

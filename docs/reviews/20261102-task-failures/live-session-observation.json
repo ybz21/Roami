@@ -1,0 +1,23 @@
+{
+  "capturedUTC": "2026-11-02T10:41:18.411086+00:00",
+  "task": {
+    "id": "f169ed78c1614449a6f18d65b222a2c6",
+    "state": "cancelling",
+    "revision": 1
+  },
+  "attempt": {
+    "id": "f8676518c89047df8f357efc2e9bcca8",
+    "state": "unknown",
+    "hasResult": false
+  },
+  "queuedSteerOperations": 1,
+  "lifecycle": {
+    "state": "unknown",
+    "pendingToolCount": 1,
+    "unknownReasonPersisted": false
+  },
+  "cancelMarkerPresent": true,
+  "resultFilePresent": false,
+  "paneProcessExists": true,
+  "meaning": "Process existence is not proof of running tools or successful completion. No live mutation or cancellation was executed in this investigation."
+}

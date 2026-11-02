@@ -123,7 +123,7 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 	}
 	if runCtx.Err() != nil {
 		result.State = "failed"
-		result.Summary = "EXECUTION_DEADLINE_OR_INTERRUPTION"
+		result.Summary = executionInterruptionCode(runCtx)
 		if _, e := os.Stat(filepath.Join(dir, "cancel.json")); e == nil {
 			result.State = "cancelled"
 			result.Summary = "Execution cancelled"

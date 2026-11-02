@@ -103,6 +103,8 @@ class Tasks:
             target = {key: value for key, value in target.items() if key != "directory"}
         if target.get("kind") not in {"project", "session", "new_session", "new_project"}:
             raise DomainError("INVALID_TASK_TARGET")
+        if executor == "native" and target["kind"] == "session":
+            raise DomainError("NATIVE_TARGET_ADAPTER_NOT_IMPLEMENTED")
         if target.get("kind") == "new_session" and "baseDir" in target:
             raise DomainError("LOOSE_SESSION_USE_DIRECTORY")
         if "resourceOnly" in target and (
@@ -492,13 +494,24 @@ class Tasks:
             task["latestAttempt"]["outcomeKnown"] = result.get(
                 "outcomeKnown", False if task["latestAttempt"]["state"] == "unknown" else None
             )
-            task["latestAttempt"]["stopConfirmed"] = (
+            task["latestAttempt"]["stopConfirmed"] = result.get("inputStopped") is True or (
                 task["latestAttempt"]["state"] in {"succeeded", "failed", "cancelled"}
                 and bool(result)
                 and result.get("outcomeKnown") is not False
                 and result.get("inputStopped") is not False
             )
             if task["latestAttempt"]["state"] == "unknown":
+                observation = row(
+                    db,
+                    "SELECT payload_json FROM events WHERE task_id=? "
+                    "AND kind='task.observation_unknown' AND json_extract(payload_json,'$.runId')=? "
+                    "ORDER BY id DESC LIMIT 1",
+                    (task["id"], task["latestAttempt"]["runId"]),
+                )
+                if observation:
+                    task["latestAttempt"]["observationErrorCode"] = json.loads(
+                        observation["payload_json"]
+                    ).get("errorCode")
                 run = row(
                     db,
                     "SELECT * FROM task_attempts WHERE id=?",
