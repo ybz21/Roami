@@ -4646,6 +4646,7 @@ const zhCN = {
   'hub.modelSaved': "模型已保存，可在各场景中使用",
   'hub.modelImpact': "使用方：{users}。后续请求使用新配置，进行中的请求保持原路由。",
   'hub.currentMode': "当前使用",
+  'hub.directConnection': "当前直连来源，应用后计入 Roami 用量。",
   'hub.connectionMode': "模型模式",
   'hub.mode.official': "原厂模式（Default）",
   'hub.mode.custom': "自定义模式",
