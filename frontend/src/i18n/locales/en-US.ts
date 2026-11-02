@@ -1,4 +1,12 @@
 const enUS = {
+  'agent.proxy.gatewayUnavailable': "Model service is unavailable. Restore the connection on this node, then retry.",
+  'agent.rsi.error.MODEL_GATEWAY_UNAVAILABLE': "Model service is unavailable. Restore the connection on this node, then retry.",
+  'agent.rsi.error.MODEL_GATEWAY_KEY_DISABLED': "The model connection is disabled. Restore it on this node, then retry.",
+  'agent.rsi.error.MODEL_GATEWAY_UNAUTHORIZED': "Model authentication failed. Check the connection on this node, then retry.",
+  'agent.pipeline.signal.MODEL_GATEWAY_UNAVAILABLE': "Model service unavailable",
+  'agent.pipeline.signal.MODEL_GATEWAY_KEY_DISABLED': "Model connection disabled",
+  'agent.pipeline.signal.MODEL_GATEWAY_UNAUTHORIZED': "Model authentication failed",
+
   'hub.error.connectionDisabled': 'This model connection is disabled. Restore it on the node, then try again.',
   'hub.billing.priceHint': 'Leave blank for unpriced calls. Enter 0 for free models.',
   'hub.billing.unpriced': 'Unpriced',

@@ -21,5 +21,5 @@ export function modelLabel(name: string): string {
 }
 
 export function modelProxyFailureKey(code: unknown): string | undefined {
-  return typeof code === 'string' ? ({ MODEL_HTTP_402: 'agent.models.gatewayQuota', MODEL_PROXY_DAILY_LIMIT: 'agent.proxy.limitReached', MODEL_PROXY_CURRENCY_MISMATCH: 'agent.proxy.currencyMismatch', MODEL_PROXY_USAGE_PENDING: 'agent.proxy.usagePending', MODEL_PROXY_USAGE_UNKNOWN: 'agent.proxy.usageUnknown' } as Record<string, string>)[code] : undefined
+  return typeof code === 'string' ? ({ MODEL_GATEWAY_UNAVAILABLE: 'agent.proxy.gatewayUnavailable', MODEL_GATEWAY_KEY_DISABLED: 'hub.error.connectionDisabled', MODEL_GATEWAY_UNAUTHORIZED: 'agent.task.failure.authentication', MODEL_HTTP_402: 'agent.models.gatewayQuota', MODEL_PROXY_DAILY_LIMIT: 'agent.proxy.limitReached', MODEL_PROXY_CURRENCY_MISMATCH: 'agent.proxy.currencyMismatch', MODEL_PROXY_USAGE_PENDING: 'agent.proxy.usagePending', MODEL_PROXY_USAGE_UNKNOWN: 'agent.proxy.usageUnknown' } as Record<string, string>)[code] : undefined
 }

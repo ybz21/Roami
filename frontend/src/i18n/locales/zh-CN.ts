@@ -1,4 +1,12 @@
 const zhCN = {
+  'agent.proxy.gatewayUnavailable': "模型服务暂不可用，请在节点恢复连接后重试。",
+  'agent.rsi.error.MODEL_GATEWAY_UNAVAILABLE': "模型服务暂不可用，请在节点恢复连接后重试。",
+  'agent.rsi.error.MODEL_GATEWAY_KEY_DISABLED': "模型连接已停用，请在节点恢复连接后重试。",
+  'agent.rsi.error.MODEL_GATEWAY_UNAUTHORIZED': "模型鉴权失败，请在节点检查连接配置后重试。",
+  'agent.pipeline.signal.MODEL_GATEWAY_UNAVAILABLE': "模型服务暂不可用",
+  'agent.pipeline.signal.MODEL_GATEWAY_KEY_DISABLED': "模型连接已停用",
+  'agent.pipeline.signal.MODEL_GATEWAY_UNAUTHORIZED': "模型鉴权失败",
+
   'hub.error.connectionDisabled': '模型连接已停用，请在节点恢复连接后重试。',
   'hub.billing.priceHint': '留空表示未定价；免费模型请填写 0。',
   'hub.billing.unpriced': '未定价',

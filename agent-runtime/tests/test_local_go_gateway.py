@@ -23,13 +23,15 @@ async def gateway_fixture(socket, seen, *, status=200, code=None, events=EVENTS)
             headers = dict(line.lower().split(": ", 1) for line in lines[1:] if line)
             body = await reader.readexactly(int(headers["content-length"]))
             seen.append((lines[0], headers, json.loads(body)))
-            payload = events if status == 200 else b"{}"
+            current_status = status(len(seen)) if callable(status) else status
+            current_code = code(len(seen)) if callable(code) else code
+            payload = events if current_status == 200 else b"{}"
             response = (
-                f"HTTP/1.1 {status} Fixture\r\nContent-Type: text/event-stream\r\n"
+                f"HTTP/1.1 {current_status} Fixture\r\nContent-Type: text/event-stream\r\n"
                 f"Content-Length: {len(payload)}\r\nConnection: close\r\n"
             )
-            if code:
-                response += f"X-Roami-Model-Error: {code}\r\n"
+            if current_code:
+                response += f"X-Roami-Model-Error: {current_code}\r\n"
             writer.write(response.encode() + b"\r\n" + payload)
             await writer.drain()
         finally:

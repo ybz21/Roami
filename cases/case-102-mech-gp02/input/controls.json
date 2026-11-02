@@ -1,0 +1,20 @@
+{
+  "rejections": [
+    {
+      "status": 503,
+      "code": "MODEL_GATEWAY_UNAVAILABLE"
+    },
+    {
+      "status": 403,
+      "code": "MODEL_GATEWAY_KEY_DISABLED"
+    },
+    {
+      "status": 401,
+      "code": "MODEL_GATEWAY_UNAUTHORIZED"
+    }
+  ],
+  "negative_controls": [
+    "untrusted_remote_headers",
+    "trusted_rejection_after_unknown_attempt"
+  ]
+}

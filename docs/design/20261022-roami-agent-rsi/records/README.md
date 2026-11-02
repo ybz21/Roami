@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [本机网关就绪与鉴权准入拒绝](2026-11-03/gateway-readiness-admission.md) |
 | 2026-11-03 | [网关结算状态与回报失败原因](2026-11-03/gateway-pending-and-report-errors.md) |
 | 2026-11-03 | [多轮会话验收保留网关阻塞原因](2026-11-03/conversation-gateway-blockers.md) |
 | 2026-11-02 | [事实绑定的外挂行情报告](2026-11-02/market-series-report.md) |
