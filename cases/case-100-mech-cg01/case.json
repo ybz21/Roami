@@ -1,0 +1,52 @@
+{
+  "id": "MECH-CG01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "会话验收",
+  "prompt": "区分未执行的网关阻塞、真实内容错误与已验证的前轮结果。",
+  "preconditions": "使用冻结的 agent-runtime 开发依赖和隔离启动器，不连接真实网关。",
+  "expected_terminal": "execution_cause_preserved_without_false_semantic_score",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "9项无跳过测试回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-CG01-H1",
+      "rule": "可信准入拒绝不调用语义判定器，用量为已知零外部请求，保留错误码。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-CG01-H2",
+      "rule": "前轮通过结果保留；已完成的错误JSON和错误码文本仍按内容判失败。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-CG01-H3",
+      "rule": "汇总显示嵌套失败，未执行回合不宣称已测真实模型语义。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_transport_controls",
+    "issue": 609,
+    "fixture_reproduction_only": true
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

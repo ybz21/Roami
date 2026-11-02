@@ -129,6 +129,22 @@ async def episodes(args, cases):
     return 0 if results and not failure and all(r["passed"] for r in results) else 1
 
 
+def execution_summary(evaluated):
+    results = evaluated["results"]
+    return {
+        "failure": evaluated["failure"]
+        or next((r["failure"] for r in results if r["failure"]), None),
+        "blocked_scenarios": sum(r["state"] == "blocked" for r in results),
+        "failed_scenarios": sum(r["state"] == "failed" for r in results),
+        "semantic_checked_user_turns": sum(
+            c["semantic_checked"] for r in results for c in r["checkpoints"]
+        ),
+        "live_model_semantics_tested": any(
+            r["live_model_semantics_tested"] for r in results
+        ),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--case", choices=["all", *CASES], default="all")
@@ -221,7 +237,7 @@ def main():
         "expected_user_turns": sum(
             len(s["turns"]) for c in cases for s in c["scenarios"]
         ),
-        "failure": evaluated["failure"],
+        **execution_summary(evaluated),
         "child_exit_code": child_exit,
         "cleanup_exit_code": cleanup_exit,
         "source_unchanged": unchanged,

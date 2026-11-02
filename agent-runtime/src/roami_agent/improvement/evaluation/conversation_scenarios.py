@@ -318,10 +318,21 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
                 )
                 if actor:
                     actor.turn(step["fixture"])
+                journal_start = len(journal)
                 await runtime.scheduler._job(job)
                 await runtime.tasks.revisions.advance()
                 snapshot = await task_snapshot(runtime, conversation["id"], receipt["turnId"])
-                grade = grade_checkpoint(step["expect"], snapshot, bindings)
+                turn_records = journal[journal_start:]
+                semantic_checked = snapshot["turn_state"] == "completed"
+                admission_rejected = any(r.get("admission_rejected") for r in turn_records)
+                if semantic_checked:
+                    grade = grade_checkpoint(step["expect"], snapshot, bindings)
+                else:
+                    failure = next(
+                        (r["error_code"] for r in reversed(turn_records) if r.get("error_code")),
+                        "RSI_SCENARIO_TURN_FAILED",
+                    )
+                    grade = {"passed": False, "failures": []}
                 for task in snapshot["tasks"]:
                     identity = [task["executor"], task["project_id"], task["binding"]]
                     if task["id"] in identities and identities[task["id"]] != identity:
@@ -336,21 +347,24 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
                 ):
                     grade["passed"] = False
                     grade["failures"].append("FUTURE_USER_INPUT_LEAKED")
-                checkpoints.append({"turn": index + 1, **grade})
-                transcripts.append({"turn": index + 1, "snapshot": snapshot})
                 if budget.metrics()["token_coverage"] != "complete":
-                    failure = "RSI_USAGE_UNKNOWN"
-                    break
-                if not grade["passed"]:
-                    if snapshot["turn_state"] != "completed":
-                        failure = next(
-                            (
-                                record["error_code"]
-                                for record in reversed(journal)
-                                if record.get("error_code")
-                            ),
-                            "RSI_SCENARIO_TURN_FAILED",
-                        )
+                    failure = failure or "RSI_USAGE_UNKNOWN"
+                checkpoints.append(
+                    {
+                        "turn": index + 1,
+                        **grade,
+                        "semantic_checked": semantic_checked,
+                        "state": "blocked"
+                        if (admission_rejected or failure == "RSI_USAGE_UNKNOWN")
+                        and not grade["failures"]
+                        else "passed"
+                        if grade["passed"] and not failure
+                        else "failed",
+                        "failure": failure,
+                    }
+                )
+                transcripts.append({"turn": index + 1, "snapshot": snapshot})
+                if failure or not grade["passed"]:
                     break
                 await complete_fixture_work(runtime, root)
                 completed = await task_snapshot(runtime, conversation["id"], receipt["turnId"])
@@ -374,11 +388,19 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         and len(checkpoints) == len(scenario["turns"])
         and all(c["passed"] for c in checkpoints),
         "failure": failure,
+        "state": "blocked"
+        if checkpoints and checkpoints[-1]["state"] == "blocked"
+        else "passed"
+        if failure is None
+        and len(checkpoints) == len(scenario["turns"])
+        and all(c["passed"] for c in checkpoints)
+        else "failed",
         "expected_turns": len(scenario["turns"]),
         "checkpoints": checkpoints,
         "metrics": budget.metrics(),
         "background_execution": "synthetic_checkpoint",
-        "live_model_semantics_tested": actor is None,
+        "live_model_semantics_tested": actor is None
+        and any(c["semantic_checked"] for c in checkpoints),
         "eligible_for_promotion": False,
     }
     for name, value in [

@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [多轮会话验收保留网关阻塞原因](2026-11-03/conversation-gateway-blockers.md) |
 | 2026-11-02 | [事实绑定的外挂行情报告](2026-11-02/market-series-report.md) |
 | 2026-11-02 | [外挂演示稿的精确文本修订](2026-11-02/presentation-text-replacement.md) |
 | 2026-11-02 | [Go网关上游关联与错误状态传播](2026-11-02/upstream-response-receipts.md) |
