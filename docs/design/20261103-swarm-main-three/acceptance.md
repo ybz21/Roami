@@ -22,7 +22,7 @@
 | 旧 HTTP 真跑 | 新二进制下旧目录/完成/角色入口返回 404，新目录 200，私有成员回传公共地址 404 |
 | 能力说明升级 | 精确匹配旧出厂文本时升级；自定义说明不覆盖；新说明不再引导旧命令 |
 | 会话 CLI 真跑 | 隔离实例完成 stable ID、发送/捕获、改名保持 ID、旧命令拒绝且不影响会话；经统一入口清理 |
-| 最终增量 full / commit quick | 最终增量 full 已通过；提交 quick 随提交运行。范围从已完整验证的首版 commit 开始，不重复未变化的 Python 全量 |
+| 最终增量 full / commit quick | 最终增量 full 与提交 quick 均通过；同步 main 后另补 76 项 Python 集成回归。范围从已完整验证的首版 commit 开始，不重复未变化的 Python 全量 |
 
 ## 浏览器与 Android
 
@@ -37,7 +37,7 @@
 
 桌面操作使用 roami chrome。Android 的 Roami Chrome 身份探测不可用，DOM 诊断用同一 ADB 转发连接的 CDP，实际触控用 roami adb；没有用 DOM click 替代触控验收。
 
-临时截图在 /tmp/swarm-main-e2e：desktop-before.png、desktop-after.png、desktop-board.png、phone-before.png、phone-after.png、phone-board.png、phone-chat-keyboard.png。PR 图片通过 pr-shot.sh 上传孤儿 pr-shots 分支，图片不进入 main。
+临时截图在 /tmp/swarm-main-e2e：desktop-before.png、desktop-after.png、desktop-board.png、phone-after.png、phone-board.png、phone-chat-keyboard.png。PR 图片通过 pr-shot.sh 上传孤儿 pr-shots 分支，图片不进入 main。
 
 ## Three.js 诊断
 
