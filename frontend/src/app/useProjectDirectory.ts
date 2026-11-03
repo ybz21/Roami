@@ -10,6 +10,8 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
     return s
   })
   const treeSrcRef = useRef(treeSrc)
+  const [projectsLoaded, setProjectsLoaded] = useState(treeSrc.projects.length > 0)
+  const [projectsError, setProjectsError] = useState(false)
   treeSrcRef.current = treeSrc
   const treeReload = useRef<(() => void) | null>(null)
   const [unfinished, setUnfinished] = useState(0)
@@ -47,6 +49,8 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
         const [pr, an, sw] = await Promise.all([prP, anP, swP])
         if (stop) return
         const projects = pr?.data?.projects || []
+        setProjectsLoaded(true)
+        setProjectsError(false)
         setUnfinished(projects.reduce((n: number, p: any) => n + (p.unfinished || 0), 0))
         const placement = buildSessionProjects(projects, an?.data || {})
         setSessionProjects(placement)
@@ -69,7 +73,7 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
           setTreeSrc({ projects, worktrees })
           saveTreeSrc({ projects, worktrees, placement })
         }
-      } catch { /* 轮询失败就保持上一轮的值，不清空 */ }
+      } catch { if (!stop) setProjectsError(true) }
     }
     let wtAt = 0
     treeReload.current = () => { wtAt = 0; void load() }
@@ -78,6 +82,6 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
     return () => { stop = true; clearInterval(i); treeReload.current = null }
   }, [hasSider])
 
-  return { treeSrc, setTreeSrc, treeSrcRef, unfinished, swarmCount, git, refresh: () => treeReload.current?.() }
+  return { treeSrc, setTreeSrc, treeSrcRef, projectsLoaded, projectsError, unfinished, swarmCount, git, refresh: () => treeReload.current?.() }
 }
 export type ProjectDirectory = ReturnType<typeof useProjectDirectory>

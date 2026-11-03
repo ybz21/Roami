@@ -10,6 +10,7 @@ import {
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { sessionLabel } from '../sessions/session-label'
 import { api, upload } from '../../api'
+import { pollWhileVisible } from '../../visible-poll'
 import { DirPicker, recentDirs, pushRecentDir } from '../sessions/DirPicker'
 import { useI18n } from '../../i18n'
 import Markdown from '../markdown/Markdown'
@@ -51,7 +52,7 @@ function statusTag(status: string, t: T) {
   return <Tag style={{ color: c, borderColor: c + '66', background: c + '14', margin: 0 }}>{label}</Tag>
 }
 
-export default function Swarm({ openTerm, initialSwarm, onNav }: { openTerm: (n: string) => void; initialSwarm?: string; onNav?: (name: string | null) => void }) {
+export default function Swarm({ openTerm, initialSwarm, onNav, embedded = false }: { openTerm: (n: string) => void; initialSwarm?: string; onNav?: (name: string | null) => void; embedded?: boolean }) {
   // 选中态以 URL hash 为唯一来源（深链 #/swarm/<名> 可直达/分享/后退）
   const sel = initialSwarm || null
   const nav = onNav || (() => {})
@@ -62,7 +63,7 @@ export default function Swarm({ openTerm, initialSwarm, onNav }: { openTerm: (n:
     loadList(); const t = setInterval(loadList, 3000); return () => clearInterval(t)
   }, [sel])
 
-  if (sel) return <SwarmDetail name={sel} onBack={() => nav(null)} openTerm={openTerm} onGone={() => { nav(null); loadList() }} />
+  if (sel) return <SwarmDetail name={sel} onBack={() => nav(null)} openTerm={openTerm} onGone={() => { nav(null); loadList() }} embedded={embedded} />
   return <SwarmList list={list} onOpen={(n) => nav(n)} reload={loadList} />
 }
 
@@ -284,7 +285,7 @@ export function NewSwarmModal({ open, onClose, onDone, initialDir, lockDir }: {
 }
 
 // ── 详情仪表盘 ──
-function SwarmDetail({ name, onBack, openTerm, onGone }: { name: string; onBack: () => void; openTerm: (n: string) => void; onGone: () => void }) {
+function SwarmDetail({ name, onBack, openTerm, onGone, embedded = false }: { name: string; onBack: () => void; openTerm: (n: string) => void; onGone: () => void; embedded?: boolean }) {
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const [detail, setDetail] = useState<Detail | null>(null)
@@ -309,6 +310,24 @@ function SwarmDetail({ name, onBack, openTerm, onGone }: { name: string; onBack:
 
   useEffect(() => {
     const loadDetail = reloadDetail
+    if (embedded) {
+      const poll = pollWhileVisible(async signal => {
+        const enc = encodeURIComponent(name)
+        const [detail, cards, feed] = await Promise.all([
+          api('GET', `/swarms/${enc}`, undefined, { signal }),
+          api('GET', `/swarms/${enc}/board`, undefined, { signal }),
+          api('GET', `/swarms/${enc}/feed?since=${lastId.current}`, undefined, { signal }),
+        ])
+        if (signal.aborted) return
+        setDetail(detail)
+        setCards(Array.isArray(cards) ? cards : [])
+        if (Array.isArray(feed) && feed.length) {
+          lastId.current = feed[feed.length - 1].id
+          setPosts(current => { const ids = new Set(current.map(post => post.id)); return [...current, ...feed.filter(post => !ids.has(post.id))] })
+        }
+      }, 3000)
+      return poll.stop
+    }
     const loadBoard = () => api('GET', `/swarms/${encodeURIComponent(name)}/board`).then((r) => setCards(Array.isArray(r) ? r : [])).catch(() => {})
     const loadFeed = () => api('GET', `/swarms/${encodeURIComponent(name)}/feed?since=${lastId.current}`)
       .then((r) => {
@@ -321,7 +340,7 @@ function SwarmDetail({ name, onBack, openTerm, onGone }: { name: string; onBack:
     loadDetail(); loadBoard(); loadFeed()
     const t1 = setInterval(loadDetail, 3000), t2 = setInterval(loadBoard, 3000), t3 = setInterval(loadFeed, 2000)
     return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3) }
-  }, [name])
+  }, [name, embedded])
 
   const onNode = (m: string) => { setFocus(m); setDrawer(m) }
   const closeDrawer = () => { setDrawer(null); setFocus(null) }
@@ -342,10 +361,10 @@ function SwarmDetail({ name, onBack, openTerm, onGone }: { name: string; onBack:
   const inbox = <Inbox detail={detail} cards={cards} posts={posts} onNode={onNode} />
 
   return (
-    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 32px)', minHeight: 0 }}>
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: embedded ? '100%' : 'calc(100dvh - 32px)', minHeight: 0 }}>
       {/* 顶部条 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 2px 12px', flexWrap: 'wrap' }}>
-        <a onClick={onBack} style={{ color: C.fg2, display: 'inline-flex', alignItems: 'center', gap: 4 }}><ChevronLeft size={13} />{t('nav.swarm')}</a>
+        {!embedded && <button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={13} />{t('nav.swarm')}</button>}
         <span style={{ fontSize: 17, fontWeight: 700 }}>{name}</span>
         {detail?.goal && (
           <Tooltip title={<div style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap' }}>{detail.goal}</div>} overlayStyle={{ maxWidth: 520 }}>

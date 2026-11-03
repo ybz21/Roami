@@ -12,6 +12,7 @@ Read only the relevant reference through `read`:
 | Task | Reference |
 | --- | --- |
 | Projects, sessions and dispatch | `skill://roami/references/projects-sessions.md` |
+| Objectives, KRs, dated metrics and Swarm learning loops | `skill://roami/references/project-okr.md` |
 | Task progress, reports, reminders and takeover | `skill://roami/references/agent-tasks.md` |
 | Memory, files and external capabilities | `skill://roami/references/capabilities.md` |
 | Login, node diagnostics, plugins and database | `skill://roami/references/node-operations.md` |

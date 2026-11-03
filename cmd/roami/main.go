@@ -208,11 +208,13 @@ func main() {
 		}
 	}
 
+	defer server.Close(r)
 	// 退出时回收本进程拉起的 Chrome（含其子进程组），避免泄漏孤儿进程
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sig
+		server.Close(r)
 		stopBrowserRecovery()
 		stopAgent()
 		browser.Shutdown()
