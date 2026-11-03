@@ -22,9 +22,10 @@ const sourceName = (source: ModelSource) => {
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
+  onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { modal, message } = App.useApp()
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
@@ -104,7 +105,10 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         {!!draft.directory.length && <><Input aria-label={t('hub.directory.search')} placeholder={t('hub.directory.search')} prefix={<SearchIcon />} allowClear value={draft.query} onChange={event => patch({ query: event.target.value })} />
           <div className="tt-model-directory-selection"><Checkbox checked={!!selectable.length && selectedVisible.length === selectable.length} indeterminate={selectedVisible.length > 0 && selectedVisible.length < selectable.length} disabled={!selectable.length} onChange={event => patch({ selected: event.target.checked ? [...new Set([...draft.selected, ...selectable])] : draft.selected.filter(value => !selectable.includes(value)) })}>{t(draft.query ? 'hub.directory.selectMatches' : 'hub.directory.selectAll')}</Checkbox>{!!selected.length && <button type="button" className="tt-act" onClick={() => patch({ selected: [] })}>{t('hub.directory.clear')}</button>}</div>
         </>}
-        <div className="tt-model-directory-list">{visible.map(model => <div className="tt-model-directory-row" key={model}><Checkbox checked={added.has(model) || draft.selected.includes(model)} disabled={added.has(model)} onChange={event => patch({ selected: event.target.checked ? [...draft.selected, model] : draft.selected.filter(value => value !== model) })}><span>{model}</span></Checkbox>{added.has(model) && <span className="tt-model-directory-added"><CheckIcon />{t('hub.directory.added')}</span>}</div>)}</div>
+        <div className="tt-model-directory-list">{visible.map(model => {
+          const saved = attached.filter(row => row.candidates[0].model === model)
+          return <div className="tt-model-directory-row" key={model}><Checkbox checked={added.has(model) || draft.selected.includes(model)} disabled={added.has(model)} onChange={event => patch({ selected: event.target.checked ? [...draft.selected, model] : draft.selected.filter(value => value !== model) })}><span>{model}</span></Checkbox>{!!saved.length && <div className="tt-model-directory-actions"><span className="tt-model-directory-added"><CheckIcon />{t('hub.directory.added')}</span>{saved.map(row => <button key={row.id} type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>)}</div>}</div>
+        })}</div>
         {!visible.length && <p className="agent-settings-hint">{t(draft.directory.length ? 'hub.directory.noMatches' : 'hub.directory.empty')}</p>}
       </section>}
       <section className="tt-model-source-manual">

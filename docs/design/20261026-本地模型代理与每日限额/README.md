@@ -89,4 +89,6 @@ roami agent gateway reconcile --call <调用ID> --file /path/to/receipt.json
 
 验收记录：[本地 Go 网关](records/2026-10-29/local-go-gateway.md)、[恢复计费页面](records/2026-10-29/restored-billing-page.md)。
 
+[上游拒绝误记未知费用修复](records/2026-11-03/rejected-request-accounting.md)。
+
 [设计修订与验收记录](records/README.md)

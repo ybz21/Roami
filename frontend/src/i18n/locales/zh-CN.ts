@@ -4600,6 +4600,7 @@ const zhCN = {
   'hub.directory.selectMatches': "选择搜索结果",
   'hub.directory.clear': "清空选择",
   'hub.directory.added': "已添加",
+  'hub.directory.editModel': '编辑 {model}',
   'hub.directory.empty': "未返回模型，可手动添加。",
   'hub.directory.noMatches': "没有匹配的模型",
   'hub.directory.manual': "手动添加模型",
