@@ -65,7 +65,10 @@ class ToolGateway:
                 seen.add(task["origin_conversation_id"])
             task_id = task["parent_task_id"]
 
-    async def invoke(self, turn, mid, call, role, binding):
+    async def reject(self, turn, mid, call, role, binding, error):
+        return await self.invoke(turn, mid, call, role, binding, rejection=error)
+
+    async def invoke(self, turn, mid, call, role, binding, *, rejection=None):
         try:
             tool, args = self.tools.validate(call, role)
         except (DomainError, KeyError, TypeError):
@@ -94,6 +97,8 @@ class ToolGateway:
         await self.db.call(plan, write=True)
         preflight_error = None
         try:
+            if rejection:
+                raise DomainError(rejection, 409)
             if binding.get("finalizing"):
                 raise DomainError("TOOL_FINALIZING_READ_ONLY", 409)
             if role == "main" and tool and tool.effect == "write":
@@ -226,6 +231,12 @@ class ToolGateway:
                 )
                 if operation_name in {"file_write", "file_patch"}:
                     value["writePublished"] = False
+            if value["error"] == "QUESTION_MUST_BE_ONLY_TOOL":
+                value.update(
+                    executionStarted=False,
+                    retryable=False,
+                    recovery="No tools in this batch executed. Call ask_user, task_reply, task_queue_reply or reply alone. Run any required reads or actions in a separate batch before the final response.",
+                )
             if value["error"] in {"TASK_RESULT_REQUIRED", "TASK_REPLY_TASK_MISMATCH"}:
                 value["recovery"] = (
                     "This is a completion report for one task. Deliver its actual requested findings, "

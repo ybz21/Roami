@@ -1,0 +1,52 @@
+{
+  "id": "MECH-TB02",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "工具批次纠错",
+  "prompt": "无效的结束工具混合批次应全批拒绝并提供纠错回执，不执行任何动作；合法进展与单独结束保持。",
+  "preconditions": "冻结的agent-runtime开发依赖与隔离启动器；只用模拟提供方和真实SQLite，不连接节点网关。",
+  "expected_terminal": "invalid_ending_batch_repaired_before_actions",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "18项无跳过检查回执",
+    "输入与源码冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-TB02-H1",
+      "rule": "四类结束工具在批首或批尾混入其他动作均全批拒绝，持久失败回执注明executionStarted=false。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TB02-H2",
+      "rule": "有效纠正可以继续，连续同类错误停滞；有效进展后可再次纠错，不引入请求数量限额。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-TB02-H3",
+      "rule": "合法多动作、读批次、单独回复和纠正后的提问继续工作，原生交付与既有权限边界保持。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_terminal_batch_repair",
+    "fixture_reproduction_only": true,
+    "issue": 624
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}
