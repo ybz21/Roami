@@ -55,18 +55,20 @@ type CallRecord struct {
 }
 
 type Statistics struct {
-	RecentState string        `json:"recentState,omitempty"`
-	AgentKind   string        `json:"agentKind"`
-	Source      string        `json:"source"`
-	Day         string        `json:"day"`
-	Timezone    string        `json:"timezone"`
-	From        string        `json:"from"`
-	To          string        `json:"to"`
-	Days        int           `json:"days"`
-	Hourly      []HourlyUsage `json:"hourly"`
-	Today       []UsageGroup  `json:"today"`
-	Groups      []UsageGroup  `json:"groups"`
-	Recent      []CallRecord  `json:"recent"`
+	DetailRetentionHours int           `json:"detailRetentionHours"`
+	DailyAggregated      bool          `json:"dailyAggregated"`
+	RecentState          string        `json:"recentState,omitempty"`
+	AgentKind            string        `json:"agentKind"`
+	Source               string        `json:"source"`
+	Day                  string        `json:"day"`
+	Timezone             string        `json:"timezone"`
+	From                 string        `json:"from"`
+	To                   string        `json:"to"`
+	Days                 int           `json:"days"`
+	Hourly               []HourlyUsage `json:"hourly"`
+	Today                []UsageGroup  `json:"today"`
+	Groups               []UsageGroup  `json:"groups"`
+	Recent               []CallRecord  `json:"recent"`
 }
 
 type HourlyUsage struct {
@@ -91,7 +93,7 @@ func (l *Ledger) StatisticsForSource(days int, selected, source string, agents .
 }
 
 func (l *Ledger) StatisticsForCalls(days int, selected, source, agent, recentState string) (Statistics, error) {
-	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days, Source: source, AgentKind: agent, RecentState: recentState}
+	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days, Source: source, AgentKind: agent, RecentState: recentState, DetailRetentionHours: int(callRetention / time.Hour)}
 	if recentState != "" && recentState != "unknown" {
 		return result, fmt.Errorf("INVALID_MODEL_USAGE_STATE")
 	}
@@ -123,11 +125,11 @@ func (l *Ledger) StatisticsForCalls(days int, selected, source, agent, recentSta
 			}
 			result.From, result.To, result.Days = selected, selected, 1
 		} else if days == 0 {
-			if err := tx.QueryRow(`SELECT COALESCE(MIN(day),?) FROM gateway_calls`, result.Day).Scan(&result.From); err != nil {
+			if err := tx.QueryRow(`SELECT COALESCE(MIN(day),?) FROM (SELECT day FROM gateway_calls UNION ALL SELECT day FROM gateway_daily_usage)`, result.Day).Scan(&result.From); err != nil {
 				return err
 			}
 		}
-		rows, err := tx.Query(`SELECT day,role,model,currency,agent_kind,`+usageSourceSQL+` AS source,count(*),COALESCE(sum(input_tokens),0),COALESCE(sum(output_tokens),0),COALESCE(sum(cache_read_tokens),0),sum(state='pending'),sum(state='unknown'),sum(state!='pending' AND input_tokens IS NULL),sum(state='failed'),COALESCE(sum(cost_nano),0) FROM gateway_calls WHERE ((day>=? AND day<=?) OR day=?) AND (?='' OR agent_kind=?) GROUP BY day,role,model,currency,agent_kind,source ORDER BY day DESC,role,model,currency,source`, result.From, result.To, result.Day, agent, agent)
+		rows, err := tx.Query(`SELECT day,role,model,currency,agent_kind,source,sum(requests),sum(input_tokens),sum(output_tokens),sum(cache_read_tokens),sum(pending),sum(unknown),sum(usage_unknown),sum(failed),sum(cost_nano) FROM `+usageTotalsSQL+` WHERE ((day>=? AND day<=?) OR day=?) AND (?='' OR agent_kind=?) GROUP BY day,role,model,currency,agent_kind,source ORDER BY day DESC,role,model,currency,source`, result.From, result.To, result.Day, agent, agent)
 		if err != nil {
 			return err
 		}
@@ -152,6 +154,11 @@ func (l *Ledger) StatisticsForCalls(days int, selected, source, agent, recentSta
 			return err
 		}
 		if result.Days == 1 {
+			if err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM gateway_daily_usage WHERE day=? AND (?='' OR source=?) AND (?='' OR agent_kind=?))`, result.From, source, source, agent, agent).Scan(&result.DailyAggregated); err != nil {
+				return err
+			}
+		}
+		if result.Days == 1 && !result.DailyAggregated {
 			rows, err = tx.Query(`SELECT started_ms,role,model,currency,agent_kind,`+usageSourceSQL+`,state,input_tokens,output_tokens,cache_read_tokens,cost_nano FROM gateway_calls WHERE day=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?)`, result.From, source, source, agent, agent)
 			if err != nil {
 				return err

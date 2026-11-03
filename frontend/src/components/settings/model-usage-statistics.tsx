@@ -8,7 +8,7 @@ import { ModelUsageChart } from './model-usage-chart'
 export type UsageTotals = { requests: number; charges: ModelCharge[]; localCharges?: ModelCharge[]; localEstimated?: number; estimatedCharges: ModelCharge[]; totalTokens: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; unknown: number; pending: number; failed: number; estimated: number; missingUsage: number }
 export type UsageModelPart = UsageTotals & { model: string | null }
 export type UsagePoint = UsageTotals & { models?: UsageModelPart[] }
-export type UsageStatistics = { days: number; startDay: string; endDay: string; dailyStartDay: string; total: UsageTotals; daily: (UsagePoint & { day: string })[]; hourly?: (UsagePoint & { hour: number })[]; seriesModels?: string[]; seriesTruncated?: boolean; models: (UsageTotals & { model: string })[]; modelsTruncated: boolean }
+export type UsageStatistics = { dailyAggregated?: boolean; days: number; startDay: string; endDay: string; dailyStartDay: string; total: UsageTotals; daily: (UsagePoint & { day: string })[]; hourly?: (UsagePoint & { hour: number })[]; seriesModels?: string[]; seriesTruncated?: boolean; models: (UsageTotals & { model: string })[]; modelsTruncated: boolean }
 
 export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedDay, today, onDayChange, loading, disabled, sourceControl, filterHint, summaryContent }: { summaryContent?: ReactNode; sourceControl?: ReactNode; filterHint?: string; statistics?: UsageStatistics; days: number; onDaysChange: (days: number) => void; selectedDay?: string; today?: string; onDayChange?: (day: string) => void; loading: boolean; disabled: boolean }) {
   const { t, locale } = useI18n()
@@ -22,7 +22,7 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
   const selectedMetric = ['requests', 'totalTokens', ...currencies].includes(metric) ? metric : 'totalTokens'
   const metricValue = (row: UsageTotals) => selectedMetric === 'totalTokens' || selectedMetric === 'requests' ? row[selectedMetric] : Number(row.charges.find(charge => charge.currency === selectedMetric)?.amount || 0)
   const metricText = (row: UsageTotals) => selectedMetric === 'totalTokens' ? tokenText(row) : selectedMetric === 'requests' ? count(row.requests) : chargeText(row.charges.filter(charge => charge.currency === selectedMetric), locale) || (row.unknown > 0 || row.pending > 0 ? t('agent.proxy.costUnknown') : chargeText([{ currency: selectedMetric, amount: '0' }], locale))
-  const hourly = statistics?.days === 1
+  const hourly = statistics?.days === 1 && !statistics.dailyAggregated
   const time = (hour: number) => new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, hour)))
   const points = hourly ? (statistics.hourly || []).map(row => ({ ...row, key: String(row.hour), label: time(row.hour) })) : (statistics?.daily || []).map(row => ({ ...row, key: row.day, label: day(row.day) }))
   const metricLabel = selectedMetric === 'totalTokens' ? t('agent.proxy.tokens') : selectedMetric === 'requests' ? t('agent.proxy.requests') : t('agent.usage.cost') + ' · ' + selectedMetric
@@ -64,6 +64,7 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
       {status(statistics.total) && <p className="agent-settings-hint" role="status">{status(statistics.total)}</p>}
       {statistics.total.missingUsage > 0 && <p className="agent-settings-hint">{t('agent.usage.incomplete', { missing: count(statistics.total.missingUsage) })}</p>}
       {summaryContent}
+      {statistics.dailyAggregated && <p className="agent-settings-hint" role="status">{t('agent.usage.dailyAggregated')}</p>}
       {statistics.total.requests === 0 ? <p className="agent-settings-hint">{t('agent.usage.empty')}</p> : <>
         <div className="agent-usage-toolbar"><h4>{t(hourly ? 'agent.usage.hourly' : 'agent.usage.daily')}</h4><Select aria-label={t('agent.usage.chartMetric')} value={selectedMetric} disabled={disabled} virtual={false} options={[{ value: 'totalTokens', label: t('agent.proxy.tokens') }, { value: 'requests', label: t('agent.proxy.requests') }, ...currencies.map(currency => ({ value: currency, label: t('agent.usage.cost') + ' · ' + currency }))]} onChange={setMetric} /></div>
         {statistics.dailyStartDay !== statistics.startDay && <p className="agent-settings-hint">{t('agent.usage.dailyWindow', { count: count(statistics.daily.length) })}</p>}

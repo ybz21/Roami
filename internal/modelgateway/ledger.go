@@ -32,6 +32,19 @@ CREATE INDEX gateway_calls_agent_day ON gateway_calls(agent_kind,day,started_ms)
 `}, {Version: 4, Name: "upstream-response-receipts", SQL: `
 ALTER TABLE gateway_calls ADD COLUMN upstream_http_status INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE gateway_calls ADD COLUMN upstream_request_id TEXT NOT NULL DEFAULT '';
+`}, {Version: 5, Name: "daily-usage-retention", SQL: `
+CREATE TABLE gateway_daily_usage(
+ day TEXT NOT NULL, timezone TEXT NOT NULL, role TEXT NOT NULL, model TEXT NOT NULL,
+ currency TEXT NOT NULL, agent_kind TEXT NOT NULL, source TEXT NOT NULL,
+ requests INTEGER NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+ cache_read_tokens INTEGER NOT NULL, cost_nano INTEGER NOT NULL,
+ unknown INTEGER NOT NULL, usage_unknown INTEGER NOT NULL, failed INTEGER NOT NULL,
+ PRIMARY KEY(day,timezone,role,model,currency,agent_kind,source),
+ CHECK(typeof(requests)='integer' AND typeof(input_tokens)='integer' AND typeof(output_tokens)='integer'
+  AND typeof(cache_read_tokens)='integer' AND typeof(cost_nano)='integer'
+  AND typeof(unknown)='integer' AND typeof(usage_unknown)='integer' AND typeof(failed)='integer')
+);
+CREATE INDEX gateway_calls_retention ON gateway_calls(COALESCE(finished_ms,started_ms)) WHERE state!='pending';
 `}}
 
 type Ledger struct {
@@ -89,7 +102,7 @@ func (l *Ledger) Configure(c Configuration) error {
 		if previous.Currency != c.Currency || previous.Timezone != c.Timezone {
 			var count int
 			// Reinterpreting an existing accounting period could bypass its daily limit.
-			err = tx.QueryRow(`SELECT count(*) FROM gateway_calls WHERE state='pending' OR state='unknown' OR day>=?`, l.now().UTC().Add(-48*time.Hour).Format("2006-01-02")).Scan(&count)
+			err = tx.QueryRow(`SELECT (SELECT count(*) FROM gateway_calls WHERE state='pending' OR state='unknown' OR day>=?) + (SELECT COALESCE(sum(requests),0) FROM gateway_daily_usage WHERE unknown>0 OR day>=?)`, l.now().UTC().Add(-48*time.Hour).Format("2006-01-02"), l.now().UTC().Add(-48*time.Hour).Format("2006-01-02")).Scan(&count)
 			if err != nil {
 				return err
 			}

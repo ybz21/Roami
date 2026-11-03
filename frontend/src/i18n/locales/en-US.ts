@@ -4574,6 +4574,8 @@ const enUS = {
   'agent.gateway.defaultPrice': "Default price",
   'agent.gateway.zeroPrice': "0",
   'agent.gateway.callDetails': "View details",
+  'agent.gateway.retention': 'Keep individual receipts for {days} days, then retain daily totals only; in-flight requests are excluded.',
+  'agent.usage.dailyAggregated': 'This day has been aggregated. Complete individual receipts and hourly details are no longer retained.',
   'agent.gateway.tokenUnknown': 'Unknown',
   'agent.usage.knownTokens': '{count} known',
   'agent.gateway.viewCalls': 'View requests',

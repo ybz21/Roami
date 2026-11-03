@@ -96,3 +96,5 @@ roami agent gateway reconcile --call <调用ID> --file /path/to/receipt.json
 [逐笔 Token 与未知费用请求记录](records/2026-11-03/request-token-records.md)。
 
 [设计修订与验收记录](records/README.md)
+
+- [三天明细与日账归并](records/2026-11-03/daily-retention.md)
