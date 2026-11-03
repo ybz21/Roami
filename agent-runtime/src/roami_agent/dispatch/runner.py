@@ -179,69 +179,18 @@ class TaskDispatcher:
             else:
                 raise DomainError("EXTERNAL_EXECUTOR_NOT_CONFIGURED")
         except asyncio.CancelledError:
-            if task is None:
-                # Recover the committed start before resolving cancellation.
-                started = await starting
-                if not started:
-                    raise
-                task, run, turn = started
-            if run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False):
-                # The Go runner outlives Python; restart observes the same launch key.
-                raise
-            await self.end_prepared_turn(turn, "interrupted", "TURN_INTERRUPTED")
-            current = await self.db.call(
-                lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
-            )
-            uncertain = (
-                await self.db.call(
-                    lambda db: row(
-                        db,
-                        "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' AND state IN ('planned','running','unknown') LIMIT 1",
-                        (turn["id"],),
-                    )
-                )
-                if turn
-                else None
-            )
-            if uncertain:
-                await self.complete(
-                    task,
-                    run,
-                    {
-                        "state": "failed",
-                        "summary": "TOOL_STOP_UNCONFIRMED",
-                        "outcomeKnown": False,
-                        "retryable": False,
-                    },
-                    "interrupted",
-                    unknown=True,
-                )
-            elif current["state"] == "cancelling":
-                await self.tasks.report(
-                    task["owner_id"],
-                    task["id"],
-                    run["id"],
-                    task["revision"],
-                    {"state": "cancelled", "summary": "Cancelled"},
-                )
-            else:
-                await self.db.call(
-                    lambda db: db.execute(
-                        "UPDATE tasks SET state='interrupted' WHERE id=?", (task["id"],)
-                    ),
-                    write=True,
-                )
+            await self._settle(self._finish_cancellation(starting, task, run, turn))
             raise
         except (DomainError, OSError, ValueError, httpx.HTTPError, TimeoutError) as exc:
             if task is None:
                 raise
-            await self._settle_failure(task, run, turn, job, exc)
+            await self._settle(self._finish_failure(task, run, turn, job, exc))
             return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
 
-    async def _settle_failure(self, task, run, turn, job, exc):
-        # Cancellation must not abandon a failure receipt after execution has already stopped.
-        finalizing = asyncio.create_task(self._finish_failure(task, run, turn, job, exc))
+    async def _settle(self, finalization):
+        # Execution has stopped; repeated cancellation must not abandon durable cleanup.
+        finalizing = asyncio.create_task(finalization)
         cancelled = None
         while not finalizing.done():
             try:
@@ -251,6 +200,60 @@ class TaskDispatcher:
         finalizing.result()
         if cancelled is not None:
             raise cancelled
+
+    async def _finish_cancellation(self, starting, task, run, turn):
+        if task is None:
+            # Recover the committed start before resolving cancellation.
+            started = await starting
+            if not started:
+                return
+            task, run, turn = started
+        if run["executor_kind"] == "cli" and getattr(self.executor, "can_reconcile", False):
+            # The Go runner outlives Python; restart observes the same launch key.
+            return
+        await self.end_prepared_turn(turn, "interrupted", "TURN_INTERRUPTED")
+        current = await self.db.call(
+            lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))
+        )
+        uncertain = (
+            await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' AND state IN ('planned','running','unknown') LIMIT 1",
+                    (turn["id"],),
+                )
+            )
+            if turn
+            else None
+        )
+        if uncertain:
+            await self.complete(
+                task,
+                run,
+                {
+                    "state": "failed",
+                    "summary": "TOOL_STOP_UNCONFIRMED",
+                    "outcomeKnown": False,
+                    "retryable": False,
+                },
+                "interrupted",
+                unknown=True,
+            )
+        elif current["state"] == "cancelling":
+            await self.tasks.report(
+                task["owner_id"],
+                task["id"],
+                run["id"],
+                task["revision"],
+                {"state": "cancelled", "summary": "Cancelled"},
+            )
+        else:
+            await self.db.call(
+                lambda db: db.execute(
+                    "UPDATE tasks SET state='interrupted' WHERE id=?", (task["id"],)
+                ),
+                write=True,
+            )
 
     async def _finish_failure(self, task, run, turn, job, exc):
         if (

@@ -1,4 +1,4 @@
-"""Freeze and run role-scoped Main file images with local model events."""
+"""Freeze Native startup and stop settlement controls with local model events."""
 
 import argparse
 import hashlib
