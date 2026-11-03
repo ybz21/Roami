@@ -71,8 +71,8 @@ def test_contract_cannot_duplicate_metadata_or_disagree_with_directory(tmp_path)
 
 def test_catalog_is_complete_and_execution_matches_frozen_contracts():
     definitions = case_definitions()
-    assert len(definitions) == 105
-    assert len({value["id"] for value in definitions}) == 105
+    assert len(definitions) == 106
+    assert len({value["id"] for value in definitions}) == 106
     assert all(value["name"] and value["description"] for value in definitions)
     historical = json.loads(
         (
@@ -154,7 +154,7 @@ async def test_http_catalog_requires_local_owner_and_exposes_readable_metadata(s
         response = await client.get("/v1/improvement/cases", headers={"X-Roami-Owner": "local"})
         assert response.status_code == 200
         cases = response.json()["data"]
-        assert len(cases) == 105
+        assert len(cases) == 106
         report = next(value for value in cases if value["id"] == "MECH-MP01")
         assert report["name"] == "外挂行情报告的事实、图表与最终渲染"
         assert report["description"]

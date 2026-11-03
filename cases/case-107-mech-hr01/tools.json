@@ -1,0 +1,14 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "python_tests": [
+    "agent-runtime/tests/test_handoff_history_receipts.py",
+    "agent-runtime/tests/test_main_history.py",
+    "agent-runtime/tests/test_coordinator_handoff.py::test_read_then_two_handoffs_in_one_batch_end_without_extra_model_round"
+  ],
+  "expected_python_tests": 18,
+  "external_model_calls": 0,
+  "fixture_boundary": "模拟提供方；真实Runtime、SQLite、任务接收、CLI续跑及历史读取。未执行交付或外部模型。"
+}

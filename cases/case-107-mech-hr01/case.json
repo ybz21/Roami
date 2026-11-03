@@ -1,0 +1,57 @@
+{
+  "id": "MECH-HR01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "历史派活证据",
+  "prompt": "精简历史保留已成功接收且来源仍可见的派活回执；不把接收当成完成或新授权。",
+  "preconditions": "冻结的agent-runtime开发依赖与隔离启动器；只用模拟提供方和真实SQLite，不连接节点网关。",
+  "expected_terminal": "accepted_handoff_receipts_remain_attached_to_historical_requests",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "18项无跳过检查回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-HR01-H1",
+      "rule": "历史请求之后保留真实delegate/task_steer接收事实和原任务引用，执行方长指令不进入精简历史。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-HR01-H2",
+      "rule": "失败、未知、拒绝、其他工具伪造形状、缺失持久回执、遗忘/删除及跨用户数据不提升为已接收。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-HR01-H3",
+      "rule": "部分与完整请求的requestComplete事实分别保留；接收不等于交付完成或新授权。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-HR01-H4",
+      "rule": "显式读取完整历史恢复原协议，源消息不改写，当前轮派活行为不改变。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_handoff_history_projection",
+    "fixture_reproduction_only": true,
+    "issue": 623
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

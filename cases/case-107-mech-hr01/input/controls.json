@@ -1,0 +1,31 @@
+{
+  "first_request": "Create the first report.",
+  "update_request": "Add a sources section to that report.",
+  "current_request": "Create a separate materials inventory.",
+  "executor_detail": "EXECUTOR_ONLY_DETAIL ",
+  "handoffs": [
+    {
+      "continued": false,
+      "cli": false
+    },
+    {
+      "continued": true,
+      "cli": false
+    },
+    {
+      "continued": true,
+      "cli": true
+    }
+  ],
+  "excluded_receipts": [
+    "failed",
+    "unknown",
+    "rejected",
+    "foreign_tool",
+    "forget_receipt",
+    "forget_request",
+    "delete_request",
+    "foreign_owner",
+    "unbound_result"
+  ]
+}
