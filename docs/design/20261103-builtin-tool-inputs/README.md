@@ -91,7 +91,7 @@ Main 没有新增工具；明确校验其直接目录、能力发现、直接调
 - tool_argument_failures、tool_admission_failures（executionStarted=false）和错误码频次。参数拒绝是准入失败的子集，不重复相加。
 - tool_failure_rate / tool_error_rate；shell 的非零 exitCode 即使回执 state=succeeded 仍计为错误。
 - tool_process_score = 100 × 成功调用数 / 总调用数，与最终产物 quality 分开保留。
-- tool_first_attempt_success_rate：按 turn 第一条工具调用计数；分母为有工具调用的 turn，覆盖 Main 和 Worker。
+- tool_first_attempt_success_rate：Native 按 turn 第一条工具调用计数，覆盖 Main 和 Worker；没有 turn_id 的外部日志只按该次执行首条统计，不声称覆盖各个子 turn。
 
 NativeExecutor 写入这些指标；隔离 Worker 和 RSI 工作流从实际 execution-log 重新计算，外部执行器也按日志计量，不能只采信 response 中的指标。trial summary 和周期回顾输出错误率及首次成功率。中断、截断、日志缺失或未完成调用标为 partial/missing，未知比率为 null；无工具调用的比率也是 null。
 
@@ -112,11 +112,11 @@ NativeExecutor 写入这些指标；隔离 Worker 和 RSI 工作流从实际 exe
 
 ### 机制与回归
 
-`tests/test_model_tool_inputs.py` 覆盖真实文件写读改、持久化哈希恢复、并发修改拒绝、artifact 行范围、简短委派、自由文本/选项提问、CLI 帮助与受管任务命令与 Main 最小工具集、续跑幂等、真实浏览器表单和隔离 Xvfb 桌面表单。浏览器/桌面的模型事件由固定夹具生成，属于机制验证，不宣称真实模型视觉操作能力。
+`tests/test_model_tool_inputs.py` 覆盖真实文件写读改、持久化哈希恢复、并发修改拒绝、artifact 行范围、简短委派、自由文本/选项提问、CLI 帮助与受管任务命令与 Main 最小工具集、续跑幂等、浏览器协议夹具表单和隔离 Xvfb 桌面表单。浏览器 CLI 进程由 BrowserFixture 模拟；桌面使用实际隔离 Xvfb。两者的模型事件均由固定夹具生成，属于机制验证，不宣称真实模型视觉操作能力。
 
 `tests/test_improvement_tool_process.py` 验证“失败→恢复→最终通过”的错误仍被计数、非零 shell 退出码、未知覆盖、不完整基线和过程退步晋级阻断。
 
-定向回归 103 项通过；全量 quality quick/full 的最终结果在本次 PR 验收记录补充。首轮 3,318 项的失败保留为契约迁移排查过程，不算最终通过证据。
+最终定向契约回归 32 项通过，RSI 工作流 17 项通过，过程日志回归 5 项通过。full 质量门通过：Python 3,274 项通过、48 项跳过；Go、CLI 审计、格式、前端 i18n/hover/typecheck/build 和秘密扫描通过。quick 提交钩子通过：Python 3,275 项通过、48 项跳过，包含后补的损坏中断日志回归。详见 [质量检查记录](evidence/checks.txt)。首轮 3,318 项中的失败保留为契约迁移排查过程，不算最终通过证据。
 
 ## 未修复项与范围
 
