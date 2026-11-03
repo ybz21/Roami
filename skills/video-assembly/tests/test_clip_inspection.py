@@ -183,14 +183,16 @@ def test_single_frame_keeps_all_requests_without_duplicating_the_image(source, m
 def test_variable_frame_rate_pairs_pixels_with_presentation_time(source, media):
     workspace, spec = source
     replace_source(workspace, spec, media / "variable.mp4")
-    spec["fractions"] = [0, 0.05, 0.4, 0.9, 1]
+    # Decoder versions report different dwell times for the repeated final frame.
+    spec["fractions"] = [i / 16 for i in range(17)]
     _, manifest = result(workspace, spec)
     assert [x["seconds"] for x in manifest["samples"]] == pytest.approx(
         [0, 0.04, 0.28, 0.6, 0.64]
     )
     assert [x["frameIndex"] for x in manifest["samples"]] == [0, 1, 2, 3, 4]
-    assert manifest["timing"]["decodedEndSeconds"] == pytest.approx(0.68)
-    assert manifest["samplingDurationSeconds"] >= 0.68
+    assert manifest["decodedFrameCount"] == 5
+    assert manifest["timing"]["decodedEndSeconds"] >= 0.64
+    assert manifest["samplingDurationSeconds"] >= 0.64
     with Image.open(workspace.root / spec["image"]) as sheet:
         pixels = [
             sheet.getpixel(((i % 3) * 384 + 192, (i // 3) * 244 + 136))
