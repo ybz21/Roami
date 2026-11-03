@@ -34,6 +34,13 @@ it('keeps unknown costs and missing usage visible after reconciliation', () => {
   expect(reconciled.statistics?.total.missingUsage).toBe(1)
 })
 
+it('preserves per-request tokens, real zero usage and correlation IDs when costs are unknown', () => {
+  const raw = { ...usage([group]), recent: [{ id: 'unknown-cost', day: group.day, model: 'fixture', role: 'main', state: 'unknown', currency: 'CNY', cost: null, startedMs: 1, inputTokens: 123, outputTokens: 9, cacheReadTokens: 0, errorCode: 'MODEL_GATEWAY_PRICE_MISSING', httpStatus: 200, upstreamHttpStatus: 200, requestId: 'client-id', upstreamRequestId: 'provider-id', sessionId: 'session-id', reconciliation: '' }] }
+  expect(gatewayUsage(raw, 'CNY').recent[0]).toMatchObject({ inputTokens: 123, outputTokens: 9, cacheReadTokens: 0, requestId: 'client-id', upstreamRequestId: 'provider-id', sessionId: 'session-id', httpStatus: 200, charges: [] })
+  const missing = { ...raw, recent: [{ ...raw.recent[0], inputTokens: null, outputTokens: null, cacheReadTokens: null, httpStatus: 0 }] }
+  expect(gatewayUsage(missing, 'CNY').recent[0]).toMatchObject({ inputTokens: null, outputTokens: null, cacheReadTokens: null, httpStatus: 0 })
+})
+
 
 it('labels historical RSI sessions and new roles without guessing untagged requests', () => {
   const call = { id: '1', day: group.day, model: 'fixture', role: 'main', state: 'known', currency: 'CNY', cost: '0.000000001', startedMs: 1, inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, errorCode: '', httpStatus: 200, reconciliation: '' }

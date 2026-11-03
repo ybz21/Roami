@@ -15,12 +15,13 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
   const [metric, setMetric] = useState('totalTokens'), [expandedPoint, setExpandedPoint] = useState(''), [selectedPoint, setSelectedPoint] = useState('')
   const previousColors = useRef(new Map<string, number>())
   const count = (value: number) => new Intl.NumberFormat(locale).format(value)
+  const tokenText = (row: UsageTotals, value = row.totalTokens) => row.missingUsage + row.pending > 0 ? value > 0 ? t('agent.usage.knownTokens', { count: count(value) }) : t('agent.gateway.tokenUnknown') : count(value)
   const day = (value: string, full = false) => new Intl.DateTimeFormat(locale, { ...(full ? { year: 'numeric' as const } : {}), month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'))
   const status = (total: UsageTotals) => [total.unknown ? t('agent.usage.unknown', { count: count(total.unknown) }) : '', total.pending ? t('agent.usage.pending', { count: count(total.pending) }) : '', total.failed ? t('agent.usage.failed', { count: count(total.failed) }) : ''].filter(Boolean).join(' · ')
   const currencies = statistics?.total.charges.map(charge => charge.currency) || []
   const selectedMetric = ['requests', 'totalTokens', ...currencies].includes(metric) ? metric : 'totalTokens'
   const metricValue = (row: UsageTotals) => selectedMetric === 'totalTokens' || selectedMetric === 'requests' ? row[selectedMetric] : Number(row.charges.find(charge => charge.currency === selectedMetric)?.amount || 0)
-  const metricText = (row: UsageTotals) => selectedMetric === 'totalTokens' || selectedMetric === 'requests' ? count(row[selectedMetric]) : chargeText(row.charges.filter(charge => charge.currency === selectedMetric), locale) || (row.unknown > 0 || row.pending > 0 ? t('agent.proxy.costUnknown') : chargeText([{ currency: selectedMetric, amount: '0' }], locale))
+  const metricText = (row: UsageTotals) => selectedMetric === 'totalTokens' ? tokenText(row) : selectedMetric === 'requests' ? count(row.requests) : chargeText(row.charges.filter(charge => charge.currency === selectedMetric), locale) || (row.unknown > 0 || row.pending > 0 ? t('agent.proxy.costUnknown') : chargeText([{ currency: selectedMetric, amount: '0' }], locale))
   const hourly = statistics?.days === 1
   const time = (hour: number) => new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, hour)))
   const points = hourly ? (statistics.hourly || []).map(row => ({ ...row, key: String(row.hour), label: time(row.hour) })) : (statistics?.daily || []).map(row => ({ ...row, key: row.day, label: day(row.day) }))
@@ -56,10 +57,10 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
       <div className="agent-proxy-totals" role="status">
         <div><span>{t('agent.usage.totalCost')}</span><strong>{fees(statistics.total)}</strong></div>
         <div><span>{t('agent.usage.totalRequests')}</span><strong>{count(statistics.total.requests)}</strong></div>
-        <div><span>{t('agent.usage.totalTokens')}</span><strong>{count(statistics.total.totalTokens)}</strong></div>
+        <div><span>{t('agent.usage.totalTokens')}</span><strong>{tokenText(statistics.total)}</strong></div>
         <div><span>{t('agent.usage.cacheRate')}</span><strong>{statistics.total.inputTokens > 0 ? new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(statistics.total.cacheReadTokens / statistics.total.inputTokens) : t('agent.usage.noRate')}</strong></div>
       </div>
-      <p className="agent-settings-hint">{t('agent.usage.tokenBreakdown', { input: count(statistics.total.inputTokens), output: count(statistics.total.outputTokens), cache: count(statistics.total.cacheReadTokens) })}</p>
+      <p className="agent-settings-hint">{t('agent.usage.tokenBreakdown', { input: tokenText(statistics.total, statistics.total.inputTokens), output: tokenText(statistics.total, statistics.total.outputTokens), cache: tokenText(statistics.total, statistics.total.cacheReadTokens) })}</p>
       {status(statistics.total) && <p className="agent-settings-hint" role="status">{status(statistics.total)}</p>}
       {statistics.total.missingUsage > 0 && <p className="agent-settings-hint">{t('agent.usage.incomplete', { missing: count(statistics.total.missingUsage) })}</p>}
       {summaryContent}
@@ -73,23 +74,23 @@ export function ModelUsageStatistics({ statistics, days, onDaysChange, selectedD
         <p className="agent-settings-hint">{t('agent.usage.chartHint')}</p>
         {chosenPoint && <section className="agent-usage-point" aria-label={t('agent.usage.pointDetails')}>
           <div className="agent-usage-toolbar"><Select aria-label={t('agent.usage.point')} value={chosenPoint.key} disabled={disabled} virtual={false} options={points.map(point => ({ value: point.key, label: point.label }))} onChange={setSelectedPoint} />{!hourly && onDayChange && 'day' in chosenPoint && <button type="button" className="tt-act" onClick={() => { onDayChange(chosenPoint.day); onDaysChange(1) }}>{t('agent.usage.viewDayModels')}</button>}</div>
-          <div className="agent-proxy-totals"><div><span>{t('agent.proxy.tokens')}</span><strong>{count(chosenPoint.totalTokens)}</strong></div><div><span>{t('agent.proxy.requests')}</span><strong>{count(chosenPoint.requests)}</strong></div><div><span>{t('agent.usage.cost')}</span><strong>{chosenPoint.requests ? fees(chosenPoint) : t('agent.usage.noRate')}</strong></div></div>
-          <p className="agent-settings-hint">{t('agent.usage.tokenBreakdown', { input: count(chosenPoint.inputTokens), output: count(chosenPoint.outputTokens), cache: count(chosenPoint.cacheReadTokens) })}</p>
+          <div className="agent-proxy-totals"><div><span>{t('agent.proxy.tokens')}</span><strong>{tokenText(chosenPoint)}</strong></div><div><span>{t('agent.proxy.requests')}</span><strong>{count(chosenPoint.requests)}</strong></div><div><span>{t('agent.usage.cost')}</span><strong>{chosenPoint.requests ? fees(chosenPoint) : t('agent.usage.noRate')}</strong></div></div>
+          <p className="agent-settings-hint">{t('agent.usage.tokenBreakdown', { input: tokenText(chosenPoint, chosenPoint.inputTokens), output: tokenText(chosenPoint, chosenPoint.outputTokens), cache: tokenText(chosenPoint, chosenPoint.cacheReadTokens) })}</p>
           {status(chosenPoint) && <p className="agent-settings-hint">{status(chosenPoint)}</p>}
-          <ul className="agent-usage-point-models">{pointParts(chosenPoint).map(part => <li key={JSON.stringify(part.model)}><strong><span className="agent-usage-swatch" style={{ background: seriesColor(part.model) }} aria-hidden="true" />{seriesLabel(part.model)}</strong><span>{t('agent.usage.pointUsage', { tokens: count(part.totalTokens), requests: count(part.requests) })}</span>{fees(part)}</li>)}</ul>
+          <ul className="agent-usage-point-models">{pointParts(chosenPoint).map(part => <li key={JSON.stringify(part.model)}><strong><span className="agent-usage-swatch" style={{ background: seriesColor(part.model) }} aria-hidden="true" />{seriesLabel(part.model)}</strong><span>{t('agent.usage.pointUsage', { tokens: tokenText(part), requests: count(part.requests) })}</span>{fees(part)}</li>)}</ul>
         </section>}
         <details className="agent-model-advanced agent-usage-daily"><summary>{t(hourly ? 'agent.usage.hourlyDetails' : 'agent.usage.dailyDetails')}</summary><table><thead><tr><th scope="col">{t(hourly ? 'agent.usage.time' : 'agent.usage.date')}</th><th scope="col">{t('agent.proxy.requests')}</th><th scope="col">{t('agent.proxy.tokens')}</th><th scope="col">{t('agent.usage.cost')}</th></tr></thead><tbody>{points.map(row => {
           const key = statistics.startDay + ':' + hourly + ':' + row.key, parts = pointParts(row), expanded = expandedPoint === key
           return <Fragment key={row.key}>
-            <tr><th scope="row">{parts.length ? <button type="button" className="tt-act" aria-expanded={expanded} aria-label={t('agent.usage.expandPoint', { time: row.label })} onClick={() => setExpandedPoint(expanded ? '' : key)}>{row.label}</button> : row.label}</th><td>{count(row.requests)}</td><td>{count(row.totalTokens)}</td><td>{row.requests ? fees(row) : t('agent.usage.noRate')}{status(row) && <small>{status(row)}</small>}</td></tr>
-            {expanded && parts.map(part => <tr className="agent-usage-model-detail" key={JSON.stringify(part.model)}><th scope="row"><span className="agent-usage-swatch" style={{ background: seriesColor(part.model) }} aria-hidden="true" />{seriesLabel(part.model)}</th><td>{count(part.requests)}</td><td>{count(part.totalTokens)}</td><td>{fees(part)}{status(part) && <small>{status(part)}</small>}</td></tr>)}
+            <tr><th scope="row">{parts.length ? <button type="button" className="tt-act" aria-expanded={expanded} aria-label={t('agent.usage.expandPoint', { time: row.label })} onClick={() => setExpandedPoint(expanded ? '' : key)}>{row.label}</button> : row.label}</th><td>{count(row.requests)}</td><td>{tokenText(row)}</td><td>{row.requests ? fees(row) : t('agent.usage.noRate')}{status(row) && <small>{status(row)}</small>}</td></tr>
+            {expanded && parts.map(part => <tr className="agent-usage-model-detail" key={JSON.stringify(part.model)}><th scope="row"><span className="agent-usage-swatch" style={{ background: seriesColor(part.model) }} aria-hidden="true" />{seriesLabel(part.model)}</th><td>{count(part.requests)}</td><td>{tokenText(part)}</td><td>{fees(part)}{status(part) && <small>{status(part)}</small>}</td></tr>)}
             {expanded && !hourly && onDayChange && 'day' in row && <tr><td colSpan={4}><button type="button" className="tt-act" onClick={() => { onDayChange(row.day); onDaysChange(1) }}>{t('agent.usage.viewDayModels')}</button></td></tr>}
           </Fragment>
         })}</tbody></table></details>
         <h4>{t('agent.usage.byModel')}</h4>
         <div className="agent-usage-models">{statistics.models.map(row => <article className="agent-usage-model" key={row.model} aria-label={row.model}>
           <div className="agent-usage-model-head"><strong>{row.model}</strong><strong>{fees(row)}</strong></div>
-          <dl>{([['requests', 'agent.proxy.requests'], ['inputTokens', 'agent.usage.input'], ['outputTokens', 'agent.usage.output'], ['cacheReadTokens', 'agent.usage.cache']] as const).map(([key, label]) => <div key={key}><dt>{t(label)}</dt><dd>{count(row[key])}</dd></div>)}</dl>
+          <dl>{([['requests', 'agent.proxy.requests'], ['inputTokens', 'agent.usage.input'], ['outputTokens', 'agent.usage.output'], ['cacheReadTokens', 'agent.usage.cache']] as const).map(([key, label]) => <div key={key}><dt>{t(label)}</dt><dd>{key === 'requests' ? count(row.requests) : tokenText(row, row[key])}</dd></div>)}</dl>
           {status(row) && <p className="agent-settings-hint">{status(row)}</p>}
         </article>)}</div>
         {statistics.modelsTruncated && <p className="agent-settings-hint">{t('agent.usage.modelsTruncated')}</p>}

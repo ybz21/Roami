@@ -93,4 +93,6 @@ roami agent gateway reconcile --call <调用ID> --file /path/to/receipt.json
 
 [未知费用仅提示、不阻断调用](records/2026-11-03/nonblocking-unknown-charges.md)。
 
+[逐笔 Token 与未知费用请求记录](records/2026-11-03/request-token-records.md)。
+
 [设计修订与验收记录](records/README.md)

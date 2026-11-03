@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (method, path, body) => {
     if (path === '/agent/model-settings') return { data: connection }
     if (path === '/agent/model-gateway/settings') { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
-    if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, source: new URL(path, 'https://fixture.invalid').searchParams.get('source') || '' } }
+    if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, source: new URL(path, 'https://fixture.invalid').searchParams.get('source') || '', recentState: new URL(path, 'https://fixture.invalid').searchParams.get('recentState') || '' } }
     return { data: {} }
   })
 })
@@ -109,6 +109,43 @@ it('reconciles an unknown charge only after amount, reason and explicit confirma
   fireEvent.click(within(dialog).getByRole('button', { name: 'agent.gateway.confirmReconcile' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/calls/unknown-call', { amount: .75, reason: 'verified receipt' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+})
+
+it('shows tokens and request identities independently from unknown costs, preserving unknown versus zero', async () => {
+  const call = { id: 'known-token-call', day: usage.day, model: 'unpriced-model', role: 'main', state: 'unknown', currency: 'CNY', cost: null, startedMs: Date.UTC(2026, 9, 29, 12, 6, 23), inputTokens: 1234567, outputTokens: 9, cacheReadTokens: 0, errorCode: 'MODEL_GATEWAY_PRICE_MISSING', httpStatus: 200, requestId: 'client-correlation', upstreamRequestId: 'provider-correlation', reconciliation: '' }
+  currentUsage.recent = [call, { ...call, id: 'missing-token-call', model: 'interrupted-model', inputTokens: null, outputTokens: null, cacheReadTokens: null, httpStatus: 0, errorCode: 'MODEL_TRANSPORT_FAILED' }]
+  setup()
+  const records = await screen.findByRole('region', { name: 'agent.proxy.recent' })
+  const known = within(records).getByText('unpriced-model').closest('li')!
+  expect(within(known).getByText('1,234,567')).toBeTruthy()
+  expect(within(known).getByText('9')).toBeTruthy()
+  expect(within(known).getByText('0')).toBeTruthy()
+  const missing = within(records).getByText('interrupted-model').closest('li')!
+  expect(within(missing).getAllByText('agent.gateway.tokenUnknown')).toHaveLength(3)
+  expect(within(missing).queryByText('0')).toBeNull()
+  fireEvent.click(within(known).getByText('agent.gateway.callDetails'))
+  expect(within(known).getByText('known-token-call')).toBeTruthy()
+  expect(within(known).getByText('client-correlation')).toBeTruthy()
+  expect(within(known).getByText('provider-correlation')).toBeTruthy()
+})
+
+it('loads older unknown requests through the server filter without changing the accounting summary', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  const call = { id: 'old-unknown', day: usage.day, model: 'old-unknown-model', role: 'main', state: 'unknown', currency: 'CNY', cost: null, startedMs: 1, inputTokens: null, outputTokens: null, cacheReadTokens: null, errorCode: 'MODEL_TRANSPORT_FAILED', httpStatus: 0, reconciliation: '' }
+  currentUsage.today = [{ day: usage.day, role: 'main', model: 'fixture', currency: 'CNY', requests: 27, inputTokens: 250, outputTokens: 50, cacheReadTokens: 0, pending: 0, unknown: 1, usageUnknown: 1, failed: 0, cost: '1.000000000' }]
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path.startsWith('/agent/model-gateway/usage')) {
+      const state = new URL(path, 'https://fixture.invalid').searchParams.get('recentState') || ''
+      return { data: { ...currentUsage, recentState: state, recent: state ? [call] : [{ ...call, id: 'latest', model: 'latest-model', state: 'known' }] } }
+    }
+    return original(method, path, body, options)
+  })
+  setup(); await screen.findByText('latest-model')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.gateway.onlyUnknown' }))
+  await screen.findByText('old-unknown-model')
+  expect(screen.queryByText('latest-model')).toBeNull()
+  expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/usage?days=7&recentState=unknown', undefined, expect.anything())
+  expect(within(screen.getAllByText('agent.proxy.requests')[0].parentElement!).getByText('27')).toBeTruthy()
 })
 
 it('sends date selection to the Go ledger and preserves the selected range', async () => {
