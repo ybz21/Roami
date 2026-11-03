@@ -235,46 +235,64 @@ class TaskDispatcher:
         except (DomainError, OSError, ValueError, httpx.HTTPError, TimeoutError) as exc:
             if task is None:
                 raise
-            if (
-                isinstance(exc, DomainError)
-                and exc.code == "SESSION_NOT_IDLE"
-                and run["executor_kind"] == "cli"
-                and await self.defer_session_submission(task, run, job)
-            ):
-                return
-            result = execution_failure(exc)
-            await self.end_prepared_turn(turn, "failed", result["summary"])
-            if isinstance(exc, ToolPreflightError):
-                progress = await self.db.call(lambda db: self.attempt_progress(db, task, run, turn))
-                result.update(
-                    errorCode=exc.code,
-                    executionStarted=progress["executionStarted"],
-                    retryable=False,
-                    progress=progress,
-                    failedStep={"phase": "preflight", "executionStarted": False},
-                )
-            pending = (
-                await self.db.call(
-                    lambda db: row(
-                        db,
-                        "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' AND state IN ('planned','running','unknown') LIMIT 1",
-                        (turn["id"],),
-                    )
-                )
-                if turn
-                else None
+            await self._settle_failure(task, run, turn, job, exc)
+            return
+        await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
+
+    async def _settle_failure(self, task, run, turn, job, exc):
+        # Cancellation must not abandon a failure receipt after execution has already stopped.
+        finalizing = asyncio.create_task(self._finish_failure(task, run, turn, job, exc))
+        cancelled = None
+        while not finalizing.done():
+            try:
+                await asyncio.shield(finalizing)
+            except asyncio.CancelledError as signal:
+                cancelled = cancelled or signal
+        finalizing.result()
+        if cancelled is not None:
+            raise cancelled
+
+    async def _finish_failure(self, task, run, turn, job, exc):
+        if (
+            isinstance(exc, DomainError)
+            and exc.code == "SESSION_NOT_IDLE"
+            and run["executor_kind"] == "cli"
+            and await self.defer_session_submission(task, run, job)
+        ):
+            return
+        result = execution_failure(exc)
+        await self.end_prepared_turn(turn, "failed", result["summary"])
+        if isinstance(exc, ToolPreflightError):
+            progress = await self.db.call(lambda db: self.attempt_progress(db, task, run, turn))
+            result.update(
+                errorCode=exc.code,
+                executionStarted=progress["executionStarted"],
+                retryable=False,
+                progress=progress,
+                failedStep={"phase": "preflight", "executionStarted": False},
             )
-            if pending and not isinstance(exc, DomainError):
-                result["summary"] = "TOOL_STOP_UNCONFIRMED"
-            if pending or result["summary"] in {
-                "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
-                "NATIVE_WORKSPACE_RELEASE_UNKNOWN",
-                "TOOL_OUTCOME_UNKNOWN",
-                "MCP_OUTCOME_UNKNOWN",
-            }:
-                result.update(outcomeKnown=False, retryable=False)
-                await self.complete(task, run, result, "interrupted", unknown=True)
-                return
+        pending = (
+            await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT id FROM tool_calls WHERE turn_id=? AND effect='write' AND state IN ('planned','running','unknown') LIMIT 1",
+                    (turn["id"],),
+                )
+            )
+            if turn
+            else None
+        )
+        if pending and not isinstance(exc, DomainError):
+            result["summary"] = "TOOL_STOP_UNCONFIRMED"
+        if pending or result["summary"] in {
+            "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
+            "NATIVE_WORKSPACE_RELEASE_UNKNOWN",
+            "TOOL_OUTCOME_UNKNOWN",
+            "MCP_OUTCOME_UNKNOWN",
+        }:
+            result.update(outcomeKnown=False, retryable=False)
+            await self.complete(task, run, result, "interrupted", unknown=True)
+            return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
 
     async def defer_session_submission(self, task, run, job):

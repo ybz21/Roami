@@ -1,0 +1,30 @@
+{
+  "id": "MECH-FS01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "失败收尾与取消",
+  "prompt": "执行已报错后，取消不得丢弃失败收尾；原错误、停止证据与未知写入边界保持，用户续跑得到终态回执。",
+  "preconditions": "冻结的agent-runtime开发依赖及隔离启动器；模拟执行器、真实SQLite/Scheduler，不连接模型网关。",
+  "expected_terminal": "failure_receipt_settled_before_cancellation_propagation",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": ["22项无跳过检查回执", "公开输入和实现冻结清单"],
+  "hard_assertions": [
+    {"id": "MECH-FS01-H1", "rule": "失败登记前/后、一次/重复取消均保留失败结果，旧轮次不留在running。", "failure_effect": "case_failed"},
+    {"id": "MECH-FS01-H2", "rule": "已确定停止的失败允许用户续跑，未知工作区及未知写入保持阻断，不推断安全重放。", "failure_effect": "case_failed"},
+    {"id": "MECH-FS01-H3", "rule": "无取消的原错误分类、预检信息和关机后恢复记录保持。", "failure_effect": "case_failed"},
+    {"id": "MECH-FS01-H4", "rule": "正常启动取消仍可终止执行，不把失败收尾保护扩大成不可取消的执行。", "failure_effect": "case_failed"}
+  ],
+  "decision_domains": ["CT"],
+  "grading_profile": "mechanism",
+  "provenance": {"origin": "public_synthetic_failure_settlement_races", "fixture_reproduction_only": true, "issue": 631},
+  "resources": {
+    "inputs": ["input/controls.json"],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "runtime": ["Python >=3.12 with frozen agent-runtime dev dependencies", "scripts/dev/isolated-roami.sh"],
+  "python_tests": [
+    "agent-runtime/tests/test_failure_settlement_cancellation.py",
+    "agent-runtime/tests/test_native_start_cancellation.py"
+  ],
+  "expected_python_tests": 22,
+  "external_model_calls": 0,
+  "fixture_boundary": "模拟执行器；真实Scheduler、ToolGateway、SQLite、取消与续跑状态机。不连接节点模型。"
+}
