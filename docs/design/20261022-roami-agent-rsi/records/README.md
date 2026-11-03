@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [取消期间完整保存执行失败记录](2026-11-03/failure-settlement-cancellation.md) |
 | 2026-11-03 | [精简历史保留回复送达事实](2026-11-03/reply-history-receipts.md) |
 | 2026-11-03 | [结束工具混合批次的零副作用纠错](2026-11-03/terminal-tool-batch-repair.md) |
 | 2026-11-03 | [精简历史保留可信派活回执](2026-11-03/handoff-history-receipts.md) |

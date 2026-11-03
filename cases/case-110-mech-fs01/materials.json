@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-FS01",
+  "data": {"kind": "public_synthetic_failure_settlement_races", "inputs": ["input/controls.json"]},
+  "tools": {"configuration": "tools.json", "kind": "task_dispatch_failure_and_continuation"},
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "durable_failure_receipts_under_cancellation",
+    "expected_python_tests": 22
+  }
+}

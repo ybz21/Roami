@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_failure_settlement_races",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "16项新增机制检查及6项既有启动取消检查。事件门稳定复现竞态；原CLI偶发超时缺少当时数据库，不声称已证明同一根因。"
+}

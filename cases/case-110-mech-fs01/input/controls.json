@@ -1,0 +1,8 @@
+{
+  "failure_kinds": ["known", "unknown", "write"],
+  "pause_after_turn_record": [false, true],
+  "cancellation_signals": [1, 2],
+  "goal": "Return a read-only analysis.",
+  "continuation": "Include another check.",
+  "known_failure": "MODEL_PROXY_USAGE_UNKNOWN"
+}
