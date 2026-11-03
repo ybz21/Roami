@@ -24,6 +24,7 @@ from roami_agent.replies.delivery_policy import (
     DELIVERY_INSTRUCTIONS,
 )
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.reply_history import replied_message_ids
 from roami_agent.storage.request_coverage import latest_coverage
 from roami_agent.storage.task_context import recent_task_context
 from roami_agent.storage.task_handoff import handoff_receipt_context
@@ -184,7 +185,7 @@ class PromptBuilder:
                 historical_ids = [
                     plan["modelSourceMessageIds"][index]
                     for index, message in enumerate(plan["messages"][: plan["currentTurnStart"]])
-                    if message["role"] in {"user", "tool"}
+                    if message["role"] in {"user", "assistant", "tool"}
                     and not plan["modelAgentTaskInstructions"][index]
                     and plan["modelSourceMessageIds"][index]
                 ]
@@ -194,6 +195,14 @@ class PromptBuilder:
                         m["role"] == "tool" for m in plan["messages"][: plan["currentTurnStart"]]
                     )
                     else {}
+                )
+                plan["modelRepliedMessageIds"] = (
+                    await self.db.call(lambda db: replied_message_ids(db, turn, historical_ids))
+                    if any(
+                        m["role"] == "assistant" and not m.get("tool_calls")
+                        for m in plan["messages"][: plan["currentTurnStart"]]
+                    )
+                    else []
                 )
                 plan = main_history(plan, configuration)
             if status_scope and not include_result and not history_requested:

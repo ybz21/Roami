@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_interleaved_chat",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "15项新增机制检查及3项既有历史检查。只证明送达事实的投影；原16场景的实模语义、原生多媒体及独立评分仍需另验收。"
+}

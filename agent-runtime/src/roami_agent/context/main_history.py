@@ -8,6 +8,7 @@ def main_history(plan, configuration):
     messages, start = plan["messages"], plan["currentTurnStart"]
     source_ids = plan["modelSourceMessageIds"]
     receipts = plan.get("modelHandoffReceipts", {})
+    replies = set(plan.get("modelRepliedMessageIds", []))
     previous_reply = next(
         (
             index
@@ -18,6 +19,8 @@ def main_history(plan, configuration):
     )
     if previous_reply is not None and plan["modelDetailedAnswers"][previous_reply]:
         previous_reply = None
+    if previous_reply is not None:
+        replies.discard(source_ids[previous_reply])
     selected = [
         index
         for index, message in enumerate(messages)
@@ -25,8 +28,9 @@ def main_history(plan, configuration):
         or (message["role"] in {"user", "system"} and not plan["modelAgentTaskInstructions"][index])
         or index == previous_reply
         or source_ids[index] in receipts
+        or source_ids[index] in replies
     ]
-    if len(selected) == len(messages) and not receipts:
+    if len(selected) == len(messages) and not receipts and not replies:
         return plan
     selected_set = set(selected)
     suppressed = [
@@ -39,6 +43,14 @@ def main_history(plan, configuration):
             + encoded(receipts[source_ids[i]]),
         }
         if i < start and source_ids[i] in receipts
+        else {
+            "role": "assistant",
+            "content": "Historical assistant reply (delivered, content omitted): "
+            "This request received a reply. Omission is not evidence of an unanswered question "
+            "and delivery is not proof of task completion. Use conversation_history for the exact "
+            "reply; do not repeat old answers unless the user asks.",
+        }
+        if i < start and source_ids[i] in replies
         else messages[i]
         for i in selected
     ]
@@ -47,9 +59,9 @@ def main_history(plan, configuration):
         messages=visible,
         currentTurnStart=sum(i < start for i in selected),
         historyView="main_briefing",
-        historyViewVersion=2,
+        historyViewVersion=3,
         requestBasis=request_basis(
-            dict(configuration, historyView="main_briefing", historyViewVersion=2)
+            dict(configuration, historyView="main_briefing", historyViewVersion=3)
         ),
         usageTokens=None,
         trailingTokens=None,
