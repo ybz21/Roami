@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const callRetention = 72 * time.Hour
+const callRetention = 48 * time.Hour
 const retentionBatchSize = 1000
 
 // Both sides expose the same additive measures; unknown costs remain separate counts.

@@ -37,7 +37,7 @@ func TestDailyRetentionPreservesAccountingAndLateReceipts(t *testing.T) {
 	}
 	now = now.Add(time.Millisecond)
 	fresh := settle("fixture", "rsi-fresh", "codex", &Usage{200, 19, 20}, "")
-	now = now.Add(72*time.Hour - time.Millisecond)
+	now = now.Add(48*time.Hour - time.Millisecond)
 	before, err := l.Statistics(0)
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestDailyRetentionPreservesAccountingAndLateReceipts(t *testing.T) {
 		t.Fatalf("filter changed after aggregation: %+v %v", filteredAfter, err)
 	}
 	day, err := l.StatisticsFor(1, "2026-10-25")
-	if err != nil || !day.DailyAggregated || len(day.Hourly) != 0 || day.DetailRetentionHours != 72 {
+	if err != nil || !day.DailyAggregated || len(day.Hourly) != 0 || day.DetailRetentionHours != 48 {
 		t.Fatalf("partial hourly history exposed: %+v %v", day, err)
 	}
 	c.Currency = "USD"
@@ -82,7 +82,7 @@ func TestDailyRetentionPreservesAccountingAndLateReceipts(t *testing.T) {
 	if err := l.db.QueryRow(`SELECT count(*) FROM gateway_calls WHERE id=?`, pending.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("late receipt pruned before its own retention window: %d %v", count, err)
 	}
-	now = now.Add(72 * time.Hour)
+	now = now.Add(48 * time.Hour)
 	if err := l.Compact(); err != nil {
 		t.Fatal(err)
 	}

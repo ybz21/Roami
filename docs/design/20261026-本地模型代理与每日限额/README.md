@@ -97,4 +97,4 @@ roami agent gateway reconcile --call <调用ID> --file /path/to/receipt.json
 
 [设计修订与验收记录](records/README.md)
 
-- [三天明细与日账归并](records/2026-11-03/daily-retention.md)
+- [计费明细保留与日账归并](records/2026-11-03/daily-retention.md)
