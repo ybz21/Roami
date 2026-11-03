@@ -1,0 +1,30 @@
+{
+  "id": "MECH-AR01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "历史回复送达",
+  "prompt": "在精简历史中保留旧请求曾收到Main回复的可信事实，原文按需读取，不把已回复等同于问题已解决。",
+  "preconditions": "冻结的agent-runtime开发依赖及隔离启动器；模拟提供方与真实SQLite，不连接节点网关。",
+  "expected_terminal": "historical_delivered_reply_is_not_erased_or_promoted_to_task_completion",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": ["18项无跳过检查回执", "公开输入和实现冻结清单"],
+  "hard_assertions": [
+    {"id": "MECH-AR01-H1", "rule": "四种已交付回复在其旧请求附近保留送达事实，最新简短回答保留原文。", "failure_effect": "case_failed"},
+    {"id": "MECH-AR01-H2", "rule": "显式完整历史读取恢复准确原文，较早长回答不自动灌回精简历史。", "failure_effect": "case_failed"},
+    {"id": "MECH-AR01-H3", "rule": "失败、提问、回调、缺失事件、遗忘、删除和跨用户/会话记录不提升为可信回复。", "failure_effect": "case_failed"},
+    {"id": "MECH-AR01-H4", "rule": "送达不表示任务完成或新授权，不改写用户输入、源消息和模型输出。", "failure_effect": "case_failed"}
+  ],
+  "decision_domains": ["CT"],
+  "grading_profile": "mechanism",
+  "provenance": {"origin": "public_synthetic_interleaved_chat", "fixture_reproduction_only": true, "issue": 628},
+  "resources": {
+    "inputs": ["input/controls.json"],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

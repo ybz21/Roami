@@ -1,0 +1,13 @@
+{
+  "requests": [
+    "Compute 17 times 13. Return the full exact result.",
+    "Keep the meeting budget at 800. Only return JSON.",
+    "Change the meeting attendance to 14. Only return the current JSON."
+  ],
+  "delivered_answer": "221",
+  "reply_modes": ["text", "brief", "detailed", "debug"],
+  "excluded_records": [
+    "missing_event", "task_report", "question", "failed_turn",
+    "forgotten_reply", "forgotten_request", "deleted_reply", "deleted_request"
+  ]
+}

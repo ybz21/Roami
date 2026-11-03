@@ -1,0 +1,13 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "python_tests": [
+    "agent-runtime/tests/test_reply_history_receipts.py",
+    "agent-runtime/tests/test_main_history.py"
+  ],
+  "expected_python_tests": 18,
+  "external_model_calls": 0,
+  "fixture_boundary": "模拟提供方；真实Runtime、SQLite、回复交付事件及上下文投影。不是实模质量检查。"
+}

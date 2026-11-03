@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-AR01",
+  "data": {"kind": "public_synthetic_interleaved_chat", "inputs": ["input/controls.json"]},
+  "tools": {"configuration": "tools.json", "kind": "main_reply_delivery_history"},
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "delivered_reply_provenance_and_history_restoration",
+    "expected_python_tests": 18
+  }
+}
