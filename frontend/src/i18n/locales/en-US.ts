@@ -27,6 +27,8 @@ const enUS = {
   'okr.tab.review': "Reviews",
   'okr.tab.board': "OKR & dashboard",
   'okr.tab.activities': "Activities",
+  'okr.tab.files': 'Files',
+  'okr.filesUnavailable': 'The project directory has not loaded yet.',
   'okr.nextAction': "Next action",
   'okr.openReview': "Read full review",
   'okr.noReviewAction': "No review yet. Check the evidence before deciding the next step.",

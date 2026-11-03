@@ -27,6 +27,8 @@ const zhCN = {
   'okr.tab.review': "复盘",
   'okr.tab.board': "OKR 与看板",
   'okr.tab.activities': "具体活动",
+  'okr.tab.files': '文件',
+  'okr.filesUnavailable': '项目目录尚未加载。',
   'okr.nextAction': "下一步行动",
   'okr.openReview': "查看完整复盘",
   'okr.noReviewAction': "还没有复盘。先核对真实数据，再决定下一步。",

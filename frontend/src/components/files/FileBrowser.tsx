@@ -359,6 +359,7 @@ const PREVIEW: LayerSize = { key: 'ttmux.filePreviewW', min: 280, max: 1200, def
 
 export default function FileBrowser({
   dir,
+  active = true,
   accent = 'var(--accent)',
   layout = 'sidebar',
   onClose,
@@ -379,6 +380,7 @@ export default function FileBrowser({
       作用域头由外层给；'full' 是今天的文件管理器 */
   chrome?: 'full' | 'tree'
   dir?: string
+  active?: boolean
   accent?: string
   layout?: 'sidebar' | 'split' | 'dock'
   onClose?: () => void
@@ -1210,7 +1212,7 @@ export default function FileBrowser({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           {view ? (
-            <Viewer path={view} accent={accent} inline onClose={() => setView(null)} onOpenPath={openPath} onOpenAgent={onOpenAgent} />
+            <Viewer path={view} accent={accent} inline active={active} onClose={() => setView(null)} onOpenPath={openPath} onOpenAgent={onOpenAgent} />
           ) : (
             <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--text-dimmer)', fontSize: 13 }}>
               {t('file.selectPreview')}
@@ -1237,7 +1239,7 @@ export default function FileBrowser({
         pinned={browserPane} pinnedSize={TREE} grownSize={PREVIEW}
         handle="filetree"
         grown={view ? (twoPane) => (
-          <Viewer path={view} accent={accent} inline
+          <Viewer path={view} accent={accent} inline active={active}
             onBack={twoPane ? undefined : () => setView(null)} onClose={() => setView(null)}
             onOpenPath={openPath} onOpenAgent={onOpenAgent} />
         ) : null}
@@ -1264,7 +1266,7 @@ export default function FileBrowser({
               boxShadow: 'var(--elevated-shadow)',
             }}
           >
-            <Viewer path={view} accent={accent} inline onClose={() => setView(null)} onOpenPath={openPath} />
+            <Viewer path={view} accent={accent} inline active={active} onClose={() => setView(null)} onOpenPath={openPath} />
           </div>
         )}
       </>
