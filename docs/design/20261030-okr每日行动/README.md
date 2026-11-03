@@ -2,6 +2,8 @@
 
 2026-10-30 起草，2026-10-31 补充整体面板与完整原型。设计提案，OKR 运行时尚未实施。
 
+成品入口：[Roami 宣传工作台（HTML）](promotion-workbench.html)。直接进入共享看板和群聊，可推进任务、数据、反思与下一轮；GitHub 可主动连接实读。
+
 新增：[宣传 Roami 的完整故事](interaction-design.html?case=promotion)，两条执行线共用群聊与看板，追踪 star/fork。
 
 对应 [Roadmap 第三条主线](../../../ROADMAP.zh-CN.md#3-基于-okr让智能体每天主动干活)。本文统一使用仓库产品名 **Roami**，对应需求中的 Rumi。
@@ -161,3 +163,24 @@ X 图文智能体制作英文稿与截图，B站视频智能体每天制作一�
 Redmi Note 8 经 LAN HTTPS，ADB 真实点按完成 21 幕、两条任务接棒、同群发言与输入、看板明细、跨轮任务、两日结果和后续计划。392 CSS px / DPR 2.75 / compact-coarse，键盘 314px，输入保留，真实滑动 0 到 288.73，无横向溢出或文档滚动。浏览器 runner 实读新增本地夹具：仓库与 B站分别通过，X 缺点击时拒绝样本且不落文件，字段齐备后读取成功。
 
 以上均为设计文档与隔离回放验证；未创建真实宣传项目、发帖、上传视频、合成配音、读取真实账号或采集线上仓库指标。截图仅发布到 PR 的 pr-shots 分支。
+
+## 成品宣传工作台（2026-11-03）
+
+最终入口：[Roami 宣传工作台（HTML）](promotion-workbench.html)。运行态直接呈现五个角色、X/B站两条任务线、结果指标和共享群聊；搭建过程保留在设计书入口。支持交付验收、取数、反思、采用下一轮、暂停恢复、目标修订、按日查看、草稿持久化与 JSON 导出。
+
+`promotion-workbench-state.ts` 管理纯状态迁移，`promotion-workbench.tsx` 渲染界面并提供 GitHub 公开 API 读取，`promotion-workbench.css` 复用设计 token。全部由现有 `build-prototype.mjs` 构建；三个独立交互 HTML 分别服务成品工作台、故事设计书、详细建板/日常原型。三份正文相应补充成品体验、模块与数据边界，文档示例中文仍属于 i18n 例外。
+
+已验证：两线交付与验收、暂停期间收尾、群聊与草稿保存、采用下一轮引用 Review、刷新恢复、目标变化使旧反思失效。GitHub 真实实读 11 star / 5 fork（2026-11-03 10:37 北京时间），真实仓库身份、基线、同日版本与演示记录隔离；错误输入与模拟 403 保留旧数据。X/B站尚未接入；演示任务不生成成片、不实际发布，也未启动后台 Swarm。
+
+Redmi Note 8 真机经 LAN HTTPS，ADB 完成整个闭环、配置、任务详情和返回，键盘 314px、输入保存、真实滚动 0→401.09、392 CSS px / DPR 2.75 / compact-coarse，无文档或横向溢出。桌面在六种宽度下对看板/群聊/配置共做 18 项布局断言。详细证据见 [HTML 验收记录](index.html#promotion-workbench-evidence)。
+
+复验：
+
+```bash
+frontend/node_modules/.bin/tsc -p docs/design/20261030-okr每日行动/prototype-tsconfig.json
+node docs/design/20261030-okr每日行动/verify-workbench.mjs
+node docs/design/20261030-okr每日行动/verify-generation.mjs
+node docs/design/20261030-okr每日行动/build-prototype.mjs
+```
+
+本轮仓库 `quick` 与 `full` 门禁均通过（`GOFLAGS=-p=1`，隔离测试实例）；无相关 Python 变更，按仓库规则跳过。前端生产构建保留现有大 chunk 提示，未修改应用运行时。
