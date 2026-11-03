@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	swarmcore "github.com/ybz21/Roami/internal/swarm"
 	"github.com/ybz21/Roami/internal/terminalui"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -20,14 +19,11 @@ type Runner func(args []string) error
 type menu struct {
 	rt  runtime.Runtime
 	run Runner
-	st  *swarmcore.Store
 }
 
 // Run starts the interactive loop.
 func Run(rt runtime.Runtime, version string, run Runner) error {
-	m := &menu{rt: rt, run: run, st: swarmcore.NewStore(swarmcore.Options{
-		HomeDir: rt.HomeDir, DataDir: rt.DataDir, TmuxBin: rt.TmuxBin, Now: rt.Now,
-	})}
+	m := &menu{rt: rt, run: run}
 	for {
 		m.header(version)
 		m.mainMenu()
@@ -82,9 +78,7 @@ func (m *menu) header(version string) {
 	p := ui.P()
 	fmt.Printf("\n  %s %s  %s\n", ui.Bold("roami session"), ui.Dim("v"+version), ui.Dim("— 交互模式 (q 退出)"))
 	fmt.Printf("  %s%s%s\n", p.Dim, strings.Repeat("─", 44), p.Reset)
-	swarms, _ := m.st.ListSwarms()
-	fmt.Printf("  %s会话: %s%s%d%s%s  蜂群: %s%s%d%s\n\n",
-		p.Dim, p.Reset, p.Bold, len(m.rt.Sessions()), p.Reset, p.Dim, p.Reset, p.Bold, len(swarms), p.Reset)
+	fmt.Printf("  会话: %d\n\n", len(m.rt.Sessions()))
 }
 
 func (m *menu) mainMenu() {
@@ -117,9 +111,8 @@ func (m *menu) runningLabel(sess string) string {
 
 func (m *menu) pickSession(prompt string) (string, bool) {
 	var names []string
-	excl := swarmcore.SessionNames(m.st.Options())
 	for _, s := range m.rt.Sessions() {
-		if !excl[s] {
+		if !strings.HasPrefix(s, "_ttmux-") {
 			names = append(names, s)
 		}
 	}

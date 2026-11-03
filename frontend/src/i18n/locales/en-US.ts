@@ -4917,6 +4917,7 @@ const enUS = {
   'swarm.managed.state.cancelling': 'Stopping',
   'swarm.managed.state.idle': 'Idle',
   'swarm.managed.deliveryPending': 'Awaiting delivery confirmation',
+  'swarm.managed.filter': 'Filter swarms',
   'swarm.managed.mainFailed': 'Main could not continue. Check the model connection, then retry in the group chat.',
 }
 

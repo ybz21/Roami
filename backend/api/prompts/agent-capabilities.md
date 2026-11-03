@@ -17,13 +17,13 @@ Roami 已有的能力优先用 `roami` CLI 完成；用 `roami help` 查看命�
 - 找会话：`roami session ls --json`、`roami session ls --tree --json`；操作前用 `roami session resolve <目标> --strict --json` 确认唯一 ID，后续保存并使用该 ID，展示名可能重名。
 - 派生工作会话：`roami session fork <父会话ID> <短名称> --dir <工作目录> --detach --json`，返回的 `session` 是子会话 ID。派生只创建工作会话，不复制 Agent 对话、不自动启动 Agent，也不创建 Git worktree；需要隔离代码时先准备独立 worktree。
 - 向会话发话：先 `roami session capture <会话ID> --lines 100` 确认里面是 shell 还是 Agent，再用 `roami session send <会话ID> "启动命令或后续任务"` 提交。shell 接收命令，运行中的 Agent 接收任务；`send` 会提交输入，不只是打字。跟进时再次读取屏幕、核对实际产物和测试，不能把发送成功当作任务完成。
-- 建蜂群并派活：`roami session swarm new <群名> --goal "目标" --no-master` 建立由当前会话负责的群；`roami session swarm add <群名> <成员名> --type agent --kind <已安装Agent类型> --role member --dir <工作目录> "任务与验收标准"` 启动成员。需要另起指挥 Agent 时才使用默认带指挥的建群方式。
-- 分工与沟通：`roami session swarm task add/assign/ls/show/move/done` 管任务卡；`roami session swarm say/feed/listen` 管成员消息；`roami session swarm status/board/collect` 查看进展和输出。具体参数见 `roami-session` skill。验收成员成果后用 `roami session swarm done <群名> <成员名>` 更新成员状态，整群通过集成验收后才标记整群完成。
+- 建蜂群：`roami session swarm new <名称> --key <持久请求键> --goal "目标与验收标准" [--main-conversation <对话ID>] [--dir <目录>]` 绑定现有 Roami Main。成员通过 `swarm plan <sw-id> --file plan.json` 提交 executor、goal、acceptance 和硬依赖，走既有受管任务执行。
+- 分工与沟通：`roami session swarm status/board/feed/collect <sw-id>` 查看任务与群聊；`say <sw-id> --file message.json` 给 Main 或原任务补充；成员使用绑定 taskId/runId/taskRevision 的 `post --file` 回传。Main 使用 swarm 工具协调，task_steer 继续原任务，依赖修复先确认停止。完成以任务独立验收为准，旧 add/adopt/done/activate 和手动卡片已移除。
 - 整理会话：`roami session rename <会话ID> <短名称>` 改展示名；`roami session children <会话ID> --json` 看直接子会话；关闭仅针对明确属于当前任务、已不再需要的会话 ID。
 
 ## Agent 自动执行
 
-新建任务和派活使用对应 Agent 的 YOLO / Auto 模式。通过 `roami session swarm add` 启动成员时沿用其自动权限默认值；如果先用 `roami session fork` 建了 shell，再启动 Agent，Claude Code 用 `claude --dangerously-skip-permissions`，Codex 用 `codex --dangerously-bypass-approvals-and-sandbox`，OpenCode 用 `opencode --auto`。Pi 原生直接执行工具，无需额外的 YOLO 参数。保留用户明确配置的权限模式，自动模式下仍遵守用户授权范围和仓库规则。
+新建任务和派活使用对应 Agent 的 YOLO / Auto 模式。受管蜂群成员沿用对应执行器的自动权限默认值；如果先用 `roami session fork` 建了 shell，再启动 Agent，Claude Code 用 `claude --dangerously-skip-permissions`，Codex 用 `codex --dangerously-bypass-approvals-and-sandbox`，OpenCode 用 `opencode --auto`。Pi 原生直接执行工具，无需额外的 YOLO 参数。保留用户明确配置的权限模式，自动模式下仍遵守用户授权范围和仓库规则。
 
 ## 浏览器与验收
 

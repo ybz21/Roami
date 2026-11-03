@@ -232,28 +232,29 @@ func (a *API) pluginSource() search.Source {
 // ── 蜂群 ───────────────────────────────────────────────────────────────
 func (a *API) swarmSource() search.Source {
 	return search.FuncSource{KindName: "swarm", Max: 6, List: func(context.Context) []search.Doc {
-		var list []struct {
-			ID     string `json:"id"`
-			Name   string `json:"name"`
-			Goal   string `json:"goal"`
-			Status string `json:"status"`
-			Alive  int    `json:"alive"`
+		var response struct {
+			Data []struct {
+				ID       string `json:"id"`
+				Name     string `json:"name"`
+				Goal     string `json:"goal"`
+				Archived bool   `json:"archived"`
+			} `json:"data"`
 		}
 		out, err := a.cliJSON("swarms", "swarm", "ls", "--json")
 		if err != nil {
 			return nil
 		}
-		if json.Unmarshal([]byte(out), &list) != nil {
+		if json.Unmarshal([]byte(out), &response) != nil {
 			return nil
 		}
-		docs := make([]search.Doc, 0, len(list))
-		for _, s := range list {
-			if s.Status == "archived" {
+		docs := make([]search.Doc, 0, len(response.Data))
+		for _, s := range response.Data {
+			if s.Archived {
 				continue // 归档的蜂群不进搜索：它们只会淹没在跑的那几个
 			}
 			docs = append(docs, search.Doc{
 				ID: s.ID, Title: s.Name, Subtitle: clipLine(s.Goal), Aliases: []string{s.ID},
-				Action: search.Action{Type: "route", Target: "#/swarm/" + urlPathEscape(s.Name)},
+				Action: search.Action{Type: "route", Target: "#/swarm/" + urlPathEscape(s.ID)},
 			})
 		}
 		return docs

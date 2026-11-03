@@ -79,7 +79,7 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
     return { node, group, robot, head, hands, bars, status, selected: selectedRing, hit, position }
   }
   function render() {
-    if (disposed || lost) return
+    if (disposed || lost || document.hidden || !host.clientWidth || !host.clientHeight) return
     for (const rig of rigs) {
       const active = motion && !reduced && ['running', 'preparing'].includes(rig.node.state)
       rig.head.rotation.y = active ? Math.sin(elapsed * 1.1 + rig.position.x) * .1 : 0

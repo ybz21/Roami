@@ -114,7 +114,6 @@ if [ "$DEV" = 1 ] && [ -d scripts/install ]; then
   export INSTALL_DIR="$HOME/.local/bin"
   export SKILL_DIR="$HOME/.claude/skills"
   export REPO="ybz21/Roam" BRANCH="${TTMUX_INSTALL_BRANCH:-main}"
-  export CC_SWARM_DOCS="intake decompose spawn patrol approve test-push review concurrency integrate memory"
   mkdir -p "$INSTALL_DIR"
   # lib/platform.sh 在 source 时自检平台；模块用 lib 里的 step/info/… + 平台变量。
   source scripts/install/lib/common.sh

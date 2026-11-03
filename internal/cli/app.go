@@ -19,7 +19,6 @@ import (
 	"github.com/ybz21/Roami/internal/plugin"
 	"github.com/ybz21/Roami/internal/session"
 	"github.com/ybz21/Roami/internal/sessionstore"
-	swarmcore "github.com/ybz21/Roami/internal/swarm"
 	"github.com/ybz21/Roami/internal/terminalui"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -86,18 +85,18 @@ func (a App) Run(args []string) error {
 			if !has(rest, "--json") || has(rest, "--tree") {
 				return fmt.Errorf("--live requires --json and cannot be combined with --tree")
 			}
-			return session.ListLiveJSON(a.rt, a.swarmSessions(), out)
+			return session.ListLiveJSON(a.rt, a.infrastructureSessions(), out)
 		}
 		if has(rest, "--tree") {
 			if has(rest, "--json") {
-				return session.TreeJSON(a.rt, a.meta(), a.swarmSessions(), out)
+				return session.TreeJSON(a.rt, a.meta(), a.infrastructureSessions(), out)
 			}
-			return session.Tree(a.rt, a.meta(), a.swarmSessions(), out)
+			return session.Tree(a.rt, a.meta(), a.infrastructureSessions(), out)
 		}
 		if has(rest, "--json") {
-			return session.ListJSON(a.rt, a.meta(), a.swarmSessions(), out)
+			return session.ListJSON(a.rt, a.meta(), a.infrastructureSessions(), out)
 		}
-		return session.List(a.rt, a.meta(), a.swarmSessions(), out)
+		return session.List(a.rt, a.meta(), a.infrastructureSessions(), out)
 	case "new":
 		return session.New(a.rt, rest, out)
 	// ── subSession（fork/树/parent，设计 07 §2.1）──
@@ -108,21 +107,21 @@ func (a App) Run(args []string) error {
 	case "parent":
 		return session.ParentCmd(a.rt, a.meta(), rest, out)
 	case "a", "attach":
-		return session.Attach(a.rt, a.meta(), a.swarmSessions(), rest, out)
+		return session.Attach(a.rt, a.meta(), a.infrastructureSessions(), rest, out)
 	case "d", "detach":
 		return session.Detach(a.rt, rest, out)
 	case "kill":
-		return session.KillTree(a.rt, a.meta(), a.swarmSessions(), rest, out)
+		return session.KillTree(a.rt, a.meta(), a.infrastructureSessions(), rest, out)
 	case "rename":
 		// 改名 = 改展示名，tmux 会话名(id)不动 → meta 外键/路径全都不用跟着搬。
 		// 但名字本身要**同时**写 tmux 的 @roam_name 和台账的 label：
 		// 前者随会话生死，后者是会话死后唯一还认得出它的东西。
-		_, _, err := session.Rename(a.rt, a.meta(), a.swarmSessions(), rest, out)
+		_, _, err := session.Rename(a.rt, a.meta(), a.infrastructureSessions(), rest, out)
 		return err
 	case "resolve": // 把展示名/id/老名字解析成 tmux 会话名（后端与脚本用）
 		return session.Resolve(a.rt, rest, out)
 	case "send":
-		return session.Send(a.rt, a.swarmSessions(), rest, out)
+		return session.Send(a.rt, a.infrastructureSessions(), rest, out)
 	case "keys":
 		return session.Keys(a.rt, rest, out)
 
@@ -149,7 +148,7 @@ func (a App) Run(args []string) error {
 		return envelope.Run(a.rt, rest, out)
 	case "info":
 		if has(rest, "--json") {
-			return session.InfoJSON(a.rt, version, a.swarmSessions(), out)
+			return session.InfoJSON(a.rt, version, a.infrastructureSessions(), out)
 		}
 		return a.rt.Tmux("info")
 
@@ -170,9 +169,9 @@ func (a App) Run(args []string) error {
 
 func (a App) runStatus(args []string) error {
 	if len(args) < 1 {
-		_ = session.List(a.rt, a.meta(), a.swarmSessions(), a.out)
+		_ = session.List(a.rt, a.meta(), a.infrastructureSessions(), a.out)
 		fmt.Fprintln(a.out)
-		return group.List(a.rt, a.swarmNames(), a.out)
+		return group.List(a.rt, nil, a.out)
 	}
 	if len(args) >= 2 && args[1] == "--json" {
 		return group.StatusJSON(a.rt, args[0], a.out)
@@ -194,43 +193,24 @@ func (a App) migrateSessionsToID() {
 	if len(mapping) == 0 {
 		return
 	}
-	swarmcore.NewStore(a.swarmOptions()).MigrateSessionNames(mapping)
 	if st, err := plugin.Open(plugin.NewEnv(a.rt)); err == nil {
 		st.MigrateSessionNames(mapping)
 		st.Close()
 	}
 }
 
-// swarmSessions returns the set of tmux sessions hidden from native session
-// listings: swarm members (matching the shell CLI's _is_swarm_session) plus
-// `_ttmux-` 命名空间的基础设施会话(如插件守护进程 _ttmux-plugind)——
-// 从列表和 killall 中隐藏防止被顺手关掉;显式指名 attach/kill 不受影响。
-// 只收窄到自家前缀:用户自己起的 _xxx 会话不受影响,照常显示。
-func (a App) swarmSessions() map[string]bool {
-	set := swarmcore.SessionNames(a.swarmOptions())
-	for _, s := range a.rt.Sessions() {
-		if strings.HasPrefix(s, "_ttmux-") {
-			set[s] = true
+// Infrastructure sessions remain hidden from ordinary session listings.
+func (a App) infrastructureSessions() map[string]bool {
+	set := map[string]bool{}
+	for _, session := range a.rt.Sessions() {
+		if strings.HasPrefix(session, "_ttmux-") {
+			set[session] = true
 		}
 	}
 	return set
 }
 
-// swarmNames returns the set of swarm names so the group listing hides them.
-func (a App) swarmNames() map[string]bool {
-	return swarmcore.Names(a.swarmOptions())
-}
-
 func (a App) meta() *sessmeta.Store { return sessmeta.New(a.rt.HomeDir) }
-
-func (a App) swarmOptions() swarmcore.Options {
-	return swarmcore.Options{
-		HomeDir: a.rt.HomeDir,
-		DataDir: a.rt.DataDir,
-		TmuxBin: a.rt.TmuxBin,
-		Now:     a.rt.Now,
-	}
-}
 
 // stripQuiet consumes leading global -q/--quiet/--agent flags (before the
 // command), enabling machine-friendly output (also settable via TTMUX_AGENT=1).

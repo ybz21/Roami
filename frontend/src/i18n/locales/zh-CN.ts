@@ -4926,6 +4926,7 @@ const zhCN = {
   'swarm.managed.state.cancelling': '停止中',
   'swarm.managed.state.idle': '空闲',
   'swarm.managed.deliveryPending': '等待投递确认',
+  'swarm.managed.filter': '筛选蜂群',
   'swarm.managed.mainFailed': 'Main 暂时未能继续，请检查模型连接后在群聊重试。',
 }
 

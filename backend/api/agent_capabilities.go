@@ -67,7 +67,8 @@ func isShippedAgentCapabilities(data []byte) bool {
 	case "0d50a9e28f927ed484a75c9fe898ec72d47823574f2f71b1f4f8d92f9ee66786", // #317
 		"8774efb02f7ffef268c3cfa6cdd51a5b2eb8af9be5969ee529302e6095894dda", // #328
 		"a7b402f283e8182fedbd330dd5ca775ad9d210985a148f364cdbbc3e19af6aec", // #399
-		"731ca3553ff6cfedc7f5560ae54351c362a388a7d4913adfeda1478b03dea849": // #403
+		"731ca3553ff6cfedc7f5560ae54351c362a388a7d4913adfeda1478b03dea849", // #403
+		"b6ca3cf275e11f89c1b0a062dbb998bf5352fc6c0f73f6942b30c8bbd84cc70d": // Main collaboration protocol
 		return true
 	}
 	return false

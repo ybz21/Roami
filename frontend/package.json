@@ -15,7 +15,6 @@
     "design:capabilities": "node scripts/build-capability-design.mjs"
   },
   "dependencies": {
-    "@hello-pangea/dnd": "^16.6.0",
     "@jvmr/pptx-to-html": "^1.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@xterm/addon-fit": "^0.10.0",

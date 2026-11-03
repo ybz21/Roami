@@ -26,7 +26,7 @@ func managedCommand(rt runtime.Runtime, sub string, args []string, w io.Writer) 
 			mainID = args[i+1]
 		}
 	}
-	if (sub == "new" || sub == "create") && mainID != "" {
+	if sub == "new" || sub == "create" {
 		if len(args) == 0 {
 			return true, fmt.Errorf("name is required")
 		}
@@ -54,11 +54,11 @@ func managedCommand(rt runtime.Runtime, sub string, args []string, w io.Writer) 
 		}
 		return true, managedRequest(rt, "POST", "/v1/swarms", spec, w)
 	}
-	if sub == "managed-list" {
+	if sub == "ls" || sub == "list" {
 		return true, managedRequest(rt, "GET", "/v1/swarms", nil, w)
 	}
 	if len(args) == 0 || !managedID.MatchString(args[0]) {
-		return false, nil
+		return true, fmt.Errorf("managed swarm ID required (sw-...)")
 	}
 	path := "/v1/swarms/" + url.PathEscape(args[0])
 	switch sub {

@@ -23,7 +23,7 @@ export default function ManagedSwarm({ id, onBack, openTerm }: { id: string; onB
   const [selected, setSelected] = useState('main'), [tab, setTab] = useState(() => localStorage.getItem(panelKey) || 'studio'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
   const controlKey = useRef<{ action: string; revision: number; key: string } | null>(null)
   const [readCount, setReadCount] = useState(() => Number(localStorage.getItem(panelKey + ':read') || 0))
-  const chatCount = (data?.posts.length || 0) + (data?.mainMessages.filter(item => item.text).length || 0)
+  const chatCount = (data?.posts.length || 0) + (data?.mainMessages.filter(item => item.text).length || 0) + (data?.work.filter(item => item.attempt?.summary).length || 0)
   useEffect(() => { localStorage.setItem(panelKey, tab); if (tab === 'chat') { setReadCount(chatCount); localStorage.setItem(panelKey + ':read', String(chatCount)) } }, [phone, tab, chatCount, panelKey])
   const positions = useRef<Record<string, number>>({})
   const switchTab = (next: string) => {

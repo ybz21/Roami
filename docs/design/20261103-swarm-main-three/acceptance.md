@@ -1,46 +1,58 @@
-# 本轮检查与后续验收
+# 验收记录
 
-2026-11-03 · **设计与概念稿检查，不是产品功能验收。**
+2026-11-03 · [产品设计](README.md) · [技术设计](technical-design.md)
 
-[返回方案](README.md)
+## 已实施
 
-## 本轮产物
+- 桌面、手机统一协作 / 群聊 / 看板三个 Tab，Three.js 真实状态驱动，Main 工位读取真实 turn 状态；草稿、接收人、选择和滚动保持。
+- Main 绑定、成员任务、硬依赖、独立验收、原任务续改、幂等、版本失效、暂停/停止/归档、SSE 和私有成员回传。
+- 旧页面、SVG/CSS 办公室、广场/手动卡片、旧 HTTP、旧 Go swarm 存储编排、Claude 指挥启动和角色 prompt 已删除；CLI 默认进入新服务。旧说明和安装技能同步更新。
+- 历史 schema、备份、会话和文件保留，不做破坏性删除。
 
-- 产品方案、用户故事、视觉与动画语义：`README.md`。
-- 技术架构、数据所有权、Main 回流、依赖门禁、接口、代码拆分与迁移：`technical-design.md`。
-- 可编辑概念稿：`index.html`、`assets/studio.css`、`assets/studio.js`。使用演示数据，不发任务、不调用模型、不连接生产蜂群。
-- 单文件离线预览：`/tmp/swarm-main-three/index.html`。将相同源码中的固定 Three.js 模块下载到临时目录，用已有 esbuild 打包并内联 CSS / JS；外部资源请求数为 0，未增加项目依赖。Three.js MIT 许可随预览保留。
-- 截图：`/tmp/swarm-design-desktop.png`、`/tmp/swarm-design-light.png`、`/tmp/swarm-design-phone.png`、`/tmp/swarm-design-phone-detail.png`。
-- 演示录屏：`/tmp/swarm-design-demo.mp4`。这些一次性媒体不提交进主分支。
+## 自动化检查
 
-## 已检查
-
-| 检查 | 结果与边界 |
+| 检查 | 结果 |
 | --- | --- |
-| 源码对照 | 核对 legacy swarm new/adopt、成员软依赖、终端推测状态、Web 请求和既有 Tasks / Dispatcher / 常驻执行器机制；方案中新增接口明确标为提案 |
-| JS 与文档 | `node --check assets/studio.js`、`git diff --check`、本主题相对链接检查；无产品源码变更，不运行无关运行时全量门禁 |
-| 桌面场景 | Chrome 中 `data-scene=ready`，帧序号增长；切换派发、执行、待验收、已验收，DOM 状态与场景同步 |
-| 验收语义 | 待验收显示主 Agent“验收中”、成员“待验收”；只有手动切到演示“已验收”才显示完成；实际验证机制尚待实施 |
-| 动画暂停 | 关闭动画后帧序号在采样期间保持不变；已验收终态也不继续绘制。未据此声称生产 CPU / 电量下降 |
-| 主题和选择 | 桌面深浅主题切换、成员列表选择与工位选中联动；手机真实点按主题按钮可切换，所选成员保持 |
-| 真机 | Redmi Note 8，ADB 序列号 `216d6a43`，物理 1080×2340、CSS 宽 392；经 LAN 打开隔离启动的静态设计稿 |
-| 触控与滚动 | 使用 `roami adb ... input tap/swipe` 实际切换“待验收”、选择成员、滚动内容；`.scroll.scrollTop` 从 0 增长超过 500，文档 `scrollTop=0` |
-| 手机溢出 | `scrollWidth=clientWidth=392`；body scrollHeight 与 clientHeight 同为 766；阶段按钮高度 44 CSS px；精简为只显示选中工位标签，避免遮住角色 |
-| 依赖失败 | 手机初次访问 CDN 失败时场景给出降级提示，成员 DOM 列表仍能使用；改用离线预览后 `data-scene=ready`，没有 CDN 资源请求 |
-| WebGL 失效 | 桌面使用 `WEBGL_lose_context` 实际触发 context loss 后显示暂停提示，仍可点成员列表选中“前端”；自动恢复与正式资源泄漏检查留待产品实施 |
+| 首版完整 full 门禁 | 通过；Go 全量、Python uv/ruff/format/pytest、前端 typecheck/i18n/hover/build、secret/staged policy |
+| Python 全量 | 3253 passed、48 skipped，843.71s；随后仅删除旧 Go/UI/技能代码，Python 未变化 |
+| Python 协作协议 | 14 passed：Main 复用/来源/所有权、DAG/修订冲突、并发解锁、验证门禁、未知不重投、暂停/恢复/归档、群聊幂等、run 绑定、依赖修复、旧停止重放、产物版本 |
+| 删除旧实现后的前端全量 | 169 files、1230 tests passed |
+| 新 CLI 契约 | 无 commander 参数的 new 调用同一私有 Main 服务；持久键必需；旧 add/adopt/done/activate 拒绝 |
+| HTTP 认证 | 新 public 路由复用现有鉴权；私有成员回传不挂到公网代理 |
+| 旧 HTTP 真跑 | 新二进制下旧目录/完成/角色入口返回 404，新目录 200，私有成员回传公共地址 404 |
+| 能力说明升级 | 精确匹配旧出厂文本时升级；自定义说明不覆盖；新说明不再引导旧命令 |
+| 会话 CLI 真跑 | 隔离实例完成 stable ID、发送/捕获、改名保持 ID、旧命令拒绝且不影响会话；经统一入口清理 |
+| 最终增量 full / commit quick | 最终增量 full 已通过；提交 quick 随提交运行。范围从已完整验证的首版 commit 开始，不重复未变化的 Python 全量 |
 
-浏览器操作优先使用 `roami chrome`。本机 Android CDP 的该 CLI 返回 `CHROME_BROWSER_IDENTITY_UNAVAILABLE`，因此手机 DOM 诊断使用同一 ADB 转发连接的 CDP；实际触摸仍用 Roami ADB，未用 DOM click 代替触控验收。
+## 浏览器与 Android
 
-预览中的移动布局是独立概念页面，没有产品顶部 / 底部导航、任务数据或真实输入框。本轮只证明该概念稿在真机上可运行可触控；正式接入后必须重新验证产品上下栏、安全区、输入、路由与任务详情。
+测试服务均经 isolated-roami.sh 启动。UI 测试群手动创建计划后保持暂停，三名成员分别显示 Codex、Claude、Roami 的待派发状态；没有把测试数据写成真实执行成功。改前对照为基线前端与无 Agent 的隔离旧测试群。
 
-## 正式实施必须补齐
+- 桌面逻辑宽 1920、页面高 993；document scrollHeight=clientHeight，任务详情打开后文档 scrollTop=0。
+- Redmi Note 8（216d6a43），1080×2340、DPR 2.75、CSS 宽 392；document 宽=392，高=clientHeight，document scrollTop=0。
+- ADB 实际点按三个 Tab、任务卡片和返回，实际输入、回车换行与返回；草稿切换保持，MobileSubPage 返回保留看板。
+- 软键盘高 314 CSS px；composer bottom=439.82，键盘 top=451，发送按钮完整可见。
+- 初轮通过 LAN HTTPS 测试。最终对照截图为避免共享 Chrome 的跨端口 cookie 干扰，改用本任务 ADB reverse 的 loopback 源；不据此新增 TLS 行为结论。
+- 桌面实际触发 WEBGL_lose_context，显示降级提示，成员 DOM 列表可用，提供重试。
 
-- 受管任务闭环：Main 原对话发起；Codex / Claude / Roami 实际执行、回报、独立验收与续改。
-- 计划与依赖：并发幂等、环检测、版本失效、两个上游同时解锁、旧回报、断线、重启与 unknown 不重投。
-- 生命周期：暂停只停派发；停止取得证据；归档不杀会话；关闭复用现有清理并保护未提交、未合入和非独占资源。
-- 旧蜂群：保持身份与资源；显式接管；旧 done 不升级为 verified；新旧 engine 的 CLI / Web 写入入口一致。
-- 性能：同机生产构建改前改后测请求、主线程、帧时长、draw calls、内存和前后台行为；1/8/24 与聚合规模。当前 60/30fps 仅目标，不是实测通过结论。
-- Three.js：真实事件驱动、相机聚焦、验收短动效、系统减少动画偏好、context loss / restore、重复进入退出的资源释放和离线依赖。
-- 产品前端：按仓库全量前端门禁、四档布局、深浅主题、中英文、键盘可访问性及 Android 实际触控验收。当前开发文档使用中文属于 i18n 规范例外。
+桌面操作使用 roami chrome。Android 的 Roami Chrome 身份探测不可用，DOM 诊断用同一 ADB 转发连接的 CDP，实际触控用 roami adb；没有用 DOM click 替代触控验收。
 
-所有测试静态服务经 `scripts/dev/isolated-roami.sh /tmp/swarm-main-three-preview ...` 启动；完成后停止本任务服务器，隔离 tmux 仅通过同一入口 `--stop` 清理。未启动真实蜂群或更改用户现有成员。
+临时截图在 /tmp/swarm-main-e2e：desktop-before.png、desktop-after.png、desktop-board.png、phone-before.png、phone-after.png、phone-board.png、phone-chat-keyboard.png。PR 图片通过 pr-shot.sh 上传孤儿 pr-shots 分支，图片不进入 main。
+
+## Three.js 诊断
+
+同一桌面生产 bundle，显式测试节点在 640×480 场景中绘制 1/8/24 个工位；不改变产品任务状态。
+
+| 工位 | 1s drawElements 调用 | 关闭动画后 400ms | dispose 后 canvas |
+| --- | --- | --- | --- |
+| 1 | 1760 | 0 | 0 |
+| 8 | 9196 | 0 | 0 |
+| 24 | 14440 | 0 | 0 |
+
+这是渲染、暂停和卸载诊断，不是 FPS/CPU/内存测试，也不是优化前后对比。真机规模性能、GPU 内存趋势和多次 context restore 仍待补齐，未声称达成 60/30fps。隐藏元素或文档时渲染函数直接返回，不因隐藏页签收到快照继续绘制。
+
+## 未通过与边界
+
+真实 Main 的端到端调用沿用节点保存的模型路线与参数，返回 MODEL_HTTP_401。保存配置没有 API key，对应环境变量未提供；未覆盖真实 Main/Codex/Claude/Roami 多执行器闭环，不使用其他路线绕过验收。截图中的 Main 阻塞提示和红色工位保留此状态。
+
+PR 应为 Draft，等待模型凭据恢复后的真实闭环验收。相机聚焦、大规模聚合和生产前后性能对比未实施。历史用户数据不自动转换成受管任务。

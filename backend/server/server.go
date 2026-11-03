@@ -253,21 +253,6 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/tasks/:g/send", h.Send)
 
 		// 蜂群(swarm)：建群/加成员/管理 + 广场/看板
-		g.GET("/swarm/subroles", h.SwarmSubroles)
-		g.GET("/swarms", h.Swarms)
-		g.POST("/swarms", h.SwarmNew)
-		g.GET("/swarms/:n", h.SwarmStatus)
-		g.DELETE("/swarms/:n", h.SwarmArchive)
-		g.POST("/swarms/:n/adopt", h.SwarmAdopt)
-		g.POST("/swarms/:n/members", h.SwarmAddMember)
-		g.POST("/swarms/:n/done", h.SwarmDone)
-		g.POST("/swarms/:n/activate", h.SwarmActivate)
-		g.GET("/swarms/:n/feed", h.SwarmFeed)
-		g.POST("/swarms/:n/say", h.SwarmSay)
-		g.GET("/swarms/:n/board", h.SwarmBoard)
-		g.POST("/swarms/:n/task", h.SwarmTaskAdd)
-		g.PATCH("/swarms/:n/task/:id", h.SwarmTaskPatch)
-		g.DELETE("/swarms/:n/task/:id", h.SwarmTaskDelete)
 
 		// 插件:统一管理/配置(VS Code 式设置页;backend 只做 CLI 薄封装)
 		g.GET("/plugins", h.Plugins)

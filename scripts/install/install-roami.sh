@@ -1,5 +1,5 @@
 # scripts/install/install-roami.sh — [1/3] Roami CLI 二进制 + skills + Tab 补全。
-# 依赖：lib/common, lib/platform, lib/github；编排器导出 GO_SRC/SKILL_DIR/CC_SWARM_DOCS/INSTALL_DIR/REPO/BRANCH。
+# 依赖：lib/common, lib/platform, lib/github；编排器导出 GO_SRC/SKILL_DIR/INSTALL_DIR/REPO/BRANCH。
 # shellcheck shell=bash
 
 source "${SCRIPT_DIR}/scripts/install/retire-session-entries.sh"
@@ -40,12 +40,6 @@ roami_skills() {
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/skills/babysit-pr/wait-codex-review.sh" \
         -o "${local_tmp}/wait-codex-review.sh" 2>/dev/null || all_ok=false
     local d
-    for d in $CC_SWARM_DOCS; do
-        $all_ok || break
-        curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/skills/cc-swarm/docs/${d}.md" \
-            -o "${local_tmp}/doc-${d}.md" 2>/dev/null && \
-            { printf '\n\n' >> "${local_tmp}/cc-swarm.md"; cat "${local_tmp}/doc-${d}.md" >> "${local_tmp}/cc-swarm.md"; }
-    done
     # dev-roles 各角色子文档（顺序与 skills/sync-skills.sh 的 DEV_ROLES_DOCS 保持一致）
     for d in plaza board chrome pm architect frontend backend fullstack qa designer reviewer devops docs; do
         $all_ok || break
