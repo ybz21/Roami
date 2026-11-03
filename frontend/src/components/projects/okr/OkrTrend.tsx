@@ -6,7 +6,7 @@ import { useThemeMode } from '../../../theme'
 import type { EChartsType } from 'echarts/core'
 import { dailyHistory, dateOffset, shanghaiDate, sourceObservations, type Workspace } from './okr-workspace'
 
-export default function OkrTrend({ workspace }: { workspace: Workspace }) {
+export default function OkrTrend({ workspace, title }: { workspace: Workspace; title?: string }) {
   const { t, locale } = useI18n()
   const { coarse } = useLayout()
   const { mode } = useThemeMode()
@@ -40,7 +40,7 @@ export default function OkrTrend({ workspace }: { workspace: Workspace }) {
     return () => { disposed = true; observer.disconnect(); chart.current?.dispose(); chart.current = null }
   }, [rows, dates, metric, locale, coarse, mode]) // eslint-disable-line react-hooks/exhaustive-deps
   return <section className="okr-trend">
-    <div className="okr-section-head"><div><h3>{t('okr.trend')}</h3><p className="okr-muted">{t('okr.recentDays')}</p></div><Select aria-label={t('okr.trendMetric')} value={metric?.id} onChange={setChosen} options={workspace.metrics.map(m => ({ value: m.id, label: m.name }))} /></div>
+    <div className="okr-section-head"><div><h3>{title || t('okr.trend')}</h3><p className="okr-muted">{t('okr.recentDays')}</p></div><Select aria-label={t('okr.trendMetric')} value={metric?.id} onChange={setChosen} options={workspace.metrics.map(m => ({ value: m.id, label: m.name }))} /></div>
     {latest ? <>
       <div className="okr-trend-value"><strong>{number(latest.latest.value)} <small>{metric?.unit}</small></strong><span>{day(latest.date)} · {latest.delta === null ? t('okr.noDailyComparison') : t('okr.latestDelta', { value: new Intl.NumberFormat(locale, { signDisplay: 'always', maximumFractionDigits: 2 }).format(latest.delta), unit: metric?.unit || '' })}</span></div>
       {rows.length === 1 && <p className="okr-muted">{t('okr.firstDay')}</p>}

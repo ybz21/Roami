@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { configurationOf, dailyHistory, keyResultEvidence, shanghaiDate, sourceObservations, type Observation, type Workspace } from './okr-workspace'
+import { configurationOf, dailyHistory, keyResultEvidence, shanghaiDate, sourceObservations, workspaceUpdated, type Observation, type Workspace } from './okr-workspace'
 
 const observation = (id: string, date: string, value: number, capturedAt = date + 'T01:00:00Z', sourceKey = 'github:42:stars'): Observation => ({ id, metricId: 'stars', date, value, capturedAt, sourceKey, source: 'github', note: '' })
 const workspace: Workspace = {
@@ -41,6 +41,21 @@ describe('OKR evidence', () => {
   it('uses the collection timezone across UTC midnight boundaries', () => {
     expect(shanghaiDate(new Date('2026-11-02T16:00:00Z'))).toBe('2026-11-03')
   })
+  it('preserves editable initiatives and dashboard definitions without sharing draft references or sending project metadata', () => {
+    const configured: Workspace = { ...workspace,
+      initiatives: [{ id: 'video', title: 'Daily videos', channel: 'bilibili', keyResultIds: ['kr'], description: 'Narrated tips', acceptance: 'Playable media and publication receipts' }],
+      dashboard: { schemaVersion: 1, widgets: [{ id: 'interest', type: 'keyResults', keyResultIds: ['kr'] }] },
+      projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 8, teamMemory: 'Context' },
+    }
+    const draft = configurationOf(configured)
+    expect(draft.initiatives).toEqual(configured.initiatives)
+    expect(draft.dashboard).toEqual(configured.dashboard)
+    expect(draft).not.toHaveProperty('projectFiles')
+    draft.initiatives![0].keyResultIds.length = 0
+    draft.dashboard!.widgets[0].keyResultIds!.length = 0
+    expect(configured.initiatives![0].keyResultIds).toEqual(['kr'])
+    expect(configured.dashboard!.widgets[0].keyResultIds).toEqual(['kr'])
+  })
 })
 
 it('preserves server append order for mixed RFC3339 fractional precision within one date', () => {
@@ -59,4 +74,15 @@ it('counts a met threshold as achieved while growth uses only the net increase',
   expect(resultAttainment({ ...kr, mode: 'increase', target: 100 }, point, point)).toMatchObject({ achieved: 0, percent: 0, met: false })
   expect(resultAttainment(kr, null, null).percent).toBeNull()
   expect(resultAttainment({ ...kr, mode: 'atMost', target: 3 }, point, point).met).toBe(true)
+})
+
+
+it('accepts live project memory and pending file changes at the same revision without reusing stale history', () => {
+  const current = { ...workspace, projectFiles: { root: '.roami/okr', schemaVersion: 1 as const, revision: 8, teamMemorySha256: 'old', mainInstructions: 'Existing instructions' } }
+  expect(workspaceUpdated(current, { ...current })).toBe(false)
+  expect(workspaceUpdated(current, { ...current, projectFiles: { ...current.projectFiles, teamMemorySha256: 'new' } })).toBe(true)
+  expect(workspaceUpdated(current, { ...current, projectFiles: { ...current.projectFiles, mainInstructions: 'New instructions' } })).toBe(true)
+  expect(workspaceUpdated(current, { ...current, projectFiles: { ...current.projectFiles, pendingChanges: true } })).toBe(true)
+  expect(workspaceUpdated(current, { ...current, revision: 7, projectFiles: { ...current.projectFiles, teamMemorySha256: 'new' } })).toBe(false)
+  expect(workspaceUpdated(current, { ...current, observations: [] })).toBe(false)
 })

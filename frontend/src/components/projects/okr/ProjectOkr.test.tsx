@@ -7,10 +7,11 @@ import { type Workspace } from './okr-workspace'
 vi.mock('./OkrMainChat', () => ({ default: ({ onUpdated }: { onUpdated: () => void }) => <button onClick={onUpdated}>Complete discussion</button> }))
 vi.mock('./OkrTrend', () => ({ default: () => <div data-testid="trend" /> }))
 vi.mock('./OkrProjectFiles', () => ({ default: ({ dir }: { dir: string }) => <div data-testid="project-files">{dir}</div> }))
+vi.mock('../../swarm/useSwarmSnapshot', () => ({ useSwarmSnapshot: () => ({ data: null, error: false, refresh: vi.fn() }) }))
 vi.mock('../../swarm/Swarm', () => ({ default: ({ initialSwarm }: { initialSwarm: string }) => <div data-testid="activities">{initialSwarm}</div> }))
 
 function panel(key: string) {
-  const choice = screen.queryByRole('radio', { name: 'okr.tab.' + key })
+  const choice = screen.queryByRole('radio', { name: 'okr.tab.' + ({ overview: 'okr', data: 'dashboard', review: 'status' }[key] || key) })
   if (choice) fireEvent.click(choice)
 }
 
@@ -23,12 +24,12 @@ const initial: Workspace = {
   projectId: 'stable-project', revision: 3, objective: 'Launch', startDate: '2026-11-01', endDate: '2026-11-30',
   metrics: [{ id: 'visits', name: 'Visits', unit: 'people', source: 'manual' }, { id: 'stars', name: 'Stars', unit: '', source: 'github', repo: 'owner/repo', field: 'stars' }],
   keyResults: [{ id: 'kr1', title: 'Reach people', metricId: 'visits', horizon: 'short', target: 100, mode: 'atLeast', dueDate: '2026-11-30' }],
-  swarm: 'stable-team', autoCollect: false, observations: [], reviews: [], updatedAt: '2026-11-03T00:00:00Z',
+  swarm: 'sw-11111111111111111111111111111111', autoCollect: false, observations: [], reviews: [], updatedAt: '2026-11-03T00:00:00Z',
 }
 beforeEach(() => {
   state.phone = false
   state.api.mockReset()
-  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [{ id: 'stable-team', name: 'real-team' }] } : { data: initial })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [{ id: 'sw-11111111111111111111111111111111', name: 'real-team' }] } : { data: initial })
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
@@ -47,7 +48,7 @@ it('keeps project navigation available and preserves a configuration draft acros
 it('keeps an edited objective across 409, reloads revision and saves only configuration', async () => {
   let conflicted = false
   state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/agent/swarms') return { data: [{ id: 'stable-team', name: 'real-team' }] }
+    if (path === '/agent/swarms') return { data: [{ id: 'sw-11111111111111111111111111111111', name: 'real-team' }] }
     if (method === 'PUT' && !conflicted) { conflicted = true; throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 }) }
     if (method === 'PUT') return { data: { ...initial, ...body, revision: 9 } }
     return { data: { ...initial, revision: conflicted ? 8 : 3 } }
@@ -72,7 +73,7 @@ it('keeps an edited objective across 409, reloads revision and saves only config
 it('records manual zero and real review input, uses each returned revision and links to the existing swarm', async () => {
   let revision = 3
   state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/agent/swarms') return { data: [{ id: 'stable-team', name: 'real-team' }] }
+    if (path === '/agent/swarms') return { data: [{ id: 'sw-11111111111111111111111111111111', name: 'real-team' }] }
     if (method === 'POST') return { data: { ...initial, revision: ++revision, reviews: path.endsWith('/reviews') ? [{ id: 'review', ...body, evidenceRevision: revision - 1, date: '2026-11-03T01:00:00Z' }] : [] } }
     return { data: initial }
   })
@@ -80,7 +81,7 @@ it('records manual zero and real review input, uses each returned revision and l
   await screen.findByText('Launch')
   expect(screen.queryByTestId('activities')).toBeNull()
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.activities' }))
-  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', 'stable-team')
+  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', 'sw-11111111111111111111111111111111')
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
   panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '0' } })
@@ -335,4 +336,47 @@ it.each([false, true])('adopts a goal saved by the discussion without silently o
   await waitFor(() => expect(screen.queryByLabelText('okr.objective')).toBeNull())
   expect(screen.getByText('Launch')).toBeTruthy()
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})
+
+it('keeps the inner navigation during editing and saves initiatives with KR bindings and dashboard definitions', async () => {
+  const configured: Workspace = { ...initial,
+    initiatives: [{ id: 'x-posts', title: 'X posts', channel: 'x', keyResultIds: ['kr1'], description: 'Share real examples', acceptance: 'Keep public receipts' }],
+    dashboard: { schemaVersion: 1, widgets: [{ id: 'visits', type: 'metricTrend', metricIds: ['visits'], title: 'Observed visits' }] },
+  }
+  state.api.mockImplementation(async (method, path, body) => path === '/agent/swarms' ? { data: [] } : { data: method === 'PUT' ? { ...configured, ...body, revision: 4 } : configured })
+  render(<ProjectOkr projectId="stable-project" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'okr.edit' }))
+  fireEvent.change(screen.getByLabelText('okr.initiativeTitle'), { target: { value: 'Weekly X walkthroughs' } })
+  panel('data')
+  expect(screen.getByRole('radio', { name: 'okr.tab.okr' })).toBeTruthy()
+  panel('overview')
+  expect((screen.getByLabelText('okr.initiativeTitle') as HTMLInputElement).value).toBe('Weekly X walkthroughs')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.save' }))
+  await waitFor(() => expect(state.api.mock.calls.some(call => call[0] === 'PUT')).toBe(true))
+  const saved = state.api.mock.calls.find(call => call[0] === 'PUT')![2]
+  expect(saved.initiatives).toEqual([{ ...configured.initiatives![0], title: 'Weekly X walkthroughs' }])
+  expect(saved.dashboard).toEqual(configured.dashboard)
+  expect(saved).not.toHaveProperty('observations')
+})
+
+it('keeps a configuration draft on pending-file conflicts and offers file confirmation instead of a reload loop', async () => {
+  let pending = true
+  state.api.mockImplementation(async (method, path, body) => {
+    if (path === '/agent/swarms') return { data: [] }
+    if (method === 'PUT' && pending) throw Object.assign(new Error('OKR_FILES_PENDING'), { status: 409 })
+    if (path.endsWith('/sync')) pending = false
+    return { data: { ...initial, ...(method === 'PUT' ? body : {}), revision: pending ? 3 : 4 } }
+  })
+  render(<ProjectOkr projectId="stable-project" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'okr.edit' }))
+  fireEvent.change(screen.getByLabelText('okr.objective'), { target: { value: 'Preserved GUI draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.save' }))
+  expect((await screen.findByRole('alert')).textContent).toContain('okr.filesPendingConflict')
+  expect(screen.queryByRole('button', { name: 'okr.loadLatest' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'okr.confirmFiles' }))
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('Preserved GUI draft')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.save' }))
+  await waitFor(() => expect(state.api.mock.calls.filter(call => call[0] === 'PUT')).toHaveLength(2))
+  expect(state.api.mock.calls.filter(call => call[0] === 'PUT')[1][2]).toMatchObject({ revision: 4, objective: 'Preserved GUI draft' })
 })

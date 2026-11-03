@@ -54,7 +54,7 @@ it('preserves the draft and reuses the exact message key after an ambiguous fail
 
 it('provides verified board evidence for analysis without requiring unregistered CLI access', async () => {
   const draft = emptyConfiguration()
-  const workspace = { ...draft, projectId: 'project', revision: 8, updatedAt: '2026-11-03T10:00:00Z', objective: 'Grow the project', keyResults: [{ id: 'growth', title: 'Stars', horizon: 'long' as const, metricId: 'stars', target: 100, mode: 'increase' as const, dueDate: draft.endDate }], metrics: [{ id: 'stars', name: 'Stars', unit: 'stars', source: 'manual' as const }], observations: [{ id: 'one', metricId: 'stars', date: draft.startDate, value: 11, source: 'manual' as const, sourceKey: 'manual:stars', capturedAt: 'now', note: '' }], reviews: [] }
+  const workspace = { ...draft, projectId: 'project', revision: 8, updatedAt: '2026-11-03T10:00:00Z', objective: 'Grow the project', keyResults: [{ id: 'growth', title: 'Stars', horizon: 'long' as const, metricId: 'stars', target: 100, mode: 'increase' as const, dueDate: draft.endDate }], metrics: [{ id: 'stars', name: 'Stars', unit: 'stars', source: 'manual' as const }], observations: [{ id: 'one', metricId: 'stars', date: draft.startDate, value: 11, source: 'manual' as const, sourceKey: 'manual:stars', capturedAt: 'now', note: '' }], reviews: [], initiatives: [{ id: 'x-posts', title: 'Product posts', channel: 'x', keyResultIds: ['growth'], description: 'Weekly examples', acceptance: 'Publication receipts' }], dashboard: { schemaVersion: 1 as const, widgets: [{ id: 'stars', type: 'metricTrend' as const, metricIds: ['stars'] }] }, projectFiles: { root: '.roami/okr', schemaVersion: 1 as const, revision: 8, mainInstructions: 'Use the project acceptance process', teamMemory: 'The last video is still unverified' } }
   render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
   fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'What next?' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
@@ -62,6 +62,9 @@ it('provides verified board evidence for analysis without requiring unregistered
   const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
   const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
   expect(context.revision).toBe(8)
+  expect(context.initiatives).toEqual(workspace.initiatives)
+  expect(context.dashboard).toEqual(workspace.dashboard)
+  expect(context.projectContext).toMatchObject({ mainInstructions: workspace.projectFiles.mainInstructions, teamMemory: workspace.projectFiles.teamMemory })
   expect(context.snapshot.keyResults[0].latest.value).toBe(11)
   expect(context.snapshot.metrics[0].recentDays[0]).toMatchObject({ value: 11, delta: null })
   expect(state.api.mock.calls.some(call => call[1].includes('/okr'))).toBe(false)

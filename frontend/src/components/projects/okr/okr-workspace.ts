@@ -1,12 +1,19 @@
 export type Metric = { id: string; name: string; unit: string; source: 'manual' | 'github'; repo?: string; field?: 'stars' | 'forks'; sourceKey?: string }
 export type KeyResult = { id: string; title: string; horizon: 'long' | 'short'; metricId: string; target: number; mode: 'increase' | 'atLeast' | 'atMost'; dueDate: string }
-export type Configuration = { objective: string; startDate: string; endDate: string; keyResults: KeyResult[]; metrics: Metric[]; swarm: string; autoCollect: boolean }
+export type Initiative = { id: string; title: string; channel: string; keyResultIds: string[]; description: string; acceptance: string }
+export type DashboardWidget = { id: string; type: 'keyResults' | 'metricTrend' | 'nextAction'; keyResultIds?: string[]; metricIds?: string[]; title?: string }
+export type Dashboard = { schemaVersion: 1; widgets: DashboardWidget[] }
+export type Configuration = { objective: string; startDate: string; endDate: string; keyResults: KeyResult[]; metrics: Metric[]; swarm: string; autoCollect: boolean; initiatives?: Initiative[]; dashboard?: Dashboard }
 export type Observation = { id: string; metricId: string; date: string; value: number; source: 'manual' | 'github'; sourceKey: string; capturedAt: string; note: string }
 export type Review = { id: string; summary: string; actions: string; date: string; evidenceRevision: number }
-export type Workspace = Configuration & { revision: number; projectId: string; observations: Observation[]; reviews: Review[]; updatedAt: string }
+export type Workspace = Configuration & { revision: number; projectId: string; observations: Observation[]; reviews: Review[]; updatedAt: string; projectFiles?: { root: string; schemaVersion: 1; revision: number; mainInstructionsFile?: string; teamMemoryFile?: string; mainInstructions?: string; teamMemory?: string; teamMemorySha256?: string; pendingChanges?: boolean } }
 export type EvidencePoint = { date: string; value: number }
 export type ResultOverview = KeyResult & { unit: string; baseline: EvidencePoint | null; latest: EvidencePoint | null; delta: number | null }
 export type OkrOverview = Pick<Workspace, 'projectId' | 'objective' | 'startDate' | 'endDate' | 'updatedAt' | 'revision'> & { projectName: string; keyResults: ResultOverview[] }
+
+export function workspaceUpdated(current: Workspace | null, next: Workspace | null): next is Workspace {
+  return !!next && (!current || next.revision > current.revision || next.revision === current.revision && JSON.stringify(next.projectFiles) !== JSON.stringify(current.projectFiles))
+}
 
 export function resultAttainment(kr: KeyResult, baseline?: EvidencePoint | null, latest?: EvidencePoint | null) {
   const achieved = latest ? kr.mode === 'increase' ? baseline ? latest.value - baseline.value : null : latest.value : null
@@ -41,7 +48,12 @@ export function configurationOf(value: Configuration): Configuration {
     objective: value.objective, startDate: value.startDate, endDate: value.endDate,
     metrics: value.metrics.map(({ id, name, unit, source, repo, field }) => ({ id, name, unit, source, ...(source === 'github' ? { repo, field } : {}) })),
     keyResults: value.keyResults.map(kr => ({ ...kr })), swarm: value.swarm, autoCollect: value.autoCollect,
+    ...(value.initiatives ? { initiatives: value.initiatives.map(({ id, title, channel, keyResultIds, description, acceptance }) => ({ id, title, channel, keyResultIds: [...keyResultIds], description, acceptance })) } : {}),
+    ...(value.dashboard ? { dashboard: { schemaVersion: 1 as const, widgets: value.dashboard.widgets.map(({ id, type, title, keyResultIds, metricIds }) => ({ id, type, ...(title !== undefined ? { title } : {}), ...(keyResultIds ? { keyResultIds: [...keyResultIds] } : {}), ...(metricIds ? { metricIds: [...metricIds] } : {}) })) } } : {}),
   }
+}
+export function dashboardOf(value: Configuration): Dashboard {
+  return value.dashboard || { schemaVersion: 1, widgets: [{ id: 'key-results', type: 'keyResults' }, { id: 'metric-trend', type: 'metricTrend' }, { id: 'next-action', type: 'nextAction' }] }
 }
 export function stableId(prefix: string): string {
   return prefix + Array.from(crypto.getRandomValues(new Uint32Array(2)), n => n.toString(16).padStart(8, '0')).join('')
