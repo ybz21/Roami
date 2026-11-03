@@ -24,7 +24,7 @@ export function useSwarmSnapshot(id: string) {
   const refresh = useCallback(async () => {
     if (!/^sw-[a-f0-9]{32}$/.test(id)) { setMissing(true); return }
     try { const next = await load(path); if (mounted.current && currentScope.current === scope) { setData(next); setError(false); setMissing(false) } }
-    catch (cause) { if (mounted.current && currentScope.current === scope) { setMissing((cause as { status?: number }).status === 404); setError(true) } }
+    catch (cause) { if (mounted.current && currentScope.current === scope) { const absent = (cause as { status?: number }).status === 404; setMissing(absent); setError(!absent); if (absent) { setData(null); dataRef.current = null } } }
   }, [scope])
   useEffect(() => {
     mounted.current = true; setData(null); dataRef.current = null; setMissing(false)
@@ -48,7 +48,7 @@ export function useSwarmSnapshot(id: string) {
         throw new Error('STREAM_ENDED')
       } catch (cause) {
         if (stopped || currentAbort.signal.aborted || document.hidden) return
-        if ((cause as { status?: number }).status === 404) { setMissing(true); setError(false); return }
+        if ((cause as { status?: number }).status === 404) { setData(null); dataRef.current = null; setMissing(true); setError(false); return }
         setError(true); timer = setTimeout(connect, Math.min(30000, 1000 * 2 ** failures++))
       }
     }

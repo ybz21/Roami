@@ -110,3 +110,7 @@ html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm
 .swarm-legacy-content details { padding:var(--sp-2) 0; border-bottom:1px solid var(--border-subtle); }
 .swarm-legacy-content summary { cursor:pointer; overflow-wrap:anywhere; }
 .swarm-legacy-content summary > :is(small,span,time) { margin-left:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+
+html[data-pointer="coarse"] .swarm-legacy-content details { padding-block:var(--sp-3); }
+html[data-pointer="coarse"] .swarm-legacy-content summary { position:relative; }
+html[data-pointer="coarse"] .swarm-legacy-content summary::after { content:""; position:absolute; inset-inline:0; top:50%; height:var(--tap); transform:translateY(-50%); }
