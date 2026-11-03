@@ -1,0 +1,14 @@
+=== RUN   TestLargePostToolUseResponseDoesNotLoseCompletionAndReportedFiles
+=== RUN   TestLargePostToolUseResponseDoesNotLoseCompletionAndReportedFiles/PostToolUse
+=== RUN   TestLargePostToolUseResponseDoesNotLoseCompletionAndReportedFiles/PostToolUseFailure
+--- PASS: TestLargePostToolUseResponseDoesNotLoseCompletionAndReportedFiles (0.50s)
+    --- PASS: TestLargePostToolUseResponseDoesNotLoseCompletionAndReportedFiles/PostToolUse (0.25s)
+    --- PASS: TestLargePostToolUseResponseDoesNotLoseCompletionAndReportedFiles/PostToolUseFailure (0.25s)
+=== RUN   TestSessionHookMetadataAndJSONRemainBounded
+--- PASS: TestSessionHookMetadataAndJSONRemainBounded (0.28s)
+PASS
+ok  	github.com/ybz21/Roami/internal/agentexecution	0.809s
+=== RUN   TestSessionEventInputAcceptsLargeReadCallbackWithoutChangingOrdinaryCLIInput
+--- PASS: TestSessionEventInputAcceptsLargeReadCallbackWithoutChangingOrdinaryCLIInput (0.00s)
+PASS
+ok  	github.com/ybz21/Roami/cmd/roami	0.014s

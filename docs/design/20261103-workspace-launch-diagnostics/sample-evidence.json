@@ -1,0 +1,225 @@
+{
+  "capturedAt": "2026-11-03T11:22:33.729866+00:00",
+  "source": "read-only runtime.db and local execution artifacts; no business replay",
+  "taskId": "65291b93a72e418d87f13c8d3cdc9585",
+  "createdMs": 1793703036812,
+  "budget": {
+    "deadlineMs": 0,
+    "depth": 0,
+    "maxTurns": 0,
+    "timeoutMs": 0,
+    "usedSteps": 1
+  },
+  "attempt": {
+    "id": "d2dfdf43d27e4468a7c5f41d9f841798",
+    "state": "failed",
+    "session_id": "2026-1103-1850-00cy",
+    "agent_conversation_id": null,
+    "started_ms": 1793703037216,
+    "finished_ms": 1793703040701
+  },
+  "result": {
+    "executor": "roami-cli",
+    "exitCode": -1,
+    "finishedMs": 1793703039676,
+    "sessionId": "2026-1103-1850-00cy",
+    "state": "failed",
+    "summary": "WORKSPACE_OUTCOME_UNKNOWN",
+    "workspace": {
+      "directory": "/home/ai/.roami/workspaces/agent-coding",
+      "workspaceId": "ad894949d92248fd361078a33a1ca43178acacc458f10fdb4ea427399e813966"
+    }
+  },
+  "executionArtifacts": {
+    "spec.json": {
+      "size": 6874,
+      "modifiedNs": 1793703037429376299,
+      "bodyWithoutPromptOrKey": {
+        "persistent": true,
+        "executor": "claude",
+        "directory": "/home/ai/.roami/workspaces/agent-coding",
+        "title": "SpaceX 与 Andrew 两套 Agent 治理方法三份 HTML",
+        "permission": "auto",
+        "timeoutSeconds": 0
+      }
+    },
+    "result.json": {
+      "size": 97,
+      "modifiedNs": 1793703039675376434,
+      "bodyWithoutPromptOrKey": {
+        "state": "failed",
+        "summary": "WORKSPACE_OUTCOME_UNKNOWN",
+        "exitCode": -1,
+        "finishedMs": 1793703039676
+      }
+    },
+    "started": {
+      "size": 0,
+      "modifiedNs": 1793703039575376428
+    },
+    "receipt.json": {
+      "size": 201,
+      "modifiedNs": 1793703039567376427,
+      "bodyWithoutPromptOrKey": {
+        "session": "2026-1103-1850-00cy",
+        "state": "launched",
+        "workspace": {
+          "workspaceId": "ad894949d92248fd361078a33a1ca43178acacc458f10fdb4ea427399e813966",
+          "directory": "/home/ai/.roami/workspaces/agent-coding"
+        }
+      }
+    },
+    "run.lock": {
+      "size": 0,
+      "modifiedNs": 1793703039575376428
+    },
+    "launch.lock": {
+      "size": 0,
+      "modifiedNs": 1793703037429376299
+    }
+  },
+  "timeline": [
+    {
+      "kind": "task.accepted",
+      "createdMs": 1793703036973,
+      "state": null
+    },
+    {
+      "kind": "task.preparing",
+      "createdMs": 1793703037375,
+      "state": null
+    },
+    {
+      "kind": "task.workspace_prepared",
+      "createdMs": 1793703039577,
+      "state": null
+    },
+    {
+      "kind": "task.started",
+      "createdMs": 1793703039740,
+      "state": null
+    },
+    {
+      "kind": "task.result",
+      "createdMs": 1793703040873,
+      "state": "verifying"
+    },
+    {
+      "kind": "task.failed",
+      "createdMs": 1793703041057,
+      "state": "failed"
+    }
+  ],
+  "blockingWriter": {
+    "executionId": "163d773b30abb90c977481b8a32878d6d6238f2dd271a070d2c7bc9e7d67ec80",
+    "resultFileExists": false,
+    "receipt": {
+      "session": "2026-1029-1407-009d",
+      "state": "running",
+      "workspace": {
+        "workspaceId": "ad894949d92248fd361078a33a1ca43178acacc458f10fdb4ea427399e813966",
+        "directory": "/home/ai/.roami/workspaces/agent-coding"
+      },
+      "sessionBinding": {
+        "id": "2026-1029-1407-009d",
+        "directory": "/home/ai/.roami/workspaces/agent-coding",
+        "providerConversationId": "af741332-56e9-4526-8609-d71d40bb0451"
+      }
+    },
+    "lifecycle": {
+      "executor": "claude",
+      "state": "unknown",
+      "unknownReason": null,
+      "turnId": "6d5d8fde-c493-4ff0-8067-34551accc9aa",
+      "tools": {
+        "call_00_albpmg34twooy6uuamyykmov": true,
+        "call_00_ghw3kjmiy3k7pgash6rwdl0l": true,
+        "call_00_m059kggkt2ba3skuzaqljyoz": true,
+        "call_00_no3su4iuq9r1m4u6pkbpnc3v": true
+      },
+      "updatedMs": 1793362099952
+    },
+    "databaseAttempt": {
+      "task_id": "365dec53f78d4ec784c6d4433d0d0c26",
+      "state": "succeeded",
+      "finished_ms": 1793340977503,
+      "task_state": "failed"
+    },
+    "transcriptCrossCheck": {
+      "toolUseCount": 287,
+      "toolResultCount": 287,
+      "unmatchedToolIds": [],
+      "pendingTools": [
+        {
+          "toolId": "call_00_albpmg34twooy6uuamyykmov",
+          "use": {
+            "name": "Read",
+            "timestamp": null
+          },
+          "result": {
+            "isError": false,
+            "timestamp": null,
+            "contentSerializationUtf8Bytes": 563712
+          }
+        },
+        {
+          "toolId": "call_00_ghw3kjmiy3k7pgash6rwdl0l",
+          "use": {
+            "name": "Read",
+            "timestamp": "2026-10-30T02:38:14.458Z"
+          },
+          "result": {
+            "isError": false,
+            "timestamp": "2026-10-30T02:38:14.604Z",
+            "contentSerializationUtf8Bytes": 505612
+          }
+        },
+        {
+          "toolId": "call_00_m059kggkt2ba3skuzaqljyoz",
+          "use": {
+            "name": "Read",
+            "timestamp": "2026-10-30T02:37:39.140Z"
+          },
+          "result": {
+            "isError": false,
+            "timestamp": "2026-10-30T02:37:39.249Z",
+            "contentSerializationUtf8Bytes": 502600
+          }
+        },
+        {
+          "toolId": "call_00_no3su4iuq9r1m4u6pkbpnc3v",
+          "use": {
+            "name": "Read",
+            "timestamp": "2026-10-30T02:38:07.097Z"
+          },
+          "result": {
+            "isError": false,
+            "timestamp": "2026-10-30T02:38:07.193Z",
+            "contentSerializationUtf8Bytes": 604624
+          }
+        }
+      ]
+    },
+    "writerFile": {
+      "modifiedNs": 1793254062805712598,
+      "changedNs": 1793254062808712591
+    },
+    "executionDirectory": {
+      "modifiedNs": 1793254063468711256,
+      "changedNs": 1793254063468711256
+    },
+    "terminalHookEvidence": {
+      "sourcePath": "/home/ai/.roami/logs/2026-1029-1407-009d.log",
+      "sha256": "514ec78834590133ab14a090d8013a4b7f6c3044ff568f0931647997823998e0",
+      "bytes": 5561666,
+      "renderedHookErrorOccurrences": 286,
+      "occurrencesAreNotDistinctCalls": true,
+      "observedFailure": "PostToolUse:Read hook error / Failed with non-blocking status code: AGENT_INPUT_TOO_LARGE",
+      "existingFixIssue": "https://github.com/ybz21/Roami/issues/523",
+      "existingFixPR": "https://github.com/ybz21/Roami/pull/524",
+      "fixMergedAt": "2026-10-30T05:02:49Z"
+    }
+  },
+  "sampleLogTail": "WORKSPACE_OUTCOME_UNKNOWN\n",
+  "expectedDirectoryExists": false
+}

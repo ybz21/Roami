@@ -487,3 +487,67 @@ async def test_unknown_preparing_execution_is_visible_without_ending_task(store)
     assert len(unknown) == 1
     assert unknown[0]["payload"]["activity"]["state"] == "unknown"
     assert (await tasks.list("alice"))[0]["state"] == "preparing"
+
+
+async def test_workspace_claim_diagnostics_survive_poll_verification_and_detail(store):
+    import json
+
+    from roami_agent.dispatch.runner import TaskDispatcher
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "Write report",
+        key="blocked-workspace",
+        executor="claude",
+        record_intent=True,
+    )
+    result = {
+        "state": "failed",
+        "summary": "WORKSPACE_PRIOR_RESULT_MISSING",
+        "errorCode": "WORKSPACE_OUTCOME_UNKNOWN",
+        "exitCode": -1,
+        "exitCodeSource": "not_started",
+        "executionStarted": False,
+        "failure": {
+            "phase": "workspace_claim",
+            "reasonCode": "WORKSPACE_PRIOR_RESULT_MISSING",
+            "blockingExecutionId": "a" * 64,
+            "blockingSessionId": "prior-session",
+        },
+    }
+    executor = CodingExecutor(store, Settings())
+    calls = []
+
+    async def command(sub, *args, **kwargs):
+        calls.append(sub)
+        return {"state": "failed", "session": "blocked-session", "result": result}
+
+    executor.command = command
+
+    def preparing(db):
+        db.execute("UPDATE tasks SET state='preparing' WHERE id=?", (task["id"],))
+        db.execute("UPDATE task_attempts SET state='starting' WHERE task_id=?", (task["id"],))
+        db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (task["id"],))
+
+    await store.call(preparing, write=True)
+    await executor.poll(tasks)
+    verification = await store.call(
+        lambda db: row(db, "SELECT * FROM jobs WHERE kind='task.verify'")
+    )
+    await TaskDispatcher(store, tasks, executor, None, None, None, {}).verify(verification)
+    attempt = await store.call(lambda db: row(db, "SELECT * FROM task_attempts"))
+    retained = json.loads(attempt["result_json"])
+    for key, value in result.items():
+        assert retained[key] == value
+    current = await tasks.get("alice", task["id"])
+    assert current["task"]["state"] == "failed"
+    assert current["outcome"]["errorCode"] == "WORKSPACE_OUTCOME_UNKNOWN"
+    events = await conversations.events("alice", conversation["id"])
+    failed = next(e for e in events if e["kind"] == "task.failed")
+    assert failed["payload"]["result"]["failure"] == result["failure"]
+    await executor.poll(tasks)
+    assert calls == ["status"]

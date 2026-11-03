@@ -34,7 +34,7 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	}
 	lease, err := s.claimWorkspace(ctx, binding.Directory, spec.Key)
 	if err != nil {
-		return s.failPersistent(dir, err)
+		return s.failWorkspaceClaim(dir, err)
 	}
 	defer lease()
 	path, err := s.lifecycleFile(binding)

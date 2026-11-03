@@ -12,6 +12,52 @@ import (
 	"github.com/ybz21/Roami/backend/worktree"
 )
 
+// WorkspaceClaimFailure describes the blocked new execution, not the prior writer's outcome.
+type WorkspaceClaimFailure struct {
+	Phase               string `json:"phase"`
+	ReasonCode          string `json:"reasonCode"`
+	BlockingExecutionID string `json:"blockingExecutionId,omitempty"`
+	BlockingSessionID   string `json:"blockingSessionId,omitempty"`
+}
+
+type workspaceClaimError struct {
+	failure WorkspaceClaimFailure
+}
+
+func (e *workspaceClaimError) Error() string { return "WORKSPACE_OUTCOME_UNKNOWN" }
+
+func (s Service) blockedWorkspaceWriter(key, reason string) error {
+	failure := WorkspaceClaimFailure{Phase: "workspace_claim", ReasonCode: reason}
+	if dir, err := s.directory(key); err == nil {
+		failure.BlockingExecutionID = filepath.Base(dir)
+		var receipt Receipt
+		if readJSON(filepath.Join(dir, "receipt.json"), &receipt) == nil {
+			failure.BlockingSessionID = receipt.Session
+		}
+	}
+	return &workspaceClaimError{failure: failure}
+}
+
+func workspaceClaimResult(err error) Result {
+	started := false
+	code := workspaceLeaseCode(err)
+	failure := WorkspaceClaimFailure{Phase: "workspace_claim", ReasonCode: code}
+	var blocked *workspaceClaimError
+	if errors.As(err, &blocked) {
+		failure = blocked.failure
+	}
+	return Result{State: "failed", Summary: failure.ReasonCode, ErrorCode: code, ExitCode: -1,
+		ExecutionStarted: &started, ExitCodeSource: "not_started", Failure: &failure,
+		FinishedMS: time.Now().UnixMilli()}
+}
+
+func (s Service) failWorkspaceClaim(dir string, err error) error {
+	if problem := writeJSON(filepath.Join(dir, "result.json"), workspaceClaimResult(err)); problem != nil {
+		return problem
+	}
+	return err
+}
+
 // A lost runner keeps its writer fence until stop is confirmed.
 func (s Service) lockWorkspaceWriter(ctx context.Context, directory string) (string, func(), error) {
 	canonical, err := canonicalWorkspace(directory)
@@ -61,9 +107,21 @@ func (s Service) claimWorkspace(ctx context.Context, directory, launchKey string
 	if err = readJSON(filepath.Join(root, "writer.json"), &previous); err == nil {
 		priorDir, e := s.directory(previous.Key)
 		var result Result
-		if e != nil || readJSON(filepath.Join(priorDir, "result.json"), &result) != nil || (result.State != "succeeded" && result.State != "failed" && result.State != "cancelled") {
+		if e != nil {
 			release()
-			return nil, fmt.Errorf("WORKSPACE_OUTCOME_UNKNOWN")
+			return nil, s.blockedWorkspaceWriter(previous.Key, "WORKSPACE_PRIOR_LAUNCH_INVALID")
+		}
+		if e = readJSON(filepath.Join(priorDir, "result.json"), &result); e != nil {
+			reason := "WORKSPACE_PRIOR_RESULT_UNREADABLE"
+			if errors.Is(e, os.ErrNotExist) {
+				reason = "WORKSPACE_PRIOR_RESULT_MISSING"
+			}
+			release()
+			return nil, s.blockedWorkspaceWriter(previous.Key, reason)
+		}
+		if result.State != "succeeded" && result.State != "failed" && result.State != "cancelled" {
+			release()
+			return nil, s.blockedWorkspaceWriter(previous.Key, "WORKSPACE_PRIOR_RESULT_NOT_TERMINAL")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		release()

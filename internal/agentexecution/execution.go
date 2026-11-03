@@ -52,15 +52,19 @@ type Receipt struct {
 }
 
 type Result struct {
-	InputStopped *bool  `json:"inputStopped,omitempty"`
-	OutcomeKnown *bool  `json:"outcomeKnown,omitempty"`
-	StopEvidence string `json:"stopEvidenceSha256,omitempty"`
-	State        string `json:"state"`
-	Summary      string `json:"summary"`
-	ExitCode     int    `json:"exitCode"`
-	Stderr       string `json:"stderr,omitempty"`
-	Output       string `json:"output,omitempty"`
-	FinishedMS   int64  `json:"finishedMs"`
+	ErrorCode        string                 `json:"errorCode,omitempty"`
+	ExecutionStarted *bool                  `json:"executionStarted,omitempty"`
+	ExitCodeSource   string                 `json:"exitCodeSource,omitempty"`
+	Failure          *WorkspaceClaimFailure `json:"failure,omitempty"`
+	InputStopped     *bool                  `json:"inputStopped,omitempty"`
+	OutcomeKnown     *bool                  `json:"outcomeKnown,omitempty"`
+	StopEvidence     string                 `json:"stopEvidenceSha256,omitempty"`
+	State            string                 `json:"state"`
+	Summary          string                 `json:"summary"`
+	ExitCode         int                    `json:"exitCode"`
+	Stderr           string                 `json:"stderr,omitempty"`
+	Output           string                 `json:"output,omitempty"`
+	FinishedMS       int64                  `json:"finishedMs"`
 }
 
 type Status struct {
@@ -388,7 +392,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	}
 	workspaceUnlock, err := s.claimWorkspace(ctx, directory, key)
 	if err != nil {
-		return writeJSON(filepath.Join(dir, "result.json"), Result{State: "failed", Summary: workspaceLeaseCode(err), ExitCode: -1, FinishedMS: time.Now().UnixMilli()})
+		return writeJSON(filepath.Join(dir, "result.json"), workspaceClaimResult(err))
 	}
 	defer workspaceUnlock()
 	deadline := receipt.DeadlineMS

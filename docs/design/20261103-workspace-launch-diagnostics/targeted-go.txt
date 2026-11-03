@@ -1,0 +1,31 @@
+=== RUN   TestSessionContinuationUsesOneDurableSubmissionAndOriginalIdentity
+--- PASS: TestSessionContinuationUsesOneDurableSubmissionAndOriginalIdentity (0.22s)
+=== RUN   TestSessionContinuationThroughRealPythonAndGoCLI
+=== RUN   TestSessionContinuationThroughRealPythonAndGoCLI/codex
+=== RUN   TestSessionContinuationThroughRealPythonAndGoCLI/claude
+--- PASS: TestSessionContinuationThroughRealPythonAndGoCLI (3.83s)
+    --- PASS: TestSessionContinuationThroughRealPythonAndGoCLI/codex (1.26s)
+    --- PASS: TestSessionContinuationThroughRealPythonAndGoCLI/claude (1.49s)
+=== RUN   TestWorkspaceClaimFailureDistinguishesPriorEvidence
+=== RUN   TestWorkspaceClaimFailureDistinguishesPriorEvidence/missing
+=== RUN   TestWorkspaceClaimFailureDistinguishesPriorEvidence/malformed
+=== RUN   TestWorkspaceClaimFailureDistinguishesPriorEvidence/nonterminal
+--- PASS: TestWorkspaceClaimFailureDistinguishesPriorEvidence (0.05s)
+    --- PASS: TestWorkspaceClaimFailureDistinguishesPriorEvidence/missing (0.02s)
+    --- PASS: TestWorkspaceClaimFailureDistinguishesPriorEvidence/malformed (0.02s)
+    --- PASS: TestWorkspaceClaimFailureDistinguishesPriorEvidence/nonterminal (0.02s)
+=== RUN   TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation
+=== RUN   TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation/claude
+    workspace-claim-diagnostics_test.go:131: claude: phase=workspace_claim executionStarted=false exitCodeSource=not_started reason=WORKSPACE_PRIOR_RESULT_MISSING
+=== RUN   TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation/codex
+    workspace-claim-diagnostics_test.go:131: codex: phase=workspace_claim executionStarted=false exitCodeSource=not_started reason=WORKSPACE_PRIOR_RESULT_MISSING
+=== RUN   TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation/pi
+    workspace-claim-diagnostics_test.go:131: pi: phase=workspace_claim executionStarted=false exitCodeSource=not_started reason=WORKSPACE_PRIOR_RESULT_MISSING
+--- PASS: TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation (0.18s)
+    --- PASS: TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation/claude (0.06s)
+    --- PASS: TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation/codex (0.06s)
+    --- PASS: TestWorkspaceClaimFailurePersistsBeforeExecutorInvocation/pi (0.06s)
+=== RUN   TestNativeWorkspacePreparationReturnsStructuredError
+--- PASS: TestNativeWorkspacePreparationReturnsStructuredError (0.10s)
+PASS
+ok  	github.com/ybz21/Roami/internal/agentexecution	4.386s
