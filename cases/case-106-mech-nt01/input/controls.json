@@ -1,0 +1,21 @@
+{
+  "filename": "result.json",
+  "first_value": "draft",
+  "final_value": "final",
+  "first_prompt": "Create result.json containing the JSON string \"draft\" in this workspace.",
+  "followup_prompt": "Update the same result.json to contain the JSON string \"final\".",
+  "profiles": [
+    {
+      "allow_shell": false,
+      "allow_tasks": false
+    },
+    {
+      "allow_shell": true,
+      "allow_tasks": false
+    },
+    {
+      "allow_shell": true,
+      "allow_tasks": true
+    }
+  ]
+}

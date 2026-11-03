@@ -13,6 +13,10 @@ from roami_agent.app import Runtime
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.domain.policy import apply_policy
 from roami_agent.improvement.evaluation.contracts import agent_view
+from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
+    NATIVE_TASK_PROFILE_VERSION,
+    NATIVE_TASK_TOOLS,
+)
 from roami_agent.improvement.evaluation.grading import judge_case, validate_external_grade
 from roami_agent.improvement.integrations.artifact_files import materialize, private_json
 from roami_agent.improvement.integrations.json_documents import load_json
@@ -129,6 +133,11 @@ class NativeFilesExecutor:
                 settings.worker_instructions,
                 fixture,
                 {
+                    "allow_shell": allow_shell,
+                    "allow_tasks": allow_tasks,
+                    "task_tools_version": NATIVE_TASK_PROFILE_VERSION if allow_tasks else None,
+                },
+                {
                     "reserve_tokens": settings.reserve_tokens,
                     "keep_recent_tokens": settings.keep_recent_tokens,
                     "compaction_ratio": settings.compaction_ratio,
@@ -240,15 +249,7 @@ class NativeFilesExecutor:
                 bind_evaluation_tasks,
             )
 
-            allowed.update(
-                {
-                    "delegate",
-                    "task_status",
-                    "task_reply",
-                    "task_queue_reply",
-                    "conversation_history",
-                }
-            )
+            allowed.update(NATIVE_TASK_TOOLS)
             bind_evaluation_tasks(runtime, workspace)
         runtime.tools.disabled_tools.update(set(runtime.tools.registry) - allowed)
         output, trace, failure = "", None, None
@@ -404,6 +405,7 @@ class NativeFilesExecutor:
                     "runtime_profile": "main_and_native_worker"
                     if self.allow_tasks
                     else "file_tools_only",
+                    "task_tools_version": NATIVE_TASK_PROFILE_VERSION if self.allow_tasks else None,
                 },
             )
         if failure:

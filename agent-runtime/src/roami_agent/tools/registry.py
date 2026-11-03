@@ -15,6 +15,7 @@ class Tools:
         self.registry: dict[str, Tool] = {}
         self.artifacts = artifacts
         self.disabled_tools: set[str] = set()
+        self.shell_disabled_roles: set[str] = set()
         self.disabled_skills: set[str] = set()
         self.skills: dict[str, dict] = {}
         self.directory = None
@@ -69,12 +70,17 @@ class Tools:
             if role == "main" and self.directory and tool.name == "bash":
                 wire = deepcopy(wire)
                 wire["function"]["description"] = (
-                    "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
-                    "For user-authorized local machine operations, set scope=host and omit cwd; "
-                    "host scope is general execution in a temporary working directory, not a read-only sandbox. "
-                    "For project code or file deliverables, keep workspace scope and delegate to a worker "
-                    "with the user-selected directory, or an automatic private directory for new native work. "
-                    "Registered permissions and execution receipts remain enforced."
+                    "Execute registered Roami CLI operations only. Direct shell and host commands "
+                    "are unavailable in this role. Use tool_list for the exact argv and schema."
+                    if role in self.shell_disabled_roles
+                    else (
+                        "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
+                        "For user-authorized local machine operations, set scope=host and omit cwd; "
+                        "host scope is general execution in a temporary working directory, not a read-only sandbox. "
+                        "For project code or file deliverables, keep workspace scope and delegate to a worker "
+                        "with the user-selected directory, or an automatic private directory for new native work. "
+                        "Registered permissions and execution receipts remain enforced."
+                    )
                 )
             elif role != "main" and self.directory and tool.name == "bash":
                 wire = deepcopy(wire)

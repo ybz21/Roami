@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.dispatch.native_model_capabilities import native_model_capabilities
 from roami_agent.dispatch.workflow_preferences import workspace_preference
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import object_schema
@@ -71,6 +72,10 @@ def routing_schema():
             ),
             "requiredCapabilities": {
                 "type": "array",
+                "description": "Declare required cli:COMMAND availability and, for native tasks, "
+                "model:CAPABILITY input support (for example model:images). Native model requirements "
+                "use the saved Worker route; Main support does not transfer. Resolve needed evidence "
+                "in Main before handing off execution when only Main supports it.",
                 "maxItems": 24,
                 "uniqueItems": True,
                 "items": {"type": "string", "minLength": 1, "maxLength": 160},
@@ -247,6 +252,13 @@ class TaskRouter:
                     decision["metadataRefs"].append(catalog)
             if selected == "native" and model:
                 raise DomainError("INVALID_TASK_MODEL")
+            if selected == "native" and (
+                observed := native_model_capabilities(
+                    self.settings, assessment.get("requiredCapabilities", [])
+                )
+            ):
+                decision["metadataRefs"].append(observed)
+                decision["capabilityVerification"] = "native_model_capabilities_observed"
             if selected != "native":
                 if explicit:
                     catalog = catalog or await self.targets.executors()

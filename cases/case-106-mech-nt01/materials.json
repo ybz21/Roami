@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-NT01",
+  "data": {
+    "kind": "public_synthetic_native_control_continuation",
+    "inputs": [
+      "input/controls.json"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "managed_cli_controls_and_worker_owned_files"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "native_user_continuation_without_main_shell",
+    "expected_python_tests": 11
+  }
+}

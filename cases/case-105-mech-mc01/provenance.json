@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_native_model_requirements",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "只验证已声明要求的派活和执行边界；不证明模型会自主声明要求或完成视觉任务。"
+}

@@ -1,0 +1,16 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "python_tests": [
+    "agent-runtime/tests/test_native_evaluation_tool_parity.py",
+    "agent-runtime/tests/test_improvement_task_lane.py::test_evaluation_main_cannot_execute_shell_but_worker_can",
+    "agent-runtime/tests/test_task_revisions.py::test_completion_cannot_invent_user_steering_but_a_new_user_request_can",
+    "agent-runtime/tests/test_improvement_task_lane.py::test_task_lane_rejects_foreign_workspace_and_unknown_writes",
+    "agent-runtime/tests/test_improvement_task_lane.py::test_native_evaluation_profile_exposes_delivery_writes_only_to_workers"
+  ],
+  "expected_python_tests": 11,
+  "external_model_calls": 0,
+  "container_constructor": "模拟构造器的容器存在性；不调用Docker或外部模型。工作区文件与任务生命周期真实执行。"
+}

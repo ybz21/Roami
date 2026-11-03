@@ -365,6 +365,8 @@ class ToolDirectory:
         elif tool.name == "bash":
             argv = self.argv(args)
             if args.get("scope") == "host":
+                if role in self.registry.shell_disabled_roles:
+                    raise DomainError("TOOL_UNAVAILABLE")
                 if role != "main":
                     raise DomainError("HOST_SCOPE_UNAVAILABLE")
                 if "cwd" in args:
@@ -380,6 +382,8 @@ class ToolDirectory:
                 return self.help_tool(argv, role)
             operation = self.operation(argv)
             if operation is None:
+                if role in self.registry.shell_disabled_roles:
+                    raise DomainError("TOOL_UNAVAILABLE")
                 argv = self.argv(args)
                 if (
                     argv
