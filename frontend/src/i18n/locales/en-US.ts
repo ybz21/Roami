@@ -4591,6 +4591,7 @@ const enUS = {
   'hub.directory.selectMatches': "Select matches",
   'hub.directory.clear': "Clear selection",
   'hub.directory.added': "Added",
+  'hub.directory.editModel': 'Edit {model}',
   'hub.directory.empty': "No models returned. Add them manually.",
   'hub.directory.noMatches': "No matching models",
   'hub.directory.manual': "Add models manually",

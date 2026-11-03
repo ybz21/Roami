@@ -18,7 +18,7 @@ import (
 
 func TestUpstreamResponseReceiptEndToEnd(t *testing.T) {
 	for _, mode := range []string{"node", "catalog", "bridge"} {
-		for _, status := range []int{200, 401, 429, 500} {
+		for _, status := range []int{200, 400, 401, 403, 429, 500} {
 			t.Run(fmt.Sprintf("%s/%d", mode, status), func(t *testing.T) {
 				upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("X-Request-Id", "upstream-correlation")
@@ -80,6 +80,9 @@ func TestUpstreamResponseReceiptEndToEnd(t *testing.T) {
 				}
 				if record.Status != status {
 					t.Errorf("existing settlement status changed: %d", record.Status)
+				}
+				if status >= 400 && status < 500 && (record.State != "failed" || record.Cost == nil || *record.Cost != "0.000000000" || record.Input != nil || record.Error != fmt.Sprintf("MODEL_HTTP_%d", status)) {
+					t.Errorf("rejected request left unknown charges or invented usage: %+v", record)
 				}
 				api := httptest.NewRecorder()
 				h.ServeHTTP(api, httptest.NewRequest("GET", "/v1/model-gateway/usage?days=1", nil))

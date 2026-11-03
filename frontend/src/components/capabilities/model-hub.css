@@ -59,6 +59,7 @@ html[data-pointer="coarse"] .tt-model-connection-confirm .ant-btn { min-height:v
 .tt-model-directory-row { display:flex; align-items:center; gap:var(--sp-3); min-height:var(--tap); border-top:1px solid var(--border-subtle); }
 .tt-model-directory-row .ant-checkbox-wrapper { flex:1; min-width:0; margin:0; padding-block:var(--sp-3); align-items:center; overflow-wrap:anywhere; }
 .tt-model-directory-added { flex-shrink:0; display:flex; align-items:center; gap:var(--sp-1); color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-model-directory-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:var(--sp-2); max-width:50%; }
 .tt-model-source-manual { display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-3); }
 .tt-model-source-manual > label { width:100%; }
 .tt-model-source-manual > button { display:flex; align-items:center; gap:var(--sp-2); }

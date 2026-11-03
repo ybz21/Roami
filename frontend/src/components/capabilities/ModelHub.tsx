@@ -25,9 +25,10 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const billing = useGatewaySettings(tab === 'usage' || tab === 'prices')
   const [newSourceId, setNewSourceId] = useState(newID), [newModelId, setNewModelId] = useState(newID)
   const [sourceDrafts, setSourceDrafts] = useState<Record<string, SourceDraft>>({}), [modelDrafts, setModelDrafts] = useState<Record<string, CatalogModel>>({})
+  const [returnSource, setReturnSource] = useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
-  const back = () => navigate(tab)
+  const back = () => { navigate(detail === 'model' && returnSource ? 'catalog/source/' + returnSource : tab); setReturnSource('') }
   const error = controller.error && <Alert type="error" role="alert" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />
   const models = value?.models || [], sources = value?.sources || []
   const priceModels = [...new Set(models.flatMap(model => model.candidates.map(candidate => candidate.model)).concat(models.flatMap(model => [model.id, ...model.candidates.map(candidate => candidate.sourceId + "/" + candidate.model)])))]
@@ -58,7 +59,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     <label className="agent-settings-field">{t('hub.source')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.source')} value={model.candidates[index].sourceId || undefined} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={sourceId => selectSource(sourceId, index)} /></label>
     <label className="agent-settings-field">{t('hub.upstreamModel')}<Input aria-label={t('hub.upstreamModel')} value={model.candidates[index].model} onChange={event => updateModel({ candidates: model.candidates.map((row, i) => i === index ? { ...row, model: event.target.value } : row) })} /></label>
   </>
-  const sourceEditor = <ModelSourceEditor key={sourceBase.id} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onSave={async next => {
+  const sourceEditor = <ModelSourceEditor key={sourceBase.id} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
     const saved = await controller.save(next)
     if (saved) {
       setSourceDrafts(previous => { const next = { ...previous }; delete next[id]; return next })

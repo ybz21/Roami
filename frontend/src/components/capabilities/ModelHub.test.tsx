@@ -141,6 +141,31 @@ it('keeps existing IDs, credentials and failover candidates while adding discove
   })))
 })
 
+it('edits an added model and returns to the source with its selection and draft intact', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? { data: { models: ['priced-model', 'new-model'] } } : original(method, path, body, options))
+  const navigate = vi.fn(), page = mount('catalog/source/upstream', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'new-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'draft-model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.editModel' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/model/coding')
+  page.rerender(<App><ModelHub sub="catalog/model/coding" onNav={navigate} /></App>)
+  fireEvent.change(await screen.findByLabelText('hub.displayName'), { target: { value: 'Renamed model' } })
+  fireEvent.change(screen.getByLabelText('hub.upstreamModel'), { target: { value: 'repaired-model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream'))
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: catalog.sources,
+    models: [expect.objectContaining({ id: 'coding', name: 'Renamed model', candidates: [{ sourceId: 'upstream', model: 'repaired-model' }] })],
+  }))
+  page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
+  expect((screen.getByRole('checkbox', { name: 'new-model' }) as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByLabelText('hub.directory.manual') as HTMLTextAreaElement).value).toBe('draft-model')
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
+})
+
 it('preserves inputs after authentication errors and allows manual recovery', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => { if (path.endsWith('/discover')) throw { apiError: { code: 'MODEL_LIST_UNAUTHORIZED' } }; return original(method, path, body, options) })

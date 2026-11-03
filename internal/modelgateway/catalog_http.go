@@ -416,6 +416,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			if bridge != nil {
 				if status < 200 || status >= 300 {
 					code = "MODEL_HTTP_" + strconv.Itoa(status)
+					if status >= 300 && status < 500 {
+						// Match native forwarding: only a complete rejection proves zero cost.
+						n, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, (4<<20)+1))
+						notSent = readErr == nil && n <= 4<<20
+					}
 					newProtocolEncoder(w, bridge).failStatus(code, status)
 					return false
 				}
@@ -459,6 +464,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				}
 			} else {
 				code = "MODEL_HTTP_" + strconv.Itoa(status)
+				notSent = complete && status >= 300 && status < 500
 			}
 			return false
 		}
