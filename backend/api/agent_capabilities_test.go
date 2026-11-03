@@ -48,7 +48,7 @@ func TestAgentCapabilitiesUpgradesShippedGuides(t *testing.T) {
 		t.Fatal(err)
 	}
 	files, err := filepath.Glob("testdata/agent-capabilities/*.txt")
-	if err != nil || len(files) != 5 {
+	if err != nil || len(files) != 6 {
 		t.Fatalf("historical guides: %v %v", files, err)
 	}
 	for _, file := range files {

@@ -1,19 +1,193 @@
 package swarm
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
+	"github.com/ybz21/Roami/internal/terminalui"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 func Run(rt runtime.Runtime, args []string, w io.Writer) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return runCommand(ctx, rt, args, w, os.Stdin)
+}
+func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Writer, input io.Reader) error {
 	command := "ls"
 	if len(args) > 0 {
-		command, args = args[0], args[1:]
+		if !strings.HasPrefix(args[0], "--") || args[0] == "--help" {
+			command, args = args[0], args[1:]
+		}
 	}
-	if handled, err := managedCommand(rt, command, args, w); handled {
+	if command == "help" {
+		return showHelp(w, args)
+	}
+	for _, arg := range args {
+		if arg == "--" {
+			break
+		}
+		if arg == "--help" || arg == "-h" {
+			return showHelp(w, []string{command})
+		}
+	}
+	if command == "--help" || command == "-h" {
+		return showHelp(w, nil)
+	}
+	if command == "member" {
+		if len(args) == 0 {
+			return showHelp(w, []string{"member"})
+		}
+		action := args[0]
+		args = args[1:]
+		switch action {
+		case "ls", "list":
+			command = "members"
+		case "show":
+			command = "work"
+		case "add":
+			command = "member-add"
+		default:
+			return fmt.Errorf("unknown member command: %s", action)
+		}
+	}
+	valueFlags, switchFlags := "", ""
+	switch command {
+	case "new", "create":
+		valueFlags = "key goal main-conversation dir"
+	case "ls", "list":
+		switchFlags = "archived"
+	case "status", "show", "board":
+		switchFlags = "follow"
+	case "members", "work", "collect":
+	case "chat", "feed":
+		valueFlags = "limit"
+		switchFlags = "follow"
+	case "plan", "control":
+		valueFlags = "file"
+	case "member-add":
+		valueFlags = "file key revision executor title goal acceptance depends-on"
+		switchFlags = "integration"
+	case "dependencies":
+		valueFlags = "file key revision depends-on"
+		switchFlags = "clear"
+	case "say":
+		valueFlags = "file key to task-revision"
+	case "post":
+		valueFlags = "file key task run task-revision"
+	case "pause", "resume", "stop", "archive":
+		valueFlags = "key revision"
+	default:
+		return fmt.Errorf("MANAGED_SWARM_USES_MAIN: unsupported command %q; use roami swarm help", command)
+	}
+	options, err := parseOptions(args, valueFlags, switchFlags)
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("unsupported swarm command: %s; use new, ls, status, plan, dependencies, control, say or post", command)
+	jsonOutput := options.switches["json"] || ui.AgentMode()
+	if command == "new" || command == "create" {
+		return createSwarm(ctx, rt, options, w, jsonOutput)
+	}
+	if command == "ls" || command == "list" {
+		if err = options.arguments(0, 0); err != nil {
+			return err
+		}
+		client, err := newRuntimeClient(rt)
+		if err != nil {
+			return err
+		}
+		defer client.close()
+		raw, err := client.request(ctx, "GET", "/v1/swarms", nil)
+		if err != nil {
+			return err
+		}
+		if jsonOutput {
+			return writeJSON(w, raw)
+		}
+		var values []snapshot
+		if err = responseData(raw, &values); err != nil {
+			return err
+		}
+		return renderDirectory(w, values, options.switches["archived"])
+	}
+	min, max := 1, 1
+	switch command {
+	case "member-add":
+		if options.value("file") == "" {
+			min, max = 2, 2
+		}
+	case "dependencies":
+		if options.value("file") == "" {
+			min, max = 2, 2
+		}
+	case "say", "post":
+		if options.value("file") == "" {
+			min, max = 2, 2
+		}
+	case "work":
+		min, max = 2, 2
+	}
+	if err = options.arguments(min, max); err != nil {
+		return err
+	}
+	path, err := swarmPath(options.args[0])
+	if err != nil {
+		return err
+	}
+	if isMutation(command) {
+		return mutateSwarm(ctx, rt, command, path, options, w, input, jsonOutput)
+	}
+	client, err := newRuntimeClient(rt)
+	if err != nil {
+		return err
+	}
+	defer client.close()
+	value, raw, err := readSnapshot(ctx, client, path)
+	if err != nil {
+		return err
+	}
+	if command == "work" {
+		return showWork(ctx, client, value, options.args[1], w, jsonOutput)
+	}
+	if command == "chat" || command == "feed" {
+		limit := 50
+		if options.value("limit") != "" {
+			limit, err = options.positive("limit")
+			if err != nil {
+				return err
+			}
+			if limit > 200 {
+				return fmt.Errorf("--limit must be 1..200")
+			}
+		}
+		if options.switches["follow"] {
+			return followChat(ctx, client, path, value, limit, w, jsonOutput)
+		}
+		messages := chatMessages(value)
+		if len(messages) > limit {
+			messages = messages[len(messages)-limit:]
+		}
+		if jsonOutput {
+			return writeJSON(w, map[string]any{"data": messages})
+		}
+		return renderChat(w, messages)
+	}
+	if options.switches["follow"] {
+		return followView(ctx, client, path, value, command, w, jsonOutput)
+	}
+	if jsonOutput && command == "members" {
+		return writeJSON(w, map[string]any{"data": value.Work})
+	}
+	if jsonOutput && command == "board" {
+		return writeJSON(w, map[string]any{"data": boardView(value)})
+	}
+	if jsonOutput && command != "collect" {
+		return writeJSON(w, raw)
+	}
+	return renderSnapshot(w, value, command, jsonOutput)
 }

@@ -2,7 +2,7 @@
 
 2026-11-03 · 方向已确认并实施。用户最后确认：桌面、手机统一三个 Tab，移除旧实现与兼容入口。真实模型闭环尚被节点鉴权 401 阻塞，详见[验收记录](acceptance.md)。
 
-[动态概念稿](index.html) · [技术设计](technical-design.md) · [验收记录](acceptance.md)
+[动态概念稿](index.html) · [技术设计](technical-design.md) · [CLI 用法](cli.md) · [验收记录](acceptance.md)
 
 ## 产品设计
 

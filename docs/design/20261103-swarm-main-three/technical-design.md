@@ -56,7 +56,7 @@ Main 工具包括 swarm_create、swarm_plan、swarm_status、swarm_post、swarm_
 | POST /api/agent/swarms/:id/control | pause / resume / stop / archive |
 | POST /api/agent/swarms/:id/messages | 用户群聊投递 |
 
-member-posts 只在私有 Unix 通道开放，不挂到公共 Go 代理。CLI new 默认进入此服务，不再需要选择新旧引擎。new 要求 --key、--goal，可用 --main-conversation 指定对话；ls/status/board/feed/collect 读取新数据，plan/dependencies/control/say/post 使用 --file JSON。add/adopt/done/activate/task/sql/listen/watch 与旧 /api/swarms* 路由均移除。
+member-posts 只在私有 Unix 通道开放，不挂到公共 Go 代理。顶层 `roami swarm` 是显式入口，`roami session swarm` 调用同一处理器，帮助和补全同时覆盖。CLI new 默认进入此服务，不再需要选择新旧引擎。new 要求 --key、--goal，可用 --main-conversation 指定对话；ls/status/board/feed/collect 读取新数据，plan/dependencies/control/say/post 使用 --file JSON。可读状态、成员、看板、群聊、原任务详情、已验收交付均有独立视图；群聊/状态/看板 --follow 复用 SSE，直接参数命令与完整 --file JSON 共用请求身份和修订门禁。详见 [CLI 用法](cli.md)。add/adopt/done/activate/task/sql/listen/watch 与旧 /api/swarms* 路由均移除。
 
 旧 Go internal/swarm、独立 Claude 指挥启动、广场/手动卡片、角色 prompt 模板及 CSS 办公室均删除。项目与搜索改读新模型。安装技能同步更新到 Main/Tasks 协议，不再下载旧指挥文档。历史 schema/备份保持可读取，不删除用户旧会话、工作区或文件。
 

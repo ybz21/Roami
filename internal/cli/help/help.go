@@ -39,8 +39,10 @@ func Show(version string, w io.Writer) {
 
 	fmt.Fprintln(w, "  蜂群编排 (Roami Main)")
 	fmt.Fprintln(w, "    swarm new <名> --key KEY --goal <目标> [--main-conversation ID] [--dir DIR]")
-	fmt.Fprintln(w, "    swarm ls | status/board/feed/collect <sw-id>")
+	fmt.Fprintln(w, "    roami swarm help  完整蜂群命令；roami session swarm 访问同一实现")
+	fmt.Fprintln(w, "    swarm ls | status/board/chat <sw-id> [--follow] [--json]")
 	fmt.Fprintln(w, "    swarm plan/dependencies/control/say/post <sw-id> --file <request.json>")
+	fmt.Fprintln(w, "    swarm members/work/collect <sw-id>; pause/resume/stop/archive <sw-id> --key KEY --revision N")
 	fmt.Fprintln(w, "    Main 编排计划；成员结果经任务验收，看板随真实状态更新")
 
 	fmt.Fprintf(w, "  %s\n", b("窗口 / 窗格"))

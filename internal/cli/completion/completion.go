@@ -15,7 +15,7 @@ import (
 // Script completes only the public Roami command vocabulary.
 const Script = `_roami_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}" prev="${COMP_WORDS[COMP_CWORD-1]}"
-    local words="session chrome adb project agent db server auth plugin help version completion"
+    local words="session swarm chrome adb project agent db server auth plugin help version completion"
     case "${COMP_WORDS[1]}" in
         session)
             words="ls new attach detach kill rename send keys capture fork children parent swarm env info nw lw kw sp split kp db help"
@@ -27,10 +27,11 @@ const Script = `_roami_complete() {
                     return ;;
             esac
             case "${COMP_WORDS[2]}" in
-                swarm) words="new add ls status activate done say feed listen watch board task adopt archive rm sql" ;;
+                swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive help" ;;
                 db) words="status migrate backup history restore revive set-home link-agent" ;;
                 env) words="set rm clear push" ;;
             esac ;;
+        swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive help" ;;
         chrome) words="tabs goto click fill text eval screenshot record setup help" ;;
         adb) words="devices shell exec-out push pull install uninstall logcat forward reverse connect disconnect pair version help" ;;
         agent) words="setup init serve status conversations new send history report notify execution" ;;
@@ -38,6 +39,26 @@ const Script = `_roami_complete() {
         db) words="status migrate backup" ;;
         auth) words="login logout status" ;;
     esac
+    local swarm_index=0
+    if [[ "${COMP_WORDS[1]}" == swarm ]]; then swarm_index=2
+    elif [[ "${COMP_WORDS[1]}" == session && "${COMP_WORDS[2]}" == swarm ]]; then swarm_index=3; fi
+    if (( swarm_index > 0 && COMP_CWORD > swarm_index )); then
+        case "${COMP_WORDS[$swarm_index]}" in
+            member)
+                if (( COMP_CWORD == swarm_index + 1 )); then words="add ls show"
+                else words="--executor --goal --acceptance --key --revision --title --depends-on --integration --file --json --help"; fi ;;
+            new|create) words="--key --goal --main-conversation --dir --json --help" ;;
+            ls|list) words="--archived --json --help" ;;
+            status|board) words="--follow --json --help" ;;
+            chat|feed) words="--follow --limit --json --help" ;;
+            say) words="--key --to --task-revision --file --json --help" ;;
+            post) words="--key --task --run --task-revision --file --json --help" ;;
+            dependencies) words="--key --revision --depends-on --clear --file --json --help" ;;
+            pause|resume|stop|archive) words="--key --revision --json --help" ;;
+            plan|control) words="--file --json --help" ;;
+            *) words="--json --help" ;;
+        esac
+    fi
     COMPREPLY=($(compgen -W "$words" -- "$cur"))
 }
 complete -F _roami_complete roami

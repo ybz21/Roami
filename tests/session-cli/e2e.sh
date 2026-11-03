@@ -16,6 +16,9 @@ jget() { python3 -c "import sys,json; d=json.load(sys.stdin); print($1)"; }
 check() { [[ "$2" == "$3" ]] || { echo "FAIL: $1 expected=$2 actual=$3"; exit 1; }; echo "PASS: $1"; }
 
 "${CLI[@]}" help | rg -q 'Roami Main'
+"$binary" help | rg -q 'swarm <命令>'
+"$binary" swarm help | rg -q -- '--task-revision'
+"$binary" swarm stop --help | rg -q '只停新派发'
 sid="$("${CLI[@]}" new 'session-e2e' --detach --no-reuse --json | jget 'd["session"]')"
 check 'stable session ID' "$sid" "$("${CLI[@]}" resolve session-e2e --strict --json | jget 'd["name"]')"
 "${CLI[@]}" send "$sid" "printf 'SESSION_E2E_OK\\n'" >/dev/null
@@ -34,7 +37,7 @@ for command in add adopt activate done task sql watch listen; do
     echo "FAIL: removed swarm command accepted: $command"; exit 1
   fi
 done
-if "${CLI[@]}" swarm new group --goal build >/dev/null 2>&1; then
+if "$binary" swarm new group --goal build >/dev/null 2>&1; then
   echo 'FAIL: creation accepted without idempotency key'; exit 1
 fi
 check 'rejected commands preserve sessions' "$before" "$("${CLI[@]}" ls --json | jget 'len(d)')"

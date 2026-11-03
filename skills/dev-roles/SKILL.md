@@ -59,4 +59,4 @@ Main 使用 `swarm_plan` 把角色职责写进成员 goal 和 acceptance，execu
 
 Main 把角色名称、职责、产物和验收标准写入 `swarm_plan.items`。例如架构成员先冻结 API 契约，前后端依赖其指定 task revision，最终验收成员设置 `integration: true`。依赖是执行门禁，指定版本验证成功前不会启动下游。
 
-成员讨论用 `swarm_post`，不能自行改卡片状态或手工标记完成。完整流程见 `cc-swarm` skill；CLI 计划入口为 `roami session swarm plan <sw-id> --file plan.json`。
+成员讨论用 `swarm_post`，不能自行改卡片状态或手工标记完成。完整流程见 `cc-swarm` skill；CLI 计划入口为 `roami swarm plan <sw-id> --file plan.json`。

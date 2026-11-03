@@ -19,13 +19,13 @@ user-invocable: true
 CLI 与 Web 使用同一服务：
 
 ```bash
-roami session swarm new <名称> --key <持久请求键> --goal "目标与验收标准" [--main-conversation <对话ID>] [--dir <目录>]
-roami session swarm ls
-roami session swarm status <sw-id>
-roami session swarm plan <sw-id> --file plan.json
-roami session swarm dependencies <sw-id> --file dependencies.json
-roami session swarm control <sw-id> --file control.json
-roami session swarm say <sw-id> --file message.json
+roami swarm new <名称> --key <持久请求键> --goal "目标与验收标准" [--main-conversation <对话ID>] [--dir <目录>]
+roami swarm ls
+roami swarm status <sw-id>
+roami swarm plan <sw-id> --file plan.json
+roami swarm dependencies <sw-id> --file dependencies.json
+roami swarm control <sw-id> --file control.json
+roami swarm say <sw-id> --file message.json
 ```
 
 写请求都带 `commandKey`；计划、依赖和控制另带 `expectedRevision`。未知投递重试保持原键和原 revision。专业执行器发群聊使用宿主提供的 taskId/runId/taskRevision 与 `post --file` 私有回传通道，不能冒充其他成员。
