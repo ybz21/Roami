@@ -2,6 +2,7 @@ package modelgateway
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -58,6 +59,11 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 	if err == nil {
 		err = ledger.Recover()
 	}
+	if err == nil {
+		if compactErr := ledger.Compact(); compactErr != nil {
+			log.Printf("model gateway daily retention: %v", compactErr)
+		}
+	}
 	if err != nil {
 		listener.Close()
 		return nil, err
@@ -88,10 +94,28 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan struct{})
 	go func() { defer close(done); _ = server.Serve(listener) }()
+	maintenanceStop, maintenanceDone := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(maintenanceDone)
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-maintenanceStop:
+				return
+			case <-ticker.C:
+				if err := ledger.Compact(); err != nil {
+					log.Printf("model gateway daily retention: %v", err)
+				}
+			}
+		}
+	}()
 	locked = true
 	var once sync.Once
 	return func() {
 		once.Do(func() {
+			close(maintenanceStop)
+			<-maintenanceDone
 			handler.mu.Lock()
 			handler.closing = true
 			handler.mu.Unlock()

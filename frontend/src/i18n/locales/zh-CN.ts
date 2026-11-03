@@ -4583,6 +4583,8 @@ const zhCN = {
   'agent.gateway.defaultPrice': "默认单价",
   'agent.gateway.zeroPrice': "0",
   'agent.gateway.callDetails': "查看详情",
+  'agent.gateway.retention': '逐笔明细保留 {days} 天，之后仅保留日汇总；处理中请求除外。',
+  'agent.usage.dailyAggregated': '该日已按天汇总，不再保留完整的逐笔和小时明细。',
   'agent.gateway.tokenUnknown': '未知',
   'agent.usage.knownTokens': '已知 {count}',
   'agent.gateway.viewCalls': '查看请求',

@@ -32,6 +32,15 @@ it('shows one empty-period message without an empty chart or model list', () => 
   expect(screen.queryByRole('article')).toBeNull()
 })
 
+it('shows an aggregated day with its real daily total instead of an empty hourly chart', () => {
+  render(<ModelUsageStatistics statistics={{ ...statistics, days: 1, dailyAggregated: true, startDay: '2026-10-26', dailyStartDay: '2026-10-26', hourly: [] }} days={1} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  expect(screen.getByText('agent.usage.dailyAggregated')).toBeTruthy()
+  expect(screen.getByText('agent.usage.daily')).toBeTruthy()
+  expect(screen.queryByText('agent.usage.hourly')).toBeNull()
+  expect(within(screen.getByRole('region', { name: 'agent.usage.pointDetails' })).getByText('715')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'chart-2026-10-26' })).toBeTruthy()
+})
+
 it('shows missing token receipts as unknown and distinguishes them from confirmed zero usage', () => {
   const missing = { ...totals, requests: 1, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, totalTokens: 0, missingUsage: 1, charges: [] }
   const view = render(<ModelUsageStatistics statistics={{ ...statistics, total: missing, daily: [{ ...missing, day: '2026-10-26' }], models: [{ ...missing, model: 'model-a' }] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
