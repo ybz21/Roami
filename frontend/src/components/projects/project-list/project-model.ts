@@ -30,9 +30,9 @@ export type Proj = {
   needs?: ProjSession[] | null
 }
 
-// 蜂群在项目上的投影（/swarms + 逐群详情，10s）
+// 受管蜂群目录在项目上的投影。
 export type ProjSwarm = {
-  name: string; projKey: string; projName: string
+  name: string; label?: string; projKey: string; projName: string
   total: number; inProj: number; pending: number
 }
 

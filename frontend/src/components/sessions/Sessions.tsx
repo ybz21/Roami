@@ -1,6 +1,8 @@
 import { agentName, useAgentKinds } from '../../agent-kind'
 // ── 会话（可新建/指定目录 / 进终端 / 关闭） ──
 import { Suspense, useEffect, useMemo, useState } from 'react'
+import { loadSwarmDirectory } from '../swarm/swarm-directory'
+import { swarmSessionMembership, type SwarmSessionMember } from '../swarm/swarm-session-membership'
 import { RaceComparePanel, RaceCreateModal } from '../swarm/Race'
 import WorktreePanel from '../git/WorktreePanel'
 import { api } from '../../api'
@@ -32,7 +34,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const agentKinds = useAgentKinds()
   const overview = useSessionOverview()
   const needsInput = useMemo(() => Object.fromEntries(overview.value.map(item => [item.name, item.waiting])), [overview.value])
-  const [swarmMap, setSwarmMap] = useState<Record<string, { swarm: string; role: string }>>({})
+  const [swarmMap, setSwarmMap] = useState<Record<string, SwarmSessionMember>>({})
   const [newOpen, setNewOpen] = useState(false)
   const [wtOpen, setWtOpen] = useState(false)
   const [wtDir, setWtDir] = useState<string | undefined>(undefined)
@@ -67,25 +69,10 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
       .then((r) => { if (!signal.aborted) setRaces(Array.isArray(r?.data) ? r.data : []) }), 8000).stop
   }, [])
   const reloadRaces = () => api('GET', '/races').then((r) => setRaces(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
-  // 拉取蜂群拓扑：哪些会话其实是蜂群的指挥/成员。会话页和蜂群页看到的是同一批 tmux 会话，
-  // 这里据成员的真实 session 名(非前缀猜测)打标，并据此拦住「关闭」误把成员当完成解锁下游。
-  useEffect(() => {
-    return pollWhileVisible(async signal => {
-      const swarms = await api('GET', '/swarms', undefined, { signal })
-      if (!Array.isArray(swarms)) return
-      const map: Record<string, { swarm: string; role: string }> = {}
-      await Promise.all(swarms.map(async (sw: any) => {
-        try {
-          const st = await api('GET', `/swarms/${encodeURIComponent(sw.name)}`, undefined, { signal })
-          if (st?.supervisor) map[st.supervisor] = { swarm: sw.name, role: 'leader' }
-          for (const m of (st?.members || [])) {
-            if (m?.session) map[m.session] = { swarm: sw.name, role: m.role === 'leader' || m.role === 'master' ? 'leader' : 'member' }
-          }
-        } catch {}
-      }))
-      if (!signal.aborted) setSwarmMap(map)
-    }, 8000).stop
-  }, [])
+  useEffect(() => pollWhileVisible(async signal => {
+    const groups = await loadSwarmDirectory()
+    if (!signal.aborted) setSwarmMap(swarmSessionMembership(groups).sessions)
+  }, 10000).stop, [])
   // W7 关闭分流（非 worktree 确认后结束；worktree 有东西三选一；同 worktree 还有别人只关自己）和左树同一份
   const closer = useSessionCloser(closeTerm, () => { void load().catch(() => {}) })
   const goSwarm = (sw: string) => { location.hash = '#/swarm/' + encodeURIComponent(sw) }
@@ -421,7 +408,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                           {ann.primary.external && <Tag className="wt" style={{ margin: 0, flex: '0 0 auto' }}><WindowsIcon size={11} /></Tag>}
                         </>)
                       })()}
-                      {sw && <Tag color="blue" style={{ margin: 0, flex: '0 0 auto' }}>{t('nav.swarm')}:{sw.swarm}{sw.role === 'leader' ? `·${t('swarm.master')}` : ''}</Tag>}
+                      {sw && <Tag color="blue" style={{ margin: 0, flex: '0 0 auto' }}>{t('nav.swarm')}:{sw.label}</Tag>}
                       {waiting && !dormant && <Tag color="warning" style={{ margin: 0, flex: '0 0 auto' }}>{t('session.waiting')}</Tag>}
                       {agent && !dormant && <span className="tt-agentmark"><AgentLogo kind={agent} size={12} />{agentName(agent)}</span>}
                       {/* 休眠会话必须一眼看得出来。从前它和活会话一样显示「空闲中」，
@@ -438,11 +425,11 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                     <span className="tm" title={absTime(s.last_activity)}>{relTime(s.last_activity, t)}</span>
                     <span className="acts" onClick={(e) => e.stopPropagation()}>
                       {!sw && wide && <a onClick={() => setForking(s.name)}>{t('session.fork.entry')}</a>}
-                      {sw && <a onClick={() => goSwarm(sw.swarm)}>{t('session.swarmPage')}</a>}
+                      {sw && <button type="button" className="tt-act" onClick={() => goSwarm(sw.swarm)}>{t('session.swarmPage')}</button>}
                       {sw ? (
                         <Popconfirm
                           title={t('session.closeSwarmSessionTitle')}
-                          description={<div style={{ maxWidth: 280 }}>{t('session.closeSwarmSessionDesc', { swarm: sw.swarm, role: sw.role === 'leader' ? t('swarm.master') : t('swarm.member') })}</div>}
+                          description={<div style={{ maxWidth: 280 }}>{t('session.closeSwarmSessionDesc', { swarm: sw.label, role: t('swarm.member') })}</div>}
                           okText={t('session.closeAnyway')} okButtonProps={{ danger: true }} cancelText={t('common.cancel')}
                           onConfirm={() => closer.kill(s.name)}>
                           <a style={{ color: '#f85149' }}>{t('session.close')}</a>

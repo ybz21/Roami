@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/backend/okr"
 	"github.com/ybz21/Roami/backend/project"
+	"github.com/ybz21/Roami/backend/ttmux"
 	"github.com/ybz21/Roami/internal/metadb"
 	storage "github.com/ybz21/Roami/internal/storage"
 )
@@ -170,18 +172,36 @@ func TestProjectOKRAPIRejectsHistoryNullValuesAndMalformedInput(t *testing.T) {
 	}
 }
 
-func TestProjectOKRAPIBindsOnlyExistingSwarmAndNormalizesName(t *testing.T) {
-	a, router, projectID := projectOKRFixture(t)
-	if _, err := a.Meta.Exec(`INSERT INTO swarms(id,name,goal,status,created,dir,supervisor) VALUES(?,?,?,'running',?,?,?)`, "2026-1103-1200-abcd", "existing-group", "test", "2026-11-03 12:00:00", "", ""); err != nil {
-		t.Fatal(err)
-	}
-	path := "/projects/" + projectID + "/okr"
-	missing := strings.Replace(projectOKRConfigJSON(), `"swarm":""`, `"swarm":"2026-1103-1200-xxxx"`, 1)
-	projectOKRRequest(t, router, "PUT", path, missing, http.StatusBadRequest)
-	body := strings.Replace(projectOKRConfigJSON(), `"swarm":""`, `"swarm":"2026-1103-1200-abcd"`, 1)
-	w := decodeProjectOKR(t, projectOKRRequest(t, router, "PUT", path, body, http.StatusOK))
-	if w.Swarm != "existing-group" {
-		t.Fatalf("swarm route identity: %q", w.Swarm)
+func TestProjectOKRAPIBindsManagedSwarmByStableID(t *testing.T) {
+	const id = "sw-0123456789abcdef0123456789abcdef"
+	const other = "sw-1123456789abcdef0123456789abcdef"
+	for _, tc := range []struct {
+		name, key, directory string
+		status               int
+	}{
+		{"id", id, `{"data":[{"id":"` + id + `","name":"existing-group"}]}`, 200},
+		{"unique name", "existing-group", `{"data":[{"id":"` + id + `","name":"existing-group"}]}`, 200},
+		{"duplicate name", "existing-group", `{"data":[{"id":"` + id + `","name":"existing-group"},{"id":"` + other + `","name":"existing-group"}]}`, 400},
+		{"archived", id, `{"data":[{"id":"` + id + `","name":"existing-group","archived":true}]}`, 400},
+		{"legacy only", "legacy-group", `{"data":[]}`, 400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a, router, projectID := projectOKRFixture(t)
+			if _, err := a.Meta.Exec(`INSERT INTO swarms(id,name,goal,status,created,dir,supervisor) VALUES('legacy','legacy-group','test','running','','','')`); err != nil {
+				t.Fatal(err)
+			}
+			bin := filepath.Join(t.TempDir(), "directory-cli")
+			script := "#!/bin/sh\n[ \"$*\" = 'swarm ls --json' ] || exit 1\ncat <<'JSON'\n" + tc.directory + "\nJSON\n"
+			if err := os.WriteFile(bin, []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			a.TT = ttmux.New(bin)
+			body := strings.Replace(projectOKRConfigJSON(), `"swarm":""`, `"swarm":"`+tc.key+`"`, 1)
+			response := projectOKRRequest(t, router, "PUT", "/projects/"+projectID+"/okr", body, tc.status)
+			if tc.status == 200 && decodeProjectOKR(t, response).Swarm != id {
+				t.Fatal(response.Body.String())
+			}
+		})
 	}
 }
 

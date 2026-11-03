@@ -105,7 +105,7 @@ func dirExists(p string) bool {
 const Version = "0.4.1-go"
 
 func (r Runtime) EnsureDirs() error {
-	for _, dir := range []string{r.LogsDir, r.GroupsDir, r.MetaDir, filepath.Join(r.HomeDir, "swarms")} {
+	for _, dir := range []string{r.LogsDir, r.GroupsDir, r.MetaDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}

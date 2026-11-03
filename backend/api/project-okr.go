@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -127,17 +126,6 @@ func (a *API) resolveOKRSwarm(ctx context.Context, key string) (string, error) {
 	if key == "" {
 		return "", nil
 	}
-	if a.Meta.OK() {
-		var name string
-		err := a.Meta.QueryRow(`SELECT name FROM swarms WHERE id=? OR name=? LIMIT 1`, key, key).Scan(&name)
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", okr.ErrInvalid
-		}
-		if err != nil {
-			return "", err
-		}
-		return name, nil
-	}
 	if a.TT == nil {
 		return "", okr.ErrInvalid
 	}
@@ -147,17 +135,32 @@ func (a *API) resolveOKRSwarm(ctx context.Context, key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var swarms []struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+	var response struct {
+		Data []struct {
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			Archived bool   `json:"archived"`
+		} `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(out), &swarms); err != nil {
+	if err := json.Unmarshal([]byte(out), &response); err != nil {
 		return "", err
 	}
-	for _, s := range swarms {
-		if (key == s.ID || key == s.Name) && s.ID != "" {
-			return s.Name, nil
+	for _, s := range response.Data {
+		if key == s.ID && !s.Archived {
+			return s.ID, nil
 		}
+	}
+	resolved := ""
+	for _, s := range response.Data {
+		if key == s.Name && s.ID != "" && !s.Archived {
+			if resolved != "" {
+				return "", okr.ErrInvalid
+			}
+			resolved = s.ID
+		}
+	}
+	if resolved != "" {
+		return resolved, nil
 	}
 	return "", okr.ErrInvalid
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/ybz21/Roami/backend/browser/automation"
 	"github.com/ybz21/Roami/internal/cli"
 	"github.com/ybz21/Roami/internal/cli/completion"
+	swarmcommand "github.com/ybz21/Roami/internal/cli/swarm"
 	"github.com/ybz21/Roami/internal/plugin"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 	"os"
@@ -96,7 +97,31 @@ func discoverPlugins() ([]pluginInfo, error) {
 
 func runSession(args []string) int { return runSessionEngine(args) }
 
+func runSwarm(args []string) int {
+	if swarmcommand.HelpRequested(args) {
+		if err := swarmcommand.Run(runtime.Runtime{}, args, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
+	release, err := instanceLease()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	defer release()
+	if err := swarmcommand.Run(runtime.New(), args, os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
 func runSessionEngine(args []string) int {
+	if len(args) > 0 && args[0] == "swarm" {
+		return runSwarm(args[1:])
+	}
 	needsStorage := len(args) == 0 || (args[0] != "help" && args[0] != "--help" && args[0] != "-h" && args[0] != "--version" && args[0] != "-v")
 	if needsStorage {
 		release, err := instanceLease()
@@ -140,6 +165,8 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 			switch rest[0] {
 			case "session":
 				return true, runSession([]string{"help"})
+			case "swarm":
+				return true, runSwarm(append([]string{"help"}, rest[1:]...))
 			case "chrome":
 				return true, runChrome([]string{"help"})
 			case "adb":
@@ -162,6 +189,8 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 		return true, 0
 	case "session":
 		return true, runSession(rest)
+	case "swarm":
+		return true, runSwarm(rest)
 	case "ttmux":
 		fmt.Fprintln(os.Stderr, "ttmux entry retired; use roami session <command>")
 		return true, 2
@@ -214,7 +243,7 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 
 func legacySessionCommand(word string) bool {
 	switch word {
-	case "ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "resolve", "send", "keys", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm":
+	case "ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "resolve", "send", "keys", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info":
 		return true
 	}
 	return false
@@ -255,7 +284,8 @@ func forward(bin string, args []string) int {
 
 func printHelp(_ []pluginInfo) {
 	fmt.Printf("roami %s — 统一命令入口\n\n", displayVersion())
-	fmt.Println("  session <命令>     会话、窗格、蜂群与环境")
+	fmt.Println("  session <命令>     会话、窗格与环境")
+	fmt.Println("  swarm <命令>       Main 蜂群：协作、群聊、看板与受管任务")
 	fmt.Println("  chrome <命令>      浏览器自动化")
 	fmt.Println("  adb [参数...]      Android 设备操作（转发系统 ADB）")
 	fmt.Println("  project <命令>     ls / show / sessions / create / prefs / activity / remove")

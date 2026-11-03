@@ -15,7 +15,6 @@
     "design:capabilities": "node scripts/build-capability-design.mjs"
   },
   "dependencies": {
-    "@hello-pangea/dnd": "^16.6.0",
     "@jvmr/pptx-to-html": "^1.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@xterm/addon-fit": "^0.10.0",
@@ -34,12 +33,14 @@
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
+    "three": "0.180.0",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/three": "0.180.0",
     "@vitejs/plugin-react": "^4.3.3",
     "jsdom": "^26.1.0",
     "typescript": "^5.6.3",

@@ -25,6 +25,7 @@ class Scheduler:
         memory_jobs,
         *,
         task_sessions=None,
+        swarms=None,
     ):
         self.db, self.settings, self.context, self.dispatch = database, settings, context, dispatch
         self.mailbox, self.run_turn, self.wakeup, self.active = mailbox, run_turn, wakeup, active
@@ -32,6 +33,7 @@ class Scheduler:
         self.stopping = False
         self.memory_jobs = memory_jobs
         self.task_sessions = task_sessions
+        self.swarms = swarms
 
     async def run(self):
         while not self.stopping:
@@ -56,7 +58,7 @@ class Scheduler:
                 "LEFT JOIN turns t ON j.kind='turn.run' AND t.id=j.aggregate_id "
                 "LEFT JOIN task_attempts a ON j.kind='task.run' AND a.id=json_extract(j.payload_json,'$.runId') "
                 "LEFT JOIN branches b ON b.id=a.native_branch_id "
-                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','task.run','task.verify','task.close_session','memory.daily','memory.extract') "
+                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','task.run','task.verify','task.close_session','swarm.advance','memory.daily','memory.extract') "
                 "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'task.verify' THEN 0 WHEN 'task.close_session' THEN 1 WHEN 'turn.run' THEN 2 WHEN 'task.run' THEN 3 WHEN 'context.compact' THEN 4 WHEN 'memory.daily' THEN 5 ELSE 6 END,"
                 "CASE WHEN j.kind='turn.run' AND t.trigger_kind='user' AND COALESCE(json_extract(j.payload_json,'$.deferred'),0)=0 THEN 0 ELSE 1 END,j.rowid LIMIT 100",
                 (now_ms(),),
@@ -122,6 +124,9 @@ class Scheduler:
 
     async def _job(self, job):
         try:
+            if job["kind"] == "swarm.advance":
+                await self.swarms.advance(job)
+                return
             if job["kind"] == "task.close_session":
                 await self.task_sessions.advance(job)
                 return

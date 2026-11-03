@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import { loadSwarmDirectory } from '../components/swarm/swarm-directory'
 import { buildSessionProjects, setSessionProjects } from '../components/sessions/session-project'
 import { loadTreeSrc, saveTreeSrc, type TreeSrc } from '../components/shell/task-tree-snapshot'
 
@@ -40,7 +41,7 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
       try {
         const prP = api('GET', '/projects')
         const anP = api('GET', '/sessions/annotations').catch(() => null)
-        const swP = api('GET', '/swarms').catch(() => null)
+        const swP = loadSwarmDirectory().catch(() => null)
         void anP.then((an) => {
           if (stop || !an?.data) return
           const known = treeSrcRef.current.projects
@@ -54,8 +55,7 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
         setUnfinished(projects.reduce((n: number, p: any) => n + (p.unfinished || 0), 0))
         const placement = buildSessionProjects(projects, an?.data || {})
         setSessionProjects(placement)
-        const swarms = Array.isArray(sw) ? sw : sw?.data || []
-        setSwarmCount(swarms.filter((x: any) => x?.status && x.status !== 'archived').length)
+        if (sw) setSwarmCount(sw.filter(group => !group.archived).length)
         void loadGit()
         setTreeSrc((cur) => ({ ...cur, projects }))
         // Worktree scans are expensive: serialize them and keep the slower cadence.

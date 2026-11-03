@@ -22,12 +22,12 @@ const initial: Workspace = {
   projectId: 'stable-project', revision: 3, objective: 'Launch', startDate: '2026-11-01', endDate: '2026-11-30',
   metrics: [{ id: 'visits', name: 'Visits', unit: 'people', source: 'manual' }, { id: 'stars', name: 'Stars', unit: '', source: 'github', repo: 'owner/repo', field: 'stars' }],
   keyResults: [{ id: 'kr1', title: 'Reach people', metricId: 'visits', horizon: 'short', target: 100, mode: 'atLeast', dueDate: '2026-11-30' }],
-  swarm: 'real-team', autoCollect: false, observations: [], reviews: [], updatedAt: '2026-11-03T00:00:00Z',
+  swarm: 'stable-team', autoCollect: false, observations: [], reviews: [], updatedAt: '2026-11-03T00:00:00Z',
 }
 beforeEach(() => {
   state.phone = false
   state.api.mockReset()
-  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [{ id: 'stable-team', name: 'real-team' }] : { data: initial })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [{ id: 'stable-team', name: 'real-team' }] } : { data: initial })
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
@@ -35,7 +35,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
 it('keeps an edited objective across 409, reloads revision and saves only configuration', async () => {
   let conflicted = false
   state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/swarms') return [{ id: 'stable-team', name: 'real-team' }]
+    if (path === '/agent/swarms') return { data: [{ id: 'stable-team', name: 'real-team' }] }
     if (method === 'PUT' && !conflicted) { conflicted = true; throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 }) }
     if (method === 'PUT') return { data: { ...initial, ...body, revision: 9 } }
     return { data: { ...initial, revision: conflicted ? 8 : 3 } }
@@ -60,7 +60,7 @@ it('keeps an edited objective across 409, reloads revision and saves only config
 it('records manual zero and real review input, uses each returned revision and links to the existing swarm', async () => {
   let revision = 3
   state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/swarms') return [{ id: 'stable-team', name: 'real-team' }]
+    if (path === '/agent/swarms') return { data: [{ id: 'stable-team', name: 'real-team' }] }
     if (method === 'POST') return { data: { ...initial, revision: ++revision, reviews: path.endsWith('/reviews') ? [{ id: 'review', ...body, evidenceRevision: revision - 1, date: '2026-11-03T01:00:00Z' }] : [] } }
     return { data: initial }
   })
@@ -68,7 +68,7 @@ it('records manual zero and real review input, uses each returned revision and l
   await screen.findByText('Launch')
   expect(screen.queryByTestId('activities')).toBeNull()
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.activities' }))
-  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', 'real-team')
+  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', 'stable-team')
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
   panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '0' } })
@@ -86,13 +86,13 @@ it('records manual zero and real review input, uses each returned revision and l
 })
 
 it('does not collect on template selection or page load; only collects saved sources on explicit action', async () => {
-  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: null })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: null })
   const view = render(<ProjectOkr projectId="new-project" />)
   fireEvent.click(await screen.findByRole('button', { name: 'okr.template.use' }))
   expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('okr.template.objective')
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
   view.unmount()
-  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: initial })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: initial })
   render(<ProjectOkr projectId="stable-project" />)
   await screen.findByText('Launch')
   panel('data')
@@ -102,7 +102,7 @@ it('does not collect on template selection or page load; only collects saved sou
 
 it('keeps manual and review input on conflicts and never displays invented progress', async () => {
   state.api.mockImplementation(async (method, path) => {
-    if (path === '/swarms') return []
+    if (path === '/agent/swarms') return { data: [] }
     if (method === 'POST') throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 })
     return { data: initial }
   })
@@ -140,7 +140,7 @@ it('uses a URL-backed phone page without pushing overlay history and returns to 
 it('keeps a removed manual metric unselected after conflict instead of moving the draft to another metric', async () => {
   let changed = false
   state.api.mockImplementation(async (method, path) => {
-    if (path === '/swarms') return []
+    if (path === '/agent/swarms') return { data: [] }
     if (method === 'POST') { changed = true; throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 }) }
     return { data: changed ? { ...initial, revision: 8, metrics: [{ id: 'another', name: 'Another metric', source: 'manual', unit: '' }], keyResults: [{ ...initial.keyResults[0], metricId: 'another' }] } : initial }
   })
@@ -162,19 +162,19 @@ it('keeps a removed manual metric unselected after conflict instead of moving th
 
 it('keeps removed-metric history traceable and marks reviews only after a subsequent revision', async () => {
   const historical = { ...initial, revision: 4, reviews: [{ id: 'review', summary: 'Saved review', actions: '', date: '2026-11-03T01:00:00Z', evidenceRevision: 3 }], observations: [{ id: 'old', metricId: 'removed', date: '2026-11-01', value: 6, note: 'Retained evidence', source: 'manual', sourceKey: 'manual:removed', capturedAt: '2026-11-01T01:00:00Z' }] }
-  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: historical })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: historical })
   const view = render(<ProjectOkr projectId="stable-project" />)
   expect(await screen.findByText('Retained evidence')).toBeTruthy()
   expect(screen.queryByText('okr.reviewUpdated')).toBeNull()
   view.unmount()
-  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: { ...historical, revision: 5 } })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: { ...historical, revision: 5 } })
   render(<ProjectOkr projectId="stable-project" />)
   expect(await screen.findByText('okr.reviewUpdated')).toBeTruthy()
 })
 
 it('creates a workspace with an arbitrary manual metric and key result at revision zero', async () => {
   state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/swarms') return []
+    if (path === '/agent/swarms') return { data: [] }
     if (method === 'PUT') return { data: { ...body, projectId: 'new-project', revision: 1, observations: [], reviews: [], updatedAt: '2026-11-03T01:00:00Z' } }
     return { data: null }
   })
@@ -200,7 +200,7 @@ it('updates visible snapshots every 30 seconds without loops, backs off errors a
   let next = initial, fail = false, hold = false
   let finish!: (response: { data: Workspace }) => void
   state.api.mockImplementation(async (_method, path) => {
-    if (path === '/swarms') return []
+    if (path === '/agent/swarms') return { data: [] }
     if (fail) { fail = false; throw new Error('Offline') }
     if (hold) { hold = false; return new Promise(resolve => { finish = resolve }) }
     return { data: { ...next } }
@@ -258,7 +258,7 @@ it('discards a poll when editing starts in flight and preserves manual or review
   let next = initial, hold = false
   let finish!: (response: { data: Workspace }) => void
   state.api.mockImplementation(async (method, path) => {
-    if (path === '/swarms') return []
+    if (path === '/agent/swarms') return { data: [] }
     if (method === 'POST') throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 })
     if (hold) { hold = false; return new Promise(resolve => { finish = resolve }) }
     return { data: next }
@@ -307,7 +307,7 @@ it('discards a poll when editing starts in flight and preserves manual or review
 
 it.each([false, true])('adopts a goal saved by the discussion without silently overwriting a dirty builder (%s)', async dirty => {
   let saved = false
-  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: saved ? { ...initial, revision: 1 } : null })
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: saved ? { ...initial, revision: 1 } : null })
   render(<ProjectOkr projectId="new-project" />)
   await screen.findByLabelText('okr.objective')
   if (dirty) fireEvent.change(screen.getByLabelText('okr.objective'), { target: { value: 'My unsaved goal' } })

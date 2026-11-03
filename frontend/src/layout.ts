@@ -26,6 +26,7 @@ export type LayoutState = {
   coarse: boolean
   /** 软键盘高度 px，0 = 收起 */
   keyboard: number
+  reducedMotion: boolean
 }
 
 /** 档位下界，与 13 §3.1 的表一一对应。 */
@@ -40,6 +41,7 @@ const QUERIES = {
   large: `(min-width: ${BREAKPOINTS.large}px)`,
   landscape: '(max-height: 480px) and (orientation: landscape)',
   coarse: '(pointer: coarse)',
+  motion: '(prefers-reduced-motion: reduce)',
 } as const
 
 function matches(query: string): boolean {
@@ -82,6 +84,7 @@ function read(): LayoutState {
     landscape: matches(QUERIES.landscape),
     coarse: matches(QUERIES.coarse),
     keyboard: currentKeyboard(),
+    reducedMotion: matches(QUERIES.motion),
   }
 }
 
@@ -90,7 +93,7 @@ const listeners = new Set<() => void>()
 
 function same(a: LayoutState, b: LayoutState): boolean {
   return a.size === b.size && a.landscape === b.landscape
-    && a.coarse === b.coarse && a.keyboard === b.keyboard
+    && a.coarse === b.coarse && a.keyboard === b.keyboard && a.reducedMotion === b.reducedMotion
 }
 
 function publish() {

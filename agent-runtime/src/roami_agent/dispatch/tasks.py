@@ -747,8 +747,14 @@ class Tasks:
             await self.get(owner, task_id)
         return result_task
 
-    async def cancel(self, owner, task_id):
+    async def cancel(self, owner, task_id, *, expected_revision=None):
         def write(db):
+            if expected_revision is not None:
+                current = row(
+                    db, "SELECT revision FROM tasks WHERE id=? AND owner_id=?", (task_id, owner)
+                )
+                if not current or current["revision"] != expected_revision:
+                    raise DomainError("TASK_REVISION_CHANGED", 409)
             result = request_task_cancellation(db, owner, task_id)
             pending = rows(
                 db,

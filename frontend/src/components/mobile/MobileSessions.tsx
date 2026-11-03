@@ -4,6 +4,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Input, Modal, Spin, App as AntApp } from 'antd'
 import { api } from '../../api'
+import { pollWhileVisible } from '../../visible-poll'
+import { loadSwarmDirectory } from '../swarm/swarm-directory'
+import { swarmSessionMembership, type SwarmSessionMember } from '../swarm/swarm-session-membership'
 import { useI18n } from '../../i18n'
 import { AgentLogo, ChevronRight, CloseIcon, PencilIcon, StopIcon, SwarmIcon, TerminalIcon, PlusIcon } from '../../icons'
 import { MobileSheet, SheetRow } from '../shell/MobileSheet'
@@ -121,31 +124,15 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     return () => { stop = true; clearInterval(timer) }
   }, [])
 
-  // 蜂群：成员会话折成一张卡（领队一行、成员缩进、N 待解锁），点卡头进蜂群页。和桌面会话页同一条取数路
-  const [swarmOf, setSwarmOf] = useState<Record<string, { swarm: string; role: 'leader' | 'member' }>>({})
+  const [swarmOf, setSwarmOf] = useState<Record<string, SwarmSessionMember>>({})
   const [swarmPending, setSwarmPending] = useState<Record<string, number>>({})
-  useEffect(() => {
-    let stop = false
-    const load = async () => {
-      try {
-        const swarms = await api('GET', '/swarms')
-        if (!Array.isArray(swarms)) return
-        const of: typeof swarmOf = {}, pend: Record<string, number> = {}
-        await Promise.all(swarms.map(async (sw: any) => {
-          try {
-            const st = await api('GET', `/swarms/${encodeURIComponent(sw.name)}`)
-            if (st?.supervisor) of[st.supervisor] = { swarm: sw.name, role: 'leader' }
-            for (const m of (st?.members || [])) if (m?.session) of[m.session] = { swarm: sw.name, role: m.role === 'leader' || m.role === 'master' ? 'leader' : 'member' }
-            pend[sw.name] = Array.isArray(st?.pending) ? st.pending.length : 0
-          } catch {}
-        }))
-        if (!stop) { setSwarmOf(of); setSwarmPending(pend) }
-      } catch {}
+  useEffect(() => pollWhileVisible(async signal => {
+    const groups = await loadSwarmDirectory()
+    if (!signal.aborted) {
+      const membership = swarmSessionMembership(groups)
+      setSwarmOf(membership.sessions); setSwarmPending(membership.pending)
     }
-    void load()
-    const i = setInterval(load, 10000)
-    return () => { stop = true; clearInterval(i) }
-  }, [])
+  }, 10000).stop, [])
 
   const needle = q.trim().toLowerCase()
   const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : filter === 'activity' || filter === 'unfinished' ? false : !s.waiting && !s.running && !s.dormant)
@@ -195,16 +182,15 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       if (seen.has(sw.swarm)) continue
       seen.add(sw.swarm)
       const members = list.filter((x) => swarmOf[x.name]?.swarm === sw.swarm)
-      const leader = members.filter((x) => swarmOf[x.name]?.role === 'leader'), rest = members.filter((x) => swarmOf[x.name]?.role !== 'leader')
       const pending = swarmPending[sw.swarm] || 0
       out.push(
         <div key={'sw:' + sw.swarm} className="tt-msess-task swarm">
           <button type="button" className="tn" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(sw.swarm) }}>
-            <SwarmIcon size={14} /><b>{sw.swarm}</b><span>{members.length}</span>
+            <SwarmIcon size={14} /><b>{sw.label}</b><span>{members.length}</span>
             {pending > 0 && <i className="pend">{t('swarm.pendingSummary', { count: pending })}</i>}
             <ChevronRight size={14} />
           </button>
-          {[...leader, ...rest].map((x) => row(x, true))}
+          {members.map((x) => row(x, true))}
         </div>,
       )
     }

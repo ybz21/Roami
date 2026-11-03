@@ -119,7 +119,7 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
 
       {projSwarms.map((sw) => (
         <div key={sw.name} className="prj-cfoot">
-          <SwarmIcon size={12} /><b>{sw.name}</b>
+          <SwarmIcon size={12} /><b>{sw.label || sw.name}</b>
           <span className="dim">{t('project.swarm.members', { mine: sw.inProj, total: sw.total })}</span>
           <button type="button" onClick={(e) => { e.stopPropagation(); goSwarm(sw.name) }}>{t('project.swarm.board')}<Go /></button>
         </div>

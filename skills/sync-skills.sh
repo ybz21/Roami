@@ -20,7 +20,6 @@ TARGETS=("$DEST")
 [[ -d "${HOME}/.codex" ]] && TARGETS+=("${HOME}/.codex/skills")
 
 # 子文档拼接顺序；与 scripts/install/install-roami.sh 的 GitHub 下载分支保持一致。
-CC_SWARM_DOCS="intake decompose spawn patrol approve test-push review concurrency integrate memory"
 DEV_ROLES_DOCS="plaza board chrome pm architect frontend backend fullstack qa designer reviewer devops docs"
 
 # 把一个 skill 的 SKILL.md + docs/<doc>.md 合并到 $1（输出文件）。
@@ -36,7 +35,7 @@ merge_skill() {  # <out> <skill名> <doc顺序…>
 }
 
 # cc-swarm / dev-roles：SKILL.md + docs/*.md 先合并到临时文件，再分发到各目标。
-tmp_cc="$(mktemp)"; merge_skill "$tmp_cc" cc-swarm $CC_SWARM_DOCS
+tmp_cc="$(mktemp)"; merge_skill "$tmp_cc" cc-swarm
 tmp_dr="$(mktemp)"; merge_skill "$tmp_dr" dev-roles $DEV_ROLES_DOCS
 
 for d in "${TARGETS[@]}"; do

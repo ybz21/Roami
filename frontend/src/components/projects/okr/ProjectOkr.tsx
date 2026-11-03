@@ -7,6 +7,7 @@ import { pollWhileVisible } from '../../../visible-poll'
 import { BotIcon, ChevronLeft, PencilIcon } from '../../../icons'
 import MobileSubPage from '../../MobileSubPage'
 import { getHashParams } from '../../../route-hash'
+import { loadSwarmDirectory } from '../../swarm/swarm-directory'
 import OkrConfiguration, { OkrField, type SwarmOption } from './OkrConfiguration'
 import { configurationOf, dailyHistory, emptyConfiguration, projectPath, resultOverview, resultAttainment, shanghaiDate, sourceObservations, type Configuration, type Workspace } from './okr-workspace'
 import OkrReviewEvidence from './OkrReviewEvidence'
@@ -76,9 +77,8 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   useEffect(() => () => workspaceRead.current?.controller.abort(), [readWorkspace])
   const loadSwarms = useCallback(async () => {
     try {
-      const response = await api('GET', '/swarms')
-      const rows = Array.isArray(response) ? response : response.data || []
-      setSwarms(rows.map((s: { id: string; name: string }) => ({ id: s.name, name: s.name })))
+      const rows = await loadSwarmDirectory()
+      setSwarms(rows.filter(s => !s.archived).map(s => ({ id: s.id, name: s.name })))
       setSwarmError(false)
     } catch { setSwarmError(true) }
   }, [])

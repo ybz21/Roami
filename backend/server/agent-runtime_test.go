@@ -42,6 +42,14 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		}
 	}
 	for _, request := range []struct{ method, path string }{
+		{"GET", "/api/agent/swarms"},
+		{"POST", "/api/agent/swarms"},
+		{"GET", "/api/agent/swarms/probe"},
+		{"GET", "/api/agent/swarms/probe/events"},
+		{"POST", "/api/agent/swarms/probe/plan"},
+		{"POST", "/api/agent/swarms/probe/dependencies"},
+		{"POST", "/api/agent/swarms/probe/control"},
+		{"POST", "/api/agent/swarms/probe/messages"},
 		{"GET", "/api/agent/capability-markets"},
 		{"PUT", "/api/agent/capability-markets"},
 		{"GET", "/api/agent/capability-markets/npm/search?query=cli"},

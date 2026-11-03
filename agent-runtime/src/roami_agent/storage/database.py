@@ -204,4 +204,19 @@ def event(connection, conversation_id: str, kind: str, payload, *, key=None, **r
     ).lastrowid
     if getattr(connection, "event_conversations", None) is not None:
         connection.event_conversations.add(conversation_id)
+    if refs.get("task_id") and kind in {
+        "task.succeeded",
+        "task.failed",
+        "task.waiting_user",
+        "task.cancelled",
+        "task.interrupted",
+        "task.steered",
+    }:
+        for item in connection.execute(
+            "SELECT swarm_id FROM swarm_work_items WHERE task_id=?", (refs["task_id"],)
+        ):
+            connection.execute(
+                "INSERT OR IGNORE INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) VALUES(?,'swarm.advance',?,?,?,'queued',?)",
+                (identity(), item[0], "swarm.event:" + str(cursor), "{}", now_ms()),
+            )
     return cursor

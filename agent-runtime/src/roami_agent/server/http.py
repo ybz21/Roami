@@ -34,6 +34,7 @@ from roami_agent.protocol.http import (
 )
 from roami_agent.server.installation import Installation
 from roami_agent.server.model_settings import ModelSettings
+from roami_agent.server.swarm_routes import mount_swarm_routes
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
 EVENT_HEARTBEAT_SECONDS = 10
@@ -52,6 +53,7 @@ def create_app(runtime, *, manage_lifecycle=True):
         title="Roami Agent", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
     )
 
+    mount_swarm_routes(app, runtime)
     installation = Installation(runtime)
 
     @app.middleware("http")

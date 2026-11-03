@@ -45,7 +45,7 @@ For a manual observation submit `{"revision":N,"metricId":"followers","date":"YY
 
 ## Execute, reflect, execute
 
-Associate the workspace with an existing Swarm's canonical name. Create a Swarm or dispatch real tasks only when the user's request authorizes the work, following the session skill and native task routing. All members use the existing shared board and group chat; this workspace does not create a second message history.
+Associate the workspace with an existing managed Swarm's stable ID from `roami swarm ls --json` (`data[].id`). Create a Swarm or dispatch real tasks only when the user's request authorizes the work, following the session skill and native task routing. All members use the existing shared board and group chat; this workspace does not create a second message history.
 
 An executor reports actual artifacts and acceptance evidence. A data role records verified observations. A separate reflection role reads the current workspace and delivery evidence, separates facts from hypotheses, then submits `{"revision":N,"summary":"evidence and uncertainty","actions":"specific next experiments"}`. The server records the evidence revision. Changed data or goals require a fresh review before adopting its conclusions.
 

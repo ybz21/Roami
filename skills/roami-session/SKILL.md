@@ -3,12 +3,13 @@ name: roami-session
 description: 管理 Roami 的持久会话、派生派活、会话通信和 swarm 蜂群：创建成员、看板分工、消息协作、巡检与完成状态。用于会话 CLI 操作，不替代项目开发流程。
 allowed-tools:
   - Bash(roami session *)
+  - Bash(roami swarm *)
   - Read
 ---
 
 # Roami 会话
 
-使用 `roami session help` 查询本节点支持的命令。当前 CLI 没有 `swarm help`；子命令不统一支持 `--help`，不要把它当作无副作用的探测方式。
+使用 `roami session help` 查询本节点支持的命令。蜂群入口为 `roami swarm`，`roami swarm help` 和蜂群子命令 `--help` 只显示帮助；其他能力仍先查其帮助。`roami session swarm` 使用同一实现。
 
 会话 ID 是稳定身份，label 只是可重复的展示名；自动化先用 `roami session resolve <目标> --strict --json` 解析，再保存返回的 ID。
 
@@ -35,35 +36,31 @@ roami session kill <会话ID> --yes
 
 ## 蜂群分工与沟通
 
-按任务范围和项目规则选择并行方式，已有授权不重复询问。需要完整拆任务、巡检与集成流程时按需读同目录的 `cc-swarm` skill；需要角色职责划分时读 `dev-roles` skill。
-
-当前会话自己指挥时，用 `--no-master` 避免额外启动指挥 Agent。省略该参数会尝试启动 Claude 指挥会话。成员的 `--kind` 要选择本机已安装可用的类型；显式 `--role member` 避免首个成员被当成指挥。
+蜂群绑定现有 Roami Main。使用 `cc-swarm` skill 了解受管任务编排，使用 `dev-roles` 定义角色范围与验收。当前 CLI 不启动额外指挥，也不接受旧的 add/adopt/done/activate、卡片流转或广场监听命令。
 
 ```bash
-roami session swarm new <群> --goal "目标与验收标准" --no-master
-roami session swarm add <群> <成员> --type agent --kind codex --role member --dir /path/to/worktree "任务与验收标准"
-roami session swarm status <群> --json
-roami session swarm collect <群> --json
-roami session swarm task add <群> "任务标题" --desc "范围与验收标准" --assignee <成员>
-roami session swarm task assign <群> <卡ID> <成员>
-roami session swarm task ls <群> --assignee <成员> --json
-roami session swarm task show <群> <卡ID>
-roami session swarm task move <群> <卡ID> doing
-roami session swarm board <群> --json
-roami session swarm say <群> --as <成员> --kind note "进展或接口约定"
-roami session swarm say <群> --to <成员> --kind ask "需要确认的问题"
-roami session swarm feed <群> --json
-roami session swarm listen <群> --as <成员> --mentions --once
-roami session swarm task done <群> <卡ID>
-roami session swarm done <群> <成员>
-roami session swarm done <群>
+roami swarm new <名称> --key <持久请求键> --goal "目标与验收标准" [--main-conversation <对话ID>] [--dir <目录>]
+roami swarm ls
+roami swarm status <sw-id>
+roami swarm board <sw-id>
+roami swarm chat <sw-id> --follow
+roami swarm members <sw-id>
+roami swarm work <sw-id> <成员名或工作项ID>
+roami swarm collect <sw-id>
+roami swarm plan <sw-id> --file plan.json
+roami swarm dependencies <sw-id> --file dependencies.json
+roami swarm pause <sw-id> --key pause-1 --revision N
+roami swarm resume <sw-id> --key resume-1 --revision N
+roami swarm stop <sw-id> --key stop-1 --revision N
+roami swarm archive <sw-id> --key archive-1 --revision N
+roami swarm say <sw-id> "补充需求" --key message-1
+roami swarm say <sw-id> "继续修改" --to api --task-revision N --key revise-1
+roami swarm member add <sw-id> api --executor codex --goal "实现接口" --acceptance "接口测试通过" --key member-1 --revision N
 ```
 
-`--type agent` 的内容是给 Agent 的任务，`--type task` 的内容是 shell 命令。`swarm say --to` 将消息写入广场，不能替代 `session send` 向终端提交输入；巡检时读 `feed` / `listen`，需要直接续派任务时用会话 ID 发送。
+`new` 缺省复用节点 Main，也可明确指定现有普通 Main 对话。`--json` 提供结构化结果，`chat/board/status --follow` 通过 SSE 订阅并退避重连，Ctrl-C 退出。`--file -` 可从 stdin 读取批量计划等完整 JSON 请求。请求文件使用 `commandKey` 持久幂等键，计划/依赖/控制还带 `expectedRevision`。成员在计划中指定 executor、goal、acceptance 与 dependencies，实际派发走 Tasks。指定上游版本通过独立验收后才解锁下游；最终整合项覆盖全部工作后整群才完成。
 
-任务卡状态、成员完成状态与实际产物需分别核对。成员成果通过验收后再标记卡片和成员完成，最后做整体验收。`swarm add --depends-on` 记录软依赖，不阻止新成员启动；需要等上游时先验收上游再派下游。`swarm activate <群> [成员]` 用于解锁已有挂起成员。
-
-普通会话的创建与发送输入、专业智能体的任务派发是不同操作；需要专业任务的结果和验收时使用 `roami agent execution`，不要把命令投递成功当成任务完成。
+用户发给 Main 的群聊进入绑定对话；指定成员时续派原任务。专业执行器使用任务提示中提供的 taskId/runId/taskRevision，执行 `swarm post <sw-id> --file message.json` 回传讨论。普通会话的 send 与专业任务派发仍是不同操作。
 
 ## 生命周期与隔离
 

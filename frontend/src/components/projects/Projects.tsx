@@ -1,3 +1,8 @@
+import { nodeApi } from '../cluster/node-url'
+import '../swarm/swarm.css'
+import { loadSwarmDirectory } from '../swarm/swarm-directory'
+import { swarmStateToken, type SwarmSnapshot } from '../swarm/swarm-protocol'
+import { pollWhileVisible } from '../../visible-poll'
 import { useSettingsDraft } from '../settings/settings-draft'
 import NativeProjectSessions from '../agent/NativeProjectSessions'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
@@ -816,7 +821,8 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [cx, setCx] = useState<Record<string, boolean>>({})
   const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
   const [races, setRaces] = useState<any[]>([])
-  const [swarms, setSwarms] = useState<any[]>([])
+  const swarmScope = nodeApi('/agent/swarms')
+  const [swarms, setSwarms] = useState<SwarmSnapshot[]>([])
   const [swarmOpen, setSwarmOpen] = useState(false)
   // 「＋ 开始」的主动作：回到 composer 并聚焦——这一页最主要的事就是在这儿描述需求
   const composerRef = useRef<HTMLDivElement>(null)
@@ -827,9 +833,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   }
   const [activity, setActivity] = useState<any[]>([])
   const [finishing, setFinishing] = useState<any>(null)
-  const [swarmExtras, setSwarmExtras] = useState<Record<string, { cols: Record<string, number>; last?: any }>>({})
-  const [saying, setSaying] = useState<string>('') // 给指挥发话的目标蜂群名
-  const [sayText, setSayText] = useState('')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [peeks, setPeeks] = useState<Record<string, string>>({})
   const [creating, setCreating] = useState(false)
@@ -901,28 +904,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const i = setInterval(loadRaces, 8000)
     return () => { stop = true; clearInterval(i) }
   }, [dir, isGit])
-  // 编队 tab 才拉的重数据（P5 帧一）：看板列计数 + 广场最后一条（15s）
-  useEffect(() => {
-    if (tab !== 'race' || !swarms.length) return
-    let stop = false
-    const loadExtras = () => swarms.forEach(async (sw: any) => {
-      try {
-        const [board, feed] = await Promise.all([
-          api('GET', `/swarms/${encodeURIComponent(sw.name)}/board`).catch(() => []),
-          api('GET', `/swarms/${encodeURIComponent(sw.name)}/feed?n=1`).catch(() => []),
-        ])
-        if (stop) return
-        const cols: Record<string, number> = {}
-        for (const c of (Array.isArray(board) ? board : [])) cols[c.col] = (cols[c.col] || 0) + 1
-        const posts = Array.isArray(feed) ? feed : []
-        setSwarmExtras((m) => ({ ...m, [sw.name]: { cols, last: posts[posts.length - 1] } }))
-      } catch {}
-    })
-    loadExtras()
-    const i = setInterval(loadExtras, 15000)
-    return () => { stop = true; clearInterval(i) }
-  }, [tab, swarms])
-
   // 活动流（懒加载：切到活动 tab 才拉，60s 后端缓存）
   useEffect(() => {
     if (tab !== 'act' || !proj) return
@@ -957,42 +938,14 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const claimedByDeeper = (c: string) => deeper.some((d) => c === d || c.startsWith(d + '/'))
     return sessions.filter((s) => !ann[s.name]?.primary?.repo && under(homeOf(s)) && !claimedByDeeper(homeOf(s)))
   }, [sessions, ann, dir, isGit, allProjects])
-  // 蜂群归属（08 §2.2）：两条判据取并集
-  //  1) 蜂群自报的工作目录 dir == 本项目目录（swarm new/adopt --dir 落库，CLI 建的群靠这条）
-  //  2) 「指挥/成员会话 ∈ 本项目会话」现算（老蜂群没有 dir，保留兼容）
-  // 光靠 2) 不够：项目会话来自 ttmux ls --json，而它按设计过滤掉所有蜂群会话，
-  // 于是 CLI 建的群 inProj 恒为 0、永远不显示（issue #125）。
-  const mineKey = useMemo(() => mine.map((s) => s.name).sort().join('\n'), [mine])
   useEffect(() => {
     if (!isGit) return
-    let stop = false
-    const loadSwarms = async () => {
-      try {
-        const list = await api('GET', '/swarms')
-        const names = new Set(mineKey.split('\n').filter(Boolean))
-        const here = normDir(dir)
-        const active = (Array.isArray(list) ? list : []).filter((s: any) => s.status !== 'archived')
-        const out: any[] = []
-        await Promise.all(active.map(async (sw: any) => {
-          try {
-            const st = await api('GET', `/swarms/${encodeURIComponent(sw.name)}`)
-            const members = (st?.members || []) as any[]
-            const inProj = members.filter((m: any) => names.has(m.session)).length + (st?.supervisor && names.has(st.supervisor) ? 1 : 0)
-            const swDir = normDir(sw.dir || st?.dir || '')
-            const byDir = !!here && !!swDir && swDir === here
-            const roster = members.length + (st?.supervisor ? 1 : 0)
-            // 认了 dir 的群，整支班子都算本项目的：它的会话本来就被 ls 过滤掉了，
-            // 按会话数算会显示成 0/N 且每行都标「跨项目」。
-            if (inProj > 0 || byDir) out.push({ ...sw, inProj: byDir ? roster : inProj, byDir, roster, supervisor: st?.supervisor || '', members })
-          } catch {}
-        }))
-        if (!stop) setSwarms(out.sort((a, b) => String(a.name).localeCompare(String(b.name))))
-      } catch {}
-    }
-    loadSwarms()
-    const i = setInterval(loadSwarms, 10000)
-    return () => { stop = true; clearInterval(i) }
-  }, [isGit, mineKey, dir])
+    return pollWhileVisible(async signal => {
+      const groups = await loadSwarmDirectory()
+      const matching = groups.filter(group => !group.archived && (normDir(group.target.directory || '') === normDir(dir) || group.target.projectId === proj?.key))
+      if (!signal.aborted) setSwarms(matching)
+    }, 10000).stop
+  }, [isGit, dir, proj?.key, swarmScope])
   // Agent 运行标注 + 待输入检测（仅本项目会话，量小）
   useEffect(() => {
     let stop = false
@@ -1018,16 +971,12 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [wts, expanded])
 
-  // session → 蜂群成员映射（任务流 ⬡ 分组 + 成员标签的数据源）
   const swarmMap = useMemo(() => {
-    const m: Record<string, { swarm: string; role: string; subrole?: string; done?: boolean }> = {}
-    for (const sw of swarms) {
-      if (sw.supervisor) m[sw.supervisor] = { swarm: sw.name, role: 'leader' }
-      for (const mem of (sw.members || [])) {
-        if (mem.session) m[mem.session] = { swarm: sw.name, role: mem.role === 'leader' || mem.role === 'master' ? 'leader' : 'member', subrole: mem.subrole, done: !!mem.done }
-      }
+    const members: Record<string, { swarm: string }> = {}
+    for (const group of swarms) for (const work of group.work) {
+      if (work.attempt?.sessionId) members[work.attempt.sessionId] = { swarm: group.id }
     }
-    return m
+    return members
   }, [swarms])
 
   const orphans = useMemo(() => wts.filter((w: any) => !w.external && !(w.sessions?.length)), [wts])
@@ -1277,9 +1226,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
             )}
             {hit.linked && hit.branch && <span className="tt-branch" title={hit.branch}><BranchIcon size={10} />{hit.branch}</span>}
             {hit.external && hit.linked && <Tag style={{ margin: 0 }}><WindowsIcon size={11} /></Tag>}
-            {swarmMap[s.name]?.role === 'leader' && <Tag color="purple" style={{ margin: 0 }}>{t('project.swarm.leaderTag')}</Tag>}
-            {swarmMap[s.name]?.subrole && <Tag style={{ margin: 0 }}>{t(('swarm.subrole.' + swarmMap[s.name]!.subrole) as any) || swarmMap[s.name]!.subrole}</Tag>}
-            {swarmMap[s.name]?.done && <Tag color="purple" style={{ margin: 0 }}>{t('project.swarm.integrate')}</Tag>}
             {(agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : undefined)) && <span className="tt-agentmark" title={agentName(agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex'))}><AgentLogo kind={agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex')} size={13} /></span>}
             {waiting && <Tag color="warning" style={{ margin: 0 }}>{t('session.waiting')}</Tag>}
             <MemBar mem={s.mem} />
@@ -1418,15 +1364,15 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
             }
             return (<>
               {[...groups.entries()].map(([swName, rows]) => {
-                const sw = swarms.find((x: any) => x.name === swName)
+                const sw = swarms.find(x => x.id === swName)
                 return (
                   <div key={'g' + swName}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 6px 2px', fontSize: 'var(--fs-sm)', color: 'var(--text-dim)' }}>
                       <span style={{ color: 'var(--swarm)', display: 'inline-flex' }}><SwarmIcon /></span>
                       <b style={{ color: 'var(--text-bright)' }}>{swName}</b>
-                      {sw && <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)' }}>{t('project.swarm.members', { mine: sw.inProj, total: sw.roster })}</span>}
+                      {sw && <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)' }}>{t('project.swarm.members', { mine: rows.length, total: sw.work.length })}</span>}
                       <span style={{ flex: 1 }} />
-                      <a style={{ fontSize: 'var(--fs-meta)' }} onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(swName) }}>{t('project.swarm.board')}</a>
+                      <button type="button" className="tt-act" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(swName) }}>{t('project.swarm.board')}</button>
                     </div>
                     <div style={{ marginLeft: 6, paddingLeft: 10, borderLeft: '2px solid rgba(163,113,247,.3)' }}>
                       {rows.map(row)}
@@ -1691,71 +1637,11 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
               </div>
             </div>
           ))}
-          {/* 蜂群卡（P5 帧一）：成员/看板计数/广场尾声只读投影 + 给指挥发话；编排一律去蜂群台 */}
-          {swarms.map((sw: any) => {
-            const ex = swarmExtras[sw.name]
-            const mineNames = new Set(mine.map((x) => x.name))
-            // label：蜂群成员的语义名 `<群>-<成员>` / 指挥 cc-<群>。蜂群会话被会话列表
-            // 过滤掉（不在全局展示名表里），所以名字要由蜂群接口随行带来。
-            const memberRow = (session: string, role: string, subrole?: string, done?: boolean, status?: string, label?: string) => {
-              // 按 dir 认领的群：成员会话不在 ls 清单里（被蜂群过滤挡掉），但确实属于本项目
-              const inProj = mineNames.has(session) || !!sw.byDir
-              const running = !!agentKinds[session] || cc[session] || cx[session] || status === 'running'
-              return (
-                <div key={session} className="prj-subrow" style={{ opacity: inProj ? 1 : 0.45 }}
-                  onClick={() => { if (inProj) openTerm(session) }}>
-                  {dot(false, status === 'waiting' ? '#d29922' : running ? 'var(--ok)' : undefined)}
-                  <span style={{ fontWeight: 600, fontSize: 13 }} title={session}>{label || sessionLabel(session)}</span>
-                  {role === 'leader' && <Tag color="purple" style={{ margin: 0, fontSize: 'var(--fs-micro)', lineHeight: '16px' }}>{t('project.swarm.leaderTag')}</Tag>}
-                  {subrole && <Tag style={{ margin: 0, fontSize: 'var(--fs-micro)', lineHeight: '16px' }}>{t(('swarm.subrole.' + subrole) as any) || subrole}</Tag>}
-                  {done && <Tag color="purple" style={{ margin: 0, fontSize: 'var(--fs-micro)', lineHeight: '16px' }}>{t('project.swarm.integrate')}</Tag>}
-                  {ann[session]?.primary?.linked && <span className="tt-branch" title={ann[session].primary.branch}><BranchIcon size={10} />{ann[session].primary.branch}</span>}
-                  <span style={{ flex: 1 }} />
-                  {inProj
-                    ? <a style={{ fontSize: 'var(--fs-meta)' }} onClick={(e) => { e.stopPropagation(); openTerm(session) }}>{t('project.enter')}</a>
-                    : <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)' }}>{t('project.swarm.crossProj')}</span>}
-                </div>
-              )
-            }
-            return (
-              <div key={sw.id || sw.name} className="prj-panel prj-in" style={{ padding: '13px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Tag color="purple" style={{ margin: 0 }} icon={<SwarmIcon size={11} />}>{t('nav.swarm')}</Tag>
-                  <b>{sw.name}</b>
-                  {sw.goal && <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{sw.goal}</span>}
-                  {!sw.supervisor && <Tag color="warning" style={{ margin: 0 }}>{t('project.swarm.noLeader')}</Tag>}
-                  <span style={{ flex: 1 }} />
-                  {ex && Object.keys(ex.cols).length > 0 && (
-                    <span className="prj-mono" style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-dimmer)' }}>
-                      {['backlog', 'assigned', 'doing', 'review', 'done'].filter((c) => ex.cols[c]).map((c) => `${t(('swarm.board.col.' + c) as any)} ${ex.cols[c]}`).join(' · ')}
-                    </span>
-                  )}
-                  {/* 无指挥修复入口（09 S2）：群在指挥不在（拉起失败/被杀）→ adopt 接管 */}
-                  {!sw.supervisor && (
-                    <Button size="small" onClick={async () => {
-                      try {
-                        await api('POST', `/swarms/${encodeURIComponent(sw.name)}/adopt`, { dir, worktree: true })
-                        message.success(t('project.swarm.adopted')); openTerm('cc-' + sw.name)
-                      } catch (e: any) { message.error(e.message) }
-                    }}>{t('project.swarm.adopt')}</Button>
-                  )}
-                  <Button size="small" onClick={() => { setSaying(sw.name); setSayText('') }}>{t('project.swarm.sayLeader')}</Button>
-                  <Button size="small" type="primary" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(sw.name) }}>{t('project.swarm.board')} →</Button>
-                </div>
-                <div style={{ margin: '9px 0 0 5px', paddingLeft: 12, borderLeft: '2px solid rgba(163,113,247,.3)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {sw.supervisor && memberRow(sw.supervisor, 'leader', undefined, false, undefined, 'cc-' + sw.name)}
-                  {(sw.members || []).filter((m: any) => m.session && m.session !== sw.supervisor)
-                    .map((m: any) => memberRow(m.session, m.role, m.subrole, !!m.done, m.status, m.label))}
-                </div>
-                {ex?.last && (
-                  <div className="prj-mono" style={{ display: 'flex', gap: 8, marginTop: 9, padding: '6px 10px', borderRadius: 'var(--r-sm)', background: 'var(--bg-term)', border: '1px solid var(--border-subtle)', fontSize: 'var(--fs-meta)', color: 'var(--text-dim)' }}>
-                    <span style={{ color: '#c4a5f9', flex: '0 0 auto' }}>{ex.last.author}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.last.text}</span>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {swarms.map(group => <div key={group.id} className="prj-panel swarm-project-card">
+            <div className="swarm-project-heading"><b>{group.name}</b><span style={{ color: `var(${swarmStateToken(group.state)})` }}>{t(`swarm.managed.state.${group.state}`)}</span><button type="button" className="tt-act" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(group.id) }}>{t('project.swarm.board')}</button></div>
+            <p>{group.goal}</p>
+            <small>Roami Main</small>
+          </div>)}
           {races.length === 0 && swarms.length === 0 && <div className="prj-empty">{t('project.formation.empty')}</div>}
           <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
             {/* 新建入口统一收在页头的「＋ 开始」里，这里不再重复（14 §6.2） */}
@@ -1814,7 +1700,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           {swarmOpen && (
             <NewSwarmModal open={swarmOpen} initialDir={dir} lockDir
               onClose={() => setSwarmOpen(false)}
-              onDone={(n) => { setSwarmOpen(false); refresh(); if (n) openTerm('cc-' + n) }} />
+              onDone={(n) => { setSwarmOpen(false); refresh(); if (n) location.hash = '#/swarm/' + encodeURIComponent(n) }} />
           )}
           {compareRace && <RaceComparePanel race={compareRace} onClose={() => setCompareRace(null)} openTerm={openTerm} onChanged={refresh} />}
         </Suspense>
@@ -1826,19 +1712,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
         <CloseWorktreeModal info={closing} onClose={() => setClosing(null)} onDone={(name) => { closeTerm(name); setClosing(null); refresh() }} />
         <FinishModal w={finishing} base={defBranch} onClose={() => setFinishing(null)}
           onDone={() => { setFinishing(null); refresh() }} onRevive={(w) => newCli(w, 'shell')} />
-        {/* 给指挥发话 = 广场署名 human 发言（08 §3），编排动作仍去蜂群台 */}
-        <Modal open={!!saying} onCancel={() => setSaying('')} title={t('project.swarm.sayTitle', { name: saying })}
-          okText={t('project.swarm.saySend')} destroyOnClose
-          onOk={async () => {
-            if (!sayText.trim()) return
-            try {
-              await api('POST', `/swarms/${encodeURIComponent(saying)}/say`, { text: '@leader ' + sayText.trim(), kind: 'ask' })
-              message.success(t('project.swarm.saySent')); setSaying('')
-            } catch (e: any) { message.error(e.message) }
-          }}>
-          <Input.TextArea autoFocus rows={3} value={sayText} onChange={(e) => setSayText(e.target.value)}
-            placeholder={t('project.swarm.sayPlaceholder')} />
-        </Modal>
+
       </div>
     </div>
   )
