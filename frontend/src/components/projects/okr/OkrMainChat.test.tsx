@@ -51,3 +51,18 @@ it('preserves the draft and reuses the exact message key after an ambiguous fail
   expect(calls[0][2]).toEqual(calls[1][2])
   expect(state.api.mock.calls.filter(call => call[1] === '/agent/conversations')).toHaveLength(1)
 })
+
+it('provides verified board evidence for analysis without requiring unregistered CLI access', async () => {
+  const draft = emptyConfiguration()
+  const workspace = { ...draft, projectId: 'project', revision: 8, updatedAt: '2026-11-03T10:00:00Z', objective: 'Grow the project', keyResults: [{ id: 'growth', title: 'Stars', horizon: 'long' as const, metricId: 'stars', target: 100, mode: 'increase' as const, dueDate: draft.endDate }], metrics: [{ id: 'stars', name: 'Stars', unit: 'stars', source: 'manual' as const }], observations: [{ id: 'one', metricId: 'stars', date: draft.startDate, value: 11, source: 'manual' as const, sourceKey: 'manual:stars', capturedAt: 'now', note: '' }], reviews: [] }
+  render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'What next?' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
+  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
+  const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
+  expect(context.revision).toBe(8)
+  expect(context.snapshot.keyResults[0].latest.value).toBe(11)
+  expect(context.snapshot.metrics[0].recentDays[0]).toMatchObject({ value: 11, delta: null })
+  expect(state.api.mock.calls.some(call => call[1].includes('/okr'))).toBe(false)
+})
