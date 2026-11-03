@@ -6,6 +6,7 @@ import { type Workspace } from './okr-workspace'
 
 vi.mock('./OkrMainChat', () => ({ default: ({ onUpdated }: { onUpdated: () => void }) => <button onClick={onUpdated}>Complete discussion</button> }))
 vi.mock('./OkrTrend', () => ({ default: () => <div data-testid="trend" /> }))
+vi.mock('./OkrProjectFiles', () => ({ default: ({ dir }: { dir: string }) => <div data-testid="project-files">{dir}</div> }))
 vi.mock('../../swarm/Swarm', () => ({ default: ({ initialSwarm }: { initialSwarm: string }) => <div data-testid="activities">{initialSwarm}</div> }))
 
 function panel(key: string) {
@@ -31,6 +32,17 @@ beforeEach(() => {
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
+
+it('keeps project navigation available and preserves a configuration draft across files', async () => {
+  render(<ProjectOkr projectId="stable-project" projectDir="/project" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'okr.edit' }))
+  fireEvent.change(screen.getByLabelText('okr.objective'), { target: { value: 'Unfinished goal edit' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.files' }))
+  expect(await screen.findByTestId('project-files')).toHaveProperty('textContent', '/project')
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
+  expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('Unfinished goal edit')
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})
 
 it('keeps an edited objective across 409, reloads revision and saves only configuration', async () => {
   let conflicted = false
@@ -275,7 +287,7 @@ it('discards a poll when editing starts in flight and preserves manual or review
   await act(async () => { finish({ data: next }) })
   await advance(60_000)
   expect(reads()).toHaveLength(2)
-  expect(screen.getByText('Launch')).toBeTruthy()
+  expect(screen.queryByText('External revision four')).toBeNull()
   expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('My configuration draft')
   fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
   await advance(30_000)
