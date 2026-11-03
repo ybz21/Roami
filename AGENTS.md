@@ -69,6 +69,9 @@ token-based padding; filling the workspace does not mean stretching text or cont
   subtractions. The list, editor, or preview owns scrolling, not the document.
 - In a focused activity or file view, retain project identity and navigation; avoid repeating a
   large objective summary that pushes the working content below the fold.
+- The shared header holds project identity and primary navigation. Put each tab's objective,
+  summary, filters, and editor inside that tab; keep sibling tabs reachable while editing and
+  preserve drafts when switching contexts.
 - Verify desktop layouts at 1280, 1920, 2560, and 3440 CSS px, with optional panes open and closed,
   plus the phone layout. Check pane bounds, usable content height, overflow, and real interactions;
   a screenshot with a large unexplained empty band is a layout defect, not acceptable whitespace.
