@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TF02",
+  "data": {
+    "kind": "public_synthetic_task_completion_fallback",
+    "inputs": [
+      "input/controls.json"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "persisted_artifacts_and_local_uds"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "fallback_delivery_state_and_ownership_boundary",
+    "expected_python_tests": 10,
+    "expected_frontend_tests": 6
+  }
+}

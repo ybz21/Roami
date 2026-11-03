@@ -1,0 +1,8 @@
+{
+  "origin": "authored_synthetic_scenarios",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "新增独立案例，不替换或重新编号历史40/60项。任务执行完成为公开模拟检查点，只测Main是否建对和续作对，不证明真实交付质量。",
+  "input_revision": "source-bound-oracle-v4"
+}

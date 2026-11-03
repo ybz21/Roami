@@ -32,8 +32,18 @@
 .agent-task-note.error { background:var(--danger-soft); }
 .agent-task-resource { display:flex; flex-direction:column; gap:var(--sp-2); padding-block:var(--sp-2); }
 .agent-task-resource b { font-size:var(--fs-body); font-weight:500; overflow-wrap:anywhere; }
-.agent-task-artifact { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); flex-wrap:wrap; padding-block:var(--sp-2); }
-.agent-task-artifact > span { min-width:0; flex:1; overflow-wrap:anywhere; }
+.agent-task-artifact { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--sp-2) var(--sp-3); padding-block:var(--sp-3); border-bottom:1px solid var(--border-subtle); }
+.agent-task-artifact:last-child { border-bottom:0; }
+.agent-task-file-icon { display:flex; align-items:center; color:var(--text-dim); }
+.agent-task-file-info { min-width:0; overflow-wrap:anywhere; }
+.agent-task-file-info b { font-size:var(--fs-body); font-weight:500; }
+.agent-task-file-info small { margin-top:var(--sp-1); }
+.agent-task-file-actions { flex-wrap:nowrap; }
+.agent-tasks .agent-task-file-actions .tt-act { box-sizing:border-box; min-height:var(--ctl-h, calc(var(--tap) - var(--sp-1))); height:var(--ctl-h, calc(var(--tap) - var(--sp-1))); border-color:var(--border-subtle); }
+.agent-tasks .agent-task-file-actions .agent-task-file-preview { color:var(--accent); border-color:var(--accent-border); background:var(--accent-soft); }
+.agent-task-file-actions svg { flex:none; }
+html[data-size="compact"] .agent-task-artifact { grid-template-columns:auto minmax(0,1fr); }
+html[data-size="compact"] .agent-task-file-actions { grid-column:2; justify-self:start; }
 .agent-task-artifact small { display:block; }
 .agent-task-preview { width:100%; max-height:calc(var(--tap) * 6); object-fit:contain; background:var(--bg-container); border-radius:var(--r-xs); }
 .agent-task-disclosure { align-self:flex-start; }

@@ -1,3 +1,4 @@
+import { isPrimaryShortcut } from '../../keyboard-platform'
 // 全站快捷键：每个动作一条偏好，存成 'Mod+Shift+KeyS' 这种串（修饰键 + KeyboardEvent.code），
 // 按 code 匹配不看布局。Mod = Mac 上 ⌘、其它 Ctrl；显式写 Ctrl / Meta 就只认那一个。
 // 都能在 设置 › 界面 › 快捷键 里改：本机别的软件占了哪个键，换一个就是，不用改代码。
@@ -44,7 +45,7 @@ export function parseHotkey(s: string | undefined | null): Hotkey | null {
 
 export function matchHotkey(e: KeyboardEvent, h: Hotkey | null): boolean {
   if (!h || e.code !== h.code) return false
-  if (h.mod) { if (!(e.ctrlKey || e.metaKey)) return false }
+  if (h.mod) { if (!isPrimaryShortcut(e)) return false }
   else { if (e.ctrlKey !== h.ctrl || e.metaKey !== h.meta) return false }
   return e.altKey === h.alt && e.shiftKey === h.shift
 }

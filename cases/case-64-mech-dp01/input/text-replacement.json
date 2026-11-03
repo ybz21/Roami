@@ -1,0 +1,11 @@
+{
+  "source_runs": [
+    {"text": "增长摘要：", "rgb": "224466"},
+    {"text": "旧版结", "bold": true, "rgb": "CC3311"},
+    {"text": "论", "italic": true, "rgb": "228833"},
+    {"text": "；已复核", "rgb": "224466"}
+  ],
+  "replacement": {"old": "旧版结论", "new": "修订结论 <已核对 & 可编辑>", "expectedCount": 1},
+  "expected_text": "增长摘要：修订结论 <已核对 & 可编辑>；已复核",
+  "provenance": "Public synthetic mixed-format text; no benchmark answer or private deck."
+}

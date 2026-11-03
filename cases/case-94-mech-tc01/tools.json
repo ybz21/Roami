@@ -1,0 +1,11 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "pytest",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "runner": "scripts/dev/run-task-recovery-cases.py",
+  "selection": "input/scenarios.json",
+  "registered_tools": [],
+  "external_model_calls": 0
+}

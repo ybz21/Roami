@@ -1,0 +1,17 @@
+{
+  "runtime": [
+    "Python >=3.12",
+    "pandas >=2.2,<4",
+    "matplotlib >=3.8,<4",
+    "python-pptx >=1,<2",
+    "pytest",
+    "fontconfig",
+    "LibreOffice Impress",
+    "Poppler",
+    "Liberation Sans or Carlito or DejaVu Sans"
+  ],
+  "test_entry": "skills/market-series-report/tests",
+  "expected_tests": 16,
+  "execution": "Caller-supplied local Docker image; offline, read-only repository and separate writable evidence directory",
+  "external_model_calls": 0
+}

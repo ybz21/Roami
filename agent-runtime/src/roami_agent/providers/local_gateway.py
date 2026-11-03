@@ -38,15 +38,15 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
             "MODEL_PROXY_USAGE_PENDING",
             "MODEL_PROXY_USAGE_UNKNOWN",
             "MODEL_GATEWAY_STORAGE_FAILED",
+            "MODEL_GATEWAY_UNAVAILABLE",
+            "MODEL_GATEWAY_KEY_DISABLED",
+            "MODEL_GATEWAY_UNAUTHORIZED",
             "MODEL_NOT_CONFIGURED",
             "MODEL_GATEWAY_ROUTE_CHANGED",
             "MODEL_GATEWAY_CONFIGURATION_INVALID",
             "INVALID_MODEL_CONFIG",
         }:
             await response.aclose()
-            # Pending charges use the existing unsettled-cost recovery hint.
-            if code == "MODEL_PROXY_USAGE_PENDING":
-                code = "MODEL_PROXY_USAGE_UNKNOWN"
             raise ModelAdmissionRejected(code, response.status_code)
         return response
 

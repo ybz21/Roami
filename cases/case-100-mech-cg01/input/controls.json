@@ -1,0 +1,17 @@
+{
+  "contract": "cases/case-95-chat-stack01/input/conversations.json",
+  "scenario": "chat-constraints-accumulate",
+  "admission_errors": [
+    "MODEL_PROXY_USAGE_UNKNOWN",
+    "MODEL_PROXY_USAGE_PENDING",
+    "MODEL_PROXY_DAILY_LIMIT"
+  ],
+  "counterexamples": [
+    "second_turn_block_after_success",
+    "completed_invalid_json",
+    "completed_null_field",
+    "model_text_claims_gateway_error",
+    "transport_failure_with_unknown_usage",
+    "driver_failure_priority"
+  ]
+}

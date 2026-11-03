@@ -1,0 +1,15 @@
+.task-artifact-page { display:flex; flex-direction:column; height:100dvh; min-width:0; overflow:hidden; background:var(--bg-base); padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l); box-sizing:border-box; }
+.task-artifact-page .task-artifact-page-head { box-sizing:border-box; flex:none; flex-wrap:nowrap; align-items:center; min-height:calc(var(--tap) + var(--sp-4)); padding:var(--sp-2) var(--sp-4); gap:var(--sp-3); border-bottom:1px solid var(--border-subtle); }
+.task-artifact-page-title { flex:1; min-width:0; display:flex; align-items:center; gap:var(--sp-2); }
+.task-artifact-page-title > span { display:flex; flex:none; }
+.task-artifact-page .task-artifact-page-title h2 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-lg); margin:0; }
+.task-artifact-page-head .tt-act { box-sizing:border-box; min-height:calc(var(--tap) - var(--sp-1)); position:relative; }
+.task-artifact-reader { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.task-artifact-reader > .agent-task-frame { display:block; flex:1; width:100%; height:100%; min-height:0; border:0; border-radius:0; color-scheme:light; background:Canvas; }
+.task-artifact-reader > .agent-task-document { flex:1; flex-basis:auto; min-height:0; max-height:none; padding:var(--sp-4); background:var(--bg-base); border-radius:0; }
+.task-artifact-reader .agent-task-document pre { max-height:none; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-meta); }
+.task-artifact-reader .agent-task-document > :is(div, pre) { max-width:var(--content-form); margin-inline:auto; }
+.task-artifact-reader > .agent-task-preview { flex:1; width:100%; min-height:0; max-height:none; object-fit:contain; border-radius:0; background:var(--bg-base); }
+.task-artifact-preview-state { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:var(--sp-3); padding:var(--sp-4); color:var(--text-dim); }
+.task-artifact-preview-state p { margin:0; }
+.native-artifact-row .agent-task-file-preview { color:var(--accent); border-color:var(--accent-border); background:var(--accent-soft); }

@@ -5,6 +5,7 @@ import Markdown from '../markdown/Markdown'
 import type { TaskArtifact, TaskAttempt } from './agent-task-protocol'
 import { taskFailureKey } from './task-failure'
 import DocumentPreview, { isPdfDocument, isPptxDocument } from '../documents/DocumentPreview'
+import './task-artifact-preview.css'
 
 export function taskOutputArtifact(href: string, artifacts: TaskArtifact[], runId?: string): TaskArtifact | undefined {
   return artifacts.find(item => (!runId || !item.metadata?.runId || item.metadata.runId === runId) && (item.metadata?.sourcePath === href || item.metadata?.reportedAliases?.includes(href)))
@@ -45,24 +46,26 @@ export const TaskResult = memo(TaskResultBody)
 export function TaskArtifactPreview({ artifact, contentUrl, fullHeight = false }: { artifact: TaskArtifact; contentUrl?: string; fullHeight?: boolean }) {
   const { t } = useI18n()
   const [text, setText] = useState<string | null>(null), [failed, setFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
   const url = contentUrl || nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')
   const image = /^image\/(png|jpeg|webp|gif)$/.test(artifact.mimeType)
   const document = isPdfDocument(artifact.name, artifact.mimeType) || isPptxDocument(artifact.name, artifact.mimeType)
   useEffect(() => {
+    setFailed(false)
     if (image || document) return
     const controller = new AbortController()
-    setText(null); setFailed(false)
+    setText(null)
     void fetch(url, { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('ARTIFACT_UNAVAILABLE')
       const body = await response.text()
       if (!controller.signal.aborted) setText(body)
     }).catch(() => { if (!controller.signal.aborted) setFailed(true) })
     return () => controller.abort()
-  }, [url, image, document])
+  }, [url, image, document, retry])
   if (document) return <div className={fullHeight ? 'document-preview-full' : 'agent-task-document-preview'}><DocumentPreview src={url} name={artifact.name} mimeType={artifact.mimeType} /></div>
-  if (image) return failed ? <p role="alert">{t('agent.task.artifactsUnavailable')}</p> : <img className="agent-task-preview" src={url} alt={artifact.name} onError={() => setFailed(true)} />
-  if (failed) return <p role="alert">{t('agent.task.artifactsUnavailable')}</p>
-  if (text === null) return <p role="status">{t('common.loading')}</p>
+  if (failed) return <div className="task-artifact-preview-state" role="alert"><p>{t('document.loadFailed')}</p><button type="button" className="tt-act" onClick={() => { setFailed(false); setRetry(value => value + 1) }}>{t('agent.retry')}</button></div>
+  if (image) return <img className="agent-task-preview" src={url} alt={artifact.name} onError={() => setFailed(true)} />
+  if (text === null) return <div className="task-artifact-preview-state" role="status">{t('common.loading')}</div>
   if (artifact.mimeType === 'text/html') return <iframe className="agent-task-frame" sandbox="" title={artifact.name} srcDoc={'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; base-uri \'none\'; form-action \'none\'">' + text} />
   return <div className="agent-task-document">{artifact.name.toLowerCase().endsWith('.md') ? <Markdown resolveHref={(href, kind) => kind === 'link' && /^https?:\/\//i.test(href) ? href : '#'}>{text}</Markdown> : <pre>{text}</pre>}</div>
 }

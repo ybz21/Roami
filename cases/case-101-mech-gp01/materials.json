@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-GP01",
+  "data": {
+    "kind": "public_synthetic_gateway_decisions",
+    "inputs": [
+      "input/decisions.json"
+    ]
+  },
+  "tools": {
+    "kind": "unix_http_fixture_and_real_runtime_components",
+    "configuration": "tools.json"
+  },
+  "acceptance": {
+    "kind": "python_xml_and_vitest_json",
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "expected_python_tests": 5,
+    "expected_frontend_tests": 8
+  }
+}

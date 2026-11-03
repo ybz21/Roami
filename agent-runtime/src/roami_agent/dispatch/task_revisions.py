@@ -3,6 +3,7 @@
 import json
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.conversation.attachments import context_attachments
 from roami_agent.dispatch.navigation_recovery import recovered_navigation, stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_sessions import assert_session_open
@@ -11,6 +12,7 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import message, owned
 
 STABLE = {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}
@@ -236,12 +238,25 @@ class TaskRevisions:
     def _blocked(db, task, run, payload):
         owner = task["owner_id"]
         for mid in (task["origin_message_id"], payload["messageId"]):
+            source = row(
+                db,
+                "SELECT * FROM messages WHERE id=? AND conversation_id=? AND role='user' "
+                "AND deleted_ms IS NULL",
+                (mid, task["origin_conversation_id"]),
+            )
+            source = task_user_request(db, source) if source else None
+            if not source:
+                return "TASK_SOURCE_FORGOTTEN"
             if row(
                 db,
                 "SELECT 1 FROM context_omissions WHERE owner_id=? AND message_id=?",
                 (owner, mid),
             ):
                 return "TASK_SOURCE_FORGOTTEN"
+            content = json.loads(source["content_json"])
+            _, evidence = context_attachments(db, owner, content)
+            if len(evidence) != len(content.get("attachments", [])):
+                return "ATTACHMENT_NOT_FOUND"
         if task["parent_task_id"]:
             parent = row(
                 db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task["parent_task_id"], owner)
@@ -410,6 +425,10 @@ class TaskRevisions:
                 budget = json.loads(task["budget_json"])
                 budget.update(usedSteps=0, maxTurns=0, timeoutMs=0, deadlineMs=0)
                 if run["native_branch_id"]:
+                    source = task_user_request(
+                        db, row(db, "SELECT * FROM messages WHERE id=?", (payload["messageId"],))
+                    )
+                    attachments = json.loads(source["content_json"]).get("attachments", [])
                     branch = row(
                         db,
                         "SELECT conversation_id FROM branches WHERE id=?",
@@ -424,11 +443,7 @@ class TaskRevisions:
                             "text": payload.get("executionText", payload["text"]),
                             "taskRevision": revision,
                             "displayText": payload.get("executionText", payload["text"]),
-                            **(
-                                {"attachments": payload["attachments"]}
-                                if payload.get("attachments")
-                                else {}
-                            ),
+                            **({"attachments": attachments} if attachments else {}),
                         },
                     )
                 db.execute(

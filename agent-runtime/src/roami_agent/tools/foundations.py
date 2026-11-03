@@ -443,6 +443,8 @@ def register_foundations(registry, settings):
                 excluded_env=settings.provider_key_environments(),
             )
             return result
+        if "shell" in registry.disabled_tools:
+            raise DomainError("TOOL_DISABLED")
         shell_args = {key: value for key, value in args.items() if key != "command"}
         shell_args["argv"] = ["bash", "-c", args["command"]] if "command" in args else argv
         return await registry.registry["shell"].handler(shell_args, binding)

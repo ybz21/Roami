@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_transport_controls",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "重现验收错误分类，不证明 #605 原始模型输出已修复；原始合同和 oracle 不修改。"
+}

@@ -1,0 +1,609 @@
+{
+  "schema_version": 1,
+  "input_revision": "source-bound-oracle-v4",
+  "case_id": "TASK-SCOPE01",
+  "scenarios": [
+    {
+      "id": "ambiguous-followup-needs-target-choice",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "分别新建两个独立任务：新建周一清单空白模板任务，字段日期和事项，输出Markdown；新建周二清单空白模板任务，字段日期和事项，输出CSV。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建周一清单空白模板任务，字段日期和事项，输出Markdown",
+                "title": "新建周一清单空白模板任务，字段日期和事项，输出Markdown",
+                "requestComplete": false,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建周一清单空白模板任务，字段日期和事项，输出Markdown",
+                    "status": "current"
+                  },
+                  {
+                    "quote": "新建周二清单空白模板任务，字段日期和事项，输出CSV",
+                    "status": "pending"
+                  }
+                ]
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建周二清单空白模板任务，字段日期和事项，输出CSV",
+                "title": "新建周二清单空白模板任务，字段日期和事项，输出CSV",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建周一清单空白模板任务，字段日期和事项，输出Markdown",
+                    "status": "delegated",
+                    "taskId": {
+                      "task": "新建周一清单空白模板任务，字段日期和事项，输出Markdown"
+                    }
+                  },
+                  {
+                    "quote": "新建周二清单空白模板任务，字段日期和事项，输出CSV",
+                    "status": "current"
+                  }
+                ]
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一清单",
+                "match": "周一清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二清单",
+                "match": "周二清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "把那个清单加一个备注栏。",
+          "fixture": [
+            {
+              "tool": "ask_user",
+              "args": {
+                "prompt": "要修改哪份清单？",
+                "options": [
+                  {
+                    "label": "周一清单"
+                  },
+                  {
+                    "label": "周二清单"
+                  }
+                ]
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一清单",
+                "match": "周一清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二清单",
+                "match": "周二清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ],
+            "question": true,
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        },
+        {
+          "text": "修改周一清单，加备注栏，周二清单保持不动。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "周一清单"
+                },
+                "revision": {
+                  "revision": "周一清单"
+                },
+                "text": "修改周一清单，加备注栏，周二清单保持不动。",
+                "sourceQuote": "修改周一清单，加备注栏，周二清单保持不动。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一清单",
+                "match": "周一清单",
+                "revision": 2,
+                "contains": [
+                  "备注栏"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二清单",
+                "match": "周二清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "intake-replay-vs-explicit-duplicate-work",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "新建第一份名册空白模板任务，列为姓名和组别，输出Markdown。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "第一份名册空白模板，列为姓名和组别，输出Markdown",
+                "title": "第一份名册空白模板，列为姓名和组别，输出Markdown",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "第一份名册",
+                "match": "第一份名册",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          },
+          "replay": true
+        },
+        {
+          "text": "内容相同也要另开第二份名册任务，这是独立任务，不是重试或修改第一份。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "第二份名册空白模板，列为姓名和组别，输出Markdown",
+                "title": "第二份名册空白模板，列为姓名和组别，输出Markdown",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "第一份名册",
+                "match": "第一份名册",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "第二份名册",
+                "match": "第二份名册",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              }
+            ]
+          },
+          "replay": true
+        },
+        {
+          "text": "只查看这两份独立名册任务，不要再创建。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "text": "两份名册是两个独立任务。"
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "第一份名册",
+                "match": "第一份名册",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "第二份名册",
+                "match": "第二份名册",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              }
+            ],
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-projects-keep-original-provider",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "在枫林项目用 Codex 新建枫林接待清单空白模板任务，字段为日期、姓名、人数，输出Markdown。",
+          "fixture": [
+            {
+              "tool": "target_resolve",
+              "args": {
+                "kind": "project",
+                "id": "maple"
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "枫林接待清单空白模板，字段为日期、姓名、人数，输出Markdown",
+                "title": "枫林接待清单空白模板，字段为日期、姓名、人数，输出Markdown",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": "codex",
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对",
+                  "userQuote": "用 Codex"
+                },
+                "target": {
+                  "kind": "project",
+                  "projectId": "maple"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "枫林接待清单",
+                "match": "枫林接待清单",
+                "revision": 1,
+                "contains": [],
+                "executor": "codex",
+                "project_id": "maple",
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "在雪松项目用 Claude 另外新建雪松接待清单空白模板任务，字段为日期、姓名、人数，输出CSV，不修改枫林。",
+          "fixture": [
+            {
+              "tool": "target_resolve",
+              "args": {
+                "kind": "project",
+                "id": "cedar"
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "雪松接待清单空白模板，字段为日期、姓名、人数，输出CSV",
+                "title": "雪松接待清单空白模板，字段为日期、姓名、人数，输出CSV",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": "claude",
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对",
+                  "userQuote": "用 Claude"
+                },
+                "target": {
+                  "kind": "project",
+                  "projectId": "cedar"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "枫林接待清单",
+                "match": "枫林接待清单",
+                "revision": 1,
+                "contains": [],
+                "executor": "codex",
+                "project_id": "maple",
+                "created_turn": 1
+              },
+              {
+                "alias": "雪松接待清单",
+                "match": "雪松接待清单",
+                "revision": 1,
+                "contains": [],
+                "executor": "claude",
+                "project_id": "cedar",
+                "created_turn": 2
+              }
+            ]
+          }
+        },
+        {
+          "text": "只给原枫林接待清单加姓名读音，雪松不改。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "枫林接待清单"
+                },
+                "revision": {
+                  "revision": "枫林接待清单"
+                },
+                "text": "只给原枫林接待清单加姓名读音，雪松不改。",
+                "sourceQuote": "只给原枫林接待清单加姓名读音，雪松不改。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "枫林接待清单",
+                "match": "枫林接待清单",
+                "revision": 2,
+                "contains": [
+                  "姓名读音"
+                ],
+                "executor": "codex",
+                "project_id": "maple",
+                "created_turn": 1
+              },
+              {
+                "alias": "雪松接待清单",
+                "match": "雪松接待清单",
+                "revision": 1,
+                "contains": [],
+                "executor": "claude",
+                "project_id": "cedar",
+                "created_turn": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "status-and-chat-do-not-recreate-work",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "新建志愿者名单空白模板任务，字段姓名、组别，输出Markdown，不发通知。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "志愿者名单空白模板，字段姓名、组别，输出Markdown，不发通知",
+                "title": "志愿者名单空白模板，字段姓名、组别，输出Markdown，不发通知",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "志愿者名单",
+                "match": "志愿者名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "先不修改任务。我说的后台任务就是异步执行的意思吗？只返回JSON true或false。",
+          "fixture": [
+            {
+              "text": "true"
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "志愿者名单",
+                "match": "志愿者名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ],
+            "reply_json": true,
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        },
+        {
+          "text": "刚才的志愿者名单任务状态是什么？只查看，不新增。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "text": "志愿者名单已登记。"
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "志愿者名单",
+                "match": "志愿者名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ],
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        },
+        {
+          "text": "在原志愿者名单补一个联系电话列，不另开任务。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "志愿者名单"
+                },
+                "revision": {
+                  "revision": "志愿者名单"
+                },
+                "text": "在原志愿者名单补一个联系电话列，不另开任务。",
+                "sourceQuote": "在原志愿者名单补一个联系电话列，不另开任务。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "志愿者名单",
+                "match": "志愿者名单",
+                "revision": 2,
+                "contains": [
+                  "联系电话"
+                ],
+                "source_contains": [
+                  "不发通知"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

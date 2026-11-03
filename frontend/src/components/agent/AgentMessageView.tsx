@@ -9,6 +9,7 @@ import { ChatMessage } from '../chat/Message'
 import type { Msg } from '../chat/types'
 import type { AgentMessage } from './agent-protocol'
 import { activityReason } from './AgentActivity'
+import { taskFailureKey } from './task-failure'
 import { useLayout } from '../../layout'
 import { lazyRetry } from '../lazy-retry'
 import { fileLink, type FileLink } from '../markdown/file-link'
@@ -64,6 +65,8 @@ function AgentMessageView({ item: source, node, focused, remember, canAnswer = f
   const assistant = item.role === 'assistant'
   const resolveResource = useCallback((href: string) => agentResourceUrl(href, node), [node])
   const report = item.content.sessionReply
+  const reportError = item.content.taskStatus?.reportError
+  const reportFailure = taskFailureKey(reportError)
   const reportStatus = report && ['progress', 'blocked', 'completed', 'failed'].includes(report.status) ? report.status : 'unknown'
   const transcript = useMemo<Msg>(() => ({ id: item.id, role: item.role, blocks: item.content.text ? [{ kind: 'text', text: item.content.text }] : [], ...(item.created_ms ? { ts: new Date(item.created_ms).toISOString() } : {}) }), [item.id, item.role, item.content.text, item.created_ms])
   const rememberAction = !readOnly && !item.contentTruncated && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length ? <button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button> : undefined
@@ -74,7 +77,7 @@ function AgentMessageView({ item: source, node, focused, remember, canAnswer = f
     {item.contentTruncated && conversationId && <button type="button" className="tt-act" disabled={loading} onClick={() => { void readFull() }}>{t(loading ? 'agent.pagination.loading' : failed ? 'agent.retry' : 'agent.pagination.fullMessage')}</button>}
     {failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {item.content.question && <AgentQuestion question={item.content.question} disabled={!canAnswer || item.contentTruncated} answer={answer && (text => answer(report ? t('agent.sessionReply.answer', { sessionId: report.sessionId, dispatchId: report.dispatchId, answer: text }) : text))} />}
-    {item.content.taskStatus && <div className="agent-task-status" role="status"><strong>{t('agent.activity.result', { state: t('agent.state.' + item.content.taskStatus.state) })}</strong><span>{item.content.taskStatus.errorCode ? activityReason(item.content.taskStatus.errorCode, t) : t('agent.activity.resultRecorded')}</span><small>{t('agent.activity.reportUnavailable')}</small><code>{item.content.taskStatus.taskId}</code></div>}
+    {item.content.taskStatus && <div className="agent-task-status" data-state={item.content.taskStatus.state} role="status"><strong>{t('agent.activity.result', { state: t('agent.state.' + item.content.taskStatus.state) })}</strong><span>{item.content.taskStatus.errorCode ? activityReason(item.content.taskStatus.errorCode, t) : t('agent.activity.resultRecorded')}</span><small>{reportError ? t('agent.activity.reportUnavailableReason', { reason: reportFailure ? t(reportFailure) : activityReason(reportError, t) }) : t('agent.activity.reportUnavailable')}</small></div>}
     {!!item.content.attachments?.length && <div className="agent-message-files">{item.content.attachments.map(file => file.mimeType?.startsWith('image/') && file.previewState !== 'unavailable'
       ? <AgentImageAttachment key={file.id} file={file} node={node} />
       : <a key={file.id} className="agent-file-card" href={attachmentUrl(file, node)} download={file.name} onClick={event => {

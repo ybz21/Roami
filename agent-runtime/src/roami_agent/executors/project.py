@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.tools.process import execute
 
 
@@ -44,12 +44,8 @@ async def provision_project(settings, task, run):
             problem = payload.get("error") or {}
             if not isinstance(problem, dict):
                 raise TypeError("invalid project error")
-            code = problem.get("code", "PROJECT_PROVISION_UNAVAILABLE")
-            raise DomainError(
-                code
-                if isinstance(code, str) and code.startswith("PROJECT_")
-                else "PROJECT_PROVISION_UNAVAILABLE"
-            )
+            code = public_error_code(problem.get("code"))
+            raise DomainError(code or "PROJECT_PROVISION_UNAVAILABLE")
         entry = payload["data"]
         if (
             not isinstance(entry["key"], str)

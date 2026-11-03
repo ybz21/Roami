@@ -1,0 +1,607 @@
+{
+  "input_revision": "source-bound-oracle-v4",
+  "fixture": {
+    "mode": "fixture",
+    "passed": true,
+    "selected_passed": true,
+    "complete_cases": true,
+    "expected_scenarios": 16,
+    "observed_scenarios": 16,
+    "passed_scenarios": 16,
+    "observed_user_turns": 62,
+    "verified_user_turns": 62,
+    "expected_user_turns": 62,
+    "failure": null,
+    "child_exit_code": 0,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "505796074c817095f7ff32b54e13fbf13f8f00e5411329ce97b0af0602740dde",
+    "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+    "saved_main_route_hash": null,
+    "model_calls": 90,
+    "external_model_calls": 0,
+    "observed_tokens": 10800,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint"
+  },
+  "saved_main_diagnostic": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 16,
+    "observed_scenarios": 16,
+    "passed_scenarios": 15,
+    "observed_user_turns": 61,
+    "verified_user_turns": 60,
+    "expected_user_turns": 62,
+    "failure": null,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": false,
+    "frozen_sha256": "505796074c817095f7ff32b54e13fbf13f8f00e5411329ce97b0af0602740dde",
+    "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 120,
+    "external_model_calls": 120,
+    "observed_tokens": 971899,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint"
+  },
+  "freeze_audit": {
+    "raw_receipt_source_unchanged": false,
+    "existing_frozen_files_unchanged": true,
+    "implementation_and_input_changes": [],
+    "only_additions": [
+      "skills/video-assembly/scripts/__pycache__/assemble.cpython-312.pyc",
+      "skills/video-assembly/scripts/__pycache__/video_workspace.cpython-312.pyc",
+      "skills/video-assembly/tests/__pycache__/test_assembly.cpython-312-pytest-9.1.1.pyc"
+    ],
+    "reason": "root pytest collection generated Python bytecode in the video Skill; Actor cannot access shell/files or this Skill",
+    "formal_promotion_claimed": false
+  },
+  "conversations": [
+    {
+      "scenario": "ambiguous-followup-needs-target-choice",
+      "contract_sha256": "f8f1e8251b276763ec6328a56f9f0906755384c242f515f1fa2b422c78d5f6ef",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 3,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "chat-constraints-accumulate",
+      "contract_sha256": "f79c95891351861a15680f86a38ede0ac9ef0dbf9c1c446ff33d219e40baeac7",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 5,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 5,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "chat-correction-and-removal",
+      "contract_sha256": "fafa80eafec31f46cb803ba81f20f034be151c0c635c97f666d4a140cc2e88a2",
+      "passed": false,
+      "failure": null,
+      "expected_turns": 5,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": false,
+          "failures": [
+            "CHAT_CONSTRAINTS_MISMATCH"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "chat-first-create-after-confirmation",
+      "contract_sha256": "1788b5d760a2fa1a4c4e42af109bd8fb562d265154c228a690980b434eb004a6",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "chat-language-and-format",
+      "contract_sha256": "94da97a1b5b9fa16e42508a1aad8931a178d15d3ac27ed7264aecda1d1148e6c",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "chat-topic-interleave",
+      "contract_sha256": "24fd39c3691062221942083703e0b9b1755bc570927cc9164d3d3600249703da",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "create-separate-user-turns",
+      "contract_sha256": "ee886ae211ba8274536db6c9ec6422ef00a6c2794ca39bc45b6cc7a1768f7fcb",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "create-similar-titles-distinct-work",
+      "contract_sha256": "76e614d5637ad774c6975c41ec7596ad5c4938e4f385a8170829042f9585c0b0",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 3,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "create-three-independent-outcomes",
+      "contract_sha256": "85abfa2c1af37be75162860faa5b0c0276079cc90aa95ab82c726fe3eb536d24",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 3,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "intake-replay-vs-explicit-duplicate-work",
+      "contract_sha256": "30e4795f529fcd72b358b6c6fc93cf5c9f2af6e4f3d7d152f6d0a05662bfd30d",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 3,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "status-and-chat-do-not-recreate-work",
+      "contract_sha256": "ed256377ca6c4a55be83e0585110128572c6c5625c7ec2cf3de64414214beb89",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "steer-four-cumulative-updates",
+      "contract_sha256": "c0281dbbfbde0743f7fe272811d68402dbb914acda5c0537ca0ef153a855da06",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 5,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 5,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "steer-inputs-with-unrelated-chat-image",
+      "contract_sha256": "09301753ed096616e72c5d9f1120b14e60cf93c14067249109fdbded7c06d2ab",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "steer-preserves-project-and-provider",
+      "contract_sha256": "ca7e4e4c181e65ce2324eaacc39e7cefd43518d9bf5db8ade02c223ae32a3df7",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "steer-two-tasks-without-cross-contamination",
+      "contract_sha256": "470d50b3246a81b852e7c1bd676e0be3ea8c13548ac932d58cac5f49949f01b8",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 4,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 4,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    },
+    {
+      "scenario": "two-projects-keep-original-provider",
+      "contract_sha256": "e91d4f7bcb8eaa6654fa09b160b16e74d47cc67f13b9ecf4010db74dc242336f",
+      "passed": true,
+      "failure": null,
+      "expected_turns": 3,
+      "checkpoints": [
+        {
+          "turn": 1,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 2,
+          "passed": true,
+          "failures": []
+        },
+        {
+          "turn": 3,
+          "passed": true,
+          "failures": []
+        }
+      ]
+    }
+  ],
+  "quality_issue": "https://github.com/ybz21/Roami/issues/605",
+  "permission_issue": "https://github.com/ybz21/Roami/issues/604",
+  "all_live_measurement_usage": {
+    "runs": [
+      {
+        "run": "saved-main-final-profile",
+        "model_calls": 9,
+        "external_model_calls": 9,
+        "observed_tokens": 67446,
+        "usage_known": true,
+        "passed_scenarios": 1,
+        "observed_scenarios": 1,
+        "source_unchanged": true
+      },
+      {
+        "run": "saved-main-full-v2",
+        "model_calls": 77,
+        "external_model_calls": 77,
+        "observed_tokens": 547884,
+        "usage_known": true,
+        "passed_scenarios": 7,
+        "observed_scenarios": 16,
+        "source_unchanged": true
+      },
+      {
+        "run": "saved-main-full-v3",
+        "model_calls": 91,
+        "external_model_calls": 91,
+        "observed_tokens": 673801,
+        "usage_known": true,
+        "passed_scenarios": 11,
+        "observed_scenarios": 16,
+        "source_unchanged": true
+      },
+      {
+        "run": "saved-main-full-v4",
+        "model_calls": 120,
+        "external_model_calls": 120,
+        "observed_tokens": 971899,
+        "usage_known": true,
+        "passed_scenarios": 15,
+        "observed_scenarios": 16,
+        "source_unchanged": false
+      },
+      {
+        "run": "saved-main-probe-v1",
+        "model_calls": 11,
+        "external_model_calls": 11,
+        "observed_tokens": 75282,
+        "usage_known": true,
+        "passed_scenarios": 1,
+        "observed_scenarios": 2,
+        "source_unchanged": true
+      },
+      {
+        "run": "saved-main-probe-v2",
+        "model_calls": 12,
+        "external_model_calls": 12,
+        "observed_tokens": 96795,
+        "usage_known": true,
+        "passed_scenarios": 1,
+        "observed_scenarios": 1,
+        "source_unchanged": true
+      }
+    ],
+    "model_calls": 320,
+    "external_model_calls": 320,
+    "observed_tokens": 2433107,
+    "all_usage_known": true
+  },
+  "pr": "https://github.com/ybz21/Roami/pull/606",
+  "quality": {
+    "full": {
+      "passed": true,
+      "python_passed": 3136,
+      "python_skipped": 48,
+      "python_seconds": 898.93,
+      "build_seconds": 44.24
+    },
+    "commit_quick": {
+      "passed": true,
+      "python_passed": 3136,
+      "python_skipped": 48,
+      "python_seconds": 953.01
+    },
+    "implementation_commit": "eff68abb"
+  }
+}

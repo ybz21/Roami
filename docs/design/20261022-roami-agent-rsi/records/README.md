@@ -4,6 +4,14 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [视频素材的时序预览与可核对回执](2026-11-03/video-temporal-review.md) |
+| 2026-11-03 | [任务回报失败时保留交付入口](2026-11-03/task-fallback-deliverables.md) |
+| 2026-11-03 | [当前核心机制与行情修订稿](2026-11-03/current-core-mechanisms-and-report.md) |
+| 2026-11-03 | [本机网关就绪与鉴权准入拒绝](2026-11-03/gateway-readiness-admission.md) |
+| 2026-11-03 | [网关结算状态与回报失败原因](2026-11-03/gateway-pending-and-report-errors.md) |
+| 2026-11-03 | [多轮会话验收保留网关阻塞原因](2026-11-03/conversation-gateway-blockers.md) |
+| 2026-11-02 | [事实绑定的外挂行情报告](2026-11-02/market-series-report.md) |
+| 2026-11-02 | [外挂演示稿的精确文本修订](2026-11-02/presentation-text-replacement.md) |
 | 2026-11-02 | [Go网关上游关联与错误状态传播](2026-11-02/upstream-response-receipts.md) |
 | 2026-11-01 | [完整正反参考池与定量演示稿](2026-11-01/reference-pool.md) |
 | 2026-11-01 | [Skill资源的可读取协议地址](2026-11-01/skill-resource-locations.md) |
@@ -179,3 +187,5 @@
 - [错误模型JSON的动作隔离与队列续办](2026-11-01/model-result-shapes.md)：输入形状校验、后台存活及缓存回执不重放。
 
 - [参考质量与演示文稿设计](2026-11-01/reference-quality.md)：委托AI评审、可选设计Skill、渲染修订和评分协议边界。
+
+- [演示稿字体预检与真实股票任务复核](2026-11-02/presentation-rendering-review.md)：三次原题运行、网关账务、26页复核、字体定位及仍未通过的内容问题。

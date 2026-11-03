@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-GP02",
+  "data": {
+    "kind": "public_synthetic_local_gateway_readiness",
+    "inputs": [
+      "input/controls.json"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "local_uds_and_untrusted_remote_transport_controls"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "trusted_preflight_and_unknown_usage_boundary",
+    "expected_python_tests": 7,
+    "expected_frontend_tests": 4
+  }
+}

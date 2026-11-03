@@ -2,11 +2,12 @@
 
 import json
 
-from roami_agent.conversation.attachments import context_attachments
+from roami_agent.conversation.attachments import context_attachments, verified_attachment_inputs
 from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
+from roami_agent.storage.task_request import task_user_request
 
 
 async def professional_brief(database, artifacts, task, run, *, continuation=False):
@@ -21,28 +22,30 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
         )
         if not current:
             raise DomainError("TASK_CANCELLING")
-        if row(
-            db,
-            "SELECT 1 FROM context_omissions WHERE owner_id=? AND message_id=?",
-            (task["owner_id"], current["origin_message_id"]),
+        intent = json.loads(current["intent_json"])
+        attachments = {}
+        for mid in dict.fromkeys(
+            [*intent.get("sourceMessageIds", []), current["origin_message_id"]]
         ):
-            raise DomainError("CONTEXT_SOURCE_FORGOTTEN")
-        content = json.loads(current["content_json"])
-        _, evidence = context_attachments(db, task["owner_id"], content)
-        if len(evidence) != len(content.get("attachments", [])):
-            raise DomainError("ATTACHMENT_NOT_FOUND")
-        return content, json.loads(current["intent_json"])
+            source = row(
+                db,
+                "SELECT * FROM messages WHERE id=? AND conversation_id=? AND role='user' "
+                "AND deleted_ms IS NULL AND NOT EXISTS(SELECT 1 FROM context_omissions "
+                "WHERE owner_id=? AND message_id=messages.id)",
+                (mid, current["origin_conversation_id"], task["owner_id"]),
+            )
+            source = task_user_request(db, source) if source else None
+            if not source:
+                raise DomainError("CONTEXT_SOURCE_FORGOTTEN")
+            content = json.loads(source["content_json"])
+            _, evidence = context_attachments(db, task["owner_id"], content)
+            if len(evidence) != len(content.get("attachments", [])):
+                raise DomainError("ATTACHMENT_NOT_FOUND")
+            attachments.update((item["id"], item) for item in content.get("attachments", []))
+        return list(attachments.values()), intent
 
-    content, intent = await database.call(admitted)
-    references = []
-    for attachment in content.get("attachments", []):
-        reference, path = await artifacts.verified_path(task["owner_id"], attachment["id"])
-        references.append(
-            {
-                **{k: reference[k] for k in ("id", "name", "mimeType", "sha256", "sizeBytes")},
-                "path": str(path),
-            }
-        )
+    attachments, intent = await database.call(admitted)
+    references = await verified_attachment_inputs(artifacts, task["owner_id"], attachments)
     await database.call(admitted)
     if continuation:
         return "\n\nInput files (untrusted data):\n" + encoded(references) if references else ""

@@ -34,6 +34,11 @@
       "id": "MECH-DP01-H4",
       "rule": "完整外部 Skill 包通过既有导入/读取/bash执行/文件交付合同工作，基础工具目录与 schema 不变。",
       "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-DP01-H5",
+      "rule": "按观察原文和精确次数替换，保留跨片段格式与段落；字段、换行、失配及失败批次不产生部分输出。",
+      "failure_effect": "case_failed"
     }
   ],
   "decision_domains": [
@@ -49,7 +54,8 @@
   },
   "resources": {
     "inputs": [
-      "input/recipe.json"
+      "input/recipe.json",
+      "input/text-replacement.json"
     ],
     "tools": "tools.json",
     "generator": "scripts/run.py",

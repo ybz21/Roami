@@ -1,0 +1,52 @@
+{
+  "id": "MECH-VI01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "视频时序检查",
+  "prompt": "使用公开合成素材验证实际帧时间、解码像素和预览输出发布。",
+  "preconditions": "准备好的本地离线镜像，含 Python、pytest、Pillow>=10.1、ffmpeg/ffprobe。",
+  "expected_terminal": "decoded_frame_timestamps_and_pixels_match_published_receipt",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "19项无跳过真实编码检查回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-VI01-H1",
+      "rule": "可变帧率、非零起始时间和多视频流中，记录的实际帧时间与画面相符。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-VI01-H2",
+      "rule": "单帧不伪造重复画面；原素材保持，非法采样、符号链接及已有输出不被修改。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-VI01-H3",
+      "rule": "抽帧回执不得声称语义选片已验证。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_video_sampling",
+    "issue": 618,
+    "fixture_reproduction_only": true
+  },
+  "resources": {
+    "inputs": [
+      "input/recipe.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

@@ -192,7 +192,7 @@ func TestDeadlineRetainsPartialOutputForInspection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Result == nil || status.Result.State != "failed" || status.Result.Summary != "EXECUTION_DEADLINE_OR_INTERRUPTION" || status.Result.Output != "partial deliverable evidence" || status.Result.Stderr != "diagnostic" {
+	if status.Result == nil || status.Result.State != "failed" || status.Result.Summary != "EXECUTION_DEADLINE" || status.Result.Output != "partial deliverable evidence" || status.Result.Stderr != "diagnostic" {
 		t.Fatalf("lost deadline evidence: %+v", status.Result)
 	}
 }
@@ -230,5 +230,53 @@ func TestExecutionTimeoutIsOptionalAndCanExceedOneDay(t *testing.T) {
 	defer cancel()
 	if _, bounded := ctx.Deadline(); bounded {
 		t.Fatal("default execution has no deadline")
+	}
+}
+
+func TestParentInterruptionRemainsDistinctFromDeadline(t *testing.T) {
+	s := testService(t)
+	dir, _ := s.directory("parent-interruption")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	spec := Spec{Key: "parent-interruption", Executor: "codex", Directory: dir, Prompt: "work"}
+	marker := filepath.Join(dir, "process-started")
+	bin := filepath.Join(dir, "codex")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nprintf 'partial output'\nprintf 'diagnostic' >&2\ntouch "+quote(marker)+"\nsleep 5\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if err := writeJSON(filepath.Join(dir, "spec.json"), spec); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(dir, "receipt.json"), Receipt{State: "running"}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			if _, err := os.Stat(marker); err == nil {
+				cancel()
+				return
+			}
+			select {
+			case <-done:
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}()
+	if err := s.Run(ctx, spec.Key, io.Discard, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	var result Result
+	if err := readJSON(filepath.Join(dir, "result.json"), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.State != "failed" || result.Summary != "EXECUTION_INTERRUPTED" || result.Output != "partial output" || result.Stderr != "diagnostic" {
+		t.Fatalf("unexpected result: %+v", result)
 	}
 }

@@ -1,0 +1,682 @@
+{
+  "schema_version": 1,
+  "input_revision": "source-bound-oracle-v4",
+  "case_id": "TASK-NEW01",
+  "scenarios": [
+    {
+      "id": "create-three-independent-outcomes",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "请分别处理这三件独立的事：新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知；新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单；新建任务生成周三时间表空白模板JSON，字段时间和事项，不发通知。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知",
+                "title": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知",
+                "requestComplete": false,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知",
+                    "status": "current"
+                  },
+                  {
+                    "quote": "新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单",
+                    "status": "pending"
+                  },
+                  {
+                    "quote": "新建任务生成周三时间表空白模板JSON，字段时间和事项，不发通知",
+                    "status": "pending"
+                  }
+                ]
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单",
+                "title": "新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单",
+                "requestComplete": false,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知",
+                    "status": "delegated",
+                    "taskId": {
+                      "task": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知"
+                    }
+                  },
+                  {
+                    "quote": "新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单",
+                    "status": "current"
+                  },
+                  {
+                    "quote": "新建任务生成周三时间表空白模板JSON，字段时间和事项，不发通知",
+                    "status": "pending"
+                  }
+                ]
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建任务生成周三时间表空白模板JSON，字段时间和事项，不发通知",
+                "title": "新建任务生成周三时间表空白模板JSON，字段时间和事项，不发通知",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知",
+                    "status": "delegated",
+                    "taskId": {
+                      "task": "新建任务生成周一名单空白模板Markdown，字段姓名和组别，不发通知"
+                    }
+                  },
+                  {
+                    "quote": "新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单",
+                    "status": "delegated",
+                    "taskId": {
+                      "task": "新建任务生成周二物料空白模板CSV，字段物品和数量，不覆盖名单"
+                    }
+                  },
+                  {
+                    "quote": "新建任务生成周三时间表空白模板JSON，字段时间和事项，不发通知",
+                    "status": "current"
+                  }
+                ]
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 3,
+            "tasks": [
+              {
+                "alias": "周一名单",
+                "match": "周一名单",
+                "revision": 1,
+                "contains": [
+                  "姓名",
+                  "组别",
+                  "Markdown"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料",
+                "match": "周二物料",
+                "revision": 1,
+                "contains": [
+                  "物品",
+                  "数量",
+                  "CSV"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周三时间表",
+                "match": "周三时间表",
+                "revision": 1,
+                "contains": [
+                  "时间",
+                  "事项",
+                  "JSON"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "只查刚才这批任务已创建的总数，包括已完成任务，只返回JSON整数；不新增也不修改。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "text": "3"
+            }
+          ],
+          "expect": {
+            "task_count": 3,
+            "tasks": [
+              {
+                "alias": "周一名单",
+                "match": "周一名单",
+                "revision": 1,
+                "contains": [
+                  "姓名",
+                  "组别",
+                  "Markdown"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料",
+                "match": "周二物料",
+                "revision": 1,
+                "contains": [
+                  "物品",
+                  "数量",
+                  "CSV"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周三时间表",
+                "match": "周三时间表",
+                "revision": 1,
+                "contains": [
+                  "时间",
+                  "事项",
+                  "JSON"
+                ],
+                "created_turn": 1
+              }
+            ],
+            "reply_json": 3,
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        },
+        {
+          "text": "插问：6乘7是多少？只返回整数，不动刚才的任务。",
+          "fixture": [
+            {
+              "text": "42"
+            }
+          ],
+          "expect": {
+            "task_count": 3,
+            "tasks": [
+              {
+                "alias": "周一名单",
+                "match": "周一名单",
+                "revision": 1,
+                "contains": [
+                  "姓名",
+                  "组别",
+                  "Markdown"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料",
+                "match": "周二物料",
+                "revision": 1,
+                "contains": [
+                  "物品",
+                  "数量",
+                  "CSV"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周三时间表",
+                "match": "周三时间表",
+                "revision": 1,
+                "contains": [
+                  "时间",
+                  "事项",
+                  "JSON"
+                ],
+                "created_turn": 1
+              }
+            ],
+            "reply_json": 42
+          }
+        }
+      ]
+    },
+    {
+      "id": "create-separate-user-turns",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "新建一个独立任务，生成入场名单空白模板，字段姓名和组别，格式Markdown。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "入场名单空白模板，字段姓名和组别，格式Markdown",
+                "title": "入场名单空白模板，字段姓名和组别，格式Markdown",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "入场名单",
+                "match": "入场名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "另外新建一个独立任务，生成物料盘点空白模板，字段物品和数量，格式CSV，和名单无关。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "物料盘点空白模板，字段物品和数量，格式CSV",
+                "title": "物料盘点空白模板，字段物品和数量，格式CSV",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "入场名单",
+                "match": "入场名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "物料盘点",
+                "match": "物料盘点",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              }
+            ]
+          }
+        },
+        {
+          "text": "再单独新建离场统计空白模板任务，字段时间和人数，输出JSON，不是修改前两项。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "离场统计空白模板，字段时间和人数，输出JSON",
+                "title": "离场统计空白模板，字段时间和人数，输出JSON",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 3,
+            "tasks": [
+              {
+                "alias": "入场名单",
+                "match": "入场名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "物料盘点",
+                "match": "物料盘点",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              },
+              {
+                "alias": "离场统计",
+                "match": "离场统计",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 3
+              }
+            ]
+          }
+        },
+        {
+          "text": "现在只查看全部三个任务状态，不新增任务。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "text": "三个任务都已登记。"
+            }
+          ],
+          "expect": {
+            "task_count": 3,
+            "tasks": [
+              {
+                "alias": "入场名单",
+                "match": "入场名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "物料盘点",
+                "match": "物料盘点",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              },
+              {
+                "alias": "离场统计",
+                "match": "离场统计",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 3
+              }
+            ],
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "create-similar-titles-distinct-work",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "新建基础版名单空白模板任务，只含姓名和组别，输出Markdown。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "基础版名单只含姓名和组别，输出Markdown",
+                "title": "基础版名单只含姓名和组别，输出Markdown",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "基础版名单",
+                "match": "基础版名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "不要修改基础版名单。另外新建增强版名单空白模板，字段姓名、组别、座位，输出CSV。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "增强版名单增加座位列，输出CSV",
+                "title": "增强版名单增加座位列，输出CSV",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "基础版名单",
+                "match": "基础版名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "增强版名单",
+                "match": "增强版名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              }
+            ]
+          }
+        },
+        {
+          "text": "再强调一次，这两份名单是独立任务，只查看它们，不要合并。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "text": "两份名单保持为独立任务。"
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "基础版名单",
+                "match": "基础版名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "增强版名单",
+                "match": "增强版名单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 2
+              }
+            ],
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat-first-create-after-confirmation",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "先只聊天，不要建任务：交流会预算600，时间周五。只返回键为预算、时间的JSON。",
+          "fixture": [
+            {
+              "text": "{\"预算\": 600, \"时间\": \"周五\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "预算": 600,
+              "时间": "周五"
+            }
+          }
+        },
+        {
+          "text": "仍然先讨论，产物定为Markdown。只返回预算、时间、产物三个键的JSON。",
+          "fixture": [
+            {
+              "text": "{\"预算\": 600, \"时间\": \"周五\", \"产物\": \"Markdown\"}"
+            }
+          ],
+          "expect": {
+            "task_count": 0,
+            "tasks": [],
+            "reply_json": {
+              "预算": 600,
+              "时间": "周五",
+              "产物": "Markdown"
+            }
+          }
+        },
+        {
+          "text": "现在开始，按刚才确认的预算、时间和产物新建交流会清单任务。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "交流会清单：预算600，时间周五，输出Markdown",
+                "title": "交流会清单：预算600，时间周五，输出Markdown",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "交流会清单",
+                "match": "交流会清单",
+                "revision": 1,
+                "contains": [
+                  "600",
+                  "周五",
+                  "Markdown"
+                ],
+                "created_turn": 3
+              }
+            ]
+          }
+        },
+        {
+          "text": "只告诉我这个交流会任务是否已经建好，不要重复创建。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "text": "交流会任务已建立。"
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "交流会清单",
+                "match": "交流会清单",
+                "revision": 1,
+                "contains": [
+                  "600",
+                  "周五",
+                  "Markdown"
+                ],
+                "created_turn": 3
+              }
+            ],
+            "forbidden_tools": [
+              "delegate",
+              "task_steer"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

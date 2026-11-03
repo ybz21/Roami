@@ -1,0 +1,52 @@
+{
+  "id": "MECH-GP01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "网关回报",
+  "prompt": "验证网关结算与未知用量状态原样传播，回报生成失败时显示已知原因并保留任务实际结果。",
+  "preconditions": "冻结的Python开发依赖和frontend/node_modules；本地UDS夹具，不连接节点模型。",
+  "expected_terminal": "admission_identity_and_report_failure_visible",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "5项后端与8项前端检查回执",
+    "输入与源码冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-GP01-H1",
+      "rule": "本地准入拒绝零上游尝试，不自动重试，原始码在日志与汇总中保留。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-GP01-H2",
+      "rule": "结算后新调用可使用同一提供方，未知用量不被清零；任务结果与回报错误分别保留。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-GP01-H3",
+      "rule": "中英文聊天、活动和RSI显示结算提示；旧记录兼容，回报错误不改变真实任务状态。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_local_gateway_controls",
+    "issue": 611,
+    "fixture_reproduction_only": true
+  },
+  "resources": {
+    "inputs": [
+      "input/decisions.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

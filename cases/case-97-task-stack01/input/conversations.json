@@ -1,0 +1,821 @@
+{
+  "schema_version": 1,
+  "input_revision": "source-bound-oracle-v4",
+  "case_id": "TASK-STACK01",
+  "scenarios": [
+    {
+      "id": "steer-four-cumulative-updates",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "新建读书会清单任务，预算3000，日期2030-05-16，只写Markdown，不发通知。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "读书会清单：预算3000，日期2030-05-16，只写Markdown，不发通知",
+                "title": "读书会清单：预算3000，日期2030-05-16，只写Markdown，不发通知",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "读书会清单",
+                "match": "读书会清单",
+                "revision": 1,
+                "contains": [
+                  "3000",
+                  "Markdown"
+                ],
+                "source_contains": [
+                  "不发通知"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "给原读书会清单再补PDF摘要，Markdown保留。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "读书会清单"
+                },
+                "revision": {
+                  "revision": "读书会清单"
+                },
+                "text": "给原读书会清单再补PDF摘要，Markdown保留。",
+                "sourceQuote": "给原读书会清单再补PDF摘要，Markdown保留。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "读书会清单",
+                "match": "读书会清单",
+                "revision": 2,
+                "contains": [
+                  "3000",
+                  "Markdown",
+                  "PDF摘要"
+                ],
+                "source_contains": [
+                  "不发通知"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "原读书会日期改为2030-05-20，其余要求继续保留。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "读书会清单"
+                },
+                "revision": {
+                  "revision": "读书会清单"
+                },
+                "text": "原读书会日期改为2030-05-20，其余要求继续保留。",
+                "sourceQuote": "原读书会日期改为2030-05-20，其余要求继续保留。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "读书会清单",
+                "match": "读书会清单",
+                "revision": 3,
+                "contains": [
+                  "3000",
+                  "Markdown",
+                  "PDF摘要",
+                  "2030-05-20"
+                ],
+                "source_contains": [
+                  "不发通知"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "继续原读书会清单，加一节雨天安排，不要新建任务。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "读书会清单"
+                },
+                "revision": {
+                  "revision": "读书会清单"
+                },
+                "text": "继续原读书会清单，加一节雨天安排，不要新建任务。",
+                "sourceQuote": "继续原读书会清单，加一节雨天安排，不要新建任务。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "读书会清单",
+                "match": "读书会清单",
+                "revision": 4,
+                "contains": [
+                  "3000",
+                  "Markdown",
+                  "PDF摘要",
+                  "2030-05-20",
+                  "雨天安排"
+                ],
+                "source_contains": [
+                  "不发通知"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "原读书会清单还需附核对表，仍然不要发通知。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "读书会清单"
+                },
+                "revision": {
+                  "revision": "读书会清单"
+                },
+                "text": "原读书会清单还需附核对表，仍然不要发通知。",
+                "sourceQuote": "原读书会清单还需附核对表，仍然不要发通知。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "读书会清单",
+                "match": "读书会清单",
+                "revision": 5,
+                "contains": [
+                  "3000",
+                  "Markdown",
+                  "PDF摘要",
+                  "2030-05-20",
+                  "雨天安排",
+                  "核对表"
+                ],
+                "source_contains": [
+                  "不发通知"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "steer-preserves-project-and-provider",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "在枫林项目用 Codex 新建报名页文案任务，生成可填写的Markdown模板，活动为读书会，人数20人，只提交文件，不部署。",
+          "fixture": [
+            {
+              "tool": "target_resolve",
+              "args": {
+                "kind": "project",
+                "id": "maple"
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "报名页文案Markdown空白模板，活动为读书会，人数20人，只提交文件，不部署",
+                "title": "报名页文案Markdown空白模板，活动为读书会，人数20人，只提交文件，不部署",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": "codex",
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对",
+                  "userQuote": "用 Codex"
+                },
+                "target": {
+                  "kind": "project",
+                  "projectId": "maple"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "报名页文案",
+                "match": "报名页文案",
+                "revision": 1,
+                "contains": [
+                  "20"
+                ],
+                "executor": "codex",
+                "project_id": "maple",
+                "source_contains": [
+                  "不部署"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "在原报名页文案中补上报名截止日期2030-06-01。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "报名页文案"
+                },
+                "revision": {
+                  "revision": "报名页文案"
+                },
+                "text": "在原报名页文案中补上报名截止日期2030-06-01。",
+                "sourceQuote": "在原报名页文案中补上报名截止日期2030-06-01。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "报名页文案",
+                "match": "报名页文案",
+                "revision": 2,
+                "contains": [
+                  "20"
+                ],
+                "executor": "codex",
+                "project_id": "maple",
+                "source_contains": [
+                  "不部署"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "继续原报名页文案，加上无障碍标签，不另开任务。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "报名页文案"
+                },
+                "revision": {
+                  "revision": "报名页文案"
+                },
+                "text": "继续原报名页文案，加上无障碍标签，不另开任务。",
+                "sourceQuote": "继续原报名页文案，加上无障碍标签，不另开任务。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "报名页文案",
+                "match": "报名页文案",
+                "revision": 3,
+                "contains": [
+                  "20"
+                ],
+                "executor": "codex",
+                "project_id": "maple",
+                "source_contains": [
+                  "不部署"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "原报名页再加一段英文说明，继续保留不部署要求。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "报名页文案"
+                },
+                "revision": {
+                  "revision": "报名页文案"
+                },
+                "text": "原报名页再加一段英文说明，继续保留不部署要求。",
+                "sourceQuote": "原报名页再加一段英文说明，继续保留不部署要求。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "报名页文案",
+                "match": "报名页文案",
+                "revision": 4,
+                "contains": [
+                  "20"
+                ],
+                "executor": "codex",
+                "project_id": "maple",
+                "source_contains": [
+                  "不部署"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "steer-inputs-with-unrelated-chat-image",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "新建示意图说明任务，只把附件diagram-v1.png登记为输入，在Markdown中记录文件名和版本来源，暂不解释图片内容。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "示意图说明：将diagram-v1.png登记为输入，在Markdown记录文件名和版本来源，暂不解释图片内容",
+                "title": "示意图说明：将diagram-v1.png登记为输入，在Markdown记录文件名和版本来源，暂不解释图片内容",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                }
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "示意图说明",
+                "match": "示意图说明",
+                "revision": 1,
+                "contains": [],
+                "attachments": [
+                  "diagram-v1.png"
+                ],
+                "created_turn": 1
+              }
+            ]
+          },
+          "attachments": [
+            "diagram-v1.png"
+          ]
+        },
+        {
+          "text": "这张other-topic.png只用于闲聊，与示意图任务无关。只返回整数7，不建任务。",
+          "fixture": [
+            {
+              "text": "7"
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "示意图说明",
+                "match": "示意图说明",
+                "revision": 1,
+                "contains": [],
+                "attachments": [
+                  "diagram-v1.png"
+                ],
+                "created_turn": 1
+              }
+            ],
+            "reply_json": 7
+          },
+          "attachments": [
+            "other-topic.png"
+          ]
+        },
+        {
+          "text": "继续原示意图说明，把新附件diagram-v2.png作为第二版输入，记录两版文件名，保留原图来源；暂不分析图片内容。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "示意图说明"
+                },
+                "revision": {
+                  "revision": "示意图说明"
+                },
+                "text": "继续原示意图说明，把新附件diagram-v2.png作为第二版输入，记录两版文件名，保留原图来源；暂不分析图片内容。",
+                "sourceQuote": "继续原示意图说明，把新附件diagram-v2.png作为第二版输入，记录两版文件名，保留原图来源；暂不分析图片内容。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "示意图说明",
+                "match": "示意图说明",
+                "revision": 2,
+                "contains": [],
+                "attachments": [
+                  "diagram-v1.png",
+                  "diagram-v2.png"
+                ],
+                "created_turn": 1
+              }
+            ]
+          },
+          "attachments": [
+            "diagram-v2.png"
+          ]
+        },
+        {
+          "text": "继续原示意图说明，加上两版差异表，不新建任务。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "示意图说明"
+                },
+                "revision": {
+                  "revision": "示意图说明"
+                },
+                "text": "继续原示意图说明，加上两版差异表，不新建任务。",
+                "sourceQuote": "继续原示意图说明，加上两版差异表，不新建任务。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 1,
+            "tasks": [
+              {
+                "alias": "示意图说明",
+                "match": "示意图说明",
+                "revision": 3,
+                "contains": [],
+                "attachments": [
+                  "diagram-v1.png",
+                  "diagram-v2.png"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "steer-two-tasks-without-cross-contamination",
+      "seconds": 300,
+      "turns": [
+        {
+          "text": "分别处理两件独立的事：新建周一签到清单空白模板任务，字段姓名和组别，输出Markdown；新建周二物料清单空白模板任务，字段物品和数量，输出CSV。",
+          "fixture": [
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建周一签到清单空白模板任务，字段姓名和组别，输出Markdown",
+                "title": "新建周一签到清单空白模板任务，字段姓名和组别，输出Markdown",
+                "requestComplete": false,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建周一签到清单空白模板任务，字段姓名和组别，输出Markdown",
+                    "status": "current"
+                  },
+                  {
+                    "quote": "新建周二物料清单空白模板任务，字段物品和数量，输出CSV",
+                    "status": "pending"
+                  }
+                ]
+              }
+            },
+            {
+              "tool": "delegate",
+              "args": {
+                "goal": "新建周二物料清单空白模板任务，字段物品和数量，输出CSV",
+                "title": "新建周二物料清单空白模板任务，字段物品和数量，输出CSV",
+                "requestComplete": true,
+                "routing": {
+                  "explicitExecutor": null,
+                  "complexity": "bounded",
+                  "complexityBasis": {
+                    "procedure": "把给定字段整理为指定格式并读回核对"
+                  },
+                  "routingExplanation": "输入和交付字段已明确，可直接生成并核对"
+                },
+                "target": {
+                  "kind": "new_session"
+                },
+                "requestCoverage": [
+                  {
+                    "quote": "新建周一签到清单空白模板任务，字段姓名和组别，输出Markdown",
+                    "status": "delegated",
+                    "taskId": {
+                      "task": "新建周一签到清单空白模板任务，字段姓名和组别，输出Markdown"
+                    }
+                  },
+                  {
+                    "quote": "新建周二物料清单空白模板任务，字段物品和数量，输出CSV",
+                    "status": "current"
+                  }
+                ]
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一签到清单",
+                "match": "周一签到清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料清单",
+                "match": "周二物料清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "只修改原周一签到清单，补上嘉宾姓名。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "周一签到清单"
+                },
+                "revision": {
+                  "revision": "周一签到清单"
+                },
+                "text": "只修改原周一签到清单，补上嘉宾姓名。",
+                "sourceQuote": "只修改原周一签到清单，补上嘉宾姓名。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一签到清单",
+                "match": "周一签到清单",
+                "revision": 2,
+                "contains": [
+                  "嘉宾姓名"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料清单",
+                "match": "周二物料清单",
+                "revision": 1,
+                "contains": [],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "只修改原周二物料清单，补上备用物料。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "周二物料清单"
+                },
+                "revision": {
+                  "revision": "周二物料清单"
+                },
+                "text": "只修改原周二物料清单，补上备用物料。",
+                "sourceQuote": "只修改原周二物料清单，补上备用物料。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一签到清单",
+                "match": "周一签到清单",
+                "revision": 2,
+                "contains": [
+                  "嘉宾姓名"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料清单",
+                "match": "周二物料清单",
+                "revision": 2,
+                "contains": [
+                  "备用物料"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        },
+        {
+          "text": "继续原周一签到清单，再补座位号；物料清单保持不动。",
+          "fixture": [
+            {
+              "tool": "task_status",
+              "args": {
+                "includeResult": true
+              }
+            },
+            {
+              "tool": "task_steer",
+              "args": {
+                "taskId": {
+                  "task": "周一签到清单"
+                },
+                "revision": {
+                  "revision": "周一签到清单"
+                },
+                "text": "继续原周一签到清单，再补座位号；物料清单保持不动。",
+                "sourceQuote": "继续原周一签到清单，再补座位号；物料清单保持不动。",
+                "requestComplete": true
+              }
+            }
+          ],
+          "expect": {
+            "task_count": 2,
+            "tasks": [
+              {
+                "alias": "周一签到清单",
+                "match": "周一签到清单",
+                "revision": 3,
+                "contains": [
+                  "嘉宾姓名",
+                  "座位号"
+                ],
+                "created_turn": 1
+              },
+              {
+                "alias": "周二物料清单",
+                "match": "周二物料清单",
+                "revision": 2,
+                "contains": [
+                  "备用物料"
+                ],
+                "created_turn": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

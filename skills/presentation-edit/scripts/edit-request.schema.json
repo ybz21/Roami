@@ -169,6 +169,28 @@
                 }
               }
             ]
+          },
+          "replaceText": {
+            "type": "object",
+            "properties": {
+              "old": {
+                "type": "string",
+                "minLength": 1
+              },
+              "new": {
+                "type": "string"
+              },
+              "expectedCount": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1
+              }
+            },
+            "required": [
+              "old",
+              "new"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -185,6 +207,11 @@
           {
             "required": [
               "color"
+            ]
+          },
+          {
+            "required": [
+              "replaceText"
             ]
           }
         ]

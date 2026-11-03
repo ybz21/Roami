@@ -17,7 +17,11 @@ import AgentPageBoundary from './AgentPageBoundary'
 import { useAgentTask } from './useAgentTask'
 import { useAgentDraft } from './useAgentDraft'
 import { agentDataKey } from './agent-data-cache'
-import { TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
+import { canPreviewArtifact } from './TaskOutput'
+import { DownloadIcon, FileTypeIcon } from '../files/file-icons'
+import { useLayout } from '../../layout'
+import { artifactPreviewHref } from './artifact-preview-route'
+import { TaskArtifactLink, TaskArtifactMobilePreview } from './TaskArtifactLink'
 import { taskFailureKey } from './task-failure'
 import { taskSessionError as failure } from './task-session-error'
 import { openAgentPage } from './agent-page-route'
@@ -128,6 +132,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   }
   const [closeConfirm, setCloseConfirm] = useState(false)
   const [history, setHistory] = useState(false), [preview, setPreview] = useState('')
+  const { phone } = useLayout()
   const alive = useRef(true), controlFence = useRef(0), busyRef = useRef(false)
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
@@ -137,6 +142,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const controls = controlSafe ? snapshot.controls.value : null
   const latest = detail?.attempts[0], steering = detail?.steering
   const artifacts = useMemo(() => currentTaskArtifacts([...new Map([...(snapshot.artifacts.value || []), ...(detail?.delivery?.artifacts || [])].map(item => [item.id, item])).values()]), [snapshot.artifacts.value, detail?.delivery?.artifacts])
+  const previewFile = artifacts.find(artifact => artifact.id === preview)
   const sessionClosed = detail?.sessionClosure?.state === 'closed'
   const sessionClosing = detail?.sessionClosure?.state === 'closing'
   const sessionId = detail?.attempts.find(attempt => attempt.sessionId)?.sessionId || task?.latestAttempt?.sessionId
@@ -144,9 +150,9 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const retainedSession = !!task?.nativeSession || professional && !!(task?.latestAttempt?.agentConversationId || detail?.attempts.some(attempt => attempt.sessionId === sessionId && attempt.agentConversationId))
   const ended = !!latest?.finishedMs || terminal.has(task?.state || '')
   const previewArtifact = useCallback((artifactId: string) => {
-    setPreview(artifactId)
-    requestAnimationFrame(() => document.getElementById('task-artifact-' + artifactId)?.scrollIntoView?.({ block: 'nearest' }))
-  }, [])
+    if (phone) setPreview(artifactId)
+    else window.open(artifactPreviewHref(artifactId), '_blank', 'noopener,noreferrer')
+  }, [phone])
   const stopping = steering?.state === 'stopping'
   const goal = task ? taskGoal(task) : ''
   const current = latest?.revision === task?.revision ? latest : undefined
@@ -205,11 +211,16 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
         {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}
         {!snapshot.artifacts.value && !snapshot.artifacts.failed && <Spin size="small" />}
         {!!detail?.delivery?.unavailable.length && <p className="agent-task-note" role="status">{t('agent.task.outputsUnavailable')}<small>{detail.delivery.unavailable.map(item => item.sourcePath).join(' · ')}</small></p>}
-        {artifacts.map((artifact) => <div className="agent-task-artifact" id={'task-artifact-' + artifact.id} key={artifact.id}><span>{artifact.name}<small className="agent-muted">{t('agent.task.artifactBytes', { n: artifact.sizeBytes.toLocaleString(locale) })}{artifact.createdMs && <time>{new Date(artifact.createdMs).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}</time>}</small></span><div className="agent-task-actions">
-          {canPreviewArtifact(artifact) && <button type="button" className="tt-act" aria-label={t('agent.task.previewNamed', { name: artifact.name })} onClick={() => setPreview(preview === artifact.id ? '' : artifact.id)}>{t('agent.task.preview')}</button>}
-          <a className="tt-act" href={nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')} download={artifact.name}>{t('agent.task.download')}</a>
-        </div>{preview === artifact.id && <TaskArtifactPreview artifact={artifact} />}</div>)}
+        {artifacts.map((artifact) => <div className="agent-task-artifact" id={'task-artifact-' + artifact.id} key={artifact.id}>
+          <span className="agent-task-file-icon" aria-hidden="true"><FileTypeIcon name={artifact.name} /></span>
+          <div className="agent-task-file-info"><b>{artifact.name}</b><small className="agent-muted">{t('agent.task.artifactBytes', { n: artifact.sizeBytes.toLocaleString(locale) })}{artifact.createdMs && <time>{new Date(artifact.createdMs).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}</time>}</small></div>
+          <div className="agent-task-actions agent-task-file-actions">
+            {canPreviewArtifact(artifact) && <TaskArtifactLink artifact={artifact} onPreview={setPreview} />}
+            <a className="tt-act" href={nodeApi('/agent/artifacts/' + encodeURIComponent(artifact.id) + '/content')} download={artifact.name}><DownloadIcon />{t('agent.task.download')}</a>
+          </div>
+        </div>)}
       </section>}
+      {phone && previewFile && <TaskArtifactMobilePreview artifact={previewFile} onBack={() => setPreview('')} />}
       {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || !detailSafe} onClick={() => { if (retainedSession && (sessionId || task.nativeSession)) setCloseConfirm(true); else void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t(retainedSession && (sessionId || task.nativeSession) ? 'agent.task.completeAndClose' : 'agent.task.accept')}</Button><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
       {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskTopic(child) || t('agent.task.untitled')}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
       {(snapshot.controls.failed || !!snapshot.controls.value?.resources.length || !!controls?.actions.some(action => action.state === 'unknown' && action.outcomeKnown !== true)) && <section className="agent-task-section"><h4>{t('agent.task.control')}</h4>

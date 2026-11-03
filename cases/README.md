@@ -100,3 +100,26 @@ Case 定义不记录实时运行状态，通过每次 Run 的冻结合同、阶�
 - [Case90 / MECH-RA01](case-90-mech-ra01/CASE.md)：用户委托AI参考的显式准入、证据绑定和混合校准，24项零外部模型机制检查。
 
 - [Case91 / MECH-UG01](case-91-mech-ug01/CASE.md)：Go网关上游响应关联、内部标记边界与旧账本迁移，6组、25项叶检查，零外部模型调用。
+
+- [Case92 / MECH-TF01](case-92-mech-tf01/CASE.md)：后台任务失败分类、未知观测与取消围栏，47项Python、6组12项Go叶检查。
+
+- [Case93 / MECH-SI01](case-93-mech-si01/CASE.md)：原会话附图与文件的单次传递、来源撤回和稳定回执，17项机制检查。
+
+- [Case94 / MECH-TC01](case-94-mech-tc01/CASE.md)：原任务续作的附图来源、执行器绑定与拒绝恢复说明，41项机制检查。
+
+- [Case99 / MECH-MP01](case-99-mech-mp01/CASE.md)：公开跨年行情、外挂报告流水线、实际九页渲染与16项检查；不加入历史正式套件。
+
+后三项使用公开合成夹具及严格冻结运行器，单独运行，不加入历史正式40/60项套件；不重放旧业务或调用真实绘图模型。
+
+- [Case95 / CHAT-STACK01](case-95-chat-stack01/CASE.md)：多轮聊天的约束叠加、改口、取消、语言和话题切换，4段对话、18轮。
+- [Case96 / TASK-NEW01](case-96-task-new01/CASE.md)：多项交办、连续新建、相似标题及讨论后再创建，4段对话、14轮。
+- [Case97 / TASK-STACK01](case-97-task-stack01/CASE.md)：原任务反复补要求、附件追加、执行器绑定及跨任务隔离，4段对话、17轮。
+- [Case98 / TASK-SCOPE01](case-98-task-scope01/CASE.md)：歧义澄清、请求重放、跨项目和查状态不误建任务，4段对话、13轮。
+
+这四项共16段、62轮，逐轮读回真实Runtime/SQLite判定。`fixture`只验证设施；`saved-model`使用节点保存的Main配置及Go网关，参考答案不进入模型请求。后台执行结果是显式合成检查点，不运行真实项目或会话，也不证明实际交付质量；保持历史正式套件不变。
+
+- [Case 100：多轮会话的网关阻塞与内容评分分离](case-100-mech-cg01/CASE.md)：公开传输控制、真实Runtime、分层汇总及零模型调用回执。
+
+- [Case 101：网关结算状态与任务回报失败原因](case-101-mech-gp01/CASE.md)：真实Runtime、本地UDS夹具和中英文前端组件，分别核对任务与回报状态。
+
+- [Case 102：本机网关就绪与鉴权准入拒绝](case-102-mech-gp02/CASE.md)：本地 UDS、远端伪造与跨尝试未知用量控制，零模型调用回执。

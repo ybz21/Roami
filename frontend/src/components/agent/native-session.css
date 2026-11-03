@@ -29,13 +29,6 @@
 .native-artifact-info b { font-size:var(--fs-body); font-weight:500; overflow-wrap:anywhere; }
 .native-artifact-info small { display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
 .native-artifact-info small > span:first-child { overflow-wrap:anywhere; }
-.native-artifact-preview { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:auto; max-height:70dvh; }
-.native-artifact-preview-actions { display:flex; justify-content:flex-end; padding:var(--sp-2) var(--sp-4); }
-.native-artifact-preview-actions .tt-act { display:flex; align-items:center; min-height:var(--tap); }
-.native-artifact-preview .agent-task-preview { max-height:none; border-radius:0; }
-.native-artifact-preview .agent-task-document { flex:1; max-height:none; background:var(--bg-base); }
-.native-artifact-preview .agent-task-document pre { max-height:none; }
-html[data-size="compact"] .native-artifact-preview,html[data-size="medium"] .native-artifact-preview { flex:1; max-height:none; }
 .native-project-sessions { padding:0; min-width:0; }
 .native-project-sessions .tt-msess-row.native-project-session { border:0; border-bottom:1px solid var(--border-subtle); border-radius:0; margin:0; padding:var(--sp-3) 0; background:transparent; min-height:calc(var(--tap) + var(--sp-2)); }
 .native-project-session .ic { color:var(--text-dim); }
