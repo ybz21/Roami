@@ -227,6 +227,14 @@ async def execute_diagnostic(runtime, service, request, *, executor_image=None):
                     "metrics": {"tokens": None, "token_coverage": "unknown"},
                     **failure_fields(exc),
                 }
+        if result.get("execution_kind") in {
+            "native_files",
+            "isolated_native_worker",
+            "external_worker",
+        }:
+            from roami_agent.improvement.integrations.tool_process import logged_tool_process
+
+            result.setdefault("metrics", {}).update(logged_tool_process(target))
         review_tokens = result.get("metrics", {}).get("artifact_review_tokens", 0)
         artifact_tokens = (
             artifact_tokens + review_tokens

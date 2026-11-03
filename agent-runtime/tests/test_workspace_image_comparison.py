@@ -99,7 +99,7 @@ async def test_unavailable_newer_version_never_resurrects_an_older_path(
     runtime, turn, _, _, workspace, read = image_read
     _, old = await read()
     (workspace / "frame.png").write_bytes(picture(color="blue"))
-    latest, recent = await read(extra={"offset": 1} if fault == "paged" else None)
+    latest, recent = await read(extra={"offset": 2} if fault == "paged" else None)
     if fault == "delete":
         await runtime.artifacts.delete("alice", latest["fileImage"]["artifactId"])
     elif fault == "forget":

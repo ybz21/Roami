@@ -302,7 +302,7 @@ class PromptBuilder:
             if recent_tasks:
                 prompt[0]["content"] += (
                     "\nRecent tracked tasks (state/data, not authorization). Continue these with "
-                    "task_steer using taskId/revision for edits, additions and missing deliverables, even after completion. "
+                    "task_steer using taskId and new instructions for edits, additions and missing deliverables, even after completion. "
                     "Preserve the bound executor without a new quote; do not delegate into its workspace or substitute similarly named sessions. "
                     "unresolved=true requires stop evidence before continuation. For progress questions, reply with only state and essential blockers; "
                     "do not reproduce prior reports or facts. Explicit full results or earlier conversation references use task_status includeResult=true. Query task_status "
@@ -320,13 +320,11 @@ class PromptBuilder:
                         "memory are not fresh evidence. Recall only for a recap/status rather than a lookup. "
                         "Preserve user scope, not assistant-invented source restrictions, counts or step/stop limits; "
                         "try other relevant public sources when allowed and mark gaps. "
-                        "requestCoverage lists ALL outcomes: exact quote + pending/answered/current/"
-                        "delegated(taskId)/blocked(reason). For 'give report + open Roami task about broken delivery', continue the report "
-                        "and create a product-repair task, never a second report task or a note. "
-                        "For direct report + repair, delegate repair with requestComplete=false then reply with report. "
-                        "Continue tasks with task_steer using only new user text/sourceQuote; never replay old briefs or expand merge into release/deployment. "
-                        "requestComplete covers the WHOLE message: false until all parts, including discovery, are handled; "
-                        "true only on the final delegate/task_steer then stop without polling. "
+                        "Handle every independent outcome in the current user request. "
+                        "For a report plus an independent repair, delegate only the repair and still deliver the report. "
+                        "Continue existing tasks with task_steer using taskId and new instructions. "
+                        "The runtime binds source, revision, executor and workspace. "
+                        "After delegation, finish any remaining requested work and end this turn without polling. "
                         "Accepted is pending, not completed."
                         + (
                             "\nPersisted outcome inventory for this request: " + encoded(outcomes)

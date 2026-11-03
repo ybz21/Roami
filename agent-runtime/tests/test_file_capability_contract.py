@@ -21,7 +21,7 @@ async def test_binary_file_reads_preserve_pages_and_source_hash(store, tmp_path)
         offset, chunks = 0, []
         while True:
             result = await runtime.tools.invoke(
-                call("read", {"path": "input.pptx", "offset": offset, "limit": 37}),
+                call("file_read", {"path": "input.pptx", "offset": offset, "limit": 37}),
                 "worker",
                 binding,
             )

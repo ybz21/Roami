@@ -294,7 +294,7 @@ async def test_main_file_permission_and_unavailable_inputs_do_not_capture(main_r
         runtime.tools.disabled_tools.add("read")
     if mode == "invalid":
         path.write_text("not an image")
-    value, tool = await read(extra={"offset": 1} if mode == "paged" else None)
+    value, tool = await read(extra={"offset": 2} if mode == "paged" else None)
     assert not value.get("fileImage", {}).get("artifactId")
     assert not image_parts((await attach(runtime, turn, prompt(tool)))[1])
     assert (

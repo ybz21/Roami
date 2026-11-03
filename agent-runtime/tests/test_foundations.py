@@ -323,7 +323,7 @@ async def test_malformed_cli_arguments_have_an_executable_recovery_example(store
                 arguments, _ = json.JSONDecoder().raw_decode(
                     failure["recovery"].split("Example: ", 1)[1]
                 )
-                assert all(isinstance(value, str) for value in arguments["argv"])
+                assert isinstance(arguments["command"], str)
                 wire = call("bash", arguments)
                 wire["id"] = "repaired"
                 yield ModelEvent("tool", wire)
@@ -511,5 +511,5 @@ def test_main_catalog_does_not_advertise_an_implicit_shell_workspace():
     )
     main = registry.catalog("main")[0]["function"]["description"]
     worker = registry.catalog("worker")[0]["function"]["description"]
-    assert "Main has no implicit shell workspace" in main and "delegate" in main
+    assert "host supplies the working directory" in main and "scope=host" not in main
     assert worker == "Shell in a prepared workspace"

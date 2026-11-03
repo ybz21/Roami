@@ -1,0 +1,170 @@
+{
+  "saved_routes_unchanged": true,
+  "passed": true,
+  "cases": [
+    {
+      "case": "main-shell",
+      "role": "main",
+      "model": "deepseek-4.1-flash",
+      "state": "completed",
+      "passed": true,
+      "first_attempt_succeeded": true,
+      "tool_failures": 0,
+      "error": null,
+      "calls": [
+        {
+          "tool": "bash",
+          "state": "succeeded",
+          "fields": [
+            "command"
+          ],
+          "error": null
+        }
+      ],
+      "process": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 1,
+        "tool_failures": 0,
+        "tool_unknowns": 0,
+        "tool_errors": 0,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {},
+        "tool_failure_rate": 0.0,
+        "tool_error_rate": 0.0,
+        "tool_process_score": 100.0,
+        "tool_first_calls": 1,
+        "tool_first_successes": 1,
+        "tool_first_attempt_success_rate": 1.0
+      }
+    },
+    {
+      "case": "main-status",
+      "role": "main",
+      "model": "deepseek-4.1-flash",
+      "state": "completed",
+      "passed": true,
+      "first_attempt_succeeded": true,
+      "tool_failures": 0,
+      "error": null,
+      "calls": [
+        {
+          "tool": "task_queue_reply",
+          "state": "succeeded",
+          "fields": [],
+          "error": null
+        }
+      ],
+      "process": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 1,
+        "tool_failures": 0,
+        "tool_unknowns": 0,
+        "tool_errors": 0,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {},
+        "tool_failure_rate": 0.0,
+        "tool_error_rate": 0.0,
+        "tool_process_score": 100.0,
+        "tool_first_calls": 1,
+        "tool_first_successes": 1,
+        "tool_first_attempt_success_rate": 1.0
+      }
+    },
+    {
+      "case": "main-question",
+      "role": "main",
+      "model": "deepseek-4.1-flash",
+      "state": "completed",
+      "passed": true,
+      "first_attempt_succeeded": true,
+      "tool_failures": 0,
+      "error": null,
+      "calls": [
+        {
+          "tool": "ask_user",
+          "state": "succeeded",
+          "fields": [
+            "options",
+            "prompt"
+          ],
+          "error": null
+        }
+      ],
+      "process": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 1,
+        "tool_failures": 0,
+        "tool_unknowns": 0,
+        "tool_errors": 0,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {},
+        "tool_failure_rate": 0.0,
+        "tool_error_rate": 0.0,
+        "tool_process_score": 100.0,
+        "tool_first_calls": 1,
+        "tool_first_successes": 1,
+        "tool_first_attempt_success_rate": 1.0
+      }
+    },
+    {
+      "case": "worker-files",
+      "role": "worker",
+      "model": "deepseek-4.1-flash",
+      "state": "completed",
+      "passed": true,
+      "first_attempt_succeeded": true,
+      "tool_failures": 0,
+      "error": null,
+      "calls": [
+        {
+          "tool": "file_write",
+          "state": "succeeded",
+          "fields": [
+            "content",
+            "path"
+          ],
+          "error": null
+        },
+        {
+          "tool": "file_read",
+          "state": "succeeded",
+          "fields": [
+            "limit",
+            "offset",
+            "path"
+          ],
+          "error": null
+        },
+        {
+          "tool": "file_patch",
+          "state": "succeeded",
+          "fields": [
+            "newText",
+            "oldText",
+            "path"
+          ],
+          "error": null
+        }
+      ],
+      "process": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 3,
+        "tool_failures": 0,
+        "tool_unknowns": 0,
+        "tool_errors": 0,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {},
+        "tool_failure_rate": 0.0,
+        "tool_error_rate": 0.0,
+        "tool_process_score": 100.0,
+        "tool_first_calls": 1,
+        "tool_first_successes": 1,
+        "tool_first_attempt_success_rate": 1.0
+      }
+    }
+  ]
+}

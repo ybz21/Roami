@@ -1,9 +1,16 @@
 """Worker-only Browser Use; actions always reference a durable observation."""
 
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.observation_inputs import observation_input, resource_input
 
 
 def register_browser_tools(registry, driver):
+    async def observe(args, binding):
+        return await driver.observe(await resource_input(driver, args, binding, "browser"), binding)
+
+    async def act(args, binding):
+        return await driver.act(await observation_input(driver, args, binding, "browser"), binding)
+
     registry.add(
         Tool(
             "browser_open",
@@ -25,7 +32,7 @@ def register_browser_tools(registry, driver):
             object_schema(
                 {"resourceId": {"type": "string", "minLength": 1, "maxLength": 128}}, ["resourceId"]
             ),
-            driver.observe,
+            observe,
         )
     )
     registry.add(
@@ -63,7 +70,7 @@ def register_browser_tools(registry, driver):
                     },
                 ],
             },
-            driver.act,
+            act,
             effect="write",
         )
     )

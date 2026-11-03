@@ -4,7 +4,7 @@
 
 ## 项目与会话：逐项操作
 
-以下操作名是受管 CLI 能力，使用 命令族帮助返回的真实命令及 `--input JSON` 的搜索结果 argv，由 `bash` 执行；不是新增的模型工具。
+以下操作名是受管 CLI 能力，使用命令族帮助返回的真实命令及 `--input JSON`，由 `bash` 的 command 字符串执行。任务和会话操作不新增 Main 工具。
 
 | 意图 | 操作 / 参数 | 结果判断 |
 | --- | --- | --- |
@@ -20,7 +20,7 @@
 先查询完整目标，再可靠投递：
 
 ```json
-{"argv":["roami","session","send","--input","{\"sessionId\":\"实际发现的ID\",\"text\":\"请继续完成用户交办的需求，并说明验证结果。\"}"]}
+{"command":"roami session send --input '{\"sessionId\":\"实际发现的ID\",\"text\":\"请继续完成用户交办的需求，并说明验证结果。\"}'"}
 ```
 
 复用现有持久投递与 TUI 提交路径。不能用 `tmux send-keys text Enter` 替代；目标名在 tmux 中是前缀匹配，底层必须使用精确身份。未知提交结果先对账，同一意图不换新幂等键盲目重发。用户明确指定投递已经授权，不重复确认。
@@ -29,17 +29,21 @@
 
 使用模型的 `delegate`，不是把新会话命令拼进旧会话投递。
 
-每次 `delegate` 都带 `routing:{complexity:"bounded",complexityBasis:{维度:"具体事实"},routingExplanation:"本次执行负担",explicitExecutor:null}`；复杂工作把 complexity 改为 `complex`。用户指定执行器时，把 `explicitExecutor` 改成 `native` / `codex` / `claude` / `opencode` / `pi`，同时提供原始用户消息中的准确 `userQuote`；没有指定则用 `null` 并省略 `userQuote`。选择不能只写进 goal、说明或引文，不再填写顶层 executor。依据实际自主探索与验证负担判断复杂度，不按文件类型或任务名称分流。
+`delegate` 只必填 `goal`；可选 `executor`（native/codex/claude/opencode/pi），省略时使用节点或项目默认值。需要特定目标时选 `directory`、`projectId` 或 `sessionId` 之一。执行器安装、目标身份和权限由后台校验，不用填写 routing、引文或覆盖清单。
 
-| 场景 | 参数 | 行为 |
-| --- | --- | --- |
-| 项目新任务 | `target:{kind:"project",projectId:ID}`, goal, routing | 复杂任务选择可用专业执行器；后台准备项目工作区 |
-| 复用工作区 | 上述 target 增加 workspaceId | 不覆盖 directory/base/remote，不 fetch/reset 本地改动 |
-| 新散任务 | `target:{kind:"new_session"}`, goal, routing | 内置任务自动获得独立可写目录；用户选了现有目录时才填写 directory，不从无关历史猜路径 |
-| 新项目 | `target:{kind:"new_project",name:"名称",baseDir:"可选父目录"}`, goal, routing | 仅在用户要求新项目时创建，不用于逃避旧会话限制 |
-| 原生 Worker | bounded routing，合法 project/new_session 目标，goal | 用后台模型执行，显式指定优先于历史偏好 |
-| 简单公开网页研究 | `target:{kind:"new_session",resourceOnly:true}`, goal, bounded routing | 无代码目录，沿用已启用的 Skill、MCP、CLI 和浏览器能力 |
+| 用户目的 | 调用 |
+| --- | --- |
+| 新任务 | `delegate({"goal":"用户交办的工作"})` |
+| 指定执行器 | `delegate({"goal":"工作内容","executor":"codex"})` |
+| 项目工作 | `delegate({"goal":"工作内容","projectId":"实际项目 ID"})` |
+| 指定目录 | `delegate({"goal":"工作内容","directory":"用户指定的绝对路径"})` |
+| 续改原任务 | `roami agent task steer --input '{"taskId":"原任务 ID","text":"本次新增要求"}'` |
+| 查任务 | `roami agent task status --input '{"taskId":"原任务 ID"}'` |
+| 已有会话追加 | `roami session send --input '{"sessionId":"实际会话 ID","text":"用户的新要求"}'` |
+
 | 检查点 Fork | delegate 增加 fromMessageId | 只从已完成助手检查点派生；保留父任务、预算和原 Main 回报目标 |
+
+原生 Worker 用 `executor:"native"`，由宿主准备独立工作目录。已接受任务的回报自动返回，处理完用户其他要求后结束当前轮，不重复轮询。
 
 queued / preparing 不代表已给 Codex 投递，失败不静默创建第二个会话。专业 Agent 是否安装、可登录、用量可读是不同状态，不能把未知额度说成额度充足。
 

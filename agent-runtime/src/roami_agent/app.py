@@ -123,7 +123,7 @@ class Runtime:
             grace_seconds=self.settings.artifact_gc_grace_seconds,
             interval_seconds=self.settings.artifact_gc_interval_seconds,
         )
-        self.files = WorkspaceFiles(self.settings)
+        self.files = WorkspaceFiles(self.settings, database)
         self.resources = ResourceLeases(database)
         self.controls = ResourceControls(database, self.resources)
         self.memory = Memories(

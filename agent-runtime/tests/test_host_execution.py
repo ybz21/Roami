@@ -110,12 +110,6 @@ async def test_arbitrary_program_and_pipeline_use_disposable_cwd_and_filter_cred
         ("main", {"workspace": {"directory": "/tmp"}}, {}, "HOST_SCOPE_UNAVAILABLE"),
         ("main", {}, {"cwd": "/tmp"}, "HOST_SCOPE_CWD_NOT_ALLOWED"),
         ("main", {}, {"cwd": ""}, "HOST_SCOPE_CWD_NOT_ALLOWED"),
-        (
-            "main",
-            {},
-            {"argv": ["roami", "agent", "host", "processes", "--input", "{}"]},
-            "HOST_SCOPE_REGISTERED_COMMAND",
-        ),
         ("main", {}, {"scope": "unknown"}, "INVALID_TOOL_ARGUMENTS"),
     ],
 )
@@ -196,7 +190,7 @@ async def test_host_failure_or_cancellation_cleans_working_directory_and_child_p
 
 
 @pytest.mark.parametrize("argv", [["uname", "-s"], ["df", "-k"]])
-async def test_main_recovers_generically_and_records_actual_scope_without_delegation(store, argv):
+async def test_main_infers_host_scope_and_records_actual_scope_without_delegation(store, argv):
     class Main:
         model = "host-scope-fixture"
         step = 0
@@ -205,12 +199,6 @@ async def test_main_recovers_generically_and_records_actual_scope_without_delega
             self.step += 1
             if self.step == 1:
                 args = {"argv": argv}
-            elif self.step == 2:
-                failure = json.loads(messages[-1]["content"])
-                assert failure["error"] == "WORKSPACE_REQUIRED"
-                assert "scope=host" in failure["recovery"]
-                assert "host,processes" not in failure["recovery"]
-                args = {"argv": argv, "scope": "host"}
             else:
                 result = json.loads(messages[-1]["content"])
                 assert result["exitCode"] == 0 and result["stdout"].strip()
@@ -242,17 +230,16 @@ async def test_main_recovers_generically_and_records_actual_scope_without_delega
             )
         )
         assert [(item["tool_name"], item["effect"], item["state"]) for item in calls] == [
-            ("bash", "write", "failed"),
             ("bash", "write", "succeeded"),
             ("reply", "read", "succeeded"),
         ]
-        assert json.loads(calls[1]["arguments_json"])["scope"] == "host"
+        assert "scope" not in json.loads(calls[0]["arguments_json"])
         assert not await runtime.tasks.list("alice")
     finally:
         await runtime.close()
 
 
-async def test_role_catalogs_expose_host_scope_only_to_main(store):
+async def test_role_catalogs_keep_scope_in_runtime_binding(store):
     runtime = Runtime(store, ConversationModel())
     try:
         schemas = {
@@ -263,8 +250,7 @@ async def test_role_catalogs_expose_host_scope_only_to_main(store):
             )
             for role in ("main", "worker", "research")
         }
-        assert schemas["main"]["scope"]["enum"] == ["workspace", "host"]
-        assert schemas["worker"]["scope"]["enum"] == ["workspace"]
-        assert schemas["research"] == schemas["worker"]
+        for schema in schemas.values():
+            assert set(schema) == {"command", "timeout"}
     finally:
         await runtime.close()

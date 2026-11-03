@@ -12,6 +12,7 @@ from roami_agent.improvement.evaluation.execution.interrupted_evidence import sn
 from roami_agent.improvement.evaluation.native_judgment import native_judgment
 from roami_agent.improvement.integrations.artifact_paths import relative_file
 from roami_agent.improvement.integrations.container_failure_evidence import failure_fields
+from roami_agent.improvement.integrations.tool_process import tool_process_metrics
 from roami_agent.protocol.errors import DomainError
 
 
@@ -52,6 +53,7 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
     checks = {code(k): v for k, v in grade.get("checks", {}).items() if type(v) is bool}
     signals.update("check:" + k for k, v in checks.items() if not v)
     tools, roles, files = [], {}, []
+    process = {key: value for key, value in metrics.items() if key.startswith("tool_")}
     execution_log_found = False
     execution_evidence = None
     if root:
@@ -76,6 +78,9 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
             if data.get("source") == "interrupted_runtime_snapshot":
                 execution_evidence = snapshot_metadata(data)
             execution_log_found = True
+            process = tool_process_metrics(
+                data["tool_calls"], complete=data.get("complete", True) is True
+            )
             for item in data.get("tool_calls", []):
                 error = None
                 if item.get("state") == "failed":
@@ -186,9 +191,12 @@ def trial_summary(case, result, root=None, *, blocked_by=None):
         "checks": checks,
         "signals": sorted(signals),
         "metrics": {
-            k: metrics.get(k)
-            for k in ("tokens", "token_coverage", "model_calls", "elapsed_ms", "model_ms")
-            + (("artifact_assessment_ms",) if "artifact_assessment_ms" in metrics else ())
+            **process,
+            **{
+                k: metrics.get(k)
+                for k in ("tokens", "token_coverage", "model_calls", "elapsed_ms", "model_ms")
+                + (("artifact_assessment_ms",) if "artifact_assessment_ms" in metrics else ())
+            },
         },
         "tools": tools,
         "tool_calls": execution_evidence["recorded_tool_calls"]
