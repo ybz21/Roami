@@ -112,5 +112,11 @@
     "version": "roami vokr-board-4d307a49",
     "containsNewWorkspaceDiagnostic": false
   },
-  "productionMutations": false
+  "productionMutations": false,
+  "finalCliObservation": {
+    "snapshotUtc": "2026-11-03T14:58:16.966612+00:00",
+    "version": "roami vokr-board-4d307a49",
+    "containsNewWorkspaceDiagnostic": false,
+    "deploymentPerformedByThisTask": false
+  }
 }

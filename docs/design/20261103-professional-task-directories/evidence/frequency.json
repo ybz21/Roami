@@ -1,0 +1,13 @@
+{
+  "snapshotUtc": "2026-11-03T14:49:43.640029+00:00",
+  "taskCount": 57,
+  "attemptCount": 81,
+  "errorCounts": {
+    "WORKSPACE_OUTCOME_UNKNOWN": 3,
+    "NATIVE_WORKSPACE_OUTCOME_UNKNOWN": 2,
+    "SESSION_NOT_IDLE": 1,
+    "WORKSPACE_STALE": 1,
+    "TOOL_OUTCOME_UNKNOWN": 2,
+    "MODEL_HTTP_401": 1
+  }
+}

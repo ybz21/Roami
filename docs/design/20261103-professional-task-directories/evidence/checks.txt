@@ -1,0 +1,20 @@
+Runtime commit: 62d0ff0d
+
+full: env -u ROAM_HOME scripts/dev/quality/check.sh full
+quick: installed pre-commit hook
+
+workspace-directory-quality-full.log
+sha256: d068b31ce22a921191f8d6e9d6dc10c61b9189ca5896b887dd055bf13b04fee4
+3285 passed, 48 skipped in 964.38s (0:16:04)
+==> Quality gate passed
+
+workspace-directory-commit.log
+sha256: 014680fec2fd47fe5a5b6aa9772bba30b24690cb6d9eddfc4b9e3c82a146d03d
+3285 passed, 48 skipped in 971.98s (0:16:11)
+==> Quality gate passed
+
+Targeted: 89 passed.
+CLI fixture: real Go launcher + private tmux + fake Claude; explicit blocked target remains blocked, two implicit tasks finish in distinct directories, old writer unchanged.
+Private instances cleaned through isolated-roami.sh --stop.
+Reproduction script retained in workspace: tmp/workspace-directory-proof/verify.py
+No production task or writer mutation; no deployment performed by this task.

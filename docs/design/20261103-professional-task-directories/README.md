@@ -31,7 +31,7 @@
 
 失败顺序为：专业任务未选目录 → Python 回退全局 coding_directory → Go 准备该目录并启动 runner → claimWorkspace 发现旧 writer 缺终态 → CLI 任务 exec 前失败。这里 -1 仍是启动前构造值，不是已观测到的 Claude 退出信号。
 
-本次确认 **3 次新专业任务启动失败受同一旧 writer 影响**，不把三次界面报错认作三次独立工具故障。其它 NATIVE_WORKSPACE_OUTCOME_UNKNOWN、真实工具未知、会话忙、模型认证等错误仍需分别归因，不能都用本次根因解释。
+本次快照共 57 个任务、81 次尝试（[频次](evidence/frequency.json)）；确认 **3 次新专业任务启动失败受同一旧 writer 影响**，不把三次界面报错认作三次独立工具故障。其它 NATIVE_WORKSPACE_OUTCOME_UNKNOWN、真实工具未知、会话忙、模型认证等错误仍需分别归因，不能都用本次根因解释。
 
 ## Technical Design
 
@@ -55,7 +55,7 @@
 uv run --frozen --directory agent-runtime pytest -q tests/test_professional_task_directories.py tests/test_coding_executor.py tests/test_task_directories.py tests/test_routing_policy.py
 ```
 
-结果：**89 passed**。全量 quick/full 结果见最终质量检查记录。
+结果：**89 passed**。full 质量门通过：Python **3,285 passed / 48 skipped**，Go、CLI 审计、ruff、i18n/hover/typecheck/build、秘密扫描均通过。quick 提交钩子同样通过：Python **3,285 passed / 48 skipped**；见 [检查记录](evidence/checks.txt)。
 
 ### 真实 Go CLI 与隔离 tmux 的协议验证
 
@@ -72,7 +72,7 @@ uv run --frozen --directory agent-runtime pytest -q tests/test_professional_task
 
 ## 线上版本和未修复项
 
-读取到的线上 CLI 版本为 `roami vokr-files-8b74b3bb`，二进制中没有此前 #640 引入的 WORKSPACE_PRIOR_RESULT_MISSING 标记；新生产结果也没有 executionStarted / failure 字段。代码合入没有自动更新该实例。
+读取到的线上 CLI 版本为 `roami vokr-files-8b74b3bb`，二进制中没有此前 #640 引入的 WORKSPACE_PRIOR_RESULT_MISSING 标记；新生产结果也没有 executionStarted / failure 字段。最终复核时 CLI 已变为 `roami vokr-board-4d307a49`，诊断标记仍缺失；本次没有执行部署或覆盖检查期间的其它部署。新目录逻辑没有进行生产写入验收。
 
 1. 本分支尚未部署，不能声称截图中的服务已恢复。
 2. 三条历史失败不会被这次代码改写，旧 writer 未确认的停止边界继续保留；没有擅自恢复或重做原三份 HTML。
