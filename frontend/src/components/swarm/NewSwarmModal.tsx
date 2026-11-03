@@ -28,7 +28,7 @@ export function NewSwarmModal({ open, onClose, onDone, initialDir, lockDir }: { 
       if (dir.trim()) {
         const projects = await api('GET', '/projects')
         const project = (projects.data?.projects || []).find((item: { dir: string }) => item.dir.replace(/\/+$/, '') === dir.trim().replace(/\/+$/, ''))
-        if (project) target = { kind: 'project', projectId: project.key, directory: dir.trim() }
+        if (project) target = { kind: 'project', projectId: project.key }
         else target = { kind: 'new_session', directory: dir.trim() }
       }
       const body = { name: name.trim(), goal: goal.trim(), mainConversationId: cid, target }
