@@ -23,7 +23,7 @@ func TestActiveUsageAdmission(t *testing.T) {
 	}{
 		{"within limit", floatPointer(10), billableEvents, 200, true},
 		{"limit reached", floatPointer(2), billableEvents, 402, false},
-		{"unknown after settlement", floatPointer(10), "data: {\"choices\":[]}\n\n", 409, false},
+		{"unknown after settlement", floatPointer(10), "data: {\"choices\":[]}\n\n", 200, true},
 		{"unlimited stays concurrent", nil, billableEvents, 200, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -89,8 +89,8 @@ func TestActiveUsageAdmission(t *testing.T) {
 			if err != nil || int(hits.Load()) != want || len(stats.Recent) != want {
 				t.Fatalf("unexpected upstream attempt or ledger row: hits=%d rows=%d err=%v", hits.Load(), len(stats.Recent), err)
 			}
-			if test.name == "unknown after settlement" && second.Header().Get("X-Roami-Model-Error") != "MODEL_PROXY_USAGE_UNKNOWN" {
-				t.Fatal("settled unknown usage protection lost")
+			if test.name == "unknown after settlement" && (stats.Today[0].Unknown != 1 || second.Header().Get("X-Roami-Model-Error") != "") {
+				t.Fatal("unknown charge was cleared or blocked a later request")
 			}
 		})
 	}
