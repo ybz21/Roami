@@ -24,6 +24,7 @@ const InstallPage = lazyRetry(() => import('../components/install/InstallPage'))
 const MobileTools = lazyRetry(() => import('../components/mobile/MobileTools'))
 const BrowserView = lazyRetry(() => import('../components/mirror/BrowserView'))
 const PhoneView = lazyRetry(() => import('../components/mirror/PhoneView'))
+const ProjectOkr = lazyRetry(() => import('../components/projects/okr/ProjectOkr'))
 const Swarm = lazyRetry(() => import('../components/swarm/Swarm'))
 const HubPage = lazyRetry(() => import('../components/cluster/HubPage'))
 const AgentHomePage = lazyRetry(() => import('../components/agent/AgentHomePage'))
@@ -53,7 +54,7 @@ type AppRoutesProps = {
   agent: { node: string | null; inbox: ReturnType<typeof useAgentInbox>; open: boolean; notifications: () => void }
 }
 export default function AppRoutes({ routing, isMobile, active, projects, actions, mobileProject, mobileSearchNonce, mobileActionsHost, fullscreen, agent }: AppRoutesProps) {
-  const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, pluginSub, settingsSub } = routing
+  const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, pluginSub, settingsSub } = routing
   const { openTerm, closeTerm, newTerminalAt, logout } = actions
   const { node: curNodeId, inbox: agentInbox, open: agentInboxOpen } = agent
   const { t } = useI18n()
@@ -66,7 +67,7 @@ export default function AppRoutes({ routing, isMobile, active, projects, actions
   )
   const pages: Record<string, ReactNode> = {
     swarm: <Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => { location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm' }} />,
-    projects: isMobile
+    projects: projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} /> : isMobile
       ? mobileSessions
       : <Projects openTerm={openTerm} closeTerm={closeTerm} initialKey={projectSub || undefined} activeTerm={active} />,
     sessions: isMobile

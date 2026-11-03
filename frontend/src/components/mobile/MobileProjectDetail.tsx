@@ -3,9 +3,11 @@
 // 桌面项目页那套问候 / 行动卡 / 筛选 chips / 路径在手机上是硬缩，这里不复用。
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Spin } from 'antd'
+import { getHashParams } from '../../route-hash'
+import { projectPath } from '../projects/okr/okr-workspace'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, DiffIcon, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronRight, DiffIcon, TargetIcon, TerminalIcon } from '../../icons'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import NativeProjectSessions from '../agent/NativeProjectSessions'
 
@@ -63,6 +65,7 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   const shown = [...all.filter((w) => busy(w) || w.isMain).sort((a, b) => rank(a) - rank(b)), ...(showQuiet ? quiet : [])]
   return (
     <div className="tt-mproj">
+      {projectId && <a className="tt-msess-row" href={'#/' + projectPath(projectId, true) + (getHashParams().toString() ? '?' + getHashParams().toString() : '')}><span className="ic"><TargetIcon /></span><span className="t"><b>{t('okr.title')}</b></span><ChevronRight /></a>}
       {projectId && <NativeProjectSessions projectId={projectId} />}
       {wts === null && <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}><Spin /></div>}
       {shown.map((w) => (

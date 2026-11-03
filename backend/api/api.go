@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/backend/okr"
 	"github.com/ybz21/Roami/backend/project"
 	"github.com/ybz21/Roami/backend/race"
 	"github.com/ybz21/Roami/backend/search"
@@ -49,9 +50,11 @@ type API struct {
 	Events            EventHub          // 会话事件长连接（api/events-ws.go），Android App 的通知来源
 	Races             *race.Store       // 竞赛（W5/W6）业务数据模型
 	Projects          *project.Store    // 项目（08）：knownRepos 弱台账 + UI 偏好
+	ProjectOKR        *okr.Store        // 项目目标与观测证据
 	FileIndex         *search.FileIndex // 全局搜索（⌘K）的项目文件名索引，见 search.go
 	Meta              *metadb.DB        // 台账库直连；降级时各 store 自动退回 JSON
 	agentLink         *agentLinker      // 把手敲起来的 claude 会话认到它那段对话上
+	projectOKRGitHub  okr.GitHub
 }
 
 // New 组装 API。台账库的握手在这里做一次：库的位置由 ttmux 报，不是后端自己拼
@@ -75,7 +78,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 			}
 			return nil
 		}),
-		Projects: project.NewStore(dataDir, meta), FileIndex: search.NewFileIndex(), Meta: meta,
+		Projects: project.NewStore(dataDir, meta), ProjectOKR: openProjectOKR(dataDir), FileIndex: search.NewFileIndex(), Meta: meta,
 		agentLink: newAgentLinker()}
 }
 

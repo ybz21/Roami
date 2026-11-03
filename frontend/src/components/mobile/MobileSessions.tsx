@@ -16,6 +16,7 @@ import MobileSubPage from '../MobileSubPage'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
+import { projectPath } from '../projects/okr/okr-workspace'
 import { getHashParams, setHashParams } from '../../route-hash'
 export type { OverviewItem } from './mobile-overview-cache'
 
@@ -75,7 +76,13 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 点开的项目（worktree 视图）；安卓返回手势退回列表
   const [cur, setCur] = useState<{ name: string; dir: string } | null>(null)
-  useEffect(() => { if (openProject) setCur({ name: openProject.name, dir: openProject.dir }) }, [openProject?.at]) // eslint-disable-line react-hooks/exhaustive-deps
+  const enterProject = (project: { name: string; dir: string }) => {
+    const key = projects?.find(p => p.dir === project.dir)?.key
+    if (key) { const query = getHashParams().toString(); location.hash = '#/' + projectPath(key) + (query ? '?' + query : '') }
+    else setCur(project)
+  }
+  const handledProject = useRef(0)
+  useEffect(() => { if (openProject && projects && handledProject.current !== openProject.at) { handledProject.current = openProject.at; if (!initialProjectKey) enterProject(openProject) } }, [openProject?.at, projects, initialProjectKey]) // eslint-disable-line react-hooks/exhaustive-deps
   // 长按一行：改名 / 中断 / 关闭（24 稿 §5 会话列表）
   const { message, modal } = AntApp.useApp()
   const [menu, setMenu] = useState<OverviewItem | null>(null)
@@ -206,7 +213,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 
   if (initialProjectKey) {
     const project = projects?.find(project => project.key === initialProjectKey)
-    return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { location.hash = '#/projects' }} keepBottomNav>
+    return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }} keepBottomNav>
       {project ? <MobileProjectDetail projectId={project.key} dir={project.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} /> : <p role="status">{projects === null ? t('common.loading') : t('agent.activity.detailsUnavailable')}</p>}
     </MobileSubPage>
   }
@@ -242,7 +249,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       {filter === 'activity' ? <SessionActivity onOpenSession={onOpen} showEmpty /> : filter === 'unfinished' ? (
         projects === null ? <div className="tt-msess-empty" role="status">{t('common.loading')}</div>
           : unfinishedProjects.length ? unfinishedProjects.map((p) => (
-            <button key={p.key} type="button" className="tt-msess-unfinished" onClick={() => setCur({ name: p.name, dir: p.dir })}>
+            <button key={p.key} type="button" className="tt-msess-unfinished" onClick={() => enterProject(p)}>
               <span className="av">{p.name.slice(0, 1).toUpperCase()}</span><span className="name">{p.name}</span>
               <span className="count">{t('mobile.proj.unfinished', { n: p.unfinished })}</span><ChevronRight size={14} />
             </button>
@@ -250,7 +257,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       ) : visibleGroups.map((g, i) => (
         <section key={i} className="tt-msess-sec">
           {g.dir
-            ? <button type="button" className="tt-msess-proj" onClick={() => setCur({ name: g.name, dir: g.dir })}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
+            ? <button type="button" className="tt-msess-proj" onClick={() => enterProject(g)}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
             : <h3>{g.name} <span>{g.list.length}</span></h3>}
           {swarmCards(needle || filter !== 'all' || expanded.has(g.name) ? g.list : g.list.slice(0, 5))}
           {filter === 'all' && projects?.find(project => project.dir === g.dir) && <NativeProjectSessions projectId={projects.find(project => project.dir === g.dir)!.key} entries={(native.value || []).filter(session => session.projectId === projects.find(project => project.dir === g.dir)!.key)} />}

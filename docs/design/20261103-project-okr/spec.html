@@ -1,0 +1,17 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>项目 OKR 实现约定</title><main><h1>项目 OKR 实现约定</h1>
+<p>真实系统的首个可用版本；不展示模拟消息、虚构历史和假执行。入口为项目详情的 OKR；桌面和手机均可访问 URL #/projects/PROJECT_ID/okr。</p>
+<h2>统一接口</h2><p>所有接口使用现有 /api 鉴权与节点选择，响应 {data: ...}，错误现有 {error: ...}，项目 key 按 Projects.Resolve 归一为稳定 ID。</p>
+<ul><li>GET /projects/:key/okr：返回 Workspace；首次尚未设置返回 null。</li><li>PUT /projects/:key/okr：保存配置，body {revision, objective, startDate, endDate, keyResults, metrics, swarm, autoCollect}，创建 revision=0，修订使用当前 revision；冲突409。返回 Workspace。</li><li>POST /projects/:key/okr/observations：body {revision,metricId,date,value,note}；人工填报并保留同日版本；成功返回 Workspace。</li><li>POST /projects/:key/okr/collect：body {revision}；实际读取已确认的 GitHub 公开来源（仅固定 api.github.com/repos/owner/repo），成功返回 Workspace。超时/错误保留旧值。</li><li>GET /projects/:key/okr/reviews/:reviewID/evidence：返回该复盘提交前完整 Workspace，跨项目或不存在404。</li><li>POST /projects/:key/okr/reviews：body {revision,summary,actions}；真实人或智能体提交复盘，绑定当前证据摘要；返回 Workspace。无假模型按钮。</li></ul>
+<h2>JSON 契约</h2><pre>{
+ revision: number, projectId: string, objective: string, startDate: "YYYY-MM-DD", endDate: "YYYY-MM-DD",
+ keyResults: [{id: string, title: string, horizon: "long"|"short", metricId: string, target: number, mode: "increase"|"atLeast"|"atMost", dueDate: "YYYY-MM-DD"}],
+ metrics: [{id: string, name: string, unit: string, source: "manual"|"github", repo?: "owner/repo", field?: "stars"|"forks"}],
+ swarm: string, autoCollect: boolean,
+ observations: [{id:string,metricId:string,date:string,value:number,source:"manual"|"github",sourceKey:string,capturedAt:string,note:string}],
+ reviews: [{id:string,summary:string,actions:string,date:string,evidenceRevision:number}],
+ updatedAt: string
+}</pre>
+<p>Workspace 的 observations/reviews 为服务端维护；PUT 不接受覆盖历史。ID 为稳定简短英文，指标允许任意数量和名称。KR 引用必须存在，日期范围和有限数值严格验证；未知值保持未知。同日追加版本；展示日表取最新，周期起点保持首次有效观测；按 sourceKey 隔离更换来源后的曲线，Github sourceKey=github:REPO_STABLE_ID:FIELD（前端依 metric repo 过滤须服务端提供当前 metric.sourceKey 可选字段，人工=manual:METRIC_ID）。指标配置更新不删除历史。GitHub 不补造此前日期，相邻日期都存在才求日变化，允许负值。自动采集仅对已确认来源启用，日级一次、启动可补今日，时区 Asia/Shanghai，成功日持久化去重；失败不补零。</p>
+<h2>Swarm 与模型</h2><p>工作台选择并关联现有 Swarm（GET /swarms），通过真实 #/swarm/STABLE_ID 进入其任务与群聊，保持同一身份。不在此实现第二套群聊/假执行。新建蜂群通过现有入口；后端绑定时核对存在。智能体可通过上述真实 API 填报和提交反思；本版不把规则拼装冒充 LLM 自动拆解。界面明确当前自动采集范围，创建时用户确认 O/KR 与来源。Roami 宣传预设只是可编辑建议，需保存确认。</p>
+<h2>职责</h2><p>backend 成员只改 backend/、必要 internal/存储与 backend/server 路由，提供领域存储、验证、GitHub采集、自动采集生命周期与 API测试；不改 frontend/。frontend 成员只改 frontend/，实现路由、桌面项目及手机入口、OKR创建配置/观测/复盘/蜂群关联，全部 i18n、tokens、hover规范和有意义的测试；不改 backend/。协调者负责联调、真实项目初始化、真机验收、完整门禁、PR与部署。成员不 commit、不 push、不部署，不碰用户数据，不向真实X/B站发布。</p>
+<h2>验收</h2><p>真实 API 创建目标、重启后保留；公开 GitHub 实读、日期/增量/同日版本与未知值正确；人工指标填报与历史可追溯；两端项目入口与返回可操作；绑定实际蜂群可打开同群任务/群聊；复盘真实录入且有证据版本。所有产品运行状态必须依据服务端真实数据。首次没有观测不显示进展数字。</p></main></html>

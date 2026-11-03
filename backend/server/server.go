@@ -38,7 +38,9 @@ import (
 var fallbackHTML []byte
 
 type Config struct {
-	TTmuxBin string
+	// Lifecycle cancels background OKR collection; nil requires Close when the engine ends.
+	Lifecycle context.Context
+	TTmuxBin  string
 	// EmbeddedBin 是内嵌的那份 ttmux（release 构建才有真货）。台账握手失败时用它
 	// 重试一次——救「PATH 上残留一个老 ttmux，而 roam 二进制是新的」这种情况。
 	EmbeddedBin  string
@@ -81,6 +83,7 @@ func New(cfg Config) *gin.Engine {
 	tt := ttmux.New(cfg.TTmuxBin)
 	a := auth.New(cfg.Password, cfg.TOTPSecret, cfg.TOTPState, cfg.LockAfter, cfg.LockSecs, cfg.SavePassword)
 	h := api.New(tt, cfg.BrowserHome, cfg.DataDir, cfg.EmbeddedBin)
+	startProjectOKRCollector(r, h, cfg.Lifecycle)
 	go h.SyncLoop()                 // 后台兜底远端同步（10 §3 第三档），失败静默
 	go h.AgentLinkLoop()            // 会话 ↔ claude 对话 id 对账、归属跟着 worktree 走（api/session-home-sync.go）
 	h.SyncClaudeThemeOnce()         // Claude Code 主题对齐 Roami 主题（api/claude-theme-sync.go）
@@ -220,6 +223,12 @@ func New(cfg Config) *gin.Engine {
 		g.DELETE("/projects/:key", h.ProjectDelete)         // 显式移除（纯台账，不动目录/会话）
 		g.GET("/projects/:key/activity", h.ProjectActivity) // 活动流（全部分支近 30 天）
 		g.PATCH("/projects/:key/prefs", h.ProjectPrefs)     // 置顶/显示名/默认 agent/base
+		g.GET("/projects/:key/okr", h.ProjectOKRGet)
+		g.PUT("/projects/:key/okr", h.ProjectOKRSave)
+		g.POST("/projects/:key/okr/observations", h.ProjectOKRObserve)
+		g.POST("/projects/:key/okr/collect", h.ProjectOKRCollect)
+		g.POST("/projects/:key/okr/reviews", h.ProjectOKRReview)
+		g.GET("/projects/:key/okr/reviews/:reviewID/evidence", h.ProjectOKREvidence)
 
 		// ── 全局搜索（⌘K）：一个查询打项目/会话/项目文件三张表；全文另走一条 ──
 		g.GET("/search", h.Search)

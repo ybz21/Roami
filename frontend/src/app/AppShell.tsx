@@ -8,6 +8,7 @@ import { useAgentInbox } from '../components/agent/useAgentInbox'
 import { hubReasonText } from '../components/cluster/hub-health'
 import { useCurrentNodeId } from '../components/cluster/node-url'
 import { NodeMark, nodeDotColor } from '../components/cluster/NodeMark'
+import { projectPath } from '../components/projects/okr/okr-workspace'
 import MobilePullRefresh from '../components/mobile/MobilePullRefresh'
 import { ICONS } from '../components/nav-icons'
 import { sessionDisplay, sessionLabel } from '../components/sessions/session-label'
@@ -107,7 +108,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
     actions={{ openTerm, closeTerm, renameOpenTerm, newTerminalInTask }} />
   openTermRef.current = (n) => openTerm(n)
   const page = taskView ? null : <AppRoutes routing={routing} isMobile={isMobile} active={active} projects={treeSrc.projects}
-    actions={{ openTerm, closeTerm, newTerminalAt, logout, newTask: projectActions.newTask, openProject: (p) => { setMobileProject({ ...p, at: Date.now() }); go('projects') } }}
+    actions={{ openTerm, closeTerm, newTerminalAt, logout, newTask: projectActions.newTask, openProject: (p) => { const project = treeSrc.projects.find(item => item.dir === p.dir); if (project) { setMobileProject(null); go(projectPath(project.key)) } else { setMobileProject({ ...p, at: Date.now() }); go('projects') } } }}
     mobileProject={mobileProject} mobileSearchNonce={mobileSearchNonce} mobileActionsHost={mobileActionsHost}
     fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined}
     agent={{ node: curNodeId, inbox: agentInbox, open: agentInboxOpen, notifications }} />

@@ -132,12 +132,15 @@ type apiFailure struct {
 func (e *apiFailure) Error() string { return fmt.Sprintf("HTTP %d: %s", e.status, e.raw) }
 
 func runAPICommand(group string, args []string) int {
+	if group == "project" && len(args) > 0 && args[0] == "okr" {
+		return runProjectOKR(args[1:])
+	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
 		fmt.Printf("roami %s ", group)
 		if group == "auth" {
 			fmt.Println("login|logout|status [--server URL] [--stdin] [--json]")
 		} else {
-			fmt.Println("ls|show|sessions|create|prefs|activity|remove [--server URL] [--json]")
+			fmt.Println("ls|show|sessions|create|prefs|activity|remove|okr [--server URL] [--json]")
 		}
 		return 0
 	}

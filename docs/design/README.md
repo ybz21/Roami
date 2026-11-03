@@ -54,3 +54,5 @@
 - [web](web/README.md)
 
 [本次规则精简与迁移校验](20261028-agent-instructions/README.md)
+
+- [20261103-project-okr · 真实项目 OKR 工作台](20261103-project-okr/README.md)：项目入口、真实指标、Swarm 关联和验收记录。
