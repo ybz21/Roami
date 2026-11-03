@@ -1,4 +1,6 @@
 .okr-page{min-width:0;max-width:var(--content-form);color:var(--text-bright);padding:0 var(--pad-page) var(--sp-5);font-size:var(--fs-body)}
+.tt-page.tt-page-okr{padding:0;height:100%;min-height:0;overflow:hidden}
+.tt-page-okr>.okr-page{width:100%;max-height:100%;overflow:auto;overscroll-behavior:contain}
 .okr-page>.tt-pagehead{padding-block:var(--sp-4)}
 .okr-page>.tt-pagehead h2{font-size:var(--fs-title)}
 .okr-section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}
@@ -31,6 +33,13 @@
 :where(html[data-pointer="fine"]) .okr-page summary:hover{color:var(--text-bright)}
 .okr-error{padding-block:var(--sp-3);color:var(--danger)}
 .okr-swarm{display:inline-flex;align-items:center;gap:var(--sp-2);position:relative}
+.okr-project-link{display:flex;align-items:center;gap:var(--sp-3);padding-block:var(--sp-4);min-height:var(--tap);color:var(--text-bright);border-bottom:1px solid var(--border-subtle);text-decoration:none}
+.okr-project-link>span{flex:1;min-width:0}
+.okr-project-link b,.okr-project-link small{display:block;overflow-wrap:anywhere}
+.okr-project-link small{font-size:var(--fs-meta);color:var(--text-dim)}
+.okr-project-link>svg{flex-shrink:0}
+.okr-project-link:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}
+:where(html[data-pointer="fine"]) .okr-project-link:hover{background:var(--list-hover);color:var(--text-bright)}
 html[data-size="compact"] .okr-grid{grid-template-columns:minmax(0,1fr)}
 html:is([data-size="compact"],[data-size="medium"]) .okr-page{max-width:none;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
 html[data-pointer="coarse"] .okr-page :is(.ant-btn,summary,.okr-swarm,.ant-checkbox-wrapper){position:relative}

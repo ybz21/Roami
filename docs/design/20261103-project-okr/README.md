@@ -1,6 +1,6 @@
 # 项目 OKR 工作台
 
-入口为真实系统的 `#/projects/PROJECT_ID/okr`，桌面与手机均从项目详情进入。
+桌面左栏有独立 OKR 入口 `#/okr`，可搜索项目，进入 `#/okr/PROJECT_ID` 查看或搭建；手机项目顶栏同样可进入。原有项目详情入口 `#/projects/PROJECT_ID/okr` 保留。
 
 - [产品、用户故事与技术实现（HTML）](implementation.html)
 - [接口与任务规格（HTML）](spec.html)

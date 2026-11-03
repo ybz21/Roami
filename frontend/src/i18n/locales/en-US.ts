@@ -1,4 +1,11 @@
 const enUS = {
+  'okr.chooseProject': 'Choose a project to view or set up OKRs.',
+  'okr.searchProjects': 'Search projects',
+  'okr.projectsFailed': 'Could not load projects. Try again.',
+  'okr.noProjects': 'No projects yet. Add a project first.',
+  'okr.noMatchingProjects': 'No matching projects.',
+  'okr.allProjects': 'All projects',
+  'okr.projectTitle': '{name} · OKR',
   'okr.viewEvidence': 'View evidence at submission',
   'okr.evidenceFailed': 'Could not load evidence. Try again.',
   'okr.snapshotRevision': 'Evidence revision at submission: {revision}',

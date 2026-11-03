@@ -17,7 +17,7 @@ function navigate(path: string) {
   location.hash = '#/' + path + (query ? '?' + query : '')
 }
 
-export default function ProjectOkr({ projectId }: { projectId: string }) {
+export default function ProjectOkr({ projectId, projectName, fromOverview = false }: { projectId: string; projectName?: string; fromOverview?: boolean }) {
   const { t, locale } = useI18n()
   const { phone } = useLayout()
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
@@ -134,13 +134,14 @@ export default function ProjectOkr({ projectId }: { projectId: string }) {
     }
     void mutate('PUT', '', configurationOf(draft), () => { setEditing(false); if (!workspace) { observationSelection.current.metricId = draft.metrics.find(m => m.source === 'manual')?.id || ''; setManualMetric(observationSelection.current.metricId) } })
   }
-  const back = () => navigate(projectPath(workspace?.projectId || projectId))
+  const back = () => navigate(fromOverview ? 'okr' : projectPath(workspace?.projectId || projectId))
+  const title = projectName ? t('okr.projectTitle', { name: projectName }) : t('okr.title')
   const manualMetrics = workspace?.metrics.filter(m => m.source === 'manual') || []
   const selectedManual = manualMetrics.find(m => m.id === manualMetric)
   const hasGithub = workspace?.metrics.some(m => m.source === 'github')
   const retiredObservations = (workspace?.observations || []).filter(o => !workspace.metrics.some(m => m.id === o.metricId))
   const content = <div className="okr-page" data-mobile-refresh-scroll>
-    {!phone && <header className="tt-pagehead"><h2>{t('okr.title')}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t('okr.backProject')}</Button></div></header>}
+    {!phone && <header className="tt-pagehead"><h2>{title}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allProjects' : 'okr.backProject')}</Button></div></header>}
     {error && <div className="okr-error" role="alert">
       <p>{t(error)}</p>
       {(conflict || !loaded) && <Button disabled={busy} onClick={() => void reload()}>{t(conflict ? 'okr.loadLatest' : 'inbox.retry')}</Button>}
@@ -222,5 +223,5 @@ export default function ProjectOkr({ projectId }: { projectId: string }) {
       </>}
     </>}
   </div>
-  return phone ? <MobileSubPage title={t('okr.title')} onBack={back} manageHistory={false} keepBottomNav>{content}</MobileSubPage> : content
+  return phone ? <MobileSubPage title={title} onBack={back} manageHistory={false} keepBottomNav>{content}</MobileSubPage> : content
 }

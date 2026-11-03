@@ -1,4 +1,11 @@
 const zhCN = {
+  'okr.chooseProject': '选择项目，查看或搭建 OKR。',
+  'okr.searchProjects': '搜索项目',
+  'okr.projectsFailed': '项目列表加载失败，请重试。',
+  'okr.noProjects': '暂无项目，请先添加项目。',
+  'okr.noMatchingProjects': '没有匹配的项目。',
+  'okr.allProjects': '全部项目',
+  'okr.projectTitle': '{name} · OKR',
   'okr.viewEvidence': '查看当时证据',
   'okr.evidenceFailed': '无法加载证据，请重试。',
   'okr.snapshotRevision': '提交时的数据版本 {revision}',

@@ -108,6 +108,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
     actions={{ openTerm, closeTerm, renameOpenTerm, newTerminalInTask }} />
   openTermRef.current = (n) => openTerm(n)
   const page = taskView ? null : <AppRoutes routing={routing} isMobile={isMobile} active={active} projects={treeSrc.projects}
+    projectDirectory={{ loaded: directory.projectsLoaded, error: directory.projectsError, retry: directory.refresh }}
     actions={{ openTerm, closeTerm, newTerminalAt, logout, newTask: projectActions.newTask, openProject: (p) => { const project = treeSrc.projects.find(item => item.dir === p.dir); if (project) { setMobileProject(null); go(projectPath(project.key)) } else { setMobileProject({ ...p, at: Date.now() }); go('projects') } } }}
     mobileProject={mobileProject} mobileSearchNonce={mobileSearchNonce} mobileActionsHost={mobileActionsHost}
     fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined}
@@ -195,7 +196,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
             collapsed={navRail}
             style={{ position: 'sticky', top: 0, height: '100%', background: 'var(--bg-base)', borderRight: '1px solid var(--border-subtle)' }}>
             <Navigation
-              rail={navRail} active={tab} groups={navGroups} onGo={go}
+              rail={navRail} active={tab === 'projects' && routing.projectView === 'okr' ? 'okr' : tab} groups={navGroups} onGo={go}
               settings={{ key: 'settings', label: t('nav.env'), icon: ICONS.settings }}
               nodeMenu={nodeItems}
               onSearch={openPalette}

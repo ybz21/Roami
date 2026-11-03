@@ -10,6 +10,7 @@ vi.mock('../layout', () => ({ useLayout: () => layout }))
 vi.mock('../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../components/projects/Projects', () => ({ default: () => <div data-testid="project-home" /> }))
 vi.mock('../components/mobile/MobileSessions', () => ({ default: () => <div data-testid="mobile-projects" /> }))
+vi.mock('../components/projects/okr/OkrProjects', () => ({ default: () => <div data-testid="okr-projects" /> }))
 vi.mock('../components/projects/okr/ProjectOkr', () => ({ default: ({ projectId }: { projectId: string }) => { const [initial] = useState(projectId); return <div data-testid="okr" data-project={projectId} data-initial-project={initial} /> } }))
 afterEach(cleanup)
 
@@ -35,4 +36,16 @@ it('remounts project-owned drafts when navigating directly between OKR projects'
   const { fireEvent, waitFor } = await import('@testing-library/react')
   fireEvent(window, new HashChangeEvent('hashchange'))
   await waitFor(() => expect(screen.getByTestId('okr').getAttribute('data-initial-project')).toBe('second'))
+})
+
+it.each(['large', 'compact'])('opens the sidebar OKR destination and its project links on %s', async size => {
+  layout.size = size
+  history.replaceState(null, '', '#/okr?node=remote')
+  render(<RoutedPage />)
+  expect(await screen.findByTestId('okr-projects')).toBeTruthy()
+  history.replaceState(null, '', '#/okr/stable%20project?node=remote')
+  const { fireEvent, waitFor } = await import('@testing-library/react')
+  fireEvent(window, new HashChangeEvent('hashchange'))
+  await waitFor(() => expect(screen.getByTestId('okr').getAttribute('data-project')).toBe('stable project'))
+  expect(screen.queryByTestId('okr-projects')).toBeNull()
 })
