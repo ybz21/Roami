@@ -2,8 +2,6 @@ package okr
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"errors"
 	"log"
 	"strings"
@@ -126,7 +124,7 @@ func (s *Store) Collect(ctx context.Context, github GitHub, projectID string, re
 	if today(s.now()) != date {
 		return nil, ErrSource
 	}
-	result, err := s.mutate(projectID, revision, false, func(current *Workspace, _ *sql.Tx) error {
+	result, err := s.mutate(projectID, revision, false, func(current *Workspace) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -146,30 +144,15 @@ func (s *Store) Collect(ctx context.Context, github GitHub, projectID string, re
 
 // CollectDue uses persisted successful observations as its day-level deduplication ledger.
 func (s *Store) CollectDue(ctx context.Context, github GitHub, projectExists func(string) bool) error {
-	rows, err := s.db.Query(`SELECT body FROM workspaces`)
+	workspaces, err := s.workspaces()
 	if err != nil {
 		return err
 	}
-	var due []Workspace
-	for rows.Next() {
-		var body string
-		if err = rows.Scan(&body); err != nil {
-			rows.Close()
-			return err
-		}
-		var w Workspace
-		if err = json.Unmarshal([]byte(body), &w); err != nil {
-			rows.Close()
-			return err
-		}
+	due := []Workspace{}
+	for _, w := range workspaces {
 		if w.AutoCollect {
 			due = append(due, w)
 		}
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
 	}
 	var failures []error
 	for _, w := range due {

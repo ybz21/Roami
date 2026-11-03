@@ -14,10 +14,11 @@ import (
 )
 
 type Store struct {
-	db      *storage.DB
-	now     func() time.Time
-	retryMu sync.Mutex
-	retries map[string]collectionRetry
+	db       *storage.DB
+	now      func() time.Time
+	retryMu  sync.Mutex
+	retries  map[string]collectionRetry
+	projects func() map[string]string
 }
 
 func Open(paths storage.Paths) (*Store, error) {
@@ -27,7 +28,7 @@ func Open(paths storage.Paths) (*Store, error) {
 	db, err := storage.OpenManaged(paths, storage.DatabaseDescriptor{ID: "project-okr", Kind: "project-okr", Owner: "project-okr", Path: filepath.Join(paths.Database, "project-okr.db")}, []storage.Step{{Version: 1, Name: "project OKR evidence", SQL: `
 CREATE TABLE workspaces(project_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, body TEXT NOT NULL);
 CREATE TABLE review_evidence(review_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL);
-`}}, storage.Options{})
+`}, {Version: 2, Name: "project file ownership", SQL: `CREATE TABLE file_workspaces(project_id TEXT PRIMARY KEY);`}}, storage.Options{})
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +53,17 @@ func read(q rowReader, projectID string) (*Workspace, error) {
 	return &w, nil
 }
 
-func (s *Store) Get(projectID string) (*Workspace, error) { return read(s.db, projectID) }
+func (s *Store) Get(projectID string) (*Workspace, error) {
+	if s.projects != nil {
+		return s.getFiles(projectID)
+	}
+	return read(s.db, projectID)
+}
 
 func (s *Store) Evidence(projectID, reviewID string) (*Workspace, error) {
+	if s.projects != nil {
+		return s.fileEvidence(projectID, reviewID)
+	}
 	var body string
 	err := s.db.QueryRow(`SELECT body FROM review_evidence WHERE project_id=? AND review_id=?`, projectID, reviewID).Scan(&body)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -70,8 +79,11 @@ func (s *Store) Evidence(projectID, reviewID string) (*Workspace, error) {
 	return &w, nil
 }
 
-// The revision is checked again after external reads, inside the write transaction.
-func (s *Store) mutate(projectID string, revision int64, create bool, change func(*Workspace, *sql.Tx) error) (*Workspace, error) {
+// Recheck the revision after external reads while holding the write lock.
+func (s *Store) mutate(projectID string, revision int64, create bool, change func(*Workspace) error) (*Workspace, error) {
+	if s.projects != nil {
+		return s.mutateFiles(projectID, revision, create, change, create)
+	}
 	var result *Workspace
 	err := s.db.Tx(func(tx *sql.Tx) error {
 		w, err := read(tx, projectID)
@@ -87,8 +99,18 @@ func (s *Store) mutate(projectID string, revision int64, create bool, change fun
 		if w.Revision != revision {
 			return ErrConflict
 		}
-		if err := change(w, tx); err != nil {
+		before, err := json.Marshal(w)
+		if err != nil {
 			return err
+		}
+		previousReviews := len(w.Reviews)
+		if err := change(w); err != nil {
+			return err
+		}
+		for _, review := range w.Reviews[previousReviews:] {
+			if _, err := tx.Exec(`INSERT INTO review_evidence(review_id,project_id,revision,body) VALUES(?,?,?,?)`, review.ID, projectID, revision, string(before)); err != nil {
+				return err
+			}
 		}
 		w.Revision++
 		w.UpdatedAt = timestamp(s.now())
@@ -112,30 +134,54 @@ func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
 	if err := validate(&c); err != nil {
 		return nil, err
 	}
-	return s.mutate(projectID, c.Revision, true, func(w *Workspace, _ *sql.Tx) error {
-		for i := range c.Metrics {
-			m := &c.Metrics[i]
-			m.SourceKey = ""
-			if m.Source == "manual" {
-				m.SourceKey = "manual:" + m.ID
-				continue
+	return s.mutate(projectID, c.Revision, true, func(w *Workspace) error {
+		if s.projects != nil && w.Revision > 0 {
+			root, err := s.openBundle(projectID, false)
+			if err != nil {
+				return err
 			}
-			for _, old := range w.Metrics {
-				if old.ID == m.ID && old.Source == m.Source && strings.EqualFold(old.Repo, m.Repo) && old.Field == m.Field {
-					m.SourceKey = old.SourceKey
-				}
+			err = decorate(root, w)
+			root.Close()
+			if err != nil {
+				return err
+			}
+			if w.ProjectFiles.PendingChanges {
+				return ErrPending
 			}
 		}
-		w.Config = c
-		return nil
+		applyConfig(w, c)
+		return validate(&w.Config)
 	})
+}
+
+func applyConfig(w *Workspace, c Config) {
+	for i := range c.Metrics {
+		m := &c.Metrics[i]
+		m.SourceKey = ""
+		if m.Source == "manual" {
+			m.SourceKey = "manual:" + m.ID
+			continue
+		}
+		for _, old := range w.Metrics {
+			if old.ID == m.ID && old.Source == m.Source && strings.EqualFold(old.Repo, m.Repo) && old.Field == m.Field {
+				m.SourceKey = old.SourceKey
+			}
+		}
+	}
+	if c.Dashboard == nil {
+		c.Dashboard = w.Dashboard
+	}
+	if c.Dashboard == nil {
+		c.Dashboard = defaultDashboard()
+	}
+	w.Config = c
 }
 
 func (s *Store) Observe(projectID string, revision int64, metricID, date string, value float64, note string) (*Workspace, error) {
 	if !validDate(date) || !finite(value) {
 		return nil, ErrInvalid
 	}
-	return s.mutate(projectID, revision, false, func(w *Workspace, _ *sql.Tx) error {
+	return s.mutate(projectID, revision, false, func(w *Workspace) error {
 		if date < w.StartDate || date > w.EndDate || date > today(s.now()) {
 			return ErrInvalid
 		}
@@ -153,16 +199,8 @@ func (s *Store) Review(projectID string, revision int64, summary, actions string
 	if strings.TrimSpace(summary) == "" {
 		return nil, ErrInvalid
 	}
-	return s.mutate(projectID, revision, false, func(w *Workspace, tx *sql.Tx) error {
+	return s.mutate(projectID, revision, false, func(w *Workspace) error {
 		r := Review{ID: id.New(), Summary: summary, Actions: actions, Date: timestamp(s.now()), EvidenceRevision: w.Revision}
-		// Preserve the evidence even when later configuration edits change the interpretation.
-		evidence, err := json.Marshal(w)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO review_evidence(review_id,project_id,revision,body) VALUES(?,?,?,?)`, r.ID, projectID, w.Revision, string(evidence)); err != nil {
-			return err
-		}
 		w.Reviews = append(w.Reviews, r)
 		return nil
 	})

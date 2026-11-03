@@ -31,13 +31,25 @@ func projectOKRFixture(t *testing.T) (*API, *gin.Engine, string) {
 		t.Fatal(err)
 	}
 	projects := project.NewStore(root, metadb.NewLocal(meta))
+	if err := os.Mkdir(filepath.Join(root, "repo"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	projectID, _ := projects.Add(filepath.Join(root, "repo"), "Test")
+	store.SetProjects(func() map[string]string {
+		result := map[string]string{}
+		for id, entry := range projects.Entries() {
+			result[id] = entry.Dir
+		}
+		return result
+	})
 	a := &API{Projects: projects, ProjectOKR: store, Meta: metadb.NewLocal(meta)}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.GET("/okr", a.ProjectOKROverview)
 	r.GET("/projects/:key/okr", a.ProjectOKRGet)
 	r.PUT("/projects/:key/okr", a.ProjectOKRSave)
+	r.POST("/projects/:key/okr/sync", a.ProjectOKRSync)
+	r.PUT("/projects/:key/okr/memory", a.ProjectOKRMemory)
 	r.POST("/projects/:key/okr/observations", a.ProjectOKRObserve)
 	r.POST("/projects/:key/okr/collect", a.ProjectOKRCollect)
 	r.POST("/projects/:key/okr/reviews", a.ProjectOKRReview)
@@ -235,4 +247,44 @@ func TestProjectOKRAPICollectionFailurePreservesLastKnownValue(t *testing.T) {
 		t.Fatal("collection failure lost evidence")
 	}
 	projectOKRRequest(t, router, "POST", path+"/observations", `{"revision":2,"metricId":"users","date":"2001-01-01","value":123}`, 400)
+}
+
+func TestProjectOKRSyncAndSharedMemory(t *testing.T) {
+	a, router, id := projectOKRFixture(t)
+	endpoint := "/projects/" + id + "/okr"
+	w := decodeProjectOKR(t, projectOKRRequest(t, router, "PUT", endpoint, projectOKRConfigJSON(), 200))
+	if w.ProjectFiles == nil {
+		t.Fatal("project file metadata absent")
+	}
+	payload, _ := json.Marshal(map[string]string{"content": "Team context", "expectedSha256": w.ProjectFiles.TeamMemorySha256})
+	w = decodeProjectOKR(t, projectOKRRequest(t, router, "PUT", endpoint+"/memory", string(payload), 200))
+	if w.ProjectFiles.TeamMemory != "Team context" || w.Revision != 1 {
+		t.Fatal(w)
+	}
+	projectOKRRequest(t, router, "PUT", endpoint+"/memory", string(payload), 409)
+	projectOKRRequest(t, router, "PUT", endpoint+"/memory", `{"content":"missing hash"}`, 400)
+	dir, _ := a.Projects.Dir(id)
+	file := filepath.Join(dir, ".roami", "okr", "okr.json")
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte(strings.Replace(string(b), "Grow adoption", "Edited locally", 1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	pending := decodeProjectOKR(t, projectOKRRequest(t, router, "GET", endpoint, "", 200))
+	if !pending.ProjectFiles.PendingChanges || pending.Objective != "Grow adoption" {
+		t.Fatal(pending)
+	}
+	pendingSave := strings.Replace(projectOKRConfigJSON(), `"revision":0`, `"revision":1`, 1)
+	response := projectOKRRequest(t, router, "PUT", endpoint, pendingSave, 409)
+	if !strings.Contains(response.Body.String(), "OKR_FILES_PENDING") {
+		t.Fatal(response.Body.String())
+	}
+
+	w = decodeProjectOKR(t, projectOKRRequest(t, router, "POST", endpoint+"/sync", `{"revision":1}`, 200))
+	if w.Objective != "Edited locally" || w.Revision != 2 || w.ProjectFiles.PendingChanges {
+		t.Fatal(w)
+	}
+	projectOKRRequest(t, router, "POST", endpoint+"/sync", `{"revision":1}`, 409)
 }

@@ -14,6 +14,7 @@ var (
 	ErrInvalid  = errors.New("invalid OKR input")
 	ErrConflict = errors.New("OKR revision conflict")
 	ErrNotFound = errors.New("OKR workspace not found")
+	ErrPending  = errors.New("OKR project files have pending changes")
 	ErrSource   = errors.New("GitHub collection failed")
 )
 
@@ -57,15 +58,51 @@ func (k *KeyResult) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+type Initiative struct {
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Channel      string   `json:"channel"`
+	KeyResultIDs []string `json:"keyResultIds"`
+	Description  string   `json:"description"`
+	Acceptance   string   `json:"acceptance"`
+}
+
+type DashboardWidget struct {
+	ID           string   `json:"id"`
+	Type         string   `json:"type"`
+	KeyResultIDs []string `json:"keyResultIds,omitempty"`
+	MetricIDs    []string `json:"metricIds,omitempty"`
+	Title        string   `json:"title,omitempty"`
+}
+
+type Dashboard struct {
+	SchemaVersion int               `json:"schemaVersion"`
+	Widgets       []DashboardWidget `json:"widgets"`
+}
+
+type ProjectFiles struct {
+	Root                 string `json:"root"`
+	SchemaVersion        int    `json:"schemaVersion"`
+	Revision             int64  `json:"revision"`
+	MainInstructionsFile string `json:"mainInstructionsFile"`
+	TeamMemoryFile       string `json:"teamMemoryFile"`
+	MainInstructions     string `json:"mainInstructions,omitempty"`
+	TeamMemory           string `json:"teamMemory,omitempty"`
+	TeamMemorySha256     string `json:"teamMemorySha256"`
+	PendingChanges       bool   `json:"pendingChanges"`
+}
+
 type Config struct {
-	Revision    int64       `json:"revision"`
-	Objective   string      `json:"objective"`
-	StartDate   string      `json:"startDate"`
-	EndDate     string      `json:"endDate"`
-	KeyResults  []KeyResult `json:"keyResults"`
-	Metrics     []Metric    `json:"metrics"`
-	Swarm       string      `json:"swarm"`
-	AutoCollect bool        `json:"autoCollect"`
+	Initiatives []Initiative `json:"initiatives,omitempty"`
+	Dashboard   *Dashboard   `json:"dashboard,omitempty"`
+	Revision    int64        `json:"revision"`
+	Objective   string       `json:"objective"`
+	StartDate   string       `json:"startDate"`
+	EndDate     string       `json:"endDate"`
+	KeyResults  []KeyResult  `json:"keyResults"`
+	Metrics     []Metric     `json:"metrics"`
+	Swarm       string       `json:"swarm"`
+	AutoCollect bool         `json:"autoCollect"`
 }
 
 type Observation struct {
@@ -89,6 +126,7 @@ type Review struct {
 
 type Workspace struct {
 	Config
+	ProjectFiles *ProjectFiles `json:"projectFiles,omitempty"`
 	ProjectID    string        `json:"projectId"`
 	Observations []Observation `json:"observations"`
 	Reviews      []Review      `json:"reviews"`
@@ -131,7 +169,52 @@ func validate(c *Config) error {
 		}
 		keys[k.ID] = true
 	}
+	initiatives := map[string]bool{}
+	for _, initiative := range c.Initiatives {
+		if !identifier.MatchString(initiative.ID) || initiatives[initiative.ID] || strings.TrimSpace(initiative.Title) == "" || strings.TrimSpace(initiative.Channel) == "" {
+			return ErrInvalid
+		}
+		initiatives[initiative.ID] = true
+		seen := map[string]bool{}
+		for _, key := range initiative.KeyResultIDs {
+			if !keys[key] || seen[key] {
+				return ErrInvalid
+			}
+			seen[key] = true
+		}
+	}
+	if c.Dashboard != nil {
+		if c.Dashboard.SchemaVersion != 1 || c.Dashboard.Widgets == nil {
+			return ErrInvalid
+		}
+		seen := map[string]bool{}
+		for _, widget := range c.Dashboard.Widgets {
+			if !identifier.MatchString(widget.ID) || seen[widget.ID] {
+				return ErrInvalid
+			}
+			seen[widget.ID] = true
+			switch widget.Type {
+			case "keyResults", "metricTrend", "nextAction":
+			default:
+				return ErrInvalid
+			}
+			for _, key := range widget.KeyResultIDs {
+				if !keys[key] {
+					return ErrInvalid
+				}
+			}
+			for _, metric := range widget.MetricIDs {
+				if !metrics[metric] {
+					return ErrInvalid
+				}
+			}
+		}
+	}
 	return nil
+}
+
+func defaultDashboard() *Dashboard {
+	return &Dashboard{SchemaVersion: 1, Widgets: []DashboardWidget{{ID: "results", Type: "keyResults"}, {ID: "trends", Type: "metricTrend"}, {ID: "next", Type: "nextAction"}}}
 }
 
 var shanghai = time.FixedZone("Asia/Shanghai", 8*60*60)
