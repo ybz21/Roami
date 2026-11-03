@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-HR01",
+  "data": {
+    "kind": "public_synthetic_handoff_history_projection",
+    "inputs": [
+      "input/controls.json"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "runtime_and_persisted_handoff_receipts"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "historical_receipt_fidelity_and_provenance",
+    "expected_python_tests": 18
+  }
+}

@@ -26,6 +26,7 @@ from roami_agent.replies.delivery_policy import (
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.request_coverage import latest_coverage
 from roami_agent.storage.task_context import recent_task_context
+from roami_agent.storage.task_handoff import handoff_receipt_context
 from roami_agent.storage.task_request import task_user_request
 
 log = logging.getLogger(__name__)
@@ -180,6 +181,20 @@ class PromptBuilder:
                 )
             )
             if not turn.get("executionRunId") and not history_requested:
+                historical_ids = [
+                    plan["modelSourceMessageIds"][index]
+                    for index, message in enumerate(plan["messages"][: plan["currentTurnStart"]])
+                    if message["role"] in {"user", "tool"}
+                    and not plan["modelAgentTaskInstructions"][index]
+                    and plan["modelSourceMessageIds"][index]
+                ]
+                plan["modelHandoffReceipts"] = (
+                    await self.db.call(lambda db: handoff_receipt_context(db, historical_ids))
+                    if any(
+                        m["role"] == "tool" for m in plan["messages"][: plan["currentTurnStart"]]
+                    )
+                    else {}
+                )
                 plan = main_history(plan, configuration)
             if status_scope and not include_result and not history_requested:
                 # A progress read does not need historical answers; full-result reads restore them.

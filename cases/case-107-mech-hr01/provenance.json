@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_handoff_history_projection",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "14项新增集成检查与4项既有历史/当前轮检查；不代表实际模型不再重复派活，不能替代原始对话验收。"
+}

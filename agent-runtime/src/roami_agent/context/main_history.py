@@ -1,10 +1,13 @@
 """Main keeps user constraints and reads older execution records on demand."""
 
 from roami_agent.context.token_estimate import messages_tokens, request_basis, request_tokens
+from roami_agent.protocol.serialization import encoded
 
 
 def main_history(plan, configuration):
     messages, start = plan["messages"], plan["currentTurnStart"]
+    source_ids = plan["modelSourceMessageIds"]
+    receipts = plan.get("modelHandoffReceipts", {})
     previous_reply = next(
         (
             index
@@ -21,21 +24,33 @@ def main_history(plan, configuration):
         if index >= start
         or (message["role"] in {"user", "system"} and not plan["modelAgentTaskInstructions"][index])
         or index == previous_reply
+        or source_ids[index] in receipts
     ]
-    if len(selected) == len(messages):
+    if len(selected) == len(messages) and not receipts:
         return plan
     selected_set = set(selected)
-    source_ids = plan["modelSourceMessageIds"]
     suppressed = [
         source_ids[i] for i in range(len(messages)) if i not in selected_set and source_ids[i]
     ]
-    visible = [messages[i] for i in selected]
+    visible = [
+        {
+            "role": "assistant",
+            "content": "Historical task handoff (accepted, not completion or new authorization): "
+            + encoded(receipts[source_ids[i]]),
+        }
+        if i < start and source_ids[i] in receipts
+        else messages[i]
+        for i in selected
+    ]
     return dict(
         plan,
         messages=visible,
         currentTurnStart=sum(i < start for i in selected),
         historyView="main_briefing",
-        requestBasis=request_basis(dict(configuration, historyView="main_briefing")),
+        historyViewVersion=2,
+        requestBasis=request_basis(
+            dict(configuration, historyView="main_briefing", historyViewVersion=2)
+        ),
         usageTokens=None,
         trailingTokens=None,
         historyTokens=messages_tokens(visible),
