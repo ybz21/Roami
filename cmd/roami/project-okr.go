@@ -14,7 +14,7 @@ import (
 
 func runProjectOKR(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("roami project okr show|save|record|collect|review PROJECT [--file JSON|-] [--server URL] [--json]\nWrites require the current revision in the JSON object; collect also requires --file. A conflict never retries a write.")
+		fmt.Println("roami project okr show|save|sync|memory|record|collect|review PROJECT [--file JSON|-] [--server URL] [--json]\nWrites require the current revision in the JSON object; collect also requires --file. A conflict never retries a write.")
 		return 0
 	}
 	action := args[0]
@@ -24,6 +24,10 @@ func runProjectOKR(args []string) int {
 		method = "GET"
 	case "save":
 		method = "PUT"
+	case "sync":
+		method, suffix = "POST", "/sync"
+	case "memory":
+		method, suffix = "PUT", "/memory"
 	case "record":
 		method, suffix = "POST", "/observations"
 	case "collect":

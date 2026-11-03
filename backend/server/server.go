@@ -227,6 +227,8 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/projects/:key/okr", h.ProjectOKRGet)
 		g.GET("/projects/:key/okr/legacy-swarm", h.ProjectOKRLegacySwarm)
 		g.PUT("/projects/:key/okr", h.ProjectOKRSave)
+		g.POST("/projects/:key/okr/sync", h.ProjectOKRSync)
+		g.PUT("/projects/:key/okr/memory", h.ProjectOKRMemory)
 		g.POST("/projects/:key/okr/observations", h.ProjectOKRObserve)
 		g.POST("/projects/:key/okr/collect", h.ProjectOKRCollect)
 		g.POST("/projects/:key/okr/reviews", h.ProjectOKRReview)
