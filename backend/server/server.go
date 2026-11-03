@@ -223,6 +223,7 @@ func New(cfg Config) *gin.Engine {
 		g.DELETE("/projects/:key", h.ProjectDelete)         // 显式移除（纯台账，不动目录/会话）
 		g.GET("/projects/:key/activity", h.ProjectActivity) // 活动流（全部分支近 30 天）
 		g.PATCH("/projects/:key/prefs", h.ProjectPrefs)     // 置顶/显示名/默认 agent/base
+		g.GET("/okr", h.ProjectOKROverview)
 		g.GET("/projects/:key/okr", h.ProjectOKRGet)
 		g.PUT("/projects/:key/okr", h.ProjectOKRSave)
 		g.POST("/projects/:key/okr/observations", h.ProjectOKRObserve)

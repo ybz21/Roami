@@ -1,31 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, InputNumber, Select, Spin } from 'antd'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Button, Input, InputNumber, Select, Spin, Tabs, Segmented } from 'antd'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
 import { useLayout } from '../../../layout'
 import { pollWhileVisible } from '../../../visible-poll'
-import { ChevronLeft, PencilIcon, SwarmIcon } from '../../../icons'
+import { BotIcon, ChevronLeft, PencilIcon } from '../../../icons'
 import MobileSubPage from '../../MobileSubPage'
 import { getHashParams } from '../../../route-hash'
 import OkrConfiguration, { OkrField, type SwarmOption } from './OkrConfiguration'
-import { configurationOf, dailyHistory, emptyConfiguration, keyResultEvidence, projectPath, shanghaiDate, sourceObservations, type Configuration, type Workspace } from './okr-workspace'
+import { configurationOf, dailyHistory, emptyConfiguration, projectPath, resultOverview, resultAttainment, shanghaiDate, sourceObservations, type Configuration, type Workspace } from './okr-workspace'
 import OkrReviewEvidence from './OkrReviewEvidence'
+import OkrResult from './OkrResult'
+import OkrTrend from './OkrTrend'
+import { lazyRetry } from '../../lazy-retry'
 import './project-okr.css'
+import './okr-dashboard.css'
+const Swarm = lazyRetry(() => import('../../swarm/Swarm'))
+const OkrMainChat = lazyRetry(() => import('./OkrMainChat'))
 
 function navigate(path: string) {
   const query = getHashParams().toString()
   location.hash = '#/' + path + (query ? '?' + query : '')
 }
 
-export default function ProjectOkr({ projectId, projectName, fromOverview = false }: { projectId: string; projectName?: string; fromOverview?: boolean }) {
+export default function ProjectOkr({ projectId, projectName, projectDir, fromOverview = false, onSession = () => {} }: { projectId: string; projectName?: string; projectDir?: string; fromOverview?: boolean; onSession?: (id: string) => void }) {
   const { t, locale } = useI18n()
   const { phone } = useLayout()
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [draft, setDraft] = useState<Configuration>(emptyConfiguration)
   const [editing, setEditing] = useState(false)
+  const [panel, setPanel] = useState('overview')
+  const [mainPanel, setMainPanel] = useState('board')
+  const [chatting, setChatting] = useState(false)
+  const [incoming, setIncoming] = useState<Workspace | null>(null)
   const [busy, setBusy] = useState(false)
   const writing = useRef(false)
+  const builderSeed = useRef('')
   const [error, setError] = useState('')
   const [errorDetail, setErrorDetail] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -41,8 +52,8 @@ export default function ProjectOkr({ projectId, projectName, fromOverview = fals
   const observationSelection = useRef({ metricId: '', date })
   const hasDraft = editing || value !== null || note !== '' || summary !== '' || actions !== ''
     || manualMetric !== observationSelection.current.metricId || date !== observationSelection.current.date
-  const live = useRef({ loaded, blocked: hasDraft || busy || conflict, workspace })
-  live.current = { loaded, blocked: hasDraft || busy || conflict, workspace }
+  const live = useRef({ loaded, blocked: hasDraft || busy || conflict, workspace, emptyBuilder: false })
+  live.current = { loaded, blocked: hasDraft || busy || conflict, workspace, emptyBuilder: !workspace && editing && builderSeed.current === JSON.stringify(configurationOf(draft)) }
   const workspaceRead = useRef<{ controller: AbortController; promise: Promise<{ data: Workspace | null }> } | null>(null)
   const readWorkspace = useCallback((signal?: AbortSignal) => {
     if (workspaceRead.current && !workspaceRead.current.controller.signal.aborted) return workspaceRead.current.promise
@@ -78,7 +89,7 @@ export default function ProjectOkr({ projectId, projectName, fromOverview = fals
       setWorkspace(response.data)
       observationSelection.current.metricId = response.data?.metrics.find(m => m.source === 'manual')?.id || ''
       setManualMetric(observationSelection.current.metricId)
-      setDraft(response.data ? configurationOf(response.data) : emptyConfiguration())
+      const initialDraft = response.data ? configurationOf(response.data) : emptyConfiguration(); builderSeed.current = JSON.stringify(initialDraft); setDraft(initialDraft)
       setEditing(!response.data)
       setLoaded(true)
     }).catch(e => { if (!controller.signal.aborted) { setError('okr.loadFailed'); setErrorDetail(e.message) } })
@@ -105,7 +116,7 @@ export default function ProjectOkr({ projectId, projectName, fromOverview = fals
     try {
       const response = await readWorkspace()
       setWorkspace(response.data)
-      if (!loaded) { observationSelection.current.metricId = response.data?.metrics.find(m => m.source === 'manual')?.id || ''; setManualMetric(observationSelection.current.metricId); setDraft(response.data ? configurationOf(response.data) : emptyConfiguration()); setEditing(!response.data) }
+      if (!loaded) { observationSelection.current.metricId = response.data?.metrics.find(m => m.source === 'manual')?.id || ''; setManualMetric(observationSelection.current.metricId); const initialDraft = response.data ? configurationOf(response.data) : emptyConfiguration(); builderSeed.current = JSON.stringify(initialDraft); setDraft(initialDraft); setEditing(!response.data) }
       setLoaded(true); setConflict(false); setError(''); setErrorDetail('')
     } catch (e) { setError('okr.loadFailed'); setErrorDetail((e as Error).message) }
     finally { setBusy(false) }
@@ -140,38 +151,57 @@ export default function ProjectOkr({ projectId, projectName, fromOverview = fals
   const selectedManual = manualMetrics.find(m => m.id === manualMetric)
   const hasGithub = workspace?.metrics.some(m => m.source === 'github')
   const retiredObservations = (workspace?.observations || []).filter(o => !workspace.metrics.some(m => m.id === o.metricId))
-  const content = <div className="okr-page" data-mobile-refresh-scroll>
-    {!phone && <header className="tt-pagehead"><h2>{title}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allProjects' : 'okr.backProject')}</Button></div></header>}
+  const results = workspace?.keyResults.map(kr => resultOverview(workspace, kr)) || []
+  const met = results.filter(kr => resultAttainment(kr, kr.baseline, kr.latest).met).length
+  const latestReview = workspace?.reviews.slice(-1)[0]
+  const missing = workspace?.metrics.filter(metric => !sourceObservations(workspace, metric).length).length || 0
+  const applyDiscussion = (next: Workspace) => {
+    setWorkspace(next); setDraft(configurationOf(next)); setEditing(false); setIncoming(null); setConflict(false)
+    if (!workspace) { observationSelection.current.metricId = next.metrics.find(metric => metric.source === 'manual')?.id || ''; setManualMetric(observationSelection.current.metricId) }
+  }
+  const refreshDiscussion = async () => {
+    try {
+      const { data: next } = await readWorkspace()
+      if (!next || next.revision <= (live.current.workspace?.revision || 0)) return
+      const emptyBuilder = live.current.emptyBuilder
+      if (live.current.blocked && !emptyBuilder) setIncoming(current => current && current.revision > next.revision ? current : next)
+      else applyDiscussion(next)
+    } catch (e) { setError('okr.loadFailed'); setErrorDetail((e as Error).message) }
+  }
+  const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-mobile-refresh-scroll>
+    {!phone && <header className="tt-pagehead"><h2>{title}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')}</Button></div></header>}
     {error && <div className="okr-error" role="alert">
       <p>{t(error)}</p>
-      {(conflict || !loaded) && <Button disabled={busy} onClick={() => void reload()}>{t(conflict ? 'okr.loadLatest' : 'inbox.retry')}</Button>}
+      {(conflict || !loaded || error === 'okr.loadFailed') && <Button disabled={busy} onClick={() => void reload()}>{t(conflict ? 'okr.loadLatest' : 'inbox.retry')}</Button>}
       {errorDetail && <details><summary>{t('okr.errorDetails')}</summary><p>{errorDetail}</p></details>}
     </div>}
     {!loaded && !error && <Spin />}
+    {incoming && <div className="okr-update" role="status"><span>{t('okr.discussionUpdated')}</span><Button onClick={() => { void readWorkspace().then(response => { if (response.data) applyDiscussion(response.data) }).catch(() => setError('okr.loadFailed')) }}>{t('okr.adoptUpdate')}</Button></div>}
     {loaded && <>
-      {workspace && <section className="okr-section">
-        <div className="okr-section-head"><h2>{workspace.objective}</h2>{!editing && <Button icon={<PencilIcon />} onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button>}</div>
-        <p className="okr-muted">{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</p>
-        <p className="okr-muted">{t(workspace.autoCollect ? 'okr.autoEnabled' : 'okr.autoDisabled')}</p>
-        {workspace.swarm && <a className="tt-act okr-swarm" href={'#/swarm/' + encodeURIComponent(workspace.swarm) + (getHashParams().toString() ? '?' + getHashParams().toString() : '')}><SwarmIcon />{t('okr.openSwarm')}</a>}
+      {workspace && <section className="okr-objective-head">
+        <div><span className="okr-eyebrow">{t('okr.objective')}</span><h2>{workspace.objective}</h2><p className="okr-muted">{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</p></div>
+        <div className="okr-objective-actions">
+          <span className="okr-completion">{t('okr.completedCount', { done: number(met), total: number(results.length) })}</span>
+          <div className="okr-actions">
+            {!editing && <Button icon={<PencilIcon />} onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button>}
+          </div>
+        </div>
       </section>}
-      {editing && <section className="okr-section"><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section>}
-      {workspace && <>
-        <section className="okr-section"><h3>{t('okr.keyResults')}</h3>
-          {workspace.keyResults.map(kr => {
-            const metric = workspace.metrics.find(m => m.id === kr.metricId)
-            const { baseline, latest, change } = keyResultEvidence(workspace, kr)
-            return <article className="okr-result" key={kr.id}>
-              <h4>{kr.title}</h4>
-              <p>{t('okr.krTarget', { horizon: t('okr.horizon.' + kr.horizon), mode: t('okr.mode.' + kr.mode), target: number(kr.target), unit: metric?.unit || '', date: day(kr.dueDate) })}</p>
-              {latest ? <dl className="okr-evidence">
-                <div><dt>{t('okr.current', { metric: metric?.name || '' })}</dt><dd>{number(latest.value)} {metric?.unit}</dd></div>
-                <div><dt>{t('okr.baseline', { date: day(baseline.date) })}</dt><dd>{number(baseline.value)}</dd></div>
-                <div><dt>{t('okr.periodChange')}</dt><dd>{number(change)}</dd></div>
-              </dl> : <p className="okr-muted">{t('okr.noEvidence')}</p>}
-            </article>
-          })}
-        </section>
+      {editing && <section className="okr-section"><div className="okr-actions"><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section>}
+      {workspace && !editing && <Tabs activeKey={mainPanel} onChange={setMainPanel} items={[
+        { key: 'board', label: t('okr.tab.board'), children: <>
+          <div className="okr-board-toolbar"><Segmented value={panel} onChange={value => setPanel(String(value))} options={['overview', 'data', 'review'].map(key => ({ value: key, label: t('okr.tab.' + key) }))} /><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div>
+          <Tabs activeKey={panel} onChange={setPanel} tabBarStyle={{ display: 'none' }} items={[
+        { key: 'overview', label: t('okr.tab.overview'), forceRender: true, children: <>
+          <section className="okr-board"><h3>{t('okr.keyResults')}</h3><div className="okr-results">{results.map(kr => <OkrResult key={kr.id} result={kr} />)}</div></section>
+          <div className="okr-insight-grid"><OkrTrend workspace={workspace} /><section className="okr-focus">
+            <h3>{t('okr.nextAction')}</h3>
+            {latestReview ? <><p className="okr-focus-action">{latestReview.actions || latestReview.summary}</p><p className="okr-muted okr-clamp">{latestReview.summary}</p><Button onClick={() => setPanel('review')}>{t('okr.openReview')}</Button></> : <><p className="okr-muted">{t('okr.noReviewAction')}</p><Button onClick={() => setPanel('review')}>{t('okr.writeFirstReview')}</Button></>}
+            {!!missing && <div className="okr-quality"><span>{t('okr.missingMetrics', { count: number(missing) })}</span><Button type="text" onClick={() => setPanel('data')}>{t('okr.tab.data')}</Button></div>}
+          </section></div>
+        </> },
+        { key: 'data', label: t('okr.tab.data'), forceRender: true, children: <>
+          <p className="okr-muted">{t(workspace.autoCollect ? 'okr.autoEnabled' : 'okr.autoDisabled')}</p>
         <section className="okr-section"><h3>{t('okr.observations')}</h3>
           {hasGithub && <div className="okr-actions"><Button loading={busy} disabled={busy || conflict} onClick={() => void mutate('POST', '/collect', {})}>{t('okr.collect')}</Button><span className="okr-muted">{t('okr.collectHint')}</span></div>}
           {!!manualMetrics.length && <form onSubmit={e => { e.preventDefault(); if (selectedManual && value !== null && Number.isFinite(value)) void mutate('POST', '/observations', { metricId: selectedManual.id, date, value, note }, () => { observationSelection.current = { metricId: manualMetric, date }; setValue(null); setNote('') }) }}>
@@ -208,7 +238,12 @@ export default function ProjectOkr({ projectId, projectName, fromOverview = fals
           })}
           {!!retiredObservations.length && <details><summary>{t('okr.retiredMetrics')}</summary>{retiredObservations.slice().reverse().map(o => <div className="okr-version" key={o.id}><span>{t('okr.retiredMetric', { id: o.metricId })}</span><time>{day(o.date)}</time><span>{number(o.value)}</span><code>{o.sourceKey}</code><time>{timestamp(o.capturedAt)}</time>{o.note && <p>{o.note}</p>}</div>)}</details>}
         </section>
+        </> },
+        { key: 'review', label: t('okr.tab.review'), forceRender: true, children: <>
         <section className="okr-section"><h3>{t('okr.reviews')}</h3>
+
+          {!(workspace.reviews || []).length && <p className="okr-muted">{t('okr.noReviews')}</p>}
+          {(workspace.reviews || []).slice().reverse().map(review => <article className="okr-review" key={review.id}><p>{review.summary}</p>{review.actions && <p>{review.actions}</p>}<p className="okr-muted">{t('okr.reviewEvidence', { date: timestamp(review.date), revision: number(review.evidenceRevision) })}</p>{workspace.revision > review.evidenceRevision + 1 && <p className="okr-muted">{t('okr.reviewUpdated')}</p>}<OkrReviewEvidence projectId={workspace.projectId} reviewId={review.id} /></article>)}
           <form onSubmit={e => { e.preventDefault(); if (summary.trim()) void mutate('POST', '/reviews', { summary, actions }, () => { setSummary(''); setActions('') }) }}>
             <fieldset disabled={busy || conflict}>
               <OkrField label={t('okr.reviewSummary')}><Input.TextArea required value={summary} onChange={e => setSummary(e.target.value)} autoSize={{ minRows: 3, maxRows: 8 }} /></OkrField>
@@ -217,11 +252,15 @@ export default function ProjectOkr({ projectId, projectName, fromOverview = fals
               <p className="okr-muted">{t('okr.reviewHint')}</p>
             </fieldset>
           </form>
-          {!(workspace.reviews || []).length && <p className="okr-muted">{t('okr.noReviews')}</p>}
-          {(workspace.reviews || []).slice().reverse().map(review => <article className="okr-review" key={review.id}><p>{review.summary}</p>{review.actions && <p>{review.actions}</p>}<p className="okr-muted">{t('okr.reviewEvidence', { date: timestamp(review.date), revision: number(review.evidenceRevision) })}</p>{workspace.revision > review.evidenceRevision + 1 && <p className="okr-muted">{t('okr.reviewUpdated')}</p>}<OkrReviewEvidence projectId={workspace.projectId} reviewId={review.id} /></article>)}
         </section>
-      </>}
+        </> },
+          ]} />
+        </> },
+        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} openTerm={onSession} onNav={() => setMainPanel('board')} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button></div> : null },
+      ]} />}
     </>}
+  </div>
+    {chatting && <Suspense fallback={<Spin />}><OkrMainChat projectId={projectId} projectDir={projectDir} workspace={workspace} draft={draft} onUpdated={() => { void refreshDiscussion() }} onClose={() => { setChatting(false); void refreshDiscussion() }} /></Suspense>}
   </div>
   return phone ? <MobileSubPage title={title} onBack={back} manageHistory={false} keepBottomNav>{content}</MobileSubPage> : content
 }

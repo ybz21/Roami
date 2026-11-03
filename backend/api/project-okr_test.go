@@ -33,6 +33,7 @@ func projectOKRFixture(t *testing.T) (*API, *gin.Engine, string) {
 	a := &API{Projects: projects, ProjectOKR: store, Meta: metadb.NewLocal(meta)}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.GET("/okr", a.ProjectOKROverview)
 	r.GET("/projects/:key/okr", a.ProjectOKRGet)
 	r.PUT("/projects/:key/okr", a.ProjectOKRSave)
 	r.POST("/projects/:key/okr/observations", a.ProjectOKRObserve)
@@ -40,6 +41,31 @@ func projectOKRFixture(t *testing.T) (*API, *gin.Engine, string) {
 	r.POST("/projects/:key/okr/reviews", a.ProjectOKRReview)
 	r.GET("/projects/:key/okr/reviews/:reviewID/evidence", a.ProjectOKREvidence)
 	return a, r, projectID
+}
+
+func TestProjectOKROverviewOnlyListsSavedObjectives(t *testing.T) {
+	a, router, id := projectOKRFixture(t)
+	other, _ := a.Projects.Add(t.TempDir(), "No objective")
+	response := projectOKRRequest(t, router, "GET", "/okr", "", 200)
+	if response.Body.String() != `{"data":[]}` {
+		t.Fatal(response.Body.String())
+	}
+	projectOKRRequest(t, router, "PUT", "/projects/"+id+"/okr", projectOKRConfigJSON(), 200)
+	response = projectOKRRequest(t, router, "GET", "/okr", "", 200)
+	var body struct {
+		Data []okr.Overview `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil || len(body.Data) != 1 || body.Data[0].ProjectID != id {
+		t.Fatal(response.Body.String(), err)
+	}
+	if w, err := a.ProjectOKR.Get(other); err != nil || w != nil {
+		t.Fatal("overview created a workspace", w, err)
+	}
+	a.Projects.Remove(id)
+	response = projectOKRRequest(t, router, "GET", "/okr", "", 200)
+	if response.Body.String() != `{"data":[]}` {
+		t.Fatal(response.Body.String())
+	}
 }
 
 func projectOKRRequest(t *testing.T, router *gin.Engine, method, path, body string, status int) *httptest.ResponseRecorder {

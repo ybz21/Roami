@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -91,6 +92,35 @@ func (a *API) ProjectOKRGet(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": w})
+}
+
+func (a *API) ProjectOKROverview(c *gin.Context) {
+	if a.ProjectOKR == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "OKR_UNAVAILABLE"})
+		return
+	}
+	items, err := a.ProjectOKR.Overviews()
+	if err != nil {
+		okrError(c, err)
+		return
+	}
+	type itemWithProject struct {
+		okr.Overview
+		ProjectName string `json:"projectName"`
+	}
+	visible := make([]itemWithProject, 0, len(items))
+	for _, item := range items {
+		if a.Projects != nil {
+			if project, ok := a.Projects.Entry(item.ProjectID); ok && project.ID == item.ProjectID {
+				name := project.DisplayName
+				if name == "" {
+					name = filepath.Base(project.Dir)
+				}
+				visible = append(visible, itemWithProject{Overview: item, ProjectName: name})
+			}
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": visible})
 }
 
 func (a *API) resolveOKRSwarm(ctx context.Context, key string) (string, error) {

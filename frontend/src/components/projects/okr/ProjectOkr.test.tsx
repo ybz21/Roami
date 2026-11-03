@@ -4,6 +4,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ProjectOkr from './ProjectOkr'
 import { type Workspace } from './okr-workspace'
 
+vi.mock('./OkrMainChat', () => ({ default: ({ onUpdated }: { onUpdated: () => void }) => <button onClick={onUpdated}>Complete discussion</button> }))
+vi.mock('./OkrTrend', () => ({ default: () => <div data-testid="trend" /> }))
+vi.mock('../../swarm/Swarm', () => ({ default: ({ initialSwarm }: { initialSwarm: string }) => <div data-testid="activities">{initialSwarm}</div> }))
+
+function panel(key: string) {
+  const choice = screen.queryByRole('radio', { name: 'okr.tab.' + key })
+  if (choice) fireEvent.click(choice)
+}
+
 const state = vi.hoisted(() => ({ phone: false, api: vi.fn() }))
 vi.mock('../../../api', () => ({ api: state.api }))
 vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: state.phone }) }))
@@ -56,19 +65,24 @@ it('records manual zero and real review input, uses each returned revision and l
     return { data: initial }
   })
   render(<ProjectOkr projectId="stable-project" />)
-  const link = await screen.findByRole('link', { name: 'okr.openSwarm' })
-  expect(link.getAttribute('href')).toContain('#/swarm/real-team')
+  await screen.findByText('Launch')
+  expect(screen.queryByTestId('activities')).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.activities' }))
+  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', 'real-team')
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
+  panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '0' } })
   fireEvent.change(screen.getByLabelText('okr.date'), { target: { value: '2026-11-02' } })
   fireEvent.change(screen.getByLabelText('okr.note'), { target: { value: 'Actual count' } })
   fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/observations', expect.objectContaining({ revision: 3, metricId: 'visits', value: 0, note: 'Actual count' })))
   await waitFor(() => expect((screen.getByLabelText('okr.note') as HTMLInputElement).value).toBe(''))
+  panel('review')
   fireEvent.change(screen.getByLabelText('okr.reviewSummary'), { target: { value: 'Observed outcome' } })
   fireEvent.change(screen.getByLabelText('okr.reviewActions'), { target: { value: 'Next experiment' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.submitReview' }))
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/reviews', { revision: 4, summary: 'Observed outcome', actions: 'Next experiment' }))
-  expect(await screen.findByText('Observed outcome')).toBeTruthy()
+  expect((await screen.findAllByText('Observed outcome')).length).toBeGreaterThan(0)
 })
 
 it('does not collect on template selection or page load; only collects saved sources on explicit action', async () => {
@@ -80,7 +94,9 @@ it('does not collect on template selection or page load; only collects saved sou
   view.unmount()
   state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: initial })
   render(<ProjectOkr projectId="stable-project" />)
-  fireEvent.click(await screen.findByRole('button', { name: 'okr.collect' }))
+  await screen.findByText('Launch')
+  panel('data')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.collect' }))
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/collect', { revision: 3 }))
 })
 
@@ -93,8 +109,10 @@ it('keeps manual and review input on conflicts and never displays invented progr
   render(<ProjectOkr projectId="stable-project" />)
   await screen.findByText('Launch')
   expect(screen.queryByText('okr.periodChange')).toBeNull()
+  panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '5' } })
   fireEvent.change(screen.getByLabelText('okr.note'), { target: { value: 'Kept note' } })
+  panel('review')
   fireEvent.change(screen.getByLabelText('okr.reviewSummary'), { target: { value: 'Kept review' } })
   fireEvent.change(screen.getByLabelText('okr.reviewActions'), { target: { value: 'Kept actions' } })
   fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
@@ -128,6 +146,7 @@ it('keeps a removed manual metric unselected after conflict instead of moving th
   })
   render(<ProjectOkr projectId="stable-project" />)
   await screen.findByText('Launch')
+  panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '5' } })
   fireEvent.change(screen.getByLabelText('okr.note'), { target: { value: 'Original metric note' } })
   fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
@@ -137,6 +156,7 @@ it('keeps a removed manual metric unselected after conflict instead of moving th
   fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
   expect(state.api.mock.calls.filter(c => c[0] === 'POST')).toHaveLength(1)
   expect((screen.getByLabelText('okr.note') as HTMLInputElement).value).toBe('Original metric note')
+  panel('data')
   expect((screen.getByRole('button', { name: 'okr.record' }) as HTMLButtonElement).disabled).toBe(true)
 })
 
@@ -260,14 +280,17 @@ it('discards a poll when editing starts in flight and preserves manual or review
   fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
   await advance(30_000)
   expect(screen.getByText('External revision four')).toBeTruthy()
+  panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '0' } })
   next = { ...initial, revision: 5, objective: 'External revision five' }
   await advance(60_000)
   expect(reads()).toHaveLength(3)
   expect((screen.getByLabelText('okr.value') as HTMLInputElement).value).toBe('0')
+  panel('data')
   fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '' } })
   await advance(30_000)
   expect(screen.getByText('External revision five')).toBeTruthy()
+  panel('review')
   fireEvent.change(screen.getByLabelText('okr.reviewSummary'), { target: { value: 'My review draft' } })
   fireEvent.change(screen.getByLabelText('okr.reviewActions'), { target: { value: 'My actions' } })
   next = { ...initial, revision: 6, objective: 'External revision six' }
@@ -279,4 +302,25 @@ it('discards a poll when editing starts in flight and preserves manual or review
   expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/reviews', { revision: 5, summary: 'My review draft', actions: 'My actions' })
   expect((screen.getByLabelText('okr.reviewSummary') as HTMLTextAreaElement).value).toBe('My review draft')
   expect(screen.getByRole('alert').textContent).toContain('okr.conflict')
+})
+
+
+it.each([false, true])('adopts a goal saved by the discussion without silently overwriting a dirty builder (%s)', async dirty => {
+  let saved = false
+  state.api.mockImplementation(async (_method, path) => path === '/swarms' ? [] : { data: saved ? { ...initial, revision: 1 } : null })
+  render(<ProjectOkr projectId="new-project" />)
+  await screen.findByLabelText('okr.objective')
+  if (dirty) fireEvent.change(screen.getByLabelText('okr.objective'), { target: { value: 'My unsaved goal' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.chatOpen' }))
+  const complete = await screen.findByRole('button', { name: 'Complete discussion' })
+  saved = true
+  fireEvent.click(complete)
+  if (dirty) {
+    await screen.findByText('okr.discussionUpdated')
+    expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('My unsaved goal')
+    fireEvent.click(screen.getByRole('button', { name: 'okr.adoptUpdate' }))
+  }
+  await waitFor(() => expect(screen.queryByLabelText('okr.objective')).toBeNull())
+  expect(screen.getByText('Launch')).toBeTruthy()
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
 })

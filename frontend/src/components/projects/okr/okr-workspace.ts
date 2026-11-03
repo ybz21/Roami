@@ -4,6 +4,24 @@ export type Configuration = { objective: string; startDate: string; endDate: str
 export type Observation = { id: string; metricId: string; date: string; value: number; source: 'manual' | 'github'; sourceKey: string; capturedAt: string; note: string }
 export type Review = { id: string; summary: string; actions: string; date: string; evidenceRevision: number }
 export type Workspace = Configuration & { revision: number; projectId: string; observations: Observation[]; reviews: Review[]; updatedAt: string }
+export type EvidencePoint = { date: string; value: number }
+export type ResultOverview = KeyResult & { unit: string; baseline: EvidencePoint | null; latest: EvidencePoint | null; delta: number | null }
+export type OkrOverview = Pick<Workspace, 'projectId' | 'objective' | 'startDate' | 'endDate' | 'updatedAt' | 'revision'> & { projectName: string; keyResults: ResultOverview[] }
+
+export function resultAttainment(kr: KeyResult, baseline?: EvidencePoint | null, latest?: EvidencePoint | null) {
+  const achieved = latest ? kr.mode === 'increase' ? baseline ? latest.value - baseline.value : null : latest.value : null
+  if (achieved === null) return { achieved: null, percent: null, met: false }
+  const met = kr.mode === 'atMost' ? achieved <= kr.target : achieved >= kr.target
+  const percent = kr.mode !== 'atMost' && kr.target > 0 ? Math.max(0, Math.min(100, achieved / kr.target * 100)) : met ? 100 : 0
+  return { achieved, percent, met }
+}
+
+export function resultOverview(workspace: Workspace, kr: KeyResult): ResultOverview {
+  const { baseline, latest } = keyResultEvidence(workspace, kr)
+  const metric = workspace.metrics.find(m => m.id === kr.metricId)
+  const days = metric ? dailyHistory(sourceObservations(workspace, metric).filter(o => o.date >= workspace.startDate && o.date <= kr.dueDate)) : []
+  return { ...kr, unit: metric?.unit || '', baseline: baseline || null, latest: latest || null, delta: days[0]?.delta ?? null }
+}
 
 export function shanghaiDate(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)

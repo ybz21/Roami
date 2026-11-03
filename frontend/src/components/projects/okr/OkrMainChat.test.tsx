@@ -1,0 +1,53 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import OkrMainChat from './OkrMainChat'
+import { emptyConfiguration } from './okr-workspace'
+const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn() }))
+vi.mock('../../../api', () => ({ api: state.api }))
+vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: false, size: 'large' }) }))
+vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
+vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: () => ({ refresh: state.refresh, view: null }) }))
+vi.mock('../../shell/AdaptivePanel', () => ({ default: ({ children }: any) => children }))
+vi.mock('../../markdown/Markdown', () => ({ default: ({ children }: any) => children }))
+beforeEach(() => { state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
+afterEach(cleanup)
+it('creates an independent Main instance only on first send and closes only that conversation', async () => {
+  const close = vi.fn()
+  const view = render(<OkrMainChat projectId="project" projectDir="/repo" draft={emptyConfiguration()} workspace={null} onClose={close} />)
+  expect(state.api).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Help define my goal' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: expect.stringContaining('"projectId":"project"') })))
+  expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages')).every(call => call[1] === '/agent/conversations/independent/messages')).toBe(true)
+  const first = state.api.mock.calls.find(call => call[1] === '/agent/conversations')[2].requestKey
+  fireEvent.click(screen.getByRole('button', { name: 'okr.endChat' }))
+  await waitFor(() => expect(close).toHaveBeenCalledOnce())
+  expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: '/stop' }))
+  view.unmount()
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'New discussion' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.filter(call => call[1] === '/agent/conversations')).toHaveLength(2))
+  expect(state.api.mock.calls.filter(call => call[1] === '/agent/conversations')[1][2].requestKey).not.toBe(first)
+})
+it('preserves the draft and reuses the exact message key after an ambiguous failure', async () => {
+  let failed = false
+  state.api.mockImplementation(async (_method, path) => {
+    if (path === '/agent/main-conversation') return { data: { id: 'home' } }
+    if (path === '/agent/conversations') return { data: { id: 'independent' } }
+    if (!failed) { failed = true; throw new Error('lost receipt') }
+    return { data: { kind: 'message' } }
+  })
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Keep this request' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await screen.findByRole('alert')
+  expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep this request')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages'))).toHaveLength(2))
+  const calls = state.api.mock.calls.filter(call => call[1].endsWith('/messages'))
+  expect(calls[0][2]).toEqual(calls[1][2])
+  expect(state.api.mock.calls.filter(call => call[1] === '/agent/conversations')).toHaveLength(1)
+})

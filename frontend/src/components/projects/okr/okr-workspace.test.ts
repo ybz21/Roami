@@ -50,3 +50,13 @@ it('preserves server append order for mixed RFC3339 fractional precision within 
   expect(rows[0].latest.id).toBe('later')
   expect(keyResultEvidence(changed, workspace.keyResults[0]).baseline?.id).toBe('first')
 })
+
+it('counts a met threshold as achieved while growth uses only the net increase', async () => {
+  const { resultAttainment } = await import('./okr-workspace')
+  const kr = { id: 'k', metricId: 'm', title: 'Goal', horizon: 'short' as const, target: 2, mode: 'atLeast' as const, dueDate: '2026-11-03' }
+  const point = { date: '2026-11-03', value: 2 }
+  expect(resultAttainment(kr, point, point)).toMatchObject({ achieved: 2, percent: 100, met: true })
+  expect(resultAttainment({ ...kr, mode: 'increase', target: 100 }, point, point)).toMatchObject({ achieved: 0, percent: 0, met: false })
+  expect(resultAttainment(kr, null, null).percent).toBeNull()
+  expect(resultAttainment({ ...kr, mode: 'atMost', target: 3 }, point, point).met).toBe(true)
+})
