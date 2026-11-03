@@ -114,7 +114,7 @@ func (s Service) structuredTurn(ctx context.Context, path, key string, initial b
 		}
 	}
 	if err != nil {
-		return s.failPersistent(dir, err)
+		return s.failWorkspaceClaim(dir, err)
 	}
 	defer lease()
 	spec.Model, spec.Permission = state.Model, state.Permission

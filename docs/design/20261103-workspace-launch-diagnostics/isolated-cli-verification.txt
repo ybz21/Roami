@@ -1,0 +1,17 @@
+Built Go CLI -> private tmux runner -> workspace admission -> status result:
+{
+  "errorCode": "WORKSPACE_OUTCOME_UNKNOWN",
+  "executionStarted": false,
+  "exitCodeSource": "not_started",
+  "failure": {
+    "phase": "workspace_claim",
+    "reasonCode": "WORKSPACE_PRIOR_RESULT_MISSING",
+    "blockingExecutionId": "690b4df67736fda4c890ccc920210ba3bda96658a4ca75027a7cef0bf6c62d97",
+    "blockingSessionId": "isolated-prior-session"
+  },
+  "state": "failed",
+  "summary": "WORKSPACE_PRIOR_RESULT_MISSING",
+  "exitCode": -1,
+  "finishedMs": 1793705142208
+}
+PASS: task CLI not started; prompt not handed off; prior writer and unknown result preserved.

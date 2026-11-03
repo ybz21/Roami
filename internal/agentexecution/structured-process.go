@@ -145,7 +145,7 @@ func (s Service) runStructuredOnce(ctx context.Context, dir string, spec Spec, s
 	}
 	lease, err := s.claimWorkspace(ctx, receipt.Workspace.Directory, spec.Key)
 	if err != nil {
-		return s.failPersistent(dir, err)
+		return s.failWorkspaceClaim(dir, err)
 	}
 	defer lease()
 	result, _ := s.structuredProcess(ctx, dir, spec, receipt, "", stdout, stderr)

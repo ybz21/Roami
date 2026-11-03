@@ -1,0 +1,23 @@
+Current local CLI probe (read-only, no task/model/tool invocation):
+2.1.317 (Claude Code)
+
+  --mcp-config <configs...>             Load MCP servers from JSON files or
+                                        strings (space-separated)
+  --model <model>                       Model for the current session. Provide
+                                        an alias for the latest model (e.g.
+  --model <model>                       Model for the current session. Provide
+                                        an alias for the latest model (e.g.
+                                        'fable', 'opus', or 'sonnet') or a
+                                        model's full name.
+  --permission-mode <mode>              Permission mode to use for the session
+                                        (choices: "acceptEdits", "auto",
+                                        "bypassPermissions", "manual",
+                                        "dontAsk", "plan")
+  --session-id <uuid>                   Use a specific session ID for the
+                                        conversation (must be a valid UUID)
+  --setting-sources <sources>           Comma-separated list of setting sources
+                                        to load (user, project, local).
+  --settings <file-or-json>             Path to a settings JSON file or a JSON
+                                        string to load additional settings from
+  --strict-mcp-config                   Only use MCP servers from --mcp-config,
+                                        ignoring all other MCP configurations

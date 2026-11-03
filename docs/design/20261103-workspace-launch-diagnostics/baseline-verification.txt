@@ -1,0 +1,7 @@
+=== RUN   TestWorkspaceClaimBaselineEvidence
+    workspace-claim-diagnostics_test.go:11: {"state":"failed","summary":"WORKSPACE_OUTCOME_UNKNOWN","exitCode":-1,"finishedMs":1793704823739}
+    workspace-claim-diagnostics_test.go:12: missing proof that executor never started
+--- FAIL: TestWorkspaceClaimBaselineEvidence (0.01s)
+FAIL
+FAIL	github.com/ybz21/Roami/internal/agentexecution	0.024s
+FAIL

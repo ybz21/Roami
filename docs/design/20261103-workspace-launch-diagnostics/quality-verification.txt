@@ -1,0 +1,22 @@
+Command: env -u ROAM_HOME bash scripts/dev/quality/check.sh full
+Exit: 0
+Output excerpt (section markers and aggregate results; full output retained in task workspace tmp/workspace-launch-evidence/quality-full.log):
+
+==> CLI entry audit
+==> Shell syntax
+==> Go formatting
+==> Go tests
+==> Python Agent runtime
+All checks passed!
+586 files already formatted
+3258 passed, 48 skipped in 728.56s (0:12:08)
+==> Frontend checks
+i18n audit passed: 4790 locale keys checked.
+hover 作用域检查通过
+==> Frontend build
+i18n audit passed: 4790 locale keys checked.
+hover 作用域检查通过
+✓ built in 41.23s
+==> Secret scan
+==> Staged file policy
+==> Quality gate passed
