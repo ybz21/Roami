@@ -32,6 +32,16 @@ it('shows one empty-period message without an empty chart or model list', () => 
   expect(screen.queryByRole('article')).toBeNull()
 })
 
+it('shows missing token receipts as unknown and distinguishes them from confirmed zero usage', () => {
+  const missing = { ...totals, requests: 1, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, totalTokens: 0, missingUsage: 1, charges: [] }
+  const view = render(<ModelUsageStatistics statistics={{ ...statistics, total: missing, daily: [{ ...missing, day: '2026-10-26' }], models: [{ ...missing, model: 'model-a' }] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  expect(within(screen.getByText('agent.usage.totalTokens').parentElement!).getByText('agent.gateway.tokenUnknown')).toBeTruthy()
+  expect(within(screen.getByRole('article', { name: 'model-a' })).getAllByText('agent.gateway.tokenUnknown')).toHaveLength(3)
+  const confirmed = { ...missing, missingUsage: 0 }
+  view.rerender(<ModelUsageStatistics statistics={{ ...statistics, total: confirmed, daily: [], models: [{ ...confirmed, model: 'model-a' }] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)
+  expect(within(screen.getByText('agent.usage.totalTokens').parentElement!).getByText('0')).toBeTruthy()
+})
+
 it('shows unknown instead of zero cost when a model has no settled known charges', () => {
   const unknown = { ...totals, requests: 1, charges: [], unknown: 1, pending: 0, failed: 0, estimated: 0 }
   render(<ModelUsageStatistics statistics={{ ...statistics, models: [{ ...unknown, model: 'unpriced-model' }] }} days={7} onDaysChange={vi.fn()} loading={false} disabled={false} />)

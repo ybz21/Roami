@@ -55,17 +55,18 @@ type CallRecord struct {
 }
 
 type Statistics struct {
-	AgentKind string        `json:"agentKind"`
-	Source    string        `json:"source"`
-	Day       string        `json:"day"`
-	Timezone  string        `json:"timezone"`
-	From      string        `json:"from"`
-	To        string        `json:"to"`
-	Days      int           `json:"days"`
-	Hourly    []HourlyUsage `json:"hourly"`
-	Today     []UsageGroup  `json:"today"`
-	Groups    []UsageGroup  `json:"groups"`
-	Recent    []CallRecord  `json:"recent"`
+	RecentState string        `json:"recentState,omitempty"`
+	AgentKind   string        `json:"agentKind"`
+	Source      string        `json:"source"`
+	Day         string        `json:"day"`
+	Timezone    string        `json:"timezone"`
+	From        string        `json:"from"`
+	To          string        `json:"to"`
+	Days        int           `json:"days"`
+	Hourly      []HourlyUsage `json:"hourly"`
+	Today       []UsageGroup  `json:"today"`
+	Groups      []UsageGroup  `json:"groups"`
+	Recent      []CallRecord  `json:"recent"`
 }
 
 type HourlyUsage struct {
@@ -82,12 +83,18 @@ func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
 }
 
 func (l *Ledger) StatisticsForSource(days int, selected, source string, agents ...string) (Statistics, error) {
-	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days, Source: source}
 	agent := ""
 	if len(agents) > 0 {
 		agent = agents[0]
 	}
-	result.AgentKind = agent
+	return l.StatisticsForCalls(days, selected, source, agent, "")
+}
+
+func (l *Ledger) StatisticsForCalls(days int, selected, source, agent, recentState string) (Statistics, error) {
+	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days, Source: source, AgentKind: agent, RecentState: recentState}
+	if recentState != "" && recentState != "unknown" {
+		return result, fmt.Errorf("INVALID_MODEL_USAGE_STATE")
+	}
 	if agent != "" && !containsField(gatewayAgentKinds, agent) {
 		return result, fmt.Errorf("INVALID_AGENT_KIND")
 	}
@@ -196,7 +203,7 @@ func (l *Ledger) StatisticsForSource(days int, selected, source string, agents .
 				result.Hourly = append(result.Hourly, *g)
 			}
 		}
-		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id,agent_kind,key_id,source_id,route_id,price_status,upstream_http_status,upstream_request_id,`+usageSourceSQL+` FROM gateway_calls WHERE day>=? AND day<=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?) ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To, source, source, agent, agent)
+		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id,agent_kind,key_id,source_id,route_id,price_status,upstream_http_status,upstream_request_id,`+usageSourceSQL+` FROM gateway_calls WHERE day>=? AND day<=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?) AND (?='' OR state=?) ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To, source, source, agent, agent, recentState, recentState)
 		if err != nil {
 			return err
 		}
