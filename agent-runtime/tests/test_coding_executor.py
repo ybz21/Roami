@@ -274,6 +274,8 @@ async def test_new_delegated_tasks_launch_in_auto_mode(
     assert launches[0]["executor"] == provider
     assert launches[0]["persistent"] is persistent
     assert launches[0]["permission"] == "auto"
+    if target_kind == "new_session":
+        assert launches[0]["directory"] == str(tmp_path)
 
 
 @pytest.mark.parametrize("provider", ["codex", "claude", "opencode", "pi"])

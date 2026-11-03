@@ -1,0 +1,116 @@
+{
+  "snapshotUtc": "2026-11-03T14:37:34.490099+00:00",
+  "source": "read-only SQLite snapshot plus local execution metadata",
+  "tasks": [
+    {
+      "id": "65291b93a72e418d87f13c8d3cdc9585",
+      "launch_id": "task:local:6aaa55848ad343f8b9a21ce0c0e0b230:call_00_7b9p7e1dqs6lzue82zeh9mfs",
+      "session_id": "2026-1103-1850-00cy",
+      "agent_conversation_id": null,
+      "started_ms": 1793703037216,
+      "finished_ms": 1793703040701,
+      "requestedTarget": {
+        "kind": "new_session"
+      },
+      "result": {
+        "state": "failed",
+        "summary": "WORKSPACE_OUTCOME_UNKNOWN",
+        "exitCode": -1,
+        "workspace": {
+          "directory": "/home/ai/.roami/workspaces/agent-coding",
+          "workspaceId": "ad894949d92248fd361078a33a1ca43178acacc458f10fdb4ea427399e813966"
+        }
+      },
+      "execution": {
+        "id": "e86bb40abe53d69ee82cdd37fd6210997e7be6e1a4d3435271e226001223323b",
+        "files": {
+          "spec.json": true,
+          "receipt.json": true,
+          "started": true,
+          "prompt.txt": false,
+          "result.json": true
+        },
+        "persistent": true,
+        "configuredDirectory": "/home/ai/.roami/workspaces/agent-coding",
+        "receiptBindingPresent": false
+      }
+    },
+    {
+      "id": "f36abc9fe31e45748fee076bf3dfd468",
+      "launch_id": "task:local:3479b870834f4fe993775c37e814fae8:call_00_mqpgx60u5jxo5zyicolwczmt",
+      "session_id": "2026-1103-2033-00d6",
+      "agent_conversation_id": null,
+      "started_ms": 1793709222582,
+      "finished_ms": 1793709226394,
+      "requestedTarget": {
+        "kind": "new_session",
+        "label": "治理Agent三份HTML"
+      },
+      "result": {
+        "state": "failed",
+        "summary": "WORKSPACE_OUTCOME_UNKNOWN",
+        "exitCode": -1,
+        "workspace": {
+          "directory": "/home/ai/.roami/workspaces/agent-coding",
+          "workspaceId": "ad894949d92248fd361078a33a1ca43178acacc458f10fdb4ea427399e813966"
+        }
+      },
+      "execution": {
+        "id": "2a3fbc3ed48cd10d5ad797751d2aecb2aefb2fbdc98d807dd8caa68ec7d27de5",
+        "files": {
+          "spec.json": true,
+          "receipt.json": true,
+          "started": true,
+          "prompt.txt": false,
+          "result.json": true
+        },
+        "persistent": true,
+        "configuredDirectory": "/home/ai/.roami/workspaces/agent-coding",
+        "receiptBindingPresent": false
+      }
+    },
+    {
+      "id": "ad9adba6df574fac942a2c4d722f1424",
+      "launch_id": "task:local:91445e402ff84a8a829e5862c885f8d3:call_00_ujhnad7t0j9t9jupe5f5ppqd",
+      "session_id": "2026-1103-2205-00d7",
+      "agent_conversation_id": null,
+      "started_ms": 1793714699655,
+      "finished_ms": 1793714703250,
+      "requestedTarget": {
+        "kind": "new_session"
+      },
+      "result": {
+        "state": "failed",
+        "summary": "WORKSPACE_OUTCOME_UNKNOWN",
+        "exitCode": -1,
+        "workspace": {
+          "directory": "/home/ai/.roami/workspaces/agent-coding",
+          "workspaceId": "ad894949d92248fd361078a33a1ca43178acacc458f10fdb4ea427399e813966"
+        }
+      },
+      "execution": {
+        "id": "8ffa0ca99f31cbbdb72d7a9bcc586c07aac2564c99f78fcf2c8cc0933b92a362",
+        "files": {
+          "spec.json": true,
+          "receipt.json": true,
+          "started": true,
+          "prompt.txt": false,
+          "result.json": true
+        },
+        "persistent": true,
+        "configuredDirectory": "/home/ai/.roami/workspaces/agent-coding",
+        "receiptBindingPresent": false
+      }
+    }
+  ],
+  "blockingWriter": {
+    "executionId": "163d773b30abb90c977481b8a32878d6d6238f2dd271a070d2c7bc9e7d67ec80",
+    "writerSha256": "49b5ecd17c5f765ee584f561ccd80bff18b8d1c72e49dc650303126db08222b3",
+    "resultExists": false
+  },
+  "deployedCli": {
+    "version": "roami vokr-board-4d307a49",
+    "containsNewWorkspaceDiagnostic": false
+  },
+  "productionMutations": false
+}

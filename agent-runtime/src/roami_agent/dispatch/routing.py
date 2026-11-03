@@ -284,10 +284,6 @@ class TaskRouter:
                     raise DomainError("ROUTING_FORK_UNSUPPORTED")
                 if target.get("resourceOnly"):
                     raise DomainError("ROUTING_PROFILE_CONFLICT")
-                if target["kind"] == "new_session" and not (
-                    target.get("directory") or self.settings.coding_directory
-                ):
-                    raise DomainError("ROUTING_DIRECTORY_REQUIRED")
             decision.update(action="new_task", executor=selected, reasonCode=reason)
 
         if args.get("executor") and args["executor"] != decision["executor"]:
