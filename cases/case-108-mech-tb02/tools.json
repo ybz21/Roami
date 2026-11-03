@@ -1,0 +1,15 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "python_tests": [
+    "agent-runtime/tests/test_terminal_tool_batches.py",
+    "agent-runtime/tests/test_coordinator_handoff.py::test_read_then_two_handoffs_in_one_batch_end_without_extra_model_round",
+    "agent-runtime/tests/test_argument_repair_progress.py::test_repeated_schema_failure_stops_after_guided_repair_without_side_effects",
+    "agent-runtime/tests/test_native_evaluation_tool_parity.py"
+  ],
+  "expected_python_tests": 18,
+  "external_model_calls": 0,
+  "fixture_boundary": "模拟提供方和动作处理器计数；真实Core、工具校验、SQLite失败回执及原生文件续跑。无外部模型或系统Shell。"
+}

@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_terminal_batch_repair",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "14项新增集成检查及4项既有检查。此前CLI与call-ID夹具错误不计为缺陷；不代表原始模型语义通过。"
+}

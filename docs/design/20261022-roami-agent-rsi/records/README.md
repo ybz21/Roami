@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [结束工具混合批次的零副作用纠错](2026-11-03/terminal-tool-batch-repair.md) |
 | 2026-11-03 | [精简历史保留可信派活回执](2026-11-03/handoff-history-receipts.md) |
 | 2026-11-03 | [原生验收管理命令与用户追问续跑](2026-11-03/native-execution-control-parity.md) |
 | 2026-11-03 | [原生模型能力要求的准入校验](2026-11-03/native-model-capability-admission.md) |

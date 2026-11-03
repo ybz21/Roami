@@ -1,0 +1,33 @@
+{
+  "ending_tools": [
+    "reply",
+    "ask_user",
+    "task_reply",
+    "task_queue_reply"
+  ],
+  "ending_first": [
+    false,
+    true
+  ],
+  "valid_action_count": 30,
+  "terminal_arguments": {
+    "reply": {
+      "text": "The requested answer is ready."
+    },
+    "task_queue_reply": {},
+    "task_reply": {
+      "taskId": "unexecuted-fixture-task"
+    },
+    "ask_user": {
+      "prompt": "Choose the required destination.",
+      "options": [
+        {
+          "label": "First"
+        },
+        {
+          "label": "Second"
+        }
+      ]
+    }
+  }
+}

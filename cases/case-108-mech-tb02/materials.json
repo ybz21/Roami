@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-TB02",
+  "data": {
+    "kind": "public_synthetic_terminal_batch_repair",
+    "inputs": [
+      "input/controls.json"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "core_tool_batches_and_persisted_rejections"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "batch_rejection_repair_and_progress",
+    "expected_python_tests": 18
+  }
+}

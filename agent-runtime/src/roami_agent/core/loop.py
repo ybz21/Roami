@@ -18,6 +18,7 @@ from roami_agent.protocol.ports import (
     TurnWriter,
 )
 from roami_agent.protocol.serialization import encoded
+from roami_agent.protocol.tool_batches import invalid_ending_batch
 
 
 class AgentLoop:
@@ -211,12 +212,9 @@ class AgentLoop:
                         )
                     if not text.strip() and not calls:
                         raise DomainError("EMPTY_MODEL_RESPONSE")
-                    if len(calls) > 1 and any(
-                        call["function"]["name"]
-                        in {"ask_user", "task_reply", "task_queue_reply", "reply"}
-                        for call in calls
-                    ):
-                        raise DomainError("QUESTION_MUST_BE_ONLY_TOOL")
+                    rejected_batch = invalid_ending_batch(self.tools, calls, role)
+                    if not rejected_batch:
+                        seen_rejections = {r for r in seen_rejections if r[0] != "terminal_batch"}
                     await self.journal.finish(
                         turn,
                         mid,
@@ -257,7 +255,13 @@ class AgentLoop:
                             "workspace": turn.get("workspace"),
                             "finalizing": finalizing,
                         }
-                        value = await self.gateway.invoke(turn, mid, call, role, binding)
+                        value = (
+                            await self.gateway.reject(
+                                turn, mid, call, role, binding, "QUESTION_MUST_BE_ONLY_TOOL"
+                            )
+                            if rejected_batch
+                            else await self.gateway.invoke(turn, mid, call, role, binding)
+                        )
                         if isinstance(value, dict) and value.get("finalizeFromEvidence") is True:
                             finalizing = True
                             finalization_error = value.get("error")
@@ -282,7 +286,11 @@ class AgentLoop:
                             )
                             await self.context.after_turn(turn, instructions, catalog)
                             return reply
-                        if (
+                        if rejected_batch:
+                            rejections.add(
+                                ("terminal_batch", "QUESTION_MUST_BE_ONLY_TOOL", None, "")
+                            )
+                        elif (
                             (
                                 operation is None
                                 or operation in {"reply", "task_reply", "task_queue_reply"}
