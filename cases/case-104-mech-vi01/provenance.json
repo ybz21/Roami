@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_video_sampling",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "仅验证 #618 的时序预览与文件发布能力，不包含原分镜答案，不代表原生Agent选片质量通过。"
+}

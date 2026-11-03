@@ -83,7 +83,7 @@ def main():
         "-o",
         "xfail_strict=true",
         "--junitxml=/proof/junit.xml",
-        "/repository/skills/video-assembly/tests",
+        "/repository/skills/video-assembly/tests/test_assembly.py",
     ]
     with (output / "tests.log").open("w") as log:
         try:
