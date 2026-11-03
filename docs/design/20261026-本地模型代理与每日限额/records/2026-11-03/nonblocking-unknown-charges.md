@@ -20,4 +20,5 @@
 - 新回归覆盖未知账后跨 Agent 连续准入、费用和 token 持续未知、已确认费用达到限额拒绝，以及人工核账后金额计入限额；既有并发在途准入、拒绝响应结算与禁止自动重放检查保留。
 - 本补丁 `scripts/dev/quality/check.sh full` 与前端 167 文件、1,220 项测试通过；OKR 整合源码树的 Go 全量、前端 typecheck / i18n / hover、173 文件 1,248 项测试和生产构建通过。无 Python 改动，按范围跳过 Python 检查。
 - 隔离 HTTPS 服务使用未知费用、100 CNY 日限额的离线账目夹具验证提示。桌面中文深色与英文浅色通过；Redmi Note 8 经 LAN 使用 ADB 真实登录、查看提示和滚动，`data-size=compact`、`data-pointer=coarse`，未知提示使用普通提示样式、限额仍为 100。滚动位置从 0 增至 376.73，文档滚动为 0，无横向溢出，顶部与底部导航保留。
-- 截图 `/tmp/roami-unknown-before-desktop.png`、`/tmp/roami-unknown-after-desktop.png`、`/tmp/roami-unknown-after-desktop-en.png`、`/tmp/roami-unknown-after-phone.png` 不提交进主分支。验收不请求付费上游，不修改生产账目。
+- 截图 `/tmp/roami-unknown-before-desktop.png`、`/tmp/roami-unknown-after-desktop.png`、`/tmp/roami-unknown-after-desktop-en.png`、`/tmp/roami-unknown-after-phone.png` 不提交进主分支。离线夹具验收不请求付费上游，不修改生产账目。
+- 本机已部署整合树 `0896117bcfa58c9c35240f27fc9cde5adad6778c`，版本 `okr-usage-0896117b`。原生 Claude Code 使用原配置执行一轮无工具调用，成功返回 `OK`；网关账本 HTTP 200、1,558 输入 / 2 输出 token、正常结算。原 12:06 网络失败账目仍为 unknown、费用和 token 均为空，没有核账或归零。100 CNY 限额、路由、单价、Python runtime 环境文件均核对未改动，OKR 源码完整保留。
