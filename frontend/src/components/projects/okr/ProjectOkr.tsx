@@ -169,7 +169,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
       else applyDiscussion(next)
     } catch (e) { setError('okr.loadFailed'); setErrorDetail((e as Error).message) }
   }
-  const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-view={!editing ? mainPanel : 'board'} data-mobile-refresh-scroll>
+  const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-view={mainPanel} data-mobile-refresh-scroll>
     {!phone && <header className="tt-pagehead"><h2>{title}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')}</Button></div></header>}
     {error && <div className="okr-error" role="alert">
       <p>{t(error)}</p>
@@ -179,18 +179,13 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     {!loaded && !error && <Spin />}
     {incoming && <div className="okr-update" role="status"><span>{t('okr.discussionUpdated')}</span><Button onClick={() => { void readWorkspace().then(response => { if (response.data) applyDiscussion(response.data) }).catch(() => setError('okr.loadFailed')) }}>{t('okr.adoptUpdate')}</Button></div>}
     {loaded && <>
-      {workspace && <section className="okr-objective-head">
-        <div><span className="okr-eyebrow">{t('okr.objective')}</span><h2>{workspace.objective}</h2><p className="okr-muted">{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</p></div>
-        <div className="okr-objective-actions">
-          <span className="okr-completion">{t('okr.completedCount', { done: number(met), total: number(results.length) })}</span>
-          <div className="okr-actions">
-            {!editing && <Button icon={<PencilIcon />} onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button>}
-          </div>
-        </div>
-      </section>}
-      {editing && <section className="okr-section"><div className="okr-actions"><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section>}
-      {workspace && !editing && <Tabs className="okr-work-tabs" activeKey={mainPanel} onChange={setMainPanel} items={[
+      <Tabs className="okr-work-tabs" activeKey={mainPanel} onChange={setMainPanel} items={[
         { key: 'board', label: t('okr.tab.board'), children: <>
+          {editing ? <section className="okr-section"><div className="okr-actions"><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section> : workspace && <>
+          <section className="okr-objective-head">
+            <div><h2>{workspace.objective}</h2><div className="okr-goal-meta"><span>{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</span><span className="okr-completion">{t('okr.completedCount', { done: number(met), total: number(results.length) })}</span></div></div>
+            <Button icon={<PencilIcon />} onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button>
+          </section>
           <div className="okr-board-toolbar"><Segmented value={panel} onChange={value => setPanel(String(value))} options={['overview', 'data', 'review'].map(key => ({ value: key, label: t('okr.tab.' + key) }))} /><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div>
           <Tabs activeKey={panel} onChange={setPanel} tabBarStyle={{ display: 'none' }} items={[
         { key: 'overview', label: t('okr.tab.overview'), forceRender: true, children: <>
@@ -256,10 +251,11 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
         </section>
         </> },
           ]} />
+          </>}
         </> },
-        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} openTerm={onSession} onNav={() => setMainPanel('board')} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button></div> : null },
+        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} openTerm={onSession} onNav={() => setMainPanel('board')} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={() => { if (workspace) setDraft(configurationOf(workspace)); setEditing(true); setMainPanel('board') }}>{t('okr.edit')}</Button></div> : null },
         { key: 'files', label: t('okr.tab.files'), children: <Suspense fallback={<Spin />}><OkrProjectFiles key={projectDir} dir={projectDir} active={mainPanel === 'files'} /></Suspense> },
-      ]} />}
+      ]} />
     </>}
   </div>
     {chatting && <Suspense fallback={<Spin />}><OkrMainChat projectId={projectId} projectDir={projectDir} workspace={workspace} draft={draft} onUpdated={() => { void refreshDiscussion() }} onClose={() => { setChatting(false); void refreshDiscussion() }} /></Suspense>}
