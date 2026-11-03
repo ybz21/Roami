@@ -121,13 +121,16 @@ async def test_task_lane_rejects_foreign_workspace_and_unknown_writes(tmp_path):
     native = SimpleNamespace()
     runtime = SimpleNamespace(
         dispatch=SimpleNamespace(native_executor=native),
-        tools=SimpleNamespace(registry={"bash": SimpleNamespace(main=True)}),
+        tools=SimpleNamespace(
+            registry={"bash": SimpleNamespace(main=True)}, shell_disabled_roles=set()
+        ),
     )
     bind_evaluation_tasks(runtime, tmp_path)
     task = {
+        "id": "owned-evaluation-task",
         "intent_json": json.dumps(
             {"target": {"kind": "new_session", "directory": str(tmp_path / "other")}}
-        )
+        ),
     }
     with pytest.raises(DomainError, match="TASK_WORKSPACE_REQUIRED"):
         async with native.workspace_factory(None, task, {"id": "one"}):
@@ -154,7 +157,7 @@ async def test_evaluation_main_cannot_execute_shell_but_worker_can(store, tmp_pa
     )
     bind_evaluation_tasks(runtime, tmp_path)
     try:
-        assert "bash" not in {t["function"]["name"] for t in runtime.tools.catalog("main")}
+        assert "bash" in {t["function"]["name"] for t in runtime.tools.catalog("main")}
         assert "bash" in {t["function"]["name"] for t in runtime.tools.catalog("worker")}
         call = {
             "function": {
@@ -462,7 +465,7 @@ async def test_container_entry_uses_the_host_spending_policy(tmp_path, monkeypat
 
 async def test_native_evaluation_profile_exposes_delivery_writes_only_to_workers(store, tmp_path):
     runtime = Runtime(store, SimpleNamespace(model="profile-fixture"))
-    names = {"bash", "write", "edit", "file_write", "file_patch"}
+    names = {"write", "edit", "file_write", "file_patch"}
     before = {item["function"]["name"] for item in runtime.tools.catalog("worker")}
     bind_evaluation_tasks(runtime, tmp_path)
     main = {item["function"]["name"] for item in runtime.tools.catalog("main")}

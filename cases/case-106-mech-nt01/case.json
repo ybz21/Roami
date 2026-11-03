@@ -1,0 +1,57 @@
+{
+  "id": "MECH-NT01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "原生任务控制",
+  "prompt": "原生验收保留内部管理命令，允许真实用户追问续跑原任务；禁止Main执行系统shell或写交付文件。",
+  "preconditions": "冻结的agent-runtime开发依赖与隔离启动器；只用模拟模型，不连接节点网关。",
+  "expected_terminal": "same_native_task_and_workspace_with_profile_specific_cache_identity",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "11项无跳过检查回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-NT01-H1",
+      "rule": "Main通过真实Roami管理入口查询和续跑；系统shell、host命令和交付写入仍拒绝。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NT01-H2",
+      "rule": "新用户追问后同一Native任务进入第二版本，复用工作目录和标识，文件实际更新。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NT01-H3",
+      "rule": "完成回调不能替代用户授权，未知写入及外部工作区继续拒绝。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NT01-H4",
+      "rule": "不同shell/任务执行权限拥有不同缓存身份，原生工具协议版本参与哈希。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_native_control_continuation",
+    "fixture_reproduction_only": true,
+    "issue": 621
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

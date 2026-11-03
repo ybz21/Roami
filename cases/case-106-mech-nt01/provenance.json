@@ -1,0 +1,7 @@
+{
+  "origin": "public_synthetic_native_control_continuation",
+  "real_user_history": false,
+  "historical_suite_updated": false,
+  "fixture_is_model_quality": false,
+  "notes": "两个新增回归加九项既有边界检查；不代表真实模型语义或原生媒体质量通过。"
+}

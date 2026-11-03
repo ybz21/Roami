@@ -1,0 +1,25 @@
+{
+  "unavailable_worker_capabilities": [
+    {},
+    {
+      "images": false
+    },
+    {
+      "images": null
+    },
+    {
+      "images": 1
+    },
+    {
+      "images": "true"
+    }
+  ],
+  "main_images": [
+    false,
+    true
+  ],
+  "model_requirement": "model:images",
+  "known_cli": "renderer",
+  "missing_cli": "absent-renderer",
+  "unknown_model_requirement": "model:unavailable-input"
+}

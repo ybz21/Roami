@@ -1,0 +1,52 @@
+{
+  "id": "MECH-MC01",
+  "kind": "mechanism_regression",
+  "category": "MECH",
+  "category_label": "原生模型能力",
+  "prompt": "按保存的Worker角色能力校验原生任务声明的模型要求，创建前及执行前均拒绝不满足的要求。",
+  "preconditions": "冻结的agent-runtime开发依赖与隔离启动器；只用模拟模型，不连接节点网关。",
+  "expected_terminal": "native_requirements_checked_without_role_or_configuration_override",
+  "counts_as_delivery": false,
+  "selected_in_mixed_suite_v1": false,
+  "run_profile": "isolated_host_regression",
+  "required_deliverables": [
+    "11项无跳过检查回执",
+    "输入与实现冻结清单"
+  ],
+  "hard_assertions": [
+    {
+      "id": "MECH-MC01-H1",
+      "rule": "Main支持不能替代Worker；缺失、关闭及非布尔true均不能满足声明要求。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MC01-H2",
+      "rule": "Worker支持时保留原路由和参数，CLI要求同时核对且回执不包含连接凭据。",
+      "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-MC01-H3",
+      "rule": "执行前依据当前保存配置重新检查，不信任旧路由成功回执；无声明的旧任务兼容。",
+      "failure_effect": "case_failed"
+    }
+  ],
+  "decision_domains": [
+    "CT"
+  ],
+  "grading_profile": "mechanism",
+  "provenance": {
+    "origin": "public_synthetic_native_model_requirements",
+    "fixture_reproduction_only": true,
+    "issue": 620
+  },
+  "resources": {
+    "inputs": [
+      "input/controls.json"
+    ],
+    "tools": "tools.json",
+    "generator": "scripts/run.py",
+    "provenance": "provenance.json",
+    "acceptance": "acceptance.md",
+    "materials": "materials.json"
+  }
+}

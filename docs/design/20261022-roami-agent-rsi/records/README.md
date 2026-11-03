@@ -4,6 +4,8 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-03 | [原生验收管理命令与用户追问续跑](2026-11-03/native-execution-control-parity.md) |
+| 2026-11-03 | [原生模型能力要求的准入校验](2026-11-03/native-model-capability-admission.md) |
 | 2026-11-03 | [视频素材的时序预览与可核对回执](2026-11-03/video-temporal-review.md) |
 | 2026-11-03 | [任务回报失败时保留交付入口](2026-11-03/task-fallback-deliverables.md) |
 | 2026-11-03 | [当前核心机制与行情修订稿](2026-11-03/current-core-mechanisms-and-report.md) |

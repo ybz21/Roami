@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "case_id": "MECH-MC01",
+  "data": {
+    "kind": "public_synthetic_native_model_requirements",
+    "inputs": [
+      "input/controls.json"
+    ]
+  },
+  "tools": {
+    "configuration": "tools.json",
+    "kind": "saved_role_capability_admission_and_execution_controls"
+  },
+  "acceptance": {
+    "entry": "scripts/run.py",
+    "contract": "acceptance.md",
+    "kind": "native_saved_worker_requirements",
+    "expected_python_tests": 11
+  }
+}

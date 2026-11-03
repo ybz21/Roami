@@ -1,0 +1,9 @@
+{
+  "runtime": [
+    "Python >=3.12 with frozen agent-runtime dev dependencies",
+    "scripts/dev/isolated-roami.sh"
+  ],
+  "python_test": "agent-runtime/tests/test_native_model_capability_admission.py",
+  "expected_python_tests": 11,
+  "external_model_calls": 0
+}

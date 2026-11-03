@@ -4,6 +4,7 @@ import asyncio
 import json
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.dispatch.native_model_capabilities import native_model_capabilities
 from roami_agent.executors.task_directory import automatic_task_directory, prepare_task_directory
 from roami_agent.executors.workspace import hold_workspace
 from roami_agent.protocol.errors import DomainError
@@ -51,6 +52,12 @@ class NativeExecutor:
         if turn is None or turn["branch_id"] != run["native_branch_id"]:
             raise DomainError("NATIVE_EXECUTION_CONTEXT_MISMATCH")
 
+        native_model_capabilities(
+            self.settings,
+            json.loads(task["intent_json"])
+            .get("routingDecision", {})
+            .get("requiredCapabilities", []),
+        )
         deadline = json.loads(task["budget_json"]).get("deadlineMs")
         observed = now_ms()
         started = run.get("started_ms")

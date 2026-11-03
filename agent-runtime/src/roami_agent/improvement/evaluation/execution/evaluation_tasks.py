@@ -9,6 +9,17 @@ from roami_agent.improvement.domain.contracts import require
 from roami_agent.protocol.errors import DomainError
 
 NATIVE_TASK_REQUEST = "本次任务明确使用内置Native Worker执行。"
+NATIVE_TASK_PROFILE_VERSION = "native-worker-v2-continuations"
+NATIVE_TASK_TOOLS = frozenset(
+    {
+        "delegate",
+        "task_status",
+        "task_reply",
+        "task_queue_reply",
+        "conversation_history",
+        "task_steer",
+    }
+)
 NATIVE_BUDGET_FAILURES = frozenset(
     {"RSI_TOKEN_BUDGET", "RSI_REQUEST_BUDGET", "RSI_TIME_BUDGET", "RSI_USAGE_UNKNOWN"}
 )
@@ -37,8 +48,9 @@ async def evaluation_turn_failure(database, turn):
 
 def bind_evaluation_tasks(runtime, workspace):
     root = workspace.resolve()
-    # Host scope must not bypass this lane's explicit Native handoff.
-    for name in ("bash", "write", "edit", "file_write", "file_patch"):
+    # Keep internal task controls reachable without admitting Main's OS shell.
+    runtime.tools.shell_disabled_roles.add("main")
+    for name in ("shell", "write", "edit", "file_write", "file_patch"):
         if name in runtime.tools.registry:
             runtime.tools.registry[name].main = False
 
@@ -55,7 +67,7 @@ def bind_evaluation_tasks(runtime, workspace):
         )
         try:
             # The outer Docker lifetime owns this directory; no Go/tmux lease is created.
-            yield {"workspaceId": "rsi-" + run["id"], "directory": str(root), "projectId": None}
+            yield {"workspaceId": "rsi-" + task["id"], "directory": str(root), "projectId": None}
         finally:
             if stopped is not None:
                 require(await stopped(), "RSI_TASK_WRITE_UNKNOWN")
