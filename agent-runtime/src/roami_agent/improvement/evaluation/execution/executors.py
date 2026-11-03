@@ -378,8 +378,8 @@ class NativeFilesExecutor:
                 lambda db: [
                     dict(item)
                     for item in db.execute(
-                        "SELECT t.*,m.content_json AS result_json FROM tool_calls t "
-                        "LEFT JOIN messages m ON m.id=t.result_message_id ORDER BY t.created_ms,t.id"
+                        "SELECT t.*,native_content(m.content_json) AS result_json FROM tool_calls t "
+                        "LEFT JOIN messages m ON m.id=t.result_message_id ORDER BY t.rowid"
                     )
                 ]
             )
@@ -431,6 +431,9 @@ class NativeFilesExecutor:
             if self.settle_maintenance
             else "calendar_deferred",
         }
+        from roami_agent.improvement.integrations.tool_process import tool_process_metrics
+
+        metrics.update(tool_process_metrics(tool_records))
         metrics["observed_tokens"] = budget.used
         if diagnostics:
             metrics["first_committed_text_ms"] = diagnostics[0]["first_committed_text_ms"]

@@ -148,7 +148,7 @@ async def test_collection_failure_does_not_claim_an_empty_healthy_machine(
         await runtime.close()
 
 
-async def test_main_recovers_from_ps_rejection_without_delegating_or_borrowing_a_workspace(
+async def test_main_reads_host_processes_without_delegating_or_borrowing_a_workspace(
     store, monkeypatch
 ):
     class Main:
@@ -158,11 +158,6 @@ async def test_main_recovers_from_ps_rejection_without_delegating_or_borrowing_a
         async def stream(self, messages, tools):
             self.step += 1
             if self.step == 1:
-                wire = call("bash", {"argv": ["ps", "aux", "--sort=-%cpu"]})
-            elif self.step == 2:
-                error = json.loads(messages[-1]["content"])
-                assert error["error"] == "WORKSPACE_REQUIRED"
-                assert "scope=host" in error["recovery"]
                 wire = host_call()
             else:
                 result = json.loads(messages[-1]["content"])
@@ -195,7 +190,6 @@ async def test_main_recovers_from_ps_rejection_without_delegating_or_borrowing_a
             )
         )
         assert calls == [
-            {"tool_name": "bash", "effect": "write", "state": "failed"},
             {"tool_name": "host_processes", "effect": "read", "state": "succeeded"},
             {"tool_name": "reply", "effect": "read", "state": "succeeded"},
         ]

@@ -147,7 +147,7 @@ async def test_automatic_executor_quote_mismatch_can_be_corrected_without_a_user
             turn, binding["assistantMessageId"], call("quote", "delegate", args), "main", binding
         )
         assert rejected["error"] == "ROUTING_EXECUTOR_INTENT_REQUIRED"
-        assert "omit routing.userQuote" in rejected["recovery"]
+        assert "omit legacy routing metadata" in rejected["recovery"]
         assert not await runtime.tasks.list("alice")
         args["routing"].pop("userQuote")
         binding["toolCallId"] = "corrected"

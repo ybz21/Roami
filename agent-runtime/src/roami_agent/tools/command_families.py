@@ -33,9 +33,15 @@ def chrome_operation(argv):
         return "browser_open", {"targetId": flags["--target"]}
     if verb in {"observe", "screenshot"} and not positionals and set(flags) == {"--resource"}:
         return "browser_observe", {"resourceId": flags["--resource"]}
-    if set(flags) != {"--observation"}:
+    if verb in {"observe", "screenshot"} and not positionals and not flags:
+        return "browser_observe", {}
+    if set(flags) not in (set(), {"--observation"}, {"--resource"}):
         raise DomainError("INVALID_CLI_ARGUMENTS")
-    args = {"observationId": flags["--observation"], "kind": verb}
+    args = {"kind": verb}
+    if "--observation" in flags:
+        args["observationId"] = flags["--observation"]
+    if "--resource" in flags:
+        args["resourceId"] = flags["--resource"]
     if verb == "goto" and len(positionals) == 1:
         args["url"] = positionals[0]
     elif verb == "click" and len(positionals) == 1:

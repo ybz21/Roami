@@ -228,7 +228,7 @@ async def test_nonvisual_reads_and_disabled_read_permission_do_not_capture_pixel
         runtime.tools.disabled_tools.add("read")
     value, tool = await read(
         role=role,
-        extra={"offset": 1} if mode == "paged" else None,
+        extra={"offset": 2} if mode == "paged" else None,
         altered_binding={"runId": None} if mode == "unbound" else None,
     )
     assert not value.get("fileImage", {}).get("artifactId")

@@ -46,7 +46,7 @@ MCP 安装只登记，另行发现／连接；npm CLI 在首次调用时下载�
 - read 普通文件受任务工作区 / 配置根目录约束；长文件按返回的分页续读，不把截断当完整内容。
 - `read(path="skill://browser_use/references/chrome-cli.md")` 读 Skill 参考文档，不需要代码目录；未注册文件或路径穿越不允许。
 - `read(path="artifact://实际ID")` 读取用户可见产物。返回的 continuation / offset 以实际 schema 为准，原文件不假装已完整载入上下文。
-- edit/write 先核对文件版本 expectedSha256，变更冲突重新读取，不覆盖用户改动。普通 Shell 使用已绑定 cwd，不能因缺目录就随便创建项目。
+- edit/write 的版本校验由宿主使用已读取快照完成，变更冲突时重新读取，不覆盖用户改动。普通 Shell 使用已绑定 cwd，不能因缺目录就随便创建项目。
 - 图片使用附件 / 模型视觉内容块；不要把 Base64 贴进用户消息或上下文报告。大图片走已有本地优化流程，token 估计与文件字节大小分开。
 
 ## MCP、HTTP 与 Computer Use
@@ -55,4 +55,4 @@ MCP 安装只登记，另行发现／连接；npm CLI 在首次调用时下载�
 
 HTTP 能力通过 tool_list(kind="tool") 发现，由节点配置注册，名称如 http_NAME；凭据由宿主注入，不写入 Skill、argv、报告或回显。浏览器页面读取不等于 HTTP 工具，配置端点不是可随意访问的任意 URL 代理。
 
-Computer Use 由工作节点提供专属桌面资源，使用 tool_list(kind="tool") 查实际 computer 操作。先观察、再基于 observationId 操作；动作失败 / 接管 / 未知按实际状态回报。未配置时不能声称有手机或桌面控制，也不能把 Chrome 的设备视口模拟称为真机操作。
+Computer Use 由工作节点提供专属桌面资源，使用 tool_list(kind="tool") 查实际 computer 操作。先观察，再基于当前截图操作，宿主绑定观测凭据；动作失败 / 接管 / 未知按实际状态回报。未配置时不能声称有手机或桌面控制，也不能把 Chrome 的设备视口模拟称为真机操作。

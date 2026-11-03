@@ -38,6 +38,7 @@ def compare(baseline, candidate):
     paired_time, paired_tokens = [], []
     hidden_time, hidden_tokens = [], []
     regressions, blockers, pending = [], [], []
+    tool_regressions, tool_unmeasured = [], []
     measured, admission_blocked = [], []
     groups = defaultdict(list)
     for key in sorted(left):
@@ -61,6 +62,27 @@ def compare(baseline, candidate):
             blockers.append("admission_blocked")
             continue
         measured.append(key)
+        ma, mb = a["metrics"], b["metrics"]
+        if (
+            "tool_process_coverage" in ma
+            or "tool_process_coverage" in mb
+            or any(
+                t.get("execution_kind")
+                in {"native_files", "isolated_native_worker", "external_worker"}
+                for t in (a, b)
+            )
+        ):
+            if any(m.get("tool_process_coverage") != "complete" for m in (ma, mb)):
+                tool_unmeasured.append(a["case_id"])
+            elif ma.get("tool_calls", 0) or mb.get("tool_calls", 0):
+                if not ma.get("tool_calls") or not mb.get("tool_calls"):
+                    tool_unmeasured.append(a["case_id"])
+                elif (
+                    mb["tool_error_rate"] > ma["tool_error_rate"]
+                    or mb["tool_errors"] > ma["tool_errors"]
+                    or mb["tool_first_attempt_success_rate"] < ma["tool_first_attempt_success_rate"]
+                ):
+                    tool_regressions.append(a["case_id"])
         cluster = a["cluster"]
         ga, gb = a["grade"], b["grade"]
         quality[cluster].append(gb["quality"] - ga["quality"])
@@ -115,6 +137,10 @@ def compare(baseline, candidate):
         reasons.append("admission_blocked_pairs")
     if regressions:
         reasons.append("baseline_pass_regressed")
+    if tool_regressions:
+        reasons.append("tool_process_regression")
+    if tool_unmeasured:
+        reasons.append("tool_process_unmeasured")
     if pending:
         reasons.append("judge_pending")
     if blockers:
@@ -165,6 +191,8 @@ def compare(baseline, candidate):
         "paired_success_token_ratio_p50": token_ratio,
         "efficiency_pairs": {"elapsed": len(paired_time), "tokens": len(paired_tokens)},
         "baseline_pass_regressions": regressions,
+        "tool_process_regressions": tool_regressions,
+        "tool_process_unmeasured_cases": tool_unmeasured,
         "release_blockers": sorted(set(blockers)),
         "eligible_for_promotion": not reasons,
         "reasons": reasons,

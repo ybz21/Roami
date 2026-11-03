@@ -1,0 +1,22 @@
+Runtime commit: 4b0d0611
+
+Full gate: env -u ROAM_HOME scripts/dev/quality/check.sh full
+
+builtin-inputs-quality-full-final-main.log
+sha256: 74e49c43ecb31a410be028b254f6ce9527fca4eeaee55aebf6b0313d485935c8
+3274 passed, 48 skipped in 838.49s (0:13:58)
+==> Quality gate passed
+
+builtin-inputs-commit-complete.log
+sha256: b042d55f70794cb5e5bdd4ecc67ca64ddffa87e5b3dd8ee44709d82d915a6fc5
+3275 passed, 48 skipped in 807.34s (0:13:27)
+==> Quality gate passed
+
+Quick ran through the installed pre-commit hook; full additionally built the frontend.
+The final quick suite includes one later interruption-log regression.
+
+Live acceptance: saved Main/Worker routes, unchanged generation parameters, 4 cases / 6 calls / 0 errors.
+Main: 11 tools; no browser/desktop action in its declared or managed CLI capabilities.
+Focused contracts: 32 passed; RSI workflow: 17 passed; process log cases: 5 passed.
+Browser protocol uses BrowserFixture; desktop uses isolated Xvfb. Neither is a real-model visual acceptance.
+Whole RSI real-model suite and production deployment were not run.

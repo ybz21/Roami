@@ -108,7 +108,15 @@ class TaskRouter:
         self.db, self.targets, self.settings, self.memory = database, targets, settings, memory
 
     async def decide(self, args, binding):
-        assessment = args["routing"]
+        compact = "routing" not in args
+        assessment = args.get("routing") or {
+            "explicitExecutor": args.get("executor"),
+            "complexity": "bounded" if args.get("executor") == "native" else "complex",
+            "complexityBasis": {
+                "selection": "Requested executor or configured node/project default"
+            },
+            "routingExplanation": "The runtime selects the requested executor or the configured default.",
+        }
         if not assessment["routingExplanation"].strip() or not all(
             str(v).strip() for v in assessment["complexityBasis"].values()
         ):
@@ -143,9 +151,13 @@ class TaskRouter:
         explicit = assessment.get("explicitExecutor")
         if assessment.get("userQuote") and not explicit:
             raise DomainError("ROUTING_EXECUTOR_INTENT_REQUIRED")
-        if explicit and (
-            not assessment.get("userQuote", "").strip()
-            or assessment["userQuote"] not in json.loads(origin["content_json"]).get("text", "")
+        if (
+            explicit
+            and not compact
+            and (
+                not assessment.get("userQuote", "").strip()
+                or assessment["userQuote"] not in json.loads(origin["content_json"]).get("text", "")
+            )
         ):
             raise DomainError("ROUTING_EXPLICIT_SOURCE_REQUIRED")
         model = assessment.get("model")
@@ -222,7 +234,7 @@ class TaskRouter:
                 else None
             )
             if explicit:
-                selected, reason = explicit, "explicit_executor"
+                selected, reason = explicit, "tool_executor" if compact else "explicit_executor"
             elif assessment["complexity"] == "bounded":
                 selected, reason = "native", "bounded_native"
             else:

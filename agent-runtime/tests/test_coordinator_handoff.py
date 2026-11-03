@@ -23,15 +23,13 @@ def call(name, args, key=None, *, cli=False):
 @pytest.mark.parametrize(
     "name,cli", [("delegate", False), ("task_steer", False), ("task_steer", True)]
 )
-async def test_missing_handoff_flag_rejected_before_side_effects(store, name, cli):
+async def test_missing_task_input_rejected_before_side_effects(store, name, cli):
     runtime = Runtime(store, ConversationModel())
     args = (
-        {"goal": "Requested lookup"}
+        {}
         if name == "delegate"
         else {
             "taskId": "nonexistent",
-            "revision": 1,
-            "text": "Requested update",
         }
     )
     try:
@@ -41,13 +39,13 @@ async def test_missing_handoff_flag_rejected_before_side_effects(store, name, cl
         assert not await store.call(lambda db: rows(db, "SELECT * FROM jobs"))
         if name == "delegate":
             wire = next(t for t in runtime.tools.catalog() if t["function"]["name"] == name)
-            assert "requestComplete" in wire["function"]["parameters"]["required"]
+            assert wire["function"]["parameters"]["required"] == ["goal"]
         else:
             commands = runtime.tools.directory.command_entries("main")[0]["commands"]
             schema = next(
                 c["inputSchema"] for c in commands if c["argv"][1:4] == ["agent", "task", "steer"]
             )
-            assert "requestComplete" in schema["required"]
+            assert schema["required"] == ["taskId", "text"]
     finally:
         await runtime.close()
 
@@ -204,7 +202,7 @@ async def test_failed_batch_call_does_not_hide_behind_final_handoff(store):
         await runtime.close()
 
 
-async def test_model_repairs_missing_flag_without_duplicating_dispatch(store):
+async def test_model_repairs_missing_goal_without_duplicating_dispatch(store):
     rounds = 0
 
     class Main:
@@ -216,15 +214,18 @@ async def test_model_repairs_missing_flag_without_duplicating_dispatch(store):
             if rounds == 2:
                 rejected = json.loads(messages[-1]["content"])
                 assert rejected["executionStarted"] is False
-                assert rejected["missingFields"] == ["requestComplete"]
+                assert rejected["missingFields"] == ["goal"]
             assert rounds <= 2
             yield ModelEvent(
                 "tool",
                 call(
                     "delegate",
                     {
-                        "goal": "The exact original request",
-                        **({"requestComplete": True} if rounds == 2 else {}),
+                        **(
+                            {"goal": "The exact original request", "requestComplete": True}
+                            if rounds == 2
+                            else {}
+                        ),
                     },
                     f"dispatch-{rounds}",
                 ),

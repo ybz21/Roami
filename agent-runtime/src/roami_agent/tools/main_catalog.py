@@ -19,6 +19,8 @@ from roami_agent.storage.task_request import task_user_request
 
 def register_main_tools(registry, tasks, memory, targets, router=None):
     async def coverage(args, binding, *, handoff=False):
+        if "requestCoverage" not in args and registry.registry["reply"].model_schema is not None:
+            return None
         return await tasks.db.call(lambda db: check_coverage(db, binding, args, handoff=handoff))
 
     async def record(binding, outcomes, receipt=None):
@@ -27,6 +29,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         await tasks.db.call(lambda db: record_coverage(db, binding, outcomes, receipt), write=True)
 
     async def reply_source(binding):
+        if not binding.get("turnId") or not binding.get("owner"):
+            return ""
         source = await tasks.db.call(
             lambda db: row(
                 db,
@@ -42,7 +46,12 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
 
     async def reply(args, binding):
         outcomes = await coverage(args, binding)
-        result = {"reply": validate_answer(args, await reply_source(binding))}
+        legacy = registry.registry["reply"].model_schema is None or any(
+            key in args for key in ("mode", "language", "scopeQuote", "languageQuote")
+        )
+        result = {
+            "reply": validate_answer(args, await reply_source(binding), check_internal=legacy)
+        }
         await record(binding, outcomes)
         return result
 
@@ -193,6 +202,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def ask_user(args, binding):
+        args = dict(
+            args,
+            options=[
+                {"label": option} if isinstance(option, str) else option
+                for option in args.get("options", [])
+            ],
+        )
         labels = [option["label"].strip() for option in args["options"]]
         if len(set(labels)) != len(labels) or any(not label for label in labels):
             raise DomainError("INVALID_QUESTION_OPTIONS")
@@ -288,8 +304,28 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def delegate(args, binding):
+        args = dict(args)
+        if "target" not in args:
+            selected = [key for key in ("directory", "projectId", "sessionId") if args.get(key)]
+            if len(selected) > 1:
+                raise DomainError("CODING_SESSION_TARGET_CONFLICT")
+            if selected:
+                field = selected[0]
+                args["target"] = {
+                    "kind": {
+                        "directory": "new_session",
+                        "projectId": "project",
+                        "sessionId": "session",
+                    }[field],
+                    field: args[field],
+                }
         outcomes = await coverage(args, binding, handoff=True)
-        decision = await router.decide(args, binding) if args.get("routing") and router else None
+        compact = "requestComplete" not in args and "requestCoverage" not in args
+        decision = (
+            await router.decide(args, binding)
+            if router and (compact or args.get("routing"))
+            else None
+        )
         executor = decision["executor"] if decision else args.get("executor", "native")
         target = args.get("target") or {}
         if target.get("kind") == "session" and not binding.get("taskId"):
@@ -667,6 +703,9 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                         "type": "string",
                         "enum": ["native", "codex", "claude", "opencode", "pi"],
                     },
+                    "directory": {"type": "string", "minLength": 1, "maxLength": 2000},
+                    "projectId": {"type": "string", "minLength": 1, "maxLength": 300},
+                    "sessionId": {"type": "string", "minLength": 1, "maxLength": 300},
                     "target": {
                         **object_schema(
                             {
@@ -706,6 +745,29 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     )
 
     async def steer_task(args, binding):
+        if "revision" not in args:
+            current = await tasks.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT COALESCE(json_extract(j.payload_json,'$.expectedRevision'),t.revision) AS revision "
+                    "FROM tasks t LEFT JOIN jobs j ON j.dedupe_key=? "
+                    "WHERE t.id=? AND t.owner_id=? AND t.origin_conversation_id=?",
+                    (
+                        "task.steer:"
+                        + binding["owner"]
+                        + ":"
+                        + binding["turnId"]
+                        + ":"
+                        + binding["toolCallId"],
+                        args["taskId"],
+                        binding["owner"],
+                        binding["conversation"],
+                    ),
+                )
+            )
+            if current is None:
+                raise DomainError("TASK_NOT_FOUND", 404)
+            args = dict(args, revision=current["revision"])
         outcomes = await coverage(args, binding, handoff=True)
         source_quote = args.get("sourceQuote")
         if outcomes:

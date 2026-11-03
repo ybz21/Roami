@@ -3,6 +3,7 @@
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.storage.database import row
+from roami_agent.storage.file_lines import read_line_page
 
 
 def register_artifact_tools(registry, artifacts):
@@ -22,6 +23,24 @@ def register_artifact_tools(registry, artifacts):
         ):
             await artifacts.verified_path(owner, aid)
             return {"artifact": reference, "textAvailable": False}
+        if (
+            binding.get("fileReadLines")
+            and args.get("offset", 1) != 0
+            and args.get("limit", 2000) <= 2000
+        ):
+            reference, path = await artifacts.verified_path(owner, aid)
+
+            def lines():
+                with path.open("rb") as file:
+                    return read_line_page(file, args.get("offset", 1), args.get("limit", 2000))
+
+            page = await artifacts._io(lines)
+            return {
+                "artifact": reference,
+                "textAvailable": page["encoding"] == "utf-8",
+                "text": page["data"],
+                **{key: value for key, value in page.items() if key != "data"},
+            }
         offset, limit = args.get("offset", 0), args.get("limit", 8000)
         reference, excerpt = await artifacts.read_page(owner, aid, offset, limit)
         size = reference["sizeBytes"]

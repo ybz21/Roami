@@ -10,15 +10,20 @@ from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError, ToolCancellation
 from roami_agent.protocol.identity import identity
+from roami_agent.storage.database import row
+from roami_agent.storage.file_lines import read_line_page
+
+CURRENT_CONTENT = object()
 
 
 class WorkspaceFiles:
-    def __init__(self, settings):
-        self.settings = settings
+    def __init__(self, settings, database=None):
+        self.settings, self.db = settings, database
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="agent-files")
         self.capacity = asyncio.Semaphore(4)
         self.pending = set()
         self.closed = False
+        self.observed = {}
 
     async def _io(self, operation, *args):
         try:
@@ -155,6 +160,15 @@ class WorkspaceFiles:
             "nextOffset": offset + len(page) if offset + len(page) < size else None,
         }
 
+    def _read_lines(self, location, offset, limit):
+        parent, name = self._parent(location)
+        try:
+            descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            with os.fdopen(descriptor, "rb") as file:
+                return read_line_page(file, offset, limit)
+        finally:
+            os.close(parent)
+
     def _modify(self, location, expected, content, replacement):
         parent, name = self._parent(location)
         temporary, published = ".roami-write-" + identity(), False
@@ -164,6 +178,8 @@ class WorkspaceFiles:
             except FileNotFoundError:
                 original, info = None, None
             digest = hashlib.sha256(original).hexdigest() if original is not None else None
+            if expected is CURRENT_CONTENT:
+                expected = digest
             if digest != expected:
                 raise DomainError("FILE_CHANGED", 409)
             if replacement is not None:
@@ -220,38 +236,90 @@ class WorkspaceFiles:
 
     async def read(self, args, binding):
         try:
-            return await self._io(
-                self._read_page,
-                self.location(args["path"], binding),
-                args.get("offset", 0),
-                args.get("limit", 16000),
+            lines = (
+                binding.get("fileReadLines")
+                and args.get("offset", 1) != 0
+                and args.get("limit", 2000) <= 2000
             )
+            result = await self._io(
+                self._read_lines if lines else self._read_page,
+                self.location(args["path"], binding),
+                args.get("offset", 1 if lines else 0),
+                args.get("limit", 2000 if lines else 16000),
+            )
+            self._remember(args, binding, result)
+            return result
         except OSError:
             raise DomainError("FILE_ACCESS_FAILED") from None
 
+    def _observation_key(self, path, binding):
+        root, parts = self.location(path, binding)
+        return (
+            binding.get("owner"),
+            binding.get("conversation"),
+            binding.get("taskId"),
+            binding.get("turnId"),
+            str(root.joinpath(*parts)),
+        )
+
+    def _remember(self, args, binding, result):
+        if self.db is None or not binding.get("toolCallId"):
+            self.observed[self._observation_key(args["path"], binding)] = result["sha256"]
+
+    async def _expected(self, args, binding):
+        if "expectedSha256" in args:
+            return None if args["expectedSha256"] == "null" else args["expectedSha256"]
+        if self.db is not None and binding.get("turnId"):
+            root, parts = self.location(args["path"], binding)
+            paths = {args["path"], str(root.joinpath(*parts)), "/".join(parts)}
+            observed = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT json_extract(json_extract(native_content(m.content_json),'$.text'),'$.sha256') AS sha256 "
+                    "FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+                    "JOIN turns t ON t.id=x.turn_id JOIN conversations c ON c.id=t.conversation_id "
+                    "WHERE x.turn_id=? AND c.owner_id=? AND x.state='succeeded' "
+                    "AND x.tool_name IN ('file_read','file_write','file_patch') "
+                    "AND json_extract(x.arguments_json,'$.path') IN (?,?,?) ORDER BY x.rowid DESC LIMIT 1",
+                    (
+                        binding["turnId"],
+                        binding.get("owner"),
+                        *sorted(paths),
+                        *([None] * (3 - len(paths))),
+                    ),
+                )
+            )
+            if observed and observed["sha256"]:
+                return observed["sha256"]
+        return self.observed.get(self._observation_key(args["path"], binding), CURRENT_CONTENT)
+
     async def write(self, args, binding):
         # Some providers quote JSON null; this alias keeps the same exclusive-create fence.
-        expected = None if args["expectedSha256"] == "null" else args["expectedSha256"]
+        expected = await self._expected(args, binding)
         try:
-            return await self._io(
+            result = await self._io(
                 self._modify,
                 self.location(args["path"], binding),
                 expected,
                 args["content"],
                 None,
             )
+            self._remember(args, binding, result)
+            return result
         except OSError:
             raise DomainError("FILE_ACCESS_FAILED") from None
 
     async def patch(self, args, binding):
         try:
-            return await self._io(
+            result = await self._io(
                 self._modify,
                 self.location(args["path"], binding),
-                args["expectedSha256"],
+                await self._expected(args, binding),
                 args["oldText"],
                 args["newText"],
             )
+            self._remember(args, binding, result)
+            return result
         except OSError:
             raise DomainError("FILE_ACCESS_FAILED") from None
 
