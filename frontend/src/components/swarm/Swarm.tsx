@@ -3,6 +3,11 @@
 //   一个蜂群 = 一个 master cc(会话 cc-<群>) 带一群 member cc(会话 <群>-<成员>)，每个节点可一键进终端。
 //   Web 只读 + 广场/看板轻操作；建群/加成员/接管仍在 CLI。
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ManagedSwarm from './ManagedSwarm'
+import SwarmStudio from './SwarmStudio'
+import { pollWhileVisible } from '../../visible-poll'
+import { NewSwarmModal } from './NewSwarmModal'
+export { NewSwarmModal } from './NewSwarmModal'
 import {
   Card, Tag, Empty, Segmented, Input, Select, Button, Drawer, Tooltip,
   App as AntApp, Popconfirm, Modal, Space, Spin, AutoComplete,
@@ -35,7 +40,7 @@ const authorLabel = (author: string, t: T) => isLeaderAuthor(author) ? t('swarm.
 const displayPostText = (text: string) => text.replace(/(^|\s)@master\b/g, '$1@leader')
 const memberNodeKind = (m: Member) => m.done ? 'done' : ['running', 'idle', 'waiting', 'done'].includes(m.status) ? m.status : 'exited'
 
-interface SwarmRow { id: string; name: string; goal: string; status: string; supervisor: string; created: string; total: number; alive: number; pending: number }
+interface SwarmRow { id: string; label?: string; name: string; goal: string; status: string; supervisor: string; created: string; total: number; alive: number; pending: number }
 interface Member { name: string; type: string; task: string; deps: string; done: number; status: string; session: string; kind?: string; role?: string; subrole?: string; duty?: string }
 interface Pending { name: string; deps: string }
 interface Detail { name: string; goal: string; status: string; supervisor: string; created: string; leader_last_post?: number; members: Member[]; pending: Pending[]; done_marked: string[] }
@@ -56,14 +61,15 @@ export default function Swarm({ openTerm, initialSwarm, onNav }: { openTerm: (n:
   const sel = initialSwarm || null
   const nav = onNav || (() => {})
   const [list, setList] = useState<SwarmRow[]>([])
-  const loadList = () => api('GET', '/swarms').then((r) => setList(Array.isArray(r) ? r : [])).catch(() => {})
+  const loadList = (signal?: AbortSignal) => api('GET', '/swarms', undefined, { signal }).then((r) => { if (!signal?.aborted) setList(Array.isArray(r) ? r : []) })
   useEffect(() => {
     if (sel) return
-    loadList(); const t = setInterval(loadList, 3000); return () => clearInterval(t)
+    return pollWhileVisible(signal => loadList(signal), 10000).stop
   }, [sel])
 
+  if (sel?.startsWith('sw-')) return <ManagedSwarm key={sel} id={sel} onBack={() => nav(null)} openTerm={openTerm} />
   if (sel) return <SwarmDetail name={sel} onBack={() => nav(null)} openTerm={openTerm} onGone={() => { nav(null); loadList() }} />
-  return <SwarmList list={list} onOpen={(n) => nav(n)} reload={loadList} />
+  return <SwarmList list={list} onOpen={(n) => nav(n)} reload={() => { void loadList() }} />
 }
 
 // ── 列表页 ──
@@ -134,7 +140,7 @@ function SwarmCard({ s, onOpen }: { s: SwarmRow; onOpen: (n: string) => void }) 
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: accent }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ color: C.magenta, display: 'inline-flex' }}><DiamondIcon size={12} /></span>
-        <span style={{ fontSize: 16, fontWeight: 700, color: C.fg }}>{s.name}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: C.fg }}>{s.label || s.name}</span>
         <span style={{ marginLeft: 'auto' }}>{statusTag(s.status, t)}</span>
       </div>
       <div style={{ color: s.goal ? C.fg2 : C.fg3, fontSize: 13, marginBottom: 12, minHeight: 19, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -165,7 +171,7 @@ function SwarmCard({ s, onOpen }: { s: SwarmRow; onOpen: (n: string) => void }) 
 
 // initialDir/lockDir：项目页入口预填并锁定目录（09 §3——「在项目里创建」的含义）。
 // roster/worktree 是 09 §4 的上下文字段：只写进指挥开场白，编排权仍在指挥。
-export function NewSwarmModal({ open, onClose, onDone, initialDir, lockDir }: {
+function LegacyNewSwarmModal({ open, onClose, onDone, initialDir, lockDir }: {
   open: boolean; onClose: () => void; onDone: (name?: string) => void
   initialDir?: string; lockDir?: boolean
 }) {
@@ -549,6 +555,12 @@ function Topology({ detail, swarm, cards, posts, focus, onNode }: {
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
     if (!d?.moved) onNode(name)
   }
+  if (view === 'office') return <Panel title={t('swarm.topologyTitle')} extra={<button type="button" className="tt-act" onClick={() => setView('graph')}>{t('swarm.topology.view.graph')}</button>}>
+    <SwarmStudio nodes={[
+      ...(detail?.supervisor ? [{ id: detail.supervisor, name: t('swarm.master'), executor: 'claude', main: true, state: 'idle' }] : []),
+      ...(detail?.members || []).filter(member => member.session !== detail?.supervisor).map(member => ({ id: member.name, name: member.name, executor: member.kind || 'claude', state: member.status === 'done' ? 'idle' : member.status === 'waiting' ? 'blocked' : member.status })),
+    ]} selected={focus || ''} onSelect={onNode} />
+  </Panel>
   return (
     <Panel title={<><span>{t('swarm.topologyTitle')}</span></>} extra={<Space size={6} wrap>
       <Segmented size="small" value={view} onChange={(v) => setView(v as 'office' | 'graph')}
@@ -558,7 +570,7 @@ function Topology({ detail, swarm, cards, posts, focus, onNode }: {
       <div ref={wrapRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 8 }}>
         {layout.nodes.length === 0 ? <Empty description={t('swarm.noMembersAdd')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> : (
           <svg viewBox={`0 0 ${canvasW} ${canvasH}`} width={canvasW} height={canvasH} preserveAspectRatio="xMinYMin meet"
-            style={{ display: 'block', margin: '0 auto', width: '100%', height: '100%', minHeight: view === 'office' ? 260 : 300, touchAction: 'none' }}>
+            style={{ display: 'block', margin: '0 auto', width: '100%', height: '100%', minHeight: 300, touchAction: 'none' }}>
             <defs>
               <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill={C.green} /></marker>
               <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -569,7 +581,7 @@ function Topology({ detail, swarm, cards, posts, focus, onNode }: {
                 <feDropShadow dx="0" dy="16" stdDeviation="10" floodColor="#000000" floodOpacity=".16" />
               </filter>
             </defs>
-            {view === 'office' && <OfficeBackdrop w={canvasW} h={canvasH} />}
+
             {view === 'graph' && layout.edges.map((e, i) => (
               <path key={i} d={pathFor(e)} fill="none" stroke={e.kind === 'cmd' ? C.fg2 : C.green} strokeWidth={e.kind === 'cmd' ? 1.2 : 1.7}
                 strokeDasharray={e.kind === 'cmd' ? '4 4' : undefined} opacity={e.kind === 'cmd' ? 0.55 : 0.95} markerEnd={e.kind === 'dep' ? 'url(#arr)' : undefined} />
@@ -580,7 +592,7 @@ function Topology({ detail, swarm, cards, posts, focus, onNode }: {
               const running = n.kind === 'running'
               const assigned = cards.filter((c) => c.assignee === n.name)
               const lastPost = posts.filter((p) => p.author === n.name).slice(-1)[0]
-              const labelPad = view === 'office' ? 24 : 0
+              const labelPad = 0
               return (
                 <g key={n.name} className="swarm-topology-node" style={{ cursor: 'grab', opacity: dim ? 0.35 : 1 }}
                   onPointerDown={(e) => startDrag(e, n)} onPointerMove={moveDrag} onPointerUp={(e) => endDrag(e, n.name)} onPointerCancel={() => { drag.current = null }}>
@@ -588,28 +600,7 @@ function Topology({ detail, swarm, cards, posts, focus, onNode }: {
                   {/* office 视图名字药丸浮在节点上方(top:-18px)，顶部留出 labelPad 高度并允许溢出，否则会被 foreignObject 裁掉 */}
                   <foreignObject x={n.x} y={n.y - labelPad} width={n.w} height={n.h + labelPad} style={{ overflow: 'visible' }}>
                     <div style={{ height: '100%', paddingTop: labelPad, boxSizing: 'border-box' }}>
-                    {view === 'office' ? (
-                      <div className={`swarm-office-desk ${n.w < 220 ? 'is-compact' : ''} ${running ? 'is-running' : ''} ${n.kind === 'idle' ? 'is-idle' : ''} ${n.kind === 'waiting' ? 'is-waiting' : ''}`} style={{ ['--node-accent' as any]: col }} title={n.mduty || undefined}>
-                        <div className="swarm-office-label">
-                          <b>{isLeaderRole(n.mrole) ? <><DiamondIcon size={9} />{n.name}</> : n.name}</b>
-                          {subroleKey(n) && <span className="swarm-office-role" style={{ ['--role-color' as any]: memberHatColor(n) }}>{(SUBROLE_MAP[subroleKey(n)!]?.icon || '👤')} {subroleText(t, subroleKey(n))}</span>}
-                          <span className="swarm-office-status">{nodeStatus(n, t)}</span>
-                        </div>
-                        <div className="swarm-office-surface">
-                          <div className={`swarm-office-monitor is-${screenKind(n)}`}><span>{n.mkind || 'agent'}</span></div>
-                          <div className="swarm-office-tower" />
-                          <div className="swarm-office-keyboard" />
-                        </div>
-                        <div className="swarm-office-chair">
-                          <div className={`swarm-office-agent hat-${memberHatStyle(n)}`} style={{ ['--hat-color' as any]: memberHatColor(n) }}><span /><i /><em /></div>
-                        </div>
-                        <div className="swarm-office-shadow" />
-                        <div className="swarm-office-stats">
-                          <span>{t('swarm.nodeCardsShort', { count: assigned.length })}</span>
-                          <span>{t('swarm.nodePostsShort', { count: posts.filter((p) => p.author === n.name).length })}</span>
-                        </div>
-                      </div>
-                    ) : (
+
                       <div className={`swarm-node-card ${running ? 'is-running' : ''} ${n.kind === 'idle' ? 'is-idle' : ''} ${n.kind === 'waiting' ? 'is-waiting' : ''} ${n.kind === 'pending' ? 'is-pending' : ''}`} style={{ ['--node-accent' as any]: col }}>
                         <div className="swarm-node-head">
                           <span className="swarm-node-mark">{nodeIcon(n)}</span>
@@ -630,7 +621,7 @@ function Topology({ detail, swarm, cards, posts, focus, onNode }: {
                         </div>
                         {lastPost && <div className="swarm-node-last">{lastPost.text}</div>}
                       </div>
-                    )}
+
                     </div>
                   </foreignObject>
                 </g>

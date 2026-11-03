@@ -39,6 +39,8 @@ func Show(version string, w io.Writer) {
 
 	fmt.Fprintf(w, "  %s %s\n", b("蜂群编排"), m("(swarm — 有目标的任务组)"))
 	fmt.Fprintf(w, "    %s %s  新建蜂群\n", g("swarm new"), d("<名> [--goal \"...\"] [--no-master]"))
+	fmt.Fprintln(w, "    swarm new <名> --main-conversation ID --key KEY --goal <目标>  Roami Main 蜂群")
+	fmt.Fprintln(w, "    swarm managed-list | status <sw-id> | plan/control/say <sw-id> --file <request.json>")
 	fmt.Fprintf(w, "    %s %s  加成员\n", g("swarm add"), d("<群> <成员> --type task|agent [--kind claude|codex] ..."))
 	fmt.Fprintf(w, "    %s %s  列出 / 状态\n", g("swarm ls|status"), d("[<群>] [--json]"))
 	fmt.Fprintf(w, "    %s %s  解锁挂起 / 标记完成\n", g("swarm activate|done"), d("<群> [成员]"))

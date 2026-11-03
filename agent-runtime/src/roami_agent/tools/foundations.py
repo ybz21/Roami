@@ -114,6 +114,9 @@ class ToolDirectory:
         if query in {**SKILL_ALIASES, "web_research": "browser_use"}:
             words = normalize({**SKILL_ALIASES, "web_research": "browser_use"}[query]).split()
         aliases = {
+            "蜂群": "swarm",
+            "群聊": "swarm post",
+            "看板": "swarm status",
             "会话": "session target",
             "项目": "project workspace target",
             "派活": "session delegate",

@@ -168,6 +168,20 @@ class TaskDispatcher:
                         write=True,
                     )
                 raise DomainError("TASK_SOURCE_FORGOTTEN")
+            from roami_agent.storage.swarm_repository import dependency_ready
+
+            admitted = await self.db.call(
+                lambda db: all(
+                    dependency_ready(db, dep)
+                    for dep in rows(
+                        db,
+                        "SELECT d.* FROM swarm_dependencies d JOIN swarm_work_items w ON w.id=d.work_id WHERE w.task_id=?",
+                        (task["id"],),
+                    )
+                )
+            )
+            if not admitted:
+                raise DomainError("SWARM_DEPENDENCY_NOT_VERIFIED")
             if turn:
                 result = await self.native_executor.run(task, run, turn=turn)
             elif self.executor:

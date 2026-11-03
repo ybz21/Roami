@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/ybz21/Roami/internal/agentruntime"
 	"github.com/ybz21/Roami/internal/session"
 	"net/http"
 	"os"
@@ -32,6 +33,7 @@ import (
 const labelOption = "@roam_name"
 
 type API struct {
+	AgentSocket       string
 	AgentVerification *AgentVerificationStore
 	AgentProviders    *agentproviders.Store
 	GitFootprints     *GitFootprintStore
@@ -66,7 +68,8 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 			metadb.RetireLegacyFiles(dataDir)
 		}
 	}()
-	return &API{GitFootprints: NewGitFootprintStore(dataDir), Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
+	paths, _ := agentruntime.Resolve("", dataDir)
+	return &API{AgentSocket: paths.Socket, GitFootprints: NewGitFootprintStore(dataDir), Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir), AgentProviders: agentproviders.NewStore(dataDir),
 		AgentVerification: NewAgentVerificationStore(dataDir), Prefs: NewPreferencesStore(dataDir), Workspace: NewWorkspaceStore(dataDir), Races: race.NewStore(dataDir, meta),
 		Push: NewPushStore(dataDir), Inbox: NewInboxStore(dataDir, func() *sql.DB {

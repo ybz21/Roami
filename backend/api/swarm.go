@@ -1,6 +1,4 @@
-// 蜂群(swarm) 资源的 HTTP handler —— 全部通过 ttmux.Client 转发到 CLI，自身不含编排逻辑。
-// 读 = roami session swarm ... --json；写 = 对应子命令。路径/字段都作独立 argv 传入，杜绝命令注入。
-// Web 端只读 + 广场/看板轻操作；建群/加成员/接管/标记成员完成等重编排仍只在 CLI/终端。
+// Legacy collaboration uses CLI storage; managed collaboration projects the Agent runtime.
 package api
 
 import (
@@ -12,7 +10,29 @@ import (
 )
 
 // GET /api/swarms —— 蜂群列表
-func (a *API) Swarms(c *gin.Context) { a.json(c, "swarm", "ls", "--json") }
+func (a *API) Swarms(c *gin.Context) {
+	rows := []any{}
+	out, legacyErr := a.TT.Run("swarm", "ls", "--json")
+	if legacyErr == nil {
+		_ = json.Unmarshal([]byte(out), &rows)
+	}
+	if values, err := a.managedSwarms(c.Request.Context(), ""); err == nil {
+		if managed, ok := values.([]any); ok {
+			for _, raw := range managed {
+				if value, ok := raw.(map[string]any); ok {
+					rows = append(rows, managedProjection(value))
+				}
+			}
+		}
+	} else {
+		if legacyErr != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "AGENT_RUNTIME_UNAVAILABLE"}})
+			return
+		}
+		c.Header("X-Roami-Swarm-Partial", "true")
+	}
+	c.JSON(http.StatusOK, rows)
+}
 
 // POST /api/swarms —— 新建蜂群（默认自带 Leader；master=false 则 --no-master，字段名为历史兼容）
 func (a *API) SwarmNew(c *gin.Context) {
@@ -52,6 +72,10 @@ func (a *API) SwarmNew(c *gin.Context) {
 // POST /api/swarms/:n/adopt —— 拉起/接管 Leader（指挥）会话。
 // 用于「先建群+上传文档、再起 Leader」的时序：建群时传 master=false，上传完文档后再调本接口。
 func (a *API) SwarmAdopt(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Dir      string   `json:"dir"`
 		Roster   []string `json:"roster"` // 与 SwarmNew 同款（先建群传文档再 adopt 的时序不丢上下文）
@@ -84,6 +108,10 @@ func (a *API) SwarmAdopt(c *gin.Context) {
 
 // POST /api/swarms/:n/members —— 加成员(默认 agent cc)
 func (a *API) SwarmAddMember(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Name    string `json:"name"`
 		Type    string `json:"type"`
@@ -196,6 +224,10 @@ func (a *API) SwarmAddMember(c *gin.Context) {
 
 // POST /api/swarms/:n/done —— 标记成员完成(解锁下游)；body 无 member 则标整群完成
 func (a *API) SwarmDone(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Member string `json:"member"`
 	}
@@ -209,6 +241,10 @@ func (a *API) SwarmDone(c *gin.Context) {
 
 // POST /api/swarms/:n/activate —— 解锁挂起成员(可指定成员 + --force)
 func (a *API) SwarmActivate(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Member string `json:"member"`
 		Force  bool   `json:"force"`
@@ -228,7 +264,12 @@ func (a *API) SwarmActivate(c *gin.Context) {
 func (a *API) SwarmArchive(c *gin.Context) { a.text(c, "swarm", "archive", c.Param("n")) }
 
 // GET /api/swarms/:n —— 蜂群详情(成员/依赖/挂起 + 看板/广场摘要由前端另取)
-func (a *API) SwarmStatus(c *gin.Context) { a.json(c, "swarm", "status", c.Param("n"), "--json") }
+func (a *API) SwarmStatus(c *gin.Context) {
+	if a.managedSwarmStatus(c) {
+		return
+	}
+	a.json(c, "swarm", "status", c.Param("n"), "--json")
+}
 
 // GET /api/swarms/:n/feed?since=&kind=&n= —— 广场消息流(增量轮询用 since)
 func (a *API) SwarmFeed(c *gin.Context) {
@@ -247,6 +288,10 @@ func (a *API) SwarmFeed(c *gin.Context) {
 
 // POST /api/swarms/:n/say —— 广场发言(web 代发固定署名 human)
 func (a *API) SwarmSay(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Kind string `json:"kind"`
 		Re   string `json:"re"`
@@ -275,6 +320,10 @@ func (a *API) SwarmBoard(c *gin.Context) { a.json(c, "swarm", "board", c.Param("
 
 // POST /api/swarms/:n/task —— 建卡
 func (a *API) SwarmTaskAdd(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Title    string `json:"title"`
 		Desc     string `json:"desc"`
@@ -304,6 +353,10 @@ func (a *API) SwarmTaskAdd(c *gin.Context) {
 
 // PATCH /api/swarms/:n/task/:id —— 卡片流转: {move:<列>} 或 {assign:<成员>}
 func (a *API) SwarmTaskPatch(c *gin.Context) {
+	if managedSwarmID.MatchString(c.Param("n")) {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "MANAGED_SWARM_USES_MAIN"}})
+		return
+	}
 	var b struct {
 		Move   string `json:"move"`
 		Assign string `json:"assign"`

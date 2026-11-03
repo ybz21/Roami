@@ -4007,3 +4007,6 @@ button.mc-tab-x { padding: 0; border: 0; background: transparent; cursor: pointe
 :where(html[data-pointer="coarse"]) .mc-tab-directory-trigger { min-height: var(--tap); }
 
 :where(html[data-pointer="coarse"]) .mc-tab-directory { top: max(var(--topbar-h), calc(var(--tap) + var(--sp-2))); }
+
+.tt-page-swarm { height:100%; min-height:0; padding:0; overflow:auto; }
+.tt-page-swarm > .swarm-managed { flex:1; }

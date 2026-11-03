@@ -31,6 +31,7 @@ from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.routing import TaskRouter
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
+from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.dispatch.task_workspace_cleanup import TaskWorkspaceCleanup
 from roami_agent.dispatch.tasks import Tasks
@@ -80,6 +81,7 @@ from roami_agent.tools.mcp_broker import MCPBroker, node_socket
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
+from roami_agent.tools.swarm_catalog import register_swarm_tools
 from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 from roami_agent.tools.workspace_images import WorkspaceImageReads
@@ -220,6 +222,8 @@ class Runtime:
         if self.desktop.config["enabled"]:
             register_computer_tools(self.tools, self.desktop)
 
+        self.swarms = SwarmPlans(database, self.tasks, self.conversations, self.wakeup)
+        register_swarm_tools(self.tools, self.swarms)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 
@@ -298,6 +302,7 @@ class Runtime:
             self.active,
             self.memory_jobs,
             task_sessions=self.task_sessions,
+            swarms=self.swarms,
         )
         self.chat = ConversationService(
             database,
@@ -309,6 +314,7 @@ class Runtime:
             self.turn_tasks,
             self.loop.preempt,
         )
+        self.swarms.chat = self.chat
         self.model_settings = ModelSettings(self, configured_provider)
         if self.improvement is not None:
             self.improvement.ledger.shared_daily_limit = True
@@ -363,6 +369,7 @@ class Runtime:
         await self.memory_jobs.recover()
         await self.resources.recover()
         await self.dispatch.recover()
+        await self.swarms.recover()
         await self.briefs.recover()
         await self.native_sessions.recover()
         if self.settings.proactive_enabled:

@@ -5,6 +5,7 @@
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
 | 工作区围栏启动诊断 | [20261103-workspace-launch-diagnostics](20261103-workspace-launch-diagnostics/README.md) | 启动前拒绝、阻塞执行证据、历史频次与回归 |
+| 蜂群 Main 编排与 Three.js | [20261103-swarm-main-three](20261103-swarm-main-three/README.md) | Roami Main、多执行器、三页签与受管验收 |
 | 思考强度四档与对齐 | [20261102-thinking-levels](20261102-thinking-levels/README.md) | 竞品调研、四档提案与旧配置兼容 |
 | 任务结果文件预览 | [20261102-task-file-preview](20261102-task-file-preview/README.md) | 独立预览页、手机全屏阅读与文件入口 |
 | 公网首次加载诊断 | [20261102-initial-load](20261102-initial-load/README.md) | 公网响应传输、消息分页与数据库布局排查 |

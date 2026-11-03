@@ -1718,9 +1718,9 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
               <div key={sw.id || sw.name} className="prj-panel prj-in" style={{ padding: '13px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Tag color="purple" style={{ margin: 0 }} icon={<SwarmIcon size={11} />}>{t('nav.swarm')}</Tag>
-                  <b>{sw.name}</b>
+                  <b>{sw.label || sw.name}</b>
                   {sw.goal && <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{sw.goal}</span>}
-                  {!sw.supervisor && <Tag color="warning" style={{ margin: 0 }}>{t('project.swarm.noLeader')}</Tag>}
+                  {!sw.supervisor && sw.engine !== 'roami_v2' && <Tag color="warning" style={{ margin: 0 }}>{t('project.swarm.noLeader')}</Tag>}
                   <span style={{ flex: 1 }} />
                   {ex && Object.keys(ex.cols).length > 0 && (
                     <span className="prj-mono" style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-dimmer)' }}>
@@ -1728,7 +1728,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                     </span>
                   )}
                   {/* 无指挥修复入口（09 S2）：群在指挥不在（拉起失败/被杀）→ adopt 接管 */}
-                  {!sw.supervisor && (
+                  {!sw.supervisor && sw.engine !== 'roami_v2' && (
                     <Button size="small" onClick={async () => {
                       try {
                         await api('POST', `/swarms/${encodeURIComponent(sw.name)}/adopt`, { dir, worktree: true })
@@ -1736,7 +1736,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                       } catch (e: any) { message.error(e.message) }
                     }}>{t('project.swarm.adopt')}</Button>
                   )}
-                  <Button size="small" onClick={() => { setSaying(sw.name); setSayText('') }}>{t('project.swarm.sayLeader')}</Button>
+                  <Button size="small" onClick={() => { if (sw.engine === 'roami_v2') { location.hash = '#/swarm/' + encodeURIComponent(sw.name); return }; setSaying(sw.name); setSayText('') }}>{t('project.swarm.sayLeader')}</Button>
                   <Button size="small" type="primary" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(sw.name) }}>{t('project.swarm.board')} →</Button>
                 </div>
                 <div style={{ margin: '9px 0 0 5px', paddingLeft: 12, borderLeft: '2px solid rgba(163,113,247,.3)', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1811,7 +1811,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           {swarmOpen && (
             <NewSwarmModal open={swarmOpen} initialDir={dir} lockDir
               onClose={() => setSwarmOpen(false)}
-              onDone={(n) => { setSwarmOpen(false); refresh(); if (n) openTerm('cc-' + n) }} />
+              onDone={(n) => { setSwarmOpen(false); refresh(); if (n) location.hash = '#/swarm/' + encodeURIComponent(n) }} />
           )}
           {compareRace && <RaceComparePanel race={compareRace} onClose={() => setCompareRace(null)} openTerm={openTerm} onChanged={refresh} />}
         </Suspense>

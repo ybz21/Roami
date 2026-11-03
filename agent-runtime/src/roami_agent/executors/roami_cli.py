@@ -109,6 +109,32 @@ class CodingExecutor:
             if json.loads(task["budget_json"]).get("deadlineMs")
             else 0,
         }
+        swarm = await self.db.call(
+            lambda db: row(
+                db,
+                "SELECT swarm_id,member_name FROM swarm_work_items WHERE task_id=?",
+                (task["id"],),
+            )
+        )
+        if swarm:
+            collaboration = {
+                "taskId": task["id"],
+                "runId": run["id"],
+                "taskRevision": run["task_revision"],
+            }
+            launch["prompt"] += (
+                "\n\nSwarm group chat: "
+                + swarm["swarm_id"]
+                + "; member: "
+                + swarm["member_name"]
+                + ". For progress or questions, write a JSON file containing the following binding plus commandKey (unique per message) and text, then call roami session swarm post "
+                + swarm["swarm_id"]
+                + " --file /absolute/path/message.json. Binding: "
+                + encoded(collaboration)
+                + ". This posts discussion only; continue using the existing final result handoff for completion. Read group chat and board with roami session swarm status "
+                + swarm["swarm_id"]
+                + " --json."
+            )
         if target["kind"] != "session":
             launch["permission"] = "auto"
         if spec.get("model") and target["kind"] != "session":

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN" data-pointer="fine" data-size="large">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>蜂群协作工作室 · 方案 v1</title>
+  <link rel="stylesheet" href="assets/studio.css">
+</head>
+<body>
+  <header class="toolbar">
+    <strong>蜂群 · 方案 v1</strong>
+    <div class="controls" aria-label="设计稿显示设置">
+      <button type="button" id="device" aria-pressed="false">手机稿</button>
+      <button type="button" id="theme" aria-pressed="false">浅色</button>
+      <button type="button" id="motion" aria-pressed="true">动画开</button>
+    </div>
+  </header>
+  <main class="scroll">
+    <div class="proposal" data-tab="studio">
+      <header class="tt-pagehead">
+        <div><p class="eyebrow">THREE.JS / ROAMI MAIN</p><h1>一个主 Agent，一起把事做好。</h1><p class="subtitle">等距协作工作室 · 动态概念稿，使用演示数据</p></div>
+      </header>
+      <nav class="view-tabs" aria-label="蜂群工作区"><button type="button" data-view="studio" aria-pressed="true">协作</button><button type="button" data-view="chat" aria-pressed="false">群聊</button><button type="button" data-view="board" aria-pressed="false">看板</button></nav>
+      <div class="workspace">
+        <div class="work-area">
+        <section class="stage-panel" aria-label="Three.js 动效概念">
+          <div class="stage-heading"><strong>协作工作室</strong><span class="meta" id="phase-name">执行中</span></div>
+          <div id="stage" aria-label="蜂群三维场景；也可通过右侧成员列表选择">
+            <div id="scene-message" role="status">正在加载场景；成员列表可直接使用。</div>
+            <div id="labels" aria-label="工位选择"></div>
+          </div>
+          <div class="stage-foot"><span>Roami Main 协调 · 多执行器协作</span><span>正交视角</span></div>
+          <div class="phase-controls" role="group" aria-label="演示业务状态">
+            <button type="button" data-phase="dispatch" aria-pressed="false">派发</button>
+            <button type="button" data-phase="running" aria-pressed="true">执行</button>
+            <button type="button" data-phase="review" aria-pressed="false">待验收</button>
+            <button type="button" data-phase="done" aria-pressed="false">已验收</button>
+            <button type="button" id="autoplay" aria-pressed="false">自动演示</button>
+          </div>
+          <p id="phase-description" class="phase-description" role="status">角色敲击键盘，显示器轻微变化；运行状态来自当前任务。</p>
+        </section>
+        <section class="board-panel" aria-label="任务看板">
+          <div class="panel-heading"><strong>看板</strong><span class="meta">点任务卡联动工位与详情</span></div>
+          <div class="board-columns">
+            <section><h2>待办</h2><button type="button" class="work-card" data-work="organize"><strong>整理交付说明</strong><small>Roami · 整理</small></button></section>
+            <section><h2>执行中</h2><button type="button" class="work-card" data-work="frontend"><strong>实现工作室交互</strong><small>Codex · 前端</small></button></section>
+            <section><h2>阻塞</h2><button type="button" class="work-card" data-work="check"><strong>补齐验收标准</strong><small>Codex · 验证</small><span>需要明确手机验收范围</span></button></section>
+            <section><h2>待验收</h2><button type="button" class="work-card" data-work="research"><strong>提交执行架构方案</strong><small>Claude · 研究</small><span>报告已回传，等待检查</span></button></section>
+            <section><h2>完成</h2><p class="meta">验收通过后显示</p></section>
+          </div>
+        </section>
+        <details class="member-details"><summary>成员与选中详情</summary><div class="members-panel" aria-label="成员与选中详情">
+          <div class="panel-heading"><strong>成员</strong><span class="meta">1 主 Agent / 4 成员</span></div>
+          <div id="members"></div>
+          <section class="selection" aria-live="polite"><p class="eyebrow" id="selection-role">主 Agent</p><h2 id="selection-name">Roami Main</h2><p id="selection-detail">复用你正在对话的 Roami Main，拆解目标、协调成员并汇总经过验收的结果。</p><div class="selection-note">概念稿中的选择和状态切换只影响本页。</div></section>
+        </div></details>
+        </div>
+        <aside class="conversation-panel" aria-label="蜂群群聊">
+          <div class="panel-heading"><strong>群聊</strong><span class="meta">Main 与全体成员</span></div>
+          <div class="chat-messages" id="chat-messages" role="log" aria-label="协作消息">
+            <article><strong>你</strong><p>把蜂群的动画与执行架构一起重构，手机也要能用。</p></article>
+            <article data-chat-member="main"><strong>Roami Main <small>主 Agent</small></strong><p>前端先做交互，研究并行梳理执行边界。我会检查产物，再安排整合。</p></article>
+            <article data-chat-member="frontend"><button type="button" class="chat-author" data-work="frontend">前端 · Codex</button><p>正在实现工作室与成员选择联动，完成后提交桌面和手机截图。</p></article>
+            <article data-chat-member="check"><button type="button" class="chat-author" data-work="check">验证 · Codex</button><p>需要明确手机验收范围：包含群聊输入和看板操作吗？</p><button type="button" class="reply-member" data-reply="验证">回复验证成员</button></article>
+            <article data-chat-member="research"><button type="button" class="chat-author" data-work="research">研究 · Claude</button><p>执行架构方案已提交，请检查 Main 绑定、回报与续派边界。</p><button type="button" data-work="research">查看任务与产物</button></article>
+          </div>
+          <form id="chat-form" class="chat-composer"><label for="chat-draft">发到群聊</label><textarea id="chat-draft" rows="3" placeholder="告诉 Main，或 @成员补充要求"></textarea><div><small>演示输入，不会发送真实消息</small><button type="submit">发送</button></div></form>
+          <p class="chat-selection" id="chat-selection" role="status">全部消息</p>
+        </aside>
+      </div>
+      <section class="decisions" aria-label="方案关键决策">
+        <article><span class="eyebrow">01 / 指挥</span><h2>就是原来的 Main</h2><p>对话、模型配置、记忆和任务回报沿用现有体系。项目里创建蜂群，也绑定一个明确的 Main 对话。</p></article>
+        <article><span class="eyebrow">02 / 执行</span><h2>成员各用所长</h2><p>Codex、Claude、Roami 共用受管任务协议。追加要求回到原任务和原执行器，保留工作现场。</p></article>
+        <article><span class="eyebrow">03 / 交付</span><h2>验收之后再完成</h2><p>派发、运行、回报、验收逐步呈现。先看结果和文件，再按需展开执行记录。</p></article>
+      </section>
+      <footer class="document-links"><a href="README.md">产品方案</a><a href="technical-design.md">技术设计</a><span>开发者设计文档 · 尚未接入真实任务</span></footer>
+    </div>
+  </main>
+  <script type="module" src="assets/studio.js"></script>
+</body>
+</html>

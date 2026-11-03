@@ -39,6 +39,7 @@ export default defineConfig({
           // 4.3MB JS + 146KB 阻塞 CSS 全进首屏，懒加载失效）。固定进 vendor（入口本就依赖）。
           if (id.includes('vite/preload-helper')) return 'vendor'
           if (!id.includes('node_modules')) return
+          if (/[\\/]node_modules[\\/]three[\\/]/.test(id)) return 'swarm-three'
           if (id.includes('pdfjs-dist')) return 'pdf'
           // Office 预览（docx/xlsx/pptx）很重，仅看 Office 文件时才用 → 独立块（配合 FileBrowser 懒加载按需取）
           // jszip 是 docx-preview / pptx-to-html 的专属依赖，一并归入，别落进首屏 vendor。

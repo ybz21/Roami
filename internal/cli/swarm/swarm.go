@@ -22,6 +22,9 @@ func Run(rt runtime.Runtime, args []string, w io.Writer) error {
 		subcmd = args[0]
 		args = args[1:]
 	}
+	if handled, err := managedCommand(rt, subcmd, args, w); handled {
+		return err
+	}
 	st := swarmcore.NewStore(opts(rt))
 	switch subcmd {
 	case "new", "create":
