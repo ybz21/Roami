@@ -5091,6 +5091,16 @@ const zhCN = {
   'swarm.managed.state.idle': '空闲',
   'swarm.managed.deliveryPending': '等待投递确认',
   'swarm.managed.filter': '筛选蜂群',
+  'swarm.managed.relinkTeam': '当前团队链接不可用。请选择或创建受管团队，再到项目设置中关联；已有历史记录保留。',
+  'swarm.managed.selectTeam': '选择团队',
+  'swarm.legacy.partial': '部分历史暂时无法读取，已显示可用记录。',
+  'swarm.legacy.title': '原团队历史',
+  'swarm.legacy.connect': '关联受管团队',
+  'swarm.legacy.missing': '此项目暂无可读取的原团队历史。',
+  'swarm.legacy.hint': '以下为只读历史记录，未经当前验收。关联受管团队后可继续使用 @leader；系统不会自动创建团队。',
+  'swarm.legacy.recordedStatus': '原记录：{status}',
+  'swarm.legacy.messages': '历史消息',
+  'swarm.legacy.truncated': '当前展示最近的可用记录。',
   'swarm.managed.mainFailed': 'Main 暂时未能继续，请检查模型连接后在群聊重试。',
 }
 

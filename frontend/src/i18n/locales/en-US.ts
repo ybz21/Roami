@@ -5082,6 +5082,16 @@ const enUS = {
   'swarm.managed.state.idle': 'Idle',
   'swarm.managed.deliveryPending': 'Awaiting delivery confirmation',
   'swarm.managed.filter': 'Filter swarms',
+  'swarm.managed.relinkTeam': 'This team link is unavailable. Select or create a managed team, then link it in the project settings. Existing history is retained.',
+  'swarm.managed.selectTeam': 'Select team',
+  'swarm.legacy.partial': 'Some history could not be loaded. Available records are shown.',
+  'swarm.legacy.title': 'Previous team history',
+  'swarm.legacy.connect': 'Connect managed team',
+  'swarm.legacy.missing': 'No previous team history is available for this project.',
+  'swarm.legacy.hint': 'Historical records are read-only and unverified. Connect a managed team to continue with @leader; no team will be created automatically.',
+  'swarm.legacy.recordedStatus': 'Recorded: {status}',
+  'swarm.legacy.messages': 'Recorded messages',
+  'swarm.legacy.truncated': 'Showing the most recent available records.',
   'swarm.managed.mainFailed': 'Main could not continue. Check the model connection, then retry in the group chat.',
 }
 

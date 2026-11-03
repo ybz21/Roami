@@ -1,0 +1,36 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import LegacySwarmHistory from './LegacySwarmHistory'
+const test = vi.hoisted(() => ({ api: vi.fn() }))
+vi.mock('../../api', () => ({ api: (...args: unknown[]) => test.api(...args) }))
+vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { status?: string }) => key + (values?.status ? ':' + values.status : '') }) }))
+vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => path }))
+vi.mock('../markdown/Markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
+vi.mock('antd', () => ({ Spin: () => <span>loading</span>, Button: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button> }))
+beforeEach(() => test.api.mockReset())
+afterEach(cleanup)
+it('restores actual historical members, board and feed without trusting recorded done', async () => {
+  test.api.mockResolvedValue({ data: { id: 'old-team', name: 'Original team', goal: 'Original goal', historical: true, verified: false, source: 'legacy', status: 'running', members: [{ name: 'writer', kind: 'native', status: 'done', done: true }], tasks: [{ id: 'card', title: 'Video work', description: 'Original instructions', assignee: 'writer', status: 'done' }], posts: [{ id: 1, author: 'writer', text: 'Published claim', createdAt: '2026-11-03' }], truncated: { members: false, tasks: false, posts: false } } })
+  const manage = vi.fn()
+  render(<LegacySwarmHistory projectId="owned-project" onManage={manage} />)
+  await waitFor(() => expect(screen.getByText('Original team')).toBeTruthy())
+  expect(screen.getByText('Video work')).toBeTruthy()
+  expect(screen.getByText('Published claim')).toBeTruthy()
+  expect(screen.getAllByText('swarm.legacy.recordedStatus:done')).toHaveLength(2)
+  expect(screen.getByText('swarm.legacy.hint')).toBeTruthy()
+  expect(screen.queryByText('swarm.managed.state.succeeded')).toBeNull()
+  expect(screen.queryByRole('textbox')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.legacy.connect' }))
+  expect(manage).toHaveBeenCalledTimes(1)
+  expect(test.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+  expect(test.api.mock.calls[0].slice(0, 2)).toEqual(['GET', '/projects/owned-project/okr/legacy-swarm'])
+})
+it('shows a connection action when owned history is absent', async () => {
+  test.api.mockResolvedValue({ data: null })
+  render(<LegacySwarmHistory projectId="owned-project" onManage={vi.fn()} />)
+  await waitFor(() => expect(screen.getByText('swarm.legacy.missing')).toBeTruthy())
+  expect(screen.getByRole('button', { name: 'swarm.legacy.connect' })).toBeTruthy()
+  expect(test.api).toHaveBeenCalledTimes(1)
+})
