@@ -48,6 +48,7 @@ max_depth = 0 # unlimited nesting
 input_budget = 24000
 timeout_seconds = 0 # no model deadline
 # cli_bin = "/absolute/path/to/roami" # defaults to the Go launcher binary
+# New unscoped tasks use private per-task directories; this is a legacy target fallback.
 # coding_directory = "/absolute/path/for/loose-coding-tasks"
 
 [memory]

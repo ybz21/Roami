@@ -1,4 +1,4 @@
-"""Persistent private working directories for native tasks without a user-selected target."""
+"""Persistent private working directories for tasks without a user-selected target."""
 
 import asyncio
 import os

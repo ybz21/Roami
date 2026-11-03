@@ -1,0 +1,40 @@
+{
+  "fixture_only": true,
+  "real_go_cli_and_private_tmux": true,
+  "prior_writer_unchanged": true,
+  "passed": true,
+  "cases": [
+    {
+      "case": "explicit-blocked",
+      "state": "failed",
+      "reason": "WORKSPACE_PRIOR_RESULT_MISSING",
+      "executionStarted": false,
+      "directory": "/tmp/roami-professional-directory-DS8yUP/agent-coding",
+      "files": []
+    },
+    {
+      "case": "implicit-first",
+      "state": "succeeded",
+      "reason": "fixture completed",
+      "executionStarted": null,
+      "directory": "/tmp/roami-professional-directory-DS8yUP/agents/task-directories/c25a89c9588643d6ab556a1aecb63394",
+      "files": [
+        "first.html",
+        "second.html",
+        "third.html"
+      ]
+    },
+    {
+      "case": "implicit-second",
+      "state": "succeeded",
+      "reason": "fixture completed",
+      "executionStarted": null,
+      "directory": "/tmp/roami-professional-directory-DS8yUP/agents/task-directories/2533850176014abcbda6c2ed8c4f6258",
+      "files": [
+        "first.html",
+        "second.html",
+        "third.html"
+      ]
+    }
+  ]
+}

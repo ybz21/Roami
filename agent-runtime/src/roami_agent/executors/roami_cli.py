@@ -7,6 +7,7 @@ from pathlib import Path
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.executors.professional_brief import professional_brief
 from roami_agent.executors.project import provision_project
+from roami_agent.executors.task_directory import automatic_task_directory, prepare_task_directory
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
@@ -176,6 +177,9 @@ class CodingExecutor:
                 if target.get("base") or target.get("remote"):
                     raise DomainError("CODING_WORKSPACE_REUSE_CONFLICT")
                 launch["workspaceId"] = target["workspaceId"]
+        elif automatic_task_directory(target):
+            workspace = await prepare_task_directory(self.db.data_root, task["id"])
+            launch["directory"] = workspace["directory"]
         else:
             directory = target.get("directory") or self.settings.coding_directory
             if not isinstance(directory, (str, Path)) or not Path(directory).is_absolute():
