@@ -794,6 +794,9 @@ class ContainerExecutor:
             process_diagnostics=response.get("metrics", {}),
             process_diagnostics_attested=False,
         )
+        from roami_agent.improvement.integrations.tool_process import logged_tool_process
+
+        metrics.update(logged_tool_process(root))
         blockers = [failure] if failure else []
         if budget.unknown:
             blockers.append("unknown_provider_usage")

@@ -12,7 +12,7 @@ import { swarmStateToken, type SwarmSnapshot } from './swarm-protocol'
 import './swarm.css'
 export { NewSwarmModal } from './NewSwarmModal'
 
-export default function Swarm({ openTerm, initialSwarm, onNav }: { openTerm: (id: string) => void; initialSwarm?: string; onNav?: (id: string | null) => void }) {
+export default function Swarm({ openTerm, initialSwarm, onNav, embedded = false }: { openTerm: (id: string) => void; initialSwarm?: string; onNav?: (id: string | null) => void; embedded?: boolean }) {
   const { t } = useI18n(), { phone } = useLayout()
   const [list, setList] = useState<SwarmSnapshot[] | null>(null), [error, setError] = useState(false), [creating, setCreating] = useState(false), [archived, setArchived] = useState(false)
   const scope = nodeApi('/agent/swarms')
@@ -26,7 +26,7 @@ export default function Swarm({ openTerm, initialSwarm, onNav }: { openTerm: (id
       } catch (cause) { if (!signal.aborted) setError(true); throw cause }
     }, 10000).stop
   }, [initialSwarm, scope])
-  if (initialSwarm) return <ManagedSwarm key={scope + initialSwarm} id={initialSwarm} onBack={() => onNav?.(null)} openTerm={openTerm} />
+  if (initialSwarm) return <ManagedSwarm key={scope + initialSwarm} id={initialSwarm} onBack={() => onNav?.(null)} openTerm={openTerm} embedded={embedded} />
   const shown = list?.filter(item => item.archived === archived)
   return <div className="swarm-directory">
     <header className="tt-pagehead">{!phone && <h2>{t('nav.swarm')}</h2>}<div className="acts"><Select aria-label={t('swarm.managed.filter')} value={archived ? 'archived' : 'active'} onChange={value => setArchived(value === 'archived')} options={[{ value: 'active', label: t('swarm.active') }, { value: 'archived', label: t('swarm.status.archived') }]} /><Button type="primary" icon={<PlusIcon />} onClick={() => setCreating(true)}>{t('swarm.new')}</Button></div></header>

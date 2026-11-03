@@ -1,20 +1,20 @@
 # Managed browser tasks
 
-Native bash accepts these actual `roami chrome` command forms, with argv as an array:
+Native bash accepts these actual `roami chrome` command forms, inside the bash command string:
 
 ```bash
 roami chrome help
 roami chrome new https://example.com
-roami chrome observe --resource RESOURCE_ID
-roami chrome goto https://example.com/source --observation OBSERVATION_ID
-roami chrome screenshot --resource RESOURCE_ID
-roami chrome click 'button[type=submit]' --observation OBSERVATION_ID
-roami chrome fill 'input[name=q]' 'query' --observation OBSERVATION_ID
-roami chrome type textarea 'text' --observation OBSERVATION_ID
-roami chrome press Enter --observation OBSERVATION_ID
+roami chrome observe
+roami chrome goto https://example.com/source
+roami chrome screenshot
+roami chrome click 'button[type=submit]'
+roami chrome fill 'input[name=q]' 'query'
+roami chrome type textarea 'text'
+roami chrome press Enter
 ```
 
-Resource and observation IDs come from the latest returned observation, not from guessed tab positions. `--resource` and `--observation` use the host's admitted task context; the terminal CLI also supports them inside an active Agent tool call. The host records the underlying operation, effect and durable receipt. Native tasks cannot substitute arbitrary `--cdp`, eval, shell wrappers or receipt directories.
+The host binds actions to the last observation already delivered to this task. No observation ID is required in ordinary calls. With multiple owned tabs, choose the desired one using `--resource RESOURCE_ID`. `--resource` and `--observation` use the host's admitted task context; the terminal CLI also supports them inside an active Agent tool call. The host records the underlying operation, effect and durable receipt. Native tasks cannot substitute arbitrary `--cdp`, eval, shell wrappers or receipt directories.
 
 Research allows new, observe, screenshot and goto only. It cannot claim an existing user tab with `observe --target TARGET_ID`, interact with forms, or use standalone Shell. Ordinary Workers can claim existing targets only when node policy allows it.
 

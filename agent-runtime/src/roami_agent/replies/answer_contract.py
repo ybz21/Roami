@@ -6,7 +6,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.replies.task_progress import request_language
 
 
-def validate_answer(args, source):
+def validate_answer(args, source, *, check_internal=True):
     mode, text = args.get("mode", "brief"), args["text"]
     quote = args.get("scopeQuote")
     if mode != "brief":
@@ -25,8 +25,9 @@ def validate_answer(args, source):
         re.IGNORECASE,
     ):
         raise DomainError("REPLY_BOILERPLATE", 409)
-    if re.search(r"(?:stopConfirmed|outcomeKnown|inputStopped)\s*[=:]", text) or (
-        has_han and re.search(r"\b(?:interrupted|succeeded|task_steer)\b", text)
+    if check_internal and (
+        re.search(r"(?:stopConfirmed|outcomeKnown|inputStopped)\s*[=:]", text)
+        or (has_han and re.search(r"\b(?:interrupted|succeeded|task_steer)\b", text))
     ):
         raise DomainError("REPLY_INTERNAL_FIELDS", 409)
     return text

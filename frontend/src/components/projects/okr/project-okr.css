@@ -1,0 +1,47 @@
+.okr-page{min-width:0;max-width:var(--content-form);color:var(--text-bright);padding:0 var(--pad-page) var(--sp-5);font-size:var(--fs-body)}
+.tt-page.tt-page-okr{padding:0;height:100%;min-height:0;overflow:hidden}
+.tt-page-okr>.okr-page{width:100%;max-height:100%;overflow:auto;overscroll-behavior:contain}
+.okr-page>.tt-pagehead{padding-block:var(--sp-4)}
+.okr-page>.tt-pagehead h2{font-size:var(--fs-title)}
+.okr-section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}
+.okr-section-head{display:flex;align-items:start;justify-content:space-between;gap:var(--sp-3)}
+.okr-page h2{font-size:var(--fs-lg);margin:0;overflow-wrap:anywhere}
+.okr-page h3,.okr-page h4{font-size:var(--fs-body);margin:0 0 var(--sp-3);font-weight:600;overflow-wrap:anywhere}
+.okr-page h3{font-size:var(--fs-lg)}
+.okr-page p{margin:var(--sp-2) 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.okr-muted,.okr-evidence dt{color:var(--text-dim);font-size:var(--fs-meta)}
+.okr-actions{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-3);margin-block:var(--sp-3)}
+.okr-form fieldset,.okr-page fieldset{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;align-items:start;gap:var(--sp-3)}
+.okr-form h3{margin-block:var(--sp-4) 0}
+.okr-field{display:flex;flex-direction:column;gap:var(--sp-2);min-width:0;width:100%;color:var(--text-dim);font-size:var(--fs-sm)}
+.okr-field .ant-select,.okr-field .ant-input-number{width:100%}
+.okr-field input[type="date"]{font:inherit;min-width:0;max-width:100%;height:var(--ctl-h);padding:var(--sp-1) var(--sp-2);background:var(--bg-container);color:var(--text-bright);border:1px solid var(--border);border-radius:var(--r-xs)}
+.okr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3);width:100%}
+.okr-editor-row{display:flex;flex-direction:column;align-items:start;gap:var(--sp-3);padding-block:var(--sp-3);border-bottom:1px solid var(--border-subtle);width:100%;min-width:0}
+.okr-result,.okr-history,.okr-review{padding-block:var(--sp-3)}
+.okr-result+.okr-result,.okr-history+.okr-history,.okr-review+.okr-review{border-top:1px solid var(--border-subtle)}
+.okr-evidence{display:flex;flex-wrap:wrap;gap:var(--sp-5);margin:var(--sp-3) 0}
+.okr-evidence dd{margin:var(--sp-1) 0 0;font-size:var(--fs-lg)}
+.okr-day{padding-block:var(--sp-3);border-top:1px solid var(--border-subtle)}
+.okr-day-head{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:baseline}
+.okr-day-head>span{color:var(--text-dim);font-size:var(--fs-meta)}
+.okr-version{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--sp-3);padding:var(--sp-2) 0;font-size:var(--fs-meta)}
+.okr-version p{width:100%}
+.okr-version code{overflow-wrap:anywhere}
+.okr-page summary{position:relative;cursor:pointer;color:var(--text-dim);padding-block:var(--sp-2);width:fit-content}
+.okr-page summary:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}
+:where(html[data-pointer="fine"]) .okr-page summary:hover{color:var(--text-bright)}
+.okr-error{padding-block:var(--sp-3);color:var(--danger)}
+.okr-swarm{display:inline-flex;align-items:center;gap:var(--sp-2);position:relative}
+.okr-project-link{display:flex;align-items:center;gap:var(--sp-3);padding-block:var(--sp-4);min-height:var(--tap);color:var(--text-bright);border-bottom:1px solid var(--border-subtle);text-decoration:none}
+.okr-project-link>span{flex:1;min-width:0}
+.okr-project-link b,.okr-project-link small{display:block;overflow-wrap:anywhere}
+.okr-project-link small{font-size:var(--fs-meta);color:var(--text-dim)}
+.okr-project-link>svg{flex-shrink:0}
+.okr-project-link:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}
+:where(html[data-pointer="fine"]) .okr-project-link:hover{background:var(--list-hover);color:var(--text-bright)}
+html[data-size="compact"] .okr-grid{grid-template-columns:minmax(0,1fr)}
+html:is([data-size="compact"],[data-size="medium"]) .okr-page{max-width:none;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+html[data-pointer="coarse"] .okr-page :is(.ant-btn,summary,.okr-swarm,.ant-checkbox-wrapper){position:relative}
+html[data-pointer="coarse"] .okr-page :is(.ant-btn,summary,.okr-swarm,.ant-checkbox-wrapper)::after{content:"";position:absolute;inset:0 calc(-1 * var(--sp-1));min-height:var(--tap);min-width:var(--tap);top:50%;transform:translateY(-50%)}
+html[data-pointer="coarse"] .okr-field :is(input[type="date"],.ant-select-selector){min-height:var(--tap)}

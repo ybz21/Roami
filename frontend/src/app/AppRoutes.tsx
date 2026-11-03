@@ -24,6 +24,8 @@ const InstallPage = lazyRetry(() => import('../components/install/InstallPage'))
 const MobileTools = lazyRetry(() => import('../components/mobile/MobileTools'))
 const BrowserView = lazyRetry(() => import('../components/mirror/BrowserView'))
 const PhoneView = lazyRetry(() => import('../components/mirror/PhoneView'))
+const ProjectOkr = lazyRetry(() => import('../components/projects/okr/ProjectOkr'))
+const OkrProjects = lazyRetry(() => import('../components/projects/okr/OkrProjects'))
 const Swarm = lazyRetry(() => import('../components/swarm/Swarm'))
 const HubPage = lazyRetry(() => import('../components/cluster/HubPage'))
 const AgentHomePage = lazyRetry(() => import('../components/agent/AgentHomePage'))
@@ -45,6 +47,7 @@ type AppRoutesProps = {
   isMobile: boolean
   active: string | null
   projects: TreeSrc['projects']
+  projectDirectory?: { loaded: boolean; error: boolean; retry: () => void }
   actions: RouteActions
   mobileProject: MobileProject
   mobileSearchNonce: number
@@ -52,21 +55,24 @@ type AppRoutesProps = {
   fullscreen?: { active: boolean; toggle: () => void }
   agent: { node: string | null; inbox: ReturnType<typeof useAgentInbox>; open: boolean; notifications: () => void }
 }
-export default function AppRoutes({ routing, isMobile, active, projects, actions, mobileProject, mobileSearchNonce, mobileActionsHost, fullscreen, agent }: AppRoutesProps) {
-  const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, pluginSub, settingsSub } = routing
+export default function AppRoutes({ routing, isMobile, active, projects, projectDirectory, actions, mobileProject, mobileSearchNonce, mobileActionsHost, fullscreen, agent }: AppRoutesProps) {
+  const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, pluginSub, settingsSub } = routing
   const { openTerm, closeTerm, newTerminalAt, logout } = actions
   const { node: curNodeId, inbox: agentInbox, open: agentInboxOpen } = agent
   const { t } = useI18n()
   const { size } = useLayout()
   const inlineNative = agentPage?.view === 'session' && size === 'large' && !isMobile
+  const okrProject = tab === 'okr' && route.includes('/') ? decodeURIComponent(route.split('/')[1]) : ''
   const mobileSessions = (
     <MobileSessions initialProjectKey={projectSub || undefined} onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
       onNewTask={actions.newTask}
       onNewInWorktree={(kind, path) => { void newTerminalAt(kind, path) }} />
   )
   const pages: Record<string, ReactNode> = {
+    okr: okrProject ? <ProjectOkr key={`${curNodeId || 'local'}:${okrProject}`} projectId={okrProject} projectName={projects.find(p => p.key === okrProject)?.name} projectDir={projects.find(p => p.key === okrProject)?.dir} onSession={openTerm} fromOverview />
+      : <OkrProjects projects={projects} loaded={projectDirectory?.loaded ?? true} error={projectDirectory?.error ?? false} retry={projectDirectory?.retry || (() => {})} />,
     swarm: <Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => { location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm' }} />,
-    projects: isMobile
+    projects: projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} projectDir={projects.find(p => p.key === projectSub)?.dir} onSession={openTerm} /> : isMobile
       ? mobileSessions
       : <Projects openTerm={openTerm} closeTerm={closeTerm} initialKey={projectSub || undefined} activeTerm={active} />,
     sessions: isMobile

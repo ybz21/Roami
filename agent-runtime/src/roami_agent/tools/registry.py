@@ -5,7 +5,6 @@ from jsonschema import Draft202012Validator, ValidationError
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
-from roami_agent.protocol.tool_arguments import validate_tool_arguments
 from roami_agent.protocol.tools import Tool
 from roami_agent.tools.skill_reads import loaded_workflows
 
@@ -24,6 +23,8 @@ class Tools:
         if tool.name in self.registry:
             raise DomainError("DUPLICATE_TOOL")
         Draft202012Validator.check_schema(tool.schema)
+        if tool.model_schema is not None:
+            Draft202012Validator.check_schema(tool.model_schema)
         self.registry[tool.name] = tool
 
     def optional_skill_metadata(self):
@@ -63,10 +64,6 @@ class Tools:
             if tool.name in self.disabled_tools or role == "main" and not tool.main:
                 continue
             wire = tool.wire()
-            if role == "main" and self.directory and tool.name == "delegate":
-                wire = deepcopy(wire)
-                wire["function"]["parameters"]["required"] = ["goal", "routing", "requestComplete"]
-                wire["function"]["parameters"]["properties"].pop("executor", None)
             if role == "main" and self.directory and tool.name == "bash":
                 wire = deepcopy(wire)
                 wire["function"]["description"] = (
@@ -74,12 +71,8 @@ class Tools:
                     "are unavailable in this role. Use tool_list for the exact argv and schema."
                     if role in self.shell_disabled_roles
                     else (
-                        "Execute discovered Roami CLI operations. Main has no implicit shell workspace. "
-                        "For user-authorized local machine operations, set scope=host and omit cwd; "
-                        "host scope is general execution in a temporary working directory, not a read-only sandbox. "
-                        "For project code or file deliverables, keep workspace scope and delegate to a worker "
-                        "with the user-selected directory, or an automatic private directory for new native work. "
-                        "Registered permissions and execution receipts remain enforced."
+                        "Execute a shell command. The host supplies the working directory and execution context. "
+                        "Use registered Roami commands for managed resources."
                     )
                 )
             elif role != "main" and self.directory and tool.name == "bash":
@@ -119,7 +112,7 @@ class Tools:
             raise DomainError("TOOL_UNAVAILABLE")
         try:
             args = json.loads(call["function"]["arguments"])
-            validate_tool_arguments(tool.schema, args)
+            tool.validate(args)
         except (ValueError, ValidationError) as exc:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
         if self.directory:
@@ -127,7 +120,7 @@ class Tools:
             if tool.name in self.disabled_tools:
                 raise DomainError("TOOL_DISABLED")
             try:
-                validate_tool_arguments(tool.schema, args)
+                tool.validate(args)
             except ValidationError as exc:
                 raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
         return tool, args

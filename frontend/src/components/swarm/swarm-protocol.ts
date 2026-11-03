@@ -8,7 +8,7 @@ export type SwarmWork = {
 export type SwarmSnapshot = {
   id: string; name: string; goal: string; mainConversationId: string; revision: number; sequence: number
   mainState?: string; paused: boolean; archived: boolean; state: SwarmState; target: { projectId?: string; directory?: string }
-  work: SwarmWork[]; posts: { id: number; author: string; text: string; taskId?: string; createdMs: number; deliveryState?: 'accepted' | 'pending' }[]
+  work: SwarmWork[]; posts: { id: number; author: string; text: string; taskId?: string | null; createdMs: number; deliveryState?: 'accepted' | 'pending' }[]
   mainMessages: { id: string; role: string; text: string; createdMs: number }[]
 }
 export type StudioNode = { id: string; name: string; executor: string; state: string; main?: boolean }

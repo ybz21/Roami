@@ -210,6 +210,8 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if tool is None:
+                value["executionStarted"] = False
             if isinstance(exc, WorkspaceImageReadError):
                 value["fileImage"] = {"path": exc.path, "unavailable": exc.code}
             if value["error"] in {
@@ -227,7 +229,7 @@ class ToolGateway:
                 )
             if value["error"] == "FILE_CHANGED":
                 value["recovery"] = (
-                    "Read the same file again with read, review its current contents, then use that read's exact sha256 as expectedSha256. JSON null is only for creating a missing file. Preserve unrelated changes; do not retry the stale edit or bypass the check with shell redirection."
+                    "Read the same file again, reconcile its current contents, then retry write or edit with the corrected content. The host binds the last read's version. Preserve unrelated changes; do not retry the stale edit or bypass the check with shell redirection."
                 )
                 if operation_name in {"file_write", "file_patch"}:
                     value["writePublished"] = False
@@ -311,6 +313,7 @@ class ToolGateway:
                     "Keep unknown outcomes and source limitations explicit; human takeover and unknown writes still stop input."
                 )
             if isinstance(exc, ToolArgumentsError):
+                value["executionStarted"] = False
                 value["argumentIssues"] = exc.issues
                 value["issuesTruncated"] = exc.truncated
                 if call["function"]["name"] in {"write", "file_write"} and any(
@@ -333,8 +336,7 @@ class ToolGateway:
                 value["recovery"] = (
                     "This call was rejected before execution. "
                     "Use tool_list to find a registered operation available in this role. "
-                    "Use the exact command argv returned by tool_list or command-family help, with "
-                    "real returned resource/observation IDs. Correct the intended "
+                    "Use the command string returned by tool_list or command-family help. Correct the intended "
                     "call instead of repeating the rejected command."
                 )
             if value["error"] == "TASK_ALREADY_HANDED_OFF":
@@ -361,17 +363,15 @@ class ToolGateway:
                 value["recovery"] = (
                     "Main has no shell workspace for this operation. Do not retry shell commands or guess cwd. "
                     "For a user-authorized local machine operation independent of project files, "
-                    "use bash scope=host without cwd. Host scope is general execution, not read-only; "
-                    "it requires no project or delegation. resourceOnly skips coding-workspace preparation, not enabled capabilities. "
+                    "use bash with command only; the host supplies cwd and scope. "
                     "An error affects only this attempted operation: preserve every other part of the current request. "
                     "Resolve project/session metadata through target_search/target_resolve; a project edit still needs its own handoff. "
-                    "Keep requestComplete=false until all requested parts have been handled or handed off. Do not reduce a mixed request to its lookup part. "
+                    "Handle all requested parts before ending the turn. Do not reduce a mixed request to its lookup part. "
                     "Do not search projects to read a webpage. For changes or missing deliverables of an existing task, "
-                    "use task_steer with its taskId/revision; preserve the original executor and workspace, even after completion. "
+                    "use task_steer with taskId and text; preserve the original executor and workspace, even after completion. "
                     "For bounded public lookups use delegate executor=native "
-                    "with the current user's goal. For web-only reading use "
-                    "target={kind:new_session,resourceOnly:true} with bounded routing; complex work goes to a professional executor with concrete routing evidence. For bounded file deliverables use "
-                    "target={kind:new_session,directory:the_user_requested_directory}. "
+                    "with the current user's goal. Complex work uses the configured professional executor. "
+                    "Set directory only when the user selected one. "
                     "The worker loads the requested Skills and executes the task."
                 )
             if value["error"] in {
@@ -401,7 +401,7 @@ class ToolGateway:
                 value["recovery"] = (
                     "No task was accepted. This does not establish that other directories are unwritable. "
                     "Preserve any user-selected destination and executor. If the rejected path was guessed by you "
-                    "for new native work, retry target={kind:new_session} without a directory so the runtime "
+                    "for new native work, omit directory so the runtime "
                     "allocates a private task directory. Do not substitute another guessed path, a project, "
                     "resourceOnly or another executor. For a user-selected path, ask for its correction."
                 )
@@ -415,16 +415,14 @@ class ToolGateway:
             }:
                 value["recovery"] = (
                     "Do not change or drop the rejected executor choice to bypass this error. "
-                    "For a user-requested executor use routing.explicitExecutor with an exact userQuote; "
-                    "omit the legacy top-level executor field. If unavailable, explain and ask the user without dispatching; never use a native shell wrapper."
+                    "Use delegate.executor for the requested executor. If unavailable, explain and ask the user without dispatching; never use a native shell wrapper."
                 )
             if role == "main" and value["error"] == "ROUTING_EXPLICIT_SOURCE_REQUIRED":
                 value["recovery"] = (
                     "Executor metadata is not a new user executor choice. If continuing a tracked task "
-                    "found by task_status, use task_steer with that taskId/revision; do not search for "
+                    "found by task_status, use task_steer with taskId and text; do not search for "
                     "a similarly named session or switch to session_send. For a genuinely new dispatch, "
-                    "use an exact quote only when the user actually specified an executor; otherwise "
-                    "set explicitExecutor=null and omit userQuote."
+                    "use delegate with goal and optional executor; omit legacy routing metadata."
                 )
             if role == "main" and value["error"] == "INVALID_RESOURCE_ONLY_TARGET":
                 value["recovery"] = (
@@ -445,9 +443,8 @@ class ToolGateway:
             if role == "main" and value["error"] == "ROUTING_EXECUTOR_INTENT_REQUIRED":
                 value["recovery"] = (
                     "This is a tool-argument inconsistency, not a missing user decision. If the user did not "
-                    "choose an executor, keep routing.explicitExecutor=null and omit routing.userQuote; "
-                    "automatic routing uses existing defaults. Otherwise set the user's actual executor "
-                    "with its exact source quote. Correct the arguments; do not ask the user to repair them."
+                    "choose an executor, omit executor to use the configured default. Otherwise set executor "
+                    "to the user's choice and omit legacy routing metadata. Correct the arguments; do not ask the user to repair them."
                 )
             if (
                 role == "main"
@@ -455,23 +452,9 @@ class ToolGateway:
                 and call["function"]["name"] == "bash"
             ):
                 value["recovery"] = (
-                    "bash accepts argv as an array of strings, or command as a string. "
-                    "For registered Roami calls, the final --input argument is serialized JSON text, "
-                    "not a nested object. Example: "
-                    + encoded(
-                        {
-                            "argv": [
-                                "roami",
-                                "agent",
-                                "capability",
-                                "call",
-                                "task_status",
-                                "--input",
-                                "{}",
-                            ]
-                        }
-                    )
-                    + ". Substitute the intended operation and its input, within the user's scope. "
+                    "bash requires a command string. Example: "
+                    + encoded({"command": "roami agent task status --input '{}'"})
+                    + ". Use task_status directly for task queries. "
                     "These calls need no shell workspace. Repair the same intended operation and preserve task identity; do not replace task_status/task_steer with similarly named session discovery. Do not ask the user to fix arguments."
                 )
             if (
@@ -485,11 +468,8 @@ class ToolGateway:
                         if value.get("missingFields")
                         else ""
                     )
-                    + "delegate requires goal and routing with complexity, complexityBasis, routingExplanation "
-                    'and explicitExecutor. With no user executor choice, merge {"explicitExecutor":null} '
-                    "INSIDE routing and delete routing.userQuote; null must be an actual JSON null. "
-                    "When the user chose an executor, use that choice and its exact source quote instead. "
-                    "Omit top-level executor and unrecognized fields such as taskDescription. "
+                    + "delegate requires goal. Optionally set executor, directory, projectId or sessionId; "
+                    "the host supplies routing and execution bookkeeping. "
                     "Correct arguments within the user's scope; never create test/probe tasks or ask the user to fix internal parameters."
                 )
             if (

@@ -1,9 +1,16 @@
 """Worker Computer Use requires a current model-visible image for every input action."""
 
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.observation_inputs import observation_input, resource_input
 
 
 def register_computer_tools(registry, driver):
+    async def observe(args, binding):
+        return await driver.observe(await resource_input(driver, args, binding, "desktop"), binding)
+
+    async def act(args, binding):
+        return await driver.act(await observation_input(driver, args, binding, "desktop"), binding)
+
     registry.add(
         Tool(
             "computer_open",
@@ -24,7 +31,7 @@ def register_computer_tools(registry, driver):
                 },
                 ["resourceId"],
             ),
-            driver.observe,
+            observe,
         )
     )
     registry.add(
@@ -64,7 +71,7 @@ def register_computer_tools(registry, driver):
                     },
                 ],
             },
-            driver.act,
+            act,
             effect="write",
         )
     )

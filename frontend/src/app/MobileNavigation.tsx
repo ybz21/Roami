@@ -2,7 +2,7 @@ import { onboardingTitle, onboardingBack } from '../components/onboarding/onboar
 import { ICONS } from '../components/nav-icons'
 import { openPalette } from '../components/shell/palette'
 import { useI18n } from '../i18n'
-import { BellIcon, ChevronLeft, PlusIcon, SearchIcon } from '../icons'
+import { BellIcon, ChevronLeft, PlusIcon, SearchIcon, TargetIcon } from '../icons'
 
 import { MOBILE_NAV_KEYS, NAV, mobileNavRoot } from './navigation'
 type MobileNavigationProps = {
@@ -19,7 +19,7 @@ export function MobileTopBar({ tab, route = tab, go, unread, notifications, newT
   const { t } = useI18n()
   const navRoot = mobileNavRoot(tab, route)
   const mobilePrimary = MOBILE_NAV_KEYS.includes(tab) || tab === 'sessions'
-  const mobileBack = tab === 'onboarding' ? onboardingBack(route) : tab === 'activity' ? 'home' : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
+  const mobileBack = tab === 'onboarding' ? onboardingBack(route) : tab === 'activity' ? 'home' : tab === 'okr' ? 'projects' : tab === 'install' || tab === 'about' ? 'settings' : 'tools'
   const mobileTitle = tab === 'onboarding' ? t(onboardingTitle(route)) : tab === 'install' ? t('install.pageTitle')
     : tab === 'about' ? t('nav.about')
       : tab === 'sessions' || tab === 'swarm' || tab === 'w' ? t('nav.projects')
@@ -36,6 +36,7 @@ export function MobileTopBar({ tab, route = tab, go, unread, notifications, newT
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
           {tab === 'home' && <span ref={setMobileActionsHost} className="tt-mobile-page-actions" />}
+          {tab === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('okr.title')} onClick={() => go('okr')}><TargetIcon size={20} /></button>}
           <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon size={20} />{!!unread && <span className="agent-badge">{unread > 99 ? '99+' : unread}</span>}</button>
           {mobilePrimary && navRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}
             onClick={() => newTask()}><PlusIcon size={20} /></button>}

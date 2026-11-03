@@ -52,6 +52,27 @@ Use existing automatic updates and mobile pull-to-refresh instead of a permanent
 or a toolbar devoted to it. Desktop pages use browser refresh/F5; keep explicit recovery actions
 where an error requires them.
 
+## Use the Available Workspace
+
+Interactive workspaces (dashboards, boards, file browsers, editors, and agent activity views)
+fill the available canvas width and height. Do not cap a workspace shell with
+`--content-overview`, `--content-form`, or a fixed pixel width: this leaves a dead strip on wide
+screens. Limit readable prose, forms, and composers inside the workspace instead. Keep normal
+token-based padding; filling the workspace does not mean stretching text or controls indefinitely.
+
+- Allocate space to useful content: responsive columns for related results, and flexible panes
+  for lists, previews, and conversations. Do not add filler cards or enlarge type to occupy space.
+- Only an open pane reserves space. Closing a conversation, inspector, or explorer returns its
+  width to the active content; never keep an empty column for an optional module.
+- Size workspace tabs with flex/grid and `min-height: 0`, using the height remaining below the
+  actual header and tab bar. Do not simulate that space with fixed heights or guessed viewport
+  subtractions. The list, editor, or preview owns scrolling, not the document.
+- In a focused activity or file view, retain project identity and navigation; avoid repeating a
+  large objective summary that pushes the working content below the fold.
+- Verify desktop layouts at 1280, 1920, 2560, and 3440 CSS px, with optional panes open and closed,
+  plus the phone layout. Check pane bounds, usable content height, overflow, and real interactions;
+  a screenshot with a large unexplained empty band is a layout defect, not acceptable whitespace.
+
 ## Mobile Material UI
 
 All compact Web pages follow [`docs/development/mobile-material-ui.md`](docs/development/mobile-material-ui.md).

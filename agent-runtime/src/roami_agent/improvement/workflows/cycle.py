@@ -186,6 +186,16 @@ async def run_cycle(
                     }
                 if uses_shared_model_limit(ledger):
                     result["shared_admission_managed"] = True
+                if result.get("execution_kind") in {
+                    "native_files",
+                    "isolated_native_worker",
+                    "external_worker",
+                }:
+                    from roami_agent.improvement.integrations.tool_process import (
+                        logged_tool_process,
+                    )
+
+                    result.setdefault("metrics", {}).update(logged_tool_process(root))
                 trial = {
                     "case_id": case["id"],
                     "case_hash": digest(case),

@@ -27,6 +27,19 @@ function snapshot(): SwarmSnapshot {
 }
 beforeEach(() => { localStorage.clear(); test.phone = false; test.data = snapshot(); test.api.mockReset().mockResolvedValue({ data: {} }); test.refresh.mockReset().mockResolvedValue(undefined); test.error.mockReset(); test.openTask.mockReset() })
 afterEach(cleanup)
+it('embeds the same managed workspace without an extra page return action', () => {
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect(screen.queryByRole('button', { name: 'common.back' })).toBeNull()
+  expect(screen.getByRole('button', { name: /swarm.managed.tab.chat/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'swarm.managed.tab.board' })).toBeTruthy()
+})
+it('keeps Main discussion separate from undispatched members with no task identity', () => {
+  test.data = { ...test.data!, posts: [{ id: 1, author: 'human', text: 'Discuss with Main', taskId: null, createdMs: 5 }], work: test.data!.work.map(item => ({ ...item, task_id: null, revision: null, attempt: null })) }
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: /swarm.managed.tab.chat/ }))
+  expect(screen.getByText('Discuss with Main')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'swarm.managed.replyMember' })).toBeNull()
+})
 it('keeps a reported task in review and opens the original task outputs', () => {
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: /swarm.managed.tab.chat/ }))

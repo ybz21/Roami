@@ -17,7 +17,7 @@ function State({ state }: { state: string }) {
   const { t } = useI18n()
   return <span className="swarm-state" style={{ color: `var(${swarmStateToken(state)})` }}>{t(`swarm.managed.state.${state}`)}</span>
 }
-export default function ManagedSwarm({ id, onBack, openTerm }: { id: string; onBack: () => void; openTerm: (id: string) => void }) {
+export default function ManagedSwarm({ id, onBack, openTerm, embedded = false }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean }) {
   const { data, error, refresh } = useSwarmSnapshot(id), { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const panelKey = 'roami.swarm.panel:' + nodeApi('/agent/swarms/' + id)
   const [selected, setSelected] = useState('main'), [tab, setTab] = useState(() => localStorage.getItem(panelKey) || 'studio'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
@@ -60,7 +60,7 @@ export default function ManagedSwarm({ id, onBack, openTerm }: { id: string; onB
     </>}
   </div>
   return <div className="swarm-managed" data-tab={tab}>
-    <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && <button type="button" className="tt-act" onClick={onBack} aria-label={t('common.back')}><ChevronLeft /></button>}<h2>{data.name}</h2><State state={data.state} />{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts"><Button size="small" loading={busy} disabled={data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</Button><details className="swarm-controls"><summary>{t('common.more')}</summary><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></details></div></header>
+    <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && !embedded && <button type="button" className="tt-act" onClick={onBack} aria-label={t('common.back')}><ChevronLeft /></button>}<h2>{data.name}</h2><State state={data.state} />{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts"><Button size="small" loading={busy} disabled={data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</Button><details className="swarm-controls"><summary>{t('common.more')}</summary><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></details></div></header>
     {error && <div className="swarm-stream-error" role="status">{t('swarm.managed.reconnecting')}</div>}
     {data.mainState === 'failed' && <p role="alert" className="swarm-stream-error">{t('swarm.managed.mainFailed')}</p>}
     {data.archived && <p className="swarm-note">{t('swarm.managed.archived')}</p>}
@@ -85,7 +85,7 @@ function SwarmChat({ data, selected, onSelect, onWork, onSent }: { data: SwarmSn
   const sendKey = useRef<{ key: string; payload: string; body?: { text: string; workId?: string; taskRevision?: number | null } }>(saved.pending || { key: crypto.randomUUID(), payload: '' })
   useEffect(() => { localStorage.setItem(storageKey, JSON.stringify({ draft, recipient, pending: sendKey.current })) }, [draft, recipient, sending, storageKey])
   const messages = useMemo(() => [
-    ...data.posts.map(post => ({ id: 'post:' + post.id, author: post.author === 'human' ? t('swarm.chat.you') : post.author === 'main' ? 'Roami Main' : post.author, text: post.text, time: post.createdMs, pending: post.deliveryState === 'pending', work: data.work.find(item => item.task_id === post.taskId) })),
+    ...data.posts.map(post => ({ id: 'post:' + post.id, author: post.author === 'human' ? t('swarm.chat.you') : post.author === 'main' ? 'Roami Main' : post.author, text: post.text, time: post.createdMs, pending: post.deliveryState === 'pending', work: post.taskId ? data.work.find(item => item.task_id === post.taskId) : undefined })),
     ...data.mainMessages.filter(item => item.text).map(item => ({ id: item.id, author: 'Roami Main', text: item.text, time: item.createdMs, pending: false, work: undefined as SwarmWork | undefined })),
     ...data.work.filter(item => item.attempt?.summary).map(item => ({ id: 'result:' + item.id, author: item.member_name, text: item.attempt!.summary!, time: item.attempt?.finishedMs || 0, pending: false, work: item })),
   ].sort((a, b) => a.time - b.time), [data.posts, data.mainMessages, data.work, t])

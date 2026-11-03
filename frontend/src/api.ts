@@ -27,9 +27,10 @@ export async function api(method: string, path: string, body?: any, opts?: { sig
   const data = ct.includes('json') ? await r.json() : await r.text()
   if (!r.ok) {
     const errObj = data?.error || {}
-    const msg = errObj.message || errObj.code || 'HTTP ' + r.status
-    const err = new Error(msg) as Error & { apiError?: Record<string, any> }
+    const msg = (typeof errObj === 'string' ? errObj : errObj.message || errObj.code) || 'HTTP ' + r.status
+    const err = new Error(msg) as Error & { apiError?: Record<string, any>; status?: number }
     err.apiError = errObj
+    err.status = r.status
     throw err
   }
   if (method === 'POST' && (body?.activity || (path === '/tasks' && body?.type === 'agent'))) {

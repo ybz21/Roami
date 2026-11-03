@@ -4,6 +4,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Input, Modal, Spin, App as AntApp } from 'antd'
 import { api } from '../../api'
+import { pollWhileVisible } from '../../visible-poll'
+import { loadSwarmDirectory } from '../swarm/swarm-directory'
+import { swarmSessionMembership, type SwarmSessionMember } from '../swarm/swarm-session-membership'
 import { useI18n } from '../../i18n'
 import { AgentLogo, ChevronRight, CloseIcon, PencilIcon, StopIcon, SwarmIcon, TerminalIcon, PlusIcon } from '../../icons'
 import { MobileSheet, SheetRow } from '../shell/MobileSheet'
@@ -16,6 +19,7 @@ import MobileSubPage from '../MobileSubPage'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
+import { projectPath } from '../projects/okr/okr-workspace'
 import { getHashParams, setHashParams } from '../../route-hash'
 export type { OverviewItem } from './mobile-overview-cache'
 
@@ -75,7 +79,13 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   // 点开的项目（worktree 视图）；安卓返回手势退回列表
   const [cur, setCur] = useState<{ name: string; dir: string } | null>(null)
-  useEffect(() => { if (openProject) setCur({ name: openProject.name, dir: openProject.dir }) }, [openProject?.at]) // eslint-disable-line react-hooks/exhaustive-deps
+  const enterProject = (project: { name: string; dir: string }) => {
+    const key = projects?.find(p => p.dir === project.dir)?.key
+    if (key) { const query = getHashParams().toString(); location.hash = '#/' + projectPath(key) + (query ? '?' + query : '') }
+    else setCur(project)
+  }
+  const handledProject = useRef(0)
+  useEffect(() => { if (openProject && projects && handledProject.current !== openProject.at) { handledProject.current = openProject.at; if (!initialProjectKey) enterProject(openProject) } }, [openProject?.at, projects, initialProjectKey]) // eslint-disable-line react-hooks/exhaustive-deps
   // 长按一行：改名 / 中断 / 关闭（24 稿 §5 会话列表）
   const { message, modal } = AntApp.useApp()
   const [menu, setMenu] = useState<OverviewItem | null>(null)
@@ -114,31 +124,15 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     return () => { stop = true; clearInterval(timer) }
   }, [])
 
-  // 蜂群：成员会话折成一张卡（领队一行、成员缩进、N 待解锁），点卡头进蜂群页。和桌面会话页同一条取数路
-  const [swarmOf, setSwarmOf] = useState<Record<string, { swarm: string; role: 'leader' | 'member' }>>({})
+  const [swarmOf, setSwarmOf] = useState<Record<string, SwarmSessionMember>>({})
   const [swarmPending, setSwarmPending] = useState<Record<string, number>>({})
-  useEffect(() => {
-    let stop = false
-    const load = async () => {
-      try {
-        const swarms = await api('GET', '/swarms')
-        if (!Array.isArray(swarms)) return
-        const of: typeof swarmOf = {}, pend: Record<string, number> = {}
-        await Promise.all(swarms.map(async (sw: any) => {
-          try {
-            const st = await api('GET', `/swarms/${encodeURIComponent(sw.name)}`)
-            if (st?.supervisor) of[st.supervisor] = { swarm: sw.name, role: 'leader' }
-            for (const m of (st?.members || [])) if (m?.session) of[m.session] = { swarm: sw.name, role: m.role === 'leader' || m.role === 'master' ? 'leader' : 'member' }
-            pend[sw.name] = Array.isArray(st?.pending) ? st.pending.length : 0
-          } catch {}
-        }))
-        if (!stop) { setSwarmOf(of); setSwarmPending(pend) }
-      } catch {}
+  useEffect(() => pollWhileVisible(async signal => {
+    const groups = await loadSwarmDirectory()
+    if (!signal.aborted) {
+      const membership = swarmSessionMembership(groups)
+      setSwarmOf(membership.sessions); setSwarmPending(membership.pending)
     }
-    void load()
-    const i = setInterval(load, 10000)
-    return () => { stop = true; clearInterval(i) }
-  }, [])
+  }, 10000).stop, [])
 
   const needle = q.trim().toLowerCase()
   const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : filter === 'activity' || filter === 'unfinished' ? false : !s.waiting && !s.running && !s.dormant)
@@ -188,16 +182,15 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       if (seen.has(sw.swarm)) continue
       seen.add(sw.swarm)
       const members = list.filter((x) => swarmOf[x.name]?.swarm === sw.swarm)
-      const leader = members.filter((x) => swarmOf[x.name]?.role === 'leader'), rest = members.filter((x) => swarmOf[x.name]?.role !== 'leader')
       const pending = swarmPending[sw.swarm] || 0
       out.push(
         <div key={'sw:' + sw.swarm} className="tt-msess-task swarm">
           <button type="button" className="tn" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(sw.swarm) }}>
-            <SwarmIcon size={14} /><b>{sw.swarm}</b><span>{members.length}</span>
+            <SwarmIcon size={14} /><b>{sw.label}</b><span>{members.length}</span>
             {pending > 0 && <i className="pend">{t('swarm.pendingSummary', { count: pending })}</i>}
             <ChevronRight size={14} />
           </button>
-          {[...leader, ...rest].map((x) => row(x, true))}
+          {members.map((x) => row(x, true))}
         </div>,
       )
     }
@@ -206,7 +199,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 
   if (initialProjectKey) {
     const project = projects?.find(project => project.key === initialProjectKey)
-    return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { location.hash = '#/projects' }} keepBottomNav>
+    return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }} keepBottomNav>
       {project ? <MobileProjectDetail projectId={project.key} dir={project.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} /> : <p role="status">{projects === null ? t('common.loading') : t('agent.activity.detailsUnavailable')}</p>}
     </MobileSubPage>
   }
@@ -242,7 +235,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       {filter === 'activity' ? <SessionActivity onOpenSession={onOpen} showEmpty /> : filter === 'unfinished' ? (
         projects === null ? <div className="tt-msess-empty" role="status">{t('common.loading')}</div>
           : unfinishedProjects.length ? unfinishedProjects.map((p) => (
-            <button key={p.key} type="button" className="tt-msess-unfinished" onClick={() => setCur({ name: p.name, dir: p.dir })}>
+            <button key={p.key} type="button" className="tt-msess-unfinished" onClick={() => enterProject(p)}>
               <span className="av">{p.name.slice(0, 1).toUpperCase()}</span><span className="name">{p.name}</span>
               <span className="count">{t('mobile.proj.unfinished', { n: p.unfinished })}</span><ChevronRight size={14} />
             </button>
@@ -250,7 +243,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       ) : visibleGroups.map((g, i) => (
         <section key={i} className="tt-msess-sec">
           {g.dir
-            ? <button type="button" className="tt-msess-proj" onClick={() => setCur({ name: g.name, dir: g.dir })}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
+            ? <button type="button" className="tt-msess-proj" onClick={() => enterProject(g)}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
             : <h3>{g.name} <span>{g.list.length}</span></h3>}
           {swarmCards(needle || filter !== 'all' || expanded.has(g.name) ? g.list : g.list.slice(0, 5))}
           {filter === 'all' && projects?.find(project => project.dir === g.dir) && <NativeProjectSessions projectId={projects.find(project => project.dir === g.dir)!.key} entries={(native.value || []).filter(session => session.projectId === projects.find(project => project.dir === g.dir)!.key)} />}

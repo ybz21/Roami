@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>本地创作者后台夹具</title><link rel="stylesheet" href="../design.css"></head>
+<body><header class="doc-header"><div class="topbar"><span>浏览器 connector 验证夹具</span></div></header><main class="doc-scroll"><article><div class="tt-pagehead"><h1>创作者数据（虚构）</h1><p>仅用于验证实际浏览器读取，不连接抖音、视频号或真实账号。</p></div><p id="account" data-account-id="demo-creator">账号：demo-creator</p><p>数据日期：<time id="observation-date" datetime="2026-11-11">2026-11-11</time></p><table><thead><tr><th>字段</th><th>数值</th><th>单位</th></tr></thead><tbody><tr><td>粉丝总量</td><td data-field="audience">328</td><td>人</td></tr><tr><td>当日点赞</td><td data-field="likes">30</td><td>次</td></tr><tr><td>当日有效播放</td><td data-field="plays">600</td><td>次</td></tr><tr><td>当日完整播放</td><td data-field="completed">144</td><td>次</td></tr><tr><td>当日总观看</td><td data-field="watch-seconds">8400</td><td>秒</td></tr></tbody></table><p><button type="button" data-day="11">11 月 11 日</button> <button type="button" data-day="12">11 月 12 日</button> <button type="button" data-day="13">11 月 13 日</button></p><p><button type="button" id="break-field">模拟字段变化</button> <button type="button" id="wrong-account">模拟账号切换</button></p><p id="state">当前字段和账号可供核对。</p></article></main><script>
+const values = { 11:[328,30,600,144,8400],12:[334,40,700,224,12600],13:[332,25,600,162,10200] };
+document.querySelectorAll('[data-day]').forEach(button => button.addEventListener('click',() => {
+  const date = `2026-11-${button.dataset.day}`;
+  document.querySelector('time').dateTime = date;document.querySelector('time').textContent = date;
+  ['audience','likes','plays','completed','watch-seconds'].forEach((key,index) => { const el = document.querySelector(`[data-field="${key}"]`);if(el) el.textContent = values[button.dataset.day][index] });
+}));
+document.querySelector('#break-field').addEventListener('click',() => { document.querySelector('[data-field="audience"]')?.removeAttribute('data-field');document.querySelector('#state').textContent = '粉丝字段发生变化，读取应失败。刷新可恢复。' });
+document.querySelector('#wrong-account').addEventListener('click',() => { document.querySelector('#account').dataset.accountId = 'another-account';document.querySelector('#state').textContent = '账号已切换，读取应失败。刷新可恢复。' });
+</script></body></html>

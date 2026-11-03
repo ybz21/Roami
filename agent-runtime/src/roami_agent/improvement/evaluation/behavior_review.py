@@ -276,6 +276,14 @@ def review_cycle(manifest, trials):
             return sum(values) if all(type(v) is int and v >= 0 for v in values) else None
 
         layers, roles = {}, {}
+        tool_calls, tool_errors = metric_sum("tool_calls"), metric_sum("tool_errors")
+        first_calls, first_successes = (
+            metric_sum("tool_first_calls"),
+            metric_sum("tool_first_successes"),
+        )
+        process_complete = bool(items) and all(
+            t["metrics"].get("tool_process_coverage") == "complete" for t in items
+        )
         for trial in items:
             if blocking_code(trial):
                 continue
@@ -313,6 +321,17 @@ def review_cycle(manifest, trials):
             else None,
             "verified_delivery_time_p50_ms": statistics.median(times) if times else None,
             "tool_calls": metric_sum("tool_calls"),
+            "tool_errors": tool_errors,
+            "tool_failures": metric_sum("tool_failures"),
+            "tool_argument_failures": metric_sum("tool_argument_failures"),
+            "tool_admission_failures": metric_sum("tool_admission_failures"),
+            "tool_process_coverage": "complete" if process_complete else "incomplete",
+            "tool_error_rate": tool_errors / tool_calls
+            if process_complete and tool_calls and tool_errors is not None
+            else None,
+            "tool_first_attempt_success_rate": first_successes / first_calls
+            if process_complete and first_calls and first_successes is not None
+            else None,
             "model_calls": metric_sum("model_calls"),
             "quality_by_layer": {
                 name: {

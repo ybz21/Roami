@@ -47,8 +47,10 @@ import { SessionActivity, SESSION_ACTIVITY_CSS } from './project-list/session-ac
 import { ProjectCard, CARD_CSS } from './project-list/project-card'
 import { useSwarmProjection, normDir } from './project-list/swarm-projection'
 import FileBrowser from '../files/FileBrowser'
-import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, WarnIcon, WindowsIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronLeft, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, TargetIcon, WarnIcon, WindowsIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
+import { getHashParams } from '../../route-hash'
+import { projectPath } from './okr/okr-workspace'
 import { lazyRetry } from '../lazy-retry'
 
 const WorktreePanel = lazyRetry(() => import('../git/WorktreePanel'))
@@ -1288,13 +1290,13 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       <div className="prj-wrap">
         {/* 项目头：面包屑 | 名称 / 路径 · ⎇主干@HEAD | 主操作。sticky（14 §6.2）——
             往下翻任务流时"我在哪个项目、要新建什么"不该跟着滚走。 */}
-        <div className="prj-in prj-head" style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
-          <Button type="text" size="small" onClick={() => { location.hash = '#/projects' }}
-            style={{ color: 'var(--text-dim)', paddingInline: 6, flex: '0 0 auto' }}>‹ {t('project.title')}</Button>
+        <div className="tt-pagehead prj-in prj-head" style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
+          <Button type="text" size="small" icon={<ChevronLeft />} onClick={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }}
+            style={{ color: 'var(--text-dim)', paddingInline: 'var(--sp-2)', flex: '0 0 auto' }}> {t('project.title')}</Button>
           <span style={{ width: 1, height: 18, background: 'var(--border-subtle)', flex: '0 0 auto' }} />
           <div style={{ minWidth: 0, flex: 1 }}>
             {/* 名称可编辑 = 重命名（displayName 偏好，key/目录不变） */}
-            <Typography.Text style={{ fontSize: 16, fontWeight: 700, display: 'block', whiteSpace: 'nowrap' }}
+            <Typography.Text style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, display: 'block', whiteSpace: 'nowrap' }}
               ellipsis editable={{ onChange: rename, tooltip: t('project.rename'), triggerType: ['icon'] }}>
               {proj.name}
             </Typography.Text>
@@ -1309,6 +1311,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
               </Tooltip>
             </div>
           </div>
+          <Button size="small" icon={<TargetIcon />} onClick={() => { const query = getHashParams().toString(); location.hash = '#/' + projectPath(proj.key, true) + (query ? '?' + query : '') }}>{t('okr.title')}</Button>
           {isGit && <Button size="small" onClick={() => setGitOpen(true)}>{t('project.gitPanel')}</Button>}
           {/* 「新建会话 / 蜂群 / Race / 命令行」原来散在页头和编队 tab 里，两处入口互相不知道
               对方存在。集中成一枚 split button：主动作 = 回到 composer 描述需求（这一页最主要的

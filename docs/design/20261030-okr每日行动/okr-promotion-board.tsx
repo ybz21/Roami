@@ -1,0 +1,16 @@
+import React from 'react'
+import { CycleState } from './okr-execution-cycle'
+const show=(value:number|undefined,unit='')=>value === undefined ? '待取得数据' : `${Number(value.toFixed(2))}${unit}`
+const change=(value:number|undefined,before:number|undefined,unit='')=>value === undefined || before === undefined ? '待比较' : `${value-before>0?'+':''}${value-before}${unit}`
+export default function PromotionBoard({state,date}:{state:CycleState;date:string}) {
+  const row=state.observations.find(item=>item.date===date),base=state.observations.find(item=>item.date==='2026-11-11')
+  const previous=new Date(Date.parse(`${date}T12:00:00Z`)-86400000).toISOString().slice(0,10),before=state.observations.find(item=>item.date===previous)
+  const completion=row?.biliPlays && row.biliCompleted !== undefined ? row.biliCompleted/row.biliPlays*100 : undefined
+  const average=row?.biliPlays && row.biliWatchSeconds !== undefined ? row.biliWatchSeconds/row.biliPlays : undefined
+  return <section className="book-section promotion-board" aria-label="Roami 宣传共享看板"><h3>Roami 宣传结果</h3><p className="meta">ybz21/Roami · {date} · 全部为虚构回放，示例目标需确认</p>
+    <div className="book-board-stats"><article data-promotion="stars"><small>GitHub star / 建议八周净增 100</small><strong>{show(row?.value,' star')}</strong><small>日变化 {change(row?.value,before?.value)} · 周期净增 {row && base ? row.value-base.value : '未知'}</small></article><article data-promotion="forks"><small>GitHub fork / 建议八周净增 20</small><strong>{show(row?.forks,' fork')}</strong><small>日变化 {change(row?.forks,before?.forks)} · 周期净增 {row?.forks !== undefined && base?.forks !== undefined ? row.forks-base.forks : '未知'}</small></article></div>
+    <div className="book-metric-list"><article data-channel="x"><h3>X 图文智能体</h3><small>任务日期 {state.activeDate} · 反馈日期 {date}</small><p>英文图文、真实功能截图与仓库入口</p><p>{(state.delivered[state.activeDate]??[]).includes('x-post') ? '本轮产物与示例发布回执已验收' : '等待本轮制作或验收'}</p><small>曝光 {show(row?.xViews)} · 链接点击 {show(row?.xClicks)}</small></article><article data-channel="bilibili"><h3>B站视频智能体</h3><small>任务日期 {state.activeDate} · 反馈日期 {date}</small><p>每天一个 Roami 小技巧：录屏、中文配音、字幕与视频</p><p>{(state.delivered[state.activeDate]??[]).includes('bili-tip') ? '本轮配音视频与示例发布回执已验收' : '等待本轮录屏、配音与合成'}</p><small>播放 {show(row?.biliPlays)} · 完播 {show(completion,'%')} · 平均观看 {show(average,' 秒')}</small></article></div>
+    <p className="meta">两个内容渠道的反馈用于诊断。没有归因证据，不把曝光、点击或视频表现换算成 star/fork。</p>
+    <details><summary>查看按日结果与渠道原始数</summary><div className="history-table"><table><thead><tr><th>日期</th><th>star / 日变化</th><th>fork / 日变化</th><th>X 曝光 / 点击</th><th>B站播放 / 完整 / 总秒数</th><th>来源与更新时间</th></tr></thead><tbody>{state.observations.filter(item=>item.date<=date).map(item=>{const dayBefore=new Date(Date.parse(`${item.date}T12:00:00Z`)-86400000).toISOString().slice(0,10),prev=state.observations.find(old=>old.date===dayBefore);return <tr key={item.date}><td>{item.date}</td><td>{item.value} / {change(item.value,prev?.value)}</td><td>{show(item.forks)} / {change(item.forks,prev?.forks)}</td><td>{show(item.xViews)} / {show(item.xClicks)}</td><td>{show(item.biliPlays)} / {show(item.biliCompleted)} / {show(item.biliWatchSeconds)}</td><td>{item.source}<br/>{item.dataReadyAt}</td></tr>})}</tbody></table></div></details>
+  </section>
+}

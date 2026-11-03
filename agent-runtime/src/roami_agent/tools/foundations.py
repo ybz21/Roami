@@ -6,11 +6,11 @@ import re
 import shlex
 from copy import deepcopy
 from dataclasses import replace
+from pathlib import PurePath
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
-from roami_agent.protocol.tool_arguments import validate_tool_arguments
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.command_families import COMMANDS, INTERNAL, operation_kind, public_operation
 from roami_agent.tools.process import execute
@@ -104,7 +104,7 @@ class ToolDirectory:
                             "--input",
                             "JSON",
                         ],
-                        "inputSchema": deepcopy(tool.schema),
+                        "inputSchema": deepcopy(tool.model_schema or tool.schema),
                         "effect": tool.effect,
                     }
                 )
@@ -203,8 +203,8 @@ class ToolDirectory:
             )
             if any(item["name"] == "browser_use" for item in result["suggestions"]):
                 result["hint"] += (
-                    " browser_use guides public research. Main can delegate with target={kind:new_session,resourceOnly:true} "
-                    "and bounded routing; complex investigations use a professional executor."
+                    ' browser_use guides public research. Main can delegate with executor="native" '
+                    "for bounded browser work or the configured default for complex investigations."
                 )
         return result
 
@@ -218,7 +218,7 @@ class ToolDirectory:
         commands = [
             {
                 "argv": ["roami", *path, "--input", "JSON"],
-                "inputSchema": deepcopy(available[name].schema),
+                "inputSchema": deepcopy(available[name].model_schema or available[name].schema),
                 "effect": available[name].effect,
             }
             for name, path in COMMANDS.items()
@@ -244,17 +244,17 @@ class ToolDirectory:
         if "browser_open" in available:
             browser_commands = [
                 ["new", "URL"],
-                ["observe", "--resource", "RESOURCE_ID"],
-                ["screenshot", "--resource", "RESOURCE_ID"],
-                ["goto", "URL", "--observation", "OBSERVATION_ID"],
+                ["observe"],
+                ["screenshot"],
+                ["goto", "URL"],
             ]
             browser_commands.extend(
                 [
                     ["observe", "--target", "TARGET_ID"],
-                    ["click", "SELECTOR", "--observation", "OBSERVATION_ID"],
-                    ["fill", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
-                    ["type", "SELECTOR", "TEXT", "--observation", "OBSERVATION_ID"],
-                    ["press", "KEY", "--observation", "OBSERVATION_ID"],
+                    ["click", "SELECTOR"],
+                    ["fill", "SELECTOR", "TEXT"],
+                    ["type", "SELECTOR", "TEXT"],
+                    ["press", "KEY"],
                 ]
             )
             entries.append(
@@ -353,20 +353,45 @@ class ToolDirectory:
                 if reference:
                     args["reference"] = reference
             elif path.startswith("artifact://"):
-                name, args = (
-                    "artifact_read",
-                    {
-                        "id": path.removeprefix("artifact://"),
-                        **{key: value for key, value in args.items() if key != "path"},
-                    },
-                )
+                original = self.registry.registry["artifact_read"]
+                args = {
+                    "id": path.removeprefix("artifact://"),
+                    **{key: value for key, value in args.items() if key != "path"},
+                }
+
+                async def artifact_lines(arguments, binding):
+                    return await original.handler(arguments, dict(binding, fileReadLines=True))
+
+                return replace(original, main=True, handler=artifact_lines), args
             else:
-                return replace(self.registry.registry["file_read"], main=True), args
+                original = self.registry.registry["file_read"]
+
+                async def read_lines(arguments, binding):
+                    image = PurePath(arguments["path"]).suffix.lower() in {
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                        ".webp",
+                        ".gif",
+                    }
+                    if image and arguments.get("offset") == 1:
+                        arguments = {
+                            key: value for key, value in arguments.items() if key != "offset"
+                        }
+                    return await original.handler(arguments, dict(binding, fileReadLines=not image))
+
+                return replace(
+                    original, main=True, model_schema=tool.model_schema, handler=read_lines
+                ), args
         elif tool.name in {"edit", "write"}:
             name = "file_patch" if tool.name == "edit" else "file_write"
-            return replace(self.registry.registry[name], main=True), args
+            return replace(
+                self.registry.registry[name], main=True, model_schema=tool.model_schema
+            ), args
         elif tool.name == "bash":
             argv = self.argv(args)
+            if argv and argv[0] in {"roami", self.settings.cli_bin}:
+                args = {key: value for key, value in args.items() if key not in {"scope", "cwd"}}
             if args.get("scope") == "host":
                 if role in self.registry.shell_disabled_roles:
                     raise DomainError("TOOL_UNAVAILABLE")
@@ -410,7 +435,7 @@ class ToolDirectory:
         original = self.registry.registry.get(name)
         if not original or name in self.registry.disabled_tools:
             raise DomainError("TOOL_DISABLED" if original else "TOOL_UNAVAILABLE")
-        validate_tool_arguments(original.schema, args)
+        original.validate(args)
         return original, args
 
 
@@ -427,6 +452,14 @@ def register_foundations(registry, settings):
             args.get("offset", 0),
         )
         result["availability"] = await registry.registry["capability_overview"].handler({}, binding)
+        for item in result["items"]:
+            if item.get("source") != "builtin" or item.get("kind") != "cli":
+                continue
+            if item.get("argv"):
+                item["command"] = shlex.join(item.pop("argv"))
+            for command in item.get("commands", []):
+                if command.get("argv"):
+                    command["command"] = shlex.join(command.pop("argv"))
         return result
 
     async def bash(args, binding):
@@ -454,6 +487,13 @@ def register_foundations(registry, settings):
             raise DomainError("TOOL_DISABLED")
         shell_args = {key: value for key, value in args.items() if key != "command"}
         shell_args["argv"] = ["bash", "-c", args["command"]] if "command" in args else argv
+        if (
+            "scope" not in shell_args
+            and binding.get("role") == "main"
+            and not binding.get("workspace")
+            and not binding.get("taskId")
+        ):
+            shell_args["scope"] = "host"
         return await registry.registry["shell"].handler(shell_args, binding)
 
     async def resolved_only(args, binding):
@@ -540,3 +580,7 @@ def register_foundations(registry, settings):
             cancellation_stops_execution=True,
         )
     )
+
+    from roami_agent.tools.model_inputs import register_model_inputs
+
+    register_model_inputs(registry)
