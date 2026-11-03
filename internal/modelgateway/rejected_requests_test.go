@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -73,19 +72,21 @@ func TestCatalogRejectionDoesNotBlockSharedDailyBudget(t *testing.T) {
 				} {
 					body, _ := json.Marshal(protocolFixtureRequest(next.protocol, false))
 					response := requestWithKey(h, h.Catalog.credential(next.agent), next.path, string(body))
-					if rejection.unknown {
-						if response.Code != 409 || !strings.Contains(response.Body.String(), "MODEL_PROXY_USAGE_UNKNOWN") || hits.Load() != 1 {
-							t.Fatalf("unknown charges bypassed admission: %d %s hits=%d", response.Code, response.Body, hits.Load())
-						}
-					} else if response.Code != 200 {
+					if response.Code != 200 {
 						t.Fatalf("rejection blocked %s: %d %s", next.agent, response.Code, response.Body)
 					}
 				}
-				if !rejection.unknown {
-					stats, err = h.Ledger.Statistics(1)
-					if err != nil || hits.Load() != 3 || len(stats.Recent) != 3 || stats.Today[0].Unknown != 0 {
-						t.Fatalf("subsequent calls did not settle: %+v hits=%d err=%v", stats, hits.Load(), err)
-					}
+				stats, err = h.Ledger.Statistics(1)
+				var unknown int64
+				for _, group := range stats.Today {
+					unknown += group.Unknown
+				}
+				wantUnknown := int64(0)
+				if rejection.unknown {
+					wantUnknown = 1
+				}
+				if err != nil || hits.Load() != 3 || len(stats.Recent) != 3 || unknown != wantUnknown {
+					t.Fatalf("subsequent calls did not settle or lost unknown charge: %+v hits=%d err=%v", stats, hits.Load(), err)
 				}
 			})
 		}

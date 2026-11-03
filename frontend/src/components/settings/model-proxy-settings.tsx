@@ -48,7 +48,7 @@ export function ModelProxySettings({ value, disabled, onChange, snapshot, active
         <div><span>{t('agent.proxy.tokens')}</span><strong>{count(usage.inputTokens + usage.outputTokens)}</strong></div>
       </div>
       <p className="agent-settings-hint">{t('agent.proxy.period', { day: new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(usage.day + 'T00:00:00Z')), zone: usage.timezone })}</p>
-      {usage.unknown > 0 && <p className="agent-settings-error" role="status">{t('agent.proxy.unknown', { count: count(usage.unknown) })}</p>}
+      {usage.unknown > 0 && <p className="agent-settings-hint" role="status">{t('agent.proxy.unknown', { count: count(usage.unknown) })}</p>}
       {usage.pending > 0 && <p className="agent-settings-hint">{t('agent.proxy.pending', { count: count(usage.pending) })}</p>}
 
     </> : !failed && <Spin size="small" />}

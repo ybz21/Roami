@@ -152,13 +152,10 @@ func (l *Ledger) Admit(role, model, session, request string, attribution ...Call
 			call.PriceStatus = "unpriced"
 		}
 		if c.DailyLimit != nil {
-			var spent, unknown, pending int64
-			err := tx.QueryRow(`SELECT COALESCE(SUM(cost_nano),0),COALESCE(SUM(state='unknown'),0),COALESCE(SUM(state='pending'),0) FROM gateway_calls WHERE day=?`, call.Day).Scan(&spent, &unknown, &pending)
+			var spent, pending int64
+			err := tx.QueryRow(`SELECT COALESCE(SUM(cost_nano),0),COALESCE(SUM(state='pending'),0) FROM gateway_calls WHERE day=?`, call.Day).Scan(&spent, &pending)
 			if err != nil {
 				return err
-			}
-			if unknown > 0 {
-				return fmt.Errorf("MODEL_PROXY_USAGE_UNKNOWN")
 			}
 			if pending > 0 {
 				return fmt.Errorf("MODEL_PROXY_USAGE_PENDING")

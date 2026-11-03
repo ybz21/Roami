@@ -109,8 +109,12 @@ func TestLedgerRecoveryUnknownReconciliationAndZeroDefault(t *testing.T) {
 	if err = l.Recover(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = l.Admit("worker", "fixture", "", ""); err == nil || err.Error() != "MODEL_PROXY_USAGE_UNKNOWN" {
-		t.Fatalf("unknown call admitted: %v", err)
+	continued, err := l.Admit("worker", "fixture", "", "")
+	if err != nil {
+		t.Fatalf("unknown charge blocked a new call: %v", err)
+	}
+	if err = l.Settle(continued, &Usage{}, 200, "", false); err != nil {
+		t.Fatal(err)
 	}
 	if err = l.Reconcile(call.ID, .25, "provider receipt checked"); err != nil {
 		t.Fatal(err)
@@ -135,7 +139,7 @@ func TestLedgerRecoveryUnknownReconciliationAndZeroDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stats.Groups) != 2 {
+	if len(stats.Groups) != 3 {
 		t.Fatalf("groups: %+v", stats)
 	}
 	for _, record := range stats.Recent {
@@ -145,6 +149,69 @@ func TestLedgerRecoveryUnknownReconciliationAndZeroDefault(t *testing.T) {
 	}
 	if _, err = l.Admit("worker", "fixture", "", ""); err != nil {
 		t.Fatalf("zero default blocked: %v", err)
+	}
+}
+
+func TestUnknownChargesRetainAccountingWithoutBlockingConfirmedLimit(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		calls     int
+		reconcile bool
+	}{
+		{"confirmed spending", 5, false},
+		{"reconciled spending", 2, true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			l := newLedger(t)
+			limit := 1.0
+			if err := l.Configure(testConfiguration(&limit)); err != nil {
+				t.Fatal(err)
+			}
+			unknown, err := l.Admit("cli_claude", "fixture", "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = l.Settle(unknown, nil, 0, "MODEL_TRANSPORT_FAILED", false); err != nil {
+				t.Fatal(err)
+			}
+			if err = l.Recover(); err != nil {
+				t.Fatal(err)
+			}
+			roles := []string{"cli_codex", "cli_opencode", "main", "worker", "memory"}
+			for _, role := range roles[:scenario.calls] {
+				call, err := l.Admit(role, "fixture", "", "")
+				if err != nil {
+					t.Fatalf("unknown charge blocked %s: %v", role, err)
+				}
+				if err = l.Settle(call, &Usage{Input: 100_000}, 200, "", false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			stats, err := l.Statistics(1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, record := range stats.Recent {
+				if record.ID == unknown.ID {
+					found = true
+					if record.State != "unknown" || record.Cost != nil || record.Input != nil || record.Reconciliation != "" || record.Error != "MODEL_TRANSPORT_FAILED" {
+						t.Fatalf("unknown charge was rewritten: %+v", record)
+					}
+				}
+			}
+			if !found || len(stats.Recent) != scenario.calls+1 {
+				t.Fatalf("missing receipt: %+v", stats)
+			}
+			if scenario.reconcile {
+				if err = l.Reconcile(unknown.ID, .6, "provider receipt checked"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err = l.Admit("main", "fixture", "", ""); err == nil || err.Error() != "MODEL_PROXY_DAILY_LIMIT" {
+				t.Fatalf("confirmed limit bypassed: %v", err)
+			}
+		})
 	}
 }
 
