@@ -23,6 +23,11 @@
       "id": "MECH-NS01-H2",
       "rule": "已提交Native回合被结束；启动错误保持原错误，停机保持中断，不改原CLI时限。",
       "failure_effect": "case_failed"
+    },
+    {
+      "id": "MECH-NS01-H3",
+      "rule": "重复取消不得打断启动核对或停止收尾；用户停止与续跑得到终态，关机保持中断，未知写入仍阻断重放。",
+      "failure_effect": "case_failed"
     }
   ],
   "decision_domains": [
@@ -33,11 +38,15 @@
   "provenance": {
     "origin": "observed_runtime_regression",
     "issue": 443,
-    "private_records_published": false
+    "private_records_published": false,
+    "related_issues": [
+      634
+    ]
   },
   "resources": {
     "inputs": [
-      "input/scenarios.json"
+      "input/scenarios.json",
+      "input/cancellation-settlement.json"
     ],
     "tools": "tools.json",
     "generator": "scripts/run.py",

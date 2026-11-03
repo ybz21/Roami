@@ -1,0 +1,8 @@
+{
+  "after_record": [false, true],
+  "unknown_write": [false, true],
+  "intents": ["continue", "stop", "shutdown"],
+  "extra_cancel_signals": 2,
+  "goal": "Read the supplied data",
+  "continuation": "Include another check"
+}
