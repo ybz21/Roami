@@ -32,6 +32,57 @@ async def test_swarm_discovery_and_scoped_help_return_executable_schemas(store):
         await runtime.close()
 
 
+async def test_swarm_post_receipt_uses_identity_not_runtime_callbacks(store):
+    runtime = Runtime(store, ConversationModel())
+    runtime.swarms.chat = None
+    conversation = await runtime.conversations.create("alice")
+    created = await runtime.swarms.create(
+        "alice",
+        {
+            "name": "Posting",
+            "goal": "Share verified progress",
+            "mainConversationId": conversation["id"],
+            "commandKey": "create-posting",
+        },
+    )
+    binding = {
+        "owner": "alice",
+        "conversation": conversation["id"],
+        "turnId": "post-turn",
+        "toolCallId": "post-call",
+        "assistantMessageId": "message-one",
+        "progress": lambda *_: None,
+    }
+    call = command(
+        [
+            "roami",
+            "swarm",
+            "post",
+            "--input",
+            json.dumps({"swarmId": created["id"], "text": "Plan reviewed"}),
+        ],
+        as_text=True,
+    )
+    try:
+        posted = await runtime.tools.invoke(call, "main", binding)
+        assert (
+            await runtime.tools.invoke(
+                call,
+                "main",
+                {**binding, "progress": lambda *_: None, "assistantMessageId": "message-two"},
+            )
+            == posted
+        )
+        posts = (await runtime.swarms.snapshot("alice", created["id"]))["posts"]
+        assert len(posts) == 1 and posts[0]["author"] == "main"
+        other = await runtime.conversations.create("alice")
+        with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
+            await runtime.tools.invoke(call, "main", {**binding, "conversation": other["id"]})
+        assert len((await runtime.swarms.snapshot("alice", created["id"]))["posts"]) == 1
+    finally:
+        await runtime.close()
+
+
 @pytest.mark.parametrize("as_text", [False, True])
 async def test_discovered_swarm_commands_preserve_binding_and_revision_without_host_cli(
     store, monkeypatch, as_text

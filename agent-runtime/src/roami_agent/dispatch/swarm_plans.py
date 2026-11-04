@@ -372,6 +372,15 @@ class SwarmPlans:
         text = spec.get("text", "").strip()
         if not text or len(text) > 8000:
             raise DomainError("INVALID_SWARM_MESSAGE")
+        identity_binding = (
+            {
+                key: binding[key]
+                for key in ("conversation", "taskId", "runId", "taskRevision")
+                if key in binding
+            }
+            if binding
+            else None
+        )
 
         def write(db):
             def apply():
@@ -424,7 +433,11 @@ class SwarmPlans:
                 return {"id": ident, "swarmId": sid}
 
             return receipt(
-                db, owner, spec["commandKey"], {"swarmId": sid, **spec, "binding": binding}, apply
+                db,
+                owner,
+                spec["commandKey"],
+                {"swarmId": sid, **spec, "binding": identity_binding},
+                apply,
             )
 
         return await self.db.call(write, write=True)
