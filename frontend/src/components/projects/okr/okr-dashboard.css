@@ -4,7 +4,7 @@
 .okr-objective-head h2{font-size:var(--fs-title);line-height:1.5;margin:0}
 .okr-board{padding-block:var(--sp-3)}
 .okr-board-toolbar{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding-block:var(--sp-2) var(--sp-4);flex-wrap:wrap}
-.okr-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-4)}
+.okr-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*12)),1fr));gap:var(--sp-4)}
 .okr-result{min-width:0;padding:var(--sp-4);background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:var(--r-card)}
 .okr-result+.okr-result{border-top:1px solid var(--border-subtle)}
 .okr-result h4{min-height:calc(var(--sp-5)*2);margin:var(--sp-3) 0;line-height:1.6;font-size:var(--fs-body)}
