@@ -225,6 +225,7 @@ func New(cfg Config) *gin.Engine {
 		g.PATCH("/projects/:key/prefs", h.ProjectPrefs)     // 置顶/显示名/默认 agent/base
 		g.GET("/okr", h.ProjectOKROverview)
 		g.GET("/projects/:key/okr", h.ProjectOKRGet)
+		g.GET("/projects/:key/okr/legacy-swarm", h.ProjectOKRLegacySwarm)
 		g.PUT("/projects/:key/okr", h.ProjectOKRSave)
 		g.POST("/projects/:key/okr/observations", h.ProjectOKRObserve)
 		g.POST("/projects/:key/okr/collect", h.ProjectOKRCollect)

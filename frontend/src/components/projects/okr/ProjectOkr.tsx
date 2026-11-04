@@ -253,7 +253,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
           ]} />
           </>}
         </> },
-        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} openTerm={onSession} onNav={() => setMainPanel('board')} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={() => { if (workspace) setDraft(configurationOf(workspace)); setEditing(true); setMainPanel('board') }}>{t('okr.edit')}</Button></div> : null },
+        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} projectId={projectId} onManage={() => { if (!editing) setDraft(configurationOf(workspace)); setEditing(true); setMainPanel('board') }} openTerm={onSession} onNav={() => setMainPanel('board')} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={() => { if (workspace) setDraft(configurationOf(workspace)); setEditing(true); setMainPanel('board') }}>{t('okr.edit')}</Button></div> : null },
         { key: 'files', label: t('okr.tab.files'), children: <Suspense fallback={<Spin />}><OkrProjectFiles key={projectDir} dir={projectDir} active={mainPanel === 'files'} /></Suspense> },
       ]} />
     </>}

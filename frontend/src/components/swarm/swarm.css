@@ -103,3 +103,14 @@ html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm
 .swarm-project-heading .tt-act { margin-left:auto; }
 .swarm-project-card p { color:var(--text-dim); font-size:var(--fs-sm); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .swarm-project-card small { font-size:var(--fs-meta); color:var(--text-dim); }
+
+.swarm-legacy { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; }
+.swarm-legacy-content { flex:1; min-height:0; overflow:auto; padding:var(--sp-4); }
+.swarm-legacy-content h3 { font-size:var(--fs-body); margin:var(--sp-4) 0 var(--sp-2); }
+.swarm-legacy-content details { padding:var(--sp-2) 0; border-bottom:1px solid var(--border-subtle); }
+.swarm-legacy-content summary { cursor:pointer; overflow-wrap:anywhere; }
+.swarm-legacy-content summary > :is(small,span,time) { margin-left:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+
+html[data-pointer="coarse"] .swarm-legacy-content details { padding-block:var(--sp-3); }
+html[data-pointer="coarse"] .swarm-legacy-content summary { position:relative; }
+html[data-pointer="coarse"] .swarm-legacy-content summary::after { content:""; position:absolute; inset-inline:0; top:50%; height:var(--tap); transform:translateY(-50%); }

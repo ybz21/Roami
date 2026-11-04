@@ -10,6 +10,7 @@ import Markdown from '../markdown/Markdown'
 import { openAgentPage } from '../agent/agent-page-route'
 import { useSwarmSnapshot } from './useSwarmSnapshot'
 import SwarmStudio from './SwarmStudio'
+import LegacySwarmHistory from './LegacySwarmHistory'
 import { swarmColumn, swarmStateToken, type SwarmSnapshot, type SwarmWork } from './swarm-protocol'
 import './swarm.css'
 
@@ -17,8 +18,8 @@ function State({ state }: { state: string }) {
   const { t } = useI18n()
   return <span className="swarm-state" style={{ color: `var(${swarmStateToken(state)})` }}>{t(`swarm.managed.state.${state}`)}</span>
 }
-export default function ManagedSwarm({ id, onBack, openTerm, embedded = false }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean }) {
-  const { data, error, refresh } = useSwarmSnapshot(id), { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
+export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, projectId, onManage }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean; projectId?: string; onManage?: () => void }) {
+  const { data, error, missing, refresh } = useSwarmSnapshot(id), { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const panelKey = 'roami.swarm.panel:' + nodeApi('/agent/swarms/' + id)
   const [selected, setSelected] = useState('main'), [tab, setTab] = useState(() => localStorage.getItem(panelKey) || 'studio'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
   const controlKey = useRef<{ action: string; revision: number; key: string } | null>(null)
@@ -47,7 +48,8 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false }:
   useEffect(() => {
     if (!phone && detail && tab === 'board') document.querySelector('.swarm-work-detail')?.scrollIntoView?.({ block: 'nearest' })
   }, [detail, tab, phone])
-  if (!data) return <div className="swarm-loading">{error ? <><p role="alert">{t('swarm.managed.unavailable')}</p><button type="button" className="tt-act" onClick={() => void refresh()}>{t('agent.retry')}</button></> : <Spin />}</div>
+  if (!data && missing && projectId) return <LegacySwarmHistory projectId={projectId} onManage={onManage || onBack} />
+  if (!data) return <div className="swarm-loading">{missing ? <><p role="alert">{t('swarm.managed.relinkTeam')}</p><button type="button" className="tt-act" onClick={onBack}>{t('swarm.managed.selectTeam')}</button></> : error ? <><p role="alert">{t('swarm.managed.unavailable')}</p><button type="button" className="tt-act" onClick={() => void refresh()}>{t('agent.retry')}</button></> : <Spin />}</div>
   const work = data.work.find(item => item.id === detail)
   const openWork = (item: SwarmWork) => { setSelected(item.id); setDetail(item.id); if (!phone) switchTab('board') }
   const view = <div className="swarm-work-detail">
