@@ -95,7 +95,7 @@ const zhCN = {
   'okr.tab.data': "数据记录",
   'okr.tab.review': "复盘",
   'okr.tab.board': "OKR 与看板",
-  'okr.tab.activities': "具体活动",
+  'okr.tab.activities': '团队',
   'okr.tab.files': '项目文件',
   'okr.fileTeam': '团队',
   'okr.fileMemory': '记忆',

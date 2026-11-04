@@ -166,7 +166,7 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { g
 .swarm-chat-threads small { margin-left:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
 .swarm-chat-context { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); min-height:var(--tap); padding:var(--sp-1) var(--sp-4); flex-shrink:0; color:var(--text-dim); font-size:var(--fs-meta); }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="false"] .swarm-main-area { display:none; }
-html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="true"] .swarm-main-area { flex:0 0 40%; height:auto; border-bottom:1px solid var(--border-subtle); }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="true"] .swarm-main-area { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="board"] .swarm-chat { display:none; }
 html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm-managed[data-tab="studio"] .swarm-main-area { display:none; }
 html[data-pointer="coarse"] .swarm-chat-threads button { position:relative; }
@@ -207,3 +207,7 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-studio { flex:1; min-
 html:is([data-size="compact"],[data-size="medium"]) .swarm-stage { flex:1; height:auto; min-height:0; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-studio-area .swarm-relations { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { grid-auto-flow:row; grid-auto-columns:auto; overflow:visible; }
+
+.swarm-team-page { display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg-base); }
+.swarm-team-page > .swarm-studio-area { flex:1; min-height:0; }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-team-page .swarm-relations { display:block; max-height:35%; }

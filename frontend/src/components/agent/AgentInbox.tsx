@@ -13,6 +13,10 @@ import { useAgentData } from './useAgentData'
 import { notificationDestination } from './notification-destination'
 import './agent-notifications.css'
 
+function noticePreview(text = '') {
+  return text.replace(/!?\[([^\]\n]+)\]\([^\n)]*(?:\)|$)/gu, '$1').replace(/`([^`]+)`/gu, '$1').replace(/\*\*([^*\n]+)\*\*/gu, '$1')
+}
+
 export default function AgentInbox({ inbox, select, onNavigate, conversationId }: { conversationId?: string; inbox: AgentInboxState; onNavigate?: () => void; select: (cid: string, branch?: string, message?: string) => void }) {
   const { t, locale } = useI18n()
   const [unreadOnly, setUnreadOnly] = useState(false), [busy, setBusy] = useState(false), [failed, setFailed] = useState(false)
@@ -57,7 +61,7 @@ export default function AgentInbox({ inbox, select, onNavigate, conversationId }
       {pages.failed && <p role="alert">{t('agent.requestFailed')}<button type="button" className="tt-act" onClick={pages.refresh}>{t('agent.retry')}</button></p>}
       {!pages.loading && !pages.failed && !notices.length && <p className="agent-muted">{t('agent.noNotifications')}</p>}
       {notices.map(n => <button type="button" className="agent-notice" data-unread={!n.read && n.id > readThrough} key={n.id} onClick={() => { void openNotice(n) }}>
-        <b>{n.title === 'New conversation' ? t('agent.new') : n.title}</b><span>{n.summary}</span><small>{new Date(n.created_ms).toLocaleString(locale)}</small>
+        <b>{n.title === 'New conversation' ? t('agent.new') : n.title}</b><span>{noticePreview(n.summary)}</span><small>{new Date(n.created_ms).toLocaleString(locale)}</small>
       </button>)}
       <AgentPageBoundary more={pages.hasMore} loading={pages.loadingMore} failed={pages.moreFailed} load={() => { void pages.loadMore() }} />
     </section>

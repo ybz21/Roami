@@ -74,3 +74,21 @@
 第一轮页面构建独立浏览器验收：1280/1920/2560/3440 均无文档溢出，动画画布高度456 CSS px，主要内容不再被上方关系卡片压住。源码资产按页从私有上下文读取，API只读；宿主监控插件 POST 被阻断，未派活或发送消息。上下文已关闭。证据 /tmp/okr-leader-workspace/desktop-qa.json、team-before.png、team-after-*.png、okr-after.png、data-after.png、files-after.png、memory-after.png。这些是第一轮快照，后续隔离代码仍需最终重验。
 
 前一轮前端全量188文件/1343测试通过；此后追加了会话级通知隔离与回归，最终结果待补。CLI→Leader续派→同一成员/native branch→群聊记录的真实运行时/SQLite/注册CLI集成专项通过；当前Python专题61项通过。真实Android仍未操作，不能把窄屏模拟记作通过。
+
+
+### 最终第一轮记录
+
+第一轮提交 `9d410ee8`，提交门禁通过：Go 全量、Python **3427 passed / 48 skipped**（931.14秒）、ruff、typecheck、i18n、hover 与秘密扫描。前端全量 **188文件/1344测试**通过，构建通过。没有运行 full 命令或开新 PR，不能把该记录标为 PR 完整发布门禁。
+
+真实浏览器最终第一轮：/tmp/okr-leader-workspace/final-qa/desktop-qa.json。四档无文档溢出；全局通知进入原宣传项目、原 Main 和原 branch/message，定位元素位于消息面板内，输入可用；没有创建或发送会话消息。所有临时 QA 上下文已关闭。窄屏模拟暴露团队/聊天分屏会使场景仅剩128px高，随后改为独立团队全屏预览，选成员返回原线程；最终几何与测试补录在后续提交。
+
+[长期成员与执行轮次设计](long-lived-members.md)明确区分职责、实例和任务。当前 task/native branch 延续已有回归证明；独立职责实例、关闭终端后可信恢复以及历史重复职责迁移仍未完成，不把提示词约束当作宿主强制保证。
+
+
+### 手机预览与摘要后续
+
+前端全量最终 **188文件/1346测试**通过，typecheck、i18n（5150 keys）、hover 与构建通过。独立团队预览在392×766紧凑/粗指针模拟中占705px页面，动画高381.25px；聊天、预览、项目文件与Main均无文档溢出，没有自动聚焦输入。Main和团队两个页面均可返回原上下文，真实手机仍未验收。
+
+证据 `/tmp/okr-leader-workspace/final-qa/phone-qa.json` 与 `phone-{chat,team,files,main}-emulated.png`；通知列表将Markdown链接显示为文件名并限制三行，点击仍回原消息。
+
+后续边界：未绑定Swarm的项目Main通知，仍需要由统一身份API提供归属，不能把当前已有团队的复验扩展宣称为所有实例都已覆盖。长期职责实体、未派发成员实例与原生会话可信恢复按独立设计继续实现。

@@ -317,3 +317,27 @@ it('does not open an obsolete session when the same member advances while its id
  expect(session).not.toHaveBeenCalled()
  expect(test.api).toHaveBeenCalledOnce()
 })
+
+
+it('opens the phone team preview as its own page and returns to the same member thread', async () => {
+  test.phone = true
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.chat.team' }))
+  const preview = screen.getByRole('dialog')
+  expect(within(preview).getByTestId('studio-selection').getAttribute('data-active')).toBe('true')
+  expect(screen.getAllByTestId('studio-selection')).toHaveLength(1)
+  fireEvent.click(within(preview).getByRole('button', { name: 'frontend', pressed: false }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByRole('button', { name: 'swarm.chat.withMember' }).getAttribute('aria-pressed')).toBe('true')
+  expect(document.activeElement?.tagName).not.toBe('TEXTAREA')
+})
+
+it('does not open a recorded CLI session missing from the shared live-session overview', async () => {
+  const session = vi.fn()
+  test.api.mockResolvedValueOnce({ data: { task: { id: 'task', revision: 1 }, attempts: [{ id: 'run', revision: 1, sessionId: 'gone-session' }] } })
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={session} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.chat.withMember' }))
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.openSession' }))
+  await waitFor(() => expect(test.openTask).toHaveBeenCalledWith('tasks', 'task'))
+  expect(session).not.toHaveBeenCalled()
+})

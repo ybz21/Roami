@@ -9,7 +9,7 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale
 vi.mock('./AgentReminders', () => ({ default: () => <p>Future reminder</p> }))
 afterEach(() => { cleanup(); clearAgentDataCache(); vi.resetAllMocks() })
 const notices = [
-  { id: 4, conversation_id: 'main', branch_id: 'branch', message_id: 'message', title: 'New report', summary: 'Report ready', created_ms: 1, read: false },
+  { id: 4, conversation_id: 'main', branch_id: 'branch', message_id: 'message', title: 'New report', summary: 'Report ready: [交付文件](/api/file/raw?path=%2Fproject%2Fa-very-long-path', created_ms: 1, read: false },
   { id: 2, conversation_id: 'main', branch_id: 'branch', title: 'Old report', summary: '', created_ms: 1, read: true },
 ]
 const inbox = () => ({ conversations: [{ id: 'main', title: 'Home', active_branch_id: 'branch', updated_ms: 0 }], notices: [], unread: 1, cursor: 4, unavailable: false, refresh: vi.fn() })
@@ -18,6 +18,8 @@ it('loads a short page only when opened and applies Unread on the server', async
   const select = vi.fn()
   render(<AgentInbox inbox={inbox()} select={select} />)
   expect(screen.getByText('Future reminder')).toBeTruthy()
+  expect(await screen.findByText('Report ready: 交付文件')).toBeTruthy()
+  expect(screen.queryByText(/%2Fproject/)).toBeNull()
   expect(await screen.findByText('Old report')).toBeTruthy()
   expect(api).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: 'agent.notification.unread' }))
