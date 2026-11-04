@@ -27,6 +27,17 @@ class DependencySpec(Payload):
     artifactId: str | None = None
 
 
+class DeliverableSpec(Payload):
+    kind: Literal["artifact", "external_action"]
+    description: str = Field(min_length=1, max_length=1000)
+    mimeType: str | None = Field(default=None, max_length=100)
+
+
+class MemorySwarm(Payload):
+    content: str = Field(max_length=64000)
+    expectedSha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class WorkSpec(Payload):
     member: str = Field(min_length=1, max_length=80)
     executor: Literal["native", "codex", "claude", "opencode", "pi"]
@@ -34,6 +45,7 @@ class WorkSpec(Payload):
     goal: str = Field(min_length=1, max_length=30000)
     acceptance: str = Field(min_length=1, max_length=8000)
     integration: bool = False
+    deliverables: list[DeliverableSpec] = Field(default_factory=list, max_length=30)
     dependencies: list[DependencySpec] = Field(default_factory=list, max_length=100)
 
 
@@ -97,6 +109,10 @@ def mount_swarm_routes(app, runtime):
     @app.post("/v1/swarms/{sid}/control")
     async def swarm_control(sid: str, body: ControlSwarm, owner: Owner):
         return {"data": await runtime.swarms.control(owner, sid, body.model_dump())}
+
+    @app.put("/v1/swarms/{sid}/memory")
+    async def swarm_memory(sid: str, body: MemorySwarm, owner: Owner):
+        return {"data": await runtime.swarms.memory_write(owner, sid, body.model_dump())}
 
     @app.post("/v1/swarms/{sid}/messages")
     async def swarm_message(sid: str, body: PostSwarm, owner: Owner):

@@ -39,6 +39,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/capability-markets/prepare"}, {"POST", "/agent/capability-markets/install"},
 		{"PUT", "/agent/capability-imports/:kind/:name"}, {"DELETE", "/agent/capability-imports/:kind/:name"}, {"POST", "/agent/capability-imports/mcp/:name/connect"}, {"GET", "/agent/capability-imports"}, {"POST", "/agent/capability-imports/:kind"}, {"GET", "/agent/capability-settings"}, {"PUT", "/agent/capability-settings"}, {"POST", "/agent/main-conversation"}, {"GET", "/agent/swarms"}, {"POST", "/agent/swarms"}, {"GET", "/agent/swarms/:sid"}, {"POST", "/agent/swarms/:sid/plan"}, {"POST", "/agent/swarms/:sid/dependencies"}, {"POST", "/agent/swarms/:sid/control"}, {"POST", "/agent/swarms/:sid/messages"}, {"GET", "/agent/swarms/:sid/events"}, {"GET", "/agent/status"}, {"GET", "/agent/conversations"}, {"POST", "/agent/conversations"},
 		{"POST", "/agent/attachments"},
+		{"PUT", "/agent/swarms/:sid/memory"},
 		{"GET", "/agent/traces"},
 		{"GET", "/agent/improvement/cycles"}, {"GET", "/agent/improvement/cycles/:cycle_id"},
 		{"GET", "/agent/improvement"}, {"PUT", "/agent/improvement/preferences"},

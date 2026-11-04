@@ -100,6 +100,7 @@ class ConfirmMemory(Confirm):
 
 
 class ConfirmTask(Confirm):
+    evidence: dict | None = None
     revision: int | None = Field(default=None, ge=1)
     runId: str | None = Field(default=None, min_length=1, max_length=200)
 

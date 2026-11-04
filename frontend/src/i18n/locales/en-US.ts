@@ -5151,6 +5151,17 @@ const enUS = {
   'swarm.managed.state.idle': 'Idle',
   'swarm.managed.deliveryPending': 'Awaiting delivery confirmation',
   'swarm.managed.filter': 'Filter swarms',
+  'swarm.managed.leader': 'Leader',
+  'swarm.managed.memory': 'Team memory',
+  'swarm.managed.memoryEmpty': 'No team memory yet.',
+  'swarm.managed.memoryUnavailable': 'Team memory is unavailable. Check the project files.',
+  'swarm.managed.memorySave': 'Save memory',
+  'swarm.managed.memoryFailed': 'Memory was not saved. Your draft is kept; reopen memory to load the current version.',
+  'swarm.managed.report': 'Executor report',
+  'swarm.managed.outputs': 'Deliverables',
+  'swarm.managed.externalAcceptance': 'Accept only after checking the receipt and the confirmed external result. Drafts and submissions are not confirmation.',
+  'swarm.managed.receipt': 'Receipt',
+  'swarm.managed.externalTarget': 'Confirmed result URL or ID',
   'swarm.managed.relinkTeam': 'This team link is unavailable. Select or create a managed team, then link it in the project settings. Existing history is retained.',
   'swarm.managed.selectTeam': 'Select team',
   'swarm.legacy.partial': 'Some history could not be loaded. Available records are shown.',
@@ -5162,7 +5173,10 @@ const enUS = {
   'swarm.legacy.recordedStatus': 'Recorded: {status}',
   'swarm.legacy.messages': 'Recorded messages',
   'swarm.legacy.truncated': 'Showing the most recent available records.',
+  'swarm.managed.evidenceMissing': 'Required deliverables are missing. Ask the member to provide the actual files or receipts.',
   'swarm.managed.mainFailed': 'Main could not continue. Check the model connection, then retry in the group chat.',
+  'swarm.managed.memoryChanged': 'Team memory changed. Merge your draft with the current content.',
+  'swarm.managed.memoryMerged': 'Merged, continue saving',
 }
 
 export default enUS
