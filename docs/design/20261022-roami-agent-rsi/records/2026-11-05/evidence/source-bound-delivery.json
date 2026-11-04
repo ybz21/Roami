@@ -108,7 +108,17 @@
     "passed": 3443,
     "skipped": 48
   },
-  "combined_full": "running",
+  "combined_full": {
+    "exit": 0,
+    "passed": 3447,
+    "skipped": 48
+  },
   "production_changed": false,
-  "original_suite_and_grades_unchanged": true
+  "original_suite_and_grades_unchanged": true,
+  "pre_commit_quick": {
+    "exit": 0,
+    "passed": 3447,
+    "skipped": 48,
+    "code_commit": "12319e61"
+  }
 }
