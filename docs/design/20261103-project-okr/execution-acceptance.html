@@ -6,13 +6,13 @@
 <style>
 :root{--bg-base:#0d1117;--text-bright:#e6edf3;--text-dim:#8b949e;--border-subtle:#21262d;--accent:#58a6ff;--ok:#3fb950;--fs-meta:12px;--fs-body:14px;--fs-title:22px;--sp-2:8px;--sp-4:16px;--sp-5:24px;--content-form:920px}
 *{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui,sans-serif}
-main{height:100%;overflow:auto;padding:var(--sp-5)}article{max-width:var(--content-form);margin:auto}h1,h2{font-size:var(--fs-title)}section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}a{color:var(--accent)}code,pre{white-space:pre-wrap;overflow-wrap:anywhere}small{font-size:var(--fs-meta);color:var(--text-dim)}table{width:100%;border-collapse:collapse}th,td{padding:var(--sp-2);border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}summary{cursor:pointer;padding-block:var(--sp-2)}.passed{color:var(--ok)}
+h3{font-size:var(--fs-body)}main{height:100%;overflow:auto;padding:var(--sp-5)}article{max-width:var(--content-form);margin:auto}h1,h2{font-size:var(--fs-title)}section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}a{color:var(--accent)}code,pre{white-space:pre-wrap;overflow-wrap:anywhere}small{font-size:var(--fs-meta);color:var(--text-dim)}table{width:100%;border-collapse:collapse}th,td{padding:var(--sp-2);border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}summary{cursor:pointer;padding-block:var(--sp-2)}.passed{color:var(--ok)}
 </style>
 <main><article>
 <header class="tt-pagehead"><h1>执行优先：真实验收记录</h1><p>先证明团队能干对活并受控，再组织展示，最后由对话生成配置。记录更新于 2026-11-04；本页区分组件证据与完整业务验收。</p></header>
 <section><h2>三道门槛</h2><table>
 <tr><th>阶段</th><th>通过条件</th><th>当前证据</th></tr>
-<tr><td>受管执行</td><td>同一项目内规划、派发、实际产物、独立复核、验收与回收；真实手机发帖、浏览器投稿有平台回执。</td><td>命令发现、暂停规划、共享群聊、@leader 与取消组件已分别实测。完整新版本团队链路及公开发布尚未完成。</td></tr>
+<tr><td>受管执行</td><td>同一项目内规划、派发、实际产物、独立复核、验收与回收；真实手机发帖、浏览器投稿有平台回执。</td><td>真实 Main 已规划、派发、共享群聊、响应 @leader，并继续同一成员做修正；原生制作与 Codex 独立复核均交付了实际文件。正在补 Main 核验入口，公开发布尚未完成。</td></tr>
 <tr><td>展示已有结果</td><td>目标、日期指标、任务、文件、媒体与回执同源；缺数保持未知，能追溯来源和修订。</td><td>PR652 的项目文件与三内页已有工程及桌面/真机验收；需接入第一阶段新产生的真实结果。</td></tr>
 <tr><td>对话生成</td><td>先提出 KR、方法、指标和来源，用户确认后保存有效配置，复用同一执行和展示协议。</td><td>已有项目作用域工具与冲突保护；跨场景真实模型闭环仍待验收。</td></tr>
 </table></section>
@@ -27,17 +27,33 @@ main{height:100%;overflow:auto;padding:var(--sp-5)}article{max-width:var(--conte
 <p>修复使用持久中断意图、原 launch/provider/turn/输入 hash/pane 校验、PID 启动 token 与 Linux pidfd；不重新枚举或重放未知信号，不终止原 baseline、常驻 host、其他 scope 或新用户工作。无法确认工具或子智能体停止时继续保留取消中或未知。取消不撤销已经完成的外部操作。</p>
 <p>Codex 内部临时线程继承 notify 的完成通知只记录身份诊断，不能当根任务完成证据，也不能污染原根任务。旧版本已经记录、却未保留 incoming 身份的未知状态不自动改判成功。</p>
 </details></section>
-<section><h2>完整团队：历史失败与当前进展</h2><p class="passed">V3 原生核验成员已真实交付 JSON 与 HTML，并由负责人通过正式验收入口验收。</p><p>负责人独立重算四份原件的字节与摘要、再次完整解码视频 2149 帧、检查 10 条字幕末帧边界与 PNG 尺寸，并下载当前 run 的两份 artifact 与磁盘逐字节核对；20 份原输入的 hash 与 mtime 均未改变。执行者报告未冒充当前平台观察或编造身份，身份由宿主 artifact 绑定。上游通过后才解除暂停，Codex 复核成员已启动；完整团队尚待第二位成员交付与回收。</p><details><summary>保留的完整团队第二轮失败</summary>
+<section><h2>真实团队已经跑过的循环</h2>
+<p class="passed">同一团队实际完成了交付、独立复核、发现错误、修正和再次复核。</p>
+<p>V3 使用原生 preflight 与 Codex reviewer，所有成员在同一项目目录工作，共用群聊与任务看板。负责人独立重算素材摘要、完整解码视频 2149 帧、检查 10 条字幕与 PNG 尺寸，并下载当前 run 的 artifact 与磁盘逐字节核对。20 份原始输入的摘要和修改时间保持不变。</p>
+<p>复核成员真实发现单位换算附注错误。Main 收到群聊 @leader 后用 task_steer 继续原任务，保留执行器、会话与目录。纠偏中新增的无依据修订时间被退回删除；后续复核又发现 HTML 将 138881 字节的 PNG 错称小于 1 kB，已精确修正该句，其余 JSON 字节与修改时间不动。发现问题的报告也保留，不把它改写成全部通过。</p>
+<table><tr><th>当前工作</th><th>已核实</th><th>仍待完成</th></tr>
+<tr><td>素材报告 revision 4</td><td>JSON 17918 B、HTML 14651 B；Main 已完整读取并正式核验，当前产物下载与磁盘一致。</td><td>工作实例已按受管流程回收；报告不等于平台发布。</td></tr>
+<tr><td>独立复核 revision 5</td><td>JSON 1721 B、HTML 2492 B；自动完成通知触发 Main 完整读取、核验、群聊与正常结束。原会话及执行器保持，旧报告保留。</td><td>工作实例已回收，原始素材与旧失败记录不变。</td></tr>
+<tr><td>手机与浏览器</td><td>Main 按最新已验收复核更新依赖后派发。手机成员真实执行 55 条带序列号的 Roami ADB 命令，核对账号并记录 X 列表加载失败；没有新建草稿或发送。</td><td>首次执行身份的完成跟踪待修；同目录 writer 保护拒绝了尚未开始的浏览器成员，保留保护并串行续作。</td></tr></table>
+<p>续作能力不是只靠报告自述：宿主记录当前 run 的 skill_read 开始事件 953 与成功事件 955，专业执行器真实工具响应也保留了旧上下文的 ACTIVE_TASK_CONTEXT_REQUIRED。私有签名及上下文内容未放进产物。</p>
+<h3>为什么旧复核不能恢复成已完成</h3>
+<p>在真实团队中，Main 将 reviewer 依赖从上游 revision 1 改为 3 后，旧 reviewer revision 2 仍 blocked，所需最低 revision 为 3；没有新任务、伪造报告或自动重新验收。上游后续到 revision 4，旧 reviewer 再次因版本失效而阻塞。</p>
+<p>schema 18 保存 required_task_revision。只有实际依赖变化才提高门槛，重复保存不强制重跑；传递依赖也检查来源是否仍有效。最终确认在实际写事务内复查当前任务、运行、门槛和依赖，防止并发变更把旧成果误判为有效。<a href="dependency-lineage.html">依赖修订机制</a>记录具体边界。</p>
+<p>Main 的窄核验入口与自核验状态衔接修复已实现，组合定向 89 项通过，真实 Main 用户触发轮和自动结果轮都已完成完整读取与正式核验：仅该团队 Main 能核验本团队当前运行，先独立读取实际产物，再复用现有确认逻辑。成员不能自验；外部发布仍须保留真实回执与用户决策边界。用户触发轮的核验有实际工具回执与事件 1157。自动完成通知轮也已成功核验 reviewer revision 4（事件 1271），随后结束回复被 TASK_RESULT_SUPERSEDED 拦截（事件 1273）：系统将 Main 自己把 waiting_user 核验为 succeeded 的变化误判成旧结果失效。任务与真实核验记录保留，不回滚或补写失败 turn；修复只接受同 turn 可信核验转移，不改历史 manifest。其后真实 revision 5 的自动完成轮已完整通过：事件 1363 记录核验，Main turn 正常 completed；先前等待态 manifest 保留，新的请求采用真实 succeeded，旧失败 turn 和原 manifest 逐字节不变。这证明文件交付的自动核验闭环，不证明外部发布。</p>
+<details><summary>保留的完整团队第二轮失败</summary>
 <p>完整团队第二轮遇到两类问题：隔离验收目录误设为非私有权限，修正后继续了同一任务；随后旧候选 CLI 被 Codex 临时线程通知错误标成身份变化，成员开始排查能力上下文而未交付报告。该轮没有产生报告，原素材 hash 与 mtime 均未改变，不能计为产出成功。负责人在核对精确会话后手工中断并归档，关闭自己的 Web/Python 与私有 tmux；这是人工恢复，不能算自动取消通过。</p>
 <p>当前 V3 已使用集成取消、通知隔离与群聊修复的新 CLI。遇到任务上下文失效仍必须停止并报告，不能绕过受管能力修复宿主或另开任务。</p></details>
 </section>
-<section><h2>实际宣传状态</h2><table>
+<section><h2>首次手机执行的真实边界</h2><p>手机成员读取了本机技能与真实组件信息，按当前 XML 导航并核对 @ybz21_，通知引导用返回退出，没有改变通知选项或系统配置。X 本人帖子页首次加载和一次重试均报错；报告明确 duplicate_check=unknown、draft_created=false、send_tap_count=0，已停止设备输入。窗口已向其他会话释放，原素材、旧报告及旧草稿未改。</p><p>专业执行器已给出真实最终回复，但 Go 初始状态绑定了另一个尚未认证的线程 ID，导致仍显示 running，下一浏览器 writer 因缺少前任终态而被正确拒绝。正在修复：初始回调仅作候选，按精确原输入、CLI 进程与结构化记录认证真正 root；原先无启动基线的情况须额外逐个证明 resident 身份，不能把当前全进程快照冒充历史基线。不能证明时保持未知。没有手改生产或私有任务状态、回写虚假完成回调，也没有删除 writer 保护文件。</p><p>真实桌面页面已核对同一团队：素材核验和复核显示已验收，手机显示执行中，浏览器显示失败，最终检查显示阻塞；看板无文档横向溢出。此时手机仍运行的显示忠实反映了未收尾的执行记录，不能拿执行器自述替代终态。检查后关闭本任务页面并恢复本地 QA cookie，原 B站登录页和手机保持原状。</p><p>本次新 Codex 路径的 7 条生命周期回调经过负责人检查后做了一次性信任核准；这是验收启动前置条件，不计为无需核准的无人启动通过。浏览器初次尝试 executionStarted=false，空会话已自动回收，尚无真实 B站操作。</p></section><section><h2>实际宣传状态</h2><table>
 <tr><th>交付</th><th>实际状态</th><th>不能据此声称</th></tr>
 <tr><td>技巧视频</td><td>实际 H.264/AAC MP4，约 71.6 秒，带录屏、机器配音与字幕；完整解码及浏览器播放完成。</td><td>未等于上传、投稿、审核通过或公开；配音仍是初稿。</td></tr>
-<tr><td>X 图文</td><td>249 字符英文文案、真实截图与 ALT 已准备，原生 App 保存草稿。</td><td>未发送，没有公开帖子回执。</td></tr>
-<tr><td>B站投稿</td><td>浏览器仍需账号登录。正在补受管文件选择能力，并以独立 Chrome 和本地服务端核对实际上传字节。</td><td>文件选择成功不能等于平台上传完成，更不能等于已投稿。</td></tr>
+<tr><td>X 图文</td><td>主会话的旧草稿仍单独记录。新受管成员已在真机确认 @ybz21_，生成独立 221 字符文案与 ALT，真实帖子列表读取失败后停止输入。新草稿、附图、ALT 设置与最终发送均未完成。</td><td>不得标成 prepared_not_published 或发布成功；没有本任务公开帖子回执。</td></tr>
+<tr><td>B站投稿</td><td>浏览器仍需账号登录。受管文件选择能力已实现，并在独立 Chrome 与本地服务端核对上传实际字节；这不是 B站平台验收。</td><td>文件选择成功不能等于平台上传完成，更不能等于已投稿。</td></tr>
 </table><p>全链路分别记录制作、文件选择、上传完成、提交、平台审核与公开状态。没有回执的阶段保持未确认，不填虚假的曝光、完播率、star 或 fork 增量。</p></section>
 <section><h2>展示层采用什么形式</h2><p>先采用配置驱动的 HTML：React 读取已存在的项目 JSON、任务记录、日期数据和产物，使用注册组件展示。数据来自代码、脚本或模型都使用同一协议，不依赖对话搭建器。</p><p>自由 HTML 展示包属于第二阶段可选扩展：隔离呈现、只读数据绑定，控制动作由宿主执行；不向展示页面交出账号凭据、Shell 或数据库。第三阶段模型再生成这些经过校验的定义，而不是生成不可核验的完成画面。</p></section>
-<section><h2>检查范围</h2><p>群聊修复的 34 项相关回归通过；其提交 quick 的 Python 3325 项通过、48 项跳过。最新 main 已包含 PR649/651；与其重放后的 59 项受管命令、团队与项目对话测试通过。取消提交的 Go 全量、quick 与最终定向 race 通过。最终组合 full、真实完整团队与发布验收尚待完成。</p><p><a href="execution-first.html">三阶段方案</a> · <a href="integration-acceptance.html">既有工程与真机验收</a> · <a href="overall-solution.html">总体方案与故事</a></p></section>
+<section><h2>检查范围与部署边界</h2>
+<p>4b9a4faa 的完整 full 通过：Python 3342 项、48 项跳过，Go 全量与前端检查/构建通过；相同前端代码的 184 文件、1306 项测试通过。schema 18 的 41 项协作回归、Go 兼容与串行 Go 全量通过。因为新增 Main 入口和真实自动轮暴露的衔接问题，中途旧组合 full 与提交钩子已主动停止，不计通过；当前组合定向 89 项通过。最终完整门禁须包含首次 Codex 身份修复后重跑。</p>
+<p>旧 OKR 在只读快照中演练迁移：1 个目标、3 个 KR、7 个指标、11 条观测（2 个日期）、1 次复盘及其证据全部保留，13 项哈希比较一致，生成 36 个项目文件。原 SQLite body 留作归档；真实 DB/WAL/SHM 与项目目录未变，真实项目尚未创建 .roami/okr。</p>
+<p>生产仍有两个执行状态未收尾的历史任务。继续保留 upgrade busy，不伪造回调、不直接改状态来放行；本轮新执行只在独立实例验收，未部署。模型、路由、参数、限额与 48 小时账目未改。</p><p><a href="execution-first.html">三阶段方案</a> · <a href="integration-acceptance.html">既有工程与真机验收</a> · <a href="overall-solution.html">总体方案与故事</a></p></section>
 </article></main>
 </html>

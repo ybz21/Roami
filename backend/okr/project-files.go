@@ -468,15 +468,15 @@ func workingConfig(root *os.Root) (Config, error) {
 	if err := validate(&c); err != nil {
 		return c, err
 	}
-	var main struct {
-		SchemaVersion int    `json:"schemaVersion"`
-		Role          string `json:"role"`
-	}
+	var main projectMainDefinition
 	if err := decodeFile(root, "agents/main.json", &main); err != nil {
 		return c, err
 	}
 	if main.SchemaVersion != 1 || main.Role != "main" {
 		return c, ErrInvalid
+	}
+	if _, err := projectSkills(root, main); err != nil {
+		return c, err
 	}
 	var swarm struct {
 		SchemaVersion int    `json:"schemaVersion"`
@@ -568,6 +568,13 @@ func decorate(root *os.Root, w *Workspace) error {
 		metadata.PendingChanges = !bytes.Equal(a, b)
 	}
 	w.ProjectFiles = metadata
+	var main projectMainDefinition
+	if err := decodeFile(root, "agents/main.json", &main); err == nil {
+		metadata.Skills, err = projectSkills(root, main)
+		if err != nil {
+			metadata.PendingChanges = true
+		}
+	}
 	return nil
 }
 
@@ -623,18 +630,10 @@ func definitions(root *os.Root, w *Workspace, referenceSources map[string]string
 	if err := writeJSON(root, "agents/swarm.json", map[string]any{"schemaVersion": 1, "swarmId": w.Swarm}); err != nil {
 		return err
 	}
-	for name, value := range map[string]any{"agents/main.json": map[string]any{"schemaVersion": 1, "role": "main"}} {
-		if _, err := root.Lstat(name); errors.Is(err, fs.ErrNotExist) {
-			if err := writeJSON(root, name, value); err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		} else if err := safeFile(root, name); err != nil {
-			return err
-		}
+	if err := seedProjectCapabilities(root); err != nil {
+		return err
 	}
-	for _, name := range []string{"agents/main.md", "memory/team.md", "memory/decisions.jsonl"} {
+	for _, name := range []string{"memory/team.md", "memory/decisions.jsonl"} {
 		if _, err := root.Lstat(name); errors.Is(err, fs.ErrNotExist) {
 			if err := atomicFile(root, name, nil); err != nil {
 				return err

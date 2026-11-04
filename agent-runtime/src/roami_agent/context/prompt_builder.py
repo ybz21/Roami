@@ -26,6 +26,7 @@ from roami_agent.replies.delivery_policy import (
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.reply_history import replied_message_ids
 from roami_agent.storage.request_coverage import latest_coverage
+from roami_agent.storage.swarm_completion import self_verified_completion
 from roami_agent.storage.task_context import recent_task_context
 from roami_agent.storage.task_handoff import handoff_receipt_context
 from roami_agent.storage.task_request import task_user_request
@@ -117,6 +118,11 @@ class PromptBuilder:
         completion_request = None
         request_created_ms = turn["created_ms"]
         if completion:
+            refreshed = await self.db.call(
+                lambda db: self_verified_completion(db, turn, completion)
+            )
+            if refreshed:
+                completion = refreshed
             allowed = await self.db.call(
                 lambda db: row(
                     db,

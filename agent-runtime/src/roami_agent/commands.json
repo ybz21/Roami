@@ -111,6 +111,10 @@
     "swarm",
     "post"
   ],
+  "swarm_verify": [
+    "swarm",
+    "verify"
+  ],
   "swarm_control": [
     "swarm",
     "control"

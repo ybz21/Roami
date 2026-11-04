@@ -1,8 +1,12 @@
 # 项目 OKR 工作台
 
-最新优先级：[先执行、再展示、最后对话生成（HTML）](execution-first.html)。
+最新优先级：[先交付最终项目文件与展示态（HTML）](final-workspace.html)。Swarm 先接入，具体执行细节继续单独迭代。
 
-执行主线：[真实模型、共享群聊、取消组件与待完成项（HTML）](execution-acceptance.html)。这份记录区分组件通过、完整团队交付与实际平台发布。
+此前三阶段方案：[执行、展示、对话生成（HTML）](execution-first.html)。
+
+执行主线：[真实交付、独立复核、纠偏、依赖修订与待完成项（HTML）](execution-acceptance.html)。这份记录区分组件通过、完整团队交付与实际平台发布。
+
+依赖修订：[上游变更后重新核验（HTML）](dependency-lineage.html)。
 
 浏览器上传：[设计（HTML）](browser-upload.html)、[调用契约与实际字节验收（HTML）](browser-upload-acceptance.html)。成功选择文件与平台上传、提交、公开分别验收。
 
@@ -16,7 +20,7 @@
 
 代码位于 `backend/okr/`、`backend/api/project-okr.go`、`cmd/roami/project-okr.go`、`frontend/src/components/projects/okr/` 与 `agent-runtime/src/roami_agent/` 的项目工具、Swarm、记忆和证据模块。任务、群聊与调度继续复用既有运行时。
 
-本轮 full 门禁通过；Python 3321通过/48跳过，前端184文件/1301测试通过，受影响Go模块race通过。桌面四档×对话开关八组和Android ADB真机检查通过。接口验收使用独立实例及合成项目，没有模型调用，不代表已自动发布或完成日更。
+基础工作台的门禁与真机检查已通过。4b9a4faa 的后续执行修复 full 通过（Python 3342/48），前端184文件/1306测试通过；Main 核验入口和依赖修订的最终组合门禁待完成，不将中途停止的检查计为通过。桌面四档×对话开关八组和Android ADB真机检查通过。接口验收使用独立实例及合成项目，没有模型调用，不代表已自动发布或完成日更。
 
 真实“Roami 宣传”的配音/字幕MP4已生成，X保存草稿，B站待登录；均未公开发布，原文案验收2/2未改写为视频或发布完成。详情见验收HTML。
 

@@ -1,0 +1,35 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OKR 最终项目与展示态</title><style>
+:root{--bg-base:#0d1117;--text-bright:#e6edf3;--text-dim:#8b949e;--border-subtle:#21262d;--accent:#58a6ff;--ok:#3fb950;--fs-meta:12px;--fs-body:14px;--fs-title:22px;--sp-2:8px;--sp-4:16px;--sp-5:24px;--content-form:920px}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui,sans-serif}
+h3{font-size:var(--fs-body)}main{height:100%;overflow:auto;padding:var(--sp-5)}article{max-width:var(--content-form);margin:auto}h1,h2{font-size:var(--fs-title)}section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}a{color:var(--accent)}code,pre{white-space:pre-wrap;overflow-wrap:anywhere}small{font-size:var(--fs-meta);color:var(--text-dim)}table{width:100%;border-collapse:collapse}th,td{padding:var(--sp-2);border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}summary{cursor:pointer;padding-block:var(--sp-2)}.passed{color:var(--ok)}
+</style></head><body><main><article><header class="tt-pagehead"><h1>从最终项目看 OKR</h1><p>2026-11-04：先交付展示态与真实项目文件，Swarm 先接入，执行细节继续独立迭代。</p></header>
+<section><h2>打开后应该看到什么</h2><table><tr><th>位置</th><th>真实内容</th><th>下一步</th></tr><tr><td>OKR</td><td>目标、长短 KR、方法。例如 X 图文和 B站配音视频属于方法，star/fork 属于结果。</td><td>按需讨论和修订，先确认口径再保存。</td></tr><tr><td>数据看板</td><td>dashboard.json 绑定 KR 与指标，展示按日期记录的数值、增量及同日修订。</td><td>看来源；未取得曝光、完播率或平均观看时长时保持未知。</td></tr><tr><td>当前状态</td><td>关联团队、当前任务、真实产物与核验/外部动作状态。</td><td>进入同一团队查看、暂停、停止或纠偏。</td></tr><tr><td>文件</td><td>默认直接打开项目 .roami/okr，明确切换到项目素材目录。</td><td>查看定义、代码、skill、数据和视频，而非一张演示列表。</td></tr></table></section>
+<section><h2>保存后实际落盘的目录</h2><pre>.roami/okr/
+  README.md
+  okr.json
+  dashboard.json
+  connectors/&lt;metric-id&gt;/
+    connector.json
+    github.go + collector.go / store.go
+    README.md
+  agents/
+    main.json
+    main.md
+    swarm.json
+  skills/
+    okr-planning/SKILL.md
+    metric-collection/SKILL.md
+    swarm-execution/SKILL.md
+  data/
+    observations.jsonl
+    reviews.jsonl
+  memory/
+    team.md
+    decisions.jsonl
+  evidence/&lt;review-id&gt;.json
+  state/
+    current.json
+    confirmed-revisions/&lt;revision&gt;-&lt;id&gt;.json</pre><p>只有已保存 OKR 的项目才生成目录。已有目标迁移原始定义、日期观测及复盘证据；普通项目不凭空创建目标。空观测文件表示尚无证据，不生成虚假基线或零值。</p></section>
+<section><h2>每种文件如何使用</h2><table><tr><th>定义</th><th>展示与执行</th></tr><tr><td>okr.json</td><td>目标、KR、指标、方法、周期及关联团队。用户确认后的配置驱动页面；模型可以按目标动态决定数量和组合。</td></tr><tr><td>dashboard.json</td><td>注册组件 keyResults、metricTrend、nextAction；组件顺序、选择哪些 KR/指标由定义决定。React 渲染为 HTML，并非写死一张业务看板。</td></tr><tr><td>connector.json 与代码</td><td>GitHub 内置采集器实际读取公开仓库 star/fork。manual 指标由授权成员观察真实账号后记录日期、数值和来源。导出的 Go 代码解释运行实现，修改参考代码不会偷偷执行。</td></tr><tr><td>Main 配置与 skill</td><td>main.json 列出真实 SKILL.md 路径，main.md 给出协调约定。目标对话可读取这些项目能力，团队上下文携带相同说明及内容摘要；不是放三个没人读取的空目录。</td></tr><tr><td>团队绑定、记忆和运行态</td><td>swarm.json 关联既有团队；共享同一任务板和群聊。记忆保留事实与决定，宿主记录实际任务/run、控制和验收状态。配置或执行器自述不替代交付证据。</td></tr></table></section>
+<section><h2>动态聊出来，再按确认的定义执行</h2><ol><li>用户给出目标，例如“宣传 Roami，提高 star 和 fork”。按需 Main 读取当前定义和已有事实。</li><li>Main 提出 KR、短期实验、X/B站方法、指标与看板绑定。完播率、观看时长、曝光与点击先确认账号、口径和来源，缺数不填零。</li><li>用户确认后，受管项目工具带当前 revision 保存；文件和页面使用同一份定义。文件编辑中的草稿与已确认版本分开。</li><li>已支持来源通过实际 collect/record 写入日期事实；具体内容工作接入既有 Swarm。观察、准备、上传、提交、审核与公开分别记录。</li><li>人看真实结果作决定，Main 再提出下一轮方法。目标对话按需创建，关闭时只结束该实例；没有调度器就不宣称已长期日更。</li></ol><p>任意脚本 connector 的自动运行、自由 HTML 脚本看板及模型任意改系统配置均不在当前能力中。先把现有定义、数据、素材和团队真正组织起来。</p></section>
+<section><h2>验收与上线边界</h2><p>项目能力 Go 定向、51 项 Python 定向、文件入口前端定向已通过；最终组合门禁与真实页面/手机验收正在进行。尚未将本次文件包部署到生产，因此原宣传目录此前确实没有 .roami/okr。</p><p>生产仍有旧运行任务；先保持其任务、模型和账目不变。展示服务可以独立更新，智能体服务须通过正式升级门禁；旧服务不支持项目绑定对话时明确提示更新并保留输入，不退化成无项目约束的 Main。</p><p><a href="execution-acceptance.html">真实执行记录</a> · <a href="overall-solution.html">整体故事与架构</a></p></section></article></main></body></html>

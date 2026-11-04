@@ -226,7 +226,12 @@ class Runtime:
         self.swarms = SwarmPlans(
             database, self.tasks, self.conversations, self.wakeup, settings=self.settings
         )
-        register_swarm_tools(self.tools, self.swarms)
+        register_swarm_tools(
+            self.tools,
+            self.swarms,
+            confirm=lambda *args, **kwargs: self.dispatch.confirm(*args, **kwargs),
+            artifacts=self.artifacts,
+        )
         register_project_okr_tools(self.tools, database, self.settings)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)

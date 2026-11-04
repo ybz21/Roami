@@ -47,6 +47,10 @@ func codexCompletion(binding SessionBinding, turn, promptHash string) (*Result, 
 }
 
 func codexOutcome(binding SessionBinding, turn, promptHash string, cancelled bool) (*Result, string) {
+	return codexTranscriptOutcome(binding, turn, promptHash, cancelled, false)
+}
+
+func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, cancelled, initial bool) (*Result, string) {
 	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
 		return nil, ""
 	}
@@ -107,6 +111,7 @@ func codexOutcome(binding SessionBinding, turn, promptHash string, cancelled boo
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), hash))
 	active, assistant := "", ""
 	metadata, matched, finalAnswer, aborted := false, false, false, false
+	startedTurns := 0
 	calls := map[string]bool{}
 	var result *Result
 	for {
@@ -129,6 +134,10 @@ func codexOutcome(binding SessionBinding, turn, promptHash string, cancelled boo
 			metadata = true
 		case "event_msg":
 			if value.Type == "task_started" {
+				startedTurns++
+				if initial && (startedTurns != 1 || value.TurnID != turn || value.RootTurnID != turn) {
+					return nil, ""
+				}
 				active, assistant, matched, result = value.TurnID, "", false, nil
 				finalAnswer, aborted = false, false
 				calls = map[string]bool{}

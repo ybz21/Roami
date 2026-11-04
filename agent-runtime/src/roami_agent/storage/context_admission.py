@@ -1,8 +1,11 @@
 """Keep in-flight forgotten context from starting another model or tool operation."""
 
+import json
+
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
-from roami_agent.storage.database import row
+from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_completion import self_verified_completion
 
 
 def assert_context_admitted(db, turn):
@@ -46,11 +49,20 @@ def assert_context_admitted(db, turn):
         "SELECT 1 FROM prompt_manifests p LEFT JOIN tasks t ON t.id=json_extract(p.parts_json,'$.taskEvidence.taskId') "
         "WHERE p.turn_id=? AND json_type(p.parts_json,'$.taskEvidence')='object' "
         "AND (t.id IS NULL OR t.owner_id!=? OR t.revision!=json_extract(p.parts_json,'$.taskEvidence.revision') "
-        "OR t.state!=json_extract(p.parts_json,'$.taskEvidence.state') "
         "OR EXISTS(SELECT 1 FROM jobs j WHERE j.kind='task.steer' AND j.aggregate_id=t.id AND j.state='queued')) LIMIT 1",
         (turn["id"], turn["owner_id"]),
     ):
         raise DomainError("TASK_RESULT_SUPERSEDED", 409)
+
+    for manifest in rows(
+        db,
+        "SELECT json_extract(p.parts_json,'$.taskEvidence') AS evidence FROM prompt_manifests p "
+        "JOIN tasks t ON t.id=json_extract(p.parts_json,'$.taskEvidence.taskId') "
+        "WHERE p.turn_id=? AND t.state!=json_extract(p.parts_json,'$.taskEvidence.state')",
+        (turn["id"],),
+    ):
+        if not self_verified_completion(db, turn, json.loads(manifest["evidence"])):
+            raise DomainError("TASK_RESULT_SUPERSEDED", 409)
 
     if row(
         db,

@@ -11,7 +11,7 @@ vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
 vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: () => ({ refresh: state.refresh, view: null }) }))
 vi.mock('../../shell/AdaptivePanel', () => ({ default: ({ children }: any) => children }))
 vi.mock('../../markdown/Markdown', () => ({ default: ({ children }: any) => children }))
-beforeEach(() => { state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
+beforeEach(() => { state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
 afterEach(cleanup)
 it('creates an independent Main instance only on first send and closes only that conversation', async () => {
   const close = vi.fn()
@@ -36,6 +36,7 @@ it('creates an independent Main instance only on first send and closes only that
 it('preserves the draft and reuses the exact message key after an ambiguous failure', async () => {
   let failed = false
   state.api.mockImplementation(async (_method, path) => {
+    if (path === '/agent/status') return { data: { projectOkr: true } }
     if (path === '/agent/main-conversation') return { data: { id: 'home' } }
     if (path === '/agent/conversations') return { data: { id: 'independent' } }
     if (!failed) { failed = true; throw new Error('lost receipt') }
@@ -69,4 +70,14 @@ it('provides verified board evidence for analysis without requiring unregistered
   expect(context.snapshot.keyResults[0].latest.value).toBe(11)
   expect(context.snapshot.metrics[0].recentDays[0]).toMatchObject({ value: 11, delta: null })
   expect(state.api.mock.calls.some(call => call[1].includes('/okr'))).toBe(false)
+})
+
+it('preserves input and explains a runtime that cannot bind project conversations', async () => {
+  state.api.mockResolvedValue({ data: { version: 'older-runtime' } })
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Keep the goal in this project' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await screen.findByText('okr.agentUpgradeRequired')
+  expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep the goal in this project')
+  expect(state.api.mock.calls.every(call => call[1] === '/agent/status')).toBe(true)
 })

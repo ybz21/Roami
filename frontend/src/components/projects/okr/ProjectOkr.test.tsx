@@ -6,7 +6,7 @@ import { type Workspace } from './okr-workspace'
 
 vi.mock('./OkrMainChat', () => ({ default: ({ onUpdated }: { onUpdated: () => void }) => <button onClick={onUpdated}>Complete discussion</button> }))
 vi.mock('./OkrTrend', () => ({ default: () => <div data-testid="trend" /> }))
-vi.mock('./OkrProjectFiles', () => ({ default: ({ dir }: { dir: string }) => <div data-testid="project-files">{dir}</div> }))
+vi.mock('./OkrProjectFiles', () => ({ default: ({ dir, bundleRoot }: { dir: string; bundleRoot?: string }) => <div data-testid="project-files" data-bundle-root={bundleRoot}>{dir}</div> }))
 vi.mock('../../swarm/useSwarmSnapshot', () => ({ useSwarmSnapshot: () => ({ data: null, error: false, refresh: vi.fn() }) }))
 vi.mock('../../swarm/Swarm', () => ({ default: ({ initialSwarm }: { initialSwarm: string }) => <div data-testid="activities">{initialSwarm}</div> }))
 
@@ -40,6 +40,7 @@ it('keeps project navigation available and preserves a configuration draft acros
   fireEvent.change(screen.getByLabelText('okr.objective'), { target: { value: 'Unfinished goal edit' } })
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.files' }))
   expect(await screen.findByTestId('project-files')).toHaveProperty('textContent', '/project')
+  expect(screen.getByTestId('project-files').getAttribute('data-bundle-root')).toBeNull()
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
   expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('Unfinished goal edit')
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
@@ -379,4 +380,13 @@ it('keeps a configuration draft on pending-file conflicts and offers file confir
   fireEvent.click(screen.getByRole('button', { name: 'okr.save' }))
   await waitFor(() => expect(state.api.mock.calls.filter(call => call[0] === 'PUT')).toHaveLength(2))
   expect(state.api.mock.calls.filter(call => call[0] === 'PUT')[1][2]).toMatchObject({ revision: 4, objective: 'Preserved GUI draft' })
+})
+
+it('passes the saved bundle path to Files without assuming it exists for unsaved projects', async () => {
+  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: { ...initial, projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 3 } } })
+  render(<ProjectOkr projectId="stable-project" projectDir="/project" />)
+  await screen.findByText('Launch')
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.files' }))
+  expect((await screen.findByTestId('project-files')).getAttribute('data-bundle-root')).toBe('.roami/okr')
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
 })

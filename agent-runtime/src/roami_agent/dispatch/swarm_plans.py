@@ -566,7 +566,9 @@ class SwarmPlans:
                 if not work:
                     raise DomainError("SWARM_MEMBER_TASK_REQUIRED", 404)
                 if work["task_id"]:
-                    task = row(db, "SELECT state FROM tasks WHERE id=?", (work["task_id"],))
+                    task = row(
+                        db, "SELECT state,revision FROM tasks WHERE id=?", (work["task_id"],)
+                    )
                     attempt = row(
                         db,
                         "SELECT state,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
@@ -580,6 +582,9 @@ class SwarmPlans:
                         or result.get("inputStopped") is False
                     ):
                         raise DomainError("SWARM_STOP_REQUIRED", 409)
+                previous = rows(
+                    db, "SELECT * FROM swarm_dependencies WHERE work_id=?", (work["id"],)
+                )
                 db.execute("DELETE FROM swarm_dependencies WHERE work_id=?", (work["id"],))
                 for dep in spec.get("dependencies", []):
                     upstream = row(
@@ -599,6 +604,17 @@ class SwarmPlans:
                 ).fetchone()
                 if cycle:
                     raise DomainError("SWARM_DEPENDENCY_CYCLE", 409)
+                current = rows(
+                    db, "SELECT * FROM swarm_dependencies WHERE work_id=?", (work["id"],)
+                )
+                if work["task_id"] and {tuple(dep.values()) for dep in previous} != {
+                    tuple(dep.values()) for dep in current
+                }:
+                    # Rebinding changes inputs, not the meaning of an already accepted run.
+                    db.execute(
+                        "UPDATE swarm_work_items SET required_task_revision=MAX(required_task_revision,?) WHERE id=?",
+                        (task["revision"] + 1, work["id"]),
+                    )
                 db.execute(
                     "UPDATE swarm_work_items SET dispatch_error=NULL WHERE id=?", (work["id"],)
                 )

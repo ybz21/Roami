@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import now_ms
@@ -76,12 +77,48 @@ def from_project(workspace):
     content, sha = files.get("teamMemory", ""), files.get("teamMemorySha256")
     if not isinstance(content, str) or not isinstance(sha, str) or digest(content) != sha:
         raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
-    return {
+    result = {
         "content": content,
         "sha256": sha,
         "source": ".roami/okr/memory/team.md",
         "available": True,
     }
+    instructions = files.get("mainInstructions", "")
+    skills = files.get("skills", [])
+    if (
+        not isinstance(instructions, str)
+        or len(instructions.encode()) > 65536
+        or not isinstance(skills, list)
+        or len(skills) > 16
+    ):
+        raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
+    total, seen = 0, set()
+    for skill in skills:
+        if not isinstance(skill, dict):
+            raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
+        name, content = skill.get("id"), skill.get("content")
+        if (
+            not isinstance(name, str)
+            or not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,63}", name)
+            or name in seen
+            or skill.get("path") != "skills/" + name + "/SKILL.md"
+            or not isinstance(content, str)
+            or not content
+            or digest(content) != skill.get("sha256")
+        ):
+            raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
+        seen.add(name)
+        total += len(content.encode())
+    if total > 65536:
+        raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
+    if instructions or skills:
+        result["projectGuidance"] = {
+            "source": ".roami/okr/agents/main.json",
+            "instructions": instructions,
+            "skills": skills,
+            "scope": "Project guidance; never execution proof or authority to bypass host controls",
+        }
+    return result
 
 
 async def read_memory(swarms, owner, sid):

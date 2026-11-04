@@ -389,8 +389,8 @@ export default function FileBrowser({
   // dock 布局下由外层（编辑器 tab 区）接管文件打开：点文件不再弹内置预览，而是回调让外层开 tab。
   onOpenFile?: (path: string) => void
   /** 外部要求打开某个路径（对话里点 Read/Edit 的文件名）。
-      nonce 自增才触发——同一个文件点第二次时 path 没变，没有 nonce 就毫无反应。 */
-  openRequest?: { path: string; nonce: number }
+      nonce 变化才触发；directory=true 只导航，不打开预览。 */
+  openRequest?: { path: string; nonce: number; directory?: boolean }
   // 外层当前激活的文件 tab，用于在浏览器里高亮选中项（覆盖内部 view）。
   selectedPath?: string | null
 }) {
@@ -496,7 +496,7 @@ export default function FileBrowser({
     const q = path ? `?path=${encodeURIComponent(path)}` : ''
     api('GET', `/files${q}`)
       .then((r) => { if (!stop) setData(r.data) })
-      .catch((e: any) => { if (!stop) setErr(e.apiError?.code === 'DIR_ACCESS_TIMEOUT' ? t('file.dirAccessTimeout', { path: e.apiError.path || path }) : e.message) })
+      .catch((e: any) => { if (!stop) { setData(null); setErr(e.apiError?.code === 'DIR_ACCESS_TIMEOUT' ? t('file.dirAccessTimeout', { path: e.apiError.path || path }) : e.message) } })
       .finally(() => { if (!stop) setLoading(false) })
     return () => { stop = true }
   }, [path, tick])
@@ -864,9 +864,12 @@ export default function FileBrowser({
   useEffect(() => {
     if (!openRequest?.path || openRequest.nonce === openReqRef.current) return
     openReqRef.current = openRequest.nonce
-    const dirOf = openRequest.path.replace(/\/[^/]*$/, '') || '/'
-    navigate(dirOf)
-    openFile(openRequest.path)
+    if (openRequest.directory) navigate(openRequest.path)
+    else {
+      const dirOf = openRequest.path.replace(/\/[^/]*$/, '') || '/'
+      navigate(dirOf)
+      openFile(openRequest.path)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest?.path, openRequest?.nonce])
 
@@ -1066,7 +1069,7 @@ export default function FileBrowser({
         ) : (
         <>
         {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><Spin size="small" /></div>}
-        {err && <div style={{ color: '#f85149', fontSize: 12, padding: '6px 10px' }}>{err}</div>}
+        {err && <div role="alert" style={{ color: 'var(--danger)', fontSize: 'var(--fs-meta)', padding: 'var(--sp-2) var(--sp-3)' }}>{err}</div>}
         {canUp && (
           <div onClick={goUp} style={rowStyle()}>
             <span style={{ color: 'var(--text-dim)', display: 'inline-flex' }}><ArrowUp size={13} /></span><span style={{ color: 'var(--text-dim)' }}>{t('file.parentDir')}</span>

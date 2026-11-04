@@ -663,6 +663,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
+                "projectOkr": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,

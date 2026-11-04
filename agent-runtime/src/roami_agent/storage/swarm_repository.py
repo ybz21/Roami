@@ -61,35 +61,77 @@ def work_state(db, item):
     state = task["state"]
     if attempt and attempt["state"] == "unknown":
         state = "unknown"
+    if task["revision"] < item["required_task_revision"]:
+        state = "blocked"
     return state, task
 
 
-def dependency_ready(db, dep):
+def dependency_task_ready(db, dep):
     upstream = row(
         db,
-        "SELECT t.* FROM swarm_work_items w LEFT JOIN tasks t ON t.id=w.task_id WHERE w.id=?",
+        "SELECT t.*,w.required_task_revision FROM swarm_work_items w LEFT JOIN tasks t ON t.id=w.task_id WHERE w.id=?",
         (dep["upstream_id"],),
     )
     if (
         not upstream
         or upstream["state"] != "succeeded"
         or upstream["revision"] != dep["task_revision"]
+        or upstream["revision"] < upstream["required_task_revision"]
     ):
         return False
-    if dep["artifact_id"]:
-        return bool(
-            row(
-                db,
-                "SELECT a.id FROM artifacts a JOIN task_attempts r ON r.id=json_extract(a.metadata_json,'$.runId') WHERE a.id=? AND a.task_id=? AND r.task_id=a.task_id AND r.task_revision=? AND a.purged_ms IS NULL AND a.deleted_ms IS NULL",
-                (dep["artifact_id"], upstream["id"], upstream["revision"]),
-            )
+    return not dep["artifact_id"] or bool(
+        row(
+            db,
+            "SELECT a.id FROM artifacts a JOIN task_attempts r ON r.id=json_extract(a.metadata_json,'$.runId') WHERE a.id=? AND a.task_id=? AND r.task_id=a.task_id AND r.task_revision=? AND a.purged_ms IS NULL AND a.deleted_ms IS NULL",
+            (dep["artifact_id"], upstream["id"], upstream["revision"]),
         )
-    return True
+    )
+
+
+def dependency_ready(db, dep, *, cache=None):
+    if not dependency_task_ready(db, dep):
+        return False
+    cache = {} if cache is None else cache
+    root = dep["upstream_id"]
+    visiting = set()
+    pending = [(root, None)]
+    while pending:
+        ident, parents = pending.pop()
+        if ident in cache:
+            continue
+        if parents is not None:
+            visiting.discard(ident)
+            cache[ident] = all(cache.get(parent["upstream_id"], False) for parent in parents)
+        elif ident in visiting:
+            cache[ident] = False
+        else:
+            parents = rows(db, "SELECT * FROM swarm_dependencies WHERE work_id=?", (ident,))
+            if not all(dependency_task_ready(db, parent) for parent in parents):
+                cache[ident] = False
+                continue
+            visiting.add(ident)
+            pending.append((ident, parents))
+            pending.extend((parent["upstream_id"], None) for parent in parents)
+    return cache[root]
+
+
+def task_dependencies_ready(db, task):
+    work = row(db, "SELECT * FROM swarm_work_items WHERE task_id=?", (task["id"],))
+    if not work:
+        return True
+    if task["revision"] < work["required_task_revision"]:
+        return False
+    cache = {}
+    return all(
+        dependency_ready(db, dep, cache=cache)
+        for dep in rows(db, "SELECT * FROM swarm_dependencies WHERE work_id=?", (work["id"],))
+    )
 
 
 def snapshot(db, owner, swarm_id):
     value = group(db, owner, swarm_id)
     work = rows(db, "SELECT * FROM swarm_work_items WHERE swarm_id=? ORDER BY rowid", (swarm_id,))
+    dependency_cache = {}
     for item in work:
         item["deliverables"] = json.loads(item.pop("deliverables_json"))
         item["dependencies"] = rows(
@@ -140,6 +182,7 @@ def snapshot(db, owner, swarm_id):
                     "task_revision": dep["revision"],
                     "artifact_id": dep["artifactId"],
                 },
+                cache=dependency_cache,
             )
             for dep in item["dependencies"]
         )
@@ -158,7 +201,12 @@ def snapshot(db, owner, swarm_id):
             )
             for dep in item["dependencies"]
         )
-        if stale and (item["task_id"] or unhealthy):
+        if (
+            task
+            and task["revision"] < item["required_task_revision"]
+            or stale
+            and (item["task_id"] or unhealthy)
+        ):
             item["state"] = "blocked"
             item["dispatch_error"] = item["dispatch_error"] or "SWARM_DEPENDENCY_NOT_VERIFIED"
     all_ids = {item["id"] for item in work}

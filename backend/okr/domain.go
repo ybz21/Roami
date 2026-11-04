@@ -81,15 +81,23 @@ type Dashboard struct {
 }
 
 type ProjectFiles struct {
-	Root                 string `json:"root"`
-	SchemaVersion        int    `json:"schemaVersion"`
-	Revision             int64  `json:"revision"`
-	MainInstructionsFile string `json:"mainInstructionsFile"`
-	TeamMemoryFile       string `json:"teamMemoryFile"`
-	MainInstructions     string `json:"mainInstructions,omitempty"`
-	TeamMemory           string `json:"teamMemory,omitempty"`
-	TeamMemorySha256     string `json:"teamMemorySha256"`
-	PendingChanges       bool   `json:"pendingChanges"`
+	Root                 string         `json:"root"`
+	SchemaVersion        int            `json:"schemaVersion"`
+	Revision             int64          `json:"revision"`
+	MainInstructionsFile string         `json:"mainInstructionsFile"`
+	TeamMemoryFile       string         `json:"teamMemoryFile"`
+	MainInstructions     string         `json:"mainInstructions,omitempty"`
+	TeamMemory           string         `json:"teamMemory,omitempty"`
+	TeamMemorySha256     string         `json:"teamMemorySha256"`
+	PendingChanges       bool           `json:"pendingChanges"`
+	Skills               []ProjectSkill `json:"skills"`
+}
+
+type ProjectSkill struct {
+	ID      string `json:"id"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	SHA256  string `json:"sha256"`
 }
 
 type Config struct {

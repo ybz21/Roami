@@ -363,6 +363,290 @@ async def test_dependency_revision_repair_requires_stopped_downstream(collaborat
     assert updated["work"][1]["state"] == "blocked"
 
 
+async def lineage_result(store, swarms, created, member, *, accepted=True, verify=True):
+    work = next(
+        w
+        for w in (await swarms.snapshot("alice", created["id"]))["work"]
+        if w["member_name"] == member
+    )
+    dispatcher = TaskDispatcher(store, swarms.tasks, None, None, None, asyncio.Event(), {})
+    await swarms.tasks.report(
+        "alice",
+        work["task_id"],
+        work["attempt"]["runId"],
+        work["revision"],
+        {"state": "succeeded", "summary": "Verified " + member, "checks": []},
+    )
+    job = await store.call(
+        lambda db: row(
+            db,
+            "SELECT * FROM jobs WHERE kind='task.verify' AND aggregate_id=? "
+            "AND json_extract(payload_json,'$.runId')=?",
+            (work["task_id"], work["attempt"]["runId"]),
+        )
+    )
+    if not verify:
+        return work, dispatcher
+    await dispatcher.verify(job)
+    if accepted:
+        await dispatcher.confirm(
+            "alice",
+            work["task_id"],
+            True,
+            revision=work["revision"],
+            run_id=work["attempt"]["runId"],
+        )
+    return work, dispatcher
+
+
+async def lineage_pair(
+    store, collaboration, *, reviewer_accepted=True, reviewer_verified=True, revise_producer=True
+):
+    swarms, created = collaboration
+    await plan(swarms, created, [item("producer"), item("reviewer", integration=True)])
+    await advance(swarms, created)
+    producer, _ = await lineage_result(store, swarms, created, "producer")
+    await advance(swarms, created)
+    reviewer, dispatcher = await lineage_result(
+        store,
+        swarms,
+        created,
+        "reviewer",
+        accepted=reviewer_accepted,
+        verify=reviewer_verified,
+    )
+    if revise_producer:
+        await swarms.tasks.revisions.request(
+            "alice",
+            producer["task_id"],
+            "Use revised producer outputs",
+            1,
+            "producer-v2",
+        )
+        await swarms.tasks.revisions.advance()
+        await lineage_result(store, swarms, created, "producer")
+    before = await swarms.snapshot("alice", created["id"])
+    spec = {
+        "commandKey": "rebind-v2",
+        "expectedRevision": before["revision"],
+        "workId": reviewer["id"],
+        "dependencies": [{"member": "producer", "revision": 2}],
+    }
+    return swarms, created, reviewer, dispatcher, spec
+
+
+async def test_rebinding_verified_dependency_never_reuses_old_success(collaboration, store):
+    swarms, created, reviewer, _, spec = await lineage_pair(store, collaboration)
+    await swarms.dependencies("alice", created["id"], spec)
+    view = await swarms.snapshot("alice", created["id"])
+    updated = view["work"][1]
+    assert updated["task_id"] == reviewer["task_id"]
+    assert updated["attempt"]["runId"] == reviewer["attempt"]["runId"]
+    assert updated["state"] == "blocked"
+    assert view["state"] == "blocked"
+
+
+async def test_rebinding_dependency_rejects_acceptance_of_old_waiting_run(collaboration, store):
+    swarms, created, reviewer, dispatcher, spec = await lineage_pair(
+        store,
+        collaboration,
+        reviewer_accepted=False,
+    )
+    await swarms.dependencies("alice", created["id"], spec)
+    with pytest.raises(DomainError, match="TASK_RESULT_SUPERSEDED|SWARM_DEPENDENCY_NOT_VERIFIED"):
+        await dispatcher.confirm(
+            "alice",
+            reviewer["task_id"],
+            True,
+            revision=reviewer["revision"],
+            run_id=reviewer["attempt"]["runId"],
+        )
+
+
+async def test_dependency_rebind_preserves_history_until_new_revision_is_accepted(
+    collaboration, store
+):
+    swarms, created, reviewer, _, spec = await lineage_pair(store, collaboration)
+    old = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM task_attempts WHERE id=?", (reviewer["attempt"]["runId"],)
+        )
+    )
+    task = (await swarms.tasks.get("alice", reviewer["task_id"]))["task"]
+    artifacts = ArtifactStore(store)
+    try:
+        artifact = await artifacts.put(
+            "alice",
+            b"old review",
+            task_id=reviewer["task_id"],
+            mime_type="text/plain",
+            metadata={"runId": old["id"]},
+        )
+        receipt = await swarms.dependencies("alice", created["id"], spec)
+        assert await swarms.dependencies("alice", created["id"], spec) == receipt
+        await advance(swarms, created)
+        view = await swarms.snapshot("alice", created["id"])
+        assert view["work"][1]["required_task_revision"] == 2
+        assert len(await swarms.tasks.list("alice")) == 2
+        assert (
+            await store.call(
+                lambda db: row(db, "SELECT * FROM task_attempts WHERE id=?", (old["id"],))
+            )
+            == old
+        )
+        assert (await artifacts.verified_path("alice", artifact["id"]))[
+            1
+        ].read_bytes() == b"old review"
+        await swarms.tasks.revisions.request(
+            "alice", reviewer["task_id"], "Review revised inputs", 1, "reviewer-v2"
+        )
+        await swarms.tasks.revisions.advance()
+        pending = await swarms.snapshot("alice", created["id"])
+        assert pending["work"][1]["revision"] == 2
+        assert pending["work"][1]["state"] != "succeeded"
+        await lineage_result(store, swarms, created, "reviewer", accepted=False)
+        waiting = await swarms.snapshot("alice", created["id"])
+        assert waiting["work"][1]["state"] == "waiting_user"
+        run = waiting["work"][1]["attempt"]["runId"]
+        dispatcher = TaskDispatcher(store, swarms.tasks, None, None, None, asyncio.Event(), {})
+        await dispatcher.confirm("alice", reviewer["task_id"], True, revision=2, run_id=run)
+        final = await swarms.snapshot("alice", created["id"])
+        assert final["state"] == "done" and final["work"][1]["task_id"] == task["id"]
+        after = (await swarms.tasks.get("alice", reviewer["task_id"]))["task"]
+        assert (
+            json.loads(after["intent_json"])["executor"]
+            == json.loads(task["intent_json"])["executor"]
+        )
+        assert after["target_json"] == task["target_json"]
+    finally:
+        await artifacts.close()
+
+
+async def test_dependency_noop_keeps_accepted_revision(collaboration, store):
+    swarms, created, reviewer, _, spec = await lineage_pair(
+        store, collaboration, revise_producer=False
+    )
+    spec["dependencies"][0]["revision"] = 1
+    await swarms.dependencies("alice", created["id"], spec)
+    view = await swarms.snapshot("alice", created["id"])
+    assert view["work"][1]["required_task_revision"] == 1
+    assert view["state"] == "done"
+    await swarms.dependencies(
+        "alice",
+        created["id"],
+        {**spec, "commandKey": "noop-again", "expectedRevision": view["revision"]},
+    )
+    assert (await swarms.snapshot("alice", created["id"]))["work"][1]["state"] == "succeeded"
+    assert (await swarms.tasks.get("alice", reviewer["task_id"]))["task"]["revision"] == 1
+
+
+async def test_stale_dependency_blocks_transitive_accepted_result_and_dispatch(
+    collaboration, store
+):
+    swarms, created = collaboration
+    await plan(
+        swarms,
+        created,
+        [
+            item("a"),
+            item("b", dependencies=[{"member": "a"}]),
+            item("c", dependencies=[{"member": "b"}]),
+            item("d", dependencies=[{"member": "c"}]),
+        ],
+    )
+    for member in ["a", "b", "c"]:
+        await advance(swarms, created)
+        await lineage_result(store, swarms, created, member)
+    before = await swarms.snapshot("alice", created["id"])
+    a = before["work"][0]
+    await swarms.tasks.revisions.request("alice", a["task_id"], "Revise upstream inputs", 1, "a-v2")
+    await swarms.tasks.revisions.advance()
+    await lineage_result(store, swarms, created, "a")
+    await advance(swarms, created)
+    view = await swarms.snapshot("alice", created["id"])
+    assert [w["state"] for w in view["work"]][1:3] == ["blocked", "blocked"]
+    assert view["work"][3]["task_id"] is None
+    assert not await store.call(
+        lambda db: dependency_ready(
+            db, {"upstream_id": view["work"][2]["id"], "task_revision": 1, "artifact_id": None}
+        )
+    )
+
+
+@pytest.mark.parametrize("first", ["rebind", "confirm"])
+async def test_dependency_rebind_and_confirm_serialize_in_write_transaction(
+    collaboration, store, monkeypatch, first
+):
+    swarms, created, reviewer, dispatcher, spec = await lineage_pair(
+        store, collaboration, reviewer_accepted=False, revise_producer=False
+    )
+    spec["dependencies"] = []
+    from roami_agent.storage import swarm_evidence
+
+    original = swarm_evidence.validate_evidence
+    validating, release = asyncio.Event(), asyncio.Event()
+
+    async def paused(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        validating.set()
+        await release.wait()
+        return result
+
+    monkeypatch.setattr(swarm_evidence, "validate_evidence", paused)
+    confirmation = asyncio.create_task(
+        dispatcher.confirm(
+            "alice", reviewer["task_id"], True, revision=1, run_id=reviewer["attempt"]["runId"]
+        )
+    )
+    await asyncio.wait_for(validating.wait(), 2)
+    if first == "rebind":
+        await swarms.dependencies("alice", created["id"], spec)
+        release.set()
+        with pytest.raises(DomainError, match="SWARM_DEPENDENCY_NOT_VERIFIED"):
+            await confirmation
+    else:
+        release.set()
+        await confirmation
+        await swarms.dependencies("alice", created["id"], spec)
+    view = await swarms.snapshot("alice", created["id"])
+    assert view["work"][1]["required_task_revision"] == 2
+    assert view["work"][1]["state"] == "blocked"
+
+
+async def test_dependency_rebind_cannot_be_overwritten_by_inflight_verifier(collaboration, store):
+    swarms, created, reviewer, _, spec = await lineage_pair(
+        store,
+        collaboration,
+        reviewer_accepted=False,
+        reviewer_verified=False,
+        revise_producer=False,
+    )
+    validating, release = asyncio.Event(), asyncio.Event()
+
+    async def verifier(task, result):
+        validating.set()
+        await release.wait()
+        return True
+
+    dispatcher = TaskDispatcher(store, swarms.tasks, None, verifier, None, asyncio.Event(), {})
+    job = await store.call(
+        lambda db: row(
+            db,
+            "SELECT * FROM jobs WHERE kind='task.verify' AND aggregate_id=?",
+            (reviewer["task_id"],),
+        )
+    )
+    verification = asyncio.create_task(dispatcher.verify(job))
+    await asyncio.wait_for(validating.wait(), 2)
+    await swarms.dependencies("alice", created["id"], {**spec, "dependencies": []})
+    release.set()
+    await verification
+    view = await swarms.snapshot("alice", created["id"])
+    assert view["work"][1]["state"] == "blocked"
+    assert view["work"][1]["required_task_revision"] == 2
+    assert (await swarms.tasks.get("alice", reviewer["task_id"]))["task"]["state"] == "waiting_user"
+
+
 async def test_main_completion_replies_are_in_the_group_chat(collaboration, store):
     swarms, created = collaboration
     await plan(swarms, created, [item("a")])
@@ -928,3 +1212,145 @@ def test_canonical_empty_memory_omission_requires_matching_digest():
     assert value["available"] and value["content"] == ""
     with pytest.raises(DomainError, match="SWARM_PROJECT_MEMORY_UNAVAILABLE"):
         from_project({"projectFiles": {"teamMemorySha256": digest("missing nonempty content")}})
+
+
+async def test_dependency_revision_gate_survives_database_restart(collaboration, store):
+    from roami_agent.storage.database import Database
+
+    swarms, created, reviewer, _, spec = await lineage_pair(store, collaboration)
+    await swarms.dependencies("alice", created["id"], spec)
+    await store.close()
+    database = Database(store.path, store.data_root, managed=False)
+    await database.open()
+    try:
+        conversations = Conversations(database)
+        recovered = SwarmPlans(
+            database, Tasks(database, conversations), conversations, asyncio.Event()
+        )
+        await recovered.recover()
+        await advance(recovered, created)
+        view = await recovered.snapshot("alice", created["id"])
+        assert view["work"][1]["task_id"] == reviewer["task_id"]
+        assert view["work"][1]["required_task_revision"] == 2
+        assert view["work"][1]["state"] == "blocked"
+        assert view["work"][1]["attempt"]["runId"] == reviewer["attempt"]["runId"]
+        assert len(await recovered.tasks.list("alice")) == 2
+    finally:
+        await database.close()
+
+
+async def test_dependency_readiness_memoizes_shared_ancestors_and_rejects_legacy_cycles(
+    collaboration, store
+):
+    from collections import Counter
+
+    swarms, created = collaboration
+    await plan(
+        swarms,
+        created,
+        [
+            item("a"),
+            item("b", dependencies=[{"member": "a"}]),
+            item("c", dependencies=[{"member": "a"}]),
+            item("d", dependencies=[{"member": "b"}, {"member": "c"}]),
+        ],
+    )
+    for member in ["a", "b", "c", "d"]:
+        await advance(swarms, created)
+        await lineage_result(store, swarms, created, member)
+    traced = []
+    await store.call(lambda db: db.set_trace_callback(traced.append))
+    try:
+        view = await swarms.snapshot("alice", created["id"])
+    finally:
+        await store.call(lambda db: db.set_trace_callback(None))
+    walks = Counter(
+        sql for sql in traced if sql.startswith("SELECT * FROM swarm_dependencies WHERE work_id=")
+    )
+    assert walks and max(walks.values()) == 1
+    assert all(w["state"] == "succeeded" for w in view["work"])
+    await store.call(
+        lambda db: db.execute(
+            "INSERT INTO swarm_dependencies VALUES(?,?,1,NULL)",
+            (view["work"][0]["id"], view["work"][3]["id"]),
+        ),
+        write=True,
+    )
+    cyclic = await asyncio.wait_for(swarms.snapshot("alice", created["id"]), 2)
+    assert all(w["state"] == "blocked" for w in cyclic["work"])
+
+
+async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, monkeypatch):
+    from roami_agent.storage import database as database_module
+    from roami_agent.storage import migrations
+
+    root = tmp_path / "upgrade"
+    path = root / "database/agents/runtime.db"
+    with monkeypatch.context() as old:
+        old.setattr(migrations, "SCHEMA_VERSION", 17)
+        old.setattr(database_module, "SCHEMA_VERSION", 17)
+        database = database_module.Database(path, root, managed=False)
+        await database.open()
+        try:
+            conversations = Conversations(database)
+            tasks = Tasks(database, conversations)
+            swarms = SwarmPlans(database, tasks, conversations, asyncio.Event())
+            main = await conversations.main("alice")
+            origin = await conversations.accept(
+                "alice", main["id"], "origin", "Build original output"
+            )
+            created = await swarms.create(
+                "alice",
+                {
+                    "name": "Legacy",
+                    "goal": "Build original output",
+                    "mainConversationId": main["id"],
+                    "commandKey": "create",
+                },
+                binding={"turnId": origin["turnId"]},
+            )
+            await plan(swarms, created, [item("original")])
+            await advance(swarms, created)
+            work = await database.call(
+                lambda db: row(
+                    db, "SELECT * FROM swarm_work_items WHERE swarm_id=?", (created["id"],)
+                )
+            )
+            run = await database.call(
+                lambda db: row(
+                    db, "SELECT * FROM task_attempts WHERE task_id=?", (work["task_id"],)
+                )
+            )
+            await tasks.report(
+                "alice",
+                work["task_id"],
+                run["id"],
+                1,
+                {"state": "succeeded", "summary": "Original evidence", "checks": []},
+            )
+            original = await database.call(
+                lambda db: row(db, "SELECT * FROM task_attempts WHERE id=?", (run["id"],))
+            )
+        finally:
+            await database.close()
+    database = database_module.Database(path, root, managed=False)
+    await database.open()
+    try:
+        saved = await database.call(
+            lambda db: row(db, "SELECT * FROM swarm_work_items WHERE id=?", (work["id"],))
+        )
+        assert saved["required_task_revision"] == 1 and saved["task_id"] == work["task_id"]
+        assert (
+            await database.call(
+                lambda db: row(db, "SELECT * FROM task_attempts WHERE id=?", (original["id"],))
+            )
+            == original
+        )
+        assert (
+            await database.call(
+                lambda db: db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
+            )
+            == 18
+        )
+    finally:
+        await database.close()

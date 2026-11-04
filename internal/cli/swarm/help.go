@@ -42,6 +42,9 @@ func showHelp(w io.Writer, topics []string) error {
   pause|resume|stop|archive <群ID> --key KEY --revision N [--json]
   plan|dependencies|control|say|post <群ID> --file request.json [--json]
   post <群ID> "讨论" --key KEY --task TASK --run RUN --task-revision N
+  verify --input JSON（仅绑定本群 Main 的 Agent 工具上下文）
+    必填 swarmId/taskId/revision/runId/accepted/checks/artifactIds
+    先完整读取本轮文本产物；外部动作由用户界面/宿主核验，不能代填回执。
   help [命令] / <命令> --help
 
 群ID、工作项、task、run 是不同身份；status 显示计划修订，members 显示任务修订。

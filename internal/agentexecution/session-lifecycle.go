@@ -194,6 +194,19 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 	if state.Tools == nil {
 		state.Tools = map[string]bool{}
 	}
+	if executor == "codex" && state.Executor == "codex" && state.InitialLaunch && state.TurnID == "" && state.PromptHash == "" {
+		// SessionStart can belong to an internal thread; only assigned input authenticates a root.
+		if event.Hook != "UserPromptSubmit" {
+			return nil
+		}
+		dir, _ := s.directory(state.LaunchKey)
+		var spec Spec
+		var receipt Receipt
+		if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" || !spec.Persistent || spec.SessionID != "" || spec.Key != state.LaunchKey || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding != nil || workspaceHash(event.Prompt) != workspaceHash(sessionPrompt(dir, spec)) || event.TurnID == "" {
+			return nil
+		}
+		state.Binding.ProviderID, state.State = "", "submitting"
+	}
 	if state.Binding.ProviderID != "" && (state.Binding.ProviderID != event.ProviderID || state.Executor != executor) {
 		if state.ProviderConflict == nil {
 			state.ProviderConflict = &sessionProviderConflict{Executor: executor, ProviderID: event.ProviderID, TurnID: truncate(event.TurnID, 300), Hook: truncate(event.Hook, 100), Type: truncate(event.Type, 100)}

@@ -636,6 +636,13 @@ class TaskDispatcher:
                 }
                 if uncertain:
                     result.update(outcomeKnown=False, retryable=False)
+            if state == "succeeded":
+                from roami_agent.storage.swarm_repository import task_dependencies_ready
+
+                if not task_dependencies_ready(db, current):
+                    if confirmation:
+                        raise DomainError("SWARM_DEPENDENCY_NOT_VERIFIED", 409)
+                    state = "waiting_user"
             completion = {
                 "taskId": task["id"],
                 "taskRevision": run["task_revision"],
