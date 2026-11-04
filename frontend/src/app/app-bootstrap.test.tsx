@@ -78,6 +78,15 @@ describe('application mount boundary', () => {
     expect(screen.queryByText('Workspace')).toBeNull()
   })
 
+  it('preserves the task notification destination after login', async () => {
+    history.replaceState(null, '', '#/inbox/task-session')
+    mock.api.mockRejectedValueOnce(new Error('UNAUTHORIZED'))
+    render(<App />)
+    fireEvent.click(await screen.findByText('Login'))
+    await screen.findByText('Workspace')
+    expect(location.hash).toBe('#/inbox/task-session')
+  })
+
   it('opens an authenticated artifact page without mounting the workspace', async () => {
     history.replaceState(null, '', '#/artifact/report%20html?node=origin')
     render(<App />)

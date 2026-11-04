@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/ic_launcher_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="@dimen/task_toolbar"
+        android:gravity="center_vertical" android:paddingHorizontal="@dimen/task_space_medium">
+        <Button android:id="@+id/task_back" android:layout_width="wrap_content" android:layout_height="@dimen/task_touch"
+            android:text="@string/event_back" android:textColor="@color/task_text" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="@dimen/task_space_medium" android:text="@string/event_all_tasks"
+            android:textSize="@dimen/task_text_name" android:textColor="@color/task_text" android:textStyle="bold" />
+    </LinearLayout>
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <ListView android:id="@+id/task_list" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:divider="@color/task_separator" android:dividerHeight="1dp" />
+        <TextView android:id="@+id/task_empty" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:gravity="center" android:text="@string/event_no_tasks" android:textSize="@dimen/task_text_body"
+            android:textColor="@color/task_muted" />
+    </FrameLayout>
+</LinearLayout>

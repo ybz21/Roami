@@ -17,7 +17,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-data class WidgetSession(val name: String, val label: String, val project: String)
+data class WidgetSession(val name: String, val label: String, val project: String,
+    val waitingBody: String = "", val prompt: String = "", val choices: List<TaskChoice> = emptyList(),
+    val selectionMode: String = "single")
 data class WidgetRow(val session: WidgetSession, val waiting: Boolean)
 
 data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: List<WidgetSession>,
@@ -37,8 +39,9 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
             val waitingItems = mutableListOf<WidgetSession>()
             for (i in 0 until items.length()) {
                 val item = items.optJSONObject(i) ?: continue
-                val session = WidgetSession(item.optString("name"), item.optString("label"), item.optString("project"))
-                if (item.optBoolean("waiting")) { waiting++; if (waitingItems.isEmpty()) waitingItems += session }
+                val session = WidgetSession(item.optString("name"), item.optString("label"), item.optString("project"),
+                    item.optString("waitingBody"), item.optString("prompt"), TaskChoice.read(item.optJSONArray("choices")), item.optString("selectionMode", "single"))
+                if (item.optBoolean("waiting")) { waiting++; waitingItems += session }
                 if (item.optBoolean("running")) { running++; runningItems += session }
             }
             return WidgetSnapshot(running, waiting, runningItems, waitingItems, System.currentTimeMillis())
@@ -55,7 +58,8 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
             fun items(key: String): List<WidgetSession> {
                 val rows = o.optJSONArray(key) ?: JSONArray()
                 return (0 until rows.length()).mapNotNull { rows.optJSONObject(it)?.let { row ->
-                    WidgetSession(row.optString("name"), row.optString("label"), row.optString("project"))
+                    WidgetSession(row.optString("name"), row.optString("label"), row.optString("project"),
+                        row.optString("waitingBody"), row.optString("prompt"), TaskChoice.read(row.optJSONArray("choices")), row.optString("selectionMode", "single"))
                 } }
             }
             val previousWaiting = o.optJSONObject("waitingItem")?.let {
@@ -78,7 +82,9 @@ data class WidgetSnapshot(val running: Int, val waiting: Int, val runningItems: 
 
     fun save(ctx: Context, base: String) {
         fun items(list: List<WidgetSession>) = JSONArray().apply {
-            list.forEach { put(JSONObject().put("name", it.name).put("label", it.label).put("project", it.project)) }
+            list.forEach { put(JSONObject().put("name", it.name).put("label", it.label).put("project", it.project)
+                .put("waitingBody", it.waitingBody).put("prompt", it.prompt).put("choices", JSONArray(TaskChoice.encode(it.choices)))
+                .put("selectionMode", it.selectionMode)) }
         }
         val o = JSONObject().put("running", running).put("waiting", waiting).put("unfinished", unfinished).put("updated", updated)
             .put("runningItems", items(runningItems)).put("waitingItems", items(waitingItems))

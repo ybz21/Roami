@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="@dimen/task_touch"
+    android:padding="@dimen/task_space_medium" android:orientation="vertical">
+    <TextView android:id="@+id/task_status" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textSize="@dimen/task_text_meta" />
+    <TextView android:id="@+id/task_name" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/task_space_small" android:textSize="@dimen/task_text_name"
+        android:textColor="@color/task_text" android:textStyle="bold" android:maxLines="2" android:ellipsize="end" />
+    <TextView android:id="@+id/task_summary" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/task_space_small" android:textSize="@dimen/task_text_body"
+        android:textColor="@color/task_muted" android:maxLines="3" android:ellipsize="end" />
+</LinearLayout>

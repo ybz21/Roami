@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="task_space_small">8dp</dimen>
+    <dimen name="task_space_medium">16dp</dimen>
+    <dimen name="task_toolbar">60dp</dimen>
+    <dimen name="task_touch">44dp</dimen>
+    <dimen name="task_text_meta">12sp</dimen>
+    <dimen name="task_text_body">14sp</dimen>
+    <dimen name="task_text_name">16sp</dimen>
+</resources>

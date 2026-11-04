@@ -7,6 +7,17 @@ import org.json.JSONArray
 class WidgetSnapshotTest {
     private fun session(name: String) = WidgetSession(name, name, "project")
 
+    @Test fun overviewRecoversPromptAndAllChoicesAfterReconnect() {
+        val snapshot = WidgetSnapshot.fromOverview(JSONArray("""[
+            {"name":"s","label":"Task","waiting":true,"prompt":"current",
+             "waitingBody":"Choose a release","choices":[{"value":"1","label":"Stable"},{"value":"2","label":"Beta"}]}
+        ]"""))
+        val task = snapshot.waitingItems.single()
+        assertEquals("current", task.prompt)
+        assertEquals("Choose a release", task.waitingBody)
+        assertEquals(listOf("Stable", "Beta"), task.choices.map { it.label })
+    }
+
     @Test fun overviewCountsBusyAgentsNotIdleProcesses() {
         val items = JSONArray("""[
             {"name":"pi-busy","label":"Pi busy","project":"P","agent":"pi","running":true,"waiting":false},
