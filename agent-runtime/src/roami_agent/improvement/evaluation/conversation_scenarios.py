@@ -236,7 +236,7 @@ async def complete_fixture_work(runtime, root):
     await runtime.db.call(write, write=True)
 
 
-async def run_conversation(scenario, root, *, settings=None, provider=None):
+async def run_conversation(scenario, root, *, settings=None, provider=None, review_replies=False):
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     database = Database(root / "runtime.db", root / "runtime", managed=False)
     await database.open()
@@ -258,7 +258,7 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         computer={},
         proactive_enabled=False,
     )
-    runtime = Runtime(database, model, settings=isolated)
+    runtime = Runtime(database, model, settings=isolated, review_replies=review_replies)
     targets = ScenarioTargets(root, database)
     registry = Tools(runtime.artifacts)
     register_main_tools(
@@ -267,6 +267,7 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         runtime.memory,
         targets,
         TaskRouter(database, targets, runtime.settings, runtime.memory),
+        reply_reviewer=runtime.reply_review,
     )
     runtime.tools.registry.update(registry.registry)
     register_model_inputs(runtime.tools)

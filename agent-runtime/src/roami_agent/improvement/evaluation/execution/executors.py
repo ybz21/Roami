@@ -30,6 +30,7 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.model_routes import settings_with_route
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.providers.factory import configured_provider
+from roami_agent.replies.source_review import REVIEW_VERSION
 from roami_agent.storage.database import Database, row
 
 
@@ -111,11 +112,13 @@ class NativeFilesExecutor:
         workspace=None,
         provider_factory=None,
         shared_daily_limit=False,
+        review_replies=False,
     ):
         self.settings, self.fixture = settings, fixture
         self.settle_maintenance = settle_maintenance
         self.allow_shell, self.workspace = allow_shell, workspace
         self.allow_tasks = allow_tasks
+        self.review_replies = review_replies and not fixture
         require(not allow_tasks or allow_shell, "RSI_CONTAINER_REQUIRED")
         self.provider_factory = provider_factory
         self.shared_daily_limit = True
@@ -147,6 +150,7 @@ class NativeFilesExecutor:
                     "allow_shell": allow_shell,
                     "allow_tasks": allow_tasks,
                     "task_tools_version": NATIVE_TASK_PROFILE_VERSION if allow_tasks else None,
+                    "reply_review": REVIEW_VERSION if self.review_replies else None,
                 },
                 {
                     "reserve_tokens": settings.reserve_tokens,
@@ -238,6 +242,7 @@ class NativeFilesExecutor:
             worker_model=models[1],
             memory_model=models[2],
             execution_deadline=lambda: enclosing_deadline_ms,
+            review_replies=self.review_replies,
         )
         # No shell, delegations, external capabilities, session operations or grader access.
         allowed = {

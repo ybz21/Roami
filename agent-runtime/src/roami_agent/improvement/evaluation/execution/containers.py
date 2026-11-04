@@ -123,8 +123,8 @@ class ContainerExecutor:
         self.artifact_renderer = None
         self.model_hash = digest(
             [
-                NativeFilesExecutor(settings).model_hash,
-                "container-uds-v34-saved-role-instructions",
+                NativeFilesExecutor(settings, review_replies=True).model_hash,
+                "container-uds-v38-source-admission",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -229,6 +229,7 @@ class ContainerExecutor:
                 {
                     "org.roami.rsi.role-instructions": "1",
                     "org.roami.rsi.shared-daily-policy": "6",
+                    "org.roami.rsi.source-reply-review": "3",
                 }
             )
         if model_inputs and self.main_image_input["enabled"]:

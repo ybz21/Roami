@@ -55,6 +55,7 @@ from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
 from roami_agent.replies.proactive_jobs import ProactiveJobs
+from roami_agent.replies.source_review import SourceReplyReview
 from roami_agent.server.capability_imports import CapabilityImports
 from roami_agent.server.capability_markets import CapabilityMarkets
 from roami_agent.server.capability_settings import CapabilitySettings
@@ -102,6 +103,7 @@ class Runtime:
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
         development_rsi=False,
+        review_replies=False,
         execution_deadline: Callable[[], int | None] | None = None,
     ):
         self.db, self.model = database, model
@@ -165,6 +167,18 @@ class Runtime:
             keep_recent_tokens=self.settings.keep_recent_tokens,
         )
         self.tools = Tools(self.artifacts)
+        self.reply_review = (
+            SourceReplyReview(
+                database,
+                lambda: self.model,
+                timeout=lambda: self.settings.timeout_for("main"),
+                preemptible=lambda tid, active: (
+                    self.loop.preemptible.add(tid) if active else self.loop.preemptible.discard(tid)
+                ),
+            )
+            if review_replies
+            else None
+        )
         self.active = {}
         self.turn_tasks = {}
         self.wakeup = asyncio.Event()
@@ -194,6 +208,7 @@ class Runtime:
             self.memory,
             targets,
             TaskRouter(database, targets, self.settings, self.memory),
+            reply_reviewer=self.reply_review,
         )
         register_reminder_tools(
             self.tools,
@@ -300,6 +315,7 @@ class Runtime:
             self.turn_tasks,
             time.monotonic,
             self.gateway,
+            reply_reviewer=self.reply_review,
         )
         self.scheduler = Scheduler(
             database,
@@ -595,6 +611,7 @@ async def serve(args):
         worker_model=worker,
         executor=CodingExecutor(database, settings),
         development_rsi=getattr(args, "development_rsi", False),
+        review_replies=True,
     )
     runtime.managed_parent = getattr(args, "parent_fd", None) is not None
     try:

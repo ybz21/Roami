@@ -184,7 +184,7 @@ async def test_native_cycle_uses_node_settings_and_needs_no_rsi_budget(tmp_path,
             assert (
                 settings.model == "saved-main" and settings.route("worker").name == "saved-worker"
             )
-            assert options == {"fixture": False, "shared_daily_limit": True}
+            assert options == {"fixture": False, "shared_daily_limit": True, "review_replies": True}
 
     async def run(**options):
         assert options["ledger"].shared_daily_limit is True
@@ -251,7 +251,12 @@ async def test_cli_native_runtime_retains_provider_parameters_past_old_case_budg
     def provider(settings, role):
         route = settings.route(role)
         observed.append((role, route))
-        return ProtocolFixtureModel([{"text": "1" if role == "main" else '{"memories":[]}'}])
+        return ProtocolFixtureModel(
+            [
+                {"text": "1" if role == "main" else '{"memories":[]}'},
+                {"text": '{"accepted":true,"feedback":""}'},
+            ]
+        )
 
     monkeypatch.setattr(
         "roami_agent.improvement.evaluation.execution.executors.configured_provider", provider

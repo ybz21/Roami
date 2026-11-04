@@ -305,7 +305,8 @@ async def test_scenario_uses_current_main_schemas_and_executes_compact_registere
 
         async def stream(self, messages, tools):
             schemas = {t["function"]["name"]: t["function"]["parameters"] for t in tools}
-            assert set(schemas["reply"]["properties"]) == {"text"}
+            assert set(schemas["reply"]["properties"]) == {"text", "json"}
+            assert schemas["reply"]["allOf"]
             assert schemas["delegate"]["required"] == ["goal"]
             assert schemas["ask_user"]["properties"]["options"]["items"]["type"] == "string"
             assert "task_steer" not in schemas

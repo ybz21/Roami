@@ -19,6 +19,7 @@ from roami_agent.protocol.errors import (
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
+from roami_agent.replies.source_review import DraftReviewRejected, ReplyReviewUnavailable
 from roami_agent.replies.task_progress import task_progress
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
@@ -221,6 +222,10 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if isinstance(exc, DraftReviewRejected):
+                value.update(
+                    executionStarted=False, failurePhase="validation", feedback=exc.feedback
+                )
             if tool is None:
                 value["executionStarted"] = False
             if rejection or validation_error:
@@ -292,6 +297,12 @@ class ToolGateway:
                     recovery="This tool call failed readiness before its browser action. Earlier calls in this attempt may have executed; preserve their results and sources. End this attempt and "
                     "report the dependency failure to Main; do not retry different URLs or probe shell commands.",
                 )
+                if isinstance(exc, ReplyReviewUnavailable):
+                    value["recovery"] = (
+                        "The reply review did not complete. No reply or question was delivered. "
+                        "Preserve prior work and report this dependency failure; do not repeat "
+                        "model requests as an argument repair."
+                    )
                 has_research_evidence = (
                     role == "research"
                     and binding.get("taskId")

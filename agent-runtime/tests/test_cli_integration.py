@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 import pytest
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 
 
@@ -96,19 +96,23 @@ async def test_python_artifacts_survive_real_go_backup_and_restore(tmp_path, roa
 
 
 async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
+    from roami_agent.replies.source_review import REVIEW_INSTRUCTIONS
+
     model_app = FastAPI()
+    requests = []
 
     @model_app.post("/v1/chat/completions")
-    async def model():
+    async def model(request: Request):
+        body = await request.json()
+        requests.append(body)
+        answer = (
+            json.dumps({"accepted": True, "feedback": ""})
+            if body["messages"][0]["content"] == REVIEW_INSTRUCTIONS
+            else "Live transport answer"
+        )
         text = (
             "data: "
-            + json.dumps(
-                {
-                    "choices": [
-                        {"delta": {"content": "Live transport answer"}, "finish_reason": "stop"}
-                    ]
-                }
-            )
+            + json.dumps({"choices": [{"delta": {"content": answer}, "finish_reason": "stop"}]})
             + "\n\ndata: [DONE]\n\n"
         )
         return StreamingResponse(
@@ -187,8 +191,28 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                         break
                     await asyncio.sleep(0.05)
             assert messages[-1]["content"]["text"] == "Live transport answer"
-            usage = await cli("gateway", "usage")
-            call = usage["data"]["recent"][0]
+            reviews = [
+                request
+                for request in requests
+                if request["messages"][0]["content"] == REVIEW_INSTRUCTIONS
+            ]
+            assert len(reviews) == 1
+            assert reviews[0]["model"] == "injected-http-model"
+            async with asyncio.timeout(5):
+                while True:
+                    usage = await cli("gateway", "usage")
+                    call = next(
+                        (
+                            item
+                            for item in usage["data"]["recent"]
+                            if item.get("upstreamRequestId") == "fixture-cli-response"
+                            and item["state"] != "pending"
+                        ),
+                        None,
+                    )
+                    if call:
+                        break
+                    await asyncio.sleep(0.01)
             assert call["model"] == "injected-http-model"
             assert call["priceStatus"] == "unpriced" and call["cost"] is None
             assert call["state"] == "unknown"

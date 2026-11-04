@@ -385,7 +385,10 @@ async def execute(args):
         )
         ledger.shared_daily_limit = mode == "native_files"
         executor = NativeFilesExecutor(
-            settings, fixture=mode == "protocol_fixture", shared_daily_limit=mode == "native_files"
+            settings,
+            fixture=mode == "protocol_fixture",
+            shared_daily_limit=mode == "native_files",
+            review_replies=mode == "native_files",
         )
         machine = dict(
             machine,

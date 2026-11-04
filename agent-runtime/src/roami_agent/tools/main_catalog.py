@@ -8,6 +8,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import validate_answer
+from roami_agent.replies.source_review import reply_text
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
@@ -20,7 +21,7 @@ from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
 
-def register_main_tools(registry, tasks, memory, targets, router=None):
+def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_reviewer=None):
     async def coverage(args, binding, *, handoff=False):
         if "requestCoverage" not in args and registry.registry["reply"].model_schema is not None:
             return None
@@ -52,9 +53,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         legacy = registry.registry["reply"].model_schema is None or any(
             key in args for key in ("mode", "language", "scopeQuote", "languageQuote")
         )
-        result = {
-            "reply": validate_answer(args, await reply_source(binding), check_internal=legacy)
-        }
+        text = reply_text(args)
+        text = validate_answer(
+            {**args, "text": text}, await reply_source(binding), check_internal=legacy
+        )
+        if reply_reviewer is not None:
+            await reply_reviewer.check_reply(args, binding)
+        result = {"reply": text}
         await record(binding, outcomes)
         return result
 
@@ -69,14 +74,27 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             object_schema(
                 {
                     "text": {"type": "string", "minLength": 1},
+                    "json": {
+                        "description": "The requested JSON value. Preserve literal field names, values and types."
+                    },
                     "requestCoverage": coverage_schema(),
                     "mode": {"type": "string", "enum": ["brief", "detailed", "debug"]},
                     "language": {"type": "string", "enum": ["zh", "en"]},
                     "scopeQuote": {"type": "string", "minLength": 1},
                     "languageQuote": {"type": "string", "minLength": 1},
                 },
-                ["text"],
-            ),
+                [],
+            )
+            | {
+                "allOf": [
+                    {
+                        "oneOf": [
+                            {"required": ["text"], "not": {"required": ["json"]}},
+                            {"required": ["json"], "not": {"required": ["text"]}},
+                        ]
+                    }
+                ]
+            },
             reply,
             main=True,
         )
@@ -215,6 +233,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         labels = [option["label"].strip() for option in args["options"]]
         if len(set(labels)) != len(labels) or any(not label for label in labels):
             raise DomainError("INVALID_QUESTION_OPTIONS")
+        if reply_reviewer is not None:
+            await reply_reviewer.check_question(args, binding)
         return {"question": args, "state": "waiting_user"}
 
     registry.add(

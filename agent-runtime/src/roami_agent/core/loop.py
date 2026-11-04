@@ -13,6 +13,7 @@ from roami_agent.protocol.ports import (
     ContextBuilder,
     LoopSettings,
     ManifestWriter,
+    ReplyReviewer,
     ToolCatalog,
     ToolInvoker,
     TurnWriter,
@@ -35,12 +36,13 @@ class AgentLoop:
         turn_tasks,
         clock,
         gateway: ToolInvoker,
+        reply_reviewer: ReplyReviewer | None = None,
     ):
         self.model, self.worker_model, self.settings = model, worker_model, settings
         self.context, self.journal, self.tools = context, journal, tools
         self.manifests, self.charge_task, self.turn_tasks = manifests, charge_task, turn_tasks
         self.clock = clock
-        self.gateway = gateway
+        self.gateway, self.reply_reviewer = gateway, reply_reviewer
         self.preemptible = set()
 
     def preempt(self, turn_id):
@@ -115,6 +117,12 @@ class AgentLoop:
                 finalizing = False
                 finalization_error = None
                 for step in count(offset):
+                    if role == "main" and self.reply_reviewer is not None:
+                        self.reply_reviewer.observe_context(
+                            turn,
+                            prompt,
+                            source_ids=plan["modelSourceMessageIds"],
+                        )
                     if task_id:
                         await self.charge_task(task_id)
                     provider_key = getattr(model, "provider_key", "unidentified")
@@ -193,6 +201,14 @@ class AgentLoop:
                         and text.strip()
                         and await self.gateway.reply_error(turn, text)
                     )
+                    if (
+                        role == "main"
+                        and text.strip()
+                        and not calls
+                        and not invalid_reply
+                        and self.reply_reviewer is not None
+                    ):
+                        invalid_reply = await self.reply_reviewer.final_error(turn, text)
                     if invalid_reply and not calls:
                         calls = [
                             {
@@ -248,6 +264,7 @@ class AgentLoop:
                             "owner": owner,
                             "conversation": cid,
                             "turnId": tid,
+                            "leaseEpoch": turn.get("lease_epoch"),
                             "taskId": task_id,
                             "runId": turn.get("executionRunId"),
                             "originMessageId": origin["id"] if origin else None,
@@ -293,7 +310,8 @@ class AgentLoop:
                         elif (
                             (
                                 operation is None
-                                or operation in {"reply", "task_reply", "task_queue_reply"}
+                                or operation
+                                in {"reply", "task_reply", "task_queue_reply", "ask_user"}
                                 or (tool and tool.effect == "write")
                             )
                             and isinstance(value, dict)
@@ -305,6 +323,9 @@ class AgentLoop:
                                 "TOOL_UNAVAILABLE",
                                 "TOOL_DISABLED",
                                 "REPLY_BOILERPLATE",
+                                "REPLY_SOURCE_REVIEW_REQUIRED",
+                                "QUESTION_SOURCE_REVIEW_REQUIRED",
+                                "REPLY_REVIEW_SOURCE_CHANGED",
                                 "REPLY_INTERNAL_FIELDS",
                                 "REPLY_LANGUAGE_MISMATCH",
                                 "REPLY_SCOPE_QUOTE_REQUIRED",
@@ -452,4 +473,6 @@ class AgentLoop:
             raise
         finally:
             self.preemptible.discard(tid)
+            if self.reply_reviewer is not None:
+                self.reply_reviewer.forget_turn(turn)
             self.turn_tasks.pop(tid, None)

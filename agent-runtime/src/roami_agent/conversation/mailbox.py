@@ -50,6 +50,11 @@ class TurnMailbox:
             db.execute(
                 "UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=?", (job["id"],)
             )
-            return dict(turn, resumed=bool(json.loads(job["payload_json"]).get("deferred")))
+            return dict(
+                turn,
+                state="running",
+                lease_epoch=turn["lease_epoch"] + 1,
+                resumed=bool(json.loads(job["payload_json"]).get("deferred")),
+            )
 
         return await self.db.call(write, write=True)
