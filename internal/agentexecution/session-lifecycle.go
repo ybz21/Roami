@@ -195,9 +195,12 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		state.Tools = map[string]bool{}
 	}
 	if state.Binding.ProviderID != "" && (state.Binding.ProviderID != event.ProviderID || state.Executor != executor) {
-		markSessionUnknown(&state, "SESSION_PROVIDER_CHANGED")
 		if state.ProviderConflict == nil {
 			state.ProviderConflict = &sessionProviderConflict{Executor: executor, ProviderID: event.ProviderID, TurnID: truncate(event.TurnID, 300), Hook: truncate(event.Hook, 100), Type: truncate(event.Type, 100)}
+		}
+		// Internal Codex threads inherit notify; their completion says nothing about this turn.
+		if !completed || state.Executor != executor {
+			markSessionUnknown(&state, "SESSION_PROVIDER_CHANGED")
 		}
 		state.UpdatedMS = time.Now().UnixMilli()
 		return writeJSON(path, state)

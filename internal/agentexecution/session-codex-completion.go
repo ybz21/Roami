@@ -201,7 +201,7 @@ func codexOutcome(binding SessionBinding, turn, promptHash string, cancelled boo
 }
 
 func (s Service) reconcileCodexCompletion(key string, status Status, state *sessionLifecycle, path string) (Status, bool, error) {
-	if state.Executor != "codex" || (state.State != "unknown" && state.State != "busy") || state.LaunchKey != key || state.Binding.ProviderID != status.Binding.ProviderID || len(state.Tools) != 0 {
+	if state.Executor != "codex" || (state.State != "unknown" && state.State != "busy") || state.LaunchKey != key || state.Binding.ProviderID != status.Binding.ProviderID {
 		return status, false, nil
 	}
 	dir, _ := s.directory(key)
@@ -220,6 +220,17 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 	result, evidence := codexOutcome(*status.Binding, state.TurnID, state.PromptHash, cancelErr == nil)
 	if result == nil || !sessionProcessesStopped(*status.Binding) {
 		return status, false, nil
+	}
+	if len(state.Tools) != 0 {
+		for tool := range state.Tools {
+			if strings.HasPrefix(tool, "subagent:") {
+				return status, false, nil
+			}
+		}
+		var interrupt sessionInterrupt
+		if result.State != "cancelled" || readJSON(filepath.Join(dir, "interrupt-request.json"), &interrupt) != nil || !interrupt.Delivered || interrupt.ResourceID != status.Binding.resourceID() || interrupt.ProviderID != state.Binding.ProviderID || interrupt.TurnID != state.TurnID || interrupt.PromptHash != state.PromptHash {
+			return status, false, nil
+		}
 	}
 	stopped := true
 	result.InputStopped, result.OutcomeKnown = &stopped, &stopped

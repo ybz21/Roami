@@ -249,3 +249,30 @@ func TestSessionProviderConflictPreservesBoundIdentityAndCannotInterrupt(t *test
 		t.Fatalf("foreign callback caused interrupt: %s", input)
 	}
 }
+
+func TestForeignCodexNotificationCannotFinishOrPoisonBoundTurn(t *testing.T) {
+	s, binding := sessionFixture(t)
+	seedSession(t, s, binding)
+	spec, prompt := startSessionTask(t, s, binding, "foreign-notification")
+	event := SessionEvent{Type: "agent-turn-complete", ThreadID: "internal-thread", NotificationTurn: "internal-turn", Inputs: []string{"internal work"}, LastAssistant: "internal result"}
+	if err := s.applySessionEvent("codex", binding, event); err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.Status(spec.Key)
+	if err != nil || status.State != "running" || status.Result != nil || status.Binding.ProviderID != "provider-thread" {
+		t.Fatalf("foreign notify altered the bound turn: %+v %v", status, err)
+	}
+	path, _ := s.lifecycleFile(binding)
+	var state sessionLifecycle
+	if err := readJSON(path, &state); err != nil || state.TurnID != "task-turn" || state.LaunchKey != spec.Key || state.ProviderConflict == nil || state.ProviderConflict.ProviderID != "internal-thread" {
+		t.Fatalf("lost bound identity or rejected notification evidence: %+v %v", state, err)
+	}
+	event.ThreadID, event.NotificationTurn, event.Inputs = "provider-thread", "task-turn", []string{prompt}
+	if err := s.applySessionEvent("codex", binding, event); err != nil {
+		t.Fatal(err)
+	}
+	status, err = s.Status(spec.Key)
+	if err != nil || status.State != "succeeded" || status.Result == nil {
+		t.Fatalf("matching completion did not settle: %+v %v", status, err)
+	}
+}

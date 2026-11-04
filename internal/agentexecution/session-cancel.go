@@ -9,12 +9,14 @@ import (
 )
 
 type sessionInterrupt struct {
-	ResourceID string `json:"resourceId"`
-	ProviderID string `json:"providerConversationId"`
-	TurnID     string `json:"turnId"`
-	PromptHash string `json:"promptHash"`
-	Delivered  bool   `json:"delivered"`
-	CreatedMS  int64  `json:"createdMs"`
+	ResourceID           string         `json:"resourceId"`
+	ProviderID           string         `json:"providerConversationId"`
+	TurnID               string         `json:"turnId"`
+	PromptHash           string         `json:"promptHash"`
+	Delivered            bool           `json:"delivered"`
+	CreatedMS            int64          `json:"createdMs"`
+	Tools                map[int]string `json:"tools,omitempty"`
+	ToolSignalsDelivered bool           `json:"toolSignalsDelivered,omitempty"`
 }
 
 func (s Service) cancelSession(key string, status Status) (Status, error) {
@@ -58,8 +60,8 @@ func (s Service) cancelSession(key string, status Status) (Status, error) {
 		status.State, status.ObservationErrorCode = "unknown", "SESSION_BINDING_CONFLICT"
 		return status, nil
 	}
-	processes, _, _, err := paneProcessSnapshot(binding.PID)
-	if err != nil || state.Binding.Processes[binding.PID] == "" || processes[binding.PID].Token != state.Binding.Processes[binding.PID] {
+	processes, scope, scoped, err := paneProcessSnapshot(binding.PID)
+	if err != nil || scope != state.Binding.Scope || state.Binding.Processes[binding.PID] == "" || processes[binding.PID].Token != state.Binding.Processes[binding.PID] {
 		status.State, status.ObservationErrorCode = "unknown", "SESSION_PROCESS_OBSERVATION_UNAVAILABLE"
 		return status, nil
 	}
@@ -77,11 +79,14 @@ func (s Service) cancelSession(key string, status Status) (Status, error) {
 		}
 		if !previous.Delivered {
 			status.ObservationErrorCode = "SESSION_INTERRUPT_UNKNOWN"
+		} else if len(previous.Tools) > 0 && !previous.ToolSignalsDelivered {
+			status.ObservationErrorCode = "SESSION_TOOL_INTERRUPT_UNKNOWN"
 		}
 		return status, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return status, err
 	}
+	intent.Tools = capturedSessionTools(*status.Binding, processes, scoped)
 	// Journal before input: an uncertain delivery must never hit a later reused turn.
 	if err = writeJSON(interruptPath, intent); err != nil {
 		return status, err
@@ -91,6 +96,14 @@ func (s Service) cancelSession(key string, status Status) (Status, error) {
 		return status, nil
 	}
 	intent.Delivered = true
+	if err = writeJSON(interruptPath, intent); err != nil {
+		return status, err
+	}
+	if err = signalCapturedSessionTools(*status.Binding, intent.Tools); err != nil {
+		status.ObservationErrorCode = "SESSION_TOOL_INTERRUPT_UNKNOWN"
+		return status, nil
+	}
+	intent.ToolSignalsDelivered = true
 	if err = writeJSON(interruptPath, intent); err != nil {
 		return status, err
 	}

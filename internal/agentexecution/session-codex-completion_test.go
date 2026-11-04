@@ -151,7 +151,7 @@ func TestCodexCompletionIgnoresEarlierCompletedTurns(t *testing.T) {
 }
 
 func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
-	for _, mode := range []string{"unknown", "busy", "cancelled", "cancelled-manual-input", "lost-post-hook", "pending-subagent", "evidence-conflict", "aborted", "aborted-without-request", "aborted-other-turn", "aborted-live-process", "aborted-manual-input"} {
+	for _, mode := range []string{"unknown", "busy", "cancelled", "cancelled-manual-input", "lost-post-hook", "pending-subagent", "evidence-conflict", "aborted", "aborted-without-request", "aborted-other-turn", "aborted-live-process", "aborted-manual-input", "aborted-pending-hook", "aborted-pending-hook-unbound", "aborted-pending-subagent"} {
 		t.Run(mode, func(t *testing.T) {
 			cancelled := strings.HasPrefix(mode, "cancelled") || strings.HasPrefix(mode, "aborted") && mode != "aborted-without-request"
 			s, binding := sessionFixture(t)
@@ -195,8 +195,11 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 			if mode == "lost-post-hook" {
 				state.Tools = map[string]bool{"call-1": true}
 			}
-			if mode == "pending-subagent" {
+			if mode == "pending-subagent" || mode == "aborted-pending-subagent" {
 				state.Tools = map[string]bool{"subagent:child": true}
+			}
+			if strings.HasPrefix(mode, "aborted-pending-hook") {
+				state.Tools = map[string]bool{"exec-pending": true}
 			}
 			if mode == "aborted-manual-input" || mode == "cancelled-manual-input" {
 				state.UnknownReason = "SESSION_PROMPT_MISMATCH"
@@ -219,6 +222,12 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 			}
 			saveCompletionRecords(t, os.Getenv("CODEX_HOME"), records)
 			dir, _ := s.directory(spec.Key)
+			if mode == "aborted-pending-hook" || mode == "aborted-pending-subagent" {
+				intent := sessionInterrupt{ResourceID: state.Binding.resourceID(), ProviderID: state.Binding.ProviderID, TurnID: state.TurnID, PromptHash: state.PromptHash, Delivered: true, ToolSignalsDelivered: true}
+				if err := writeJSON(filepath.Join(dir, "interrupt-request.json"), intent); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if cancelled {
 				if err := os.WriteFile(filepath.Join(dir, "cancel.json"), []byte("{}"), 0600); err != nil {
 					t.Fatal(err)
@@ -248,7 +257,7 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 				return
 			}
 			status, err := s.Status(spec.Key)
-			if mode == "lost-post-hook" || mode == "pending-subagent" || mode == "aborted-without-request" || mode == "aborted-other-turn" || mode == "aborted-live-process" || mode == "aborted-manual-input" || mode == "cancelled-manual-input" {
+			if mode == "lost-post-hook" || mode == "pending-subagent" || mode == "aborted-without-request" || mode == "aborted-other-turn" || mode == "aborted-live-process" || mode == "aborted-manual-input" || mode == "cancelled-manual-input" || mode == "aborted-pending-hook-unbound" || mode == "aborted-pending-subagent" {
 				if err != nil || status.Result != nil || status.State != "unknown" {
 					t.Fatalf("pending work accepted: %v", err)
 				}
