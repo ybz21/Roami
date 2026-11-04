@@ -1,7 +1,7 @@
 package phone
 
-// 联机测试：需有一台真 Android 设备/模拟器（adb 可见）。无设备时自动跳过。
-// 跑：cd backend && go test ./phone/ -run TestLive -v
+// 联机测试仅在显式启用并指定设备时运行，普通门禁不操作已连接手机。
+// 跑：ANDROID_SERIAL=<已确认序列号> ROAMI_PHONE_LIVE_TESTS=1 go test ./backend/phone -run TestLive -v
 
 import (
 	"os"
@@ -12,7 +12,13 @@ import (
 )
 
 func liveDev(t *testing.T) *androidDevice {
+	if os.Getenv("ROAMI_PHONE_LIVE_TESTS") != "1" || os.Getenv("ANDROID_SERIAL") == "" {
+		t.Skip("真机测试需显式启用 ROAMI_PHONE_LIVE_TESTS=1 并指定 ANDROID_SERIAL")
+	}
 	d := newAndroidDevice()
+	if d.target() != os.Getenv("ANDROID_SERIAL") {
+		t.Fatal("当前手机配置覆盖了 ANDROID_SERIAL，拒绝操作其他设备")
+	}
 	if d.state() != "device" {
 		t.Skip("无已连接 Android 设备，跳过联机测试")
 	}

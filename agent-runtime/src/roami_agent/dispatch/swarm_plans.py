@@ -95,6 +95,7 @@ class SwarmPlans:
                 + "\n\nSwarm collaboration ID: "
                 + result["id"]
                 + ". You are the existing Roami Main coordinating this swarm. Discover swarm_plan and swarm_status using tool_list. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. Use task_steer for changes to existing tasks. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
+                + " Use the exact registered CLI command and input schema returned by tool_list or roami swarm help. Submit each managed command alone: no cd prefix, shell chaining or pipes; the host binds the execution context. Never probe a write operation with placeholder goals or acceptance criteria. Planning dispatches real tasks, so every item must carry its complete actual instructions and acceptance before submission."
             )
             start = await self.conversations.accept(
                 owner, cid, "swarm.start:" + result["id"], kickoff

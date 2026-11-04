@@ -1,9 +1,33 @@
 {
-  "host_processes": ["agent", "host", "processes"],
-  "market_sources": ["agent", "capability", "market", "sources"],
-  "market_search": ["agent", "capability", "market", "search"],
-  "market_preview": ["agent", "capability", "market", "preview"],
-  "market_install": ["agent", "capability", "market", "install"],
+  "host_processes": [
+    "agent",
+    "host",
+    "processes"
+  ],
+  "market_sources": [
+    "agent",
+    "capability",
+    "market",
+    "sources"
+  ],
+  "market_search": [
+    "agent",
+    "capability",
+    "market",
+    "search"
+  ],
+  "market_preview": [
+    "agent",
+    "capability",
+    "market",
+    "preview"
+  ],
+  "market_install": [
+    "agent",
+    "capability",
+    "market",
+    "install"
+  ],
   "workspace_overview": [
     "project",
     "overview"
@@ -70,5 +94,59 @@
     "agent",
     "reminder",
     "cancel"
+  ],
+  "swarm_create": [
+    "swarm",
+    "new"
+  ],
+  "swarm_plan": [
+    "swarm",
+    "plan"
+  ],
+  "swarm_status": [
+    "swarm",
+    "status"
+  ],
+  "swarm_post": [
+    "swarm",
+    "post"
+  ],
+  "swarm_control": [
+    "swarm",
+    "control"
+  ],
+  "swarm_dependencies": [
+    "swarm",
+    "dependencies"
+  ],
+  "swarm_memory_read": [
+    "swarm",
+    "memory",
+    "get"
+  ],
+  "swarm_memory_write": [
+    "swarm",
+    "memory",
+    "put"
+  ],
+  "swarm_project_context": [
+    "swarm",
+    "project",
+    "show"
+  ],
+  "swarm_project_update": [
+    "swarm",
+    "project",
+    "update"
+  ],
+  "project_okr_context": [
+    "project",
+    "okr",
+    "context"
+  ],
+  "project_okr_update": [
+    "project",
+    "okr",
+    "update"
   ]
 }
