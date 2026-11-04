@@ -223,28 +223,32 @@ class ContainerExecutor:
                 replacement.execution_diagnostics = fields["execution_diagnostics"]
             raise replacement from None
         labels = detail.get("Config", {}).get("Labels") or {}
+        requirements = {}
         if model_inputs:
-            require(
-                labels.get("org.roami.rsi.role-instructions") == "1",
-                "RSI_CONTAINER_IMAGE_REQUIRED",
-            )
-            require(
-                labels.get("org.roami.rsi.shared-daily-policy") == "6",
-                "RSI_CONTAINER_IMAGE_REQUIRED",
+            requirements.update(
+                {
+                    "org.roami.rsi.role-instructions": "1",
+                    "org.roami.rsi.shared-daily-policy": "6",
+                }
             )
         if model_inputs and self.main_image_input["enabled"]:
-            require(
-                labels.get("org.roami.rsi.model-image-input") == "1",
-                "RSI_CONTAINER_IMAGE_REQUIRED",
-            )
+            requirements["org.roami.rsi.model-image-input"] = "1"
         if model_inputs and self.worker_image_input["enabled"]:
-            require(
-                (detail.get("Config", {}).get("Labels") or {}).get(
-                    "org.roami.rsi.workspace-image-input"
-                )
-                == "1",
-                "RSI_CONTAINER_IMAGE_REQUIRED",
-            )
+            requirements["org.roami.rsi.workspace-image-input"] = "1"
+        missing = [
+            {"label": label, "required": required, "observed": labels.get(label)}
+            for label, required in requirements.items()
+            if labels.get(label) != required
+        ]
+        if missing:
+            error = DomainError("RSI_CONTAINER_IMAGE_REQUIRED")
+            error.execution_diagnostics = {
+                "source": "host_container_image",
+                "image_id": detail["Id"],
+                "execution_started": False,
+                "requirements": missing,
+            }
+            raise error
         self.image_id = detail["Id"]
         renderer_id = None
         if self.artifact_reviewer:

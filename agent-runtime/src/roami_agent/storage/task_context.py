@@ -4,6 +4,7 @@ import json
 from collections import Counter
 
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.task_continuation import unresolved_repeated_requests
 from roami_agent.storage.task_request import task_user_request
 
 
@@ -20,6 +21,13 @@ def recent_task_context(db, turn):
         "AND o.message_id=t.origin_message_id) ORDER BY t.created_ms DESC,t.id LIMIT 3",
         (turn["owner_id"], turn["conversation_id"], turn["branch_id"], turn["created_ms"]),
     )
+    origin = row(
+        db,
+        "SELECT * FROM messages WHERE turn_id=? AND role='user' ORDER BY rowid LIMIT 1",
+        (turn["id"],),
+    )
+    matched = unresolved_repeated_requests(db, turn, origin)
+    tasks = list({task["id"]: task for task in [*tasks, *matched]}.values())
     source_counts = Counter(task["origin_message_id"] for task in tasks)
     result = []
     for task in tasks:

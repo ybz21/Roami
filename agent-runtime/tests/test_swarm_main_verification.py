@@ -152,7 +152,7 @@ async def test_discovery_registered_cli_and_success_require_real_prior_read(
     entry = next(
         c
         for item in entries["items"]
-        for c in item.get("commands", [])
+        for c in item.get("commands", [item])
         if c["command"] == "roami swarm verify --input JSON"
     )
     assert entry["command"] == "roami swarm verify --input JSON"

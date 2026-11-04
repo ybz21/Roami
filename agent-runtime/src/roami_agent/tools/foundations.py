@@ -118,6 +118,10 @@ class ToolDirectory:
                     }
                 )
         version = hashlib.sha256(encoded(entries).encode()).hexdigest()
+        if query and "bash" not in self.registry.disabled_tools:
+            commands = self.command_entries(role, query=query)
+            if commands and commands[0]["name"] in COMMANDS:
+                entries = [item for item in entries if item["id"] != "cli:roami"] + commands
         normalize = lambda value: re.sub(r"[-_\s]+", " ", value.casefold()).strip()
         words = normalize(query).split()
         if query in {**SKILL_ALIASES, "web_research": "browser_use"}:
@@ -217,12 +221,33 @@ class ToolDirectory:
                 )
         return result
 
-    def command_entries(self, role):
+    def command_entries(self, role, *, query=""):
         available = {
             tool.name: tool
             for tool in self.operations(role)
             if tool.name not in self.registry.disabled_tools
         }
+        normalized = re.sub(r"[-_\s]+", " ", query.casefold()).strip()
+        named = [
+            {
+                "id": "cli:" + name,
+                "kind": "cli",
+                "name": name,
+                "description": available[name].description,
+                "argv": ["roami", *path, "--input", "JSON"],
+                "inputSchema": deepcopy(available[name].model_schema or available[name].schema),
+                "effect": available[name].effect,
+                "source": "builtin",
+                "mutable": False,
+                "enabled": True,
+                "searchTerms": [name, " ".join(["roami", *path])],
+            }
+            for name, path in COMMANDS.items()
+            if name in available
+            and normalized in {name.replace("_", " "), " ".join(["roami", *path])}
+        ]
+        if named:
+            return named
         entries = []
         commands = [
             {

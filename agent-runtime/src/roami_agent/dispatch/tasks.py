@@ -18,7 +18,10 @@ from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.native_session_registry import register as register_native_session
 from roami_agent.storage.task_context import model_task_projection
-from roami_agent.storage.task_continuation import continuation_candidates
+from roami_agent.storage.task_continuation import (
+    continuation_candidates,
+    unresolved_repeated_requests,
+)
 from roami_agent.storage.task_reports import reported_progress
 from roami_agent.storage.transcript_repository import history, message, owned
 
@@ -313,6 +316,9 @@ class Tasks:
             if not origin:
                 raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
             if source_turn_id and not parent_task_id:
+                source_turn = row(db, "SELECT * FROM turns WHERE id=?", (source_turn_id,))
+                if unresolved_repeated_requests(db, dict(source_turn, owner_id=owner), origin):
+                    raise DomainError("TASK_FAILURE_REVIEW_REQUIRED", 409)
                 previous = rows(
                     db,
                     "SELECT * FROM tasks WHERE owner_id=? AND origin_conversation_id=? "

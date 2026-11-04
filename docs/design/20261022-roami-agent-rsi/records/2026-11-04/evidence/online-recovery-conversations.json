@@ -1,0 +1,375 @@
+{
+  "baseline-chat": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 4,
+    "observed_scenarios": 4,
+    "passed_scenarios": 3,
+    "observed_user_turns": 17,
+    "verified_user_turns": 16,
+    "expected_user_turns": 18,
+    "tool_process_coverage": "complete",
+    "tool_calls": 1,
+    "tool_errors": 0,
+    "tool_error_rate": 0.0,
+    "tool_first_attempt_success_rate": 1.0,
+    "failure": null,
+    "blocked_scenarios": 0,
+    "failed_scenarios": 1,
+    "semantic_checked_user_turns": 17,
+    "live_model_semantics_tested": true,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "aa3c2c184e204e267285c7d33dfb2a78fde0210f86d7fd9ba4aaf5460a280741",
+    "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 17,
+    "external_model_calls": 17,
+    "observed_tokens": 59774,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint",
+    "failed_checkpoints": [
+      {
+        "scenario": "chat-correction-and-removal",
+        "turn": 4,
+        "failures": [
+          "CHAT_CONSTRAINTS_MISMATCH"
+        ]
+      }
+    ]
+  },
+  "baseline-scope": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 4,
+    "observed_scenarios": 4,
+    "passed_scenarios": 3,
+    "observed_user_turns": 11,
+    "verified_user_turns": 10,
+    "expected_user_turns": 13,
+    "tool_process_coverage": "complete",
+    "tool_calls": 22,
+    "tool_errors": 1,
+    "tool_error_rate": 0.045454545454545456,
+    "tool_first_attempt_success_rate": 1.0,
+    "failure": null,
+    "blocked_scenarios": 0,
+    "failed_scenarios": 1,
+    "semantic_checked_user_turns": 11,
+    "live_model_semantics_tested": true,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "aa3c2c184e204e267285c7d33dfb2a78fde0210f86d7fd9ba4aaf5460a280741",
+    "contracts_sha256": "44ac9d7b7e2dfe846e0abffe0becbd1ec79464a53c75e7896a810179c508636a",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 27,
+    "external_model_calls": 27,
+    "observed_tokens": 125362,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint",
+    "failed_checkpoints": [
+      {
+        "scenario": "intake-replay-vs-explicit-duplicate-work",
+        "turn": 1,
+        "failures": [
+          "TASK_COUNT_MISMATCH",
+          "TASK_IDENTITY_MISMATCH:第一份名册"
+        ]
+      }
+    ]
+  },
+  "single-policy-chat": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 4,
+    "observed_scenarios": 4,
+    "passed_scenarios": 3,
+    "observed_user_turns": 17,
+    "verified_user_turns": 16,
+    "expected_user_turns": 18,
+    "tool_process_coverage": "complete",
+    "tool_calls": 4,
+    "tool_errors": 0,
+    "tool_error_rate": 0.0,
+    "tool_first_attempt_success_rate": 1.0,
+    "failure": null,
+    "blocked_scenarios": 0,
+    "failed_scenarios": 1,
+    "semantic_checked_user_turns": 17,
+    "live_model_semantics_tested": true,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "3387ffbd4939f4b3185ddeabb4dea13690f68dfab57115f74af4c0c3fef7bbc6",
+    "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 18,
+    "external_model_calls": 18,
+    "observed_tokens": 63803,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint",
+    "failed_checkpoints": [
+      {
+        "scenario": "chat-correction-and-removal",
+        "turn": 4,
+        "failures": [
+          "CHAT_CONSTRAINTS_MISMATCH"
+        ]
+      }
+    ]
+  },
+  "explicit-task-all": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 16,
+    "observed_scenarios": 16,
+    "passed_scenarios": 12,
+    "observed_user_turns": 52,
+    "verified_user_turns": 48,
+    "expected_user_turns": 62,
+    "tool_process_coverage": "complete",
+    "tool_calls": 86,
+    "tool_errors": 12,
+    "tool_error_rate": 0.13953488372093023,
+    "tool_first_attempt_success_rate": 0.8108108108108109,
+    "failure": null,
+    "blocked_scenarios": 0,
+    "failed_scenarios": 4,
+    "semantic_checked_user_turns": 52,
+    "live_model_semantics_tested": true,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "8d4d75c9897287e5e434dbbced751fbee099e491631232d99a246a16148e5b9e",
+    "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 121,
+    "external_model_calls": 121,
+    "observed_tokens": 580013,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint",
+    "failed_checkpoints": [
+      {
+        "scenario": "chat-constraints-accumulate",
+        "turn": 1,
+        "failures": [
+          "CHAT_JSON_REQUIRED"
+        ]
+      },
+      {
+        "scenario": "chat-correction-and-removal",
+        "turn": 4,
+        "failures": [
+          "CHAT_CONSTRAINTS_MISMATCH"
+        ]
+      },
+      {
+        "scenario": "chat-first-create-after-confirmation",
+        "turn": 1,
+        "failures": [
+          "CHAT_JSON_REQUIRED"
+        ]
+      },
+      {
+        "scenario": "status-and-chat-do-not-recreate-work",
+        "turn": 2,
+        "failures": [
+          "CHAT_CONSTRAINTS_MISMATCH"
+        ]
+      }
+    ]
+  },
+  "directory-all": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 16,
+    "observed_scenarios": 16,
+    "passed_scenarios": 13,
+    "observed_user_turns": 56,
+    "verified_user_turns": 53,
+    "expected_user_turns": 62,
+    "tool_process_coverage": "complete",
+    "tool_calls": 76,
+    "tool_errors": 4,
+    "tool_error_rate": 0.05263157894736842,
+    "tool_first_attempt_success_rate": 0.926829268292683,
+    "failure": null,
+    "blocked_scenarios": 0,
+    "failed_scenarios": 3,
+    "semantic_checked_user_turns": 56,
+    "live_model_semantics_tested": true,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "60ac4d614c5d24f025028bdf0b26f4c10163cf7deaf8d9a67a13e07225eab9f8",
+    "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 113,
+    "external_model_calls": 113,
+    "observed_tokens": 507097,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint",
+    "failed_checkpoints": [
+      {
+        "scenario": "chat-constraints-accumulate",
+        "turn": 1,
+        "failures": [
+          "CHAT_JSON_REQUIRED"
+        ]
+      },
+      {
+        "scenario": "chat-correction-and-removal",
+        "turn": 4,
+        "failures": [
+          "CHAT_CONSTRAINTS_MISMATCH"
+        ]
+      },
+      {
+        "scenario": "chat-topic-interleave",
+        "turn": 3,
+        "failures": [
+          "CHAT_JSON_REQUIRED"
+        ]
+      }
+    ]
+  },
+  "routing": {
+    "originals": [
+      {
+        "id": "Q03",
+        "round": 1,
+        "passed": true,
+        "model_calls": 5
+      },
+      {
+        "id": "Q06",
+        "round": 1,
+        "passed": true,
+        "model_calls": 9
+      },
+      {
+        "id": "Q03",
+        "round": 2,
+        "passed": true,
+        "model_calls": 4
+      },
+      {
+        "id": "Q06",
+        "round": 2,
+        "passed": true,
+        "model_calls": 8
+      },
+      {
+        "id": "Q03",
+        "round": 3,
+        "passed": true,
+        "model_calls": 12
+      },
+      {
+        "id": "Q06",
+        "round": 3,
+        "passed": true,
+        "model_calls": 7
+      }
+    ],
+    "duplicate_project_control": true,
+    "saved_routes_changed": false,
+    "background_execution": "paused_fixture",
+    "prior_verdicts_preserved": {
+      "results": [
+        {
+          "round": 1,
+          "original_verdict": false,
+          "source_bound_verdict": true,
+          "raw_result_changed": false
+        },
+        {
+          "round": 2,
+          "original_verdict": false,
+          "source_bound_verdict": true,
+          "raw_result_changed": false
+        },
+        {
+          "round": 3,
+          "original_verdict": false,
+          "source_bound_verdict": true,
+          "raw_result_changed": false
+        }
+      ],
+      "new_model_calls": 0,
+      "new_grader_sha256": "f53811b33c343cc3ed59e947ab59c207402ec47e6afd9eefc8bcd2e1263bcf79",
+      "old_grader_sha256": "9b0ec4e31b51d747f88f1e7626721dfd2733f05357ffc183f63c4adffed466d7"
+    }
+  },
+  "json_value_candidate": {
+    "mode": "saved-model",
+    "passed": false,
+    "selected_passed": false,
+    "complete_cases": true,
+    "expected_scenarios": 4,
+    "observed_scenarios": 4,
+    "passed_scenarios": 2,
+    "observed_user_turns": 13,
+    "verified_user_turns": 11,
+    "expected_user_turns": 18,
+    "tool_process_coverage": "complete",
+    "tool_calls": 5,
+    "tool_errors": 0,
+    "tool_error_rate": 0.0,
+    "tool_first_attempt_success_rate": 1.0,
+    "failure": null,
+    "blocked_scenarios": 0,
+    "failed_scenarios": 2,
+    "semantic_checked_user_turns": 13,
+    "live_model_semantics_tested": true,
+    "child_exit_code": 1,
+    "cleanup_exit_code": 0,
+    "source_unchanged": true,
+    "frozen_sha256": "237f6a1939a6a4056d3a747469e60243835a5b474fd26c8c31e5255f37af0dda",
+    "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+    "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+    "model_calls": 13,
+    "external_model_calls": 13,
+    "observed_tokens": 46952,
+    "usage_known": true,
+    "historical_suite_updated": false,
+    "eligible_for_promotion": false,
+    "background_execution": "synthetic_checkpoint",
+    "delivered": false
+  },
+  "full_history_diagnostic": {
+    "scope": "diagnostic only; no delivered runtime change",
+    "change": "bypass Main history projection; retain all eligible history while keeping system policy and tools",
+    "passed": 3,
+    "total": 4,
+    "model_calls": 17,
+    "tokens": 60370,
+    "failed": [
+      "chat-correction-and-removal"
+    ],
+    "saved_routes_changed": false,
+    "questions_and_oracle_changed": false
+  }
+}
