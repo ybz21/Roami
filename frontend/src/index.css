@@ -611,17 +611,15 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-tree-row .chev { flex: 0 0 auto; margin-left: auto; display: grid; place-items: center; color: var(--text-dimmer); transition: transform .15s; }
 .tt-tree-row .bd + .chev { margin-left: 0; }
 .tt-tree-row.closed .chev { transform: rotate(-90deg); }
-/* 状态点住在图标槽正中：运行 / 等你 / 待收尾 才上色，空闲很淡 */
+/* 会话行尾状态点；工作区不重复显示运行状态。 */
 .tt-tree .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dimmer); }
-.tt-tree .dot.idle { opacity: .4; }
 .tt-tree .dot.run { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .tt-tree .dot.wait { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .tt-tree .dot.sleep { background: var(--text-dim); box-shadow: 0 0 0 3px var(--sel-bg); }
-.tt-tree .dot.fin { background: var(--swarm); }
 /* 会话沿用侧栏底色，避免每个任务再套一张卡片。 */
 .tt-tree-task { margin: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3); padding: 0; border: 0; border-radius: 0; background: transparent; }
 .tt-tree-task.idle { opacity: .72; }
-.tt-tree .tt-tree-row.on { background: transparent; color: var(--text-bright); }
+.tt-tree .tt-tree-row.on { background: var(--sel-bg); color: var(--text-bright); }
 /* 项目行右端的 […] [+]：一直看得见（淡），悬停亮 */
 .tt-tree-row.proj .act { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
 .tt-tree-row.proj .nm + .act, .tt-tree-row.proj .bd + .act { margin-left: auto; }
@@ -635,6 +633,12 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 :where(html[data-pointer="fine"]) .tt-nav-tree:hover::-webkit-scrollbar-thumb { background: var(--scroll-thumb); }
 .tt-tree-task > .tt-tree-row.head { padding-left: var(--sp-3); border-radius: var(--r-xs); }
 .tt-tree-task > .tt-tree-row.head .nm { font-weight: 500; font-size: var(--fs-sm); }
+.tt-tree-task > .workspace-head { gap: var(--sp-2); padding-block: var(--sp-2); }
+.tt-tree-row .workspace-title { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: var(--sp-1); }
+.tt-tree-row .workspace-meta { color: var(--text-dim); font-size: var(--fs-meta); line-height: 1.4; }
+/* 连接线只用于显式工作区分组，主目录的平铺会话保持原层级。 */
+.tt-tree-task.grouped > .tt-tree-sessions { margin-left: calc(var(--sp-3) + var(--sp-2)); padding-left: var(--sp-2); border-left: 1px solid var(--border-subtle); }
+html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 /* 头行右端的分支状态图标（Orca 卡片右上角那枚）：颜色说状态，悬停看分支和数字 */
 .wtst { flex: 0 0 auto; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
 .tt-tree-row .wtst { margin-left: auto; width: 20px; height: 20px; }
@@ -658,7 +662,7 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-pill.sm.danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-soft); }
 .tt-pill.sm.warn { color: var(--warn); border-color: var(--warn-border); background: var(--warn-soft); }
 .tt-pill.sm.dim { color: var(--text-dim); }
-/* 会话与任务头行对齐，不再为会话数量多缩一级。 */
+/* 会话行保留状态与时间，分组容器负责缩进。 */
 .tt-tree-sessions .tt-tree-row { padding-left: var(--sp-3); padding-right: var(--sp-2); min-height: 30px; border-radius: var(--r-xs); margin: 0; width: 100%; gap: var(--sp-2); }
 .tt-tree-sessions .tt-tree-row .nm { flex: 1 1 auto; }
 .tt-tree-sessions .tt-tree-row .nm { color: var(--text-dim); font-size: var(--fs-sm); font-weight: 400; }
@@ -670,7 +674,7 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-tree-sessions .tt-tree-row.on .nm { color: var(--text-bright); }
 :where(html[data-pointer="fine"]) .tt-tree-sessions .tt-tree-row:hover .nm { color: var(--text-bright); }
 /* 行尾时间在会话行和单会话任务卡头行都出现：不许收缩、不许折行——名字一长「刚刚」会被挤成竖排两个字 */
-.tt-tree-row .tm { flex: 0 0 auto; white-space: nowrap; margin-left: 0; color: var(--text-dimmer); font: 400 var(--fs-micro)/1 var(--mono); }
+.tt-tree-row .tm { flex: 0 0 auto; white-space: nowrap; margin-left: 0; color: var(--text-dimmer); font: 400 var(--fs-meta)/1 var(--mono); }
 .tt-tree-sessions .tt-tree-row .nm + .dot { margin-left: 0; }
 /* 会话行末尾的状态点（只在运行 / 等你时有） */
 .tt-tree-row .nm + .dot { flex: 0 0 auto; margin-left: auto; }

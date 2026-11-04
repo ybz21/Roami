@@ -1,13 +1,4 @@
-// 左栏项目树：项目 → 任务（worktree）→ 会话（22 设计 §3.2）。
-//
-// 塞在导航组下面原来空着的那段，侧栏别的一切照旧；树只借侧栏的语言（圆角、hover 底、
-// 3px 左线 + 淡蓝底的选中态）。它同时是导航和任务列表：点任务进任务视图，点会话进任务视图并
-// 打开那个会话，点项目名回项目主页。
-//
-// 两条让它不吵的规矩：
-//   · 任务行与它下面的会话行是**一整块**，选中盖整组，不是两个错开的圆角块；
-//   · 没会话也没未合并提交的 worktree 折进「还有 N 个空闲 worktree」一行——真实项目里这种
-//     一抓一把，全铺出来就是一列灰点加一列被截断的分支名。
+// 项目 → 工作区 → 会话；单会话同名时合成一行。
 import { useState, type ReactNode } from 'react'
 import { Dropdown, Tooltip } from 'antd'
 import { useI18n } from '../../i18n'
@@ -39,11 +30,10 @@ function writeClosed(s: Set<string>) {
   try { localStorage.setItem(CLOSED_KEY, JSON.stringify([...s])) } catch { /* 记不住而已 */ }
 }
 
-/** 状态点：运行 / 等你 / 待收尾 才画；空闲只在任务行画一枚很淡的占位点，会话行不画 */
-function dot(o: { running?: boolean; waiting?: boolean; unfinished?: boolean }, idlePlaceholder: boolean): ReactNode {
-  const tone = o.waiting ? 'wait' : o.running ? 'run' : o.unfinished ? 'fin' : ''
-  if (tone) return <i className={`dot ${tone}`} />
-  return idlePlaceholder ? <i className="dot idle" /> : null
+/** 工作区不重复汇总会话状态。 */
+function dot(o: { running?: boolean; waiting?: boolean }, label: string): ReactNode {
+  const tone = o.waiting ? 'wait' : o.running ? 'run' : ''
+  return tone ? <i className={`dot ${tone}`} role="img" aria-label={label} /> : null
 }
 
 export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask, onSession, onAddProject, onRename, onRenameTask, onNewTask, onKill, onFinishTask, onNewInTask, onRemoveProject }: {
@@ -70,7 +60,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
   /** 项目行「…」菜单里的「移除项目」（只动台账，不动目录和会话） */
   onRemoveProject?: (key: string) => void
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [closed, setClosed] = useState<Set<string>>(readClosed)
   // 「显示空闲 worktree」：没会话的 worktree 平时不进树（Orca 的 hidden worktrees），从「…」菜单打开才列出来；纯视图态
   const [showIdle, setShowIdle] = useState<Set<string>>(() => new Set())
@@ -81,17 +71,13 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     return next
   })
 
-  // 每一行都是侧栏那枚 .tt-nav-item：同样的高、图标槽、hover、选中态、同一款计数徽标。
-  // 区别只有图标槽里放什么：项目放首字母圆标，任务放状态点，会话放 agent 标。
-  // 右键菜单：会话行 = 打开 / 重命名 / 关闭会话；任务行 = 起名 / 派生三样 / 收尾；
-  // 两者合成的那一行（soleRow）见 soleMenu——它挑着拼，不是两张摞一起。
-  // 标签条的 × 只是收起标签，会话还活着、树上还在——真要关，在这里
+  // 合成行保留会话动作，分组标题保留工作区动作。
   const openItem = (task: TaskKey, s: TreeSession) =>
     ({ key: 'open', icon: <OpenInIcon size={14} />, label: t('tree.menu.open'), onClick: () => onSession(task, s.name) })
   const renameSession = (s: TreeSession) => onRename
     ? [{ key: 'rename', icon: <PencilIcon size={14} />, label: t('session.rename'), onClick: () => onRename(s.name) }] : []
   const renameTask = (task: TreeTask) => onRenameTask
-    ? [{ key: 'name', icon: <PencilIcon size={14} />, label: t('session.rename'), onClick: () => onRenameTask(task.key, task.name) }] : []
+    ? [{ key: 'name', icon: <PencilIcon size={14} />, label: t('tree.renameTask'), onClick: () => onRenameTask(task.key, task.name) }] : []
   const derive = (task: TreeTask) => onNewInTask
     ? [{ type: 'group' as const, label: t('tree.menu.deriveHere'), children: [
       { key: 'sh', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: () => onNewInTask(task.key, 'shell') },
@@ -127,7 +113,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
   // 它自己的会话名是一串 id（<被审id>-review），照原样印出来没人认得出这是什么。
   const rowLabel = (s: TreeSession) => (s.reviewOf ? t('tree.reviewOf', { name: s.reviewOf }) : s.label)
 
-  const sessionRow = (task: TaskKey, s: TreeSession) => (
+  const sessionRow = (task: TaskKey, s: TreeSession, showTime = true) => (
     <Dropdown key={s.name} trigger={['contextMenu']} menu={sessionMenu(task, s)}>
       <button type="button"
         className={`tt-nav-item tt-tree-row${activeTask === task && activeSession === s.name ? ' on' : ''}${s.dormant ? ' dormant' : ''}${s.reviewOf ? ' review' : ''}`}
@@ -135,26 +121,23 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
         aria-current={activeTask === task && activeSession === s.name ? 'true' : undefined}>
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
         <span className="nm">{rowLabel(s)}</span>
-        {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, false)}
-        {!s.dormant && s.at ? <span className="tm">{ago(s.at, t)}</span> : null}
+        {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, t(s.waiting ? 'mobile.st.waiting' : 'mobile.st.running'))}
+        {showTime && !s.dormant && s.at ? <span className="tm">{ago(s.at, t)}</span> : null}
       </button>
     </Dropdown>
   )
 
-  // 分支不在这棵树里出现。
-  //
-  // 这一栏回答的是「我有哪些活、开在哪」，分支是那件活的实现细节：一枚谁也说不清含义的
-  // ⑂ 挂在每个任务后面，只是把本来就窄的行再挤掉 20px。真要看分支状态，底部状态条上有一格，
-  // 右栏的 Git 面板里更全。
-
-  // 任务卡的头行：状态点 + 任务名 + 徽标 + 分支状态图标。活着的任务和空闲 worktree 共用，只差徽标写什么
+  // 类型文字与层级线区分工作区和同名会话。
   const taskHead = (task: TreeTask, badge: ReactNode, on: boolean) => (
     <Dropdown trigger={['contextMenu']} menu={taskMenu(task)}>
-      <button type="button" className={`tt-nav-item tt-tree-row head${on ? ' on' : ''}`}
-        onClick={() => onTask(task.key)} title={task.path}
+      <button type="button" className={`tt-nav-item tt-tree-row head workspace-head${on ? ' on' : ''}`}
+        onClick={() => onTask(task.key)} title={task.path} aria-current={on ? 'true' : undefined}
         onDoubleClick={onRenameTask ? () => onRenameTask(task.key, task.name) : undefined}>
-        <span className="ic">{dot({ running: task.sessions.some((s) => s.running), waiting: task.sessions.some((s) => s.waiting), unfinished: task.unfinished }, true)}</span>
-        <span className="nm">{task.name}</span>
+        <span className="ic"><WorktreeIcon size={15} /></span>
+        <span className="workspace-title">
+          <span className="nm">{task.name}</span>
+          <span className="workspace-meta">{task.sessions.length ? t('tree.workspaceSessions', { n: new Intl.NumberFormat(locale).format(task.sessions.length) }) : t('tree.workspace')}</span>
+        </span>
         {badge}
       </button>
     </Dropdown>
@@ -166,24 +149,18 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     ? <span className="bd" title={t('tree.unfinished', { n: task.ahead })}>{t('tree.unfinishedShort', { n: task.ahead })}</span>
     : null
 
-  /**
-   * 任务只有一个会话、而且任务名就是这个会话的名字时，两行印的是同一个名字
-   * （任务没起名时，名字本来就是从头一个会话的 label 拿的，见 task-tree.ts）。
-   * 上下叠着两遍「XiaoHui-sh」，读的人以为是两样东西。这时候合成一行：
-   * 会话的身份（agent 标、状态点、时间）和任务的身份（主仓库徽标、分支状态）挤在同一枚上，
-   * 因为它们本来就是同一个东西。右键菜单也把两边的动作合起来，免得少了哪一样。
-   */
+  // 同名且只有一个会话时，保留紧凑的合成行。
   const soleRow = (task: TreeTask, s: TreeSession) => (
     <Dropdown key={s.name} trigger={['contextMenu']} menu={soleMenu(task, s)}>
       <button type="button"
-        className={`tt-nav-item tt-tree-row head${activeTask === task.key ? ' on' : ''}${s.dormant ? ' dormant' : ''}`}
+        className={`tt-nav-item tt-tree-row head${activeTask === task.key && (!activeSession || activeSession === s.name) ? ' on' : ''}${s.dormant ? ' dormant' : ''}`}
         onClick={() => onSession(task.key, s.name)} title={s.dormant ? t('session.dormant.hint') : task.path}
         onDoubleClick={onRename ? () => onRename(s.name) : undefined}
-        aria-current={activeTask === task.key && activeSession === s.name ? 'true' : undefined}>
+        aria-current={activeTask === task.key && (!activeSession || activeSession === s.name) ? 'true' : undefined}>
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
         <span className="nm">{s.label}</span>
         {task.unfinished && taskBadge(task)}
-        {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, false)}
+        {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, t(s.waiting ? 'mobile.st.waiting' : 'mobile.st.running'))}
         {!s.dormant && s.at ? <span className="tm">{ago(s.at, t)}</span> : null}
       </button>
     </Dropdown>
@@ -201,9 +178,9 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     // 派生/收尾这些动作项目行的 ⋯ 里都有。
     const bare = !!task.main && !!projName && task.name === projName
     return (
-      <div key={task.key} className={`tt-tree-task${on ? ' on' : ''}`}>
+      <div key={task.key} className={`tt-tree-task${bare ? '' : ' grouped'}${on ? ' on' : ''}`} role="group" aria-label={t('tree.workspaceName', { name: task.name })}>
         {!bare && taskHead(task, taskBadge(task), on && !hasActive)}
-        <div className="tt-tree-sessions">{task.sessions.map((s) => sessionRow(task.key, s))}</div>
+        <div className="tt-tree-sessions">{task.sessions.map((s) => sessionRow(task.key, s, bare))}</div>
       </div>
     )
   }
