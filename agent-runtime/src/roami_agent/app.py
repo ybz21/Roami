@@ -79,6 +79,7 @@ from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.mcp_broker import MCPBroker, node_socket
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
+from roami_agent.tools.project_okr import register_project_okr_tools
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.swarm_catalog import register_swarm_tools
@@ -226,6 +227,7 @@ class Runtime:
             database, self.tasks, self.conversations, self.wakeup, settings=self.settings
         )
         register_swarm_tools(self.tools, self.swarms)
+        register_project_okr_tools(self.tools, database, self.settings)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 

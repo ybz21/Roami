@@ -21,6 +21,7 @@ it('creates an independent Main instance only on first send and closes only that
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: expect.stringContaining('"projectId":"project"') })))
   expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages')).every(call => call[1] === '/agent/conversations/independent/messages')).toBe(true)
+  expect(state.api.mock.calls.find(call => call[1] === '/agent/conversations')[2]).toMatchObject({ projectId: 'project' })
   const first = state.api.mock.calls.find(call => call[1] === '/agent/conversations')[2].requestKey
   fireEvent.click(screen.getByRole('button', { name: 'okr.endChat' }))
   await waitFor(() => expect(close).toHaveBeenCalledOnce())

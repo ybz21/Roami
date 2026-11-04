@@ -5166,7 +5166,7 @@ const enUS = {
   'swarm.managed.memoryEmpty': 'No team memory yet.',
   'swarm.managed.memoryUnavailable': 'Team memory is unavailable. Check the project files.',
   'swarm.managed.memorySave': 'Save memory',
-  'swarm.managed.memoryFailed': 'Memory was not saved. Your draft is kept; reopen memory to load the current version.',
+  'swarm.managed.memoryFailed': 'Memory was not saved. Your draft is kept; review the latest content before saving.',
   'swarm.managed.report': 'Executor report',
   'swarm.managed.outputs': 'Deliverables',
   'swarm.managed.externalAcceptance': 'Accept only after checking the receipt and the confirmed external result. Drafts and submissions are not confirmation.',

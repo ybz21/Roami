@@ -5175,7 +5175,7 @@ const zhCN = {
   'swarm.managed.memoryEmpty': '暂无团队记忆。',
   'swarm.managed.memoryUnavailable': '团队记忆暂不可用，请检查项目文件。',
   'swarm.managed.memorySave': '保存记忆',
-  'swarm.managed.memoryFailed': '记忆未保存，草稿已保留；重新打开记忆后查看最新版本。',
+  'swarm.managed.memoryFailed': '记忆未保存，草稿已保留；请核对最新内容后再保存。',
   'swarm.managed.report': '执行器报告',
   'swarm.managed.outputs': '交付物',
   'swarm.managed.externalAcceptance': '请核对回执及已确认的外部结果后验收；草稿和已提交不代表已确认。',
