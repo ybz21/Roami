@@ -174,7 +174,28 @@ async def test_followup_retains_executor_context_and_waits_for_old_work_to_stop(
             assert len(launches) == 1
             assert launches[0]["executor"] == executor
             assert launches[0]["sessionId"] == "original-session"
-            assert launches[0]["prompt"] == "Append this requirement"
+            assert launches[0]["title"] == "Original requirement"
+            assert "permission" not in launches[0]
+            prompt = launches[0]["prompt"]
+            assert prompt.startswith("\n\n[Roami platform capabilities]\n")
+            assert (
+                prompt.split("\n\n[Roami continuation handoff]\n", 1)[0].rsplit("\n\n", 1)[-1]
+                == "Append this requirement"
+            )
+            assert prompt.count("Append this requirement") == 1
+            assert "Original requirement" not in prompt and "routing" not in prompt
+            context_file = next((store.data_root / "agents/capability-contexts").glob("*.json"))
+            context = json.loads(context_file.read_text())
+            assert context["runId"] == new["id"] and context["revision"] == 2
+            assert str(context_file) in prompt and context["signature"] not in prompt
+            source = await store.call(
+                lambda db: row(
+                    db,
+                    "SELECT m.content_json FROM messages m JOIN tasks t ON t.origin_message_id=m.id WHERE t.id=?",
+                    (task["id"],),
+                )
+            )
+            assert json.loads(source["content_json"])["text"] == "Append this requirement"
             await coding.poll(runtime.tasks)
         verification = await store.call(
             lambda db: row(

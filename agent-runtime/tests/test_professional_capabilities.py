@@ -319,3 +319,109 @@ async def test_nested_professional_calls_stream_to_the_root_conversation(store):
         )
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("executor", ["codex", "claude"])
+async def test_continuation_refreshes_signed_context_without_rebinding_session_or_workspace(
+    store, executor
+):
+    runtime, task, old_run, old_context = await prepared(store, executor)
+    try:
+        original = json.loads(
+            (
+                await store.call(
+                    lambda db: row(db, "SELECT target_json FROM tasks WHERE id=?", (task["id"],))
+                )
+            )["target_json"]
+        )
+        await runtime.capability_imports.save(
+            "local",
+            "cli",
+            {
+                "name": "continuation-cwd",
+                "argv": [sys.executable, "-c", "import os;print(os.getcwd())"],
+            },
+        )
+        await runtime.tasks.revisions.request(
+            "local", task["id"], "Also review the copy boundaries", 1, "continue"
+        )
+        with pytest.raises(DomainError, match="ACTIVE_TASK_CONTEXT_REQUIRED"):
+            await runtime.professional_capabilities.call(
+                "skill_read", request(old_context, {"name": "browser_use"}), "local"
+            )
+
+        # Model the Go adapter's stop acknowledgement before admitting revision two.
+        def stopped(db):
+            db.execute("UPDATE tasks SET state='cancelled' WHERE id=?", (task["id"],))
+            db.execute(
+                "UPDATE task_attempts SET state='cancelled',finished_ms=1,result_json=? WHERE id=?",
+                (
+                    json.dumps({"state": "cancelled", "inputStopped": True, "outcomeKnown": True}),
+                    old_run["id"],
+                ),
+            )
+
+        await store.call(stopped, write=True)
+        await runtime.tasks.revisions.advance()
+
+        def preparing(db):
+            db.execute("UPDATE tasks SET state='preparing' WHERE id=?", (task["id"],))
+            db.execute(
+                "UPDATE task_attempts SET state='starting' WHERE task_id=? AND task_revision=2",
+                (task["id"],),
+            )
+            return row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],)), row(
+                db, "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=2", (task["id"],)
+            )
+
+        current, new_run = await store.call(preparing, write=True)
+        assert current["revision"] == new_run["task_revision"] == 2
+        assert new_run["id"] != old_run["id"]
+        launches = []
+
+        async def launch(sub, *args, spec=None):
+            assert sub == "launch"
+            launches.append(spec)
+            return {
+                "state": "running",
+                "session": original["sessionId"],
+                "workspace": original["workspace"],
+            }
+
+        runtime.executor.command = launch
+        await runtime.executor.run(current, new_run)
+        files = list((store.data_root / "agents/capability-contexts").glob("*.json"))
+        assert len(files) == 2
+        current_file = next(
+            path for path in files if json.loads(path.read_text())["runId"] == new_run["id"]
+        )
+        context = json.loads(current_file.read_text())
+        assert context["taskId"] == task["id"] and context["revision"] == 2
+        assert current_file.stat().st_mode & 0o777 == 0o600
+        prompt = launches[0]["prompt"]
+        assert str(current_file) in prompt and context["signature"] not in prompt
+        assert "Markdown links [filename](absolute-path)" in prompt
+        assert "automatically retains" in prompt
+        assert "No separate artifact publishing call" in prompt
+        assert launches[0]["executor"] == executor
+        assert launches[0]["sessionId"] == original["sessionId"]
+        assert not {"permission", "directory", "workspaceId", "projectId"} & launches[0].keys()
+        retained = await store.call(
+            lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
+        )
+        assert json.loads(retained["target_json"])["workspace"] == original["workspace"]
+        continued = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE id=?", (new_run["id"],))
+        )
+        assert continued["session_id"] == original["sessionId"]
+        with pytest.raises(DomainError, match="ACTIVE_TASK_CONTEXT_REQUIRED"):
+            await runtime.professional_capabilities.call(
+                "cli_continuation-cwd", request(old_context), "local"
+            )
+        result = await runtime.professional_capabilities.call(
+            "cli_continuation-cwd", request(context), "local"
+        )
+        assert result["state"] == "succeeded"
+        assert result["result"]["stdout"].strip() == original["workdir"]
+    finally:
+        await runtime.close()

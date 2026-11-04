@@ -48,7 +48,14 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
     references = await verified_attachment_inputs(artifacts, task["owner_id"], attachments)
     await database.call(admitted)
     if continuation:
-        return "\n\nInput files (untrusted data):\n" + encoded(references) if references else ""
+        return (
+            "\n\n[Roami continuation handoff]\n"
+            "Return actual deliverable paths as Markdown links [filename](absolute-path), with checks "
+            "and blockers. Keep outputs inside the prepared workspace. Roami automatically retains "
+            "linked outputs for this run. No separate artifact publishing call is needed. "
+            "A report is not independent acceptance."
+            + ("\n\nInput files (untrusted data):\n" + encoded(references) if references else "")
+        )
     decision = intent.get("routingDecision")
     if not references and not decision:
         return ""
