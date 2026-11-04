@@ -10,6 +10,7 @@ from roami_agent.improvement.domain.admission_blocking import MODEL_ADMISSION_BL
 from roami_agent.improvement.domain.contracts import digest, identifier, require
 from roami_agent.improvement.domain.policy import BOUNDS
 from roami_agent.improvement.evaluation.contracts import load_suite
+from roami_agent.improvement.evaluation.diagnostic_selection import LIGHT_CASE_IDS
 from roami_agent.improvement.evaluation.trial_evidence import trial_summary
 from roami_agent.improvement.integrations.container_failure_evidence import failure_fields
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
@@ -21,19 +22,6 @@ from roami_agent.improvement.persistence.diagnostic_requests import (
     existing_request,
 )
 
-LIGHT_CASES = (
-    "CODE-01",
-    "QUANT-01",
-    "DOC-05",
-    "DEMO-01",
-    "NEWS-01",
-    "finqa:4f978c08853a6db6",
-    "MECH-MR01",
-    "MECH-CT01",
-    "MECH-TL01",
-    "MECH-MB01",
-)
-
 
 def enqueue_diagnostic(service, owner, payload, settings=None):
     require(
@@ -41,12 +29,15 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
         "RSI_INVALID_REQUEST",
     )
     key = identifier(payload.get("request_key"))
-    case_ids = payload.get("case_ids", list(LIGHT_CASES))
+    case_ids = payload.get("case_ids")
     require(
-        isinstance(case_ids, list)
-        and 1 <= len(case_ids) <= 60
-        and all(isinstance(c, str) and 0 < len(c) <= 160 for c in case_ids)
-        and len(set(case_ids)) == len(case_ids),
+        "case_ids" not in payload
+        or (
+            isinstance(case_ids, list)
+            and 1 <= len(case_ids) <= 60
+            and all(isinstance(c, str) and 0 < len(c) <= 160 for c in case_ids)
+            and len(set(case_ids)) == len(case_ids)
+        ),
         "RSI_INVALID_REQUEST",
     )
     records = service.runs
@@ -71,7 +62,10 @@ def enqueue_diagnostic(service, owner, payload, settings=None):
             "RSI_CASES_UNAVAILABLE",
         )
     require(prefs["suite_id"] and prefs["machine_ids"], "RSI_SETUP_REQUIRED")
-    review_needed = any(needs_artifact_review({"id": case_id}) for case_id in case_ids)
+    review_needed = any(
+        needs_artifact_review({"id": case_id})
+        for case_id in (case_ids if case_ids is not None else LIGHT_CASE_IDS)
+    )
     reviewer = (
         ArtifactReviewer.load(
             settings, service.ledger.path.parent, owner, shared_daily_limit=shared

@@ -1,0 +1,239 @@
+{
+  "default_diagnostic": "select one public_component FinQA from frozen current suite in the enqueue transaction; fixed nine checks retained; explicit IDs and baseline snapshots unchanged",
+  "old_source_control": {
+    "failed": 2,
+    "passed": 9,
+    "failure": "RSI_CASE_NOT_FOUND for replaced valid financial samples; existing ID control passes"
+  },
+  "current_targeted": {
+    "passed": 90,
+    "failed": 0
+  },
+  "finance_contract": {
+    "v2": {
+      "passed": 2,
+      "total": 3,
+      "model_calls": 27,
+      "known_tokens": 100468
+    },
+    "v3": {
+      "passed": 3,
+      "total": 3,
+      "model_calls": 25,
+      "known_tokens": 93866
+    },
+    "same_source_sample_and_expected_values": true,
+    "tolerance_unchanged": 0.0001,
+    "changed": "generic explicit relevant-source monetary unit convention; new adapter namespace",
+    "old_result_replaced": false,
+    "same_contract_improvement_claim": false,
+    "saved_model_routes_parameters_capabilities_unchanged": true,
+    "actor_image": "sha256:2dded6ed343a889735d7e1989d38214d8a3e1af516138bf4ddfb2e59b64320d3"
+  },
+  "production_selection": {
+    "reason": "installed default diagnostic selection still hardcodes old FinQA ID; prevent broken UI default while new suite remains registered for explicit validation",
+    "before_suite": "roami-formal-60-v19-reference-validated-online-20261105",
+    "after_suite": "roami-formal-60-v18-online-recovery-20261104",
+    "revision_before": 6,
+    "revision_after": 7,
+    "enabled": false,
+    "other_preferences_unchanged": true,
+    "old_scores_unchanged": true
+  },
+  "code_deployed": false,
+  "independent_raters_or_calibration_changed": false,
+  "interrupted_checks": [
+    {
+      "scope": "full v1",
+      "status": "interrupted during Go tests after source review found optional authored origin=None must not be interpreted as public provenance",
+      "passing_check": false
+    }
+  ],
+  "upgrade_readonly_audit": {
+    "observed_at": "2026-11-04T18:19:57.423410+00:00",
+    "running_python_jobs": 0,
+    "logical_task_states": {
+      "running": 2,
+      "cancelling": 1
+    },
+    "latest_cli_receipts": {
+      "SESSION_BINDING_UNAVAILABLE": 1,
+      "SESSION_START_UNTRACKED": 1,
+      "SESSION_COMPLETION_MISMATCH": 1
+    },
+    "terminal_result_or_stop_proof_present": false,
+    "observed_sessions": {
+      "present": 2,
+      "absent": 1
+    },
+    "observation_is_completion_proof": false,
+    "unrelated_tasks_stopped_or_states_rewritten": false,
+    "guard_bypassed": false
+  },
+  "finance_gateway_accounting": {
+    "scope": "only completed v2/v3 three-case FinQA runs, deduplicated gateway call IDs; no old full-suite grading changes",
+    "journal_model_calls_expected": 52,
+    "unique_gateway_calls": 52,
+    "missing_receipts": 0,
+    "states": {
+      "known": 52
+    },
+    "http_statuses": {
+      "200": 52
+    },
+    "known_tokens": 194334,
+    "currencies": [
+      "CNY"
+    ],
+    "cost_by_currency": {
+      "CNY": 0.10761
+    },
+    "historical_receipts_modified": false
+  },
+  "prepared_v3_full_suite": {
+    "suite_id": "roami-formal-60-v20-financial-units-online-20261105",
+    "suite_hash": "e447a988055df13814dfab5d528d5146cd1e81cd0299a0a597e2d77a8d63b153",
+    "prior_suite_hash": "90b2932b4d5da1c2269f5c52b7d5b3bfd3fd3effc1f4f08d563ce0ecb9f7b35a",
+    "coverage": {
+      "contract": "roami-daily-60-v1",
+      "complete": true,
+      "checks": {
+        "count": true,
+        "unique_ids": true,
+        "public_quotas": true,
+        "unique_public_tasks": true,
+        "pinned_public_revisions": true,
+        "authored_selection": true,
+        "mechanism_selection": true,
+        "formal_splits": true,
+        "no_smoke": true,
+        "mechanism_grader": true
+      },
+      "public": {
+        "swe_verified": {
+          "expected": 2,
+          "actual": 2
+        },
+        "terminal_bench": {
+          "expected": 2,
+          "actual": 2
+        },
+        "the_agent_company": {
+          "expected": 2,
+          "actual": 2
+        },
+        "osworld": {
+          "expected": 2,
+          "actual": 2
+        },
+        "agentic_vbench": {
+          "expected": 2,
+          "actual": 2
+        },
+        "dsbench": {
+          "expected": 2,
+          "actual": 2
+        },
+        "spreadsheetbench": {
+          "expected": 1,
+          "actual": 1
+        },
+        "gaia": {
+          "expected": 1,
+          "actual": 1
+        },
+        "longmemeval_v2": {
+          "expected": 1,
+          "actual": 1
+        },
+        "finqa": {
+          "expected": 3,
+          "actual": 3
+        },
+        "convfinqa": {
+          "expected": 1,
+          "actual": 1
+        },
+        "mlagentbench": {
+          "expected": 1,
+          "actual": 1
+        }
+      },
+      "missing_authored": [],
+      "missing_mechanisms": [],
+      "scope": "composition_only; environment and graders require separate acceptance"
+    },
+    "default_diagnostic_ids": [
+      "CODE-01",
+      "QUANT-01",
+      "DOC-05",
+      "DEMO-01",
+      "NEWS-01",
+      "finqa:4a00d7dc1848a85e",
+      "MECH-MR01",
+      "MECH-CT01",
+      "MECH-TL01",
+      "MECH-MB01"
+    ],
+    "retained_cases_unchanged": 57,
+    "registered_in_production": false,
+    "selected_in_production": false,
+    "new_full_suite_execution_completed": false,
+    "old_grades_replaced": false,
+    "scope": "prepared current contract; not a full60 passing claim"
+  },
+  "additional_scope_regression": {
+    "scope": "original #635 Main choice and identity regression only; synthetic background checkpoints",
+    "rounds": 3,
+    "passed": 3,
+    "contract_sha256": "f8f1e8251b276763ec6328a56f9f0906755384c242f515f1fa2b422c78d5f6ef",
+    "checkpoints_passed": 9,
+    "checkpoints_total": 9,
+    "model_calls": 18,
+    "gateway_known": 18,
+    "http_200": 18,
+    "known_tokens": 77111,
+    "cost_cny": 0.026157,
+    "saved_model_routes_parameters_capabilities_changed": false,
+    "product_main_instructions_changed": false,
+    "old_failures_erased": false,
+    "production_verified": false,
+    "causal_fix_proven": false
+  },
+  "installed_host_bound_image_probe": {
+    "case": "finqa:4f978c08853a6db6",
+    "passed": true,
+    "host_source": "installed main-b240588e",
+    "image_id": "sha256:2dded6ed343a889735d7e1989d38214d8a3e1af516138bf4ddfb2e59b64320d3",
+    "saved_model_routes_parameters_and_capabilities_changed": false,
+    "gateway_calls": 8,
+    "known_tokens": 25846,
+    "cost_cny": 0.0128639,
+    "old_grade_overwritten": false
+  },
+  "full_quality_gate": {
+    "exit": 0,
+    "python_passed": 3458,
+    "python_skipped": 48,
+    "go_passed": true,
+    "i18n_hover_typecheck_passed": true,
+    "production_build_passed": true,
+    "runtime_test_quality_files_frozen": 640,
+    "source_drift": false
+  },
+  "default_image_activation": {
+    "old_default_image": "sha256:ff250e9b70864fea9b7984ebfa1298755cba2472239282d69dddd2579789547c",
+    "new_default_image": "sha256:2dded6ed343a889735d7e1989d38214d8a3e1af516138bf4ddfb2e59b64320d3",
+    "rollback_tag": "roami-rsi-eval:before-bound-answer-20261105",
+    "host_source": "installed main-b240588e",
+    "host_compatibility_case": "finqa:4f978c08853a6db6",
+    "host_compatibility_grade": true,
+    "candidate_all_handoff_regressions_and_quality_already_passed": true,
+    "active_or_queued_production_rsi_requests_during_switch": 0,
+    "model_settings_changed": false,
+    "service_restart": false,
+    "suite_selection_changed": false,
+    "old_scores_modified": false,
+    "policy_promotion_claim": false
+  }
+}

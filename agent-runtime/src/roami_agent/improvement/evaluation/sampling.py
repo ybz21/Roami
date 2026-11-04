@@ -125,7 +125,9 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
             "Read the supplied financial report and answer the question. Return only one number; "
             "express percentages as decimal ratios (10% as 0.1). No percent sign, units or explanation."
             + (
-                " Keep enough precision for an absolute error of at most 0.0001."
+                " Keep enough precision for an absolute error of at most 0.0001. "
+                "For monetary amounts, keep the unit of the source figures relevant to the question; "
+                "do not rescale them to base currency or to units from an unrelated table."
                 if not conversational
                 else ""
             )
@@ -141,7 +143,7 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
             "input_sha256": digest(inputs),
             "adapter_revision": "financial-numeric-v1"
             if conversational
-            else "financial-numeric-v2-consistent-reference",
+            else "financial-numeric-v3-source-units",
             "adapted": True,
             "adaptation": "Complete supplied report; numeric final-answer grading, not upstream program evaluation.",
         }
@@ -187,7 +189,7 @@ def import_finqa(path, *, revision, source_split, count=3, seed=20261023, conver
         "official_leaderboard_comparable": False,
     }
     return freeze_suite(
-        benchmark + ("-sample-v1" if conversational else "-sample-v2"),
+        benchmark + ("-sample-v1" if conversational else "-sample-v3"),
         cases,
         sampling_lock=metadata,
     )
