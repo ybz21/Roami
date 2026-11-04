@@ -370,7 +370,7 @@ func (s *Store) getFiles(projectID string) (*Workspace, error) {
 	}
 	w := &snapshot.Workspace
 	w.ProjectID = projectID
-	if err := decorate(root, w); err != nil {
+	if err := s.decorate(root, w); err != nil {
 		return nil, err
 	}
 	return w, nil
@@ -391,7 +391,7 @@ func (s *Store) migrateFiles(projectID string) (*Workspace, error) {
 	if err == nil {
 		w := &snapshot.Workspace
 		w.ProjectID = projectID
-		if err := decorate(root, w); err != nil {
+		if err := s.decorate(root, w); err != nil {
 			return nil, err
 		}
 		return w, nil
@@ -444,7 +444,7 @@ func (s *Store) migrateFiles(projectID string) (*Workspace, error) {
 	if _, err := s.db.Exec(`INSERT OR IGNORE INTO file_workspaces(project_id) VALUES(?)`, projectID); err != nil {
 		return nil, err
 	}
-	if err := decorate(root, legacy); err != nil {
+	if err := s.decorate(root, legacy); err != nil {
 		return nil, err
 	}
 	return legacy, nil
@@ -533,8 +533,16 @@ func workingConfig(root *os.Root) (Config, error) {
 	return c, nil
 }
 
-func decorate(root *os.Root, w *Workspace) error {
+func (s *Store) decorate(root *os.Root, w *Workspace) error {
+	if err := s.seedWorkflow(root, w.ProjectID); err != nil {
+		return err
+	}
 	metadata := &ProjectFiles{Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
+	workflow, err := readFile(root, "AGENTS.md", maxMemory)
+	if err != nil {
+		return err
+	}
+	metadata.WorkflowFile, metadata.Workflow = "AGENTS.md", string(workflow)
 	for _, item := range []struct {
 		name   string
 		target *string
@@ -779,7 +787,7 @@ func (s *Store) mutateFiles(projectID string, revision int64, create bool, chang
 	if _, err := s.db.Exec(`INSERT OR IGNORE INTO file_workspaces(project_id) VALUES(?)`, projectID); err != nil {
 		return nil, err
 	}
-	if err := decorate(root, w); err != nil {
+	if err := s.decorate(root, w); err != nil {
 		return nil, err
 	}
 	return w, nil

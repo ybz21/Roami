@@ -163,8 +163,7 @@ async def test_discovery_registered_cli_and_success_require_real_prior_read(
         wire("bash", {"argv": ["roami", "swarm", "help"]}), "main", binding
     )
     assert any(
-        item["argv"] == ["roami", "swarm", "verify", "--input", "JSON"]
-        for item in help_result["commands"]
+        item["command"] == "roami swarm verify --input JSON" for item in help_result["commands"]
     )
     missing = await verify(runtime, turn, binding, args)
     assert missing["error"] == "SWARM_ARTIFACT_REVIEW_REQUIRED"

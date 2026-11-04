@@ -10,6 +10,7 @@ def project_files():
         "teamMemory": "Actual decisions",
         "teamMemorySha256": digest("Actual decisions"),
         "mainInstructions": "Use this project's confirmed definitions.",
+        "workflow": "Read daily files and report task/revision/run to Main.",
         "skills": [
             {
                 "id": "metric-collection",
@@ -28,6 +29,8 @@ def test_project_skills_and_instructions_reach_same_shared_team_context():
     assert value["content"] == "Actual decisions"
     assert value["projectGuidance"]["skills"] == files["skills"]
     assert value["projectGuidance"]["instructions"] == files["mainInstructions"]
+    assert value["projectGuidance"]["workflow"] == files["workflow"]
+    assert value["projectGuidance"]["workflowSource"] == ".roami/okr/AGENTS.md"
 
 
 @pytest.mark.parametrize(

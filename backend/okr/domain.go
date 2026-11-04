@@ -87,6 +87,8 @@ type ProjectFiles struct {
 	MainInstructionsFile string         `json:"mainInstructionsFile"`
 	TeamMemoryFile       string         `json:"teamMemoryFile"`
 	MainInstructions     string         `json:"mainInstructions,omitempty"`
+	WorkflowFile         string         `json:"workflowFile,omitempty"`
+	Workflow             string         `json:"workflow,omitempty"`
 	TeamMemory           string         `json:"teamMemory,omitempty"`
 	TeamMemorySha256     string         `json:"teamMemorySha256"`
 	PendingChanges       bool           `json:"pendingChanges"`

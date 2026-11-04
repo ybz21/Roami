@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>项目每日产物与多智能体协作</title><link rel="stylesheet" href="daily-workflow.css"></head><body><main><article><header class="tt-pagehead"><h1>项目每日产物与多智能体协作</h1><p>目标、行动、产物、数据和复盘使用同一个项目目录；按日期回溯，按真实任务验收。</p></header>
+<section><h2>进入目录就知道如何工作</h2><p>使用智能体通用文件名 <code>AGENTS.md</code>。项目根文件是入口，指向 <code>.roami/okr/AGENTS.md</code> 的每日协作约定。已有项目规则、用户修改过的说明均不覆盖。只有保存了 OKR 的项目生成这些文件；普通项目保持原样。</p><p>专业智能体读取项目入口；项目绑定的 Main 和团队上下文同时携带真实协作文件内容。文件是工作约定，宿主依然控制任务身份、修订、停止、验收和发布权限；改一行说明不能把任务改成成功。</p></section>
+<section><h2>一天的故事</h2><ol><li>早上 Main 读取目标、昨日复盘、团队记忆和当前任务板，为今天选择一个可测实验，例如“同一个 Roami 小技巧，用 X 图文引导尝试，用 B站视频演示操作”。</li><li>Main 给出 KR/方法、输入、负责人、依赖和验收标准。文案与视频成员各写自己的任务/run 目录，在同一群聊交付路径和摘要；共享文件与设备串行使用。</li><li>交付后 Main 读取当前运行的真实字节与上游证据。文字、录屏、配音、字幕、封面、MP4 分别核验；内容批准与外部发布是两个环节。</li><li>数据成员取得真实日期与账号口径的指标。发布回执在产物旁保存，增长归因未知就保持未知。宿主收录的产物和平台回执是验收依据，目录名和群聊自述不能替代它们。</li><li>晚上复盘成员比较实验、数据和未知项，形成下一轮建议。Main 维护当日索引并把长期事实写入共享记忆，人决定是否调整目标、方法或投入。再进入下一轮执行。</li></ol></section>
+<section><h2>最终目录</h2><pre>project/
+  AGENTS.md                         项目入口，已有规则保留
+  .roami/okr/
+    AGENTS.md                       每日工作与多智能体约定
+    okr.json / dashboard.json       已确认定义
+    agents/ / connectors/ / skills/
+    data/ / evidence/ / memory/ / state/
+  2026/202611/20261104/
+    README.md                       今天做了什么、结果与下一步
+    manifest.json                   路径、身份、日期、摘要和证据索引
+    x-content/&lt;task&gt;/r&lt;revision&gt;/&lt;run&gt;/
+    bili-video/&lt;task&gt;/r&lt;revision&gt;/&lt;run&gt;/
+    data/&lt;task&gt;/r&lt;revision&gt;/&lt;run&gt;/
+    reflection/&lt;task&gt;/r&lt;revision&gt;/&lt;run&gt;/
+    legacy/                         历史文件的可核对副本</pre><p>日期采用项目时区，默认 Asia/Shanghai。年、月、日必须一致，因此 11 月 4 日是 <code>2026/202611/20261104</code>，不是 202610。跨午夜的运行保留原目录，次日索引引用它；不重命名旧产物冒充新成果。任务真正发生时才创建当天目录，目录存在也不表示调度器已安装。</p></section>
+<section><h2>谁负责什么</h2><table><tr><th>角色</th><th>职责与写入边界</th></tr><tr><td>Main</td><td>规划与分工，控制运行，核验当前 run，维护每日 README/manifest，合并长期记忆。不能把待发布写成已公开。</td></tr><tr><td>创作 / 执行成员</td><td>各写自己的任务/run 子目录，保留真实输入与版本。群聊报告路径、任务/修订/run 和阻塞；不自验、不覆盖他人文件。</td></tr><tr><td>数据成员</td><td>保存取数证据、账号、指标日期和统计窗口，经受控接口追加观察。采集时间与指标日期分开，不用零填缺失值。</td></tr><tr><td>复盘成员</td><td>依据交付与数据写每日复盘，区分相关性与因果，提出下一轮实验，不自行改变已确认目标。</td></tr><tr><td>人</td><td>决定目标与策略、精确内容/账号的发布边界。可从成员卡进入任务页补充要求，或在同一群聊定向沟通。</td></tr></table><p>共同使用一个看板、一份群聊和项目记忆。Main 是共享索引的单一写入者；成员通过群聊交接，宿主处理修订冲突。浏览器、手机和同一账号一次只有一个操作者。</p></section>
+<section><h2>每日索引与记忆</h2><p>每个新产物记录路径、KR/方法、owner、taskId、revision、runId、带时区的 producedAt、bytes、SHA256、上游证据与核验状态。发布额外记录准备、上传、提交、审核、公开各阶段及真实回执；不把 cookie、token 放进产物目录。</p><p><code>memory/team.md</code> 记录稳定事实和协作约定，写入携带当前 hash；决定通过现有受控操作留痕。每日目录保存具体过程，指标与复盘保留原日期和修订历史；不直接篡改确认快照或覆盖观察账本。</p><p>历史整理使用 <code>legacy-copy</code>：保留原路径、原文件时间、归档时间、原文件与副本 SHA256。已有真实任务证据继续引用旧路径；不凭文件名猜测 task/run，也不把归档副本登记成当前运行的新交付。文件系统 mtime 仅是可观察的历史时间，不等于已证实的创作或发布时间。</p></section>
+<section><h2>实现与验收</h2><p>Go 项目文件层首次创建或读取已确认 OKR 时补齐入口与协作文件，存在即保留，拒绝不安全链接；API 返回实际协作文本。Python 团队上下文校验文本并传递给 Main/成员。自动创建每日目录、写每日索引仍由执行智能体按约定完成，宿主不伪造运行或发布记录。</p><p>验收覆盖普通项目不生成、已有规则不覆盖、协作文件可定制与读取、团队上下文携带真实内容；生产目录整理独立校验副本与原路径。此文档与 <a href="final-workspace.html">展示态设计</a>、<a href="execution-acceptance.html">执行证据</a> 一起使用。</p></section>
+</article></main></body></html>

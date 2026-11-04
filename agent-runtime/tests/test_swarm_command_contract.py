@@ -26,8 +26,14 @@ async def test_swarm_discovery_and_scoped_help_return_executable_schemas(store):
         for path in [["swarm"], ["swarm", "plan"]]:
             help_view = await runtime.tools.invoke(command(["roami", *path, "help"]), "main", {})
             assert help_view["name"] == "roami " + " ".join(path)
-            assert plan in help_view["commands"]
-            assert all(item["argv"][1 : 1 + len(path)] == path for item in help_view["commands"])
+            plan_view = {key: value for key, value in plan.items() if key != "argv"}
+            plan_view["command"] = shlex.join(plan["argv"])
+            assert plan_view in help_view["commands"]
+            assert all("argv" not in item for item in help_view["commands"])
+            assert all(
+                shlex.split(item["command"])[1 : 1 + len(path)] == path
+                for item in help_view["commands"]
+            )
     finally:
         await runtime.close()
 

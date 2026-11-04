@@ -21,6 +21,37 @@ var builtinProjectSkills = []string{
 	"skills/swarm-execution/SKILL.md",
 }
 
+func seedGuidance(root *os.Root, name, content string) error {
+	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if errors.Is(err, fs.ErrExist) {
+		return safeFile(root, name)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(content)
+	if err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
+}
+
+func (s *Store) seedWorkflow(root *os.Root, projectID string) error {
+	if err := seedGuidance(root, "AGENTS.md", projectDailyWorkflow); err != nil {
+		return err
+	}
+	project, err := os.OpenRoot(s.projects()[projectID])
+	if err != nil {
+		return err
+	}
+	defer project.Close()
+	return seedGuidance(project, "AGENTS.md", projectAgentEntry)
+}
+
 func seedProjectCapabilities(root *os.Root) error {
 	files := map[string]string{
 		"README.md":             projectBundleReadme,
@@ -126,4 +157,92 @@ description: Execute, independently review and iterate using the bound managed S
 Use the existing Swarm ID, shared board/chat and this project workspace. Declare KR/method, owner, inputs, concrete artifacts, dependencies and acceptance for every task. Serialize conflicting writers and device actions. Pause dispatch, stop execution and steer are distinct controls; use their actual receipts. Never bypass an unknown prior writer or relabel an old artifact as a current run.
 
 After delivery, independently read the current run and source evidence. Main may use the scoped verification capability for supported artifact tasks, never member self-verification. External actions keep their real receipt and user decision gates. Publication preparation, upload, submission, review and public availability are separate states. Reconcile an unknown write on the same resource instead of replaying it. Reflect on dated results and propose the next measurable experiment; do not infer causation from activity counts alone.
+`
+
+const projectAgentEntry = `# Project agent instructions
+
+Before OKR work, read .roami/okr/AGENTS.md, the confirmed .roami/okr/okr.json,
+the bound team's current board/chat and .roami/okr/memory/team.md.
+Follow the daily artifact and multi-agent collaboration contract there.
+Keep this file's existing project rules when extending it.
+`
+
+const projectDailyWorkflow = `# Daily OKR work and multi-agent collaboration
+
+## Shared authority
+
+Use the confirmed okr.json and dashboard.json in this directory. The bound Swarm
+in agents/swarm.json owns the shared board, group chat and current task state.
+Main coordinates; members work on the same project directory, not private copies
+of the goal. Read agents/main.md, the configured skills and memory/team.md.
+Instructions and plans never prove execution, verification or publication.
+
+## Daily artifacts
+
+Use the project's local timezone (Asia/Shanghai unless explicitly configured).
+Place new deliverables under project-relative YYYY/YYYYMM/YYYYMMDD/, for example
+2026/202611/20261104/. The month segment must agree with the day; 202610/20261104
+is invalid. Never move an old output into today and claim it was produced today.
+
+Within the day use x-content/, bili-video/, data/, reflection/ or a short method
+ID appropriate to this project. Each worker writes its own task/revision/run
+subdirectory: <method>/<task-id>/r<revision>/<run-id>/. Preserve original filenames
+and use new versions instead of overwriting another worker's output. A task that
+crosses midnight keeps its run directory; the next day's index links to it.
+
+Keep README.md and manifest.json at the day root. Main owns these two shared
+indexes; workers report candidates in the group chat. Each manifest entry records
+relative path, KR/method, owner, taskId, revision, runId, producedAt with timezone,
+bytes, SHA256, upstream evidence and verification status. Data also records asOf
+and source/account; collection time and metric date are different. A migrated
+copy records its original path/date/hash and migratedAt; it is not a new run.
+Daily directories and indexes are created when work actually happens, not as
+empty promises for future days. Paths and indexes do not replace host artifacts.
+
+For X retain copy, image, ALT text, exact account, reviewed version and receipt.
+For video retain script, source recordings, voiceover, subtitles, cover, final
+MP4 and decode/review evidence. Store publishing receipts beside the delivered
+content: prepared, selected, uploaded, submitted, reviewing, public or blocked
+are distinct states. A URL without a verified platform receipt proves no post.
+Do not put credentials, cookies or tokens in deliverables or daily indexes.
+
+## Roles and control
+
+Main reads the confirmed KR/method, plans owners and dependencies, assigns bounded
+work with acceptance criteria, resolves blockers and independently verifies the
+current run's artifacts. Main controls pause/resume/stop/steer through the host;
+members cannot accept their own work or edit host task state. A real resume
+receipt supersedes an old temporary planning pause; external action approval
+still applies to the exact content/account. Never infer publish permission from
+a changed label or another member's assertion.
+
+Content members create real files; the video member produces and checks actual
+media. A data member collects dated facts from confirmed sources, never invented
+zeros. A reflection member compares outcomes to the experiment, identifies
+uncertainty and proposes the next change; Main/user decide and dispatch it.
+One member owns a file, account or device action at a time. Serialize browser and
+phone operations; unknown outcomes are reconciled on the same resource before
+retry. Do not bypass a busy task, old pending tool or login/approval boundary.
+
+Use the same group chat for handoffs, blockers, candidate artifacts and decisions.
+Report task/revision/run and paths rather than only saying done. @leader addresses
+Main; a member mention addresses its real task. To change an existing task, use
+the task page or directed chat and preserve host revision checks. A plan-only
+member has no executable session; Main must dispatch it first.
+
+## Daily execution, reflection and memory
+
+At the start of work read today's index, confirmed targets, team memory, recent
+review and current board. Produce bounded artifacts, report them, and let Main
+read actual current-run bytes and dependency evidence before acceptance. External
+actions require their platform receipt and the user's decision boundary.
+
+Record real metric observations through the revision-checked project operation;
+do not hand-edit confirmed snapshots or replace observations.jsonl history. Keep
+same-day corrections as new observations. At day end compare evidence, results
+and unknowns; write reflection and the next experiment in the daily directory.
+Main merges lasting facts into memory/team.md with its current hash and records
+decisions through the supported operation. Memory is concise knowledge, not raw
+logs or proof that a publication succeeded. The loop is execute, observe, reflect,
+decide, then execute again. A daily plan is not an installed recurring scheduler.
 `

@@ -84,10 +84,13 @@ def from_project(workspace):
         "available": True,
     }
     instructions = files.get("mainInstructions", "")
+    workflow = files.get("workflow", "")
     skills = files.get("skills", [])
     if (
         not isinstance(instructions, str)
         or len(instructions.encode()) > 65536
+        or not isinstance(workflow, str)
+        or len(workflow.encode()) > 65536
         or not isinstance(skills, list)
         or len(skills) > 16
     ):
@@ -111,10 +114,12 @@ def from_project(workspace):
         total += len(content.encode())
     if total > 65536:
         raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
-    if instructions or skills:
+    if instructions or skills or workflow:
         result["projectGuidance"] = {
             "source": ".roami/okr/agents/main.json",
             "instructions": instructions,
+            "workflow": workflow,
+            "workflowSource": ".roami/okr/AGENTS.md",
             "skills": skills,
             "scope": "Project guidance; never execution proof or authority to bypass host controls",
         }

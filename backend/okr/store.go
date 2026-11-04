@@ -140,7 +140,7 @@ func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
 			if err != nil {
 				return err
 			}
-			err = decorate(root, w)
+			err = s.decorate(root, w)
 			root.Close()
 			if err != nil {
 				return err

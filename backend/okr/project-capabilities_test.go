@@ -62,3 +62,39 @@ func TestProjectSkillReferencesRemainBoundToProjectFiles(t *testing.T) {
 		t.Fatal("legacy two-field agent configuration rejected", err)
 	}
 }
+
+func TestProjectWorkflowIsSeededOnlyForOKRAndPreservesProjectRules(t *testing.T) {
+	s, project := fileStore(t)
+	if w, err := s.Get("project"); err != nil || w != nil {
+		t.Fatal(w, err)
+	}
+	if _, err := os.Stat(filepath.Join(project, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatal("ordinary project acquired OKR instructions", err)
+	}
+	custom := "# Existing project rules\nKeep the original inputs.\n"
+	if err := os.WriteFile(filepath.Join(project, "AGENTS.md"), []byte(custom), 0600); err != nil {
+		t.Fatal(err)
+	}
+	w, err := s.Save("project", testConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body, _ := os.ReadFile(filepath.Join(project, "AGENTS.md")); string(body) != custom {
+		t.Fatal("existing project rules overwritten")
+	}
+	if w.ProjectFiles.WorkflowFile != "AGENTS.md" || !strings.Contains(w.ProjectFiles.Workflow, "2026/202611/20261104/") || !strings.Contains(w.ProjectFiles.Workflow, "members cannot accept their own work") {
+		t.Fatal("daily/team guidance missing", w.ProjectFiles)
+	}
+	os.Remove(filepath.Join(project, "AGENTS.md"))
+	edited := "# Custom daily workflow\nUse dated evidence.\n"
+	if err := os.WriteFile(filepath.Join(project, bundleRoot, "AGENTS.md"), []byte(edited), 0600); err != nil {
+		t.Fatal(err)
+	}
+	w, err = s.Get("project")
+	if err != nil || w.ProjectFiles.Workflow != edited {
+		t.Fatal("workflow edit overwritten", err)
+	}
+	if body, _ := os.ReadFile(filepath.Join(project, "AGENTS.md")); !strings.Contains(string(body), ".roami/okr/AGENTS.md") {
+		t.Fatal("missing project entry")
+	}
+}
