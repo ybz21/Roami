@@ -1,0 +1,114 @@
+{
+  "previous_pr": 662,
+  "rejected_user_directory": {
+    "old_tests": {
+      "failed": 2,
+      "passed": 2
+    },
+    "regressions_with_existing_recovery": {
+      "passed": 20
+    },
+    "saved_main_original_Q05": {
+      "passed": 3,
+      "total": 3,
+      "new_tasks": [
+        0,
+        0,
+        0
+      ],
+      "saved_routes_changed": false,
+      "background_execution": "paused_fixture"
+    }
+  },
+  "native_delivery": {
+    "new_regressions": 11,
+    "existing_committed_answer_controls_unchanged": true,
+    "replay": {
+      "scope": "separate diagnosis of immutable completed trials; original formal grades unchanged; no model calls or question/judge changes",
+      "results": [
+        {
+          "case": "finqa:d587661d9420b7e1",
+          "original_grade_passed": false,
+          "old_selector_passed": false,
+          "bound_selector_passed": false,
+          "turns": [
+            {
+              "old": "The rent expense average (2010–2012) calculation has been handed to the Native Worker and is still running; the result isn't confirmed yet.",
+              "bound": "215.3"
+            }
+          ],
+          "all_turns_have_native_delivery": true
+        },
+        {
+          "case": "convfinqa:85d9a548c6a57df1",
+          "original_grade_passed": false,
+          "old_selector_passed": false,
+          "bound_selector_passed": true,
+          "turns": [
+            {
+              "old": "任务已提交给内置 Native Worker 处理，结果尚待返回。",
+              "bound": "0.1325"
+            },
+            {
+              "old": "Queued for the native worker; the answer is pending, not yet confirmed.",
+              "bound": "0.046"
+            }
+          ],
+          "all_turns_have_native_delivery": true
+        },
+        {
+          "case": "finqa:ab5bf9f64e475b1a",
+          "original_grade_passed": false,
+          "old_selector_passed": false,
+          "bound_selector_passed": false,
+          "turns": [
+            {
+              "old": "已委派 Native Worker 计算，任务仍在运行中，最终数值尚未返回。",
+              "bound": "-0.538"
+            }
+          ],
+          "all_turns_have_native_delivery": true
+        }
+      ],
+      "model_calls": 0
+    },
+    "fresh_original_cases": [
+      {
+        "case": "convfinqa:85d9a548c6a57df1",
+        "passed": true,
+        "reason": "assertions_passed",
+        "metrics": {
+          "tokens": 82100,
+          "token_coverage": "complete",
+          "model_calls": 21
+        }
+      },
+      {
+        "case": "finqa:ab5bf9f64e475b1a",
+        "passed": false,
+        "reason": "assertion_failed",
+        "metrics": {
+          "tokens": 29556,
+          "token_coverage": "complete",
+          "model_calls": 8
+        }
+      }
+    ],
+    "earlier_fresh_run": {
+      "convfinqa": "RSI_TIME_BUDGET; original failure retained",
+      "finqa_ab": "numeric assertion failed"
+    }
+  },
+  "combined_targeted": {
+    "passed": 48,
+    "skipped": 5
+  },
+  "standalone_delivery_full": {
+    "exit": 0,
+    "passed": 3443,
+    "skipped": 48
+  },
+  "combined_full": "running",
+  "production_changed": false,
+  "original_suite_and_grades_unchanged": true
+}
