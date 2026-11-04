@@ -1,0 +1,24 @@
+{
+  "role_routes": {
+    "main": {
+      "name": "deepseek-4.1-flash",
+      "parameters": {
+        "reasoning_effort": "high"
+      },
+      "images": true,
+      "timeout_seconds": 0
+    },
+    "worker": {
+      "name": "deepseek-4.1-flash",
+      "parameters": {
+        "reasoning_effort": "low"
+      },
+      "images": false,
+      "timeout_seconds": 0
+    }
+  },
+  "distinct_endpoint_model_identities": 1,
+  "external_model_calls": 0,
+  "configuration_modified": false,
+  "preflight_error": "MODEL_IMAGES_UNSUPPORTED"
+}

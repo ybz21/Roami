@@ -1,0 +1,15 @@
+{
+  "code_commit": "ea2ffc08ba6086e0c1d138a6890da10b7a6ed575",
+  "base_main": "01c6e435032a48b7abdcf4fae03579470d05c4b9",
+  "files": {
+    "agent-runtime/src/roami_agent/core/loop.py": "8830a83d1639e4e7195616852e4e94f66b35fd35d9f189775ac55b209713385e",
+    "agent-runtime/src/roami_agent/tools/foundations.py": "3449a34a08c14a1644785765a4ba97e526427e3a276d8e970fb9c07ad4288c30",
+    "agent-runtime/src/roami_agent/tools/gateway.py": "e917b715daf606371c775634fa581525e9b4cdcf3c53af67ae6754237f2d181a",
+    "agent-runtime/tests/test_command_discovery_inputs.py": "b35184391584f6eda0021e8a01de0b37216ea51bfaef982945ff86da8786b451",
+    "agent-runtime/tests/test_command_families.py": "45bfdf371e62fd606603b28c418024416389ccbb3c0190674022dcb0e1ce71a0",
+    "agent-runtime/tests/test_tool_rejection_evidence.py": "cb94b3a783b4db94a439c0d9b60bc061d6a3fd1b85d6d5699e16ee633eb733c5"
+  },
+  "source_matches_commit": true,
+  "frozen_actor_image_rebuilt": false,
+  "production_deployed": false
+}

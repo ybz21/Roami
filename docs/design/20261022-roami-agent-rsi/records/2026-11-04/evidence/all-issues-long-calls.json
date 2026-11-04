@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "method": "real local subprocesses and stdio MCP fixture; no external model or route override",
+  "calls": [
+    {
+      "kind": "shell",
+      "elapsedSeconds": 65.012,
+      "exitCode": 0,
+      "stdout": "shell-completed-after-65s",
+      "explicitTimeout": false
+    },
+    {
+      "kind": "stdio_mcp",
+      "elapsedSeconds": 120.11,
+      "result": "mcp-completed-after-120s",
+      "explicitTimeout": false
+    }
+  ]
+}
