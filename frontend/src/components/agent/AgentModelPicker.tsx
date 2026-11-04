@@ -6,7 +6,7 @@ import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
 import { useBackDismiss } from '../shell/useBackDismiss'
 import { agentSettingsRoute, modelFailure } from './agent-models'
-import { reasoningChoices, reasoningValue } from './agent-reasoning'
+import { reasoningChoices, reasoningCustom, reasoningKnown, reasoningLabel, reasoningValue } from './agent-reasoning'
 import type { useAgentModels } from './useAgentModels'
 import './agent-model-picker.css'
 
@@ -22,6 +22,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
   const [geometry, setGeometry] = useState<{ left: number; bottom: number; width: number; height: number }>()
   const modelTrigger = useRef<HTMLButtonElement>(null), effortTrigger = useRef<HTMLButtonElement>(null)
   const search = useRef<InputRef>(null), returnFocus = useRef<HTMLButtonElement | null>(null)
+  const choices = useRef<HTMLDivElement>(null)
   const retry = useRef<Choice | null>(null), saving = useRef(false), saveSequence = useRef(0)
   const roleKey = models.role || 'main', role = models.settings?.[roleKey], model = role?.model || '', effort = reasoningValue(role?.reasoningEffort)
   const options = reasoningChoices(role)
@@ -72,7 +73,11 @@ export default function AgentModelPicker({ models, disabled, node }: {
     buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length].focus()
   }
   const content = <div className="agent-model-picker-body" aria-busy={models.busy}>
-    <p className="agent-menu-note">{t(roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>
+    {open === 'model' && <p className="agent-menu-note">{t(roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>}
+    {open === 'reasoning' && <>
+      {reasoningCustom(effort) && <p className="agent-reasoning-note">{t('agent.reasoning.customCurrent')}</p>}
+      {!reasoningKnown(role) && <p className="agent-reasoning-note">{t('agent.reasoning.unknown')}</p>}
+    </>}
     {open === 'model' && <Input ref={search} allowClear prefix={<SearchIcon size={16} />} aria-label={t('agent.models.search')} placeholder={t('agent.models.search')} value={query} disabled={models.busy}
       onChange={event => setQuery(event.target.value)} onKeyDown={event => {
         if (event.key === 'Enter' && (names.length || query.trim())) { event.preventDefault(); chooseModel(names[0] || query.trim()) }
@@ -80,26 +85,30 @@ export default function AgentModelPicker({ models, disabled, node }: {
       }} />}
     {models.error && <div className="agent-model-picker-error" role="alert"><span>{modelFailure(models.error, t)}</span><button type="button" className="tt-act" disabled={models.busy || models.loading} onClick={() => { if (retry.current) void choose(retry.current); else void models.load() }}>{t('agent.retry')}</button></div>}
     {open === 'model' && models.loading && <div className="agent-model-picker-loading" role="status" aria-label={t('common.loading')}><Spin size="small" /></div>}
-    <div className="agent-model-picker-list" role={open === 'model' ? 'listbox' : 'menu'} aria-label={title} onKeyDown={move}>
+    <div ref={choices} className="agent-model-picker-list" role={open === 'model' ? 'listbox' : 'menu'} aria-label={title} onKeyDown={move}>
       {open === 'model' ? <>
         {names.map(name => <button type="button" role="option" aria-selected={name === model} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
           <span>{name}</span>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
         </button>)}
         {!names.length && !!query.trim() && <button type="button" role="option" aria-selected={false} disabled={models.busy || !role} onClick={() => chooseModel(query.trim())}><span>{t('agent.models.use', { name: query.trim() })}</span>{pending && <Spin size="small" />}</button>}
         {!names.length && !query.trim() && !models.loading && !models.error && <p className="agent-menu-note">{t('agent.models.manual')}</p>}
-      </> : options.map(value => <button type="button" role="menuitemradio" aria-checked={effort === value} key={value} disabled={models.busy || !role} onClick={() => { void choose({ model, effort: value }) }}>
-        <span>{t('agent.reasoning.' + value)}</span>{pending?.effort === value ? <Spin size="small" /> : effort === value && <CheckIcon size={18} />}
+      </> : options.map(value => <button type="button" role="menuitemradio" aria-label={t(reasoningLabel(value))} aria-checked={effort === value} key={value} disabled={models.busy || !role} onClick={() => { void choose({ model, effort: value }) }}>
+        <span className="agent-reasoning-copy"><span>{t(reasoningLabel(value))}</span><small>{t('agent.reasoning.description.' + value)}</small></span><span className="agent-reasoning-mark">{pending?.effort === value ? <Spin size="small" /> : effort === value && <CheckIcon size={18} />}</span>
       </button>)}
     </div>
   </div>
   return <>
     <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: model || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{model || t('agent.composer.model')}</span><ChevronDown size={14} /></button>
-    {role && options.length > 1 && <button type="button" ref={effortTrigger} className="tt-pill agent-thinking-trigger" disabled={disabled || models.busy} aria-label={t('agent.reasoning.picker', { effort: t('agent.reasoning.' + effort) })} aria-haspopup="dialog" aria-expanded={open === 'reasoning'} onClick={() => show('reasoning')}><span>{t('composer.effort.' + effort)}</span></button>}
+    {role && (role.reasoningSupport !== 'unsupported' || effort !== 'default') && <button type="button" ref={effortTrigger} className="tt-pill agent-thinking-trigger" disabled={disabled || models.busy} aria-label={t('agent.reasoning.picker', { effort: t(reasoningLabel(effort)) })} aria-haspopup="dialog" aria-expanded={open === 'reasoning'} onClick={() => show('reasoning')}><span>{t(reasoningLabel(effort))}</span></button>}
     {phone && open === 'model' ? <MobileSubPage title={title} dialogLabel={title} onBack={close} search={false} action={{ label: t('agent.models.settings'), icon: <GearIcon size={20} />, onClick: settings }}>
       <section className="agent-model-picker-page" aria-label={title}>{content}</section>
     </MobileSubPage> : <Modal open={!!open} onCancel={close} footer={null} title={<div className="agent-model-picker-head"><strong>{title}</strong>{open === 'model' && <button type="button" className="tt-act" aria-label={t('agent.models.settings')} onClick={settings}><GearIcon size={18} /></button>}<button type="button" className="tt-act" aria-label={t('common.close')} onClick={close}><CloseIcon size={18} /></button></div>} closable={false} destroyOnClose focusTriggerAfterClose={false}
       width={geometry?.width} className="agent-model-picker-dialog" wrapClassName="agent-model-picker-wrap" style={phone ? undefined : { left: geometry?.left, bottom: geometry?.bottom }}
-      afterOpenChange={visible => { if (visible && !phone && open === 'model') search.current?.focus() }}>
+      afterOpenChange={visible => {
+        if (!visible) return
+        if (!phone && open === 'model') search.current?.focus()
+        if (open === 'reasoning') (choices.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]') || choices.current?.querySelector<HTMLButtonElement>('button'))?.focus({ preventScroll: true })
+      }}>
       <div className="agent-model-picker-content" style={{ '--agent-picker-available': geometry ? geometry.height + 'px' : undefined } as CSSProperties}>{content}</div>
     </Modal>}
   </>

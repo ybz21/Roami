@@ -123,10 +123,8 @@ async def test_provider_discovery_uses_secret_server_side_and_blocks_redirect(st
             "models": ["model-a", "model-b"],
             "truncated": False,
             "contextWindows": {},
-            "reasoningEfforts": {
-                name: ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
-                for name in ("model-a", "model-b")
-            },
+            "reasoningEfforts": {name: [] for name in ("model-a", "model-b")},
+            "reasoningSupport": {name: "unknown" for name in ("model-a", "model-b")},
         }
         assert seen == ["Bearer catalog-private-key"]
         with pytest.raises(DomainError, match="MODEL_KEY_REQUIRED_FOR_ENDPOINT"):
@@ -459,5 +457,28 @@ async def test_reasoning_effort_model_change_resets_and_rejects_unsupported_or_m
             "local", {"main": {"model": "glm-5.3-flash", "reasoningEffort": "high"}}
         )
         assert runtime.settings.route().parameters["reasoning_effort"] == "high"
+    finally:
+        await runtime.close()
+
+
+async def test_unknown_reasoning_capability_is_not_the_protocol_fallback(store):
+    settings = Settings(
+        endpoint="http://127.0.0.1:1/v1",
+        model="unknown-reasoner",
+        model_parameters={"reasoning_effort": "xhigh", "max_tokens": 300},
+    )
+    runtime = Runtime(store, Model(), settings=settings)
+    runtime.model_settings.factory = lambda configured, role: Model(configured.route(role).name)
+    try:
+        view = runtime.model_settings.view("local")["main"]
+        assert view["reasoningSupport"] == "unknown"
+        assert view["reasoningEfforts"] == []
+        assert view["reasoningEffort"] == "xhigh"
+        await runtime.model_settings.save("local", {"main": {"images": True}})
+        assert runtime.settings.route().parameters["reasoning_effort"] == "xhigh"
+        await runtime.model_settings.save("local", {"main": {"reasoningEffort": None}})
+        assert runtime.settings.route().parameters == {"max_tokens": 300}
+        restored = load_model_settings(settings, store.data_root)
+        assert restored.route().parameters == {"max_tokens": 300}
     finally:
         await runtime.close()
