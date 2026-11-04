@@ -1018,7 +1018,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def verify_task(task_id: str, body: ConfirmTask, owner: Owner):
         return {
             "data": await runtime.dispatch.confirm(
-                owner, task_id, body.accepted, revision=body.revision, run_id=body.runId
+                owner,
+                task_id,
+                body.accepted,
+                revision=body.revision,
+                run_id=body.runId,
+                evidence=body.evidence,
             )
         }
 

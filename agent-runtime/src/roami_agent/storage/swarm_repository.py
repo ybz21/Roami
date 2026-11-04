@@ -91,6 +91,7 @@ def snapshot(db, owner, swarm_id):
     value = group(db, owner, swarm_id)
     work = rows(db, "SELECT * FROM swarm_work_items WHERE swarm_id=? ORDER BY rowid", (swarm_id,))
     for item in work:
+        item["deliverables"] = json.loads(item.pop("deliverables_json"))
         item["dependencies"] = rows(
             db,
             "SELECT upstream_id AS upstreamId,task_revision AS revision,artifact_id AS artifactId FROM swarm_dependencies WHERE work_id=?",
@@ -107,6 +108,30 @@ def snapshot(db, owner, swarm_id):
             if task
             else None
         )
+        from roami_agent.storage.swarm_evidence import evidence
+
+        attempt = (
+            row(db, "SELECT * FROM task_attempts WHERE id=?", (item["attempt"]["runId"],))
+            if item["attempt"]
+            else None
+        )
+        accepted = (
+            row(
+                db,
+                "SELECT json_extract(payload_json,'$.result.verification') AS verification FROM events "
+                "WHERE task_id=? AND json_extract(payload_json,'$.runId')=? "
+                "AND kind IN ('task.succeeded','task.waiting_user','task.failed','task.interrupted') ORDER BY id DESC LIMIT 1",
+                (task["id"], attempt["id"]),
+            )
+            if task and attempt
+            else None
+        )
+        item["evidence"] = {
+            "artifacts": evidence(db, task, attempt) if task and attempt else [],
+            "verification": json.loads(accepted["verification"])
+            if accepted and accepted["verification"]
+            else None,
+        }
         stale = any(
             not dependency_ready(
                 db,

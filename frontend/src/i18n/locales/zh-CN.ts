@@ -5170,6 +5170,17 @@ const zhCN = {
   'swarm.managed.state.idle': '空闲',
   'swarm.managed.deliveryPending': '等待投递确认',
   'swarm.managed.filter': '筛选蜂群',
+  'swarm.managed.leader': '负责人',
+  'swarm.managed.memory': '团队记忆',
+  'swarm.managed.memoryEmpty': '暂无团队记忆。',
+  'swarm.managed.memoryUnavailable': '团队记忆暂不可用，请检查项目文件。',
+  'swarm.managed.memorySave': '保存记忆',
+  'swarm.managed.memoryFailed': '记忆未保存，草稿已保留；重新打开记忆后查看最新版本。',
+  'swarm.managed.report': '执行器报告',
+  'swarm.managed.outputs': '交付物',
+  'swarm.managed.externalAcceptance': '请核对回执及已确认的外部结果后验收；草稿和已提交不代表已确认。',
+  'swarm.managed.receipt': '回执',
+  'swarm.managed.externalTarget': '已确认结果的链接或 ID',
   'swarm.managed.relinkTeam': '当前团队链接不可用。请选择或创建受管团队，再到项目设置中关联；已有历史记录保留。',
   'swarm.managed.selectTeam': '选择团队',
   'swarm.legacy.partial': '部分历史暂时无法读取，已显示可用记录。',
@@ -5181,7 +5192,10 @@ const zhCN = {
   'swarm.legacy.recordedStatus': '原记录：{status}',
   'swarm.legacy.messages': '历史消息',
   'swarm.legacy.truncated': '当前展示最近的可用记录。',
+  'swarm.managed.evidenceMissing': '缺少必要交付物，请让成员提供实际文件或回执。',
   'swarm.managed.mainFailed': 'Main 暂时未能继续，请检查模型连接后在群聊重试。',
+  'swarm.managed.memoryChanged': '团队记忆已更新，请对照最新内容合并草稿。',
+  'swarm.managed.memoryMerged': '已合并，继续保存',
 }
 
 export default zhCN

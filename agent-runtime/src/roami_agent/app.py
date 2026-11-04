@@ -222,7 +222,9 @@ class Runtime:
         if self.desktop.config["enabled"]:
             register_computer_tools(self.tools, self.desktop)
 
-        self.swarms = SwarmPlans(database, self.tasks, self.conversations, self.wakeup)
+        self.swarms = SwarmPlans(
+            database, self.tasks, self.conversations, self.wakeup, settings=self.settings
+        )
         register_swarm_tools(self.tools, self.swarms)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
@@ -278,6 +280,7 @@ class Runtime:
                 skills=self.tools.optional_skill_metadata,
                 workflow_reads=self.tools.loaded_workflow_metadata,
                 execution_deadline=execution_deadline,
+                swarms=self.swarms,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True
