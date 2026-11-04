@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>执行优先：真实验收记录</title>
+<style>
+:root{--bg-base:#0d1117;--text-bright:#e6edf3;--text-dim:#8b949e;--border-subtle:#21262d;--accent:#58a6ff;--ok:#3fb950;--fs-meta:12px;--fs-body:14px;--fs-title:22px;--sp-2:8px;--sp-4:16px;--sp-5:24px;--content-form:920px}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui,sans-serif}
+main{height:100%;overflow:auto;padding:var(--sp-5)}article{max-width:var(--content-form);margin:auto}h1,h2{font-size:var(--fs-title)}section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}a{color:var(--accent)}code,pre{white-space:pre-wrap;overflow-wrap:anywhere}small{font-size:var(--fs-meta);color:var(--text-dim)}table{width:100%;border-collapse:collapse}th,td{padding:var(--sp-2);border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}summary{cursor:pointer;padding-block:var(--sp-2)}.passed{color:var(--ok)}
+</style>
+<main><article>
+<header class="tt-pagehead"><h1>执行优先：真实验收记录</h1><p>先证明团队能干对活并受控，再组织展示，最后由对话生成配置。记录更新于 2026-11-04；本页区分组件证据与完整业务验收。</p></header>
+<section><h2>三道门槛</h2><table>
+<tr><th>阶段</th><th>通过条件</th><th>当前证据</th></tr>
+<tr><td>受管执行</td><td>同一项目内规划、派发、实际产物、独立复核、验收与回收；真实手机发帖、浏览器投稿有平台回执。</td><td>命令发现、暂停规划、共享群聊、@leader 与取消组件已分别实测。完整新版本团队链路及公开发布尚未完成。</td></tr>
+<tr><td>展示已有结果</td><td>目标、日期指标、任务、文件、媒体与回执同源；缺数保持未知，能追溯来源和修订。</td><td>PR652 的项目文件与三内页已有工程及桌面/真机验收；需接入第一阶段新产生的真实结果。</td></tr>
+<tr><td>对话生成</td><td>先提出 KR、方法、指标和来源，用户确认后保存有效配置，复用同一执行和展示协议。</td><td>已有项目作用域工具与冲突保护；跨场景真实模型闭环仍待验收。</td></tr>
+</table></section>
+<section><h2>已经实际证明什么</h2>
+<p class="passed">真实 Main 能发现受管命令并生成完整计划。</p>
+<p>隔离实例使用节点原样保存的模型配置与原 Go 计费入口，未更改模型、路由、参数、限额或历史账目。Main 实际执行 tool_list、roami swarm help、roami swarm plan help，三次调用成功；只读验收后任务、团队和尝试数量均为零。</p>
+<p>第二轮实际生成 preflight（Codex）与 reviewer（原生 Worker）两项完整计划、产物声明和硬依赖。暂停时没有任何任务派发。通过群聊 @leader 后，Main 实际读取状态、写入共享讨论并完成回复；未重建团队或重复派活。</p>
+<p class="passed">取消组件能够停止这次真实模型与在途工具。</p>
+<p>最终独立组件验收先观察真实 Python 工具已开始，再自动发出两次取消。系统只对本轮已捕获、身份匹配的工具进程发送终止信号，确认原 turn 中断及进程停止后，才返回 cancelled、inputStopped=true、outcomeKnown=true。148 秒后再次检查，工具 PID 不存在，原本将在结束时生成的文件仍未出现；原 shell、Codex 与常驻 CodeMode host 保留，会话随后正常关闭。</p>
+<details><summary>取消边界与旧失败</summary>
+<p>首次验收被新增 hooks 审查延迟，超期后取消没有发出中断；第二轮虽中断模型，在途工具仍完成。第三轮只证明工具属于该 pane 的后代与同一 scope，不能算中断成功。三轮失败保留原样，未补写成功状态。</p>
+<p>修复使用持久中断意图、原 launch/provider/turn/输入 hash/pane 校验、PID 启动 token 与 Linux pidfd；不重新枚举或重放未知信号，不终止原 baseline、常驻 host、其他 scope 或新用户工作。无法确认工具或子智能体停止时继续保留取消中或未知。取消不撤销已经完成的外部操作。</p>
+<p>Codex 内部临时线程继承 notify 的完成通知只记录身份诊断，不能当根任务完成证据，也不能污染原根任务。旧版本已经记录、却未保留 incoming 身份的未知状态不自动改判成功。</p>
+</details></section>
+<section><h2>完整团队：历史失败与当前进展</h2><p class="passed">V3 原生核验成员已真实交付 JSON 与 HTML，并由负责人通过正式验收入口验收。</p><p>负责人独立重算四份原件的字节与摘要、再次完整解码视频 2149 帧、检查 10 条字幕末帧边界与 PNG 尺寸，并下载当前 run 的两份 artifact 与磁盘逐字节核对；20 份原输入的 hash 与 mtime 均未改变。执行者报告未冒充当前平台观察或编造身份，身份由宿主 artifact 绑定。上游通过后才解除暂停，Codex 复核成员已启动；完整团队尚待第二位成员交付与回收。</p><details><summary>保留的完整团队第二轮失败</summary>
+<p>完整团队第二轮遇到两类问题：隔离验收目录误设为非私有权限，修正后继续了同一任务；随后旧候选 CLI 被 Codex 临时线程通知错误标成身份变化，成员开始排查能力上下文而未交付报告。该轮没有产生报告，原素材 hash 与 mtime 均未改变，不能计为产出成功。负责人在核对精确会话后手工中断并归档，关闭自己的 Web/Python 与私有 tmux；这是人工恢复，不能算自动取消通过。</p>
+<p>当前 V3 已使用集成取消、通知隔离与群聊修复的新 CLI。遇到任务上下文失效仍必须停止并报告，不能绕过受管能力修复宿主或另开任务。</p></details>
+</section>
+<section><h2>实际宣传状态</h2><table>
+<tr><th>交付</th><th>实际状态</th><th>不能据此声称</th></tr>
+<tr><td>技巧视频</td><td>实际 H.264/AAC MP4，约 71.6 秒，带录屏、机器配音与字幕；完整解码及浏览器播放完成。</td><td>未等于上传、投稿、审核通过或公开；配音仍是初稿。</td></tr>
+<tr><td>X 图文</td><td>249 字符英文文案、真实截图与 ALT 已准备，原生 App 保存草稿。</td><td>未发送，没有公开帖子回执。</td></tr>
+<tr><td>B站投稿</td><td>浏览器仍需账号登录。正在补受管文件选择能力，并以独立 Chrome 和本地服务端核对实际上传字节。</td><td>文件选择成功不能等于平台上传完成，更不能等于已投稿。</td></tr>
+</table><p>全链路分别记录制作、文件选择、上传完成、提交、平台审核与公开状态。没有回执的阶段保持未确认，不填虚假的曝光、完播率、star 或 fork 增量。</p></section>
+<section><h2>展示层采用什么形式</h2><p>先采用配置驱动的 HTML：React 读取已存在的项目 JSON、任务记录、日期数据和产物，使用注册组件展示。数据来自代码、脚本或模型都使用同一协议，不依赖对话搭建器。</p><p>自由 HTML 展示包属于第二阶段可选扩展：隔离呈现、只读数据绑定，控制动作由宿主执行；不向展示页面交出账号凭据、Shell 或数据库。第三阶段模型再生成这些经过校验的定义，而不是生成不可核验的完成画面。</p></section>
+<section><h2>检查范围</h2><p>群聊修复的 34 项相关回归通过；其提交 quick 的 Python 3325 项通过、48 项跳过。最新 main 已包含 PR649/651；与其重放后的 59 项受管命令、团队与项目对话测试通过。取消提交的 Go 全量、quick 与最终定向 race 通过。最终组合 full、真实完整团队与发布验收尚待完成。</p><p><a href="execution-first.html">三阶段方案</a> · <a href="integration-acceptance.html">既有工程与真机验收</a> · <a href="overall-solution.html">总体方案与故事</a></p></section>
+</article></main>
+</html>

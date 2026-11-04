@@ -2,6 +2,10 @@
 
 最新优先级：[先执行、再展示、最后对话生成（HTML）](execution-first.html)。
 
+执行主线：[真实模型、共享群聊、取消组件与待完成项（HTML）](execution-acceptance.html)。这份记录区分组件通过、完整团队交付与实际平台发布。
+
+浏览器上传：[设计（HTML）](browser-upload.html)、[调用契约与实际字节验收（HTML）](browser-upload-acceptance.html)。成功选择文件与平台上传、提交、公开分别验收。
+
 2026-11-04：当前主线基于已合入 PR648/650 的 main，补齐项目文件、方法与指标看板、按需目标对话工具、团队记忆和真实交付验收；本轮主线尚未部署。
 
 - [总体方案、完整用户故事与技术架构（HTML）](overall-solution.html)
