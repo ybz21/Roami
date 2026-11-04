@@ -5209,7 +5209,7 @@ const enUS = {
   'swarm.managed.memoryChanged': 'Team memory changed. Merge your draft with the current content.',
   'swarm.managed.memoryMerged': 'Merged, continue saving',
   'swarm.chat.team': 'Team',
-  'swarm.chat.conversations': 'Team conversations',
+  'swarm.chat.conversations': 'Conversation',
   'swarm.chat.withMain': 'Talk to Main',
   'swarm.chat.withMember': 'Talk to {name}',
   'swarm.chat.memberPlan': 'View {name} plan',

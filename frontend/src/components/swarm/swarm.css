@@ -160,17 +160,14 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { g
 
 .swarm-relation-actions { display:flex; flex-wrap:wrap; gap:var(--sp-3); margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--border-subtle); }
 
-.swarm-chat-threads { display:flex; flex-shrink:0; align-items:center; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); overflow-x:auto; border-bottom:1px solid var(--border-subtle); }
-.swarm-chat-threads button { flex-shrink:0; white-space:nowrap; }
-.swarm-chat-threads button[aria-pressed="true"] { color:var(--accent); border-color:var(--accent-border); background:var(--sel-bg); }
-.swarm-chat-threads small { margin-left:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+.swarm-chat-conversation { display:flex; flex-shrink:0; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.swarm-chat-conversation label { color:var(--text-dim); font-size:var(--fs-sm); }
+.swarm-chat-conversation .ant-select { flex:1; min-width:0; }
 .swarm-chat-context { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); min-height:var(--tap); padding:var(--sp-1) var(--sp-4); flex-shrink:0; color:var(--text-dim); font-size:var(--fs-meta); }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="false"] .swarm-main-area { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="true"] .swarm-main-area { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="board"] .swarm-chat { display:none; }
 html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm-managed[data-tab="studio"] .swarm-main-area { display:none; }
-html[data-pointer="coarse"] .swarm-chat-threads button { position:relative; }
-html[data-pointer="coarse"] .swarm-chat-threads button::after { content:''; position:absolute; top:50%; height:var(--tap); inset-inline:calc(-1 * var(--sp-1)); transform:translateY(-50%); }
 
 /* The scene and chat share the canvas; assignment details no longer sit above it. */
 .swarm-managed > .tt-pagehead { display:flex; align-items:center; gap:var(--sp-3); padding-block:var(--sp-2); }

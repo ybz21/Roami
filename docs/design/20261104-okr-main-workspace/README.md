@@ -99,3 +99,13 @@
 新增只读 GET /agent/conversations/:cid/identity 与 conversationIdentity 能力标记，Go代理路由同步接入。接口通过真实owner和持久索引识别首页Main、项目Main、成员或普通对话；冲突绑定拒绝，不产生对话、不重绑定实例。成员沿用native session的来源可见性校验。
 
 通知导航和目标页均按该身份独立校验，未建团队的固定Main可进入原项目。新旧运行时通过能力标记区分，不能把不支持身份接口的旧服务当成可信身份响应。项目定义加载前不打开带默认草稿的Main面板。专项覆盖无团队Main、worker隔离、跨owner、首页/项目绑定冲突和跨项目共享，以及前端不新建/不发送的引用打开。
+
+### 聚焦当前对话与真实实例
+
+参考 Anthropic [Frontend Design](https://github.com/anthropics/skills/tree/main/skills/frontend-design) 的内容主导与减法原则，以及 Vercel [Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines) 的可访问、焦点与草稿保留要求；视觉仍服从本仓 UI 令牌和 Material 手机规范。
+
+团队聊天只保留一个带标签的“当前对话”选择：群聊、Main、已派发成员。删除横排成员页签和输入区重复收件人；切换同步收信目标、消息过滤与已有提及，保留草稿及重试幂等键。未派发计划从成员列表查看，不伪装成已有对话。
+
+动画仅呈现有证据的实例：CLI 对照共享活会话概览；原生执行器对照批量实例索引，并核对任务修订与 open 状态。关闭、过期或未派发的工作仍在列表和任务页，历史不删、不合并、不冒充活实例。场景不可见时暂停新增索引刷新，没有逐成员请求。
+
+统一身份补充提交 `5d0a2a71` 的 quick 门禁已通过，包括 Python 全量、Go、前端静态检查。当前聚焦交互的专项通过；最终前端全量、构建、四档浏览器和 full 门禁另行记录。真实 Android 仍待用户解除此前不操作手机的约定。

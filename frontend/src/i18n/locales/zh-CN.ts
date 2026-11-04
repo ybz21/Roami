@@ -5218,7 +5218,7 @@ const zhCN = {
   'swarm.managed.memoryChanged': '团队记忆已更新，请对照最新内容合并草稿。',
   'swarm.managed.memoryMerged': '已合并，继续保存',
   'swarm.chat.team': '团队',
-  'swarm.chat.conversations': '团队对话',
+  'swarm.chat.conversations': '当前对话',
   'swarm.chat.withMain': '与 Main 对话',
   'swarm.chat.withMember': '与 {name} 对话',
   'swarm.chat.memberPlan': '查看 {name} 的计划',
