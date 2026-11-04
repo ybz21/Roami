@@ -669,6 +669,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "configured": bool(runtime.model.model),
                 "projectOkr": True,
                 "projectOkrMain": True,
+                "conversationIdentity": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
@@ -765,6 +766,10 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/conversations/{cid}/activities/{aid}")
     async def activity_detail(cid: str, aid: str, owner: Owner, branchId: str | None = None):
         return {"data": await runtime.conversations.activity_detail(owner, cid, aid, branchId)}
+
+    @app.get("/v1/conversations/{cid}/identity")
+    async def conversation_identity(cid: str, owner: Owner):
+        return {"data": await runtime.conversations.identity(owner, cid)}
 
     @app.get("/v1/conversations/{cid}/messages")
     async def messages(

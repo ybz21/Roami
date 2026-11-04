@@ -91,4 +91,11 @@
 
 证据 `/tmp/okr-leader-workspace/final-qa/phone-qa.json` 与 `phone-{chat,team,files,main}-emulated.png`；通知列表将Markdown链接显示为文件名并限制三行，点击仍回原消息。
 
-后续边界：未绑定Swarm的项目Main通知，仍需要由统一身份API提供归属，不能把当前已有团队的复验扩展宣称为所有实例都已覆盖。长期职责实体、未派发成员实例与原生会话可信恢复按独立设计继续实现。
+后续边界：随后补充只读统一身份API，按owner/持久Main索引区分首页Main、项目Main和成员；未绑定Swarm也可导航到原项目Main。新运行时通过conversationIdentity能力标记启用，旧运行时保留团队绑定复验路径。该新增接口只有专项验证，不把旧生产环境的浏览器复验扩展宣称为新接口已部署。长期职责实体、未派发成员实例与原生会话可信恢复按独立设计继续实现。
+
+
+### 统一实例身份补充
+
+新增只读 GET /agent/conversations/:cid/identity 与 conversationIdentity 能力标记，Go代理路由同步接入。接口通过真实owner和持久索引识别首页Main、项目Main、成员或普通对话；冲突绑定拒绝，不产生对话、不重绑定实例。成员沿用native session的来源可见性校验。
+
+通知导航和目标页均按该身份独立校验，未建团队的固定Main可进入原项目。新旧运行时通过能力标记区分，不能把不支持身份接口的旧服务当成可信身份响应。项目定义加载前不打开带默认草稿的Main面板。专项覆盖无团队Main、worker隔离、跨owner、首页/项目绑定冲突和跨项目共享，以及前端不新建/不发送的引用打开。

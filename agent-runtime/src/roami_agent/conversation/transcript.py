@@ -127,6 +127,11 @@ class Conversations:
     async def get(self, owner, cid):
         return await self.db.call(lambda db: owned(db, owner, cid))
 
+    async def identity(self, owner, cid):
+        from roami_agent.conversation.conversation_identity import conversation_identity
+
+        return await self.db.call(lambda db: conversation_identity(db, owner, cid))
+
     async def activity_detail(self, owner, cid, aid, branch_id=None):
         from roami_agent.conversation.activity_payloads import activity_payload
 

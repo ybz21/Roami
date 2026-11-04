@@ -54,7 +54,12 @@ function OkrMainInstance({ reference, onClearReference, projectId, projectDir, d
       const status = await api('GET', '/agent/status')
       if (!alive.current) throw new Error('Conversation changed')
       let id: string
-      if (status.data?.projectOkrMain === true && !reference) {
+      if (reference && status.data?.conversationIdentity === true) {
+        const response = await api('GET', '/agent/conversations/' + encodeURIComponent(reference.conversationId) + '/identity')
+        const identity = response.data
+        if (identity?.kind !== 'project_main' || identity.projectId !== projectId || identity.conversationId !== reference.conversationId) throw new Error('Referenced conversation changed')
+        id = identity.conversationId
+      } else if (status.data?.projectOkrMain === true && !reference) {
         const response = await api('POST', '/agent/conversations', create.current)
         id = response.data?.id
       } else if (workspace?.swarm.startsWith('sw-')) {

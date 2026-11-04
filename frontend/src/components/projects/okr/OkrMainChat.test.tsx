@@ -134,3 +134,10 @@ it('rejects a notification for another conversation and keeps the project draft'
   expect(state.thread.mock.calls.every(call => !call[0])).toBe(true)
   expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations' || call[1].endsWith('/messages'))).toBe(false)
 })
+
+it('restores a referenced fixed Main before a team exists using read-only identity', async () => {
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true, conversationIdentity: true } : { kind: 'project_main', projectId: 'project', conversationId: 'fixed-main' } }))
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} reference={{ conversationId: 'fixed-main', branchId: 'branch', messageId: 'message' }} onClose={vi.fn()} />)
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('fixed-main', 'branch', null, 'message'))
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})

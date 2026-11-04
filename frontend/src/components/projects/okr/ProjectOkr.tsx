@@ -184,7 +184,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
       ]} />
     </>}
   </div>
-    {chatting && <Suspense fallback={<Spin />}><OkrMainChat reference={reference} onClearReference={clearOkrMessageReference} projectId={projectId} projectDir={projectDir} workspace={workspace} draft={draft} onUpdated={() => { void refreshDiscussion() }} onClose={() => { setChatting(false); clearOkrMessageReference(); void refreshDiscussion() }} /></Suspense>}
+    {chatting && loaded && <Suspense fallback={<Spin />}><OkrMainChat reference={reference} onClearReference={clearOkrMessageReference} projectId={projectId} projectDir={projectDir} workspace={workspace} draft={draft} onUpdated={() => { void refreshDiscussion() }} onClose={() => { setChatting(false); clearOkrMessageReference(); void refreshDiscussion() }} /></Suspense>}
   </div>
   return phone ? <MobileSubPage title={title} onBack={back} manageHistory={false} keepBottomNav>{content}</MobileSubPage> : content
 }
