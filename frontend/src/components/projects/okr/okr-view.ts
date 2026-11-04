@@ -4,21 +4,15 @@ import { useCurrentNodeId } from '../../cluster/node-url'
 export function useOkrView(projectId: string) {
   const node = useCurrentNodeId()
   const key = 'roam.okr.view:' + JSON.stringify([node, projectId])
-  const [view, setView] = useState(() => {
+  const [mainPanel, setMainPanel] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(key) || '{}')
-      return {
-        mainPanel: ['board', 'activities', 'files'].includes(saved.mainPanel) ? saved.mainPanel as string : 'board',
-        panel: ['overview', 'data', 'review'].includes(saved.panel) ? saved.panel as string : 'overview',
-      }
-    } catch { return { mainPanel: 'board', panel: 'overview' } }
+      if (['okr', 'data', 'activities', 'memory', 'files'].includes(saved.mainPanel)) return saved.mainPanel as string
+      return saved.mainPanel === 'board' && saved.panel === 'data' ? 'data' : 'okr'
+    } catch { return 'okr' }
   })
   useEffect(() => {
-    try { localStorage.setItem(key, JSON.stringify(view)) } catch { /* 当前页面仍可切换 */ }
-  }, [key, view])
-  return {
-    ...view,
-    setMainPanel: (mainPanel: string) => setView(current => ({ ...current, mainPanel })),
-    setPanel: (panel: string) => setView(current => ({ ...current, panel })),
-  }
+    try { localStorage.setItem(key, JSON.stringify({ mainPanel })) } catch { /* 当前页面仍可切换 */ }
+  }, [key, mainPanel])
+  return { mainPanel, setMainPanel }
 }

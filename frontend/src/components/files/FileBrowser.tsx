@@ -369,6 +369,8 @@ export default function FileBrowser({
   selectedPath,
   openRequest,
   chrome = 'full',
+  autoFocusSearch = true,
+  collapseEmptyPreview = false,
   onOpenLine,
   focusSearchNonce,
 }: {
@@ -379,6 +381,8 @@ export default function FileBrowser({
   /** 'tree'：只要树 + 搜索（右栏当前任务的文件面板，22 设计 §3.4）——标题行、项目芯片、路径框都不画，
       作用域头由外层给；'full' 是今天的文件管理器 */
   chrome?: 'full' | 'tree'
+  autoFocusSearch?: boolean
+  collapseEmptyPreview?: boolean
   dir?: string
   active?: boolean
   accent?: string
@@ -961,7 +965,7 @@ export default function FileBrowser({
           <Input
             ref={searchRef}
             size="small"
-            autoFocus
+            autoFocus={autoFocusSearch}
             allowClear
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -1208,6 +1212,7 @@ export default function FileBrowser({
 
   const content = (() => {
   if (layout === 'split') {
+    if (collapseEmptyPreview && !view) return browserPane
     return (
       <div style={{ height: '100%', minHeight: 0, display: 'flex', background: 'var(--bg-base)' }}>
         <div style={{ flex: '0 0 clamp(220px, 22vw, 300px)', minWidth: 0, borderRight: '1px solid var(--border-subtle)' }}>

@@ -5,6 +5,7 @@ import json
 
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.attachments import Attachments
+from roami_agent.conversation.project_main import project_main
 from roami_agent.memory.intake import remember_request
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -49,7 +50,10 @@ class Conversations:
                 return existing
             legacy = row(
                 db,
-                "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) ORDER BY c.created_ms,c.id LIMIT 1",
+                "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) "
+                "AND NOT EXISTS (SELECT 1 FROM project_okr_conversations p WHERE p.conversation_id=c.id) "
+                "AND NOT EXISTS (SELECT 1 FROM swarm_groups g WHERE g.conversation_id=c.id) ORDER BY c.created_ms,c.id LIMIT 1",
                 (owner,),
             )
             conversation = legacy or self._new(db, owner, "New conversation")
@@ -62,7 +66,13 @@ class Conversations:
         return await self.db.call(write, write=True)
 
     async def create(
-        self, owner: str, title="New conversation", *, request_key=None, project_id=None
+        self,
+        owner: str,
+        title="New conversation",
+        *,
+        request_key=None,
+        project_id=None,
+        swarm_id=None,
     ):
         if request_key is not None and (not request_key or len(request_key) > 200):
             raise DomainError("INVALID_REQUEST_KEY")
@@ -81,14 +91,19 @@ class Conversations:
                 if prior:
                     if prior["payload_sha256"] != digest:
                         raise DomainError("REQUEST_KEY_CONFLICT", 409)
+                    if project_id is not None:
+                        main = project_main(
+                            db, owner, project_id, title, self._new, swarm_id=swarm_id
+                        )
+                        if main["id"] != prior["conversation_id"]:
+                            raise DomainError("PROJECT_OKR_MAIN_CONFLICT", 409)
                     return owned(db, owner, prior["conversation_id"])
-            conversation = self._new(db, owner, title)
+            conversation = (
+                project_main(db, owner, project_id, title, self._new, swarm_id=swarm_id)
+                if project_id is not None
+                else self._new(db, owner, title)
+            )
             cid = conversation["id"]
-            if project_id is not None:
-                db.execute(
-                    "INSERT INTO project_okr_conversations VALUES(?,?,?)",
-                    (cid, owner, project_id),
-                )
             if request_key:
                 db.execute(
                     "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",
@@ -111,6 +126,11 @@ class Conversations:
 
     async def get(self, owner, cid):
         return await self.db.call(lambda db: owned(db, owner, cid))
+
+    async def identity(self, owner, cid):
+        from roami_agent.conversation.conversation_identity import conversation_identity
+
+        return await self.db.call(lambda db: conversation_identity(db, owner, cid))
 
     async def activity_detail(self, owner, cid, aid, branch_id=None):
         from roami_agent.conversation.activity_payloads import activity_payload

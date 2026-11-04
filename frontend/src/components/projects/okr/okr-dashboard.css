@@ -110,5 +110,26 @@ html[data-pointer="coarse"] .okr-board-toolbar .ant-segmented-item-label{min-hei
 a.okr-deliverable{color:var(--accent)}
 
 .okr-files-nav{display:flex;flex-shrink:0;flex-wrap:wrap;gap:var(--sp-3);padding:var(--sp-3) var(--pad-page);border-bottom:1px solid var(--border-subtle)}
+.okr-files-nav button[aria-pressed="true"]{color:var(--accent);border-color:var(--accent-border);background:var(--sel-bg)}
 .okr-files-browser{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}
 .okr-files-hint{margin:var(--sp-3) var(--pad-page)}
+
+.okr-dashboard:is([data-view="okr"],[data-view="data"]) .okr-work-tabs .ant-tabs-tabpane-active{overflow:auto;overscroll-behavior:contain}
+.okr-goal-map{padding:var(--sp-4) 0 var(--sp-5);min-width:0}
+.okr-map-objective{display:flex;align-items:start;gap:var(--sp-3);padding-block:var(--sp-3) var(--sp-5);border-bottom:1px solid var(--border-subtle)}
+.okr-map-objective>span,.okr-map-result>span{color:var(--accent);font-size:var(--fs-meta);font-weight:600;flex-shrink:0}
+.okr-map-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*14)),1fr));gap:var(--sp-5);padding:0;margin:0;list-style:none}
+.okr-map-results>li{min-width:0;position:relative;padding-top:var(--sp-5)}
+.okr-map-results>li::before{content:'';position:absolute;top:0;left:var(--sp-4);height:var(--sp-5);border-left:1px solid var(--border-subtle)}
+.okr-map-result{padding:var(--sp-3) var(--sp-4);border-left:2px solid var(--accent-border)}
+.okr-map-result h3{margin:var(--sp-2) 0;font-size:var(--fs-body)}
+.okr-map-methods{list-style:none;padding:0 0 0 var(--sp-4);margin:0}
+.okr-map-methods>li{border-left:1px solid var(--border-subtle);padding:var(--sp-4) 0 0 var(--sp-4);position:relative}
+.okr-map-methods>li::before{content:'';position:absolute;left:0;top:calc(var(--sp-4)*2);width:var(--sp-4);border-top:1px solid var(--border-subtle)}
+.okr-map-method{padding:var(--sp-3);background:var(--bg-container);border-radius:var(--r-card);overflow-wrap:anywhere}
+.okr-map-method strong,.okr-map-method small{display:block}
+.okr-map-method small{color:var(--text-dim);font-size:var(--fs-meta);margin-top:var(--sp-1)}
+.okr-map-method p{font-size:var(--fs-sm)}
+.okr-map-unlinked{margin-top:var(--sp-5)}
+.okr-map-unlinked .okr-map-method{margin-top:var(--sp-3)}
+html:is([data-size="compact"],[data-size="medium"]) .okr-map-results{grid-template-columns:minmax(0,1fr)}

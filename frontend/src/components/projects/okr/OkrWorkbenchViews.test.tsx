@@ -26,11 +26,11 @@ beforeEach(() => {
 afterEach(cleanup)
 
 it('renders only configured known widgets and restricts metric trends to their declared metrics', () => {
-  render(<OkrDashboard workspace={{ ...workspace, dashboard: { schemaVersion: 1, widgets: [{ id: 'watch', type: 'metricTrend', title: 'Video evidence', metricIds: ['watch'] }] } }} onReview={vi.fn()} onConfigure={vi.fn()} />)
+  render(<OkrDashboard workspace={{ ...workspace, dashboard: { schemaVersion: 1, widgets: [{ id: 'watch', type: 'metricTrend', title: 'Video evidence', metricIds: ['watch'] }] } }} />)
   expect(screen.getByText('Video evidence')).toBeTruthy()
   expect(screen.getByText('Video evidence').closest('section')?.textContent).toBe('Video evidenceVideo watch time')
-  expect(screen.getAllByText('Video watch time')).toHaveLength(2)
-  expect(screen.getAllByText('X clicks')).toHaveLength(1)
+  expect(screen.getAllByText('Video watch time')).toHaveLength(1)
+  expect(screen.queryByText('X clicks')).toBeNull()
   expect(screen.queryByText('okr.nextAction')).toBeNull()
 })
 

@@ -1,6 +1,8 @@
-"""Scoped OKR tools for the on-demand goal discussion, without a persistent swarm."""
+"""Project-scoped OKR tools for the goal's persistent coordinator."""
 
+from roami_agent.conversation.project_main import project_team
 from roami_agent.conversation.project_okr import bound_project, operation
+from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
 
 
@@ -12,6 +14,12 @@ def register_project_okr_tools(registry, database, settings):
 
     async def update(args, binding):
         pid = await bound_project(database, binding)
+        if args["operation"] == "save" and args["payload"].get("swarm"):
+            team = await database.call(
+                lambda db: project_team(db, binding["owner"], pid, args["payload"]["swarm"])
+            )
+            if team["conversation_id"] != binding["conversation"]:
+                raise DomainError("PROJECT_OKR_TEAM_CONFLICT", 409)
         return await operation(settings, pid, args["operation"], args["payload"])
 
     registry.add(

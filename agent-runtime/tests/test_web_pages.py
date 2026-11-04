@@ -300,3 +300,45 @@ async def test_compact_memory_catalog_retains_full_body_only_in_details(store):
     assert page["items"][0]["id"] == saved["id"]
     assert "search_tokens" not in page["items"][0]
     assert (await memories.details.get("alice", saved["id"]))["record"]["body"] == body
+
+
+async def test_scoped_notifications_and_read_cursor_never_cross_conversations(store):
+    from test_runtime import ConversationModel
+
+    home, _ = await seed_messages(store, 0)
+    project, _ = await seed_messages(store, 0)
+    runtime = Runtime(store, ConversationModel())
+    own = await runtime.notifications.publish(
+        "alice", home["id"], "Home result", source="test", dedupe_key="home"
+    )
+    await runtime.notifications.publish(
+        "alice", project["id"], "Project result", source="test", dedupe_key="project"
+    )
+    foreign = await runtime.conversations.create("bob")
+    app = create_app(runtime, manage_lifecycle=False)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "alice"},
+        ) as client:
+            scoped = (
+                await client.get("/v1/notification-list", params={"conversationId": home["id"]})
+            ).json()["data"]
+            assert len(scoped["items"]) == 1 and scoped["items"][0]["conversation_id"] == home["id"]
+            summary = (
+                await client.get("/v1/notifications/summary", params={"conversationId": home["id"]})
+            ).json()["data"]
+            assert summary == {"conversationId": home["id"], "cursor": own["eventId"], "unread": 1}
+            assert (
+                await client.post(
+                    f"/v1/conversations/{home['id']}/read", json={"eventId": own["eventId"]}
+                )
+            ).status_code == 200
+            assert (await runtime.notifications.summary("alice", project["id"]))["unread"] == 1
+            for route in ["/v1/notification-list", "/v1/notifications/summary", "/v1/reminders"]:
+                assert (
+                    await client.get(route, params={"conversationId": foreign["id"]})
+                ).status_code == 404
+    finally:
+        await runtime.close()

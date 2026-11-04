@@ -208,6 +208,30 @@ class TaskRevisions:
                 "VALUES(?,'task.steer',?,?,?,'queued',?)",
                 (operation, task_id, dedupe, encoded(payload), now_ms()),
             )
+            if source_turn_id:
+                team = row(
+                    db,
+                    "SELECT g.* FROM swarm_groups g JOIN swarm_work_items w ON w.swarm_id=g.id "
+                    "WHERE w.task_id=? AND g.owner_id=? AND g.conversation_id=?",
+                    (task_id, owner, source_conversation_id),
+                )
+                if team:
+                    from roami_agent.storage.swarm_repository import changed
+
+                    db.execute(
+                        "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_json) "
+                        "VALUES(?,'main',?,?,?,?)",
+                        (
+                            team["id"],
+                            text_for_execution,
+                            task_id,
+                            now_ms(),
+                            encoded(
+                                {"operationId": operation, "taskId": task_id, "acceptedOnly": True}
+                            ),
+                        ),
+                    )
+                    changed(db, team, "swarm.message_forwarded")
             event(
                 db,
                 task["origin_conversation_id"],

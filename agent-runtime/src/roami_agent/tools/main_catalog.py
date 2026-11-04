@@ -800,7 +800,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
     registry.add(
         Tool(
             "task_steer",
-            "Continue a known tracked task with additional user requirements at its actual revision. Preserves its executor and source; waits for stop proof. This cannot switch executors or use a tmux sessionId. Queue acceptance is not completion.",
+            "Continue a known tracked task with additional user requirements at its actual revision. Preserves its executor and source; waits for stop proof. This cannot switch executors or use a tmux sessionId. For managed swarm members this also records Main’s forwarded request in the group and member thread. Reuse this member for later rounds. Queue acceptance is not completion.",
             object_schema(
                 {
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
