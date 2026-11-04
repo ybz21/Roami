@@ -5203,6 +5203,13 @@ const enUS = {
   'swarm.managed.mainFailed': 'Main could not continue. Check the model connection, then retry in the group chat.',
   'swarm.managed.memoryChanged': 'Team memory changed. Merge your draft with the current content.',
   'swarm.managed.memoryMerged': 'Merged, continue saving',
+  'swarm.chat.team': 'Team',
+  'swarm.chat.conversations': 'Team conversations',
+  'swarm.chat.withMain': 'Talk to Main',
+  'swarm.chat.withMember': 'Talk to {name}',
+  'swarm.chat.memberPlan': 'View {name} plan',
+  'swarm.chat.notStarted': 'Not started',
+  'swarm.chat.teamVisible': 'Shared with the team',
 }
 
 export default enUS
