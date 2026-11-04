@@ -135,7 +135,7 @@ function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSessi
       const detail: TaskDetail = response.data
       if (!alive.current || latestScope.current !== requestedScope) return
       const attempt = detail.attempts[0]
-      if (detail.task.id !== taskId || detail.task.revision !== currentWork.revision || attempt?.id !== currentWork.attempt?.runId || ['closing', 'closed'].includes(detail.sessionClosure?.state || '')) { fallback(); return }
+      if (detail.task.id !== taskId || detail.task.revision !== currentWork.revision || !attempt || attempt.revision !== detail.task.revision || attempt.id !== currentWork.attempt?.runId || ['closing', 'closed'].includes(detail.sessionClosure?.state || '')) { fallback(); return }
       if (detail.task.nativeSession) openAgentPage('session', detail.task.nativeSession.id)
       else if (attempt.sessionId) onSession(attempt.sessionId)
       else fallback()

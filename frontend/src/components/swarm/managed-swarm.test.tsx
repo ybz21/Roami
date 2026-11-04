@@ -278,13 +278,25 @@ it('opens a concrete current conversation only after reading its real task ident
  expect(test.api).toHaveBeenCalledWith('GET','/agent/tasks/task')
  expect(test.openTask).not.toHaveBeenCalled()
 })
-it.each(['closed','changed'])('keeps a %s conversation on its real task detail instead of opening an obsolete session', async kind => {
+it.each(['closed','changed','revision'])('keeps a %s conversation on its real task detail instead of opening an obsolete session', async kind => {
  const session = vi.fn()
- test.api.mockResolvedValueOnce({data:{task:{id:'task',revision:1},sessionClosure:kind==='closed'?{state:'closed'}:null,attempts:[{id:kind==='changed'?'new-run':'run',revision:1,sessionId:'obsolete'}]}})
+ test.api.mockResolvedValueOnce({data:{task:{id:'task',revision:1},sessionClosure:kind==='closed'?{state:'closed'}:null,attempts:[{id:kind==='changed'?'new-run':'run',revision:kind==='revision'?0:1,sessionId:'obsolete'}]}})
  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={session} />)
  fireEvent.click(screen.getByRole('button',{name:'swarm.chat.withMember'}))
  fireEvent.click(screen.getByRole('button',{name:'swarm.managed.openSession'}))
  await waitFor(()=>expect(test.openTask).toHaveBeenCalledWith('tasks','task'))
  expect(session).not.toHaveBeenCalled()
+ expect(test.api).toHaveBeenCalledOnce()
+})
+
+it('enters a bound native conversation instead of creating a new agent', async () => {
+ const session = vi.fn()
+ test.api.mockResolvedValueOnce({data:{task:{id:'task',revision:1,nativeSession:{id:'native-session',conversationId:'native-conversation'}},attempts:[{id:'run',revision:1,state:'succeeded'}]}})
+ render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={session} />)
+ fireEvent.click(screen.getByRole('button',{name:'swarm.chat.withMember'}))
+ fireEvent.click(screen.getByRole('button',{name:'swarm.managed.openSession'}))
+ await waitFor(()=>expect(test.openTask).toHaveBeenCalledWith('session','native-session'))
+ expect(session).not.toHaveBeenCalled()
+ expect(test.api).toHaveBeenCalledWith('GET','/agent/tasks/task')
  expect(test.api).toHaveBeenCalledOnce()
 })
