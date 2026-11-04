@@ -20,16 +20,17 @@ import { dirname, resolve, extname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import net from 'node:net'
 import { OperationReceipts, operationFailureCode } from './operation-receipts.mjs'
+import { MAX_FILE_UPLOAD_BYTES, uploadArguments, withUploadFile } from './file-upload.mjs'
 import { discoverBrowser, observePage } from './browser-observation.mjs'
 import { ScopedCDP, connectTarget, selectTarget } from './scoped-cdp.mjs'
 
 const SELF_PATH = fileURLToPath(import.meta.url)
-const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v5'
+const SOCK_PATH = (process.env.TTMUX_CHROME_SOCK || '/tmp/ttmux-chrome-cli.sock') + '.scoped-v6'
 const DAEMON_LOG = process.env.TTMUX_CHROME_DAEMON_LOG || '/tmp/ttmux-chrome-cli.log'
 const DAEMON_IDLE_MS = Number(process.env.TTMUX_CHROME_DAEMON_IDLE || 300) * 1000
 
 class ChromeError extends Error {}
-const OPERATION_VERBS = new Set(['new', 'goto', 'url', 'title', 'click', 'fill', 'type', 'press', 'close', 'screenshot', 'shot', 'text', 'html', 'attr', 'wait', 'pdf', 'observe', 'sleep', 'wake'])
+const OPERATION_VERBS = new Set(['new', 'goto', 'url', 'title', 'click', 'fill', 'type', 'press', 'close', 'screenshot', 'shot', 'text', 'html', 'attr', 'wait', 'pdf', 'observe', 'sleep', 'wake', 'upload'])
 
 const runCatalog = promisify(execFile)
 async function catalogEvent(event) {
@@ -333,6 +334,20 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
     case 'url': io.log((await pickHere()).url()); break
     case 'title': io.log(await (await pickHere()).title()); break
     case 'click': await (await pickHere()).click(pos[0], { timeout: to }); io.log('ok'); break
+    case 'upload': {
+      uploadArguments(flags, pos)
+      const result = await withUploadFile(pos[1], { root: flags['file-root'], maxBytes: flags['max-file-bytes'], sha256: flags['expected-file-sha256'] }, async (snapshot, file) => {
+        const input = (await pickHere()).locator(pos[0])
+        try {
+          await input.waitFor({ state: 'attached', timeout: to })
+          if (await input.count() !== 1 || !await input.evaluate(element => element.tagName === 'INPUT' && element.type === 'file' && !element.webkitdirectory && !element.disabled)) throw new Error('invalid input')
+        } catch { throw new ChromeError('CHROME_UPLOAD_INPUT_INVALID') }
+        await input.setInputFiles(snapshot, { timeout: to })
+        return { selected: true, needsVerification: true, file }
+      })
+      io.log(result)
+      break
+    }
     case 'fill': await (await pickHere()).fill(pos[0], pos[1] ?? '', { timeout: to }); io.log('ok'); break
     case 'type': await (await pickHere()).type(pos[0], pos[1] ?? '', { timeout: to }); io.log('ok'); break
     case 'press': { const p = await pickHere(); if (pos.length > 1) await p.press(pos[0], pos[1], { timeout: to }); else await p.keyboard.press(pos[0]); io.log('ok'); break }
@@ -631,7 +646,7 @@ class Session {
       await control.request('Browser.getVersion')
       const targets = (await control.request('Target.getTargets')).targetInfos.filter(t => t.type === 'page' && userPages([{ url: () => t.url }]).length)
       const catalog = await catalogEvent({ action: 'sync', browserId: discovered.id, targets: targets.map(t => t.targetId) })
-      io.log({ version: 'roami-browser-v1', browserId: discovered.id, tabPolicies: catalog.policies, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close', 'tab_catalog', 'background_tab_sleep'] })
+      io.log({ version: 'roami-browser-v1', browserId: discovered.id, tabPolicies: catalog.policies, fileUpload: { maxBytes: MAX_FILE_UPLOAD_BYTES, limitSource: 'playwright-cdp', confirmation: 'selected' }, features: ['target_id', 'operation_receipts', 'scene_observation', 'expected_scene', 'background_tab_close', 'tab_catalog', 'background_tab_sleep', 'file_upload'] })
       return
     }
     const listTargets = async () => (await control.request('Target.getTargets')).targetInfos
@@ -936,7 +951,7 @@ async function daemonRequestWithRetry(argv, timeoutMs, verb, request = daemonReq
   const fullTimeoutS = timeoutMs === 0 ? 0 : effectiveTimeoutMs(verb, timeoutMs) / 1000 + 35
   const retryTimeoutS = Math.min(fullTimeoutS, 20)
   const flags = parseArgs(argv).flags
-  const attempts = flags['no-retry'] || flags['operation-id'] ? 1 : 3
+  const attempts = flags['no-retry'] || flags['operation-id'] || verb === 'upload' ? 1 : 3
   const requestArgv = flags['expected-scene'] != null || flags['expected-browser'] != null || flags['no-focus'] ? ['_scene', ...argv]
     : flags['operation-id'] ? ['_operation', ...argv]
     : flags.target != null || flags['no-retry'] ? ['_managed', ...argv] : argv
@@ -969,6 +984,7 @@ async function main() {
   if (verb === '_daemon') { await daemonMain(); return }
 
   const timeoutMs = num(flags.timeout, 15000)
+  if (verb === 'upload') uploadArguments(flags, pos)
 
   if (verb === 'operation-status' || verb === 'operation-cancel') {
     const receipts = new OperationReceipts(flags['receipt-root'])
@@ -1007,7 +1023,7 @@ async function main() {
   process.exitCode = resp.code || 0
 }
 
-export { parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait, handleConnection, cdpScreenshot, withInsecureTLS }
+export { executeVerb, parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait, handleConnection, cdpScreenshot, withInsecureTLS }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === SELF_PATH) {
   main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })
