@@ -63,9 +63,7 @@ export function useSessionProjects(): Record<string, SessionProject> {
 /**
  * 从 `/projects` 与 `/sessions/annotations` 两条现成接口拼归属表。
  *
- * git 项目按 annotation 里的 repo 目录匹配；非 git 项目后端只给了 `top` 名单
- * （每个项目最近几个会话），只能近似——够用了，标签前缀标错的代价是"看着眼熟但
- * 不对"，不是功能失效，而为此新开一条接口不值。
+ * Git 按 repo 匹配，普通目录按已保存 home 的最长前缀匹配；top 只作旧节点兜底。
  */
 export function buildSessionProjects(
   projects: { key: string; name: string; dir: string; git: boolean; top?: { name: string }[] | null }[],
@@ -80,6 +78,11 @@ export function buildSessionProjects(
     const hit = primary?.repo && byDir.get(primary.repo)
     // worktree 绝对路径就是任务的 key（22 设计 §3.2）：annotation 里本来就带着，多抄一个字段
     if (hit) out[session] = { ...hit, branch: primary.branch || undefined, worktree: primary.worktree || undefined }
+    else if (ann?.home) {
+      const home = String(ann.home).replace(/\/+$/, '')
+      const project = projects.filter(p => !p.git && (home === p.dir.replace(/\/+$/, '') || home.startsWith(p.dir.replace(/\/+$/, '') + '/'))).sort((a, b) => b.dir.length - a.dir.length)[0]
+      if (project) out[session] = { key: project.key, name: project.name, dir: project.dir }
+    }
   }
   // 非 git 项目兜底：已经有归属的不覆盖（annotation 比 top 名单准）
   for (const p of projects) {

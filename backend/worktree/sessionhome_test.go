@@ -7,7 +7,46 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ybz21/Roami/internal/metadb"
+	storage "github.com/ybz21/Roami/internal/storage"
 )
+
+func TestRegisteredNonGitProjectRepairsIncidentalLauncherHome(t *testing.T) {
+	root, project, launcher := t.TempDir(), t.TempDir(), mkRepo(t)
+	db, err := storage.Open(root, storage.Options{DataDir: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	for _, statement := range []struct {
+		query string
+		args  []any
+	}{
+		{`INSERT INTO projects(id,dir) VALUES('promotion',?)`, []any{project}},
+		{`INSERT INTO sessions(id,status,tmux_id,home_dir) VALUES('data','live','$1',?)`, []any{project}},
+		{`INSERT INTO sessions(id,status,tmux_id,home_dir) VALUES('wrong-incarnation','live','$99',?)`, []any{project}},
+	} {
+		if _, err := db.Exec(statement.query, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	panes := fakeTmux(t)
+	s := New(root, metadb.NewLocal(db))
+	s.homes.bind("$1", "data", launcher)
+	setPanes(t, panes, "$1\tdata\t1\t"+launcher+"\n$2\twrong-incarnation\t1\t"+launcher+"\n")
+	ann := s.Annotations(context.Background())
+	if ann["data"].Home != project || ann["data"].Primary != nil {
+		t.Fatalf("promotion member inherited source repository: %+v", ann["data"])
+	}
+	if ann["wrong-incarnation"].Home != launcher {
+		t.Fatalf("stale tmux identity overrode current session: %+v", ann["wrong-incarnation"])
+	}
+	setPanes(t, panes, "$1\tdata\t1\t"+t.TempDir()+"\n")
+	if got := s.Annotations(context.Background())["data"].Home; got != project {
+		t.Fatalf("member moved with pane cwd: %s", got)
+	}
+}
 
 // fakeTmux 装一个假 tmux：list-panes 的输出从 panesFile 读，测试中途改文件即可
 // 模拟「用户在会话里 cd 走了」/「会话没了」。display-message 也走同一份数据，

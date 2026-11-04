@@ -114,7 +114,7 @@ export function buildTaskTree(o: {
     for (const wt of o.worktrees[p.key] || []) {
       // worktree 带来的会话列表是**另一条来源**（不是 /sessions），基础设施会话得在这里
       // 再滤一遍——上一版只滤了 /sessions，于是 _ttmux-plugind 照样从这条路挂进任务里。
-      const names = (wt.sessions || []).filter((s) => s.session && !isInfraSession(s.session) && alive(s.session, s.dormant)).map((s) => s.session)
+      const names = (wt.sessions || []).filter((s) => s.session && !isInfraSession(s.session) && alive(s.session, s.dormant) && (!o.placement?.[s.session] || o.placement[s.session].key === p.key)).map((s) => s.session)
       // 主仓库检出：有会话才立卡（在仓库根目录开的 claude 也得归到项目下，不能丢进散会话）；
       // 没会话不立——它不是一个可收尾的任务位，每个项目都挂一张空的「main」只会碍事
       if (wt.isMain && names.length === 0) continue
@@ -161,7 +161,8 @@ export function buildTaskTree(o: {
     // 左树却把它们扔进「散会话」，同一件事两处不一致。以项目页为准。
     const owned = new Set([...(p.top || []), ...(p.needs || [])].map((x) => x.name))
     for (const s of o.sessions) {
-      if (placed.has(s.name) || !owned.has(s.name) || isInfraSession(s.name)) continue
+      const assigned = o.placement?.[s.name]?.key
+      if (placed.has(s.name) || (assigned ? assigned !== p.key : !owned.has(s.name)) || isInfraSession(s.name)) continue
       placed.add(s.name)
       const hit = tasks.find((x) => x.path.replace(/\/+$/, '') === root)
       if (hit) {
