@@ -1,4 +1,5 @@
 import json
+import shlex
 
 import pytest
 from test_browser_driver import BrowserFixture, BrowserModel, native_browser
@@ -78,7 +79,7 @@ async def test_research_public_commands_share_worker_admission(store):
     runtime = Runtime(store, ConversationModel(), settings=Settings(browser={"enabled": True}))
     help_result = await runtime.tools.invoke(bash("chrome", "help"), "research", {})
     assert help_result["name"] == "roami chrome"
-    assert any(command["argv"][2] == "click" for command in help_result["commands"])
+    assert any(shlex.split(command["command"])[2] == "click" for command in help_result["commands"])
     assert help_result == await runtime.tools.invoke(bash("chrome", "help"), "worker", {})
     for argv in [
         ("chrome", "click", "#buy", "--observation", "scene"),

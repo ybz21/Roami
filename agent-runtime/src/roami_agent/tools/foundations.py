@@ -39,6 +39,15 @@ WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 
 
+def command_strings(entry):
+    entry = deepcopy(entry)
+    if entry.get("argv"):
+        entry["command"] = shlex.join(entry.pop("argv"))
+    if "commands" in entry:
+        entry["commands"] = [command_strings(item) for item in entry["commands"]]
+    return entry
+
+
 class ToolDirectory:
     def __init__(self, registry, settings):
         self.registry, self.settings = registry, settings
@@ -308,7 +317,7 @@ class ToolDirectory:
             raise DomainError("TOOL_UNAVAILABLE")
 
         async def help_command(args, binding):
-            return entries[0]
+            return command_strings(entries[0])
 
         return Tool(
             "command_help",
@@ -452,14 +461,9 @@ def register_foundations(registry, settings):
             args.get("offset", 0),
         )
         result["availability"] = await registry.registry["capability_overview"].handler({}, binding)
-        for item in result["items"]:
-            if item.get("source") != "builtin" or item.get("kind") != "cli":
-                continue
-            if item.get("argv"):
-                item["command"] = shlex.join(item.pop("argv"))
-            for command in item.get("commands", []):
-                if command.get("argv"):
-                    command["command"] = shlex.join(command.pop("argv"))
+        for field in ("items", "suggestions"):
+            if field in result:
+                result[field] = [command_strings(item) for item in result[field]]
         return result
 
     async def bash(args, binding):
@@ -504,7 +508,7 @@ def register_foundations(registry, settings):
         Tool(
             "tool_list",
             "Discover extra Skills, MCP and CLI capabilities; built-in tools are already supplied. "
-            "Filter by name/intent/category and paginate. Returns skill:// paths or exact bash argv and schemas. "
+            "Filter by name/intent/category and paginate. Returns skill:// paths or exact bash command strings and schemas. "
             "Known operations can run directly. This is a local capability directory, not web results or service pricing.",
             object_schema(
                 {

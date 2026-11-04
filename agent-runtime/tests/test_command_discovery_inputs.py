@@ -1,0 +1,75 @@
+"""Discovery and help expose the command strings accepted by bash."""
+
+import json
+import shlex
+
+import pytest
+from test_foundations import call
+from test_runtime import ConversationModel
+
+from roami_agent.app import Runtime
+from roami_agent.protocol.tools import Tool, object_schema
+
+
+@pytest.mark.parametrize("role", ["main", "worker"])
+@pytest.mark.parametrize("prefix,kind", [("mcp", "mcp"), ("cli", "cli"), ("http", "tool")])
+async def test_external_command_discovery_round_trips_without_shell_expansion(
+    store, role, prefix, kind
+):
+    runtime, received = Runtime(store, ConversationModel()), []
+    name = prefix + "_fixture_lookup"
+
+    async def lookup(args, binding):
+        received.append((args, binding["role"]))
+        return args
+
+    runtime.tools.add(
+        Tool(
+            name,
+            "Fixture lookup",
+            object_schema({"query": {"type": "string"}}, ["query"]),
+            lookup,
+            main=True,
+            source="external",
+        )
+    )
+    try:
+        result = await runtime.tools.invoke(
+            call("tool_list", {"query": name, "kind": kind}), role, {}
+        )
+        (entry,) = result["items"]
+        assert "command" in entry and "argv" not in entry
+        argv = shlex.split(entry["command"])
+        assert argv == ["roami", "agent", "capability", "call", name, "--input", "JSON"]
+        payload = {"query": "中文 spaces ' quotes $(must-not-execute) ; &"}
+        argv[-1] = json.dumps(payload)
+        actual = await runtime.tools.invoke(call("bash", {"command": shlex.join(argv)}), role, {})
+        assert actual == payload and received == [(payload, role)]
+        if kind != "cli":
+            alternative = await runtime.tools.invoke(
+                call("tool_list", {"query": name, "kind": "cli"}), role, {}
+            )
+            assert not alternative["items"]
+            assert alternative["suggestions"][0]["command"] == entry["command"]
+            assert "argv" not in alternative["suggestions"][0]
+    finally:
+        await runtime.close()
+
+
+async def test_help_uses_compact_commands_without_mutating_internal_directory(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        for role in ("main", "worker"):
+            help_view = await runtime.tools.invoke(
+                call("bash", {"command": "roami help"}), role, {}
+            )
+            assert help_view["command"] == "roami help" and "argv" not in help_view
+            assert help_view["commands"]
+            assert all(
+                "command" in entry and "argv" not in entry for entry in help_view["commands"]
+            )
+            internal = runtime.tools.directory.command_entries(role)[0]
+            assert internal["argv"] == ["roami", "help"]
+            assert all("argv" in entry and "command" not in entry for entry in internal["commands"])
+    finally:
+        await runtime.close()

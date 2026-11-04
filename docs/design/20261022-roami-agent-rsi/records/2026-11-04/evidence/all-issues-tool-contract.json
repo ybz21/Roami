@@ -1,0 +1,16 @@
+{
+  "main_tool_count": 11,
+  "main_has_builtin_browser_or_desktop": false,
+  "help_command": "roami help",
+  "help_commands_use_strings": true,
+  "rejected": {
+    "tool": "bash",
+    "attempted_arguments": {
+      "command": "roami task_status --input '{}'"
+    },
+    "error": "USE_REGISTERED_CLI_CAPABILITY",
+    "failurePhase": "command_admission",
+    "executionStarted": false
+  },
+  "external_model_calls": 0
+}

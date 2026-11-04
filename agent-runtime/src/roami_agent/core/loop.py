@@ -301,6 +301,7 @@ class AgentLoop:
                             in {
                                 "INVALID_TOOL_ARGUMENTS",
                                 "INVALID_CLI_ARGUMENTS",
+                                "USE_REGISTERED_CLI_CAPABILITY",
                                 "TOOL_UNAVAILABLE",
                                 "TOOL_DISABLED",
                                 "REPLY_BOILERPLATE",

@@ -1,0 +1,42 @@
+full
+exitCode=0
+==> CLI entry audit
+==> Shell syntax
+==> Go formatting
+==> Go tests
+==> Python Agent runtime
+3318 passed, 48 skipped in 1168.58s (0:19:28)
+==> Frontend checks
+==> Frontend build
+==> Secret scan
+==> Staged file policy
+==> Quality gate passed
+
+pre-commit quick
+exitCode=0
+==> CLI entry audit
+==> Shell syntax
+==> Go formatting
+==> Go tests
+==> Python Agent runtime
+3318 passed, 48 skipped in 1167.31s (0:19:27)
+==> Frontend checks
+==> Secret scan
+==> Staged file policy
+==> Quality gate passed
+[fix/rsi-remaining-issues-20261104 ea2ffc08] fix(agent): 统一命令发现并保留工具拒绝证据
+
+final targeted controls
+25 passed in 12.11s
+
+baseline modules: expected regression failures
+13 failed in 4.45s
+
+baseline loop only: expected guard failure and valid repair control
+1 failed, 1 passed, 4 deselected in 1.49s
+
+execution limits/process controls
+30 passed in 8.98s
+
+recovery/reconciliation/routing controls
+86 passed in 21.40s

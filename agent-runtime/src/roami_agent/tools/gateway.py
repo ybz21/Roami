@@ -1,6 +1,7 @@
 """Validated tool execution with durable receipts, progress and unknown outcomes."""
 
 import asyncio
+import json
 import math
 import time
 from pathlib import PurePath
@@ -69,10 +70,20 @@ class ToolGateway:
         return await self.invoke(turn, mid, call, role, binding, rejection=error)
 
     async def invoke(self, turn, mid, call, role, binding, *, rejection=None):
+        validation_error = None
         try:
             tool, args = self.tools.validate(call, role)
-        except (DomainError, KeyError, TypeError):
-            tool, args = None, {}
+        except (DomainError, KeyError, TypeError) as exc:
+            validation_error = (
+                exc if isinstance(exc, DomainError) else DomainError("INVALID_TOOL_ARGUMENTS")
+            )
+            tool = None
+            try:
+                attempted = json.loads(call["function"]["arguments"])
+            except (ValueError, KeyError, TypeError):
+                attempted = None
+            # Keep rejected inputs as evidence, never as executable normalized arguments.
+            args = attempted if isinstance(attempted, dict) else {}
         tool_id = identity()
         operation_name = tool.name if tool else call["function"]["name"]
 
@@ -99,6 +110,8 @@ class ToolGateway:
         try:
             if rejection:
                 raise DomainError(rejection, 409)
+            if validation_error:
+                raise validation_error
             if binding.get("finalizing"):
                 raise DomainError("TOOL_FINALIZING_READ_ONLY", 409)
             if role == "main" and tool and tool.effect == "write":
@@ -111,8 +124,6 @@ class ToolGateway:
                     )
                 )
                 if callback:
-                    import json
-
                     completion = json.loads(callback["payload_json"]).get("completion", {})
                     final_handoff = operation_name in {
                         "delegate",
@@ -212,6 +223,11 @@ class ToolGateway:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
             if tool is None:
                 value["executionStarted"] = False
+            if rejection or validation_error:
+                value["executionStarted"] = False
+                value["failurePhase"] = "batch" if rejection else "validation"
+            if value["error"] == "USE_REGISTERED_CLI_CAPABILITY":
+                value.update(executionStarted=False, failurePhase="command_admission")
             if isinstance(exc, WorkspaceImageReadError):
                 value["fileImage"] = {"path": exc.path, "unavailable": exc.code}
             if value["error"] in {
@@ -332,7 +348,11 @@ class ToolGateway:
                     "This call was rejected before execution because the capability is disabled. "
                     "Do not repeat it or bypass the disabled capability; report the limitation."
                 )
-            elif tool is None and value["error"] in {"TOOL_UNAVAILABLE", "INVALID_CLI_ARGUMENTS"}:
+            elif (
+                tool is None
+                and value["error"] in {"TOOL_UNAVAILABLE", "INVALID_CLI_ARGUMENTS"}
+                or value["error"] == "USE_REGISTERED_CLI_CAPABILITY"
+            ):
                 value["recovery"] = (
                     "This call was rejected before execution. "
                     "Use tool_list to find a registered operation available in this role. "
@@ -454,8 +474,11 @@ class ToolGateway:
                 value["recovery"] = (
                     "bash requires a command string. Example: "
                     + encoded({"command": "roami agent task status --input '{}'"})
-                    + ". Use task_status directly for task queries. "
-                    "These calls need no shell workspace. Repair the same intended operation and preserve task identity; do not replace task_status/task_steer with similarly named session discovery. Do not ask the user to fix arguments."
+                    + ". Use tool_list or registered command-family help "
+                    "for the exact command and input schema; internal operation names are not CLI commands. "
+                    "Task queries and continuation need no shell workspace. Repair the same intended "
+                    "operation and preserve task identity; do not substitute session discovery or ask "
+                    "the user to fix internal arguments."
                 )
             if (
                 role == "main"
