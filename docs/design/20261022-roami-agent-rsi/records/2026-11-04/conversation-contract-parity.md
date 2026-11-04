@@ -71,7 +71,7 @@ Main 不新增工具。原题、输出要求、类型、验收阈值、节点模
 
 ### 工程质量门
 
-最终源码的 `scripts/dev/quality/check.sh full` 通过：Python **3304 passed / 48 skipped**，Go、CLI 审计、格式、前端 i18n/hover/typecheck/build、秘密扫描和暂存文件检查通过。48 项环境跳过不当成通过。提交钩子仍执行同一仓库的 quick；最终提交结果见 PR 与[检查记录](evidence/checks.txt)。
+最终源码的 `scripts/dev/quality/check.sh full` 通过：Python **3304 passed / 48 skipped**，Go、CLI 审计、格式、前端 i18n/hover/typecheck/build、秘密扫描和暂存文件检查通过。48 项环境跳过不当成通过。提交钩子的 quick 同样通过，Python 3304 passed / 48 skipped；完整回执见[检查记录](evidence/checks.txt)。
 
 [源码哈希核对](evidence/accepted-runtime-source.json)确认交付的五份运行时代码/脚本与最后实模运行一致；Main 不增加常驻工具。原始完整日志保留在工作区，公开记录不包含模型提示、节点配置或凭据。
 

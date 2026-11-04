@@ -12,4 +12,7 @@ Legacy source control: b240588e8934f857b307c66e14024f0e4cc780b1
 New same-source task-title test: expected failure (KeyError: title); existing single-task test passed
 1 failed, 1 passed in 1.73s
 
-Quick: enforced by the commit hook; final receipt is recorded in the PR.
+Command: commit hook scripts/dev/quality/check.sh quick
+Python: 3304 passed, 48 skipped in 785.96s (0:13:05)
+Go, CLI audit, formatting, frontend i18n/hover/typecheck, secret scan and staged file policy: passed
+Quick/commit log SHA256: d6e3b3d22e68ebd03756da5d4253ee668de78157e8d26f2c4a76f5ab2b2f589a
