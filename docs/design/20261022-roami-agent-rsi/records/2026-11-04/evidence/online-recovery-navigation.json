@@ -67,7 +67,18 @@
         }
       ]
     },
-    "full_quality_gate": "running on byte-matched isolated source tree"
+    "full_quality_gate": {
+      "exit": 0,
+      "python_passed": 3432,
+      "python_skipped": 48,
+      "source_manifest_sha256": "55f205c3ac0a5e9aa12fd580a38cc100ab1730fcd1f6f130e004a08cbc4df1c1"
+    },
+    "pre_commit_quick_gate": {
+      "exit": 0,
+      "python_passed": 3432,
+      "python_skipped": 48,
+      "commit": "9df2b700"
+    }
   },
   "full_issue_acceptance": false
 }
