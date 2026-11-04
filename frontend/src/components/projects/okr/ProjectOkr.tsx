@@ -16,6 +16,7 @@ import OkrDashboard from './OkrDashboard'
 import OkrInitiatives from './OkrInitiatives'
 import OkrCurrentStatus from './OkrCurrentStatus'
 import OkrTeamMemory from './OkrTeamMemory'
+import { useOkrView } from './okr-view'
 import { lazyRetry } from '../../lazy-retry'
 import './project-okr.css'
 import './okr-dashboard.css'
@@ -35,8 +36,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const [loaded, setLoaded] = useState(false)
   const [draft, setDraft] = useState<Configuration>(emptyConfiguration)
   const [editing, setEditing] = useState(false)
-  const [panel, setPanel] = useState('overview')
-  const [mainPanel, setMainPanel] = useState('board')
+  const { panel, setPanel, mainPanel, setMainPanel } = useOkrView(projectId)
   const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number }>()
   const [chatting, setChatting] = useState(false)
   const [incoming, setIncoming] = useState<Workspace | null>(null)

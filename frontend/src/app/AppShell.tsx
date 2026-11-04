@@ -75,8 +75,8 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const { claudeMap, codexMap, mobileWaiting } = runtime
   const inspector = useTabInspector(workspace, data.sessIds)
   const { panel, pickPanel, toggleInspector, searchNonce } = inspector
-  const pageTabsState = usePageTabs(tab, terms, go)
-  const { setTabBarHost } = pageTabsState
+  const pageTabsState = usePageTabs(routing.route, terms, go, curNodeId)
+  const { setTabBarHost, selectPage } = pageTabsState
   const { online, offline, roamVersion, isFs, fsSupported, toggleFs } = useBrowserEnvironment()
   const canvasRef = useCanvasScroll(hasSider, space.mode)
   const [mobileSearchNonce, setMobileSearchNonce] = useState(0)
@@ -117,7 +117,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const paletteItems: PaletteItem[] = [
     ...NAV.map((n) => ({
       key: `page:${n.key}`, group: t('workspace.groupPages'), title: t(n.labelKey),
-      keywords: n.key, icon: ICONS[n.key], run: () => go(n.key),
+      keywords: n.key, icon: ICONS[n.key], run: () => selectPage(n.key),
     })),
     ...terms.map((name) => ({
       key: `term:${name}`, group: t('workspace.groupSessions'),
@@ -196,7 +196,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
             collapsed={navRail}
             style={{ position: 'sticky', top: 0, height: '100%', background: 'var(--bg-base)', borderRight: '1px solid var(--border-subtle)' }}>
             <Navigation
-              rail={navRail} active={tab === 'projects' && routing.projectView === 'okr' ? 'okr' : tab} groups={navGroups} onGo={go}
+              rail={navRail} active={tab === 'projects' && routing.projectView === 'okr' ? 'okr' : tab} groups={navGroups} onGo={selectPage}
               settings={{ key: 'settings', label: t('nav.env'), icon: ICONS.settings }}
               nodeMenu={nodeItems}
               onSearch={openPalette}
@@ -268,7 +268,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
           )
         })()}
 
-        {isMobile && <MobileBottomBar tab={tab} route={routing.route} go={go} offline={offline} />}
+        {isMobile && <MobileBottomBar tab={tab} route={routing.route} go={selectPage} offline={offline} />}
 
         <AgentNotifications node={curNodeId} open={agentInboxOpen} close={() => setAgentInboxOpen(false)} inbox={agentInbox} select={selectAgent} />
         <GlobalSearch items={paletteItems} actions={paletteActions} dir={activeProject?.worktree || activeProject?.dir} />
