@@ -366,3 +366,14 @@ it.each([
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe(nodes)
 })
+
+
+it('routes the visible group to Main when a remembered member no longer has a task', async () => {
+  localStorage.setItem('roami.swarm.draft:/agent/swarms/sw-one', JSON.stringify({ draft: 'Keep this request', scope: 'gone', recipient: 'gone' }))
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect((screen.getByLabelText('swarm.chat.conversations') as HTMLSelectElement).value).toBe('group')
+  fireEvent.click(screen.getByRole('button', { name: 'common.send' }))
+  await waitFor(() => expect(test.api).toHaveBeenCalledOnce())
+  expect(test.api.mock.calls[0][2]).toMatchObject({ text: 'Keep this request' })
+  expect(test.api.mock.calls[0][2]).not.toHaveProperty('workId')
+})

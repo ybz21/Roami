@@ -104,22 +104,22 @@ function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSessi
   const latestSessions = useRef(sessions); latestSessions.current = sessions
   const storageKey = 'roami.swarm.draft:' + nodeApi('/agent/swarms/' + data.id)
   const [saved] = useState(() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}') } catch { return {} } })
-  const [scope, setScope] = useState<string>(saved.scope || 'group'), [opening, setOpening] = useState(false)
+  const [scope, setScope] = useState<string>(saved.scope || saved.recipient || 'group'), [opening, setOpening] = useState(false)
   const alive = useRef(true), openingRef = useRef(false), latestScope = useRef(scope); latestScope.current = scope
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  const [draft, setDraft] = useState<string>(saved.draft || ''), [recipient, setRecipient] = useState<string>(saved.recipient || 'main'), [sending, setSending] = useState(false)
+  const [draft, setDraft] = useState<string>(saved.draft || ''), [sending, setSending] = useState(false)
   const sendKey = useRef<{ key: string; payload: string; body?: { text: string; workId?: string; taskRevision?: number | null } }>(saved.pending || { key: crypto.randomUUID(), payload: '' })
-  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify({ draft, recipient, scope, pending: sendKey.current })) }, [draft, recipient, scope, sending, storageKey])
+  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify({ draft, scope, pending: sendKey.current })) }, [draft, scope, sending, storageKey])
   const editDraft = (text: string) => {
     setDraft(text)
     const mention = /^\s*@([^\s]+)(?:\s+|$)/.exec(text)?.[1]
     const id = ['leader', 'main'].includes(mention?.toLowerCase() || '') ? 'main' : data.work.find(item => item.task_id && item.member_name === mention)?.id
-    if (id) { setRecipient(id); setScope(id); onSelect(id) }
+    if (id) { setScope(id); onSelect(id) }
   }
   const chooseRecipient = (id: string) => {
     const member = data.work.find(item => item.id === id && item.task_id)
     if (id !== 'main' && !member) return
-    setRecipient(id); setScope(id); onSelect(id)
+    setScope(id); onSelect(id)
     setDraft(text => text.replace(/^(\s*)@[^\s]+(?=\s|$)/, (_match, space: string) => space + '@' + (id === 'main' ? 'leader' : member!.member_name)))
   }
   useEffect(() => {
@@ -170,6 +170,7 @@ function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSessi
   const send = async () => {
     if (!draft.trim() || sending) return
     const mention = /^\s*@([^\s]+)(?:\s+|$)/.exec(draft)?.[1]
+    const recipient = thread === 'group' ? 'main' : thread
     const destination = mention?.toLowerCase() === 'leader' || mention?.toLowerCase() === 'main' ? 'main' : mention ? data.work.find(item => item.member_name === mention)?.id ?? recipient : recipient
     const work = data.work.find(item => item.id === destination)
     if (destination !== 'main' && (!work?.task_id || !work.revision)) { message.error(t('swarm.managed.sendFailed')); return }
@@ -188,5 +189,5 @@ function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSessi
     <div className="swarm-chat-log" ref={chatLog} onScroll={event => { const pane = event.currentTarget; followLatest.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight < pane.clientHeight * .1 }} role="log" aria-label={t('swarm.managed.messages')}>
     {!visibleMessages.length && <p className="swarm-note">{t('swarm.managed.chatEmpty')}</p>}
     {visibleMessages.map(item => <article className="swarm-chat-message" key={item.id} data-selected={item.work?.id === selected}><header><button type="button" className="tt-act" onClick={() => chooseRecipient(item.work?.id || 'main')}>{item.author}</button>{item.time > 0 && <time>{new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(item.time)}</time>}</header>{item.pending && <span className="swarm-note">{t('swarm.managed.deliveryPending')}</span>}{item.id.startsWith('result:') && item.text === 'SESSION_TARGET_NOT_FOUND' && <p role="status">{t('swarm.chat.sessionMissing')}</p>}{item.id.startsWith('result:') ? <details><summary>{t('swarm.managed.report')}</summary><Markdown>{item.text}</Markdown></details> : <Markdown>{item.text}</Markdown>}{item.work && <div className="swarm-chat-task-actions"><State state={item.work.state} /><button type="button" className="tt-act" onClick={() => onWork(item.work!)}>{t('swarm.managed.openTask')}</button><button type="button" className="tt-act" onClick={() => { chooseRecipient(item.work!.id); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{t('swarm.managed.replyMember')}</button></div>}</article>)}
-  </div><div className="tt-composer swarm-chat-composer"><Input.TextArea variant="borderless" aria-label={t('swarm.managed.messages')} value={draft} onChange={e => editDraft(e.target.value)} rows={3} disabled={data.archived || sending} placeholder={t('swarm.managed.chatPlaceholder')} />{/^\s*@[^\s]*$/.test(draft) && <div className="swarm-detail-actions">{[{ name: 'leader', id: 'main' }, ...data.work.filter(item => item.task_id).map(item => ({ name: item.member_name, id: item.id }))].filter(item => item.name.toLowerCase().startsWith(draft.trim().slice(1).toLowerCase())).map(item => <button type="button" key={item.id} className="tt-act" onClick={() => { setRecipient(item.id); setDraft('@' + item.name + ' '); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{'@' + item.name}</button>)}</div>}<div className="tt-cbar"><div className="tt-cend"><button type="button" className="tt-send" aria-label={t('common.send')} disabled={sending || data.archived || !draft.trim()} onClick={() => void send()}>{sending ? <Spin size="small" /> : <ArrowUp size={18} />}</button></div></div></div></section>
+  </div><div className="tt-composer swarm-chat-composer"><Input.TextArea variant="borderless" aria-label={t('swarm.managed.messages')} value={draft} onChange={e => editDraft(e.target.value)} rows={3} disabled={data.archived || sending} placeholder={t('swarm.managed.chatPlaceholder')} />{/^\s*@[^\s]*$/.test(draft) && <div className="swarm-detail-actions">{[{ name: 'leader', id: 'main' }, ...data.work.filter(item => item.task_id).map(item => ({ name: item.member_name, id: item.id }))].filter(item => item.name.toLowerCase().startsWith(draft.trim().slice(1).toLowerCase())).map(item => <button type="button" key={item.id} className="tt-act" onClick={() => { setScope(item.id); onSelect(item.id); setDraft('@' + item.name + ' '); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{'@' + item.name}</button>)}</div>}<div className="tt-cbar"><div className="tt-cend"><button type="button" className="tt-send" aria-label={t('common.send')} disabled={sending || data.archived || !draft.trim()} onClick={() => void send()}>{sending ? <Spin size="small" /> : <ArrowUp size={18} />}</button></div></div></div></section>
 }
